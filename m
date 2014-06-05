@@ -1,21 +1,21 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  5 Jun 2014 10:53:06 +0100
-Subject: [RFC v3 1/9] arm: fiq: arbitrary mappings from IRQ to FIQ virqs
+Date: Thu,  5 Jun 2014 10:53:07 +0100
+Subject: [RFC v3 2/9] arm: fiq: Allow EOI to be communicated to the intc
 In-Reply-To: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
  <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401961994-18033-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
-virq into a FIQ virq. This is too inflexible for multi-platform kernels
-and makes runtime error checking impossible.
+Modern ARM systems require an EOI to be sent to the interrupt controller
+on completion of both IRQ and FIQ. The FIQ code currently does not provide
+any API to perform this. This patch provides this API, implemented by
+hooking into main irq driver in a similar way to the existing
+enable_fiq()/disable_fiq().
 
-We solve this by introducing a flexible mapping that allows interrupt
-controllers that support FIQ to register those mappings. This, in turn,
-makes it much possible for drivers in DT kernels to gain access to
-FIQ virqs.
+All existing in-kernel callers of init_FIQ() and fiq_add_mapping() have
+been reviewed to check they meet the documented restriction.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
@@ -23,131 +23,74 @@ Cc: Fabio Estevam <festevam@gmail.com>
 Cc: Nicolas Pitre <nico@linaro.org>
 ---
  arch/arm/include/asm/fiq.h |  2 ++
- arch/arm/kernel/fiq.c      | 57 +++++++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 53 insertions(+), 6 deletions(-)
+ arch/arm/kernel/fiq.c      | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
 
 diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
-index d493d0b..75d98c6 100644
+index 75d98c6..10d22eb 100644
 --- a/arch/arm/include/asm/fiq.h
 +++ b/arch/arm/include/asm/fiq.h
-@@ -36,8 +36,10 @@ struct fiq_handler {
- extern int claim_fiq(struct fiq_handler *f);
- extern void release_fiq(struct fiq_handler *f);
- extern void set_fiq_handler(void *start, unsigned int length);
-+extern struct irq_data *lookup_fiq_irq_data(int fiq);
+@@ -39,6 +39,8 @@ extern void set_fiq_handler(void *start, unsigned int length);
+ extern struct irq_data *lookup_fiq_irq_data(int fiq);
  extern void enable_fiq(int fiq);
  extern void disable_fiq(int fiq);
-+extern void fiq_add_mapping(int irq, int fiq_virq, unsigned int length);
++extern void eoi_fiq_with_irq_data(struct irq_data *d);
++extern void eoi_fiq(int fiq);
+ extern void fiq_add_mapping(int irq, int fiq_virq, unsigned int length);
  
  /* helpers defined in fiqasm.S: */
- extern void __set_fiq_regs(unsigned long const *regs);
 diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 918875d..177939c 100644
+index 177939c..ed01162 100644
 --- a/arch/arm/kernel/fiq.c
 +++ b/arch/arm/kernel/fiq.c
-@@ -40,6 +40,8 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/seq_file.h>
-+#include <linux/irq.h>
-+#include <linux/radix-tree.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
-@@ -53,6 +55,9 @@
- 	})
- 
- static unsigned long no_fiq_insn;
-+static int fiq_start = -1;
-+static RADIX_TREE(fiq_virq_tree, GFP_KERNEL);
-+static DEFINE_MUTEX(fiq_virq_mutex);
- 
- /* Default reacquire function
-  * - we always relinquish FIQ control
-@@ -60,8 +65,11 @@ static unsigned long no_fiq_insn;
-  */
- static int fiq_def_op(void *ref, int relinquish)
- {
--	if (!relinquish)
-+	if (!relinquish) {
-+		unsigned offset = FIQ_OFFSET;
-+		no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
- 		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
-+	}
- 
- 	return 0;
- }
-@@ -127,16 +135,33 @@ void release_fiq(struct fiq_handler *f)
- 	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
+@@ -164,6 +164,25 @@ void disable_fiq(int fiq)
+ 	disable_irq(d->irq);
  }
  
--static int fiq_start;
-+struct irq_data *lookup_fiq_irq_data(int fiq)
++/* This call ends a FIQ and does not perform radix tree lookups. Use this
++ * if the FIQ interrupt rate is expected to be extremely high.
++ */
++void eoi_fiq_with_irq_data(struct irq_data *irq_data)
 +{
-+	struct irq_data *d;
-+
-+	if (fiq_start != -1)
-+		return irq_get_irq_data(fiq + fiq_start);
-+
-+	rcu_read_lock();
-+	d = radix_tree_lookup(&fiq_virq_tree, fiq);
-+	rcu_read_unlock();
-+	return d;
++	struct irq_chip *chip = irq_data_get_irq_chip(irq_data);
++	if (chip->irq_eoi)
++		chip->irq_eoi(irq_data);
 +}
- 
- void enable_fiq(int fiq)
- {
--	enable_irq(fiq + fiq_start);
++EXPORT_SYMBOL(eoi_fiq_with_irq_data);
++
++void eoi_fiq(int fiq)
++{
 +	struct irq_data *d = lookup_fiq_irq_data(fiq);
-+	if (WARN_ON(!d))
-+		return;
-+	enable_irq(d->irq);
- }
- 
- void disable_fiq(int fiq)
- {
--	disable_irq(fiq + fiq_start);
-+	struct irq_data *d = lookup_fiq_irq_data(fiq);
-+	if (WARN_ON(!d))
-+		return;
-+	disable_irq(d->irq);
- }
- 
++	BUG_ON(!d);
++	eoi_fiq_with_irq_data(d);
++}
++EXPORT_SYMBOL(eoi_fiq);
++
  EXPORT_SYMBOL(set_fiq_handler);
-@@ -144,12 +169,32 @@ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
  EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
- EXPORT_SYMBOL(claim_fiq);
- EXPORT_SYMBOL(release_fiq);
-+EXPORT_SYMBOL(lookup_fiq_irq_data);
- EXPORT_SYMBOL(enable_fiq);
- EXPORT_SYMBOL(disable_fiq);
+@@ -175,6 +194,9 @@ EXPORT_SYMBOL(disable_fiq);
+ 
+ /*
+  * Add a mapping between a normal IRQ and a FIQ shadow.
++ *
++ * By providing a mapping the interrupt controller is guaranteeing not
++ * to use spin locks from .irq_eoi
+  */
+ void fiq_add_mapping(int irq, int fiq_virq, unsigned int length)
+ {
+@@ -194,6 +216,12 @@ void fiq_add_mapping(int irq, int fiq_virq, unsigned int length)
+ 	mutex_unlock(&fiq_virq_mutex);
+ }
  
 +/*
-+ * Add a mapping between a normal IRQ and a FIQ shadow.
++ * Set the offset between normal IRQs and their FIQ shadows.
++ *
++ * By providing an offset the interrupt controller is guaranteeing not
++ * to use spin locks from .irq_eoi
 + */
-+void fiq_add_mapping(int irq, int fiq_virq, unsigned int length)
-+{
-+	int i;
-+
-+	/* fiq_add_mapping can't be mixed with init_FIQ */
-+	BUG_ON(fiq_start != -1);
-+
-+	mutex_lock(&fiq_virq_mutex);
-+	for (i = 0; i < length; i++) {
-+		int err = radix_tree_insert(&fiq_virq_tree, irq + i,
-+					    irq_get_irq_data(fiq_virq + i));
-+		if (err)
-+			pr_err("fiq: Cannot map %d to %d\n", irq + i,
-+			       fiq_virq + i);
-+	}
-+	mutex_unlock(&fiq_virq_mutex);
-+}
-+
  void __init init_FIQ(int start)
  {
--	unsigned offset = FIQ_OFFSET;
--	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
  	fiq_start = start;
- }
 -- 
 1.9.0
