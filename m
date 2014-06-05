@@ -1,53 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Jun 2014 16:21:40 +0100
-Subject: [PATCH RFC v1 0/2] Add support for Hisilicon SMMU architecture
-In-Reply-To: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20140605152140.GA31564@leverpostej>
+From: Ranjani.Vaidyanathan@freescale.com (Ranjani.Vaidyanathan at freescale.com)
+Date: Thu, 5 Jun 2014 16:26:26 +0000
+Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <538F5C26.1000505@gmail.com>
+References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
+ <538F4B43.6070804@gmail.com>
+ <5f0cb6161f5146cbbc778149015249ce@BY2PR03MB379.namprd03.prod.outlook.com>
+ <538F5C26.1000505@gmail.com>
+Message-ID: <86ba99b9d58e4235a7a131639c2a0694@BY2PR03MB379.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 02:37:08PM +0100, Zhen Lei wrote:
-> This driver is base on arm_smmu.c, beause of hisilicon smmu-v1 is similar to
-> arm-smmu, some code can be direct reused. for example: map and unmap, device
-> tree configuration, and the software framework. Somebody may doubted: why not
-> strip the share code in one file, and put hardware-dependent part into other
-> files? Yeah, it's right. But now, in order to make the code flow clearly, just
-> put all hisilicon smmu driver code in hisi_smmu.c.If this driver is acceptable,
-> I will update and submit a revised verion.
+Hi Dirk,
 
-This does not make the code flow clearer. If anything this makes it
-harder to review the series, because it's not clear what the delta from
-the existing ARM SMMU driver is.
+Response below.
 
-No-one is going to be happy merging a redundant copy of (portions of)
-the existing ARM SMMU driver. Whatever gets merged will look very
-different due to the refactoring required to remedy that, so there's
-almost no point reviewing this in any depth until that's sorted out.
+Ranjani
 
-Mark.
+-----Original Message-----
+From: Dirk Behme [mailto:dirk.behme at gmail.com] 
+Sent: Wednesday, June 04, 2014 12:49 PM
+To: Vaidyanathan Ranjani-RA5478; Estevam Fabio-R49496
+Cc: Fabio Estevam; Guo Shawn-R65073; christian.gmeiner at gmail.com; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
 
-> 
-> Zhen Lei (2):
->   documentation/iommu: Add description of Hisilicon System MMU binding
->   iommu/hisilicon: Add support for Hisilicon Ltd. System MMU
->     architecture
-> 
->  .../devicetree/bindings/iommu/hisilicon,smmu.txt   |   70 +
->  drivers/iommu/Kconfig                              |   11 +
->  drivers/iommu/Makefile                             |    1 +
->  drivers/iommu/hisi-smmu.c                          | 1686 ++++++++++++++++++++
->  4 files changed, 1768 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/hisilicon,smmu.txt
->  create mode 100644 drivers/iommu/hisi-smmu.c
-> 
-> --
-> 1.8.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
+On 04.06.2014 19:29, Ranjani.Vaidyanathan at freescale.com wrote:
+> Hi Dirk,
+>
+> Responses below.
+>
+> Thanks,
+> Ranjani
+>
+> -----Original Message-----
+> From: Dirk Behme [mailto:dirk.behme at gmail.com]
+> Sent: Wednesday, June 04, 2014 11:37 AM
+> To: Vaidyanathan Ranjani-RA5478; Estevam Fabio-R49496
+> Cc: Fabio Estevam; Guo Shawn-R65073; christian.gmeiner at gmail.com; 
 > linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Subject: Re: [PATCH] ARM: imx6: Fix procedure to switch the parent of 
+> LDB_DI_CLK
+>
+> On 09.04.2014 13:55, Fabio Estevam wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Due to incorrect placement of the clock gate cell in the 
+>> ldb_di[x]_clk tree, the glitchy parent mux of ldb_di[x]_clk can cause 
+>> a glitch to enter the ldb_di_ipu_div divider. If the divider gets 
+>> locked up, no ldb_di[x]_clk is generated, and the LVDS display will 
+>> hang when the ipu_di_clk is sourced from ldb_di_clk.
+>>
+>> To fix the problem, both the new and current parent of the ldb_di_clk 
+>> should be disabled before the switch. This patch ensures that correct 
+>> steps are followed when ldb_di_clk parent is switched in the beginning of boot.
+>>
+>> Signed-off-by: Ranjani Vaidyanathan
+>> <Ranjani.Vaidyanathan@freescale.com>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>>    arch/arm/mach-imx/clk-imx6q.c | 125 ++++++++++++++++++++++++++++++++++++++++--
+>>    1 file changed, 121 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-imx6q.c 
+>> b/arch/arm/mach-imx/clk-imx6q.c index 20ad0d1..3ee45f4 100644
+>> --- a/arch/arm/mach-imx/clk-imx6q.c
+>> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> ....
+>> +static void disable_anatop_clocks(void __iomem *anatop_base) {
+>> +	unsigned int reg;
+>> +
+>> +	/* Make sure PFDs are disabled at boot. */
+>> +	reg = readl_relaxed(anatop_base + 0x100);
+>> +	/* Cannot disable pll2_pfd2_396M, as it is the MMDC clock in iMX6DL */
+>> +	if (cpu_is_imx6dl())
+>> +		reg |= 0x80008080;
+>> +	else
+>> +		reg |= 0x80808080;
+>
+> There are two issues with this code section:
+>
+> 1) You want to know here if pll2_pfd2_396M is used as MMDC clock. This is independent of IMX6DL. Even a Quad/Dual could use pll2_pfd2_396M as MMDC clock. You better should check what you are really looking for:
+>
+> if (MMDC clock == pll2_pfd2_396M)
+> ...
+> [RV] Yes, you are perfectly correct. We need to check MMDC parent clock.
+
+Just an additional question:
+
+Do we really need that check here? Why wouldn't it be sufficent to just do
+
+reg |= 0x00008080;
+
+?
+
+Independent if pll2_pfd2_396M is used as MMDC clock or not? Or if we are on a DualLite or Quad/Dual?
+ 
+[RV] For mx6q, if mmdc is not from pll2_pfd2_396M, I would prefer we gate it at boot. That way the clock use count is maintained. And we don't want pll2_pfd2_396M to be an always-on clock. 
+On mx6dl, there is no option, MMDC_CLK can only come from ppl2_pfd2. Since its possible that MX6Q can use pll2_pfd2, we should check the source of mmdc.
+ 
+Best regards
+
+Dirk
