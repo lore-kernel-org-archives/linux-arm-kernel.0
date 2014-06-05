@@ -1,37 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Jun 2014 11:04:16 +0100
-Subject: [PATCH 3/3] cpufreq: Enable big.LITTLE cpufreq driver on arm64
-In-Reply-To: <3610030.uyJEv7eFhP@vostro.rjw.lan>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <2437793.vfcRUkFCet@vostro.rjw.lan>
- <20140519230729.GD30457@sirena.org.uk>
- <3610030.uyJEv7eFhP@vostro.rjw.lan>
-Message-ID: <20140605100416.GB27946@arm.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 5 Jun 2014 18:19:27 +0800
+Subject: [PATCH 0/5] ARM: atmel: switch audio to CCF
+Message-ID: <1401963572-10953-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+As the sama5d3xek and at91sam9n12ek have switch to CCF, in order to
+support audio, also switch it to CCF.
 
-On Tue, May 20, 2014 at 12:36:56AM +0100, Rafael J. Wysocki wrote:
-> On Tuesday, May 20, 2014 12:07:29 AM Mark Brown wrote:
-> > 
-> > --MAH+hnPXVZWQ5cD/
-> > Content-Type: text/plain; charset=us-ascii
-> > Content-Disposition: inline
-> > 
-> > On Tue, May 20, 2014 at 01:19:03AM +0200, Rafael J. Wysocki wrote:
-> > 
-> > > I've queued this one up for 3.16, thanks!
-> > 
-> > This will fail to build without patch 1 - it uses the stubs added there.
-> 
-> OK, dropping then.
+This patch series based on next-2014-0604 tag.
 
-This patch still made it as commit 4920ab84979d (cpufreq: Enable
-big.LITTLE cpufreq driver on arm64) and fails to build on arm64. Could
-you please revert it?
+Bo Shen (5):
+  ASoC: atmel_wm8904: switch to CCF
+  ASoC: wm8904: switch to CCF
+  dt: wm8904: add device tree binding document
+  ARM: atmel: sama5d3xek: switch sound to CCF
+  ARM: atmel: at91sam9n12ek: switch sound to CCF
 
-Thanks.
+ Documentation/devicetree/bindings/sound/wm8904.txt | 32 ++++++++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts                |  2 +
+ arch/arm/boot/dts/sama5d3xmb.dtsi                  |  2 +
+ sound/soc/atmel/atmel_wm8904.c                     | 50 ----------------------
+ sound/soc/codecs/wm8904.c                          | 13 ++++++
+ 5 files changed, 49 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/wm8904.txt
 
 -- 
-Catalin
+1.8.5.2
