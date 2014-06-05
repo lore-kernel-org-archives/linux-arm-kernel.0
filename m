@@ -1,31 +1,23 @@
-From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
-Date: Thu, 05 Jun 2014 22:30:02 +0530
-Subject: [RFC PATCH 3/3] PPC, KVM,
- CMA: use general CMA reserved area management framework
-In-Reply-To: <538D9363.7020203@redhat.com>
-References: <1401757919-30018-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1401757919-30018-4-git-send-email-iamjoonsoo.kim@lge.com>
- <xa1ttx82jx1i.fsf@mina86.com> <538D9363.7020203@redhat.com>
-Message-ID: <8761kfuwa5.fsf@linux.vnet.ibm.com>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Thu, 5 Jun 2014 20:01:22 +0300
+Subject: [PATCH v7 3/5] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
+References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <5390A262.50402@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paolo Bonzini <pbonzini@redhat.com> writes:
+On 05/06/14 16:09, Peter De Schrijver wrote:
+> +       dev_info(dev,
+> +               "Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
+> +               tegra_revision_name[sku_info->revision],
+> +               sku_info->sku_id, sku_info->cpu_process_id,
+> +               sku_info->core_process_id);
 
-> Il 03/06/2014 09:02, Michal Nazarewicz ha scritto:
->> On Tue, Jun 03 2014, Joonsoo Kim wrote:
->>> Now, we have general CMA reserved area management framework,
->>> so use it for future maintainabilty. There is no functional change.
->>>
->>> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->>
->> Acked-by: Michal Nazarewicz <mina86@mina86.com>
->>
->
-> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
->
-> Aneesh, can you test this series?
+sku_info->sku_id doesn't seem to get initialized anywhere - with an 
+older revision of this set I see SKU: 0 in place of what the L4T kernel 
+prints (SKU: 0x81).
 
-Sorry for the late reply. I will test this and update here.
-
--aneesh
+-- 
+nvpublic
