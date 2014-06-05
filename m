@@ -1,59 +1,45 @@
-From: vidyas@nvidia.com (Vidya Sagar)
-Date: Fri, 6 Jun 2014 00:17:48 +0530
-Subject: [PATCH v2] ARM: fix debug prints relevant to PCI devices
-Message-ID: <1401994068-820-1-git-send-email-vidyas@nvidia.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 5 Jun 2014 11:48:32 -0700
+Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <1401467562-5585-1-git-send-email-dianders@chromium.org>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
+ <1401467562-5585-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per PCIe spec, fast back-to-back transactions feature
-is not applicable to PCIe devices. Hence, do not print
-that fast back-to-back trasactions are disabled when
-there is a PCIe device found on the bus
+Tomasz / Mike,
 
-Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
----
+On Fri, May 30, 2014 at 9:32 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
+> then you'll get a hang on boot.  Here's why:
+>
+> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
+>    enable its clock and disable it.  This is the clock "i2c2".
+> 2. The act of disabling "i2c2" will disable its parents.  In this case
+>    the parent is "aclk66_peric".  There are no other children of
+>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
+>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
+> 3. The next time you try to earlyprintk you'll do so without the UART
+>    clock enabled.  That's because the UART clocks are also children of
+>    "aclk66_peric".  You'll hang.
+>
+> There's no good place to put a clock enable for earlyprintk, which is
+> handled by a bunch of assembly code.  The best we can do is to handle
+> this in the clock driver.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+> Changes in v2:
+> - Use GATE_A and clk_get().  Save the clock for putting later.
+> - Return 0 from exynos5420_clk_late_init().
+>
+>  drivers/clk/samsung/clk-exynos5420.c | 33 +++++++++++++++++++++++++++++++--
+>  1 file changed, 31 insertions(+), 2 deletions(-)
 
-v2:
-* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
-* replaced printk with pr_info
+Are there other changes you'd like me to make to this?  It would be
+really nice to get this in for 3.16 so the system doesn't just
+mysteriously hang when you use earlyprintk.
 
- arch/arm/kernel/bios32.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 17a26c1..d48d9d3 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- {
- 	struct pci_dev *dev;
- 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
-+	bool has_pcie_dev = 0;
- 
- 	/*
- 	 * Walk the devices on this bus, working out what we can
-@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- 	list_for_each_entry(dev, &bus->devices, bus_list) {
- 		u16 status;
- 
-+		if (!has_pcie_dev)
-+			has_pcie_dev = pci_is_pcie(dev);
- 		pci_read_config_word(dev, PCI_STATUS, &status);
- 
- 		/*
-@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- 
- 	/*
- 	 * Report what we did for this bus
-+	 * (only if the bus doesn't have even one PCIe device)
- 	 */
--	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
--		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-+	if (!has_pcie_dev)
-+		pr_info(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
-+			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
--- 
-1.8.1.5
+-Doug
