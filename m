@@ -1,415 +1,348 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  5 Jun 2014 10:53:10 +0100
-Subject: [RFC v3 5/9] irqchip: vic: Introduce shadow irqs for FIQ
+Date: Thu,  5 Jun 2014 10:53:12 +0100
+Subject: [RFC v3 7/9] ARM: Add KGDB/KDB FIQ debugger generic code
 In-Reply-To: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
  <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401961994-18033-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401961994-18033-8-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently on the ARM Versatile machine both FIQ and IRQ signals share
-the same irq number. The effect of this is that enable_fiq() will
-enable an interrupt but will leave it routed to IRQ. This requires a
-driver utilizing FIQ to employ machine specific knowledge (i.e. that
-the machine has a VIC).
+From: Anton Vorontsov <anton.vorontsov@linaro.org>
 
-By introducing shadow irqs to describe FIQs the VIC driver is able
-to update the routing automatically during enable_fiq()/disable_fiq().
+The FIQ debugger may be used to debug situations when the kernel stuck
+in uninterruptable sections, e.g. the kernel infinitely loops or
+deadlocked in an interrupt or with interrupts disabled.
 
-Changes to the vic_init() API allow individual machines to choose where
-to fit the shadow irqs in the interrupt map and also to
-choose not to have shadows at all.
+By default KGDB FIQ is disabled in runtime, but can be enabled with
+kgdb_fiq.enable=1 kernel command line option.
 
-This patch introduces shadows for mach-versatile whilst mach-ep93xx, mach-netx, mach-s3c64xx and plat-samsung retain unmodified interrupt maps.
-
+Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
+Signed-off-by: John Stultz <john.stultz@linaro.org>
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: linux-samsung-soc at vger.kernel.org
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+Cc: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/mach-ep93xx/core.c                 |   6 +-
- arch/arm/mach-netx/generic.c                |   3 +-
- arch/arm/mach-s3c64xx/common.c              |   6 +-
- arch/arm/mach-versatile/core.c              |   9 +--
- arch/arm/mach-versatile/include/mach/irqs.h |   5 +-
- arch/arm/plat-samsung/s5p-irq.c             |   3 +-
- drivers/irqchip/irq-vic.c                   | 102 +++++++++++++++++++++++-----
- include/linux/irqchip/arm-vic.h             |   8 ++-
- 8 files changed, 113 insertions(+), 29 deletions(-)
+ arch/arm/Kconfig                 |   2 +
+ arch/arm/Kconfig.debug           |  18 ++++++
+ arch/arm/include/asm/kgdb.h      |   7 +++
+ arch/arm/kernel/Makefile         |   1 +
+ arch/arm/kernel/kgdb_fiq.c       | 124 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/kgdb_fiq_entry.S |  87 +++++++++++++++++++++++++++
+ 6 files changed, 239 insertions(+)
+ create mode 100644 arch/arm/kernel/kgdb_fiq.c
+ create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 0e571f1..aa26411 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -185,8 +185,10 @@ void __init ep93xx_timer_init(void)
-  *************************************************************************/
- void __init ep93xx_init_irq(void)
- {
--	vic_init(EP93XX_VIC1_BASE, 0, EP93XX_VIC1_VALID_IRQ_MASK, 0);
--	vic_init(EP93XX_VIC2_BASE, 32, EP93XX_VIC2_VALID_IRQ_MASK, 0);
-+	vic_init(EP93XX_VIC1_BASE, 0, VIC_FIQ_START_NONE,
-+		 EP93XX_VIC1_VALID_IRQ_MASK, 0);
-+	vic_init(EP93XX_VIC2_BASE, 32, VIC_FIQ_START_NONE,
-+		 EP93XX_VIC2_VALID_IRQ_MASK, 0);
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index db3c541..419fd0a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -307,6 +307,7 @@ choice
+ config ARCH_MULTIPLATFORM
+ 	bool "Allow multiple platforms to be selected"
+ 	depends on MMU
++	select ARCH_MIGHT_HAVE_KGDB_FIQ
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_HAS_SG_CHAIN
+ 	select ARM_PATCH_PHYS_VIRT
+@@ -356,6 +357,7 @@ config ARCH_REALVIEW
  
+ config ARCH_VERSATILE
+ 	bool "ARM Ltd. Versatile family"
++	select ARCH_MIGHT_HAVE_KGDB_FIQ
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_TIMER_SP804
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 6a2bcfd..1f1bec1 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -2,6 +2,24 @@ menu "Kernel hacking"
  
-diff --git a/arch/arm/mach-netx/generic.c b/arch/arm/mach-netx/generic.c
-index db25b0c..5398dcd 100644
---- a/arch/arm/mach-netx/generic.c
-+++ b/arch/arm/mach-netx/generic.c
-@@ -169,7 +169,8 @@ void __init netx_init_irq(void)
- {
- 	int irq;
+ source "lib/Kconfig.debug"
  
--	vic_init(io_p2v(NETX_PA_VIC), NETX_IRQ_VIC_START, ~0, 0);
-+	vic_init(io_p2v(NETX_PA_VIC), NETX_IRQ_VIC_START, VIC_FIQ_START_NONE,
-+		 ~0, 0);
- 
- 	for (irq = NETX_IRQ_HIF_CHAINED(0); irq <= NETX_IRQ_HIF_LAST; irq++) {
- 		irq_set_chip_and_handler(irq, &netx_hif_chip,
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 5c45aae..b98dd48 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -242,8 +242,10 @@ void __init s3c64xx_init_irq(u32 vic0_valid, u32 vic1_valid)
- 	printk(KERN_DEBUG "%s: initialising interrupts\n", __func__);
- 
- 	/* initialise the pair of VICs */
--	vic_init(VA_VIC0, IRQ_VIC0_BASE, vic0_valid, IRQ_VIC0_RESUME);
--	vic_init(VA_VIC1, IRQ_VIC1_BASE, vic1_valid, IRQ_VIC1_RESUME);
-+	vic_init(VA_VIC0, IRQ_VIC0_BASE, VIC_FIQ_START_NONE, vic0_valid,
-+		 IRQ_VIC0_RESUME);
-+	vic_init(VA_VIC1, IRQ_VIC1_BASE, VIC_FIQ_START_NONE, vic1_valid,
-+		 IRQ_VIC1_RESUME);
- }
- 
- #define eint_offset(irq)	((irq) - IRQ_EINT(0))
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index f2c89fb..3444ca8 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -108,7 +108,8 @@ void __init versatile_init_irq(void)
- 
- 	np = of_find_matching_node_by_address(NULL, vic_of_match,
- 					      VERSATILE_VIC_BASE);
--	__vic_init(VA_VIC_BASE, 0, IRQ_VIC_START, ~0, 0, np);
-+	__vic_init(VA_VIC_BASE, 0, IRQ_VIC_START,
-+		   np ? -1 : FIQ_VIC_START, ~0, 0, np);
- 
- 	writel(~0, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
- 
-@@ -614,9 +615,9 @@ static struct pl022_ssp_controller ssp0_plat_data = {
-  * These devices are connected via the DMA APB bridge
-  */
- #define SCI_IRQ		{ IRQ_SCIINT }
--#define UART0_IRQ	{ IRQ_UARTINT0 }
--#define UART1_IRQ	{ IRQ_UARTINT1 }
--#define UART2_IRQ	{ IRQ_UARTINT2 }
-+#define UART0_IRQ	{ IRQ_UARTINT0, FIQ_UARTINT0 }
-+#define UART1_IRQ	{ IRQ_UARTINT1, FIQ_UARTINT1 }
-+#define UART2_IRQ	{ IRQ_UARTINT2, FIQ_UARTINT2 }
- #define SSP_IRQ		{ IRQ_SSPINT }
- 
- /* FPGA Primecells */
-diff --git a/arch/arm/mach-versatile/include/mach/irqs.h b/arch/arm/mach-versatile/include/mach/irqs.h
-index 0fd771c..68171d9 100644
---- a/arch/arm/mach-versatile/include/mach/irqs.h
-+++ b/arch/arm/mach-versatile/include/mach/irqs.h
-@@ -131,4 +131,7 @@
- #define IRQ_GPIO3_START		(IRQ_GPIO2_END + 1)
- #define IRQ_GPIO3_END		(IRQ_GPIO3_START + 31)
- 
--#define NR_IRQS			(IRQ_GPIO3_END + 1)
-+#define FIQ_VIC_START		(IRQ_GPIO3_END + 1)
-+#define FIQ_VIC_END		(FIQ_VIC_START + (IRQ_VIC_END - IRQ_VIC_START))
++config ARCH_MIGHT_HAVE_KGDB_FIQ
++	bool
 +
-+#define NR_IRQS			(FIQ_VIC_END + 1)
-diff --git a/arch/arm/plat-samsung/s5p-irq.c b/arch/arm/plat-samsung/s5p-irq.c
-index ddfaca9..ddb1138 100644
---- a/arch/arm/plat-samsung/s5p-irq.c
-+++ b/arch/arm/plat-samsung/s5p-irq.c
-@@ -26,6 +26,7 @@ void __init s5p_init_irq(u32 *vic, u32 num_vic)
++config KGDB_FIQ
++	bool "KGDB FIQ support"
++	depends on KGDB_KDB && ARCH_MIGHT_HAVE_KGDB_FIQ && !THUMB2_KERNEL
++	select FIQ
++	help
++	  The FIQ debugger may be used to debug situations when the
++	  kernel stuck in uninterruptable sections, e.g. the kernel
++	  infinitely loops or deadlocked in an interrupt or with
++	  interrupts disabled.
++
++	  By default KGDB FIQ is disabled at runtime, but can be
++	  enabled with kgdb_fiq.enable=1 kernel command line option.
++
++	  If unsure, say N.
++
+ config ARM_PTDUMP
+ 	bool "Export kernel pagetable layout to userspace via debugfs"
+ 	depends on DEBUG_KERNEL
+diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+index 0a9d5dd..5de21f01 100644
+--- a/arch/arm/include/asm/kgdb.h
++++ b/arch/arm/include/asm/kgdb.h
+@@ -11,7 +11,9 @@
+ #define __ARM_KGDB_H__
  
- 	/* initialize the VICs */
- 	for (irq = 0; irq < num_vic; irq++)
--		vic_init(VA_VIC(irq), VIC_BASE(irq), vic[irq], 0);
-+		vic_init(VA_VIC(irq), VIC_BASE(irq), VIC_FIQ_START_NONE,
-+			 vic[irq], 0);
- #endif
- }
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index 7d35287..748c5af 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -36,6 +36,9 @@
+ #include <linux/ptrace.h>
++#include <linux/linkage.h>
+ #include <asm/opcodes.h>
++#include <asm/exception.h>
  
- #include <asm/exception.h>
- #include <asm/irq.h>
-+#ifdef CONFIG_FIQ
+ /*
+  * GDB assumes that we're a user process being debugged, so
+@@ -48,6 +50,11 @@ static inline void arch_kgdb_breakpoint(void)
+ extern void kgdb_handle_bus_error(void);
+ extern int kgdb_fault_expected;
+ 
++extern char kgdb_fiq_handler;
++extern char kgdb_fiq_handler_end;
++asmlinkage void __exception_irq_entry kgdb_fiq_do_handle(struct pt_regs *regs);
++extern int kgdb_register_fiq(unsigned int fiq);
++
+ #endif /* !__ASSEMBLY__ */
+ 
+ /*
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 040619c..251f651 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -67,6 +67,7 @@ endif
+ obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
+ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
+ obj-$(CONFIG_KGDB)		+= kgdb.o
++obj-$(CONFIG_KGDB_FIQ)		+= kgdb_fiq_entry.o kgdb_fiq.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
+ obj-$(CONFIG_OF)		+= devtree.o
+diff --git a/arch/arm/kernel/kgdb_fiq.c b/arch/arm/kernel/kgdb_fiq.c
+new file mode 100644
+index 0000000..45f2a79
+--- /dev/null
++++ b/arch/arm/kernel/kgdb_fiq.c
+@@ -0,0 +1,124 @@
++/*
++ * KGDB FIQ
++ *
++ * Copyright 2010 Google, Inc.
++ *		  Arve Hj?nnev?g <arve@android.com>
++ *		  Colin Cross <ccross@android.com>
++ * Copyright 2012 Linaro Ltd.
++ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published
++ * by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/slab.h>
++#include <linux/errno.h>
++#include <linux/hardirq.h>
++#include <linux/atomic.h>
++#include <linux/kdb.h>
++#include <linux/kgdb.h>
 +#include <asm/fiq.h>
-+#endif
- 
- #include "irqchip.h"
- 
-@@ -56,6 +59,8 @@
- 
- #define VIC_PL192_VECT_ADDR		0xF00
- 
-+#define VIC_FIQ_SHADOW_OFFSET		32
++#include <asm/exception.h>
 +
- /**
-  * struct vic_device - VIC PM device
-  * @parent_irq: The parent IRQ number of the VIC if cascaded, or 0.
-@@ -81,8 +86,11 @@ struct vic_device {
- 	u32		soft_int;
- 	u32		protect;
- 	struct irq_domain *domain;
-+	struct irq_domain *fiq_domain;
- };
- 
-+static DEFINE_RAW_SPINLOCK(irq_controller_lock);
++static int kgdb_fiq_enabled;
++module_param_named(enable, kgdb_fiq_enabled, int, 0600);
++MODULE_PARM_DESC(enable, "set to 1 to enable FIQ KGDB");
 +
- /* we cannot allocate memory when VICs are initially registered */
- static struct vic_device vic_devices[CONFIG_ARM_VIC_NR];
- 
-@@ -197,6 +205,9 @@ static int vic_irqdomain_map(struct irq_domain *d, unsigned int irq,
- {
- 	struct vic_device *v = d->host_data;
- 
-+	if (hwirq > VIC_FIQ_SHADOW_OFFSET)
-+		hwirq -= VIC_FIQ_SHADOW_OFFSET;
++static unsigned int kgdb_fiq;
 +
- 	/* Skip invalid IRQs, only register handlers for the real ones */
- 	if (!(v->valid_sources & (1 << hwirq)))
- 		return -EPERM;
-@@ -261,6 +272,15 @@ static struct irq_domain_ops vic_irqdomain_ops = {
- 	.xlate = irq_domain_xlate_onetwocell,
- };
- 
-+#ifdef CONFIG_FIQ
-+static void vic_map_fiq(int irq, int fiq, unsigned int length)
++asmlinkage void __exception_irq_entry kgdb_fiq_do_handle(struct pt_regs *regs)
 +{
-+	fiq_add_mapping(irq, fiq, length);
-+}
-+#else
-+static inline void vic_map_fiq(int irq, int fiq, unsigned int length) {}
-+#endif
-+
- /**
-  * vic_register() - Register a VIC.
-  * @base: The base address of the VIC.
-@@ -277,7 +297,7 @@ static struct irq_domain_ops vic_irqdomain_ops = {
-  * This also configures the IRQ domain for the VIC.
-  */
- static void __init vic_register(void __iomem *base, unsigned int parent_irq,
--				unsigned int irq,
-+				unsigned int irq, int fiq,
- 				u32 valid_sources, u32 resume_sources,
- 				struct device_node *node)
- {
-@@ -307,6 +327,22 @@ static void __init vic_register(void __iomem *base, unsigned int parent_irq,
- 	for (i = 0; i < fls(valid_sources); i++)
- 		if (valid_sources & (1 << i))
- 			irq_create_mapping(v->domain, i);
-+
-+	/* create FIQ shadow mapping for each IRQ */
-+	if (fiq >= 0) {
-+		v->fiq_domain = irq_domain_add_legacy(
-+				node, fls(valid_sources), fiq,
-+				VIC_FIQ_SHADOW_OFFSET, &vic_irqdomain_ops, v);
-+		/* create an IRQ mapping for each valid IRQ */
-+		for (i = 0; i < fls(valid_sources); i++)
-+			if (valid_sources & (1 << i)) {
-+				int fiq_virq = irq_create_mapping(
-+				    v->fiq_domain, i + VIC_FIQ_SHADOW_OFFSET);
-+				vic_map_fiq(irq_find_mapping(v->domain, i),
-+					    fiq_virq, 1);
-+			}
++	if (kgdb_nmi_poll_knock()) {
++		nmi_enter();
++		kgdb_handle_exception(1, 0, 0, regs);
++		nmi_exit();
 +	}
 +
- 	/* If no base IRQ was passed, figure out our allocated base */
- 	if (irq)
- 		v->irq = irq;
-@@ -314,10 +350,36 @@ static void __init vic_register(void __iomem *base, unsigned int parent_irq,
- 		v->irq = irq_find_mapping(v->domain, 0);
- }
- 
-+static inline bool vic_is_fiq(struct irq_data *d)
-+{
-+	return d->hwirq >= VIC_FIQ_SHADOW_OFFSET;
++	eoi_fiq(kgdb_fiq);
 +}
 +
-+static inline unsigned int vic_irq(struct irq_data *d)
++static struct fiq_handler kgdb_fiq_desc = {
++	.name = "kgdb",
++};
++
++static long kgdb_fiq_setup_stack(void *info)
 +{
-+	return d->hwirq & (VIC_FIQ_SHADOW_OFFSET-1);
++	struct pt_regs regs;
++
++	regs.ARM_sp = __get_free_pages(GFP_KERNEL, THREAD_SIZE_ORDER) +
++			THREAD_START_SP;
++	WARN_ON(!regs.ARM_sp);
++
++	set_fiq_regs(&regs);
++	return 0;
 +}
 +
-+static void vic_set_fiq(struct irq_data *d, bool enable)
++/**
++ * kgdb_fiq_enable_nmi - Manage NMI-triggered entry to KGDB
++ * @on: Flag to either enable or disable an NMI
++ *
++ * This function manages NMIs that usually cause KGDB to enter. That is, not
++ * all NMIs should be enabled or disabled, but only those that issue
++ * kgdb_handle_exception().
++ *
++ * The call counts disable requests, and thus allows to nest disables. But
++ * trying to enable already enabled NMI is an error.
++ */
++static void kgdb_fiq_enable_nmi(bool on)
 +{
-+	void __iomem *base = irq_data_get_irq_chip_data(d);
-+	unsigned int irq = vic_irq(d);
-+	u32 val;
++	static atomic_t cnt;
++	int ret;
 +
-+	raw_spin_lock(&irq_controller_lock);
-+	val = readl(base + VIC_INT_SELECT);
-+	if (enable)
-+		val |= 1 << irq;
++	ret = atomic_add_return(on ? 1 : -1, &cnt);
++	if (ret > 1 && on) {
++		/*
++		 * There should be only one instance that calls this function
++		 * in "enable, disable" order. All other users must call
++		 * disable first, then enable. If not, something is wrong.
++		 */
++		WARN_ON(1);
++		return;
++	}
++
++	if (ret > 0)
++		enable_fiq(kgdb_fiq);
 +	else
-+		val &= ~(1 << irq);
-+	writel(val, base + VIC_INT_SELECT);
-+	raw_spin_unlock(&irq_controller_lock);
++		disable_fiq(kgdb_fiq);
 +}
 +
- static void vic_ack_irq(struct irq_data *d)
- {
- 	void __iomem *base = irq_data_get_irq_chip_data(d);
--	unsigned int irq = d->hwirq;
-+	unsigned int irq = vic_irq(d);
- 	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
- 	/* moreover, clear the soft-triggered, in case it was the reason */
- 	writel(1 << irq, base + VIC_INT_SOFT_CLEAR);
-@@ -326,17 +388,22 @@ static void vic_ack_irq(struct irq_data *d)
- static void vic_mask_irq(struct irq_data *d)
- {
- 	void __iomem *base = irq_data_get_irq_chip_data(d);
--	unsigned int irq = d->hwirq;
-+	unsigned int irq = vic_irq(d);
-+	if (vic_is_fiq(d))
-+		vic_set_fiq(d, false);
- 	writel(1 << irq, base + VIC_INT_ENABLE_CLEAR);
- }
- 
- static void vic_unmask_irq(struct irq_data *d)
- {
- 	void __iomem *base = irq_data_get_irq_chip_data(d);
--	unsigned int irq = d->hwirq;
-+	unsigned int irq = vic_irq(d);
-+	if (vic_is_fiq(d))
-+		vic_set_fiq(d, true);
- 	writel(1 << irq, base + VIC_INT_ENABLE);
- }
- 
++int kgdb_register_fiq(unsigned int fiq)
++{
++	int err;
++	int cpu;
 +
- #if defined(CONFIG_PM)
- static struct vic_device *vic_from_irq(unsigned int irq)
- {
-@@ -355,7 +422,7 @@ static struct vic_device *vic_from_irq(unsigned int irq)
- static int vic_set_wake(struct irq_data *d, unsigned int on)
- {
- 	struct vic_device *v = vic_from_irq(d->irq);
--	unsigned int off = d->hwirq;
-+	unsigned int off = vic_irq(d);
- 	u32 bit = 1 << off;
- 
- 	if (!v)
-@@ -413,7 +480,8 @@ static void __init vic_clear_interrupts(void __iomem *base)
-  *  and 020 within the page. We call this "second block".
-  */
- static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
--			       u32 vic_sources, struct device_node *node)
-+			       int fiq_start, u32 vic_sources,
-+			       struct device_node *node)
- {
- 	unsigned int i;
- 	int vic_2nd_block = ((unsigned long)base & ~PAGE_MASK) != 0;
-@@ -439,12 +507,12 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
- 		writel(32, base + VIC_PL190_DEF_VECT_ADDR);
- 	}
- 
--	vic_register(base, 0, irq_start, vic_sources, 0, node);
-+	vic_register(base, 0, irq_start, fiq_start, vic_sources, 0, node);
- }
- 
- void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
--			      u32 vic_sources, u32 resume_sources,
--			      struct device_node *node)
-+		       int fiq_start, u32 vic_sources, u32 resume_sources,
-+		       struct device_node *node)
- {
- 	unsigned int i;
- 	u32 cellid = 0;
-@@ -462,7 +530,7 @@ void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
- 
- 	switch(vendor) {
- 	case AMBA_VENDOR_ST:
--		vic_init_st(base, irq_start, vic_sources, node);
-+		vic_init_st(base, irq_start, fiq_start, vic_sources, node);
- 		return;
- 	default:
- 		printk(KERN_WARNING "VIC: unknown vendor, continuing anyways\n");
-@@ -479,7 +547,8 @@ void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
- 
- 	vic_init2(base);
- 
--	vic_register(base, parent_irq, irq_start, vic_sources, resume_sources, node);
-+	vic_register(base, parent_irq, irq_start, fiq_start, vic_sources,
-+		     resume_sources, node);
- }
- 
- /**
-@@ -490,9 +559,9 @@ void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
-  * @resume_sources: bitmask of interrupt sources to allow for resume
-  */
- void __init vic_init(void __iomem *base, unsigned int irq_start,
--		     u32 vic_sources, u32 resume_sources)
-+		     int fiq_start, u32 vic_sources, u32 resume_sources)
- {
--	__vic_init(base, 0, irq_start, vic_sources, resume_sources, NULL);
-+	__vic_init(base, 0, irq_start, -1, vic_sources, resume_sources, NULL);
- }
- 
- /**
-@@ -511,7 +580,7 @@ int __init vic_init_cascaded(void __iomem *base, unsigned int parent_irq,
- 	struct vic_device *v;
- 
- 	v = &vic_devices[vic_id];
--	__vic_init(base, parent_irq, 0, vic_sources, resume_sources, NULL);
-+	__vic_init(base, parent_irq, 0, -1, vic_sources, resume_sources, NULL);
- 	/* Return out acquired base */
- 	return v->irq;
- }
-@@ -535,9 +604,10 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
- 	of_property_read_u32(node, "valid-wakeup-mask", &wakeup_mask);
- 
- 	/*
--	 * Passing 0 as first IRQ makes the simple domain allocate descriptors
-+	 * Passing 0 as first IRQ (and first FIQ) makes the domain allocate
-+	 * descriptors.
- 	 */
--	__vic_init(regs, 0, 0, interrupt_mask, wakeup_mask, node);
-+	__vic_init(regs, 0, 0, -1, interrupt_mask, wakeup_mask, node);
- 
- 	return 0;
- }
-diff --git a/include/linux/irqchip/arm-vic.h b/include/linux/irqchip/arm-vic.h
-index ba46c79..fae480d 100644
---- a/include/linux/irqchip/arm-vic.h
-+++ b/include/linux/irqchip/arm-vic.h
-@@ -26,12 +26,16 @@
- #define VIC_INT_ENABLE			0x10	/* 1 = enable, 0 = disable */
- #define VIC_INT_ENABLE_CLEAR		0x14
- 
-+#define VIC_FIQ_START_NONE -1
++	if (!kgdb_fiq_enabled)
++		return -ENODEV;
 +
- struct device_node;
- struct pt_regs;
- 
- void __vic_init(void __iomem *base, int parent_irq, int irq_start,
--		u32 vic_sources, u32 resume_sources, struct device_node *node);
--void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
-+		int fiq_start, u32 vic_sources, u32 resume_sources,
-+		struct device_node *node);
-+void vic_init(void __iomem *base, unsigned int irq_start, int fiq_start,
-+	      u32 vic_sources, u32 resume_sources);
- int vic_init_cascaded(void __iomem *base, unsigned int parent_irq,
- 		      u32 vic_sources, u32 resume_sources);
- 
++	if (!lookup_fiq_irq_data(fiq)) {
++		pr_warn(
++		    "%s: Cannot register %u (no FIQ with this number)\n",
++		    __func__, fiq);
++		return -ENODEV;
++	}
++
++	kgdb_fiq = fiq;
++
++	err = claim_fiq(&kgdb_fiq_desc);
++	if (err) {
++		pr_warn("%s: unable to claim fiq", __func__);
++		return err;
++	}
++
++	for_each_possible_cpu(cpu)
++		work_on_cpu(cpu, kgdb_fiq_setup_stack, NULL);
++
++	set_fiq_handler(&kgdb_fiq_handler,
++			&kgdb_fiq_handler_end - &kgdb_fiq_handler);
++
++	arch_kgdb_ops.enable_nmi = kgdb_fiq_enable_nmi;
++	return 0;
++}
+diff --git a/arch/arm/kernel/kgdb_fiq_entry.S b/arch/arm/kernel/kgdb_fiq_entry.S
+new file mode 100644
+index 0000000..d6becca
+--- /dev/null
++++ b/arch/arm/kernel/kgdb_fiq_entry.S
+@@ -0,0 +1,87 @@
++/*
++ * KGDB FIQ entry
++ *
++ * Copyright 1996,1997,1998 Russell King.
++ * Copyright 2012 Linaro Ltd.
++ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published
++ * by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/memory.h>
++#include <asm/unwind.h>
++#include "entry-header.S"
++
++	.text
++
++@ This is needed for usr_entry/alignment_trap
++.LCcralign:
++	.long	cr_alignment
++.LCdohandle:
++	.long	kgdb_fiq_do_handle
++
++	.macro	fiq_handler
++	ldr	r1, =.LCdohandle
++	mov	r0, sp
++	adr	lr, BSYM(9997f)
++	ldr	pc, [r1]
++9997:
++	.endm
++
++	.align	5
++__fiq_svc:
++	svc_entry
++	fiq_handler
++	mov	r0, sp
++	ldmib	r0, {r1 - r14}
++	msr	cpsr_c, #FIQ_MODE | PSR_I_BIT | PSR_F_BIT
++	add	r8, r0, #S_PC
++	ldr	r9, [r0, #S_PSR]
++	msr	spsr_cxsf, r9
++	ldr	r0, [r0, #S_R0]
++	ldmia	r8, {pc}^
++
++ UNWIND(.fnend		)
++ENDPROC(__fiq_svc)
++	.ltorg
++
++	.align	5
++__fiq_usr:
++	usr_entry
++	kuser_cmpxchg_check
++	fiq_handler
++	get_thread_info tsk
++	mov	why, #0
++	b	ret_to_user_from_irq
++ UNWIND(.fnend		)
++ENDPROC(__fiq_usr)
++	.ltorg
++
++	.global kgdb_fiq_handler
++kgdb_fiq_handler:
++
++	vector_stub	fiq, FIQ_MODE, 4
++
++	.long	__fiq_usr			@  0  (USR_26 / USR_32)
++	.long	__fiq_svc			@  1  (FIQ_26 / FIQ_32)
++	.long	__fiq_svc			@  2  (IRQ_26 / IRQ_32)
++	.long	__fiq_svc			@  3  (SVC_26 / SVC_32)
++	.long	__fiq_svc			@  4
++	.long	__fiq_svc			@  5
++	.long	__fiq_svc			@  6
++	.long	__fiq_svc			@  7
++	.long	__fiq_svc			@  8
++	.long	__fiq_svc			@  9
++	.long	__fiq_svc			@  a
++	.long	__fiq_svc			@  b
++	.long	__fiq_svc			@  c
++	.long	__fiq_svc			@  d
++	.long	__fiq_svc			@  e
++	.long	__fiq_svc			@  f
++
++	.global kgdb_fiq_handler_end
++kgdb_fiq_handler_end:
 -- 
 1.9.0
