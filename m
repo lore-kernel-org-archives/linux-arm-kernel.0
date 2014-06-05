@@ -1,84 +1,37 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  5 Jun 2014 10:53:14 +0100
-Subject: [RFC v3 9/9] serial: asc: Add support for KGDB's FIQ/NMI mode
-In-Reply-To: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
-References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401961994-18033-10-git-send-email-daniel.thompson@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Jun 2014 11:04:16 +0100
+Subject: [PATCH 3/3] cpufreq: Enable big.LITTLE cpufreq driver on arm64
+In-Reply-To: <3610030.uyJEv7eFhP@vostro.rjw.lan>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <2437793.vfcRUkFCet@vostro.rjw.lan>
+ <20140519230729.GD30457@sirena.org.uk>
+ <3610030.uyJEv7eFhP@vostro.rjw.lan>
+Message-ID: <20140605100416.GB27946@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the platform bus has provided the st-asc with a FIQ resource (i.e. a
-second IRQ) then speculatively register it with KGDB when the polling
-driver is initialized.
+Hi Rafael,
 
-By providing this information to KGDB the serial driver offers
-"permission" for KGDB to route the UART interrupt signal from the
-drivers own handler to KGDBs FIQ handler (which will eventually use the
-UART's polled I/O callbacks to interact with the user). This permission
-also implies the st-asc driver has already unmasked RX interrupts
-(otherwise the FIQ handler will never trigger). This unmask is copied
-from similar code in amba-pl011.c .
+On Tue, May 20, 2014 at 12:36:56AM +0100, Rafael J. Wysocki wrote:
+> On Tuesday, May 20, 2014 12:07:29 AM Mark Brown wrote:
+> > 
+> > --MAH+hnPXVZWQ5cD/
+> > Content-Type: text/plain; charset=us-ascii
+> > Content-Disposition: inline
+> > 
+> > On Tue, May 20, 2014 at 01:19:03AM +0200, Rafael J. Wysocki wrote:
+> > 
+> > > I've queued this one up for 3.16, thanks!
+> > 
+> > This will fail to build without patch 1 - it uses the stubs added there.
+> 
+> OK, dropping then.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: kernel at stlinux.com
-Cc: linux-serial at vger.kernel.org
----
- drivers/tty/serial/st-asc.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+This patch still made it as commit 4920ab84979d (cpufreq: Enable
+big.LITTLE cpufreq driver on arm64) and fails to build on arm64. Could
+you please revert it?
 
-diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index c7f61ac..4f376d8 100644
---- a/drivers/tty/serial/st-asc.c
-+++ b/drivers/tty/serial/st-asc.c
-@@ -30,6 +30,7 @@
- #include <linux/of_platform.h>
- #include <linux/serial_core.h>
- #include <linux/clk.h>
-+#include <linux/kgdb.h>
- 
- #define DRIVER_NAME "st-asc"
- #define ASC_SERIAL_NAME "ttyAS"
-@@ -613,6 +614,25 @@ asc_verify_port(struct uart_port *port, struct serial_struct *ser)
- }
- 
- #ifdef CONFIG_CONSOLE_POLL
-+
-+#ifdef CONFIG_KGDB_FIQ
-+/*
-+ * Prepare the UART to be used from kgdb's NMI support.
-+ */
-+static int asc_poll_init(struct uart_port *port)
-+{
-+	struct asc_port *ascport = container_of(port, struct asc_port, port);
-+
-+	/* register the FIQ with kgdb */
-+	kgdb_register_fiq(ascport->port.irq);
-+
-+	/* enable RX interrupts in case the interrupt is used for NMI entry. */
-+	asc_enable_rx_interrupts(port);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_KGDB_FIQ */
-+
- /*
-  * Console polling routines for writing and reading from the uart while
-  * in an interrupt or debug context (i.e. kgdb).
-@@ -656,6 +676,9 @@ static struct uart_ops asc_uart_ops = {
- 	.verify_port	= asc_verify_port,
- 	.pm		= asc_pm,
- #ifdef CONFIG_CONSOLE_POLL
-+#ifdef CONFIG_KGDB_FIQ
-+	.poll_init     = asc_poll_init,
-+#endif /* CONFIG_KGDB_FIQ */
- 	.poll_get_char = asc_get_poll_char,
- 	.poll_put_char = asc_put_poll_char,
- #endif /* CONFIG_CONSOLE_POLL */
+Thanks.
+
 -- 
-1.9.0
+Catalin
