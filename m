@@ -1,33 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 5 Jun 2014 07:18:10 -0500
-Subject: [PATCH 8/9] ata: Add support for the Tegra124 SATA controller
-In-Reply-To: <1401881559-18469-9-git-send-email-mperttunen@nvidia.com>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-9-git-send-email-mperttunen@nvidia.com>
-Message-ID: <CAL_JsqLh7kqnufNaWKdOEFb=m2mViFX4kTGMHOKmHuTAVMr+fA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Jun 2014 13:25:07 +0100
+Subject: [STLinux Kernel] [PATCH 1/6] thermal: sti: Supply Device Tree
+ documentation
+In-Reply-To: <20140605120147.GA7446@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1401442715-6350-1-git-send-email-lee.jones@linaro.org>
+ <1401442715-6350-2-git-send-email-lee.jones@linaro.org>
+ <20140605120147.GA7446@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20140605122507.GA24240@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 4, 2014 at 6:32 AM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
-> This adds support for the integrated AHCI-compliant Serial ATA
-> controller present on the NVIDIA Tegra124 system-on-chip.
->
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> ---
+On Thu, 05 Jun 2014, Peter Griffin wrote:
 
-[...]
+> Hi Lee,
+> 
+> > +Example:
+> > +
+> > +	temp1 at fdfe8000 {
+> > +		compatible	= "st,stih416-mpe-thermal";
+> > +		reg		= <0xfdfe8000 0x10>;
+> > +		clock-names	= "thermal";
+> > +		clocks		= <&CLK_M_MPETHSENS>;
+> > +		interrupts	= <GIC_SPI 23 IRQ_TYPE_NONE>;
+> > +	};
+> 
+> With the renaming of the STI device tree from upper to lower
+> case. The clock name in this example also needs updating.
 
-> +static int tegra_ahci_probe(struct platform_device *pdev)
-> +{
-> +       const struct of_device_id *match;
-> +       struct ahci_host_priv *hpriv;
-> +       struct tegra_ahci_priv *tegra;
-> +       int ret;
-> +
-> +       match = of_match_device(tegra_ahci_of_match, &pdev->dev);
+You're right.  Will rebase and fix.
 
-This is not needed.
+> Once fixed: -
+>  Acked-by: Peter Griffin <peter.griffin@linaro.org>
+> 
+> Regards,
+> 
+> Peter
 
-> +       if (!match)
-> +               return -EINVAL;
-> +
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
