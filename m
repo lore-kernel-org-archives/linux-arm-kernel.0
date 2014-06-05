@@ -1,31 +1,54 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 5 Jun 2014 18:19:32 +0800
-Subject: [PATCH 5/5] ARM: atmel: at91sam9n12ek: switch sound to CCF
-In-Reply-To: <1401963572-10953-1-git-send-email-voice.shen@atmel.com>
-References: <1401963572-10953-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1401963572-10953-6-git-send-email-voice.shen@atmel.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 5 Jun 2014 12:26:29 +0200
+Subject: [PATCH v6 5/6] dt-bindings: add documentation for Mediatek SoC
+In-Reply-To: <CAL_Jsq+jYZj_OcFkkBmpbGyEDKT7P_4Ek3os-qNFs9FfzxJvNw@mail.gmail.com>
+References: <1401468964-5307-1-git-send-email-matthias.bgg@gmail.com>
+ <1401468964-5307-6-git-send-email-matthias.bgg@gmail.com>
+ <CAL_Jsq+jYZj_OcFkkBmpbGyEDKT7P_4Ek3os-qNFs9FfzxJvNw@mail.gmail.com>
+Message-ID: <CABuKBe+rgPdCxQiDR34Cdb-mZKksbgLrEnHQre9PhgFY=WvrDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the at91sam9n12ek has switch to CCF, so add clock for wm8904
+2014-06-03 14:51 GMT+02:00 Rob Herring <robherring2@gmail.com>:
+> On Fri, May 30, 2014 at 11:56 AM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+>> This adds a DT binding documentation for the MT6589 SoC from Mediatek.
+>>
+>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>  .../devicetree/bindings/arm/mediatek-mt65xx.txt    |    8 ++++++++
+>
+> How about just mediatek.txt? Otherwise:
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- arch/arm/boot/dts/at91sam9n12ek.dts | 2 ++
- 1 file changed, 2 insertions(+)
+You are right, I will fix this for v7 of the series.
 
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 64bbe46..8ae771d 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -56,6 +56,8 @@
- 				wm8904: codec at 1a {
- 					compatible = "wm8904";
- 					reg = <0x1a>;
-+					clocks = <&pck0>;
-+					clock-names = "mclk";
- 				};
- 
- 				qt1070: keyboard at 1b {
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+> Rob
+>
+>>  1 file changed, 8 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek-mt65xx.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/mediatek-mt65xx.txt b/Documentation/devicetree/bindings/arm/mediatek-mt65xx.txt
+>> new file mode 100644
+>> index 0000000..d6ac71f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/mediatek-mt65xx.txt
+>> @@ -0,0 +1,8 @@
+>> +Mediatek MT6589 Platforms Device Tree Bindings
+>> +
+>> +Boards with a SoC of the Mediatek MT6589 shall have the following property:
+>> +
+>> +Required root node property:
+>> +
+>> +compatible: must contain "mediatek,mt6589"
+>> +
+>> --
+>> 1.7.9.5
+>>
+
+
+
 -- 
-1.8.5.2
+motzblog.wordpress.com
