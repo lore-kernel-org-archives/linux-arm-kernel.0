@@ -1,35 +1,43 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Thu, 5 Jun 2014 09:51:09 +0200
-Subject: [STLinux Kernel] [PATCH RESEND 06/12] drivers: clk: st: Add
- polarity bit indication
-In-Reply-To: <20140605074516.GA3865@griffinp-ThinkPad-X1-Carbon-2nd>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 5 Jun 2014 08:51:41 +0100
+Subject: [STLinux Kernel] [PATCH RESEND 02/12] clk: st: Adds Flexgen
+ clock binding
+In-Reply-To: <1401892320-18211-3-git-send-email-gabriel.fernandez@linaro.org>
 References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
- <1401892320-18211-7-git-send-email-gabriel.fernandez@linaro.org>
- <20140605074516.GA3865@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <5390216D.9020306@st.com>
+ <1401892320-18211-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20140605075141.GB3865@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Gabi,
 
-On 06/05/2014 09:45 AM, Peter Griffin wrote:
-> Hi Gabi,
->
-> On Wed, 04 Jun 2014, Gabriel FERNANDEZ wrote:
->
->> This patch introduces polarity indication for pll power up bit
->> and for standby bit in order to have same code between Orly 2
->> and CAN.
-> I think it would be better to refer to the SoC's by there numeric
-> name stih416 and stih407, as people unfamiliar with ST SoC names
-> reading the commit message are unlikely to know what Orly2 or CAN
-> mean.
->
-> Once fixed you can add my:
-> Acked-by: Peter Griffin <peter.griffin@linaro.org>
+> +Example:
+> +
+> +	clockgenD2 at x9106000 {
+> +		compatible = "st,clkgen-c32";
+> +		reg = <0x9106000 0x1000>;
+> +
+> +		CLK_S_D2_FLEXGEN: CLK_S_D2_FLEXGEN {
+> +			compatible = "st,flexgen";
+> +
+> +			#clock-cells = <1>;
+> +			clocks = <&CLK_S_D2_QUADFS 0>,
+> +				 <&CLK_S_D2_QUADFS 1>,
+> +				 <&CLK_S_D2_QUADFS 2>,
+> +				 <&CLK_S_D2_QUADFS 3>;
+> +
+> +			clock-output-names = "CLK_PIX_MAIN_DISP",
+> +					     "CLK_PIX_PIP",
+> +					     "CLK_PIX_GDP1",
+> +					     "CLK_PIX_GDP2";
 
-Ok thanks Peter
+With the upper case to lower case renaming of the STI device tree
+this example also needs to be converted to lower case names 
+throughout.
 
-> regards,
->
-> Peter.
->
+Once rectified you can add my:
+ Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+regards,
+
+Peter.
