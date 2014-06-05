@@ -1,55 +1,22 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 05 Jun 2014 13:36:12 +0200
-Subject: [PATCH] i2c: mux: pca954x needs gpiolib
-In-Reply-To: <4499715.bEb4MNR8Tt@wuerfel>
-References: <17059569.EZXzqhtzTf@wuerfel> <6840846.92XabYdCA4@avalon>
- <4499715.bEb4MNR8Tt@wuerfel>
-Message-ID: <3104966.JoqjcbmMru@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 5 Jun 2014 12:35:26 +0100
+Subject: [PATCH] ASoC: MMP audio needs sram support
+In-Reply-To: <4367111.vzeoBg4u5h@wuerfel>
+References: <4367111.vzeoBg4u5h@wuerfel>
+Message-ID: <20140605113526.GU2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Jun 05, 2014 at 12:40:04PM +0200, Arnd Bergmann wrote:
 
-On Thursday 05 June 2014 13:24:16 Arnd Bergmann wrote:
-> On Thursday 05 June 2014 12:56:08 Laurent Pinchart wrote:
-> > On Thursday 05 June 2014 12:44:47 Arnd Bergmann wrote:
-> > > commit 4807e8459bce ("i2c: mux: pca954x: Use the descriptor-based GPIO
-> > > API") moved this driver over to the gpio descriptor API, which means
-> > > we now have a dependency on GPIOLIB and get this build error when
-> > > it is disabled:
-> > > 
-> > > i2c/muxes/i2c-mux-pca954x.c: In function 'pca954x_probe':
-> > > i2c/muxes/i2c-mux-pca954x.c:204:2: error: implicit declaration of
-> > > function
-> > > 'devm_gpiod_get' [-Werror=implicit-function-declaration] gpio =
-> > > devm_gpiod_get(&client->dev, "reset");
-> > >   ^
-> > > 
-> > > i2c/muxes/i2c-mux-pca954x.c:204:7: warning: assignment makes pointer
-> > > from
-> > > integer without a cast [enabled by default] gpio =
-> > > devm_gpiod_get(&client->dev, "reset");
-> > >        ^
-> > > 
-> > > i2c/muxes/i2c-mux-pca954x.c:206:3: error: implicit declaration of
-> > > function
-> > > 'gpiod_direction_output' [-Werror=implicit-function-declaration]
-> > > gpiod_direction_output(gpio, 0);
-> > >    ^
-> > > 
-> > > This adds the dependency in Kconfig as we do for other similar drivers.
-> > 
-> > I've sent "i2c: pca954x: Fix compilation without CONFIG_GPIOLIB"
-> > yesterday, which fixes the compilation issue by including
-> > <linux/gpio/consumer.h>. When CONFIG_GPIOLIB isn't set the header defines
-> > stub functions, keeping the driver usable without GPIOLIB support.
-> 
-> Ok, makes sense. Should we remove the 'depends on GPIOLIB' from other
-> drivers doing the same, too?
+> Building the pxa/mmp audio driver without support for the mmp
+> sram driver enabled results in this link error:
 
-When the GPIO is optional I think so.
-
--- 
-Regards,
-
-Laurent Pinchart
+applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140605/caf132ce/attachment.sig>
