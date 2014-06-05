@@ -1,84 +1,231 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 5 Jun 2014 11:21:36 -0700
-Subject: [PATCH 3/3] clocksource: exynos_mct: Optimize register reads with
- ldmia
-In-Reply-To: <539051F9.4030100@gmail.com>
-References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
- <1401903034-20074-3-git-send-email-dianders@chromium.org>
- <alpine.DEB.2.10.1406042004140.3319@nanos>
- <CAD=FV=UDAcBeXewVinSG0WeoHkkw2zHe2ORp7BLW=NKxmKUiew@mail.gmail.com>
- <539051F9.4030100@gmail.com>
-Message-ID: <CAD=FV=WYT6gEh9vJjAWxE_zY1m0hojq_5LYL9vKgUzN+7MZ9ow@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Jun 2014 19:21:38 +0100
+Subject: [PATCH v7 5/7] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <1401989181-4712-6-git-send-email-matthias.bgg@gmail.com>
+References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
+ <1401989181-4712-6-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <20140605182138.GI31564@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On Thu, Jun 05, 2014 at 06:26:19PM +0100, Matthias Brugger wrote:
+> This adds a generic devicetree board file and a dtsi for boards
+> based on MT6589 SoCs from Mediatek.
+> 
+> Apart from the generic parts (gic, clocks) the only component
+> currently supported are the timers.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  arch/arm/Kconfig                  |    2 +
+>  arch/arm/Makefile                 |    1 +
+>  arch/arm/boot/dts/mt6589.dtsi     |   94 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mediatek/Kconfig    |    6 +++
+>  arch/arm/mach-mediatek/Makefile   |    1 +
+>  arch/arm/mach-mediatek/mediatek.c |   27 +++++++++++
+>  6 files changed, 131 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt6589.dtsi
+>  create mode 100644 arch/arm/mach-mediatek/Kconfig
+>  create mode 100644 arch/arm/mach-mediatek/Makefile
+>  create mode 100644 arch/arm/mach-mediatek/mediatek.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index db3c541..0fc8acd 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -997,6 +997,8 @@ source "arch/arm/mach-mv78xx0/Kconfig"
+>  
+>  source "arch/arm/mach-imx/Kconfig"
+>  
+> +source "arch/arm/mach-mediatek/Kconfig"
+> +
+>  source "arch/arm/mach-mxs/Kconfig"
+>  
+>  source "arch/arm/mach-netx/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 41c1931..8ce9774 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -170,6 +170,7 @@ machine-$(CONFIG_ARCH_MSM)		+= msm
+>  machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
+>  machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
+>  machine-$(CONFIG_ARCH_MXC)		+= imx
+> +machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
+>  machine-$(CONFIG_ARCH_MXS)		+= mxs
+>  machine-$(CONFIG_ARCH_NETX)		+= netx
+>  machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
+> diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
+> new file mode 100644
+> index 0000000..f1d8a8b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt6589.dtsi
+> @@ -0,0 +1,94 @@
+> +/*
+> + * Copyright (c) 2014 MundoReader S.L.
+> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "mediatek,mt6589";
+> +	interrupt-parent = <&gic>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x0>;
+> +		};
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x1>;
+> +		};
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x2>;
+> +		};
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x3>;
+> +		};
+> +
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
 
-On Thu, Jun 5, 2014 at 4:18 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 04.06.2014 20:49, Doug Anderson wrote:
->> Thomas,
->>
->> On Wed, Jun 4, 2014 at 11:05 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
->>> On Wed, 4 Jun 2014, Doug Anderson wrote:
->>>
->>>> As we saw in (clocksource: exynos_mct: cache mct upper count), the
->>>> time spent reading the MCT shows up fairly high in real-world
->>>> profiles.  That means that it's worth some optimization.
->>>>
->>>> We get a roughly 10% speedup in userspace gettimeofday() by using an
->>>> ldmia to read the two halfs of the MCT.  That seems like a worthwhile
->>>> thing to do.
->>>>
->>>> Before: 1173084 us for 1000000 gettimeofday in userspace
->>>> After:  1045674 us for 1000000 gettimeofday in userspace
->>>>
->>>> NOTE: we could actually do better than this if we really wanted to.
->>>> Technically we could register the clocksource as a 32-bit timer and
->>>> only use the "lower" half.  Doing so brings us down to 1014429 us for
->>>> 1000000 gettimeofday in userspace (and doesn't even require assembly
->>>> code).  That would be an alternative to this change.
->>>
->>> I was about to ask exactly that question: What's the advantage of the
->>> 64 bit dance there? AFAICT nothing.
->>
->> I debated whether to send out the 32-bit version, since I'd
->> implemented both.  I'm happy to send out the 32-bit version too and
->> people can pick which they like better.  Let me know.
->>
->> The final thing that pushed me over the edge to send the 64-bit
->> version was that I didn't know enough about how MCT was used with
->> respect to low power modes (we don't use AFTR / LPA modes on our
->> system).  I could actually believe that we might want to set a timer
->> for more than 178 seconds into the future for these low power modes.
->> If that's the case, we still need to keep around the 64-bit read code
->> for that case.  ...and once we have the 64-bit code then we might as
->> well use it for the rest of the timers.
->>
->> Perhaps Tomasz will comment on this.
->
-> I can't say definitely that we won't need those extra 32-bits, but the
-> low power modes you mentioned are (and probably will always be)
-> implemented as CPU idle modes. This means that most likely having a
-> wake-up every 178 second wouldn't hurt that much, especially considering
-> the fact that in normal use cases, when the system is not fully
-> suspended it usually has things to do and will need to be woken up more
-> frequently than that.
->
-> Adding Bart and Krzysztof to the discussion as they are currently
-> working on power management.
+This is just nonsense. This /clocks node is in no way special -- /clocks
+was never reserved as a place to put clocks that we guarantee to probe.
+It's just an arbitrary containter node, and the fact we happen to probe
+clocks under it is an implementation detail (and arguably a bug).
 
-OK, I'm happy to send out the 32-bit version of the patches.  In the
-other series Vincent was questioning whether the performance gain of
-32-bit would be offset by the extra overhead of needing to handle the
-wraparound.  I have no idea what the answer is there.  Who on this
-thread would be willing to pick between the two?
+I argued in the past to at least have them as a simple-bus,
+necessitating ranges, #address-cells, and #size-cells you have here, but
+you'r missing the compatible = "simple-bus", rendering the exercise
+pointless.
 
-My own personal opinion is to take the existing optimized 64-bit
-versions I sent out since:
-* there's no question that they work and won't regress performance or
-functionality
-* the speed is nearly equal to the 32-bit version
-* the single assembly instruction isn't _too_ ugly.
+> +
+> +		system_clk: dummy13m {
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <13000000>;
+> +			#clock-cells = <0>;
+> +		};
+> +
+> +		rtc_clk: dummy32k {
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32000>;
+> +			#clock-cells = <0>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		clock-ranges;
+
+Why the clock-ranges? You refer to them explicitly below.
+
+> +		ranges;
+> +
+> +		timer: timer at 10008000 {
+> +			compatible = "mediatek,mt6577-timer";
+> +			reg = <0x10008000 0x80>;
+> +			interrupts = <GIC_SPI 113 IRQ_TYPE_EDGE_RISING>;
+> +			clocks = <&system_clk>, <&rtc_clk>;
+> +			clock-names = "system-clk", "rtc-clk";
+> +		};
+> +
+> +		gic: interrupt-controller at 10212000 {
+> +			compatible = "arm,cortex-a15-gic";
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +			reg = <0x10211000 0x1000>,
+> +			      <0x10212000 0x1000>,
+> +			      <0x10214000 0x2000>,
+> +			      <0x10216000 0x2000>;
+> +		};
+> +	};
+> +};
+
+No architected timers?
 
 
--Doug
+> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+> new file mode 100644
+> index 0000000..2c043a2
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/Kconfig
+> @@ -0,0 +1,6 @@
+> +config ARCH_MEDIATEK
+> +	bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
+> +	select ARM_GIC
+> +	select MTK_TIMER
+> +	help
+> +	  Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
+> diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+> new file mode 100644
+> index 0000000..43e619f
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> new file mode 100644
+> index 0000000..f2acf07
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Device Tree support for Mediatek SoCs
+> + *
+> + * Copyright (c) 2014 MundoReader S.L.
+> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/init.h>
+> +#include <asm/mach/arch.h>
+> +
+> +static const char * const mediatek_board_dt_compat[] = {
+> +	"mediatek,mt6589",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+> +	.dt_compat	= mediatek_board_dt_compat,
+> +MACHINE_END
+
+If this is all we have, surely we can get by with the defaults?
+
+Cheers,
+Mark.
