@@ -1,33 +1,35 @@
-From: marketing@gulfcapital.com (=?UTF-8?Q?GC_Loans?=)
-Date: Thu, 5 Jun 2014 08:40:47 +0200
-Subject: =?UTF-8?Q?Hello_from_Lee?=
-Message-ID: <c87a28c930611d5b18e37a361b56b6cf@www.vandenheuvel-meubelmakerij.be>
+From: xiaoguangrong@linux.vnet.ibm.com (Xiao Guangrong)
+Date: Thu, 05 Jun 2014 14:55:43 +0800
+Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
+ support
+In-Reply-To: <1401916278-24835-1-git-send-email-m.smarduch@samsung.com>
+References: <1401916278-24835-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <5390146F.8020407@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We understand your desire to live your dreams.
-GCI/IIDB Personal loans and corporate loans gives you an
-Opportunity to fulfill such desires brings happiness to your loved ones through hassle-free loans at GCI.
-Borrow from US$100,000. To US$1 Million and above for any purpose.
-We support you to set up a business of any kind in any part of the world.    
+On 06/05/2014 05:11 AM, Mario Smarduch wrote:
 
-Loan repayment tenure from 12 to 120 months.
+> +	spin_lock(&kvm->mmu_lock);
+> +
+> +	for (i = 0; i < n / sizeof(long); i++) {
+> +		unsigned long mask;
+> +		gfn_t offset;
+> +
+> +		if (!dirty_bitmap[i])
+> +			continue;
+> +
+> +		is_dirty = true;
+> +
+> +		mask = xchg(&dirty_bitmap[i], 0);
+> +		dirty_bitmap_buffer[i] = mask;
+> +
+> +		offset = i * BITS_PER_LONG;
+> +		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
+> +	}
+> +	if (is_dirty)
+> +		kvm_flush_remote_tlbs(kvm);
 
-Attractive interest rates: 5%
+You moved the flush into mmu-lock. Please do not :).
 
-For inquiries and online application please contact below person.
-Mr. Imad Ali
-Email: <imadgulf@globomail.com>
-
-
-
-
-Head of Campaign Team,
-
-Mr.Jack Lee
-Gulf Capital Pvt.
-Al Sila Tower, 25th Floor
-Sowwah Square
-Al Maryah Island
-P.O.Box 27522
-Abu Dhabi, United Arab Emirates
+See commit 198c74f43f0f5473f99967aead30ddc622804bc1
