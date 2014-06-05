@@ -1,50 +1,71 @@
-From: andy@aeruder.net (Andrew Ruder)
-Date: Thu, 5 Jun 2014 05:01:22 +0200
-Subject: PXA 2xx devictree port and clock infrastructure
-In-Reply-To: <87zji3cr3d.fsf@free.fr>
-References: <87zji3cr3d.fsf@free.fr>
-Message-ID: <20140605030122.GA27682@og3k>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 05 Jun 2014 12:06:43 +0800
+Subject: [PATCH 1/7] ACPICA: Only include ACPI asm files if ACPI is enabled
+In-Reply-To: <1AE640813FDE7649BE1B193DEA596E88026203D0@SHSMSX101.ccr.corp.intel.com>
+References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
+ <1401883796-17841-2-git-send-email-lee.jones@linaro.org>
+ <1AE640813FDE7649BE1B193DEA596E88026203D0@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <538FECD3.2000700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 03:02:14PM +0200, Robert Jarzmik wrote:
-> I'm playing with devicetree to port the mioa701 machine code to devicetree (or
-> rather to eliminate the mioa701 machine code).
+Hi Lv,
 
-Sorry for the late response, but for what its worth I have an entire
-line of boards running on device-tree for PXA270.  Even better, they are
-FIT booted out of U-Boot so I can use the same kernel on at least 4 (and
-growing) different pieces of hardware.  Some of the patches are in
-really sorry shape, but I'm just now trying to get them cleaned up for
-inclusion (just sent the first wave to netdev today).
+On 2014-6-5 8:56, Zheng, Lv wrote:
+> Hi, Lee
+> 
+>> From: Lee Jones [mailto:lee.jones at linaro.org]
+>> Sent: Wednesday, June 04, 2014 8:10 PM
+>>
+>> Any drivers which support ACPI and Device Tree probing need to include
+>> both respective header files.  Without this patch, if a driver is being
+>> used on a platform which does not support ACPI and subsequently does not
+>> have the config option enabled, but includes linux/acpi.h the build
+>> breaks with:
+>>
+>>   In file included from ../include/acpi/platform/acenv.h:150:0,
+>>                    from ../include/acpi/acpi.h:56,
+>>                    from ../include/linux/match.h:2,
+>>                    from ../drivers/i2c/i2c-core.c:43:
+>>   ../include/acpi/platform/aclinux.h:73:23:
+>>    fatal error: asm/acenv.h: No such file or directory
+>>    #include <asm/acenv.h>
+>>                        ^
+>> Cc: Lv Zheng <lv.zheng@intel.com>
+>> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>> Cc: linux-acpi at vger.kernel.org
+>> Cc: devel at acpica.org
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>  include/acpi/platform/aclinux.h | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/acpi/platform/aclinux.h b/include/acpi/platform/aclinux.h
+>> index cd1f052..fdf7663 100644
+>> --- a/include/acpi/platform/aclinux.h
+>> +++ b/include/acpi/platform/aclinux.h
+>> @@ -70,9 +70,10 @@
+>>  #ifdef EXPORT_ACPI_INTERFACES
+>>  #include <linux/export.h>
+>>  #endif
+>> -#include <asm/acenv.h>
+>>
+>> -#ifndef CONFIG_ACPI
+>> +#ifdef CONFIG_ACPI
+>> +#include <asm/acenv.h>
+>> +#else
+> 
+> This is exactly what I want to do in the next step.
+> But you are a bit faster here.
+> I believe:
+> The miss-ordered inclusions of <asm/acpi.h> is the culprit of all of the miss-ordered inclusions in arch/x86/include/asm.
+> You should have noted that <asm/acpi.h> was originally unexpected included by some x86 specific headers.
+> Simply doing <asm/acenv.h> exlusion in this way might be able to fix your issue for your architecture, but it could be very likely breaking x86 builds.
+> You might be able to find another way to solve your build issue - for example, creating an empty <asm/acenv.h> for arch/arm.
 
-Unfortunately the few major issues I have is:
+Yes, we solve this issue as you suggested for arch/arm64.
+since ARM32 will not support ACPI in the near future,
+we may find another way to fix it.
 
-  a.) I simply changed the names of the clocks to match to get past that
-  part (didn't create the clock driver stuff).
-
-  b.) I'm currently using a hacky patch to pxamci.c to set the DMA
-  channel since I'm not yet using the DMA patches that have been posted
-  here.
-
-  c.) Several other little things in mach-pxa/ to get the thing going
-  that I haven't totally figured out yet.
-
-I've gone ahead and pushed everything up to my personal github
-repository in the meantime - it will probably be rebased frequently
-while I get things cleaned up.
-
-http://github.com/aeruder/linux
-
-elecsys-v3.14/master - merges all of below
-elecsys-v3.14/dm9000 - several patches for dm9000 network against v3.14
-elecsys-v3.14/dt-dma-hack - the aforementioned pxamci.c patch
-elecsys-v3.14/hwirq-vs-irq - issue regarding ISA interrupts
-elecsys-v3.14/misc - this is where some of the changes get really bad
-and still lots of cleanup to do
-elecsys-v3.14/trivial - lots of small cleanups - several to device-tree
-                        stuff
-elecsys-v3.14/zx-support - stuff to support my specific boards (the
-                           device trees and configs)
-
-- Andy
+Thanks
+Hanjun
