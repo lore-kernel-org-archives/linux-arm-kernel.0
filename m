@@ -1,236 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 05 Jun 2014 09:44:15 +0100
-Subject: [PATCH v4 02/20] arm64: initial support for GICv3
-In-Reply-To: <539020A5.6070807@huawei.com> (Abel's message of "Thu, 5 Jun 2014
- 08:47:49 +0100")
-References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
- <1400176719-31275-3-git-send-email-marc.zyngier@arm.com>
- <539020A5.6070807@huawei.com>
-Message-ID: <87zjhrvj8g.fsf@approximate.cambridge.arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 5 Jun 2014 10:47:45 +0200
+Subject: [PATCH] clk: st: avoid build warnings
+In-Reply-To: <10904360.yBfDy9q35b@wuerfel>
+References: <10904360.yBfDy9q35b@wuerfel>
+Message-ID: <53902EB1.1050208@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abel,
+Hi Arnd,
 
-On Thu, Jun 05 2014 at  8:47:49 am BST, Abel <wuyun.wu@huawei.com> wrote:
-> Hi Marc,
+On 06/04/2014 05:32 PM, Arnd Bergmann wrote:
+> This driver prints some variables in debugging output when
+> their contents are undefined.
 >
-> On 2014/5/16 1:58, Marc Zyngier wrote:
+> drivers/clk/st/clkgen-fsyn.c: In function 'quadfs_pll_fs660c32_round_rate':
+> drivers/clk/st/clkgen-fsyn.c:419:93: warning: 'params.sdiv' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    pr_debug("%s: %s new rate %ld [sdiv=0x%x,md=0x%x,pe=0x%x,nsdiv3=%u]\n",
+>                                                                                               ^
+> drivers/clk/st/clkgen-fsyn.c:414:16: note: 'params.sdiv' was declared here
+>    struct stm_fs params;
+>                  ^
 >
->> The Generic Interrupt Controller (version 3) offers services that are
->> similar to GICv2, with a number of additional features:
->> - Affinity routing based on the CPU MPIDR (ARE)
->> - System register for the CPU interfaces (SRE)
->> - Support for more that 8 CPUs
->> - Locality-specific Peripheral Interrupts (LPIs)
->> - Interrupt Translation Services (ITS)
->>
->> This patch adds preliminary support for GICv3 with ARE and SRE,
->> non-secure mode only. It relies on higher exception levels to grant ARE
->> and SRE access.
->>
->> Support for LPI and ITS will be added at a later time.
->>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Reviewed-by: Zi Shen Lim <zlim@broadcom.com>
->> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/Kconfig                 |   1 +
->>  arch/arm64/kernel/head.S           |  18 +
->>  arch/arm64/kernel/hyp-stub.S       |   1 +
->>  drivers/irqchip/Kconfig            |   5 +
->>  drivers/irqchip/Makefile           |   1 +
->>  drivers/irqchip/irq-gic-v3.c       | 684 +++++++++++++++++++++++++++++++++++++
->>  include/linux/irqchip/arm-gic-v3.h | 190 +++++++++++
->>  7 files changed, 900 insertions(+)
->>  create mode 100644 drivers/irqchip/irq-gic-v3.c
->>  create mode 100644 include/linux/irqchip/arm-gic-v3.h
->>
+> This removes them from the output.
 >
-> [...]
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 >
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> new file mode 100644
->> index 0000000..6570e7b
->> --- /dev/null
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -0,0 +1,684 @@
 
-[...]
+You can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
->> +static int gic_set_type(struct irq_data *d, unsigned int type)
->> +{
->> +     unsigned int irq = gic_irq(d);
->> +     void (*rwp_wait)(void);
->> +     void __iomem *base;
->> +
->> +     if (gic_irq_in_rdist(d)) {
->> +             base = gic_data_rdist_sgi_base();
->> +             rwp_wait = gic_redist_wait_for_rwp;
->> +     } else {
->> +             base = gic_data.dist_base;
->> +             rwp_wait = gic_dist_wait_for_rwp;
->> +     }
->> +
->> +     /* Interrupt configuration for SGIs can't be changed */
->> +     if (irq < 16)
->> +             return -EINVAL;
->> +
->> +     if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
->> +             return -EINVAL;
->
->
-> It would be better if checking the two conditions right after variable declaration.
-
-Sure, why not.
-
->> +
->> +     gic_configure_irq(irq, type, base, rwp_wait);
->> +
->> +     return 0;
->> +}
->> +
->> +static u64 gic_mpidr_to_affinity(u64 mpidr)
->> +{
->> +     u64 aff;
->> +
->> +     aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
->> +            MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
->> +            MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
->> +            MPIDR_AFFINITY_LEVEL(mpidr, 0)) & ~GICD_IROUTER_SPI_MODE_ANY;
->> +
->> +     return aff;
->> +}
->> +
->> +static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->> +{
->> +     u64 irqnr;
->> +
->> +     do {
->> +             irqnr = gic_read_iar();
->> +
->> +             if (likely(irqnr > 15 && irqnr < 1021)) {
->
->
-> I prefer to use gic_data.irq_nr instead of '1021'.
-> The ranges here should be consistent with the ones in domain.map.
-
-That's debatable. gic_data.irq_nr is used as a guard for the rest of the
-kernel, so that we don't map an out-of-range interrupt number. But here,
-we read the interrupt that has been generated by the actual HW. If such
-thing happen, we need to know about it, handle it as a spurious
-interrupt, and EOI it. Otherwise, we're stuck forever (with your
-proposed change, nothing EOIs the interrupt).
-
->> +                     irqnr = irq_find_mapping(gic_data.domain, irqnr);
->> +                     handle_IRQ(irqnr, regs);
->> +                     continue;
->> +             }
->> +             if (irqnr < 16) {
->> +                     gic_write_eoir(irqnr);
->> +#ifdef CONFIG_SMP
->> +                     handle_IPI(irqnr, regs);
->> +#else
->> +                     WARN_ONCE(true, "Unexpected SGI received!\n");
->> +#endif
->> +                     continue;
->> +             }
->> +     } while (irqnr != 0x3ff);
->> +}
->> +
->> +static void __init gic_dist_init(void)
->> +{
->> +     unsigned int i;
->> +     u64 affinity;
->> +     void __iomem *base = gic_data.dist_base;
->> +
->> +     /* Disable the distributor */
->> +     writel_relaxed(0, base + GICD_CTLR);
->
->
-> I'm not sure whether waiting for write pending here is necessary. What do you think?
-
-Hmmm. That's a good point. The spec says the RWP tracks the completion
-of writes that change (among other things) the state of an interrupt
-group enable. But the next line will perform a wait_for_rwp anyway after
-having disabled all SPIs. So no, I don't think we need to wait. We
-guaranteed to get a consistent state after the call to gic_dist_config.
-
->> +
->> +     gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
->> +
->> +     /* Enable distributor with ARE, Group1 */
->> +     writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
->> +                    base + GICD_CTLR);
->> +
->> +     /*
->> +      * Set all global interrupts to the boot CPU only. ARE must be
->> +      * enabled.
->> +      */
->> +     affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
->> +     for (i = 32; i < gic_data.irq_nr; i++)
->> +             writeq_relaxed(affinity, base + GICD_IROUTER + i * 8);
->> +}
->> +
-
-[...]
-
->> +static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->> +                           irq_hw_number_t hw)
->> +{
->> +     /* SGIs are private to the core kernel */
->> +     if (hw < 16)
->> +             return -EPERM;
->> +     /* PPIs */
->> +     if (hw < 32) {
->> +             irq_set_percpu_devid(irq);
->> +             irq_set_chip_and_handler(irq, &gic_chip,
->> +                                      handle_percpu_devid_irq);
->> +             set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
->> +     }
->> +     /* SPIs */
->> +     if (hw >= 32 && hw < gic_data.irq_nr) {
->> +             irq_set_chip_and_handler(irq, &gic_chip,
->> +                                      handle_fasteoi_irq);
->> +             set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->> +     }
->
->
-> Use 'else' here, since the conditions are non-overlapping.
-
-For the code as it is now, I'd agree. But I'm also looking at the ITS
-code that will follow as soon as this one is on its way to mainline, and
-I then have this:
-
-@@ -553,6 +571,19 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
-                                         handle_fasteoi_irq);
-                set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-        }
-+       /* Nothing */
-+       if (hw >= gic_data.irq_nr && hw < 8192)
-+               return -EPERM;
-+       /* LPIs */
-+       if (hw >= 8192 && hw < GIC_ID_NR) {
-+               if (!its_chip)
-+                       return -EPERM;
-+               irq_set_chip_and_handler(irq, its_chip, handle_fasteoi_irq);
-+               set_irq_flags(irq, IRQF_VALID);
-+       }
-+       /* Off limits */
-+       if (hw >= GIC_ID_NR)
-+               return -EPERM;
-        irq_set_chip_data(irq, d->host_data);
-        return 0;
- }
-
-Having a bunch of else clauses looks pretty awful in this context, and
-I've decided to try and keep it readable instead. This is not on the hot
-path anyway, so it doesn't really matter if we test an extra variable.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Thanks!
+Maxime
