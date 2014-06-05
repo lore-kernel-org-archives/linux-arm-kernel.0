@@ -1,574 +1,655 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 05 Jun 2014 15:15:15 +0200
-Subject: [PATCH v2] ARM: KVM: add irqfd and irq routing support
-In-Reply-To: <20140605102831.GA3994@lvm>
-References: <1401694196-30861-1-git-send-email-eric.auger@linaro.org>
- <20140605102831.GA3994@lvm>
-Message-ID: <53906D63.9040508@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 05 Jun 2014 15:20:50 +0200
+Subject: [PATCH 1/2] [RFC] ASoC: samsung: move s3c24xx over to dmaengine
+Message-ID: <6123933.aGtaUr149J@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 12:28 PM, Christoffer Dall wrote:
-> On Mon, Jun 02, 2014 at 09:29:56AM +0200, Eric Auger wrote:
->> This patch enables irqfd and irq routing on ARM.
->>
->> It turns on CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQ_ROUTING
->>
->> irqfd framework enables to assign physical IRQs to guests.
->>
->> 1) user-side uses KVM_IRQFD VM ioctl to pass KVM a kvm_irqfd struct that
->> associates a VM, an eventfd, an IRQ number (aka. the GSI). When an actor
->> signals the eventfd (typically a VFIO platform driver), the irqfd subsystem
->> injects the specified IRQ into the VM (the "GSI" takes the semantic of a
->> virtual IRQ for that guest).
->>
->> 2) the other use case is user-side does 1) and uses KVM_SET_GSI_ROUTING
->> VM ioctl to create an association between a VM, a physical IRQ (aka GSI) and
->> a virtual IRQ (aka irchip.pin).  This creates a so-called GSI routing entry.
->> When someone triggers the eventfd, irqfd handles it but uses the specified
->> routing and eventually injects irqchip.pin virtual IRQ into the guest. In that
->> context the GSI takes the semantic of a physical IRQ while the irqchip.pin
->> takes the semantic of a virtual IRQ.
->>
->> in 1) routing is used by irqfd but an identity routing is created by default
->> making the gsi = irqchip.pin. Note on ARM there is a single interrupt
->> controller kind, the GIC.
->>
->> GSI routing mostly is implemented in generic irqchip.c.
->> The tiny ARM specific part is directly implemented in the virtual interrupt
->> controller (vgic.c) as it is done for powerpc for instance. This option was
->> prefered compared to implementing other #ifdef in irq_comm.c (x86 and ia64).
->> Hence irq_comm.c is not used at all.
->>
->> Routing currently is not used for anything else than irqfd IRQ injection. Only
->> SPI can be injected. This means the vgic is not totally hidden behind the
->> irqchip. There are separate discussions on PPI/SGI routing.
-> 
-> What do you mean here?  Is there an ongoing discussion on the mailing
-> list somewhere?
+The s3c24xx sound support keeps giving randconfig build errors, this
+is a new attempt to solve it by moving the driver over to use dmaengine
+exclusively.
 
-Hi Christoffer,
+The removal of the legacy DMA support and the addition of the
+s3c24xx_dma_filter pointer are fairly obvious here. The part I'm not
+completely sure about is the removal of the s3c2410_dma_ctrl(...,
+S3C2410_DMAOP_STARTED) and dma_data->ops->started() calls. My understanding
+is that these are only required for drivers that do not support cyclic
+transfers, which the new dma engine driver now does, so we can simply
+remove them. This would also fix at least one bug in the ac97 driver
+on newer machines, which currently gives us a NULL pointer dereference
+from trying to call dma_data->ops->started().
 
-Thanks for the review.
+Any insights about this, or testing would be very welcome.
 
-I was refering to that thread where it was invoked to put the whole vgic
-behind irqchip:
-http://www.spinics.net/lists/kvm-arm/msg08413.html
-> 
->>
->> Only level sensitive IRQs are supported (with a registered resampler). As a
-> 
-> Is it not trivial to add edge-triggered support in the same go?
-Yes it shouldn't be a problem. It is more a matter of testing.
-> 
->> reminder the resampler is a second eventfd called by irqfd framework when the
->> virtual IRQ is completed by the guest. This eventfd is supposed to be handled
->> on user-side
->>
->> MSI routing is not supported yet.
->>
->> This work was tested with Calxeda Midway xgmac main interrupt (with and without
->> explicit user routing) with qemu-system-arm and QEMU VFIO platform device.
->>
->> changes v1 -> v2:
->> 2 fixes:
->> - v1 assumed gsi/irqchip.pin was already incremented by VGIC_NR_PRIVATE_IRQS.
->>   This is now vgic_set_assigned_irq that increments it before injection.
->> - v2 now handles the case where a pending assigned irq is cleared through
->>   MMIO access. The irq is properly acked allowing the resamplefd handler
->>   to possibly unmask the physical IRQ.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> Conflicts:
->> 	Documentation/virtual/kvm/api.txt
->> 	arch/arm/kvm/Kconfig
->>
->> Conflicts:
->> 	Documentation/virtual/kvm/api.txt
-> 
-> We usually don't include these conflict notices when sending out
-> patches.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Sangbeom Kim <sbkim73@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
+---
+ sound/soc/samsung/Kconfig       |  13 --
+ sound/soc/samsung/Makefile      |   4 +-
+ sound/soc/samsung/ac97.c        |  16 --
+ sound/soc/samsung/dma.c         | 454 ------------------------------------
+ sound/soc/samsung/dmaengine.c   |   3 +
+ sound/soc/samsung/s3c24xx-i2s.c |   1 -
+ 6 files changed, 4 insertions(+), 487 deletions(-)
 
-OK I will remove them
-> 
->> ---
->>  Documentation/virtual/kvm/api.txt |   4 +-
->>  arch/arm/include/uapi/asm/kvm.h   |   8 +++
->>  arch/arm/kvm/Kconfig              |   2 +
->>  arch/arm/kvm/Makefile             |   1 +
->>  arch/arm/kvm/irq.h                |  25 +++++++
->>  virt/kvm/arm/vgic.c               | 141 ++++++++++++++++++++++++++++++++++++--
->>  6 files changed, 174 insertions(+), 7 deletions(-)
->>  create mode 100644 arch/arm/kvm/irq.h
->>
->> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->> index b4f5365..b376334 100644
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -1339,7 +1339,7 @@ KVM_ASSIGN_DEV_IRQ. Partial deassignment of host or guest IRQ is allowed.
->>  4.52 KVM_SET_GSI_ROUTING
->>  
->>  Capability: KVM_CAP_IRQ_ROUTING
->> -Architectures: x86 ia64 s390
->> +Architectures: x86 ia64 s390 arm
->>  Type: vm ioctl
->>  Parameters: struct kvm_irq_routing (in)
->>  Returns: 0 on success, -1 on error
->> @@ -2126,7 +2126,7 @@ into the hash PTE second double word).
->>  4.75 KVM_IRQFD
->>  
->>  Capability: KVM_CAP_IRQFD
->> -Architectures: x86 s390
->> +Architectures: x86 s390 arm
->>  Type: vm ioctl
->>  Parameters: struct kvm_irqfd (in)
->>  Returns: 0 on success, -1 on error
->> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
->> index ef0c878..89b864d 100644
->> --- a/arch/arm/include/uapi/asm/kvm.h
->> +++ b/arch/arm/include/uapi/asm/kvm.h
->> @@ -192,6 +192,14 @@ struct kvm_arch_memory_slot {
->>  /* Highest supported SPI, from VGIC_NR_IRQS */
->>  #define KVM_ARM_IRQ_GIC_MAX		127
->>  
->> +/* needed by IRQ routing */
->> +
->> +/* One single KVM irqchip, ie. the VGIC */
->> +#define KVM_NR_IRQCHIPS          1
->> +
->> +/* virtual interrupt controller input pins (max 480 SPI, 32 SGI/PPI) */
->> +#define KVM_IRQCHIP_NUM_PINS     256
-> 
-> I don't even see how the comment correlates to the define.  Hmmm.  But
-> since Marc asked you to change this anyhow, maybe this doesn't matter
-> now.
 
-yes you're right. Those were the figures I was able to find in GIC400
-TRM and I was confused by the fact I was not able to find them in the
-code so I eventually put the same value as VGIC_NR_IRQS. I started
-looking at kvm-arm64/vgic-dyn and found this dist nr_irqs but need more
-time to investigate. Nethertheless his KVM_IRQCHIP_NUM_PINS is used in
-generic code (irqchip).
-> 
->> +
->>  /* PSCI interface */
->>  #define KVM_PSCI_FN_BASE		0x95c1ba5e
->>  #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
->> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->> index 4be5bb1..096692c 100644
->> --- a/arch/arm/kvm/Kconfig
->> +++ b/arch/arm/kvm/Kconfig
->> @@ -24,6 +24,7 @@ config KVM
->>  	select KVM_MMIO
->>  	select KVM_ARM_HOST
->>  	depends on ARM_VIRT_EXT && ARM_LPAE && !CPU_BIG_ENDIAN
->> +	select HAVE_KVM_EVENTFD
->>  	---help---
->>  	  Support hosting virtualized guest machines. You will also
->>  	  need to select one or more of the processor modules below.
->> @@ -56,6 +57,7 @@ config KVM_ARM_VGIC
->>  	bool "KVM support for Virtual GIC"
->>  	depends on KVM_ARM_HOST && OF
->>  	select HAVE_KVM_IRQCHIP
->> +	select HAVE_KVM_IRQ_ROUTING
->>  	default y
->>  	---help---
->>  	  Adds support for a hardware assisted, in-kernel GIC emulation.
->> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
->> index 789bca9..29de111 100644
->> --- a/arch/arm/kvm/Makefile
->> +++ b/arch/arm/kvm/Makefile
->> @@ -21,4 +21,5 @@ obj-y += kvm-arm.o init.o interrupts.o
->>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
->>  obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
->>  obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
->> +obj-$(CONFIG_HAVE_KVM_EVENTFD) += $(KVM)/eventfd.o $(KVM)/irqchip.o
->>  obj-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
->> diff --git a/arch/arm/kvm/irq.h b/arch/arm/kvm/irq.h
->> new file mode 100644
->> index 0000000..4d6fcc6
->> --- /dev/null
->> +++ b/arch/arm/kvm/irq.h
->> @@ -0,0 +1,25 @@
->> +/*
->> + * Copyright (C) 2014, STMicroelectronics
->> + * Authors: Eric Auger <eric.auger@st.com>
-> 
-> please use the Linaro copyright notice for this.  You can add your
-> @st.com e-mail in addition to the Linaro one in case you want that for
-> long-term support.
-
-OK I will do
-> 
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License, version 2, as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + */
->> +
->> +#ifndef __IRQ_H
->> +#define __IRQ_H
->> +
->> +#include <linux/kvm_host.h>
->> +/*
->> + * Placeholder for irqchip and irq/msi routing declarations
->> + * included in irqchip.c
->> + */
-> 
-> But none needed now?
-
-Yes nothing for the time being.
-> 
->> +
->> +#endif
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 56ff9be..39afa0d 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -93,6 +93,9 @@ static struct device_node *vgic_node;
->>  #define ACCESS_WRITE_VALUE	(3 << 1)
->>  #define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
->>  
->> +static struct kvm_irq_routing_entry identity_table[VGIC_NR_IRQS];
->> +static int set_default_routing_table(struct kvm *kvm);
->> +
->>  static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
->>  static void vgic_update_state(struct kvm *kvm);
->>  static void vgic_kick_vcpus(struct kvm *kvm);
->> @@ -408,11 +411,27 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
->>  					  struct kvm_exit_mmio *mmio,
->>  					  phys_addr_t offset)
->>  {
->> -	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +	unsigned int i;
->> +	bool is_assigned_irq;
->> +	DECLARE_BITMAP(old, VGIC_NR_SHARED_IRQS);
->> +	DECLARE_BITMAP(diff, VGIC_NR_SHARED_IRQS);
->> +	unsigned long *pending =
->> +		vgic_bitmap_get_shared_map(&dist->irq_state);
->> +	u32 *reg;
-> 
-> please add a blank line between your declarations and the actual code.
-
-OK
-> 
->> +	bitmap_copy(old, pending, VGIC_NR_SHARED_IRQS);
->> +	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
->>  				       vcpu->vcpu_id, offset);
->>  	vgic_reg_access(mmio, reg, offset,
->>  			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
->>  	if (mmio->is_write) {
->> +		pending = vgic_bitmap_get_shared_map(&dist->irq_state);
->> +		bitmap_xor(diff, old, pending, VGIC_NR_SHARED_IRQS);
->> +		for_each_set_bit(i, diff, VGIC_NR_SHARED_IRQS) {
->> +			is_assigned_irq = kvm_irq_has_notifier(vcpu->kvm, 0, i);
->> +			if (is_assigned_irq)
->> +				kvm_notify_acked_irq(vcpu->kvm, 0, i);
->> +		}
-> 
-> As Mark pointed out, just copy the vgic reg value and do a simple xor on
-> the two instead, and factor out the two lines that check for
-> is_assigned_irq and calles notify_acked so that you can give a small
-> static function a semantically meaningful name and call that from both
-> this function and the process_maintenance function.
-
-Yes I corrected this after looking into more details at the register
-semantic.
-> 
-> That being said, this whole thing feels a bit weird, I'll comment on the
-> other thread.
-OK
-> 
->>  		vgic_update_state(vcpu->kvm);
->>  		return true;
->>  	}
->> @@ -1172,6 +1191,8 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>  {
->>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->>  	bool level_pending = false;
->> +	struct kvm *kvm;
->> +	int is_assigned_irq;
->>  
->>  	kvm_debug("MISR = %08x\n", vgic_cpu->vgic_misr);
->>  
->> @@ -1189,12 +1210,23 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>  			vgic_irq_clear_active(vcpu, irq);
->>  			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_EOI;
->>  
->> +			kvm = vcpu->kvm;
->> +			is_assigned_irq =
->> +				kvm_irq_has_notifier(kvm, 0, irq-VGIC_NR_PRIVATE_IRQS);
-> 
-> I think the preferred style is to keep the function call name on the
-> same line as the assignment, and the do a line break on the parameter
-> that doesn't fit in the line width and align that to the opening
-> parenthesis on the funciton call.  At least I prefer it that way.
-
-OK I will change this.
-> 
-> also spaces around the '-', please.
-> 
->>  			/* Any additional pending interrupt? */
-> 
-> This comment seems to only aplly for non-assigned IRQs now, right?
-
-yes it does
-> 
->> -			if (vgic_dist_irq_is_pending(vcpu, irq)) {
->> -				vgic_cpu_irq_set(vcpu, irq);
->> -				level_pending = true;
->> -			} else {
->> +			if (is_assigned_irq) {
->>  				vgic_cpu_irq_clear(vcpu, irq);
->> +				kvm_debug("EOI irqchip routed vIRQ %d\n", irq);
->> +				kvm_notify_acked_irq(kvm, 0,
->> +					irq-VGIC_NR_PRIVATE_IRQS);
-> 
-> spaces around the '-', please.
-OK
-> 
->> +				vgic_dist_irq_clear(vcpu, irq);
->> +			} else {
->> +				if (vgic_dist_irq_is_pending(vcpu, irq)) {
->> +					vgic_cpu_irq_set(vcpu, irq);
->> +					level_pending = true;
->> +				} else {
->> +					vgic_cpu_irq_clear(vcpu, irq);
->> +				}
->>  			}
->>  
->>  			/*
->> @@ -1627,6 +1659,8 @@ int kvm_vgic_create(struct kvm *kvm)
->>  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
->>  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
->>  
->> +	set_default_routing_table(kvm);
->> +
->>  out_unlock:
->>  	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
->>  		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
->> @@ -2017,3 +2051,100 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
->>  	.get_attr = vgic_get_attr,
->>  	.has_attr = vgic_has_attr,
->>  };
->> +
->> +
->> +/*
->> + * set up a default identity routing table
->> + * The user-side can further change the routing table using
->> + * KVM_SET_GSI_ROUTING VM ioctl
->> + */
->> +
-> 
-> don't add this whitespace between comments and a function declaration,
-> please check the entire patch for this.
-OK
-> 
->> +static int set_default_routing_table(struct kvm *kvm)
->> +{
->> +	struct kvm_irq_routing_entry;
->> +	int i;
->> +	for (i = 0; i < VGIC_NR_IRQS; i++)	{
->> +		identity_table[i].gsi = i;
->> +		identity_table[i].type = KVM_IRQ_ROUTING_IRQCHIP;
->> +		identity_table[i].u.irqchip.irqchip = 0;
->> +		identity_table[i].u.irqchip.pin = i;
->> +	}
->> +	return kvm_set_irq_routing(kvm, identity_table,
->> +				   ARRAY_SIZE(identity_table), 0);
-> 
-> is identity table used after this stage?  If not, could you not
-> dynamically allocate it and free it after use so we don't waste this
-> staic allocation of memory in the kernel?
-
-yes this definitively can be optimized.
-> 
->> +}
->> +
->> +
->> +/*
->> + * Functions needed for GSI routing (used by irqchip.c)
->> + * implemented in irq_comm.c for x86 and ia64
->> + * in architecture specific files for some other archictures (powerpc)
->> + */
-> 
-> Hmmm, this comment seems rather pointless in this file.  If you want to
-> describe what this function does, then just document this functionality
-> and the parameters/return value, i.e.
-> 
-> vgic_set_assigned_irq - set state of IRQs driven by irqfd
-> 
-> When an IRQ is raised or lowered.... blah blah blah blah.
-> 
-> @e:   the routing entry describing...
-> @kvm: the kvm struct
-> and so on.
-
-> 
-> return 0 on success, -error on errors.
-> 
-
-OK
->> +
->> +static int vgic_set_assigned_irq(struct kvm_kernel_irq_routing_entry *e,
->> +			   struct kvm *kvm, int irq_source_id, int level,
->> +			   bool line_status)
->> +{
->> +	unsigned int spi = e->irqchip.pin + VGIC_NR_PRIVATE_IRQS;
-> 
-> I noticed this in the changelogs too, where's the rationale/API
-> documentaiton for the use of irqchip.pin and its semantics on ARM?
-> 
-> Should we add something in Documentation/virtual/kvm/api.txt ?
-
-- in 4.24 KVM_CREATE_IRQCHIP I might add that similarly to s390 a dummy
-identity table is created.
-
-- KVM_CAP_IRQFD says "kvm_irqfd.gsi specifies the irqchip pin toggled by
-this event.  When an event is triggered on the eventfd, an interrupt is
-injected into the guest using the specified gsi pin"
-
-Assuming the standard use case is to use an identity/dummy GSI table the
-irqchip.pin still remains the "irqchip pin" toggled on eventfd.
-
-By the way I might remove the mention to the use case where the gsi !=
-irqchip.pin.
-
-Now when reading 4.25 KVM_IRQ_LINE, it is said that it is used to inject
-a GSI as well.
-
-Now on ARM The GSI has the following content.
-
-  bits:  | 31 ... 24 | 23  ... 16 | 15    ...    0 |
-  field: | irq_type  | vcpu_index |     irq_id     |
-
-As such that's true that currently there is an inconsistency.
-
-Currently my GSI == spi number whereas the GSI as injected by
-KVM_IRQ_LINE has the above format.
-> 
->> +
->> +	if (irq_source_id == KVM_USERSPACE_IRQ_SOURCE_ID) {
->> +		/*
->> +		 * This path is not tested yet,
->> +		 * only irqchip with resampler was exercised
->> +		 */
->> +		kvm_vgic_inject_irq(kvm, 0, spi, level);
-> 
-> hmmm, stuff like this definitely makes this patch an RFC.
-
-Yes I acknowledge I shall step back to RFC. I was a bit eager.
-> 
->> +	} else if (irq_source_id == KVM_IRQFD_RESAMPLE_IRQ_SOURCE_ID) {
->> +		if (level == 1) {
-> 
-> This seems very wrong.  What if an external device raises a
-> level-triggered IRQ, but then lowers it again, without the guest was
-> ever running, now you have to wait until the guest sees the (now
-> inactive) interrupt and EOIs it before the interrupt is lowered on the
-> vgic?
-Hum I am bit confused here. when you enter that code, this means an
-irqfd was triggered. This irqfd was registered by some user code that is
-supposed to be alive and do the proper action to complete the IRQ. in my
-case the xgmac toggles down the IRQ if anyone resets the IRQ status
-register? this action is done in the xgmac guest ISR. A device
-reset/error? might provoke the IRQ pin toggling done. Do you see any
-other events?
-> 
->> +			kvm_debug("Inject irqchip routed vIRQ %d\n",
->> +					e->irqchip.pin);
->> +			kvm_vgic_inject_irq(kvm, 0, spi, level);
->> +			/*
->> +			 * toggling down vIRQ wire is directly handled in
->> +			 * process_maintenance for this reason:
->> +			 * irqfd_resampler_ack is called in
->> +			 * process_maintenance which holds the dist lock.
->> +			 * irqfd_resampler_ack calls kvm_set_irq
->> +			 * which ends_up calling kvm_vgic_inject_irq.
->> +			 * This later attempts to take the lock -> deadlock!
->> +			 */
-> 
-> Not sure I understand this comment.  What are we trying to achieve, are
-> we using some sort of a workaround to avoid a deadlock?
-
-What I wanted to point out here is I would have prefered to handle both
-levels 0 and 1 in a symetrical manner. irqfd_resampler_ack (in eventfd)
-is calling kvm_set_irq with level 0. This would be the prefered way to
-toggle down the SPI at GIC input instead of doing this in
-process_maintenance in a dirty manner. However this does work because
-irqfd_resampler_ack is called in process_maintenance (the place where
-the EOI is analyzed). process_maintenance holds the dist lock and would
-eventually call kvm_vgic_inject_irq which also attempts to take the lock.
-	
-> 
->> +		}
->> +	}
->> +	return 0;
->> +
->> +}
->> +
->> +/* void implementation requested to compile irqchip.c */
->> +
-> 
-> hmm, "TODO: MSI routing not yet implemented" seems more appropriate.
-
-OK
-> 
->> +int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
->> +		struct kvm *kvm, int irq_source_id, int level, bool line_status)
->> +{
->> +	return 0;
->> +}
->> +
->> +int kvm_set_routing_entry(struct kvm_irq_routing_table *rt,
->> +			  struct kvm_kernel_irq_routing_entry *e,
->> +			  const struct kvm_irq_routing_entry *ue)
->> +{
->> +	int r = -EINVAL;
->> +
->> +	switch (ue->type) {
->> +	case KVM_IRQ_ROUTING_IRQCHIP:
->> +		e->set = vgic_set_assigned_irq;
->> +		e->irqchip.irqchip = ue->u.irqchip.irqchip;
->> +		e->irqchip.pin = ue->u.irqchip.pin;
->> +		if (e->irqchip.pin >= KVM_IRQCHIP_NUM_PINS)
->> +			goto out;
->> +		/* chip[0][virtualID] = physicalID  */
->> +		rt->chip[ue->u.irqchip.irqchip][e->irqchip.pin] = ue->gsi;
-> 
-> did we verify ue->u.irqchip.irqchip anywhere before reaching this code?
-
-No you are right. Should add this check.
-> 
->> +		break;
->> +	default:
->> +		goto out;
->> +	}
->> +
->> +	r = 0;
->> +out:
->> +	return r;
->> +}
->> +
->> +
->> +
->> +
-> 
-> That's a lot of unnecessary white space.
-OK
-> 
->> -- 
->> 1.9.1
->>
-> 
-> Thanks,
-> -Christoffer
-> 
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 7745629..32bfcf1 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -1,25 +1,15 @@
+ config SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+ 	depends on PLAT_SAMSUNG
+-	select S3C2410_DMA if ARCH_S3C24XX
+ 	select S3C64XX_PL080 if ARCH_S3C64XX
+-	select SND_S3C_DMA if !ARCH_S3C24XX
+-	select SND_S3C_DMA_LEGACY if ARCH_S3C24XX
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM if !ARCH_S3C24XX
+ 	help
+ 	  Say Y or M if you want to add support for codecs attached to
+ 	  the Samsung SoCs' Audio interfaces. You will also need to
+ 	  select the audio interfaces to support below.
+ 
+-config SND_S3C_DMA
+-	tristate
+-
+-config SND_S3C_DMA_LEGACY
+-	tristate
+-
+ config SND_S3C24XX_I2S
+ 	tristate
+-	select S3C24XX_DMA
+ 
+ config SND_S3C_I2SV2_SOC
+ 	tristate
+@@ -27,7 +17,6 @@ config SND_S3C_I2SV2_SOC
+ config SND_S3C2412_SOC_I2S
+ 	tristate
+ 	select SND_S3C_I2SV2_SOC
+-	select S3C2410_DMA
+ 
+ config SND_SAMSUNG_PCM
+ 	tristate
+@@ -83,7 +72,6 @@ config SND_SOC_SAMSUNG_SMDK_WM8994
+ config SND_SOC_SAMSUNG_SMDK2443_WM9710
+ 	tristate "SoC AC97 Audio support for SMDK2443 - WM9710"
+ 	depends on SND_SOC_SAMSUNG && MACH_SMDK2443
+-	select S3C2410_DMA
+ 	select AC97_BUS
+ 	select SND_SOC_AC97_CODEC
+ 	select SND_SAMSUNG_AC97
+@@ -94,7 +82,6 @@ config SND_SOC_SAMSUNG_SMDK2443_WM9710
+ config SND_SOC_SAMSUNG_LN2440SBC_ALC650
+ 	tristate "SoC AC97 Audio support for LN2440SBC - ALC650"
+ 	depends on SND_SOC_SAMSUNG && ARCH_S3C24XX
+-	select S3C2410_DMA
+ 	select AC97_BUS
+ 	select SND_SOC_AC97_CODEC
+ 	select SND_SAMSUNG_AC97
+diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
+index 6d0212b..f69f490 100644
+--- a/sound/soc/samsung/Makefile
++++ b/sound/soc/samsung/Makefile
+@@ -1,6 +1,5 @@
+ # S3c24XX Platform Support
+ snd-soc-s3c-dma-objs := dmaengine.o
+-snd-soc-s3c-dma-legacy-objs := dma.o
+ snd-soc-idma-objs := idma.o
+ snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
+ snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
+@@ -10,8 +9,7 @@ snd-soc-samsung-spdif-objs := spdif.o
+ snd-soc-pcm-objs := pcm.o
+ snd-soc-i2s-objs := i2s.o
+ 
+-obj-$(CONFIG_SND_S3C_DMA) += snd-soc-s3c-dma.o
+-obj-$(CONFIG_SND_S3C_DMA_LEGACY) += snd-soc-s3c-dma-legacy.o
++obj-$(CONFIG_SND_SOC_SAMSUNG) += snd-soc-s3c-dma.o
+ obj-$(CONFIG_SND_S3C24XX_I2S) += snd-soc-s3c24xx-i2s.o
+ obj-$(CONFIG_SND_SAMSUNG_AC97) += snd-soc-ac97.o
+ obj-$(CONFIG_SND_S3C2412_SOC_I2S) += snd-soc-s3c2412-i2s.o
+diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
+index 68d9303..a674827 100644
+--- a/sound/soc/samsung/ac97.c
++++ b/sound/soc/samsung/ac97.c
+@@ -225,9 +225,6 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
+ 				struct snd_soc_dai *dai)
+ {
+ 	u32 ac_glbctrl;
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct s3c_dma_params *dma_data =
+-		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+ 
+ 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+@@ -253,11 +250,6 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
+ 
+ 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 
+-	if (!dma_data->ops)
+-		dma_data->ops = samsung_dma_get_ops();
+-
+-	dma_data->ops->started(dma_data->channel);
+-
+ 	return 0;
+ }
+ 
+@@ -265,9 +257,6 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
+ 				    int cmd, struct snd_soc_dai *dai)
+ {
+ 	u32 ac_glbctrl;
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct s3c_dma_params *dma_data =
+-		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+ 
+ 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 	ac_glbctrl &= ~S3C_AC97_GLBCTRL_MICINTM_MASK;
+@@ -287,11 +276,6 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
+ 
+ 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 
+-	if (!dma_data->ops)
+-		dma_data->ops = samsung_dma_get_ops();
+-
+-	dma_data->ops->started(dma_data->channel);
+-
+ 	return 0;
+ }
+ 
+diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+deleted file mode 100644
+index d9dc7bc..0000000
+--- a/sound/soc/samsung/dma.c
++++ /dev/null
+@@ -1,454 +0,0 @@
+-/*
+- * dma.c  --  ALSA Soc Audio Layer
+- *
+- * (c) 2006 Wolfson Microelectronics PLC.
+- * Graeme Gregory graeme.gregory at wolfsonmicro.com or linux at wolfsonmicro.com
+- *
+- * Copyright 2004-2005 Simtec Electronics
+- *	http://armlinux.simtec.co.uk/
+- *	Ben Dooks <ben@simtec.co.uk>
+- *
+- *  This program is free software; you can redistribute  it and/or modify it
+- *  under  the terms of  the GNU General  Public License as published by the
+- *  Free Software Foundation;  either version 2 of the  License, or (at your
+- *  option) any later version.
+- */
+-
+-#include <linux/slab.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/module.h>
+-
+-#include <sound/soc.h>
+-#include <sound/pcm_params.h>
+-
+-#include <asm/dma.h>
+-#include <mach/hardware.h>
+-#include <mach/dma.h>
+-
+-#include "dma.h"
+-
+-#define ST_RUNNING		(1<<0)
+-#define ST_OPENED		(1<<1)
+-
+-static const struct snd_pcm_hardware dma_hardware = {
+-	.info			= SNDRV_PCM_INFO_INTERLEAVED |
+-				    SNDRV_PCM_INFO_BLOCK_TRANSFER |
+-				    SNDRV_PCM_INFO_MMAP |
+-				    SNDRV_PCM_INFO_MMAP_VALID,
+-	.buffer_bytes_max	= 128*1024,
+-	.period_bytes_min	= PAGE_SIZE,
+-	.period_bytes_max	= PAGE_SIZE*2,
+-	.periods_min		= 2,
+-	.periods_max		= 128,
+-	.fifo_size		= 32,
+-};
+-
+-struct runtime_data {
+-	spinlock_t lock;
+-	int state;
+-	unsigned int dma_loaded;
+-	unsigned int dma_period;
+-	dma_addr_t dma_start;
+-	dma_addr_t dma_pos;
+-	dma_addr_t dma_end;
+-	struct s3c_dma_params *params;
+-};
+-
+-static void audio_buffdone(void *data);
+-
+-/* dma_enqueue
+- *
+- * place a dma buffer onto the queue for the dma system
+- * to handle.
+- */
+-static void dma_enqueue(struct snd_pcm_substream *substream)
+-{
+-	struct runtime_data *prtd = substream->runtime->private_data;
+-	dma_addr_t pos = prtd->dma_pos;
+-	unsigned int limit;
+-	struct samsung_dma_prep dma_info;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	limit = (prtd->dma_end - prtd->dma_start) / prtd->dma_period;
+-
+-	pr_debug("%s: loaded %d, limit %d\n",
+-				__func__, prtd->dma_loaded, limit);
+-
+-	dma_info.cap = (samsung_dma_has_circular() ? DMA_CYCLIC : DMA_SLAVE);
+-	dma_info.direction =
+-		(substream->stream == SNDRV_PCM_STREAM_PLAYBACK
+-		? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM);
+-	dma_info.fp = audio_buffdone;
+-	dma_info.fp_param = substream;
+-	dma_info.period = prtd->dma_period;
+-	dma_info.len = prtd->dma_period*limit;
+-
+-	if (dma_info.cap == DMA_CYCLIC) {
+-		dma_info.buf = pos;
+-		prtd->params->ops->prepare(prtd->params->ch, &dma_info);
+-		prtd->dma_loaded += limit;
+-		return;
+-	}
+-
+-	while (prtd->dma_loaded < limit) {
+-		pr_debug("dma_loaded: %d\n", prtd->dma_loaded);
+-
+-		if ((pos + dma_info.period) > prtd->dma_end) {
+-			dma_info.period  = prtd->dma_end - pos;
+-			pr_debug("%s: corrected dma len %ld\n",
+-					__func__, dma_info.period);
+-		}
+-
+-		dma_info.buf = pos;
+-		prtd->params->ops->prepare(prtd->params->ch, &dma_info);
+-
+-		prtd->dma_loaded++;
+-		pos += prtd->dma_period;
+-		if (pos >= prtd->dma_end)
+-			pos = prtd->dma_start;
+-	}
+-
+-	prtd->dma_pos = pos;
+-}
+-
+-static void audio_buffdone(void *data)
+-{
+-	struct snd_pcm_substream *substream = data;
+-	struct runtime_data *prtd = substream->runtime->private_data;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	if (prtd->state & ST_RUNNING) {
+-		prtd->dma_pos += prtd->dma_period;
+-		if (prtd->dma_pos >= prtd->dma_end)
+-			prtd->dma_pos = prtd->dma_start;
+-
+-		if (substream)
+-			snd_pcm_period_elapsed(substream);
+-
+-		spin_lock(&prtd->lock);
+-		if (!samsung_dma_has_circular()) {
+-			prtd->dma_loaded--;
+-			dma_enqueue(substream);
+-		}
+-		spin_unlock(&prtd->lock);
+-	}
+-}
+-
+-static int dma_hw_params(struct snd_pcm_substream *substream,
+-	struct snd_pcm_hw_params *params)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct runtime_data *prtd = runtime->private_data;
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	unsigned long totbytes = params_buffer_bytes(params);
+-	struct s3c_dma_params *dma =
+-		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+-	struct samsung_dma_req req;
+-	struct samsung_dma_config config;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	/* return if this is a bufferless transfer e.g.
+-	 * codec <--> BT codec or GSM modem -- lg FIXME */
+-	if (!dma)
+-		return 0;
+-
+-	/* this may get called several times by oss emulation
+-	 * with different params -HW */
+-	if (prtd->params == NULL) {
+-		/* prepare DMA */
+-		prtd->params = dma;
+-
+-		pr_debug("params %p, client %p, channel %d\n", prtd->params,
+-			prtd->params->client, prtd->params->channel);
+-
+-		prtd->params->ops = samsung_dma_get_ops();
+-
+-		req.cap = (samsung_dma_has_circular() ?
+-			DMA_CYCLIC : DMA_SLAVE);
+-		req.client = prtd->params->client;
+-		config.direction =
+-			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK
+-			? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM);
+-		config.width = prtd->params->dma_size;
+-		config.fifo = prtd->params->dma_addr;
+-		prtd->params->ch = prtd->params->ops->request(
+-				prtd->params->channel, &req, rtd->cpu_dai->dev,
+-				prtd->params->ch_name);
+-		if (!prtd->params->ch) {
+-			pr_err("Failed to allocate DMA channel\n");
+-			return -ENXIO;
+-		}
+-		prtd->params->ops->config(prtd->params->ch, &config);
+-	}
+-
+-	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+-
+-	runtime->dma_bytes = totbytes;
+-
+-	spin_lock_irq(&prtd->lock);
+-	prtd->dma_loaded = 0;
+-	prtd->dma_period = params_period_bytes(params);
+-	prtd->dma_start = runtime->dma_addr;
+-	prtd->dma_pos = prtd->dma_start;
+-	prtd->dma_end = prtd->dma_start + totbytes;
+-	spin_unlock_irq(&prtd->lock);
+-
+-	return 0;
+-}
+-
+-static int dma_hw_free(struct snd_pcm_substream *substream)
+-{
+-	struct runtime_data *prtd = substream->runtime->private_data;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	snd_pcm_set_runtime_buffer(substream, NULL);
+-
+-	if (prtd->params) {
+-		prtd->params->ops->flush(prtd->params->ch);
+-		prtd->params->ops->release(prtd->params->ch,
+-					prtd->params->client);
+-		prtd->params = NULL;
+-	}
+-
+-	return 0;
+-}
+-
+-static int dma_prepare(struct snd_pcm_substream *substream)
+-{
+-	struct runtime_data *prtd = substream->runtime->private_data;
+-	int ret = 0;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	/* return if this is a bufferless transfer e.g.
+-	 * codec <--> BT codec or GSM modem -- lg FIXME */
+-	if (!prtd->params)
+-		return 0;
+-
+-	/* flush the DMA channel */
+-	prtd->params->ops->flush(prtd->params->ch);
+-
+-	prtd->dma_loaded = 0;
+-	prtd->dma_pos = prtd->dma_start;
+-
+-	/* enqueue dma buffers */
+-	dma_enqueue(substream);
+-
+-	return ret;
+-}
+-
+-static int dma_trigger(struct snd_pcm_substream *substream, int cmd)
+-{
+-	struct runtime_data *prtd = substream->runtime->private_data;
+-	int ret = 0;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	spin_lock(&prtd->lock);
+-
+-	switch (cmd) {
+-	case SNDRV_PCM_TRIGGER_START:
+-		prtd->state |= ST_RUNNING;
+-		prtd->params->ops->trigger(prtd->params->ch);
+-		break;
+-
+-	case SNDRV_PCM_TRIGGER_STOP:
+-		prtd->state &= ~ST_RUNNING;
+-		prtd->params->ops->stop(prtd->params->ch);
+-		break;
+-
+-	default:
+-		ret = -EINVAL;
+-		break;
+-	}
+-
+-	spin_unlock(&prtd->lock);
+-
+-	return ret;
+-}
+-
+-static snd_pcm_uframes_t
+-dma_pointer(struct snd_pcm_substream *substream)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct runtime_data *prtd = runtime->private_data;
+-	unsigned long res;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	res = prtd->dma_pos - prtd->dma_start;
+-
+-	pr_debug("Pointer offset: %lu\n", res);
+-
+-	/* we seem to be getting the odd error from the pcm library due
+-	 * to out-of-bounds pointers. this is maybe due to the dma engine
+-	 * not having loaded the new values for the channel before being
+-	 * called... (todo - fix )
+-	 */
+-
+-	if (res >= snd_pcm_lib_buffer_bytes(substream)) {
+-		if (res == snd_pcm_lib_buffer_bytes(substream))
+-			res = 0;
+-	}
+-
+-	return bytes_to_frames(substream->runtime, res);
+-}
+-
+-static int dma_open(struct snd_pcm_substream *substream)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct runtime_data *prtd;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
+-	snd_soc_set_runtime_hwparams(substream, &dma_hardware);
+-
+-	prtd = kzalloc(sizeof(struct runtime_data), GFP_KERNEL);
+-	if (prtd == NULL)
+-		return -ENOMEM;
+-
+-	spin_lock_init(&prtd->lock);
+-
+-	runtime->private_data = prtd;
+-	return 0;
+-}
+-
+-static int dma_close(struct snd_pcm_substream *substream)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-	struct runtime_data *prtd = runtime->private_data;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	if (!prtd)
+-		pr_debug("dma_close called with prtd == NULL\n");
+-
+-	kfree(prtd);
+-
+-	return 0;
+-}
+-
+-static int dma_mmap(struct snd_pcm_substream *substream,
+-	struct vm_area_struct *vma)
+-{
+-	struct snd_pcm_runtime *runtime = substream->runtime;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	return dma_mmap_writecombine(substream->pcm->card->dev, vma,
+-				     runtime->dma_area,
+-				     runtime->dma_addr,
+-				     runtime->dma_bytes);
+-}
+-
+-static struct snd_pcm_ops dma_ops = {
+-	.open		= dma_open,
+-	.close		= dma_close,
+-	.ioctl		= snd_pcm_lib_ioctl,
+-	.hw_params	= dma_hw_params,
+-	.hw_free	= dma_hw_free,
+-	.prepare	= dma_prepare,
+-	.trigger	= dma_trigger,
+-	.pointer	= dma_pointer,
+-	.mmap		= dma_mmap,
+-};
+-
+-static int preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
+-{
+-	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
+-	struct snd_dma_buffer *buf = &substream->dma_buffer;
+-	size_t size = dma_hardware.buffer_bytes_max;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	buf->dev.type = SNDRV_DMA_TYPE_DEV;
+-	buf->dev.dev = pcm->card->dev;
+-	buf->private_data = NULL;
+-	buf->area = dma_alloc_writecombine(pcm->card->dev, size,
+-					   &buf->addr, GFP_KERNEL);
+-	if (!buf->area)
+-		return -ENOMEM;
+-	buf->bytes = size;
+-	return 0;
+-}
+-
+-static void dma_free_dma_buffers(struct snd_pcm *pcm)
+-{
+-	struct snd_pcm_substream *substream;
+-	struct snd_dma_buffer *buf;
+-	int stream;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	for (stream = 0; stream < 2; stream++) {
+-		substream = pcm->streams[stream].substream;
+-		if (!substream)
+-			continue;
+-
+-		buf = &substream->dma_buffer;
+-		if (!buf->area)
+-			continue;
+-
+-		dma_free_writecombine(pcm->card->dev, buf->bytes,
+-				      buf->area, buf->addr);
+-		buf->area = NULL;
+-	}
+-}
+-
+-static int dma_new(struct snd_soc_pcm_runtime *rtd)
+-{
+-	struct snd_card *card = rtd->card->snd_card;
+-	struct snd_pcm *pcm = rtd->pcm;
+-	int ret;
+-
+-	pr_debug("Entered %s\n", __func__);
+-
+-	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		return ret;
+-
+-	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
+-		ret = preallocate_dma_buffer(pcm,
+-			SNDRV_PCM_STREAM_PLAYBACK);
+-		if (ret)
+-			goto out;
+-	}
+-
+-	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
+-		ret = preallocate_dma_buffer(pcm,
+-			SNDRV_PCM_STREAM_CAPTURE);
+-		if (ret)
+-			goto out;
+-	}
+-out:
+-	return ret;
+-}
+-
+-static struct snd_soc_platform_driver samsung_asoc_platform = {
+-	.ops		= &dma_ops,
+-	.pcm_new	= dma_new,
+-	.pcm_free	= dma_free_dma_buffers,
+-};
+-
+-void samsung_asoc_init_dma_data(struct snd_soc_dai *dai,
+-				struct s3c_dma_params *playback,
+-				struct s3c_dma_params *capture)
+-{
+-	snd_soc_dai_init_dma_data(dai, playback, capture);
+-}
+-EXPORT_SYMBOL_GPL(samsung_asoc_init_dma_data);
+-
+-int samsung_asoc_dma_platform_register(struct device *dev)
+-{
+-	return devm_snd_soc_register_platform(dev, &samsung_asoc_platform);
+-}
+-EXPORT_SYMBOL_GPL(samsung_asoc_dma_platform_register);
+-
+-MODULE_AUTHOR("Ben Dooks, <ben@simtec.co.uk>");
+-MODULE_DESCRIPTION("Samsung ASoC DMA Driver");
+-MODULE_LICENSE("GPL");
+diff --git a/sound/soc/samsung/dmaengine.c b/sound/soc/samsung/dmaengine.c
+index a0e4e79..506f5bf 100644
+--- a/sound/soc/samsung/dmaengine.c
++++ b/sound/soc/samsung/dmaengine.c
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/module.h>
+ #include <linux/amba/pl08x.h>
++#include <linux/platform_data/dma-s3c24xx.h>
+ 
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+@@ -29,6 +30,8 @@
+ 
+ #ifdef CONFIG_ARCH_S3C64XX
+ #define filter_fn pl08x_filter_id
++#elif defined(CONFIG_ARCH_S3C24XX)
++#define filter_fn s3c24xx_dma_filter
+ #else
+ #define filter_fn NULL
+ #endif
+diff --git a/sound/soc/samsung/s3c24xx-i2s.c b/sound/soc/samsung/s3c24xx-i2s.c
+index 9aba9fb..890d241 100644
+--- a/sound/soc/samsung/s3c24xx-i2s.c
++++ b/sound/soc/samsung/s3c24xx-i2s.c
+@@ -290,7 +290,6 @@ static int s3c24xx_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		else
+ 			s3c24xx_snd_txctrl(1);
+ 
+-		s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
+ 		break;
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_SUSPEND:
