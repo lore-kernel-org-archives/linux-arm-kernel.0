@@ -1,50 +1,36 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu,  5 Jun 2014 19:26:21 +0200
-Subject: [PATCH v7 7/7] arm: mediatek: add dts for Aquaris5 mobile phone
-In-Reply-To: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
-References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1401989181-4712-8-git-send-email-matthias.bgg@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 05 Jun 2014 11:29:29 -0600
+Subject: [PATCH 0/9] Serial ATA support for NVIDIA Tegra124
+In-Reply-To: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <5390A8F9.2090408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aquaris5 is a mobile phone based on the MT6589 SoC.
+On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+> Hi,
+> 
+> This series adds support for the onboard AHCI-compliant Serial ATA
+> controller found on Tegra124 systems-on-chip. The controller is
+> enabled on Jetson TK1. The series depends on Peter's efuse series 
+> and Thierry's yet to be submitted XUSB pinctrl driver.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm/boot/dts/mt6589-aquaris5.dts |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
+This series includes patches to a lot of different subsystems. That will
+complicate applying it.
 
-diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-new file mode 100644
-index 0000000..443b446
---- /dev/null
-+++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (c) 2014 MundoReader S.L.
-+ * Author: Matthias Brugger <matthias.bgg@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "mt6589.dtsi"
-+
-+/ {
-+	model = "bq Aquaris5";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
--- 
-1.7.9.5
+Can you write a summary of the *compile time* dependencies, since that
+will influence how the patches get merged.
+
+You mentioned that this series depends on efuse and XUSB padctl. Can you
+point out which specific parts of this series depend on which of those
+two other series, and whether this is a compile-time or run-time dependency.
+
+I hope that the drivers/ata patches, drivers/clk patches, DT, and
+defconfig patches can each be applied to their normal tree and don't
+depend on each-other at compile-time at all.
+
+At run-time, obviously all the patches are needed to make the code work,
+but since this is a new feature, it's fine if this all only works once
+everything is merged together in linux-next or Linus's tree.
+
+Thanks.
