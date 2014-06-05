@@ -1,925 +1,574 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 5 Jun 2014 16:09:13 +0300
-Subject: [PATCH v7 5/5] ARM: tegra: build new fuse driver in drivers/misc
-In-Reply-To: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1401973754-19701-6-git-send-email-pdeschrijver@nvidia.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 05 Jun 2014 15:15:15 +0200
+Subject: [PATCH v2] ARM: KVM: add irqfd and irq routing support
+In-Reply-To: <20140605102831.GA3994@lvm>
+References: <1401694196-30861-1-git-send-email-eric.auger@linaro.org>
+ <20140605102831.GA3994@lvm>
+Message-ID: <53906D63.9040508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra fuse code has moved to drivers/misc/fuse/tegra. Enable the
-building of that code, and disable the building of the old fuse code in
-arch/arm/mach-tegra/.
+On 06/05/2014 12:28 PM, Christoffer Dall wrote:
+> On Mon, Jun 02, 2014 at 09:29:56AM +0200, Eric Auger wrote:
+>> This patch enables irqfd and irq routing on ARM.
+>>
+>> It turns on CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQ_ROUTING
+>>
+>> irqfd framework enables to assign physical IRQs to guests.
+>>
+>> 1) user-side uses KVM_IRQFD VM ioctl to pass KVM a kvm_irqfd struct that
+>> associates a VM, an eventfd, an IRQ number (aka. the GSI). When an actor
+>> signals the eventfd (typically a VFIO platform driver), the irqfd subsystem
+>> injects the specified IRQ into the VM (the "GSI" takes the semantic of a
+>> virtual IRQ for that guest).
+>>
+>> 2) the other use case is user-side does 1) and uses KVM_SET_GSI_ROUTING
+>> VM ioctl to create an association between a VM, a physical IRQ (aka GSI) and
+>> a virtual IRQ (aka irchip.pin).  This creates a so-called GSI routing entry.
+>> When someone triggers the eventfd, irqfd handles it but uses the specified
+>> routing and eventually injects irqchip.pin virtual IRQ into the guest. In that
+>> context the GSI takes the semantic of a physical IRQ while the irqchip.pin
+>> takes the semantic of a virtual IRQ.
+>>
+>> in 1) routing is used by irqfd but an identity routing is created by default
+>> making the gsi = irqchip.pin. Note on ARM there is a single interrupt
+>> controller kind, the GIC.
+>>
+>> GSI routing mostly is implemented in generic irqchip.c.
+>> The tiny ARM specific part is directly implemented in the virtual interrupt
+>> controller (vgic.c) as it is done for powerpc for instance. This option was
+>> prefered compared to implementing other #ifdef in irq_comm.c (x86 and ia64).
+>> Hence irq_comm.c is not used at all.
+>>
+>> Routing currently is not used for anything else than irqfd IRQ injection. Only
+>> SPI can be injected. This means the vgic is not totally hidden behind the
+>> irqchip. There are separate discussions on PPI/SGI routing.
+> 
+> What do you mean here?  Is there an ongoing discussion on the mailing
+> list somewhere?
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/mach-tegra/Makefile          |    4 -
- arch/arm/mach-tegra/fuse.c            |  252 ----------------------------
- arch/arm/mach-tegra/fuse.h            |   61 -------
- arch/arm/mach-tegra/tegra114_speedo.c |  105 ------------
- arch/arm/mach-tegra/tegra20_speedo.c  |  110 ------------
- arch/arm/mach-tegra/tegra30_speedo.c  |  293 ---------------------------------
- drivers/misc/Makefile                 |    1 +
- 7 files changed, 1 insertions(+), 825 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/fuse.c
- delete mode 100644 arch/arm/mach-tegra/fuse.h
- delete mode 100644 arch/arm/mach-tegra/tegra114_speedo.c
- delete mode 100644 arch/arm/mach-tegra/tegra20_speedo.c
- delete mode 100644 arch/arm/mach-tegra/tegra30_speedo.c
+Hi Christoffer,
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 6fbfbb7..e8601bb 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -2,7 +2,6 @@ asflags-y				+= -march=armv7-a
- 
- obj-y                                   += io.o
- obj-y                                   += irq.o
--obj-y					+= fuse.o
- obj-y					+= pmc.o
- obj-y					+= flowctrl.o
- obj-y					+= powergate.o
-@@ -13,13 +12,11 @@ obj-y					+= reset-handler.o
- obj-y					+= sleep.o
- obj-y					+= tegra.o
- obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
--obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra20_speedo.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-tegra20.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pm-tegra20.o
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= cpuidle-tegra20.o
- endif
--obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_speedo.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= sleep-tegra30.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= pm-tegra30.o
- ifeq ($(CONFIG_CPU_IDLE),y)
-@@ -28,7 +25,6 @@ endif
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
- 
--obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= tegra114_speedo.o
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= sleep-tegra30.o
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= pm-tegra30.o
- ifeq ($(CONFIG_CPU_IDLE),y)
-diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-deleted file mode 100644
-index c9ac23b..0000000
---- a/arch/arm/mach-tegra/fuse.c
-+++ /dev/null
-@@ -1,252 +0,0 @@
--/*
-- * arch/arm/mach-tegra/fuse.c
-- *
-- * Copyright (C) 2010 Google, Inc.
-- * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-- *
-- * Author:
-- *	Colin Cross <ccross@android.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/export.h>
--#include <linux/random.h>
--#include <linux/clk.h>
--#include <linux/tegra-soc.h>
--
--#include "fuse.h"
--#include "iomap.h"
--#include "apbio.h"
--
--/* Tegra20 only */
--#define FUSE_UID_LOW		0x108
--#define FUSE_UID_HIGH		0x10c
--
--/* Tegra30 and later */
--#define FUSE_VENDOR_CODE	0x200
--#define FUSE_FAB_CODE		0x204
--#define FUSE_LOT_CODE_0		0x208
--#define FUSE_LOT_CODE_1		0x20c
--#define FUSE_WAFER_ID		0x210
--#define FUSE_X_COORDINATE	0x214
--#define FUSE_Y_COORDINATE	0x218
--
--#define FUSE_SKU_INFO		0x110
--
--#define TEGRA20_FUSE_SPARE_BIT		0x200
--#define TEGRA30_FUSE_SPARE_BIT		0x244
--
--int tegra_sku_id;
--int tegra_cpu_process_id;
--int tegra_core_process_id;
--int tegra_chip_id;
--int tegra_cpu_speedo_id;		/* only exist in Tegra30 and later */
--int tegra_soc_speedo_id;
--enum tegra_revision tegra_revision;
--
--static struct clk *fuse_clk;
--static int tegra_fuse_spare_bit;
--static void (*tegra_init_speedo_data)(void);
--
--/* The BCT to use at boot is specified by board straps that can be read
-- * through a APB misc register and decoded. 2 bits, i.e. 4 possible BCTs.
-- */
--int tegra_bct_strapping;
--
--#define STRAP_OPT 0x008
--#define GMI_AD0 (1 << 4)
--#define GMI_AD1 (1 << 5)
--#define RAM_ID_MASK (GMI_AD0 | GMI_AD1)
--#define RAM_CODE_SHIFT 4
--
--static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
--	[TEGRA_REVISION_UNKNOWN] = "unknown",
--	[TEGRA_REVISION_A01]     = "A01",
--	[TEGRA_REVISION_A02]     = "A02",
--	[TEGRA_REVISION_A03]     = "A03",
--	[TEGRA_REVISION_A03p]    = "A03 prime",
--	[TEGRA_REVISION_A04]     = "A04",
--};
--
--static void tegra_fuse_enable_clk(void)
--{
--	if (IS_ERR(fuse_clk))
--		fuse_clk = clk_get_sys(NULL, "fuse");
--	if (IS_ERR(fuse_clk))
--		return;
--	clk_prepare_enable(fuse_clk);
--}
--
--static void tegra_fuse_disable_clk(void)
--{
--	if (IS_ERR(fuse_clk))
--		return;
--	clk_disable_unprepare(fuse_clk);
--}
--
--u32 tegra_fuse_readl(unsigned long offset)
--{
--	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
--}
--
--bool tegra_spare_fuse(int bit)
--{
--	bool ret;
--
--	tegra_fuse_enable_clk();
--
--	ret = tegra_fuse_readl(tegra_fuse_spare_bit + bit * 4);
--
--	tegra_fuse_disable_clk();
--
--	return ret;
--}
--
--static enum tegra_revision tegra_get_revision(u32 id)
--{
--	u32 minor_rev = (id >> 16) & 0xf;
--
--	switch (minor_rev) {
--	case 1:
--		return TEGRA_REVISION_A01;
--	case 2:
--		return TEGRA_REVISION_A02;
--	case 3:
--		if (tegra_chip_id == TEGRA20 &&
--			(tegra_spare_fuse(18) || tegra_spare_fuse(19)))
--			return TEGRA_REVISION_A03p;
--		else
--			return TEGRA_REVISION_A03;
--	case 4:
--		return TEGRA_REVISION_A04;
--	default:
--		return TEGRA_REVISION_UNKNOWN;
--	}
--}
--
--static void tegra_get_process_id(void)
--{
--	u32 reg;
--
--	tegra_fuse_enable_clk();
--
--	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
--	tegra_cpu_process_id = (reg >> 6) & 3;
--	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
--	tegra_core_process_id = (reg >> 12) & 3;
--
--	tegra_fuse_disable_clk();
--}
--
--u32 tegra_read_chipid(void)
--{
--	return readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
--}
--
--static void __init tegra20_fuse_init_randomness(void)
--{
--	u32 randomness[2];
--
--	randomness[0] = tegra_fuse_readl(FUSE_UID_LOW);
--	randomness[1] = tegra_fuse_readl(FUSE_UID_HIGH);
--
--	add_device_randomness(randomness, sizeof(randomness));
--}
--
--/* Applies to Tegra30 or later */
--static void __init tegra30_fuse_init_randomness(void)
--{
--	u32 randomness[7];
--
--	randomness[0] = tegra_fuse_readl(FUSE_VENDOR_CODE);
--	randomness[1] = tegra_fuse_readl(FUSE_FAB_CODE);
--	randomness[2] = tegra_fuse_readl(FUSE_LOT_CODE_0);
--	randomness[3] = tegra_fuse_readl(FUSE_LOT_CODE_1);
--	randomness[4] = tegra_fuse_readl(FUSE_WAFER_ID);
--	randomness[5] = tegra_fuse_readl(FUSE_X_COORDINATE);
--	randomness[6] = tegra_fuse_readl(FUSE_Y_COORDINATE);
--
--	add_device_randomness(randomness, sizeof(randomness));
--}
--
--void __init tegra_init_fuse(void)
--{
--	u32 id;
--	u32 randomness[5];
--
--	u32 reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
--	reg |= 1 << 28;
--	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
--
--	/*
--	 * Enable FUSE clock. This needs to be hardcoded because the clock
--	 * subsystem is not active during early boot.
--	 */
--	reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x14));
--	reg |= 1 << 7;
--	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x14));
--	fuse_clk = ERR_PTR(-EINVAL);
--
--	reg = tegra_fuse_readl(FUSE_SKU_INFO);
--	randomness[0] = reg;
--	tegra_sku_id = reg & 0xFF;
--
--	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
--	randomness[1] = reg;
--	tegra_bct_strapping = (reg & RAM_ID_MASK) >> RAM_CODE_SHIFT;
--
--	id = tegra_read_chipid();
--	randomness[2] = id;
--	tegra_chip_id = (id >> 8) & 0xff;
--
--	switch (tegra_chip_id) {
--	case TEGRA20:
--		tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
--		tegra_init_speedo_data = &tegra20_init_speedo_data;
--		break;
--	case TEGRA30:
--		tegra_fuse_spare_bit = TEGRA30_FUSE_SPARE_BIT;
--		tegra_init_speedo_data = &tegra30_init_speedo_data;
--		break;
--	case TEGRA114:
--		tegra_init_speedo_data = &tegra114_init_speedo_data;
--		break;
--	default:
--		pr_warn("Tegra: unknown chip id %d\n", tegra_chip_id);
--		tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
--		tegra_init_speedo_data = &tegra_get_process_id;
--	}
--
--	tegra_revision = tegra_get_revision(id);
--	tegra_init_speedo_data();
--	randomness[3] = (tegra_cpu_process_id << 16) | tegra_core_process_id;
--	randomness[4] = (tegra_cpu_speedo_id << 16) | tegra_soc_speedo_id;
--
--	add_device_randomness(randomness, sizeof(randomness));
--	switch (tegra_chip_id) {
--	case TEGRA20:
--		tegra20_fuse_init_randomness();
--		break;
--	case TEGRA30:
--	case TEGRA114:
--	default:
--		tegra30_fuse_init_randomness();
--		break;
--	}
--
--	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
--		tegra_revision_name[tegra_revision],
--		tegra_sku_id, tegra_cpu_process_id,
--		tegra_core_process_id);
--}
-diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
-deleted file mode 100644
-index b17c4ba..0000000
---- a/arch/arm/mach-tegra/fuse.h
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * Copyright (C) 2010 Google, Inc.
-- * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-- *
-- * Author:
-- *	Colin Cross <ccross@android.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#ifndef __MACH_TEGRA_FUSE_H
--#define __MACH_TEGRA_FUSE_H
--
--#define SKU_ID_T20	8
--#define SKU_ID_T25SE	20
--#define SKU_ID_AP25	23
--#define SKU_ID_T25	24
--#define SKU_ID_AP25E	27
--#define SKU_ID_T25E	28
--
--#ifndef __ASSEMBLY__
--
--extern int tegra_sku_id;
--extern int tegra_cpu_process_id;
--extern int tegra_core_process_id;
--extern int tegra_chip_id;
--extern int tegra_cpu_speedo_id;		/* only exist in Tegra30 and later */
--extern int tegra_soc_speedo_id;
--
--unsigned long long tegra_chip_uid(void);
--bool tegra_spare_fuse(int bit);
--u32 tegra_fuse_readl(unsigned long offset);
--
--#ifdef CONFIG_ARCH_TEGRA_2x_SOC
--void tegra20_init_speedo_data(void);
--#else
--static inline void tegra20_init_speedo_data(void) {}
--#endif
--
--#ifdef CONFIG_ARCH_TEGRA_3x_SOC
--void tegra30_init_speedo_data(void);
--#else
--static inline void tegra30_init_speedo_data(void) {}
--#endif
--
--#ifdef CONFIG_ARCH_TEGRA_114_SOC
--void tegra114_init_speedo_data(void);
--#else
--static inline void tegra114_init_speedo_data(void) {}
--#endif
--#endif /* __ASSEMBLY__ */
--
--#endif
-diff --git a/arch/arm/mach-tegra/tegra114_speedo.c b/arch/arm/mach-tegra/tegra114_speedo.c
-deleted file mode 100644
-index 7c73716..0000000
---- a/arch/arm/mach-tegra/tegra114_speedo.c
-+++ /dev/null
-@@ -1,105 +0,0 @@
--/*
-- * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/kernel.h>
--#include <linux/bug.h>
--#include <linux/tegra-soc.h>
--
--#include "fuse.h"
--
--#define CORE_PROCESS_CORNERS_NUM	2
--#define CPU_PROCESS_CORNERS_NUM		2
--
--enum {
--	THRESHOLD_INDEX_0,
--	THRESHOLD_INDEX_1,
--	THRESHOLD_INDEX_COUNT,
--};
--
--static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
--	{1123,     UINT_MAX},
--	{0,        UINT_MAX},
--};
--
--static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
--	{1695,     UINT_MAX},
--	{0,        UINT_MAX},
--};
--
--static void rev_sku_to_speedo_ids(int rev, int sku, int *threshold)
--{
--	u32 tmp;
--
--	switch (sku) {
--	case 0x00:
--	case 0x10:
--	case 0x05:
--	case 0x06:
--		tegra_cpu_speedo_id = 1;
--		tegra_soc_speedo_id = 0;
--		*threshold = THRESHOLD_INDEX_0;
--		break;
--
--	case 0x03:
--	case 0x04:
--		tegra_cpu_speedo_id = 2;
--		tegra_soc_speedo_id = 1;
--		*threshold = THRESHOLD_INDEX_1;
--		break;
--
--	default:
--		pr_err("Tegra114 Unknown SKU %d\n", sku);
--		tegra_cpu_speedo_id = 0;
--		tegra_soc_speedo_id = 0;
--		*threshold = THRESHOLD_INDEX_0;
--		break;
--	}
--
--	if (rev == TEGRA_REVISION_A01) {
--		tmp = tegra_fuse_readl(0x270) << 1;
--		tmp |= tegra_fuse_readl(0x26c);
--		if (!tmp)
--			tegra_cpu_speedo_id = 0;
--	}
--}
--
--void tegra114_init_speedo_data(void)
--{
--	u32 cpu_speedo_val;
--	u32 core_speedo_val;
--	int threshold;
--	int i;
--
--	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) !=
--			THRESHOLD_INDEX_COUNT);
--	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) !=
--			THRESHOLD_INDEX_COUNT);
--
--	rev_sku_to_speedo_ids(tegra_revision, tegra_sku_id, &threshold);
--
--	cpu_speedo_val = tegra_fuse_readl(0x12c) + 1024;
--	core_speedo_val = tegra_fuse_readl(0x134);
--
--	for (i = 0; i < CPU_PROCESS_CORNERS_NUM; i++)
--		if (cpu_speedo_val < cpu_process_speedos[threshold][i])
--			break;
--	tegra_cpu_process_id = i;
--
--	for (i = 0; i < CORE_PROCESS_CORNERS_NUM; i++)
--		if (core_speedo_val < core_process_speedos[threshold][i])
--			break;
--	tegra_core_process_id = i;
--}
-diff --git a/arch/arm/mach-tegra/tegra20_speedo.c b/arch/arm/mach-tegra/tegra20_speedo.c
-deleted file mode 100644
-index 3b1bb53..0000000
---- a/arch/arm/mach-tegra/tegra20_speedo.c
-+++ /dev/null
-@@ -1,110 +0,0 @@
--/*
-- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/kernel.h>
--#include <linux/bug.h>
--#include <linux/tegra-soc.h>
--
--#include "fuse.h"
--
--#define CPU_SPEEDO_LSBIT		20
--#define CPU_SPEEDO_MSBIT		29
--#define CPU_SPEEDO_REDUND_LSBIT		30
--#define CPU_SPEEDO_REDUND_MSBIT		39
--#define CPU_SPEEDO_REDUND_OFFS	(CPU_SPEEDO_REDUND_MSBIT - CPU_SPEEDO_MSBIT)
--
--#define CORE_SPEEDO_LSBIT		40
--#define CORE_SPEEDO_MSBIT		47
--#define CORE_SPEEDO_REDUND_LSBIT	48
--#define CORE_SPEEDO_REDUND_MSBIT	55
--#define CORE_SPEEDO_REDUND_OFFS	(CORE_SPEEDO_REDUND_MSBIT - CORE_SPEEDO_MSBIT)
--
--#define SPEEDO_MULT			4
--
--#define PROCESS_CORNERS_NUM		4
--
--#define SPEEDO_ID_SELECT_0(rev)		((rev) <= 2)
--#define SPEEDO_ID_SELECT_1(sku)		\
--	(((sku) != 20) && ((sku) != 23) && ((sku) != 24) && \
--	 ((sku) != 27) && ((sku) != 28))
--
--enum {
--	SPEEDO_ID_0,
--	SPEEDO_ID_1,
--	SPEEDO_ID_2,
--	SPEEDO_ID_COUNT,
--};
--
--static const u32 cpu_process_speedos[][PROCESS_CORNERS_NUM] = {
--	{315, 366, 420, UINT_MAX},
--	{303, 368, 419, UINT_MAX},
--	{316, 331, 383, UINT_MAX},
--};
--
--static const u32 core_process_speedos[][PROCESS_CORNERS_NUM] = {
--	{165, 195, 224, UINT_MAX},
--	{165, 195, 224, UINT_MAX},
--	{165, 195, 224, UINT_MAX},
--};
--
--void tegra20_init_speedo_data(void)
--{
--	u32 reg;
--	u32 val;
--	int i;
--
--	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) != SPEEDO_ID_COUNT);
--	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) != SPEEDO_ID_COUNT);
--
--	if (SPEEDO_ID_SELECT_0(tegra_revision))
--		tegra_soc_speedo_id = SPEEDO_ID_0;
--	else if (SPEEDO_ID_SELECT_1(tegra_sku_id))
--		tegra_soc_speedo_id = SPEEDO_ID_1;
--	else
--		tegra_soc_speedo_id = SPEEDO_ID_2;
--
--	val = 0;
--	for (i = CPU_SPEEDO_MSBIT; i >= CPU_SPEEDO_LSBIT; i--) {
--		reg = tegra_spare_fuse(i) |
--			tegra_spare_fuse(i + CPU_SPEEDO_REDUND_OFFS);
--		val = (val << 1) | (reg & 0x1);
--	}
--	val = val * SPEEDO_MULT;
--	pr_debug("%s CPU speedo value %u\n", __func__, val);
--
--	for (i = 0; i < (PROCESS_CORNERS_NUM - 1); i++) {
--		if (val <= cpu_process_speedos[tegra_soc_speedo_id][i])
--			break;
--	}
--	tegra_cpu_process_id = i;
--
--	val = 0;
--	for (i = CORE_SPEEDO_MSBIT; i >= CORE_SPEEDO_LSBIT; i--) {
--		reg = tegra_spare_fuse(i) |
--			tegra_spare_fuse(i + CORE_SPEEDO_REDUND_OFFS);
--		val = (val << 1) | (reg & 0x1);
--	}
--	val = val * SPEEDO_MULT;
--	pr_debug("%s Core speedo value %u\n", __func__, val);
--
--	for (i = 0; i < (PROCESS_CORNERS_NUM - 1); i++) {
--		if (val <= core_process_speedos[tegra_soc_speedo_id][i])
--			break;
--	}
--	tegra_core_process_id = i;
--
--	pr_info("Tegra20 Soc Speedo ID %d", tegra_soc_speedo_id);
--}
-diff --git a/arch/arm/mach-tegra/tegra30_speedo.c b/arch/arm/mach-tegra/tegra30_speedo.c
-deleted file mode 100644
-index 81a958d..0000000
---- a/arch/arm/mach-tegra/tegra30_speedo.c
-+++ /dev/null
-@@ -1,293 +0,0 @@
--/*
-- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/kernel.h>
--#include <linux/bug.h>
--#include <linux/tegra-soc.h>
--
--#include "fuse.h"
--
--#define CORE_PROCESS_CORNERS_NUM	1
--#define CPU_PROCESS_CORNERS_NUM		6
--
--#define FUSE_SPEEDO_CALIB_0	0x114
--#define FUSE_PACKAGE_INFO	0X1FC
--#define FUSE_TEST_PROG_VER	0X128
--
--#define G_SPEEDO_BIT_MINUS1	58
--#define G_SPEEDO_BIT_MINUS1_R	59
--#define G_SPEEDO_BIT_MINUS2	60
--#define G_SPEEDO_BIT_MINUS2_R	61
--#define LP_SPEEDO_BIT_MINUS1	62
--#define LP_SPEEDO_BIT_MINUS1_R	63
--#define LP_SPEEDO_BIT_MINUS2	64
--#define LP_SPEEDO_BIT_MINUS2_R	65
--
--enum {
--	THRESHOLD_INDEX_0,
--	THRESHOLD_INDEX_1,
--	THRESHOLD_INDEX_2,
--	THRESHOLD_INDEX_3,
--	THRESHOLD_INDEX_4,
--	THRESHOLD_INDEX_5,
--	THRESHOLD_INDEX_6,
--	THRESHOLD_INDEX_7,
--	THRESHOLD_INDEX_8,
--	THRESHOLD_INDEX_9,
--	THRESHOLD_INDEX_10,
--	THRESHOLD_INDEX_11,
--	THRESHOLD_INDEX_COUNT,
--};
--
--static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
--	{180},
--	{170},
--	{195},
--	{180},
--	{168},
--	{192},
--	{180},
--	{170},
--	{195},
--	{180},
--	{180},
--	{180},
--};
--
--static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
--	{306, 338, 360, 376, UINT_MAX},
--	{295, 336, 358, 375, UINT_MAX},
--	{325, 325, 358, 375, UINT_MAX},
--	{325, 325, 358, 375, UINT_MAX},
--	{292, 324, 348, 364, UINT_MAX},
--	{324, 324, 348, 364, UINT_MAX},
--	{324, 324, 348, 364, UINT_MAX},
--	{295, 336, 358, 375, UINT_MAX},
--	{358, 358, 358, 358, 397, UINT_MAX},
--	{364, 364, 364, 364, 397, UINT_MAX},
--	{295, 336, 358, 375, 391, UINT_MAX},
--	{295, 336, 358, 375, 391, UINT_MAX},
--};
--
--static int threshold_index;
--static int package_id;
--
--static void fuse_speedo_calib(u32 *speedo_g, u32 *speedo_lp)
--{
--	u32 reg;
--	int ate_ver;
--	int bit_minus1;
--	int bit_minus2;
--
--	reg = tegra_fuse_readl(FUSE_SPEEDO_CALIB_0);
--
--	*speedo_lp = (reg & 0xFFFF) * 4;
--	*speedo_g = ((reg >> 16) & 0xFFFF) * 4;
--
--	ate_ver = tegra_fuse_readl(FUSE_TEST_PROG_VER);
--	pr_info("%s: ATE prog ver %d.%d\n", __func__, ate_ver/10, ate_ver%10);
--
--	if (ate_ver >= 26) {
--		bit_minus1 = tegra_spare_fuse(LP_SPEEDO_BIT_MINUS1);
--		bit_minus1 |= tegra_spare_fuse(LP_SPEEDO_BIT_MINUS1_R);
--		bit_minus2 = tegra_spare_fuse(LP_SPEEDO_BIT_MINUS2);
--		bit_minus2 |= tegra_spare_fuse(LP_SPEEDO_BIT_MINUS2_R);
--		*speedo_lp |= (bit_minus1 << 1) | bit_minus2;
--
--		bit_minus1 = tegra_spare_fuse(G_SPEEDO_BIT_MINUS1);
--		bit_minus1 |= tegra_spare_fuse(G_SPEEDO_BIT_MINUS1_R);
--		bit_minus2 = tegra_spare_fuse(G_SPEEDO_BIT_MINUS2);
--		bit_minus2 |= tegra_spare_fuse(G_SPEEDO_BIT_MINUS2_R);
--		*speedo_g |= (bit_minus1 << 1) | bit_minus2;
--	} else {
--		*speedo_lp |= 0x3;
--		*speedo_g |= 0x3;
--	}
--}
--
--static void rev_sku_to_speedo_ids(int rev, int sku)
--{
--	switch (rev) {
--	case TEGRA_REVISION_A01:
--		tegra_cpu_speedo_id = 0;
--		tegra_soc_speedo_id = 0;
--		threshold_index = THRESHOLD_INDEX_0;
--		break;
--	case TEGRA_REVISION_A02:
--	case TEGRA_REVISION_A03:
--		switch (sku) {
--		case 0x87:
--		case 0x82:
--			tegra_cpu_speedo_id = 1;
--			tegra_soc_speedo_id = 1;
--			threshold_index = THRESHOLD_INDEX_1;
--			break;
--		case 0x81:
--			switch (package_id) {
--			case 1:
--				tegra_cpu_speedo_id = 2;
--				tegra_soc_speedo_id = 2;
--				threshold_index = THRESHOLD_INDEX_2;
--				break;
--			case 2:
--				tegra_cpu_speedo_id = 4;
--				tegra_soc_speedo_id = 1;
--				threshold_index = THRESHOLD_INDEX_7;
--				break;
--			default:
--				pr_err("Tegra30: Unknown pkg %d\n", package_id);
--				BUG();
--				break;
--			}
--			break;
--		case 0x80:
--			switch (package_id) {
--			case 1:
--				tegra_cpu_speedo_id = 5;
--				tegra_soc_speedo_id = 2;
--				threshold_index = THRESHOLD_INDEX_8;
--				break;
--			case 2:
--				tegra_cpu_speedo_id = 6;
--				tegra_soc_speedo_id = 2;
--				threshold_index = THRESHOLD_INDEX_9;
--				break;
--			default:
--				pr_err("Tegra30: Unknown pkg %d\n", package_id);
--				BUG();
--				break;
--			}
--			break;
--		case 0x83:
--			switch (package_id) {
--			case 1:
--				tegra_cpu_speedo_id = 7;
--				tegra_soc_speedo_id = 1;
--				threshold_index = THRESHOLD_INDEX_10;
--				break;
--			case 2:
--				tegra_cpu_speedo_id = 3;
--				tegra_soc_speedo_id = 2;
--				threshold_index = THRESHOLD_INDEX_3;
--				break;
--			default:
--				pr_err("Tegra30: Unknown pkg %d\n", package_id);
--				BUG();
--				break;
--			}
--			break;
--		case 0x8F:
--			tegra_cpu_speedo_id = 8;
--			tegra_soc_speedo_id = 1;
--			threshold_index = THRESHOLD_INDEX_11;
--			break;
--		case 0x08:
--			tegra_cpu_speedo_id = 1;
--			tegra_soc_speedo_id = 1;
--			threshold_index = THRESHOLD_INDEX_4;
--			break;
--		case 0x02:
--			tegra_cpu_speedo_id = 2;
--			tegra_soc_speedo_id = 2;
--			threshold_index = THRESHOLD_INDEX_5;
--			break;
--		case 0x04:
--			tegra_cpu_speedo_id = 3;
--			tegra_soc_speedo_id = 2;
--			threshold_index = THRESHOLD_INDEX_6;
--			break;
--		case 0:
--			switch (package_id) {
--			case 1:
--				tegra_cpu_speedo_id = 2;
--				tegra_soc_speedo_id = 2;
--				threshold_index = THRESHOLD_INDEX_2;
--				break;
--			case 2:
--				tegra_cpu_speedo_id = 3;
--				tegra_soc_speedo_id = 2;
--				threshold_index = THRESHOLD_INDEX_3;
--				break;
--			default:
--				pr_err("Tegra30: Unknown pkg %d\n", package_id);
--				BUG();
--				break;
--			}
--			break;
--		default:
--			pr_warn("Tegra30: Unknown SKU %d\n", sku);
--			tegra_cpu_speedo_id = 0;
--			tegra_soc_speedo_id = 0;
--			threshold_index = THRESHOLD_INDEX_0;
--			break;
--		}
--		break;
--	default:
--		pr_warn("Tegra30: Unknown chip rev %d\n", rev);
--		tegra_cpu_speedo_id = 0;
--		tegra_soc_speedo_id = 0;
--		threshold_index = THRESHOLD_INDEX_0;
--		break;
--	}
--}
--
--void tegra30_init_speedo_data(void)
--{
--	u32 cpu_speedo_val;
--	u32 core_speedo_val;
--	int i;
--
--	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) !=
--			THRESHOLD_INDEX_COUNT);
--	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) !=
--			THRESHOLD_INDEX_COUNT);
--
--	package_id = tegra_fuse_readl(FUSE_PACKAGE_INFO) & 0x0F;
--
--	rev_sku_to_speedo_ids(tegra_revision, tegra_sku_id);
--	fuse_speedo_calib(&cpu_speedo_val, &core_speedo_val);
--	pr_debug("%s CPU speedo value %u\n", __func__, cpu_speedo_val);
--	pr_debug("%s Core speedo value %u\n", __func__, core_speedo_val);
--
--	for (i = 0; i < CPU_PROCESS_CORNERS_NUM; i++) {
--		if (cpu_speedo_val < cpu_process_speedos[threshold_index][i])
--			break;
--	}
--	tegra_cpu_process_id = i - 1;
--
--	if (tegra_cpu_process_id == -1) {
--		pr_warn("Tegra30: CPU speedo value %3d out of range",
--		       cpu_speedo_val);
--		tegra_cpu_process_id = 0;
--		tegra_cpu_speedo_id = 1;
--	}
--
--	for (i = 0; i < CORE_PROCESS_CORNERS_NUM; i++) {
--		if (core_speedo_val < core_process_speedos[threshold_index][i])
--			break;
--	}
--	tegra_core_process_id = i - 1;
--
--	if (tegra_core_process_id == -1) {
--		pr_warn("Tegra30: CORE speedo value %3d out of range",
--		       core_speedo_val);
--		tegra_core_process_id = 0;
--		tegra_soc_speedo_id = 1;
--	}
--
--	pr_info("Tegra30: CPU Speedo ID %d, Soc Speedo ID %d",
--		tegra_cpu_speedo_id, tegra_soc_speedo_id);
--}
-diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index 7eb4b69..ecb9349 100644
---- a/drivers/misc/Makefile
-+++ b/drivers/misc/Makefile
-@@ -55,3 +55,4 @@ obj-$(CONFIG_SRAM)		+= sram.o
- obj-y				+= mic/
- obj-$(CONFIG_GENWQE)		+= genwqe/
- obj-$(CONFIG_ECHO)		+= echo/
-+obj-y				+= fuse/
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+Thanks for the review.
+
+I was refering to that thread where it was invoked to put the whole vgic
+behind irqchip:
+http://www.spinics.net/lists/kvm-arm/msg08413.html
+> 
+>>
+>> Only level sensitive IRQs are supported (with a registered resampler). As a
+> 
+> Is it not trivial to add edge-triggered support in the same go?
+Yes it shouldn't be a problem. It is more a matter of testing.
+> 
+>> reminder the resampler is a second eventfd called by irqfd framework when the
+>> virtual IRQ is completed by the guest. This eventfd is supposed to be handled
+>> on user-side
+>>
+>> MSI routing is not supported yet.
+>>
+>> This work was tested with Calxeda Midway xgmac main interrupt (with and without
+>> explicit user routing) with qemu-system-arm and QEMU VFIO platform device.
+>>
+>> changes v1 -> v2:
+>> 2 fixes:
+>> - v1 assumed gsi/irqchip.pin was already incremented by VGIC_NR_PRIVATE_IRQS.
+>>   This is now vgic_set_assigned_irq that increments it before injection.
+>> - v2 now handles the case where a pending assigned irq is cleared through
+>>   MMIO access. The irq is properly acked allowing the resamplefd handler
+>>   to possibly unmask the physical IRQ.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> Conflicts:
+>> 	Documentation/virtual/kvm/api.txt
+>> 	arch/arm/kvm/Kconfig
+>>
+>> Conflicts:
+>> 	Documentation/virtual/kvm/api.txt
+> 
+> We usually don't include these conflict notices when sending out
+> patches.
+
+OK I will remove them
+> 
+>> ---
+>>  Documentation/virtual/kvm/api.txt |   4 +-
+>>  arch/arm/include/uapi/asm/kvm.h   |   8 +++
+>>  arch/arm/kvm/Kconfig              |   2 +
+>>  arch/arm/kvm/Makefile             |   1 +
+>>  arch/arm/kvm/irq.h                |  25 +++++++
+>>  virt/kvm/arm/vgic.c               | 141 ++++++++++++++++++++++++++++++++++++--
+>>  6 files changed, 174 insertions(+), 7 deletions(-)
+>>  create mode 100644 arch/arm/kvm/irq.h
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index b4f5365..b376334 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -1339,7 +1339,7 @@ KVM_ASSIGN_DEV_IRQ. Partial deassignment of host or guest IRQ is allowed.
+>>  4.52 KVM_SET_GSI_ROUTING
+>>  
+>>  Capability: KVM_CAP_IRQ_ROUTING
+>> -Architectures: x86 ia64 s390
+>> +Architectures: x86 ia64 s390 arm
+>>  Type: vm ioctl
+>>  Parameters: struct kvm_irq_routing (in)
+>>  Returns: 0 on success, -1 on error
+>> @@ -2126,7 +2126,7 @@ into the hash PTE second double word).
+>>  4.75 KVM_IRQFD
+>>  
+>>  Capability: KVM_CAP_IRQFD
+>> -Architectures: x86 s390
+>> +Architectures: x86 s390 arm
+>>  Type: vm ioctl
+>>  Parameters: struct kvm_irqfd (in)
+>>  Returns: 0 on success, -1 on error
+>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>> index ef0c878..89b864d 100644
+>> --- a/arch/arm/include/uapi/asm/kvm.h
+>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>> @@ -192,6 +192,14 @@ struct kvm_arch_memory_slot {
+>>  /* Highest supported SPI, from VGIC_NR_IRQS */
+>>  #define KVM_ARM_IRQ_GIC_MAX		127
+>>  
+>> +/* needed by IRQ routing */
+>> +
+>> +/* One single KVM irqchip, ie. the VGIC */
+>> +#define KVM_NR_IRQCHIPS          1
+>> +
+>> +/* virtual interrupt controller input pins (max 480 SPI, 32 SGI/PPI) */
+>> +#define KVM_IRQCHIP_NUM_PINS     256
+> 
+> I don't even see how the comment correlates to the define.  Hmmm.  But
+> since Marc asked you to change this anyhow, maybe this doesn't matter
+> now.
+
+yes you're right. Those were the figures I was able to find in GIC400
+TRM and I was confused by the fact I was not able to find them in the
+code so I eventually put the same value as VGIC_NR_IRQS. I started
+looking at kvm-arm64/vgic-dyn and found this dist nr_irqs but need more
+time to investigate. Nethertheless his KVM_IRQCHIP_NUM_PINS is used in
+generic code (irqchip).
+> 
+>> +
+>>  /* PSCI interface */
+>>  #define KVM_PSCI_FN_BASE		0x95c1ba5e
+>>  #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>> index 4be5bb1..096692c 100644
+>> --- a/arch/arm/kvm/Kconfig
+>> +++ b/arch/arm/kvm/Kconfig
+>> @@ -24,6 +24,7 @@ config KVM
+>>  	select KVM_MMIO
+>>  	select KVM_ARM_HOST
+>>  	depends on ARM_VIRT_EXT && ARM_LPAE && !CPU_BIG_ENDIAN
+>> +	select HAVE_KVM_EVENTFD
+>>  	---help---
+>>  	  Support hosting virtualized guest machines. You will also
+>>  	  need to select one or more of the processor modules below.
+>> @@ -56,6 +57,7 @@ config KVM_ARM_VGIC
+>>  	bool "KVM support for Virtual GIC"
+>>  	depends on KVM_ARM_HOST && OF
+>>  	select HAVE_KVM_IRQCHIP
+>> +	select HAVE_KVM_IRQ_ROUTING
+>>  	default y
+>>  	---help---
+>>  	  Adds support for a hardware assisted, in-kernel GIC emulation.
+>> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+>> index 789bca9..29de111 100644
+>> --- a/arch/arm/kvm/Makefile
+>> +++ b/arch/arm/kvm/Makefile
+>> @@ -21,4 +21,5 @@ obj-y += kvm-arm.o init.o interrupts.o
+>>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+>>  obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
+>>  obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
+>> +obj-$(CONFIG_HAVE_KVM_EVENTFD) += $(KVM)/eventfd.o $(KVM)/irqchip.o
+>>  obj-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
+>> diff --git a/arch/arm/kvm/irq.h b/arch/arm/kvm/irq.h
+>> new file mode 100644
+>> index 0000000..4d6fcc6
+>> --- /dev/null
+>> +++ b/arch/arm/kvm/irq.h
+>> @@ -0,0 +1,25 @@
+>> +/*
+>> + * Copyright (C) 2014, STMicroelectronics
+>> + * Authors: Eric Auger <eric.auger@st.com>
+> 
+> please use the Linaro copyright notice for this.  You can add your
+> @st.com e-mail in addition to the Linaro one in case you want that for
+> long-term support.
+
+OK I will do
+> 
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License, version 2, as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + */
+>> +
+>> +#ifndef __IRQ_H
+>> +#define __IRQ_H
+>> +
+>> +#include <linux/kvm_host.h>
+>> +/*
+>> + * Placeholder for irqchip and irq/msi routing declarations
+>> + * included in irqchip.c
+>> + */
+> 
+> But none needed now?
+
+Yes nothing for the time being.
+> 
+>> +
+>> +#endif
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 56ff9be..39afa0d 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -93,6 +93,9 @@ static struct device_node *vgic_node;
+>>  #define ACCESS_WRITE_VALUE	(3 << 1)
+>>  #define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
+>>  
+>> +static struct kvm_irq_routing_entry identity_table[VGIC_NR_IRQS];
+>> +static int set_default_routing_table(struct kvm *kvm);
+>> +
+>>  static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
+>>  static void vgic_update_state(struct kvm *kvm);
+>>  static void vgic_kick_vcpus(struct kvm *kvm);
+>> @@ -408,11 +411,27 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
+>>  					  struct kvm_exit_mmio *mmio,
+>>  					  phys_addr_t offset)
+>>  {
+>> -	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	unsigned int i;
+>> +	bool is_assigned_irq;
+>> +	DECLARE_BITMAP(old, VGIC_NR_SHARED_IRQS);
+>> +	DECLARE_BITMAP(diff, VGIC_NR_SHARED_IRQS);
+>> +	unsigned long *pending =
+>> +		vgic_bitmap_get_shared_map(&dist->irq_state);
+>> +	u32 *reg;
+> 
+> please add a blank line between your declarations and the actual code.
+
+OK
+> 
+>> +	bitmap_copy(old, pending, VGIC_NR_SHARED_IRQS);
+>> +	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
+>>  				       vcpu->vcpu_id, offset);
+>>  	vgic_reg_access(mmio, reg, offset,
+>>  			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
+>>  	if (mmio->is_write) {
+>> +		pending = vgic_bitmap_get_shared_map(&dist->irq_state);
+>> +		bitmap_xor(diff, old, pending, VGIC_NR_SHARED_IRQS);
+>> +		for_each_set_bit(i, diff, VGIC_NR_SHARED_IRQS) {
+>> +			is_assigned_irq = kvm_irq_has_notifier(vcpu->kvm, 0, i);
+>> +			if (is_assigned_irq)
+>> +				kvm_notify_acked_irq(vcpu->kvm, 0, i);
+>> +		}
+> 
+> As Mark pointed out, just copy the vgic reg value and do a simple xor on
+> the two instead, and factor out the two lines that check for
+> is_assigned_irq and calles notify_acked so that you can give a small
+> static function a semantically meaningful name and call that from both
+> this function and the process_maintenance function.
+
+Yes I corrected this after looking into more details at the register
+semantic.
+> 
+> That being said, this whole thing feels a bit weird, I'll comment on the
+> other thread.
+OK
+> 
+>>  		vgic_update_state(vcpu->kvm);
+>>  		return true;
+>>  	}
+>> @@ -1172,6 +1191,8 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  {
+>>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>>  	bool level_pending = false;
+>> +	struct kvm *kvm;
+>> +	int is_assigned_irq;
+>>  
+>>  	kvm_debug("MISR = %08x\n", vgic_cpu->vgic_misr);
+>>  
+>> @@ -1189,12 +1210,23 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  			vgic_irq_clear_active(vcpu, irq);
+>>  			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_EOI;
+>>  
+>> +			kvm = vcpu->kvm;
+>> +			is_assigned_irq =
+>> +				kvm_irq_has_notifier(kvm, 0, irq-VGIC_NR_PRIVATE_IRQS);
+> 
+> I think the preferred style is to keep the function call name on the
+> same line as the assignment, and the do a line break on the parameter
+> that doesn't fit in the line width and align that to the opening
+> parenthesis on the funciton call.  At least I prefer it that way.
+
+OK I will change this.
+> 
+> also spaces around the '-', please.
+> 
+>>  			/* Any additional pending interrupt? */
+> 
+> This comment seems to only aplly for non-assigned IRQs now, right?
+
+yes it does
+> 
+>> -			if (vgic_dist_irq_is_pending(vcpu, irq)) {
+>> -				vgic_cpu_irq_set(vcpu, irq);
+>> -				level_pending = true;
+>> -			} else {
+>> +			if (is_assigned_irq) {
+>>  				vgic_cpu_irq_clear(vcpu, irq);
+>> +				kvm_debug("EOI irqchip routed vIRQ %d\n", irq);
+>> +				kvm_notify_acked_irq(kvm, 0,
+>> +					irq-VGIC_NR_PRIVATE_IRQS);
+> 
+> spaces around the '-', please.
+OK
+> 
+>> +				vgic_dist_irq_clear(vcpu, irq);
+>> +			} else {
+>> +				if (vgic_dist_irq_is_pending(vcpu, irq)) {
+>> +					vgic_cpu_irq_set(vcpu, irq);
+>> +					level_pending = true;
+>> +				} else {
+>> +					vgic_cpu_irq_clear(vcpu, irq);
+>> +				}
+>>  			}
+>>  
+>>  			/*
+>> @@ -1627,6 +1659,8 @@ int kvm_vgic_create(struct kvm *kvm)
+>>  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+>>  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+>>  
+>> +	set_default_routing_table(kvm);
+>> +
+>>  out_unlock:
+>>  	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+>>  		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
+>> @@ -2017,3 +2051,100 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>>  	.get_attr = vgic_get_attr,
+>>  	.has_attr = vgic_has_attr,
+>>  };
+>> +
+>> +
+>> +/*
+>> + * set up a default identity routing table
+>> + * The user-side can further change the routing table using
+>> + * KVM_SET_GSI_ROUTING VM ioctl
+>> + */
+>> +
+> 
+> don't add this whitespace between comments and a function declaration,
+> please check the entire patch for this.
+OK
+> 
+>> +static int set_default_routing_table(struct kvm *kvm)
+>> +{
+>> +	struct kvm_irq_routing_entry;
+>> +	int i;
+>> +	for (i = 0; i < VGIC_NR_IRQS; i++)	{
+>> +		identity_table[i].gsi = i;
+>> +		identity_table[i].type = KVM_IRQ_ROUTING_IRQCHIP;
+>> +		identity_table[i].u.irqchip.irqchip = 0;
+>> +		identity_table[i].u.irqchip.pin = i;
+>> +	}
+>> +	return kvm_set_irq_routing(kvm, identity_table,
+>> +				   ARRAY_SIZE(identity_table), 0);
+> 
+> is identity table used after this stage?  If not, could you not
+> dynamically allocate it and free it after use so we don't waste this
+> staic allocation of memory in the kernel?
+
+yes this definitively can be optimized.
+> 
+>> +}
+>> +
+>> +
+>> +/*
+>> + * Functions needed for GSI routing (used by irqchip.c)
+>> + * implemented in irq_comm.c for x86 and ia64
+>> + * in architecture specific files for some other archictures (powerpc)
+>> + */
+> 
+> Hmmm, this comment seems rather pointless in this file.  If you want to
+> describe what this function does, then just document this functionality
+> and the parameters/return value, i.e.
+> 
+> vgic_set_assigned_irq - set state of IRQs driven by irqfd
+> 
+> When an IRQ is raised or lowered.... blah blah blah blah.
+> 
+> @e:   the routing entry describing...
+> @kvm: the kvm struct
+> and so on.
+
+> 
+> return 0 on success, -error on errors.
+> 
+
+OK
+>> +
+>> +static int vgic_set_assigned_irq(struct kvm_kernel_irq_routing_entry *e,
+>> +			   struct kvm *kvm, int irq_source_id, int level,
+>> +			   bool line_status)
+>> +{
+>> +	unsigned int spi = e->irqchip.pin + VGIC_NR_PRIVATE_IRQS;
+> 
+> I noticed this in the changelogs too, where's the rationale/API
+> documentaiton for the use of irqchip.pin and its semantics on ARM?
+> 
+> Should we add something in Documentation/virtual/kvm/api.txt ?
+
+- in 4.24 KVM_CREATE_IRQCHIP I might add that similarly to s390 a dummy
+identity table is created.
+
+- KVM_CAP_IRQFD says "kvm_irqfd.gsi specifies the irqchip pin toggled by
+this event.  When an event is triggered on the eventfd, an interrupt is
+injected into the guest using the specified gsi pin"
+
+Assuming the standard use case is to use an identity/dummy GSI table the
+irqchip.pin still remains the "irqchip pin" toggled on eventfd.
+
+By the way I might remove the mention to the use case where the gsi !=
+irqchip.pin.
+
+Now when reading 4.25 KVM_IRQ_LINE, it is said that it is used to inject
+a GSI as well.
+
+Now on ARM The GSI has the following content.
+
+  bits:  | 31 ... 24 | 23  ... 16 | 15    ...    0 |
+  field: | irq_type  | vcpu_index |     irq_id     |
+
+As such that's true that currently there is an inconsistency.
+
+Currently my GSI == spi number whereas the GSI as injected by
+KVM_IRQ_LINE has the above format.
+> 
+>> +
+>> +	if (irq_source_id == KVM_USERSPACE_IRQ_SOURCE_ID) {
+>> +		/*
+>> +		 * This path is not tested yet,
+>> +		 * only irqchip with resampler was exercised
+>> +		 */
+>> +		kvm_vgic_inject_irq(kvm, 0, spi, level);
+> 
+> hmmm, stuff like this definitely makes this patch an RFC.
+
+Yes I acknowledge I shall step back to RFC. I was a bit eager.
+> 
+>> +	} else if (irq_source_id == KVM_IRQFD_RESAMPLE_IRQ_SOURCE_ID) {
+>> +		if (level == 1) {
+> 
+> This seems very wrong.  What if an external device raises a
+> level-triggered IRQ, but then lowers it again, without the guest was
+> ever running, now you have to wait until the guest sees the (now
+> inactive) interrupt and EOIs it before the interrupt is lowered on the
+> vgic?
+Hum I am bit confused here. when you enter that code, this means an
+irqfd was triggered. This irqfd was registered by some user code that is
+supposed to be alive and do the proper action to complete the IRQ. in my
+case the xgmac toggles down the IRQ if anyone resets the IRQ status
+register? this action is done in the xgmac guest ISR. A device
+reset/error? might provoke the IRQ pin toggling done. Do you see any
+other events?
+> 
+>> +			kvm_debug("Inject irqchip routed vIRQ %d\n",
+>> +					e->irqchip.pin);
+>> +			kvm_vgic_inject_irq(kvm, 0, spi, level);
+>> +			/*
+>> +			 * toggling down vIRQ wire is directly handled in
+>> +			 * process_maintenance for this reason:
+>> +			 * irqfd_resampler_ack is called in
+>> +			 * process_maintenance which holds the dist lock.
+>> +			 * irqfd_resampler_ack calls kvm_set_irq
+>> +			 * which ends_up calling kvm_vgic_inject_irq.
+>> +			 * This later attempts to take the lock -> deadlock!
+>> +			 */
+> 
+> Not sure I understand this comment.  What are we trying to achieve, are
+> we using some sort of a workaround to avoid a deadlock?
+
+What I wanted to point out here is I would have prefered to handle both
+levels 0 and 1 in a symetrical manner. irqfd_resampler_ack (in eventfd)
+is calling kvm_set_irq with level 0. This would be the prefered way to
+toggle down the SPI at GIC input instead of doing this in
+process_maintenance in a dirty manner. However this does work because
+irqfd_resampler_ack is called in process_maintenance (the place where
+the EOI is analyzed). process_maintenance holds the dist lock and would
+eventually call kvm_vgic_inject_irq which also attempts to take the lock.
+	
+> 
+>> +		}
+>> +	}
+>> +	return 0;
+>> +
+>> +}
+>> +
+>> +/* void implementation requested to compile irqchip.c */
+>> +
+> 
+> hmm, "TODO: MSI routing not yet implemented" seems more appropriate.
+
+OK
+> 
+>> +int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+>> +		struct kvm *kvm, int irq_source_id, int level, bool line_status)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>> +int kvm_set_routing_entry(struct kvm_irq_routing_table *rt,
+>> +			  struct kvm_kernel_irq_routing_entry *e,
+>> +			  const struct kvm_irq_routing_entry *ue)
+>> +{
+>> +	int r = -EINVAL;
+>> +
+>> +	switch (ue->type) {
+>> +	case KVM_IRQ_ROUTING_IRQCHIP:
+>> +		e->set = vgic_set_assigned_irq;
+>> +		e->irqchip.irqchip = ue->u.irqchip.irqchip;
+>> +		e->irqchip.pin = ue->u.irqchip.pin;
+>> +		if (e->irqchip.pin >= KVM_IRQCHIP_NUM_PINS)
+>> +			goto out;
+>> +		/* chip[0][virtualID] = physicalID  */
+>> +		rt->chip[ue->u.irqchip.irqchip][e->irqchip.pin] = ue->gsi;
+> 
+> did we verify ue->u.irqchip.irqchip anywhere before reaching this code?
+
+No you are right. Should add this check.
+> 
+>> +		break;
+>> +	default:
+>> +		goto out;
+>> +	}
+>> +
+>> +	r = 0;
+>> +out:
+>> +	return r;
+>> +}
+>> +
+>> +
+>> +
+>> +
+> 
+> That's a lot of unnecessary white space.
+OK
+> 
+>> -- 
+>> 1.9.1
+>>
+> 
+> Thanks,
+> -Christoffer
+> 
