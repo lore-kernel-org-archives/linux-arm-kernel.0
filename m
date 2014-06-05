@@ -1,43 +1,62 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 5 Jun 2014 08:51:41 +0100
-Subject: [STLinux Kernel] [PATCH RESEND 02/12] clk: st: Adds Flexgen
- clock binding
-In-Reply-To: <1401892320-18211-3-git-send-email-gabriel.fernandez@linaro.org>
-References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
- <1401892320-18211-3-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20140605075141.GB3865@griffinp-ThinkPad-X1-Carbon-2nd>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 5 Jun 2014 09:55:15 +0200
+Subject: [PATCH 2/3] clocksource: exynos_mct: cache mct upper count
+In-Reply-To: <1401903034-20074-2-git-send-email-dianders@chromium.org>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+ <1401903034-20074-2-git-send-email-dianders@chromium.org>
+Message-ID: <CAKfTPtBeYMW7kOrAhVrqoWhTHfLAtcMeY9FXxZpm7CNAM7NdaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabi,
+On 4 June 2014 19:30, Doug Anderson <dianders@chromium.org> wrote:
+> From: Mandeep Singh Baines <msb@chromium.org>
+>
+> Saves one register read.  Note that the upper count only changes every
+> ~178 seconds with a 24MHz source clock, so it's likely it hasn't
+> changed from call to call.
 
-> +Example:
-> +
-> +	clockgenD2 at x9106000 {
-> +		compatible = "st,clkgen-c32";
-> +		reg = <0x9106000 0x1000>;
-> +
-> +		CLK_S_D2_FLEXGEN: CLK_S_D2_FLEXGEN {
-> +			compatible = "st,flexgen";
-> +
-> +			#clock-cells = <1>;
-> +			clocks = <&CLK_S_D2_QUADFS 0>,
-> +				 <&CLK_S_D2_QUADFS 1>,
-> +				 <&CLK_S_D2_QUADFS 2>,
-> +				 <&CLK_S_D2_QUADFS 3>;
-> +
-> +			clock-output-names = "CLK_PIX_MAIN_DISP",
-> +					     "CLK_PIX_PIP",
-> +					     "CLK_PIX_GDP1",
-> +					     "CLK_PIX_GDP2";
+Hi Doug,
 
-With the upper case to lower case renaming of the STI device tree
-this example also needs to be converted to lower case names 
-throughout.
+Have you checked that the time saved in using a 32bits counter instead
+of a 64bits one is not lost in the handle of the wrap of sched_clock
+which occurs every 178s instead of never ?
 
-Once rectified you can add my:
- Acked-by: Peter Griffin <peter.griffin@linaro.org>
+sched_clock_poll function will be called every 178s
 
-regards,
+Regards,
+Vincent
 
-Peter.
+
+>
+> Before: 1323852 us for 1000000 gettimeofday in userspace
+> After:  1173084 us for 1000000 gettimeofday in userspace
+>
+> Note that even with this change the CPU is in exynos_frc_read() more
+> than 2% of the time in real world profiles of ChromeOS.  That
+> indicates that it's important to optimize.
+>
+> Signed-off-by: Mandeep Singh Baines <msb@chromium.org>
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  drivers/clocksource/exynos_mct.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index ba3a683..7cbe4aa 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -167,8 +167,8 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
+>
+>  static inline cycle_t notrace _exynos4_frc_read(void)
+>  {
+> -       unsigned int lo, hi;
+> -       u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
+> +       u32 lo, hi;
+> +       static u32 hi2;
+>
+>         do {
+>                 hi = hi2;
+> --
+> 2.0.0.526.g5318336
+>
