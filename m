@@ -1,70 +1,38 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 5 Jun 2014 13:10:46 -0700
-Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
-In-Reply-To: <5390C5A9.5070900@gmail.com>
-References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
- <1401467562-5585-1-git-send-email-dianders@chromium.org>
- <CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>
- <5390C19A.9060201@gmail.com>
- <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
- <5390C5A9.5070900@gmail.com>
-Message-ID: <CAD=FV=Ucn20GDib=t=OOT+8YjGuk6uoWrP1qourY=YfrLJj1WA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 05 Jun 2014 22:22:51 +0200
+Subject: keystone breakage
+In-Reply-To: <5390C38C.9050606@ti.com>
+References: <20140605183223.GF23430@n2100.arm.linux.org.uk>
+ <5390C38C.9050606@ti.com>
+Message-ID: <11000860.cdiKf5JsLi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On Thursday 05 June 2014 15:22:52 Santosh Shilimkar wrote:
+> On Thursday 05 June 2014 02:32 PM, Russell King - ARM Linux wrote:
 
-On Thu, Jun 5, 2014 at 12:31 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> One more question that just came to my mind: Why it is just the
-> aclk66_peri and not its children related to UARTs?
+> Thanks for reporting the issue. So far neither Laura's series nor my
+> series is showing up in Linus's tip so I couldn't see the
+> breakage myself but patch at the end of the email should fix
+> the breakage.
+> 
+> Arnd, Olof,
+> Will you be able to pick up the below fix from this email ?
+> If you prefer, I can send the same after rc1 is tagged.
+> 
+> 
+> From 661e238f98171082a7b080720b837283551ff80d Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Thu, 5 Jun 2014 14:51:33 -0400
+> Subject: [PATCH] ARM: keystone: Drop use of meminfo since its not available
+>  anymore
+> 
+> Laura's series removed the meminfo structure and its no longer available.
+> Update keystone code to remove the usage of it.
+> 
+> Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Can you re-read out the original patch description and see if it
-answers that?  Basically: the UART was left on by the bootloader and
-that's a requirement of earlyprintk but the common clock framework is
-messing with aclk66_peric which is what's killing us.
+Applied on top of next/soc2, thanks a lot!
 
-
-> Exynos5420 clock driver still needs a little clean-up, so I'm okay with
-> any fix for now and changing this later if needed, but is this gate
-> clock for ACLK66_PERIC even needed? It seems to be marked with
-> CLK_IGNORE_UNUSED which suggests that it is not needed in this driver at
-> all, along with other similar clocks. AFAIK for power management
-> purposes our fine-grained approach is fine and we shouldn't need to use
-> the big gates.
-
-Right, another option is to remove this gate from the clock tree (and
-reparent all children on the gate's parent) and that would also fix
-us.  The main advantages of the "big gate" as I see it:
-
-1. There's a reasonable chance that our clock tree description is not
-complete.  Patches to add previously undocumented clocks seems to be a
-relatively common occurrence.  If one of those undocumented clocks
-happens to be a child of aclk66_peric then we'll no longer be gating
-it.
-
-2. There might be a small amount of power saved by gating the clock
-higher in the tree.
-
-3. Having a more complete description of the clock tree is nice in
-case someone outside the kernel does something.  If a stray pointer
-(or a nonstandard bootloader) gates the clock then our tree won't show
-problems, but the clock will still be gated.
-
-
-Of course as soon as the first child of aclk66_peric is activated then
-points #1 and #2 are invalid.  ...and #3 is a bit bogus because there
-are A LOT of gates that we already don't model.
-
-
-Also: the CLK_IGNORE_UNUSED is a bit bogus here.  That's not really a
-useful flag in the case that you've got children that are enabled and
-disabled.  Once your first child is enabled and disabled you'll be
-disabled!
-
----
-
-Hmmm, I think I've convinced myself that your suggestion of just
-removing this gate from the table is the right thing to do.  Patch
-will be coming up soon.
-
--Doug
+	Arnd
