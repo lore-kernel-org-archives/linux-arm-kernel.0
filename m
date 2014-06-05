@@ -1,96 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  5 Jun 2014 22:48:15 +0200
-Subject: [PATCH 5/5] staging: rtl8712, rtl8712: avoid lots of build warnings
-In-Reply-To: <1402001295-1980118-1-git-send-email-arnd@arndb.de>
-References: <1402001295-1980118-1-git-send-email-arnd@arndb.de>
-Message-ID: <1402001295-1980118-6-git-send-email-arnd@arndb.de>
+Date: Thu,  5 Jun 2014 22:48:10 +0200
+Subject: [PATCH 0/5] randconfig build fixes for staging
+Message-ID: <1402001295-1980118-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rtl8712 driver has an 'extern inline' function that contains an
-'if', which causes lots of warnings with CONFIG_PROFILE_ALL_BRANCHES
-overriding the definition of 'if':
+Hi Greg,
 
-drivers/staging/rtl8712/ieee80211.h:759:229: warning: '______f' is static but declared in inline function 'ieee80211_get_hdrlen' which is not static [enabled by default]
+Here are a couple of simple fixes from my backlog of ARM
+randconfig bugs. Nothing urgent, they can probably all go
+into next for 3.17 after the merge window, but see for
+yourself.
 
-This changes the driver to use 'static inline' instead, which happens
-to be the correct annotation anyway.
+	Arnd
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Larry Finger <Larry.Finger@lwfinger.net>
-Cc: Florian Schilhabel <florian.c.schilhabel@googlemail.com>
----
- drivers/staging/rtl8192u/ieee80211/ieee80211.h | 10 +++++-----
- drivers/staging/rtl8712/ieee80211.h            |  4 ++--
- 2 files changed, 7 insertions(+), 7 deletions(-)
+Arnd Bergmann (5):
+  staging: lirc: remove sa1100 support
+  staging/iio: IIO_SIMPLE_DUMMY_BUFFER neds IIO_BUFFER
+  staging: sn9c102 depends on USB
+  staging: wlags49_h2: avoid PROFILE_ALL_BRANCHES warnings
+  staging: rtl8712, rtl8712: avoid lots of build warnings
 
-diff --git a/drivers/staging/rtl8192u/ieee80211/ieee80211.h b/drivers/staging/rtl8192u/ieee80211/ieee80211.h
-index e0aa069..1040bab 100644
---- a/drivers/staging/rtl8192u/ieee80211/ieee80211.h
-+++ b/drivers/staging/rtl8192u/ieee80211/ieee80211.h
-@@ -2238,7 +2238,7 @@ static inline void *ieee80211_priv(struct net_device *dev)
- 	return ((struct ieee80211_device *)netdev_priv(dev))->priv;
- }
- 
--extern inline int ieee80211_is_empty_essid(const char *essid, int essid_len)
-+static inline int ieee80211_is_empty_essid(const char *essid, int essid_len)
- {
- 	/* Single white space is for Linksys APs */
- 	if (essid_len == 1 && essid[0] == ' ')
-@@ -2254,7 +2254,7 @@ extern inline int ieee80211_is_empty_essid(const char *essid, int essid_len)
- 	return 1;
- }
- 
--extern inline int ieee80211_is_valid_mode(struct ieee80211_device *ieee, int mode)
-+static inline int ieee80211_is_valid_mode(struct ieee80211_device *ieee, int mode)
- {
- 	/*
- 	 * It is possible for both access points and our device to support
-@@ -2280,7 +2280,7 @@ extern inline int ieee80211_is_valid_mode(struct ieee80211_device *ieee, int mod
- 	return 0;
- }
- 
--extern inline int ieee80211_get_hdrlen(u16 fc)
-+static inline int ieee80211_get_hdrlen(u16 fc)
- {
- 	int hdrlen = IEEE80211_3ADDR_LEN;
- 
-@@ -2564,12 +2564,12 @@ void ieee80211_softmac_scan_syncro(struct ieee80211_device *ieee);
- 
- extern const long ieee80211_wlan_frequencies[];
- 
--extern inline void ieee80211_increment_scans(struct ieee80211_device *ieee)
-+static inline void ieee80211_increment_scans(struct ieee80211_device *ieee)
- {
- 	ieee->scans++;
- }
- 
--extern inline int ieee80211_get_scans(struct ieee80211_device *ieee)
-+static inline int ieee80211_get_scans(struct ieee80211_device *ieee)
- {
- 	return ieee->scans;
- }
-diff --git a/drivers/staging/rtl8712/ieee80211.h b/drivers/staging/rtl8712/ieee80211.h
-index da4000e..8269be8 100644
---- a/drivers/staging/rtl8712/ieee80211.h
-+++ b/drivers/staging/rtl8712/ieee80211.h
-@@ -734,7 +734,7 @@ enum ieee80211_state {
- #define IEEE_G            (1<<2)
- #define IEEE_MODE_MASK    (IEEE_A|IEEE_B|IEEE_G)
- 
--extern inline int ieee80211_is_empty_essid(const char *essid, int essid_len)
-+static inline int ieee80211_is_empty_essid(const char *essid, int essid_len)
- {
- 	/* Single white space is for Linksys APs */
- 	if (essid_len == 1 && essid[0] == ' ')
-@@ -748,7 +748,7 @@ extern inline int ieee80211_is_empty_essid(const char *essid, int essid_len)
- 	return 1;
- }
- 
--extern inline int ieee80211_get_hdrlen(u16 fc)
-+static inline int ieee80211_get_hdrlen(u16 fc)
- {
- 	int hdrlen = 24;
- 
+ drivers/staging/iio/Kconfig                    |   9 +-
+ drivers/staging/media/lirc/lirc_sir.c          | 301 +------------------------
+ drivers/staging/media/sn9c102/Kconfig          |   2 +-
+ drivers/staging/rtl8192u/ieee80211/ieee80211.h |  10 +-
+ drivers/staging/rtl8712/ieee80211.h            |   4 +-
+ drivers/staging/wlags49_h2/wl_internal.h       |   4 +-
+ 6 files changed, 17 insertions(+), 313 deletions(-)
+
 -- 
 1.8.3.2
+
+Cc: Florian Schilhabel <florian.c.schilhabel@googlemail.com>
+Cc: Henk de Groot <pe1dnn@amsat.org>
+Cc: Jarod Wilson <jarod@wilsonet.com>
+Cc: Jonathan Cameron <jic23@kernel.org>
+Cc: Larry Finger <Larry.Finger@lwfinger.net>
+Cc: Luca Risolia <luca.risolia@studio.unibo.it>
+Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Cc: Tuomas Tynkkynen <tuomas.tynkkynen@iki.fi>
+Cc: linux-iio at vger.kernel.org
+Cc: linux-media at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
