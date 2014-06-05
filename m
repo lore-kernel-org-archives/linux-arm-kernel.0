@@ -1,42 +1,72 @@
-From: chris@printf.net (Chris Ball)
-Date: Thu, 05 Jun 2014 20:31:56 +0100
-Subject: MMC is *still* broken...
-In-Reply-To: <20140605183615.GG23430@n2100.arm.linux.org.uk> (Russell King's
- message of "Thu, 5 Jun 2014 19:36:15 +0100")
-References: <20140605183615.GG23430@n2100.arm.linux.org.uk>
-Message-ID: <86oay7noer.fsf@void.printf.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 05 Jun 2014 21:31:53 +0200
+Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
+In-Reply-To: <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
+References: <1401398496-4624-1-git-send-email-dianders@chromium.org>	<1401467562-5585-1-git-send-email-dianders@chromium.org>	<CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>	<5390C19A.9060201@gmail.com>
+ <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
+Message-ID: <5390C5A9.5070900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, adding Ulf and Olof,
+On 05.06.2014 21:22, Doug Anderson wrote:
+> Tomasz,
+> 
+> On Thu, Jun 5, 2014 at 12:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 05.06.2014 20:48, Doug Anderson wrote:
+>>> Tomasz / Mike,
+>>>
+>>> On Fri, May 30, 2014 at 9:32 AM, Doug Anderson <dianders@chromium.org> wrote:
+>>>> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
+>>>> then you'll get a hang on boot.  Here's why:
+>>>>
+>>>> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
+>>>>    enable its clock and disable it.  This is the clock "i2c2".
+>>>> 2. The act of disabling "i2c2" will disable its parents.  In this case
+>>>>    the parent is "aclk66_peric".  There are no other children of
+>>>>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
+>>>>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
+>>>> 3. The next time you try to earlyprintk you'll do so without the UART
+>>>>    clock enabled.  That's because the UART clocks are also children of
+>>>>    "aclk66_peric".  You'll hang.
+>>>>
+>>>> There's no good place to put a clock enable for earlyprintk, which is
+>>>> handled by a bunch of assembly code.  The best we can do is to handle
+>>>> this in the clock driver.
+>>>>
+>>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>>> ---
+>>>> Changes in v2:
+>>>> - Use GATE_A and clk_get().  Save the clock for putting later.
+>>>> - Return 0 from exynos5420_clk_late_init().
+>>>>
+>>>>  drivers/clk/samsung/clk-exynos5420.c | 33 +++++++++++++++++++++++++++++++--
+>>>>  1 file changed, 31 insertions(+), 2 deletions(-)
+>>>
+>>> Are there other changes you'd like me to make to this?  It would be
+>>> really nice to get this in for 3.16 so the system doesn't just
+>>> mysteriously hang when you use earlyprintk.
+>>
+>> We can probably take this as an -rc fix, so it should be fine.
+>>
+>> However I still don't see the point of exporting this clock and
+>> polluting the global clkdev namespace. Even the diffstat looks better in v1.
+> 
+> OK, I'm happy to go back to v1 with the addition of the "return 0".
+> 
+> Mike: are you OK with that?
+> 
 
-On Thu, Jun 05 2014, Russell King - ARM Linux wrote:
-> drivers/mmc/core/core.c: In function 'mmc_card_power_up':
-> drivers/mmc/core/core.c:1517:4: error: implicit declaration of
-> function 'gpiod_set_value'
->
-> I reported this back in April, and it's still present.  This makes me
-> wonder if MMC is maintained.... and makes me wonder what the point
-> of reporting bugs is if they just get ignored.
+One more question that just came to my mind: Why it is just the
+aclk66_peri and not its children related to UARTs?
 
-I don't recall your report.  I might have just failed to read it, but
-doing a quick mail search only finds "Subject: randconfig failures -
-MMC + trusted foundations" -- which was sent to linux-arm-kernel@, but
-not CC'd to linux-mmc@ or to me.
+Exynos5420 clock driver still needs a little clean-up, so I'm okay with
+any fix for now and changing this later if needed, but is this gate
+clock for ACLK66_PERIC even needed? It seems to be marked with
+CLK_IGNORE_UNUSED which suggests that it is not needed in this driver at
+all, along with other similar clocks. AFAIK for power management
+purposes our fine-grained approach is fine and we shouldn't need to use
+the big gates.
 
-Furthermore, this error does not exist in mmc-next or linux-next,
-so it's unclear why or how the MMC maintainers would fix it.
-drivers/mmc/core/core.c does not use gpiod_set_value() in these trees.
-
-Presumably you're testing Olof's unmerged patch "mmc: add support for
-power-on sequencing through DT".  If it needs to include more gpio
-headers, that should be reported to Olof for a respin.
-
-The patch has not been merged because we're still discussing the best
-way forward on linux-mmc@, in the thread "RFC: representing sdio
-devices oob interrupt, clks, etc. in device tree".  The most recent
-message in the thread is from yesterday.
-
-- Chris.
--- 
-Chris Ball   <http://printf.net/>
+Best regards,
+Tomasz
