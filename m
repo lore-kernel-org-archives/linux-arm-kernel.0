@@ -1,25 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jun 2014 09:51:53 -0600
-Subject: [PATCH 1/3] ARM: dts: Create a cros-ec-keyboard fragment
-In-Reply-To: <1401920421-25729-1-git-send-email-dianders@chromium.org>
-References: <1401920421-25729-1-git-send-email-dianders@chromium.org>
-Message-ID: <53909219.6090200@wwwdotorg.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Jun 2014 16:55:09 +0100
+Subject: [PATCH 7/7] OF/ACPI/I2C: Add generic match function for the
+ aforementioned systems
+In-Reply-To: <CACxGe6vLuKygv0E7yq42qe-Lh+nMZ1wrL7PW_TAeoz55wz9q8A@mail.gmail.com>
+References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
+ <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
+ <20140605103009.85BE4C40A4D@trevor.secretlab.ca>
+ <20140605103709.GE19550@lee--X1>
+ <CACxGe6vLuKygv0E7yq42qe-Lh+nMZ1wrL7PW_TAeoz55wz9q8A@mail.gmail.com>
+Message-ID: <20140605155509.GH24240@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 04:20 PM, Doug Anderson wrote:
-> All ChromeOS ARM devices that have the standard "CrOS EC" have the
-> same keyboard mapping.  It's silly to include this same definition
-> everywhere.  Let's create a "dtsi" fragment that we can include from
-> many different boards.
+On Thu, 05 Jun 2014, Grant Likely wrote:
+> On Thu, Jun 5, 2014 at 11:37 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 05 Jun 2014, Grant Likely wrote:
+> >
+> >> On Wed,  4 Jun 2014 13:09:56 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > Currently this is a helper function for the I2C subsystem to aid the
+> >> > matching of non-standard compatible strings and devices which use DT
+> >> > and/or ACPI, but do not supply any nodes (see: [1] Method 4).  However,
+> >> > it has been made more generic as it can be used to only make one call
+> >> > for drivers which support any mixture of OF, ACPI and/or I2C matching.
+> >> >
+> >> > The initial aim is for of_match_device() to be replaced by this call
+> >> > in all I2C device drivers.
+> >> >
+> >> > [1] Documentation/i2c/instantiating-devices
+> >> >
+> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>
+> >> I don't like this. It drops all type safety on the match entry
+> >> and the caller has no idea what it got back.
+> >
+> > Okay, so what's the best way forward?
+> >
+> > Introduce a i2c_of_match_device() call instead?
 > 
-> This fragment is based on what's currently in tegra124-venice2.dts
+> I still think the way to do it is to emulate the missing i2c_device_id
+> when calling the drivers .probe() hook by having a temporary copy on
+> the stack and filling it with data from the OF or ACPI table....
 
-This series looks fine to me. Given it touches both Tegra and Exynos,
-should it be merged into a topic branch in arm-soc, so that it can be
-pulled into both Tegra/Exynos trees to resolve any conflicts. So,
+That's the opposite of what I'm trying to achieve.  I'm trying to get
+rid of unused i2c_device_id tables, rather than reinforce their
+mandatory existence.  I think an i2c_of_match_device() with knowledge
+of how to match via pure DT principles (of_node/compatible) and a
+fall-back, which is able to match on a provided of_device_id table
+alone i.e. without the requirement of an existing of_node.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+I've also been mulling over the idea of removing the second probe()
+parameter, as suggested by Wolfram.  However, this has quite deep
+ramifications which would require a great deal of driver adaptions.
 
-If you want, I'm happy to apply this to a topic branch and send a pull
-request to arm-soc.
+> Actually I would completely skip trying to get the data from ACPI.
+> Since all of this is to continue supporting instantiating devices from
+> sysfs, having a fallback to the OF table completely solves that use
+> case.
+
+> Anticipating an objection of: "what do we do with drivers that are
+> ACPI only?"... That will be an incredibly rare case. If that ever does
+> happen then we'll solve it by simply adding an of_device_id table.
+
+I'm fine with leaving out ACPI support for now.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
