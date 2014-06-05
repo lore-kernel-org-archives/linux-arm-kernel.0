@@ -1,22 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Jun 2014 16:04:03 +0200
-Subject: [PATCH 1/2] [RFC] ASoC: samsung: move s3c24xx over to dmaengine
-In-Reply-To: <20140605133606.GX2520@sirena.org.uk>
-References: <6123933.aGtaUr149J@wuerfel> <20140605133606.GX2520@sirena.org.uk>
-Message-ID: <4306380.m7SZhHfhaK@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Jun 2014 15:26:12 +0100
+Subject: [PATCH v3 10/10] MAINTAINERS: Add sdhci-st file to ARCH/STI
+ architecture
+In-Reply-To: <1401899424-1365-11-git-send-email-peter.griffin@linaro.org>
+References: <1401899424-1365-1-git-send-email-peter.griffin@linaro.org>
+ <1401899424-1365-11-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140605142612.GC24240@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 June 2014 14:36:06 Mark Brown wrote:
-> On Thu, Jun 05, 2014 at 03:20:50PM +0200, Arnd Bergmann wrote:
-> > The s3c24xx sound support keeps giving randconfig build errors, this
-> > is a new attempt to solve it by moving the driver over to use dmaengine
-> > exclusively.
-> 
-> We already have a patch pending for this, it's just waiting until after
-> the merge window to avoid bisection breakage since it depends on
-> dmaengine changes.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 
-Ok, very good.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-	Arnd
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 6dc67b1..19dc265 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1306,6 +1306,7 @@ F:	drivers/pinctrl/pinctrl-st.c
+>  F:	drivers/media/rc/st_rc.c
+>  F:	drivers/i2c/busses/i2c-st.c
+>  F:	drivers/tty/serial/st-asc.c
+> +F:	drivers/mmc/host/sdhci-st.c
+>  
+>  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
