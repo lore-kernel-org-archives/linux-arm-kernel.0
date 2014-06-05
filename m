@@ -1,25 +1,31 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 5 Jun 2014 12:57:58 +0100
-Subject: [STLinux Kernel] [PATCH RESEND 12/12] drivers: clk: st: Use
- round to closest divider flag
-In-Reply-To: <1401892320-18211-13-git-send-email-gabriel.fernandez@linaro.org>
-References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
- <1401892320-18211-13-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20140605115758.GB2294@griffinp-ThinkPad-X1-Carbon-2nd>
+Date: Thu, 5 Jun 2014 13:01:47 +0100
+Subject: [STLinux Kernel] [PATCH 1/6] thermal: sti: Supply Device Tree
+ documentation
+In-Reply-To: <1401442715-6350-2-git-send-email-lee.jones@linaro.org>
+References: <1401442715-6350-1-git-send-email-lee.jones@linaro.org>
+ <1401442715-6350-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140605120147.GA7446@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jun 2014, Gabriel FERNANDEZ wrote:
+Hi Lee,
 
-> This patch uses CLK_DIVIDER_ROUND_CLOSEST flag to specify
-> the divider has to round to closest div.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
->  drivers/clk/st/clkgen-mux.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> +Example:
+> +
+> +	temp1 at fdfe8000 {
+> +		compatible	= "st,stih416-mpe-thermal";
+> +		reg		= <0xfdfe8000 0x10>;
+> +		clock-names	= "thermal";
+> +		clocks		= <&CLK_M_MPETHSENS>;
+> +		interrupts	= <GIC_SPI 23 IRQ_TYPE_NONE>;
+> +	};
 
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
+With the renaming of the STI device tree from upper to lower
+case. The clock name in this example also needs updating.
+
+Once fixed: -
+ Acked-by: Peter Griffin <peter.griffin@linaro.org>
 
 Regards,
 
