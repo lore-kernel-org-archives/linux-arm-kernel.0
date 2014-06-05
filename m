@@ -1,65 +1,67 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Thu, 5 Jun 2014 14:48:07 +0530
-Subject: [PATCH 1/1] device.h: arm,
- dma-iommu: Move out dma_iommu_mapping struct
-In-Reply-To: <20140604185926.GB30884@kroah.com>
-References: <1401869506-48129-1-git-send-email-ritesh.harjani@gmail.com>
- <1401869506-48129-2-git-send-email-ritesh.harjani@gmail.com>
- <20140604175145.GD20812@kroah.com>
- <CAD15agbiuXiiAp62R-NeLeX3rgNftmyb+wGiSVx-FgtcXzxpHA@mail.gmail.com>
- <20140604185926.GB30884@kroah.com>
-Message-ID: <CAD15agbUUBsH1Zma7sXMn9PmChKopvqkGLCDEv_HeMWdGjkK=w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 05 Jun 2014 11:42:12 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140604213159.GB18780@mithrandir>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <4830064.JvgTAs8Xty@wuerfel> <20140604213159.GB18780@mithrandir>
+Message-ID: <6794037.0YTCc6JFQV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Wednesday 04 June 2014 23:32:00 Thierry Reding wrote:
+> On Fri, May 30, 2014 at 09:01:19PM +0200, Arnd Bergmann wrote:
+> > On Friday 30 May 2014 12:22:32 Dave Martin wrote:
+> > > > +
+> > > > +Examples:
+> > > > +=========
+> > > > +
+> > > > +Single-master IOMMU:
+> > > > +--------------------
+> > > > +
+> > > > + iommu {
+> > > > +         #address-cells = <0>;
+> > > > +         #size-cells = <0>;
+> > > > + };
+> > > > +
+> > > > + master {
+> > > > +         iommus = <&/iommu>;
+> > > > + };
+> > > > +
+> > > > +Multiple-master IOMMU with fixed associations:
+> > > > +----------------------------------------------
+> > > > +
+> > > > + /* multiple-master IOMMU */
+> > > > + iommu {
+> > > > +         /*
+> > > > +          * Masters are statically associated with this IOMMU and
+> > > > +          * address translation is always enabled.
+> > > > +          */
+> > > > +         #address-cells = <0>;
+> > > > +         #size-cells = <0>;
+> > > 
+> > > In this example, can different translations be set up for the different
+> > > masters?
+> > > 
+> > > With no cells available to contain any sort of ID, it looks like this
+> > > is not possible.
+> > 
+> > Correct, this example is for an IOMMU that does not use IDs but has a
+> > shared address space for all devices.
+> 
+> Couldn't these device all still have separate address spaces?
 
-On Thu, Jun 5, 2014 at 12:29 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Thu, Jun 05, 2014 at 12:16:28AM +0530, Ritesh Harjani wrote:
->> Hi Greg,
->>
->> Thanks for reviewing.
->>
->> On Wed, Jun 4, 2014 at 11:21 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
->> > On Wed, Jun 04, 2014 at 01:41:46PM +0530, ritesh.harjani at gmail.com wrote:
->> >> From: Ritesh Harjani <ritesh.harjani@gmail.com>
->> >>
->> >> This patch moves out *mapping pointer of dma_iommu_mapping
->> >> from arch/arm/include/asm/device.h to include/liunux/device.h
->> >
->> > Why?  Who else can use this becides arm devices?
->>
->> Currently only arm and arm64 are the archs at this very moment but
->> later other archs can make use of this, as its an arch independent
->> code. (Similar to as some arch make use of iommu_area_alloc in
->> iommu-helper.c)
->>
->> >
->> >>
->> >> Also, it moves out complete structre definition of dma_iommu_mapping
->> >> to include/linux/iommu-helper.h
->> >>
->> >> This is done since arm iommu's dma-mapping arch independent code,
->> >> needs to be moved out to lib/iommu-helper.c, this means
->> >> dma_iommu_mapping will be arch independent and later other archs
->> >> can make use of it.
->> >
->> > Will that really happen?  Do you have patches that do that?  I'd prefer
->> > to not do stuff like this until you have a patch series that needs it,
->> > otherwise this is just unneeded churn.
->>
->> Yes, foll link has the patch series, (under review)
->> http://www.spinics.net/lists/arm-kernel/msg336896.html
->
-> Make this patch 1/3 of that series and resend, I don't want to take this
-> one if the others are not accepted.
+No. If they had separate address spaces, they would require a more
+sophisticated IOMMU. A simple IOMMU without IDs can only be used
+for overcoming address space limits (e.g. for 32-bit DMA masters on
+systems with more than 4GB RAM) but not for strict isolation.
 
-Sure I will do that.
+You basically have one page table shared across all devices connected
+to the IOMMU, and every call to dma_alloc_coherent or dma_map_*
+allocates a new IOVA that isn't used by any of the other devices
+already, but you can't prevent a malicious user from getting a device
+to do DMA to an IOVA that has been set up for another device.
 
->
-> thanks,
->
-> greg k-h
+You could have one such IOMMU per device of course, but I guess that's
+not what you mean.
 
-Thanks
-Ritesh
+	Arnd
