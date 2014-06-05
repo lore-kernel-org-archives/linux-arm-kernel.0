@@ -1,37 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jun 2014 00:46:57 +0100
-Subject: [PATCH] ARM: fix debug prints relevant to PCI devices
-In-Reply-To: <538F738A.6020003@wwwdotorg.org>
-References: <1401909447-8434-1-git-send-email-vidyas@nvidia.com>
- <538F738A.6020003@wwwdotorg.org>
-Message-ID: <20140604234657.GD23430@n2100.arm.linux.org.uk>
+From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
+Date: Wed, 04 Jun 2014 17:17:53 -0700 (PDT)
+Subject: [PATCH v2 5/7] ARM: shmobile: r8a7791 dtsi: Add SYS-DMAC0 and
+ SYS-DMAC1 nodes
+In-Reply-To: <2440127.sDc7m91LPu@avalon>
+References: <1401716531-29794-1-git-send-email-geert+renesas@glider.be>
+ <1401716531-29794-6-git-send-email-geert+renesas@glider.be>
+ <2440127.sDc7m91LPu@avalon>
+Message-ID: <871tv4jjkh.wl%kuninori.morimoto.gx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 04, 2014 at 01:29:14PM -0600, Stephen Warren wrote:
-> On 06/04/2014 01:17 PM, Vidya Sagar wrote:
-> > As per PCIe spec, fast back-to-back transactions feature
-> > is not applicable to PCIe devices. Hence, do not print
-> > that fast back-to-back trasactions are disabled when
-> > there is a PCIe device found on the bus
-> 
-> > @@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
-> >  	list_for_each_entry(dev, &bus->devices, bus_list) {
-> >  		u16 status;
-> >  
-> > +		if (!has_pcie_dev)
-> > +			has_pcie_dev = pci_pcie_cap(dev);
-> 
-> This sets the flag if any PCIe device is detected, even if regular PCI
-> devices are also detected. I assume the two can be mixed on a bus if
-> there's a bridge (although perhaps that would be separate buses, and
-> child buses don't get traversed by this function?)
 
-This function gets caller per PCI bus - if there's a bridge between
-(which there should be between PCIe and PCI) then they are by definition
-separate buses.  (I'm guessing that there aren't transparent bridges
-between PCI and PCIe.)
+Hi Laurent
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> > Add nodes for the SYS-DMA controllers, SYS-DMAC0 and SYS-DMAC1. These
+> > both share the same device sources, so are wrapped in the shdma-mux
+> > node to allow both to be used.
+> > 
+> > Cfr. the r8a7790 version by Ben Dooks.
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+(snip)
+> > +		sysdma0: dma-controller at e6700020 {
+> > +			compatible = "renesas,shdma-r8a7791";
+> > +			reg = <0 0xe6700020 0 0xffc0>;
+> 
+> Even though the registered defined in the datasheet start at 0xe6700020, the 
+> documentation clearly states that "The base address of registers for the 
+> lower-numbered channels  (0 to 14) is H'E670 0000". I'm also wondering where 
+> the size comes from, if you want to span the 0xe6700000 to 0xe670ffff range, 
+> the size should be 0xffe0, not 0xffc0.
+
+Unfortunately, this mapping (form 0x20) is required from driver
+for historical reasons.
+So, driver setting needs to care about it.
+Please check DMA_CHANNEL macro for each setup-xxx.c
+# but, it works without care about it (?)
+# becase there are mirror register there (?), I'm not sure detail
+
+
+Best regards
+---
+Kuninori Morimoto
