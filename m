@@ -1,96 +1,141 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  5 Jun 2014 10:53:07 +0100
-Subject: [RFC v3 2/9] arm: fiq: Allow EOI to be communicated to the intc
+Date: Thu,  5 Jun 2014 10:53:08 +0100
+Subject: [RFC v3 3/9] irqchip: gic: Provide support for interrupt grouping
 In-Reply-To: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
  <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401961994-18033-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401961994-18033-4-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern ARM systems require an EOI to be sent to the interrupt controller
-on completion of both IRQ and FIQ. The FIQ code currently does not provide
-any API to perform this. This patch provides this API, implemented by
-hooking into main irq driver in a similar way to the existing
-enable_fiq()/disable_fiq().
+All GIC hardware except GICv1 without TrustZone support provides a means
+to group exceptions into group 0 (which can optionally be signally using
+use FIQ) and group 1. The kernel currently provides no means to exploit
+this. This patch alters the initialization of the GIC to place all
+interrupts into group 1, this is a foundational requirement to meaningfully
+use FIQ.
 
-All existing in-kernel callers of init_FIQ() and fiq_add_mapping() have
-been reviewed to check they meet the documented restriction.
+Note that the hardware functionality is unavailable to the kernel when a
+secure monitor is present because access to the grouping registers are
+prohibited outside "secure world". This allows grouping to be used to
+allow hardware peripherals to send interrupts into the secure world.
+
+On systems without TrustZone support the kernel has the power to
+route interrupt sources to FIQ, potentially allowing a driver to exploit the
+NMI-like properties of FIQ.
+
+The registers involved are RAZ/WI when unimplemented or protected by
+security policy. This patch therefore applies grouping unconditionally.
+
+Tested on a qemu GICv2 model (self-written from GICv2 spec) and
+an STiH416 (ARM Cortex A9, GICv1, TZ).
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Fabio Estevam <festevam@gmail.com>
-Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Sricharan R <r.sricharan@ti.com>
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
 ---
- arch/arm/include/asm/fiq.h |  2 ++
- arch/arm/kernel/fiq.c      | 28 ++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ drivers/irqchip/irq-gic.c       | 35 ++++++++++++++++++++++++++++++-----
+ include/linux/irqchip/arm-gic.h |  3 +++
+ 2 files changed, 33 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
-index 75d98c6..10d22eb 100644
---- a/arch/arm/include/asm/fiq.h
-+++ b/arch/arm/include/asm/fiq.h
-@@ -39,6 +39,8 @@ extern void set_fiq_handler(void *start, unsigned int length);
- extern struct irq_data *lookup_fiq_irq_data(int fiq);
- extern void enable_fiq(int fiq);
- extern void disable_fiq(int fiq);
-+extern void eoi_fiq_with_irq_data(struct irq_data *d);
-+extern void eoi_fiq(int fiq);
- extern void fiq_add_mapping(int irq, int fiq_virq, unsigned int length);
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 57d165e..aa8efe4 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -408,13 +408,27 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
  
- /* helpers defined in fiqasm.S: */
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 177939c..ed01162 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -164,6 +164,25 @@ void disable_fiq(int fiq)
- 	disable_irq(d->irq);
+ 	/*
++	 * Set all global interrupts to be group 1.
++	 *
++	 * If grouping is not available (not implemented or prohibited by
++	 * security mode) these registers a read-as-zero/write-ignored.
++	 */
++	for (i = 32; i < gic_irqs; i += 32)
++		writel_relaxed(0xffffffff, base + GIC_DIST_IGROUP + i * 4 / 32);
++
++	/*
+ 	 * Disable all interrupts.  Leave the PPI and SGIs alone
+ 	 * as these enables are banked registers.
+ 	 */
+ 	for (i = 32; i < gic_irqs; i += 32)
+ 		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+ 
+-	writel_relaxed(1, base + GIC_DIST_CTRL);
++	/*
++	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
++	 * bit 1 ignored)
++	 */
++	writel_relaxed(GIC_DIST_CTRL_ENABLE_GRP0_BIT |
++		       GIC_DIST_CTRL_ENABLE_GRP1_BIT, base + GIC_DIST_CTRL);
  }
  
-+/* This call ends a FIQ and does not perform radix tree lookups. Use this
-+ * if the FIQ interrupt rate is expected to be extremely high.
-+ */
-+void eoi_fiq_with_irq_data(struct irq_data *irq_data)
-+{
-+	struct irq_chip *chip = irq_data_get_irq_chip(irq_data);
-+	if (chip->irq_eoi)
-+		chip->irq_eoi(irq_data);
-+}
-+EXPORT_SYMBOL(eoi_fiq_with_irq_data);
-+
-+void eoi_fiq(int fiq)
-+{
-+	struct irq_data *d = lookup_fiq_irq_data(fiq);
-+	BUG_ON(!d);
-+	eoi_fiq_with_irq_data(d);
-+}
-+EXPORT_SYMBOL(eoi_fiq);
-+
- EXPORT_SYMBOL(set_fiq_handler);
- EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
- EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
-@@ -175,6 +194,9 @@ EXPORT_SYMBOL(disable_fiq);
+ static void gic_cpu_init(struct gic_chip_data *gic)
+@@ -452,8 +466,16 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 	for (i = 0; i < 32; i += 4)
+ 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
  
- /*
-  * Add a mapping between a normal IRQ and a FIQ shadow.
-+ *
-+ * By providing a mapping the interrupt controller is guaranteeing not
-+ * to use spin locks from .irq_eoi
-  */
- void fiq_add_mapping(int irq, int fiq_virq, unsigned int length)
- {
-@@ -194,6 +216,12 @@ void fiq_add_mapping(int irq, int fiq_virq, unsigned int length)
- 	mutex_unlock(&fiq_virq_mutex);
++	/*
++	 * Set all PPI and SGI interrupts to be group 1.
++	 *
++	 * If grouping is not available (not implemented or prohibited by
++	 * security mode) these registers are read-as-zero/write-ignored.
++	 */
++	writel_relaxed(0xffffffff, dist_base + GIC_DIST_IGROUP + 0);
++
+ 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, base + GIC_CPU_CTRL);
++	writel_relaxed(0x1f, base + GIC_CPU_CTRL);
  }
  
-+/*
-+ * Set the offset between normal IRQs and their FIQ shadows.
-+ *
-+ * By providing an offset the interrupt controller is guaranteeing not
-+ * to use spin locks from .irq_eoi
-+ */
- void __init init_FIQ(int start)
- {
- 	fiq_start = start;
+ void gic_cpu_if_down(void)
+@@ -537,7 +559,9 @@ static void gic_dist_restore(unsigned int gic_nr)
+ 		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
+ 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
+ 
+-	writel_relaxed(1, dist_base + GIC_DIST_CTRL);
++	writel_relaxed(GIC_DIST_CTRL_ENABLE_GRP0_BIT |
++			   GIC_DIST_CTRL_ENABLE_GRP1_BIT,
++		       dist_base + GIC_DIST_CTRL);
+ }
+ 
+ static void gic_cpu_save(unsigned int gic_nr)
+@@ -594,7 +618,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+ 
+ 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
++	writel_relaxed(0x1f, cpu_base + GIC_CPU_CTRL);
+ }
+ 
+ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+@@ -670,7 +694,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	dmb(ishst);
+ 
+ 	/* this always happens on GIC0 */
+-	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
++	writel_relaxed(map << 16 | irq | 0x8000,
++		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+ 
+ 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+ }
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 7ed92d0..919502f 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -37,6 +37,9 @@
+ #define GIC_DIST_SGI_PENDING_CLEAR	0xf10
+ #define GIC_DIST_SGI_PENDING_SET	0xf20
+ 
++#define GIC_DIST_CTRL_ENABLE_GRP0_BIT	(1 << 0)
++#define GIC_DIST_CTRL_ENABLE_GRP1_BIT	(1 << 1)
++
+ #define GICH_HCR			0x0
+ #define GICH_VTR			0x4
+ #define GICH_VMCR			0x8
 -- 
 1.9.0
