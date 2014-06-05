@@ -1,35 +1,23 @@
-From: xiaoguangrong@linux.vnet.ibm.com (Xiao Guangrong)
-Date: Thu, 05 Jun 2014 14:55:43 +0800
-Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
- support
-In-Reply-To: <1401916278-24835-1-git-send-email-m.smarduch@samsung.com>
-References: <1401916278-24835-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <5390146F.8020407@linux.vnet.ibm.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Thu, 5 Jun 2014 12:55:12 +0530
+Subject: [PATCH] arm64: dts: Add more serial port nodes in APM X-Gene
+ device tree
+In-Reply-To: <20140604154116.GN10126@arm.com>
+References: <1395836346-9350-1-git-send-email-vkale@apm.com>
+ <CAPrCYkcJr5ODY3Sjcq5D_Db-cM3SAXYjUK2H9FGePrO_q0wMEw@mail.gmail.com>
+ <20140604154116.GN10126@arm.com>
+Message-ID: <CAPrCYkecDEsqHmUzfoWjQG2Vp1eUzyUZXUUQE-pwMx7gdxz8LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 05:11 AM, Mario Smarduch wrote:
+On Wed, Jun 4, 2014 at 9:11 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Jun 04, 2014 at 11:05:54AM +0100, Vinayak Kale wrote:
+>> Can you please merge this one?
+>
+> I was hoping for an ack/nak from the DT guys before merging it.
 
-> +	spin_lock(&kvm->mmu_lock);
-> +
-> +	for (i = 0; i < n / sizeof(long); i++) {
-> +		unsigned long mask;
-> +		gfn_t offset;
-> +
-> +		if (!dirty_bitmap[i])
-> +			continue;
-> +
-> +		is_dirty = true;
-> +
-> +		mask = xchg(&dirty_bitmap[i], 0);
-> +		dirty_bitmap_buffer[i] = mask;
-> +
-> +		offset = i * BITS_PER_LONG;
-> +		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
-> +	}
-> +	if (is_dirty)
-> +		kvm_flush_remote_tlbs(kvm);
+I'll resend this patch CCing DT folks.
 
-You moved the flush into mmu-lock. Please do not :).
-
-See commit 198c74f43f0f5473f99967aead30ddc622804bc1
+>
+> --
+> Catalin
