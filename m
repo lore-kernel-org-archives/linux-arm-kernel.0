@@ -1,23 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jun 2014 12:41:55 -0600
-Subject: [PATCH v7 4/5] ARM: tegra: Add efuse and apbmisc bindings
-In-Reply-To: <1401973754-19701-5-git-send-email-pdeschrijver@nvidia.com>
-References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
- <1401973754-19701-5-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <5390B9F3.8030108@wwwdotorg.org>
+From: vidyas@nvidia.com (Vidya Sagar)
+Date: Fri, 6 Jun 2014 00:17:48 +0530
+Subject: [PATCH v2] ARM: fix debug prints relevant to PCI devices
+Message-ID: <1401994068-820-1-git-send-email-vidyas@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
-> Add efuse and apbmisc bindings for Tegra20, Tegra30, Tegra114 and Tegra124.
+As per PCIe spec, fast back-to-back transactions feature
+is not applicable to PCIe devices. Hence, do not print
+that fast back-to-back trasactions are disabled when
+there is a PCIe device found on the bus
 
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
+---
 
-> +	apbmisc at 70000800 {
-> +		compatible = "nvidia,tegra114-apbmisc", "nvidia,tegra20-apbmisc";
+v2:
+* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
+* replaced printk with pr_info
 
-Is the Tegra114 APBMISC register layout 100% a backwards-compatible
-superset of that in Tegra20? For both registers the code currently uses
-*and* all possible registers the code could ever use? Since the APB MISC
-is a bit of a dumping ground for random registers, that feels unlikely,
-but perhaps it's possible.
+ arch/arm/kernel/bios32.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..d48d9d3 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
++	bool has_pcie_dev = 0;
+ 
+ 	/*
+ 	 * Walk the devices on this bus, working out what we can
+@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		u16 status;
+ 
++		if (!has_pcie_dev)
++			has_pcie_dev = pci_is_pcie(dev);
+ 		pci_read_config_word(dev, PCI_STATUS, &status);
+ 
+ 		/*
+@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 
+ 	/*
+ 	 * Report what we did for this bus
++	 * (only if the bus doesn't have even one PCIe device)
+ 	 */
+-	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+-		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
++	if (!has_pcie_dev)
++		pr_info(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
++			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-- 
+1.8.1.5
