@@ -1,36 +1,65 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 05 Jun 2014 16:55:47 +0200
-Subject: [PATCH] ASoC: sigmadsp: remove I2C support
-In-Reply-To: <6181626.txoA4bpImf@wuerfel>
-References: <6181626.txoA4bpImf@wuerfel>
-Message-ID: <539084F3.3050700@metafoo.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 5 Jun 2014 15:56:18 +0100
+Subject: [PATCH v1 1/6] thermal: sti: Supply Device Tree documentation
+In-Reply-To: <20140605120147.GA7446@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1401442715-6350-1-git-send-email-lee.jones@linaro.org>
+ <1401442715-6350-2-git-send-email-lee.jones@linaro.org>
+ <20140605120147.GA7446@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20140605145618.GF24240@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 04:47 PM, Arnd Bergmann wrote:
-> The newly added ADAU1781 codec comes with separate drivers for
-> I2C and SPI modes, which gives us a new variation of the dependency
-> problems: If SPI is enabled and the I2C core is a loadable module,
-> selecting SND_SOC_ADAU1781_SPI as built-in leads to a link error because
-> the common base code from sigmadsp.c now also gets built-in:
->
-> sound/built-in.o: In function `sigma_action_write_i2c':
-> :(.text+0x5d8d4): undefined reference to `i2c_master_send'
->
-> Rather than adding yet more complex Kconfig logic, this converts the last
-> user of process_sigma_firmware() to process_sigma_firmware_regmap(),
-> which seems trivial after the driver itself now uses regmap as well.
-> With that done, there is no more linker dependency from
-> SND_SOC_ADAU1781_SPI to i2c_master_send.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Lars-Peter Clausen <lars@metafoo.de>
+thermal: sti: Supply Device Tree documentation
 
-No this patch won't work. Regmap support for the adau1701 is rather limited 
-which is why we need native i2c support in the lib.
+Signed-off-by: Ajit Pal Singh <ajitpal.singh@st.com>
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-But yea, I just noticed the same problem an hour ago and was thinking 
-hopefully I'll get to fixing this before it shows up in Arnd's randconfig 
-builds ;)
-
-- Lars
+diff --git a/Documentation/devicetree/bindings/thermal/st-thermal.txt b/Documentation/devicetree/bindings/thermal/st-thermal.txt
+new file mode 100644
+index 0000000..3b9251b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/st-thermal.txt
+@@ -0,0 +1,42 @@
++Binding for Thermal Sensor driver for STMicroelectronics STi series of SoCs.
++
++Required parameters:
++-------------------
++
++compatible : 	st,<SoC>-<module>-thermal; should be one of:
++		  "st,stih415-sas-thermal",
++		  "st,stih415-mpe-thermal",
++		  "st,stih416-sas-thermal"
++		  "st,stih416-mpe-thermal"
++		  "st,stid127-thermal" or
++		  "st,stih407-thermal"
++		according to the SoC type (stih415, stih416, stid127, stih407)
++		and module type (sas or mpe). On stid127 & stih407 there is only
++		one die/module, so there is no module type in the compatible
++		string.
++clock-names : 	Should be "thermal".
++		  See: Documentation/devicetree/bindings/resource-names.txt
++clocks : 	Phandle of the clock used by the thermal sensor.
++		  See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Optional parameters:
++-------------------
++
++reg : 		For non-sysconf based sensors, this should be the physical base
++		address and length of the sensor's registers.
++interrupts :	Standard way to define interrupt number.
++		Interrupt is mandatory to be defined when compatible is
++		"stih416-mpe-thermal".
++		  NB: For thermal sensor's for which no interrupt has been
++		  defined, a polling delay of 1000ms will be used to read the
++		  temperature from device.
++
++Example:
++
++	temp1 at fdfe8000 {
++		compatible	= "st,stih416-mpe-thermal";
++		reg		= <0xfdfe8000 0x10>;
++		clock-names	= "thermal";
++		clocks		= <&clk_m_mpethsens>;
++		interrupts	= <GIC_SPI 23 IRQ_TYPE_NONE>;
++	};
