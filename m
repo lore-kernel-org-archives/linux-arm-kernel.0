@@ -1,24 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Jun 2014 14:36:06 +0100
-Subject: [PATCH 1/2] [RFC] ASoC: samsung: move s3c24xx over to dmaengine
-In-Reply-To: <6123933.aGtaUr149J@wuerfel>
-References: <6123933.aGtaUr149J@wuerfel>
-Message-ID: <20140605133606.GX2520@sirena.org.uk>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 5 Jun 2014 21:37:08 +0800
+Subject: [PATCH RFC v1 0/2] Add support for Hisilicon SMMU architecture
+Message-ID: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 03:20:50PM +0200, Arnd Bergmann wrote:
-> The s3c24xx sound support keeps giving randconfig build errors, this
-> is a new attempt to solve it by moving the driver over to use dmaengine
-> exclusively.
+This driver is base on arm_smmu.c, beause of hisilicon smmu-v1 is similar to
+arm-smmu, some code can be direct reused. for example: map and unmap, device
+tree configuration, and the software framework. Somebody may doubted: why not
+strip the share code in one file, and put hardware-dependent part into other
+files? Yeah, it's right. But now, in order to make the code flow clearly, just
+put all hisilicon smmu driver code in hisi_smmu.c.If this driver is acceptable,
+I will update and submit a revised verion.
 
-We already have a patch pending for this, it's just waiting until after
-the merge window to avoid bisection breakage since it depends on
-dmaengine changes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140605/1dace5ed/attachment.sig>
+Zhen Lei (2):
+  documentation/iommu: Add description of Hisilicon System MMU binding
+  iommu/hisilicon: Add support for Hisilicon Ltd. System MMU
+    architecture
+
+ .../devicetree/bindings/iommu/hisilicon,smmu.txt   |   70 +
+ drivers/iommu/Kconfig                              |   11 +
+ drivers/iommu/Makefile                             |    1 +
+ drivers/iommu/hisi-smmu.c                          | 1686 ++++++++++++++++++++
+ 4 files changed, 1768 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/hisilicon,smmu.txt
+ create mode 100644 drivers/iommu/hisi-smmu.c
+
+--
+1.8.0
