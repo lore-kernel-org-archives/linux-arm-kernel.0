@@ -1,115 +1,153 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  5 Jun 2014 10:53:05 +0100
-Subject: [RFC v3 0/9] kgdb: NMI/FIQ support for ARM
-In-Reply-To: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+Date: Thu,  5 Jun 2014 10:53:06 +0100
+Subject: [RFC v3 1/9] arm: fiq: arbitrary mappings from IRQ to FIQ virqs
+In-Reply-To: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
 References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset makes it possible to use the kgdb NMI infrastructure on
-ARM platforms by providing a mutli-platform compatible means for drivers
-to manage FIQ routings.
+Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
+virq into a FIQ virq. This is too inflexible for multi-platform kernels
+and makes runtime error checking impossible.
 
-First a quick summary of how the mainline kgdb NMI infrastructure
-(mostly found in drivers/tty/serial/kgdb_nmi.c) works. The kgdb
-infrastructure will re-route the kgdb console UART's interrupt signal
-from IRQ to FIQ. Naturally the UART will no longer function normally and
-will instead be managed by kgdb using the polled I/O functions. Any
-character delivered to the UART causes the kgdb handler function to be
-called.
+We solve this by introducing a flexible mapping that allows interrupt
+controllers that support FIQ to register those mappings. This, in turn,
+makes it much possible for drivers in DT kernels to gain access to
+FIQ virqs.
 
-Note that, within this patchset a serial driver explicitly consents (or
-not) to the abuse outlined above by calling the appropriate registration
-during the .poll_init() callback.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/include/asm/fiq.h |  2 ++
+ arch/arm/kernel/fiq.c      | 57 +++++++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 53 insertions(+), 6 deletions(-)
 
-The patch set is structured as follows:
-
-  The first five patches modify the interrupt system to make it easier
-  to describe FIQ. The key concept is that a call to enable_fiq() must
-  modify the IRQ/FIQ routing to that the FIQ really is enabled (rather
-  than spuriously delivering the signal on the IRQ). To achieve this
-  each interrupt controller registers two virqs for each hwirq (allowing
-  IRQ and FIQ to be readily distinguished) and registers the mappings
-  using a new call, fiq_add_mapping().
-  
-  The next two patches (6 and 7) provide kgdb with a FIQ handler and
-  a means for serial drivers to register their FIQ with kgdb.
-
-  Finally two example serial drivers are modified in order to register
-  their FIQs with kgdb.
-
-Major remaining TODO item is to modify the code to halt the other CPUs;
-at present this code sends IPIs (which use a normal IRQ) and busy waits
-for the other CPUs to halt. This means the benefits of invoking the
-debugger via NMI are not yet realized on SMP systems. However I plan
-to tackle that later (i.e.  when there's some consensus on whether this
-approach is the right way to handle FIQ).
-
-Changes since v2:
-
-* Use flexible mappings to link a normal virq to a FIQ virq. This
-  replaces the device tree proposals from the previous RFC
-  (thanks Russell King and Rob Herring).
-
-* Reviewed all use of spin locks within .irq_eoi callbacks (and fixed
-  the issue identified). Added comments to the FIQ registration
-  functions making clear the requirements imposed on interrupt
-  controller that call the FIQ API (thanks Russell King).
-
-* Fixed a few whitespace issues (thanks Srinivas Kandagatla)
-
-* ARM64/defconfig build tests (no problems found)
-
-Changes since v1:
-
-* Fully fledged multi-platform
-
-* Tested for correct FIQ operation on STiH416/B2020 (Cortex A9),
-  qemu/versatile and qemu/vexpress-a15 (with self-written mods to the
-  GIC model to support FIQ).
-
-* Regression tested (and resulting bugs fixed) on qemu/versatile+DT and
-  qemu/integreatorcp.
-
-Anton Vorontsov (2):
-  ARM: Move some macros from entry-armv to entry-header
-  ARM: Add KGDB/KDB FIQ debugger generic code
-
-Daniel Thompson (7):
-  arm: fiq: arbitrary mappings from IRQ to FIQ virqs
-  arm: fiq: Allow EOI to be communicated to the intc
-  irqchip: gic: Provide support for interrupt grouping
-  irqchip: gic: Introduce shadow irqs for FIQ
-  irqchip: vic: Introduce shadow irqs for FIQ
-  serial: amba-pl011: Pass on FIQ information to KGDB.
-  serial: asc: Add support for KGDB's FIQ/NMI mode
-
- arch/arm/Kconfig                            |   2 +
- arch/arm/Kconfig.debug                      |  18 +++
- arch/arm/include/asm/fiq.h                  |   4 +
- arch/arm/include/asm/kgdb.h                 |   7 ++
- arch/arm/kernel/Makefile                    |   1 +
- arch/arm/kernel/entry-armv.S                | 151 +------------------------
- arch/arm/kernel/entry-header.S              | 164 ++++++++++++++++++++++++++++
- arch/arm/kernel/fiq.c                       |  85 +++++++++++++-
- arch/arm/kernel/kgdb_fiq.c                  | 124 +++++++++++++++++++++
- arch/arm/kernel/kgdb_fiq_entry.S            |  87 +++++++++++++++
- arch/arm/mach-ep93xx/core.c                 |   6 +-
- arch/arm/mach-netx/generic.c                |   3 +-
- arch/arm/mach-s3c64xx/common.c              |   6 +-
- arch/arm/mach-versatile/core.c              |   9 +-
- arch/arm/mach-versatile/include/mach/irqs.h |   5 +-
- arch/arm/plat-samsung/s5p-irq.c             |   3 +-
- drivers/irqchip/irq-gic.c                   |  97 ++++++++++++++--
- drivers/irqchip/irq-vic.c                   | 102 ++++++++++++++---
- drivers/tty/serial/amba-pl011.c             |  99 ++++++++++-------
- drivers/tty/serial/st-asc.c                 |  23 ++++
- include/linux/irqchip/arm-gic.h             |   3 +
- include/linux/irqchip/arm-vic.h             |   8 +-
- 22 files changed, 770 insertions(+), 237 deletions(-)
- create mode 100644 arch/arm/kernel/kgdb_fiq.c
- create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
-
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index d493d0b..75d98c6 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -36,8 +36,10 @@ struct fiq_handler {
+ extern int claim_fiq(struct fiq_handler *f);
+ extern void release_fiq(struct fiq_handler *f);
+ extern void set_fiq_handler(void *start, unsigned int length);
++extern struct irq_data *lookup_fiq_irq_data(int fiq);
+ extern void enable_fiq(int fiq);
+ extern void disable_fiq(int fiq);
++extern void fiq_add_mapping(int irq, int fiq_virq, unsigned int length);
+ 
+ /* helpers defined in fiqasm.S: */
+ extern void __set_fiq_regs(unsigned long const *regs);
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 918875d..177939c 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -40,6 +40,8 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/seq_file.h>
++#include <linux/irq.h>
++#include <linux/radix-tree.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+@@ -53,6 +55,9 @@
+ 	})
+ 
+ static unsigned long no_fiq_insn;
++static int fiq_start = -1;
++static RADIX_TREE(fiq_virq_tree, GFP_KERNEL);
++static DEFINE_MUTEX(fiq_virq_mutex);
+ 
+ /* Default reacquire function
+  * - we always relinquish FIQ control
+@@ -60,8 +65,11 @@ static unsigned long no_fiq_insn;
+  */
+ static int fiq_def_op(void *ref, int relinquish)
+ {
+-	if (!relinquish)
++	if (!relinquish) {
++		unsigned offset = FIQ_OFFSET;
++		no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
+ 		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
++	}
+ 
+ 	return 0;
+ }
+@@ -127,16 +135,33 @@ void release_fiq(struct fiq_handler *f)
+ 	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
+ }
+ 
+-static int fiq_start;
++struct irq_data *lookup_fiq_irq_data(int fiq)
++{
++	struct irq_data *d;
++
++	if (fiq_start != -1)
++		return irq_get_irq_data(fiq + fiq_start);
++
++	rcu_read_lock();
++	d = radix_tree_lookup(&fiq_virq_tree, fiq);
++	rcu_read_unlock();
++	return d;
++}
+ 
+ void enable_fiq(int fiq)
+ {
+-	enable_irq(fiq + fiq_start);
++	struct irq_data *d = lookup_fiq_irq_data(fiq);
++	if (WARN_ON(!d))
++		return;
++	enable_irq(d->irq);
+ }
+ 
+ void disable_fiq(int fiq)
+ {
+-	disable_irq(fiq + fiq_start);
++	struct irq_data *d = lookup_fiq_irq_data(fiq);
++	if (WARN_ON(!d))
++		return;
++	disable_irq(d->irq);
+ }
+ 
+ EXPORT_SYMBOL(set_fiq_handler);
+@@ -144,12 +169,32 @@ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(claim_fiq);
+ EXPORT_SYMBOL(release_fiq);
++EXPORT_SYMBOL(lookup_fiq_irq_data);
+ EXPORT_SYMBOL(enable_fiq);
+ EXPORT_SYMBOL(disable_fiq);
+ 
++/*
++ * Add a mapping between a normal IRQ and a FIQ shadow.
++ */
++void fiq_add_mapping(int irq, int fiq_virq, unsigned int length)
++{
++	int i;
++
++	/* fiq_add_mapping can't be mixed with init_FIQ */
++	BUG_ON(fiq_start != -1);
++
++	mutex_lock(&fiq_virq_mutex);
++	for (i = 0; i < length; i++) {
++		int err = radix_tree_insert(&fiq_virq_tree, irq + i,
++					    irq_get_irq_data(fiq_virq + i));
++		if (err)
++			pr_err("fiq: Cannot map %d to %d\n", irq + i,
++			       fiq_virq + i);
++	}
++	mutex_unlock(&fiq_virq_mutex);
++}
++
+ void __init init_FIQ(int start)
+ {
+-	unsigned offset = FIQ_OFFSET;
+-	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
+ 	fiq_start = start;
+ }
 -- 
 1.9.0
