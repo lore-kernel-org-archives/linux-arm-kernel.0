@@ -1,53 +1,32 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 6 Jun 2014 00:09:28 +0200
-Subject: [PATCH 1/4] pinctrl: Add NVIDIA Tegra XUSB pad controller support
-In-Reply-To: <5390A426.1050307@wwwdotorg.org>
-References: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
- <5390A426.1050307@wwwdotorg.org>
-Message-ID: <20140605220927.GB28817@ulmo>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 6 Jun 2014 01:13:01 +0300
+Subject: [PATCH v7 4/5] ARM: tegra: Add efuse and apbmisc bindings
+In-Reply-To: <5390B9F3.8030108@wwwdotorg.org>
+References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401973754-19701-5-git-send-email-pdeschrijver@nvidia.com>
+ <5390B9F3.8030108@wwwdotorg.org>
+Message-ID: <20140605221301.GQ5961@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 11:08:54AM -0600, Stephen Warren wrote:
-> On 06/04/2014 09:16 AM, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > The XUSB pad controller found on NVIDIA Tegra SoCs provides several pads
-> > that lanes can be assigned to in order to support a variety of interface
-> > options: USB 2.0, USB 3.0, PCIe and SATA.
-> > 
-> > In addition to the pin controller used to assign lanes to pads two PHYs
-> > are exposed to allow the bricks for PCIe and SATA to be powered up and
-> > down by PCIe and SATA drivers.
+On Thu, Jun 05, 2014 at 08:41:55PM +0200, Stephen Warren wrote:
+> On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
+> > Add efuse and apbmisc bindings for Tegra20, Tegra30, Tegra114 and Tegra124.
 > 
-> > +#define TEGRA124_GROUP(_funcs)						\
-> > +	{								\
-> > +		.num_funcs = ARRAY_SIZE(tegra124_##_funcs##_functions),	\
-> > +		.funcs = tegra124_##_funcs##_functions,			\
-> > +	}
-> > +
-> > +static const struct tegra_xusb_padctl_group tegra124_groups[] = {
-> > +	TEGRA124_GROUP(otg),
-> > +	TEGRA124_GROUP(usb),
-> > +	TEGRA124_GROUP(pci),
-> > +};
+> > diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
 > 
-> I'm not sure what this set of groups is for.
+> > +	apbmisc at 70000800 {
+> > +		compatible = "nvidia,tegra114-apbmisc", "nvidia,tegra20-apbmisc";
 > 
-> pinctrl muxes functions onto groups, so given that each pin in padctl is
-> individually configurable, we need 1 group per pin. As far as I can
-> tell, tegra_xusb_padctl_get_groups_count()/name() implement this
-> correctly, and this array isn't used anywhere?
+> Is the Tegra114 APBMISC register layout 100% a backwards-compatible
+> superset of that in Tegra20? For both registers the code currently uses
+> *and* all possible registers the code could ever use? Since the APB MISC
+> is a bit of a dumping ground for random registers, that feels unlikely,
+> but perhaps it's possible.
 
-Indeed, there seems to be no need for this anymore. Probably left-over
-from some prior version.
+For all I can see it is. At least for the registers the kernel is likely to
+use.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140606/a29bd0dd/attachment.sig>
+Cheers,
+
+Peter.
