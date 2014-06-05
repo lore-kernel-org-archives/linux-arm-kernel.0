@@ -1,58 +1,76 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 5 Jun 2014 12:22:27 -0700
-Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
-In-Reply-To: <5390C19A.9060201@gmail.com>
-References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
- <1401467562-5585-1-git-send-email-dianders@chromium.org>
- <CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>
- <5390C19A.9060201@gmail.com>
-Message-ID: <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 5 Jun 2014 15:22:52 -0400
+Subject: keystone breakage
+In-Reply-To: <20140605183223.GF23430@n2100.arm.linux.org.uk>
+References: <20140605183223.GF23430@n2100.arm.linux.org.uk>
+Message-ID: <5390C38C.9050606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
-
-On Thu, Jun 5, 2014 at 12:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 05.06.2014 20:48, Doug Anderson wrote:
->> Tomasz / Mike,
->>
->> On Fri, May 30, 2014 at 9:32 AM, Doug Anderson <dianders@chromium.org> wrote:
->>> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
->>> then you'll get a hang on boot.  Here's why:
->>>
->>> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
->>>    enable its clock and disable it.  This is the clock "i2c2".
->>> 2. The act of disabling "i2c2" will disable its parents.  In this case
->>>    the parent is "aclk66_peric".  There are no other children of
->>>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
->>>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
->>> 3. The next time you try to earlyprintk you'll do so without the UART
->>>    clock enabled.  That's because the UART clocks are also children of
->>>    "aclk66_peric".  You'll hang.
->>>
->>> There's no good place to put a clock enable for earlyprintk, which is
->>> handled by a bunch of assembly code.  The best we can do is to handle
->>> this in the clock driver.
->>>
->>> Signed-off-by: Doug Anderson <dianders@chromium.org>
->>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> ---
->>> Changes in v2:
->>> - Use GATE_A and clk_get().  Save the clock for putting later.
->>> - Return 0 from exynos5420_clk_late_init().
->>>
->>>  drivers/clk/samsung/clk-exynos5420.c | 33 +++++++++++++++++++++++++++++++--
->>>  1 file changed, 31 insertions(+), 2 deletions(-)
->>
->> Are there other changes you'd like me to make to this?  It would be
->> really nice to get this in for 3.16 so the system doesn't just
->> mysteriously hang when you use earlyprintk.
+On Thursday 05 June 2014 02:32 PM, Russell King - ARM Linux wrote:
+> It's worth pointing out that with Laura's removal of meminfo, keystone
+> is now broken - I see that despite Laura's patches being on LAKML for
+> a while, this fact has been ignored, and now that Keystone support
+> for the LPAE mappings has been merged, Keystone now breaks:
 >
-> We can probably take this as an -rc fix, so it should be fine.
+> arch/arm/mach-keystone/keystone.c: In function 'keystone_init_meminfo':
+> arch/arm/mach-keystone/keystone.c:71:31: error: 'meminfo' undeclared (first use in this function)
 >
-> However I still don't see the point of exporting this clock and
-> polluting the global clkdev namespace. Even the diffstat looks better in v1.
+> I guess this is something that will have to be fixed later.
+> 
+I have tried Laura's series(v3 or v4 mostly) in past while
+reviewing it. But since I wasn't sure about when it is going
+to get merged, the meminfo usage remained in my code. I
+should have removed the usage of meminfo irrespectively.
 
-OK, I'm happy to go back to v1 with the addition of the "return 0".
+Thanks for reporting the issue. So far neither Laura's series nor my
+series is showing up in Linus's tip so I couldn't see the
+breakage myself but patch at the end of the email should fix
+the breakage.
 
-Mike: are you OK with that?
+Arnd, Olof,
+Will you be able to pick up the below fix from this email ?
+If you prefer, I can send the same after rc1 is tagged.
+
+
+>From 661e238f98171082a7b080720b837283551ff80d Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Thu, 5 Jun 2014 14:51:33 -0400
+Subject: [PATCH] ARM: keystone: Drop use of meminfo since its not available
+ anymore
+
+Laura's series removed the meminfo structure and its no longer available.
+Update keystone code to remove the usage of it.
+
+Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-keystone/keystone.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index 59b8383..4388267 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -14,6 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_address.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/mach/map.h>
+@@ -83,9 +84,8 @@ static void __init keystone_init_meminfo(void)
+ 	phys_addr_t offset = PHYS_OFFSET - KEYSTONE_LOW_PHYS_START;
+ 	phys_addr_t mem_start, mem_end;
+ 
+-	BUG_ON(meminfo.nr_banks < 1);
+-	mem_start = meminfo.bank[0].start;
+-	mem_end = mem_start + meminfo.bank[0].size - 1;
++	mem_start = memblock_start_of_DRAM();
++	mem_end = memblock_end_of_DRAM();
+ 
+ 	/* nothing to do if we are running out of the <32-bit space */
+ 	if (mem_start >= KEYSTONE_LOW_PHYS_START &&
+-- 
+1.7.9.5
