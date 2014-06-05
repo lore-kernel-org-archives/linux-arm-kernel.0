@@ -1,111 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 5 Jun 2014 11:22:00 -0400
-Subject: [PATCH] dt/documentation: add specification of dma bus information
-Message-ID: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 05 Jun 2014 17:23:07 +0200
+Subject: [PATCH] ASoC: sigmadsp: remove I2C support
+In-Reply-To: <4610731.9TBGyCy3TV@wuerfel>
+References: <6181626.txoA4bpImf@wuerfel> <539084F3.3050700@metafoo.de>
+ <4610731.9TBGyCy3TV@wuerfel>
+Message-ID: <53908B5B.10807@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recently we introduced the generic device tree infrastructure for couple of DMA
-bus parameter, dma-ranges and dma-coherent. Update the documentation so that
-its useful for future users.
+On 06/05/2014 05:10 PM, Arnd Bergmann wrote:
+> On Thursday 05 June 2014 16:55:47 Lars-Peter Clausen wrote:
+>> On 06/05/2014 04:47 PM, Arnd Bergmann wrote:
+>>> The newly added ADAU1781 codec comes with separate drivers for
+>>> I2C and SPI modes, which gives us a new variation of the dependency
+>>> problems: If SPI is enabled and the I2C core is a loadable module,
+>>> selecting SND_SOC_ADAU1781_SPI as built-in leads to a link error because
+>>> the common base code from sigmadsp.c now also gets built-in:
+>>>
+>>> sound/built-in.o: In function `sigma_action_write_i2c':
+>>> :(.text+0x5d8d4): undefined reference to `i2c_master_send'
+>>>
+>>> Rather than adding yet more complex Kconfig logic, this converts the last
+>>> user of process_sigma_firmware() to process_sigma_firmware_regmap(),
+>>> which seems trivial after the driver itself now uses regmap as well.
+>>> With that done, there is no more linker dependency from
+>>> SND_SOC_ADAU1781_SPI to i2c_master_send.
+>>>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Lars-Peter Clausen <lars@metafoo.de>
+>>
+>> No this patch won't work. Regmap support for the adau1701 is rather limited
+>> which is why we need native i2c support in the lib.
+>
+> Ah, I see.
+>
+>> But yea, I just noticed the same problem an hour ago and was thinking
+>> hopefully I'll get to fixing this before it shows up in Arnd's randconfig
+>> builds
+>
+> It's actually my second attempt after I finished writing the first patch
+> for it. Is that better?
 
-The "dma-ranges" property is intended to be used for describing the
-configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
+That will fix the symptoms of the issue for SND_SOC_ALL_CODECS, but the 
+problem is still there. I'll send a patch which factors the regmap and I2C 
+sigmadsp code out into their own modules.
 
-The "dma-coherent" property is intended to be used for identifying devices
-supported coherent DMA operations.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Shawn Guo <shawn.guo@freescale.com>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
-
-diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
-index 1f013bd..f0120c1 100644
---- a/Documentation/devicetree/booting-without-of.txt
-+++ b/Documentation/devicetree/booting-without-of.txt
-@@ -51,6 +51,8 @@ Table of Contents
- 
-   VIII - Specifying device power management information (sleep property)
- 
-+  VIV - Specifying dma bus information
-+
-   Appendix A - Sample SOC node for MPC8540
- 
- 
-@@ -1332,6 +1334,64 @@ reasonably grouped in this manner, then create a virtual sleep controller
- (similar to an interrupt nexus, except that defining a standardized
- sleep-map should wait until its necessity is demonstrated).
- 
-+VIV - Specifying dma bus information
-+
-+Some devices may have DMA memory range shifted relatively to the beginning of
-+RAM, or even placed outside of kernel RAM. For example, the Keystone 2 SoC
-+worked in LPAE mode with 4G memory has:
-+- RAM range: [0x8 0000 0000, 0x8 FFFF FFFF]
-+- DMA range: [  0x8000 0000,   0xFFFF FFFF]
-+and DMA range is aliased into first 2G of RAM in HW.
-+
-+In such cases, DMA addresses translation should be performed between CPU phys
-+and DMA addresses. The "dma-ranges" property is intended to be used
-+for describing the configuration of such system in DT.
-+
-+In addition, each DMA master device on the DMA bus may or may not support
-+coherent DMA operations. The "dma-coherent" property is intended to be used
-+for identifying devices supported coherent DMA operations in DT.
-+
-+* DMA Bus master
-+Optional property:
-+- dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
-+	(child-bus-address, parent-bus-address, length). Each triplet specified
-+	describes a contiguous DMA address range.
-+	The dma-ranges property is used to describe the direct memory access (DMA)
-+	structure of a memory-mapped bus whose device tree parent can be accessed
-+	from DMA operations originating from the bus. It provides a means of
-+	defining a mapping or translation between the physical address space of
-+	the bus and the physical address space of the parent of the bus.
-+	(for more information see ePAPR specification)
-+
-+* DMA Bus child
-+Optional property:
-+- dma-ranges: <empty> value. if present - It means that DMA addresses
-+	translation has to be enabled for this device.
-+- dma-coherent: Present if dma operations are coherent
-+
-+Example:
-+soc {
-+		compatible = "ti,keystone","simple-bus";
-+		ranges = <0x0 0x0 0x0 0xc0000000>;
-+		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
-+
-+		[...]
-+
-+		usb: usb at 2680000 {
-+			compatible = "ti,keystone-dwc3";
-+
-+			[...]
-+
-+			dma-coherent;
-+			dma-ranges;
-+
-+			dwc3 at 2690000 {
-+				compatible = "synopsys,dwc3";
-+				[...]
-+			};
-+		};
-+};
-+
- Appendix A - Sample SOC node for MPC8540
- ========================================
- 
--- 
-1.7.9.5
+- Lars
