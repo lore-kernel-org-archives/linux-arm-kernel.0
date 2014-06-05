@@ -1,32 +1,47 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 6 Jun 2014 01:13:01 +0300
-Subject: [PATCH v7 4/5] ARM: tegra: Add efuse and apbmisc bindings
-In-Reply-To: <5390B9F3.8030108@wwwdotorg.org>
-References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
- <1401973754-19701-5-git-send-email-pdeschrijver@nvidia.com>
- <5390B9F3.8030108@wwwdotorg.org>
-Message-ID: <20140605221301.GQ5961@tbergstrom-lnx.Nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Jun 2014 15:21:03 -0700
+Subject: MMC is *still* broken...
+In-Reply-To: <86oay7noer.fsf@void.printf.net>
+References: <20140605183615.GG23430@n2100.arm.linux.org.uk>
+ <86oay7noer.fsf@void.printf.net>
+Message-ID: <CAOesGMgp+r3TTuhctqxVxW8abj467UpPwch3iN=e8rsXeF1p-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 08:41:55PM +0200, Stephen Warren wrote:
-> On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
-> > Add efuse and apbmisc bindings for Tegra20, Tegra30, Tegra114 and Tegra124.
-> 
-> > diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-> 
-> > +	apbmisc at 70000800 {
-> > +		compatible = "nvidia,tegra114-apbmisc", "nvidia,tegra20-apbmisc";
-> 
-> Is the Tegra114 APBMISC register layout 100% a backwards-compatible
-> superset of that in Tegra20? For both registers the code currently uses
-> *and* all possible registers the code could ever use? Since the APB MISC
-> is a bit of a dumping ground for random registers, that feels unlikely,
-> but perhaps it's possible.
+[Adding Hans]
 
-For all I can see it is. At least for the registers the kernel is likely to
-use.
+On Thu, Jun 5, 2014 at 12:31 PM, Chris Ball <chris@printf.net> wrote:
+> Hi Russell, adding Ulf and Olof,
+>
+> On Thu, Jun 05 2014, Russell King - ARM Linux wrote:
+>> drivers/mmc/core/core.c: In function 'mmc_card_power_up':
+>> drivers/mmc/core/core.c:1517:4: error: implicit declaration of
+>> function 'gpiod_set_value'
+>>
+>> I reported this back in April, and it's still present.  This makes me
+>> wonder if MMC is maintained.... and makes me wonder what the point
+>> of reporting bugs is if they just get ignored.
+>
+> I don't recall your report.  I might have just failed to read it, but
+> doing a quick mail search only finds "Subject: randconfig failures -
+> MMC + trusted foundations" -- which was sent to linux-arm-kernel@, but
+> not CC'd to linux-mmc@ or to me.
+>
+> Furthermore, this error does not exist in mmc-next or linux-next,
+> so it's unclear why or how the MMC maintainers would fix it.
+> drivers/mmc/core/core.c does not use gpiod_set_value() in these trees.
+>
+> Presumably you're testing Olof's unmerged patch "mmc: add support for
+> power-on sequencing through DT".  If it needs to include more gpio
+> headers, that should be reported to Olof for a respin.
+>
+> The patch has not been merged because we're still discussing the best
+> way forward on linux-mmc@, in the thread "RFC: representing sdio
+> devices oob interrupt, clks, etc. in device tree".  The most recent
+> message in the thread is from yesterday.
 
-Cheers,
+Right, Hans has taken over the patch set and he should revise it as
+needed. Hans?
 
-Peter.
+
+-Olof
