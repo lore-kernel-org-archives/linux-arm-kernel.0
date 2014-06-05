@@ -1,26 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 05 Jun 2014 12:09:36 -0600
-Subject: [PATCH v7 3/5] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
-References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
- <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <5390B260.2010801@wwwdotorg.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Jun 2014 19:10:29 +0100
+Subject: [PATCH 3.10 005/103] irqchip: Gic: Support forced affinity setting
+In-Reply-To: <20140605180524.GC4121@kroah.com>
+References: <20140604232546.704156131@linuxfoundation.org>
+ <20140604232547.006861681@linuxfoundation.org>
+ <20140605160500.GD31564@leverpostej>
+ <20140605180524.GC4121@kroah.com>
+Message-ID: <20140605181029.GH31564@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
-> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
+On Thu, Jun 05, 2014 at 07:05:24PM +0100, Greg Kroah-Hartman wrote:
+> On Thu, Jun 05, 2014 at 05:05:00PM +0100, Mark Rutland wrote:
+> > Hi Greg,
+> > 
+> > On Thu, Jun 05, 2014 at 12:24:28AM +0100, Greg Kroah-Hartman wrote:
+> > > 3.10-stable review patch.  If anyone has any objections, please let me know.
+> > > 
+> > > ------------------
+> > > 
+> > > From: Thomas Gleixner <tglx@linutronix.de>
+> > > 
+> > > commit ffde1de64012c406dfdda8690918248b472f24e4 upstream.
+> > > 
+> > > To support the affinity setting of per cpu timers in the early startup
+> > > of a not yet online cpu, implement the force logic, which disables the
+> > > cpu online check.
+> > > 
+> > > Tagged for stable to allow a simple fix of the affected SoC clock
+> > > event drivers.
+> > 
+> > This patch alone has the possiblity of breaking CPU hotplug on arm and
+> > arm64 (specifically it breaks hot unplugging CPU0 where interrupts may
+> > be left targetting the offline CPU).
+> > 
+> > For arm64 [1] that's fixed by commit 601c942176d8 (arm64: use
+> > cpu_online_mask when using forced irq_set_affinity).
+> 
+> Thanks, I'll apply that to the 3.14-stable tree, but, it doesn't seem
+> relevant at all for 3.10-stable as arch/arm64/kernel/irq.c doesn't do
+> anything with cpumask or set_affinity.  If it's relevant for 3.10,
+> please provide a backported version.
 
-This series isn't bisectable; building at either patch 3 or patch 4 yields:
+Sorry, my bad. It's not relevant for v3.10, I'd gotten confused over
+when I added CPU hotplug.
 
-> In file included from arch/arm/mach-tegra/fuse.c:28:0:
-> arch/arm/mach-tegra/fuse.h:40:5: error: conflicting types for ?tegra_fuse_readl?
-> In file included from arch/arm/mach-tegra/fuse.c:26:0:
-> include/linux/tegra-soc.h:43:5: note: previous declaration of ?tegra_fuse_readl? was here
-> arch/arm/mach-tegra/fuse.c:98:5: error: conflicting types for ?tegra_fuse_readl?
-> In file included from arch/arm/mach-tegra/fuse.c:26:0:
-> include/linux/tegra-soc.h:43:5: note: previous declaration of ?tegra_fuse_readl? was here
-> make[1]: *** [arch/arm/mach-tegra/fuse.o] Error 1
-> make[1]: *** Waiting for unfinished jobs....
-> make: *** [arch/arm/mach-tegra] Error 2
-> make: *** Waiting for unfinished jobs....
+Thanks,
+Mark.
+
+> > Unfortunately there is not an equivalent fix for arm - Russell objected
+> > to the approach [2,3,4], and that's not yet settled.
+> 
+> Ok, be sure to cc: stable on the patch when it goes into the tree and
+> I'll pick it up then.
+> 
+> thanks,
+> 
+> greg k-h
+> 
