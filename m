@@ -1,72 +1,50 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 05 Jun 2014 21:31:53 +0200
-Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
-In-Reply-To: <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
-References: <1401398496-4624-1-git-send-email-dianders@chromium.org>	<1401467562-5585-1-git-send-email-dianders@chromium.org>	<CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>	<5390C19A.9060201@gmail.com>
- <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
-Message-ID: <5390C5A9.5070900@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 5 Jun 2014 15:50:12 -0400 (EDT)
+Subject: [RFC v3 3/9] irqchip: gic: Provide support for interrupt grouping
+In-Reply-To: <1401961994-18033-4-git-send-email-daniel.thompson@linaro.org>
+References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <alpine.LFD.2.11.1406051545380.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.06.2014 21:22, Doug Anderson wrote:
-> Tomasz,
-> 
-> On Thu, Jun 5, 2014 at 12:14 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On 05.06.2014 20:48, Doug Anderson wrote:
->>> Tomasz / Mike,
->>>
->>> On Fri, May 30, 2014 at 9:32 AM, Doug Anderson <dianders@chromium.org> wrote:
->>>> Right now if you've got earlyprintk enabled on exynos5420-peach-pit
->>>> then you'll get a hang on boot.  Here's why:
->>>>
->>>> 1. The i2c-s3c2410 driver will probe at subsys_initcall.  It will
->>>>    enable its clock and disable it.  This is the clock "i2c2".
->>>> 2. The act of disabling "i2c2" will disable its parents.  In this case
->>>>    the parent is "aclk66_peric".  There are no other children of
->>>>    "aclk66_peric" officially enabled, so "aclk66_peric" will be turned
->>>>    off (despite being CLK_IGNORE_UNUSED, but that's by design).
->>>> 3. The next time you try to earlyprintk you'll do so without the UART
->>>>    clock enabled.  That's because the UART clocks are also children of
->>>>    "aclk66_peric".  You'll hang.
->>>>
->>>> There's no good place to put a clock enable for earlyprintk, which is
->>>> handled by a bunch of assembly code.  The best we can do is to handle
->>>> this in the clock driver.
->>>>
->>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
->>>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>> ---
->>>> Changes in v2:
->>>> - Use GATE_A and clk_get().  Save the clock for putting later.
->>>> - Return 0 from exynos5420_clk_late_init().
->>>>
->>>>  drivers/clk/samsung/clk-exynos5420.c | 33 +++++++++++++++++++++++++++++++--
->>>>  1 file changed, 31 insertions(+), 2 deletions(-)
->>>
->>> Are there other changes you'd like me to make to this?  It would be
->>> really nice to get this in for 3.16 so the system doesn't just
->>> mysteriously hang when you use earlyprintk.
->>
->> We can probably take this as an -rc fix, so it should be fine.
->>
->> However I still don't see the point of exporting this clock and
->> polluting the global clkdev namespace. Even the diffstat looks better in v1.
-> 
-> OK, I'm happy to go back to v1 with the addition of the "return 0".
-> 
-> Mike: are you OK with that?
-> 
+On Thu, 5 Jun 2014, Daniel Thompson wrote:
 
-One more question that just came to my mind: Why it is just the
-aclk66_peri and not its children related to UARTs?
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 57d165e..aa8efe4 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -408,13 +408,27 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+>  		writel_relaxed(0xa0a0a0a0, base + GIC_DIST_PRI + i * 4 / 4);
+>  
+>  	/*
+> +	 * Set all global interrupts to be group 1.
+> +	 *
+> +	 * If grouping is not available (not implemented or prohibited by
+> +	 * security mode) these registers a read-as-zero/write-ignored.
+> +	 */
+> +	for (i = 32; i < gic_irqs; i += 32)
+> +		writel_relaxed(0xffffffff, base + GIC_DIST_IGROUP + i * 4 / 32);
+> +
+> +	/*
+>  	 * Disable all interrupts.  Leave the PPI and SGIs alone
+>  	 * as these enables are banked registers.
+>  	 */
+>  	for (i = 32; i < gic_irqs; i += 32)
+>  		writel_relaxed(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
+>  
+> -	writel_relaxed(1, base + GIC_DIST_CTRL);
+> +	/*
+> +	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
+> +	 * bit 1 ignored)
+> +	 */
+> +	writel_relaxed(GIC_DIST_CTRL_ENABLE_GRP0_BIT |
+> +		       GIC_DIST_CTRL_ENABLE_GRP1_BIT, base + GIC_DIST_CTRL);
 
-Exynos5420 clock driver still needs a little clean-up, so I'm okay with
-any fix for now and changing this later if needed, but is this gate
-clock for ACLK66_PERIC even needed? It seems to be marked with
-CLK_IGNORE_UNUSED which suggests that it is not needed in this driver at
-all, along with other similar clocks. AFAIK for power management
-purposes our fine-grained approach is fine and we shouldn't need to use
-the big gates.
+Could there be more meaningful defines than GIC_DIST_CTRL_ENABLE_GRP0_BIT
+and GIC_DIST_CTRL_ENABLE_GRP1_BIT for those bits?  Otherwise the code 
+would look just as clear and possibly cleaner by simply using 0x3.
 
-Best regards,
-Tomasz
+
+Nicolas
