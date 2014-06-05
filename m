@@ -1,28 +1,41 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 5 Jun 2014 13:42:20 -0700
-Subject: [PATCH v2] clk: exynos5420: Keep aclk66_peric enabled during boot
-In-Reply-To: <CAD=FV=Ucn20GDib=t=OOT+8YjGuk6uoWrP1qourY=YfrLJj1WA@mail.gmail.com>
-References: <1401398496-4624-1-git-send-email-dianders@chromium.org>
- <1401467562-5585-1-git-send-email-dianders@chromium.org>
- <CAD=FV=W8-M5iOMDG190WGaeSySTd=qcp30k-H8DMUs_C5Pdwog@mail.gmail.com>
- <5390C19A.9060201@gmail.com>
- <CAD=FV=UZsEh+bOQxc8CP+yG5a5Sbp2eTyq8B_iq9u5io5G0B6A@mail.gmail.com>
- <5390C5A9.5070900@gmail.com>
- <CAD=FV=Ucn20GDib=t=OOT+8YjGuk6uoWrP1qourY=YfrLJj1WA@mail.gmail.com>
-Message-ID: <CAD=FV=XEqWTrRCPndLPuXnVeE_wLmDXCkgL-V95UZ0S1x4ppaA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  5 Jun 2014 22:48:12 +0200
+Subject: [PATCH 2/5] staging/iio: IIO_SIMPLE_DUMMY_BUFFER neds IIO_BUFFER
+In-Reply-To: <1402001295-1980118-1-git-send-email-arnd@arndb.de>
+References: <1402001295-1980118-1-git-send-email-arnd@arndb.de>
+Message-ID: <1402001295-1980118-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+An obviously missing 'select' statement, without this we
+get a link error
 
-On Thu, Jun 5, 2014 at 1:10 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Hmmm, I think I've convinced myself that your suggestion of just
-> removing this gate from the table is the right thing to do.  Patch
-> will be coming up soon.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Jonathan Cameron <jic23@kernel.org>
+Cc: linux-iio at vger.kernel.org
+---
+ drivers/staging/iio/Kconfig | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-It's here <https://patchwork.kernel.org/patch/4308631/>
-
-Ironically, that patch has a much worse diffstat and also changes
-devicetree bindings (!).  ...but it does seem better.
-
--Doug
+diff --git a/drivers/staging/iio/Kconfig b/drivers/staging/iio/Kconfig
+index b36feb0..fa38be0 100644
+--- a/drivers/staging/iio/Kconfig
++++ b/drivers/staging/iio/Kconfig
+@@ -36,10 +36,11 @@ config IIO_SIMPLE_DUMMY_EVENTS
+          Add some dummy events to the simple dummy driver.
+ 
+ config IIO_SIMPLE_DUMMY_BUFFER
+-       boolean "Buffered capture support"
+-       select IIO_KFIFO_BUF
+-       help
+-         Add buffered data capture to the simple dummy driver.
++	boolean "Buffered capture support"
++	select IIO_BUFFER
++	select IIO_KFIFO_BUF
++	help
++	  Add buffered data capture to the simple dummy driver.
+ 
+ endif # IIO_SIMPLE_DUMMY
+ 
+-- 
+1.8.3.2
