@@ -1,28 +1,55 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 5 Jun 2014 12:32:23 +0100
-Subject: [STLinux Kernel] [PATCH RESEND 08/12] drivers: clk: st: STiH407:
- Support for clockgenC0
-In-Reply-To: <1401892320-18211-9-git-send-email-gabriel.fernandez@linaro.org>
-References: <1401892320-18211-1-git-send-email-gabriel.fernandez@linaro.org>
- <1401892320-18211-9-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20140605113223.GC11244@griffinp-ThinkPad-X1-Carbon-2nd>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 05 Jun 2014 13:36:12 +0200
+Subject: [PATCH] i2c: mux: pca954x needs gpiolib
+In-Reply-To: <4499715.bEb4MNR8Tt@wuerfel>
+References: <17059569.EZXzqhtzTf@wuerfel> <6840846.92XabYdCA4@avalon>
+ <4499715.bEb4MNR8Tt@wuerfel>
+Message-ID: <3104966.JoqjcbmMru@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jun 2014, Gabriel FERNANDEZ wrote:
+Hi Arnd,
 
-> The patch added support for DT registration of ClockGenC0
-> It includes 2 c32 type PLL and a 660 Quadfs.
+On Thursday 05 June 2014 13:24:16 Arnd Bergmann wrote:
+> On Thursday 05 June 2014 12:56:08 Laurent Pinchart wrote:
+> > On Thursday 05 June 2014 12:44:47 Arnd Bergmann wrote:
+> > > commit 4807e8459bce ("i2c: mux: pca954x: Use the descriptor-based GPIO
+> > > API") moved this driver over to the gpio descriptor API, which means
+> > > we now have a dependency on GPIOLIB and get this build error when
+> > > it is disabled:
+> > > 
+> > > i2c/muxes/i2c-mux-pca954x.c: In function 'pca954x_probe':
+> > > i2c/muxes/i2c-mux-pca954x.c:204:2: error: implicit declaration of
+> > > function
+> > > 'devm_gpiod_get' [-Werror=implicit-function-declaration] gpio =
+> > > devm_gpiod_get(&client->dev, "reset");
+> > >   ^
+> > > 
+> > > i2c/muxes/i2c-mux-pca954x.c:204:7: warning: assignment makes pointer
+> > > from
+> > > integer without a cast [enabled by default] gpio =
+> > > devm_gpiod_get(&client->dev, "reset");
+> > >        ^
+> > > 
+> > > i2c/muxes/i2c-mux-pca954x.c:206:3: error: implicit declaration of
+> > > function
+> > > 'gpiod_direction_output' [-Werror=implicit-function-declaration]
+> > > gpiod_direction_output(gpio, 0);
+> > >    ^
+> > > 
+> > > This adds the dependency in Kconfig as we do for other similar drivers.
+> > 
+> > I've sent "i2c: pca954x: Fix compilation without CONFIG_GPIOLIB"
+> > yesterday, which fixes the compilation issue by including
+> > <linux/gpio/consumer.h>. When CONFIG_GPIOLIB isn't set the header defines
+> > stub functions, keeping the driver usable without GPIOLIB support.
 > 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
-> ---
->  drivers/clk/st/clkgen-fsyn.c | 47 ++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/st/clkgen-pll.c  | 32 ++++++++++++++++++++++++++++++
->  2 files changed, 79 insertions(+)
+> Ok, makes sense. Should we remove the 'depends on GPIOLIB' from other
+> drivers doing the same, too?
 
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
+When the GPIO is optional I think so.
 
+-- 
 Regards,
 
-Peter
+Laurent Pinchart
