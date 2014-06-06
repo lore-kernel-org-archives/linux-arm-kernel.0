@@ -1,23 +1,65 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 6 Jun 2014 11:16:03 +0200
-Subject: [PATCH v3] ARM: KVM: Unmap IPA on memslot delete/move
-In-Reply-To: <1402045823-26912-1-git-send-email-eric.auger@linaro.org>
-References: <1402045823-26912-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <20140606091603.GA22341@lvm>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 06 Jun 2014 10:23:01 +0100
+Subject: [RFC v3 4/9] irqchip: gic: Introduce shadow irqs for FIQ
+In-Reply-To: <20140606074614.GU5961@tbergstrom-lnx.Nvidia.com>
+References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-5-git-send-email-daniel.thompson@linaro.org>
+ <20140606074614.GU5961@tbergstrom-lnx.Nvidia.com>
+Message-ID: <53918875.8070205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 11:10:23AM +0200, Eric Auger wrote:
-> Currently when a KVM region is deleted or moved after
-> KVM_SET_USER_MEMORY_REGION ioctl, the corresponding
-> intermediate physical memory is not unmapped.
+On 06/06/14 08:46, Peter De Schrijver wrote:
+>> @@ -1037,17 +1076,28 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>  			irq_base = irq_start;
+>>  		}
+>>  
+>> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
+>> -					hwirq_base, &gic_irq_domain_ops, gic);
+>> +		gic->domain =
+>> +		    irq_domain_add_legacy(node, 2 * gic_irqs, irq_base,
+>> +					  hwirq_base, &gic_irq_domain_ops, gic);
+>>  	} else {
+>> -		gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
+>> -						    &gic_irq_domain_ops,
+>> -						    gic);
+>> +		gic->domain = irq_domain_add_linear(node, 2 * nr_routable_irqs,
+>> +						    &gic_irq_domain_ops, gic);
+>>  	}
+>>  
+>>  	if (WARN_ON(!gic->domain))
+>>  		return;
+>>  
+>> +#ifdef CONFIG_FIQ
+>> +	/* FIQ can only be supported on platforms without an extended irq_eoi
+>> +	 * method (otherwise we take a lock during irq_eoi handling).
+>> +	 */
+>> +	if (!gic_arch_extn.irq_eoi)
+>> +		fiq_add_mapping(
+>> +		    irq_linear_revmap(gic->domain, hwirq_base),
+>> +		    irq_linear_revmap(gic->domain, hwirq_base + gic_irqs),
+>> +		    gic_irqs);
+>> +#endif
 > 
-> This patch corrects this and unmaps the region's IPA range
-> in kvm_arch_commit_memory_region using unmap_stage2_range.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> This is rather unfortunate. On Tegra for example we don't need a lock for the
+> irq_eoi because the eoi ack can be handled with a single write to the
+> appropriate irq ack register.
 
-I think I already acked it in the last version, if Marc is ok with it, I
-can queue it for next.
+I believe that Tegra is the only platform that uses this hook so should
+be safe to remove the locks from gic_irq_eoi().
 
--Christoffer
+Certainly looking back at the code history and the mailing list
+discussions around this code[1] I cannot see any reasoning about the
+locks that I have missed.
+
+Any objections to just nuking the locks?
+
+
+Daniel.
+
+
+[1]
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/107474
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/108361
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/109690
