@@ -1,97 +1,95 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 6 Jun 2014 09:10:26 +0100
-Subject: [PATCH 3/7] i2c: Add the ability to match device to compatible
- string without an of_node
-In-Reply-To: <20140605173620.5BDFBC41CBF@trevor.secretlab.ca>
-References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
- <20140605173620.5BDFBC41CBF@trevor.secretlab.ca>
-Message-ID: <20140606081026.GO24240@lee--X1>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 06 Jun 2014 10:16:30 +0200
+Subject: [PATCH v2] ARM: EXYNOS: SWRESET is needed to boot secondary CPU on
+ Exynos3250
+Message-ID: <1402042590-8056-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Jun 2014, Grant Likely wrote:
+Without software reset the secondary CPU does not power up and
+exynos_boot_secondary() ends with pen_release equal to 1. This can be
+observed in dmesg:
+	CPU1: failed to come online
+	Brought up 1 CPUs
+	SMP: Total of 1 processors activated.
+	CPU: All CPU(s) started in SVC mode.
 
-> On Wed,  4 Jun 2014 13:09:52 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> > A great deal of I2C devices are currently matched via DT node name, and
-> > as such the compatible naming convention of '<vendor>,<device>' has gone
-> > somewhat awry - some nodes don't supply one, some supply an arbitrary
-> > string and others the correct device name with an arbitrary vendor prefix.
-> > 
-> > In an effort to correct this problem we have to supply a mechanism to
-> > match a device by compatible string AND by simple device name.  This
-> > function strips off the '<vendor>,' part of a supplied compatible string
-> > and attempts to match without it.
-> > 
-> > The plan is to remove this function once all of the compatible strings
-> > for each device have been brought into line.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
-> >  include/linux/i2c.h    | 10 ++++++++++
-> >  2 files changed, 35 insertions(+)
-> > 
-> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > index d3802dc..7dcd5c3 100644
-> > --- a/drivers/i2c/i2c-core.c
-> > +++ b/drivers/i2c/i2c-core.c
-> > @@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
-> >  	return i2c_verify_adapter(dev);
-> >  }
-> >  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
-> > +
-> > +const struct of_device_id
-> > +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> > +				  struct device *dev)
-> > +{
-> > +	const struct i2c_client *client = i2c_verify_client(dev);
-> > +	const char *name;
-> > +
-> > +	if (!(client && matches))
-> > +		return NULL;
-> > +
-> > +	for (; matches->compatible[0]; matches++) {
-> > +		name = strchr(matches->compatible, ',');
-> > +		if (!name)
-> > +			name = matches->compatible;
-> > +		else
-> > +			name++;
-> > +
-> > +		if (!strncmp(client->name, name, strlen(client->name)))
-> > +			return matches;
-> > +	}
-> 
-> Is it actually necessary to strip off the vendor name? It would be fine
-> to make users include the vendor prefix when creating the device in
-> sysfs. In fact that would be preferrable for new drivers so that vendor
-> prefixes start getting used correctly.
+When booting the secondary CPU on Exynos3250 execute also software
+reset for core 1.
 
-I see a few issues with this strategy.  Firstly, there are already
-users registering their devices via sysfs, some are taking their
-device names from an EEPROM which would require reprogramming in order
-to prefix the vendor ID.  I'm keen not to break existing systems -
-which not stripping off the vendor name would inevitably do.
-Secondly, I'm not sure how Wolfram would feel about the client->name
-containing a DT compatible string. And finally, other than looking
-at the kernel source, there is no real way for a user to know if the
-device supports ACPI or OF, or neither and if an i2c_device_table is
-supplied or not.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+Changes since v1:
+1. Removed inline keyword and change if statement to early return as
+   Tomasz suggested.
+2. Added reviewed-by Tomasz Figa.
+---
+ arch/arm/mach-exynos/platsmp.c  | 23 +++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h |  3 +++
+ 2 files changed, 26 insertions(+)
 
-Remember that the idea of this set is to remove i2c_device_table's,
-doing so will break any devices which are still registering via sysfs
-with only the model number of the device.  I think the sysfs
-interface should be a black-box.  I think requiring users to have
-kernel knowledge is a sub-optimal idea.
-
-> If you're worried about preserving exisiting ABI, then I would make
-> striping the prefix an option that drivers can enable, but by default
-> only match on the full string.
-> 
-> g.
-
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 7071e49197c3..4031b0ed8057 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -76,6 +76,26 @@ static inline void __iomem *cpu_boot_reg(int cpu)
+ }
+ 
+ /*
++ * Set wake up by local power mode and execute software reset for given core.
++ *
++ * Currently this is needed only when booting secondary CPU on Exynos3250.
++ */
++static void exynos_core_restart(u32 core_id)
++{
++	u32 val;
++
++	if (!of_machine_is_compatible("samsung,exynos3250"))
++		return;
++
++	val = __raw_readl(EXYNOS_ARM_CORE_STATUS(core_id));
++	val |= S5P_CORE_WAKEUP_FROM_LOCAL_CFG;
++	__raw_writel(val, EXYNOS_ARM_CORE_STATUS(core_id));
++
++	pr_info("CPU%u: Software reset\n", core_id);
++	__raw_writel(EXYNOS_CORE_PO_RESET(core_id), EXYNOS_SWRESET);
++}
++
++/*
+  * Write pen_release in a way that is guaranteed to be visible to all
+  * observers, irrespective of whether they're taking part in coherency
+  * or not.  This is necessary for the hotplug code to work reliably.
+@@ -150,6 +170,9 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 			return -ETIMEDOUT;
+ 		}
+ 	}
++
++	exynos_core_restart(core_id);
++
+ 	/*
+ 	 * Send the secondary CPU a soft interrupt, thereby causing
+ 	 * the boot monitor to read the system wide flags register,
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 4179f6a6d595..4f578ddd4d8b 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -26,6 +26,8 @@
+ #define S5P_USE_STANDBY_WFI0			(1 << 16)
+ #define S5P_USE_STANDBY_WFE0			(1 << 24)
+ 
++#define EXYNOS_CORE_PO_RESET(n)			((1 << 4) << n)
++
+ #define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
+ #define EXYNOS5440_SWRESET			S5P_PMUREG(0x00C4)
+ 
+@@ -127,6 +129,7 @@
+ #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
+ 
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
++#define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
+ #define S5P_INT_LOCAL_PWR_EN			0x7
+ 
+ #define S5P_CHECK_SLEEP				0x00000BAD
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
