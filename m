@@ -1,58 +1,71 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 6 Jun 2014 17:37:05 +0800
-Subject: [PATCH 1/2] ARM: at91/at91_dt_defconfig: enable sound support
-Message-ID: <1402047426-4058-1-git-send-email-voice.shen@atmel.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Fri, 6 Jun 2014 15:22:53 +0530
+Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
+ am43x-epos-evm
+In-Reply-To: <53916556.10608@ti.com>
+References: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
+ <53916556.10608@ti.com>
+Message-ID: <53918F75.1050000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As sound support depends on ssc, i2c and dma, so also enable them.
+On 6/6/2014 12:23 PM, Nishanth Menon wrote:
+> On 06/06/2014 01:17 AM, George Cherian wrote:
+>> AM437x EPOS evm use external clock for RMII interface.
+>> Enable the same in DT.
+>>
+>> Signed-off-by: George Cherian <george.cherian@ti.com>
+>> Reported-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>   arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+>> index 19f1f7e..90098f9 100644
+>> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
+>> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+>> @@ -319,6 +319,10 @@
+>>   	phy-mode = "rmii";
+>>   };
+>>   
+>> +&phy_sel {
+>> +	rmii-clock-ext;
+>> +};
+>> +
+>>   &i2c0 {
+>>   	status = "okay";
+>>   	pinctrl-names = "default";
+>>
+> Where does this apply on?
+> With linux-next next-20140506 tag, and this patch applied, I get the
+Is'nt next-20140506 a month old.
+I tried the patch on next-20140604.
+> following error.
+>
+>    LD      kernel/trace/built-in.o
+>    LD      kernel/built-in.o
+> build fail, Error:
+> Error: arch/arm/boot/dts/am43x-epos-evm.dts:219.2-3 label or path,
+> 'phy_sel', not found
+> FATAL ERROR: Syntax error parsing input tree
+> make[1]: *** [arch/arm/boot/dts/am43x-epos-evm.dtb] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> make: *** [dtbs] Error 2
+> make: *** Waiting for unfinished jobs....
+>
+> in the future, it is helpful if you can point out that this is a
+> regression seen on next-20140603 and the patch needs to be applied on
+> some specific branch.
+>
+> for the record:
+> last working next tag:
+> https://github.com/nmenon/kernel-test-logs/blob/next-20140602/omap2plus_defconfig/am43xx-epos.txt
+>
+> first broken next tag:
+> https://github.com/nmenon/kernel-test-logs/blob/next-20140603/omap2plus_defconfig/am43xx-epos.txt
+>
+>
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- arch/arm/configs/at91_dt_defconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 300ded9..bd0a307 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -77,6 +77,7 @@ CONFIG_BLK_DEV_RAM_COUNT=4
- CONFIG_BLK_DEV_RAM_SIZE=8192
- CONFIG_ATMEL_PWM=y
- CONFIG_ATMEL_TCLIB=y
-+CONFIG_ATMEL_SSC=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
-@@ -128,6 +129,7 @@ CONFIG_SERIAL_ATMEL=y
- CONFIG_SERIAL_ATMEL_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_I2C=y
-+CONFIG_I2C_AT91=y
- CONFIG_I2C_GPIO=y
- CONFIG_SPI=y
- CONFIG_SPI_ATMEL=y
-@@ -149,6 +151,13 @@ CONFIG_FONT_8x8=y
- CONFIG_FONT_ACORN_8x8=y
- CONFIG_FONT_MINI_4x6=y
- CONFIG_LOGO=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_ATMEL_SOC=y
-+CONFIG_SND_AT91_SOC_SAM9G20_WM8731=y
-+CONFIG_SND_ATMEL_SOC_WM8904=y
-+CONFIG_SND_AT91_SOC_SAM9X5_WM8731=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_EHCI_HCD=y
-@@ -178,6 +187,7 @@ CONFIG_RTC_DRV_RV3029C2=y
- CONFIG_RTC_DRV_AT91RM9200=y
- CONFIG_RTC_DRV_AT91SAM9=y
- CONFIG_DMADEVICES=y
-+CONFIG_AT_HDMAC=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT4_FS=y
- CONFIG_FANOTIFY=y
 -- 
-1.8.5.2
+-George
