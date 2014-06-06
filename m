@@ -1,153 +1,48 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 06 Jun 2014 12:55:54 +0200
-Subject: [PATCH 6/9] usb: chipidea: add Berlin USB support
-In-Reply-To: <1401983326-19205-7-git-send-email-antoine.tenart@free-electrons.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 6 Jun 2014 16:32:03 +0530
+Subject: [PATCH 4/9] usb: phy: add the Berlin USB PHY driver
+In-Reply-To: <20140606071106.GA30156@kwain>
 References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-7-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53919E3A.7070008@gmail.com>
+ <1401983326-19205-5-git-send-email-antoine.tenart@free-electrons.com>
+ <CAFp+6iEKLD_rLg84h3J2oyzw7vizEV-Eqo0e_jqurx_v9ZX2JA@mail.gmail.com>
+ <20140606071106.GA30156@kwain>
+Message-ID: <CAFp+6iH+J4T=7pJU_+ZZKrgDwJWwQfznv9NWuy5SkLgz_j75_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 05:48 PM, Antoine T?nart wrote:
-> The Marvell Berlin USB controllers are compatible with ChipIdea. Add a
-> driver using the ChipIdea common functions to support them.
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->   drivers/usb/chipidea/Makefile         |   1 +
->   drivers/usb/chipidea/ci_hdrc_berlin.c | 108 ++++++++++++++++++++++++++++++++++
->   2 files changed, 109 insertions(+)
->   create mode 100644 drivers/usb/chipidea/ci_hdrc_berlin.c
->
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index 480bd4d5710a..b3a1b0b3b7a9 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -19,4 +19,5 @@ endif
->
->   ifneq ($(CONFIG_OF),)
->   	obj-$(CONFIG_USB_CHIPIDEA)	+= usbmisc_imx.o ci_hdrc_imx.o
-> +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_berlin.o
->   endif
-> diff --git a/drivers/usb/chipidea/ci_hdrc_berlin.c b/drivers/usb/chipidea/ci_hdrc_berlin.c
-> new file mode 100644
-> index 000000000000..567d83039e3e
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/ci_hdrc_berlin.c
-> @@ -0,0 +1,108 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/usb/chipidea.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/usb/ulpi.h>
-> +
-> +#include "ci.h"
-> +
-> +struct ci_hdrc_berlin_priv {
-> +	struct platform_device	*ci_pdev;
-> +	struct clk		*clk;
-> +};
-> +
-> +static int ci_hdrc_berlin_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct ci_hdrc_berlin_priv *priv;
-> +	struct ci_hdrc_platform_data ci_pdata = {
-> +		.name		= "ci_hdrc_berlin",
-> +		.capoffset	= DEF_CAPOFFSET,
-> +		.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
-> +				  CI_HDRC_DISABLE_STREAMING,
-> +	};
-> +	int ret;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(priv->clk)) {
-> +		dev_err(dev, "failed to get clock: %ld\n", PTR_ERR(priv->clk));
-> +		return PTR_ERR(priv->clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(priv->clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ci_pdata.phy = devm_usb_get_phy_by_phandle(dev, "marvell,usbphy", 0);
-> +	if (IS_ERR(ci_pdata.phy)) {
-> +		ret = PTR_ERR(ci_pdata.phy);
-> +		goto clk_err;
-> +	}
-> +
-> +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
-> +				     pdev->num_resources, &ci_pdata);
-> +	if (IS_ERR(priv->ci_pdev)) {
-> +		ret = PTR_ERR(priv->ci_pdev);
-> +		dev_err(dev,
-> +			"failed to register ci_hdrc platform device: %d\n",
-> +			ret);
-> +		goto clk_err;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	pm_runtime_no_callbacks(dev);
-> +	pm_runtime_enable(dev);
-> +
-> +	return 0;
-> +
-> +clk_err:
-> +	clk_disable_unprepare(priv->clk);
-> +	return ret;
-> +}
-> +
-> +static int ci_hdrc_berlin_remove(struct platform_device *pdev)
-> +{
-> +	struct ci_hdrc_berlin_priv *priv = platform_get_drvdata(pdev);
-> +
-> +	pm_runtime_disable(&pdev->dev);
-> +	ci_hdrc_remove_device(priv->ci_pdev);
-> +	clk_disable_unprepare(priv->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id ci_hdrc_berlin_of_match[] = {
-> +	{ .compatible = "marvell,berlin-usb" },
+Hi,
 
-Looking at the driver, I can see no Berlin-specific code at all. Maybe
-we just take the chance and have a generic chipidea boiler plate driver
-now?
-
-Sebastian
-
-> +	{ }
-> +};
-> +
-> +static struct platform_driver ci_hdrc_berlin_driver = {
-> +	.probe	= ci_hdrc_berlin_probe,
-> +	.remove	= ci_hdrc_berlin_remove,
-> +	.driver	= {
-> +		.name		= "berlin-usb",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= ci_hdrc_berlin_of_match,
-> +	},
-> +};
-> +module_platform_driver(ci_hdrc_berlin_driver);
-> +
-> +MODULE_DESCRIPTION("ChipIdea HDRC Berlin USB binding");
-> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
+On Fri, Jun 6, 2014 at 12:41 PM, Antoine T?nart
+<antoine.tenart@free-electrons.com> wrote:
+> Hi,
 >
+> On Fri, Jun 06, 2014 at 12:09:06PM +0530, Vivek Gautam wrote:
+>> On Thu, Jun 5, 2014 at 9:18 PM, Antoine T?nart
+>> <antoine.tenart@free-electrons.com> wrote:
+>> > Add the driver driving the Marvell Berlin USB PHY. This allows to
+>> > initialize the PHY and to use it from the USB driver later.
+>>
+>> Just out of curiosity, going forward we would like to have phy drivers based on
+>> generic phy framework (drivers/phy).
+>> Any particular reason that we are still adding phy drivers in usb-phy layer ?
+>>
+>> Looking at it, seems like it can very well be written based on phy framework.
+>
+> This USB controller are ChipIdea compatible, and the ChipIdea common
+> functions use the usb_phy framework. That's why this PHY driver is
+> there.
+
+Ok, i see that now. In that case shouldn't we be moving even the chipidea
+drivers to use the generic phy functions to get the phy and init/exit it.
+
+I think Felipe and Kishon can comment on this better, and tell how
+things should be. :-)
+
+[snip]
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
