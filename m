@@ -1,87 +1,69 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 07 Jun 2014 00:39:36 +0100
-Subject: [PATCH 3/7] i2c: Add the ability to match device to compatible
- string without an of_node
-In-Reply-To: <20140606081026.GO24240@lee--X1>
+Date: Sat, 07 Jun 2014 00:42:53 +0100
+Subject: [PATCH 7/7] OF/ACPI/I2C: Add generic match function for the
+ aforementioned systems
+In-Reply-To: <20140606123653.GP24240@lee--X1>
 References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
- <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
- <20140605173620.5BDFBC41CBF@trevor.secretlab.ca>
- <20140606081026.GO24240@lee--X1>
-Message-ID: <20140606233936.D05B8C427DC@trevor.secretlab.ca>
+ <1401883796-17841-8-git-send-email-lee.jones@linaro.org>
+ <20140605103009.85BE4C40A4D@trevor.secretlab.ca>
+ <20140605103709.GE19550@lee--X1>
+ <CACxGe6vLuKygv0E7yq42qe-Lh+nMZ1wrL7PW_TAeoz55wz9q8A@mail.gmail.com>
+ <20140605155509.GH24240@lee--X1> <20140606102446.GK2520@sirena.org.uk>
+ <20140606123653.GP24240@lee--X1>
+Message-ID: <20140606234253.A4E25C427F0@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Jun 2014 09:10:26 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 05 Jun 2014, Grant Likely wrote:
+On Fri, 6 Jun 2014 13:36:53 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 06 Jun 2014, Mark Brown wrote:
 > 
-> > On Wed,  4 Jun 2014 13:09:52 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> > > A great deal of I2C devices are currently matched via DT node name, and
-> > > as such the compatible naming convention of '<vendor>,<device>' has gone
-> > > somewhat awry - some nodes don't supply one, some supply an arbitrary
-> > > string and others the correct device name with an arbitrary vendor prefix.
-> > > 
-> > > In an effort to correct this problem we have to supply a mechanism to
-> > > match a device by compatible string AND by simple device name.  This
-> > > function strips off the '<vendor>,' part of a supplied compatible string
-> > > and attempts to match without it.
-> > > 
-> > > The plan is to remove this function once all of the compatible strings
-> > > for each device have been brought into line.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
-> > >  include/linux/i2c.h    | 10 ++++++++++
-> > >  2 files changed, 35 insertions(+)
-> > > 
-> > > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > > index d3802dc..7dcd5c3 100644
-> > > --- a/drivers/i2c/i2c-core.c
-> > > +++ b/drivers/i2c/i2c-core.c
-> > > @@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
-> > >  	return i2c_verify_adapter(dev);
-> > >  }
-> > >  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
-> > > +
-> > > +const struct of_device_id
-> > > +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-> > > +				  struct device *dev)
-> > > +{
-> > > +	const struct i2c_client *client = i2c_verify_client(dev);
-> > > +	const char *name;
-> > > +
-> > > +	if (!(client && matches))
-> > > +		return NULL;
-> > > +
-> > > +	for (; matches->compatible[0]; matches++) {
-> > > +		name = strchr(matches->compatible, ',');
-> > > +		if (!name)
-> > > +			name = matches->compatible;
-> > > +		else
-> > > +			name++;
-> > > +
-> > > +		if (!strncmp(client->name, name, strlen(client->name)))
-> > > +			return matches;
-> > > +	}
+> > On Thu, Jun 05, 2014 at 04:55:09PM +0100, Lee Jones wrote:
+> > > On Thu, 05 Jun 2014, Grant Likely wrote:
 > > 
-> > Is it actually necessary to strip off the vendor name? It would be fine
-> > to make users include the vendor prefix when creating the device in
-> > sysfs. In fact that would be preferrable for new drivers so that vendor
-> > prefixes start getting used correctly.
+> > > > I still think the way to do it is to emulate the missing i2c_device_id
+> > > > when calling the drivers .probe() hook by having a temporary copy on
+> > > > the stack and filling it with data from the OF or ACPI table....
+> > 
+> > > That's the opposite of what I'm trying to achieve.  I'm trying to get
+> > > rid of unused i2c_device_id tables, rather than reinforce their
+> > > mandatory existence.  I think an i2c_of_match_device() with knowledge
+> > > of how to match via pure DT principles (of_node/compatible) and a
+> > > fall-back, which is able to match on a provided of_device_id table
+> > > alone i.e. without the requirement of an existing of_node.
+> > 
+> > > I've also been mulling over the idea of removing the second probe()
+> > > parameter, as suggested by Wolfram.  However, this has quite deep
+> > > ramifications which would require a great deal of driver adaptions.
+> > 
+> > If you're going to do that another option is to refactor the probe()
+> > function to take the driver_data as an argument and then have the core
+> > pass that from whatever table it matched from rather than the entire
+> > i2c_device_id structure.  That way the driver just needs to supply all
+> > the ID tables mapping binding information to whatever it needs and the
+> > core can pass in the driver data from whatever table it matched against.
 > 
-> I see a few issues with this strategy.  Firstly, there are already
-> users registering their devices via sysfs, some are taking their
-> device names from an EEPROM which would require reprogramming in order
-> to prefix the vendor ID.  I'm keen not to break existing systems -
-> which not stripping off the vendor name would inevitably do.
-> Secondly, I'm not sure how Wolfram would feel about the client->name
-> containing a DT compatible string. And finally, other than looking
-> at the kernel source, there is no real way for a user to know if the
-> device supports ACPI or OF, or neither and if an i2c_device_table is
-> supplied or not.
+> Unfortunately this means we're back to the aforementioned typing
+> issue.  For struct {platform,i2c,spi,acpi,etc}_device_id the driver
+> data is a kernel ulong but the of_device_id's driver data attribute is
+> a void*.
 
-I just went and looked at the code. I2C_NAME_SIZE is fixed to 20
-characters. Compatible strings can be larger than that, so you're right.
-Stuffing it into the name field isn't a good solution.
+We're actually okay there. Each subsystem defines it's own convention
+about what those values mean. ulong and void* are the same size and
+every user I've seen stuffs the same data into the data field of both
+tables.
 
-g.
+> I've just started work on a migration over to a new probe().  I don't
+> think it's all that much work, but if there are any objections I'd
+> prefer to hear them now rather than waste any time.
+
+I have no problem with that approach.
+
+> I propose to convert a couple of drivers, one which doesn't use the
+> driver_data and one that does, but is DT only and send them for
+> review.  See if Wolfram et. al like the method.
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ??? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
