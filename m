@@ -1,93 +1,88 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Fri, 6 Jun 2014 23:06:51 +0530
-Subject: Problems booting exynos5420 with >1 CPU
-In-Reply-To: <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
-References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
- <539145B4.5000200@gmail.com>
- <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
-Message-ID: <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 6 Jun 2014 19:40:00 +0200
+Subject: [PATCH v3] arm/arm64: KVM: Fix and refactor unmap_range
+In-Reply-To: <5391E833.3030205@arm.com>
+References: <1401894943-11213-1-git-send-email-christoffer.dall@linaro.org>
+ <CAPvkgC2s+itzV5H+444Qhz_XfWVgWC1NU=tSugaxZWimOW5uyA@mail.gmail.com>
+ <20140606155939.GA33621@lvm> <5391E833.3030205@arm.com>
+Message-ID: <CAMJs5B_4fQmGSaHjP66sMtEVp+whoxMz9tfibOUtZC354OahPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-The first change in the kernel (clearing an iRAM location) is needed
-because of an unnecessary change that we are carrying in the Chrome
-U-boot. There is no reason for us to have the workaround in the
-mainline kernel. Rather, we should remove the check from our u-boot.
-However AFAIR a clean-up patch that I had posted internally was not
-accepted as we had frozen the SPL at the time.
-
-The second change is to enable snoops for boot cluster. Internally, we
-were disabling the snoops for both the clusters at power off and
-enabling it in power_up_setup and power_up. However, I dropped the
-approach due to problems pointed out by Nicolas here
-http://www.spinics.net/lists/arm-kernel/msg324091.html related to
-cpuidle. Hence, we turn it on at the u-boot.
-
-Regards,
-Abhilash
-
-On Fri, Jun 6, 2014 at 10:47 PM, Doug Anderson <dianders@google.com> wrote:
-> Tushar,
->
-> On Thu, Jun 5, 2014 at 9:38 PM, Tushar Behera <trblinux@gmail.com> wrote:
->> On 06/06/2014 06:38 AM, Doug Anderson wrote:
->>> Hi,
+On 6 June 2014 18:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 06/06/14 16:59, Christoffer Dall wrote:
+>> On Fri, Jun 06, 2014 at 10:28:59AM +0100, Steve Capper wrote:
+>>> Hi Christoffer,
 >>>
->>> When I try to boot linuxnext on my exynos5420-peach-pit chromebook I
->>> have problems bringing up extra CPUs:
+>>> On 4 June 2014 16:15, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>>>> unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+>>>> of situations.  It was also quite complicated to follow and didn't
+>>>> follow the usual scheme of having a separate iterating function for each
+>>>> level of page tables.
+>>>>
+>>>> Address this by refactoring the code and introduce a pgd_clear()
+>>>> function.
+>>>>
+>>>> Tested on TC2 with/without THP and limited testing on the v8 Foundation
+>>>> Model.
+>>>>
+>>>> Reviewed-by: Jungseok Lee <jays.lee@samsung.com>
+>>>> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>> ---
 >>>
->>> 1. They don't come up
+>>> This looks good to me.
+>>>
+>>> Reviewed-by: Steve Capper <steve.capper@linaro.org>
 >>>
 >>
->> [ ... ]
+>> thanks.
 >>
->>> [    1.125030] CPU1: failed to boot: -38
->>> [    2.130043] CPU2: failed to boot: -38
->>> [    3.135059] CPU3: failed to boot: -38
+>>> One minor comment below (sorry just spotted this now)...
 >>>
->>
->> With following config modifications over exynos_defconfig, I can see 4
->> big cores coming up.
->>
->> CONFIG_MCPM=y
->> CONFIG_EXYNOS5420_MCPM=y
+>>> [ ... ]
+>>>
+>>>> -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+>>>> +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+>>>> +                      phys_addr_t addr, phys_addr_t end)
+>>>>  {
+>>>> -       if (pte_present(*pte)) {
+>>>> -               kvm_set_pte(pte, __pte(0));
+>>>> -               put_page(virt_to_page(pte));
+>>>> -               kvm_tlb_flush_vmid_ipa(kvm, addr);
+>>>> -       }
+>>>> +       pte_t *pte, *start_pte;
+>>>> +       unsigned long long start_addr = addr;
+>>>> +
+>>>> +       start_pte = pte = pte_offset_kernel(pmd, addr);
+>>>> +       do {
+>>>> +               if (!pte_none(*pte)) {
+>>>> +                       kvm_set_pte(pte, __pte(0));
+>>>> +                       put_page(virt_to_page(pte));
+>>>> +                       kvm_tlb_flush_vmid_ipa(kvm, addr);
+>>>
+>>> Can this hyp call be expensive if a lot of ptes are being unmapped
+>>> (for 64K pages we can have 8192 ptes per page)?
+>>> If so, can they be batched together?
 >
-> Thanks!  OK, that certainly changes the behavior for me!  ...but it
-> doesn't work.
+> The main problem here is that HYP doesn't have access to these pages at
+> all. They are only mapped at EL1, so HYP cannot parse the PTE table.
 >
-> I also got a response from some folks that I pinged off-list.
-> Apparently our U-Boot doesn't set things up like the upstream kernel
-> expects (ugh!), so to get things booting you need the magic commands
-> in U-Boot:
+>> I suppose we could, we would have to add something to flush the entire
+>> TLB for that VMID on aarch64 (or that entire range) to do so.
 >
-> mw.l 02073028 0  # Clear EXYNOS_START_FLAG
-> mw.l 10d25000 3  # Enable CCI from U-Boot
+> Yes, VMALL would be possible, but we'd have to find out pretty early if
+> we're tearing down the whole address space, or just a single page.
 >
-> Once you do that then all 8 CPUs can come up!
+>> I think it's reasonable to merge this now and apply that as an
+>> optimization.  Marc?
 >
+> Agreed. Batching those require a bit more thoughts and more testing. I
+> remember heuristics about when it was more interesting to switch from
+> single TLBI to ALL, but I'd need to deep dive into my Inbox for this.
 >
-> Can someone at Samsung come up with a reasonable solution about how we
-> should solve this in a way that everyone can be happy with?  I haven't
-> really been involved with MCPM stuff, so I'm not sure why what landed
-> upstream is different than what we have in our kernel.
->
-> I guess worst case we can require that anyone running an upstream
-> kernel simply needs a "fixed" U-Boot, but that's always a bit of a
-> hassle.  We might have to go there eventually anyway given that our L2
-> cache timings in U-Boot are wrong (again!) and it's unlikely that
-> upstream will take some weird hack in the kernel to fix them...
->
-> -Doug
->
->
-> P.S. We also really need to do something about the configs.  There are
-> no exynos configs upstream that have any useful set of options (that I
-> know of).  ...and useful options don't seem to get selected
-> automatically...
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cool, let's try to remember this as a point of investigation and I'll
+apply this one to -next for now.
+
+-Christoffer
