@@ -1,76 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  6 Jun 2014 16:52:26 +0100
-Subject: [PATCH 3/9] i2c: Match using traditional OF methods,
- then by vendor-less compatible strings
+Date: Fri,  6 Jun 2014 16:52:27 +0100
+Subject: [PATCH 4/9] i2c: Make I2C ID tables non-mandatory for DT'ed devices
 In-Reply-To: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
 References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1402069952-28022-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1402069952-28022-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function provides a single call for all I2C devices which need to
-match firstly using traditional OF means i.e by of_node, then if that
-fails we attempt to match using the supplied I2C client name with a
-list of supplied compatible strings with the '<vendor>,' string
-removed.  The latter is required due to the unruly naming conventions
-used currently by I2C devices.
+Currently the I2C framework insists on devices supplying an I2C ID
+table.  Many of the devices which do so unnecessarily adding quite a
+few wasted lines to kernel code.  This patch allows drivers a means
+to 'not' supply the aforementioned table and match on DT match tables
+instead.
 
+Acked-by: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/i2c/i2c-core.c | 13 +++++++++++++
- include/linux/i2c.h    |  9 +++++++++
- 2 files changed, 22 insertions(+)
+ drivers/i2c/i2c-core.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index face8f9..80a2f2e 100644
+index 80a2f2e..3507087 100644
 --- a/drivers/i2c/i2c-core.c
 +++ b/drivers/i2c/i2c-core.c
-@@ -1115,6 +1115,19 @@ const struct of_device_id
- 	return NULL;
- }
- EXPORT_SYMBOL_GPL(i2c_of_match_device_strip_vendor);
-+
-+const struct of_device_id
-+*i2c_of_match_device(const struct of_device_id *matches, struct device *dev)
-+{
-+	const struct of_device_id *match;
-+
-+	match = of_match_device(matches, dev);
-+	if (match)
-+		return match;
-+
-+	return i2c_of_match_device_strip_vendor(matches, dev);
-+}
-+EXPORT_SYMBOL_GPL(i2c_of_match_device);
- #else
- static void of_i2c_register_devices(struct i2c_adapter *adap) { }
- #endif /* CONFIG_OF */
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index f7ec75b..ab5866f 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -565,6 +565,9 @@ extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
- extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
+@@ -100,7 +100,7 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
  
- extern const struct of_device_id
-+*i2c_of_match_device(const struct of_device_id *matches, struct device *dev);
-+
-+extern const struct of_device_id
- *i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
- 				  struct device *dev);
- #else
-@@ -580,6 +583,12 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
- }
  
- const struct of_device_id
-+*i2c_of_match_device(const struct of_device_id *matches, struct device *dev)
-+{
-+	return NULL;
-+}
+ 	/* Attempt an OF style match */
+-	if (of_driver_match_device(dev, drv))
++	if (i2c_of_match_device(drv->of_match_table, dev))
+ 		return 1;
+ 
+ 	/* Then ACPI style match */
+@@ -268,7 +268,15 @@ static int i2c_device_probe(struct device *dev)
+ 		return 0;
+ 
+ 	driver = to_i2c_driver(dev->driver);
+-	if (!driver->probe || !driver->id_table)
++	if (!driver->probe)
++		return -EINVAL;
 +
-+const struct of_device_id
- *i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
- 				  struct device *dev)
- {
++	/*
++	 * An I2C ID table is not mandatory, if and only if, a suitable Device
++	 * Tree match table entry is supplied for the probing device.
++	 */
++	if (!driver->id_table &&
++	    !i2c_of_match_device(dev->driver->of_match_table, dev))
+ 		return -ENODEV;
+ 
+ 	if (!device_can_wakeup(&client->dev))
 -- 
 1.8.3.2
