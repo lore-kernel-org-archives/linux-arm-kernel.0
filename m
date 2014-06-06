@@ -1,34 +1,48 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Fri, 6 Jun 2014 11:47:34 +0530
-Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
- am43x-epos-evm
-Message-ID: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Fri, 6 Jun 2014 09:27:07 +0300
+Subject: [PATCH 0/9] Serial ATA support for NVIDIA Tegra124
+In-Reply-To: <5390A8F9.2090408@wwwdotorg.org>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <5390A8F9.2090408@wwwdotorg.org>
+Message-ID: <53915F3B.6050806@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM437x EPOS evm use external clock for RMII interface.
-Enable the same in DT. 
+The only compile-time dependencies here should be that:
+- patch 8 of 9 which contains the actual driver depends on patch 6 of 9 
+(though only when building as a module) and the efuse series
+- patch 2 of 9 refers to the DT node called "padctl", so it requires the 
+xusb series. (in the submitted xusb series, the node isn't actually 
+named, though. I will fix this in v2)
 
-Signed-off-by: George Cherian <george.cherian@ti.com>
-Reported-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+- Mikko
 
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 19f1f7e..90098f9 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -319,6 +319,10 @@
- 	phy-mode = "rmii";
- };
- 
-+&phy_sel {
-+	rmii-clock-ext;
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	pinctrl-names = "default";
--- 
-1.8.3.1
+On 05/06/14 20:29, Stephen Warren wrote:
+> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+>> Hi,
+>>
+>> This series adds support for the onboard AHCI-compliant Serial ATA
+>> controller found on Tegra124 systems-on-chip. The controller is
+>> enabled on Jetson TK1. The series depends on Peter's efuse series
+>> and Thierry's yet to be submitted XUSB pinctrl driver.
+>
+> This series includes patches to a lot of different subsystems. That will
+> complicate applying it.
+>
+> Can you write a summary of the *compile time* dependencies, since that
+> will influence how the patches get merged.
+>
+> You mentioned that this series depends on efuse and XUSB padctl. Can you
+> point out which specific parts of this series depend on which of those
+> two other series, and whether this is a compile-time or run-time dependency.
+>
+> I hope that the drivers/ata patches, drivers/clk patches, DT, and
+> defconfig patches can each be applied to their normal tree and don't
+> depend on each-other at compile-time at all.
+>
+> At run-time, obviously all the patches are needed to make the code work,
+> but since this is a new feature, it's fine if this all only works once
+> everything is merged together in linux-next or Linus's tree.
+>
+> Thanks.
+>
