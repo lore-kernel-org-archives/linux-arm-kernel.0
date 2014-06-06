@@ -1,81 +1,88 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Fri, 6 Jun 2014 15:26:11 +0530
-Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
- am43x-epos-evm
-In-Reply-To: <539165E8.7030500@ti.com>
-References: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
- <53916556.10608@ti.com> <539165E8.7030500@ti.com>
-Message-ID: <5391903B.1050109@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 6 Jun 2014 19:14:22 +0900
+Subject: [PATCH 00/08] ARM: shmobile: Rework include path (Try 2, Part 1)
+In-Reply-To: <CAMuHMdWuaeZOAA-=k7nHQafxJh7h-jQqtfEGJKiEmraZXu2p+g@mail.gmail.com>
+References: <20140520075949.13851.42995.sendpatchset@w520>
+ <CAMuHMdWuaeZOAA-=k7nHQafxJh7h-jQqtfEGJKiEmraZXu2p+g@mail.gmail.com>
+Message-ID: <20140606101421.GA7971@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/6/2014 12:25 PM, Nishanth Menon wrote:
-> On 06/06/2014 01:53 AM, Nishanth Menon wrote:
->> On 06/06/2014 01:17 AM, George Cherian wrote:
->>> AM437x EPOS evm use external clock for RMII interface.
->>> Enable the same in DT.
->>>
->>> Signed-off-by: George Cherian <george.cherian@ti.com>
->>> Reported-by: Nishanth Menon <nm@ti.com>
->>> ---
->>>   arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
->>>   1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
->>> index 19f1f7e..90098f9 100644
->>> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
->>> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
->>> @@ -319,6 +319,10 @@
->>>   	phy-mode = "rmii";
->>>   };
->>>   
->>> +&phy_sel {
->>> +	rmii-clock-ext;
->>> +};
->>> +
->>>   &i2c0 {
->>>   	status = "okay";
->>>   	pinctrl-names = "default";
->>>
->> Where does this apply on?
->> With linux-next next-20140506 tag, and this patch applied, I get the
->> following error.
->>
->>    LD      kernel/trace/built-in.o
->>    LD      kernel/built-in.o
->> build fail, Error:
->> Error: arch/arm/boot/dts/am43x-epos-evm.dts:219.2-3 label or path,
->> 'phy_sel', not found
->> FATAL ERROR: Syntax error parsing input tree
->> make[1]: *** [arch/arm/boot/dts/am43x-epos-evm.dtb] Error 1
->> make[1]: *** Waiting for unfinished jobs....
->> make: *** [dtbs] Error 2
->> make: *** Waiting for unfinished jobs....
->>
->> in the future, it is helpful if you can point out that this is a
->> regression seen on next-20140603 and the patch needs to be applied on
->> some specific branch.
->>
->> for the record:
->> last working next tag:
->> https://github.com/nmenon/kernel-test-logs/blob/next-20140602/omap2plus_defconfig/am43xx-epos.txt
->>
->> first broken next tag:
->> https://github.com/nmenon/kernel-test-logs/blob/next-20140603/omap2plus_defconfig/am43xx-epos.txt
->>
->>
-> interestingly, i just re-tested today's tag without the patch
-> (omap2plus_defconfig):
-> http://slexy.org/raw/s205sRdFvy
-Lil old kernel
-from the above link.
+On Fri, Jun 06, 2014 at 11:11:46AM +0200, Geert Uytterhoeven wrote:
+> Hi Magnus,
+> 
+> On Tue, May 20, 2014 at 9:59 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> > ARM: shmobile: Rework include path (Try 2, Part 1)
+> >
+> > [PATCH 01/08] ARM: shmobile: Move intc.h, cleanup sh_intc.h usage
+> > [PATCH 02/08] ARM: shmobile: Move dma-register.h
+> > [PATCH 03/08] ARM: shmobile: Move clock.h
+> > [PATCH 04/08] ARM: shmobile: Move most of irqs.h, keep some for pinctl
+> > [PATCH 05/08] ARM: shmobile: Move common.h
+> > [PATCH 06/08] ARM: shmobile: Move pm-rmobile.h, cleanup sh73xx.h
+> > [PATCH 07/08] ARM: shmobile: Move pm-rcar.h, cleanup r8a7779 case
+> > [PATCH 08/08] ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case
+> >
+> > Olof, here my latest take on the header move that you requested earlier.
+> >
+> > This particular series hopefully follows your proposed way and moves the
+> > most common shared header files for mach-shmobile from <mach/foobar.h>
+> > to "foobar.h" without any workaround. Left are still per-SoC header files
+> > that will be moved once I know you are comformatble with this format.
+> 
+> Olof didn't scream, so I guess he's comfortable with it? :-)
+> Olof?
 
-Linux version 3.15.0-rc4-next-20140506 (nmenon at kahuna) (gcc version 
-4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) ) #2 SMP Fri Jun 6 01:47:42 CDT 2014
-> I wonder why the behavior change and what was being fixed here?
-This kernel should not have the dt entries for phy sel driver.
-Thats why it is working.
+I'd value a nod or otherwise from Olof before merging this.
 
+> If the propagation part is an issue, what about Simon applying it to a separate
+> branch, to be merged into both soc-for-v3.17 and boards-for-v3.17?
 
--- 
--George
+Yes, I think this will need to go into a cleanup branch
+which soc-for-v3.17 and boards-for-v3.17? are rebased on top of.
+
+I believe this is a project for which I will need strong coffee as an assistant.
+
+> > Please note that these are only lightly compile tested with a handful
+> > of defconfigs, but any potential issue should be trivial to fix.
+> 
+> Indeed. And it touches arch/arm/mach-shmobile only.
+> 
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> 
+> > Also, there are certain bits of arch/arm/mach-shmobile/include/mach/
+> > get included from places like arch/arm/boot/compressed/ (booting
+> > legacy kernel directly from reset vector) and also from SoC specific
+> > legacy code under drivers/pinctrl. My proposal is to keep those users
+> > as-is until we phase out legacy board support (2-3 kernels?), let me
+> > know if you would like to get rid of "include/mach" sooner!
+> 
+> It seems you forgot r7s72100.h, r8a73a4.h, and sh73a0.h?
+> Can just be moved, with #include update.
+> 
+> Remaining are lots of files only used by arch/arm/boot, so I'd move those
+> (mmc*, sdhi*, zboot*) into .../boot.
+> 
+> mach/system.h seems to be unused?
+> 
+> The parts of irqs.h needed for legacy pinctrl can be extracted into
+> drivers/pinctrl/sh-pfc/irqs_legacy.h, to be removed later.
+> After that irqs.h can move, too.
+> 
+> After that, we can see what's left...
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
