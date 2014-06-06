@@ -1,61 +1,65 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Fri, 6 Jun 2014 08:21:05 +0800
-Subject: [PATCH RFC v1 0/2] Add support for Hisilicon SMMU architecture
-In-Reply-To: <20140605152140.GA31564@leverpostej>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <20140605152140.GA31564@leverpostej>
-Message-ID: <53910971.2010908@huawei.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 5 Jun 2014 17:46:23 -0700
+Subject: [PATCH v3] clk: exynos5420: Remove aclk66_peric from the clock
+ tree description
+In-Reply-To: <20140606000324.10062.10257@quantum>
+References: <1401467562-5585-1-git-send-email-dianders@chromium.org>
+ <1402000514-30752-1-git-send-email-dianders@chromium.org>
+ <20140606000324.10062.10257@quantum>
+Message-ID: <CAD=FV=UQhBh68Bgv=kfUROCOxg1dS1OnZ1ir+wouewKoDFE_1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, thanks for your suggestion, I will adjust my code as soon as possible.
+Mike,
+
+On Thu, Jun 5, 2014 at 5:03 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Doug Anderson (2014-06-05 13:35:14)
+>> The "aclk66_peric" clock is a gate clock with a whole bunch of gates
+>> underneath it.  This big gate isn't very useful to include in our
+>> clock tree.  If any of the children need to be turned on then the big
+>> gate will need to be on anyway.  ...and there are plenty of other "big
+>> gates" that aren't described in our clock tree, some of which shut off
+>> collections of clocks that have no relationship in the hierarchy so
+>> are hard to model.
+>
+> I think this is a common problem. On OMAP we have something similar to
+> this called "clock domains" or "clkdm" and it has been historically
+> handled outside of the Linux clock framework[1]. There is a relationship
+> to the clock framework of course and in the future it might be
+> worthwhile to see if there is a generic way to handle this stuff.
+
+That sounds like something that would be nice to solve, but it's not
+going to happen now.
+
+On the off chance that the user manual mentioned the existence of one
+of these "big gate" bits, it tends to not be very specific about
+_exactly_ which sets of clocks it disables.
+
+Tracking down every one of these would be hugely time consuming.
+Also: as Tomasz has indicated they don't provide a huge amount of
+benefit since we're already dealing with clocks on a more fine-grained
+level...
 
 
-On 2014/6/5 23:21, Mark Rutland wrote:
-> On Thu, Jun 05, 2014 at 02:37:08PM +0100, Zhen Lei wrote:
->> This driver is base on arm_smmu.c, beause of hisilicon smmu-v1 is similar to
->> arm-smmu, some code can be direct reused. for example: map and unmap, device
->> tree configuration, and the software framework. Somebody may doubted: why not
->> strip the share code in one file, and put hardware-dependent part into other
->> files? Yeah, it's right. But now, in order to make the code flow clearly, just
->> put all hisilicon smmu driver code in hisi_smmu.c.If this driver is acceptable,
->> I will update and submit a revised verion.
-> 
-> This does not make the code flow clearer. If anything this makes it
-> harder to review the series, because it's not clear what the delta from
-> the existing ARM SMMU driver is.
-> 
-> No-one is going to be happy merging a redundant copy of (portions of)
-> the existing ARM SMMU driver. Whatever gets merged will look very
-> different due to the refactoring required to remedy that, so there's
-> almost no point reviewing this in any depth until that's sorted out.
-> 
-> Mark.
-> 
+>> "aclk66_peric" is causing earlyprintk problems since it gets disabled
+>> as part of the boot process, so let's just remove it.
 >>
->> Zhen Lei (2):
->>   documentation/iommu: Add description of Hisilicon System MMU binding
->>   iommu/hisilicon: Add support for Hisilicon Ltd. System MMU
->>     architecture
->>
->>  .../devicetree/bindings/iommu/hisilicon,smmu.txt   |   70 +
->>  drivers/iommu/Kconfig                              |   11 +
->>  drivers/iommu/Makefile                             |    1 +
->>  drivers/iommu/hisi-smmu.c                          | 1686 ++++++++++++++++++++
->>  4 files changed, 1768 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iommu/hisilicon,smmu.txt
->>  create mode 100644 drivers/iommu/hisi-smmu.c
->>
->> --
->> 1.8.0
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> .
-> 
+>> Strangely (and for no good reason) this clock is exported as part of
+>> the common clock bindings.  Remove it since there are no in-kernel
+>> device trees using it and no reason anyone out of tree should refer to
+>> it either.
+>
+> So Linux has no control over the big gate now, correct? You are
+> dependent on the bootloader to ungate this thing?
+
+A better way to put it is that you're dependent on the bootloader not
+to gate it.
+
+...but that's also true for pretty much any clock marked IGNORE_UNUSED
+and not explicitly enabled anywhere.
+
+
+Are you opposed to this landing as-is to unblock things and people can
+continue to work on the clock driver to make it even better?
+
+-Doug
