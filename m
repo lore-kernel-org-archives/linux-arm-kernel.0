@@ -1,25 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 6 Jun 2014 10:52:56 +0100
-Subject: [PATCH] spi/pxa2xx: change default supported DMA burst size to 1
-In-Reply-To: <1401990309-12492-1-git-send-email-chiau.ee.chew@intel.com>
-References: <1401990309-12492-1-git-send-email-chiau.ee.chew@intel.com>
-Message-ID: <20140606095256.GA2520@sirena.org.uk>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri,  6 Jun 2014 11:29:50 +0100
+Subject: [PATCH] arm64: Add flush_cache_vmap call in __early_set_fixmap
+Message-ID: <1402050590-23877-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 01:45:09AM +0800, Chew Chiau Ee wrote:
-> From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
-> 
-> This is to fix the SPI DMA transfer failure for speed less than 1M.
-> If using current DMA burst size setting (16), the Rx data bytes are
-> invalid due to each data byte is multiplied according to the burst
-> size setting.
+__early_set_fixmap does not do any synchronization when called to set a
+fixmap entry. Add call to flush_vmap_cache().
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140606/851c658f/attachment.sig>
+Tested on hardware.
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+Cc: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm64/mm/ioremap.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index 7ec3283..5b8766c 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -176,9 +176,10 @@ void __init __early_set_fixmap(enum fixed_addresses idx,
+ 
+ 	pte = early_ioremap_pte(addr);
+ 
+-	if (pgprot_val(flags))
++	if (pgprot_val(flags)) {
+ 		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+-	else {
++		flush_cache_vmap(addr, addr + PAGE_SIZE);
++	} else {
+ 		pte_clear(&init_mm, addr, pte);
+ 		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
+ 	}
+-- 
+1.7.10.4
