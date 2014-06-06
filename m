@@ -1,34 +1,105 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 06 Jun 2014 11:39:50 +0100
-Subject: [PATCH v3] ARM: KVM: Unmap IPA on memslot delete/move
-In-Reply-To: <20140606091603.GA22341@lvm> (Christoffer Dall's message of "Fri,
- 6 Jun 2014 10:16:03 +0100")
-References: <1402045823-26912-1-git-send-email-eric.auger@linaro.org>
- <20140606091603.GA22341@lvm>
-Message-ID: <87fvjiiao9.fsf@approximate.cambridge.arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 06 Jun 2014 12:44:18 +0200
+Subject: [PATCH 1/9] reset: add the Berlin reset controller driver
+In-Reply-To: <1401986205.4103.9.camel@paszta.hi.pengutronix.de>
+References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1401983326-19205-2-git-send-email-antoine.tenart@free-electrons.com>
+ <1401986205.4103.9.camel@paszta.hi.pengutronix.de>
+Message-ID: <53919B82.9040705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06 2014 at 10:16:03 am BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Fri, Jun 06, 2014 at 11:10:23AM +0200, Eric Auger wrote:
->> Currently when a KVM region is deleted or moved after
->> KVM_SET_USER_MEMORY_REGION ioctl, the corresponding
->> intermediate physical memory is not unmapped.
->> 
->> This patch corrects this and unmaps the region's IPA range
->> in kvm_arch_commit_memory_region using unmap_stage2_range.
->> 
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+On 06/05/2014 06:36 PM, Philipp Zabel wrote:
+> Am Donnerstag, den 05.06.2014, 17:48 +0200 schrieb Antoine T?nart:
+>> Add a reset controller for Marvell Berlin SoCs which is used by the
+>> USB PHYs drivers (for now).
+>>
+>> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+>> ---
+>>   drivers/reset/Makefile       |   1 +
+>>   drivers/reset/reset-berlin.c | 113 +++++++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 114 insertions(+)
+>>   create mode 100644 drivers/reset/reset-berlin.c
+>>
+[...]
+>>   obj-$(CONFIG_ARCH_STI) += sti/
+>> diff --git a/drivers/reset/reset-berlin.c b/drivers/reset/reset-berlin.c
+>> new file mode 100644
+>> index 000000000000..78b42c882cb2
+>> --- /dev/null
+>> +++ b/drivers/reset/reset-berlin.c
+>> @@ -0,0 +1,113 @@
+>> +/*
+>> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+>> + *
+>> + * Antoine T?nart <antoine.tenart@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/delay.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
 >
-> I think I already acked it in the last version, if Marc is ok with it, I
-> can queue it for next.
+> Is there a reason this is not actually implemented as platform device?
+>
+[...]
+>> +static int __berlin_reset_init(struct device_node *np)
+>> +{
+>> +	struct berlin_reset_priv *priv;
+>> +	struct resource res;
+>> +	resource_size_t size;
+>> +	int ret;
+>> +
+>> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+>> +	if (!priv)
+>> +		return -ENOMEM;
+>> +
+>> +	ret = of_address_to_resource(np, 0, &res);
+>> +	if (ret)
+>> +		goto err;
+>> +
+>> +	size = resource_size(&res);
+>> +
+>> +	priv->base = ioremap(res.start, size);
+>> +	if (!priv->base) {
+>> +		ret = -ENOMEM;
+>> +		goto err;
+>> +	}
+>
+> A platform driver could use devm_kzalloc, platform_get_resource,
+> and devm_ioremap_resource here.
+>
+>> +	priv->base += BERLIN_RESET_REGISTER;
+>> +
+>> +	priv->rcdev.owner = THIS_MODULE;
+>> +	priv->rcdev.nr_resets = size * 32;
+>
+> This doesn't seem right. The device tree patch shows that
+> size = 0x400.
 
-Yes, I'm quite happy for this to go in.
+Actually, not using a platform_device now is the outcome of
+some late DT node rework we had for the clock driver. The reason
+we only have one node for the whole register set providing
+pinctrl, reset, clock, ... is that it would require tiny separate
+register ranges spread over the whole register set.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Instead, the idea is to have a single DT node, register a
+driver providing a mmio regmap, and registering individual
+platform_devices for the non-early drivers using the regmap.
+We also evaluated syscon, but it will require dummy nodes for
+each proper platform_device and that is something we really
+want to avoid here.
 
-Thanks,
+Of course, writing that driver is delayed on my side because
+of other non-Linux stuff that has to be taken care of first.
+As I cannot tell how much time I can spend on it now, I prefer
+to take this as is and provide update patches as soon as I have
+worked out the regset driver.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Sebastian
