@@ -1,28 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 06 Jun 2014 08:48:26 +0200
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <1401975430-2648-2-git-send-email-thunder.leizhen@huawei.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <1401975430-2648-2-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <8620067.9Lo76DOS52@wuerfel>
+Date: Fri, 06 Jun 2014 08:50:04 +0200
+Subject: [PATCH 2/4] ARM: mach-s5p: get rid of all <mach/gpio.h> headers
+In-Reply-To: <4544212.mqY6dSouMv@wuerfel>
+References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
+ <1401888838-3126-3-git-send-email-linus.walleij@linaro.org>
+ <4544212.mqY6dSouMv@wuerfel>
+Message-ID: <4393612.d5qsoYg5L1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 June 2014 21:37:09 Zhen Lei wrote:
-
-> +- smmu-masters  : A list of phandles to device nodes representing bus
-> +                  masters for which the SMMU can provide a translation
-> +                  and their corresponding StreamIDs (see example below).
+On Wednesday 04 June 2014 15:58:28 Arnd Bergmann wrote:
+> On Wednesday 04 June 2014 15:33:56 Linus Walleij wrote:
+> > This renames all the local <mach/gpio.h> headers in the S5P platforms
+> > to <mach/gpio-samsung.h> indicating a scope local to this platform,
+> > and cuts the implicit inclusion of <mach/gpio.h> from <linux/gpio.h>
+> > by removing the use of NEED_MACH_GPIO_H from all S5P variants.
+> > 
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > 
 > 
+> Hmm, this patch will obviously clash with the removal of S5p64xx
+> and s5pc100. It shouldn't be hard to resolve the conflict when we
+> merge both into arm-soc/next/cleanup, but maybe there is a way to
+> avoid it?
 
-We're currently in the process of defining a generic binding for IOMMUs.
-
-While the smmu-masters property was copied from an existing binding,
-I think we will end up migrating away from that towards a common way
-to express those things, and we shouldn't add another one doing this
-in a nonstandard way. Please have a look at the latest discussion
-about the iommu binding using #iommu-cells and a reference from the
-master to the iommu and see if you can migrate your code to use that.
+Nevermind, given how happy everyone is to see this gone, let's go
+ahead with your current version, and let us handle the conflict in
+arm-soc when we merge both patch sets.
 
 	Arnd
