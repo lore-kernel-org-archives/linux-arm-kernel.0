@@ -1,54 +1,87 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 07 Jun 2014 00:33:41 +0100
-Subject: [PATCH 0/9] i2c: Relax mandatory I2C ID table passing (+ some
- creep)
-In-Reply-To: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
-References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140606233341.D7C75C42771@trevor.secretlab.ca>
+Date: Sat, 07 Jun 2014 00:39:36 +0100
+Subject: [PATCH 3/7] i2c: Add the ability to match device to compatible
+ string without an of_node
+In-Reply-To: <20140606081026.GO24240@lee--X1>
+References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
+ <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
+ <20140605173620.5BDFBC41CBF@trevor.secretlab.ca>
+ <20140606081026.GO24240@lee--X1>
+Message-ID: <20140606233936.D05B8C427DC@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  6 Jun 2014 16:52:23 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> Hi Wolfram,
->   
-> As previously discussed I believe it should be okay for an I2C device
-> driver _not_ supply an I2C ID table to match to.  The I2C subsystem
-> should be able to match via other means, such as via OF tables.  The
-> blocking factor during our previous conversation was to keep
-> registering via sysfs up and running.  This set does that.
->   
-> After thinking more deeply about the problem, it occurred to me that
-> any I2C device driver which uses the sysfs method and issues an
-> of_match_device() would also fail their probe().  Bolted on to this
-> set is a new, more generic way for these devices to match against
-> either of the I2C/OF tables.
+On Fri, 6 Jun 2014 09:10:26 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 05 Jun 2014, Grant Likely wrote:
 > 
-> I hope this ticks all of your boxes.
+> > On Wed,  4 Jun 2014 13:09:52 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> > > A great deal of I2C devices are currently matched via DT node name, and
+> > > as such the compatible naming convention of '<vendor>,<device>' has gone
+> > > somewhat awry - some nodes don't supply one, some supply an arbitrary
+> > > string and others the correct device name with an arbitrary vendor prefix.
+> > > 
+> > > In an effort to correct this problem we have to supply a mechanism to
+> > > match a device by compatible string AND by simple device name.  This
+> > > function strips off the '<vendor>,' part of a supplied compatible string
+> > > and attempts to match without it.
+> > > 
+> > > The plan is to remove this function once all of the compatible strings
+> > > for each device have been brought into line.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
+> > >  include/linux/i2c.h    | 10 ++++++++++
+> > >  2 files changed, 35 insertions(+)
+> > > 
+> > > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> > > index d3802dc..7dcd5c3 100644
+> > > --- a/drivers/i2c/i2c-core.c
+> > > +++ b/drivers/i2c/i2c-core.c
+> > > @@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+> > >  	return i2c_verify_adapter(dev);
+> > >  }
+> > >  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
+> > > +
+> > > +const struct of_device_id
+> > > +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
+> > > +				  struct device *dev)
+> > > +{
+> > > +	const struct i2c_client *client = i2c_verify_client(dev);
+> > > +	const char *name;
+> > > +
+> > > +	if (!(client && matches))
+> > > +		return NULL;
+> > > +
+> > > +	for (; matches->compatible[0]; matches++) {
+> > > +		name = strchr(matches->compatible, ',');
+> > > +		if (!name)
+> > > +			name = matches->compatible;
+> > > +		else
+> > > +			name++;
+> > > +
+> > > +		if (!strncmp(client->name, name, strlen(client->name)))
+> > > +			return matches;
+> > > +	}
+> > 
+> > Is it actually necessary to strip off the vendor name? It would be fine
+> > to make users include the vendor prefix when creating the device in
+> > sysfs. In fact that would be preferrable for new drivers so that vendor
+> > prefixes start getting used correctly.
 > 
-> v2:
->   - Removal of ACPI support (this is really an OF issue).
->   - Add a new .probe2( with will seamlessly replace
->   - Supply a warning on devices matching via OF without a suitable compatible
->   - Remove unified match_device() - bad idea as it subverts type-safe behaviour
->   - Provide examples of the kind of clean-up possible after this set.
->     - I already have the full support from the maintainer of these drivers =;-) 
+> I see a few issues with this strategy.  Firstly, there are already
+> users registering their devices via sysfs, some are taking their
+> device names from an EEPROM which would require reprogramming in order
+> to prefix the vendor ID.  I'm keen not to break existing systems -
+> which not stripping off the vendor name would inevitably do.
+> Secondly, I'm not sure how Wolfram would feel about the client->name
+> containing a DT compatible string. And finally, other than looking
+> at the kernel source, there is no real way for a user to know if the
+> device supports ACPI or OF, or neither and if an i2c_device_table is
+> supplied or not.
 
-Aside from patch 7/9 and the comment I made about struct device vs.
-struct i2c_client in the API, I think this series looks good. You can
-add my acks to 1-6 and 8-9. Number 7 is nacked.
-
-Acked-by: Grant Likely <grant.likely@linaro.org>
+I just went and looked at the code. I2C_NAME_SIZE is fixed to 20
+characters. Compatible strings can be larger than that, so you're right.
+Stuffing it into the name field isn't a good solution.
 
 g.
-
-> 
-> Kind regards,
-> Lee
-> 
->  drivers/i2c/i2c-core.c      | 73 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------
->  drivers/mfd/88pm860x-core.c |  5 ++---
->  drivers/mfd/as3722.c        | 12 ++----------
->  drivers/of/device.c         | 19 ++++++++++++++++++-
->  include/linux/i2c.h         | 29 ++++++++++++++++++++++++++++-
->  5 files changed, 114 insertions(+), 24 deletions(-)
-> 
