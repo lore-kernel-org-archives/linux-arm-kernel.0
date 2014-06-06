@@ -1,87 +1,169 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 6 Jun 2014 18:32:42 +0530
-Subject: [PATCH v2 6/6] usb: host: ohci-exynos: Use devm_ioremap_resource
- instead of devm_ioremap
-In-Reply-To: <20140604131306.GB28484@ulmo>
-References: <1399723210-21569-1-git-send-email-gautam.vivek@samsung.com>
- <1399723210-21569-7-git-send-email-gautam.vivek@samsung.com>
- <CAFp+6iFufCh6SVEF-HQA62ZsJGJGSebDSs28eqcrMy1X8e5vjA@mail.gmail.com>
- <20140604131306.GB28484@ulmo>
-Message-ID: <CAFp+6iEe8fvxboG79=2s=oe4BkQJYAoVUPtYkPdjJHCe+bC=8Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 6 Jun 2014 08:45:41 -0500
+Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
+In-Reply-To: <1402051016-28853-1-git-send-email-broonie@kernel.org>
+References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
+Message-ID: <CAL_JsqLskrFmXLnj0xndq0=cyQMTVvYGC9CZzJxZApAF9AqVUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-On Wed, Jun 4, 2014 at 6:43 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Wed, Jun 04, 2014 at 03:41:20PM +0530, Vivek Gautam wrote:
->> Hi,
->>
->>
->> On Sat, May 10, 2014 at 5:30 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->> > Using devm_ioremap_resource() API should actually be preferred over
->> > devm_ioremap(), since the former request the mem region first and then
->> > gives back the ioremap'ed memory pointer.
->> > devm_ioremap_resource() calls request_mem_region(), therby preventing
->> > other drivers to make any overlapping call to the same region.
->> >
->> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>
->> Although this patch and rest in the series are merged.
->> But i have got a doubt, so making this thread alive.
->>
->> > ---
->> >  drivers/usb/host/ohci-exynos.c |    7 +++----
->> >  1 file changed, 3 insertions(+), 4 deletions(-)
->> >
->> > diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
->> > index 9cf80cb..dec691d 100644
->> > --- a/drivers/usb/host/ohci-exynos.c
->> > +++ b/drivers/usb/host/ohci-exynos.c
->> > @@ -120,10 +120,9 @@ skip_phy:
->> >
->> >         hcd->rsrc_start = res->start;
->> >         hcd->rsrc_len = resource_size(res);
->> > -       hcd->regs = devm_ioremap(&pdev->dev, res->start, hcd->rsrc_len);
->> > -       if (!hcd->regs) {
->> > -               dev_err(&pdev->dev, "Failed to remap I/O memory\n");
->> > -               err = -ENOMEM;
->> > +       hcd->regs = devm_ioremap_resource(&pdev->dev, res);
->>
->> Here, we replaced devm_ioremap() call with devm_ioremap_resource(),
->> which internally requests the memory region
+On Fri, Jun 6, 2014 at 5:36 AM, Mark Brown <broonie@kernel.org> wrote:
+> From: Mark Brown <broonie@linaro.org>
 >
-> I guess this could lead to problems if drivers haven't been written to
-> cleanly split the register ranges that they access, since now two
-> overlapping regions may be requested and cause the drivers to fail.
-
-Sorry i did not understand completely. Wouldn't the request_mem_region()
-fail for an already busy resource ?
-So devm_ioremap_resource() will in fact prevent the drivers from requesting
-the same memory region twice until the first request frees the region.
-Isn't it ?
-
+> Since the OPP layer is a kernel library which has been converted to be
+> directly selectable by its callers rather than user selectable and
+> requiring architectures to enable it explicitly the ARCH_HAS_OPP symbol
+> has become redundant and can be removed. Do so.
 >
->> and then does a "devm_ioremap()" or "devm_ioremap_nocache()" based on
->> the check for IORESOURCE_CACHEABLE flag.
->>
->> But this flag is not set for the resource of this device.
->> So should we be explicitly setting the flag in driver ?
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  Documentation/power/opp.txt    | 3 ---
+>  arch/arm/mach-exynos/Kconfig   | 1 -
+>  arch/arm/mach-highbank/Kconfig | 1 -
+>  arch/arm/mach-imx/Kconfig      | 1 -
+>  arch/arm/mach-omap2/Kconfig    | 1 -
+>  arch/arm/mach-shmobile/Kconfig | 2 --
+>  arch/arm/mach-vexpress/Kconfig | 1 -
+>  arch/arm/mach-zynq/Kconfig     | 1 -
+>  drivers/devfreq/Kconfig        | 1 -
+>  kernel/power/Kconfig           | 3 ---
+>  10 files changed, 15 deletions(-)
 >
-> I don't think it makes much sense to map these registers cached anyway.
-> Drivers will likely expect writes to this region to take effect without
-> needing any kind of flushing.
-
-These "hcd->regs" are going to be used by the controller, so wouldn't there be a
-a performance difference when the requested address space is
-cacheable/non-cacheable ?
-
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+> diff --git a/Documentation/power/opp.txt b/Documentation/power/opp.txt
+> index a9adad8..c6279c2 100644
+> --- a/Documentation/power/opp.txt
+> +++ b/Documentation/power/opp.txt
+> @@ -51,9 +51,6 @@ Typical usage of the OPP library is as follows:
+>  SoC framework  -> modifies on required cases certain OPPs      -> OPP layer
+>                 -> queries to search/retrieve information       ->
+>
+> -Architectures that provide a SoC framework for OPP should select ARCH_HAS_OPP
+> -to make the OPP layer available.
+> -
+>  OPP layer expects each domain to be represented by a unique device pointer. SoC
+>  framework registers a set of initial OPPs per device with the OPP layer. This
+>  list is expected to be an optimally small number typically around 5 per device.
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index d58995c9..3f78c45 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -103,7 +103,6 @@ config SOC_EXYNOS5440
+>         default y
+>         depends on ARCH_EXYNOS5
+>         select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+> -       select ARCH_HAS_OPP
+>         select HAVE_ARM_ARCH_TIMER
+>         select AUTO_ZRELADDR
+>         select MIGHT_HAVE_PCI
+> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+> index 830b76e..bef970f 100644
+> --- a/arch/arm/mach-highbank/Kconfig
+> +++ b/arch/arm/mach-highbank/Kconfig
+> @@ -3,7 +3,6 @@ config ARCH_HIGHBANK
+>         select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+>         select ARCH_HAS_CPUFREQ
+>         select ARCH_HAS_HOLES_MEMORYMODEL
+> -       select ARCH_HAS_OPP
+>         select ARCH_SUPPORTS_BIG_ENDIAN
+>         select ARM_AMBA
+>         select ARM_ERRATA_764369 if SMP
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 4cce93d..95690e4 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -1,7 +1,6 @@
+>  config ARCH_MXC
+>         bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+>         select ARCH_HAS_CPUFREQ
+> -       select ARCH_HAS_OPP
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_CPU_SUSPEND if PM
+>         select CLKSRC_MMIO
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 0ba4826..524b027 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -12,7 +12,6 @@ config ARCH_OMAP3
+>         bool "TI OMAP3"
+>         depends on ARCH_MULTI_V7
+>         select ARCH_OMAP2PLUS
+> -       select ARCH_HAS_OPP
+>         select ARM_CPU_SUSPEND if PM
+>         select OMAP_INTERCONNECT
+>         select PM_OPP if PM
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index dbd954e..b51d142 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -86,7 +86,6 @@ config ARCH_R8A73A4
+>         select SH_CLK_CPG
+>         select RENESAS_IRQC
+>         select ARCH_HAS_CPUFREQ
+> -       select ARCH_HAS_OPP
+>         select SYS_SUPPORTS_SH_CMT
+>         select SYS_SUPPORTS_SH_TMU
+>
+> @@ -265,7 +264,6 @@ config MACH_KZM9G
+>         bool "KZM-A9-GT board"
+>         depends on ARCH_SH73A0
+>         select ARCH_HAS_CPUFREQ
+> -       select ARCH_HAS_OPP
+>         select ARCH_REQUIRE_GPIOLIB
+>         select REGULATOR_FIXED_VOLTAGE if REGULATOR
+>         select SND_SOC_AK4642 if SND_SIMPLE_CARD
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index 90249cf..71629fe 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -66,7 +66,6 @@ config ARCH_VEXPRESS_DCSCB
+>  config ARCH_VEXPRESS_SPC
+>         bool "Versatile Express Serial Power Controller (SPC)"
+>         select ARCH_HAS_CPUFREQ
+> -       select ARCH_HAS_OPP
+>         select PM_OPP
+>         help
+>           The TC2 (A15x2 A7x3) versatile express core tile integrates a logic
+> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+> index 573e0db..bc485f2 100644
+> --- a/arch/arm/mach-zynq/Kconfig
+> +++ b/arch/arm/mach-zynq/Kconfig
+> @@ -1,7 +1,6 @@
+>  config ARCH_ZYNQ
+>         bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
+>         select ARCH_HAS_CPUFREQ
+> -       select ARCH_HAS_OPP
+>         select ARCH_SUPPORTS_BIG_ENDIAN
+>         select ARM_AMBA
+>         select ARM_GIC
+> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+> index 49e74c1..3dced0a 100644
+> --- a/drivers/devfreq/Kconfig
+> +++ b/drivers/devfreq/Kconfig
+> @@ -68,7 +68,6 @@ comment "DEVFREQ Drivers"
+>  config ARM_EXYNOS4_BUS_DEVFREQ
+>         bool "ARM Exynos4210/4212/4412 Memory Bus DEVFREQ Driver"
+>         depends on (CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412) && !ARCH_MULTIPLATFORM
+> -       select ARCH_HAS_OPP
+>         select DEVFREQ_GOV_SIMPLE_ONDEMAND
+>         select PM_OPP
+>         help
+> diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
+> index 9a83d78..e4e4121 100644
+> --- a/kernel/power/Kconfig
+> +++ b/kernel/power/Kconfig
+> @@ -253,9 +253,6 @@ config APM_EMULATION
+>           anything, try disabling/enabling this option (or disabling/enabling
+>           APM in your BIOS).
+>
+> -config ARCH_HAS_OPP
+> -       bool
+> -
+>  config PM_OPP
+>         bool
+>         ---help---
+> --
+> 2.0.0
+>
