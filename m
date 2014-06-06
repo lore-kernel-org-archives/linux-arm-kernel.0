@@ -1,74 +1,66 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 6 Jun 2014 01:55:36 -0500
-Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
- am43x-epos-evm
-In-Reply-To: <53916556.10608@ti.com>
-References: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
- <53916556.10608@ti.com>
-Message-ID: <539165E8.7030500@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 6 Jun 2014 09:01:54 +0200
+Subject: [PATCH v2 04/11] sched: Allow all archs to set the power_orig
+In-Reply-To: <20140604111730.GM29593@e103034-lin>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
+ <20140603132217.GD29593@e103034-lin>
+ <CAKfTPtB2XC3hVN4LuRjvd3JB5GZ9=R5Tq6F52iYxO3nCJ04Cew@mail.gmail.com>
+ <20140604111730.GM29593@e103034-lin>
+Message-ID: <CAKfTPtAzhy+tu8845VWwYs5B5+xtB7WAGWD5-r=8sm+dxgRiKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2014 01:53 AM, Nishanth Menon wrote:
-> On 06/06/2014 01:17 AM, George Cherian wrote:
->> AM437x EPOS evm use external clock for RMII interface.
->> Enable the same in DT. 
+On 4 June 2014 13:17, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> On Tue, Jun 03, 2014 at 03:02:18PM +0100, Vincent Guittot wrote:
+>> On 3 June 2014 15:22, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+>> > On Fri, May 23, 2014 at 04:52:58PM +0100, Vincent Guittot wrote:
+>> >> power_orig is only changed for system with a SMT sched_domain level in order to
+>> >> reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
+>> >> original capacity that is different from the default value.
+>> >>
+>> >> Create a more generic function arch_scale_cpu_power that can be also used by
+>> >> non SMT platform to set power_orig.
+>> >
+>> > I did a quick test of the patch set with adjusting cpu_power on
+>> > big.LITTLE (ARM TC2) to reflect the different compute capacities of the
+>> > A15s and A7s. I ran the sysbench cpu benchmark with 5 threads with and
+>> > without the patches applied, but with non-default cpu_powers.
+>> >
+>> > I didn't see any difference in the load-balance. Three tasks ended up on
+>> > the two A15s and two tasks ended up on two of the three A7s leaving one
+>> > unused in both cases.
+>> >
+>> > Using default cpu_power I get one task on each of the five cpus (best
+>> > throughput). Unless I messed something up, it seems that setting
+>> > cpu_power doesn't give me the best throughput with these patches
+>> > applied.
 >>
->> Signed-off-by: George Cherian <george.cherian@ti.com>
->> Reported-by: Nishanth Menon <nm@ti.com>
->> ---
->>  arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
->> index 19f1f7e..90098f9 100644
->> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
->> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
->> @@ -319,6 +319,10 @@
->>  	phy-mode = "rmii";
->>  };
->>  
->> +&phy_sel {
->> +	rmii-clock-ext;
->> +};
->> +
->>  &i2c0 {
->>  	status = "okay";
->>  	pinctrl-names = "default";
->>
-> Where does this apply on?
-> With linux-next next-20140506 tag, and this patch applied, I get the
-> following error.
-> 
->   LD      kernel/trace/built-in.o
->   LD      kernel/built-in.o
-> build fail, Error:
-> Error: arch/arm/boot/dts/am43x-epos-evm.dts:219.2-3 label or path,
-> 'phy_sel', not found
-> FATAL ERROR: Syntax error parsing input tree
-> make[1]: *** [arch/arm/boot/dts/am43x-epos-evm.dtb] Error 1
-> make[1]: *** Waiting for unfinished jobs....
-> make: *** [dtbs] Error 2
-> make: *** Waiting for unfinished jobs....
-> 
-> in the future, it is helpful if you can point out that this is a
-> regression seen on next-20140603 and the patch needs to be applied on
-> some specific branch.
-> 
-> for the record:
-> last working next tag:
-> https://github.com/nmenon/kernel-test-logs/blob/next-20140602/omap2plus_defconfig/am43xx-epos.txt
-> 
-> first broken next tag:
-> https://github.com/nmenon/kernel-test-logs/blob/next-20140603/omap2plus_defconfig/am43xx-epos.txt
-> 
-> 
-interestingly, i just re-tested today's tag without the patch
-(omap2plus_defconfig):
-http://slexy.org/raw/s205sRdFvy
+>> That's normal this patchset is necessary but not enough to solve the
+>> issue you mention. We also need to fix the way the imbalance is
+>> calculated for such situation. I have planned to push that in another
+>> patchset in order to not mix too much thing together
+>
+> Based on the commit messages I was just lead to believe that this was a
+> self-contained patch set that also addressed issues related to handling
+> heterogeneous systems. Maybe it would be worth mentioning that this set
+> is only part of the solution somewhere?
 
-I wonder why the behavior change and what was being fixed here?
+So this patch addresses the issue of describing the CPU capacity of an
+HMP system but doesn't solve the one task per CPU issue alone.
 
--- 
-Regards,
-Nishanth Menon
+>
+> It is a bit unclear to me how these changes, which appear to mainly
+> improve factoring rt and irq time into cpu_power, will solve the
+> cpu_power issues related to heterogeneous systems. Can you share your
+> plans for the follow up patch set? I think it would be better to review
+> the solution as a whole.
+
+I have planned to use load_per_task to calculate the imbalance to pull
+
+>
+> I absolutely agree that the imbalance calculation needs to fixed, but I
+> don't think the current rq runnable_avg_sum is the right choice for that
+> purpose for the reasons I pointed out the in other thread.
+>
+> Morten
