@@ -1,31 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 06 Jun 2014 08:50:04 +0200
-Subject: [PATCH 2/4] ARM: mach-s5p: get rid of all <mach/gpio.h> headers
-In-Reply-To: <4544212.mqY6dSouMv@wuerfel>
-References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
- <1401888838-3126-3-git-send-email-linus.walleij@linaro.org>
- <4544212.mqY6dSouMv@wuerfel>
-Message-ID: <4393612.d5qsoYg5L1@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 6 Jun 2014 01:53:10 -0500
+Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
+ am43x-epos-evm
+In-Reply-To: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
+References: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
+Message-ID: <53916556.10608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 June 2014 15:58:28 Arnd Bergmann wrote:
-> On Wednesday 04 June 2014 15:33:56 Linus Walleij wrote:
-> > This renames all the local <mach/gpio.h> headers in the S5P platforms
-> > to <mach/gpio-samsung.h> indicating a scope local to this platform,
-> > and cuts the implicit inclusion of <mach/gpio.h> from <linux/gpio.h>
-> > by removing the use of NEED_MACH_GPIO_H from all S5P variants.
-> > 
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > 
+On 06/06/2014 01:17 AM, George Cherian wrote:
+> AM437x EPOS evm use external clock for RMII interface.
+> Enable the same in DT. 
 > 
-> Hmm, this patch will obviously clash with the removal of S5p64xx
-> and s5pc100. It shouldn't be hard to resolve the conflict when we
-> merge both into arm-soc/next/cleanup, but maybe there is a way to
-> avoid it?
+> Signed-off-by: George Cherian <george.cherian@ti.com>
+> Reported-by: Nishanth Menon <nm@ti.com>
+> ---
+>  arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+> index 19f1f7e..90098f9 100644
+> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
+> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+> @@ -319,6 +319,10 @@
+>  	phy-mode = "rmii";
+>  };
+>  
+> +&phy_sel {
+> +	rmii-clock-ext;
+> +};
+> +
+>  &i2c0 {
+>  	status = "okay";
+>  	pinctrl-names = "default";
+> 
+Where does this apply on?
+With linux-next next-20140506 tag, and this patch applied, I get the
+following error.
 
-Nevermind, given how happy everyone is to see this gone, let's go
-ahead with your current version, and let us handle the conflict in
-arm-soc when we merge both patch sets.
+  LD      kernel/trace/built-in.o
+  LD      kernel/built-in.o
+build fail, Error:
+Error: arch/arm/boot/dts/am43x-epos-evm.dts:219.2-3 label or path,
+'phy_sel', not found
+FATAL ERROR: Syntax error parsing input tree
+make[1]: *** [arch/arm/boot/dts/am43x-epos-evm.dtb] Error 1
+make[1]: *** Waiting for unfinished jobs....
+make: *** [dtbs] Error 2
+make: *** Waiting for unfinished jobs....
 
-	Arnd
+in the future, it is helpful if you can point out that this is a
+regression seen on next-20140603 and the patch needs to be applied on
+some specific branch.
+
+for the record:
+last working next tag:
+https://github.com/nmenon/kernel-test-logs/blob/next-20140602/omap2plus_defconfig/am43xx-epos.txt
+
+first broken next tag:
+https://github.com/nmenon/kernel-test-logs/blob/next-20140603/omap2plus_defconfig/am43xx-epos.txt
+
+
+-- 
+Regards,
+Nishanth Menon
