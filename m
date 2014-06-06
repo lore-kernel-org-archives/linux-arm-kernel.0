@@ -1,43 +1,67 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Fri, 06 Jun 2014 09:56:06 -0700
-Subject: [PATCH v7 1/7] of: Provide function to request and map memory
-In-Reply-To: <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
-References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>	<1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
- <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
-Message-ID: <5391F2A6.4040202@infradead.org>
+From: dianders@google.com (Doug Anderson)
+Date: Fri, 6 Jun 2014 10:17:00 -0700
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <539145B4.5000200@gmail.com>
+References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
+ <539145B4.5000200@gmail.com>
+Message-ID: <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2014 08:19 AM, Rob Herring wrote:
-> On Thu, Jun 5, 2014 at 12:26 PM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
->> A call to of_iomap does not request the memory region.
->> This patch adds the function of_io_request_and_map which requests
->> the memory region before mapping it.
+Tushar,
+
+On Thu, Jun 5, 2014 at 9:38 PM, Tushar Behera <trblinux@gmail.com> wrote:
+> On 06/06/2014 06:38 AM, Doug Anderson wrote:
+>> Hi,
 >>
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> ---
->>  drivers/of/address.c       |   28 ++++++++++++++++++++++++++++
->>  include/linux/of_address.h |    8 ++++++++
->>  2 files changed, 36 insertions(+)
+>> When I try to boot linuxnext on my exynos5420-peach-pit chromebook I
+>> have problems bringing up extra CPUs:
 >>
->> diff --git a/drivers/of/address.c b/drivers/of/address.c
->> index cb4242a..c55b107 100644
->> --- a/drivers/of/address.c
->> +++ b/drivers/of/address.c
->> @@ -721,3 +721,31 @@ void __iomem *of_iomap(struct device_node *np, int index)
->>         return ioremap(res.start, resource_size(&res));
->>  }
->>  EXPORT_SYMBOL(of_iomap);
->> +
->> +/**
->> + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
->> + *                        for a given device_node
-> 
-> I believe docbook requires this to be 1 line.
+>> 1. They don't come up
+>>
+>
+> [ ... ]
+>
+>> [    1.125030] CPU1: failed to boot: -38
+>> [    2.130043] CPU2: failed to boot: -38
+>> [    3.135059] CPU3: failed to boot: -38
+>>
+>
+> With following config modifications over exynos_defconfig, I can see 4
+> big cores coming up.
+>
+> CONFIG_MCPM=y
+> CONFIG_EXYNOS5420_MCPM=y
 
-No longer so.  That was fixed a couple of years ago.
+Thanks!  OK, that certainly changes the behavior for me!  ...but it
+doesn't work.
+
+I also got a response from some folks that I pinged off-list.
+Apparently our U-Boot doesn't set things up like the upstream kernel
+expects (ugh!), so to get things booting you need the magic commands
+in U-Boot:
+
+mw.l 02073028 0  # Clear EXYNOS_START_FLAG
+mw.l 10d25000 3  # Enable CCI from U-Boot
+
+Once you do that then all 8 CPUs can come up!
 
 
--- 
-~Randy
+Can someone at Samsung come up with a reasonable solution about how we
+should solve this in a way that everyone can be happy with?  I haven't
+really been involved with MCPM stuff, so I'm not sure why what landed
+upstream is different than what we have in our kernel.
+
+I guess worst case we can require that anyone running an upstream
+kernel simply needs a "fixed" U-Boot, but that's always a bit of a
+hassle.  We might have to go there eventually anyway given that our L2
+cache timings in U-Boot are wrong (again!) and it's unlikely that
+upstream will take some weird hack in the kernel to fix them...
+
+-Doug
+
+
+P.S. We also really need to do something about the configs.  There are
+no exynos configs upstream that have any useful set of options (that I
+know of).  ...and useful options don't seem to get selected
+automatically...
