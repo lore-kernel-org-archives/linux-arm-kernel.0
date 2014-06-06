@@ -1,144 +1,74 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri,  6 Jun 2014 11:10:23 +0200
-Subject: [PATCH v3] ARM: KVM: Unmap IPA on memslot delete/move
-Message-ID: <1402045823-26912-1-git-send-email-eric.auger@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 6 Jun 2014 11:11:46 +0200
+Subject: [PATCH 00/08] ARM: shmobile: Rework include path (Try 2, Part 1)
+In-Reply-To: <20140520075949.13851.42995.sendpatchset@w520>
+References: <20140520075949.13851.42995.sendpatchset@w520>
+Message-ID: <CAMuHMdWuaeZOAA-=k7nHQafxJh7h-jQqtfEGJKiEmraZXu2p+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently when a KVM region is deleted or moved after
-KVM_SET_USER_MEMORY_REGION ioctl, the corresponding
-intermediate physical memory is not unmapped.
+Hi Magnus,
 
-This patch corrects this and unmaps the region's IPA range
-in kvm_arch_commit_memory_region using unmap_stage2_range.
+On Tue, May 20, 2014 at 9:59 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> ARM: shmobile: Rework include path (Try 2, Part 1)
+>
+> [PATCH 01/08] ARM: shmobile: Move intc.h, cleanup sh_intc.h usage
+> [PATCH 02/08] ARM: shmobile: Move dma-register.h
+> [PATCH 03/08] ARM: shmobile: Move clock.h
+> [PATCH 04/08] ARM: shmobile: Move most of irqs.h, keep some for pinctl
+> [PATCH 05/08] ARM: shmobile: Move common.h
+> [PATCH 06/08] ARM: shmobile: Move pm-rmobile.h, cleanup sh73xx.h
+> [PATCH 07/08] ARM: shmobile: Move pm-rcar.h, cleanup r8a7779 case
+> [PATCH 08/08] ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case
+>
+> Olof, here my latest take on the header move that you requested earlier.
+>
+> This particular series hopefully follows your proposed way and moves the
+> most common shared header files for mach-shmobile from <mach/foobar.h>
+> to "foobar.h" without any workaround. Left are still per-SoC header files
+> that will be moved once I know you are comformatble with this format.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
+Olof didn't scream, so I guess he's comfortable with it? :-)
+Olof?
 
-The patch was tested with QEMU using the VFIO platform
-device. In a specific IRQ handling case, the device regularly
-deletes/creates some RAM regions.
+If the propagation part is an issue, what about Simon applying it to a separate
+branch, to be merged into both soc-for-v3.17 and boards-for-v3.17?
 
-v3:
-- replace u64 by phys_addr_t in kvm_arch_commit_memory_region
+> Please note that these are only lightly compile tested with a handful
+> of defconfigs, but any potential issue should be trivial to fix.
 
-v2:
-- KVM_MR_MOVE case also handled and tested using a QEMU hack
-- memslot and memory_region stubs moved from arm.c to mmu.c
-  following Marc Zyngier recommendations.
----
- arch/arm/kvm/arm.c | 37 -------------------------------------
- arch/arm/kvm/mmu.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 37 deletions(-)
+Indeed. And it touches arch/arm/mach-shmobile only.
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index f0e50a0..bcc2929 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -155,16 +155,6 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
- 	return VM_FAULT_SIGBUS;
- }
- 
--void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
--			   struct kvm_memory_slot *dont)
--{
--}
--
--int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
--			    unsigned long npages)
--{
--	return 0;
--}
- 
- /**
-  * kvm_arch_destroy_vm - destroy the VM data structure
-@@ -224,33 +214,6 @@ long kvm_arch_dev_ioctl(struct file *filp,
- 	return -EINVAL;
- }
- 
--void kvm_arch_memslots_updated(struct kvm *kvm)
--{
--}
--
--int kvm_arch_prepare_memory_region(struct kvm *kvm,
--				   struct kvm_memory_slot *memslot,
--				   struct kvm_userspace_memory_region *mem,
--				   enum kvm_mr_change change)
--{
--	return 0;
--}
--
--void kvm_arch_commit_memory_region(struct kvm *kvm,
--				   struct kvm_userspace_memory_region *mem,
--				   const struct kvm_memory_slot *old,
--				   enum kvm_mr_change change)
--{
--}
--
--void kvm_arch_flush_shadow_all(struct kvm *kvm)
--{
--}
--
--void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
--				   struct kvm_memory_slot *slot)
--{
--}
- 
- struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
- {
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 16f8049..cc5ca9e 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1100,3 +1100,49 @@ out:
- 	free_hyp_pgds();
- 	return err;
- }
-+
-+void kvm_arch_commit_memory_region(struct kvm *kvm,
-+				   struct kvm_userspace_memory_region *mem,
-+				   const struct kvm_memory_slot *old,
-+				   enum kvm_mr_change change)
-+{
-+	gpa_t gpa = old->base_gfn << PAGE_SHIFT;
-+	phys_addr_t size = old->npages << PAGE_SHIFT;
-+	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
-+		spin_lock(&kvm->mmu_lock);
-+		unmap_stage2_range(kvm, gpa, size);
-+		spin_unlock(&kvm->mmu_lock);
-+	}
-+}
-+
-+int kvm_arch_prepare_memory_region(struct kvm *kvm,
-+				   struct kvm_memory_slot *memslot,
-+				   struct kvm_userspace_memory_region *mem,
-+				   enum kvm_mr_change change)
-+{
-+	return 0;
-+}
-+
-+void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
-+			   struct kvm_memory_slot *dont)
-+{
-+}
-+
-+int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
-+			    unsigned long npages)
-+{
-+	return 0;
-+}
-+
-+void kvm_arch_memslots_updated(struct kvm *kvm)
-+{
-+}
-+
-+void kvm_arch_flush_shadow_all(struct kvm *kvm)
-+{
-+}
-+
-+void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
-+				   struct kvm_memory_slot *slot)
-+{
-+}
--- 
-1.9.1
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+
+> Also, there are certain bits of arch/arm/mach-shmobile/include/mach/
+> get included from places like arch/arm/boot/compressed/ (booting
+> legacy kernel directly from reset vector) and also from SoC specific
+> legacy code under drivers/pinctrl. My proposal is to keep those users
+> as-is until we phase out legacy board support (2-3 kernels?), let me
+> know if you would like to get rid of "include/mach" sooner!
+
+It seems you forgot r7s72100.h, r8a73a4.h, and sh73a0.h?
+Can just be moved, with #include update.
+
+Remaining are lots of files only used by arch/arm/boot, so I'd move those
+(mmc*, sdhi*, zboot*) into .../boot.
+
+mach/system.h seems to be unused?
+
+The parts of irqs.h needed for legacy pinctrl can be extracted into
+drivers/pinctrl/sh-pfc/irqs_legacy.h, to be removed later.
+After that irqs.h can move, too.
+
+After that, we can see what's left...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
