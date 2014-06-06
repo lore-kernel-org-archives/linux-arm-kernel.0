@@ -1,80 +1,93 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 06 Jun 2014 11:09:33 -0400
-Subject: [PATCH] arm64: Add flush_cache_vmap call in __early_set_fixmap
-In-Reply-To: <20140606145324.GE4179@bivouac.eciton.net>
-References: <1402050590-23877-1-git-send-email-leif.lindholm@linaro.org>
- <1402065449.15402.2.camel@deneb.redhat.com>
- <20140606145324.GE4179@bivouac.eciton.net>
-Message-ID: <1402067373.15402.9.camel@deneb.redhat.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 6 Jun 2014 10:19:28 -0500
+Subject: [PATCH v7 1/7] of: Provide function to request and map memory
+In-Reply-To: <1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
+References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
+ <1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-06-06 at 15:53 +0100, Leif Lindholm wrote:
-> On Fri, Jun 06, 2014 at 10:37:29AM -0400, Mark Salter wrote:
-> > On Fri, 2014-06-06 at 11:29 +0100, Leif Lindholm wrote:
-> > > __early_set_fixmap does not do any synchronization when called to set a
-> > > fixmap entry. Add call to flush_vmap_cache().
-> > > 
-> > > Tested on hardware.
-> > > 
-> > > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > Cc: Steve Capper <steve.capper@linaro.org>
-> > > ---
-> > >  arch/arm64/mm/ioremap.c |    5 +++--
-> > >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-> > > index 7ec3283..5b8766c 100644
-> > > --- a/arch/arm64/mm/ioremap.c
-> > > +++ b/arch/arm64/mm/ioremap.c
-> > > @@ -176,9 +176,10 @@ void __init __early_set_fixmap(enum fixed_addresses idx,
-> > >  
-> > >  	pte = early_ioremap_pte(addr);
-> > >  
-> > > -	if (pgprot_val(flags))
-> > > +	if (pgprot_val(flags)) {
-> > >  		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
-> > > -	else {
-> > > +		flush_cache_vmap(addr, addr + PAGE_SIZE);
-> > > +	} else {
-> > >  		pte_clear(&init_mm, addr, pte);
-> > >  		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
-> > >  	}
-> > 
-> > I'm confused by the commit message mentioning synchronization but
-> > the code doing a cache flush. I see that arm64 implementation of
-> > flush_cache_vmap() is just a dsb(). If it is synchronization that
-> > we need here (and it certainly looks like we do), why not just add
-> > the dsb() directly to make that clear?
-> 
-> It needs this Linux-semantically for the same reason remap_page_range
-> needs it. From the ARM architectural point of view, the reason is that
-> the translation table walk is considered a separate observer from the
-> core data interface.
-> 
-> But since there is a common Linux semantic for this, I preferred
-> reusing that over just throwing in a dsb(). My interpretation of
-> flush_cache_vmap() was "flush mappings from cache, so they can be
-> picked up by table walk". While we don't technically need to flush the
-> cache here, the underlying requirement is the same.
-> 
+On Thu, Jun 5, 2014 at 12:26 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> A call to of_iomap does not request the memory region.
+> This patch adds the function of_io_request_and_map which requests
+> the memory region before mapping it.
+>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  drivers/of/address.c       |   28 ++++++++++++++++++++++++++++
+>  include/linux/of_address.h |    8 ++++++++
+>  2 files changed, 36 insertions(+)
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index cb4242a..c55b107 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -721,3 +721,31 @@ void __iomem *of_iomap(struct device_node *np, int index)
+>         return ioremap(res.start, resource_size(&res));
+>  }
+>  EXPORT_SYMBOL(of_iomap);
+> +
+> +/**
+> + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
+> + *                        for a given device_node
 
-But the range you are flushing is not a range seen by the table walk
-observer. I just think it is clearer to explicitly show that it is
-the pte write which we want the table walk to see rather than to
-rely on the implicit behavior of a cache flush routine.
+I believe docbook requires this to be 1 line.
 
->From Documentation/cachetlb.txt:
+> + * @device:    the device whose io range will be mapped
+> + * @index:     index of the io range
+> + * @name:      name of the resource
+> + *
+> + * Returns a pointer to the requested and mapped memory
+> + */
+> +void __iomem *of_io_request_and_map(struct device_node *np, int index, char *name)
+> +{
+> +       struct resource res;
+> +       void __iomem *mem;
+> +
+> +       if (of_address_to_resource(np, index, &res))
+> +               return NULL;
+> +
+> +       if (!request_mem_region(res.start, resource_size(&res), name))
 
-6) void flush_cache_vmap(unsigned long start, unsigned long end)
-   void flush_cache_vunmap(unsigned long start, unsigned long end)
+Use the np->name here and drop the name parameter.
 
-	Here in these two interfaces we are flushing a specific range
-	of (kernel) virtual addresses from the cache.  After running,
-	there will be no entries in the cache for the kernel address
-	space for virtual addresses in the range 'start' to 'end-1'.
-
-	The first of these two routines is invoked after map_vm_area()
-	has installed the page table entries.  The second is invoked
-	before unmap_kernel_range() deletes the page table entries.
+> +               return NULL;
+> +
+> +       mem = ioremap(res.start, resource_size(&res));
+> +       if (!mem)
+> +               release_mem_region(res.start, resource_size(&res));
+> +
+> +       return mem;
+> +}
+> +EXPORT_SYMBOL(of_io_request_and_map);
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index 5f6ed6b..725b875 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -96,6 +96,8 @@ static inline struct of_pci_range *of_pci_range_parser_one(
+>  extern int of_address_to_resource(struct device_node *dev, int index,
+>                                   struct resource *r);
+>  void __iomem *of_iomap(struct device_node *node, int index);
+> +void __iomem *of_io_request_and_map(struct device_node *device,
+> +                                       int index, char *name);
+>  #else
+>  static inline int of_address_to_resource(struct device_node *dev, int index,
+>                                          struct resource *r)
+> @@ -107,6 +109,12 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
+>  {
+>         return NULL;
+>  }
+> +
+> +static inline void __iomem *of_io_request_and_map(struct device_node *device,
+> +                                       int index, char *name)
+> +{
+> +       return NULL;
+> +}
+>  #endif
+>
+>  #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
+> --
+> 1.7.9.5
+>
