@@ -1,61 +1,48 @@
-From: vidyas@nvidia.com (Vidya Sagar)
-Date: Fri, 6 Jun 2014 11:10:44 +0530
-Subject: [PATCH v3] ARM: fix debug prints relevant to PCI devices
-Message-ID: <1402033244-19050-1-git-send-email-vidyas@nvidia.com>
+From: xiaoguangrong@linux.vnet.ibm.com (Xiao Guangrong)
+Date: Fri, 06 Jun 2014 13:52:33 +0800
+Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
+ support
+In-Reply-To: <5390C04F.6060201@samsung.com>
+References: <1401916278-24835-1-git-send-email-m.smarduch@samsung.com>
+ <5390146F.8020407@linux.vnet.ibm.com> <5390C04F.6060201@samsung.com>
+Message-ID: <53915721.9090006@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per PCIe spec, fast back-to-back transactions feature
-is not applicable to PCIe devices. Hence, do not print
-that fast back-to-back trasactions are disabled when
-there is a PCIe device found on the bus
+On 06/06/2014 03:09 AM, Mario Smarduch wrote:
+> On 06/04/2014 11:55 PM, Xiao Guangrong wrote:
+>> On 06/05/2014 05:11 AM, Mario Smarduch wrote:
+>>
+>>> +	spin_lock(&kvm->mmu_lock);
+>>> +
+>>> +	for (i = 0; i < n / sizeof(long); i++) {
+>>> +		unsigned long mask;
+>>> +		gfn_t offset;
+>>> +
+>>> +		if (!dirty_bitmap[i])
+>>> +			continue;
+>>> +
+>>> +		is_dirty = true;
+>>> +
+>>> +		mask = xchg(&dirty_bitmap[i], 0);
+>>> +		dirty_bitmap_buffer[i] = mask;
+>>> +
+>>> +		offset = i * BITS_PER_LONG;
+>>> +		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
+>>> +	}
+>>> +	if (is_dirty)
+>>> +		kvm_flush_remote_tlbs(kvm);
+>>
+>> You moved the flush into mmu-lock. Please do not :).
+>>
+>> See commit 198c74f43f0f5473f99967aead30ddc622804bc1
+>>
+> 
+> Thanks for reviewing, I revised to pick up your version.
+> 
+> Functionally there should be no impact on ARM, the
+> TLB flush function is different.
 
-Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
----
-v3:
-* removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
-
-v2:
-* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
-* replaced printk with pr_info
-
- arch/arm/kernel/bios32.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 17a26c1..fcf2581 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- {
- 	struct pci_dev *dev;
- 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
-+	bool has_pcie_dev = 0;
- 
- 	/*
- 	 * Walk the devices on this bus, working out what we can
-@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- 	list_for_each_entry(dev, &bus->devices, bus_list) {
- 		u16 status;
- 
-+		if (!has_pcie_dev)
-+			has_pcie_dev = pci_is_pcie(dev);
- 		pci_read_config_word(dev, PCI_STATUS, &status);
- 
- 		/*
-@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- 
- 	/*
- 	 * Report what we did for this bus
-+	 * (only if the bus doesn't have even one PCIe device)
- 	 */
--	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
--		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-+	if (!has_pcie_dev)
-+		pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
-+			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
--- 
-1.8.1.5
+Yeah, i agree your point on ARM, but your patch moved
+the function from x86 to the common code, that means
+this function is reused between ARM and x86. No?
