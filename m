@@ -1,600 +1,1015 @@
 From: ritesh.harjani@gmail.com (ritesh.harjani at gmail.com)
-Date: Fri, 6 Jun 2014 14:12:40 +0530
-Subject: [PATCHv3 2/3] arm: dma-mapping: Refactor attach/detach,
- alloc/free func
-In-Reply-To: <1402044161-32980-2-git-send-email-ritesh.harjani@gmail.com>
+Date: Fri, 6 Jun 2014 14:12:41 +0530
+Subject: [PATCHv3 3/3] arm:dma-iommu: Move out complete func defs
+In-Reply-To: <1402044161-32980-3-git-send-email-ritesh.harjani@gmail.com>
 References: <1402044161-32980-1-git-send-email-ritesh.harjani@gmail.com>
  <1402044161-32980-2-git-send-email-ritesh.harjani@gmail.com>
-Message-ID: <1402044161-32980-3-git-send-email-ritesh.harjani@gmail.com>
+ <1402044161-32980-3-git-send-email-ritesh.harjani@gmail.com>
+Message-ID: <1402044161-32980-4-git-send-email-ritesh.harjani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ritesh Harjani <ritesh.harjani@gmail.com>
 
-Refactor following function calls to lib/iommu-helper.c
+Move out complete function definitions from
+arch/arm/dma-mapping to lib/iommu-helper
 
-1.
-arm_iommu_attach/detach device function calls.
-arm_iommu_init/release_mapping function calls.
+1. Moved out iova alloc/free routine and make them
+statically defined.
 
-2. iommu_alloc/free_buffer can be moved out from
-arm/dma-mapping.c to lib/iommu_helper.c
+2. Moved out complete function definitions which calls
+alloc/free_iova routine to lib/iommu-helper.c
+
+3. Seperated out cache maintainance from iommu_map/unmap
+function routine, to be called from within arch/arm/dma-mapping.c
 
 Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
 ---
- arch/arm/mm/dma-mapping.c    | 200 ++++--------------------------------
- include/linux/iommu-helper.h |  18 ++++
- lib/iommu-helper.c           | 235 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 272 insertions(+), 181 deletions(-)
+ arch/arm/Kconfig             |  42 ++---
+ arch/arm/mm/dma-mapping.c    | 372 ++++---------------------------------------
+ include/linux/iommu-helper.h |  28 +++-
+ lib/iommu-helper.c           | 329 +++++++++++++++++++++++++++++++++++++-
+ 4 files changed, 404 insertions(+), 367 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e65042f..a2cae78 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -94,27 +94,6 @@ config ARM_DMA_USE_IOMMU
+ 	select NEED_SG_DMA_LENGTH
+ 	select DMA_USE_IOMMU_HELPER_MAPPING
+ 
+-if ARM_DMA_USE_IOMMU
+-
+-config ARM_DMA_IOMMU_ALIGNMENT
+-	int "Maximum PAGE_SIZE order of alignment for DMA IOMMU buffers"
+-	range 4 9
+-	default 8
+-	help
+-	  DMA mapping framework by default aligns all buffers to the smallest
+-	  PAGE_SIZE order which is greater than or equal to the requested buffer
+-	  size. This works well for buffers up to a few hundreds kilobytes, but
+-	  for larger buffers it just a waste of address space. Drivers which has
+-	  relatively small addressing window (like 64Mib) might run out of
+-	  virtual space with just a few allocations.
+-
+-	  With this parameter you can specify the maximum PAGE_SIZE order for
+-	  DMA IOMMU buffers. Larger buffers will be aligned only to this
+-	  specified order. The order is expressed as a power of two multiplied
+-	  by the PAGE_SIZE.
+-
+-endif
+-
+ config MIGHT_HAVE_PCI
+ 	bool
+ 
+@@ -1915,6 +1894,27 @@ config IOMMU_HELPER
+ config DMA_USE_IOMMU_HELPER_MAPPING
+ 	def_bool n
+ 
++if DMA_USE_IOMMU_HELPER_MAPPING
++
++config DMA_IOMMU_ALIGNMENT
++	int "Maximum PAGE_SIZE order of alignment for DMA IOMMU buffers"
++	range 4 9
++	default 8
++	help
++	  DMA mapping framework by default aligns all buffers to the smallest
++	  PAGE_SIZE order which is greater than or equal to the requested buffer
++	  size. This works well for buffers up to a few hundreds kilobytes, but
++	  for larger buffers it just a waste of address space. Drivers which has
++	  relatively small addressing window (like 64Mib) might run out of
++	  virtual space with just a few allocations.
++
++	  With this parameter you can specify the maximum PAGE_SIZE order for
++	  DMA IOMMU buffers. Larger buffers will be aligned only to this
++	  specified order. The order is expressed as a power of two multiplied
++	  by the PAGE_SIZE.
++
++endif
++
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
 diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index b82561e..66cf96b 100644
+index 66cf96b..d2192d4 100644
 --- a/arch/arm/mm/dma-mapping.c
 +++ b/arch/arm/mm/dma-mapping.c
-@@ -1161,98 +1161,6 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
- 	spin_unlock_irqrestore(&mapping->lock, flags);
- }
+@@ -1066,101 +1066,6 @@ fs_initcall(dma_debug_do_init);
  
--static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
--					  gfp_t gfp, struct dma_attrs *attrs)
+ /* IOMMU */
+ 
+-static int extend_iommu_mapping(struct dma_iommu_mapping *mapping);
+-
+-static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+-				      size_t size)
 -{
--	struct page **pages;
--	int count = size >> PAGE_SHIFT;
--	int array_size = count * sizeof(struct page *);
--	int i = 0;
+-	unsigned int order = get_order(size);
+-	unsigned int align = 0;
+-	unsigned int count, start;
+-	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+-	unsigned long flags;
+-	dma_addr_t iova;
+-	int i;
 -
--	if (array_size <= PAGE_SIZE)
--		pages = kzalloc(array_size, gfp);
--	else
--		pages = vzalloc(array_size);
--	if (!pages)
--		return NULL;
+-	if (order > CONFIG_ARM_DMA_IOMMU_ALIGNMENT)
+-		order = CONFIG_ARM_DMA_IOMMU_ALIGNMENT;
 -
--	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs))
--	{
--		unsigned long order = get_order(size);
--		struct page *page;
+-	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+-	align = (1 << order) - 1;
 -
--		page = dma_alloc_from_contiguous(dev, count, order);
--		if (!page)
--			goto error;
+-	spin_lock_irqsave(&mapping->lock, flags);
+-	for (i = 0; i < mapping->nr_bitmaps; i++) {
+-		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
+-				mapping->bits, 0, count, align);
 -
--		__dma_clear_buffer(page, size);
+-		if (start > mapping->bits)
+-			continue;
 -
--		for (i = 0; i < count; i++)
--			pages[i] = page + i;
--
--		return pages;
+-		bitmap_set(mapping->bitmaps[i], start, count);
+-		break;
 -	}
 -
 -	/*
--	 * IOMMU can map any pages, so himem can also be used here
+-	 * No unused range found. Try to extend the existing mapping
+-	 * and perform a second attempt to reserve an IO virtual
+-	 * address range of size bytes.
 -	 */
--	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
--
--	while (count) {
--		int j, order = __fls(count);
--
--		pages[i] = alloc_pages(gfp, order);
--		while (!pages[i] && order)
--			pages[i] = alloc_pages(gfp, --order);
--		if (!pages[i])
--			goto error;
--
--		if (order) {
--			split_page(pages[i], order);
--			j = 1 << order;
--			while (--j)
--				pages[i + j] = pages[i] + j;
+-	if (i == mapping->nr_bitmaps) {
+-		if (extend_iommu_mapping(mapping)) {
+-			spin_unlock_irqrestore(&mapping->lock, flags);
+-			return DMA_ERROR_CODE;
 -		}
 -
--		__dma_clear_buffer(pages[i], PAGE_SIZE << order);
--		i += 1 << order;
--		count -= 1 << order;
--	}
+-		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
+-				mapping->bits, 0, count, align);
 -
--	return pages;
--error:
--	while (i--)
--		if (pages[i])
--			__free_pages(pages[i], 0);
--	if (array_size <= PAGE_SIZE)
--		kfree(pages);
--	else
--		vfree(pages);
--	return NULL;
+-		if (start > mapping->bits) {
+-			spin_unlock_irqrestore(&mapping->lock, flags);
+-			return DMA_ERROR_CODE;
+-		}
+-
+-		bitmap_set(mapping->bitmaps[i], start, count);
+-	}
+-	spin_unlock_irqrestore(&mapping->lock, flags);
+-
+-	iova = mapping->base + (mapping_size * i);
+-	iova += start << PAGE_SHIFT;
+-
+-	return iova;
 -}
 -
--static int __iommu_free_buffer(struct device *dev, struct page **pages,
--			       size_t size, struct dma_attrs *attrs)
+-static inline void __free_iova(struct dma_iommu_mapping *mapping,
+-			       dma_addr_t addr, size_t size)
 -{
--	int count = size >> PAGE_SHIFT;
--	int array_size = count * sizeof(struct page *);
--	int i;
+-	unsigned int start, count;
+-	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+-	unsigned long flags;
+-	dma_addr_t bitmap_base;
+-	u32 bitmap_index;
 -
--	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
--		dma_release_from_contiguous(dev, pages[0], count);
--	} else {
--		for (i = 0; i < count; i++)
--			if (pages[i])
--				__free_pages(pages[i], 0);
--	}
+-	if (!size)
+-		return;
 -
--	if (array_size <= PAGE_SIZE)
--		kfree(pages);
--	else
--		vfree(pages);
--	return 0;
+-	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping_size;
+-	BUG_ON(addr < mapping->base || bitmap_index > mapping->extensions);
+-
+-	bitmap_base = mapping->base + mapping_size * bitmap_index;
+-
+-	start = (addr - bitmap_base) >>	PAGE_SHIFT;
+-
+-	if (addr + size > bitmap_base + mapping_size) {
+-		/*
+-		 * The address range to be freed reaches into the iova
+-		 * range of the next bitmap. This should not happen as
+-		 * we don't allow this in __alloc_iova (at the
+-		 * moment).
+-		 */
+-		BUG();
+-	} else
+-		count = size >> PAGE_SHIFT;
+-
+-	spin_lock_irqsave(&mapping->lock, flags);
+-	bitmap_clear(mapping->bitmaps[bitmap_index], start, count);
+-	spin_unlock_irqrestore(&mapping->lock, flags);
 -}
 -
  /*
   * Create a CPU mapping for a specified pages
   */
-@@ -1417,7 +1325,8 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	 */
- 	gfp &= ~(__GFP_COMP);
- 
--	pages = __iommu_alloc_buffer(dev, size, gfp, attrs);
-+	pages = iommu_helper_alloc_buffer(dev, size, gfp, attrs,
-+					__dma_clear_buffer);
- 	if (!pages)
- 		return NULL;
- 
-@@ -1438,7 +1347,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- err_mapping:
- 	__iommu_remove_mapping(dev, *handle, size);
- err_buffer:
--	__iommu_free_buffer(dev, pages, size, attrs);
-+	iommu_helper_free_buffer(dev, pages, size, attrs);
+@@ -1194,62 +1099,6 @@ err:
  	return NULL;
  }
  
-@@ -1495,7 +1404,7 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 	}
+-/*
+- * Create a mapping in device IO address space for specified pages
+- */
+-static dma_addr_t
+-__iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
+-{
+-	struct dma_iommu_mapping *mapping = dev->mapping;
+-	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+-	dma_addr_t dma_addr, iova;
+-	int i, ret = DMA_ERROR_CODE;
+-
+-	dma_addr = __alloc_iova(mapping, size);
+-	if (dma_addr == DMA_ERROR_CODE)
+-		return dma_addr;
+-
+-	iova = dma_addr;
+-	for (i = 0; i < count; ) {
+-		unsigned int next_pfn = page_to_pfn(pages[i]) + 1;
+-		phys_addr_t phys = page_to_phys(pages[i]);
+-		unsigned int len, j;
+-
+-		for (j = i + 1; j < count; j++, next_pfn++)
+-			if (page_to_pfn(pages[j]) != next_pfn)
+-				break;
+-
+-		len = (j - i) << PAGE_SHIFT;
+-		ret = iommu_map(mapping->domain, iova, phys, len,
+-				IOMMU_READ|IOMMU_WRITE);
+-		if (ret < 0)
+-			goto fail;
+-		iova += len;
+-		i = j;
+-	}
+-	return dma_addr;
+-fail:
+-	iommu_unmap(mapping->domain, dma_addr, iova-dma_addr);
+-	__free_iova(mapping, dma_addr, size);
+-	return DMA_ERROR_CODE;
+-}
+-
+-static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova, size_t size)
+-{
+-	struct dma_iommu_mapping *mapping = dev->mapping;
+-
+-	/*
+-	 * add optional in-page offset from iova to size and align
+-	 * result to page size
+-	 */
+-	size = PAGE_ALIGN((iova & ~PAGE_MASK) + size);
+-	iova &= PAGE_MASK;
+-
+-	iommu_unmap(mapping->domain, iova, size);
+-	__free_iova(mapping, iova, size);
+-	return 0;
+-}
+-
+ static struct page **__atomic_get_pages(void *addr)
+ {
+ 	struct dma_pool *pool = &atomic_pool;
+@@ -1285,7 +1134,7 @@ static void *__iommu_alloc_atomic(struct device *dev, size_t size,
+ 	if (!addr)
+ 		return NULL;
  
- 	__iommu_remove_mapping(dev, handle, size);
--	__iommu_free_buffer(dev, pages, size, attrs);
-+	iommu_helper_free_buffer(dev, pages, size, attrs);
+-	*handle = __iommu_create_mapping(dev, &page, size);
++	*handle = iommu_helper_create_mapping(dev, &page, size);
+ 	if (*handle == DMA_ERROR_CODE)
+ 		goto err_mapping;
+ 
+@@ -1299,7 +1148,7 @@ err_mapping:
+ static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
+ 				dma_addr_t handle, size_t size)
+ {
+-	__iommu_remove_mapping(dev, handle, size);
++	iommu_helper_remove_mapping(dev, handle, size);
+ 	__free_from_pool(cpu_addr, size);
  }
  
- static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
-@@ -1924,7 +1833,8 @@ struct dma_map_ops iommu_coherent_ops = {
-  * @base: start address of the valid IO address space
-  * @size: maximum size of the valid IO address space
-  *
-- * Creates a mapping structure which holds information about used/unused
-+ * Calls for lib/iommu-helper function which creates a mapping
-+ * structure which holds information about used/unused
-  * IO address ranges, which is required to perform memory allocation and
-  * mapping with IOMMU aware functions.
-  *
-@@ -1934,71 +1844,10 @@ struct dma_map_ops iommu_coherent_ops = {
- struct dma_iommu_mapping *
- arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
- {
--	unsigned int bits = size >> PAGE_SHIFT;
--	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
--	struct dma_iommu_mapping *mapping;
--	int extensions = 1;
--	int err = -ENOMEM;
+@@ -1330,7 +1179,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	if (!pages)
+ 		return NULL;
+ 
+-	*handle = __iommu_create_mapping(dev, pages, size);
++	*handle = iommu_helper_create_mapping(dev, pages, size);
+ 	if (*handle == DMA_ERROR_CODE)
+ 		goto err_buffer;
+ 
+@@ -1345,7 +1194,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	return addr;
+ 
+ err_mapping:
+-	__iommu_remove_mapping(dev, *handle, size);
++	iommu_helper_remove_mapping(dev, *handle, size);
+ err_buffer:
+ 	iommu_helper_free_buffer(dev, pages, size, attrs);
+ 	return NULL;
+@@ -1403,7 +1252,7 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 		vunmap(cpu_addr);
+ 	}
+ 
+-	__iommu_remove_mapping(dev, handle, size);
++	iommu_helper_remove_mapping(dev, handle, size);
+ 	iommu_helper_free_buffer(dev, pages, size, attrs);
+ }
+ 
+@@ -1421,120 +1270,6 @@ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 					 GFP_KERNEL);
+ }
+ 
+-static int __dma_direction_to_prot(enum dma_data_direction dir)
+-{
+-	int prot;
 -
--	if (!bitmap_size)
--		return ERR_PTR(-EINVAL);
--
--	if (bitmap_size > PAGE_SIZE) {
--		extensions = bitmap_size / PAGE_SIZE;
--		bitmap_size = PAGE_SIZE;
+-	switch (dir) {
+-	case DMA_BIDIRECTIONAL:
+-		prot = IOMMU_READ | IOMMU_WRITE;
+-		break;
+-	case DMA_TO_DEVICE:
+-		prot = IOMMU_READ;
+-		break;
+-	case DMA_FROM_DEVICE:
+-		prot = IOMMU_WRITE;
+-		break;
+-	default:
+-		prot = 0;
 -	}
 -
--	mapping = kzalloc(sizeof(struct dma_iommu_mapping), GFP_KERNEL);
--	if (!mapping)
--		goto err;
+-	return prot;
+-}
 -
--	mapping->bitmap_size = bitmap_size;
--	mapping->bitmaps = kzalloc(extensions * sizeof(unsigned long *),
--				GFP_KERNEL);
--	if (!mapping->bitmaps)
--		goto err2;
+-/*
+- * Map a part of the scatter-gather list into contiguous io address space
+- */
+-static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+-			  size_t size, dma_addr_t *handle,
+-			  enum dma_data_direction dir, struct dma_attrs *attrs,
+-			  bool is_coherent)
+-{
+-	struct dma_iommu_mapping *mapping = dev->mapping;
+-	dma_addr_t iova, iova_base;
+-	int ret = 0;
+-	unsigned int count;
+-	struct scatterlist *s;
+-	int prot;
 -
--	mapping->bitmaps[0] = kzalloc(bitmap_size, GFP_KERNEL);
--	if (!mapping->bitmaps[0])
--		goto err3;
+-	size = PAGE_ALIGN(size);
+-	*handle = DMA_ERROR_CODE;
 -
--	mapping->nr_bitmaps = 1;
--	mapping->extensions = extensions;
--	mapping->base = base;
--	mapping->bits = BITS_PER_BYTE * bitmap_size;
+-	iova_base = iova = __alloc_iova(mapping, size);
+-	if (iova == DMA_ERROR_CODE)
+-		return -ENOMEM;
 -
--	spin_lock_init(&mapping->lock);
+-	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+-		phys_addr_t phys = page_to_phys(sg_page(s));
+-		unsigned int len = PAGE_ALIGN(s->offset + s->length);
 -
--	mapping->domain = iommu_domain_alloc(bus);
--	if (!mapping->domain)
--		goto err4;
+-		if (!is_coherent &&
+-			!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+-			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
 -
--	kref_init(&mapping->kref);
--	return mapping;
--err4:
--	kfree(mapping->bitmaps[0]);
--err3:
--	kfree(mapping->bitmaps);
--err2:
--	kfree(mapping);
--err:
--	return ERR_PTR(err);
-+	return iommu_helper_init_mapping(bus, base, size);
+-		prot = __dma_direction_to_prot(dir);
+-
+-		ret = iommu_map(mapping->domain, iova, phys, len, prot);
+-		if (ret < 0)
+-			goto fail;
+-		count += len >> PAGE_SHIFT;
+-		iova += len;
+-	}
+-	*handle = iova_base;
+-
+-	return 0;
+-fail:
+-	iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE);
+-	__free_iova(mapping, iova_base, size);
+-	return ret;
+-}
+-
+-static int __iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+-		     enum dma_data_direction dir, struct dma_attrs *attrs,
+-		     bool is_coherent)
+-{
+-	struct scatterlist *s = sg, *dma = sg, *start = sg;
+-	int i, count = 0;
+-	unsigned int offset = s->offset;
+-	unsigned int size = s->offset + s->length;
+-	unsigned int max = dma_get_max_seg_size(dev);
+-
+-	for (i = 1; i < nents; i++) {
+-		s = sg_next(s);
+-
+-		s->dma_address = DMA_ERROR_CODE;
+-		s->dma_length = 0;
+-
+-		if (s->offset || (size & ~PAGE_MASK) || size + s->length > max) {
+-			if (__map_sg_chunk(dev, start, size, &dma->dma_address,
+-			    dir, attrs, is_coherent) < 0)
+-				goto bad_mapping;
+-
+-			dma->dma_address += offset;
+-			dma->dma_length = size - offset;
+-
+-			size = offset = s->offset;
+-			start = s;
+-			dma = sg_next(dma);
+-			count += 1;
+-		}
+-		size += s->length;
+-	}
+-	if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir, attrs,
+-		is_coherent) < 0)
+-		goto bad_mapping;
+-
+-	dma->dma_address += offset;
+-	dma->dma_length = size - offset;
+-
+-	return count+1;
+-
+-bad_mapping:
+-	for_each_sg(sg, s, count, i)
+-		__iommu_remove_mapping(dev, sg_dma_address(s), sg_dma_len(s));
+-	return 0;
+-}
+-
+ /**
+  * arm_coherent_iommu_map_sg - map a set of SG buffers for streaming mode DMA
+  * @dev: valid struct device pointer
+@@ -1550,7 +1285,7 @@ bad_mapping:
+ int arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+ 		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
+ {
+-	return __iommu_map_sg(dev, sg, nents, dir, attrs, true);
++	return iommu_helper_map_sg(dev, sg, nents, dir, attrs);
+ }
+ 
+ /**
+@@ -1568,25 +1303,15 @@ int arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+ int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+ 		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
+ {
+-	return __iommu_map_sg(dev, sg, nents, dir, attrs, false);
+-}
+-
+-static void __iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+-		int nents, enum dma_data_direction dir, struct dma_attrs *attrs,
+-		bool is_coherent)
+-{
+ 	struct scatterlist *s;
+-	int i;
+-
+-	for_each_sg(sg, s, nents, i) {
+-		if (sg_dma_len(s))
+-			__iommu_remove_mapping(dev, sg_dma_address(s),
+-					       sg_dma_len(s));
+-		if (!is_coherent &&
+-		    !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+-			__dma_page_dev_to_cpu(sg_page(s), s->offset,
+-					      s->length, dir);
++	int i, ret;
++	ret = iommu_helper_map_sg(dev, sg, nents, dir, attrs);
++	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs)) {
++		for_each_sg(sg, s, ret, i)
++			__dma_page_cpu_to_dev(sg_page(s), s->offset,
++					s->length, dir);
+ 	}
++	return ret;
+ }
+ 
+ /**
+@@ -1602,7 +1327,7 @@ static void __iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+ void arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+ 		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
+ {
+-	__iommu_unmap_sg(dev, sg, nents, dir, attrs, true);
++	iommu_helper_unmap_sg(dev, sg, nents, dir, attrs);
+ }
+ 
+ /**
+@@ -1618,7 +1343,16 @@ void arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 			enum dma_data_direction dir, struct dma_attrs *attrs)
+ {
+-	__iommu_unmap_sg(dev, sg, nents, dir, attrs, false);
++	struct scatterlist *s;
++	int i;
++
++	iommu_helper_unmap_sg(dev, sg, nents, dir, attrs);
++
++	for_each_sg(sg, s, nents, i) {
++		if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
++			__dma_page_dev_to_cpu(sg_page(s), s->offset,
++					      s->length, dir);
++	}
+ }
+ 
+ /**
+@@ -1671,24 +1405,7 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+ 	     struct dma_attrs *attrs)
+ {
+-	struct dma_iommu_mapping *mapping = dev->mapping;
+-	dma_addr_t dma_addr;
+-	int ret, prot, len = PAGE_ALIGN(size + offset);
+-
+-	dma_addr = __alloc_iova(mapping, len);
+-	if (dma_addr == DMA_ERROR_CODE)
+-		return dma_addr;
+-
+-	prot = __dma_direction_to_prot(dir);
+-
+-	ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, prot);
+-	if (ret < 0)
+-		goto fail;
+-
+-	return dma_addr + offset;
+-fail:
+-	__free_iova(mapping, dma_addr, len);
+-	return DMA_ERROR_CODE;
++	return iommu_helper_map_page(dev, page, offset, size, dir);
+ }
+ 
+ /**
+@@ -1708,7 +1425,7 @@ static dma_addr_t arm_iommu_map_page(struct device *dev, struct page *page,
+ 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_cpu_to_dev(page, offset, size, dir);
+ 
+-	return arm_coherent_iommu_map_page(dev, page, offset, size, dir, attrs);
++	return iommu_helper_map_page(dev, page, offset, size, dir);
+ }
+ 
+ /**
+@@ -1724,16 +1441,7 @@ static void arm_coherent_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+ 		struct dma_attrs *attrs)
+ {
+-	struct dma_iommu_mapping *mapping = dev->mapping;
+-	dma_addr_t iova = handle & PAGE_MASK;
+-	int offset = handle & ~PAGE_MASK;
+-	int len = PAGE_ALIGN(size + offset);
+-
+-	if (!iova)
+-		return;
+-
+-	iommu_unmap(mapping->domain, iova, len);
+-	__free_iova(mapping, iova, len);
++	iommu_helper_unmap_page(dev, handle, size, dir);
+ }
+ 
+ /**
+@@ -1753,16 +1461,12 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+ 	dma_addr_t iova = handle & PAGE_MASK;
+ 	struct page *page = phys_to_page(iommu_iova_to_phys(mapping->domain, iova));
+ 	int offset = handle & ~PAGE_MASK;
+-	int len = PAGE_ALIGN(size + offset);
+-
+-	if (!iova)
+-		return;
+ 
+ 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_dev_to_cpu(page, offset, size, dir);
+ 
+-	iommu_unmap(mapping->domain, iova, len);
+-	__free_iova(mapping, iova, len);
++	iommu_helper_unmap_page(dev, handle, size, dir);
++
+ }
+ 
+ static void arm_iommu_sync_single_for_cpu(struct device *dev,
+@@ -1848,24 +1552,6 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
  }
  EXPORT_SYMBOL_GPL(arm_iommu_create_mapping);
  
--static void release_iommu_mapping(struct kref *kref)
+-static int extend_iommu_mapping(struct dma_iommu_mapping *mapping)
 -{
--	int i;
--	struct dma_iommu_mapping *mapping =
--		container_of(kref, struct dma_iommu_mapping, kref);
+-	int next_bitmap;
 -
--	iommu_domain_free(mapping->domain);
--	for (i = 0; i < mapping->nr_bitmaps; i++)
--		kfree(mapping->bitmaps[i]);
--	kfree(mapping->bitmaps);
--	kfree(mapping);
+-	if (mapping->nr_bitmaps > mapping->extensions)
+-		return -EINVAL;
+-
+-	next_bitmap = mapping->nr_bitmaps;
+-	mapping->bitmaps[next_bitmap] = kzalloc(mapping->bitmap_size,
+-						GFP_ATOMIC);
+-	if (!mapping->bitmaps[next_bitmap])
+-		return -ENOMEM;
+-
+-	mapping->nr_bitmaps++;
+-
+-	return 0;
 -}
 -
- static int extend_iommu_mapping(struct dma_iommu_mapping *mapping)
- {
- 	int next_bitmap;
-@@ -2019,8 +1868,7 @@ static int extend_iommu_mapping(struct dma_iommu_mapping *mapping)
- 
  void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping)
  {
--	if (mapping)
--		kref_put(&mapping->kref, release_iommu_mapping);
-+	iommu_helper_release_mapping(mapping);
- }
- EXPORT_SYMBOL_GPL(arm_iommu_release_mapping);
- 
-@@ -2030,8 +1878,9 @@ EXPORT_SYMBOL_GPL(arm_iommu_release_mapping);
-  * @mapping: io address space mapping structure (returned from
-  *	arm_iommu_create_mapping)
-  *
-- * Attaches specified io address space mapping to the provided device,
-- * this replaces the dma operations (dma_map_ops pointer) with the
-+ * Calls for lib/iommu-helper which attaches specified io
-+ * address space mapping to the provided device, this
-+ * replaces the dma operations (dma_map_ops pointer) with the
-  * IOMMU aware version. More than one client might be attached to
-  * the same io address space mapping.
-  */
-@@ -2040,13 +1889,12 @@ int arm_iommu_attach_device(struct device *dev,
- {
- 	int err;
- 
--	err = iommu_attach_device(mapping->domain, dev);
--	if (err)
--		return err;
-+	err = iommu_helper_attach_device(dev, mapping);
- 
--	kref_get(&mapping->kref);
--	dev->mapping = mapping;
--	set_dma_ops(dev, &iommu_ops);
-+	if (!err)
-+		set_dma_ops(dev, &iommu_ops);
-+	else
-+		return err;
- 
- 	pr_debug("Attached IOMMU controller to %s device.\n", dev_name(dev));
- 	return 0;
-@@ -2057,24 +1905,14 @@ EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
-  * arm_iommu_detach_device
-  * @dev: valid struct device pointer
-  *
-- * Detaches the provided device from a previously attached map.
-+ * Calls for lib/iommu-helper which detaches the provided
-+ * device from a previously attached map.
-  * This voids the dma operations (dma_map_ops pointer)
-  */
- void arm_iommu_detach_device(struct device *dev)
- {
--	struct dma_iommu_mapping *mapping;
--
--	mapping = to_dma_iommu_mapping(dev);
--	if (!mapping) {
--		dev_warn(dev, "Not attached\n");
--		return;
--	}
--
--	iommu_detach_device(mapping->domain, dev);
--	kref_put(&mapping->kref, release_iommu_mapping);
--	dev->mapping = NULL;
-+	iommu_helper_detach_device(dev);
- 	set_dma_ops(dev, NULL);
--
- 	pr_debug("Detached IOMMU controller from %s device.\n", dev_name(dev));
- }
- EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
+ 	iommu_helper_release_mapping(mapping);
 diff --git a/include/linux/iommu-helper.h b/include/linux/iommu-helper.h
-index 961d8ef..09bcea3 100644
+index 09bcea3..685b786 100644
 --- a/include/linux/iommu-helper.h
 +++ b/include/linux/iommu-helper.h
-@@ -2,6 +2,7 @@
- #define _LINUX_IOMMU_HELPER_H
- 
- #include <linux/kernel.h>
-+#include <linux/dma-attrs.h>
+@@ -5,6 +5,12 @@
+ #include <linux/dma-attrs.h>
  
  #ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
++#include <linux/mm_types.h>
++#include <linux/dma-debug.h>
++#include <linux/kmemcheck.h>
++#include <linux/kref.h>
++#include <linux/dma-mapping.h>
++
  struct dma_iommu_mapping {
-@@ -19,6 +20,23 @@ struct dma_iommu_mapping {
+ 	/* iommu specific data */
+ 	struct iommu_domain	*domain;
+@@ -20,6 +26,25 @@ struct dma_iommu_mapping {
  	struct kref		kref;
  };
  
-+extern struct page **iommu_helper_alloc_buffer(struct device *dev, size_t size,
-+					  gfp_t gfp, struct dma_attrs *attrs,
-+			void (*arch_clear_buffer_cb)(struct page*, size_t));
++extern dma_addr_t iommu_helper_create_mapping(struct device *dev, struct page **pages,
++					size_t size);
 +
-+extern int iommu_helper_free_buffer(struct device *dev, struct page **pages,
-+			       size_t size, struct dma_attrs *attrs);
++extern int iommu_helper_remove_mapping(struct device *dev, dma_addr_t iova,
++				size_t size);
 +
-+extern void iommu_helper_detach_device(struct device *dev);
++extern dma_addr_t iommu_helper_map_page(struct device *dev, struct page *page,
++		unsigned long offset, size_t size, enum dma_data_direction dir);
 +
++extern void iommu_helper_unmap_page(struct device *dev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir);
++
++extern int iommu_helper_map_sg(struct device *dev, struct scatterlist *sg, int nents,
++		     enum dma_data_direction dir, struct dma_attrs *attrs);
++
++extern void iommu_helper_unmap_sg(struct device *dev, struct scatterlist *sg,
++		int nents, enum dma_data_direction dir,
++		struct dma_attrs *attrs);
++
+ extern struct page **iommu_helper_alloc_buffer(struct device *dev, size_t size,
+ 					  gfp_t gfp, struct dma_attrs *attrs,
+ 			void (*arch_clear_buffer_cb)(struct page*, size_t));
+@@ -29,14 +54,13 @@ extern int iommu_helper_free_buffer(struct device *dev, struct page **pages,
+ 
+ extern void iommu_helper_detach_device(struct device *dev);
+ 
+-extern void iommu_helper_release_mapping(struct dma_iommu_mapping *mapping);
+-
+ extern int iommu_helper_attach_device(struct device *dev,
+ 			    struct dma_iommu_mapping *mapping);
+ 
+ extern struct dma_iommu_mapping *
+ iommu_helper_init_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
+ 
 +extern void iommu_helper_release_mapping(struct dma_iommu_mapping *mapping);
-+
-+extern int iommu_helper_attach_device(struct device *dev,
-+			    struct dma_iommu_mapping *mapping);
-+
-+extern struct dma_iommu_mapping *
-+iommu_helper_init_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
-+
  #define to_dma_iommu_mapping(dev) ((dev)->mapping)
  #endif
  
 diff --git a/lib/iommu-helper.c b/lib/iommu-helper.c
-index c27e269..3664709 100644
+index 3664709..320d885 100644
 --- a/lib/iommu-helper.c
 +++ b/lib/iommu-helper.c
-@@ -6,6 +6,17 @@
- #include <linux/bitmap.h>
- #include <linux/bug.h>
+@@ -8,13 +8,14 @@
  
-+#ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
-+#include <linux/iommu.h>
-+#include <linux/device.h>
-+#include <linux/iommu-helper.h>
-+#include <linux/slab.h>
-+#include <linux/vmalloc.h>
-+#include <linux/errno.h>
-+#include <linux/dma-contiguous.h>
-+#include <linux/mm.h>
-+#endif
+ #ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
+ #include <linux/iommu.h>
+-#include <linux/device.h>
+ #include <linux/iommu-helper.h>
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
+ #include <linux/errno.h>
+ #include <linux/dma-contiguous.h>
+ #include <linux/mm.h>
 +
++#include <asm/dma-mapping.h>
+ #endif
+ 
  int iommu_is_span_boundary(unsigned int index, unsigned int nr,
- 			   unsigned long shift,
- 			   unsigned long boundary_size)
-@@ -39,3 +50,227 @@ again:
- 	return -1;
- }
- EXPORT_SYMBOL(iommu_area_alloc);
-+
-+#ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
-+
-+struct page **iommu_helper_alloc_buffer(struct device *dev, size_t size,
-+					  gfp_t gfp, struct dma_attrs *attrs,
-+			void (*arch_clear_buffer_cb)(struct page*, size_t))
+@@ -53,6 +54,195 @@ EXPORT_SYMBOL(iommu_area_alloc);
+ 
+ #ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
+ 
++/* IOMMU */
++static int extend_iommu_mapping(struct dma_iommu_mapping *mapping)
 +{
-+	struct page **pages;
-+	int count = size >> PAGE_SHIFT;
-+	int array_size = count * sizeof(struct page *);
-+	int i = 0;
++	int next_bitmap;
 +
-+	if (array_size <= PAGE_SIZE)
-+		pages = kzalloc(array_size, gfp);
-+	else
-+		pages = vzalloc(array_size);
-+	if (!pages)
-+		return NULL;
++	if (mapping->nr_bitmaps > mapping->extensions)
++		return -EINVAL;
 +
-+	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
-+		unsigned long order = get_order(size);
-+		struct page *page;
++	next_bitmap = mapping->nr_bitmaps;
++	mapping->bitmaps[next_bitmap] = kzalloc(mapping->bitmap_size,
++						GFP_ATOMIC);
++	if (!mapping->bitmaps[next_bitmap])
++		return -ENOMEM;
 +
-+		page = dma_alloc_from_contiguous(dev, count, order);
-+		if (!page)
-+			goto error;
++	mapping->nr_bitmaps++;
 +
-+		if (arch_clear_buffer_cb)
-+			arch_clear_buffer_cb(page, size);
++	return 0;
++}
 +
-+		for (i = 0; i < count; i++)
-+			pages[i] = page + i;
++static int __dma_direction_to_prot(enum dma_data_direction dir)
++{
++	int prot;
 +
-+		return pages;
++	switch (dir) {
++	case DMA_BIDIRECTIONAL:
++		prot = IOMMU_READ | IOMMU_WRITE;
++		break;
++	case DMA_TO_DEVICE:
++		prot = IOMMU_READ;
++		break;
++	case DMA_FROM_DEVICE:
++		prot = IOMMU_WRITE;
++		break;
++	default:
++		prot = 0;
++	}
++
++	return prot;
++}
++
++static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
++				      size_t size)
++{
++	unsigned int order = get_order(size);
++	unsigned int align = 0;
++	unsigned int count, start;
++	size_t mapping_size = mapping->bits << PAGE_SHIFT;
++	unsigned long flags;
++	dma_addr_t iova;
++	int i;
++
++	if (order > CONFIG_DMA_IOMMU_ALIGNMENT)
++		order = CONFIG_DMA_IOMMU_ALIGNMENT;
++
++	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	align = (1 << order) - 1;
++
++	spin_lock_irqsave(&mapping->lock, flags);
++	for (i = 0; i < mapping->nr_bitmaps; i++) {
++		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
++				mapping->bits, 0, count, align);
++
++		if (start > mapping->bits)
++			continue;
++
++		bitmap_set(mapping->bitmaps[i], start, count);
++		break;
 +	}
 +
 +	/*
-+	 * IOMMU can map any pages, so himem can also be used here
++	 * No unused range found. Try to extend the existing mapping
++	 * and perform a second attempt to reserve an IO virtual
++	 * address range of size bytes.
 +	 */
-+	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
-+
-+	while (count) {
-+		int j, order = __fls(count);
-+
-+		pages[i] = alloc_pages(gfp, order);
-+		while (!pages[i] && order)
-+			pages[i] = alloc_pages(gfp, --order);
-+		if (!pages[i])
-+			goto error;
-+
-+		if (order) {
-+			split_page(pages[i], order);
-+			j = 1 << order;
-+			while (--j)
-+				pages[i + j] = pages[i] + j;
++	if (i == mapping->nr_bitmaps) {
++		if (extend_iommu_mapping(mapping)) {
++			spin_unlock_irqrestore(&mapping->lock, flags);
++			return DMA_ERROR_CODE;
 +		}
-+		if (arch_clear_buffer_cb)
-+			arch_clear_buffer_cb(pages[i], PAGE_SIZE << order);
-+		i += 1 << order;
-+		count -= 1 << order;
++
++		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
++				mapping->bits, 0, count, align);
++
++		if (start > mapping->bits) {
++			spin_unlock_irqrestore(&mapping->lock, flags);
++			return DMA_ERROR_CODE;
++		}
++
++		bitmap_set(mapping->bitmaps[i], start, count);
 +	}
++	spin_unlock_irqrestore(&mapping->lock, flags);
 +
-+	return pages;
-+error:
-+	while (i--)
-+		if (pages[i])
-+			__free_pages(pages[i], 0);
-+	if (array_size <= PAGE_SIZE)
-+		kfree(pages);
-+	else
-+		vfree(pages);
-+	return NULL;
++	iova = mapping->base + (mapping_size * i);
++	iova += start << PAGE_SHIFT;
++
++	return iova;
 +}
 +
-+int iommu_helper_free_buffer(struct device *dev, struct page **pages,
-+			       size_t size, struct dma_attrs *attrs)
++static inline void __free_iova(struct dma_iommu_mapping *mapping,
++			       dma_addr_t addr, size_t size)
 +{
-+	int count = size >> PAGE_SHIFT;
-+	int array_size = count * sizeof(struct page *);
-+	int i;
++	unsigned int start, count;
++	size_t mapping_size = mapping->bits << PAGE_SHIFT;
++	unsigned long flags;
++	dma_addr_t bitmap_base;
++	u32 bitmap_index;
 +
-+	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
-+		dma_release_from_contiguous(dev, pages[0], count);
-+	} else {
-+		for (i = 0; i < count; i++)
-+			if (pages[i])
-+				__free_pages(pages[i], 0);
-+	}
-+
-+	if (array_size <= PAGE_SIZE)
-+		kfree(pages);
-+	else
-+		vfree(pages);
-+	return 0;
-+}
-+
-+/**
-+ * iommu_helper_init_mapping
-+ * @bus: pointer to the bus holding the client device (for IOMMU calls)
-+ * @base: start address of the valid IO address space
-+ * @size: maximum size of the valid IO address space
-+ *
-+ * Creates a mapping structure which holds information about used/unused
-+ * IO address ranges, which is required to perform memory allocation and
-+ * mapping with IOMMU aware functions.
-+ *
-+ */
-+
-+struct dma_iommu_mapping *
-+iommu_helper_init_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
-+{
-+	unsigned int bits = size >> PAGE_SHIFT;
-+	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
-+	struct dma_iommu_mapping *mapping;
-+	int extensions = 1;
-+	int err = -ENOMEM;
-+
-+	if (!bitmap_size)
-+		return ERR_PTR(-EINVAL);
-+
-+	if (bitmap_size > PAGE_SIZE) {
-+		extensions = bitmap_size / PAGE_SIZE;
-+		bitmap_size = PAGE_SIZE;
-+	}
-+
-+	mapping = kzalloc(sizeof(struct dma_iommu_mapping), GFP_KERNEL);
-+	if (!mapping)
-+		goto err;
-+
-+	mapping->bitmap_size = bitmap_size;
-+	mapping->bitmaps = kzalloc(extensions * sizeof(unsigned long *),
-+				GFP_KERNEL);
-+	if (!mapping->bitmaps)
-+		goto err2;
-+
-+	mapping->bitmaps[0] = kzalloc(bitmap_size, GFP_KERNEL);
-+	if (!mapping->bitmaps[0])
-+		goto err3;
-+
-+	mapping->nr_bitmaps = 1;
-+	mapping->extensions = extensions;
-+	mapping->base = base;
-+	mapping->bits = BITS_PER_BYTE * bitmap_size;
-+
-+	spin_lock_init(&mapping->lock);
-+
-+	mapping->domain = iommu_domain_alloc(bus);
-+	if (!mapping->domain)
-+		goto err4;
-+
-+	kref_init(&mapping->kref);
-+	return mapping;
-+err4:
-+	kfree(mapping->bitmaps[0]);
-+err3:
-+	kfree(mapping->bitmaps);
-+err2:
-+	kfree(mapping);
-+err:
-+	return ERR_PTR(err);
-+}
-+
-+static void release_iommu_mapping(struct kref *kref)
-+{
-+	int i;
-+	struct dma_iommu_mapping *mapping =
-+		container_of(kref, struct dma_iommu_mapping, kref);
-+
-+	iommu_domain_free(mapping->domain);
-+	for (i = 0; i < mapping->nr_bitmaps; i++)
-+		kfree(mapping->bitmaps[i]);
-+	kfree(mapping->bitmaps);
-+	kfree(mapping);
-+}
-+
-+
-+void iommu_helper_release_mapping(struct dma_iommu_mapping *mapping)
-+{
-+	if (mapping)
-+		kref_put(&mapping->kref, release_iommu_mapping);
-+}
-+
-+/**
-+ * iommu_helper_detach_device
-+ * @dev: valid struct device pointer
-+ *
-+ * Detaches the provided device from a previously attached map.
-+ */
-+void iommu_helper_detach_device(struct device *dev)
-+{
-+	struct dma_iommu_mapping *mapping;
-+
-+	mapping = to_dma_iommu_mapping(dev);
-+	if (!mapping) {
-+		dev_warn(dev, "Not attached\n");
++	if (!size)
 +		return;
-+	}
 +
-+	iommu_detach_device(mapping->domain, dev);
-+	kref_put(&mapping->kref, release_iommu_mapping);
-+	dev->mapping = NULL;
++	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping_size;
++	BUG_ON(addr < mapping->base || bitmap_index > mapping->extensions);
++
++	bitmap_base = mapping->base + mapping_size * bitmap_index;
++
++	start = (addr - bitmap_base) >>	PAGE_SHIFT;
++
++	if (addr + size > bitmap_base + mapping_size) {
++		/*
++		 * The address range to be freed reaches into the iova
++		 * range of the next bitmap. This should not happen as
++		 * we don't allow this in __alloc_iova (at the
++		 * moment).
++		 */
++		BUG();
++	} else
++		count = size >> PAGE_SHIFT;
++
++	spin_lock_irqsave(&mapping->lock, flags);
++	bitmap_clear(mapping->bitmaps[bitmap_index], start, count);
++	spin_unlock_irqrestore(&mapping->lock, flags);
 +}
 +
-+/**
-+ * iommu_helper_attach_device
-+ * @dev: valid struct device pointer
-+ * @mapping: io address space mapping structure
-+ *
-+ * Attaches specified io address space mapping to the provided device.
++/*
++ * Create a mapping in device IO address space for specified pages
 + */
-+int iommu_helper_attach_device(struct device *dev,
-+			    struct dma_iommu_mapping *mapping)
++dma_addr_t
++iommu_helper_create_mapping(struct device *dev, struct page **pages, size_t size)
 +{
-+	int err;
++	struct dma_iommu_mapping *mapping = dev->mapping;
++	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	dma_addr_t dma_addr, iova;
++	int i, ret = DMA_ERROR_CODE;
 +
-+	err = iommu_attach_device(mapping->domain, dev);
-+	if (err)
-+		return err;
++	dma_addr = __alloc_iova(mapping, size);
++	if (dma_addr == DMA_ERROR_CODE)
++		return dma_addr;
 +
-+	kref_get(&mapping->kref);
-+	dev->mapping = mapping;
++	iova = dma_addr;
++	for (i = 0; i < count; ) {
++		unsigned int next_pfn = page_to_pfn(pages[i]) + 1;
++		phys_addr_t phys = page_to_phys(pages[i]);
++		unsigned int len, j;
++
++		for (j = i + 1; j < count; j++, next_pfn++)
++			if (page_to_pfn(pages[j]) != next_pfn)
++				break;
++
++		len = (j - i) << PAGE_SHIFT;
++		ret = iommu_map(mapping->domain, iova, phys, len,
++				IOMMU_READ|IOMMU_WRITE);
++		if (ret < 0)
++			goto fail;
++		iova += len;
++		i = j;
++	}
++	return dma_addr;
++fail:
++	iommu_unmap(mapping->domain, dma_addr, iova-dma_addr);
++	__free_iova(mapping, dma_addr, size);
++	return DMA_ERROR_CODE;
++}
++
++int iommu_helper_remove_mapping(struct device *dev, dma_addr_t iova, size_t size)
++{
++	struct dma_iommu_mapping *mapping = dev->mapping;
++
++	/*
++	 * add optional in-page offset from iova to size and align
++	 * result to page size
++	 */
++	size = PAGE_ALIGN((iova & ~PAGE_MASK) + size);
++	iova &= PAGE_MASK;
++
++	iommu_unmap(mapping->domain, iova, size);
++	__free_iova(mapping, iova, size);
 +	return 0;
 +}
-+#endif
++
+ struct page **iommu_helper_alloc_buffer(struct device *dev, size_t size,
+ 					  gfp_t gfp, struct dma_attrs *attrs,
+ 			void (*arch_clear_buffer_cb)(struct page*, size_t))
+@@ -146,6 +336,143 @@ int iommu_helper_free_buffer(struct device *dev, struct page **pages,
+ 	return 0;
+ }
+ 
++/*
++ * Map a part of the scatter-gather list into contiguous io address space
++ */
++static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
++			  size_t size, dma_addr_t *handle,
++			  enum dma_data_direction dir, struct dma_attrs *attrs)
++{
++	struct dma_iommu_mapping *mapping = dev->mapping;
++	dma_addr_t iova, iova_base;
++	int ret = 0;
++	unsigned int count;
++	struct scatterlist *s;
++	int prot;
++
++	size = PAGE_ALIGN(size);
++	*handle = DMA_ERROR_CODE;
++
++	iova_base = iova = __alloc_iova(mapping, size);
++	if (iova == DMA_ERROR_CODE)
++		return -ENOMEM;
++
++	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
++		phys_addr_t phys = page_to_phys(sg_page(s));
++		unsigned int len = PAGE_ALIGN(s->offset + s->length);
++
++		prot = __dma_direction_to_prot(dir);
++
++		ret = iommu_map(mapping->domain, iova, phys, len, prot);
++		if (ret < 0)
++			goto fail;
++		count += len >> PAGE_SHIFT;
++		iova += len;
++	}
++	*handle = iova_base;
++
++	return 0;
++fail:
++	iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE);
++	__free_iova(mapping, iova_base, size);
++	return ret;
++}
++
++int iommu_helper_map_sg(struct device *dev, struct scatterlist *sg, int nents,
++		     enum dma_data_direction dir, struct dma_attrs *attrs)
++{
++	struct scatterlist *s = sg, *dma = sg, *start = sg;
++	int i, count = 0;
++	unsigned int offset = s->offset;
++	unsigned int size = s->offset + s->length;
++	unsigned int max = dma_get_max_seg_size(dev);
++
++	for (i = 1; i < nents; i++) {
++		s = sg_next(s);
++
++		s->dma_address = DMA_ERROR_CODE;
++		s->dma_length = 0;
++
++		if (s->offset || (size & ~PAGE_MASK) || size + s->length > max) {
++			if (__map_sg_chunk(dev, start, size, &dma->dma_address,
++			    dir, attrs) < 0)
++				goto bad_mapping;
++
++			dma->dma_address += offset;
++			dma->dma_length = size - offset;
++
++			size = offset = s->offset;
++			start = s;
++			dma = sg_next(dma);
++			count += 1;
++		}
++		size += s->length;
++	}
++	if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir, attrs) < 0)
++		goto bad_mapping;
++
++	dma->dma_address += offset;
++	dma->dma_length = size - offset;
++
++	return count+1;
++
++bad_mapping:
++	for_each_sg(sg, s, count, i)
++		iommu_helper_remove_mapping(dev, sg_dma_address(s), sg_dma_len(s));
++	return 0;
++}
++
++void iommu_helper_unmap_sg(struct device *dev, struct scatterlist *sg,
++		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
++{
++	struct scatterlist *s;
++	int i;
++
++	for_each_sg(sg, s, nents, i) {
++		if (sg_dma_len(s))
++			iommu_helper_remove_mapping(dev, sg_dma_address(s),
++					       sg_dma_len(s));
++}
++}
++
++dma_addr_t iommu_helper_map_page(struct device *dev, struct page *page,
++		unsigned long offset, size_t size, enum dma_data_direction dir)
++{
++	struct dma_iommu_mapping *mapping = dev->mapping;
++	dma_addr_t dma_addr;
++	int ret, prot, len = PAGE_ALIGN(size + offset);
++
++	dma_addr = __alloc_iova(mapping, len);
++	if (dma_addr == DMA_ERROR_CODE)
++		return dma_addr;
++
++	prot = __dma_direction_to_prot(dir);
++
++	ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, prot);
++	if (ret < 0)
++		goto fail;
++
++	return dma_addr + offset;
++fail:
++	__free_iova(mapping, dma_addr, len);
++	return DMA_ERROR_CODE;
++}
++
++void iommu_helper_unmap_page(struct device *dev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir)
++{
++	struct dma_iommu_mapping *mapping = dev->mapping;
++	dma_addr_t iova = handle & PAGE_MASK;
++	int offset = handle & ~PAGE_MASK;
++	int len = PAGE_ALIGN(size + offset);
++
++	if (!iova)
++		return;
++
++	iommu_unmap(mapping->domain, iova, len);
++	__free_iova(mapping, iova, len);
++}
++
+ /**
+  * iommu_helper_init_mapping
+  * @bus: pointer to the bus holding the client device (for IOMMU calls)
 -- 
 1.8.1.3
