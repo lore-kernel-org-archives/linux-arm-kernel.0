@@ -1,58 +1,40 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 6 Jun 2014 10:28:01 -0500
-Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
- am43x-epos-evm
-In-Reply-To: <53918F75.1050000@ti.com>
-References: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
- <53916556.10608@ti.com> <53918F75.1050000@ti.com>
-Message-ID: <5391DE01.2080600@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri,  6 Jun 2014 16:52:23 +0100
+Subject: [PATCH 0/9] i2c: Relax mandatory I2C ID table passing (+ some creep)
+Message-ID: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2014 04:52 AM, George Cherian wrote:
-> On 6/6/2014 12:23 PM, Nishanth Menon wrote:
->> On 06/06/2014 01:17 AM, George Cherian wrote:
->>> AM437x EPOS evm use external clock for RMII interface.
->>> Enable the same in DT.
->>>
->>> Signed-off-by: George Cherian <george.cherian@ti.com>
->>> Reported-by: Nishanth Menon <nm@ti.com>
->>> ---
->>>   arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
->>>   1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
->>> index 19f1f7e..90098f9 100644
->>> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
->>> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
->>> @@ -319,6 +319,10 @@
->>>   	phy-mode = "rmii";
->>>   };
->>>   
->>> +&phy_sel {
->>> +	rmii-clock-ext;
->>> +};
->>> +
->>>   &i2c0 {
->>>   	status = "okay";
->>>   	pinctrl-names = "default";
->>>
->> Where does this apply on?
->> With linux-next next-20140506 tag, and this patch applied, I get the
-> Is'nt next-20140506 a month old.
+Hi Wolfram,
+  
+As previously discussed I believe it should be okay for an I2C device
+driver _not_ supply an I2C ID table to match to.  The I2C subsystem
+should be able to match via other means, such as via OF tables.  The
+blocking factor during our previous conversation was to keep
+registering via sysfs up and running.  This set does that.
+  
+After thinking more deeply about the problem, it occurred to me that
+any I2C device driver which uses the sysfs method and issues an
+of_match_device() would also fail their probe().  Bolted on to this
+set is a new, more generic way for these devices to match against
+either of the I2C/OF tables.
 
-Uggh.. yeah - 1AM+migraine is not a good combination to try to do
-testing. :( Apologies on the noise
+I hope this ticks all of your boxes.
 
+v2:
+  - Removal of ACPI support (this is really an OF issue).
+  - Add a new .probe2( with will seamlessly replace
+  - Supply a warning on devices matching via OF without a suitable compatible
+  - Remove unified match_device() - bad idea as it subverts type-safe behaviour
+  - Provide examples of the kind of clean-up possible after this set.
+    - I already have the full support from the maintainer of these drivers =;-) 
 
-> I tried the patch on next-20140604.
+Kind regards,
+Lee
 
-Tested on next-20140606 - applies clean, builds and works :)
-
-am43xx-epos:  Boot PASS: http://slexy.org/raw/s2fT6zs45y
-
-Tested-by: Nishanth Menon <nm@ti.com>
-
--- 
-Regards,
-Nishanth Menon
+ drivers/i2c/i2c-core.c      | 73 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------
+ drivers/mfd/88pm860x-core.c |  5 ++---
+ drivers/mfd/as3722.c        | 12 ++----------
+ drivers/of/device.c         | 19 ++++++++++++++++++-
+ include/linux/i2c.h         | 29 ++++++++++++++++++++++++++++-
+ 5 files changed, 114 insertions(+), 24 deletions(-)
