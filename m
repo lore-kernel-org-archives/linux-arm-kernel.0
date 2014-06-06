@@ -1,12 +1,14 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri,  6 Jun 2014 19:50:10 +0530
-Subject: [PATCH v2 1/2] usb: ehci-exynos: Make provision for vdd regulators
-Message-ID: <1402064411-18244-1-git-send-email-gautam.vivek@samsung.com>
+Date: Fri,  6 Jun 2014 19:50:11 +0530
+Subject: [PATCH v2 2/2] usb: ohci-exynos: Make provision for vdd regulators
+In-Reply-To: <1402064411-18244-1-git-send-email-gautam.vivek@samsung.com>
+References: <1402064411-18244-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1402064411-18244-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Facilitate getting required 3.3V and 1.0V VDD supply for
-EHCI controller on Exynos.
+OHCI controller on Exynos.
 
 With patches for regulators' nodes merged in 3.15:
 c8c253f ARM: dts: Add regulator entries to smdk5420
@@ -24,22 +26,22 @@ Changes from v1:
  - Addressed review comments for making the regulators optional,
    and thus refactored the checks for the obtained regulators.
 
- drivers/usb/host/ehci-exynos.c |   59 +++++++++++++++++++++++++++++++++++++++-
+ drivers/usb/host/ohci-exynos.c |   59 +++++++++++++++++++++++++++++++++++++++-
  1 file changed, 58 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-index d1c7621..b788ddd 100644
---- a/drivers/usb/host/ehci-exynos.c
-+++ b/drivers/usb/host/ehci-exynos.c
-@@ -21,6 +21,7 @@
- #include <linux/of_gpio.h>
- #include <linux/phy/phy.h>
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index 060a6a4..01f7c43 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -19,6 +19,7 @@
+ #include <linux/of.h>
  #include <linux/platform_device.h>
+ #include <linux/phy/phy.h>
 +#include <linux/regulator/consumer.h>
  #include <linux/usb/phy.h>
  #include <linux/usb/samsung_usb_phy.h>
  #include <linux/usb.h>
-@@ -50,6 +51,8 @@ struct exynos_ehci_hcd {
+@@ -41,6 +42,8 @@ struct exynos_ohci_hcd {
  	struct usb_phy *phy;
  	struct usb_otg *otg;
  	struct phy *phy_g[PHY_NUMBER];
@@ -47,17 +49,17 @@ index d1c7621..b788ddd 100644
 +	struct regulator *vdd10;
  };
  
- #define to_exynos_ehci(hcd) (struct exynos_ehci_hcd *)(hcd_to_ehci(hcd)->priv)
-@@ -193,7 +196,31 @@ static int exynos_ehci_probe(struct platform_device *pdev)
+ static int exynos_ohci_get_phy(struct device *dev,
+@@ -172,7 +175,31 @@ static int exynos_ohci_probe(struct platform_device *pdev)
  
- 	err = exynos_ehci_get_phy(&pdev->dev, exynos_ehci);
+ 	err = exynos_ohci_get_phy(&pdev->dev, exynos_ohci);
  	if (err)
 -		goto fail_clk;
 +		goto fail_regulator1;
 +
-+	exynos_ehci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
-+	if (!IS_ERR(exynos_ehci->vdd33)) {
-+		err = regulator_enable(exynos_ehci->vdd33);
++	exynos_ohci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
++	if (!IS_ERR(exynos_ohci->vdd33)) {
++		err = regulator_enable(exynos_ohci->vdd33);
 +		if (err) {
 +			dev_err(&pdev->dev,
 +				"Failed to enable 3.3V Vdd supply\n");
@@ -67,9 +69,9 @@ index d1c7621..b788ddd 100644
 +		dev_warn(&pdev->dev, "Regulator 3.3V Vdd supply not found\n");
 +	}
 +
-+	exynos_ehci->vdd10 = devm_regulator_get(&pdev->dev, "vdd10");
-+	if (!IS_ERR(exynos_ehci->vdd10)) {
-+		err = regulator_enable(exynos_ehci->vdd10);
++	exynos_ohci->vdd10 = devm_regulator_get(&pdev->dev, "vdd10");
++	if (!IS_ERR(exynos_ohci->vdd10)) {
++		err = regulator_enable(exynos_ohci->vdd10);
 +		if (err) {
 +			dev_err(&pdev->dev,
 +				"Failed to enable 1.0V Vdd supply\n");
@@ -80,64 +82,64 @@ index d1c7621..b788ddd 100644
 +	}
  
  skip_phy:
- 
-@@ -262,6 +289,10 @@ fail_add_hcd:
+ 	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
+@@ -233,6 +260,10 @@ fail_add_hcd:
  fail_io:
- 	clk_disable_unprepare(exynos_ehci->clk);
+ 	clk_disable_unprepare(exynos_ohci->clk);
  fail_clk:
-+	regulator_disable(exynos_ehci->vdd10);
++	regulator_disable(exynos_ohci->vdd10);
 +fail_regulator2:
-+	regulator_disable(exynos_ehci->vdd33);
++	regulator_disable(exynos_ohci->vdd33);
 +fail_regulator1:
  	usb_put_hcd(hcd);
  	return err;
  }
-@@ -280,6 +311,11 @@ static int exynos_ehci_remove(struct platform_device *pdev)
+@@ -251,6 +282,11 @@ static int exynos_ohci_remove(struct platform_device *pdev)
  
- 	clk_disable_unprepare(exynos_ehci->clk);
+ 	clk_disable_unprepare(exynos_ohci->clk);
  
-+	if (!IS_ERR(exynos_ehci->vdd33))
-+		regulator_disable(exynos_ehci->vdd33);
-+	if (!IS_ERR(exynos_ehci->vdd10))
-+		regulator_disable(exynos_ehci->vdd10);
++	if (!IS_ERR(exynos_ohci->vdd33))
++		regulator_disable(exynos_ohci->vdd33);
++	if (!IS_ERR(exynos_ohci->vdd10))
++		regulator_disable(exynos_ohci->vdd10);
 +
  	usb_put_hcd(hcd);
  
  	return 0;
-@@ -305,6 +341,11 @@ static int exynos_ehci_suspend(struct device *dev)
+@@ -282,6 +318,11 @@ static int exynos_ohci_suspend(struct device *dev)
  
- 	clk_disable_unprepare(exynos_ehci->clk);
+ 	clk_disable_unprepare(exynos_ohci->clk);
  
-+	if (!IS_ERR(exynos_ehci->vdd33))
-+		regulator_disable(exynos_ehci->vdd33);
-+	if (!IS_ERR(exynos_ehci->vdd10))
-+		regulator_disable(exynos_ehci->vdd10);
++	if (!IS_ERR(exynos_ohci->vdd33))
++		regulator_disable(exynos_ohci->vdd33);
++	if (!IS_ERR(exynos_ohci->vdd10))
++		regulator_disable(exynos_ohci->vdd10);
 +
- 	return rc;
+ 	return 0;
  }
  
-@@ -314,6 +355,22 @@ static int exynos_ehci_resume(struct device *dev)
- 	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
+@@ -291,6 +332,22 @@ static int exynos_ohci_resume(struct device *dev)
+ 	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
  	int ret;
  
-+	if (!IS_ERR(exynos_ehci->vdd33)) {
-+		ret = regulator_enable(exynos_ehci->vdd33);
++	if (!IS_ERR(exynos_ohci->vdd33)) {
++		ret = regulator_enable(exynos_ohci->vdd33);
 +		if (ret) {
 +			dev_err(dev, "Failed to enable 3.3V Vdd supply\n");
 +			return ret;
 +		}
 +	}
 +
-+	if (!IS_ERR(exynos_ehci->vdd10)) {
-+		ret = regulator_enable(exynos_ehci->vdd10);
++	if (!IS_ERR(exynos_ohci->vdd10)) {
++		ret = regulator_enable(exynos_ohci->vdd10);
 +		if (ret) {
 +			dev_err(dev, "Failed to enable 1.0V Vdd supply\n");
 +			return ret;
 +		}
 +	}
 +
- 	clk_prepare_enable(exynos_ehci->clk);
+ 	clk_prepare_enable(exynos_ohci->clk);
  
- 	if (exynos_ehci->otg)
+ 	if (exynos_ohci->otg)
 -- 
 1.7.10.4
