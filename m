@@ -1,48 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Jun 2014 22:01:51 +0100
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Sat, 7 Jun 2014 02:36:49 +0530
 Subject: Problems booting exynos5420 with >1 CPU
-In-Reply-To: <CAD=FV=U6HuQj3MxZ-yF-MYdjzqjT5bu=K26JuHZP1hjJzkSqbg@mail.gmail.com>
-References: <539145B4.5000200@gmail.com>
+In-Reply-To: <20140606210126.GA10219@quad.lixom.net>
+References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
+ <539145B4.5000200@gmail.com>
  <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
  <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
  <CAD=FV=Vo1JR6n496Q3FqXjRBkbTBRg89_fJQNsqeRx8WQW_a9w@mail.gmail.com>
  <CAM4voakAMN4jdAZDPz55tnc3woZDieZ5aL3TVU2kYsNHT+AMqg@mail.gmail.com>
  <CAD=FV=UjmN5AwWMPy7mQt-J4A_niO8Ug4r15Ez2ZWPT1g3L=VA@mail.gmail.com>
- <CAM4voa=1FY5bfk095BU=3X=vzqjnCSfdLoXpCix5tOwDgOoioQ@mail.gmail.com>
- <CAD=FV=UwgPQVm_KvHbpoJNs-5EtpyaYJ2rp2f-466uhnob=ixA@mail.gmail.com>
- <CAM4voa=cTbobQHi+sBOCy_CDYAnQ6CsvvuoE7XwqFZV_E3gEbQ@mail.gmail.com>
- <CAD=FV=U6HuQj3MxZ-yF-MYdjzqjT5bu=K26JuHZP1hjJzkSqbg@mail.gmail.com>
-Message-ID: <20140606210151.GK23430@n2100.arm.linux.org.uk>
+ <20140606203721.GA10422@quad.lixom.net>
+ <CAM4voanSpTd=dAXLZhdZKRP4Z_YShbD4Hr-6UWn3DFYueoxeTA@mail.gmail.com>
+ <20140606210126.GA10219@quad.lixom.net>
+Message-ID: <CAM4voa=+GF3YhC2JMqBA+he5DiFw4_RShzdHUOM7OGsh_zpVaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 01:49:11PM -0700, Doug Anderson wrote:
-> This works and IMHO is much cleaner because it totally removes the
-> U-Boot dependency.  I'll cleanup to not be so insane and post:
-> 
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c
-> b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 0498d0b..9c5df7b 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -290,6 +290,14 @@ static void __naked
-> exynos_pm_power_up_setup(unsigned int affinity_level)
->         "b      cci_enable_port_for_self");
->  }
-> 
-> +static void __naked exynos_mcpm_secondary_cpu_start(void)
-> +{
-> +       asm volatile ("\n"
-> +       "ldr    r0, [pc, #0]\n"
-> +       "bx     r0\n"
-> +       ".word  0" );
-> +}
-> +
+Hi Olof,
 
-So does it matter whether the above code gets assembled as thumb or
-ARM?  How does your caller know which ISA mode to enter this fragment
-in?
+On Sat, Jun 7, 2014 at 2:31 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Jun 07, 2014 at 02:16:27AM +0530, Abhilash Kesavan wrote:
+>> Hi Olof,
+>>
+>> On Sat, Jun 7, 2014 at 2:07 AM, Olof Johansson <olof@lixom.net> wrote:
+>> > [Adding Nico since he was involved in the original reviews]
+>> >
+>> > Hi,
+>> >
+>> > On Fri, Jun 06, 2014 at 11:20:56AM -0700, Doug Anderson wrote:
+>> >> Abhilash,
+>> >>
+>> >>
+>> >>
+>> >> On Fri, Jun 6, 2014 at 11:12 AM, Abhilash Kesavan
+>> >> <kesavan.abhilash@gmail.com> wrote:
+>> >> > Hi Doug,
+>> >> >
+>> >> > On Fri, Jun 6, 2014 at 11:32 PM, Doug Anderson <dianders@google.com> wrote:
+>> >> >> Abhilash,
+>> >> >>
+>> >> >> On Fri, Jun 6, 2014 at 10:36 AM, Abhilash Kesavan
+>> >> >> <kesavan.abhilash@gmail.com> wrote:
+>> >> >>> Hi Doug,
+>> >> >>>
+>> >> >>> The first change in the kernel (clearing an iRAM location) is needed
+>> >> >>> because of an unnecessary change that we are carrying in the Chrome
+>> >> >>> U-boot. There is no reason for us to have the workaround in the
+>> >> >>> mainline kernel. Rather, we should remove the check from our u-boot.
+>> >> >>> However AFAIR a clean-up patch that I had posted internally was not
+>> >> >>> accepted as we had frozen the SPL at the time.
+>> >> >>
+>> >> >> Ah, is that this one, or a different one?
+>> >> >>
+>> >> >> https://chromium-review.googlesource.com/#/c/66049/
+>> >> > Yes, this along with a kernel side change.
+>> >>
+>> >> Can we safely take this one without the kernel-side one?
+>> >>
+>> >>
+>> >> >> If we land that patch now it won't help since nobody is going to be
+>> >> >> updating their read-only firmware.  We'll need to put code somewhere
+>> >> >> that fixes it.
+>> >> > We just carry the workaround fix locally until we migrate to mainline
+>> >> > u-boot for 5420 where the unnecessay check will not be present.
+>> >>
+>> >> I think there are people out there who want to run a mainline kernel
+>> >> on existing Chromebook 2 hardware and don't want to rewrite their RO
+>> >> firmware.  We need a solution for those people.
+>> >
+>> > Agree. The answer to this is most definitely _not_ "install mainline u-boot".
+>> > The upstream kernel needs to be able to boot with the firmware that was shipped
+>> > on the device.
+>>
+>> My answer is not "use mainline u-boot" primarily because I am not sure
+>> mainline u-boot actually works on 5420 :).
+>
+> And I'm saying that's not the answer primarily because we should never require
+> people to update their firmware to get a usable linux system.
+>
+>> My answer is keep a patch
+>> locally (or make a trivial change to the bootcmd) for people who would
+>> like to use an upstream kernel with the firmware on the device. Once
+>> we do have a working mainline u-boot, that can then be used by the
+>> interested parties.
+>
+> And I am strongly NAK:ing both of those approaches. We should not require
+> a single out-of-tree patch because that means we have failed to make a useful
+> kernel for people. And it should never, ever, be a requirement for people to
+> reflash and risk bricking their device just to run mainline linux on it. It's
+> an artificial barrier of entry with high risk, and we'll be worse off for
+> adding it. Same for out-of-tree patches.
+I have explained my reasons in the thread. I continue to believe that
+we should not be adding code in the kernel that is specifically
+handling an oversight that exists in the Chrome U-boot. However, since
+you have NAK'ed my approaches, we are left with Doug's.
+>
+>> > In this case it shouldn't be controversial to add this. What we need is
+>> > a one-time boot-time setup, not runtime so cpuidle shouldn't be a factor
+>> > at that time. The earlier reservations were about runtime changes and this is
+>> > quite different.
+>> I think there is some confusion here, the clearing of the iRAM
+>> location is what I have been pushing against. It has got nothing to do
+>> cpuidle. If it were to be done then  it would be a one time setup and
+>> I could quite easily do it in mcpm_init.
+>
+> iRAM is covered on Doug's sub-thread, and I think his approach looks promising.
+> So, it seems like we have a solution both to enable the CCI port and to avoid
+> clearing iram -- we should be set?
+I'll have a look at Doug's updated patches tomorrow or on Monday.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Regards,
+Abhilash
+>
+>
+> -Olof
