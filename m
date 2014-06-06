@@ -1,48 +1,31 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 6 Jun 2014 16:32:03 +0530
-Subject: [PATCH 4/9] usb: phy: add the Berlin USB PHY driver
-In-Reply-To: <20140606071106.GA30156@kwain>
-References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-5-git-send-email-antoine.tenart@free-electrons.com>
- <CAFp+6iEKLD_rLg84h3J2oyzw7vizEV-Eqo0e_jqurx_v9ZX2JA@mail.gmail.com>
- <20140606071106.GA30156@kwain>
-Message-ID: <CAFp+6iH+J4T=7pJU_+ZZKrgDwJWwQfznv9NWuy5SkLgz_j75_Q@mail.gmail.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Fri,  6 Jun 2014 13:02:59 +0200
+Subject: [PATCH] ARM: dts: imx6: add missing compatible and clock properties
+ for kpp
+Message-ID: <1402052579-22803-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Jun 6, 2014 at 12:41 PM, Antoine T?nart
-<antoine.tenart@free-electrons.com> wrote:
-> Hi,
->
-> On Fri, Jun 06, 2014 at 12:09:06PM +0530, Vivek Gautam wrote:
->> On Thu, Jun 5, 2014 at 9:18 PM, Antoine T?nart
->> <antoine.tenart@free-electrons.com> wrote:
->> > Add the driver driving the Marvell Berlin USB PHY. This allows to
->> > initialize the PHY and to use it from the USB driver later.
->>
->> Just out of curiosity, going forward we would like to have phy drivers based on
->> generic phy framework (drivers/phy).
->> Any particular reason that we are still adding phy drivers in usb-phy layer ?
->>
->> Looking at it, seems like it can very well be written based on phy framework.
->
-> This USB controller are ChipIdea compatible, and the ChipIdea common
-> functions use the usb_phy framework. That's why this PHY driver is
-> there.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Ok, i see that now. In that case shouldn't we be moving even the chipidea
-drivers to use the generic phy functions to get the phy and init/exit it.
-
-I think Felipe and Kishon can comment on this better, and tell how
-things should be. :-)
-
-[snip]
-
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index ce05991..3266d01 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -466,8 +466,10 @@
+ 			};
+ 
+ 			kpp: kpp at 020b8000 {
++				compatible = "fsl,imx6q-kpp", "fsl,imx21-kpp";
+ 				reg = <0x020b8000 0x4000>;
+ 				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks 62>; /* IPG clock */
+ 			};
+ 
+ 			wdog1: wdog at 020bc000 {
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+1.7.10.4
