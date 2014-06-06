@@ -1,32 +1,25 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 6 Jun 2014 10:57:06 +0100
-Subject: [PATCH 2/5] ASoC: wm8904: switch to CCF
-In-Reply-To: <1401963572-10953-3-git-send-email-voice.shen@atmel.com>
-References: <1401963572-10953-1-git-send-email-voice.shen@atmel.com>
- <1401963572-10953-3-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140606095706.GB2520@sirena.org.uk>
+Date: Fri, 6 Jun 2014 10:52:56 +0100
+Subject: [PATCH] spi/pxa2xx: change default supported DMA burst size to 1
+In-Reply-To: <1401990309-12492-1-git-send-email-chiau.ee.chew@intel.com>
+References: <1401990309-12492-1-git-send-email-chiau.ee.chew@intel.com>
+Message-ID: <20140606095256.GA2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 06:19:29PM +0800, Bo Shen wrote:
+On Fri, Jun 06, 2014 at 01:45:09AM +0800, Chew Chiau Ee wrote:
+> From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+> 
+> This is to fix the SPI DMA transfer failure for speed less than 1M.
+> If using current DMA burst size setting (16), the Rx data bytes are
+> invalid due to each data byte is multiplied according to the burst
+> size setting.
 
-> +		if (wm8904->mclk)
-> +			clk_prepare_enable(wm8904->mclk);
-
-There's no point in having checks for MCLK here since...
-
-> +	wm8904->mclk = devm_clk_get(&i2c->dev, "mclk");
-> +	if (IS_ERR(wm8904->mclk)) {
-> +		ret = PTR_ERR(wm8904->mclk);
-> +		dev_err(&i2c->dev, "Failed to get MCLK\n");
-> +		return ret;
-> +	}
-
-...we require a clock here.
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140606/13d186bc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140606/851c658f/attachment.sig>
