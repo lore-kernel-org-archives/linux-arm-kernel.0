@@ -1,33 +1,41 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Fri, 6 Jun 2014 14:01:53 +0200
-Subject: [PATCH 6/9] usb: chipidea: add Berlin USB support
-In-Reply-To: <53919E3A.7070008@gmail.com>
-References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-7-git-send-email-antoine.tenart@free-electrons.com>
- <53919E3A.7070008@gmail.com>
-Message-ID: <20140606120153.GC32416@kwain>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri,  6 Jun 2014 17:42:11 +0530
+Subject: [PATCH v1 0/4] Fine tune USB 3.0 PHY on exynos5420
+Message-ID: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+The RFC version of this series was posted long time back, around December
+last year [1].
+This series is based on Heikki's patches for simpliefied phy lookup table:
+[PATCHv2 0/6] phy: simplified phy lookup [2], applied against 'usb-next'
+branch of Greg's usb tree.
+Tested on peach-pit boards with SuperSpeed devices and confirmed that now
+the devices are detected as SupedSpeed, not as HighSpeed.
 
-On Fri, Jun 06, 2014 at 12:55:54PM +0200, Sebastian Hesselbarth wrote:
-> On 06/05/2014 05:48 PM, Antoine T?nart wrote:
-> >+
-> >+static const struct of_device_id ci_hdrc_berlin_of_match[] = {
-> >+	{ .compatible = "marvell,berlin-usb" },
-> 
-> Looking at the driver, I can see no Berlin-specific code at all. Maybe
-> we just take the chance and have a generic chipidea boiler plate driver
-> now?
+Explanation for the need of this patch-series:
+"The DWC3-exynos eXtensible host controller present on Exynos5420
+SoC is quirky. The PHY serving this controller operates at High-Speed
+by default, so it detects even Super-speed devices as high-speed ones.
+Certain PHY parameters like Tx LOS levels and Boost levels need to be
+calibrated further post initialization of xHCI controller, to get
+SuperSpeed operations working."
 
-This driver does nothing special. If we define the PHY and the clock
-properties as optional, we can do a generic driver here.
+[1] https://lkml.org/lkml/2013/12/10/365
+[2] https://lkml.org/lkml/2014/6/5/358
 
+Vivek Gautam (4):
+  phy: Add provision for calibrating phy.
+  usb: host: xhci-plat: Add support to get PHYs
+  usb: host: xhci-plat: Caibrate PHY post host reset
+  phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
 
-Antoine
+ drivers/phy/phy-core.c           |   36 ++++++++
+ drivers/phy/phy-exynos5-usbdrd.c |  168 ++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/xhci-plat.c     |   74 ++++++++++++++++-
+ drivers/usb/host/xhci.h          |    3 +
+ include/linux/phy/phy.h          |    7 ++
+ 5 files changed, 286 insertions(+), 2 deletions(-)
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
