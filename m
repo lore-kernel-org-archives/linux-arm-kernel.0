@@ -1,43 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 6 Jun 2014 07:54:36 +0100
-Subject: [PATCH 3/3] mfd: STw481x: allow modular build
-In-Reply-To: <1402003454-1989084-4-git-send-email-arnd@arndb.de>
-References: <1402003454-1989084-1-git-send-email-arnd@arndb.de>
- <1402003454-1989084-4-git-send-email-arnd@arndb.de>
-Message-ID: <20140606065436.GN24240@lee--X1>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 6 Jun 2014 01:55:36 -0500
+Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
+ am43x-epos-evm
+In-Reply-To: <53916556.10608@ti.com>
+References: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
+ <53916556.10608@ti.com>
+Message-ID: <539165E8.7030500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Jun 2014, Arnd Bergmann wrote:
-
-> This driver depends on I2C, which may be a loadable module.
-> While you'd probably want both to be built-in in practice,
-> allowing a modular build avoids possible randconfig link
-> errors.
+On 06/06/2014 01:53 AM, Nishanth Menon wrote:
+> On 06/06/2014 01:17 AM, George Cherian wrote:
+>> AM437x EPOS evm use external clock for RMII interface.
+>> Enable the same in DT. 
+>>
+>> Signed-off-by: George Cherian <george.cherian@ti.com>
+>> Reported-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>  arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+>> index 19f1f7e..90098f9 100644
+>> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
+>> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+>> @@ -319,6 +319,10 @@
+>>  	phy-mode = "rmii";
+>>  };
+>>  
+>> +&phy_sel {
+>> +	rmii-clock-ext;
+>> +};
+>> +
+>>  &i2c0 {
+>>  	status = "okay";
+>>  	pinctrl-names = "default";
+>>
+> Where does this apply on?
+> With linux-next next-20140506 tag, and this patch applied, I get the
+> following error.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/mfd/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>   LD      kernel/trace/built-in.o
+>   LD      kernel/built-in.o
+> build fail, Error:
+> Error: arch/arm/boot/dts/am43x-epos-evm.dts:219.2-3 label or path,
+> 'phy_sel', not found
+> FATAL ERROR: Syntax error parsing input tree
+> make[1]: *** [arch/arm/boot/dts/am43x-epos-evm.dtb] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> make: *** [dtbs] Error 2
+> make: *** Waiting for unfinished jobs....
+> 
+> in the future, it is helpful if you can point out that this is a
+> regression seen on next-20140603 and the patch needs to be applied on
+> some specific branch.
+> 
+> for the record:
+> last working next tag:
+> https://github.com/nmenon/kernel-test-logs/blob/next-20140602/omap2plus_defconfig/am43xx-epos.txt
+> 
+> first broken next tag:
+> https://github.com/nmenon/kernel-test-logs/blob/next-20140603/omap2plus_defconfig/am43xx-epos.txt
+> 
+> 
+interestingly, i just re-tested today's tag without the patch
+(omap2plus_defconfig):
+http://slexy.org/raw/s205sRdFvy
 
-Applied, thanks.
-
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 2dd838f..6cc4b6a 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1226,7 +1226,7 @@ config MFD_WM8994
->  	  functionaltiy of the device other drivers must be enabled.
->  
->  config MFD_STW481X
-> -	bool "Support for ST Microelectronics STw481x"
-> +	tristate "Support for ST Microelectronics STw481x"
->  	depends on I2C && ARCH_NOMADIK
->  	select REGMAP_I2C
->  	select MFD_CORE
+I wonder why the behavior change and what was being fixed here?
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Nishanth Menon
