@@ -1,67 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  6 Jun 2014 16:52:30 +0100
-Subject: [PATCH 7/9] of/device: Allow I2C devices to OF match without
- supplying an OF node
+Date: Fri,  6 Jun 2014 16:52:31 +0100
+Subject: [PATCH 8/9] mfd: 88pm860x: Move over to new I2C device .probe() call
 In-Reply-To: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
 References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1402069952-28022-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1402069952-28022-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C framework supplies a means for devices to be registered without
-the requirement for platform_data, DT or ACPI.  The current solution is
-that every single I2C device in the kernel is forced to supply a
-normally empty/sparse I2C ID table so the I2C subsystem can match to.
-In an effort to rid the kernel of these tables we need to provide some
-temporary work arounds until we can straighten out the blocking factors.
-
-This change is meant to be temporary and will be stripped out once
-we've converted all I2C device drivers from of_match_device() over
-to the new I2C generic i2c_of_match_device().
+As part of an effort to rid the mostly unused second parameter for I2C
+related .probe() functions and to conform to other existing frameworks
+we're moving over to a temporary replacement .probe() call-back.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/of/device.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ drivers/mfd/88pm860x-core.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index dafb973..3b1c8f9 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -1,6 +1,7 @@
- #include <linux/string.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
-+#include <linux/i2c.h>
- #include <linux/of_device.h>
- #include <linux/init.h>
- #include <linux/module.h>
-@@ -21,9 +22,25 @@
- const struct of_device_id *of_match_device(const struct of_device_id *matches,
- 					   const struct device *dev)
- {
-+	const struct of_device_id *match;
-+
- 	if ((!matches) || (!dev->of_node))
- 		return NULL;
--	return of_match_node(matches, dev->of_node);
-+
-+	match = of_match_node(matches, dev->of_node);
-+	if (match)
-+		return match;
-+
-+	/*
-+	 * Low impact workaround, until we can convert all I2C compatible
-+	 * strings over to the correctly specified <vendor>,<device> format.
-+	 */
-+	match = i2c_of_match_device_strip_vendor(matches, (struct device *)dev);
-+	if (match)
-+		dev_warn(dev,
-+			 "WARNING: Vendor ID missing from compatible string\n");
-+
-+	return match;
+diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+index bcfc9e8..d763f1f 100644
+--- a/drivers/mfd/88pm860x-core.c
++++ b/drivers/mfd/88pm860x-core.c
+@@ -1127,8 +1127,7 @@ static int pm860x_dt_init(struct device_node *np,
+ 	return 0;
  }
- EXPORT_SYMBOL(of_match_device);
  
+-static int pm860x_probe(struct i2c_client *client,
+-				  const struct i2c_device_id *id)
++static int pm860x_probe(struct i2c_client *client)
+ {
+ 	struct pm860x_platform_data *pdata = dev_get_platdata(&client->dev);
+ 	struct device_node *node = client->dev.of_node;
+@@ -1255,7 +1254,7 @@ static struct i2c_driver pm860x_driver = {
+ 		.pm     = &pm860x_pm_ops,
+ 		.of_match_table	= pm860x_dt_ids,
+ 	},
+-	.probe		= pm860x_probe,
++	.probe2		= pm860x_probe,
+ 	.remove		= pm860x_remove,
+ 	.id_table	= pm860x_id_table,
+ };
 -- 
 1.8.3.2
