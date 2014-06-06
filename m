@@ -1,179 +1,81 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 6 Jun 2014 10:46:14 +0300
-Subject: [RFC v3 4/9] irqchip: gic: Introduce shadow irqs for FIQ
-In-Reply-To: <1401961994-18033-5-git-send-email-daniel.thompson@linaro.org>
-References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140606074614.GU5961@tbergstrom-lnx.Nvidia.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 6 Jun 2014 16:02:08 +0800
+Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
+Message-ID: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 11:53:09AM +0200, Daniel Thompson wrote:
-> This patch registers two virqs for each interrupt source it supports.
-> Using multiple virqs allows the GIC driver to automatically modify the group
-> register, allowing the new virqs to be used as argument to enable_fiq().
-> This also allows FIQ resources to be described in the device tree's
-> interrupt list using a special flag (currently 0x80).
-> 
-> Both these aspects combine and allow a driver to deploy a FIQ handler
-> without any machine specific knowledge; it can be used effectively on
-> multi-arch kernels.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Sricharan R <r.sricharan@ti.com>
-> ---
->  drivers/irqchip/irq-gic.c | 62 ++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 56 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index aa8efe4..9a4712d 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -42,12 +42,17 @@
->  #include <linux/irqchip/chained_irq.h>
->  #include <linux/irqchip/arm-gic.h>
->  
-> +#ifdef CONFIG_FIQ
-> +#include <asm/fiq.h>
-> +#endif
->  #include <asm/irq.h>
->  #include <asm/exception.h>
->  #include <asm/smp_plat.h>
->  
->  #include "irqchip.h"
->  
-> +#define GIC_INTSPEC_IRQ_IS_FIQ (1 << 7)
-> +
->  union gic_base {
->  	void __iomem *common_base;
->  	void __percpu * __iomem *percpu_base;
-> @@ -65,6 +70,7 @@ struct gic_chip_data {
->  #endif
->  	struct irq_domain *domain;
->  	unsigned int gic_irqs;
-> +	unsigned int fiq_shadow_offset;
->  #ifdef CONFIG_GIC_NON_BANKED
->  	void __iomem *(*get_base)(union gic_base *);
->  #endif
-> @@ -143,11 +149,34 @@ static inline void __iomem *gic_cpu_base(struct irq_data *d)
->  	return gic_data_cpu_base(gic_data);
->  }
->  
-> +static inline bool gic_is_fiq(struct irq_data *d)
-> +{
-> +	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
-> +	return d->hwirq > gic_data->gic_irqs;
-> +}
-> +
->  static inline unsigned int gic_irq(struct irq_data *d)
->  {
-> +	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
-> +	if (gic_is_fiq(d))
-> +		return d->hwirq - gic_data->fiq_shadow_offset;
->  	return d->hwirq;
->  }
->  
-> +static void gic_set_group_irq(struct irq_data *d, int group)
-> +{
-> +	unsigned int reg = gic_irq(d) / 32 * 4;
-> +	u32 mask = 1 << (gic_irq(d) % 32);
-> +	u32 val;
-> +
-> +	val = readl_relaxed(gic_dist_base(d) + GIC_DIST_IGROUP + reg);
-> +	if (group)
-> +		val |= mask;
-> +	else
-> +		val &= ~mask;
-> +	writel_relaxed(val, gic_dist_base(d) + GIC_DIST_IGROUP + reg);
-> +}
-> +
->  /*
->   * Routines to acknowledge, disable and enable interrupts
->   */
-> @@ -159,6 +188,8 @@ static void gic_mask_irq(struct irq_data *d)
->  	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
->  	if (gic_arch_extn.irq_mask)
->  		gic_arch_extn.irq_mask(d);
-> +	if (gic_is_fiq(d))
-> +		gic_set_group_irq(d, 1);
->  	raw_spin_unlock(&irq_controller_lock);
->  }
->  
-> @@ -167,6 +198,8 @@ static void gic_unmask_irq(struct irq_data *d)
->  	u32 mask = 1 << (gic_irq(d) % 32);
->  
->  	raw_spin_lock(&irq_controller_lock);
-> +	if (gic_is_fiq(d))
-> +		gic_set_group_irq(d, 0);
->  	if (gic_arch_extn.irq_unmask)
->  		gic_arch_extn.irq_unmask(d);
->  	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
-> @@ -940,7 +973,12 @@ static int gic_routable_irq_domain_xlate(struct irq_domain *d,
->  				unsigned long *out_hwirq,
->  				unsigned int *out_type)
->  {
-> +	struct gic_chip_data *gic_data = d->host_data;
->  	*out_hwirq += 16;
-> +
-> +	if (intspec[2] & GIC_INTSPEC_IRQ_IS_FIQ)
-> +		*out_hwirq += gic_data->fiq_shadow_offset;
-> +
->  	return 0;
->  }
->  
-> @@ -1026,10 +1064,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  	gic->gic_irqs = gic_irqs;
->  
->  	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
-> +	gic->fiq_shadow_offset = gic_irqs;
->  
->  	if (of_property_read_u32(node, "arm,routable-irqs",
->  				 &nr_routable_irqs)) {
-> -		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
-> +		irq_base = irq_alloc_descs(irq_start, 16, 2 * gic_irqs,
->  					   numa_node_id());
->  		if (IS_ERR_VALUE(irq_base)) {
->  			WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
-> @@ -1037,17 +1076,28 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  			irq_base = irq_start;
->  		}
->  
-> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
-> -					hwirq_base, &gic_irq_domain_ops, gic);
-> +		gic->domain =
-> +		    irq_domain_add_legacy(node, 2 * gic_irqs, irq_base,
-> +					  hwirq_base, &gic_irq_domain_ops, gic);
->  	} else {
-> -		gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
-> -						    &gic_irq_domain_ops,
-> -						    gic);
-> +		gic->domain = irq_domain_add_linear(node, 2 * nr_routable_irqs,
-> +						    &gic_irq_domain_ops, gic);
->  	}
->  
->  	if (WARN_ON(!gic->domain))
->  		return;
->  
-> +#ifdef CONFIG_FIQ
-> +	/* FIQ can only be supported on platforms without an extended irq_eoi
-> +	 * method (otherwise we take a lock during irq_eoi handling).
-> +	 */
-> +	if (!gic_arch_extn.irq_eoi)
-> +		fiq_add_mapping(
-> +		    irq_linear_revmap(gic->domain, hwirq_base),
-> +		    irq_linear_revmap(gic->domain, hwirq_base + gic_irqs),
-> +		    gic_irqs);
-> +#endif
+If the ecc parameter is not the same as definition, when the
+mtd core check these parameters, it will give the unexpected
+result.
 
-This is rather unfortunate. On Tegra for example we don't need a lock for the
-irq_eoi because the eoi ack can be handled with a single write to the
-appropriate irq ack register.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-Cheers,
-
-Peter.
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 4ce181a..4f5348f 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -861,12 +861,11 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
+ {
+ 	struct nand_chip *nand_chip = mtd->priv;
+ 	struct atmel_nand_host *host = nand_chip->priv;
+-	int i, err_nbr, eccbytes;
++	int i, err_nbr;
+ 	uint8_t *buf_pos;
+ 	int total_err = 0;
+ 
+-	eccbytes = nand_chip->ecc.bytes;
+-	for (i = 0; i < eccbytes; i++)
++	for (i = 0; i < nand_chip->ecc.total; i++)
+ 		if (ecc[i] != 0xff)
+ 			goto normal_check;
+ 	/* Erased page, return OK */
+@@ -928,7 +927,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+ 	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
+ {
+ 	struct atmel_nand_host *host = chip->priv;
+-	int eccsize = chip->ecc.size;
++	int eccsize = chip->ecc.size * chip->ecc.steps;
+ 	uint8_t *oob = chip->oob_poi;
+ 	uint32_t *eccpos = chip->ecc.layout->eccpos;
+ 	uint32_t stat;
+@@ -1169,8 +1168,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		goto err;
+ 	}
+ 
+-	/* ECC is calculated for the whole page (1 step) */
+-	nand_chip->ecc.size = mtd->writesize;
++	nand_chip->ecc.size = sector_size;
+ 
+ 	/* set ECC page size and oob layout */
+ 	switch (mtd->writesize) {
+@@ -1185,18 +1183,20 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		host->pmecc_index_of = host->pmecc_rom_base +
+ 			host->pmecc_lookup_table_offset;
+ 
+-		nand_chip->ecc.steps = 1;
++		nand_chip->ecc.steps = host->pmecc_sector_number;
+ 		nand_chip->ecc.strength = cap;
+-		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector *
++		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector;
++		nand_chip->ecc.total = host->pmecc_bytes_per_sector *
+ 				       host->pmecc_sector_number;
+-		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
++		if (nand_chip->ecc.total > mtd->oobsize - 2) {
+ 			dev_err(host->dev, "No room for ECC bytes\n");
+ 			err_no = -EINVAL;
+ 			goto err;
+ 		}
+ 		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
+ 					mtd->oobsize,
+-					nand_chip->ecc.bytes);
++					nand_chip->ecc.total);
++
+ 		nand_chip->ecc.layout = &atmel_pmecc_oobinfo;
+ 		break;
+ 	case 512:
+-- 
+1.8.5.2
