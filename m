@@ -1,56 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  6 Jun 2014 16:52:32 +0100
-Subject: [PATCH 9/9] mfd: as3722: Rid driver of superfluous I2C device ID
- structure
-In-Reply-To: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
-References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1402069952-28022-10-git-send-email-lee.jones@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 6 Jun 2014 14:08:50 +0100
+Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
+In-Reply-To: <20140606125003.GA13332@verge.net.au>
+References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
+ <20140606111411.GD25896@verge.net.au>
+ <CANqRtoTy_LwSiZgRFEw5Ly4ojfinoCichxrX7cO6m2XB9JGoww@mail.gmail.com>
+ <20140606125003.GA13332@verge.net.au>
+Message-ID: <20140606130850.GO2520@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also remove unused second probe() parameter 'i2c_device_id'.
+On Fri, Jun 06, 2014 at 09:50:06PM +0900, Simon Horman wrote:
+> On Fri, Jun 06, 2014 at 09:14:01PM +0900, Magnus Damm wrote:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/as3722.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+> > I'm not sure about the expected merge order for this kind of change vs
+> > queued up stuff in the renesas git tree, but I believe the following
+> > patch selects ARCH_HAS_OPP:
 
-diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
-index 39fa554..cb2fcf9 100644
---- a/drivers/mfd/as3722.c
-+++ b/drivers/mfd/as3722.c
-@@ -354,8 +354,7 @@ static int as3722_i2c_of_probe(struct i2c_client *i2c,
- 	return 0;
- }
- 
--static int as3722_i2c_probe(struct i2c_client *i2c,
--			const struct i2c_device_id *id)
-+static int as3722_i2c_probe(struct i2c_client *i2c)
- {
- 	struct as3722 *as3722;
- 	unsigned long irq_flags;
-@@ -428,21 +427,14 @@ static const struct of_device_id as3722_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, as3722_of_match);
- 
--static const struct i2c_device_id as3722_i2c_id[] = {
--	{ "as3722", 0 },
--	{},
--};
--MODULE_DEVICE_TABLE(i2c, as3722_i2c_id);
--
- static struct i2c_driver as3722_i2c_driver = {
- 	.driver = {
- 		.name = "as3722",
- 		.owner = THIS_MODULE,
- 		.of_match_table = as3722_of_match,
- 	},
--	.probe = as3722_i2c_probe,
-+	.probe2 = as3722_i2c_probe,
- 	.remove = as3722_i2c_remove,
--	.id_table = as3722_i2c_id,
- };
- 
- module_i2c_driver(as3722_i2c_driver);
--- 
-1.8.3.2
+> > [PATCH v3] ARM: shmobile: Mark all SoCs in shmobile as CPUFreq, capable
+
+> I propose that we fix that up by adding an incremental patch to
+> mach-shmobile via my renesas tree once the dependency (assuming there is
+> one) is in Linus's tree.
+
+Yes, the conversion to make ARCH_HAS_OPP unused is in Raphael's tree for
+the merge window.  I'd expect this patch to end up going after the merge
+window (or at the end I guess).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140606/e1c776b1/attachment.sig>
