@@ -1,66 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 6 Jun 2014 01:53:10 -0500
-Subject: [PATCH] ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for
- am43x-epos-evm
-In-Reply-To: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
-References: <1402035454-25676-1-git-send-email-george.cherian@ti.com>
-Message-ID: <53916556.10608@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 6 Jun 2014 07:53:51 +0100
+Subject: [PATCH 1/3] mfd: UCB1x00: enable modular build
+In-Reply-To: <1402003454-1989084-2-git-send-email-arnd@arndb.de>
+References: <1402003454-1989084-1-git-send-email-arnd@arndb.de>
+ <1402003454-1989084-2-git-send-email-arnd@arndb.de>
+Message-ID: <20140606065351.GL24240@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2014 01:17 AM, George Cherian wrote:
-> AM437x EPOS evm use external clock for RMII interface.
-> Enable the same in DT. 
+> The UCB1200 / UCB1300 driver uses the MCP_SA11X0 driver, which
+> can be a loadable module, but this results in a link error
+> when UCB1200 itself is built-in:
 > 
-> Signed-off-by: George Cherian <george.cherian@ti.com>
-> Reported-by: Nishanth Menon <nm@ti.com>
+> drivers/built-in.o: In function `ucb1x00_io_set_dir':
+> :(.text+0x4a364): undefined reference to `mcp_reg_write'
+> drivers/built-in.o: In function `ucb1x00_io_write':
+> :(.text+0x4a3dc): undefined reference to `mcp_reg_write'
+> drivers/built-in.o: In function `ucb1x00_io_read':
+> :(.text+0x4a400): undefined reference to `mcp_reg_read'
+> drivers/built-in.o: In function `ucb1x00_adc_enable':
+> :(.text+0x4a460): undefined reference to `mcp_enable'
+> ...
+> 
+> This can easily be resolved by making CONFIG_MCP_UCB1200 itself
+> a tristate option, since that causes Kconfig to track the
+> dependency correctly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/boot/dts/am43x-epos-evm.dts | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-> index 19f1f7e..90098f9 100644
-> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
-> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-> @@ -319,6 +319,10 @@
->  	phy-mode = "rmii";
->  };
+>  drivers/mfd/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+
+Applied, thanks.
+
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index ee8204c..4370692 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1248,7 +1248,7 @@ config MCP_SA11X0
 >  
-> +&phy_sel {
-> +	rmii-clock-ext;
-> +};
-> +
->  &i2c0 {
->  	status = "okay";
->  	pinctrl-names = "default";
-> 
-Where does this apply on?
-With linux-next next-20140506 tag, and this patch applied, I get the
-following error.
-
-  LD      kernel/trace/built-in.o
-  LD      kernel/built-in.o
-build fail, Error:
-Error: arch/arm/boot/dts/am43x-epos-evm.dts:219.2-3 label or path,
-'phy_sel', not found
-FATAL ERROR: Syntax error parsing input tree
-make[1]: *** [arch/arm/boot/dts/am43x-epos-evm.dtb] Error 1
-make[1]: *** Waiting for unfinished jobs....
-make: *** [dtbs] Error 2
-make: *** Waiting for unfinished jobs....
-
-in the future, it is helpful if you can point out that this is a
-regression seen on next-20140603 and the patch needs to be applied on
-some specific branch.
-
-for the record:
-last working next tag:
-https://github.com/nmenon/kernel-test-logs/blob/next-20140602/omap2plus_defconfig/am43xx-epos.txt
-
-first broken next tag:
-https://github.com/nmenon/kernel-test-logs/blob/next-20140603/omap2plus_defconfig/am43xx-epos.txt
-
+>  # Chip drivers
+>  config MCP_UCB1200
+> -	bool "Support for UCB1200 / UCB1300"
+> +	tristate "Support for UCB1200 / UCB1300"
+>  	depends on MCP_SA11X0
+>  	select MCP
+>  
 
 -- 
-Regards,
-Nishanth Menon
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
