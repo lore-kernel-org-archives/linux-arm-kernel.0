@@ -1,68 +1,30 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 6 Jun 2014 18:35:15 -0400 (EDT)
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <1402090985-8061-1-git-send-email-dianders@chromium.org>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
-Message-ID: <alpine.LFD.2.11.1406061831310.25775@knanqh.ubzr>
+Date: Fri, 6 Jun 2014 18:38:17 -0400 (EDT)
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <CAD=FV=WSEBRH-Py8oGXp0soAx_Y=j8NdoX89YiPGYeTBzQdOyw@mail.gmail.com>
+References: <539145B4.5000200@gmail.com>
+ <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
+ <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
+ <CAD=FV=Vo1JR6n496Q3FqXjRBkbTBRg89_fJQNsqeRx8WQW_a9w@mail.gmail.com>
+ <CAM4voakAMN4jdAZDPz55tnc3woZDieZ5aL3TVU2kYsNHT+AMqg@mail.gmail.com>
+ <CAD=FV=UjmN5AwWMPy7mQt-J4A_niO8Ug4r15Ez2ZWPT1g3L=VA@mail.gmail.com>
+ <20140606203721.GA10422@quad.lixom.net>
+ <CAM4voanSpTd=dAXLZhdZKRP4Z_YShbD4Hr-6UWn3DFYueoxeTA@mail.gmail.com>
+ <20140606210126.GA10219@quad.lixom.net>
+ <alpine.LFD.2.11.1406061717520.25775@knanqh.ubzr>
+ <20140606214921.GA10969@quad.lixom.net>
+ <CAD=FV=WSEBRH-Py8oGXp0soAx_Y=j8NdoX89YiPGYeTBzQdOyw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1406061836130.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 6 Jun 2014, Doug Anderson wrote:
 
-> On exynos mcpm systems the firmware is hardcoded to jump to an address
-> in SRAM (0x02073000) when secondary CPUs come up.  By default the
-> firmware puts a bunch of code at that location.  That code expects the
-> kernel to fill in a few slots with addresses that it uses to jump back
-> to the kernel's entry point for secondary CPUs.
-> 
-> Originally (on prerelease hardware) this firmware code contained a
-> bunch of workarounds to deal with boot ROM bugs.  However on all
-> shipped hardware we simply use this code to redirect to a kernel
-> function for bringing up the CPUs.
-> 
-> Let's stop relying on the code provided by the bootloader and just
-> plumb in our own (simple) code jump to the kernel.  This has the nice
-> benefit of fixing problems due to the fact that older bootloaders
-> (like the one shipped on the Samsung Chromebook 2) might have put
-> slightly different code into this location.
-> 
-> Once suspend/resume is implemented for systems using exynos-mcpm we'll
-> need to make sure we reinstall our fixed up code after resume.  ...but
-> that's not anything new since IRAM (and thus the address of the
-> mcpm_entry_point) is lost across suspend/resume anyway.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  arch/arm/mach-exynos/mcpm-exynos.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 0498d0b..3a7fad0 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -343,11 +343,13 @@ static int __init exynos_mcpm_init(void)
->  	pr_info("Exynos MCPM support installed\n");
->  
->  	/*
-> -	 * Future entries into the kernel can now go
-> -	 * through the cluster entry vectors.
-> +	 * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
-> +	 * as part of secondary_cpu_start().  Let's redirect it to the
-> +	 * mcpm_entry_point().
->  	 */
-> -	__raw_writel(virt_to_phys(mcpm_entry_point),
-> -			ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
-> +	__raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
-> +	__raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
-> +	__raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
+> Note that handling CPU resume in a way that can be updated by RW
+> firmware is non-trivial and requires some SRAM to be saved across
+> suspend/resume.
 
-Is this valid for all exynos systems, or is this particular to
-Chromebooks?
-
-If this is all that is needed to solve the problem being discussed in 
-the other thread I have absolutely no issue with such a workaround going 
-into mainline.
+Saved by the kernel or the firmware?
 
 
 Nicolas
