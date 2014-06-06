@@ -1,147 +1,721 @@
-From: dianders@google.com (Doug Anderson)
-Date: Fri, 6 Jun 2014 13:49:11 -0700
-Subject: Problems booting exynos5420 with >1 CPU
-In-Reply-To: <CAM4voa=cTbobQHi+sBOCy_CDYAnQ6CsvvuoE7XwqFZV_E3gEbQ@mail.gmail.com>
-References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
- <539145B4.5000200@gmail.com>
- <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
- <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
- <CAD=FV=Vo1JR6n496Q3FqXjRBkbTBRg89_fJQNsqeRx8WQW_a9w@mail.gmail.com>
- <CAM4voakAMN4jdAZDPz55tnc3woZDieZ5aL3TVU2kYsNHT+AMqg@mail.gmail.com>
- <CAD=FV=UjmN5AwWMPy7mQt-J4A_niO8Ug4r15Ez2ZWPT1g3L=VA@mail.gmail.com>
- <CAM4voa=1FY5bfk095BU=3X=vzqjnCSfdLoXpCix5tOwDgOoioQ@mail.gmail.com>
- <CAD=FV=UwgPQVm_KvHbpoJNs-5EtpyaYJ2rp2f-466uhnob=ixA@mail.gmail.com>
- <CAM4voa=cTbobQHi+sBOCy_CDYAnQ6CsvvuoE7XwqFZV_E3gEbQ@mail.gmail.com>
-Message-ID: <CAD=FV=U6HuQj3MxZ-yF-MYdjzqjT5bu=K26JuHZP1hjJzkSqbg@mail.gmail.com>
+From: ashcharles@gmail.com (Ash Charles)
+Date: Fri,  6 Jun 2014 13:51:56 -0700
+Subject: [PATCH] omap: Add devicetree for Gumstix Pepper board
+Message-ID: <1402087916-14857-1-git-send-email-ashcharles@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 6, 2014 at 12:09 PM, Abhilash Kesavan
-<kesavan.abhilash@gmail.com> wrote:
-> Hi Doug,
->
-> On Sat, Jun 7, 2014 at 12:26 AM, Doug Anderson <dianders@google.com> wrote:
->> Abhilash,
->>
->> On Fri, Jun 6, 2014 at 11:31 AM, Abhilash Kesavan
->> <kesavan.abhilash@gmail.com> wrote:
->>> Hi Doug,
->>>
->>> On Fri, Jun 6, 2014 at 11:50 PM, Doug Anderson <dianders@google.com> wrote:
->>>> Abhilash,
->>>>
->>>>
->>>>
->>>> On Fri, Jun 6, 2014 at 11:12 AM, Abhilash Kesavan
->>>> <kesavan.abhilash@gmail.com> wrote:
->>>>> Hi Doug,
->>>>>
->>>>> On Fri, Jun 6, 2014 at 11:32 PM, Doug Anderson <dianders@google.com> wrote:
->>>>>> Abhilash,
->>>>>>
->>>>>> On Fri, Jun 6, 2014 at 10:36 AM, Abhilash Kesavan
->>>>>> <kesavan.abhilash@gmail.com> wrote:
->>>>>>> Hi Doug,
->>>>>>>
->>>>>>> The first change in the kernel (clearing an iRAM location) is needed
->>>>>>> because of an unnecessary change that we are carrying in the Chrome
->>>>>>> U-boot. There is no reason for us to have the workaround in the
->>>>>>> mainline kernel. Rather, we should remove the check from our u-boot.
->>>>>>> However AFAIR a clean-up patch that I had posted internally was not
->>>>>>> accepted as we had frozen the SPL at the time.
->>>>>>
->>>>>> Ah, is that this one, or a different one?
->>>>>>
->>>>>> https://chromium-review.googlesource.com/#/c/66049/
->>>>> Yes, this along with a kernel side change.
->>>>
->>>> Can we safely take this one without the kernel-side one?
->>> Yes, just the u-boot change should suffice.
->>>>
->>>>
->>>>>> If we land that patch now it won't help since nobody is going to be
->>>>>> updating their read-only firmware.  We'll need to put code somewhere
->>>>>> that fixes it.
->>>>> We just carry the workaround fix locally until we migrate to mainline
->>>>> u-boot for 5420 where the unnecessay check will not be present.
->>>>
->>>> I think there are people out there who want to run a mainline kernel
->>>> on existing Chromebook 2 hardware and don't want to rewrite their RO
->>>> firmware.  We need a solution for those people.
->>> Yes, I see your point. But, do you think someone who has changed the
->>> existing fused kernel on the device to a mainline one would be averse
->>> to applying a couple of small work-around changes as well ? Their
->>> finding this thread and the proposed "magic" fixes may be difficult
->>> but not the actual application I think.
->>>
->>> How about having a page similar to
->>> "http://www.chromium.org/chromium-os/how-tos-and-troubleshooting/using-an-upstream-kernel-on-snow"
->>> for Peach ? We could have the work-arounds listed there.
->>
->> We can (though the fewer weird things we have the better), but we
->> definitely need to provide workarounds that don't require people to
->> change their RO firmware.
-> I do not quite agree with this. They do not need to change their RO
-> firmware, just modify their boot commands.
->>
->> Thinking all that through, I think the answer is that we want to
->> abandon the U-Boot change above
->> <https://chromium-review.googlesource.com/#/c/66049/>.  At this point
->> we're never going to take it at this point and there's no possible way
->> to do it in an RW firmware update (right?) since any workaround would
->> be overwritten by the SPL at resume time.
-> Sure, will abandon.
->>
->> So the proper "fix" for the "mw.l 02073028 0" is a kernel fix.  ...and
-> I believe there is no "proper" fix for incorrect existing code in
-> non-mainline u-boot.
->
->> if upstream doesn't want land it because it's impure then we'll just
->> have to list it on our "apply these hacks to your kernel".  You sent
->> me this as a kernel fix before and now I think I understand why (to
->> handle the s2r case).  Can you please post this up to the mailing
->> list?  Please make sure it will handle the suspend/resume case
->> whenever suspend/resume starts working (I haven't tested but I
->> remember hearing that it doesn't work).
->
-> Are you talking about the re-writing the mcpm entry point address post-resume ?
+This adds the Gumstix Pepper[1] single-board computer based on the
+TI AM335x processor. Schematics are available [2].
 
-Or even (as Andrew points out) just don't use it.
+[1] https://store.gumstix.com/index.php/products/344/
+[2] https://pubs.gumstix.com/boards/PEPPER/
 
-This works and IMHO is much cleaner because it totally removes the
-U-Boot dependency.  I'll cleanup to not be so insane and post:
+Signed-off-by: Ash Charles <ashcharles@gmail.com>
+---
+ MAINTAINERS                         |   6 +
+ arch/arm/boot/dts/Makefile          |   3 +-
+ arch/arm/boot/dts/am335x-pepper.dts | 661 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 669 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/am335x-pepper.dts
 
-diff --git a/arch/arm/mach-exynos/mcpm-exynos.c
-b/arch/arm/mach-exynos/mcpm-exynos.c
-index 0498d0b..9c5df7b 100644
---- a/arch/arm/mach-exynos/mcpm-exynos.c
-+++ b/arch/arm/mach-exynos/mcpm-exynos.c
-@@ -290,6 +290,14 @@ static void __naked
-exynos_pm_power_up_setup(unsigned int affinity_level)
-        "b      cci_enable_port_for_self");
- }
-
-+static void __naked exynos_mcpm_secondary_cpu_start(void)
-+{
-+       asm volatile ("\n"
-+       "ldr    r0, [pc, #0]\n"
-+       "bx     r0\n"
-+       ".word  0" );
-+}
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 51ebb77..d44e2e3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6427,6 +6427,12 @@ L:	linux-omap at vger.kernel.org
+ S:	Maintained
+ F:	arch/arm/boot/dts/am335x-nano.dts
+ 
++OMAP/GUMSTIX PEPPER MACHINE SUPPORT
++M:	Ash Charles <ashcharles@gmail.com>
++L:	linux-omap at vger.kernel.org
++S:	Maintained
++F:	arch/arm/boot/dts/am335x-pepper.dts
 +
- static const struct of_device_id exynos_dt_mcpm_match[] = {
-        { .compatible = "samsung,exynos5420" },
-        { .compatible = "samsung,exynos5800" },
-@@ -346,8 +354,9 @@ static int __init exynos_mcpm_init(void)
-         * Future entries into the kernel can now go
-         * through the cluster entry vectors.
-         */
--       __raw_writel(virt_to_phys(mcpm_entry_point),
--                       ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
-+       __raw_writel(((u32*)exynos_mcpm_secondary_cpu_start)[0],
-ns_sram_base_addr);
-+       __raw_writel(((u32*)exynos_mcpm_secondary_cpu_start)[1],
-ns_sram_base_addr + 4);
-+       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
-
--Doug
+ OMFS FILESYSTEM
+ M:	Bob Copeland <me@bobcopeland.com>
+ L:	linux-karma-devel at lists.sourceforge.net
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a81a24c..9e0352f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -277,7 +277,8 @@ dtb-$(CONFIG_SOC_AM33XX) += am335x-base0033.dtb \
+ 	am335x-boneblack.dtb \
+ 	am335x-evm.dtb \
+ 	am335x-evmsk.dtb \
+-	am335x-nano.dtb
++	am335x-nano.dtb \
++	am335x-pepper.dtb
+ dtb-$(CONFIG_ARCH_OMAP4) += omap4-duovero-parlor.dtb \
+ 	omap4-panda.dtb \
+ 	omap4-panda-a4.dtb \
+diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+new file mode 100644
+index 0000000..27d9b75
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-pepper.dts
+@@ -0,0 +1,661 @@
++/*
++ * Copyright (C) 2014 Gumstix, Inc. - https://www.gumstix.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++#include "am33xx.dtsi"
++
++/ {
++	model = "Gumstix Pepper";
++	compatible = "gumstix,am335x-pepper", "ti,am33xx";
++
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&dcdc3_reg>;
++		};
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x20000000>; /* 512 MB */
++	};
++
++	buttons: user_buttons {
++		compatible = "gpio-keys";
++	};
++
++	leds: user_leds {
++		compatible = "gpio-leds";
++	};
++
++	panel: lcd_panel {
++		compatible = "ti,tilcdc,panel";
++	};
++
++	sound: sound_iface {
++		compatible = "ti,da830-evm-audio";
++	};
++
++	vbat: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++	};
++
++	v3v3c_reg: fixedregulator at 1 {
++		compatible = "regulator-fixed";
++	};
++
++	vdd5_reg: fixedregulator at 2 {
++		compatible = "regulator-fixed";
++	};
++};
++
++/* I2C Busses */
++&i2c0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins>;
++
++	clock-frequency = <400000>;
++
++	tps: tps at 24 {
++		reg = <0x24>;
++	};
++
++	eeprom: eeprom at 50 {
++		compatible = "at,24c256";
++		reg = <0x50>;
++	};
++
++	audio_codec: tlv320aic3106 at 1b {
++		compatible = "ti,tlv320aic3106";
++		reg = <0x1b>;
++	};
++
++	accel: lis331dlh at 1d {
++		compatible = "st,lis3lv02d";
++		reg = <0x1d>;
++	};
++};
++
++&i2c1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++	clock-frequency = <400000>;
++};
++
++&am33xx_pinmux {
++	i2c0_pins: pinmux_i2c0 {
++		pinctrl-single,pins = <
++			0x188 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_sda.i2c0_sda */
++			0x18c (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_scl.i2c0_scl */
++		>;
++	};
++	i2c1_pins: pinmux_i2c1 {
++		pinctrl-single,pins = <
++			0x10C (PIN_INPUT_PULLUP | MUX_MODE3)	/* mii1_crs,i2c1_sda */
++			0x110 (PIN_INPUT_PULLUP | MUX_MODE3)	/* mii1_rxerr,i2c1_scl */
++		>;
++	};
++};
++
++/* Accelerometer */
++&accel {
++	pinctrl-names = "default";
++	pinctrl-0 = <&accel_pins>;
++
++	Vdd-supply = <&ldo3_reg>;
++	Vdd_IO-supply = <&ldo3_reg>;
++	st,irq1-click;
++	st,wakeup-x-lo;
++	st,wakeup-x-hi;
++	st,wakeup-y-lo;
++	st,wakeup-y-hi;
++	st,wakeup-z-lo;
++	st,wakeup-z-hi;
++	st,min-limit-x = <92>;
++	st,max-limit-x = <14>;
++	st,min-limit-y = <14>;
++	st,max-limit-y = <92>;
++	st,min-limit-z = <92>;
++	st,max-limit-z = <14>;
++};
++
++&am33xx_pinmux {
++	accel_pins: pinmux_accel {
++		pinctrl-single,pins = <
++			0x98 (PIN_INPUT_PULLUP | MUX_MODE7)   /* gpmc_wen.gpio2_4 */
++		>;
++	};
++};
++
++/* Audio */
++&audio_codec {
++	status = "okay";
++
++	gpio-reset = <&gpio1 16 GPIO_ACTIVE_LOW>;
++	AVDD-supply = <&ldo3_reg>;
++	IOVDD-supply = <&ldo3_reg>;
++	DRVDD-supply = <&ldo3_reg>;
++	DVDD-supply = <&dcdc1_reg>;
++};
++
++&sound {
++	ti,model = "AM335x-EVM";
++	ti,audio-codec = <&audio_codec>;
++	ti,mcasp-controller = <&mcasp0>;
++	ti,codec-clock-rate = <12000000>;
++	ti,audio-routing =
++		"Headphone Jack",	"HPLOUT",
++		"Headphone Jack",	"HPROUT",
++		"LINE1L",		"Line In";
++};
++
++&mcasp0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&audio_pins>;
++
++	op-mode = <0>;	/* MCASP_ISS_MODE */
++	tdm-slots = <2>;
++	serial-dir = <
++		1 2 0 0
++		0 0 0 0
++		0 0 0 0
++		0 0 0 0
++	>;
++	tx-num-evt = <1>;
++	rx-num-evt = <1>;
++};
++
++&am33xx_pinmux {
++	audio_pins: pinmux_audio {
++		pinctrl-single,pins = <
++			0x1AC (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_ahcklx.mcasp0_ahclkx */
++			0x194 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_fsx.mcasp0_fsx */
++			0x190 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_aclkx.mcasp0_aclkx */
++			0x198 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_axr0.mcasp0_axr0 */
++			0x1A8 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_axr1.mcasp0_axr1 */
++			0x40 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a0.gpio1_16 */
++		>;
++	};
++};
++
++/* Display: 24-bit LCD Screen */
++&panel {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_pins>;
++	panel-info {
++		ac-bias = <255>;
++		ac-bias-intrpt = <0>;
++		dma-burst-sz = <16>;
++		bpp = <32>;
++		fdd = <0x80>;
++		sync-edge = <0>;
++		sync-ctrl = <1>;
++		raster-order = <0>;
++		fifo-th = <0>;
++	};
++	display-timings {
++		native-mode = <&timing0>;
++		timing0: 480x272 {
++			clock-frequency = <18400000>;
++			hactive = <480>;
++			vactive = <272>;
++			hfront-porch = <8>;
++			hback-porch = <4>;
++			hsync-len = <41>;
++			vfront-porch = <4>;
++			vback-porch = <2>;
++			vsync-len = <10>;
++			hsync-active = <1>;
++			vsync-active = <1>;
++		};
++	};
++};
++
++&lcdc {
++	status = "okay";
++};
++
++&am33xx_pinmux {
++	lcd_pins: pinmux_lcd {
++		pinctrl-single,pins = <
++			0xa0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data0.lcd_data0 */
++			0xa4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data1.lcd_data1 */
++			0xa8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data2.lcd_data2 */
++			0xac (PIN_OUTPUT | MUX_MODE0)	/* lcd_data3.lcd_data3 */
++			0xb0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data4.lcd_data4 */
++			0xb4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data5.lcd_data5 */
++			0xb8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data6.lcd_data6 */
++			0xbc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data7.lcd_data7 */
++			0xc0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data8.lcd_data8 */
++			0xc4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data9.lcd_data9 */
++			0xc8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data10.lcd_data10 */
++			0xcc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data11.lcd_data11 */
++			0xd0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data12.lcd_data12 */
++			0xd4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data13.lcd_data13 */
++			0xd8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data14.lcd_data14 */
++			0xdc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data15.lcd_data15 */
++			0x20 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad8.lcd_data16 */
++			0x24 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad9.lcd_data17 */
++			0x28 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad10.lcd_data18 */
++			0x2c (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad11.lcd_data19 */
++			0x30 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad12.lcd_data20 */
++			0x34 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad13.lcd_data21 */
++			0x38 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad14.lcd_data22 */
++			0x3c (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad15.lcd_data23 */
++			0xe0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_vsync.lcd_vsync */
++			0xe4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_hsync.lcd_hsync */
++			0xe8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_pclk.lcd_pclk */
++			0xec (PIN_OUTPUT | MUX_MODE0)	/* lcd_ac_bias_en.lcd_ac_bias_en */
++			/* Display Enable */
++			0x6c (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a11.gpio1_27 */
++		>;
++	};
++};
++
++/* Ethernet */
++&cpsw_emac0 {
++	status = "okay";
++	phy_id = <&davinci_mdio>, <0>;
++	phy-mode = "rgmii";
++};
++
++&cpsw_emac1 {
++	status = "okay";
++	phy_id = <&davinci_mdio>, <1>;
++	phy-mode = "rgmii";
++};
++
++&davinci_mdio {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&mdio_pins>;
++};
++
++&mac {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&ethernet_pins>;
++};
++
++
++&am33xx_pinmux {
++	ethernet_pins: pinmux_ethernet {
++		pinctrl-single,pins = <
++			0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txen.rgmii1_tctl */
++			0x118 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxdv.rgmii1_rctl */
++			0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd3.rgmii1_td3 */
++			0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd2.rgmii1_td2 */
++			0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td1 */
++			0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td0 */
++			0x12c (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_txclk.rgmii1_tclk */
++			0x130 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxclk.rgmii1_rclk */
++			0x134 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd3.rgmii1_rxd3 */
++			0x138 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd2.rgmii1_rxd2 */
++			0x13c (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd1.rgmii1_rxd1 */
++			0x140 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd0.rgmii1_rxd0 */
++			/* ethernet interrupt */
++			0x144 (PIN_INPUT_PULLUP | MUX_MODE7)	/* rmii2_refclk.gpio0_29 */
++			/* ethernet PHY nReset */
++			0x108 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* mii1_col.gpio3_0 */
++		>;
++	};
++
++	mdio_pins: pinmux_mdio {
++		pinctrl-single,pins = <
++			0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
++			0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
++		>;
++	};
++};
++
++/* MMC */
++&mmc1 {
++	/* Bootable SD card slot */
++	status = "okay";
++	vmmc-supply = <&ldo3_reg>;
++	bus-width = <4>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd_pins>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
++};
++
++&mmc2 {
++	/* eMMC (not populated) on MMC #2 */
++	status = "disabled";
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_pins>;
++	vmmc-supply = <&ldo3_reg>;
++	bus-width = <8>;
++	ti,non-removable;
++};
++
++&edma {
++	/* Map eDMA MMC2 Events from Crossbar */
++	ti,edma-xbar-event-map = /bits/ 16 <1 12
++                                            2 13>;
++};
++
++
++&mmc3 {
++	/* Wifi & Bluetooth on MMC #3 */
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&wireless_pins>;
++	vmmmc-supply = <&v3v3c_reg>;
++	bus-width = <4>;
++	ti,non-removable;
++	dmas = <&edma 12
++		&edma 13>;
++	dma-names = "tx", "rx";
++};
++
++
++&am33xx_pinmux {
++	sd_pins: pinmux_sd_card {
++		pinctrl-single,pins = <
++			0xf0 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat0.mmc0_dat0 */
++			0xf4 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat1.mmc0_dat1 */
++			0xf8 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat2.mmc0_dat2 */
++			0xfc (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat3.mmc0_dat3 */
++			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_clk.mmc0_clk */
++			0x104 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_cmd.mmc0_cmd */
++			0x160 (PIN_INPUT | MUX_MODE7)		/* spi0_cs1.gpio0_6 */
++		>;
++	};
++	emmc_pins: pinmux_emmc {
++		pinctrl-single,pins = <
++			0x80 (PIN_INPUT_PULLUP | MUX_MODE2)	/* gpmc_csn1.mmc1_clk */
++			0x84 (PIN_INPUT_PULLUP | MUX_MODE2)	/* gpmc_csn2.mmc1_cmd */
++			0x00 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad0.mmc1_dat0 */
++			0x04 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad1.mmc1_dat1 */
++			0x08 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad2.mmc1_dat2 */
++			0x0c (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad3.mmc1_dat3 */
++			0x10 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad4.mmc1_dat4 */
++			0x14 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad5.mmc1_dat5 */
++			0x18 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad6.mmc1_dat6 */
++			0x1c (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad7.mmc1_dat7 */
++			/* EMMC nReset */
++			0x74 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_wpn.gpio0_31 */
++		>;
++	};
++	wireless_pins: pinmux_wireless {
++		pinctrl-single,pins = <
++			0x44 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a1.mmc2_dat0 */
++			0x48 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a2.mmc2_dat1 */
++			0x4c (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a3.mmc2_dat2 */
++			0x78 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_ben1.mmc2_dat3 */
++			0x88 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_csn3.mmc2_cmd */
++			0x8c (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_clk.mmc1_clk */
++			/* WLAN nReset */
++			0x60 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a8.gpio1_24 */
++			/* WLAN nPower down */
++			0x70 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_wait0.gpio0_30 */
++			/* 32kHz Clock */
++			0x1b4 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* xdma_event_intr1.clkout2 */
++		>;
++	};
++};
++
++/* Power */
++&vbat {
++	regulator-name = "vbat";
++	regulator-min-microvolt = <5000000>;
++	regulator-max-microvolt = <5000000>;
++	regulator-always-on;
++};
++
++&v3v3c_reg {
++	regulator-name = "v3v3c_reg";
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	vin-supply = <&vbat>;
++	regulator-always-on;
++};
++
++&vdd5_reg {
++	regulator-name = "vdd5_reg";
++	regulator-min-microvolt = <5000000>;
++	regulator-max-microvolt = <5000000>;
++	regulator-always-on;
++	vin-supply = <&vbat>;
++};
++
++/include/ "tps65217.dtsi"
++
++&tps {
++	backlight {
++		isel = <1>; /* ISET1 */
++		fdim = <200>; /* TPS65217_BL_FDIM_200HZ */
++		default-brightness = <80>;
++	};
++
++	regulators {
++		dcdc1_reg: regulator at 0 {
++			/* VDD_1V8 system supply */
++			regulator-always-on;
++		};
++
++		dcdc2_reg: regulator at 1 {
++			/* VDD_CORE voltage limits 0.95V - 1.26V with +/-4% tolerance */
++			regulator-name = "vdd_core";
++			regulator-min-microvolt = <925000>;
++			regulator-max-microvolt = <1325000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		dcdc3_reg: regulator at 2 {
++			/* VDD_MPU voltage limits 0.95V - 1.1V with +/-4% tolerance */
++			regulator-name = "vdd_mpu";
++			regulator-min-microvolt = <925000>;
++			regulator-max-microvolt = <1150000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		ldo1_reg: regulator at 3 {
++			/* VRTC 1.8V always-on supply */
++			regulator-always-on;
++		};
++
++		ldo2_reg: regulator at 4 {
++			/* 3.3V rail */
++			regulator-always-on;
++		};
++
++		ldo3_reg: regulator at 5 {
++			/* VDD_3V3A 3.3V rail */
++			regulator-always-on;
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
++
++		ldo4_reg: regulator at 6 {
++			/* VDD_3V3B 3.3V rail */
++			regulator-always-on;
++		};
++	};
++};
++
++/* SPI Busses */
++&spi0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins>;
++};
++
++&am33xx_pinmux {
++	spi0_pins: pinmux_spi0 {
++		pinctrl-single,pins = <
++			0x150 (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_sclk.spi0_sclk */
++			0x15C (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_cs0.spi0_cs0 */
++			0x154 (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_d0.spi0_d0 */
++			0x158 (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_d1.spi0_d1 */
++		>;
++	};
++};
++
++/* Touch Screen */
++&tscadc {
++	status = "okay";
++	tsc {
++		ti,wires = <4>;
++		ti,x-plate-resistance = <200>;
++		ti,coordinate-readouts = <5>;
++		ti,wire-config = <0x00 0x11 0x22 0x33>;
++	};
++
++	adc {
++		ti,adc-channels = <4 5 6 7>;
++	};
++};
++
++/* UARTs */
++&uart0 {
++	/* Serial Console */
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins>;
++};
++
++&uart1 {
++	/* Broken out to J6 header */
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++};
++
++&am33xx_pinmux {
++	uart0_pins: pinmux_uart0 {
++		pinctrl-single,pins = <
++			0x170 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
++			0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
++		>;
++	};
++	uart1_pins: pinmux_uart1 {
++		pinctrl-single,pins = <
++			0x178 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart1_ctsn.uart1_ctsn */
++			0x17C (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart1_rtsn.uart1_rtsn */
++			0x180 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart1_rxd.uart1_rxd */
++			0x184 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart1_txd.uart1_txd */
++		>;
++	};
++};
++
++/* USB */
++&usb {
++	status = "okay";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb_pins>;
++};
++
++&usb_ctrl_mod {
++	status = "okay";
++};
++
++&usb0_phy {
++	status = "okay";
++};
++
++&usb1_phy {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++        dr_mode = "host";
++};
++
++&usb1 {
++	status = "okay";
++        dr_mode = "host";
++};
++
++&cppi41dma {
++	status = "okay";
++};
++
++&am33xx_pinmux {
++	usb_pins: pinmux_usb {
++		pinctrl-single,pins = <
++			/* USB0 Over-Current (active low) */
++			0x64 (PIN_INPUT | MUX_MODE7)	/* gpmc_a9.gpio1_25 */
++			/* USB1 Over-Current (active low) */
++			0x68 (PIN_INPUT | MUX_MODE7)	/* gpmc_a10.gpio1_26 */
++		>;
++	};
++};
++
++/* User IO */
++&leds {
++	pinctrl-names = "default";
++	pinctrl-0 = <&user_leds_pins>;
++
++	led at 0 {
++		label = "pepper:user0:blue";
++		gpios = <&gpio1 20 GPIO_ACTIVE_HIGH>;
++		linux,default-trigger = "none";
++		default-state = "off";
++	};
++
++	led at 1 {
++		label = "pepper:user1:red";
++		gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
++		linux,default-trigger = "none";
++		default-state = "off";
++	};
++};
++
++&buttons {
++	pinctrl-names = "default";
++	pinctrl-0 = <&user_buttons_pins>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	button at 0 {
++		label = "home";
++		linux,code = <102>;
++		gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
++		gpio-key,wakeup;
++	};
++
++	button at 1 {
++		label = "menu";
++		linux,code = <139>;
++		gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
++		gpio-key,wakeup;
++	};
++
++	buttons at 2 {
++		label = "power";
++		linux,code = <116>;
++		gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
++		gpio-key,wakeup;
++	};
++};
++
++&am33xx_pinmux {
++	user_leds_pins: pinmux_user_leds {
++		pinctrl-single,pins = <
++			0x50 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a4.gpio1_20 */
++			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
++		>;
++	};
++
++	user_buttons_pins: pinmux_user_buttons {
++		pinctrl-single,pins = <
++			0x58 (PIN_INPUT_PULLUP | MUX_MODE7)	/* gpmc_a6.gpio1_22 */
++			0x5C (PIN_INPUT_PULLUP | MUX_MODE7)	/* gpmc_a7.gpio1_21 */
++			0x164 (PIN_INPUT_PULLUP | MUX_MODE7)	/* gpmc_a8.gpio0_7 */
++		>;
++	};
++};
+-- 
+1.8.3.2
