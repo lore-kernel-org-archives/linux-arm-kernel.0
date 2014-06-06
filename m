@@ -1,44 +1,37 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 5 Jun 2014 22:35:54 -0500
-Subject: [RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support of
- interrupts
-Message-ID: <1402025761-16831-1-git-send-email-nm@ti.com>
+Date: Thu, 5 Jun 2014 22:35:57 -0500
+Subject: [RFC PATCH 3/7] ARM: OMAP4+: PRM: remove "wkup" event
+In-Reply-To: <1402025761-16831-1-git-send-email-nm@ti.com>
+References: <1402025761-16831-1-git-send-email-nm@ti.com>
+Message-ID: <1402025761-16831-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+"wkup" event at bit offset 0 exists only on OMAP3.
+OMAP4430/60 PRM_IRQSTATUS_A9, OMAP5/DRA7 PRM_IRQSTATUS_MPU
 
-Hi,
+register bit 0 is DPLL_CORE_RECAL_ST not wakeup event like OMAP3.
 
-The following series is a minimal set of cleanups and generalization
-in the direction of supporting daisychain wakeup on all OMAP4+
-platforms. We cannot still add IO_WAKEUP ability for OMAP5/DRA7/AM437x
-yet pending further pinctrl patches.
+The same applies to AM437x as well.
 
-These do have a few cosmetic issues, but hope is to get a view about
-the approach. Also note that documentation of bindings for ti,dra7-prm
-etc are still pending.
+Remove the wrong definition.
 
-Nishanth Menon (7):
-  ARM: OMAP4+: prminst: provide function to find prm_dev instance
-    offset
-  ARM: OMAP4: prm use the generic prm_inst to allow logic to be
-    abstracted
-  ARM: OMAP4+: PRM: remove "wkup" event
-  ARM: OMAP4+: PRM: register interrupt information from DT
-  ARM: dts: OMAP4: Add PRM interrupt
-  ARM: dts: OMAP5: add PRM interrupt
-  ARM: dts: DRA7: add PRM interrupt
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/prm44xx.c |    1 -
+ 1 file changed, 1 deletion(-)
 
- arch/arm/boot/dts/dra7.dtsi       |    1 +
- arch/arm/boot/dts/omap4.dtsi      |    1 +
- arch/arm/boot/dts/omap5.dtsi      |    1 +
- arch/arm/mach-omap2/prm44xx.c     |   89 ++++++++++++++++++++++++++++++++-----
- arch/arm/mach-omap2/prminst44xx.c |   41 ++++++++++-------
- arch/arm/mach-omap2/prminst44xx.h |    3 ++
- 6 files changed, 111 insertions(+), 25 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index d4d745e..1ecf244 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -32,7 +32,6 @@
+ /* Static data */
+ 
+ static const struct omap_prcm_irq omap4_prcm_irqs[] = {
+-	OMAP_PRCM_IRQ("wkup",   0,      0),
+ 	OMAP_PRCM_IRQ("io",     9,      1),
+ };
+ 
 -- 
 1.7.9.5
-
-Regards,
-Nishanth Menon
