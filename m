@@ -1,82 +1,67 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  6 Jun 2014 16:52:29 +0100
-Subject: [PATCH 6/9] i2c: Provide a temporary .probe2() call-back type
+Date: Fri,  6 Jun 2014 16:52:30 +0100
+Subject: [PATCH 7/9] of/device: Allow I2C devices to OF match without
+ supplying an OF node
 In-Reply-To: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
 References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1402069952-28022-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1402069952-28022-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will aid the seamless removal of the current probe()'s, more
-commonly unused than used second parameter.  Most I2C drivers can
-simply switch over to the new interface, others which have DT
-support can use its own matching instead and others can call
-i2c_match_id() themselves.  This brings I2C's device probe method
-into line with other similar interfaces in the kernel and prevents
-the requirement to pass an i2c_device_id table.
+The I2C framework supplies a means for devices to be registered without
+the requirement for platform_data, DT or ACPI.  The current solution is
+that every single I2C device in the kernel is forced to supply a
+normally empty/sparse I2C ID table so the I2C subsystem can match to.
+In an effort to rid the kernel of these tables we need to provide some
+temporary work arounds until we can straighten out the blocking factors.
 
-Suggested-by: Grant Likely <grant.likely@linaro.org>
+This change is meant to be temporary and will be stripped out once
+we've converted all I2C device drivers from of_match_device() over
+to the new I2C generic i2c_of_match_device().
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/i2c/i2c-core.c | 12 +++++++++---
- include/linux/i2c.h    |  8 +++++++-
- 2 files changed, 16 insertions(+), 4 deletions(-)
+ drivers/of/device.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 3fe8232..7047ea9 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -269,8 +269,6 @@ static int i2c_device_probe(struct device *dev)
- 		return 0;
- 
- 	driver = to_i2c_driver(dev->driver);
--	if (!driver->probe)
--		return -EINVAL;
- 
- 	/*
- 	 * An I2C ID table is not mandatory, if and only if, a suitable Device
-@@ -286,7 +284,15 @@ static int i2c_device_probe(struct device *dev)
- 	dev_dbg(dev, "probe\n");
- 
- 	acpi_dev_pm_attach(&client->dev, true);
--	status = driver->probe(client, i2c_match_id(driver->id_table, client));
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index dafb973..3b1c8f9 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -1,6 +1,7 @@
+ #include <linux/string.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
++#include <linux/i2c.h>
+ #include <linux/of_device.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+@@ -21,9 +22,25 @@
+ const struct of_device_id *of_match_device(const struct of_device_id *matches,
+ 					   const struct device *dev)
+ {
++	const struct of_device_id *match;
 +
-+	/* When there are no more users of probe(), rename probe2 to probe. */
-+	if (driver->probe2)
-+		status = driver->probe2(client);
-+	else if (driver->probe)
-+		status = driver->probe(client,
-+				       i2c_match_id(driver->id_table, client));
-+	else
-+		return -EINVAL;
- 	if (status)
- 		acpi_dev_pm_detach(&client->dev, true);
- 
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index 9d36f86..0a470ea 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -125,7 +125,8 @@ extern s32 i2c_smbus_write_i2c_block_data(const struct i2c_client *client,
-  * struct i2c_driver - represent an I2C device driver
-  * @class: What kind of i2c device we instantiate (for detect)
-  * @attach_adapter: Callback for bus addition (deprecated)
-- * @probe: Callback for device binding
-+ * @probe: Callback for device binding - soon to be deprecated
-+ * @probe2: New callback for device binding
-  * @remove: Callback for device unbinding
-  * @shutdown: Callback for device shutdown
-  * @suspend: Callback for device suspend
-@@ -170,6 +171,11 @@ struct i2c_driver {
- 	int (*probe)(struct i2c_client *, const struct i2c_device_id *);
- 	int (*remove)(struct i2c_client *);
- 
-+	/* New driver model interface to aid the seamless removal of the
-+	 * current probe()'s, more commonly unused than used second parameter.
+ 	if ((!matches) || (!dev->of_node))
+ 		return NULL;
+-	return of_match_node(matches, dev->of_node);
++
++	match = of_match_node(matches, dev->of_node);
++	if (match)
++		return match;
++
++	/*
++	 * Low impact workaround, until we can convert all I2C compatible
++	 * strings over to the correctly specified <vendor>,<device> format.
 +	 */
-+	int (*probe2)(struct i2c_client *);
++	match = i2c_of_match_device_strip_vendor(matches, (struct device *)dev);
++	if (match)
++		dev_warn(dev,
++			 "WARNING: Vendor ID missing from compatible string\n");
 +
- 	/* driver model interfaces that don't relate to enumeration  */
- 	void (*shutdown)(struct i2c_client *);
- 	int (*suspend)(struct i2c_client *, pm_message_t mesg);
++	return match;
+ }
+ EXPORT_SYMBOL(of_match_device);
+ 
 -- 
 1.8.3.2
