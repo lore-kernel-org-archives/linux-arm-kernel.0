@@ -1,35 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 6 Jun 2014 14:08:50 +0100
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
-In-Reply-To: <20140606125003.GA13332@verge.net.au>
-References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
- <20140606111411.GD25896@verge.net.au>
- <CANqRtoTy_LwSiZgRFEw5Ly4ojfinoCichxrX7cO6m2XB9JGoww@mail.gmail.com>
- <20140606125003.GA13332@verge.net.au>
-Message-ID: <20140606130850.GO2520@sirena.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 6 Jun 2014 17:59:39 +0200
+Subject: [PATCH v3] arm/arm64: KVM: Fix and refactor unmap_range
+In-Reply-To: <CAPvkgC2s+itzV5H+444Qhz_XfWVgWC1NU=tSugaxZWimOW5uyA@mail.gmail.com>
+References: <1401894943-11213-1-git-send-email-christoffer.dall@linaro.org>
+ <CAPvkgC2s+itzV5H+444Qhz_XfWVgWC1NU=tSugaxZWimOW5uyA@mail.gmail.com>
+Message-ID: <20140606155939.GA33621@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 09:50:06PM +0900, Simon Horman wrote:
-> On Fri, Jun 06, 2014 at 09:14:01PM +0900, Magnus Damm wrote:
+On Fri, Jun 06, 2014 at 10:28:59AM +0100, Steve Capper wrote:
+> Hi Christoffer,
+> 
+> On 4 June 2014 16:15, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+> > of situations.  It was also quite complicated to follow and didn't
+> > follow the usual scheme of having a separate iterating function for each
+> > level of page tables.
+> >
+> > Address this by refactoring the code and introduce a pgd_clear()
+> > function.
+> >
+> > Tested on TC2 with/without THP and limited testing on the v8 Foundation
+> > Model.
+> >
+> > Reviewed-by: Jungseok Lee <jays.lee@samsung.com>
+> > Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> 
+> This looks good to me.
+> 
+> Reviewed-by: Steve Capper <steve.capper@linaro.org>
+> 
 
-> > I'm not sure about the expected merge order for this kind of change vs
-> > queued up stuff in the renesas git tree, but I believe the following
-> > patch selects ARCH_HAS_OPP:
+thanks.
 
-> > [PATCH v3] ARM: shmobile: Mark all SoCs in shmobile as CPUFreq, capable
+> One minor comment below (sorry just spotted this now)...
+> 
+> [ ... ]
+> 
+> > -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+> > +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+> > +                      phys_addr_t addr, phys_addr_t end)
+> >  {
+> > -       if (pte_present(*pte)) {
+> > -               kvm_set_pte(pte, __pte(0));
+> > -               put_page(virt_to_page(pte));
+> > -               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> > -       }
+> > +       pte_t *pte, *start_pte;
+> > +       unsigned long long start_addr = addr;
+> > +
+> > +       start_pte = pte = pte_offset_kernel(pmd, addr);
+> > +       do {
+> > +               if (!pte_none(*pte)) {
+> > +                       kvm_set_pte(pte, __pte(0));
+> > +                       put_page(virt_to_page(pte));
+> > +                       kvm_tlb_flush_vmid_ipa(kvm, addr);
+> 
+> Can this hyp call be expensive if a lot of ptes are being unmapped
+> (for 64K pages we can have 8192 ptes per page)?
+> If so, can they be batched together?
+> 
+I suppose we could, we would have to add something to flush the entire
+TLB for that VMID on aarch64 (or that entire range) to do so.
 
-> I propose that we fix that up by adding an incremental patch to
-> mach-shmobile via my renesas tree once the dependency (assuming there is
-> one) is in Linus's tree.
+I think it's reasonable to merge this now and apply that as an
+optimization.  Marc?
 
-Yes, the conversion to make ARCH_HAS_OPP unused is in Raphael's tree for
-the merge window.  I'd expect this patch to end up going after the merge
-window (or at the end I guess).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140606/e1c776b1/attachment.sig>
+-Christoffer
