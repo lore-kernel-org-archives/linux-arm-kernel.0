@@ -1,47 +1,61 @@
 From: vidyas@nvidia.com (Vidya Sagar)
-Date: Fri, 6 Jun 2014 11:00:32 +0530
-Subject: [PATCH v2] ARM: fix debug prints relevant to PCI devices
-In-Reply-To: <1402028592.3038.4.camel@joe-AO725>
-References: <1401994068-820-1-git-send-email-vidyas@nvidia.com>
- <1402028592.3038.4.camel@joe-AO725>
-Message-ID: <113ACA888B71994BB56E5CF3704953486D6CE1E2DF@BGMAIL02.nvidia.com>
+Date: Fri, 6 Jun 2014 11:10:44 +0530
+Subject: [PATCH v3] ARM: fix debug prints relevant to PCI devices
+Message-ID: <1402033244-19050-1-git-send-email-vidyas@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-oops... I missed it somehow. I'll post a new patch.
+As per PCIe spec, fast back-to-back transactions feature
+is not applicable to PCIe devices. Hence, do not print
+that fast back-to-back trasactions are disabled when
+there is a PCIe device found on the bus
 
-> -----Original Message-----
-> From: Joe Perches [mailto:joe at perches.com]
-> Sent: Friday, June 06, 2014 9:53 AM
-> To: Vidya Sagar
-> Cc: linux at arm.linux.org.uk; bhelgaas at google.com;
-> wangyijing at huawei.com; thierry.reding at gmail.com;
-> jason at lakedaemon.net; will.deacon at arm.com; Stephen Warren; Krishna
-> Thota; sagar.tv at gmail.com; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH v2] ARM: fix debug prints relevant to PCI devices
-> 
-> On Fri, 2014-06-06 at 00:17 +0530, Vidya Sagar wrote:
-> > * replaced printk with pr_info
-> []
-> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> []
-> > @@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
-> >
-> >  	/*
-> >  	 * Report what we did for this bus
-> > +	 * (only if the bus doesn't have even one PCIe device)
-> >  	 */
-> > -	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers
-> %sabled\n",
-> > -		bus->number, (features & PCI_COMMAND_FAST_BACK) ?
-> "en" : "dis");
-> > +	if (!has_pcie_dev)
-> > +		pr_info(KERN_INFO "PCI: bus%d: Fast back to back transfers
-> %sabled\n",
-> > +			bus->number, (features &
-> PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-> 
-> when you convert to pr_<level> you need to remove the KERN_<LEVEL>
-> from the format string too.
-> 
+Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
+---
+v3:
+* removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
+
+v2:
+* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
+* replaced printk with pr_info
+
+ arch/arm/kernel/bios32.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..fcf2581 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
++	bool has_pcie_dev = 0;
+ 
+ 	/*
+ 	 * Walk the devices on this bus, working out what we can
+@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		u16 status;
+ 
++		if (!has_pcie_dev)
++			has_pcie_dev = pci_is_pcie(dev);
+ 		pci_read_config_word(dev, PCI_STATUS, &status);
+ 
+ 		/*
+@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 
+ 	/*
+ 	 * Report what we did for this bus
++	 * (only if the bus doesn't have even one PCIe device)
+ 	 */
+-	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+-		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
++	if (!has_pcie_dev)
++		pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
++			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-- 
+1.8.1.5
