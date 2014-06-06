@@ -1,53 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 6 Jun 2014 21:50:06 +0900
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
-In-Reply-To: <CANqRtoTy_LwSiZgRFEw5Ly4ojfinoCichxrX7cO6m2XB9JGoww@mail.gmail.com>
-References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
- <20140606111411.GD25896@verge.net.au>
- <CANqRtoTy_LwSiZgRFEw5Ly4ojfinoCichxrX7cO6m2XB9JGoww@mail.gmail.com>
-Message-ID: <20140606125003.GA13332@verge.net.au>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Fri,  6 Jun 2014 14:50:19 +0200
+Subject: [patch added to the 3.12 stable tree] arm: dts: Fix missing
+ device_type="memory" for ste-ccu8540
+In-Reply-To: <1402059090-31277-1-git-send-email-jslaby@suse.cz>
+References: <1402059090-31277-1-git-send-email-jslaby@suse.cz>
+Message-ID: <1402059090-31277-75-git-send-email-jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 09:14:01PM +0900, Magnus Damm wrote:
-> On Fri, Jun 6, 2014 at 8:14 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Fri, Jun 06, 2014 at 11:36:56AM +0100, Mark Brown wrote:
-> >> From: Mark Brown <broonie@linaro.org>
-> >>
-> >> Since the OPP layer is a kernel library which has been converted to be
-> >> directly selectable by its callers rather than user selectable and
-> >> requiring architectures to enable it explicitly the ARCH_HAS_OPP symbol
-> >> has become redundant and can be removed. Do so.
-> >>
-> >> Signed-off-by: Mark Brown <broonie@linaro.org>
-> >> ---
-> >>  Documentation/power/opp.txt    | 3 ---
-> >>  arch/arm/mach-exynos/Kconfig   | 1 -
-> >>  arch/arm/mach-highbank/Kconfig | 1 -
-> >>  arch/arm/mach-imx/Kconfig      | 1 -
-> >>  arch/arm/mach-omap2/Kconfig    | 1 -
-> >>  arch/arm/mach-shmobile/Kconfig | 2 --
-> >>  arch/arm/mach-vexpress/Kconfig | 1 -
-> >>  arch/arm/mach-zynq/Kconfig     | 1 -
-> >>  drivers/devfreq/Kconfig        | 1 -
-> >>  kernel/power/Kconfig           | 3 ---
-> >>  10 files changed, 15 deletions(-)
-> >
-> > shmobile portion:
-> >
-> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Hi Simon, Mark,
-> 
-> Nice to see cleanups in this area. Reducing the number of Kconfig
-> symbols must be a good thing.
-> 
-> I'm not sure about the expected merge order for this kind of change vs
-> queued up stuff in the renesas git tree, but I believe the following
-> patch selects ARCH_HAS_OPP:
-> 
-> [PATCH v3] ARM: shmobile: Mark all SoCs in shmobile as CPUFreq, capable
+From: Leif Lindholm <leif.lindholm@linaro.org>
 
-I propose that we fix that up by adding an incremental patch to
-mach-shmobile via my renesas tree once the dependency (assuming there is
-one) is in Linus's tree.
+This patch has been added to the 3.12 stable tree. If you have any
+objections, please let us know.
+
+===============
+
+commit bfaed5abad998bfc88a66e6e71c7b08dcf82f04e upstream.
+
+The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
+its memory node, relying on an old ppc quirk in order to discover its
+memory. Fix the data so that all parsing code can handle it correctly.
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+---
+ arch/arm/boot/dts/ste-ccu8540.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/ste-ccu8540.dts b/arch/arm/boot/dts/ste-ccu8540.dts
+index 7f3baf51a3a9..32dd55e5f4e6 100644
+--- a/arch/arm/boot/dts/ste-ccu8540.dts
++++ b/arch/arm/boot/dts/ste-ccu8540.dts
+@@ -18,6 +18,7 @@
+ 	compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
+ 
+ 	memory at 0 {
++		device_type = "memory";
+ 		reg = <0x20000000 0x1f000000>, <0xc0000000 0x3f000000>;
+ 	};
+ 
+-- 
+1.9.3
