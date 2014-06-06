@@ -1,50 +1,83 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Sat, 7 Jun 2014 08:55:36 +0530
-Subject: Problems booting exynos5420 with >1 CPU
-In-Reply-To: <alpine.LFD.2.11.1406061740280.25775@knanqh.ubzr>
-References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
- <539145B4.5000200@gmail.com>
- <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
- <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
- <alpine.LFD.2.11.1406061740280.25775@knanqh.ubzr>
-Message-ID: <CAM4voam5KDicwLAt3EA1UC7M+EciGccrnMUKxoR-5c8xT8-zSQ@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 07 Jun 2014 00:28:18 +0100
+Subject: [PATCH 7/9] of/device: Allow I2C devices to OF match without
+ supplying an OF node
+In-Reply-To: <1402069952-28022-8-git-send-email-lee.jones@linaro.org>
+References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
+ <1402069952-28022-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140606232818.8D870C42604@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Fri,  6 Jun 2014 16:52:30 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> The I2C framework supplies a means for devices to be registered without
+> the requirement for platform_data, DT or ACPI.  The current solution is
+> that every single I2C device in the kernel is forced to supply a
+> normally empty/sparse I2C ID table so the I2C subsystem can match to.
+> In an effort to rid the kernel of these tables we need to provide some
+> temporary work arounds until we can straighten out the blocking factors.
+> 
+> This change is meant to be temporary and will be stripped out once
+> we've converted all I2C device drivers from of_match_device() over
+> to the new I2C generic i2c_of_match_device().
 
-The first man of the incoming cluster enables its snoops via the
-power_up_setup function. During secondary boot-up, this does not occur
-for the boot cluster. Hence, I enable the snoops for the boot cluster
-as a one-time setup from the u-boot prompt. After secondary boot-up
-there is no modification that I do. Where should this be ideally done
-?
+This change imposes the i2c workaround onto every single caller of
+i2c_of_match_device(), regardless of subsystem, and regardless of the
+desired behaviour. It also prevents an i2c driver from getting the
+correct behavour when it wants it.
 
-Regards,
-Abhilash
+So, no, I'm not okay with hooking into the core code to work around the
+subsystem problem. I2C drivers need to call the i2c specific version
+directly. I know that adds a line of change to the driver patches, but I
+think it is necessary.
 
-On Sat, Jun 7, 2014 at 3:18 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Fri, 6 Jun 2014, Abhilash Kesavan wrote:
->
->> Hi Doug,
->>
->> The first change in the kernel (clearing an iRAM location) is needed
->> because of an unnecessary change that we are carrying in the Chrome
->> U-boot. There is no reason for us to have the workaround in the
->> mainline kernel. Rather, we should remove the check from our u-boot.
->> However AFAIR a clean-up patch that I had posted internally was not
->> accepted as we had frozen the SPL at the time.
->>
->> The second change is to enable snoops for boot cluster. Internally, we
->> were disabling the snoops for both the clusters at power off and
->> enabling it in power_up_setup and power_up. However, I dropped the
->> approach due to problems pointed out by Nicolas here
->> http://www.spinics.net/lists/arm-kernel/msg324091.html related to
->> cpuidle. Hence, we turn it on at the u-boot.
->
-> You should never *ever* play with the CCI from U-Boot.  That's for the
-> MCPM layer to decide when it is safe to do so.  That's mainly the
-> _whole_ reason why MCPM exists in the first place.
->
->
-> Nicolas
+g.
+
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/of/device.c | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index dafb973..3b1c8f9 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -1,6 +1,7 @@
+>  #include <linux/string.h>
+>  #include <linux/kernel.h>
+>  #include <linux/of.h>
+> +#include <linux/i2c.h>
+>  #include <linux/of_device.h>
+>  #include <linux/init.h>
+>  #include <linux/module.h>
+> @@ -21,9 +22,25 @@
+>  const struct of_device_id *of_match_device(const struct of_device_id *matches,
+>  					   const struct device *dev)
+>  {
+> +	const struct of_device_id *match;
+> +
+>  	if ((!matches) || (!dev->of_node))
+>  		return NULL;
+> -	return of_match_node(matches, dev->of_node);
+> +
+> +	match = of_match_node(matches, dev->of_node);
+> +	if (match)
+> +		return match;
+> +
+> +	/*
+> +	 * Low impact workaround, until we can convert all I2C compatible
+> +	 * strings over to the correctly specified <vendor>,<device> format.
+> +	 */
+> +	match = i2c_of_match_device_strip_vendor(matches, (struct device *)dev);
+> +	if (match)
+> +		dev_warn(dev,
+> +			 "WARNING: Vendor ID missing from compatible string\n");
+> +
+> +	return match;
+>  }
+>  EXPORT_SYMBOL(of_match_device);
+>  
+> -- 
+> 1.8.3.2
+> 
