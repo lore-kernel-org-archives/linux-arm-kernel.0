@@ -1,131 +1,45 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 6 Jun 2014 10:35:07 +0300
-Subject: [PATCH v7 3/5] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <5390F508.8080104@wwwdotorg.org>
+Date: Fri, 6 Jun 2014 10:35:43 +0300
+Subject: [PATCH v7 4/5] ARM: tegra: Add efuse and apbmisc bindings
+In-Reply-To: <5390F55A.8090207@wwwdotorg.org>
 References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
- <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
- <5390B8E6.1050600@wwwdotorg.org>
- <20140605220946.GP5961@tbergstrom-lnx.Nvidia.com>
- <5390F508.8080104@wwwdotorg.org>
-Message-ID: <20140606073507.GS5961@tbergstrom-lnx.Nvidia.com>
+ <1401973754-19701-5-git-send-email-pdeschrijver@nvidia.com>
+ <5390B9F3.8030108@wwwdotorg.org>
+ <20140605221301.GQ5961@tbergstrom-lnx.Nvidia.com>
+ <5390F55A.8090207@wwwdotorg.org>
+Message-ID: <20140606073543.GT5961@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 12:54:00AM +0200, Stephen Warren wrote:
-> On 06/05/2014 04:09 PM, Peter De Schrijver wrote:
-> > On Thu, Jun 05, 2014 at 08:37:26PM +0200, Stephen Warren wrote:
+On Fri, Jun 06, 2014 at 12:55:22AM +0200, Stephen Warren wrote:
+> On 06/05/2014 04:13 PM, Peter De Schrijver wrote:
+> > On Thu, Jun 05, 2014 at 08:41:55PM +0200, Stephen Warren wrote:
 > >> On 06/05/2014 07:09 AM, Peter De Schrijver wrote:
-> >>> Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
-> >>>
-> >>> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> >>> ---
-> >>>  Documentation/ABI/testing/sysfs-driver-tegra-fuse |   11 +
-> >>>  drivers/misc/fuse/Makefile                        |    1 +
-> >>>  drivers/misc/fuse/tegra/Makefile                  |    7 +
-> >>>  drivers/misc/fuse/tegra/fuse-tegra.c              |  250 +++++++++++++++++
+> >>> Add efuse and apbmisc bindings for Tegra20, Tegra30, Tegra114 and Tegra124.
 > >>
-> >> I wonder if we shouldn't put this into drivers/soc/tegra?
+> >>> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
 > >>
-> >>> diff --git a/drivers/misc/fuse/tegra/fuse-tegra.c b/drivers/misc/fuse/tegra/fuse-tegra.c
+> >>> +	apbmisc at 70000800 {
+> >>> +		compatible = "nvidia,tegra114-apbmisc", "nvidia,tegra20-apbmisc";
 > >>
-> >>> +void __init tegra_init_fuse(void)
-> >>> +{
-> >>> +	struct device_node *np;
-> >>> +	u32 id;
-> >>> +	void __iomem *car_base;
-> >>> +
-> >>> +	np = of_find_matching_node(NULL, apbmisc_match);
-> >>> +	apbmisc_base = of_iomap(np, 0);
-> >>> +	if (!apbmisc_base) {
-> >>> +		pr_warn("ioremap tegra apbmisc failed. using %08x instead\n",
-> >>> +			APBMISC_BASE);
-> >>> +		apbmisc_base = ioremap(APBMISC_BASE, APBMISC_SIZE);
-> >>> +	}
-> >>> +
-> >>> +	id = tegra_read_chipid();
-> >>> +	tegra_chip_id = (id >> 8) & 0xff;
-> >>
-> >> So there's a fallback using APBMIS_BASE above if the node is missing, so
-> >> those last 2 lines always happen. However, if any of the following fail:
-> >>
-> >>> +	strapping_base = of_iomap(np, 0);
-> >> ...
-> >>> +	np = of_find_matching_node(NULL, tegra_fuse_match);
-> >> ...
-> >>> +	np = of_find_matching_node(NULL, car_match);
-> >>
-> >> Then this doesn't get executed:
-> >>
-> >>> +	tegra_get_revision(id);
-> >>
-> >> Isn't that important?
+> >> Is the Tegra114 APBMISC register layout 100% a backwards-compatible
+> >> superset of that in Tegra20? For both registers the code currently uses
+> >> *and* all possible registers the code could ever use? Since the APB MISC
+> >> is a bit of a dumping ground for random registers, that feels unlikely,
+> >> but perhaps it's possible.
 > > 
-> > No. It's only used to populate /sys/devices/soc0/revision. I don't think
-> > that's particularly important.
+> > For all I can see it is. At least for the registers the kernel is likely to
+> > use.
 > 
-> But it's a feature that works today. Why should we break it?
-> 
+> But that's ("At least for the registers the kernel is likely to  use")
+> not how compatible values are defined. We need to explicitly look at all
+> the registers and actively decide that it really is compatible in order
+> to mark it so. If we don't want to do that, it's best just to use a
+> separate compatible value for each SoC, and add a couple more entries
+> into the match table.
 
-I don't expect people to not update their DT actually...
-
-> >> I guess that can't run if the lookup for tegra_fuse_match isn't
-> >> successful, since that tegra_get_revision may call
-> >> tegra20_spare_fuse_early() which uses fuse_base which is set up in
-> >> response to succesfully calling on of those node lookups. Isn't a
-> >> fallback needed there too?
-> > 
-> > tegra20_spare_fuse_early() will not be called if fuse_base is NULL.
-> 
-> Oh yes. We can at least call the function then even if the fuses can't
-> be mapped.
-> 
-> But to avoid regressions, we should simply make sure the fuses can be
-> mapped.
-> 
-> >> I'm also a bit concerned that the driver probes, rather than the early
-> >> function tegra_init_fuse(), are doing things like setting up the speedo
-> >> data initialization, randomness addition, etc. For one, those won't
-> >> happen any more unless the DT nodes are present, and secondly,
-> >> triggering all those from driver probe rather than a function that's
-> >> called from the machine descriptor makes guaranteeing the timing
-> >> problematic.
-> > 
-> > Today there are no users of the speedo ID in upstream.
-> 
-> Well, except people reading kernel log messages. Accurate speedo-related
-> log messages have help pin-point a problem or two in the past.
-> 
-
-It's not gone if you use the new DT, it's unfortunate, but I don't think that
-should be a problem. We've had the same when introducing clocks in DT for
-example.
-
-> > Looking at chromeos
-> > the users of the speedo ID are: CPU dvfs, GPU dvfs and sdhci. The last 2 also
-> > need regulators and therefor will need to support deferred probing anyway.
-> > CPU dvfs isn't critical at all, we don't care when it gets initialized. So
-> > deferred probe is fine.
-> 
-> What condition will those modules/drivers use to defer their probe?
-> 
-
-The function to get the speedo ID will return an appropriate error.
-
-> > sdhci needs this for faster modes I guess which will also need extra DT
-> > properties looking at the chromeos driver. The others definitely will need
-> > an updated DT. For randomness I haven't seen any appreciable difference in when
-> > the 'random: nonblocking pool is initialized' message appears between having
-> > the randomness addition or not. Most likely the bulk of the randomness comes
-> > from serial interrupts rather than the fuse data. So I don't think the move to
-> > a driver probe will cause any problem. Nor do I think the lack of an updated
-> > DT will cause problems.
-> 
-> But what advantage do we have by actively changing it?
-
-We need to move the code anyway when we will have 64bit SoCs. Using DT also
-allows us to reuse the code even when the base address changes in the future.
-If it weren't for Tegra20 A03p, we could also drop the hack to enable the
-clocks directly, but use CCF instead.
+All the other registers are for all I can see only useful in emulation
+environments.
 
 Cheers,
 
