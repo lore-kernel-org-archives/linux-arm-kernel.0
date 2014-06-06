@@ -1,49 +1,68 @@
 From: jslaby@suse.cz (Jiri Slaby)
-Date: Fri,  6 Jun 2014 14:50:19 +0200
-Subject: [patch added to the 3.12 stable tree] arm: dts: Fix missing
- device_type="memory" for ste-ccu8540
+Date: Fri,  6 Jun 2014 14:49:22 +0200
+Subject: [patch added to the 3.12 stable tree] clocksource: Exynos_mct:
+ Register clock event after request_irq()
 In-Reply-To: <1402059090-31277-1-git-send-email-jslaby@suse.cz>
 References: <1402059090-31277-1-git-send-email-jslaby@suse.cz>
-Message-ID: <1402059090-31277-75-git-send-email-jslaby@suse.cz>
+Message-ID: <1402059090-31277-18-git-send-email-jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leif Lindholm <leif.lindholm@linaro.org>
+From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 This patch has been added to the 3.12 stable tree. If you have any
 objections, please let us know.
 
 ===============
 
-commit bfaed5abad998bfc88a66e6e71c7b08dcf82f04e upstream.
+commit 8db6e5104b77de5d0b7002b95069da0992a34be9 upstream.
 
-The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
-its memory node, relying on an old ppc quirk in order to discover its
-memory. Fix the data so that all parsing code can handle it correctly.
+After hotplugging CPU1 the first call of interrupt handler for CPU1
+oneshot timer was called on CPU0 because it fired before setting IRQ
+affinity. Affected are SoCs where Multi Core Timer interrupts are
+shared (SPI), e.g. Exynos 4210.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Grant Likely <grant.likely@linaro.org>
+During setup of the MCT timers the clock event device should be
+registered after setting the affinity for interrupt. This will prevent
+starting the timer too early.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>,
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org,
+Link: http://lkml.kernel.org/r/20140416143316.299247848 at linutronix.de
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Jiri Slaby <jslaby@suse.cz>
 ---
- arch/arm/boot/dts/ste-ccu8540.dts | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/exynos_mct.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-ccu8540.dts b/arch/arm/boot/dts/ste-ccu8540.dts
-index 7f3baf51a3a9..32dd55e5f4e6 100644
---- a/arch/arm/boot/dts/ste-ccu8540.dts
-+++ b/arch/arm/boot/dts/ste-ccu8540.dts
-@@ -18,6 +18,7 @@
- 	compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index b17b3e0981f0..70f3a597ec57 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -414,8 +414,6 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	evt->set_mode = exynos4_tick_set_mode;
+ 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 450;
+-	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
+-					0xf, 0x7fffffff);
  
- 	memory at 0 {
-+		device_type = "memory";
- 		reg = <0x20000000 0x1f000000>, <0xc0000000 0x3f000000>;
- 	};
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
  
+@@ -432,6 +430,8 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
++	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
++					0xf, 0x7fffffff);
+ 
+ 	return 0;
+ }
 -- 
 1.9.3
