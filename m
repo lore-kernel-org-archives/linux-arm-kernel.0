@@ -1,88 +1,54 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 6 Jun 2014 19:40:00 +0200
-Subject: [PATCH v3] arm/arm64: KVM: Fix and refactor unmap_range
-In-Reply-To: <5391E833.3030205@arm.com>
-References: <1401894943-11213-1-git-send-email-christoffer.dall@linaro.org>
- <CAPvkgC2s+itzV5H+444Qhz_XfWVgWC1NU=tSugaxZWimOW5uyA@mail.gmail.com>
- <20140606155939.GA33621@lvm> <5391E833.3030205@arm.com>
-Message-ID: <CAMJs5B_4fQmGSaHjP66sMtEVp+whoxMz9tfibOUtZC354OahPA@mail.gmail.com>
+From: dianders@google.com (Doug Anderson)
+Date: Fri, 6 Jun 2014 11:02:47 -0700
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
+References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
+ <539145B4.5000200@gmail.com>
+ <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
+ <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
+Message-ID: <CAD=FV=Vo1JR6n496Q3FqXjRBkbTBRg89_fJQNsqeRx8WQW_a9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 June 2014 18:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 06/06/14 16:59, Christoffer Dall wrote:
->> On Fri, Jun 06, 2014 at 10:28:59AM +0100, Steve Capper wrote:
->>> Hi Christoffer,
->>>
->>> On 4 June 2014 16:15, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->>>> unmap_range() was utterly broken, to quote Marc, and broke in all sorts
->>>> of situations.  It was also quite complicated to follow and didn't
->>>> follow the usual scheme of having a separate iterating function for each
->>>> level of page tables.
->>>>
->>>> Address this by refactoring the code and introduce a pgd_clear()
->>>> function.
->>>>
->>>> Tested on TC2 with/without THP and limited testing on the v8 Foundation
->>>> Model.
->>>>
->>>> Reviewed-by: Jungseok Lee <jays.lee@samsung.com>
->>>> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
->>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>> ---
->>>
->>> This looks good to me.
->>>
->>> Reviewed-by: Steve Capper <steve.capper@linaro.org>
->>>
->>
->> thanks.
->>
->>> One minor comment below (sorry just spotted this now)...
->>>
->>> [ ... ]
->>>
->>>> -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
->>>> +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
->>>> +                      phys_addr_t addr, phys_addr_t end)
->>>>  {
->>>> -       if (pte_present(*pte)) {
->>>> -               kvm_set_pte(pte, __pte(0));
->>>> -               put_page(virt_to_page(pte));
->>>> -               kvm_tlb_flush_vmid_ipa(kvm, addr);
->>>> -       }
->>>> +       pte_t *pte, *start_pte;
->>>> +       unsigned long long start_addr = addr;
->>>> +
->>>> +       start_pte = pte = pte_offset_kernel(pmd, addr);
->>>> +       do {
->>>> +               if (!pte_none(*pte)) {
->>>> +                       kvm_set_pte(pte, __pte(0));
->>>> +                       put_page(virt_to_page(pte));
->>>> +                       kvm_tlb_flush_vmid_ipa(kvm, addr);
->>>
->>> Can this hyp call be expensive if a lot of ptes are being unmapped
->>> (for 64K pages we can have 8192 ptes per page)?
->>> If so, can they be batched together?
->
-> The main problem here is that HYP doesn't have access to these pages at
-> all. They are only mapped at EL1, so HYP cannot parse the PTE table.
->
->> I suppose we could, we would have to add something to flush the entire
->> TLB for that VMID on aarch64 (or that entire range) to do so.
->
-> Yes, VMALL would be possible, but we'd have to find out pretty early if
-> we're tearing down the whole address space, or just a single page.
->
->> I think it's reasonable to merge this now and apply that as an
->> optimization.  Marc?
->
-> Agreed. Batching those require a bit more thoughts and more testing. I
-> remember heuristics about when it was more interesting to switch from
-> single TLBI to ALL, but I'd need to deep dive into my Inbox for this.
->
-Cool, let's try to remember this as a point of investigation and I'll
-apply this one to -next for now.
+Abhilash,
 
--Christoffer
+On Fri, Jun 6, 2014 at 10:36 AM, Abhilash Kesavan
+<kesavan.abhilash@gmail.com> wrote:
+> Hi Doug,
+>
+> The first change in the kernel (clearing an iRAM location) is needed
+> because of an unnecessary change that we are carrying in the Chrome
+> U-boot. There is no reason for us to have the workaround in the
+> mainline kernel. Rather, we should remove the check from our u-boot.
+> However AFAIR a clean-up patch that I had posted internally was not
+> accepted as we had frozen the SPL at the time.
+
+Ah, is that this one, or a different one?
+
+https://chromium-review.googlesource.com/#/c/66049/
+
+
+If we land that patch now it won't help since nobody is going to be
+updating their read-only firmware.  We'll need to put code somewhere
+that fixes it.
+
+
+> The second change is to enable snoops for boot cluster. Internally, we
+> were disabling the snoops for both the clusters at power off and
+> enabling it in power_up_setup and power_up. However, I dropped the
+> approach due to problems pointed out by Nicolas here
+> http://www.spinics.net/lists/arm-kernel/msg324091.html related to
+> cpuidle. Hence, we turn it on at the u-boot.
+
+I think I followed all that.  What you're saying is that our kernel
+dynamically enables and disables snoops as needed, but Nicolas pointed
+out that it was unsafe (though apparently we're not seeing problems in
+our usage).
+
+...so now the kernel doesn't touch the snoops and assumes that U-Boot
+turned them on.
+
+
+Ugh.
+
+-Doug
