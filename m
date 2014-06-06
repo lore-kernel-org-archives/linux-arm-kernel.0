@@ -1,101 +1,81 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri,  6 Jun 2014 17:42:12 +0530
-Subject: [PATCH 1/4] phy: Add provision for calibrating phy.
+Date: Fri,  6 Jun 2014 17:42:13 +0530
+Subject: [PATCH 2/4] usb: host: xhci-plat: Add support to get PHYs
 In-Reply-To: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
 References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1402056736-12674-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PHY controllers may need to calibrate certain
-PHY settings after initialization of the controller and
-sometimes even after initializing the PHY-consumer too.
-Add support for the same in order to let consumers do so in need.
+The host controller by itself may sometimes need to handle PHY
+and/or calibrate some of the PHY settings to get full support out
+of the PHY controller.
+The PHY core provides a calibration funtionality now to do so.
+Therefore, facilitate getting the two possible PHY types for
+xhci controller, viz. USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3)
+from its parent.
 
-Signed-off-by: vivek Gautam <gautam.vivek@samsung.com>
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- drivers/phy/phy-core.c  |   36 ++++++++++++++++++++++++++++++++++++
- include/linux/phy/phy.h |    7 +++++++
- 2 files changed, 43 insertions(+)
+ drivers/usb/host/xhci-plat.c |   24 ++++++++++++++++++++++++
+ drivers/usb/host/xhci.h      |    3 +++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index 74d4346..92d31a3 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -376,6 +376,42 @@ int phy_power_off(struct phy *phy)
- EXPORT_SYMBOL_GPL(phy_power_off);
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 29d8adb..e7145b5 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -17,6 +17,7 @@
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
++#include <linux/phy/phy.h>
  
- /**
-+ * phy_calibrate - calibrate a phy post initialization
-+ * @phy: Pointer to 'phy' from consumer
-+ *
-+ * For certain PHYs, it may be needed to calibrate few phy parameters
-+ * post initialization. The need to calibrate may arise after the
-+ * initialization of consumer itself, in order to prevent further any
-+ * loss of phy settings post consumer-initialization.
-+ *	example: USB 3.0 DRD PHY on Exynos5420/5800 systems is one such
-+ *	phy which needs calibration after the host controller reset
-+ *	has happened.
-+ */
-+int phy_calibrate(struct phy *phy)
-+{
-+	int ret = -ENOTSUPP;
-+
-+	if (!phy)
-+		return 0;
-+
-+	mutex_lock(&phy->mutex);
-+	if (phy->ops->calibrate) {
-+		ret =  phy->ops->calibrate(phy);
-+		if (ret < 0) {
-+			dev_err(&phy->dev,
-+				"phy calibration failed --> %d\n", ret);
-+			goto out;
+ #include "xhci.h"
+ #include "xhci-mvebu.h"
+@@ -183,6 +184,29 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/*
++	 * Get possile USB 2.0 type PHY (UTMI+), as well as
++	 * USB 3.0 type PHY (PIPE3).
++	 * The host controller may need to handle PHYs by itself too
++	 * sometimes, so as to calibrate it based on the need.
++	 */
++	xhci->phy2_gen = devm_phy_get(&pdev->dev, "usb2-phy");
++	if (IS_ERR(xhci->phy2_gen)) {
++		ret = PTR_ERR(xhci->phy2_gen);
++		if (ret != -ENOSYS && ret != -ENODEV) {
++			dev_err(&pdev->dev, "no usb2 phy configured\n");
++			return ret;
++		}
++	}
++	xhci->phy3_gen = devm_phy_get(&pdev->dev, "usb3-phy");
++	if (IS_ERR(xhci->phy3_gen)) {
++		ret = PTR_ERR(xhci->phy3_gen);
++		if (ret != -ENOSYS && ret != -ENODEV) {
++			dev_err(&pdev->dev, "no usb3 phy configured\n");
++			return ret;
 +		}
 +	}
 +
-+out:
-+	mutex_unlock(&phy->mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(phy_calibrate);
-+
-+/**
-  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
-  * @np: device_node for which to get the phy
-  * @index: the index of the phy
-diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-index 5a537a5..1de6c0a 100644
---- a/include/linux/phy/phy.h
-+++ b/include/linux/phy/phy.h
-@@ -34,6 +34,7 @@ struct phy_ops {
- 	int	(*exit)(struct phy *phy);
- 	int	(*power_on)(struct phy *phy);
- 	int	(*power_off)(struct phy *phy);
-+	int	(*calibrate)(struct phy *phy);
- 	struct module *owner;
++	/*
+ 	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
+ 	 * is called by usb_add_hcd().
+ 	 */
+diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+index 9ffecd5..453d89e 100644
+--- a/drivers/usb/host/xhci.h
++++ b/drivers/usb/host/xhci.h
+@@ -1582,6 +1582,9 @@ struct xhci_hcd {
+ 	u32			port_status_u0;
+ /* Compliance Mode Timer Triggered every 2 seconds */
+ #define COMP_MODE_RCVRY_MSECS 2000
++	/* phys for the controller */
++	struct phy		*phy2_gen;
++	struct phy		*phy3_gen;
  };
  
-@@ -124,6 +125,7 @@ int phy_init(struct phy *phy);
- int phy_exit(struct phy *phy);
- int phy_power_on(struct phy *phy);
- int phy_power_off(struct phy *phy);
-+int phy_calibrate(struct phy *phy);
- static inline int phy_get_bus_width(struct phy *phy)
- {
- 	return phy->attrs.bus_width;
-@@ -227,6 +229,11 @@ static inline int phy_power_off(struct phy *phy)
- 	return -ENOSYS;
- }
- 
-+static inline int phy_calibrate(struct phy *phy)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline int phy_get_bus_width(struct phy *phy)
- {
- 	return -ENOSYS;
+ /* convert between an HCD pointer and the corresponding EHCI_HCD */
 -- 
 1.7.10.4
