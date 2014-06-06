@@ -1,28 +1,45 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 05 Jun 2014 21:23:12 -0700
-Subject: [PATCH v2] ARM: fix debug prints relevant to PCI devices
-In-Reply-To: <1401994068-820-1-git-send-email-vidyas@nvidia.com>
-References: <1401994068-820-1-git-send-email-vidyas@nvidia.com>
-Message-ID: <1402028592.3038.4.camel@joe-AO725>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Fri, 06 Jun 2014 10:08:12 +0530
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
+References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
+Message-ID: <539145B4.5000200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-06-06 at 00:17 +0530, Vidya Sagar wrote:
-> * replaced printk with pr_info
-[]
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-[]
-> @@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->  
->  	/*
->  	 * Report what we did for this bus
-> +	 * (only if the bus doesn't have even one PCIe device)
->  	 */
-> -	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
-> -		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-> +	if (!has_pcie_dev)
-> +		pr_info(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
-> +			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+On 06/06/2014 06:38 AM, Doug Anderson wrote:
+> Hi,
+> 
+> When I try to boot linuxnext on my exynos5420-peach-pit chromebook I
+> have problems bringing up extra CPUs:
+> 
+> 1. They don't come up
+> 
 
-when you convert to pr_<level> you need to remove the
-KERN_<LEVEL> from the format string too.
+[ ... ]
+
+> [    1.125030] CPU1: failed to boot: -38
+> [    2.130043] CPU2: failed to boot: -38
+> [    3.135059] CPU3: failed to boot: -38
+> 
+
+With following config modifications over exynos_defconfig, I can see 4
+big cores coming up.
+
+CONFIG_MCPM=y
+CONFIG_EXYNOS5420_MCPM=y
+
+[    0.030919] Exynos MCPM support installed
+[    0.060233] CPU1: Booted secondary processor
+[    0.090006] CPU1: update cpu_power 1535
+[    0.090010] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.100234] CPU2: Booted secondary processor
+[    0.130007] CPU2: update cpu_power 1535
+[    0.130011] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
+[    0.140233] CPU3: Booted secondary processor
+[    0.170008] CPU3: update cpu_power 1535
+[    0.170012] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
+
+
+-- 
+Tushar Behera
