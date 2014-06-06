@@ -1,40 +1,95 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  6 Jun 2014 16:52:23 +0100
-Subject: [PATCH 0/9] i2c: Relax mandatory I2C ID table passing (+ some creep)
-Message-ID: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
+Date: Fri,  6 Jun 2014 16:52:25 +0100
+Subject: [PATCH 2/9] i2c: Add the ability to match device to compatible string
+ without an of_node
+In-Reply-To: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
+References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1402069952-28022-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-  
-As previously discussed I believe it should be okay for an I2C device
-driver _not_ supply an I2C ID table to match to.  The I2C subsystem
-should be able to match via other means, such as via OF tables.  The
-blocking factor during our previous conversation was to keep
-registering via sysfs up and running.  This set does that.
-  
-After thinking more deeply about the problem, it occurred to me that
-any I2C device driver which uses the sysfs method and issues an
-of_match_device() would also fail their probe().  Bolted on to this
-set is a new, more generic way for these devices to match against
-either of the I2C/OF tables.
+A great deal of I2C devices are currently matched via DT node name, and
+as such the compatible naming convention of '<vendor>,<device>' has gone
+somewhat awry - some nodes don't supply one, some supply an arbitrary
+string and others the correct device name with an arbitrary vendor prefix.
 
-I hope this ticks all of your boxes.
+In an effort to correct this problem we have to supply a mechanism to
+match a device by compatible string AND by simple device name.  This
+function strips off the '<vendor>,' part of a supplied compatible string
+and attempts to match without it.
 
-v2:
-  - Removal of ACPI support (this is really an OF issue).
-  - Add a new .probe2( with will seamlessly replace
-  - Supply a warning on devices matching via OF without a suitable compatible
-  - Remove unified match_device() - bad idea as it subverts type-safe behaviour
-  - Provide examples of the kind of clean-up possible after this set.
-    - I already have the full support from the maintainer of these drivers =;-) 
+The plan is to remove this function once all of the compatible strings
+for each device have been brought into line.
 
-Kind regards,
-Lee
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
+ include/linux/i2c.h    | 10 ++++++++++
+ 2 files changed, 35 insertions(+)
 
- drivers/i2c/i2c-core.c      | 73 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------
- drivers/mfd/88pm860x-core.c |  5 ++---
- drivers/mfd/as3722.c        | 12 ++----------
- drivers/of/device.c         | 19 ++++++++++++++++++-
- include/linux/i2c.h         | 29 ++++++++++++++++++++++++++++-
- 5 files changed, 114 insertions(+), 24 deletions(-)
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index d3802dc..face8f9 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+ 	return i2c_verify_adapter(dev);
+ }
+ EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
++
++const struct of_device_id
++*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
++				  struct device *dev)
++{
++	const struct i2c_client *client = i2c_verify_client(dev);
++	const char *name;
++
++	if (!(client && matches))
++		return NULL;
++
++	for (; matches->compatible[0]; matches++) {
++		name = strchr(matches->compatible, ',');
++		if (!name)
++			name = matches->compatible;
++		else
++			name++;
++
++		if (!strnicmp(client->name, name, strlen(client->name)))
++			return matches;
++	}
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(i2c_of_match_device_strip_vendor);
+ #else
+ static void of_i2c_register_devices(struct i2c_adapter *adap) { }
+ #endif /* CONFIG_OF */
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index b556e0a..f7ec75b 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -564,6 +564,9 @@ extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
+ /* must call put_device() when done with returned i2c_adapter device */
+ extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
+ 
++extern const struct of_device_id
++*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
++				  struct device *dev);
+ #else
+ 
+ static inline struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
+@@ -575,6 +578,13 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
+ {
+ 	return NULL;
+ }
++
++const struct of_device_id
++*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
++				  struct device *dev)
++{
++	return NULL;
++}
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_I2C_H */
+-- 
+1.8.3.2
