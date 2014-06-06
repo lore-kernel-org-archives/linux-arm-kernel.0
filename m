@@ -1,79 +1,318 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 6 Jun 2014 15:43:17 -0700
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <alpine.LFD.2.11.1406061831310.25775@knanqh.ubzr>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <alpine.LFD.2.11.1406061831310.25775@knanqh.ubzr>
-Message-ID: <CAD=FV=U6cUNd4tZ1q3WUMkNpU-O-1yEbnEPuGkctwi_8UkBEkA@mail.gmail.com>
+From: fkan@apm.com (Feng Kan)
+Date: Fri, 6 Jun 2014 15:46:38 -0700
+Subject: [PATCH v2 1/3] gpio: Add APM X-Gene SoC GPIO controller support
+In-Reply-To: <CAAVeFuKwcO=kjijG-Sh66_pod4=-mSjKN3+_a8P-ppomv9wq7g@mail.gmail.com>
+References: <1401391413-3833-1-git-send-email-fkan@apm.com>
+ <1401391413-3833-2-git-send-email-fkan@apm.com>
+ <CAAVeFuKwcO=kjijG-Sh66_pod4=-mSjKN3+_a8P-ppomv9wq7g@mail.gmail.com>
+Message-ID: <CAL85gmBjZ_JWctRN+0GHAA6Wyeq_NpQV941OKgppuJrmh2yx6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
-
-On Fri, Jun 6, 2014 at 3:35 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Fri, 6 Jun 2014, Doug Anderson wrote:
->
->> On exynos mcpm systems the firmware is hardcoded to jump to an address
->> in SRAM (0x02073000) when secondary CPUs come up.  By default the
->> firmware puts a bunch of code at that location.  That code expects the
->> kernel to fill in a few slots with addresses that it uses to jump back
->> to the kernel's entry point for secondary CPUs.
+On Thu, Jun 5, 2014 at 10:04 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> On Fri, May 30, 2014 at 4:23 AM, Feng Kan <fkan@apm.com> wrote:
+>> Add APM X-Gene SoC gpio controller driver.
 >>
->> Originally (on prerelease hardware) this firmware code contained a
->> bunch of workarounds to deal with boot ROM bugs.  However on all
->> shipped hardware we simply use this code to redirect to a kernel
->> function for bringing up the CPUs.
->>
->> Let's stop relying on the code provided by the bootloader and just
->> plumb in our own (simple) code jump to the kernel.  This has the nice
->> benefit of fixing problems due to the fact that older bootloaders
->> (like the one shipped on the Samsung Chromebook 2) might have put
->> slightly different code into this location.
->>
->> Once suspend/resume is implemented for systems using exynos-mcpm we'll
->> need to make sure we reinstall our fixed up code after resume.  ...but
->> that's not anything new since IRAM (and thus the address of the
->> mcpm_entry_point) is lost across suspend/resume anyway.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
 >> ---
->>  arch/arm/mach-exynos/mcpm-exynos.c | 10 ++++++----
->>  1 file changed, 6 insertions(+), 4 deletions(-)
+>>  drivers/gpio/Kconfig      |   9 ++
+>>  drivers/gpio/Makefile     |   1 +
+>>  drivers/gpio/gpio-xgene.c | 231 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 241 insertions(+)
+>>  create mode 100644 drivers/gpio/gpio-xgene.c
 >>
->> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
->> index 0498d0b..3a7fad0 100644
->> --- a/arch/arm/mach-exynos/mcpm-exynos.c
->> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->> @@ -343,11 +343,13 @@ static int __init exynos_mcpm_init(void)
->>       pr_info("Exynos MCPM support installed\n");
+>> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+>> index a86c49a..9a15983 100644
+>> --- a/drivers/gpio/Kconfig
+>> +++ b/drivers/gpio/Kconfig
+>> @@ -324,6 +324,15 @@ config GPIO_TZ1090_PDC
+>>         help
+>>           Say yes here to support Toumaz Xenif TZ1090 PDC GPIOs.
 >>
->>       /*
->> -      * Future entries into the kernel can now go
->> -      * through the cluster entry vectors.
->> +      * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
->> +      * as part of secondary_cpu_start().  Let's redirect it to the
->> +      * mcpm_entry_point().
->>        */
->> -     __raw_writel(virt_to_phys(mcpm_entry_point),
->> -                     ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
->> +     __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
->> +     __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
->> +     __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
+>> +config GPIO_XGENE
+>> +       bool "APM X-Gene GPIO controller support"
+>> +       depends on ARM64 && OF_GPIO
+>> +       help
+>> +         This driver is to support the GPIO block within the APM X-Gene SoC
+>> +         platform's generic flash controller. The GPIO pins are muxed with
+>> +         the generic flash controller's address and data pins. Say yes
+>> +         here to enable the GFC GPIO functionality.
+>> +
+>>  config GPIO_XILINX
+>>         bool "Xilinx GPIO support"
+>>         depends on PPC_OF || MICROBLAZE || ARCH_ZYNQ
+>> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+>> index 6309aff..f0f2830 100644
+>> --- a/drivers/gpio/Makefile
+>> +++ b/drivers/gpio/Makefile
+>> @@ -98,6 +98,7 @@ obj-$(CONFIG_GPIO_VX855)      += gpio-vx855.o
+>>  obj-$(CONFIG_GPIO_WM831X)      += gpio-wm831x.o
+>>  obj-$(CONFIG_GPIO_WM8350)      += gpio-wm8350.o
+>>  obj-$(CONFIG_GPIO_WM8994)      += gpio-wm8994.o
+>> +obj-$(CONFIG_GPIO_XGENE)       += gpio-xgene.o
+>>  obj-$(CONFIG_GPIO_XILINX)      += gpio-xilinx.o
+>>  obj-$(CONFIG_GPIO_XTENSA)      += gpio-xtensa.o
+>>  obj-$(CONFIG_GPIO_ZEVIO)       += gpio-zevio.o
+>> diff --git a/drivers/gpio/gpio-xgene.c b/drivers/gpio/gpio-xgene.c
+>> new file mode 100644
+>> index 0000000..a542f76
+>> --- /dev/null
+>> +++ b/drivers/gpio/gpio-xgene.c
+>> @@ -0,0 +1,231 @@
+>> +/*
+>> + * AppliedMicro X-Gene SoC GPIO Driver
+>> + *
+>> + * Copyright (c) 2014, Applied Micro Circuits Corporation
+>> + * Author: Feng Kan <fkan@apm.com>.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/of_gpio.h>
+>> +#include <linux/of.h>
+>> +#include <linux/gpio.h>
+>> +#include <linux/types.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/bitops.h>
+>> +
+>> +#define GPIO_SET_MASK(x)       BIT(x + 16)
+>> +
+>> +#define GPIO_SET_DR_OFFSET     0x00
+>> +#define GPIO_DATA_OFFSET       0x08
+>> +
+>> +#define XGENE_MAX_GPIO_PER_BANK        16
+>> +
+>> +struct xgene_gpio;
+>> +
+>> +struct xgene_gpio {
+>> +       struct  device          *dev;
+>> +       struct xgene_gpio_bank  *banks;
 >
-> Is this valid for all exynos systems, or is this particular to
-> Chromebooks?
+> I am not seeing this member being used at all in your driver, apart
+> from being kzalloc'd.
+>
+>> +       struct gpio_chip        chip;
+>> +       void __iomem            *base;
+>> +       spinlock_t              lock;
+>> +#ifdef CONFIG_PM
+>> +       u32                     set_dr_val;
+>> +       u32                     od_val;
+>> +#endif
+>> +};
+>> +
+>> +static inline struct xgene_gpio *to_xgene_gpio(struct gpio_chip *chip)
+>> +{
+>> +       return container_of(chip, struct xgene_gpio, chip);
+>> +}
+>> +
+>> +static int xgene_gpio_get(struct gpio_chip *gc, unsigned int offset)
+>> +{
+>> +       struct xgene_gpio *bank = to_xgene_gpio(gc);
+>> +
+>> +       return !!(ioread32(bank->base + GPIO_DATA_OFFSET) & BIT(offset));
+>> +}
+>> +
+>> +static void xgene_gpio_set(struct gpio_chip *gc, unsigned int offset, int val)
+>> +{
+>> +       struct xgene_gpio *bank = to_xgene_gpio(gc);
+>> +       unsigned long flags;
+>> +       u32 setval;
+>> +
+>> +       spin_lock_irqsave(&bank->lock, flags);
+>> +
+>> +       setval = ioread32(bank->base + GPIO_SET_DR_OFFSET);
+>> +       if (val)
+>> +               setval |= GPIO_SET_MASK(offset);
+>> +       else
+>> +               setval &= ~GPIO_SET_MASK(offset);
+>
+> Let's use __set_bit and __clear_bit here and everywhere it applies.
+This is a bit of issue on arm64, where the op for set_bit requires
+unsigned long.
+Any suggestions?
 
-I will have to let others comment on that since I can't be certain of
-anything other than the firmware branch I've seen.
+>
+>> +       iowrite32(setval, bank->base + GPIO_SET_DR_OFFSET);
+>> +
+>> +       spin_unlock_irqrestore(&bank->lock, flags);
+>> +}
+>> +
+>> +static int xgene_gpio_dir_in(struct gpio_chip *gc, unsigned int offset)
+>> +{
+>> +       struct xgene_gpio *bank = to_xgene_gpio(gc);
+>> +       unsigned long flags;
+>> +       u32 dirval;
+>> +
+>> +       spin_lock_irqsave(&bank->lock, flags);
+>> +
+>> +       dirval = ioread32(bank->base + GPIO_SET_DR_OFFSET);
+>> +       dirval |= BIT(offset);
+>> +       iowrite32(dirval, bank->base + GPIO_SET_DR_OFFSET);
+>> +
+>> +       spin_unlock_irqrestore(&bank->lock, flags);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int xgene_gpio_dir_out(struct gpio_chip *gc,
+>> +                                       unsigned int offset, int val)
+>> +{
+>> +       struct xgene_gpio *bank = to_xgene_gpio(gc);
+>> +       unsigned long flags;
+>> +       u32 dirval;
+>> +
+>> +       spin_lock_irqsave(&bank->lock, flags);
+>> +
+>> +       dirval = ioread32(bank->base + GPIO_SET_DR_OFFSET);
+>> +       dirval &= ~BIT(offset);
+>> +       iowrite32(dirval, bank->base + GPIO_SET_DR_OFFSET);
+>> +
+>> +       spin_unlock_irqrestore(&bank->lock, flags);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +#ifdef CONFIG_PM
+>> +static int xgene_gpio_suspend(struct device *dev)
+>> +{
+>> +       struct xgene_gpio *gpio = dev_get_drvdata(dev);
+>> +
+>> +       gpio->set_dr_val = ioread32(gpio->base + GPIO_SET_DR_OFFSET);
+>> +       return 0;
+>> +}
+>> +
+>> +static int xgene_gpio_resume(struct device *dev)
+>> +{
+>> +       struct xgene_gpio *gpio = dev_get_drvdata(dev);
+>> +
+>> +       iowrite32(gpio->set_dr_val, gpio->base + GPIO_SET_DR_OFFSET);
+>> +       return 0;
+>> +}
+>> +
+>> +static SIMPLE_DEV_PM_OPS(xgene_gpio_pm, xgene_gpio_suspend, xgene_gpio_resume);
+>> +#define XGENE_GPIO_PM_OPS      (&xgene_gpio_pm)
+>> +#else
+>> +#define XGENE_GPIO_PM_OPS      NULL
+>> +#endif
+>> +
+>> +static int xgene_gpio_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       struct resource *res;
+>> +       struct xgene_gpio *gpio;
+>> +       int err = 0;
+>> +       unsigned int bank = 0, ngpio = 0;
+>> +
+>> +       gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
+>> +       if (!gpio) {
+>> +               err = -ENOMEM;
+>> +               goto err;
+>> +       }
+>> +       gpio->dev = &pdev->dev;
+>> +
+>> +       gpio->banks = devm_kzalloc(&pdev->dev,
+>> +                                  sizeof(struct xgene_gpio), GFP_KERNEL);
+>> +       if (!gpio->banks) {
+>> +               err = -ENOMEM;
+>> +               goto err;
+>> +       }
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       gpio->base = devm_ioremap_nocache(&pdev->dev, res->start,
+>> +                                                       resource_size(res));
+>> +       if (IS_ERR(gpio->base)) {
+>> +               err = PTR_ERR(gpio->base);
+>> +               goto err;
+>> +       }
+>> +
+>> +       /*
+>> +        * Determine gpio bank using gpio resource address
+>> +        */
+>> +       bank = (res->start & 0xff) / 0xc - 1;
+>> +       if (bank > 2) {
+>> +               dev_err(gpio->dev, "incorrect gpio base specified\n");
+>> +               goto err;
+>> +       }
+>> +
+>> +       ngpio = XGENE_MAX_GPIO_PER_BANK;
+>> +       gpio->chip.ngpio = ngpio;
+>
+> Maybe use XGENE_MAX_GPIO_PER_BANK directly instead of ngpio which is
+> not used otherwise.
+>
+>> +       gpio->chip.of_node = np;
+>> +       gpio->chip.base = bank * ngpio;
+>
+> This is dangerous. You are assuming that your chip will be the first
+> GPIO chip to be registered. Can't you leave chip.base uninitialized?
+In a SoC system where there are multiple gpio blocks by different vendor, how
+do one assign base to each block? I want them to boot up the system in a way
+that the gpio values make sense each time.
 
-...but given that the code before my patch was putting the resume
-address at the magic 0x0207301C and that matches the code I've seen,
-I'm going to say that they all behave the same.
-
-
-> If this is all that is needed to solve the problem being discussed in
-> the other thread I have absolutely no issue with such a workaround going
-> into mainline.
-
-This plus the CCI fix that Andrew is planning to post.
+>
+>> +       gpio->chip.label = dev_name(&pdev->dev);
+>> +
+>> +       gpio->chip.direction_input = xgene_gpio_dir_in;
+>> +       gpio->chip.direction_output = xgene_gpio_dir_out;
+>> +       gpio->chip.get = xgene_gpio_get;
+>> +       gpio->chip.set = xgene_gpio_set;
+>> +
+>> +       platform_set_drvdata(pdev, gpio);
+>> +
+>> +       err = gpiochip_add(&gpio->chip);
+>> +       if (err) {
+>> +               dev_err(gpio->dev,
+>> +                       "failed to register gpiochip for bank%d\n", bank);
+>> +               goto err;
+>> +       }
+>> +
+>> +       dev_info(&pdev->dev, "X-Gene GPIO driver registered\n");
+>> +       return 0;
+>> +err:
+>> +       dev_err(&pdev->dev, "X-Gene GPIO driver registration failed\n");
+>> +       return err;
+>> +}
+>> +
+>> +#ifdef CONFIG_OF
+>> +static const struct of_device_id xgene_gpio_of_match[] = {
+>> +       { .compatible = "apm,xgene-gpio", },
+>> +       {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, xgene_gpio_of_match);
+>> +#endif
+>> +
+>> +static struct platform_driver xgene_gpio_driver = {
+>> +       .driver = {
+>> +               .name = "xgene-gpio",
+>> +               .owner = THIS_MODULE,
+>> +               .of_match_table = of_match_ptr(xgene_gpio_of_match),
+>> +               .pm     = XGENE_GPIO_PM_OPS,
+>> +       },
+>> +       .probe = xgene_gpio_probe,
+>> +};
+>> +
+>> +module_platform_driver(xgene_gpio_driver);
+>> +
+>> +MODULE_AUTHOR("Feng Kan <fkan@apm.com>");
+>> +MODULE_DESCRIPTION("APM X-Gene GPIO driver");
+>> +MODULE_LICENSE("GPL");
+>> --
+>> 1.9.1
+>>
