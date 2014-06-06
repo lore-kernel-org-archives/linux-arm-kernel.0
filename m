@@ -1,34 +1,36 @@
-From: dianders@google.com (Doug Anderson)
-Date: Fri, 6 Jun 2014 14:44:59 -0700
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 6 Jun 2014 17:48:21 -0400 (EDT)
 Subject: Problems booting exynos5420 with >1 CPU
-In-Reply-To: <CAD=FV=U6HuQj3MxZ-yF-MYdjzqjT5bu=K26JuHZP1hjJzkSqbg@mail.gmail.com>
+In-Reply-To: <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
 References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
  <539145B4.5000200@gmail.com>
  <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
  <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
- <CAD=FV=Vo1JR6n496Q3FqXjRBkbTBRg89_fJQNsqeRx8WQW_a9w@mail.gmail.com>
- <CAM4voakAMN4jdAZDPz55tnc3woZDieZ5aL3TVU2kYsNHT+AMqg@mail.gmail.com>
- <CAD=FV=UjmN5AwWMPy7mQt-J4A_niO8Ug4r15Ez2ZWPT1g3L=VA@mail.gmail.com>
- <CAM4voa=1FY5bfk095BU=3X=vzqjnCSfdLoXpCix5tOwDgOoioQ@mail.gmail.com>
- <CAD=FV=UwgPQVm_KvHbpoJNs-5EtpyaYJ2rp2f-466uhnob=ixA@mail.gmail.com>
- <CAM4voa=cTbobQHi+sBOCy_CDYAnQ6CsvvuoE7XwqFZV_E3gEbQ@mail.gmail.com>
- <CAD=FV=U6HuQj3MxZ-yF-MYdjzqjT5bu=K26JuHZP1hjJzkSqbg@mail.gmail.com>
-Message-ID: <CAD=FV=Xbu6hV66Eewev2261xoSrtqj22fXYf1VXyin=WBcDerQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1406061740280.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 6 Jun 2014, Abhilash Kesavan wrote:
 
-On Fri, Jun 6, 2014 at 1:49 PM, Doug Anderson <dianders@google.com> wrote:
->> Are you talking about the re-writing the mcpm entry point address post-resume ?
->
-> Or even (as Andrew points out) just don't use it.
->
-> This works and IMHO is much cleaner because it totally removes the
-> U-Boot dependency.  I'll cleanup to not be so insane and post:
+> Hi Doug,
+> 
+> The first change in the kernel (clearing an iRAM location) is needed
+> because of an unnecessary change that we are carrying in the Chrome
+> U-boot. There is no reason for us to have the workaround in the
+> mainline kernel. Rather, we should remove the check from our u-boot.
+> However AFAIR a clean-up patch that I had posted internally was not
+> accepted as we had frozen the SPL at the time.
+> 
+> The second change is to enable snoops for boot cluster. Internally, we
+> were disabling the snoops for both the clusters at power off and
+> enabling it in power_up_setup and power_up. However, I dropped the
+> approach due to problems pointed out by Nicolas here
+> http://www.spinics.net/lists/arm-kernel/msg324091.html related to
+> cpuidle. Hence, we turn it on at the u-boot.
 
-The less insane version is at
-<https://patchwork.kernel.org/patch/4313611/>.  Thanks to Andrew for
-the suggestion!
+You should never *ever* play with the CCI from U-Boot.  That's for the 
+MCPM layer to decide when it is safe to do so.  That's mainly the 
+_whole_ reason why MCPM exists in the first place.
 
--Doug
+
+Nicolas
