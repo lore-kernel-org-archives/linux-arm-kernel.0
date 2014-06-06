@@ -1,81 +1,97 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 6 Jun 2014 16:02:08 +0800
-Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
-Message-ID: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 6 Jun 2014 09:10:26 +0100
+Subject: [PATCH 3/7] i2c: Add the ability to match device to compatible
+ string without an of_node
+In-Reply-To: <20140605173620.5BDFBC41CBF@trevor.secretlab.ca>
+References: <1401883796-17841-1-git-send-email-lee.jones@linaro.org>
+ <1401883796-17841-4-git-send-email-lee.jones@linaro.org>
+ <20140605173620.5BDFBC41CBF@trevor.secretlab.ca>
+Message-ID: <20140606081026.GO24240@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the ecc parameter is not the same as definition, when the
-mtd core check these parameters, it will give the unexpected
-result.
+On Thu, 05 Jun 2014, Grant Likely wrote:
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- drivers/mtd/nand/atmel_nand.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+> On Wed,  4 Jun 2014 13:09:52 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> > A great deal of I2C devices are currently matched via DT node name, and
+> > as such the compatible naming convention of '<vendor>,<device>' has gone
+> > somewhat awry - some nodes don't supply one, some supply an arbitrary
+> > string and others the correct device name with an arbitrary vendor prefix.
+> > 
+> > In an effort to correct this problem we have to supply a mechanism to
+> > match a device by compatible string AND by simple device name.  This
+> > function strips off the '<vendor>,' part of a supplied compatible string
+> > and attempts to match without it.
+> > 
+> > The plan is to remove this function once all of the compatible strings
+> > for each device have been brought into line.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/i2c/i2c-core.c | 25 +++++++++++++++++++++++++
+> >  include/linux/i2c.h    | 10 ++++++++++
+> >  2 files changed, 35 insertions(+)
+> > 
+> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> > index d3802dc..7dcd5c3 100644
+> > --- a/drivers/i2c/i2c-core.c
+> > +++ b/drivers/i2c/i2c-core.c
+> > @@ -1090,6 +1090,31 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+> >  	return i2c_verify_adapter(dev);
+> >  }
+> >  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
+> > +
+> > +const struct of_device_id
+> > +*i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
+> > +				  struct device *dev)
+> > +{
+> > +	const struct i2c_client *client = i2c_verify_client(dev);
+> > +	const char *name;
+> > +
+> > +	if (!(client && matches))
+> > +		return NULL;
+> > +
+> > +	for (; matches->compatible[0]; matches++) {
+> > +		name = strchr(matches->compatible, ',');
+> > +		if (!name)
+> > +			name = matches->compatible;
+> > +		else
+> > +			name++;
+> > +
+> > +		if (!strncmp(client->name, name, strlen(client->name)))
+> > +			return matches;
+> > +	}
+> 
+> Is it actually necessary to strip off the vendor name? It would be fine
+> to make users include the vendor prefix when creating the device in
+> sysfs. In fact that would be preferrable for new drivers so that vendor
+> prefixes start getting used correctly.
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 4ce181a..4f5348f 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -861,12 +861,11 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
- {
- 	struct nand_chip *nand_chip = mtd->priv;
- 	struct atmel_nand_host *host = nand_chip->priv;
--	int i, err_nbr, eccbytes;
-+	int i, err_nbr;
- 	uint8_t *buf_pos;
- 	int total_err = 0;
- 
--	eccbytes = nand_chip->ecc.bytes;
--	for (i = 0; i < eccbytes; i++)
-+	for (i = 0; i < nand_chip->ecc.total; i++)
- 		if (ecc[i] != 0xff)
- 			goto normal_check;
- 	/* Erased page, return OK */
-@@ -928,7 +927,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
- 	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
- {
- 	struct atmel_nand_host *host = chip->priv;
--	int eccsize = chip->ecc.size;
-+	int eccsize = chip->ecc.size * chip->ecc.steps;
- 	uint8_t *oob = chip->oob_poi;
- 	uint32_t *eccpos = chip->ecc.layout->eccpos;
- 	uint32_t stat;
-@@ -1169,8 +1168,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
- 		goto err;
- 	}
- 
--	/* ECC is calculated for the whole page (1 step) */
--	nand_chip->ecc.size = mtd->writesize;
-+	nand_chip->ecc.size = sector_size;
- 
- 	/* set ECC page size and oob layout */
- 	switch (mtd->writesize) {
-@@ -1185,18 +1183,20 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
- 		host->pmecc_index_of = host->pmecc_rom_base +
- 			host->pmecc_lookup_table_offset;
- 
--		nand_chip->ecc.steps = 1;
-+		nand_chip->ecc.steps = host->pmecc_sector_number;
- 		nand_chip->ecc.strength = cap;
--		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector *
-+		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector;
-+		nand_chip->ecc.total = host->pmecc_bytes_per_sector *
- 				       host->pmecc_sector_number;
--		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
-+		if (nand_chip->ecc.total > mtd->oobsize - 2) {
- 			dev_err(host->dev, "No room for ECC bytes\n");
- 			err_no = -EINVAL;
- 			goto err;
- 		}
- 		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
- 					mtd->oobsize,
--					nand_chip->ecc.bytes);
-+					nand_chip->ecc.total);
-+
- 		nand_chip->ecc.layout = &atmel_pmecc_oobinfo;
- 		break;
- 	case 512:
+I see a few issues with this strategy.  Firstly, there are already
+users registering their devices via sysfs, some are taking their
+device names from an EEPROM which would require reprogramming in order
+to prefix the vendor ID.  I'm keen not to break existing systems -
+which not stripping off the vendor name would inevitably do.
+Secondly, I'm not sure how Wolfram would feel about the client->name
+containing a DT compatible string. And finally, other than looking
+at the kernel source, there is no real way for a user to know if the
+device supports ACPI or OF, or neither and if an i2c_device_table is
+supplied or not.
+
+Remember that the idea of this set is to remove i2c_device_table's,
+doing so will break any devices which are still registering via sysfs
+with only the model number of the device.  I think the sysfs
+interface should be a black-box.  I think requiring users to have
+kernel knowledge is a sub-optimal idea.
+
+> If you're worried about preserving exisiting ABI, then I would make
+> striping the prefix an option that drivers can enable, but by default
+> only match on the full string.
+> 
+> g.
+
 -- 
-1.8.5.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
