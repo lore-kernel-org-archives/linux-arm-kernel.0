@@ -1,84 +1,68 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 06 Jun 2014 15:31:23 -0700
-Subject: [PATCH v3] clk: exynos5420: Remove aclk66_peric from the clock
- tree description
-In-Reply-To: <CAD=FV=UQhBh68Bgv=kfUROCOxg1dS1OnZ1ir+wouewKoDFE_1g@mail.gmail.com>
-References: <1401467562-5585-1-git-send-email-dianders@chromium.org>
- <1402000514-30752-1-git-send-email-dianders@chromium.org>
- <20140606000324.10062.10257@quantum>
- <CAD=FV=UQhBh68Bgv=kfUROCOxg1dS1OnZ1ir+wouewKoDFE_1g@mail.gmail.com>
-Message-ID: <20140606223123.10062.29366@quantum>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 6 Jun 2014 18:35:15 -0400 (EDT)
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+Message-ID: <alpine.LFD.2.11.1406061831310.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Doug Anderson (2014-06-05 17:46:23)
-> Mike,
-> 
-> On Thu, Jun 5, 2014 at 5:03 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Doug Anderson (2014-06-05 13:35:14)
-> >> The "aclk66_peric" clock is a gate clock with a whole bunch of gates
-> >> underneath it.  This big gate isn't very useful to include in our
-> >> clock tree.  If any of the children need to be turned on then the big
-> >> gate will need to be on anyway.  ...and there are plenty of other "big
-> >> gates" that aren't described in our clock tree, some of which shut off
-> >> collections of clocks that have no relationship in the hierarchy so
-> >> are hard to model.
-> >
-> > I think this is a common problem. On OMAP we have something similar to
-> > this called "clock domains" or "clkdm" and it has been historically
-> > handled outside of the Linux clock framework[1]. There is a relationship
-> > to the clock framework of course and in the future it might be
-> > worthwhile to see if there is a generic way to handle this stuff.
-> 
-> That sounds like something that would be nice to solve, but it's not
-> going to happen now.
-> 
-> On the off chance that the user manual mentioned the existence of one
-> of these "big gate" bits, it tends to not be very specific about
-> _exactly_ which sets of clocks it disables.
-> 
-> Tracking down every one of these would be hugely time consuming.
-> Also: as Tomasz has indicated they don't provide a huge amount of
-> benefit since we're already dealing with clocks on a more fine-grained
-> level...
+On Fri, 6 Jun 2014, Doug Anderson wrote:
 
-Sounds like you are dealing with crappy documentation :-(
+> On exynos mcpm systems the firmware is hardcoded to jump to an address
+> in SRAM (0x02073000) when secondary CPUs come up.  By default the
+> firmware puts a bunch of code at that location.  That code expects the
+> kernel to fill in a few slots with addresses that it uses to jump back
+> to the kernel's entry point for secondary CPUs.
+> 
+> Originally (on prerelease hardware) this firmware code contained a
+> bunch of workarounds to deal with boot ROM bugs.  However on all
+> shipped hardware we simply use this code to redirect to a kernel
+> function for bringing up the CPUs.
+> 
+> Let's stop relying on the code provided by the bootloader and just
+> plumb in our own (simple) code jump to the kernel.  This has the nice
+> benefit of fixing problems due to the fact that older bootloaders
+> (like the one shipped on the Samsung Chromebook 2) might have put
+> slightly different code into this location.
+> 
+> Once suspend/resume is implemented for systems using exynos-mcpm we'll
+> need to make sure we reinstall our fixed up code after resume.  ...but
+> that's not anything new since IRAM (and thus the address of the
+> mcpm_entry_point) is lost across suspend/resume anyway.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  arch/arm/mach-exynos/mcpm-exynos.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 0498d0b..3a7fad0 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -343,11 +343,13 @@ static int __init exynos_mcpm_init(void)
+>  	pr_info("Exynos MCPM support installed\n");
+>  
+>  	/*
+> -	 * Future entries into the kernel can now go
+> -	 * through the cluster entry vectors.
+> +	 * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+> +	 * as part of secondary_cpu_start().  Let's redirect it to the
+> +	 * mcpm_entry_point().
+>  	 */
+> -	__raw_writel(virt_to_phys(mcpm_entry_point),
+> -			ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
+> +	__raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+> +	__raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+> +	__raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
 
-> 
-> 
-> >> "aclk66_peric" is causing earlyprintk problems since it gets disabled
-> >> as part of the boot process, so let's just remove it.
-> >>
-> >> Strangely (and for no good reason) this clock is exported as part of
-> >> the common clock bindings.  Remove it since there are no in-kernel
-> >> device trees using it and no reason anyone out of tree should refer to
-> >> it either.
-> >
-> > So Linux has no control over the big gate now, correct? You are
-> > dependent on the bootloader to ungate this thing?
-> 
-> A better way to put it is that you're dependent on the bootloader not
-> to gate it.
-> 
-> ...but that's also true for pretty much any clock marked IGNORE_UNUSED
-> and not explicitly enabled anywhere.
-> 
-> 
-> Are you opposed to this landing as-is to unblock things and people can
-> continue to work on the clock driver to make it even better?
+Is this valid for all exynos systems, or is this particular to
+Chromebooks?
 
-No. I'm just trying to understand how things work so that we can arrive
-to the right decision. I know what it is like to try and quickly unblock
-everyone else and the rush to do so often leads to less awesome
-solutions.
+If this is all that is needed to solve the problem being discussed in 
+the other thread I have absolutely no issue with such a workaround going 
+into mainline.
 
-Anyways, getting back on point, Tomasz was right about the whole clk_get
-thing. So I'm happy to take either V1 or V3 of your patch. I will be
-submitting a second PR for 3.16 next week and it will include whichever
-version you and Tomasz agree is best.
 
-Regards,
-Mike
-
-> 
-> -Doug
+Nicolas
