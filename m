@@ -1,65 +1,63 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 06 Jun 2014 10:23:01 +0100
-Subject: [RFC v3 4/9] irqchip: gic: Introduce shadow irqs for FIQ
-In-Reply-To: <20140606074614.GU5961@tbergstrom-lnx.Nvidia.com>
-References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-5-git-send-email-daniel.thompson@linaro.org>
- <20140606074614.GU5961@tbergstrom-lnx.Nvidia.com>
-Message-ID: <53918875.8070205@linaro.org>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 6 Jun 2014 10:28:59 +0100
+Subject: [PATCH v3] arm/arm64: KVM: Fix and refactor unmap_range
+In-Reply-To: <1401894943-11213-1-git-send-email-christoffer.dall@linaro.org>
+References: <1401894943-11213-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAPvkgC2s+itzV5H+444Qhz_XfWVgWC1NU=tSugaxZWimOW5uyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/14 08:46, Peter De Schrijver wrote:
->> @@ -1037,17 +1076,28 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>  			irq_base = irq_start;
->>  		}
->>  
->> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
->> -					hwirq_base, &gic_irq_domain_ops, gic);
->> +		gic->domain =
->> +		    irq_domain_add_legacy(node, 2 * gic_irqs, irq_base,
->> +					  hwirq_base, &gic_irq_domain_ops, gic);
->>  	} else {
->> -		gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
->> -						    &gic_irq_domain_ops,
->> -						    gic);
->> +		gic->domain = irq_domain_add_linear(node, 2 * nr_routable_irqs,
->> +						    &gic_irq_domain_ops, gic);
->>  	}
->>  
->>  	if (WARN_ON(!gic->domain))
->>  		return;
->>  
->> +#ifdef CONFIG_FIQ
->> +	/* FIQ can only be supported on platforms without an extended irq_eoi
->> +	 * method (otherwise we take a lock during irq_eoi handling).
->> +	 */
->> +	if (!gic_arch_extn.irq_eoi)
->> +		fiq_add_mapping(
->> +		    irq_linear_revmap(gic->domain, hwirq_base),
->> +		    irq_linear_revmap(gic->domain, hwirq_base + gic_irqs),
->> +		    gic_irqs);
->> +#endif
-> 
-> This is rather unfortunate. On Tegra for example we don't need a lock for the
-> irq_eoi because the eoi ack can be handled with a single write to the
-> appropriate irq ack register.
+Hi Christoffer,
 
-I believe that Tegra is the only platform that uses this hook so should
-be safe to remove the locks from gic_irq_eoi().
+On 4 June 2014 16:15, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> unmap_range() was utterly broken, to quote Marc, and broke in all sorts
+> of situations.  It was also quite complicated to follow and didn't
+> follow the usual scheme of having a separate iterating function for each
+> level of page tables.
+>
+> Address this by refactoring the code and introduce a pgd_clear()
+> function.
+>
+> Tested on TC2 with/without THP and limited testing on the v8 Foundation
+> Model.
+>
+> Reviewed-by: Jungseok Lee <jays.lee@samsung.com>
+> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
 
-Certainly looking back at the code history and the mailing list
-discussions around this code[1] I cannot see any reasoning about the
-locks that I have missed.
+This looks good to me.
 
-Any objections to just nuking the locks?
+Reviewed-by: Steve Capper <steve.capper@linaro.org>
 
+One minor comment below (sorry just spotted this now)...
 
-Daniel.
+[ ... ]
 
+> -static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+> +static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+> +                      phys_addr_t addr, phys_addr_t end)
+>  {
+> -       if (pte_present(*pte)) {
+> -               kvm_set_pte(pte, __pte(0));
+> -               put_page(virt_to_page(pte));
+> -               kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -       }
+> +       pte_t *pte, *start_pte;
+> +       unsigned long long start_addr = addr;
+> +
+> +       start_pte = pte = pte_offset_kernel(pmd, addr);
+> +       do {
+> +               if (!pte_none(*pte)) {
+> +                       kvm_set_pte(pte, __pte(0));
+> +                       put_page(virt_to_page(pte));
+> +                       kvm_tlb_flush_vmid_ipa(kvm, addr);
 
-[1]
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/107474
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/108361
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/109690
+Can this hyp call be expensive if a lot of ptes are being unmapped
+(for 64K pages we can have 8192 ptes per page)?
+If so, can they be batched together?
+
+Cheers,
+-- 
+Steve
