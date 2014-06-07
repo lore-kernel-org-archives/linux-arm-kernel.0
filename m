@@ -1,51 +1,131 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 06 Jun 2014 17:55:22 -0700
-Subject: [PATCHv2] arm64: Add atomic pool for non-coherent and CMA
- allocaitons.
-In-Reply-To: <20140605170500.GC27946@arm.com>
-References: <1401739432-5358-1-git-send-email-lauraa@codeaurora.org>
- <20140605170500.GC27946@arm.com>
-Message-ID: <539262FA.8010301@codeaurora.org>
+From: zlim@broadcom.com (Zi Shen Lim)
+Date: Fri, 6 Jun 2014 17:55:27 -0700
+Subject: [RESEND PATCH] arm64: topology: add MPIDR-based detection
+Message-ID: <1402102527-10569-1-git-send-email-zlim@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/5/2014 10:05 AM, Catalin Marinas wrote:
-> Hi Laura,
-> 
-> On Mon, Jun 02, 2014 at 09:03:52PM +0100, Laura Abbott wrote:
->> Neither CMA nor noncoherent allocations support atomic allocations.
->> Add a dedicated atomic pool to support this.
-> 
-> CMA indeed doesn't support atomic allocations but swiotlb does, the only
-> problem being the vmap() to create a non-cacheable mapping. Could we not
-> use the atomic pool only for non-coherent allocations?
->
+Lorenzo and Mark agreed on the following updated patch from Lorenzo:
+    http://www.spinics.net/lists/arm-kernel/msg336998.html
 
-CMA needs the atomic pool for both non-coherent and coherent allocations.
-Perhaps I should update the code so we only create the coherent atomic
-pool if CMA is used.
+W.r.t. cluster numbering, we're now back to where we were with the
+the original patch sent out in April:
+    https://lkml.org/lkml/2014/4/22/951
 
-.... 
+Were there any other objections to this approach?
+AFAICT, this patch should be good to go for 3.16.
+------->8--------
 
-> 
-> I think the safest is to use GFP_DMA as well. Without knowing exactly
-> what devices will do, what their dma masks are, I think that's a safer
-> bet. I plan to limit the CMA buffer to ZONE_DMA as well for lack of a
-> better option.
-> 
-> BTW, most of this code could be turned into a library, especially if we
-> don't need to separate coherent/non-coherent pools. Also, a lot of code
-> is similar to the dma_alloc_from_coherent() implementation (apart from
-> the ioremap() call in dma_declare_coherent_memory() and per-device pool
-> rather than global one).
-> 
+Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
+values, this method will always work. Therefore it should also work well
+as the fallback method. [1]
 
-I'm looking into if lib/genalloc.c can be extended for this purpose which
-should at least stop some of the duplicate bitmap management code. If that
-doesn't seem to work, I'll pull out what we have into a library.
+When we have multiple processing elements in the system, we create
+the cpu topology by mapping each affinity level (from lowest to highest)
+to threads (if they exist), cores, and clusters.
 
-Thanks,
-Laura
+[1] http://www.spinics.net/lists/arm-kernel/msg317445.html
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/include/asm/cputype.h |  2 ++
+ arch/arm64/kernel/topology.c     | 47 ++++++++++++++++++++++++++++------------
+ 2 files changed, 35 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index c404fb0..7639e8b 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -18,6 +18,8 @@
+ 
+ #define INVALID_HWID		ULONG_MAX
+ 
++#define MPIDR_UP_BITMASK	(0x1 << 30)
++#define MPIDR_MT_BITMASK	(0x1 << 24)
+ #define MPIDR_HWID_BITMASK	0xff00ffffff
+ 
+ #define MPIDR_LEVEL_BITS_SHIFT	3
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 43514f9..b6ee26b 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -20,6 +20,7 @@
+ #include <linux/of.h>
+ #include <linux/sched.h>
+ 
++#include <asm/cputype.h>
+ #include <asm/topology.h>
+ 
+ static int __init get_cpu_for_node(struct device_node *node)
+@@ -188,13 +189,9 @@ static int __init parse_dt_topology(void)
+ 	 * Check that all cores are in the topology; the SMP code will
+ 	 * only mark cores described in the DT as possible.
+ 	 */
+-	for_each_possible_cpu(cpu) {
+-		if (cpu_topology[cpu].cluster_id == -1) {
+-			pr_err("CPU%d: No topology information specified\n",
+-			       cpu);
++	for_each_possible_cpu(cpu)
++		if (cpu_topology[cpu].cluster_id == -1)
+ 			ret = -EINVAL;
+-		}
+-	}
+ 
+ out_map:
+ 	of_node_put(map);
+@@ -219,14 +216,6 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	struct cpu_topology *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
+ 	int cpu;
+ 
+-	if (cpuid_topo->cluster_id == -1) {
+-		/*
+-		 * DT does not contain topology information for this cpu.
+-		 */
+-		pr_debug("CPU%u: No topology information configured\n", cpuid);
+-		return;
+-	}
+-
+ 	/* update core and thread sibling masks */
+ 	for_each_possible_cpu(cpu) {
+ 		cpu_topo = &cpu_topology[cpu];
+@@ -249,6 +238,36 @@ static void update_siblings_masks(unsigned int cpuid)
+ 
+ void store_cpu_topology(unsigned int cpuid)
+ {
++	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
++	u64 mpidr;
++
++	if (cpuid_topo->cluster_id != -1)
++		goto topology_populated;
++
++	mpidr = read_cpuid_mpidr();
++
++	/* Uniprocessor systems can rely on default topology values */
++	if (mpidr & MPIDR_UP_BITMASK)
++		return;
++
++	/* Create cpu topology mapping based on MPIDR. */
++	if (mpidr & MPIDR_MT_BITMASK) {
++		/* Multiprocessor system : Multi-threads per core */
++		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
++	} else {
++		/* Multiprocessor system : Single-thread per core */
++		cpuid_topo->thread_id  = -1;
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	}
++
++	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
++		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
++		 cpuid_topo->thread_id, mpidr);
++
++topology_populated:
+ 	update_siblings_masks(cpuid);
+ }
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.4
