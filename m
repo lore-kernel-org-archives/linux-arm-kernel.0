@@ -1,110 +1,34 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 07 Jun 2014 06:59:53 +0100
-Subject: [PATCH v7 1/7] of: Provide function to request and map memory
-In-Reply-To: <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
-References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
- <1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
- <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
-Message-ID: <20140607055953.569D6C4099E@trevor.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 7 Jun 2014 10:09:44 +0100
+Subject: Kconfig fails: big select-based circular dependency
+Message-ID: <20140607090944.GL23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Jun 2014 10:19:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On Thu, Jun 5, 2014 at 12:26 PM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
-> > A call to of_iomap does not request the memory region.
-> > This patch adds the function of_io_request_and_map which requests
-> > the memory region before mapping it.
-> >
-> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > ---
-> >  drivers/of/address.c       |   28 ++++++++++++++++++++++++++++
-> >  include/linux/of_address.h |    8 ++++++++
-> >  2 files changed, 36 insertions(+)
-> >
-> > diff --git a/drivers/of/address.c b/drivers/of/address.c
-> > index cb4242a..c55b107 100644
-> > --- a/drivers/of/address.c
-> > +++ b/drivers/of/address.c
-> > @@ -721,3 +721,31 @@ void __iomem *of_iomap(struct device_node *np, int index)
-> >         return ioremap(res.start, resource_size(&res));
-> >  }
-> >  EXPORT_SYMBOL(of_iomap);
-> > +
-> > +/**
-> > + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
-> > + *                        for a given device_node
-> 
-> I believe docbook requires this to be 1 line.
-> 
-> > + * @device:    the device whose io range will be mapped
-> > + * @index:     index of the io range
-> > + * @name:      name of the resource
-> > + *
-> > + * Returns a pointer to the requested and mapped memory
-> > + */
-> > +void __iomem *of_io_request_and_map(struct device_node *np, int index, char *name)
-> > +{
-> > +       struct resource res;
-> > +       void __iomem *mem;
-> > +
-> > +       if (of_address_to_resource(np, index, &res))
-> > +               return NULL;
-> > +
-> > +       if (!request_mem_region(res.start, resource_size(&res), name))
-> 
-> Use the np->name here and drop the name parameter.
+This is getting silly:
 
-Name here would be the name of the owner (the driver), not the name of
-the node. Passing the name separately is fine by me.
+scripts/kconfig/conf --silentoldconfig Kconfig
+drivers/dma/Kconfig:5:error: recursive dependency detected!
+drivers/dma/Kconfig:5:  symbol DMADEVICES is selected by SAMSUNG_DMADEV
+arch/arm/plat-samsung/Kconfig:412:      symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
+arch/arm/mach-s3c64xx/Kconfig:20:       symbol S3C64XX_PL080 is selected by SPI_S3C64XX
+drivers/spi/Kconfig:429:        symbol SPI_S3C64XX depends on SPI
+drivers/spi/Kconfig:8:  symbol SPI is selected by DRM_PANEL_LD9040
+drivers/gpu/drm/panel/Kconfig:19:       symbol DRM_PANEL_LD9040 depends on DRM_PANEL
+drivers/gpu/drm/panel/Kconfig:1:        symbol DRM_PANEL is selected by DRM_IMX_LDB
+drivers/staging/imx-drm/Kconfig:35:     symbol DRM_IMX_LDB depends on MFD_SYSCON
+drivers/mfd/Kconfig:722:        symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
+drivers/power/reset/Kconfig:76: symbol POWER_RESET_KEYSTONE depends on POWER_SUPPLY
+drivers/power/Kconfig:1:        symbol POWER_SUPPLY is selected by HID_SONY
+drivers/hid/Kconfig:622:        symbol HID_SONY depends on NEW_LEDS
+drivers/leds/Kconfig:8: symbol NEW_LEDS is selected by BACKLIGHT_ADP8860
+drivers/video/backlight/Kconfig:327:    symbol BACKLIGHT_ADP8860 depends on BACKLIGHT_CLASS_DEVICE
+drivers/video/backlight/Kconfig:156:    symbol BACKLIGHT_CLASS_DEVICE is selected by FB_MX3
+drivers/video/fbdev/Kconfig:2333:       symbol FB_MX3 depends on MX3_IPU
+drivers/dma/Kconfig:121:        symbol MX3_IPU depends on DMADEVICES
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+This is a good illustration why the select disease is truely bad...
 
-You can merge this with the rest of the series.
-
-g.
-
-> 
-> > +               return NULL;
-> > +
-> > +       mem = ioremap(res.start, resource_size(&res));
-> > +       if (!mem)
-> > +               release_mem_region(res.start, resource_size(&res));
-> > +
-> > +       return mem;
-> > +}
-> > +EXPORT_SYMBOL(of_io_request_and_map);
-> > diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> > index 5f6ed6b..725b875 100644
-> > --- a/include/linux/of_address.h
-> > +++ b/include/linux/of_address.h
-> > @@ -96,6 +96,8 @@ static inline struct of_pci_range *of_pci_range_parser_one(
-> >  extern int of_address_to_resource(struct device_node *dev, int index,
-> >                                   struct resource *r);
-> >  void __iomem *of_iomap(struct device_node *node, int index);
-> > +void __iomem *of_io_request_and_map(struct device_node *device,
-> > +                                       int index, char *name);
-> >  #else
-> >  static inline int of_address_to_resource(struct device_node *dev, int index,
-> >                                          struct resource *r)
-> > @@ -107,6 +109,12 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
-> >  {
-> >         return NULL;
-> >  }
-> > +
-> > +static inline void __iomem *of_io_request_and_map(struct device_node *device,
-> > +                                       int index, char *name)
-> > +{
-> > +       return NULL;
-> > +}
-> >  #endif
-> >
-> >  #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
-> > --
-> > 1.7.9.5
-> >
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
