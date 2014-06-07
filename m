@@ -1,163 +1,147 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  7 Jun 2014 20:09:26 +0400
-Subject: [PATCH 2/2] ARM: i.MX27 clk: Use of_clk_init() for DT case
-In-Reply-To: <1402157366-25134-1-git-send-email-shc_work@mail.ru>
-References: <1402157366-25134-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1402157366-25134-2-git-send-email-shc_work@mail.ru>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 7 Jun 2014 12:10:27 -0400 (EDT)
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <CAM4voam5KDicwLAt3EA1UC7M+EciGccrnMUKxoR-5c8xT8-zSQ@mail.gmail.com>
+References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
+ <539145B4.5000200@gmail.com>
+ <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
+ <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
+ <alpine.LFD.2.11.1406061740280.25775@knanqh.ubzr>
+ <CAM4voam5KDicwLAt3EA1UC7M+EciGccrnMUKxoR-5c8xT8-zSQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1406062340480.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace .init_time() hook with of_clk_init() for DT targets.
+On Sat, 7 Jun 2014, Abhilash Kesavan wrote:
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/clk-imx27.c | 57 ++++++++++++++++++++++---------------------
- arch/arm/mach-imx/common.h    |  1 -
- arch/arm/mach-imx/imx27-dt.c  |  6 -----
- 3 files changed, 29 insertions(+), 35 deletions(-)
+> Hi Nicolas,
+> 
+> The first man of the incoming cluster enables its snoops via the
+> power_up_setup function. During secondary boot-up, this does not occur
+> for the boot cluster. Hence, I enable the snoops for the boot cluster
+> as a one-time setup from the u-boot prompt. After secondary boot-up
+> there is no modification that I do.
 
-diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index f5a6a3f..8c55797 100644
---- a/arch/arm/mach-imx/clk-imx27.c
-+++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -1,32 +1,31 @@
- #include <linux/clk.h>
--#include <linux/io.h>
--#include <linux/module.h>
-+#include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/err.h>
--#include <linux/clk-provider.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
+OK that's good.
+
+> Where should this be ideally done ?
+
+If I remember correctly, the CCI can be safely activated only when the 
+cache is disabled.  So that means the CCI should ideally be turned on 
+for the boot cluster (and *only* for the boot CPU) by the bootloader.
+
+Now... If you _really_ prefer to do it from the kernel to avoid 
+difficulties with bootloader updates, then it should be possible to do 
+it from the kernel by temporarily turning the cache off.  This is not a 
+small thing but the MCPM infrastructure can be leveraged.  Here's what I 
+tried on a TC2 which might just work for you as well:
+
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index 86fd60fefb..1cc49de308 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -12,11 +12,13 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/irqflags.h>
++#include <linux/cpu_pm.h>
  
- #include "clk.h"
- #include "common.h"
- #include "hardware.h"
+ #include <asm/mcpm.h>
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
+ #include <asm/cputype.h>
++#include <asm/suspend.h>
  
--#define IO_ADDR_CCM(off)	(MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR + (off)))
-+static void __iomem *ccm __initdata;
+ extern unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
  
- /* Register offsets */
--#define CCM_CSCR		IO_ADDR_CCM(0x0)
--#define CCM_MPCTL0		IO_ADDR_CCM(0x4)
--#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
--#define CCM_SPCTL0		IO_ADDR_CCM(0xc)
--#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
--#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
--#define CCM_PCDR0		IO_ADDR_CCM(0x18)
--#define CCM_PCDR1		IO_ADDR_CCM(0x1c)
--#define CCM_PCCR0		IO_ADDR_CCM(0x20)
--#define CCM_PCCR1		IO_ADDR_CCM(0x24)
--#define CCM_CCSR		IO_ADDR_CCM(0x28)
--#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
--#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
--#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
-+#define CCM_CSCR		(ccm + 0x00)
-+#define CCM_MPCTL0		(ccm + 0x04)
-+#define CCM_MPCTL1		(ccm + 0x08)
-+#define CCM_SPCTL0		(ccm + 0x0c)
-+#define CCM_SPCTL1		(ccm + 0x10)
-+#define CCM_OSC26MCTL		(ccm + 0x14)
-+#define CCM_PCDR0		(ccm + 0x18)
-+#define CCM_PCDR1		(ccm + 0x1c)
-+#define CCM_PCCR0		(ccm + 0x20)
-+#define CCM_PCCR1		(ccm + 0x24)
-+#define CCM_CCSR		(ccm + 0x28)
-+#define CCM_PMCTL		(ccm + 0x2c)
-+#define CCM_PMCOUNT		(ccm + 0x30)
-+#define CCM_WKGDCTL		(ccm + 0x34)
- 
- #define CCM_CSCR_UPDATE_DIS	(1 << 31)
- #define CCM_CSCR_SSI2		(1 << 23)
-@@ -93,6 +92,8 @@ static void __init _mx27_clocks_init(unsigned long fref)
- {
- 	unsigned i;
- 
-+	BUG_ON(!ccm);
-+
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
- 	clk[ckih] = imx_clk_fixed("ckih", fref);
- 	clk[ckil] = imx_clk_fixed("ckil", 32768);
-@@ -214,6 +215,8 @@ static void __init _mx27_clocks_init(unsigned long fref)
- 
- int __init mx27_clocks_init(unsigned long fref)
- {
-+	ccm = ioremap(MX27_CCM_BASE_ADDR, SZ_4K);
-+
- 	_mx27_clocks_init(fref);
- 
- 	clk_register_clkdev(clk[uart1_ipg_gate], "ipg", "imx21-uart.0");
-@@ -283,29 +286,27 @@ int __init mx27_clocks_init(unsigned long fref)
+@@ -146,6 +148,44 @@ int mcpm_cpu_powered_up(void)
  	return 0;
  }
  
--int __init mx27_clocks_init_dt(void)
-+static void __init mx27_clocks_init_dt(struct device_node *np)
- {
--	struct device_node *np;
-+	struct device_node *refnp;
- 	u32 fref = 26000000; /* default */
++static int go_down(unsigned long _arg)
++{
++	void (*cache_disable)(void) = (void *)_arg;
++	unsigned int mpidr = read_cpuid_mpidr();
++	unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	phys_reset_t phys_reset;
++
++	mcpm_set_entry_vector(cpu, cluster, cpu_resume);
++	setup_mm_for_reboot();
++
++	__mcpm_cpu_going_down(cpu, cluster);
++	BUG_ON(!__mcpm_outbound_enter_critical(cpu, cluster));
++	cache_disable();
++	__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
++	__mcpm_cpu_down(cpu, cluster);
++
++	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
++	phys_reset(virt_to_phys(mcpm_entry_point));
++	BUG();
++}
++	
++int mcpm_loopback(void (*cache_disable)(void))
++{
++	int ret;
++
++	local_irq_disable();
++	local_fiq_disable();
++	ret = cpu_pm_enter();
++	if (!ret) {
++		ret = cpu_suspend((unsigned long)cache_disable, go_down);
++		cpu_pm_exit();
++	}
++	local_fiq_enable();
++	local_irq_enable();
++	return ret;
++}
++
+ struct sync_struct mcpm_sync;
  
--	for_each_compatible_node(np, NULL, "fixed-clock") {
--		if (!of_device_is_compatible(np, "fsl,imx-osc26m"))
-+	for_each_compatible_node(refnp, NULL, "fixed-clock") {
-+		if (!of_device_is_compatible(refnp, "fsl,imx-osc26m"))
- 			continue;
- 
--		if (!of_property_read_u32(np, "clock-frequency", &fref))
-+		if (!of_property_read_u32(refnp, "clock-frequency", &fref))
- 			break;
- 	}
- 
--	_mx27_clocks_init(fref);
-+	ccm = of_iomap(np, 0);
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx27-ccm");
--	BUG_ON(!np);
-+	_mx27_clocks_init(fref);
- 
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 
- 	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
--
--	return 0;
+ /*
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index 29e7785a54..abecdd734f 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -323,6 +323,26 @@ static void __naked tc2_pm_power_up_setup(unsigned int affinity_level)
+ "	b	cci_enable_port_for_self ");
  }
-+CLK_OF_DECLARE(imx27_ccm, "fsl,imx27-ccm", mx27_clocks_init_dt);
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 5aaea2b..7668ff5 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -56,7 +56,6 @@ int mx27_clocks_init(unsigned long fref);
- int mx31_clocks_init(unsigned long fref);
- int mx35_clocks_init(void);
- int mx25_clocks_init_dt(void);
--int mx27_clocks_init_dt(void);
- int mx31_clocks_init_dt(void);
- struct platform_device *mxc_register_gpio(char *name, int id,
- 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
-diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
-index 17bd405..080e66c 100644
---- a/arch/arm/mach-imx/imx27-dt.c
-+++ b/arch/arm/mach-imx/imx27-dt.c
-@@ -34,16 +34,10 @@ static const char * const imx27_dt_board_compat[] __initconst = {
- 	NULL
- };
  
--static void __init imx27_timer_init(void)
--{
--	mx27_clocks_init_dt();
--}
--
- DT_MACHINE_START(IMX27_DT, "Freescale i.MX27 (Device Tree Support)")
- 	.map_io		= mx27_map_io,
- 	.init_early	= imx27_init_early,
- 	.init_irq	= mx27_init_irq,
--	.init_time	= imx27_timer_init,
- 	.init_machine	= imx27_dt_init,
- 	.dt_compat	= imx27_dt_board_compat,
- 	.restart	= mxc_restart,
--- 
-1.8.5.5
++int mcpm_loopback(void (*cache_disable)(void));
++
++static void tc2_cache_down(void)
++{
++	pr_warn("TC2: disabling cache\n");
++	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A15) {
++		/*
++		 * On the Cortex-A15 we need to disable
++		 * L2 prefetching before flushing the cache.
++		 */
++		asm volatile(
++		"mcr	p15, 1, %0, c15, c0, 3 \n\t"
++		"isb	\n\t"
++		"dsb	"
++		: : "r" (0x400) );
++	}
++	v7_exit_coherency_flush(all);
++	cci_disable_port_by_cpu(read_cpuid_mpidr());
++}
++
+ static int __init tc2_pm_init(void)
+ {
+ 	int ret, irq;
+@@ -370,6 +390,7 @@ static int __init tc2_pm_init(void)
+ 	ret = mcpm_platform_register(&tc2_pm_power_ops);
+ 	if (!ret) {
+ 		mcpm_sync_init(tc2_pm_power_up_setup);
++		BUG_ON(mcpm_loopback(tc2_cache_down) != 0);
+ 		pr_info("TC2 power management initialized\n");
+ 	}
+ 	return ret;
+
+Of course it is not because I'm helping you sidestepping firmware 
+problems that I'll stop shaming those who came up with that firmware 
+design.  ;-)
+
+
+Nicolas
