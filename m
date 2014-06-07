@@ -1,131 +1,79 @@
-From: zlim@broadcom.com (Zi Shen Lim)
-Date: Fri, 6 Jun 2014 17:55:27 -0700
-Subject: [RESEND PATCH] arm64: topology: add MPIDR-based detection
-Message-ID: <1402102527-10569-1-git-send-email-zlim@broadcom.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 6 Jun 2014 21:34:00 -0400 (EDT)
+Subject: [PATCH v2] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <1402096465-13218-1-git-send-email-dianders@chromium.org>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <1402096465-13218-1-git-send-email-dianders@chromium.org>
+Message-ID: <alpine.LFD.2.11.1406062132480.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo and Mark agreed on the following updated patch from Lorenzo:
-    http://www.spinics.net/lists/arm-kernel/msg336998.html
+On Fri, 6 Jun 2014, Doug Anderson wrote:
 
-W.r.t. cluster numbering, we're now back to where we were with the
-the original patch sent out in April:
-    https://lkml.org/lkml/2014/4/22/951
+> On exynos mcpm systems the firmware is hardcoded to jump to an address
+> in SRAM (0x02073000) when secondary CPUs come up.  By default the
+> firmware puts a bunch of code at that location.  That code expects the
+> kernel to fill in a few slots with addresses that it uses to jump back
+> to the kernel's entry point for secondary CPUs.
+> 
+> Originally (on prerelease hardware) this firmware code contained a
+> bunch of workarounds to deal with boot ROM bugs.  However on all
+> shipped hardware we simply use this code to redirect to a kernel
+> function for bringing up the CPUs.
+> 
+> Let's stop relying on the code provided by the bootloader and just
+> plumb in our own (simple) code jump to the kernel.  This has the nice
+> benefit of fixing problems due to the fact that older bootloaders
+> (like the one shipped on the Samsung Chromebook 2) might have put
+> slightly different code into this location.
+> 
+> Once suspend/resume is implemented for systems using exynos-mcpm we'll
+> need to make sure we reinstall our fixed up code after resume.  ...but
+> that's not anything new since IRAM (and thus the address of the
+> mcpm_entry_point) is lost across suspend/resume anyway.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-Were there any other objections to this approach?
-AFAICT, this patch should be good to go for 3.16.
-------->8--------
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
-values, this method will always work. Therefore it should also work well
-as the fallback method. [1]
-
-When we have multiple processing elements in the system, we create
-the cpu topology by mapping each affinity level (from lowest to highest)
-to threads (if they exist), cores, and clusters.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg317445.html
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/include/asm/cputype.h |  2 ++
- arch/arm64/kernel/topology.c     | 47 ++++++++++++++++++++++++++++------------
- 2 files changed, 35 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index c404fb0..7639e8b 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -18,6 +18,8 @@
- 
- #define INVALID_HWID		ULONG_MAX
- 
-+#define MPIDR_UP_BITMASK	(0x1 << 30)
-+#define MPIDR_MT_BITMASK	(0x1 << 24)
- #define MPIDR_HWID_BITMASK	0xff00ffffff
- 
- #define MPIDR_LEVEL_BITS_SHIFT	3
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 43514f9..b6ee26b 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -20,6 +20,7 @@
- #include <linux/of.h>
- #include <linux/sched.h>
- 
-+#include <asm/cputype.h>
- #include <asm/topology.h>
- 
- static int __init get_cpu_for_node(struct device_node *node)
-@@ -188,13 +189,9 @@ static int __init parse_dt_topology(void)
- 	 * Check that all cores are in the topology; the SMP code will
- 	 * only mark cores described in the DT as possible.
- 	 */
--	for_each_possible_cpu(cpu) {
--		if (cpu_topology[cpu].cluster_id == -1) {
--			pr_err("CPU%d: No topology information specified\n",
--			       cpu);
-+	for_each_possible_cpu(cpu)
-+		if (cpu_topology[cpu].cluster_id == -1)
- 			ret = -EINVAL;
--		}
--	}
- 
- out_map:
- 	of_node_put(map);
-@@ -219,14 +216,6 @@ static void update_siblings_masks(unsigned int cpuid)
- 	struct cpu_topology *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
- 	int cpu;
- 
--	if (cpuid_topo->cluster_id == -1) {
--		/*
--		 * DT does not contain topology information for this cpu.
--		 */
--		pr_debug("CPU%u: No topology information configured\n", cpuid);
--		return;
--	}
--
- 	/* update core and thread sibling masks */
- 	for_each_possible_cpu(cpu) {
- 		cpu_topo = &cpu_topology[cpu];
-@@ -249,6 +238,36 @@ static void update_siblings_masks(unsigned int cpuid)
- 
- void store_cpu_topology(unsigned int cpuid)
- {
-+	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
-+	u64 mpidr;
-+
-+	if (cpuid_topo->cluster_id != -1)
-+		goto topology_populated;
-+
-+	mpidr = read_cpuid_mpidr();
-+
-+	/* Uniprocessor systems can rely on default topology values */
-+	if (mpidr & MPIDR_UP_BITMASK)
-+		return;
-+
-+	/* Create cpu topology mapping based on MPIDR. */
-+	if (mpidr & MPIDR_MT_BITMASK) {
-+		/* Multiprocessor system : Multi-threads per core */
-+		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
-+	} else {
-+		/* Multiprocessor system : Single-thread per core */
-+		cpuid_topo->thread_id  = -1;
-+		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+	}
-+
-+	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
-+		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
-+		 cpuid_topo->thread_id, mpidr);
-+
-+topology_populated:
- 	update_siblings_masks(cpuid);
- }
- 
--- 
-1.8.4
+> ---
+> Changes in v2:
+> - Removed #define
+> 
+>  arch/arm/mach-exynos/mcpm-exynos.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 0498d0b..ace0ed6 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -25,7 +25,6 @@
+>  
+>  #define EXYNOS5420_CPUS_PER_CLUSTER	4
+>  #define EXYNOS5420_NR_CLUSTERS		2
+> -#define MCPM_BOOT_ADDR_OFFSET		0x1c
+>  
+>  /*
+>   * The common v7_exit_coherency_flush API could not be used because of the
+> @@ -343,11 +342,13 @@ static int __init exynos_mcpm_init(void)
+>  	pr_info("Exynos MCPM support installed\n");
+>  
+>  	/*
+> -	 * Future entries into the kernel can now go
+> -	 * through the cluster entry vectors.
+> +	 * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+> +	 * as part of secondary_cpu_start().  Let's redirect it to the
+> +	 * mcpm_entry_point().
+>  	 */
+> -	__raw_writel(virt_to_phys(mcpm_entry_point),
+> -			ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
+> +	__raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+> +	__raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+> +	__raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
+>  
+>  	iounmap(ns_sram_base_addr);
+>  
+> -- 
+> 2.0.0.526.g5318336
+> 
