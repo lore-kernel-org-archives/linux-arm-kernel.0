@@ -1,57 +1,189 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 06 Jun 2014 16:41:55 -0700
-Subject: [PATCH v3] clk: exynos5420: Remove aclk66_peric from the clock
- tree description
-In-Reply-To: <5390EE97.9020702@gmail.com>
-References: <1401467562-5585-1-git-send-email-dianders@chromium.org>
- <1402000514-30752-1-git-send-email-dianders@chromium.org>
- <5390EE97.9020702@gmail.com>
-Message-ID: <20140606234155.10062.58609@quantum>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 6 Jun 2014 17:44:57 -0700
+Subject: [RFC PATCH 2/5] clk: Introduce 'clk_round_rate_nearest()'
+In-Reply-To: <20140522182040.GB20155@pengutronix.de>
+References: <20140520073358.GJ16662@pengutronix.de>
+ <4bb5f44a-60bb-4e34-8f88-f91b8419be8d@BL2FFO11FD050.protection.gbl>
+ <537B957B.5010001@codeaurora.org>
+ <668683e3-856e-4f30-9b11-8f3e91e12d1d@BL2FFO11FD038.protection.gbl>
+ <20140521073457.GD31687@pengutronix.de>
+ <e9090453-ce40-4662-a3ea-fbdaffdb2aa4@BN1AFFO11FD046.protection.gbl>
+ <20140521182308.GN31687@pengutronix.de> <20140521203300.9521.67546@quantum>
+ <ac335a38-b0f4-4d95-b111-56c05e1a6234@BN1BFFO11FD045.protection.gbl>
+ <20140522182040.GB20155@pengutronix.de>
+Message-ID: <fabca95a-fca0-4a8e-b79a-c7d6437de9f0@BL2FFO11FD042.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2014-06-05 15:26:31)
-> On 05.06.2014 22:35, Doug Anderson wrote:
-> > The "aclk66_peric" clock is a gate clock with a whole bunch of gates
-> > underneath it.  This big gate isn't very useful to include in our
-> > clock tree.  If any of the children need to be turned on then the big
-> > gate will need to be on anyway.  ...and there are plenty of other "big
-> > gates" that aren't described in our clock tree, some of which shut off
-> > collections of clocks that have no relationship in the hierarchy so
-> > are hard to model.
-> > 
-> > "aclk66_peric" is causing earlyprintk problems since it gets disabled
-> > as part of the boot process, so let's just remove it.
-> > 
-> > Strangely (and for no good reason) this clock is exported as part of
-> > the common clock bindings.  Remove it since there are no in-kernel
-> > device trees using it and no reason anyone out of tree should refer to
-> > it either.
-> > 
-> > Signed-off-by: Doug Anderson <dianders@chromium.org>
-> > ---
-> > Changes in v3:
-> > - Now just remove aclk66_peric from the tree as suggested by Tomasz.
-> > 
-> > Changes in v2:
-> > - Use GATE_A and clk_get().  Save the clock for putting later.
-> > - Return 0 from exynos5420_clk_late_init().
-> > 
-> >  drivers/clk/samsung/clk-exynos5420.c   | 85 ++++++++++++++++++++++------------
-> >  include/dt-bindings/clock/exynos5420.h |  1 -
-> >  2 files changed, 55 insertions(+), 31 deletions(-)
-> > 
+On Thu, 2014-05-22 at 08:20PM +0200, Uwe Kleine-K?nig wrote:
+> Hello S?ren,
 > 
-> Mike, I can take this patch to my tree as a fix for 3.16-rc, or if still
-> possible and you don't mind, feel free to apply it directly with my ACK:
+> On Thu, May 22, 2014 at 11:03:00AM -0700, S?ren Brinkmann wrote:
+> > On Wed, 2014-05-21 at 01:33PM -0700, Mike Turquette wrote:
+> > > Quoting Uwe Kleine-K?nig (2014-05-21 11:23:08)
+> > > > Hello S?ren,
+> > > > 
+> > > > On Wed, May 21, 2014 at 08:58:10AM -0700, S?ren Brinkmann wrote:
+> > > > > On Wed, 2014-05-21 at 09:34AM +0200, Uwe Kleine-K?nig wrote:
+> > > > > > On Tue, May 20, 2014 at 02:48:20PM -0700, S?ren Brinkmann wrote:
+> > > > > > > On Tue, 2014-05-20 at 10:48AM -0700, Stephen Boyd wrote:
+> > > > > > > > On 05/20/14 09:01, S?ren Brinkmann wrote:
+> > > > > > > > >
+> > > > > > > > >>>>> +{
+> > > > > > > > >>>>> + unsigned long lower, upper, cur, lower_last, upper_last;
+> > > > > > > > >>>>> +
+> > > > > > > > >>>>> + lower = clk_round_rate(clk, rate);
+> > > > > > > > >>>>> + if (lower >= rate)
+> > > > > > > > >>>>> +         return lower;
+> > > > > > > > >>>> Is the >-case worth a warning?
+> > > > > > > > >>> No, it's correct behavior. If you request a rate that is way lower than what the
+> > > > > > > > >>> clock can generate, returning something larger is perfectly valid, IMHO.
+> > > > > > > > >>> Which reveals one problem in this whole discussion. The API does not
+> > > > > > > > >>> require clk_round_rate() to round down. It is actually an implementation
+> > > > > > > > >>> choice that had been made for clk-divider.
+> > > > > > > > >> I'm sure it's more than an implementation choice for clk-divider. But I
+> > > > > > > > >> don't find any respective documentation (but I didn't try hard).
+> > > > > > > > > A similar discussion - without final conclusion:
+> > > > > > > > > https://lkml.org/lkml/2010/7/14/260
+> > > > > > > > >
+> > > > > > > > >
+> > > > > > > > 
+> > > > > > > > Please call this new API something like clk_find_nearest_rate() or
+> > > > > > > > something. clk_round_rate() is supposed to return the rate that will be
+> > > > > > > > set if you call clk_set_rate() with the same arguments. It's up to the
+> > > > > > > > implementation to decide if that means rounding the rate up or down or
+> > > > > > > > to the nearest value.
+> > > > > > > 
+> > > > > > > Sounds good to me. Are there any cases of clocks that round up? I think
+> > > > > > > that case would not be handled correctly. But I also don't see a use
+> > > > > > > case for such an implementation.
+> > > > > > I don't really care which semantic (i.e. round up, round down or round
+> > > > > > closest) is picked, but I'd vote that all should pick up the same. I
+> > > > > > think the least surprising definition is to choose rounding down and add
+> > > > > > the function that is under discussion here to get a nearest match.
+> > > > > > 
+> > > > > > So I suggest:
+> > > > > > 
+> > > > > >     - if round_rate is given a rate that is smaller than the
+> > > > > >       smallest available rate, return 0
+> > > > > >     - add WARN_ONCE to round_rate and set_rate if they return with a
+> > > > > >       rate bigger than requested
+> > > > > 
+> > > > > Why do you think 0 is always valid? I think for a clock that can
+> > > > > generate 40, 70, 120, clk_round_rate(20) should return 40.
+> > > > I didn't say it's a valid value. It just makes the it possible to check
+> > > > for clk_round_rate(clk, rate) <= rate.
+> > > > 
+> > > > I grepped a bit around and found da850_round_armrate which implements a
+> > > > round_rate callback returning the best match.
+> > > > omap1_clk_round_rate_ckctl_arm can return a value < 0.
+> > > > s3c2412_roundrate_usbsrc can return values that are bigger than
+> > > > requested. (I wonder if that is a bug though.)
+> > > > 
+> > > > > >     - change the return values to unsigned long
+> > > > > 
+> > > > > Yep, I agree, this should happen.
+> > > > And we're using 0 as error value? e.g. for the case where
+> > > > omap1_clk_round_rate_ckctl_arm returns -EIO now?
+> > > 
+> > > No. clk_round_rate returns long for a reason, which is that we can
+> > > provide an error code to the caller. From include/linux/clk.h:
+> > > 
+> > > /**
+> > >  * clk_round_rate - adjust a rate to the exact rate a clock can provide
+> > >  * @clk: clock source
+> > >  * @rate: desired clock rate in Hz
+> > >  *
+> > >  * Returns rounded clock rate in Hz, or negative errno.
+> > >  */
+> > > 
+> > > This has the unfortunate side effect that the max value we can return
+> > > safely is 2147483647 (~2GHz). So another issue here is converting clock
+> > > rates to 64-bit values.
+> > 
+> > So, let's assume
+> >  - a clock does either of these
+> >    - round down
+> >    - round nearest
+> >    - round up (is there any such case? I don't see a use-case for this)
+> >  - or return an error
+> > 
+> > I think my latest try handles such cases, with the limitation of
+> > for a clock that rounds up, the up-rounded value is found instead of the
+> > nearest.
+> > 
+> > 
+> > static long clk_find_nearest_rate(struct clk *clk, unsigned long rate)
+> > {
+> > 	long ret;
+> > 	unsigned long lower, upper;
+> > 
+> > 	clk_prepare_lock();
+> > 
+> > 	lower = __clk_round_rate(clk, rate);
+> this is CCF specific while I don't see a need for it. (But yes, a
+> lock-less clk_find_nearest_rate is of course racy.)
 > 
-> Acked-by: Tomasz Figa <t.figa@samsung.com>
-
-I'll send a second PR next week that includes this.
-
-Regards,
-Mike
-
+> > 	if (lower >= rate || (long)lower < 0) {
+> If you made lower and upper a signed long, you could drop the casting
+> here. BTW, why does __clk_round_rate return an unsigned long??
+> There seem to be several more type mismatches in that area.
+> Maybe we should add a waring if rate is > LONG_MAX?
 > 
-> Best regards,
-> Tomasz
+> (And ISTR that the C standard doesn't specify what the result of
+> (long)lower is given that lower is of type unsigned long and holding a
+> value > LONG_MAX.)
+
+I have another iteration. I kept the locking part, switched to assuming
+'long' being used for frequencies and hopefully got rid of constructs
+that are not defined by the C standard:
+
+long clk_find_nearest_rate(struct clk *clk, unsigned long rate)
+{
+	long ret, lower, upper;
+	unsigned long tmp;
+
+	clk_prepare_lock();
+
+	lower = __clk_round_rate(clk, rate);
+	if (lower >= rate || lower < 0) {
+		ret = lower;
+		goto unlock;
+	}
+
+	tmp = rate + (rate - lower) - 1;
+	if (tmp > LONG_MAX)
+		upper = LONG_MAX;
+	else
+		upper = tmp;
+
+	upper = __clk_round_rate(clk, upper);
+	if (upper <= lower || upper < 0) {
+		ret = lower;
+		goto unlock;
+	}
+
+	lower = rate + 1;
+	while (lower < upper) {
+		long rounded, mid;
+
+		mid = lower + ((upper - lower) >> 1);
+		rounded = __clk_round_rate(clk, mid);
+		if (rounded < lower)
+			lower = mid + 1;
+		else
+			upper = rounded;
+	}
+
+	ret = upper;
+
+unlock:
+	clk_prepare_unlock();
+
+	return ret;
+}
+
+Is there a more elegant way to check for the arithmetic overflow?
+
+	Thanks,
+	S?ren
