@@ -1,72 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 07 Jun 2014 15:22:13 +0200
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140606224542.GA22188@mithrandir>
-References: <20140606224542.GA22188@mithrandir>
-Message-ID: <4306568.dZTtF4xhhK@wuerfel>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat,  7 Jun 2014 20:09:25 +0400
+Subject: [PATCH 1/2] ARM: i.MX27 clk: Separate DT and non-DT init procedure
+Message-ID: <1402157366-25134-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 07 June 2014 00:45:45 Thierry Reding wrote:
-> This is somewhat off-topic, but given the various concepts discussed in
-> this thread I'm beginning to wonder how they will be implemented.
+This patch separates DT and non-DT clock initialization procedure,
+so we can avoid a lot of unneeded clk_register_clkdev() for DT case.
 
-I think it's good you raised the question.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-imx27.c | 39 ++++++++++++++++++++++++---------------
+ 1 file changed, 24 insertions(+), 15 deletions(-)
 
-> The
-> current implementation hooks the IOMMU API into the DMA mapping API, and
-> the way this is done is by setting a single IOMMU (or rather a set of
-> IOMMU operations) globally per bus type.
-
-I hadn't realized that we have a per-bus iommu_ops pointer. I agree
-this will become a limitation as soon as we have a soc with two different
-IOMMUs that have platform devices attached, and it has to be moved into
-the device or a structure related to that.
-
-If that turns out controversial, we can probably have a set of pseudo
-iommu ops that just call into dev->archdata->iommu_ops->function()
-for ARM.
-
-> There are two issues that I can see with that: one is that we can't
-> support multiple IOMMUs in the system at all, and the other is that
-> there is no context associated with the IOMMU ops, and therefore there
-> is no way to differentiate between two instances of the same IOMMU. A
-> few drivers use global variables to keep track of context information
-> but that won't work with multiple instances, unless they keep a global
-> list of all instances and then require explicit lookup in each of the
-> IOMMU operations. That sounds more like a workaround rather than a
-> proper solution to me.
-
-Supporting multiple iommus that share one iommu driver should work
-without such hacks, as you can put the per-device information into
-dev->device_dma_parameters (this works only for very simple IOMMUs)
-or dev->archdata->iommu (we may want to generalize that, I think
-someone just posted patches for it).
-
-> Discussion in this thread indicates that both of the above will be
-> required at some point. Have I completely missed something or will we
-> have to rework (parts of) the IOMMU API to make this work?
-> 
-> One other thing that I have some difficulty understanding is how we can
-> support things like process isolation using the current IOMMU API. Since
-> a device will be statically assigned to one IOMMU domain at probe time
-> there is no way we can change the address space upon a context switch.
-
-We have just introduced a way to parse dma-ranges in of_dma_configure().
-
-The only way I see this done for platform devices is to do the IOMMU
-configuration in the same place: if an iommus property is found there,
-we call out to the iommu driver that matches the respective iommu device
-and let it configure the master device.
-
-The device already has multiple properties related to iommus:
-'struct device_dma_parameters', 'archdata', 'iommu_group', and
-pdev_archdata for platform devices. This should be enough to set up
-the default iommu dma_map_ops so we can have non-isolated DMA using
-dma_map_* and dma_alloc_coherent.
-
-I haven't given much thought to devices that want to use the IOMMU
-API directly so they can have multiple domains rather than rely on
-the dma-mapping abstraction.
-
-	Arnd
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 317a662..f5a6a3f 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -89,10 +89,9 @@ enum mx27_clks {
+ static struct clk *clk[clk_max];
+ static struct clk_onecell_data clk_data;
+ 
+-int __init mx27_clocks_init(unsigned long fref)
++static void __init _mx27_clocks_init(unsigned long fref)
+ {
+-	int i;
+-	struct device_node *np;
++	unsigned i;
+ 
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+ 	clk[ckih] = imx_clk_fixed("ckih", fref);
+@@ -206,12 +205,16 @@ int __init mx27_clocks_init(unsigned long fref)
+ 			pr_err("i.MX27 clk %d: register failed with %ld\n",
+ 				i, PTR_ERR(clk[i]));
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx27-ccm");
+-	if (np) {
+-		clk_data.clks = clk;
+-		clk_data.clk_num = ARRAY_SIZE(clk);
+-		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+-	}
++	clk_register_clkdev(clk[cpu_div], NULL, "cpu0");
++
++	clk_prepare_enable(clk[emi_ahb_gate]);
++
++	imx_print_silicon_rev("i.MX27", mx27_revision());
++}
++
++int __init mx27_clocks_init(unsigned long fref)
++{
++	_mx27_clocks_init(fref);
+ 
+ 	clk_register_clkdev(clk[uart1_ipg_gate], "ipg", "imx21-uart.0");
+ 	clk_register_clkdev(clk[per1_gate], "per", "imx21-uart.0");
+@@ -274,14 +277,9 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[emma_ipg_gate], "emma-ipg", "imx27-camera.0");
+ 	clk_register_clkdev(clk[emma_ahb_gate], "ahb", "m2m-emmaprp.0");
+ 	clk_register_clkdev(clk[emma_ipg_gate], "ipg", "m2m-emmaprp.0");
+-	clk_register_clkdev(clk[cpu_div], NULL, "cpu0");
+ 
+ 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
+ 
+-	clk_prepare_enable(clk[emi_ahb_gate]);
+-
+-	imx_print_silicon_rev("i.MX27", mx27_revision());
+-
+ 	return 0;
+ }
+ 
+@@ -298,5 +296,16 @@ int __init mx27_clocks_init_dt(void)
+ 			break;
+ 	}
+ 
+-	return mx27_clocks_init(fref);
++	_mx27_clocks_init(fref);
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx27-ccm");
++	BUG_ON(!np);
++
++	clk_data.clks = clk;
++	clk_data.clk_num = ARRAY_SIZE(clk);
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++
++	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
++
++	return 0;
+ }
+-- 
+1.8.5.5
