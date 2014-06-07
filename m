@@ -1,90 +1,163 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  7 Jun 2014 20:09:25 +0400
-Subject: [PATCH 1/2] ARM: i.MX27 clk: Separate DT and non-DT init procedure
-Message-ID: <1402157366-25134-1-git-send-email-shc_work@mail.ru>
+Date: Sat,  7 Jun 2014 20:09:26 +0400
+Subject: [PATCH 2/2] ARM: i.MX27 clk: Use of_clk_init() for DT case
+In-Reply-To: <1402157366-25134-1-git-send-email-shc_work@mail.ru>
+References: <1402157366-25134-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1402157366-25134-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch separates DT and non-DT clock initialization procedure,
-so we can avoid a lot of unneeded clk_register_clkdev() for DT case.
+Replace .init_time() hook with of_clk_init() for DT targets.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/clk-imx27.c | 39 ++++++++++++++++++++++++---------------
- 1 file changed, 24 insertions(+), 15 deletions(-)
+ arch/arm/mach-imx/clk-imx27.c | 57 ++++++++++++++++++++++---------------------
+ arch/arm/mach-imx/common.h    |  1 -
+ arch/arm/mach-imx/imx27-dt.c  |  6 -----
+ 3 files changed, 29 insertions(+), 35 deletions(-)
 
 diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-index 317a662..f5a6a3f 100644
+index f5a6a3f..8c55797 100644
 --- a/arch/arm/mach-imx/clk-imx27.c
 +++ b/arch/arm/mach-imx/clk-imx27.c
-@@ -89,10 +89,9 @@ enum mx27_clks {
- static struct clk *clk[clk_max];
- static struct clk_onecell_data clk_data;
+@@ -1,32 +1,31 @@
+ #include <linux/clk.h>
+-#include <linux/io.h>
+-#include <linux/module.h>
++#include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/err.h>
+-#include <linux/clk-provider.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
  
--int __init mx27_clocks_init(unsigned long fref)
-+static void __init _mx27_clocks_init(unsigned long fref)
+ #include "clk.h"
+ #include "common.h"
+ #include "hardware.h"
+ 
+-#define IO_ADDR_CCM(off)	(MX27_IO_ADDRESS(MX27_CCM_BASE_ADDR + (off)))
++static void __iomem *ccm __initdata;
+ 
+ /* Register offsets */
+-#define CCM_CSCR		IO_ADDR_CCM(0x0)
+-#define CCM_MPCTL0		IO_ADDR_CCM(0x4)
+-#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
+-#define CCM_SPCTL0		IO_ADDR_CCM(0xc)
+-#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
+-#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
+-#define CCM_PCDR0		IO_ADDR_CCM(0x18)
+-#define CCM_PCDR1		IO_ADDR_CCM(0x1c)
+-#define CCM_PCCR0		IO_ADDR_CCM(0x20)
+-#define CCM_PCCR1		IO_ADDR_CCM(0x24)
+-#define CCM_CCSR		IO_ADDR_CCM(0x28)
+-#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
+-#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
+-#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
++#define CCM_CSCR		(ccm + 0x00)
++#define CCM_MPCTL0		(ccm + 0x04)
++#define CCM_MPCTL1		(ccm + 0x08)
++#define CCM_SPCTL0		(ccm + 0x0c)
++#define CCM_SPCTL1		(ccm + 0x10)
++#define CCM_OSC26MCTL		(ccm + 0x14)
++#define CCM_PCDR0		(ccm + 0x18)
++#define CCM_PCDR1		(ccm + 0x1c)
++#define CCM_PCCR0		(ccm + 0x20)
++#define CCM_PCCR1		(ccm + 0x24)
++#define CCM_CCSR		(ccm + 0x28)
++#define CCM_PMCTL		(ccm + 0x2c)
++#define CCM_PMCOUNT		(ccm + 0x30)
++#define CCM_WKGDCTL		(ccm + 0x34)
+ 
+ #define CCM_CSCR_UPDATE_DIS	(1 << 31)
+ #define CCM_CSCR_SSI2		(1 << 23)
+@@ -93,6 +92,8 @@ static void __init _mx27_clocks_init(unsigned long fref)
  {
--	int i;
--	struct device_node *np;
-+	unsigned i;
+ 	unsigned i;
  
++	BUG_ON(!ccm);
++
  	clk[dummy] = imx_clk_fixed("dummy", 0);
  	clk[ckih] = imx_clk_fixed("ckih", fref);
-@@ -206,12 +205,16 @@ int __init mx27_clocks_init(unsigned long fref)
- 			pr_err("i.MX27 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
+ 	clk[ckil] = imx_clk_fixed("ckil", 32768);
+@@ -214,6 +215,8 @@ static void __init _mx27_clocks_init(unsigned long fref)
  
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx27-ccm");
--	if (np) {
--		clk_data.clks = clk;
--		clk_data.clk_num = ARRAY_SIZE(clk);
--		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
--	}
-+	clk_register_clkdev(clk[cpu_div], NULL, "cpu0");
+ int __init mx27_clocks_init(unsigned long fref)
+ {
++	ccm = ioremap(MX27_CCM_BASE_ADDR, SZ_4K);
 +
-+	clk_prepare_enable(clk[emi_ahb_gate]);
-+
-+	imx_print_silicon_rev("i.MX27", mx27_revision());
-+}
-+
-+int __init mx27_clocks_init(unsigned long fref)
-+{
-+	_mx27_clocks_init(fref);
+ 	_mx27_clocks_init(fref);
  
  	clk_register_clkdev(clk[uart1_ipg_gate], "ipg", "imx21-uart.0");
- 	clk_register_clkdev(clk[per1_gate], "per", "imx21-uart.0");
-@@ -274,14 +277,9 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[emma_ipg_gate], "emma-ipg", "imx27-camera.0");
- 	clk_register_clkdev(clk[emma_ahb_gate], "ahb", "m2m-emmaprp.0");
- 	clk_register_clkdev(clk[emma_ipg_gate], "ipg", "m2m-emmaprp.0");
--	clk_register_clkdev(clk[cpu_div], NULL, "cpu0");
- 
- 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
- 
--	clk_prepare_enable(clk[emi_ahb_gate]);
--
--	imx_print_silicon_rev("i.MX27", mx27_revision());
--
+@@ -283,29 +286,27 @@ int __init mx27_clocks_init(unsigned long fref)
  	return 0;
  }
  
-@@ -298,5 +296,16 @@ int __init mx27_clocks_init_dt(void)
+-int __init mx27_clocks_init_dt(void)
++static void __init mx27_clocks_init_dt(struct device_node *np)
+ {
+-	struct device_node *np;
++	struct device_node *refnp;
+ 	u32 fref = 26000000; /* default */
+ 
+-	for_each_compatible_node(np, NULL, "fixed-clock") {
+-		if (!of_device_is_compatible(np, "fsl,imx-osc26m"))
++	for_each_compatible_node(refnp, NULL, "fixed-clock") {
++		if (!of_device_is_compatible(refnp, "fsl,imx-osc26m"))
+ 			continue;
+ 
+-		if (!of_property_read_u32(np, "clock-frequency", &fref))
++		if (!of_property_read_u32(refnp, "clock-frequency", &fref))
  			break;
  	}
  
--	return mx27_clocks_init(fref);
+-	_mx27_clocks_init(fref);
++	ccm = of_iomap(np, 0);
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx27-ccm");
+-	BUG_ON(!np);
 +	_mx27_clocks_init(fref);
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx27-ccm");
-+	BUG_ON(!np);
-+
-+	clk_data.clks = clk;
-+	clk_data.clk_num = ARRAY_SIZE(clk);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+
-+	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
-+
-+	return 0;
+ 
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+ 	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx1-gpt"));
+-
+-	return 0;
  }
++CLK_OF_DECLARE(imx27_ccm, "fsl,imx27-ccm", mx27_clocks_init_dt);
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 5aaea2b..7668ff5 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -56,7 +56,6 @@ int mx27_clocks_init(unsigned long fref);
+ int mx31_clocks_init(unsigned long fref);
+ int mx35_clocks_init(void);
+ int mx25_clocks_init_dt(void);
+-int mx27_clocks_init_dt(void);
+ int mx31_clocks_init_dt(void);
+ struct platform_device *mxc_register_gpio(char *name, int id,
+ 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
+diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
+index 17bd405..080e66c 100644
+--- a/arch/arm/mach-imx/imx27-dt.c
++++ b/arch/arm/mach-imx/imx27-dt.c
+@@ -34,16 +34,10 @@ static const char * const imx27_dt_board_compat[] __initconst = {
+ 	NULL
+ };
+ 
+-static void __init imx27_timer_init(void)
+-{
+-	mx27_clocks_init_dt();
+-}
+-
+ DT_MACHINE_START(IMX27_DT, "Freescale i.MX27 (Device Tree Support)")
+ 	.map_io		= mx27_map_io,
+ 	.init_early	= imx27_init_early,
+ 	.init_irq	= mx27_init_irq,
+-	.init_time	= imx27_timer_init,
+ 	.init_machine	= imx27_dt_init,
+ 	.dt_compat	= imx27_dt_board_compat,
+ 	.restart	= mxc_restart,
 -- 
 1.8.5.5
