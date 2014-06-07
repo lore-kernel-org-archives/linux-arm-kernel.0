@@ -1,65 +1,110 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 06 Jun 2014 23:59:35 +0100
-Subject: [PATCH 1/9] i2c: Add pointer dereference protection to
- i2c_match_id()
-In-Reply-To: <1402069952-28022-2-git-send-email-lee.jones@linaro.org>
-References: <1402069952-28022-1-git-send-email-lee.jones@linaro.org>
- <1402069952-28022-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140606225935.7491DC4206E@trevor.secretlab.ca>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 07 Jun 2014 06:59:53 +0100
+Subject: [PATCH v7 1/7] of: Provide function to request and map memory
+In-Reply-To: <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
+References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
+ <1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
+ <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
+Message-ID: <20140607055953.569D6C4099E@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  6 Jun 2014 16:52:24 +0100, Lee Jones <lee.jones@linaro.org> wrote:
-> Here we're providing dereference protection for i2c_match_id(), which
-> saves us having to do it each time it's called.  We're also stripping
-> out the (now) needless checks in i2c_device_match().  This patch paves
-> the way for other, similar code trimming.
+On Fri, 6 Jun 2014 10:19:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On Thu, Jun 5, 2014 at 12:26 PM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+> > A call to of_iomap does not request the memory region.
+> > This patch adds the function of_io_request_and_map which requests
+> > the memory region before mapping it.
+> >
+> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> > ---
+> >  drivers/of/address.c       |   28 ++++++++++++++++++++++++++++
+> >  include/linux/of_address.h |    8 ++++++++
+> >  2 files changed, 36 insertions(+)
+> >
+> > diff --git a/drivers/of/address.c b/drivers/of/address.c
+> > index cb4242a..c55b107 100644
+> > --- a/drivers/of/address.c
+> > +++ b/drivers/of/address.c
+> > @@ -721,3 +721,31 @@ void __iomem *of_iomap(struct device_node *np, int index)
+> >         return ioremap(res.start, resource_size(&res));
+> >  }
+> >  EXPORT_SYMBOL(of_iomap);
+> > +
+> > +/**
+> > + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
+> > + *                        for a given device_node
 > 
-> Acked-by: Grant Likely <grant.likely@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/i2c/i2c-core.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
+> I believe docbook requires this to be 1 line.
 > 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 7c7f4b8..d3802dc 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -82,6 +82,9 @@ void i2c_transfer_trace_unreg(void)
->  static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
->  						const struct i2c_client *client)
->  {
-> +	if (!(id && client))
-> +		return NULL;
-> +
->  	while (id->name[0]) {
->  		if (strcmp(client->name, id->name) == 0)
->  			return id;
-> @@ -95,8 +98,6 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
->  	struct i2c_client	*client = i2c_verify_client(dev);
->  	struct i2c_driver	*driver;
->  
-> -	if (!client)
-> -		return 0;
->  
->  	/* Attempt an OF style match */
->  	if (of_driver_match_device(dev, drv))
-> @@ -107,9 +108,10 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
->  		return 1;
->  
->  	driver = to_i2c_driver(drv);
-> -	/* match on an id table if there is one */
-> -	if (driver->id_table)
-> -		return i2c_match_id(driver->id_table, client) != NULL;
-> +
-> +	/* Finally an I2C match */
-> +	if (i2c_match_id(driver->id_table, client))
-> +		return 1;
->  
->  	return 0;
+> > + * @device:    the device whose io range will be mapped
+> > + * @index:     index of the io range
+> > + * @name:      name of the resource
+> > + *
+> > + * Returns a pointer to the requested and mapped memory
+> > + */
+> > +void __iomem *of_io_request_and_map(struct device_node *np, int index, char *name)
+> > +{
+> > +       struct resource res;
+> > +       void __iomem *mem;
+> > +
+> > +       if (of_address_to_resource(np, index, &res))
+> > +               return NULL;
+> > +
+> > +       if (!request_mem_region(res.start, resource_size(&res), name))
+> 
+> Use the np->name here and drop the name parameter.
 
-Nit: the above 4 lines can now simply be:
+Name here would be the name of the owner (the driver), not the name of
+the node. Passing the name separately is fine by me.
 
-	return (i2c_match_id(driver->id_table, client) != NULL);
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
+You can merge this with the rest of the series.
 
 g.
+
+> 
+> > +               return NULL;
+> > +
+> > +       mem = ioremap(res.start, resource_size(&res));
+> > +       if (!mem)
+> > +               release_mem_region(res.start, resource_size(&res));
+> > +
+> > +       return mem;
+> > +}
+> > +EXPORT_SYMBOL(of_io_request_and_map);
+> > diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> > index 5f6ed6b..725b875 100644
+> > --- a/include/linux/of_address.h
+> > +++ b/include/linux/of_address.h
+> > @@ -96,6 +96,8 @@ static inline struct of_pci_range *of_pci_range_parser_one(
+> >  extern int of_address_to_resource(struct device_node *dev, int index,
+> >                                   struct resource *r);
+> >  void __iomem *of_iomap(struct device_node *node, int index);
+> > +void __iomem *of_io_request_and_map(struct device_node *device,
+> > +                                       int index, char *name);
+> >  #else
+> >  static inline int of_address_to_resource(struct device_node *dev, int index,
+> >                                          struct resource *r)
+> > @@ -107,6 +109,12 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
+> >  {
+> >         return NULL;
+> >  }
+> > +
+> > +static inline void __iomem *of_io_request_and_map(struct device_node *device,
+> > +                                       int index, char *name)
+> > +{
+> > +       return NULL;
+> > +}
+> >  #endif
+> >
+> >  #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
+> > --
+> > 1.7.9.5
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
