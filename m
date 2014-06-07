@@ -1,37 +1,22 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Sat, 7 Jun 2014 20:20:39 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable XADC driver
-In-Reply-To: <1401984324-6075-2-git-send-email-soren.brinkmann@xilinx.com>
+Date: Sat, 7 Jun 2014 20:22:06 +0200
+Subject: [PATCH 1/2] ARM: zynq: DT: Add XADC node
+In-Reply-To: <1401984324-6075-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1401984324-6075-1-git-send-email-soren.brinkmann@xilinx.com>
- <1401984324-6075-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <2c2bb5df-5e2f-415a-9bdf-b6837ba4dd6d@BN1AFFO11FD014.protection.gbl>
+Message-ID: <14b7ff93-2553-456f-9cb8-11e2dcd399c8@BN1BFFO11FD053.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/05/2014 06:05 PM, Soren Brinkmann wrote:
-> The Xilinx A/D Converter is found in Xilinx devices including Zynq.
+> Add node for the Xilinx A/D Converter.
 > 
+> Cc: Lars-Peter Clausen <lars@metafoo.de>
 > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index e2d62048e198..2d1039d8c7f1 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -360,6 +360,7 @@ CONFIG_TEGRA_IOMMU_GART=y
->  CONFIG_TEGRA_IOMMU_SMMU=y
->  CONFIG_MEMORY=y
->  CONFIG_IIO=y
-> +CONFIG_XILINX_XADC=y
->  CONFIG_AK8975=y
->  CONFIG_PWM=y
->  CONFIG_PWM_TEGRA=y
-> 
+>  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Olof, Arnd: Are you going to take this patch directly to your tree?
-I will add 1/2 to my zynq/dt branch.
+Applied to zynq/dt branch.
 
 Thanks,
 Michal
