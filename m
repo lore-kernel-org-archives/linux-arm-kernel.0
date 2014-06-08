@@ -1,60 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 Jun 2014 12:09:45 +0100
-Subject: MMC is *still* broken...
-In-Reply-To: <53943307.5070202@redhat.com>
-References: <20140605183615.GG23430@n2100.arm.linux.org.uk>
- <86oay7noer.fsf@void.printf.net>
- <CAOesGMgp+r3TTuhctqxVxW8abj467UpPwch3iN=e8rsXeF1p-A@mail.gmail.com>
- <53943307.5070202@redhat.com>
-Message-ID: <20140608110945.GN23430@n2100.arm.linux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 8 Jun 2014 14:05:02 +0200
+Subject: [PATCH v7 1/4] arm: add ARMv7 HYP API to flush VM TLBs without
+ address param
+In-Reply-To: <1401837567-5527-2-git-send-email-m.smarduch@samsung.com>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1401837567-5527-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20140608120502.GE3279@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 08, 2014 at 11:55:19AM +0200, Hans de Goede wrote:
-> 4) Implementation wise I think we all agree that we want to use a platform
-> device + driver. So the mmc-core would check for a subnode with reg == 0 and if
-> there is one instantiate a platform device from this, using the subnode as the
-> platform devices of_node, and the platform driver for the powerup will be bound
-> using the compatible string of the subnode.
+On Tue, Jun 03, 2014 at 04:19:24PM -0700, Mario Smarduch wrote:
+> Patch adds HYP interface for global VM TLB invalidation without address
+> parameter. Added ARM version of kvm_flush_remote_tlbs(), made the generic
+> implementation a weak symbol.
+> 
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/include/asm/kvm_asm.h |    1 +
+>  arch/arm/kvm/interrupts.S      |   11 +++++++++++
+>  arch/arm/kvm/mmu.c             |   14 ++++++++++++++
+>  virt/kvm/kvm_main.c            |    2 +-
+>  4 files changed, 27 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 53b3c4a..21bc519 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
+>  
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>  
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  #endif
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 0d68d40..bddc66b 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>  	bx	lr
+>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+>  
+> +/**
+> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
+> + *
+> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
+> + * parameter
+> + */
+> +
+> +ENTRY(__kvm_tlb_flush_vmid)
+> +	b	__kvm_tlb_flush_vmid_ipa
+> +ENDPROC(__kvm_tlb_flush_vmid)
+> +
+>  /********************************************************************
+>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+>   * domain, for all VMIDs
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 2ac9588..ef29540 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -56,6 +56,20 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+>  }
+>  
+> +/**
+> + * kvm_flush_remote_tlbs() - flush all VM TLB entries
+> + * @kvm:       pointer to kvm structure.
+> + *
+> + * Interface to HYP function to flush all VM TLB entries without address
+> + * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
+> + * kvm_tlb_flush_vmid_ipa().
+> + */
+> +void kvm_flush_remote_tlbs(struct kvm *kvm)
+> +{
+> +	if (kvm)
+> +		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> +}
+> +
+>  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+>  				  int min, int max)
+>  {
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index fa70c6e..ba25765 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -184,7 +184,7 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
+>  	return called;
+>  }
+>  
+> -void kvm_flush_remote_tlbs(struct kvm *kvm)
+> +void __weak kvm_flush_remote_tlbs(struct kvm *kvm)
+>  {
+>  	long dirty_count = kvm->tlbs_dirty;
+>  
+> -- 
+> 1.7.9.5
+> 
 
-I really don't think so on the platform device/driver issue.  Greg keeps
-saying that he wants to kill these off, so really we need to stop inventing
-new use cases for them.  We're just making more work for ourselves for
-when Greg decides to put a block on any further platform drivers - at that
-point, we will be forced to rewrite it not to use platform drivers.
+This doesn't build or link on aarch64 :(
 
-So, we need to take account of that today, and *not* use a platform device/
-driver for this.
-
-What's also disappointing is that we're close to six months on this issue,
-and we still don't have a proper solution to the problem, meanwhile we have
-devices out there in the wild where mainline kernels can't be used with
-wifi/bt because of our lack of progress on this issue.
-
-While it is important to get interfaces correct, we also can't sit around
-being indecisive like this - because the result is we just end up driving
-people away from mainline to vendor kernels.  That's exactly what has
-been happening.
-
-99% of people run Jon Nettleton's kernels on the Cubox-i because that's
-the only modern kernel which supports most of the hardware... why should
-anyone bother with mainline given that even 9 months down the line (it's
-been 9 months since developers had the initial hardware), mainline kernels
-remain mostly crippled on this hardware... anything beyond MMC or NFS boot
-and basic GUI... forget it with mainline... not even the eSATA port works
-with mainline kernels.
-
-This rather makes me wonder why I'm even bothering _trying_ to get support
-for this hardware into mainline - I'm probably completely wasting my time
-on that.
-
-(Note: I'm not blaming you, Hans, for this - I'm merely pointing out the
-amount of time that has been collectively wasted on this topic and we
-*still* seem to be no closer to any kind of solution to it.  Much of that
-is because we can't decide on a reasonable DT description.  Board files
-with platform data was /loads/ easier because we could come up with
-solutions to these kinds of problems much faster there...)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+-Christoffer
