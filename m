@@ -1,201 +1,127 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 8 Jun 2014 14:05:22 +0200
-Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
- support
-In-Reply-To: <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
+Date: Sun, 8 Jun 2014 14:05:30 +0200
+Subject: [PATCH v7 4/4] arm: dirty page logging 2nd stage page fault
+ handling support
+In-Reply-To: <1401837567-5527-5-git-send-email-m.smarduch@samsung.com>
 References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20140608120522.GG3279@lvm>
+ <1401837567-5527-5-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20140608120530.GH3279@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 10:33:41AM -0700, Mario Smarduch wrote:
-> kvm_vm_ioctl_get_dirty_log() is generic used by x86, ARM. x86 recent patch 
-> changed this function, this patch picks up those changes, re-tested everything
-> works. Applies cleanly with other patches.
-> 
-> This patch adds support for keeping track of VM dirty pages. As dirty page log
-> is retrieved, the pages that have been written are write protected again for
-> next write and log read.
+On Tue, Jun 03, 2014 at 04:19:27PM -0700, Mario Smarduch wrote:
+> This patch adds support for handling 2nd stage page faults during migration,
+> it disables faulting in huge pages, and disolves huge pages to page tables.
+
+s/disolves/dissolves/g
+
+> In case migration is canceled huge pages will be used again.
 > 
 > Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 > ---
->  arch/arm/include/asm/kvm_host.h |    3 ++
->  arch/arm/kvm/arm.c              |    5 ---
->  arch/arm/kvm/mmu.c              |   79 +++++++++++++++++++++++++++++++++++
->  arch/x86/kvm/x86.c              |   86 ---------------------------------------
->  virt/kvm/kvm_main.c             |   86 +++++++++++++++++++++++++++++++++++++++
->  5 files changed, 168 insertions(+), 91 deletions(-)
+>  arch/arm/kvm/mmu.c |   36 ++++++++++++++++++++++++++++++++++--
+>  1 file changed, 34 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 59565f5..b760f9c 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -232,5 +232,8 @@ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
->  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
->  
->  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
-> +void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-> +	struct kvm_memory_slot *slot,
-> +	gfn_t gfn_offset, unsigned long mask);
-
-Do all other architectures implement this function?  arm64?
-
->  
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index dfd63ac..f06fb21 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -780,11 +780,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  	}
->  }
->  
-> -int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
-> -{
-> -	return -EINVAL;
-> -}
-> -
-
-What about the other architectures implementing this function?
-
->  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
->  					struct kvm_arm_device_addr *dev_addr)
->  {
 > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index e5dff85..907344c 100644
+> index 1c546c9..aca4fbf 100644
 > --- a/arch/arm/kvm/mmu.c
 > +++ b/arch/arm/kvm/mmu.c
-> @@ -874,6 +874,85 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
->  	spin_unlock(&kvm->mmu_lock);
->  }
+> @@ -966,6 +966,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+>  	struct vm_area_struct *vma;
+>  	pfn_t pfn;
+> +	/* Get logging status, if dirty_bitmap is not NULL then logging is on */
+> +	bool logging_active = !!memslot->dirty_bitmap;
+
 >  
-> +/**
-> + * stage2_wp_mask_range() - write protect memslot pages set in mask
-> + * @pmd - pointer to page table
-> + * @start_ipa - the start range of mask
-> + * @addr - start_ipa or start range of adjusted mask if crossing PMD range
-> + * @mask - mask of dirty pages
-> + *
-> + * Walk mask and write protect the associated dirty pages in the memory region.
-> + * If mask crosses a PMD range adjust it to next page table and return.
-> + */
-> +static void stage2_wp_mask_range(pmd_t *pmd, phys_addr_t start_ipa,
-> +		phys_addr_t *addr, unsigned long *mask)
-> +{
-> +	pte_t *pte;
-> +	bool crosses_pmd;
-> +	int i = __ffs(*mask);
+>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+>  	if (fault_status == FSC_PERM && !write_fault) {
+> @@ -1019,10 +1021,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	spin_lock(&kvm->mmu_lock);
+>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>  		goto out_unlock;
+> -	if (!hugetlb && !force_pte)
 > +
-> +	if (unlikely(*addr > start_ipa))
-> +		start_ipa = *addr - i * PAGE_SIZE;
+> +	/* When logging don't spend cycles to check for huge pages */
 
-huh?
+drop the comment: either explain the entire clause (which would be too
+long) or don't explain anything.
 
-> +	pte = pte_offset_kernel(pmd, start_ipa);
-> +	for (*addr = start_ipa + i * PAGE_SIZE; *mask;
-> +		i = __ffs(*mask), *addr = start_ipa + i * PAGE_SIZE) {
-> +		crosses_pmd = !!((start_ipa & PMD_MASK) ^ (*addr & PMD_MASK));
-> +		if (unlikely(crosses_pmd)) {
-> +			/* Adjust mask dirty bits relative to next page table */
-> +			*mask >>= (PTRS_PER_PTE - pte_index(start_ipa));
-> +			return;
-> +		}
-> +		if (!pte_none(pte[i]))
-> +			kvm_set_s2pte_readonly(&pte[i]);
-> +		*mask &= ~(1 << i);
+> +	if (!hugetlb && !force_pte && !logging_active)
 
-This is *really* complicated, and *really* unintuitive and *really* hard
-to read!
+instead of having all this, can't you just change 
 
-I feel this may very likely break, and is optimizing prematurely for
-some very special case.  Can't you follow the usual scheme of traversing
-the levels one-by-one and just calculate the 'end' address based on the
-number of bits in your long, and just adjust the mask in the calling
-function each time you are about to call a lower-level function?
+if (is_vm_hugetlb_page(vma)) to
+if (is_vm_hugetlb_page(vma) && !logging_active)
 
-In fact, I think this could be trivially implemented as an extension to
-your existing wp_range functions.  On ARM you are mostly going to
-consider 32 pages, on arm64 you are mostly going to consider 64 pages,
-just calculate that range in terms of IPAs and set that as the limit for
-calling stage2_wp_pgd_range (which should be factor'ed out into its
-function and called from kvm_mmu_wp_memory_region).
+then you're also not mucking around with the gfn etc.
+
+>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>  
+> -	if (hugetlb) {
+> +	/*
+> +	 * Force all not present/perm faults to PTE handling, address both
+> +	 * PMD and PTE faults
+> +	 */
+
+I don't understand this comment?  In which case does this apply?
+
+> +	if (hugetlb && !logging_active) {
+>  		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+>  		new_pmd = pmd_mkhuge(new_pmd);
+>  		if (writable) {
+> @@ -1034,6 +1042,22 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	} else {
+>  		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+>  		if (writable) {
+> +			/*
+> +			 * If pmd is  mapping a huge page then clear it and let
+> +			 * stage2_set_pte() create a pte table. At the sametime
+> +			 * you write protect the pte (PAGE_S2 pgprot_t).
+> +			 */
+> +			if (logging_active) {
+> +				pmd_t *pmd;
+> +				if (hugetlb) {
+> +					pfn += pte_index(fault_ipa);
+> +					gfn = fault_ipa >> PAGE_SHIFT;
+> +					new_pte = pfn_pte(pfn, PAGE_S2);
+> +				}
+> +				pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
+> +				if (pmd && kvm_pmd_huge(*pmd))
+> +					clear_pmd_entry(kvm, pmd, fault_ipa);
+> +			}
+
+now instead of all this, you just need to check for kvm_pmd_huge() in
+stage2_set_pte() and if that's true, you clear it, and then then install
+your new pte.
+
+>  			kvm_set_s2pte_writable(&new_pte);
+>  			kvm_set_pfn_dirty(pfn);
+>  		}
+> @@ -1041,6 +1065,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+>  	}
+>  
+> +	/*
+> +	 * Log the dirty page in dirty_bitmap[], call regardless if logging is
+> +	 * disabled or enabled both cases handled safely.
+> +	 * TODO: for larger page size mark mulitple dirty page bits for each
+> +	 *       4k page.
+> +	 */
+> +	if (writable)
+> +		mark_page_dirty(kvm, gfn);
+
+what if you just faulted in a page on a read which wasn't present
+before but it happens to belong to a writeable memslot, is that page
+then dirty? hmmm.
 
 
-
-> +	}
-> +}
-> +
-> +/**
-> + * kvm_mmu_write_protected_pt_masked() - write protect dirty pages set in mask
-> + * @kvm:        The KVM pointer
-> + * @slot:       The memory slot associated with mask
-> + * @gfn_offset: The gfn offset in memory slot
-> + * @mask:       The mask of dirty pages at offset 'gnf_offset' in this memory
-
-s/gnf_offset/gfn_offset/
-
-> + *              slot to be write protected
-> + *
-> + * Called from dirty page logging read function to write protect bits set in
-> + * mask to record future writes to these pages in dirty page log. This function
-> + * uses simplified page table walk given  mask can spawn no more then 2 PMD
-
-random double white space before mask
-
-> + * table range.
-> + * 'kvm->mmu_lock' must be  held to protect against concurrent modification
-> + * of page tables (2nd stage fault, mmu modifiers, ...)
-> + *
-> + */
-> +void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-> +		struct kvm_memory_slot *slot,
-> +		gfn_t gfn_offset, unsigned long mask)
-> +{
-> +	pud_t *pud;
-> +	pmd_t *pmd;
-> +	phys_addr_t start_ipa = (slot->base_gfn + gfn_offset) << PAGE_SHIFT;
-> +	phys_addr_t end_ipa = start_ipa + BITS_PER_LONG * PAGE_SIZE;
-> +	phys_addr_t addr = start_ipa;
-> +	pgd_t *pgdp = kvm->arch.pgd, *pgd;
-> +
-> +	do {
-> +		pgd = pgdp + pgd_index(addr);
-> +		if (pgd_present(*pgd)) {
-> +			pud = pud_offset(pgd, addr);
-> +			if (!pud_none(*pud) && !pud_huge(*pud)) {
-> +				pmd = pmd_offset(pud, addr);
-> +				if (!pmd_none(*pmd) && !kvm_pmd_huge(*pmd))
-> +					stage2_wp_mask_range(pmd, start_ipa,
-> +								&addr, &mask);
-> +				else
-> +					addr += PMD_SIZE;
-> +			} else
-> +				addr += PUD_SIZE;
-
-is this correct? what if your gfn_offset puts you at the last page of a
-PUD, don't you need pud_addr_end() instead?
-
-> +		} else
-> +			addr += PGDIR_SIZE;
-
-please use braces for both of the single-line else-clauses above when
-the main if-clause is multi-line (see Documentation/CodingStyle chapter
-3, just before 3.1).
-
-> +	} while (mask && addr < end_ipa);
-
-this seems like a complicated loop condition.  It seems to me that
-either you clear all the bits in the mask you want to check or you check
-for an address range, why is there a need for both?
-
-> +}
-> +
->  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  			  struct kvm_memory_slot *memslot,
->  			  unsigned long fault_status)
-
-[...]
+>  
+>  out_unlock:
+>  	spin_unlock(&kvm->mmu_lock);
+> -- 
+> 1.7.9.5
+> 
 
 Thanks,
 -Christoffer
