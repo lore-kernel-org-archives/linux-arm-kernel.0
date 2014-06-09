@@ -1,107 +1,36 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 09 Jun 2014 15:15:37 +0200
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <53959A93.7080308@metafoo.de>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
- <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
- <5388C0F1.90503@gmail.com> <5388CB1B.3090802@metafoo.de>
- <20140608231823.GB10112@trinity.fluff.org> <53959A93.7080308@metafoo.de>
-Message-ID: <5395B379.2010706@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Jun 2014 15:21:15 +0200
+Subject: [PATCH v2 1/5] pinctrl: sunxi: Fix sunxi_irq_cfg_reg not working
+ for irqs >= 8
+In-Reply-To: <20140602101808.GB27722@lukather>
+References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
+ <1401544899-405-2-git-send-email-hdegoede@redhat.com>
+ <20140602101808.GB27722@lukather>
+Message-ID: <CACRpkdZ=jmj_ioob6EPM1GXKt-nfLiebnMeLwW7skuJtA3hCTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2014 01:29 PM, Lars-Peter Clausen wrote:
-> On 06/09/2014 01:18 AM, Ben Dooks wrote:
->> On Fri, May 30, 2014 at 08:16:59PM +0200, Lars-Peter Clausen wrote:
->>> On 05/30/2014 07:33 PM, David Daney wrote:
->>>> On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
->>>>> On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com>
->>>>> wrote:
->>>>>> --- a/drivers/gpio/gpiolib.c
->>>>>> +++ b/drivers/gpio/gpiolib.c
->>>>>> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct
->>>>>> gpio_chip *gpiochip);
->>>>>>    *
->>>>>>    * A gpio_chip with any GPIOs still requested may not be removed.
->>>>>>    */
->>>>>> -int gpiochip_remove(struct gpio_chip *chip)
->>>>>> +void gpiochip_remove(struct gpio_chip *chip)
->>>>>>   {
->>>>>>          unsigned long   flags;
->>>>>> -       int             status = 0;
->>>>>>          unsigned        id;
->>>>>>
->>>>>>          acpi_gpiochip_remove(chip);
->>>>>> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
->>>>>>          of_gpiochip_remove(chip);
->>>>>>
->>>>>>          for (id = 0; id < chip->ngpio; id++) {
->>>>>> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
->>>>>> -                       status = -EBUSY;
->>>>>> -                       break;
->>>>>> -               }
->>>>>> -       }
->>>>>> -       if (status == 0) {
->>>>>> -               for (id = 0; id < chip->ngpio; id++)
->>>>>> -                       chip->desc[id].chip = NULL;
->>>>>> -
->>>>>> -               list_del(&chip->list);
->>>>>> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
->>>>>> +                       panic("gpio: removing gpiochip with gpios still
->>>>>> requested\n");
->>>>>
->>>>> panic?
->>>>
->>>> NACK to the patch for this reason.  The strongest thing you should do here
->>>> is WARN.
->>>>
->>>> That said, I am not sure why we need this whole patch set in the first place.
->>>
->>> Well, what currently happens when you remove a device that is a
->>> provider of a gpio_chip which is still in use, is that the kernel
->>> crashes. Probably with a rather cryptic error message. So this patch
->>> doesn't really change the behavior, but makes it more explicit what
->>> is actually wrong. And even if you replace the panic() by a WARN()
->>> it will again just crash slightly later.
->>>
->>> This is a design flaw in the GPIO subsystem that needs to be fixed.
+On Mon, Jun 2, 2014 at 12:18 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, May 31, 2014 at 04:01:35PM +0200, Hans de Goede wrote:
+>> Rename SUNXI_IRQ_NUMBER to IRQ_PER_BANK as it no longer represents the total
+>> number of irqs and use it instead of the number of irqs-per-reg when
+>> calculating the bank to use for the various sunxi_irq_xxx_reg functions.
+>> This fixes sunxi_irq_cfg_reg using the wrong bank for irqs >= 8.
 >>
->> Surely then the best way is to error out to the module unload and
->> stop the driver being unloaded?
+>> Also sunxi_irq_cfg_reg_from_bank returns the address of pio_int_cfg0, add an
+>> offset to the register returned for irqs living in the pio_int_cfg[1-3].
 >>
-> 
-> You can't error out on module unload, although that's not really relevant 
-> here. gpiochip_remove() is typically called when the device that registered 
-> the GPIO chip is unbound. And despite some remove() callbacks having a 
-> return type of int you can not abort the removal of a device.
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> Good catch, I've squashed it into my serie with minor modifications
+> (remove the cfg_reg_from_bank that doesn't make any sense).
 
-It is a design flaw in many subsystems having providers and consumers,
-not only GPIO. The same situation is with clock providers, regulators,
-phys, drm_panels, ..., at least it was such last time I have tested it.
+I'm more than a little confused by your and Hans parallell patch
+series to sunxi now :-)
 
-The problem is that many frameworks assumes that lifetime of provider is
-always bigger than lifetime of its consumers, and this is wrong
-assumption - usually it is not possible to prevent unbinding driver from
-device, so if the device is a provider there is no way to inform
-consumers about his removal.
+I will try to apply your patches first, then Hans' as you're the
+maintainer of this driver.
 
-Some solution for such problems is to use some kind of availability
-callbacks for requesting resources (gpios, clocks, regulators,...)
-instead of simple 'getters' (clk_get, gpiod_get). Callbacks should
-guarantee that the resource is always valid between callback reporting
-its availability and callback reporting its removal. Such approach seems
-to be complicated at the first sight but it should allow to make the
-code safe and as a bonus it will allow to avoid deferred probing.
-Btw I have send already RFC for such framework [1].
-
-[1]: https://lkml.org/lkml/2014/4/30/345
-
-Regards
-Andrzej
-
-
-> 
-> - Lars
-> 
+Yours,
+Linus Walleij
