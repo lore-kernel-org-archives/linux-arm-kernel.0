@@ -1,89 +1,32 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Tue, 10 Jun 2014 00:49:50 +0200
-Subject: [PATCH v2 1/3] arm: multi_v7: enable igb, stmpe, lm95245, pwm leds
-Message-ID: <1741a33cd88cd5525f3c50c0e0cacc0853a3512a.1402350905.git.marcel@ziswiler.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 9 Jun 2014 23:51:42 +0100
+Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
+In-Reply-To: <1976508.Da0u8DZI5B@vostro.rjw.lan>
+References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
+ <3122018.iBNBjMKNbN@vostro.rjw.lan>
+ <20140609194917.GH5099@sirena.org.uk>
+ <1976508.Da0u8DZI5B@vostro.rjw.lan>
+Message-ID: <20140609225142.GA5099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
-i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller, PWM
-LEDs generically accessible from user space and an LM95245 temperature
-sensor chip. The later three can also be found on the Colibri T30
-module.
+On Tue, Jun 10, 2014 at 12:22:07AM +0200, Rafael J. Wysocki wrote:
+> On Monday, June 09, 2014 08:49:17 PM Mark Brown wrote:
 
-While at it move the NEON entry down to its proper place to have it all
-nicely ordered again.
+> > Yes, looks like it is.
 
-Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
----
-Changes since v1:
-- Forget about spidev for now.
+> But it doesn't apply for me on top of the current Linus' tree.
 
- arch/arm/configs/multi_v7_defconfig |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+> Can you please rebase?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 19dbddb..b0b996e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -66,7 +66,6 @@ CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
--CONFIG_NEON=y
- CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
-@@ -83,6 +82,7 @@ CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_IDLE=y
-+CONFIG_NEON=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -134,6 +134,7 @@ CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
- CONFIG_NET_CALXEDA_XGMAC=y
-+CONFIG_IGB=y
- CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
- CONFIG_KS8851=y
-@@ -157,6 +158,8 @@ CONFIG_KEYBOARD_TEGRA=y
- CONFIG_KEYBOARD_SPEAR=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
- CONFIG_SERIO_AMBAKMI=y
-@@ -222,6 +225,7 @@ CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_SUN6I=y
- CONFIG_SENSORS_LM90=y
-+CONFIG_SENSORS_LM95245=y
- CONFIG_THERMAL=y
- CONFIG_DOVE_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
-@@ -233,6 +237,7 @@ CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_SPI=y
- CONFIG_MFD_MAX8907=y
- CONFIG_MFD_SEC_CORE=y
-+CONFIG_MFD_STMPE=y
- CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65090=y
- CONFIG_MFD_TPS6586X=y
-@@ -315,6 +320,9 @@ CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SUNXI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_PWM=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
--- 
-1.7.9.5
+It probably depends on other people's trees too, I just killed all the
+usages in -next - I gather the SH trees added some new ones for example.
+I'd expect it'll apply after the merge window, if not that's the time to
+look at it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140609/8e1c04eb/attachment-0001.sig>
