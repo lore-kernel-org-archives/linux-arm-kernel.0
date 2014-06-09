@@ -1,41 +1,54 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Tue, 10 Jun 2014 00:16:13 +0200
-Subject: [PATCH 2/3] arm: tegra: enable igb, stmpe, i2c chardev, spidev,
- lm95245, pwm leds
-In-Reply-To: <20140604111755.GG2520@sirena.org.uk>
-References: <c5522b0efcbfc7690dcde6aaf78b9dd568f99604.1401665237.git.marcel@ziswiler.com>
- <39a8704a4c8170d6b0620a1e5e44042eae6d8810.1401665237.git.marcel@ziswiler.com>
- <538CA24B.1010602@wwwdotorg.org> <538CA635.4050502@ziswiler.com>
- <20140602221627.GP31751@sirena.org.uk> <538D64FD.2010909@ziswiler.com>
- <20140603094537.GQ31751@sirena.org.uk> <538EBACB.70100@ziswiler.com>
- <20140604111755.GG2520@sirena.org.uk>
-Message-ID: <5396322D.6030003@ziswiler.com>
+From: tony.luck@gmail.com (Tony Luck)
+Date: Mon, 9 Jun 2014 15:25:37 -0700
+Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
+In-Reply-To: <20140503221658.GA13403@kroah.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+ <1397859600-11507-4-git-send-email-robherring2@gmail.com>
+ <CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>
+ <CAL_JsqKux+BTHeYo6XEzzQMAFJZHVjbURM973oHT=t698GbJbA@mail.gmail.com>
+ <20140503220731.GA10927@kroah.com>
+ <20140503221658.GA13403@kroah.com>
+Message-ID: <CA+8MBb+7f1bOnJjJWj1vxa0UNuQwz7OGRDR_QFTxOT=9cynabQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 01:17 PM, Mark Brown wrote:
-> You're saying you're controlling it from userspace.  This is a
-> particular detail of what you are doing in your system.  You happen to
-> want to control the devices you are hanging off the system with
-> userspace drivers but that's just what you're doing right now.
+On Sat, May 3, 2014 at 3:16 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+>> > >>  drivers/tty/serial/8250/8250_early.c | 138 ++++-------------------------------
+>> > >>  drivers/tty/serial/8250/Kconfig      |   1 +
+>> > >>  2 files changed, 16 insertions(+), 123 deletions(-)
+>> > >
+>> > > Hi Greg, Rob
+>> > >
+>> > > This one in tty-next breaks booting: "console=uart8250,io,0x3f8,115200".
+>> > > No early console and regular console anymore.
+>> > >
+>> > > It should produce "early con and regular con".
+>> >
+>> > This is what I get for running checkpatch and converting
+>> > simple_strtoul to kstrto* which are not so equivalent. kstrto* will
+>> > not convert things such as 115200n8 to a number.
+>> >
+>> > Greg, Do you want a fix or for me to respin the series? The fix looks like this:
+>>
+>> As this is in my tree now (right?), I need a fix to apply to it.
+>
+> Nevermind, you already sent it...
 
-Sorry, I don't get it. Yes, spidev is to control stuff from user space 
-just like i2c-dev however bad that might sound.
+Linus' tree (HEAD=963649d735c8) is spitting out all sorts of garbage
+on the serial console - as if the baud rate is being periodically set
+to something weird, and then back to 112500.  I see over a dozen
+blocks of junk interspersed with good output.
 
-> No, that's in the controller node - the chip selects are described
-> there.  The child node references a chip select number that the master
-> has and describes what's connected to that chip select.
+This in on ia64 with "console=uart,io,0x3f8" on the command line.
 
-Well, unfortunately SPI without any chip select is just plain simply 
-useless. It won't work.
+git bisect pointed me here:
 
-> It's a perfectly fine way of controlling things from userspace if that's
-> a sensible way of controlling devices but that does not mean you should
-> describe it in the device tree in that fashion.
+d2fd6810a823bcde1ee232668f5689837aafa772 is first bad commit
+commit d2fd6810a823bcde1ee232668f5689837aafa772
+Author: Rob Herring <robh@kernel.org>
+Date:   Fri Apr 18 17:19:56 2014 -0500
 
-Only that without describing such a chip select in the device tree 
-spidev won't ever work.
+    tty/serial: convert 8250 to generic earlycon
 
-I don't see us reaching any consensus here therefore I retreat. I will 
-re-submit the whole thing without spidev however sad having to see that 
-useful feature being dropped.
+-Tony
