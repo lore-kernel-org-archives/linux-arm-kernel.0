@@ -1,740 +1,403 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon,  9 Jun 2014 11:37:47 +0200
-Subject: [PATCH 2/5] regulator: Add driver for Maxim 77802 PMIC regulators
+Date: Mon,  9 Jun 2014 11:37:48 +0200
+Subject: [PATCH 3/5] clk: Add driver for Maxim 77802 PMIC clocks
 In-Reply-To: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1402306670-17041-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1402306670-17041-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MAX77802 PMIC has 10 high-efficiency Buck and 32 Low-dropout
-(LDO) regulators. This patch adds support for all these regulators
-found on the MAX77802 PMIC and is based on a driver added by Simon
-Glass to the Chrome OS kernel 3.8 tree.
+The MAX77802 PMIC has two 32.768kHz Buffered Clock Outputs with
+Low Jitter Mode. This patch adds support for these two clocks.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- drivers/regulator/Kconfig    |   9 +
- drivers/regulator/Makefile   |   1 +
- drivers/regulator/max77802.c | 678 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 688 insertions(+)
- create mode 100644 drivers/regulator/max77802.c
+ .../devicetree/bindings/clock/maxim,max77802.txt   |  40 ++++
+ drivers/clk/Kconfig                                |   6 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-max77802.c                         | 253 +++++++++++++++++++++
+ drivers/mfd/max77802.c                             |   3 +
+ include/dt-bindings/clock/maxim,max77802.h         |  22 ++
+ 6 files changed, 325 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+ create mode 100644 drivers/clk/clk-max77802.c
+ create mode 100644 include/dt-bindings/clock/maxim,max77802.h
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 789eb46..17873d3 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -377,6 +377,15 @@ config REGULATOR_MAX77693
- 	  and one current regulator 'CHARGER'. This is suitable for
- 	  Exynos-4x12 chips.
- 
-+config REGULATOR_MAX77802
-+	tristate "Maxim 77802 regulator"
-+	depends on MFD_MAX77802
-+	help
-+	  This driver controls a Maxim 77802 regulator
-+	  via I2C bus. The provided regulator is suitable for
-+	  Exynos-5 chips to control various voltages. It includes
-+	  support for control of voltage and ramp speed.
-+
- config REGULATOR_MC13XXX_CORE
- 	tristate
- 
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index d461110..2aea4b6 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -51,6 +51,7 @@ obj-$(CONFIG_REGULATOR_MAX8997) += max8997.o
- obj-$(CONFIG_REGULATOR_MAX8998) += max8998.o
- obj-$(CONFIG_REGULATOR_MAX77686) += max77686.o
- obj-$(CONFIG_REGULATOR_MAX77693) += max77693.o
-+obj-$(CONFIG_REGULATOR_MAX77802) += max77802.o
- obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
- obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o
- obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
-diff --git a/drivers/regulator/max77802.c b/drivers/regulator/max77802.c
+diff --git a/Documentation/devicetree/bindings/clock/maxim,max77802.txt b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
 new file mode 100644
-index 0000000..93e8f69
+index 0000000..1d3fb64
 --- /dev/null
-+++ b/drivers/regulator/max77802.c
-@@ -0,0 +1,678 @@
++++ b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
+@@ -0,0 +1,40 @@
++Binding for Maxim MAX77802 32k clock generator block
++
++This is a part of device tree bindings of MAX77802 multi-function device.
++More information can be found in bindings/mfd/max77802.txt file.
++
++The MAX77802 contains two 32.768khz clock outputs that can be controlled
++(gated/ungated) over I2C.
++
++Following properties should be presend in main device node of the MFD chip.
++
++Required properties:
++
++- #clock-cells: from common clock binding; shall be set to 1.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume.
++
++Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77802.h
++header and can be used in device tree sources.
++
++Example: Node of the MFD chip
++
++	max77802: max77802 at 09 {
++		compatible = "maxim,max77802";
++		interrupt-parent = <&wakeup_eint>;
++		interrupts = <26 0>;
++		reg = <0x09>;
++		#clock-cells = <1>;
++
++		/* ... */
++	};
++
++Example: Clock consumer node
++
++	foo at 0 {
++		compatible = "bar,foo";
++		/* ... */
++		clock-names = "32khz_ap";
++		clocks = <&max77802 MAX77802_CLK_32K_AP>;
++	};
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 9f9c5ae..74c71a4 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -38,6 +38,12 @@ config COMMON_CLK_MAX77686
+ 	---help---
+ 	  This driver supports Maxim 77686 crystal oscillator clock. 
+ 
++config COMMON_CLK_MAX77802
++	tristate "Clock driver for Maxim 77802 MFD"
++	depends on MFD_MAX77802
++	---help---
++	  This driver supports Maxim 77802 crystal oscillator clock.
++
+ config COMMON_CLK_SI5351
+ 	tristate "Clock driver for SiLabs 5351A/B/C"
+ 	depends on I2C
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 567f102..677692f 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -19,6 +19,7 @@ obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
+ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
+ obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
+ obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
++obj-$(CONFIG_COMMON_CLK_MAX77802)	+= clk-max77802.o
+ obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
+diff --git a/drivers/clk/clk-max77802.c b/drivers/clk/clk-max77802.c
+new file mode 100644
+index 0000000..a98fc29
+--- /dev/null
++++ b/drivers/clk/clk-max77802.c
+@@ -0,0 +1,253 @@
 +/*
-+ * max77802.c - Regulator driver for the Maxim 77802
++ * clk-max77802.c - Clock driver for Maxim 77802
 + *
-+ * Copyright (C) 2013-2014 Google, Inc
-+ * Simon Glass <sjg@chromium.org>
++ * Copyright (C) 2014 Google, Inc
 + *
-+ * Copyright (C) 2012 Samsung Electronics
-+ * Chiwoong Byun <woong.byun@smasung.com>
++ * Copyright (C) 2012 Samsung Electornics
 + * Jonghwa Lee <jonghwa3.lee@samsung.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + *
-+ * This driver is based on max8997.c
++ * This driver is based on clk-max77686.c
 + */
 +
 +#include <linux/kernel.h>
-+#include <linux/bug.h>
-+#include <linux/err.h>
-+#include <linux/gpio.h>
 +#include <linux/slab.h>
++#include <linux/err.h>
 +#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/of_regulator.h>
 +#include <linux/mfd/max77802.h>
 +#include <linux/mfd/max77802-private.h>
++#include <linux/clk-provider.h>
++#include <linux/mutex.h>
++#include <linux/clkdev.h>
 +
-+/* Default ramp delay in case it is not manually set */
-+#define MAX77802_RAMP_DELAY		100000		/* uV/us */
++#include <dt-bindings/clock/maxim,max77802.h>
 +
-+#define MAX77802_OPMODE_SHIFT_LDO	6
-+#define MAX77802_OPMODE_BUCK234_SHIFT	4
-+#define MAX77802_OPMODE_MASK		0x3
++#define MAX77802_CLOCK_OPMODE_MASK	0x1
++#define MAX77802_CLOCK_LOW_JITTER_SHIFT 0x3
 +
-+#define MAX77802_VSEL_MASK		0x3F
-+#define MAX77802_DVS_VSEL_MASK		0xFF
-+
-+#define MAX77802_RAMP_RATE_MASK_2BIT	0xC0
-+#define MAX77802_RAMP_RATE_SHIFT_2BIT	6
-+#define MAX77802_RAMP_RATE_MASK_4BIT	0xF0
-+#define MAX77802_RAMP_RATE_SHIFT_4BIT	4
-+
-+/* LDO16, LDO22 and LDO31 are not available on MAX77802 */
-+#define MAX77802_MAX_REGULATORS		(MAX77802_REG_MAX - 3)
-+
-+/* MAX77802 has two register formats: 2-bit and 4-bit */
-+static const unsigned int ramp_table_77802_2bit[] = {
-+	12500,
-+	25000,
-+	50000,
-+	100000,
++struct max77802_clk {
++	struct max77802_dev *iodev;
++	u32 mask;
++	struct clk_hw hw;
++	struct clk_lookup *lookup;
 +};
 +
-+static unsigned int ramp_table_77802_4bit[] = {
-+	1000,	2000,	3030,	4000,
-+	5000,	5880,	7140,	8330,
-+	9090,	10000,	11110,	12500,
-+	16670,	25000,	50000,	100000,
-+};
-+
-+struct max77802_regulator_prv {
-+	int num_regulators;
-+	struct regulator_dev *rdev[MAX77802_MAX_REGULATORS];
-+	unsigned int opmode[MAX77802_MAX_REGULATORS];
-+};
-+
-+static int max77802_get_opmode_shift(int id)
++static struct max77802_clk *to_max77802_clk(struct clk_hw *hw)
 +{
-+	if (id >= MAX77802_LDO1 && id <= MAX77802_LDO35)
-+		return MAX77802_OPMODE_SHIFT_LDO;
-+	else if (id == MAX77802_BUCK1 || (id >= MAX77802_BUCK5 &&
-+					  id <= MAX77802_BUCK10))
-+		return 0;
-+	else if (id >= MAX77802_BUCK2 && id <= MAX77802_BUCK4)
-+		return MAX77802_OPMODE_BUCK234_SHIFT;
-+	else
++	return container_of(hw, struct max77802_clk, hw);
++}
++
++static int max77802_clk_prepare(struct clk_hw *hw)
++{
++	struct max77802_clk *max77802 = to_max77802_clk(hw);
++
++	return regmap_update_bits(max77802->iodev->regmap,
++				  MAX77802_REG_32KHZ, max77802->mask,
++				  max77802->mask);
++}
++
++static void max77802_clk_unprepare(struct clk_hw *hw)
++{
++	struct max77802_clk *max77802 = to_max77802_clk(hw);
++
++	regmap_update_bits(max77802->iodev->regmap,
++		MAX77802_REG_32KHZ, max77802->mask, ~max77802->mask);
++}
++
++static int max77802_clk_is_prepared(struct clk_hw *hw)
++{
++	struct max77802_clk *max77802 = to_max77802_clk(hw);
++	int ret;
++	u32 val;
++
++	ret = regmap_read(max77802->iodev->regmap,
++				MAX77802_REG_32KHZ, &val);
++
++	if (ret < 0)
 +		return -EINVAL;
++
++	return val & max77802->mask;
 +}
 +
-+/*
-+ * Some BUCKS supports Normal[ON/OFF] mode during suspend
-+ *
-+ * BUCK 1, 6, 2-4, 5, 7-10 (all)
-+ *
-+ * The other mode (0x02) will make pwrreq switch between normal
-+ * and low power.
-+ */
-+static int max77802_buck_set_suspend_disable(struct regulator_dev *rdev)
++static unsigned long max77802_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
 +{
-+	unsigned int val = MAX77802_OPMODE_STANDBY;
-+	struct max77802_regulator_prv *max77802 = rdev_get_drvdata(rdev);
-+	int id = rdev_get_id(rdev);
-+	int shift = max77802_get_opmode_shift(id);
-+
-+	max77802->opmode[id] = val;
-+	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-+				  rdev->desc->enable_mask, val << shift);
++	return 32768;
 +}
 +
-+/*
-+ * Some LDOs supports LPM-ON/OFF/Normal-ON mode during suspend state
-+ *
-+ * LDOs 3-7, 9-14, 18-26, 28, 29, 32-34, 1, 2, 8, 15, 17, 27, 30, 35 (all)
-+ *
-+ * LDOs 1, 20, 21, and 3, mode 1 is not supported
-+ */
-+static int max77802_ldo_set_suspend_mode(struct regulator_dev *rdev,
-+					 unsigned int mode)
-+{
-+	struct max77802_regulator_prv *max77802 = rdev_get_drvdata(rdev);
-+	int id = rdev_get_id(rdev);
-+	unsigned int val;
-+	int shift = max77802_get_opmode_shift(id);
-+
-+	switch (mode) {
-+	case REGULATOR_MODE_IDLE:			/* ON in LP Mode */
-+		val = MAX77802_OPMODE_LP;
-+		break;
-+	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
-+		val = MAX77802_OPMODE_NORMAL;
-+		break;
-+	case REGULATOR_MODE_STANDBY:			/* switch off */
-+		if (id != MAX77802_LDO1 && id != MAX77802_LDO20 &&
-+			id != MAX77802_LDO21 && id != MAX77802_LDO3) {
-+			val = MAX77802_OPMODE_STANDBY;
-+			break;
-+		}
-+		/* no break */
-+	default:
-+		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
-+			rdev->desc->name, mode);
-+		return -EINVAL;
-+	}
-+
-+	max77802->opmode[rdev_get_id(rdev)] = val;
-+	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-+				  rdev->desc->enable_mask, val << shift);
-+}
-+
-+static int max77802_enable(struct regulator_dev *rdev)
-+{
-+	struct max77802_regulator_prv *max77802 = rdev_get_drvdata(rdev);
-+	int id = rdev_get_id(rdev);
-+	int shift = max77802_get_opmode_shift(id);
-+
-+	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-+				  rdev->desc->enable_mask,
-+				  max77802->opmode[id] << shift);
-+}
-+
-+static int max77802_find_ramp_value(struct regulator_dev *rdev,
-+				    const unsigned int limits[], int size,
-+				    unsigned int ramp_delay)
-+{
-+	int i;
-+
-+	for (i = 0; i < size; i++) {
-+		if (ramp_delay <= limits[i])
-+			return i;
-+	}
-+
-+	/* Use maximum value for no ramp control */
-+	pr_warn("%s: ramp_delay: %d not supported, setting 100000\n",
-+		rdev->desc->name, ramp_delay);
-+	return size - 1;
-+}
-+
-+/* Used for BUCKs 2-4 */
-+static int max77802_set_ramp_delay_2bit(struct regulator_dev *rdev,
-+					int ramp_delay)
-+{
-+	int id = rdev_get_id(rdev);
-+	unsigned int ramp_value;
-+
-+	if (id > MAX77802_BUCK4) {
-+		pr_warn("%s: regulator_suspend_mode: ramp delay not supported\n",
-+			rdev->desc->name);
-+		return -EINVAL;
-+	}
-+	ramp_value = max77802_find_ramp_value(rdev, ramp_table_77802_2bit,
-+				ARRAY_SIZE(ramp_table_77802_2bit), ramp_delay);
-+
-+	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-+				  MAX77802_RAMP_RATE_MASK_2BIT,
-+				  ramp_value << MAX77802_RAMP_RATE_SHIFT_2BIT);
-+}
-+
-+/* For BUCK1, 6 */
-+static int max77802_set_ramp_delay_4bit(struct regulator_dev *rdev,
-+					    int ramp_delay)
-+{
-+	unsigned int ramp_value;
-+
-+	ramp_value = max77802_find_ramp_value(rdev, ramp_table_77802_4bit,
-+				ARRAY_SIZE(ramp_table_77802_4bit), ramp_delay);
-+
-+	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-+				  MAX77802_RAMP_RATE_MASK_4BIT,
-+				  ramp_value << MAX77802_RAMP_RATE_SHIFT_4BIT);
-+}
-+
-+/*
-+ * LDOs 3-7, 9-14, 18-26, 28, 29, 32-34, 1, 2, 8, 15, 17, 27, 30, 35 (all)
-+ */
-+static struct regulator_ops max77802_ldo_ops = {
-+	.list_voltage		= regulator_list_voltage_linear,
-+	.map_voltage		= regulator_map_voltage_linear,
-+	.is_enabled		= regulator_is_enabled_regmap,
-+	.enable			= max77802_enable,
-+	.disable		= regulator_disable_regmap,
-+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
-+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-+	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
-+	.set_suspend_mode	= max77802_ldo_set_suspend_mode,
++static struct clk_ops max77802_clk_ops = {
++	.prepare	= max77802_clk_prepare,
++	.unprepare	= max77802_clk_unprepare,
++	.is_prepared	= max77802_clk_is_prepared,
++	.recalc_rate	= max77802_recalc_rate,
 +};
 +
-+/* BUCKS 1, 6 */
-+static struct regulator_ops max77802_buck_16_dvs_ops = {
-+	.list_voltage		= regulator_list_voltage_linear,
-+	.map_voltage		= regulator_map_voltage_linear,
-+	.is_enabled		= regulator_is_enabled_regmap,
-+	.enable			= max77802_enable,
-+	.disable		= regulator_disable_regmap,
-+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
-+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-+	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
-+	.set_ramp_delay		= max77802_set_ramp_delay_4bit,
-+	.set_suspend_disable	= max77802_buck_set_suspend_disable,
++static struct clk_init_data max77802_clks_init[MAX77802_CLKS_NUM] = {
++	[MAX77802_CLK_32K_AP] = {
++		.name = "32khz_ap",
++		.ops = &max77802_clk_ops,
++		.flags = CLK_IS_ROOT,
++	},
++	[MAX77802_CLK_32K_CP] = {
++		.name = "32khz_cp",
++		.ops = &max77802_clk_ops,
++		.flags = CLK_IS_ROOT,
++	},
 +};
 +
-+/* BUCKs 2-4, 5, 7-10 */
-+static struct regulator_ops max77802_buck_dvs_ops = {
-+	.list_voltage		= regulator_list_voltage_linear,
-+	.map_voltage		= regulator_map_voltage_linear,
-+	.is_enabled		= regulator_is_enabled_regmap,
-+	.enable			= max77802_enable,
-+	.disable		= regulator_disable_regmap,
-+	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
-+	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-+	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
-+	.set_ramp_delay		= max77802_set_ramp_delay_2bit,
-+	.set_suspend_disable	= max77802_buck_set_suspend_disable,
-+};
++static struct clk *max77802_clk_register(struct device *dev,
++					struct max77802_clk *max77802)
++{
++	struct clk *clk;
++	struct clk_hw *hw = &max77802->hw;
 +
-+/* LDOs 3-7, 9-14, 18-26, 28, 29, 32-34 */
-+#define regulator_77802_desc_p_ldo(num)	{				\
-+	.name		= "LDO"#num,					\
-+	.id		= MAX77802_LDO##num,				\
-+	.ops		= &max77802_ldo_ops,				\
-+	.type		= REGULATOR_VOLTAGE,				\
-+	.owner		= THIS_MODULE,					\
-+	.min_uV		= 800000,					\
-+	.uV_step	= 50000,					\
-+	.ramp_delay	= MAX77802_RAMP_DELAY,				\
-+	.n_voltages	= 1 << 6,					\
-+	.vsel_reg	= MAX77802_REG_LDO1CTRL1 + num - 1,		\
-+	.vsel_mask	= MAX77802_VSEL_MASK,				\
-+	.enable_reg	= MAX77802_REG_LDO1CTRL1 + num - 1,		\
-+	.enable_mask	= MAX77802_OPMODE_MASK << MAX77802_OPMODE_SHIFT_LDO, \
++	clk = clk_register(dev, hw);
++	if (IS_ERR(clk))
++		return clk;
++
++	max77802->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
++	if (!max77802->lookup)
++		return ERR_PTR(-ENOMEM);
++
++	max77802->lookup->con_id = hw->init->name;
++	max77802->lookup->clk = clk;
++
++	clkdev_add(max77802->lookup);
++
++	return clk;
 +}
 +
-+/* LDOs 1, 2, 8, 15, 17, 27, 30, 35 */
-+#define regulator_77802_desc_n_ldo(num)	{				\
-+	.name		= "LDO"#num,					\
-+	.id		= MAX77802_LDO##num,				\
-+	.ops		= &max77802_ldo_ops,				\
-+	.type		= REGULATOR_VOLTAGE,				\
-+	.owner		= THIS_MODULE,					\
-+	.min_uV		= 800000,					\
-+	.uV_step	= 25000,					\
-+	.ramp_delay	= MAX77802_RAMP_DELAY,				\
-+	.n_voltages	= 1 << 6,					\
-+	.vsel_reg	= MAX77802_REG_LDO1CTRL1 + num - 1,		\
-+	.vsel_mask	= MAX77802_VSEL_MASK,				\
-+	.enable_reg	= MAX77802_REG_LDO1CTRL1 + num - 1,		\
-+	.enable_mask	= MAX77802_OPMODE_MASK << MAX77802_OPMODE_SHIFT_LDO, \
-+}
-+
-+/* BUCKs 1, 6 */
-+#define regulator_77802_desc_16_buck(num)	{			\
-+	.name		= "BUCK"#num,					\
-+	.id		= MAX77802_BUCK##num,				\
-+	.ops		= &max77802_buck_16_dvs_ops,			\
-+	.type		= REGULATOR_VOLTAGE,				\
-+	.owner		= THIS_MODULE,					\
-+	.min_uV		= 612500,					\
-+	.uV_step	= 6250,						\
-+	.ramp_delay	= MAX77802_RAMP_DELAY,				\
-+	.n_voltages	= 1 << 8,					\
-+	.vsel_reg	= MAX77802_REG_BUCK ## num ## DVS1,		\
-+	.vsel_mask	= MAX77802_DVS_VSEL_MASK,			\
-+	.enable_reg	= MAX77802_REG_BUCK ## num ## CTRL,		\
-+	.enable_mask	= MAX77802_OPMODE_MASK,				\
-+}
-+
-+/* BUCKS 2-4 */
-+#define regulator_77802_desc_234_buck(num)	{			\
-+	.name		= "BUCK"#num,					\
-+	.id		= MAX77802_BUCK##num,				\
-+	.ops		= &max77802_buck_dvs_ops,			\
-+	.type		= REGULATOR_VOLTAGE,				\
-+	.owner		= THIS_MODULE,					\
-+	.min_uV		= 600000,					\
-+	.uV_step	= 6250,						\
-+	.ramp_delay	= MAX77802_RAMP_DELAY,				\
-+	.n_voltages	= 0x91,						\
-+	.vsel_reg	= MAX77802_REG_BUCK ## num ## DVS1,		\
-+	.vsel_mask	= MAX77802_DVS_VSEL_MASK,			\
-+	.enable_reg	= MAX77802_REG_BUCK ## num ## CTRL1,		\
-+	.enable_mask	= MAX77802_OPMODE_MASK <<			\
-+				MAX77802_OPMODE_BUCK234_SHIFT,		\
-+}
-+
-+/* BUCK 5 */
-+#define regulator_77802_desc_buck5(num)		{			\
-+	.name		= "BUCK"#num,					\
-+	.id		= MAX77802_BUCK##num,				\
-+	.ops		= &max77802_buck_dvs_ops,			\
-+	.type		= REGULATOR_VOLTAGE,				\
-+	.owner		= THIS_MODULE,					\
-+	.min_uV		= 750000,					\
-+	.uV_step	= 50000,					\
-+	.ramp_delay	= MAX77802_RAMP_DELAY,				\
-+	.n_voltages	= 1 << 6,					\
-+	.vsel_reg	= MAX77802_REG_BUCK5OUT,			\
-+	.vsel_mask	= MAX77802_VSEL_MASK,				\
-+	.enable_reg	= MAX77802_REG_BUCK5CTRL,			\
-+	.enable_mask	= MAX77802_OPMODE_MASK,				\
-+}
-+
-+/* BUCKs 7-10 */
-+#define regulator_77802_desc_buck7_10(num)	{			\
-+	.name		= "BUCK"#num,					\
-+	.id		= MAX77802_BUCK##num,				\
-+	.ops		= &max77802_buck_dvs_ops,			\
-+	.type		= REGULATOR_VOLTAGE,				\
-+	.owner		= THIS_MODULE,					\
-+	.min_uV		= 750000,					\
-+	.uV_step	= 50000,					\
-+	.ramp_delay	= MAX77802_RAMP_DELAY,				\
-+	.n_voltages	= 1 << 6,					\
-+	.vsel_reg	= MAX77802_REG_BUCK7OUT + (num - 7) * 3,	\
-+	.vsel_mask	= MAX77802_VSEL_MASK,				\
-+	.enable_reg	= MAX77802_REG_BUCK7CTRL + (num - 7) * 3,	\
-+	.enable_mask	= MAX77802_OPMODE_MASK,				\
-+}
-+
-+static struct regulator_desc regulators[] = {
-+	regulator_77802_desc_n_ldo(1),
-+	regulator_77802_desc_n_ldo(2),
-+	regulator_77802_desc_p_ldo(3),
-+	regulator_77802_desc_p_ldo(4),
-+	regulator_77802_desc_p_ldo(5),
-+	regulator_77802_desc_p_ldo(6),
-+	regulator_77802_desc_p_ldo(7),
-+	regulator_77802_desc_n_ldo(8),
-+	regulator_77802_desc_p_ldo(9),
-+	regulator_77802_desc_p_ldo(10),
-+	regulator_77802_desc_p_ldo(11),
-+	regulator_77802_desc_p_ldo(12),
-+	regulator_77802_desc_p_ldo(13),
-+	regulator_77802_desc_p_ldo(14),
-+	regulator_77802_desc_n_ldo(15),
-+	regulator_77802_desc_n_ldo(17),
-+	regulator_77802_desc_p_ldo(18),
-+	regulator_77802_desc_p_ldo(19),
-+	regulator_77802_desc_p_ldo(20),
-+	regulator_77802_desc_p_ldo(21),
-+	regulator_77802_desc_p_ldo(23),
-+	regulator_77802_desc_p_ldo(24),
-+	regulator_77802_desc_p_ldo(25),
-+	regulator_77802_desc_p_ldo(26),
-+	regulator_77802_desc_n_ldo(27),
-+	regulator_77802_desc_p_ldo(28),
-+	regulator_77802_desc_p_ldo(29),
-+	regulator_77802_desc_n_ldo(30),
-+	regulator_77802_desc_p_ldo(32),
-+	regulator_77802_desc_p_ldo(33),
-+	regulator_77802_desc_p_ldo(34),
-+	regulator_77802_desc_n_ldo(35),
-+	regulator_77802_desc_16_buck(1),
-+	regulator_77802_desc_234_buck(2),
-+	regulator_77802_desc_234_buck(3),
-+	regulator_77802_desc_234_buck(4),
-+	regulator_77802_desc_buck5(5),
-+	regulator_77802_desc_16_buck(6),
-+	regulator_77802_desc_buck7_10(7),
-+	regulator_77802_desc_buck7_10(8),
-+	regulator_77802_desc_buck7_10(9),
-+	regulator_77802_desc_buck7_10(10),
-+};
-+
-+#ifdef CONFIG_OF
-+static int max77802_pmic_dt_parse_pdata(struct platform_device *pdev,
-+					struct max77802_platform_data *pdata)
++static int max77802_clk_probe(struct platform_device *pdev)
 +{
 +	struct max77802_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-+	struct device_node *pmic_np, *regulators_np;
-+	struct max77802_regulator_data *rdata;
-+	struct of_regulator_match rmatch;
-+	unsigned int i;
++	struct max77802_clk *max77802_clks[MAX77802_CLKS_NUM];
++	struct clk **clocks;
++	int i, ret;
 +
-+	pmic_np = iodev->dev->of_node;
-+	regulators_np = of_get_child_by_name(pmic_np, "voltage-regulators");
-+	if (!regulators_np) {
-+		dev_err(&pdev->dev, "could not find regulators sub-node\n");
-+		return -EINVAL;
-+	}
-+
-+	pdata->num_regulators = ARRAY_SIZE(regulators);
-+	rdata = devm_kzalloc(&pdev->dev, sizeof(*rdata) *
-+			     pdata->num_regulators, GFP_KERNEL);
-+	if (!rdata) {
-+		of_node_put(regulators_np);
++	clocks = devm_kzalloc(&pdev->dev, sizeof(struct clk *)
++					* MAX77802_CLKS_NUM, GFP_KERNEL);
++	if (!clocks)
 +		return -ENOMEM;
++
++	for (i = 0; i < MAX77802_CLKS_NUM; i++) {
++		max77802_clks[i] = devm_kzalloc(&pdev->dev,
++					sizeof(struct max77802_clk), GFP_KERNEL);
++		if (!max77802_clks[i])
++			return -ENOMEM;
 +	}
 +
-+	for (i = 0; i < pdata->num_regulators; i++) {
-+		rmatch.name = regulators[i].name;
-+		rmatch.init_data = NULL;
-+		rmatch.of_node = NULL;
-+		if (of_regulator_match(&pdev->dev, regulators_np, &rmatch,
-+				       1) != 1) {
-+			dev_warn(&pdev->dev,
-+				 "No matching regulator for '%s'\n", rmatch.name);
-+			continue;
-+		}
-+		rdata[i].initdata = rmatch.init_data;
-+		rdata[i].of_node = rmatch.of_node;
-+		rdata[i].id = regulators[i].id;
-+	}
++	for (i = 0; i < MAX77802_CLKS_NUM; i++) {
++		max77802_clks[i]->iodev = iodev;
++		max77802_clks[i]->mask = MAX77802_CLOCK_OPMODE_MASK << i;
++		max77802_clks[i]->hw.init = &max77802_clks_init[i];
 +
-+	pdata->regulators = rdata;
-+	of_node_put(regulators_np);
-+
-+	return 0;
-+}
-+#else
-+static int max77802_pmic_dt_parse_pdata(struct platform_device *pdev,
-+					struct max77802_platform_data *pdata)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_OF */
-+
-+/**
-+ * max77802_setup_gpios - init DVS-related GPIOs
-+ *
-+ * This function claims / initalizations GPIOs related to DVS if they are
-+ * defined. This may have the effect of switching voltages if the
-+ * pdata->buck_default_idx does not match the boot time state of pins.
-+ */
-+static int max77802_setup_gpios(struct device *dev,
-+				struct max77802_platform_data *pdata)
-+{
-+	int buck_default_idx = pdata->buck_default_idx;
-+	int ret;
-+	int i;
-+
-+	/* Set all SELB high to avoid glitching while DVS is changing */
-+	for (i = 0; i < ARRAY_SIZE(pdata->buck_gpio_selb); i++) {
-+		int gpio = pdata->buck_gpio_selb[i];
-+
-+		/* OK if some GPIOs aren't defined */
-+		if (!gpio_is_valid(gpio))
-+			continue;
-+
-+		/* If a GPIO is valid, we'd better be able to claim it */
-+		ret = devm_gpio_request_one(dev, gpio, GPIOF_OUT_INIT_HIGH,
-+					    "max77802 selb");
-+		if (ret) {
-+			dev_err(dev, "can't claim gpio[%d]: %d\n", i, ret);
-+			return ret;
++		clocks[i] = max77802_clk_register(&pdev->dev, max77802_clks[i]);
++		if (IS_ERR(clocks[i])) {
++			ret = PTR_ERR(clocks[i]);
++			dev_err(&pdev->dev, "failed to register %s\n",
++				max77802_clks[i]->hw.init->name);
++			goto err_clocks;
 +		}
 +	}
 +
-+	/* Set our initial setting */
-+	for (i = 0; i < ARRAY_SIZE(pdata->buck_gpio_dvs); i++) {
-+		int gpio = pdata->buck_gpio_dvs[i];
-+
-+		/* OK if some GPIOs aren't defined */
-+		if (!gpio_is_valid(gpio))
-+			continue;
-+
-+		/* If a GPIO is valid, we'd better be able to claim it */
-+		ret = devm_gpio_request(dev, gpio, "max77802 dvs");
-+		if (ret) {
-+			dev_err(dev, "can't claim gpio[%d]: %d\n", i, ret);
-+			return ret;
-+		}
-+		gpio_direction_output(gpio, (buck_default_idx >> i) & 1);
++	/* Enable low-jitter mode on the 32khz clocks. */
++	ret = regmap_update_bits(iodev->regmap, MAX77802_REG_32KHZ,
++				 1 << MAX77802_CLOCK_LOW_JITTER_SHIFT,
++				 1 << MAX77802_CLOCK_LOW_JITTER_SHIFT);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to enable low-jitter mode\n");
++		goto err_clocks;
 +	}
 +
-+	/* Now set SELB low to take effect */
-+	for (i = 0; i < ARRAY_SIZE(pdata->buck_gpio_selb); i++) {
-+		int gpio = pdata->buck_gpio_selb[i];
-+
-+		if (gpio_is_valid(gpio))
-+			gpio_set_value(gpio, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * max77802_read_gpios - read the current state of the dvs GPIOs
-+ *
-+ * We call this function at bootup to detect what slot the firmware was
-+ * using for the DVS GPIOs.  That way we can properly preserve the firmware's
-+ * voltage settings
-+ */
-+static int max77802_read_gpios(struct max77802_platform_data *pdata)
-+{
-+	int buck_default_idx = pdata->buck_default_idx;
-+	int result = 0;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(pdata->buck_gpio_dvs); i++) {
-+		int gpio = pdata->buck_gpio_dvs[i];
-+
-+		/* OK if some GPIOs aren't defined; we'll use default */
-+		if (!gpio_is_valid(gpio)) {
-+			result |= buck_default_idx & (1 << i);
-+			continue;
-+		}
-+
-+		if (gpio_get_value_cansleep(gpio))
-+			result |= 1 << i;
-+	}
-+
-+	return result;
-+}
-+
-+static inline bool max77802_is_dvs_buck(int id)
-+{
-+	/* on 77802 bucks 1-4, 6 are */
-+	return ((id >= MAX77802_BUCK1 && id <= MAX77802_BUCK4) ||
-+		(id == MAX77802_BUCK6));
-+}
-+
-+static void max77802_copy_reg(struct device *dev, struct regmap *regmap,
-+			      int from_reg, int to_reg)
-+{
-+	int val;
-+	int ret;
-+
-+	if (from_reg == to_reg)
-+		return;
-+
-+	ret = regmap_read(regmap, from_reg, &val);
-+	if (!ret)
-+		ret = regmap_write(regmap, to_reg, val);
-+
-+	if (ret)
-+		dev_warn(dev, "Copy err %d => %d (%d)\n",
-+			 from_reg, to_reg, ret);
-+}
-+
-+static int max77802_pmic_probe(struct platform_device *pdev)
-+{
-+	struct max77802_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-+	struct max77802_platform_data *pdata = dev_get_platdata(iodev->dev);
-+	struct max77802_regulator_prv *max77802;
-+	int i, ret = 0;
-+	struct regulator_config config = { };
-+	unsigned int reg;
-+	int buck_default_idx;
-+	int buck_old_idx;
-+
-+	dev_dbg(&pdev->dev, "%s\n", __func__);
-+
-+	/* This is allocated by the MFD driver */
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "no platform data found for regulator\n");
-+		return -ENODEV;
-+	}
-+
-+	max77802 = devm_kzalloc(&pdev->dev,
-+				sizeof(struct max77802_regulator_prv),
-+				GFP_KERNEL);
-+	if (!max77802)
-+		return -ENOMEM;
++	platform_set_drvdata(pdev, clocks);
 +
 +	if (iodev->dev->of_node) {
-+		ret = max77802_pmic_dt_parse_pdata(pdev, pdata);
-+		if (ret)
-+			return ret;
-+	}
++		struct clk_onecell_data *of_data;
 +
-+	if (pdata->num_regulators != MAX77802_MAX_REGULATORS) {
-+		dev_err(&pdev->dev,
-+			"Invalid initial data for regulator's initialiation: " \
-+			"expected %d, pdata/dt provided %d\n",
-+			MAX77802_MAX_REGULATORS,
-+			pdata->num_regulators);
-+		return -EINVAL;
-+	}
-+
-+	config.dev = &pdev->dev;
-+	config.regmap = iodev->regmap;
-+	config.driver_data = max77802;
-+	platform_set_drvdata(pdev, max77802);
-+
-+	buck_default_idx = pdata->buck_default_idx;
-+	buck_old_idx = max77802_read_gpios(pdata);
-+
-+	for (i = 0; i < MAX77802_MAX_REGULATORS; i++) {
-+		struct regulator_dev *rdev;
-+		int id = pdata->regulators[i].id;
-+
-+		config.init_data = pdata->regulators[i].initdata;
-+		config.of_node = pdata->regulators[i].of_node;
-+
-+		max77802->opmode[id] = MAX77802_OPMODE_NORMAL;
-+
-+		if (max77802_is_dvs_buck(id)) {
-+			/* Try to copy over data so we keep firmware settings */
-+			reg = regulators[i].vsel_reg;
-+			max77802_copy_reg(&pdev->dev, iodev->regmap,
-+					  reg + buck_old_idx,
-+					  reg + buck_default_idx);
-+			regulators[i].vsel_reg += buck_default_idx;
++		of_data = devm_kzalloc(&pdev->dev,
++					sizeof(*of_data), GFP_KERNEL);
++		if (!of_data) {
++			ret = -ENOMEM;
++			goto err_clocks;
 +		}
 +
-+		rdev = devm_regulator_register(&pdev->dev,
-+						&regulators[i], &config);
-+		if (IS_ERR(rdev)) {
-+			dev_err(&pdev->dev,
-+				"regulator init failed for %d\n", i);
-+			return PTR_ERR(rdev);
++		of_data->clks = clocks;
++		of_data->clk_num = MAX77802_CLKS_NUM;
++		ret = of_clk_add_provider(iodev->dev->of_node,
++					  of_clk_src_onecell_get, of_data);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to register OF clock provider\n");
++			goto err_clocks;
 +		}
 +	}
 +
-+	ret = max77802_setup_gpios(&pdev->dev, pdata);
-+	if (ret)
-+		return ret;
++	return 0;
 +
++err_clocks:
++	for (--i; i >= 0; --i) {
++		clkdev_drop(max77802_clks[i]->lookup);
++		clk_unregister(max77802_clks[i]->hw.clk);
++	}
++
++	return ret;
++}
++
++static int max77802_clk_remove(struct platform_device *pdev)
++{
++	struct max77802_dev *iodev = dev_get_drvdata(pdev->dev.parent);
++	struct clk **clocks = platform_get_drvdata(pdev);
++	int i;
++
++	if (iodev->dev->of_node)
++		of_clk_del_provider(iodev->dev->of_node);
++
++	for (i = 0; i < MAX77802_CLKS_NUM; i++) {
++		struct clk_hw *hw = __clk_get_hw(clocks[i]);
++		struct max77802_clk *max77802 = to_max77802_clk(hw);
++
++		clkdev_drop(max77802->lookup);
++		clk_unregister(clocks[i]);
++	}
 +	return 0;
 +}
 +
-+static const struct platform_device_id max77802_pmic_id[] = {
-+	{"max77802-pmic", 0},
++static const struct platform_device_id max77802_clk_id[] = {
++	{ "max77802-clk", 0},
 +	{ },
 +};
-+MODULE_DEVICE_TABLE(platform, max77802_pmic_id);
++MODULE_DEVICE_TABLE(platform, max77802_clk_id);
 +
-+static struct platform_driver max77802_pmic_driver = {
++static struct platform_driver max77802_clk_driver = {
 +	.driver = {
-+		.name = "max77802-pmic",
++		.name  = "max77802-clk",
 +		.owner = THIS_MODULE,
 +	},
-+	.probe = max77802_pmic_probe,
-+	.id_table = max77802_pmic_id,
++	.probe = max77802_clk_probe,
++	.remove = max77802_clk_remove,
++	.id_table = max77802_clk_id,
 +};
 +
-+static int __init max77802_pmic_init(void)
++static int __init max77802_clk_init(void)
 +{
-+	return platform_driver_register(&max77802_pmic_driver);
++	return platform_driver_register(&max77802_clk_driver);
 +}
-+subsys_initcall(max77802_pmic_init);
++subsys_initcall(max77802_clk_init);
 +
-+static void __exit max77802_pmic_cleanup(void)
++static void __init max77802_clk_cleanup(void)
 +{
-+	platform_driver_unregister(&max77802_pmic_driver);
++	platform_driver_unregister(&max77802_clk_driver);
 +}
-+module_exit(max77802_pmic_cleanup);
++module_exit(max77802_clk_cleanup);
 +
-+MODULE_DESCRIPTION("MAXIM 77802 Regulator Driver");
-+MODULE_AUTHOR("Simon Glass <sjg@chromium.org>");
++MODULE_DESCRIPTION("MAXIM 77802 Clock Driver");
++MODULE_AUTHOR("Javier Martinez Canillas <javier.martinez@collabora.co.uk>");
 +MODULE_LICENSE("GPL");
+diff --git a/drivers/mfd/max77802.c b/drivers/mfd/max77802.c
+index 59696dd..33e8023 100644
+--- a/drivers/mfd/max77802.c
++++ b/drivers/mfd/max77802.c
+@@ -35,6 +35,9 @@
+ 
+ static const struct mfd_cell max77802_devs[] = {
+ 	{ .name = "max77802-pmic", },
++#if defined(CONFIG_COMMON_CLK_MAX77802)
++	{ .name = "max77802-clk", },
++#endif
+ };
+ 
+ static bool max77802_pmic_is_accessible_reg(struct device *dev,
+diff --git a/include/dt-bindings/clock/maxim,max77802.h b/include/dt-bindings/clock/maxim,max77802.h
+new file mode 100644
+index 0000000..997312e
+--- /dev/null
++++ b/include/dt-bindings/clock/maxim,max77802.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2014 Google, Inc
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Device Tree binding constants clocks for the Maxim 77802 PMIC.
++ */
++
++#ifndef _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H
++#define _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H
++
++/* Fixed rate clocks. */
++
++#define MAX77802_CLK_32K_AP		0
++#define MAX77802_CLK_32K_CP		1
++
++/* Total number of clocks. */
++#define MAX77802_CLKS_NUM		(MAX77802_CLK_32K_CP + 1)
++
++#endif /* _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H */
 -- 
 2.0.0.rc2
