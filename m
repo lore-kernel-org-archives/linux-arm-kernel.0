@@ -1,32 +1,51 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  9 Jun 2014 11:05:02 -0700
-Subject: [PATCH] irqchip: brcmstb-l2: Level-2 interrupts are edge sensitive
-Message-ID: <1402337102-19428-1-git-send-email-f.fainelli@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 09 Jun 2014 11:09:02 -0700
+Subject: [PATCH v2] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <1402096465-13218-1-git-send-email-dianders@chromium.org> (Doug
+ Anderson's message of "Fri, 6 Jun 2014 16:14:25 -0700")
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <1402096465-13218-1-git-send-email-dianders@chromium.org>
+Message-ID: <7htx7uq7k1.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver was configuring the interrupt handler for the Level-2
-interrupts to be "level" triggered while they are in fact "edge"
-triggered. Fix this by using the correct handler.
+Doug Anderson <dianders@chromium.org> writes:
 
-Reported-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/irqchip/irq-brcmstb-l2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On exynos mcpm systems the firmware is hardcoded to jump to an address
+> in SRAM (0x02073000) when secondary CPUs come up.  By default the
+> firmware puts a bunch of code at that location.  That code expects the
+> kernel to fill in a few slots with addresses that it uses to jump back
+> to the kernel's entry point for secondary CPUs.
+>
+> Originally (on prerelease hardware) this firmware code contained a
+> bunch of workarounds to deal with boot ROM bugs.  However on all
+> shipped hardware we simply use this code to redirect to a kernel
+> function for bringing up the CPUs.
+>
+> Let's stop relying on the code provided by the bootloader and just
+> plumb in our own (simple) code jump to the kernel.  This has the nice
+> benefit of fixing problems due to the fact that older bootloaders
+> (like the one shipped on the Samsung Chromebook 2) might have put
+> slightly different code into this location.
+>
+> Once suspend/resume is implemented for systems using exynos-mcpm we'll
+> need to make sure we reinstall our fixed up code after resume.  ...but
+> that's not anything new since IRAM (and thus the address of the
+> mcpm_entry_point) is lost across suspend/resume anyway.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-index 8ee2a36d5840..c15c840987d2 100644
---- a/drivers/irqchip/irq-brcmstb-l2.c
-+++ b/drivers/irqchip/irq-brcmstb-l2.c
-@@ -150,7 +150,7 @@ int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 
- 	/* Allocate a single Generic IRQ chip for this node */
- 	ret = irq_alloc_domain_generic_chips(data->domain, 32, 1,
--				np->full_name, handle_level_irq, clr, 0, 0);
-+				np->full_name, handle_edge_irq, clr, 0, 0);
- 	if (ret) {
- 		pr_err("failed to allocate generic irq chip\n");
- 		goto out_free_domain;
--- 
-1.9.1
+Acked-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+I confirm that this patch (plus the enable CCI hack[1]) allows me to see
+all 8 cores when booting linux-next on my Chromebook2.
+
+Kevin
+
+[1] While waiting for the forth-coming patch from Andrew to enable the
+    CCI port for the boot cluster), I do this from u-boot before starting
+    the kernel (based on earlier email from Doug):
+
+    mw.l 10d25000 3  # Enable CCI from U-Boot
