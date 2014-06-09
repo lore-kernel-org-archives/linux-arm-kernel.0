@@ -1,39 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Jun 2014 14:11:10 +0200
-Subject: [PATCH 2/4] ARM: mach-s5p: get rid of all <mach/gpio.h> headers
-In-Reply-To: <CACRpkdZMwLv1rHS+mSAT4YP3F0VUtt9E-u3p89a-YzRRFbugGQ@mail.gmail.com>
-References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
- <4544212.mqY6dSouMv@wuerfel>
- <CACRpkdZMwLv1rHS+mSAT4YP3F0VUtt9E-u3p89a-YzRRFbugGQ@mail.gmail.com>
-Message-ID: <8986317.PJZ13jmgds@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Jun 2014 14:14:20 +0200
+Subject: [RESEND: PATCH 1/2] mfd: tc3589x: Add device tree bindings
+In-Reply-To: <1397028480-15413-1-git-send-email-linus.walleij@linaro.org>
+References: <1397028480-15413-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbhqoywNyHuXzo2Oqjz5ybcM_DhsRDYy28_qN8K0RYE_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 June 2014 13:36:33 Linus Walleij wrote:
-> On Wed, Jun 4, 2014 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 04 June 2014 15:33:56 Linus Walleij wrote:
-> >> This renames all the local <mach/gpio.h> headers in the S5P platforms
-> >> to <mach/gpio-samsung.h> indicating a scope local to this platform,
-> >> and cuts the implicit inclusion of <mach/gpio.h> from <linux/gpio.h>
-> >> by removing the use of NEED_MACH_GPIO_H from all S5P variants.
-> >>
-> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Hmm, this patch will obviously clash with the removal of S5p64xx
-> > and s5pc100.
-> 
-> So it is happening? I was actually expecting that to happen in
-> v3.14 or so and now I finally lost my patience 
+On Wed, Apr 9, 2014 at 9:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-I do expect it for 3.17.
+> This defines the device tree bindings for the Toshiba TC3589x
+> series of multi-purpose expanders. Only the stuff I can test
+> is defined: GPIO and keypad. Others may implement more
+> subdevices further down the road.
+>
+> This is to complement
+> commit a435ae1d51e2f18414f2a87219fdbe068231e692
+> "mfd: Enable the tc3589x for Device Tree" which left off
+> the definition of the device tree bindings.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v2->v3:
+> - Fix the keys/rows bindings to be u32 rather than
+>   /bits/ 8, inconsistency noted by Mark Rutland.
+> ChangeLog v1->v2:
+> - Include a verbose example in the DT bindings.
+> - Explain why this is a stand-alone bindings patch.
 
-> > It shouldn't be hard to resolve the conflict when we
-> > merge both into arm-soc/next/cleanup,
-> 
-> First come, first serve. I will send my pull request at the end
-> of the merge window I hope. If removal comes first, I'll rebase.
-> 
+Lee, ping on this - it seems to have fallen to the floor at some
+point...
 
-Ok, fine with me.
-
-	Arnd
+Yours,
+Linus Walleij
