@@ -1,80 +1,24 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 9 Jun 2014 17:02:38 +0200
-Subject: [PATCH v7 1/7] of: Provide function to request and map memory
-In-Reply-To: <CAL_Jsq+yi+fdN1vHK6Wwx7Jzmvz3qd6z=8sO8+q==YRmBCGdww@mail.gmail.com>
-References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
- <1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
- <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
- <20140607055953.569D6C4099E@trevor.secretlab.ca>
- <CAL_Jsq+yi+fdN1vHK6Wwx7Jzmvz3qd6z=8sO8+q==YRmBCGdww@mail.gmail.com>
-Message-ID: <CABuKBeLnF3tyKskxDZs+TORJPCU8iHmKL792JmzFyv1J5R=_FA@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 9 Jun 2014 18:13:44 +0300
+Subject: [patch] [ARM] pxa: remove duplicate SM_SCLK_SM_SCLK define
+Message-ID: <20140609151343.GH9600@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-06-09 16:36 GMT+02:00 Rob Herring <robherring2@gmail.com>:
-> On Sat, Jun 7, 2014 at 12:59 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Fri, 6 Jun 2014 10:19:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
->>> On Thu, Jun 5, 2014 at 12:26 PM, Matthias Brugger
->>> <matthias.bgg@gmail.com> wrote:
->>> > A call to of_iomap does not request the memory region.
->>> > This patch adds the function of_io_request_and_map which requests
->>> > the memory region before mapping it.
->>> >
->>> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>> > ---
->>> >  drivers/of/address.c       |   28 ++++++++++++++++++++++++++++
->>> >  include/linux/of_address.h |    8 ++++++++
->>> >  2 files changed, 36 insertions(+)
->>> >
->>> > diff --git a/drivers/of/address.c b/drivers/of/address.c
->>> > index cb4242a..c55b107 100644
->>> > --- a/drivers/of/address.c
->>> > +++ b/drivers/of/address.c
->>> > @@ -721,3 +721,31 @@ void __iomem *of_iomap(struct device_node *np, int index)
->>> >         return ioremap(res.start, resource_size(&res));
->>> >  }
->>> >  EXPORT_SYMBOL(of_iomap);
->>> > +
->>> > +/**
->>> > + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
->>> > + *                        for a given device_node
->>>
->>> I believe docbook requires this to be 1 line.
->>>
->>> > + * @device:    the device whose io range will be mapped
->>> > + * @index:     index of the io range
->>> > + * @name:      name of the resource
->>> > + *
->>> > + * Returns a pointer to the requested and mapped memory
->>> > + */
->>> > +void __iomem *of_io_request_and_map(struct device_node *np, int index, char *name)
->>> > +{
->>> > +       struct resource res;
->>> > +       void __iomem *mem;
->>> > +
->>> > +       if (of_address_to_resource(np, index, &res))
->>> > +               return NULL;
->>> > +
->>> > +       if (!request_mem_region(res.start, resource_size(&res), name))
->>>
->>> Use the np->name here and drop the name parameter.
->>
->> Name here would be the name of the owner (the driver), not the name of
->> the node. Passing the name separately is fine by me.
->
-> This function is for when there is no driver. If there is a driver,
-> the devm_* functions should be used. I would like to see some standard
-> naming and consistency here rather than allowing random strings or
-> NULL to be passed by the caller.
+The SM_SCLK_SM_SCLK is define is cut and pasted twice.  I have removed
+the second define.
 
-A driver can request and map more then one memory region, so it is
-convenient that they have different names. Therefor the extra
-parameter.
-Another possibility would be to use np->name together with the index
-to get unique names for every region requested by the driver
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-Regards,
-Matthias
-
--- 
-motzblog.wordpress.com
+diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+index fbd7ee8..8c78f2b1 100644
+--- a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
++++ b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
+@@ -23,7 +23,6 @@
+ #define SM_nCS0_nCS0		MFP_CFG(SM_nCS0, AF0)
+ #define SM_ADV_SM_ADV		MFP_CFG(SM_ADV, AF0)
+ #define SM_SCLK_SM_SCLK		MFP_CFG(SM_SCLK, AF0)
+-#define SM_SCLK_SM_SCLK		MFP_CFG(SM_SCLK, AF0)
+ #define SM_BE0_SM_BE0		MFP_CFG(SM_BE0, AF1)
+ #define SM_BE1_SM_BE1		MFP_CFG(SM_BE1, AF1)
+ 
