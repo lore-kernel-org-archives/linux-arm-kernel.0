@@ -1,114 +1,50 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  9 Jun 2014 21:22:35 +0100
-Subject: [PATCH] ARM: STi: DT: Properly define sti-ethclk & stmmaceth for
- stih415/6
-Message-ID: <1402345355-5682-1-git-send-email-peter.griffin@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 09 Jun 2014 13:27:51 -0700
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <alpine.LFD.2.11.1406062340480.25775@knanqh.ubzr> (Nicolas
+ Pitre's message of "Sat, 7 Jun 2014 12:10:27 -0400 (EDT)")
+References: <CAD=FV=UX90hgyojW3k_kpT=mt8eX9=AyHr+AGjhK=MrE1hHbUA@mail.gmail.com>
+ <539145B4.5000200@gmail.com>
+ <CAD=FV=XqwEQNJmij-4Gh62OY+B66AjdQjZC0=f_6tbot3UfQaA@mail.gmail.com>
+ <CAM4voaknx3+X4O8MUwaruUFPyquY8Opq61ucKX08xTrv8PqfLg@mail.gmail.com>
+ <alpine.LFD.2.11.1406061740280.25775@knanqh.ubzr>
+ <CAM4voam5KDicwLAt3EA1UC7M+EciGccrnMUKxoR-5c8xT8-zSQ@mail.gmail.com>
+ <alpine.LFD.2.11.1406062340480.25775@knanqh.ubzr>
+Message-ID: <7hoay1rfp4.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes two problems: -
+Nicolas Pitre <nicolas.pitre@linaro.org> writes:
 
-1) The device tree isn't currently providing sti-ethclk which is
-required by the dwmac glue code to correctly configure the ethernet
-PHY clock speed.
+> On Sat, 7 Jun 2014, Abhilash Kesavan wrote:
+>
+>> Hi Nicolas,
+>> 
+>> The first man of the incoming cluster enables its snoops via the
+>> power_up_setup function. During secondary boot-up, this does not occur
+>> for the boot cluster. Hence, I enable the snoops for the boot cluster
+>> as a one-time setup from the u-boot prompt. After secondary boot-up
+>> there is no modification that I do.
+>
+> OK that's good.
+>
+>> Where should this be ideally done ?
+>
+> If I remember correctly, the CCI can be safely activated only when the 
+> cache is disabled.  So that means the CCI should ideally be turned on 
+> for the boot cluster (and *only* for the boot CPU) by the bootloader.
+>
+> Now... If you _really_ prefer to do it from the kernel to avoid 
+> difficulties with bootloader updates, then it should be possible to do 
+> it from the kernel by temporarily turning the cache off.  This is not a 
+> small thing but the MCPM infrastructure can be leveraged.  Here's what I 
+> tried on a TC2 which might just work for you as well:
 
-This means depending on what the bootloader/jtag has
-configured this clock to, and what switch/hub the board is plugged
-into you most likely will NOT successfully negotiate a ethernet link.
+FWIW, I dropped the u-boot hack I was using to enable CCI and tested
+this patch (with a cut/paste of the TC2 specific stuff into
+mach-exynos/mcpm-exynos.c) along with Doug's patch[1] and 
+and confirm that all 8 cores boot up on the Chromebook2 using linux-next.
 
-2) The stmmaceth clock was associated with the wrong clock. It was
-referencing the PHY clock rather than the interconnect clock which
-clocks the IP.
+Kevin
 
-This patch also brings us closer to not having to boot the upstream
-kernel with the clk_ignore_unused parameter.
-
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih415.dtsi           | 8 ++++----
- arch/arm/boot/dts/stih416.dtsi           | 8 ++++----
- include/dt-bindings/clock/stih415-clks.h | 1 +
- include/dt-bindings/clock/stih416-clks.h | 1 +
- 4 files changed, 10 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
-index c81dce4..768bf27 100644
---- a/arch/arm/boot/dts/stih415.dtsi
-+++ b/arch/arm/boot/dts/stih415.dtsi
-@@ -169,8 +169,8 @@
- 
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii0>;
--			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a1_ls CLK_GMAC0_PHY>;
-+			clock-names	= "stmmaceth", "sti-ethclk";
-+			clocks		= <&clk_s_a1_ls CLK_ICN_IF_2>, <&clk_s_a1_ls CLK_GMAC0_PHY>;
- 		};
- 
- 		ethernet1: dwmac at fef08000 {
-@@ -189,11 +189,11 @@
- 			st,syscon		= <&syscfg_sbc>;
- 
- 			resets			= <&softreset STIH415_ETH1_SOFTRESET>;
--			reset-names		= "stmmaceth";
-+			reset-names		= "stmmaceth", "sti-ethclk";
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii1>;
- 			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a0_ls CLK_ETH1_PHY>;
-+			clocks		= <&clk_s_a0_ls CLK_ICN_REG>, <&clk_s_a0_ls CLK_ETH1_PHY>;
- 		};
- 
- 		rc: rc at fe518000 {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 6473287..98c43cc 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -175,8 +175,8 @@
- 			reset-names		= "stmmaceth";
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii0>;
--			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a1_ls CLK_GMAC0_PHY>;
-+			clock-names	= "stmmaceth", "sti-ethclk";
-+			clocks		= <&clk_s_a1_ls CLK_ICN_IF_2>, <&clk_s_a1_ls CLK_GMAC0_PHY>;
- 		};
- 
- 		ethernet1: dwmac at fef08000 {
-@@ -197,8 +197,8 @@
- 			reset-names	= "stmmaceth";
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii1>;
--			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a0_ls CLK_ETH1_PHY>;
-+			clock-names	= "stmmaceth", "sti-ethclk";
-+			clocks		= <&clk_s_a0_ls CLK_ICN_REG>, <&clk_s_a0_ls CLK_ETH1_PHY>;
- 		};
- 
- 		rc: rc at fe518000 {
-diff --git a/include/dt-bindings/clock/stih415-clks.h b/include/dt-bindings/clock/stih415-clks.h
-index 0d2c739..d80caa6 100644
---- a/include/dt-bindings/clock/stih415-clks.h
-+++ b/include/dt-bindings/clock/stih415-clks.h
-@@ -10,6 +10,7 @@
- #define CLK_ETH1_PHY		4
- 
- /* CLOCKGEN A1 */
-+#define CLK_ICN_IF_2		0
- #define CLK_GMAC0_PHY		3
- 
- #endif
-diff --git a/include/dt-bindings/clock/stih416-clks.h b/include/dt-bindings/clock/stih416-clks.h
-index 552c779..f9bdbd1 100644
---- a/include/dt-bindings/clock/stih416-clks.h
-+++ b/include/dt-bindings/clock/stih416-clks.h
-@@ -10,6 +10,7 @@
- #define CLK_ETH1_PHY		4
- 
- /* CLOCKGEN A1 */
-+#define CLK_ICN_IF_2		0
- #define CLK_GMAC0_PHY		3
- 
- #endif
--- 
-1.9.1
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262440.html
