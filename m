@@ -1,42 +1,39 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon,  9 Jun 2014 17:52:45 -0300
-Subject: [PATCH] ARM: mvebu: Fix broken SoC ID detection
-Message-ID: <1402347165-19988-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 9 Jun 2014 16:55:58 -0400 (EDT)
+Subject: [PATCH v2] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <CAGa+x87puSoPftG6ddGTVtxOOxoUg_dLmMmZUHm-j6pjFuhr=g@mail.gmail.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <1402096465-13218-1-git-send-email-dianders@chromium.org>
+ <7htx7uq7k1.fsf@paris.lan>
+ <CAL1qeaGv+hBCr8oqs-E2j_Qh0Z=ZTVEaM-gdyu286Snu4otbMA@mail.gmail.com>
+ <alpine.LFD.2.11.1406091617181.25775@knanqh.ubzr>
+ <CAGa+x87puSoPftG6ddGTVtxOOxoUg_dLmMmZUHm-j6pjFuhr=g@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1406091649290.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the mvebu boards need to detect the SoC revision in order to apply
-some quirks needed to workaround issues found on I2C and thermal controllers
-present only in very early SoC.
+On Mon, 9 Jun 2014, Kevin Hilman wrote:
 
-This detection requires PCI address translation to work, so we need to
-explicitly select OF_ADDRESS_PCI.
+> On Mon, Jun 9, 2014 at 1:22 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Mon, 9 Jun 2014, Andrew Bresticker wrote:
+> >
+> >> > [1] While waiting for the forth-coming patch from Andrew to enable the
+> >> >     CCI port for the boot cluster), I do this from u-boot before starting
+> >> >     the kernel (based on earlier email from Doug):
+> >> >
+> >> >     mw.l 10d25000 3  # Enable CCI from U-Boot
+> >>
+> >> From the other thread, it sounds like Nicolas wants enabling of the
+> >> boot cluster's CCI port to be done unconditionally for all MCPM
+> >> platforms.  Nicolas, are you preparing a patch for this or should I?
+> >
+> > I would like confirmation this indeed solves your problem first before I
+> > go ahead with it.
+> 
+> FYI... I confirmed on the other thread.  It works on the Chromebook2.
 
-This can be considered a partial revert of the following commit, that
-wrongly removed the option selection:
+OK I'll clean it up for mainline.
 
-commit 55400f3a1f89e39761f45c19f6e4235a329c400b
-Author: Rob Herring <robh@kernel.org>
-Date:   Tue Apr 22 14:15:52 2014 -0500
 
-    ARM: mvebu: clean-up unneeded kconfig selects
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/mach-mvebu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 6090b9e..61ac80a 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -10,6 +10,7 @@ config ARCH_MVEBU
- 	select ZONE_DMA if ARM_LPAE
- 	select ARCH_REQUIRE_GPIOLIB
- 	select PCI_QUIRKS if PCI
-+	select OF_ADDRESS_PCI
- 
- if ARCH_MVEBU
- 
--- 
-1.9.1
+Nicolas
