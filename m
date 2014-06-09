@@ -1,32 +1,32 @@
-From: mathew.li100@gmail.com (Mathew Li)
-Date: Mon, 9 Jun 2014 11:44:29 -0700
-Subject: Some SMP related questions
-Message-ID: <CALU2kfkrpoSSpRB-XGeKS5DOGRCKapRT_qhZW+u4MOsviOx3QQ@mail.gmail.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Mon, 09 Jun 2014 21:49:24 +0300
+Subject: [PATCH 0/9] Serial ATA support for NVIDIA Tegra124
+In-Reply-To: <5395FE0E.80105@wwwdotorg.org>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <5390A8F9.2090408@wwwdotorg.org> <53915F3B.6050806@nvidia.com>
+ <5395FE0E.80105@wwwdotorg.org>
+Message-ID: <539601B4.1010707@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/09/2014 09:33 PM, Stephen Warren wrote:
+> On 06/06/2014 12:27 AM, Mikko Perttunen wrote:
+>> The only compile-time dependencies here should be that:
+>> - patch 8 of 9 which contains the actual driver depends on patch 6 of 9
+>> (though only when building as a module) and the efuse series
+>
+>> - patch 2 of 9 refers to the DT node called "padctl", so it requires the
+>> xusb series. (in the submitted xusb series, the node isn't actually
+>> named, though. I will fix this in v2)
+>
+> Isn't that dependency a run-time dependency?
 
-Just trying to understand SMP arm Linux. I have following questions:
+Well, the kernel will compile but the DTC step will fail if building for 
+Tegra.
 
-1. On any ARM board, all the devices raise SPIs. Is that correct?
-2. On an SMP system, how does Linux configure SPIs? I mean the routing
-of the interrupts. For example, when a device raises an interrupt,
-does it get seen by all the cpus or is it seen only by the boot cpu,
-who handles the interrupt eventually if it is seen by all the cpus?
-Could you also please point me to the code?
-3. On an SMP system, how does Linux do scheduling? What is used for
-scheduling, I believe it is the timer interrupt. Right? Is timer
-device and its interrupt private to the cpu or is it also global? If
-global then which cpu gets to serve the timer interrupt?
-4. In an SMP system, is it possible to run a process on a given cpu
-and never schedule it out until the process itself makes some blocking
-call, leading to a call into schedule() in kernel? Essentially I am
-saying to assign infinite time quantum to the process and only
-schedule it out when it does a blocking call.
-5. Is it possible to configure and build linux in an ASMP way? For
-example, so that whole kernel logic runs on boot cpu and remaining
-cpus would be used only and only for processes?
-
-Thanks a lot in advance!
-Mathew
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
