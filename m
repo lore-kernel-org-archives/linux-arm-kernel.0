@@ -1,33 +1,41 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 9 Jun 2014 13:35:46 -0700
-Subject: [PATCH v2] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <alpine.LFD.2.11.1406091617181.25775@knanqh.ubzr>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <1402096465-13218-1-git-send-email-dianders@chromium.org>
- <7htx7uq7k1.fsf@paris.lan>
- <CAL1qeaGv+hBCr8oqs-E2j_Qh0Z=ZTVEaM-gdyu286Snu4otbMA@mail.gmail.com>
- <alpine.LFD.2.11.1406091617181.25775@knanqh.ubzr>
-Message-ID: <CAGa+x87puSoPftG6ddGTVtxOOxoUg_dLmMmZUHm-j6pjFuhr=g@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 09 Jun 2014 14:43:57 -0600
+Subject: [PATCH] clk: Remove X-Gene "default y" from Kconfig
+Message-ID: <20140609204357.920.35231.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 9, 2014 at 1:22 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 9 Jun 2014, Andrew Bresticker wrote:
->
->> > [1] While waiting for the forth-coming patch from Andrew to enable the
->> >     CCI port for the boot cluster), I do this from u-boot before starting
->> >     the kernel (based on earlier email from Doug):
->> >
->> >     mw.l 10d25000 3  # Enable CCI from U-Boot
->>
->> From the other thread, it sounds like Nicolas wants enabling of the
->> boot cluster's CCI port to be done unconditionally for all MCPM
->> platforms.  Nicolas, are you preparing a patch for this or should I?
->
-> I would like confirmation this indeed solves your problem first before I
-> go ahead with it.
+Not all arm64 systems will have APM X-Gene clocks, so don't enable the
+driver by default in the Kconfig file.
 
-FYI... I confirmed on the other thread.  It works on the Chromebook2.
+There's only one arm64 defconfig, so I turned on CONFIG_COMMON_CLK_XGENE
+there to preserve the previous behavior of building the X-Gene driver by
+default.
 
-Kevin
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ arch/arm64/configs/defconfig |    1 +
+ drivers/clk/Kconfig          |    1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 157e1d8d9a47..59ddc931836b 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -113,3 +113,4 @@ CONFIG_CRYPTO_AES_ARM64_CE=y
+ CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
+ CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
+ CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y
++CONFIG_COMMON_CLK_XGENE=y
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 9f9c5ae5359b..52f11f8a0301 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -90,7 +90,6 @@ config CLK_PPC_CORENET
+ 
+ config COMMON_CLK_XGENE
+ 	bool "Clock driver for APM XGene SoC"
+-	default y
+ 	depends on ARM64
+ 	---help---
+ 	  Sypport for the APM X-Gene SoC reference, PLL, and device clocks.
