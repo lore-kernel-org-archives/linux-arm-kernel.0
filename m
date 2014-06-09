@@ -1,51 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 9 Jun 2014 08:03:42 -0400
-Subject: [PATCH] usb: ehci_orion should be builable for mvebu multi
- platform
-In-Reply-To: <1402260237-15296-1-git-send-email-pbrobinson@gmail.com>
-References: <1402260237-15296-1-git-send-email-pbrobinson@gmail.com>
-Message-ID: <20140609120342.GO8664@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Jun 2014 14:11:10 +0200
+Subject: [PATCH 2/4] ARM: mach-s5p: get rid of all <mach/gpio.h> headers
+In-Reply-To: <CACRpkdZMwLv1rHS+mSAT4YP3F0VUtt9E-u3p89a-YzRRFbugGQ@mail.gmail.com>
+References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
+ <4544212.mqY6dSouMv@wuerfel>
+ <CACRpkdZMwLv1rHS+mSAT4YP3F0VUtt9E-u3p89a-YzRRFbugGQ@mail.gmail.com>
+Message-ID: <8986317.PJZ13jmgds@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
-
-Please amend your subject line to match the other commits in
-drivers/usb.  Also, s/builable/buildable/
-
-On Sun, Jun 08, 2014 at 09:43:57PM +0100, Peter Robinson wrote:
-> The ehci_orion is used by numerous mvebu SoCs and not just Orion
-> so enable it so it can be built as part of the mvebu multi platform
-> as it's used by Dove, Armada XP, Armada 370 too.
+On Monday 09 June 2014 13:36:33 Linus Walleij wrote:
+> On Wed, Jun 4, 2014 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 04 June 2014 15:33:56 Linus Walleij wrote:
+> >> This renames all the local <mach/gpio.h> headers in the S5P platforms
+> >> to <mach/gpio-samsung.h> indicating a scope local to this platform,
+> >> and cuts the implicit inclusion of <mach/gpio.h> from <linux/gpio.h>
+> >> by removing the use of NEED_MACH_GPIO_H from all S5P variants.
+> >>
+> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > Hmm, this patch will obviously clash with the removal of S5p64xx
+> > and s5pc100.
 > 
-> Tested on Mirabox booting of the usb attached MMC slot
+> So it is happening? I was actually expecting that to happen in
+> v3.14 or so and now I finally lost my patience 
+
+I do expect it for 3.17.
+
+> > It shouldn't be hard to resolve the conflict when we
+> > merge both into arm-soc/next/cleanup,
 > 
-> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
-> ---
->  drivers/usb/host/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> First come, first serve. I will send my pull request at the end
+> of the merge window I hope. If removal comes first, I'll rebase.
 > 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 3d9e540..c0f8900 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -141,7 +141,7 @@ config USB_EHCI_HCD_OMAP
->  
->  config USB_EHCI_HCD_ORION
->  	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
-> -	depends on USB_EHCI_HCD && PLAT_ORION
-> +	depends on USB_EHCI_HCD && ( PLAT_ORION || ARCH_MVEBU )
 
-hmmm, ARCH_MVEBU selects PLAT_ORION in mach-mvebu/Kconfig:8 over here.
-What are you trying to fix?
+Ok, fine with me.
 
-thx,
-
-Jason.
-
->  	default y
->  	---help---
->  	  Enables support for the on-chip EHCI controller on Marvell's
-> -- 
-> 2.0.0
-> 
+	Arnd
