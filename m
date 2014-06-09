@@ -1,39 +1,36 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 9 Jun 2014 16:55:58 -0400 (EDT)
-Subject: [PATCH v2] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <CAGa+x87puSoPftG6ddGTVtxOOxoUg_dLmMmZUHm-j6pjFuhr=g@mail.gmail.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <1402096465-13218-1-git-send-email-dianders@chromium.org>
- <7htx7uq7k1.fsf@paris.lan>
- <CAL1qeaGv+hBCr8oqs-E2j_Qh0Z=ZTVEaM-gdyu286Snu4otbMA@mail.gmail.com>
- <alpine.LFD.2.11.1406091617181.25775@knanqh.ubzr>
- <CAGa+x87puSoPftG6ddGTVtxOOxoUg_dLmMmZUHm-j6pjFuhr=g@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1406091649290.25775@knanqh.ubzr>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 9 Jun 2014 15:59:13 -0500
+Subject: [PATCH] ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
+Message-ID: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Jun 2014, Kevin Hilman wrote:
+am43xx reset register layout is more similar to am33xx than omap4 so
+use the am33xx functions for hwmod hardreset soc_ops rather than the
+currently used omap4 functions. Without this, assert_hardreset and
+deassert_hardreset will not work on am43xx.
 
-> On Mon, Jun 9, 2014 at 1:22 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Mon, 9 Jun 2014, Andrew Bresticker wrote:
-> >
-> >> > [1] While waiting for the forth-coming patch from Andrew to enable the
-> >> >     CCI port for the boot cluster), I do this from u-boot before starting
-> >> >     the kernel (based on earlier email from Doug):
-> >> >
-> >> >     mw.l 10d25000 3  # Enable CCI from U-Boot
-> >>
-> >> From the other thread, it sounds like Nicolas wants enabling of the
-> >> boot cluster's CCI port to be done unconditionally for all MCPM
-> >> platforms.  Nicolas, are you preparing a patch for this or should I?
-> >
-> > I would like confirmation this indeed solves your problem first before I
-> > go ahead with it.
-> 
-> FYI... I confirmed on the other thread.  It works on the Chromebook2.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-OK I'll clean it up for mainline.
-
-
-Nicolas
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 66c60fe..1c0885b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -4251,9 +4251,9 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.enable_module = _omap4_enable_module;
+ 		soc_ops.disable_module = _omap4_disable_module;
+ 		soc_ops.wait_target_ready = _omap4_wait_target_ready;
+-		soc_ops.assert_hardreset = _omap4_assert_hardreset;
+-		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
+-		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
++		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
++		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
++		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
+ 		soc_ops.init_clkdm = _init_clkdm;
+ 	} else if (soc_is_am33xx()) {
+ 		soc_ops.enable_module = _am33xx_enable_module;
+-- 
+1.9.0
