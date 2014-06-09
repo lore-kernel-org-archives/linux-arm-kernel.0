@@ -1,28 +1,32 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 9 Jun 2014 15:43:37 -0300
-Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
-In-Reply-To: <1398195678-28787-2-git-send-email-robherring2@gmail.com>
-References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
- <1398195678-28787-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20140609184337.GA9790@arch.cereza>
+From: mathew.li100@gmail.com (Mathew Li)
+Date: Mon, 9 Jun 2014 11:44:29 -0700
+Subject: Some SMP related questions
+Message-ID: <CALU2kfkrpoSSpRB-XGeKS5DOGRCKapRT_qhZW+u4MOsviOx3QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-On 22 Apr 02:41 PM, Rob Herring wrote:
-> @@ -11,7 +10,6 @@ config ARCH_MVEBU
->  	select ARCH_REQUIRE_GPIOLIB
->  	select MIGHT_HAVE_PCI
->  	select PCI_QUIRKS if PCI
-> -	select OF_ADDRESS_PCI
->  
+Just trying to understand SMP arm Linux. I have following questions:
 
-We needed that one, as Gregory introduced it specifically so we could select it
-without selecting PCI.
+1. On any ARM board, all the devices raise SPIs. Is that correct?
+2. On an SMP system, how does Linux configure SPIs? I mean the routing
+of the interrupts. For example, when a device raises an interrupt,
+does it get seen by all the cpus or is it seen only by the boot cpu,
+who handles the interrupt eventually if it is seen by all the cpus?
+Could you also please point me to the code?
+3. On an SMP system, how does Linux do scheduling? What is used for
+scheduling, I believe it is the timer interrupt. Right? Is timer
+device and its interrupt private to the cpu or is it also global? If
+global then which cpu gets to serve the timer interrupt?
+4. In an SMP system, is it possible to run a process on a given cpu
+and never schedule it out until the process itself makes some blocking
+call, leading to a call into schedule() in kernel? Essentially I am
+saying to assign infinite time quantum to the process and only
+schedule it out when it does a blocking call.
+5. Is it possible to configure and build linux in an ASMP way? For
+example, so that whole kernel logic runs on boot cpu and remaining
+cpus would be used only and only for processes?
 
-I'll cook a patch right away, sorry for not seeing this earlier!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Thanks a lot in advance!
+Mathew
