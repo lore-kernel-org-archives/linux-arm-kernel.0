@@ -1,28 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Jun 2014 20:49:17 +0100
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
-In-Reply-To: <3122018.iBNBjMKNbN@vostro.rjw.lan>
-References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
- <20140606125003.GA13332@verge.net.au>
- <20140606130850.GO2520@sirena.org.uk>
- <3122018.iBNBjMKNbN@vostro.rjw.lan>
-Message-ID: <20140609194917.GH5099@sirena.org.uk>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 9 Jun 2014 13:05:17 -0700
+Subject: [PATCH v2] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <7htx7uq7k1.fsf@paris.lan>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <1402096465-13218-1-git-send-email-dianders@chromium.org>
+ <7htx7uq7k1.fsf@paris.lan>
+Message-ID: <CAL1qeaGv+hBCr8oqs-E2j_Qh0Z=ZTVEaM-gdyu286Snu4otbMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 11:15:06PM +0200, Rafael J. Wysocki wrote:
-> On Friday, June 06, 2014 02:08:50 PM Mark Brown wrote:
+> [1] While waiting for the forth-coming patch from Andrew to enable the
+>     CCI port for the boot cluster), I do this from u-boot before starting
+>     the kernel (based on earlier email from Doug):
+>
+>     mw.l 10d25000 3  # Enable CCI from U-Boot
 
-> > Yes, the conversion to make ARCH_HAS_OPP unused is in Raphael's tree for
-> > the merge window.
+>From the other thread, it sounds like Nicolas wants enabling of the
+boot cluster's CCI port to be done unconditionally for all MCPM
+platforms.  Nicolas, are you preparing a patch for this or should I?
+The only issue I see with making the MCPM loopback generic is that
+although all current mainline MCPM platforms have the same cache flush
+procedure, a future platform could be different.
 
-> Perhaps already merged?
-
-Yes, looks like it is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140609/f9241515/attachment.sig>
+Thanks,
+Andrew
