@@ -1,30 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Jun 2014 12:56:43 +0100
-Subject: [PATCH 1/5] mfd: Add driver for Maxim 77802 Power Management IC
-In-Reply-To: <1402309361.17650.14.camel@AMDC1943>
-References: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402306670-17041-2-git-send-email-javier.martinez@collabora.co.uk>
- <1402309361.17650.14.camel@AMDC1943>
-Message-ID: <20140609115643.GZ5099@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 9 Jun 2014 08:03:42 -0400
+Subject: [PATCH] usb: ehci_orion should be builable for mvebu multi
+ platform
+In-Reply-To: <1402260237-15296-1-git-send-email-pbrobinson@gmail.com>
+References: <1402260237-15296-1-git-send-email-pbrobinson@gmail.com>
+Message-ID: <20140609120342.GO8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 09, 2014 at 12:22:41PM +0200, Krzysztof Kozlowski wrote:
-> On pon, 2014-06-09 at 11:37 +0200, Javier Martinez Canillas wrote:
+Peter,
 
-> > +static const struct max77802_irq_data max77802_irqs[] = {
-> > +	DECLARE_IRQ(MAX77802_PMICIRQ_PWRONF,	PMIC_INT1, 1 << 0),
-> > +	DECLARE_IRQ(MAX77802_PMICIRQ_PWRONR,	PMIC_INT1, 1 << 1),
+Please amend your subject line to match the other commits in
+drivers/usb.  Also, s/builable/buildable/
 
-> Why just not use two regmap_irq_chips (for PMIC and RTC blocks)
-> replacing whole max77802-irq.c file?
+On Sun, Jun 08, 2014 at 09:43:57PM +0100, Peter Robinson wrote:
+> The ehci_orion is used by numerous mvebu SoCs and not just Orion
+> so enable it so it can be built as part of the mvebu multi platform
+> as it's used by Dove, Armada XP, Armada 370 too.
+> 
+> Tested on Mirabox booting of the usb attached MMC slot
+> 
+> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
+> ---
+>  drivers/usb/host/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 3d9e540..c0f8900 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -141,7 +141,7 @@ config USB_EHCI_HCD_OMAP
+>  
+>  config USB_EHCI_HCD_ORION
+>  	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
+> -	depends on USB_EHCI_HCD && PLAT_ORION
+> +	depends on USB_EHCI_HCD && ( PLAT_ORION || ARCH_MVEBU )
 
-If they share the same primary IRQ line something like what the arizona
-drivers do should handle things well enough.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140609/ad590f22/attachment.sig>
+hmmm, ARCH_MVEBU selects PLAT_ORION in mach-mvebu/Kconfig:8 over here.
+What are you trying to fix?
+
+thx,
+
+Jason.
+
+>  	default y
+>  	---help---
+>  	  Enables support for the on-chip EHCI controller on Marvell's
+> -- 
+> 2.0.0
+> 
