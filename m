@@ -1,53 +1,116 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon,  9 Jun 2014 21:03:58 +0400
-Subject: [PATCH 2/2] clocksource: clps711x: Add DT bindings documentation
-Message-ID: <1402333438-13731-1-git-send-email-shc_work@mail.ru>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 09 Jun 2014 10:06:29 -0700
+Subject: [PATCH v7 1/4] arm: add ARMv7 HYP API to flush VM TLBs without
+ address param
+In-Reply-To: <20140608120502.GE3279@lvm>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1401837567-5527-2-git-send-email-m.smarduch@samsung.com>
+ <20140608120502.GE3279@lvm>
+Message-ID: <5395E995.2010509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT binding documentation for the Cirrus Logic
-CLPS711X-based CPUs clocksource subsystem.
+On 06/08/2014 05:05 AM, Christoffer Dall wrote:
+> On Tue, Jun 03, 2014 at 04:19:24PM -0700, Mario Smarduch wrote:
+>> Patch adds HYP interface for global VM TLB invalidation without address
+>> parameter. Added ARM version of kvm_flush_remote_tlbs(), made the generic
+>> implementation a weak symbol.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/include/asm/kvm_asm.h |    1 +
+>>  arch/arm/kvm/interrupts.S      |   11 +++++++++++
+>>  arch/arm/kvm/mmu.c             |   14 ++++++++++++++
+>>  virt/kvm/kvm_main.c            |    2 +-
+>>  4 files changed, 27 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+>> index 53b3c4a..21bc519 100644
+>> --- a/arch/arm/include/asm/kvm_asm.h
+>> +++ b/arch/arm/include/asm/kvm_asm.h
+>> @@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
+>>  
+>>  extern void __kvm_flush_vm_context(void);
+>>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>>  
+>>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>>  #endif
+>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+>> index 0d68d40..bddc66b 100644
+>> --- a/arch/arm/kvm/interrupts.S
+>> +++ b/arch/arm/kvm/interrupts.S
+>> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>>  	bx	lr
+>>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+>>  
+>> +/**
+>> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
+>> + *
+>> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
+>> + * parameter
+>> + */
+>> +
+>> +ENTRY(__kvm_tlb_flush_vmid)
+>> +	b	__kvm_tlb_flush_vmid_ipa
+>> +ENDPROC(__kvm_tlb_flush_vmid)
+>> +
+>>  /********************************************************************
+>>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+>>   * domain, for all VMIDs
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 2ac9588..ef29540 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -56,6 +56,20 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>>  		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+>>  }
+>>  
+>> +/**
+>> + * kvm_flush_remote_tlbs() - flush all VM TLB entries
+>> + * @kvm:       pointer to kvm structure.
+>> + *
+>> + * Interface to HYP function to flush all VM TLB entries without address
+>> + * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
+>> + * kvm_tlb_flush_vmid_ipa().
+>> + */
+>> +void kvm_flush_remote_tlbs(struct kvm *kvm)
+>> +{
+>> +	if (kvm)
+>> +		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+>> +}
+>> +
+>>  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+>>  				  int min, int max)
+>>  {
+>> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+>> index fa70c6e..ba25765 100644
+>> --- a/virt/kvm/kvm_main.c
+>> +++ b/virt/kvm/kvm_main.c
+>> @@ -184,7 +184,7 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
+>>  	return called;
+>>  }
+>>  
+>> -void kvm_flush_remote_tlbs(struct kvm *kvm)
+>> +void __weak kvm_flush_remote_tlbs(struct kvm *kvm)
+>>  {
+>>  	long dirty_count = kvm->tlbs_dirty;
+>>  
+>> -- 
+>> 1.7.9.5
+>>
+> 
+> This doesn't build or link on aarch64 :(
+> 
+> -Christoffer
+> 
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- .../bindings/timer/cirrus,clps711x-timer.txt       | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
+I'll recompile and retest the dirty page logging portion on ARMv8 and
+resolve these issues, early next week.
 
-diff --git a/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
-new file mode 100644
-index 0000000..cd55b52
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
-@@ -0,0 +1,29 @@
-+* Cirrus Logic CLPS711X Timer Counter
-+
-+Required properties:
-+- compatible: Shall contain "cirrus,clps711x-timer".
-+- reg       : Address and length of the register set.
-+- interrupts: The interrupt number of the timer.
-+- clocks    : phandle of timer reference clock.
-+
-+Note: Each timer should have an alias correctly numbered in "aliases" node.
-+
-+Example:
-+	aliases {
-+		timer0 = &timer1;
-+		timer1 = &timer2;
-+	};
-+
-+	timer1: timer at 80000300 {
-+		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
-+		reg = <0x80000300 0x4>;
-+		interrupts = <8>;
-+		clocks = <&clks 5>;
-+	};
-+
-+	timer2: timer at 80000340 {
-+		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
-+		reg = <0x80000340 0x4>;
-+		interrupts = <9>;
-+		clocks = <&clks 6>;
-+	};
--- 
-1.8.5.5
+In the meantime if it's ok with you, I'' move forward with the
+rest of the patches on ARMv7 to get through critical issues.
+
+Would that work?
+
+- Mario
