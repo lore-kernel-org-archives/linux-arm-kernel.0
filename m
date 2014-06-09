@@ -1,57 +1,68 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 9 Jun 2014 16:07:54 +0200
-Subject: RFC: representing sdio devices oob interrupt, clks, etc. in
- device tree
-In-Reply-To: <20140604155529.GP2520@sirena.org.uk>
-References: <538321AB.4050006@redhat.com>
- <20140526142225.GF22111@sirena.org.uk>
- <538356DA.7090302@redhat.com>
- <CAPDyKFqgvaPhMH3PFh7+6u+Am6pWYhxBFdvUZFfekUfpFJxdKw@mail.gmail.com>
- <53838023.2080807@redhat.com>
- <CAPDyKFpg_2RQabM044C1hsNTcuxdVVOvw0ZONVRdysk=eom8UA@mail.gmail.com>
- <20140527175326.GZ12304@sirena.org.uk>
- <CAPDyKFqCwSfnbXJffQeMUMLEgZPcqjEMhbTXxi4HKOKqExQ70g@mail.gmail.com>
- <20140528110351.GI12304@sirena.org.uk>
- <CAPDyKFo_xHSKzoeKJb5sh+O3cMGsnqx_yVivpw8Tk72whPHGLQ@mail.gmail.com>
- <20140604155529.GP2520@sirena.org.uk>
-Message-ID: <CAPDyKFo+OPDj0Bs_1JOgdqFAOwfcsUSV5=tijCVgRxE5s2vrbQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 9 Jun 2014 09:36:10 -0500
+Subject: [PATCH v7 1/7] of: Provide function to request and map memory
+In-Reply-To: <20140607055953.569D6C4099E@trevor.secretlab.ca>
+References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
+ <1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
+ <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
+ <20140607055953.569D6C4099E@trevor.secretlab.ca>
+Message-ID: <CAL_Jsq+yi+fdN1vHK6Wwx7Jzmvz3qd6z=8sO8+q==YRmBCGdww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2014 17:55, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jun 03, 2014 at 12:57:52PM +0200, Ulf Hansson wrote:
->> On 28 May 2014 13:03, Mark Brown <broonie@kernel.org> wrote:
+On Sat, Jun 7, 2014 at 12:59 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Fri, 6 Jun 2014 10:19:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>> On Thu, Jun 5, 2014 at 12:26 PM, Matthias Brugger
+>> <matthias.bgg@gmail.com> wrote:
+>> > A call to of_iomap does not request the memory region.
+>> > This patch adds the function of_io_request_and_map which requests
+>> > the memory region before mapping it.
+>> >
+>> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> > ---
+>> >  drivers/of/address.c       |   28 ++++++++++++++++++++++++++++
+>> >  include/linux/of_address.h |    8 ++++++++
+>> >  2 files changed, 36 insertions(+)
+>> >
+>> > diff --git a/drivers/of/address.c b/drivers/of/address.c
+>> > index cb4242a..c55b107 100644
+>> > --- a/drivers/of/address.c
+>> > +++ b/drivers/of/address.c
+>> > @@ -721,3 +721,31 @@ void __iomem *of_iomap(struct device_node *np, int index)
+>> >         return ioremap(res.start, resource_size(&res));
+>> >  }
+>> >  EXPORT_SYMBOL(of_iomap);
+>> > +
+>> > +/**
+>> > + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
+>> > + *                        for a given device_node
+>>
+>> I believe docbook requires this to be 1 line.
+>>
+>> > + * @device:    the device whose io range will be mapped
+>> > + * @index:     index of the io range
+>> > + * @name:      name of the resource
+>> > + *
+>> > + * Returns a pointer to the requested and mapped memory
+>> > + */
+>> > +void __iomem *of_io_request_and_map(struct device_node *np, int index, char *name)
+>> > +{
+>> > +       struct resource res;
+>> > +       void __iomem *mem;
+>> > +
+>> > +       if (of_address_to_resource(np, index, &res))
+>> > +               return NULL;
+>> > +
+>> > +       if (!request_mem_region(res.start, resource_size(&res), name))
+>>
+>> Use the np->name here and drop the name parameter.
 >
->> > No, runtime PM isn't really fine grained - I'm talking about things
->> > like starting and stopping individual resources or configuring them.
->
->> Are you saying that you have several levels of quiescent mode of your
->> external chip?
->
-> Partly, but also there can be active modes that don't use all
-> functionality and hence can leave some of the inputs powered down (for
-> example if a reference clock is used for some feature that isn't used
-> all the time then that reference clock may be able to be powered down
-> when the function is not in use).  The device isn't suspended but it can
-> do without some of the resources it has.
->
->> I am a bit puzzled of how such library should look like, but I suppose
->> we need to be able to go to different power states through it.
->> Typically the library may be invoked both from the mmc core to do
->> power up/off and from the sdio func driver to handle power save.
->
->> Does it make sense to you as well?
->
-> Yes, certainly for the power up/down and runtime PM type operations.
+> Name here would be the name of the owner (the driver), not the name of
+> the node. Passing the name separately is fine by me.
 
-For your information; I have started implementing a library to handle
-power sequences. I intend to have this separated from mmc, to let
-other subsystems re-use the same code.
+This function is for when there is no driver. If there is a driver,
+the devm_* functions should be used. I would like to see some standard
+naming and consistency here rather than allowing random strings or
+NULL to be passed by the caller.
 
-It will not require a compatible string, but instead use something
-like 'power-method = blah' property.
-
-I intend to post this as an RFC in couple of days.
-
-Kind regards
-Uffe
+Rob
