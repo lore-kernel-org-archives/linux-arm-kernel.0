@@ -1,185 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon,  9 Jun 2014 18:04:20 +0200
-Subject: [PATCH v2 7/7] ARM: at91/dt: enable the LCD panel on sama5d3xek boards
-In-Reply-To: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1402329860-27520-8-git-send-email-boris.brezillon@free-electrons.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 9 Jun 2014 17:40:05 +0100
+Subject: [PATCH] arm64: Add flush_cache_vmap call in __early_set_fixmap
+In-Reply-To: <20140609133859.GB18487@localhost>
+References: <1402050590-23877-1-git-send-email-leif.lindholm@linaro.org>
+ <1402065449.15402.2.camel@deneb.redhat.com>
+ <20140606145324.GE4179@bivouac.eciton.net>
+ <1402067373.15402.9.camel@deneb.redhat.com>
+ <20140609110356.GD25590@arm.com>
+ <20140609132429.GF4179@bivouac.eciton.net>
+ <20140609133859.GB18487@localhost>
+Message-ID: <20140609163954.GA22876@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable LCD related nodes and reference panel node in the hlcdc (High
-LCD Controller) controller on sama5d3xek boards.
+On Mon, Jun 09, 2014 at 02:38:59PM +0100, Catalin Marinas wrote:
+> On Mon, Jun 09, 2014 at 02:24:29PM +0100, Leif Lindholm wrote:
+> > On Mon, Jun 09, 2014 at 12:03:56PM +0100, Catalin Marinas wrote:
+> > > A quick grep through the kernel shows that we have other set_pte() calls
+> > > without additional dsb() like create_mapping(), I think kvm_set_pte() as
+> > > well.
+> > > 
+> > > So I'm proposing an alternative patch (which needs some benchmarking as
+> > > well to see if anything is affected, maybe application startup time).
+> > 
+> > I'm happy for any fix which can be included in 3.16.
+> 
+> Steve Capper made a point about performance. He'll follow up.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/sama5d31ek.dts | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/sama5d33ek.dts | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/sama5d34ek.dts | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/sama5d36ek.dts | 24 ++++++++++++++++++++++++
- 4 files changed, 96 insertions(+)
+Hi :-).
+My concern was initially about splitting THPs, as with a 64K granule,
+we will have 2048 calls to set_pte_at in a loop. Having thought about
+it, these should be relatively rare events though.
 
-diff --git a/arch/arm/boot/dts/sama5d31ek.dts b/arch/arm/boot/dts/sama5d31ek.dts
-index 04eec0d..338f4c3 100644
---- a/arch/arm/boot/dts/sama5d31ek.dts
-+++ b/arch/arm/boot/dts/sama5d31ek.dts
-@@ -33,6 +33,14 @@
- 				status = "okay";
- 			};
- 
-+			hlcdc: hlcdc at f0030000 {
-+				status = "okay";
-+
-+				hlcdc-display-controller {
-+					atmel,panel = <&panel 3 0>;
-+				};
-+			};
-+
- 			macb1: ethernet at f802c000 {
- 				status = "okay";
- 			};
-@@ -46,6 +54,22 @@
- 		};
- 	};
- 
-+	bl_reg: backlight_regulator {
-+		status = "okay";
-+	};
-+
-+	panel_reg: panel_regulator {
-+		status = "okay";
-+	};
-+
-+	backlight: backlight {
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		status = "okay";
-+	};
-+
- 	sound {
- 		status = "okay";
- 	};
-diff --git a/arch/arm/boot/dts/sama5d33ek.dts b/arch/arm/boot/dts/sama5d33ek.dts
-index cbd6a3f..f2ab41d 100644
---- a/arch/arm/boot/dts/sama5d33ek.dts
-+++ b/arch/arm/boot/dts/sama5d33ek.dts
-@@ -36,9 +36,33 @@
- 			macb0: ethernet at f0028000 {
- 				status = "okay";
- 			};
-+
-+			hlcdc: hlcdc at f0030000 {
-+				status = "okay";
-+
-+				hlcdc-display-controller {
-+					atmel,panel = <&panel 3 0>;
-+				};
-+			};
- 		};
- 	};
- 
-+	bl_reg: backlight_regulator {
-+		status = "okay";
-+	};
-+
-+	panel_reg: panel_regulator {
-+		status = "okay";
-+	};
-+
-+	backlight: backlight {
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		status = "okay";
-+	};
-+
- 	sound {
- 		status = "okay";
- 	};
-diff --git a/arch/arm/boot/dts/sama5d34ek.dts b/arch/arm/boot/dts/sama5d34ek.dts
-index 878aa16..0d0049c 100644
---- a/arch/arm/boot/dts/sama5d34ek.dts
-+++ b/arch/arm/boot/dts/sama5d34ek.dts
-@@ -46,6 +46,14 @@
- 			macb0: ethernet at f0028000 {
- 				status = "okay";
- 			};
-+
-+			hlcdc: hlcdc at f0030000 {
-+				status = "okay";
-+
-+				hlcdc-display-controller {
-+					atmel,panel = <&panel 3 0>;
-+				};
-+			};
- 		};
- 	};
- 
-@@ -56,6 +64,22 @@
- 		};
- 	};
- 
-+	bl_reg: backlight_regulator {
-+		status = "okay";
-+	};
-+
-+	panel_reg: panel_regulator {
-+		status = "okay";
-+	};
-+
-+	backlight: backlight {
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		status = "okay";
-+	};
-+
- 	sound {
- 		status = "okay";
- 	};
-diff --git a/arch/arm/boot/dts/sama5d36ek.dts b/arch/arm/boot/dts/sama5d36ek.dts
-index 59576c6..8350358 100644
---- a/arch/arm/boot/dts/sama5d36ek.dts
-+++ b/arch/arm/boot/dts/sama5d36ek.dts
-@@ -41,12 +41,36 @@
- 				status = "okay";
- 			};
- 
-+			hlcdc: hlcdc at f0030000 {
-+				status = "okay";
-+
-+				hlcdc-display-controller {
-+					atmel,panel = <&panel 3 0>;
-+				};
-+			};
-+
- 			macb1: ethernet at f802c000 {
- 				status = "okay";
- 			};
- 		};
- 	};
- 
-+	bl_reg: backlight_regulator {
-+		status = "okay";
-+	};
-+
-+	panel_reg: panel_regulator {
-+		status = "okay";
-+	};
-+
-+	backlight: backlight {
-+		status = "okay";
-+	};
-+
-+	panel: panel {
-+		status = "okay";
-+	};
-+
- 	sound {
- 		status = "okay";
- 	};
+There will be an impact on various aspects of the memory system (for
+instance fork), but this will need to be measured.
+
+Cheers,
 -- 
-1.8.3.2
+Steve
