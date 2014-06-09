@@ -1,59 +1,35 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 9 Jun 2014 11:31:45 +0800
-Subject: [PATCH v2 3/5] dt: wm8904: add device tree binding document
+Date: Mon, 9 Jun 2014 11:31:47 +0800
+Subject: [PATCH v2 5/5] ARM: atmel: at91sam9n12ek: switch sound to CCF
 In-Reply-To: <1402284707-23354-1-git-send-email-voice.shen@atmel.com>
 References: <1402284707-23354-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1402284707-23354-4-git-send-email-voice.shen@atmel.com>
+Message-ID: <1402284707-23354-6-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As the at91sam9n12ek has switch to CCF, so add clock for wm8904
+
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Reviwed-by: Mark Brown <broonie@linaro.org>
 ---
 Changes in v2:
-  - List the clock-names, which need by driver.
+  - None
 
- Documentation/devicetree/bindings/sound/wm8904.txt | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/wm8904.txt
+ arch/arm/boot/dts/at91sam9n12ek.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/wm8904.txt b/Documentation/devicetree/bindings/sound/wm8904.txt
-new file mode 100644
-index 0000000..e99f409
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/wm8904.txt
-@@ -0,0 +1,33 @@
-+WM8904 audio CODEC
-+
-+This device supports I2C only.
-+
-+Required properties:
-+  - compatible: "wlf,wm8904"
-+  - reg: the I2C address of the device.
-+  - clock-names: "mclk"
-+  - clocks: reference to
-+    <Documentation/devicetree/bindings/clock/clock-bindings.txt>
-+
-+Pins on the device (for linking into audio routes):
-+
-+  * IN1L
-+  * IN1R
-+  * IN2L
-+  * IN2R
-+  * IN3L
-+  * IN3R
-+  * HPOUTL
-+  * HPOUTR
-+  * LINEOUTL
-+  * LINEOUTR
-+  * MICBIAS
-+
-+Examples:
-+
-+codec: wm8904 at 1a {
-+	compatible = "wlf,wm8904";
-+	reg = <0x1a>;
-+	clocks = <&pck0>;
-+	clock-names = "mclk";
-+};
+diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+index 64bbe46..8ae771d 100644
+--- a/arch/arm/boot/dts/at91sam9n12ek.dts
++++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+@@ -56,6 +56,8 @@
+ 				wm8904: codec at 1a {
+ 					compatible = "wm8904";
+ 					reg = <0x1a>;
++					clocks = <&pck0>;
++					clock-names = "mclk";
+ 				};
+ 
+ 				qt1070: keyboard at 1b {
 -- 
 1.8.5.2
