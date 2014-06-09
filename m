@@ -1,77 +1,30 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  9 Jun 2014 17:57:12 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Remove duplicate i2c6 nodes
-Message-ID: <1402304232-24709-1-git-send-email-horms+renesas@verge.net.au>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 9 Jun 2014 10:27:26 +0100
+Subject: [PATCHv2] arm64: Add atomic pool for non-coherent and CMA
+ allocaitons.
+In-Reply-To: <539262FA.8010301@codeaurora.org>
+References: <1401739432-5358-1-git-send-email-lauraa@codeaurora.org>
+ <20140605170500.GC27946@arm.com> <539262FA.8010301@codeaurora.org>
+Message-ID: <20140609092725.GB25590@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A second i2c6 node was a added by
-05e234a187058ee ("ARM: shmobile: koelsch dts: Add VDD MPU regulator for
-DVFS"). Merge this into the existing node.
+On Sat, Jun 07, 2014 at 01:55:22AM +0100, Laura Abbott wrote:
+> On 6/5/2014 10:05 AM, Catalin Marinas wrote:
+> > On Mon, Jun 02, 2014 at 09:03:52PM +0100, Laura Abbott wrote:
+> >> Neither CMA nor noncoherent allocations support atomic allocations.
+> >> Add a dedicated atomic pool to support this.
+> > 
+> > CMA indeed doesn't support atomic allocations but swiotlb does, the only
+> > problem being the vmap() to create a non-cacheable mapping. Could we not
+> > use the atomic pool only for non-coherent allocations?
+> 
+> CMA needs the atomic pool for both non-coherent and coherent allocations.
+> Perhaps I should update the code so we only create the coherent atomic
+> pool if CMA is used.
 
-Also shuffle i2c nodes so they are all together.
+It's also needed with non-coherent swiotlb because of vmap (but coherent
+is fine).
 
-Cc: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 34 +++++++++++++++-------------------
- 1 file changed, 15 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index d3a914c..82ae120 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -210,25 +210,6 @@
- 	clock-frequency = <20000000>;
- };
- 
--&i2c2 {
--	pinctrl-0 = <&i2c2_pins>;
--	pinctrl-names = "default";
--
--	status = "okay";
--	clock-frequency = <400000>;
--
--	eeprom at 50 {
--		compatible = "renesas,24c02";
--		reg = <0x50>;
--		pagesize = <16>;
--	};
--};
--
--&i2c6 {
--	status = "okay";
--	clock-frequency = <100000>;
--};
--
- &pfc {
- 	pinctrl-0 = <&du_pins &scif0_pins &scif1_pins>;
- 	pinctrl-names = "default";
-@@ -395,10 +376,25 @@
- 	};
- };
- 
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	eeprom at 50 {
-+		compatible = "renesas,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+};
-+
- &i2c6 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c6_pins>;
- 	status = "okay";
-+	clock-frequency = <100000>;
- 
- 	vdd_dvfs: regulator at 68 {
- 		compatible = "diasemi,da9210";
 -- 
-2.0.0.rc2
+Catalin
