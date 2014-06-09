@@ -1,21 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 9 Jun 2014 21:14:24 +0100
-Subject: [PATCH v2 1/5] ASoC: atmel_wm8904: switch to CCF
-In-Reply-To: <1402284707-23354-2-git-send-email-voice.shen@atmel.com>
-References: <1402284707-23354-1-git-send-email-voice.shen@atmel.com>
- <1402284707-23354-2-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140609201424.GR5099@sirena.org.uk>
+From: jwerner@chromium.org (Julius Werner)
+Date: Mon, 9 Jun 2014 13:22:14 -0700
+Subject: [PATCH 2/4] usb: host: xhci-plat: Add support to get PHYs
+In-Reply-To: <1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>
+References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
+ <1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 09, 2014 at 11:31:43AM +0800, Bo Shen wrote:
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+> index 9ffecd5..453d89e 100644
+> --- a/drivers/usb/host/xhci.h
+> +++ b/drivers/usb/host/xhci.h
+> @@ -1582,6 +1582,9 @@ struct xhci_hcd {
+>         u32                     port_status_u0;
+>  /* Compliance Mode Timer Triggered every 2 seconds */
+>  #define COMP_MODE_RCVRY_MSECS 2000
+> +       /* phys for the controller */
+> +       struct phy              *phy2_gen;
+> +       struct phy              *phy3_gen;
+>  };
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140609/370a2cab/attachment.sig>
+I don't think adding new variables here and restricting most of this
+logic to xhci-plat.c (in the next patch) is the best way to do it.
+There's no conceptual reason why other host controllers (e.g. xhci-pci
+or even EHCI) could not have a similar need to tune their PHY after
+reset. PHYs are universal to all host controllers.
+
+There is already a 'phy' member in struct usb_hcd which I think is
+mostly unused right now. I think it would be much less
+confusing/redundant to reuse that member for this purpose (you could
+still set it up from xhci_plat_probe(), and then call it from
+hcd_bus_resume() or something like that). Since XHCI host controllers
+already conveniently have two struct usb_hcd (one for 2.0 and one for
+3.0), you can cleanly store references to your two PHYs in there.
