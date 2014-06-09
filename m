@@ -1,160 +1,91 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 09 Jun 2014 12:32:50 +0200
-Subject: [PATCH 1/9] reset: add the Berlin reset controller driver
-In-Reply-To: <1401983326-19205-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53958D52.2050402@gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 9 Jun 2014 18:30:38 +0800
+Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
+In-Reply-To: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
+References: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <53958CCE.5080307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 05:48 PM, Antoine T?nart wrote:
-> Add a reset controller for Marvell Berlin SoCs which is used by the
-> USB PHYs drivers (for now).
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+Hi, Bo
+
+Thanks for the patch.
+
+On 6/6/2014 4:02 PM, Bo Shen wrote:
+> If the ecc parameter is not the same as definition, when the
+> mtd core check these parameters, it will give the unexpected
+> result.
+Could you be more specific to tell what kind of result will happened?
+
+Best Regards,
+Josh Wu
+
+>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 > ---
->  drivers/reset/Makefile       |   1 +
->  drivers/reset/reset-berlin.c | 113 +++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 114 insertions(+)
->  create mode 100644 drivers/reset/reset-berlin.c
-> 
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 4f60caf750ce..fffe2a3dd255 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_RESET_CONTROLLER) += core.o
-> +obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
->  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_ARCH_STI) += sti/
-> diff --git a/drivers/reset/reset-berlin.c b/drivers/reset/reset-berlin.c
-> new file mode 100644
-> index 000000000000..78b42c882cb2
-> --- /dev/null
-> +++ b/drivers/reset/reset-berlin.c
-> @@ -0,0 +1,113 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
+>   drivers/mtd/nand/atmel_nand.c | 20 ++++++++++----------
+>   1 file changed, 10 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 4ce181a..4f5348f 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -861,12 +861,11 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
+>   {
+>   	struct nand_chip *nand_chip = mtd->priv;
+>   	struct atmel_nand_host *host = nand_chip->priv;
+> -	int i, err_nbr, eccbytes;
+> +	int i, err_nbr;
+>   	uint8_t *buf_pos;
+>   	int total_err = 0;
+>   
+> -	eccbytes = nand_chip->ecc.bytes;
+> -	for (i = 0; i < eccbytes; i++)
+> +	for (i = 0; i < nand_chip->ecc.total; i++)
+>   		if (ecc[i] != 0xff)
+>   			goto normal_check;
+>   	/* Erased page, return OK */
+> @@ -928,7 +927,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+>   	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
+>   {
+>   	struct atmel_nand_host *host = chip->priv;
+> -	int eccsize = chip->ecc.size;
+> +	int eccsize = chip->ecc.size * chip->ecc.steps;
+>   	uint8_t *oob = chip->oob_poi;
+>   	uint32_t *eccpos = chip->ecc.layout->eccpos;
+>   	uint32_t stat;
+> @@ -1169,8 +1168,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+>   		goto err;
+>   	}
+>   
+> -	/* ECC is calculated for the whole page (1 step) */
+> -	nand_chip->ecc.size = mtd->writesize;
+> +	nand_chip->ecc.size = sector_size;
+>   
+>   	/* set ECC page size and oob layout */
+>   	switch (mtd->writesize) {
+> @@ -1185,18 +1183,20 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+>   		host->pmecc_index_of = host->pmecc_rom_base +
+>   			host->pmecc_lookup_table_offset;
+>   
+> -		nand_chip->ecc.steps = 1;
+> +		nand_chip->ecc.steps = host->pmecc_sector_number;
+>   		nand_chip->ecc.strength = cap;
+> -		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector *
+> +		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector;
+> +		nand_chip->ecc.total = host->pmecc_bytes_per_sector *
+>   				       host->pmecc_sector_number;
+> -		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
+> +		if (nand_chip->ecc.total > mtd->oobsize - 2) {
+>   			dev_err(host->dev, "No room for ECC bytes\n");
+>   			err_no = -EINVAL;
+>   			goto err;
+>   		}
+>   		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
+>   					mtd->oobsize,
+> -					nand_chip->ecc.bytes);
+> +					nand_chip->ecc.total);
 > +
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/types.h>
-> +
-> +#define BERLIN_RESET_REGISTER		0x104
-> +
-> +#define to_berlin_reset_priv(p)		\
-> +	container_of((p), struct berlin_reset_priv, rcdev)
-> +
-> +struct berlin_reset_priv {
-> +	spinlock_t			lock;
-> +	void __iomem			*base;
-> +	struct reset_controller_dev	rcdev;
-> +};
-> +
-> +static int berlin_reset_reset(struct reset_controller_dev *rcdev,
-> +			      unsigned long id)
-> +{
-> +	struct berlin_reset_priv *priv = to_berlin_reset_priv(rcdev);
-> +	unsigned long flags;
-> +	int bank = id / BITS_PER_LONG;
-> +	int offset = id % BITS_PER_LONG;
-> +
-> +	spin_lock_irqsave(&priv->lock, flags);
-> +
-> +	writel(BIT(offset), priv->base + bank * 4);
-> +
-> +	spin_unlock_irqrestore(&priv->lock, flags);
-> +
-> +	/* let the reset be effective */
-> +	udelay(10);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct reset_control_ops berlin_reset_ops = {
-> +	.reset	= berlin_reset_reset,
-> +};
-> +
-> +static int __berlin_reset_init(struct device_node *np)
-> +{
-> +	struct berlin_reset_priv *priv;
-> +	struct resource res;
-> +	resource_size_t size;
-> +	int ret;
-> +
-> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	ret = of_address_to_resource(np, 0, &res);
-> +	if (ret)
-> +		goto err;
-> +
-> +	size = resource_size(&res);
-> +
-> +	priv->base = ioremap(res.start, size);
-> +	if (!priv->base) {
-> +		ret = -ENOMEM;
-> +		goto err;
-> +	}
-> +	priv->base += BERLIN_RESET_REGISTER;
-
-I currently have no way to look it up myself, but is reset API providing
-a way to deal with phandle+specifier with more than one parameter?
-Chip-ctrl has a bunch of other reset bits spread over the regset, having
-the offset encoded in the specifier would save us some SoC specific
-boiler plate, i.e.
-
-reset = <&chip 0x104 14>;
-
-Sebastian
-
-> +	priv->rcdev.owner = THIS_MODULE;
-> +	priv->rcdev.nr_resets = size * 32;
-> +	priv->rcdev.ops = &berlin_reset_ops;
-> +	priv->rcdev.of_node = np;
-> +
-> +	reset_controller_register(&priv->rcdev);
-> +
-> +	return 0;
-> +
-> +err:
-> +	kfree(priv);
-> +	return ret;
-> +}
-> +
-> +static const struct of_device_id berlin_reset_of_match[] __initdata = {
-> +	{ .compatible = "marvell,berlin2q-chip-ctrl" },
-> +	{ },
-> +};
-> +
-> +static int __init berlin_reset_init(void)
-> +{
-> +	struct device_node *np;
-> +	int ret;
-> +
-> +	for_each_matching_node(np, berlin_reset_of_match) {
-> +		ret = __berlin_reset_init(np);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +arch_initcall(berlin_reset_init);
-> 
+>   		nand_chip->ecc.layout = &atmel_pmecc_oobinfo;
+>   		break;
+>   	case 512:
