@@ -1,120 +1,173 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 9 Jun 2014 10:03:31 -0700
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
-Message-ID: <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Mon,  9 Jun 2014 21:03:36 +0400
+Subject: [PATCH 1/2] clocksource: Add CLPS711X clocksource driver
+Message-ID: <1402333416-13690-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo,
+This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
+Designed primarily for migration CLPS711X subarch for multiplatform & DT,
+for this as the "OF" and "non-OF" calls implemented.
 
-On Sat, Jun 7, 2014 at 11:12 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Fri, Jun 06, 2014 at 10:43:05PM +0100, Doug Anderson wrote:
->> On exynos mcpm systems the firmware is hardcoded to jump to an address
->> in SRAM (0x02073000) when secondary CPUs come up.  By default the
->> firmware puts a bunch of code at that location.  That code expects the
->> kernel to fill in a few slots with addresses that it uses to jump back
->> to the kernel's entry point for secondary CPUs.
->>
->> Originally (on prerelease hardware) this firmware code contained a
->> bunch of workarounds to deal with boot ROM bugs.  However on all
->> shipped hardware we simply use this code to redirect to a kernel
->> function for bringing up the CPUs.
->>
->> Let's stop relying on the code provided by the bootloader and just
->> plumb in our own (simple) code jump to the kernel.  This has the nice
->> benefit of fixing problems due to the fact that older bootloaders
->> (like the one shipped on the Samsung Chromebook 2) might have put
->> slightly different code into this location.
->>
->> Once suspend/resume is implemented for systems using exynos-mcpm we'll
->> need to make sure we reinstall our fixed up code after resume.  ...but
->> that's not anything new since IRAM (and thus the address of the
->> mcpm_entry_point) is lost across suspend/resume anyway.
->
-> Can I ask you please what the firmware does for the boot (primary) cpu
-> on cold-boot and warm-boot (resume from suspend) ?
-
-On cold boot:
-
-1. iROM loads BL1 from SPI flash
-2. BL1 loads BL2 (SPL) from SPI flash
-3. BL2 loads loads RO U-Boot from SPI flash
-4. RO U-Boot (might) load RW U-Boot from SPI flash
-5. U-Boot loads kernel from eMMC (or SD card or USB)
-6. U-Boot boots kernel using bootm.
-
-
-On resume from suspend:
-
-1. iROM loads BL1 from SPI flash
-
-2. BL1 loads BL2 (SPL) from SPI flash
-
-3. BL2 does some basic init code (clocks, SDRAM out of self refresh,
-...) and looks at some SoC registers that are preserved across
-suspend/resume.  These registers contain flags indicating that this is
-a resume from suspend and a pointer to the address in the kernel to
-jump to at resume time.  The address of these registers and which bits
-mean which flags is hardcoded and is part of the contract between the
-bootloader and the kernel.
-
-4. BL2 jumps to kernel.
-
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
+Actual calls for driver initialization of the boards will be added
+later in a separate patch for the arm-soc tree to avoid possible
+conflicts between clk, clocksource and arm-soc trees.
+---
+ drivers/clocksource/Makefile         |   1 +
+ drivers/clocksource/clps711x-timer.c | 131 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 132 insertions(+)
+ create mode 100644 drivers/clocksource/clps711x-timer.c
 
-I will note that BL1, BL2, and "RO U-Boot" are read only in production
-systems.  Note that at resume time only Read-Only code is loaded from
-persistent storage.  That means no extra verification is needed.  A
-system exploit could survive suspend/resume but a reboot would clear
-it and a reboot + suspend/resume wouldn't bring it back.
-
-
-> Does it jump to a specific (hardcoded) location ?
-
-I guess I could say it this way:
-
-A) In resume from suspend, by agreement between the kernel and the
-bootloader we'll jump to the address stored in 0x10040800 (INFORM0)
-
-B) In bringing up a new CPU, by agreement between the kernel and the
-bootloader we'll jump directly to 0x02073000 (and address in the SoC's
-internal SRAM).
-
-
-> Is the primary CPU (MPIDR) hardcoded in firmware so that on both
-> cold and warm-boot firmware sees a specific MPIDR as "special" ?
-
-Cold boot and resume from suspend are detected via various special
-flags in various special locations.  Resume from suspend looks at
-INFORM1 (0x10048004) for flags.  This register is 0 during a cold boot
-and has special values set by the kernel at resume time.
-
-It also looks as if some code looks at 0x10040900 (PMU_SPARE0) to help
-tell initial cold boot and secondary CPU bringup.
-
-
-> I am asking to check if on this platform CPUidle (where the notion of
-> primary CPU disappears) has a chance to run properly.
-
-I believe it should be possible, but we don't have CPUidle implemented
-in our current system.  Abhilash may be able to comment more.
-
-
-> Probably CPUidle won't attain idle states where IRAM content is lost, but I
-> am still worried about the primary vs secondaries firmware boot behaviour.
-
-I don't think iRAM can be turned off for CPUidle.
-
-
-> What happens on reboot from suspend to RAM (or to put it differently,
-> what does secure firmware do on reboot from suspend to RAM - in
-> particular how is the "jump" address to bootloader/kernel set ?)
-
-Should be described above now.
-
--Doug
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 800b130..eae4837 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
++obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
+ obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
+ obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+ obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
+new file mode 100644
+index 0000000..d83ec1f
+--- /dev/null
++++ b/drivers/clocksource/clps711x-timer.c
+@@ -0,0 +1,131 @@
++/*
++ *  Cirrus Logic CLPS711X clocksource driver
++ *
++ *  Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/sched_clock.h>
++#include <linux/slab.h>
++
++enum {
++	CLPS711X_CLKSRC_CLOCKSOURCE,
++	CLPS711X_CLKSRC_CLOCKEVENT,
++};
++
++static void __iomem *tcd;
++
++static u64 notrace clps711x_sched_clock_read(void)
++{
++	return ~readw(tcd);
++}
++
++static int __init _clps711x_clksrc_init(struct clk *clock, void __iomem *base)
++{
++	unsigned long rate;
++
++	if (!base)
++		return -ENOMEM;
++	if (IS_ERR(clock))
++		return PTR_ERR(clock);
++
++	rate = clk_get_rate(clock);
++
++	tcd = base;
++
++	clocksource_mmio_init(tcd, "clps711x-clocksource", rate, 300, 16,
++			      clocksource_mmio_readw_down);
++
++	sched_clock_register(clps711x_sched_clock_read, 16, rate);
++
++	return 0;
++}
++
++static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
++					 struct clock_event_device *evt)
++{
++}
++
++static int __init _clps711x_clkevt_init(struct clk *clock, void __iomem *base,
++					unsigned int irq)
++{
++	struct clock_event_device *clkevt;
++	unsigned long rate;
++
++	if (!irq)
++		return -EINVAL;
++	if (!base)
++		return -ENOMEM;
++	if (IS_ERR(clock))
++		return PTR_ERR(clock);
++
++	clkevt = kzalloc(sizeof(*clkevt), GFP_KERNEL);
++	if (!clkevt)
++		return -ENOMEM;
++
++	rate = clk_get_rate(clock);
++
++	/* Set Timer prescaler */
++	writew(DIV_ROUND_CLOSEST(rate, HZ), base);
++
++	clkevt->name = "clps711x-clockevent";
++	clkevt->rating = 300;
++	clkevt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_C3STOP;
++	clkevt->set_mode = clps711x_clockevent_set_mode;
++	clkevt->cpumask = cpumask_of(0);
++	clockevents_config_and_register(clkevt, HZ, 0, 0);
++
++	return request_irq(irq, clps711x_timer_interrupt, IRQF_TIMER,
++			   "clps711x-timer", clkevt);
++}
++
++void __init clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
++				 unsigned int irq)
++{
++	struct clk *tc1 = clk_get_sys("clps711x-timer.0", NULL);
++	struct clk *tc2 = clk_get_sys("clps711x-timer.1", NULL);
++
++	BUG_ON(_clps711x_clksrc_init(tc1, tc1_base));
++	BUG_ON(_clps711x_clkevt_init(tc2, tc2_base, irq));
++}
++
++#ifdef CONFIG_CLKSRC_OF
++static void __init clps711x_timer_init(struct device_node *np)
++{
++	unsigned int irq = irq_of_parse_and_map(np, 0);
++	struct clk *clock = of_clk_get(np, 0);
++	void __iomem *base = of_iomap(np, 0);
++
++	switch (of_alias_get_id(np, "timer")) {
++	case CLPS711X_CLKSRC_CLOCKSOURCE:
++		BUG_ON(_clps711x_clksrc_init(clock, base));
++		break;
++	case CLPS711X_CLKSRC_CLOCKEVENT:
++		BUG_ON(_clps711x_clkevt_init(clock, base, irq));
++		break;
++	default:
++		break;
++	}
++}
++CLOCKSOURCE_OF_DECLARE(clps711x, "cirrus,clps711x-timer", clps711x_timer_init);
++#endif
+-- 
+1.8.5.5
