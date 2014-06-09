@@ -1,89 +1,102 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 9 Jun 2014 09:04:02 -0700
-Subject: [PATCH 0/5] Add Maxim 77802 PMIC support
-In-Reply-To: <1402309011.17650.9.camel@AMDC1943>
-References: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402309011.17650.9.camel@AMDC1943>
-Message-ID: <CAD=FV=U2zPJ=NohDjGvJKfmwJzQhphtVMefM0p_hvFVoReauhQ@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon,  9 Jun 2014 18:04:13 +0200
+Subject: [PATCH v2 0/7] drm: add support for Atmel HLCDC Display Controller
+Message-ID: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzystof,
+Hello,
 
-On Mon, Jun 9, 2014 at 3:16 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On pon, 2014-06-09 at 11:37 +0200, Javier Martinez Canillas wrote:
->> MAX77802 is a PMIC that contains 10 high efficiency Buck regulators,
->> 32 Low-dropout (LDO) regulators, two 32kHz buffered clock outputs,
->> a Real-Time-Clock (RTC) and a I2C interface to program the individual
->> regulators, clocks and the RTC.
->>
->> This series are based on drivers added by Simon Glass to the Chrome OS
->> kernel and adds support for the Maxim 77802 Power Management IC, their
->> regulators, clocks, RTC and I2C interface. It is composed of patches:
->>
->> [PATCH 1/5] mfd: Add driver for Maxim 77802 Power Management IC
->> [PATCH 2/5] regulator: Add driver for Maxim 77802 PMIC regulators
->> [PATCH 3/5] clk: Add driver for Maxim 77802 PMIC clocks
->> [PATCH 4/5] rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
->> [PATCH 5/5] ARM: dts: Add max77802 device node for exynos5420-peach-pit
->>
->> Patches 1-4 add support for the different devices and Patch 5 enables
->> the MAX77802 PMIC on the Exynos5420 based Peach pit board.
->
->
-> Hi,
->
-> The main mfd, mfd irq, clk and rtc drivers look very similar to max77686
-> drivers. I haven't checked other Maxim drivers but I think there will be
-> a lot of similarities with them also. It is almost common for Maxim
-> chipsets to share components between each other.
->
-> I think there is no need in duplicating all that stuff once again in new
-> driver for another Maxim-almost-the-same-as-others-XYZ chipset. Just
-> merge it with max77686 (or other better candidate).
->
-> The only difference is in regulator driver. I am not sure whether this
-> is a result of differences in chip or differences in driver design.
+This patch series adds support for Atmel HLCDC (High LCD Controller)
+available on some Atmel SoCs (i.e. the sama5d3 family).
 
-Yes, we thought the same thing when we added support for the max77802
-in the ChromeOS tree.  Unfortunately it didn't work out half as well
-as we thought it would.  When Javier was asking advice about sending
-things upstream we suggested that perhaps he should split the two up.
+The HLCDC actually provides a Display Controller and a PWM device, hence I
+decided to declare an MFD device that exposes 2 subdevices: a display
+controller and a PWM chip.
+This also solves a circular dependency issue preventing HLCDC driver from
+unloading.
+The HLCDC request a drm_panel device, which request a backlight device
+(a PWM backlight), which depends on a PWM which is provided by the HLCDC
+driver (hlcdc -> panel -> backlight -> hlcdc (pwm part)).
 
+The current implementation only support sama5d3 SoCs but other SoCs should
+be easily ported by defining new compatible strings and adding HLCDC
+description structures for these SoCs.
 
-You can see the result of the combined driver the ChromeOS tree (the
-code there is older, probably misnamed as max77xxx, and doesn't have
-the proper clock pieces, but you can get the gist):
+The drivers supports basic CRTC functionalities, several overlays and an
+hardware cursor.
 
-https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/regulator/max77xxx-regulator.c
-https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/rtc/rtc-max77xxx.c
+It alse supports several RGB format on all planes and some YUV formats on
+the HEO overlay plane, though YUV formats have not been tested yet.
 
+Best Regards,
 
-Specific problems that made it ugly to have a combined driver:
+Boris
 
-* The RTC has many subtle differences between the 77686 and 77802.
-They expanded it to handle a 200 year timeframe instead of 100 and
-that meant that they had to shuffle the bits around everywhere.  They
-also moved it to have the same i2c address as the main PMIC so all
-addresses are different (see max77686_map in the RTC link above).
+Changes since v1:
+- replace the backlight driver by a PWM driver
+- make use of drm_panel infrastructure
+- split driver code in several subsystem: MFD, PWM and DRM
+- add support for overlays
+- add support for hardware cursor
 
-* The regulator itself has similar concepts between the two, but the
-list of bucks / ldos and how they behave is quite different.  Trying
-to understand the complex tables in
-<https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/regulator/max77xxx-regulator.c>
-was not easy.
+Boris BREZILLON (7):
+  mfd: add atmel-hlcdc driver
+  pwm: add support for atmel-hlcdc-pwm device
+  drm: add Atmel HLCDC Display Controller support
+  ARM: AT91/dt: split sama5d3 lcd pin definitions to match RGB mode
+    configs
+  ARM: at91/dt: define the HLCDC node available on sama5d3 SoCs
+  ARM: at91/dt: add LCD panel description to sama5d3xdm.dtsi
+  ARM: at91/dt: enable the LCD panel on sama5d3xek boards
 
+ .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     |  59 ++
+ .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  41 ++
+ .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    |  40 ++
+ arch/arm/boot/dts/sama5d31ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d33ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d34ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d36ek.dts                   |  24 +
+ arch/arm/boot/dts/sama5d3_lcd.dtsi                 | 153 ++++-
+ arch/arm/boot/dts/sama5d3xdm.dtsi                  |  32 +
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/atmel-hlcdc/Kconfig                |  11 +
+ drivers/gpu/drm/atmel-hlcdc/Makefile               |   7 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 529 ++++++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c       | 477 ++++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       | 178 ++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c    | 701 +++++++++++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h    | 417 ++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c    | 351 +++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c    | 658 +++++++++++++++++++
+ drivers/gpu/drm/atmel_hlcdc/Kconfig                |  11 +
+ drivers/gpu/drm/atmel_hlcdc/Makefile               |   8 +
+ drivers/mfd/Kconfig                                |  11 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/atmel-hlcdc.c                          | 116 ++++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-atmel-hlcdc.c                      | 216 +++++++
+ include/linux/mfd/atmel-hlcdc.h                    |  78 +++
+ 29 files changed, 4173 insertions(+), 31 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_panel.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+ create mode 100644 drivers/gpu/drm/atmel_hlcdc/Kconfig
+ create mode 100644 drivers/gpu/drm/atmel_hlcdc/Makefile
+ create mode 100644 drivers/mfd/atmel-hlcdc.c
+ create mode 100644 drivers/pwm/pwm-atmel-hlcdc.c
+ create mode 100644 include/linux/mfd/atmel-hlcdc.h
 
-If we really need to write a single driver it certainly can be done,
-but please look at the above to be sure this is what you want.
-
-
-NOTE: it's possible that things could be more sane with more driver
-redesign, possibly making things more data driven.  The thing that
-would be really nice to do would be to avoid all of the crazy
-"regulator_zzz_desc_zzz" macros, maybe?  I'd have to actually try
-doing it to be sure it's cleaner, though...
-
-
--Doug
+-- 
+1.8.3.2
