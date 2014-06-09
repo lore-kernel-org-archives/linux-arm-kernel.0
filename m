@@ -1,36 +1,57 @@
-From: pza@pengutronix.de (Philipp Zabel)
-Date: Mon, 9 Jun 2014 13:23:11 +0200
-Subject: [PATCH 1/9] reset: add the Berlin reset controller driver
-In-Reply-To: <53958D52.2050402@gmail.com>
-References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-2-git-send-email-antoine.tenart@free-electrons.com>
- <53958D52.2050402@gmail.com>
-Message-ID: <20140609112311.GA22176@pengutronix.de>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Mon, 09 Jun 2014 16:58:19 +0530
+Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
+Message-ID: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Display domain is removed due to instability issues. Explaining
+the problem below:
 
-On Mon, Jun 09, 2014 at 12:32:50PM +0200, Sebastian Hesselbarth wrote:
-> I currently have no way to look it up myself, but is reset API providing
-> a way to deal with phandle+specifier with more than one parameter?
+exynos_init_late triggers the pm_genpd_poweroff_unused which
+powers off the unused power domains. This call hits before
+the trigger to deferred probes.
 
-You could provide a custom rcdev->of_xlate callback and encode
-multiple phandle args into the reset line "index".
+DRM DP Panel defers the probe due to supply get failure. By the
+time, deferred probe is scheduled again, Display Power Domain is
+powered off by pm_genpd_poweroff_unused.
 
-static int of_reset_xlate(struct reset_controller_dev *rcdev,
-                          const struct of_phandle_args *reset_spec)
-{
-	return reset_spec->args[0] * 32 + reset_spec->args[1];
-}
+FIMD and DP drivers are accessing registers during Probe and Bind
+callbacks. If display domain is enabled/disabled around register
+accesses, display domain gets unstable and we are getting Power
+Domain Disable fail notification. Increasing the Timeout also
+didn't help.
 
-> Chip-ctrl has a bunch of other reset bits spread over the regset, having
-> the offset encoded in the specifier would save us some SoC specific
-> boiler plate, i.e.
-> 
-> reset = <&chip 0x104 14>;
+Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+---
+based on Kukjin's for-next branch.
 
-That should be possible.
+ arch/arm/boot/dts/exynos5420.dtsi |    6 ------
+ 1 file changed, 6 deletions(-)
 
-regards
-Philipp
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index e385322..3d528cf 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -262,11 +262,6 @@
+ 		reg = <0x10044060 0x20>;
+ 	};
+ 
+-	disp_pd: power-domain at 100440C0 {
+-		compatible = "samsung,exynos4210-pd";
+-		reg = <0x100440C0 0x20>;
+-	};
+-
+ 	msc_pd: power-domain at 10044120 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10044120 0x20>;
+@@ -518,7 +513,6 @@
+ 	};
+ 
+ 	fimd: fimd at 14400000 {
+-		samsung,power-domain = <&disp_pd>;
+ 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
+ 		clock-names = "sclk_fimd", "fimd";
+ 	};
+-- 
+1.7.9.5
