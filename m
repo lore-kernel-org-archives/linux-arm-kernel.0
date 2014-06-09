@@ -1,167 +1,120 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 09 Jun 2014 10:02:19 -0700
-Subject: [PATCH v7 0/4] arm: dirty page logging support for ARMv7
-In-Reply-To: <20140608104526.GD3279@lvm>
-References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <20140608104526.GD3279@lvm>
-Message-ID: <5395E89B.5030803@samsung.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 9 Jun 2014 10:03:31 -0700
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+Message-ID: <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2014 03:45 AM, Christoffer Dall wrote:
-> On Tue, Jun 03, 2014 at 04:19:23PM -0700, Mario Smarduch wrote:
->> This patch adds support for dirty page logging so far tested only on ARMv7.
->> With dirty page logging, GICv2 vGIC and arch timer save/restore support, live 
->> migration is supported. 
->>
->> Dirty page logging support -
->> - initially write protects VM RAM memory regions - 2nd stage page tables
->> - add support to read dirty page log and again write protect the dirty pages 
->>   - second stage page table for next pass.
->> - second stage huge page are disolved into page tables to keep track of
->>   dirty pages at page granularity. Tracking at huge page granularity limits 
->>   migration to an almost idle system. There are couple approaches to handling
->>   huge pages:
->>   1 - break up huge page into page table and write protect all pte's
->>   2 - clear the PMD entry, create a page table install the faulted page entry
->>       and write protect it.
-> 
-> not sure I fully understand.  Is option 2 simply write-protecting all
-> PMDs and splitting it at fault time?
+Lorenzo,
 
-No that's 1 above. Option 2 is the optimized solution you describe in patch 4 
-review - clear the PMD and let stage2_set_pte allocate a page table and install 
-the pte, then it's demand faulting on future access to that PMD range.
-> 
+On Sat, Jun 7, 2014 at 11:12 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Jun 06, 2014 at 10:43:05PM +0100, Doug Anderson wrote:
+>> On exynos mcpm systems the firmware is hardcoded to jump to an address
+>> in SRAM (0x02073000) when secondary CPUs come up.  By default the
+>> firmware puts a bunch of code at that location.  That code expects the
+>> kernel to fill in a few slots with addresses that it uses to jump back
+>> to the kernel's entry point for secondary CPUs.
 >>
->>   This patch implements #2, in the future #1 may be implemented depending on
->>   more bench mark results.
+>> Originally (on prerelease hardware) this firmware code contained a
+>> bunch of workarounds to deal with boot ROM bugs.  However on all
+>> shipped hardware we simply use this code to redirect to a kernel
+>> function for bringing up the CPUs.
 >>
->>   Option 1: may over commit and do unnecessary work, but on heavy loads appears
->>             to converge faster during live migration
->>   Option 2: Only write protects pages that are accessed, migration
->> 	    varies, takes longer then Option 1 but eventually catches up.
+>> Let's stop relying on the code provided by the bootloader and just
+>> plumb in our own (simple) code jump to the kernel.  This has the nice
+>> benefit of fixing problems due to the fact that older bootloaders
+>> (like the one shipped on the Samsung Chromebook 2) might have put
+>> slightly different code into this location.
 >>
->> - In the event migration is canceled, normal behavior is resumed huge pages
->>   are rebuilt over time.
->> - Another alternative is use of reverse mappings where for each level 2nd
->>   stage tables (PTE, PMD, PUD) pointers to spte's are maintained (x86 impl.).
->>   Primary reverse mapping benefits are for mmu notifiers for large memory range
->>   invalidations. Reverse mappings also improve dirty page logging, instead of
->>   walking page tables, spete pointers are accessed directly via reverse map
->>   array.
->> - Reverse mappings will be considered for future support once the current
->>   implementation is hardened.
-> 
-> Is the following a list of your future work?
+>> Once suspend/resume is implemented for systems using exynos-mcpm we'll
+>> need to make sure we reinstall our fixed up code after resume.  ...but
+>> that's not anything new since IRAM (and thus the address of the
+>> mcpm_entry_point) is lost across suspend/resume anyway.
+>
+> Can I ask you please what the firmware does for the boot (primary) cpu
+> on cold-boot and warm-boot (resume from suspend) ?
 
-I guess yes and no, with exception of lmbench I've ran these tests also
-couple other folks have tested with prior revisions. I'll run
-more (overnight, burn in tests) adding lmbench, but I'm hoping 
-others will run tests to give this more run time, different loads 
-and so on.
-> 
->>   o validate current dirty page logging support
->>   o VMID TLB Flushing, migrating multiple guests
->>   o GIC/arch-timer migration
->>   o migration under various loads, primarily page reclaim and validate current
->>     mmu-notifiers
->>   o Run benchmarks (lmbench for now) and test impact on performance, and
->>     optimize
->>   o Test virtio - since it writes into guest memory. Wait until pci is supported
->>     on ARM.
-> 
-> So you're not testing with virtio now?  Your command line below seems to
-> suggest that in fact you are.  /me confused.
+On cold boot:
 
-Yes so I've see no errors with virtio-mmio transport and virto-net-device,
-blk-device backends under moderate loads. But virtio inbound is purely user space 
-in this case QEMU  so I can't say with certainty that virtio is 100%. 
-Sometime back I found problems with virtio-mmio when transport and backend 
-are not fused together none of the performance options (UFO, TSO, Partial 
-Checksum...) got applied, like they did for virti-net-pci. So to summarize 
-I need to see how virtio tracks dirty pages for virtio-mmio, 
-and  virtio-pci in QEMU. I have fair idea where to look but have not
-done so yet.
+1. iROM loads BL1 from SPI flash
+2. BL1 loads BL2 (SPL) from SPI flash
+3. BL2 loads loads RO U-Boot from SPI flash
+4. RO U-Boot (might) load RW U-Boot from SPI flash
+5. U-Boot loads kernel from eMMC (or SD card or USB)
+6. U-Boot boots kernel using bootm.
 
 
-> 
->>   o Currently on ARM, KVM doesn't appear to write into Guest address space,
->>     need to mark those pages dirty too (???).
-> 
-> not sure what you mean here, can you expand?
+On resume from suspend:
 
-For few architectures KVM writes into guest memory, one example is PV-EOI,
-will write into guest memory to disable/enable PV-EOI while injecting an
-interrupt - based one number of in flight interrupts. There is other code
-that does it too, but I'm not familiar with all the use cases. So if we do
-that on ARM the page(s) must marked dirty.
+1. iROM loads BL1 from SPI flash
 
-> 
->> - Move onto ARMv8 since 2nd stage mmu is shared between both architectures. 
->>   But in addition to dirty page log additional support for GIC, arch timers, 
->>   and emulated devices is required. Also working on emulated platform masks
->>   a lot of potential bugs, but does help to get majority of code working.
->>
->> Test Environment:
->> ---------------------------------------------------------------------------
->> NOTE: RUNNING on FAST Models will hardly ever fail and mask bugs, infact 
->>       initially light loads were succeeding without dirty page logging support.
->> ---------------------------------------------------------------------------
->> - Will put all components on github, including test setup diagram
->> - In short summary
->>   o Two ARM Exyonys 5440 development platforms - 4-way 1.7 GHz, with 8GB, 256GB
->>     storage, 1GBs Ethernet, with swap enabled
->>   o NFS Server runing Ubuntu 13.04 
->>     - both ARM boards mount shared file system 
->>     - Shared file system includes - QEMU, Guest Kernel, DTB, multiple Ext3 root
->>       file systems.
->>   o Component versions: qemu-1.7.5, vexpress-a15, host/guest kernel 3.15-rc1,
->>   o Use QEMU Ctr+A+C and migrate -d tcp:IP:port command
->>     - Destination command syntax: can change smp to 4, machine model outdated,
->>       but has been tested on virt by others (need to upgrade)
->> 	
->> 	/mnt/migration/qemu-system-arm -enable-kvm -smp 2 -kernel \
->> 	/mnt/migration/zImage -dtb /mnt/migration/guest-a15.dtb -m 1792 \
->> 	-M vexpress-a15 -cpu cortex-a15 -nographic \
->> 	-append "root=/dev/vda rw console=ttyAMA0 rootwait" \
->> 	-drive if=none,file=/mnt/migration/guest1.root,id=vm1 \
->> 	-device virtio-blk-device,drive=vm1 \
->> 	-netdev type=tap,id=net0,ifname=tap0 \
->> 	-device virtio-net-device,netdev=net0,mac="52:54:00:12:34:58" \
->> 	-incoming tcp:0:4321
->>
->>     - Source command syntax same except '-incoming'
->>
->>   o Test migration of multiple VMs use tap0, tap1, ..., and guest0.root, .....
->>     has been tested as well.
->>   o On source run multiple copies of 'dirtyram.arm' - simple program to dirty
->>     pages periodically.
->>     ./dirtyarm.ram <total mmap size> <dirty page size> <sleep time>
->>     Example:
->>     ./dirtyram.arm 102580 812 30
->>     - dirty 102580 pages
->>     - 812 pages every 30ms with an incrementing counter 
->>     - run anywhere from one to as many copies as VM resources can support. If 
->>       the dirty rate is too high migration will run indefintely
->>     - run date output loop, check date is picked up smoothly
->>     - place guest/host into page reclaim/swap mode - by whatever means in this
->>       case run multiple copies of 'dirtyram.ram' on host
->>     - issue migrate command(s) on source
->>     - Top result is 409600, 8192, 5
->>   o QEMU is instrumented to save RAM memory regions on source and destination
->>     after memory is migrated, but before guest started. Later files are 
->>     checksummed on both ends for correctness, given VMs are small this works. 
->>   o Guest kernel is instrumented to capture current cycle counter - last cycle
->>     and compare to qemu down time to test arch timer accuracy. 
->>   o Network failover is at L3 due to interface limitations, ping continues
->>     working transparently
->>   o Also tested 'migrate_cancel' to test reassemble of huge pages (inserted low
->>     level instrumentation code).
->>
-> 
-> Thanks for the info, this makes it much clearer to me how you're testing
-> this and I will try to reprocuce.
-> 
-> -Christoffer
-> 
+2. BL1 loads BL2 (SPL) from SPI flash
+
+3. BL2 does some basic init code (clocks, SDRAM out of self refresh,
+...) and looks at some SoC registers that are preserved across
+suspend/resume.  These registers contain flags indicating that this is
+a resume from suspend and a pointer to the address in the kernel to
+jump to at resume time.  The address of these registers and which bits
+mean which flags is hardcoded and is part of the contract between the
+bootloader and the kernel.
+
+4. BL2 jumps to kernel.
+
+---
+
+I will note that BL1, BL2, and "RO U-Boot" are read only in production
+systems.  Note that at resume time only Read-Only code is loaded from
+persistent storage.  That means no extra verification is needed.  A
+system exploit could survive suspend/resume but a reboot would clear
+it and a reboot + suspend/resume wouldn't bring it back.
+
+
+> Does it jump to a specific (hardcoded) location ?
+
+I guess I could say it this way:
+
+A) In resume from suspend, by agreement between the kernel and the
+bootloader we'll jump to the address stored in 0x10040800 (INFORM0)
+
+B) In bringing up a new CPU, by agreement between the kernel and the
+bootloader we'll jump directly to 0x02073000 (and address in the SoC's
+internal SRAM).
+
+
+> Is the primary CPU (MPIDR) hardcoded in firmware so that on both
+> cold and warm-boot firmware sees a specific MPIDR as "special" ?
+
+Cold boot and resume from suspend are detected via various special
+flags in various special locations.  Resume from suspend looks at
+INFORM1 (0x10048004) for flags.  This register is 0 during a cold boot
+and has special values set by the kernel at resume time.
+
+It also looks as if some code looks at 0x10040900 (PMU_SPARE0) to help
+tell initial cold boot and secondary CPU bringup.
+
+
+> I am asking to check if on this platform CPUidle (where the notion of
+> primary CPU disappears) has a chance to run properly.
+
+I believe it should be possible, but we don't have CPUidle implemented
+in our current system.  Abhilash may be able to comment more.
+
+
+> Probably CPUidle won't attain idle states where IRAM content is lost, but I
+> am still worried about the primary vs secondaries firmware boot behaviour.
+
+I don't think iRAM can be turned off for CPUidle.
+
+
+> What happens on reboot from suspend to RAM (or to put it differently,
+> what does secure firmware do on reboot from suspend to RAM - in
+> particular how is the "jump" address to bootloader/kernel set ?)
+
+Should be described above now.
+
+-Doug
