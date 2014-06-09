@@ -1,74 +1,23 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Mon, 9 Jun 2014 00:18:23 +0100
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <5388CB1B.3090802@metafoo.de>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
- <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
- <5388C0F1.90503@gmail.com> <5388CB1B.3090802@metafoo.de>
-Message-ID: <20140608231823.GB10112@trinity.fluff.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 9 Jun 2014 09:56:59 +0800
+Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
+In-Reply-To: <1402051016-28853-1-git-send-email-broonie@kernel.org>
+References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140609015658.GV8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 08:16:59PM +0200, Lars-Peter Clausen wrote:
-> On 05/30/2014 07:33 PM, David Daney wrote:
-> >On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
-> >>On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com>
-> >>wrote:
-> >>>--- a/drivers/gpio/gpiolib.c
-> >>>+++ b/drivers/gpio/gpiolib.c
-> >>>@@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct
-> >>>gpio_chip *gpiochip);
-> >>>   *
-> >>>   * A gpio_chip with any GPIOs still requested may not be removed.
-> >>>   */
-> >>>-int gpiochip_remove(struct gpio_chip *chip)
-> >>>+void gpiochip_remove(struct gpio_chip *chip)
-> >>>  {
-> >>>         unsigned long   flags;
-> >>>-       int             status = 0;
-> >>>         unsigned        id;
-> >>>
-> >>>         acpi_gpiochip_remove(chip);
-> >>>@@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
-> >>>         of_gpiochip_remove(chip);
-> >>>
-> >>>         for (id = 0; id < chip->ngpio; id++) {
-> >>>-               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
-> >>>-                       status = -EBUSY;
-> >>>-                       break;
-> >>>-               }
-> >>>-       }
-> >>>-       if (status == 0) {
-> >>>-               for (id = 0; id < chip->ngpio; id++)
-> >>>-                       chip->desc[id].chip = NULL;
-> >>>-
-> >>>-               list_del(&chip->list);
-> >>>+               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
-> >>>+                       panic("gpio: removing gpiochip with gpios still
-> >>>requested\n");
-> >>
-> >>panic?
-> >
-> >NACK to the patch for this reason.  The strongest thing you should do here
-> >is WARN.
-> >
-> >That said, I am not sure why we need this whole patch set in the first place.
+On Fri, Jun 06, 2014 at 11:36:56AM +0100, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> Well, what currently happens when you remove a device that is a
-> provider of a gpio_chip which is still in use, is that the kernel
-> crashes. Probably with a rather cryptic error message. So this patch
-> doesn't really change the behavior, but makes it more explicit what
-> is actually wrong. And even if you replace the panic() by a WARN()
-> it will again just crash slightly later.
+> Since the OPP layer is a kernel library which has been converted to be
+> directly selectable by its callers rather than user selectable and
+> requiring architectures to enable it explicitly the ARCH_HAS_OPP symbol
+> has become redundant and can be removed. Do so.
 > 
-> This is a design flaw in the GPIO subsystem that needs to be fixed.
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+...
+>  arch/arm/mach-imx/Kconfig      | 1 -
 
-Surely then the best way is to error out to the module unload and
-stop the driver being unloaded?
-
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
