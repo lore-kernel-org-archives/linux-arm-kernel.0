@@ -1,35 +1,41 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 9 Jun 2014 11:31:47 +0800
-Subject: [PATCH v2 5/5] ARM: atmel: at91sam9n12ek: switch sound to CCF
-In-Reply-To: <1402284707-23354-1-git-send-email-voice.shen@atmel.com>
-References: <1402284707-23354-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1402284707-23354-6-git-send-email-voice.shen@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 9 Jun 2014 11:38:57 +0800
+Subject: [PATCH 5/5] ARM: dts: imx51-babbage: Fix esdhc setup
+In-Reply-To: <20140605103949.GL15686@pengutronix.de>
+References: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
+ <1400848384-3226-6-git-send-email-s.hauer@pengutronix.de>
+ <20140601152216.GD11061@dragon> <20140605103949.GL15686@pengutronix.de>
+Message-ID: <20140609033854.GE11061@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the at91sam9n12ek has switch to CCF, so add clock for wm8904
+On Thu, Jun 05, 2014 at 12:39:49PM +0200, Sascha Hauer wrote:
+> On Sun, Jun 01, 2014 at 11:22:19PM +0800, Shawn Guo wrote:
+> > On Fri, May 23, 2014 at 02:33:04PM +0200, Sascha Hauer wrote:
+> > > - Move cd/wp pinctrl from the hog group to the esdhc groups
+> > > - use gpio for card detection / write protection on esdhc2 since
+> > >   the controller based detection does not work
+> > 
+> > I tracked it a little bit and found that the controller based detection
+> > works fine with v3.13 and starts being broken from v3.14-rc1.  The
+> > offending commit seems to be 89d7e5c13122 (mmc: sdhci-esdhc-imx: add
+> > runtime pm support).
+> 
+> This makes sense. When the controller is disabled it obviously can't
+> detect card insertion/removal events anymore. So you can only have one:
+> controller based card detection or runtime pm for the controller.
+> So it probably makes sense to use gpio card detection whenever possible
+> to get additional power savings.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Reviwed-by: Mark Brown <broonie@linaro.org>
----
-Changes in v2:
-  - None
+Can we have something like that in commit log to explain the breakage?
+Also, the patch does not apply to my branch, so you may need to rebase
+anyway.
 
- arch/arm/boot/dts/at91sam9n12ek.dts | 2 ++
- 1 file changed, 2 insertions(+)
+Lothar, Denis,
 
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 64bbe46..8ae771d 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -56,6 +56,8 @@
- 				wm8904: codec at 1a {
- 					compatible = "wm8904";
- 					reg = <0x1a>;
-+					clocks = <&pck0>;
-+					clock-names = "mclk";
- 				};
- 
- 				qt1070: keyboard at 1b {
--- 
-1.8.5.2
+FYI.  The controller based card detection / write protection are broken
+right now, and I see your boards (imx53-tx53 and
+imx51-eukrea-mbimxsd51-baseboard) are using them.  You may want to
+switch to use GPIO if available.
+
+Shawn
