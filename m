@@ -1,173 +1,53 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon,  9 Jun 2014 21:03:36 +0400
-Subject: [PATCH 1/2] clocksource: Add CLPS711X clocksource driver
-Message-ID: <1402333416-13690-1-git-send-email-shc_work@mail.ru>
+Date: Mon,  9 Jun 2014 21:03:58 +0400
+Subject: [PATCH 2/2] clocksource: clps711x: Add DT bindings documentation
+Message-ID: <1402333438-13731-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the clocksource driver for Cirrus Logic CLPS711X series SoCs.
-Designed primarily for migration CLPS711X subarch for multiplatform & DT,
-for this as the "OF" and "non-OF" calls implemented.
+This patch adds DT binding documentation for the Cirrus Logic
+CLPS711X-based CPUs clocksource subsystem.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
-Actual calls for driver initialization of the boards will be added
-later in a separate patch for the arm-soc tree to avoid possible
-conflicts between clk, clocksource and arm-soc trees.
----
- drivers/clocksource/Makefile         |   1 +
- drivers/clocksource/clps711x-timer.c | 131 +++++++++++++++++++++++++++++++++++
- 2 files changed, 132 insertions(+)
- create mode 100644 drivers/clocksource/clps711x-timer.c
+ .../bindings/timer/cirrus,clps711x-timer.txt       | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 800b130..eae4837 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
-+obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
- obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
- obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
-diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
+diff --git a/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
 new file mode 100644
-index 0000000..d83ec1f
+index 0000000..cd55b52
 --- /dev/null
-+++ b/drivers/clocksource/clps711x-timer.c
-@@ -0,0 +1,131 @@
-+/*
-+ *  Cirrus Logic CLPS711X clocksource driver
-+ *
-+ *  Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
++++ b/Documentation/devicetree/bindings/timer/cirrus,clps711x-timer.txt
+@@ -0,0 +1,29 @@
++* Cirrus Logic CLPS711X Timer Counter
 +
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
-+#include <linux/slab.h>
++Required properties:
++- compatible: Shall contain "cirrus,clps711x-timer".
++- reg       : Address and length of the register set.
++- interrupts: The interrupt number of the timer.
++- clocks    : phandle of timer reference clock.
 +
-+enum {
-+	CLPS711X_CLKSRC_CLOCKSOURCE,
-+	CLPS711X_CLKSRC_CLOCKEVENT,
-+};
++Note: Each timer should have an alias correctly numbered in "aliases" node.
 +
-+static void __iomem *tcd;
++Example:
++	aliases {
++		timer0 = &timer1;
++		timer1 = &timer2;
++	};
 +
-+static u64 notrace clps711x_sched_clock_read(void)
-+{
-+	return ~readw(tcd);
-+}
++	timer1: timer at 80000300 {
++		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
++		reg = <0x80000300 0x4>;
++		interrupts = <8>;
++		clocks = <&clks 5>;
++	};
 +
-+static int __init _clps711x_clksrc_init(struct clk *clock, void __iomem *base)
-+{
-+	unsigned long rate;
-+
-+	if (!base)
-+		return -ENOMEM;
-+	if (IS_ERR(clock))
-+		return PTR_ERR(clock);
-+
-+	rate = clk_get_rate(clock);
-+
-+	tcd = base;
-+
-+	clocksource_mmio_init(tcd, "clps711x-clocksource", rate, 300, 16,
-+			      clocksource_mmio_readw_down);
-+
-+	sched_clock_register(clps711x_sched_clock_read, 16, rate);
-+
-+	return 0;
-+}
-+
-+static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
-+					 struct clock_event_device *evt)
-+{
-+}
-+
-+static int __init _clps711x_clkevt_init(struct clk *clock, void __iomem *base,
-+					unsigned int irq)
-+{
-+	struct clock_event_device *clkevt;
-+	unsigned long rate;
-+
-+	if (!irq)
-+		return -EINVAL;
-+	if (!base)
-+		return -ENOMEM;
-+	if (IS_ERR(clock))
-+		return PTR_ERR(clock);
-+
-+	clkevt = kzalloc(sizeof(*clkevt), GFP_KERNEL);
-+	if (!clkevt)
-+		return -ENOMEM;
-+
-+	rate = clk_get_rate(clock);
-+
-+	/* Set Timer prescaler */
-+	writew(DIV_ROUND_CLOSEST(rate, HZ), base);
-+
-+	clkevt->name = "clps711x-clockevent";
-+	clkevt->rating = 300;
-+	clkevt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_C3STOP;
-+	clkevt->set_mode = clps711x_clockevent_set_mode;
-+	clkevt->cpumask = cpumask_of(0);
-+	clockevents_config_and_register(clkevt, HZ, 0, 0);
-+
-+	return request_irq(irq, clps711x_timer_interrupt, IRQF_TIMER,
-+			   "clps711x-timer", clkevt);
-+}
-+
-+void __init clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
-+				 unsigned int irq)
-+{
-+	struct clk *tc1 = clk_get_sys("clps711x-timer.0", NULL);
-+	struct clk *tc2 = clk_get_sys("clps711x-timer.1", NULL);
-+
-+	BUG_ON(_clps711x_clksrc_init(tc1, tc1_base));
-+	BUG_ON(_clps711x_clkevt_init(tc2, tc2_base, irq));
-+}
-+
-+#ifdef CONFIG_CLKSRC_OF
-+static void __init clps711x_timer_init(struct device_node *np)
-+{
-+	unsigned int irq = irq_of_parse_and_map(np, 0);
-+	struct clk *clock = of_clk_get(np, 0);
-+	void __iomem *base = of_iomap(np, 0);
-+
-+	switch (of_alias_get_id(np, "timer")) {
-+	case CLPS711X_CLKSRC_CLOCKSOURCE:
-+		BUG_ON(_clps711x_clksrc_init(clock, base));
-+		break;
-+	case CLPS711X_CLKSRC_CLOCKEVENT:
-+		BUG_ON(_clps711x_clkevt_init(clock, base, irq));
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+CLOCKSOURCE_OF_DECLARE(clps711x, "cirrus,clps711x-timer", clps711x_timer_init);
-+#endif
++	timer2: timer at 80000340 {
++		compatible = "cirrus,ep7312-timer", "cirrus,clps711x-timer";
++		reg = <0x80000340 0x4>;
++		interrupts = <9>;
++		clocks = <&clks 6>;
++	};
 -- 
 1.8.5.5
