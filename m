@@ -1,27 +1,48 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 9 Jun 2014 12:52:42 +0200
-Subject: [PATCH 4/9] usb: phy: add the Berlin USB PHY driver
-In-Reply-To: <5395886D.9090606@gmail.com>
-References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-5-git-send-email-antoine.tenart@free-electrons.com>
- <53919DCE.1050708@gmail.com> <20140609162631.76bd2ad7@xhacker>
- <5395886D.9090606@gmail.com>
-Message-ID: <20140609105241.GC3112@piout.net>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Mon,  9 Jun 2014 12:59:07 +0200
+Subject: [PATCH v2] crypto: Add Allwinner Security System crypto accelerator
+Message-ID: <1402311551-19564-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2014 at 12:11:57 +0200, Sebastian Hesselbarth wrote :
-> > Some BG2Q boards hardwired the vbus to be always powered on, we should continue
-> > the probe if vbus gpio is missing.
-> 
-> Yeah, the same applies for regulators. But with the comments above, it
-> should move to the controller stub instead.
-> 
+Hello
 
-We should use a regulator and in the case it is hardwired, use a fixed
-regulator. Then, we can stop if it is missing.
+This is the driver for the Security System included in Allwinner SoC A20.
+The Security System (SS for short) is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+It could be found on others Allwinner SoC: 
+- A10s and A31 diagram speak about it with precisions (AES/DES/3DES/Md5/SHA1/PRNG)
+- A10 and A13 manual give the same datasheet for SS than A20
+- A23 speak about a security system but without precisions
+But I do not have access on any of those hardware, tests are welcome.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+This driver currently supports:
+- MD5 and SHA1 hash algorithms
+- AES block cipher in CBC mode with 128/196/256bits keys.
+- DES and 3DES block cipher in CBC mode
+- PRNG
+The driver exposes all those algorithms through the kernel cryptographic API.
+
+The driver support only CPU driven (aka poll mode) transfer mode since the DMA engine of the A20 does not have a driver yet.
+
+Changes since v1:
+- annotate ss->base as __iomem
+- regroup all mutex in the ss_ctx structure
+- splited driver in 7 modules (core md5 sha1 aes des 3des prng) in sunxi-ss directory
+- use dev_exit_p() for .remove
+- added missing CRYPTO_BLKCIPHER dep in Kconfig
+- use ahash instead of shash
+- use ablkcipher instead of blkcipher
+- use crypto_rng_ctx instead of crypto_tfm_ctx
+- set seed as an u32
+- drop useless comment decoration
+- drop useless debug
+- ss_ctx is now a static pointer and whole structure being allocated
+- fix the platform_get_resource/devm_ioremap_resource pattern
+- invert getting die id and configuring clock
+- set clock value as a const unsigned long
+- add MODULE_ALIAS
+- use define names more consistency (SS_xxx)
+- fix PRNG errors
+- respell SS to Security System in DT documentation
+
+Regards.
