@@ -1,79 +1,33 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 09 Jun 2014 13:29:23 +0200
-Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
-In-Reply-To: <20140608231823.GB10112@trinity.fluff.org>
-References: <20140530094025.3b78301e@canb.auug.org.au>
- <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
- <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
- <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
- <5388C0F1.90503@gmail.com> <5388CB1B.3090802@metafoo.de>
- <20140608231823.GB10112@trinity.fluff.org>
-Message-ID: <53959A93.7080308@metafoo.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Jun 2014 13:36:33 +0200
+Subject: [PATCH 2/4] ARM: mach-s5p: get rid of all <mach/gpio.h> headers
+In-Reply-To: <4544212.mqY6dSouMv@wuerfel>
+References: <1401888838-3126-1-git-send-email-linus.walleij@linaro.org>
+ <1401888838-3126-3-git-send-email-linus.walleij@linaro.org>
+ <4544212.mqY6dSouMv@wuerfel>
+Message-ID: <CACRpkdZMwLv1rHS+mSAT4YP3F0VUtt9E-u3p89a-YzRRFbugGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2014 01:18 AM, Ben Dooks wrote:
-> On Fri, May 30, 2014 at 08:16:59PM +0200, Lars-Peter Clausen wrote:
->> On 05/30/2014 07:33 PM, David Daney wrote:
->>> On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
->>>> On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com>
->>>> wrote:
->>>>> --- a/drivers/gpio/gpiolib.c
->>>>> +++ b/drivers/gpio/gpiolib.c
->>>>> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct
->>>>> gpio_chip *gpiochip);
->>>>>    *
->>>>>    * A gpio_chip with any GPIOs still requested may not be removed.
->>>>>    */
->>>>> -int gpiochip_remove(struct gpio_chip *chip)
->>>>> +void gpiochip_remove(struct gpio_chip *chip)
->>>>>   {
->>>>>          unsigned long   flags;
->>>>> -       int             status = 0;
->>>>>          unsigned        id;
->>>>>
->>>>>          acpi_gpiochip_remove(chip);
->>>>> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
->>>>>          of_gpiochip_remove(chip);
->>>>>
->>>>>          for (id = 0; id < chip->ngpio; id++) {
->>>>> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
->>>>> -                       status = -EBUSY;
->>>>> -                       break;
->>>>> -               }
->>>>> -       }
->>>>> -       if (status == 0) {
->>>>> -               for (id = 0; id < chip->ngpio; id++)
->>>>> -                       chip->desc[id].chip = NULL;
->>>>> -
->>>>> -               list_del(&chip->list);
->>>>> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
->>>>> +                       panic("gpio: removing gpiochip with gpios still
->>>>> requested\n");
->>>>
->>>> panic?
->>>
->>> NACK to the patch for this reason.  The strongest thing you should do here
->>> is WARN.
->>>
->>> That said, I am not sure why we need this whole patch set in the first place.
+On Wed, Jun 4, 2014 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 04 June 2014 15:33:56 Linus Walleij wrote:
+>> This renames all the local <mach/gpio.h> headers in the S5P platforms
+>> to <mach/gpio-samsung.h> indicating a scope local to this platform,
+>> and cuts the implicit inclusion of <mach/gpio.h> from <linux/gpio.h>
+>> by removing the use of NEED_MACH_GPIO_H from all S5P variants.
 >>
->> Well, what currently happens when you remove a device that is a
->> provider of a gpio_chip which is still in use, is that the kernel
->> crashes. Probably with a rather cryptic error message. So this patch
->> doesn't really change the behavior, but makes it more explicit what
->> is actually wrong. And even if you replace the panic() by a WARN()
->> it will again just crash slightly later.
->>
->> This is a design flaw in the GPIO subsystem that needs to be fixed.
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> Surely then the best way is to error out to the module unload and
-> stop the driver being unloaded?
->
+> Hmm, this patch will obviously clash with the removal of S5p64xx
+> and s5pc100.
 
-You can't error out on module unload, although that's not really relevant 
-here. gpiochip_remove() is typically called when the device that registered 
-the GPIO chip is unbound. And despite some remove() callbacks having a 
-return type of int you can not abort the removal of a device.
+So it is happening? I was actually expecting that to happen in
+v3.14 or so and now I finally lost my patience ;-)
 
-- Lars
+> It shouldn't be hard to resolve the conflict when we
+> merge both into arm-soc/next/cleanup,
+
+First come, first serve. I will send my pull request at the end
+of the merge window I hope. If removal comes first, I'll rebase.
+
+Linus
