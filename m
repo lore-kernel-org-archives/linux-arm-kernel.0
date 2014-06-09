@@ -1,130 +1,28 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 09 Jun 2014 11:36:45 -0700
-Subject: [PATCH v7 1/4] arm: add ARMv7 HYP API to flush VM TLBs without
- address param
-In-Reply-To: <20140609174901.GC1388@lvm>
-References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <1401837567-5527-2-git-send-email-m.smarduch@samsung.com>
- <20140608120502.GE3279@lvm> <5395E995.2010509@samsung.com>
- <20140609174901.GC1388@lvm>
-Message-ID: <5395FEBD.6070102@samsung.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 9 Jun 2014 15:43:37 -0300
+Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
+In-Reply-To: <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
+ <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20140609184337.GA9790@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2014 10:49 AM, Christoffer Dall wrote:
-> On Mon, Jun 09, 2014 at 10:06:29AM -0700, Mario Smarduch wrote:
->> On 06/08/2014 05:05 AM, Christoffer Dall wrote:
->>> On Tue, Jun 03, 2014 at 04:19:24PM -0700, Mario Smarduch wrote:
->>>> Patch adds HYP interface for global VM TLB invalidation without address
->>>> parameter. Added ARM version of kvm_flush_remote_tlbs(), made the generic
->>>> implementation a weak symbol.
->>>>
->>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>> ---
->>>>  arch/arm/include/asm/kvm_asm.h |    1 +
->>>>  arch/arm/kvm/interrupts.S      |   11 +++++++++++
->>>>  arch/arm/kvm/mmu.c             |   14 ++++++++++++++
->>>>  virt/kvm/kvm_main.c            |    2 +-
->>>>  4 files changed, 27 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
->>>> index 53b3c4a..21bc519 100644
->>>> --- a/arch/arm/include/asm/kvm_asm.h
->>>> +++ b/arch/arm/include/asm/kvm_asm.h
->>>> @@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
->>>>  
->>>>  extern void __kvm_flush_vm_context(void);
->>>>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->>>> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
->>>>  
->>>>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->>>>  #endif
->>>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->>>> index 0d68d40..bddc66b 100644
->>>> --- a/arch/arm/kvm/interrupts.S
->>>> +++ b/arch/arm/kvm/interrupts.S
->>>> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->>>>  	bx	lr
->>>>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
->>>>  
->>>> +/**
->>>> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
->>>> + *
->>>> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
->>>> + * parameter
->>>> + */
->>>> +
->>>> +ENTRY(__kvm_tlb_flush_vmid)
->>>> +	b	__kvm_tlb_flush_vmid_ipa
->>>> +ENDPROC(__kvm_tlb_flush_vmid)
->>>> +
->>>>  /********************************************************************
->>>>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
->>>>   * domain, for all VMIDs
->>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->>>> index 2ac9588..ef29540 100644
->>>> --- a/arch/arm/kvm/mmu.c
->>>> +++ b/arch/arm/kvm/mmu.c
->>>> @@ -56,6 +56,20 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->>>>  		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
->>>>  }
->>>>  
->>>> +/**
->>>> + * kvm_flush_remote_tlbs() - flush all VM TLB entries
->>>> + * @kvm:       pointer to kvm structure.
->>>> + *
->>>> + * Interface to HYP function to flush all VM TLB entries without address
->>>> + * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
->>>> + * kvm_tlb_flush_vmid_ipa().
->>>> + */
->>>> +void kvm_flush_remote_tlbs(struct kvm *kvm)
->>>> +{
->>>> +	if (kvm)
->>>> +		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
->>>> +}
->>>> +
->>>>  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
->>>>  				  int min, int max)
->>>>  {
->>>> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
->>>> index fa70c6e..ba25765 100644
->>>> --- a/virt/kvm/kvm_main.c
->>>> +++ b/virt/kvm/kvm_main.c
->>>> @@ -184,7 +184,7 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
->>>>  	return called;
->>>>  }
->>>>  
->>>> -void kvm_flush_remote_tlbs(struct kvm *kvm)
->>>> +void __weak kvm_flush_remote_tlbs(struct kvm *kvm)
->>>>  {
->>>>  	long dirty_count = kvm->tlbs_dirty;
->>>>  
->>>> -- 
->>>> 1.7.9.5
->>>>
->>>
->>> This doesn't build or link on aarch64 :(
->>>
->>> -Christoffer
->>>
->>
->> I'll recompile and retest the dirty page logging portion on ARMv8 and
->> resolve these issues, early next week.
->>
->> In the meantime if it's ok with you, I'' move forward with the
->> rest of the patches on ARMv7 to get through critical issues.
->>
->> Would that work?
-> 
-> Your patches need to at least compile with other architectures, I
-> suggest fixing that up front.  You also eventually need to somehow test
-> (or ask maintainers to test) a branch with your patches on the
-> architectures that your code messes with.  This later point can be
-> addressed once we're close to a consensus on ARM.
+Hi Rob,
 
-Ok got it. So far I just checked to make sure x86 compiles since
-one function is generic and declared __weak, both x86 and ARM
-share it now (Xiaos comment).
-> 
-> -Christoffer
-> 
+On 22 Apr 02:41 PM, Rob Herring wrote:
+> @@ -11,7 +10,6 @@ config ARCH_MVEBU
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select MIGHT_HAVE_PCI
+>  	select PCI_QUIRKS if PCI
+> -	select OF_ADDRESS_PCI
+>  
+
+We needed that one, as Gregory introduced it specifically so we could select it
+without selecting PCI.
+
+I'll cook a patch right away, sorry for not seeing this earlier!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
