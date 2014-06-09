@@ -1,29 +1,32 @@
 From: jslaby@suse.cz (Jiri Slaby)
-Date: Mon,  9 Jun 2014 10:49:10 +0200
-Subject: [PATCH 3.12 015/146] irqchip: Gic: Support forced affinity setting
+Date: Mon,  9 Jun 2014 10:49:13 +0200
+Subject: [PATCH 3.12 018/146] clocksource: Exynos_mct: Register clock event
+ after request_irq()
 In-Reply-To: <ebe219e45dcf94c1a34281167427cff4d742faef.1402303820.git.jslaby@suse.cz>
 References: <ebe219e45dcf94c1a34281167427cff4d742faef.1402303820.git.jslaby@suse.cz>
-Message-ID: <a46aaa63b66b1836ca6ad054003f035d3201548e.1402303820.git.jslaby@suse.cz>
+Message-ID: <9bdb96457c0728672b655f677d987898945d7cfd.1402303820.git.jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Gleixner <tglx@linutronix.de>
+From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 3.12-stable review patch.  If anyone has any objections, please let me know.
 
 ===============
 
-commit ffde1de64012c406dfdda8690918248b472f24e4 upstream.
+commit 8db6e5104b77de5d0b7002b95069da0992a34be9 upstream.
 
-To support the affinity setting of per cpu timers in the early startup
-of a not yet online cpu, implement the force logic, which disables the
-cpu online check.
+After hotplugging CPU1 the first call of interrupt handler for CPU1
+oneshot timer was called on CPU0 because it fired before setting IRQ
+affinity. Affected are SoCs where Multi Core Timer interrupts are
+shared (SPI), e.g. Exynos 4210.
 
-Tagged for stable to allow a simple fix of the affected SoC clock
-event drivers.
+During setup of the MCT timers the clock event device should be
+registered after setting the affinity for interrupt. This will prevent
+starting the timer too early.
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
@@ -31,33 +34,34 @@ Cc: Tomasz Figa <t.figa@samsung.com>,
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: linux-arm-kernel at lists.infradead.org,
-Link: http://lkml.kernel.org/r/20140416143315.916984416 at linutronix.de
+Link: http://lkml.kernel.org/r/20140416143316.299247848 at linutronix.de
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Jiri Slaby <jslaby@suse.cz>
 ---
- drivers/irqchip/irq-gic.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/clocksource/exynos_mct.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index d0e948084eaf..86df97f6fd27 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -246,10 +246,14 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
- {
- 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
--	unsigned int shift = (gic_irq(d) % 4) * 8;
--	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
- 	u32 val, mask, bit;
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index b17b3e0981f0..70f3a597ec57 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -414,8 +414,6 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	evt->set_mode = exynos4_tick_set_mode;
+ 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 450;
+-	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
+-					0xf, 0x7fffffff);
  
-+	if (!force)
-+		cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	else
-+		cpu = cpumask_first(mask_val);
-+
- 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
- 		return -EINVAL;
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
  
+@@ -432,6 +430,8 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
++	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
++					0xf, 0x7fffffff);
+ 
+ 	return 0;
+ }
 -- 
 1.9.3
