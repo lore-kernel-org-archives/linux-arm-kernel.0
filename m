@@ -1,32 +1,27 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 9 Jun 2014 10:19:20 +0530
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
-In-Reply-To: <1402051016-28853-1-git-send-email-broonie@kernel.org>
-References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
-Message-ID: <CAOh2x=ms6Z421AqGAQxJFA3v63fDGu+=+zfrVzNzrfQOZoZGjg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 Jun 2014 05:46:13 +0000 (UTC)
+Subject: OMAP baseline test results for v3.15-rc8
+In-Reply-To: <538C39BB.9020809@compulab.co.il>
+References: <alpine.DEB.2.02.1406020749100.21503@utopia.booyaka.com>
+ <538C39BB.9020809@compulab.co.il>
+Message-ID: <alpine.DEB.2.02.1406090543001.21441@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 6, 2014 at 4:06 PM, Mark Brown <broonie@kernel.org> wrote:
-> From: Mark Brown <broonie@linaro.org>
->
-> Since the OPP layer is a kernel library which has been converted to be
-> directly selectable by its callers rather than user selectable and
-> requiring architectures to enable it explicitly the ARCH_HAS_OPP symbol
-> has become redundant and can be removed. Do so.
->
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  Documentation/power/opp.txt    | 3 ---
->  arch/arm/mach-exynos/Kconfig   | 1 -
->  arch/arm/mach-highbank/Kconfig | 1 -
->  arch/arm/mach-imx/Kconfig      | 1 -
->  arch/arm/mach-omap2/Kconfig    | 1 -
->  arch/arm/mach-shmobile/Kconfig | 2 --
->  arch/arm/mach-vexpress/Kconfig | 1 -
->  arch/arm/mach-zynq/Kconfig     | 1 -
->  drivers/devfreq/Kconfig        | 1 -
->  kernel/power/Kconfig           | 3 ---
->  10 files changed, 15 deletions(-)
+On Mon, 2 Jun 2014, Dmitry Lifshitz wrote:
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> CM-T3517 is a bare-bone CoM without MMC/SD card slot (NAND option).
+> MMC/SD card interface (and some other peripherals) are properties of the
+> carrier base board SB-T35, which turns this CoM into fully functional board
+> SBC-T3517.
+> 
+> Please, use omap3-sbc-t3517.dtb target.
+> 
+> Attached Linux v3.15-rc8 boot log using omap2plus_defconfig.
+
+Thanks.  My mistake.  Here's the updated bootlog for that board for 
+v3.15-rc8:
+
+http://www.pwsan.com/omap/testlogs/test_v3.15-rc8/20140608202958/boot/cmt3517/cmt3517_log.txt
+
+- Paul
