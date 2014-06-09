@@ -1,1016 +1,128 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Tue, 10 Jun 2014 00:52:46 +0200
-Subject: [PATCH v2 3/3] arm: tegra: initial support for apalis t30
-In-Reply-To: <dadd07f9ed693d6bcf541764b62a2caf4cc38630.1402353627.git.marcel@ziswiler.com>
-References: <dadd07f9ed693d6bcf541764b62a2caf4cc38630.1402353627.git.marcel@ziswiler.com>
-Message-ID: <95c131deb3e410e8defc9fe125dc662bdb276310.1402353627.git.marcel@ziswiler.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 10 Jun 2014 00:55:25 +0200
+Subject: [PATCH 0/5] Add Maxim 77802 PMIC support
+In-Reply-To: <CAD=FV=U2zPJ=NohDjGvJKfmwJzQhphtVMefM0p_hvFVoReauhQ@mail.gmail.com>
+References: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>	<1402309011.17650.9.camel@AMDC1943>
+ <CAD=FV=U2zPJ=NohDjGvJKfmwJzQhphtVMefM0p_hvFVoReauhQ@mail.gmail.com>
+Message-ID: <53963B5D.8090908@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree to support Toradex Apalis T30, a
-computer on module which can be used on different carrier boards.
+Hello Krzystof,
 
-The module consists of a Tegra 3 SoC, two PMICs, 1 or 2 GB of DDR3L
-RAM, eMMC, an LM95245 temperature sensor chip, an i210 resp. i211
-gigabit Ethernet controller, an STMPE811 ADC/touch controller as well
-as two MCP2515 CAN controllers. Furthermore, there is an SGTL5000 audio
-codec which is not yet supported. Anything that is not self contained
-on the module is disabled by default.
+Thanks a lot for your feedback.
 
-The device tree for the Evaluation Board includes the modules device
-tree and enables the supported peripherals of the carrier board (the
-Evaluation Board supports almost all of them).
+On 06/09/2014 06:04 PM, Doug Anderson wrote:
+> Krzystof,
+> 
+> On Mon, Jun 9, 2014 at 3:16 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> On pon, 2014-06-09 at 11:37 +0200, Javier Martinez Canillas wrote:
+>>> MAX77802 is a PMIC that contains 10 high efficiency Buck regulators,
+>>> 32 Low-dropout (LDO) regulators, two 32kHz buffered clock outputs,
+>>> a Real-Time-Clock (RTC) and a I2C interface to program the individual
+>>> regulators, clocks and the RTC.
+>>>
+>>> This series are based on drivers added by Simon Glass to the Chrome OS
+>>> kernel and adds support for the Maxim 77802 Power Management IC, their
+>>> regulators, clocks, RTC and I2C interface. It is composed of patches:
+>>>
+>>> [PATCH 1/5] mfd: Add driver for Maxim 77802 Power Management IC
+>>> [PATCH 2/5] regulator: Add driver for Maxim 77802 PMIC regulators
+>>> [PATCH 3/5] clk: Add driver for Maxim 77802 PMIC clocks
+>>> [PATCH 4/5] rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
+>>> [PATCH 5/5] ARM: dts: Add max77802 device node for exynos5420-peach-pit
+>>>
+>>> Patches 1-4 add support for the different devices and Patch 5 enables
+>>> the MAX77802 PMIC on the Exynos5420 based Peach pit board.
+>>
+>>
+>> Hi,
+>>
+>> The main mfd, mfd irq, clk and rtc drivers look very similar to max77686
+>> drivers. I haven't checked other Maxim drivers but I think there will be
+>> a lot of similarities with them also. It is almost common for Maxim
+>> chipsets to share components between each other.
+>>
+>> I think there is no need in duplicating all that stuff once again in new
+>> driver for another Maxim-almost-the-same-as-others-XYZ chipset. Just
+>> merge it with max77686 (or other better candidate).
+>>
+>> The only difference is in regulator driver. I am not sure whether this
+>> is a result of differences in chip or differences in driver design.
+> 
+> Yes, we thought the same thing when we added support for the max77802
+> in the ChromeOS tree.  Unfortunately it didn't work out half as well
+> as we thought it would.  When Javier was asking advice about sending
+> things upstream we suggested that perhaps he should split the two up.
+> 
+> 
+> You can see the result of the combined driver the ChromeOS tree (the
+> code there is older, probably misnamed as max77xxx, and doesn't have
+> the proper clock pieces, but you can get the gist):
+> 
+> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/regulator/max77xxx-regulator.c
+> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/rtc/rtc-max77xxx.c
+> 
+> 
+> Specific problems that made it ugly to have a combined driver:
+> 
+> * The RTC has many subtle differences between the 77686 and 77802.
+> They expanded it to handle a 200 year timeframe instead of 100 and
+> that meant that they had to shuffle the bits around everywhere.  They
+> also moved it to have the same i2c address as the main PMIC so all
+> addresses are different (see max77686_map in the RTC link above).
+>
+> * The regulator itself has similar concepts between the two, but the
+> list of bucks / ldos and how they behave is quite different.  Trying
+> to understand the complex tables in
+> <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/regulator/max77xxx-regulator.c>
+> was not easy.
+> 
+> 
 
-While at it also add the device tree binding documentation for Apalis
-T30.
+There are other differences that were not mentioned:
 
-Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
----
-Changes since v1:
-- Drop binding documentation not related to Apalis support.
-- Add blank lines between nodes.
-- Put status properties first.
-- Drop unused sdhci labels.
-- Drop blank lines between related properties.
-- Sort PWM nodes alphanumerically.
-- Start regulator numbering at 0.
-- Drop spidev nodes considered evil.
+- The max77802 uses a single register to enable RTC alarm while max77686 uses 1
+bit from a set of registers.
+- Each chip has some regulators that are not available and you have to take care
+of those exceptions (e.g: LDO16, LDO22 and LD31 on max77802).
+- The max77802 has 2 clocks outputs while the max77686 has three.
 
- Documentation/devicetree/bindings/arm/tegra.txt |    2 +
- arch/arm/boot/dts/Makefile                      |    1 +
- arch/arm/boot/dts/tegra30-apalis-eval.dts       |  258 +++++++++
- arch/arm/boot/dts/tegra30-apalis.dtsi           |  673 +++++++++++++++++++++++
- 4 files changed, 934 insertions(+)
- create mode 100644 arch/arm/boot/dts/tegra30-apalis-eval.dts
- create mode 100644 arch/arm/boot/dts/tegra30-apalis.dtsi
+So, as Doug said there are many differences on these two chips besides the
+regulators. It's true that these two drivers share a lot of the structure and
+there is code duplication (this applies to most maxim drivers btw) but I have my
+doubts that the combined approach will make the code more easy to maintain.
 
-diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-index 558ed4b..73278c6 100644
---- a/Documentation/devicetree/bindings/arm/tegra.txt
-+++ b/Documentation/devicetree/bindings/arm/tegra.txt
-@@ -30,6 +30,8 @@ board-specific compatible values:
-   nvidia,seaboard
-   nvidia,ventana
-   nvidia,whistler
-+  toradex,apalis_t30
-+  toradex,apalis_t30-eval
-   toradex,colibri_t20-512
-   toradex,iris
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c1a257a..333ac53 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -364,6 +364,7 @@ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-trimslice.dtb \
- 	tegra20-ventana.dtb \
- 	tegra20-whistler.dtb \
-+	tegra30-apalis-eval.dtb \
- 	tegra30-beaver.dtb \
- 	tegra30-cardhu-a02.dtb \
- 	tegra30-cardhu-a04.dtb \
-diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
-new file mode 100644
-index 0000000..347cc60
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra30-apalis-eval.dts
-@@ -0,0 +1,258 @@
-+/dts-v1/;
-+
-+#include <dt-bindings/input/input.h>
-+#include "tegra30-apalis.dtsi"
-+
-+/ {
-+	model = "Toradex Apalis T30 on Apalis Evaluation Board";
-+	compatible = "toradex,apalis_t30-eval", "nvidia,tegra30";
-+
-+	aliases {
-+		rtc0 = "/i2c at 7000c000/rtc at 68";
-+		rtc1 = "/i2c at 7000d000/tps65911 at 2d";
-+		rtc2 = "/rtc at 7000e000";
-+	};
-+
-+	pcie-controller at 00003000 {
-+		status = "okay";
-+
-+		pci at 1,0 {
-+			status = "okay";
-+		};
-+
-+		pci at 2,0 {
-+			status = "okay";
-+		};
-+
-+		pci at 3,0 {
-+			status = "okay";
-+		};
-+	};
-+
-+	host1x at 50000000 {
-+		dc at 54200000 {
-+			rgb {
-+				status = "okay";
-+				nvidia,panel = <&panel>;
-+			};
-+		};
-+		hdmi at 54280000 {
-+			status = "okay";
-+		};
-+	};
-+
-+	serial at 70006000 {
-+		status = "okay";
-+	};
-+
-+	serial at 70006040 {
-+		compatible = "nvidia,tegra30-hsuart";
-+		status = "okay";
-+	};
-+
-+	serial at 70006200 {
-+		compatible = "nvidia,tegra30-hsuart";
-+		status = "okay";
-+	};
-+
-+	serial at 70006300 {
-+		compatible = "nvidia,tegra30-hsuart";
-+		status = "okay";
-+	};
-+
-+	pwm at 7000a000 {
-+		status = "okay";
-+	};
-+
-+	/*
-+	 * GEN1_I2C: I2C1_SDA/SCL on MXM3 pin 209/211 (e.g. RTC on carrier
-+	 * board)
-+	 */
-+	i2c at 7000c000 {
-+		status = "okay";
-+		clock-frequency = <100000>;
-+
-+		pcie-switch at 58 {
-+			compatible = "plx,pex8605";
-+			reg = <0x58>;
-+		};
-+
-+		/* M41T0M6 real time clock on carrier board */
-+		rtc at 68 {
-+			compatible = "st,m41t00";
-+			reg = <0x68>;
-+		};
-+	};
-+
-+	/* GEN2_I2C: unused */
-+
-+	/*
-+	 * CAM_I2C: I2C3_SDA/SCL on MXM3 pin 201/203 (e.g. camera sensor on
-+	 * carrier board)
-+	 */
-+	cami2c: i2c at 7000c500 {
-+		status = "okay";
-+		clock-frequency = <400000>;
-+	};
-+
-+	/* DDC: I2C2_SDA/SCL on MXM3 pin 205/207 (e.g. display EDID) */
-+	hdmiddc: i2c at 7000c700 {
-+		status = "okay";
-+	};
-+
-+	/* SPI1: Apalis SPI1 */
-+	spi at 7000d400 {
-+		status = "okay";
-+		spi-max-frequency = <25000000>;
-+		spidev0: spidev at 1 {
-+			compatible = "spidev";
-+			reg = <1>;
-+			spi-max-frequency = <25000000>;
-+		};
-+	};
-+
-+	/* SPI5: Apalis SPI2 */
-+	spi at 7000dc00 {
-+		status = "okay";
-+		spi-max-frequency = <25000000>;
-+		spidev1: spidev at 2 {
-+			compatible = "spidev";
-+			reg = <2>;
-+			spi-max-frequency = <25000000>;
-+		};
-+	};
-+
-+	sd1: sdhci at 78000000 {
-+		status = "okay";
-+		bus-width = <4>;
-+		/* SD1_CD# */
-+		cd-gpios = <&gpio TEGRA_GPIO(CC, 5) GPIO_ACTIVE_LOW>;
-+		no-1-8-v;
-+	};
-+
-+	mmc1: sdhci at 78000400 {
-+		status = "okay";
-+		bus-width = <8>;
-+		/* MMC1_CD# */
-+		cd-gpios = <&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_LOW>;
-+		no-1-8-v;
-+	};
-+
-+	/* EHCI instance 0: USB1_DP/N -> USBO1_DP/N */
-+	usb at 7d000000 {
-+		status = "okay";
-+	};
-+
-+	usb-phy at 7d000000 {
-+		status = "okay";
-+		vbus-supply = <&usbo1_vbus_reg>;
-+	};
-+
-+	/* EHCI instance 1: USB2_DP/N -> USBH2_DP/N */
-+	usb at 7d004000 {
-+		status = "okay";
-+	};
-+
-+	usb-phy at 7d004000 {
-+		status = "okay";
-+		vbus-supply = <&usbh_vbus_reg>;
-+	};
-+
-+	/* EHCI instance 2: USB3_DP/N -> USBH3_DP/N */
-+	usb at 7d008000 {
-+		status = "okay";
-+	};
-+
-+	usb-phy at 7d008000 {
-+		status = "okay";
-+		vbus-supply = <&usbh_vbus_reg>;
-+	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+
-+		/* PWM0 */
-+		pwms = <&pwm 0 5000000>;
-+		brightness-levels = <255 231 223 207 191 159 127 0>;
-+		default-brightness-level = <6>;
-+		/* BKL1_ON */
-+		enable-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio TEGRA_GPIO(V, 1) GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			debounce-interval = <10>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	panel: panel {
-+		/*
-+		 * edt,et057090dhu: EDT 5.7" LCD TFT
-+		 * edt,et070080dh6: EDT 7.0" LCD TFT
-+		 */
-+		compatible = "edt,et057090dhu", "simple-panel";
-+
-+		backlight = <&backlight>;
-+	};
-+
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		pwm3 {
-+			label = "PWM3";
-+			pwms = <&pwm 1 19600>;
-+			max-brightness = <255>;
-+		};
-+		pwm2 {
-+			label = "PWM2";
-+			pwms = <&pwm 2 19600>;
-+			max-brightness = <255>;
-+		};
-+		pwm1 {
-+			label = "PWM1";
-+			pwms = <&pwm 3 19600>;
-+			max-brightness = <255>;
-+		};
-+	};
-+
-+	regulators {
-+		sys_5v0_reg: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "5v0";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+		};
-+
-+		/* USBO1_EN */
-+		usbo1_vbus_reg: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "usbo1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio TEGRA_GPIO(T, 5) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&sys_5v0_reg>;
-+		};
-+
-+		/* USBH_EN */
-+		usbh_vbus_reg: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "usbh_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio TEGRA_GPIO(DD, 1) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&sys_5v0_reg>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
-new file mode 100644
-index 0000000..d04efcf
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
-@@ -0,0 +1,673 @@
-+#include "tegra30.dtsi"
-+
-+/*
-+ * Toradex Apalis T30 Device Tree
-+ * Compatible for Revisions 1GB: V1.0A; 2GB: V1.0B, V1.0C
-+ */
-+/ {
-+	model = "Toradex Apalis T30";
-+	compatible = "toradex,apalis_t30", "nvidia,tegra30";
-+
-+	pcie-controller at 00003000 {
-+		pex-clk-supply = <&sys_3v3_reg>;
-+		vdd-supply = <&vdd2_reg>;
-+		avdd-supply = <&ldo6_reg>;
-+
-+		pci at 1,0 {
-+			nvidia,num-lanes = <4>;
-+		};
-+
-+		pci at 2,0 {
-+			nvidia,num-lanes = <1>;
-+		};
-+
-+		pci at 3,0 {
-+			nvidia,num-lanes = <1>;
-+		};
-+	};
-+
-+	host1x at 50000000 {
-+		hdmi at 54280000 {
-+			vdd-supply = <&sys_3v3_reg>;
-+			pll-supply = <&vio_reg>;
-+
-+			nvidia,hpd-gpio =
-+				<&gpio TEGRA_GPIO(N, 7) GPIO_ACTIVE_HIGH>;
-+			nvidia,ddc-i2c-bus = <&hdmiddc>;
-+		};
-+	};
-+
-+	pinmux at 70000868 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&state_default>;
-+
-+		state_default: pinmux {
-+			/* Apalis BKL1_ON */
-+			pv2 {
-+				nvidia,pins = "pv2";
-+				nvidia,function = "rsvd4";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis BKL1_PWM */
-+			uart3_rts_n_pc0 {
-+				nvidia,pins =	"uart3_rts_n_pc0";
-+				nvidia,function = "pwm0";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			/* BKL1_PWM_EN#, disable TPS65911 PMIC PWM backlight */
-+			uart3_cts_n_pa1 {
-+				nvidia,pins =	"uart3_cts_n_pa1";
-+				nvidia,function = "rsvd1";
-+				nvidia,pull = <TEGRA_PIN_PULL_UP>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis CAN1 on SPI6 */
-+			spi2_cs0_n_px3 {
-+				nvidia,pins =   "spi2_cs0_n_px3",
-+						"spi2_miso_px1",
-+						"spi2_mosi_px0",
-+						"spi2_sck_px2";
-+				nvidia,function = "spi6";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			/* CAN_INT1 */
-+			spi2_cs1_n_pw2 {
-+				nvidia,pins = "spi2_cs1_n_pw2";
-+				nvidia,function = "spi3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* Apalis CAN2 on SPI4 */
-+			gmi_a16_pj7 {
-+				nvidia,pins =   "gmi_a16_pj7",
-+						"gmi_a17_pb0",
-+						"gmi_a18_pb1",
-+						"gmi_a19_pk7";
-+				nvidia,function = "spi4";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			/* CAN_INT2 */
-+			spi2_cs2_n_pw3 {
-+				nvidia,pins = "spi2_cs2_n_pw3";
-+				nvidia,function = "spi3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* Apalis I2C3 */
-+			cam_i2c_scl_pbb1 {
-+				nvidia,pins = "cam_i2c_scl_pbb1",
-+					      "cam_i2c_sda_pbb2";
-+				nvidia,function = "i2c3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,lock = <TEGRA_PIN_DISABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* Apalis MMC1 */
-+			sdmmc3_clk_pa6 {
-+				nvidia,pins =	"sdmmc3_clk_pa6",
-+						"sdmmc3_cmd_pa7";
-+				nvidia,function = "sdmmc3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			sdmmc3_dat0_pb7 {
-+				nvidia,pins =	"sdmmc3_dat0_pb7",
-+						"sdmmc3_dat1_pb6",
-+						"sdmmc3_dat2_pb5",
-+						"sdmmc3_dat3_pb4",
-+						"sdmmc3_dat4_pd1",
-+						"sdmmc3_dat5_pd0",
-+						"sdmmc3_dat6_pd3",
-+						"sdmmc3_dat7_pd4";
-+				nvidia,function = "sdmmc3";
-+				nvidia,pull = <TEGRA_PIN_PULL_UP>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			/* Apalis MMC1_CD# */
-+			pv3 {
-+				nvidia,pins = "pv3";
-+				nvidia,function = "rsvd2";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* Apalis PWM1 */
-+			gpio_pu6 {
-+				nvidia,pins =	"gpio_pu6";
-+				nvidia,function = "pwm3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis PWM2 */
-+			gpio_pu5 {
-+				nvidia,pins =	"gpio_pu5";
-+				nvidia,function = "pwm2";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis PWM3 */
-+			gpio_pu4 {
-+				nvidia,pins =	"gpio_pu4";
-+				nvidia,function = "pwm1";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis PWM4 */
-+			gpio_pu3 {
-+				nvidia,pins =	"gpio_pu3";
-+				nvidia,function = "pwm0";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis RESET_MOCI# */
-+			gmi_rst_n_pi4 {
-+				nvidia,pins = "gmi_rst_n_pi4";
-+				nvidia,function = "gmi";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis SD1 */
-+			sdmmc1_clk_pz0 {
-+				nvidia,pins = "sdmmc1_clk_pz0";
-+				nvidia,function = "sdmmc1";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			sdmmc1_cmd_pz1 {
-+				nvidia,pins =	"sdmmc1_cmd_pz1",
-+						"sdmmc1_dat0_py7",
-+						"sdmmc1_dat1_py6",
-+						"sdmmc1_dat2_py5",
-+						"sdmmc1_dat3_py4";
-+				nvidia,function = "sdmmc1";
-+				nvidia,pull = <TEGRA_PIN_PULL_UP>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			/* Apalis SD1_CD# */
-+			clk2_req_pcc5 {
-+				nvidia,pins = "clk2_req_pcc5";
-+				nvidia,function = "rsvd2";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* Apalis SPI1 */
-+			spi1_sck_px5 {
-+				nvidia,pins =   "spi1_sck_px5",
-+						"spi1_mosi_px4",
-+						"spi1_miso_px7",
-+						"spi1_cs0_n_px6";
-+				nvidia,function = "spi1";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis SPI2 */
-+			lcd_sck_pz4 {
-+				nvidia,pins =   "lcd_sck_pz4",
-+						"lcd_sdout_pn5",
-+						"lcd_sdin_pz2",
-+						"lcd_cs0_n_pn4";
-+				nvidia,function = "spi5";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis UART1 */
-+			ulpi_data0 {
-+				nvidia,pins =   "ulpi_data0_po1",
-+						"ulpi_data1_po2",
-+						"ulpi_data2_po3",
-+						"ulpi_data3_po4",
-+						"ulpi_data4_po5",
-+						"ulpi_data5_po6",
-+						"ulpi_data6_po7",
-+						"ulpi_data7_po0";
-+				nvidia,function = "uarta";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis UART2 */
-+			ulpi_clk_py0 {
-+				nvidia,pins =   "ulpi_clk_py0",
-+						"ulpi_dir_py1",
-+						"ulpi_nxt_py2",
-+						"ulpi_stp_py3";
-+				nvidia,function = "uartd";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis UART3 */
-+			uart2_rxd_pc3 {
-+				nvidia,pins =   "uart2_rxd_pc3",
-+						"uart2_txd_pc2";
-+				nvidia,function = "uartb";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis UART4 */
-+			uart3_rxd_pw7 {
-+				nvidia,pins =   "uart3_rxd_pw7",
-+						"uart3_txd_pw6";
-+				nvidia,function = "uartc";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis USBO1_EN */
-+			gen2_i2c_scl_pt5 {
-+				nvidia,pins = "gen2_i2c_scl_pt5";
-+				nvidia,function = "rsvd4";
-+				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Apalis USBO1_OC# */
-+			gen2_i2c_sda_pt6 {
-+				nvidia,pins = "gen2_i2c_sda_pt6";
-+				nvidia,function = "rsvd4";
-+				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* Apalis WAKE1_MICO */
-+			pv1 {
-+				nvidia,pins = "pv1";
-+				nvidia,function = "rsvd1";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* eMMC (On-module) */
-+			sdmmc4_clk_pcc4 {
-+				nvidia,pins =	"sdmmc4_clk_pcc4",
-+						"sdmmc4_rst_n_pcc3";
-+				nvidia,function = "sdmmc4";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+			sdmmc4_dat0_paa0 {
-+				nvidia,pins =	"sdmmc4_dat0_paa0",
-+						"sdmmc4_dat1_paa1",
-+						"sdmmc4_dat2_paa2",
-+						"sdmmc4_dat3_paa3",
-+						"sdmmc4_dat4_paa4",
-+						"sdmmc4_dat5_paa5",
-+						"sdmmc4_dat6_paa6",
-+						"sdmmc4_dat7_paa7";
-+				nvidia,function = "sdmmc4";
-+				nvidia,pull = <TEGRA_PIN_PULL_UP>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* LVDS Transceiver Configuration */
-+			pbb0 {
-+				nvidia,pins =	"pbb0",
-+						"pbb7",
-+						"pcc1",
-+						"pcc2";
-+				nvidia,function = "rsvd2";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
-+				nvidia,lock = <TEGRA_PIN_DISABLE>;
-+			};
-+			pbb3 {
-+				nvidia,pins =	"pbb3",
-+						"pbb4",
-+						"pbb5",
-+						"pbb6";
-+				nvidia,function = "displayb";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
-+				nvidia,lock = <TEGRA_PIN_DISABLE>;
-+			};
-+
-+			/* Power I2C (On-module) */
-+			pwr_i2c_scl_pz6 {
-+				nvidia,pins = "pwr_i2c_scl_pz6",
-+					      "pwr_i2c_sda_pz7";
-+				nvidia,function = "i2cpwr";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,lock = <TEGRA_PIN_DISABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/*
-+			 * THERMD_ALERT#, unlatched I2C address pin of LM95245
-+			 * temperature sensor therefore requires disabling for
-+			 * now
-+			 */
-+			lcd_dc1_pd2 {
-+				nvidia,pins = "lcd_dc1_pd2";
-+				nvidia,function = "rsvd3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+
-+			/* TOUCH_PEN_INT# */
-+			pv0 {
-+				nvidia,pins = "pv0";
-+				nvidia,function = "rsvd1";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
-+		};
-+	};
-+
-+	hdmiddc: i2c at 7000c700 {
-+		clock-frequency = <100000>;
-+	};
-+
-+	/*
-+	 * PWR_I2C: power I2C to audio codec, PMIC, temperature sensor and
-+	 * touch screen controller
-+	 */
-+	i2c at 7000d000 {
-+		status = "okay";
-+		clock-frequency = <100000>;
-+
-+		pmic: tps65911 at 2d {
-+			compatible = "ti,tps65911";
-+			reg = <0x2d>;
-+
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+
-+			ti,system-power-controller;
-+
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+
-+			vcc1-supply = <&sys_3v3_reg>;
-+			vcc2-supply = <&sys_3v3_reg>;
-+			vcc3-supply = <&vio_reg>;
-+			vcc4-supply = <&sys_3v3_reg>;
-+			vcc5-supply = <&sys_3v3_reg>;
-+			vcc6-supply = <&vio_reg>;
-+			vcc7-supply = <&sys_5v0_reg>;
-+			vccio-supply = <&sys_3v3_reg>;
-+
-+			regulators {
-+				/* SW1: +V1.35_VDDIO_DDR */
-+				vdd1_reg: vdd1 {
-+					regulator-name = "vddio_ddr_1v35";
-+					regulator-min-microvolt = <1350000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+				};
-+
-+				/* SW2: +V1.05 */
-+				vdd2_reg: vdd2 {
-+					regulator-name =
-+						"vdd_pexa,vdd_pexb,vdd_sata";
-+					regulator-min-microvolt = <1050000>;
-+					regulator-max-microvolt = <1050000>;
-+				};
-+
-+				/* SW CTRL: +V1.0_VDD_CPU */
-+				vddctrl_reg: vddctrl {
-+					regulator-name = "vdd_cpu,vdd_sys";
-+					regulator-min-microvolt = <1150000>;
-+					regulator-max-microvolt = <1150000>;
-+					regulator-always-on;
-+				};
-+
-+				/* SWIO: +V1.8 */
-+				vio_reg: vio {
-+					regulator-name = "vdd_1v8_gen";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				/* LDO1: unused */
-+
-+				/*
-+				 * EN_+V3.3 switching via FET:
-+				 * +V3.3_AUDIO_AVDD_S, +V3.3 and +V1.8_VDD_LAN
-+				 * see also v3_3 fixed supply
-+				 */
-+				ldo2_reg: ldo2 {
-+					regulator-name = "en_3v3";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				/* +V1.2_CSI */
-+				ldo3_reg: ldo3 {
-+					regulator-name =
-+						"avdd_dsi_csi,pwrdet_mipi";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+				};
-+
-+				/* +V1.2_VDD_RTC */
-+				ldo4_reg: ldo4 {
-+					regulator-name = "vdd_rtc";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+				};
-+
-+				/*
-+				 * +V2.8_AVDD_VDAC:
-+				 * only required for analog RGB
-+				 */
-+				ldo5_reg: ldo5 {
-+					regulator-name = "avdd_vdac";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				/*
-+				 * +V1.05_AVDD_PLLE: avdd_plle should be 1.05V
-+				 * but LDO6 can't set voltage in 50mV
-+				 * granularity
-+				 */
-+				ldo6_reg: ldo6 {
-+					regulator-name = "avdd_plle";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+				};
-+
-+				/* +V1.2_AVDD_PLL */
-+				ldo7_reg: ldo7 {
-+					regulator-name = "avdd_pll";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+				};
-+
-+				/* +V1.0_VDD_DDR_HS */
-+				ldo8_reg: ldo8 {
-+					regulator-name = "vdd_ddr_hs";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+			};
-+		};
-+
-+		/* STMPE811 touch screen controller */
-+		stmpe811 at 41 {
-+			compatible = "st,stmpe811";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x41>;
-+			interrupts = <TEGRA_GPIO(V, 0) IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-parent = <&gpio>;
-+			interrupt-controller;
-+			id = <0>;
-+			blocks = <0x5>;
-+			irq-trigger = <0x1>;
-+
-+			stmpe_touchscreen {
-+				compatible = "st,stmpe-ts";
-+				reg = <0>;
-+				/* 3.25 MHz ADC clock speed */
-+				st,adc-freq = <1>;
-+				/* 8 sample average control */
-+				st,ave-ctrl = <3>;
-+				/* 7 length fractional part in z */
-+				st,fraction-z = <7>;
-+				/*
-+				 * 50 mA typical 80 mA max touchscreen drivers
-+				 * current limit value
-+				 */
-+				st,i-drive = <1>;
-+				/* 12-bit ADC */
-+				st,mod-12b = <1>;
-+				/* internal ADC reference */
-+				st,ref-sel = <0>;
-+				/* ADC converstion time: 80 clocks */
-+				st,sample-time = <4>;
-+				/* 1 ms panel driver settling time */
-+				st,settling = <3>;
-+				/* 5 ms touch detect interrupt delay */
-+				st,touch-det-delay = <5>;
-+			};
-+		};
-+
-+		/*
-+		 * LM95245 temperature sensor
-+		 * Note: OVERT_N directly connected to PMIC PWRDN
-+		 */
-+		temp-sensor at 4c {
-+			compatible = "national,lm95245";
-+			reg = <0x4c>;
-+		};
-+
-+		/* SW: +V1.2_VDD_CORE */
-+		tps62362 at 60 {
-+			compatible = "ti,tps62362";
-+			reg = <0x60>;
-+
-+			regulator-name = "tps62362-vout";
-+			regulator-min-microvolt = <900000>;
-+			regulator-max-microvolt = <1400000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+			ti,vsel0-state-low;
-+			/* VSEL1: EN_CORE_DVFS_N low for DVFS */
-+			ti,vsel1-state-low;
-+		};
-+	};
-+
-+	/* SPI4: CAN2 */
-+	spi at 7000da00 {
-+		status = "okay";
-+		spi-max-frequency = <10000000>;
-+
-+		can at 1 {
-+			compatible = "microchip,mcp2515";
-+			reg = <1>;
-+			clocks = <&clk16m>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <TEGRA_GPIO(W, 3) GPIO_ACTIVE_LOW>;
-+			spi-max-frequency = <10000000>;
-+		};
-+	};
-+
-+	/* SPI6: CAN1 */
-+	spi at 7000de00 {
-+		status = "okay";
-+		spi-max-frequency = <10000000>;
-+
-+		can at 0 {
-+			compatible = "microchip,mcp2515";
-+			reg = <0>;
-+			clocks = <&clk16m>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <TEGRA_GPIO(W, 2) GPIO_ACTIVE_LOW>;
-+			spi-max-frequency = <10000000>;
-+		};
-+	};
-+
-+	pmc at 7000e400 {
-+		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <1>;
-+		nvidia,cpu-pwr-good-time = <5000>;
-+		nvidia,cpu-pwr-off-time = <5000>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <0>;
-+		nvidia,core-power-req-active-high;
-+		nvidia,sys-clock-req-active-high;
-+	};
-+
-+	sdhci at 78000600 {
-+		status = "okay";
-+		bus-width = <8>;
-+		non-removable;
-+	};
-+
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clk at 0 {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+		clk16m: clk at 1 {
-+			compatible = "fixed-clock";
-+			reg=<1>;
-+			#clock-cells = <0>;
-+			clock-frequency = <16000000>;
-+			clock-output-names = "clk16m";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		sys_3v3_reg: regulator at 100 {
-+			compatible = "regulator-fixed";
-+			reg = <100>;
-+			regulator-name = "3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+};
--- 
-1.7.9.5
+The biggest problem is the i2c addresses space being different so you need an
+indirection level to access registers and have duplicated registers definition
+for each chip.
+
+> If we really need to write a single driver it certainly can be done,
+> but please look at the above to be sure this is what you want.
+> 
+>
+
+Yes, if the combined driver is preferred over having a separate driver for
+max77802 then I will try to find the more elegant way to merge both drivers. But
+I tried to do it already and I can't say I liked the end result more than having
+two separate drivers.
+
+> NOTE: it's possible that things could be more sane with more driver
+> redesign, possibly making things more data driven.  The thing that
+> would be really nice to do would be to avoid all of the crazy
+> "regulator_zzz_desc_zzz" macros, maybe?  I'd have to actually try
+> doing it to be sure it's cleaner, though...
+> 
+
+Another option is to use an hybrid approach. Merge the mfd core, irq and clk
+drivers but have different platform drivers for rtc and regulators. Still the
+end result is not great imho but better than trying merging the regulators and
+RTC drivers where most of the differences are.
+
+> 
+> -Doug
+> 
+
+Best regards,
+Javier
