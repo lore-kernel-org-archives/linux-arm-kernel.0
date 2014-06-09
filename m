@@ -1,57 +1,79 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Mon, 09 Jun 2014 16:58:19 +0530
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-Message-ID: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 09 Jun 2014 13:29:23 +0200
+Subject: [PATCH 2/2] gpio: gpiolib: set gpiochip_remove retval to void
+In-Reply-To: <20140608231823.GB10112@trinity.fluff.org>
+References: <20140530094025.3b78301e@canb.auug.org.au>
+ <1401449454-30895-1-git-send-email-berthe.ab@gmail.com>
+ <1401449454-30895-2-git-send-email-berthe.ab@gmail.com>
+ <CAMuHMdV6AtjD2aqO3buzj8Eo7A7xc_+ROYnxEi2sdjMaqFiAuA@mail.gmail.com>
+ <5388C0F1.90503@gmail.com> <5388CB1B.3090802@metafoo.de>
+ <20140608231823.GB10112@trinity.fluff.org>
+Message-ID: <53959A93.7080308@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Display domain is removed due to instability issues. Explaining
-the problem below:
+On 06/09/2014 01:18 AM, Ben Dooks wrote:
+> On Fri, May 30, 2014 at 08:16:59PM +0200, Lars-Peter Clausen wrote:
+>> On 05/30/2014 07:33 PM, David Daney wrote:
+>>> On 05/30/2014 04:39 AM, Geert Uytterhoeven wrote:
+>>>> On Fri, May 30, 2014 at 1:30 PM, abdoulaye berthe <berthe.ab@gmail.com>
+>>>> wrote:
+>>>>> --- a/drivers/gpio/gpiolib.c
+>>>>> +++ b/drivers/gpio/gpiolib.c
+>>>>> @@ -1263,10 +1263,9 @@ static void gpiochip_irqchip_remove(struct
+>>>>> gpio_chip *gpiochip);
+>>>>>    *
+>>>>>    * A gpio_chip with any GPIOs still requested may not be removed.
+>>>>>    */
+>>>>> -int gpiochip_remove(struct gpio_chip *chip)
+>>>>> +void gpiochip_remove(struct gpio_chip *chip)
+>>>>>   {
+>>>>>          unsigned long   flags;
+>>>>> -       int             status = 0;
+>>>>>          unsigned        id;
+>>>>>
+>>>>>          acpi_gpiochip_remove(chip);
+>>>>> @@ -1278,24 +1277,15 @@ int gpiochip_remove(struct gpio_chip *chip)
+>>>>>          of_gpiochip_remove(chip);
+>>>>>
+>>>>>          for (id = 0; id < chip->ngpio; id++) {
+>>>>> -               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags)) {
+>>>>> -                       status = -EBUSY;
+>>>>> -                       break;
+>>>>> -               }
+>>>>> -       }
+>>>>> -       if (status == 0) {
+>>>>> -               for (id = 0; id < chip->ngpio; id++)
+>>>>> -                       chip->desc[id].chip = NULL;
+>>>>> -
+>>>>> -               list_del(&chip->list);
+>>>>> +               if (test_bit(FLAG_REQUESTED, &chip->desc[id].flags))
+>>>>> +                       panic("gpio: removing gpiochip with gpios still
+>>>>> requested\n");
+>>>>
+>>>> panic?
+>>>
+>>> NACK to the patch for this reason.  The strongest thing you should do here
+>>> is WARN.
+>>>
+>>> That said, I am not sure why we need this whole patch set in the first place.
+>>
+>> Well, what currently happens when you remove a device that is a
+>> provider of a gpio_chip which is still in use, is that the kernel
+>> crashes. Probably with a rather cryptic error message. So this patch
+>> doesn't really change the behavior, but makes it more explicit what
+>> is actually wrong. And even if you replace the panic() by a WARN()
+>> it will again just crash slightly later.
+>>
+>> This is a design flaw in the GPIO subsystem that needs to be fixed.
+>
+> Surely then the best way is to error out to the module unload and
+> stop the driver being unloaded?
+>
 
-exynos_init_late triggers the pm_genpd_poweroff_unused which
-powers off the unused power domains. This call hits before
-the trigger to deferred probes.
+You can't error out on module unload, although that's not really relevant 
+here. gpiochip_remove() is typically called when the device that registered 
+the GPIO chip is unbound. And despite some remove() callbacks having a 
+return type of int you can not abort the removal of a device.
 
-DRM DP Panel defers the probe due to supply get failure. By the
-time, deferred probe is scheduled again, Display Power Domain is
-powered off by pm_genpd_poweroff_unused.
-
-FIMD and DP drivers are accessing registers during Probe and Bind
-callbacks. If display domain is enabled/disabled around register
-accesses, display domain gets unstable and we are getting Power
-Domain Disable fail notification. Increasing the Timeout also
-didn't help.
-
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
----
-based on Kukjin's for-next branch.
-
- arch/arm/boot/dts/exynos5420.dtsi |    6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index e385322..3d528cf 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -262,11 +262,6 @@
- 		reg = <0x10044060 0x20>;
- 	};
- 
--	disp_pd: power-domain at 100440C0 {
--		compatible = "samsung,exynos4210-pd";
--		reg = <0x100440C0 0x20>;
--	};
--
- 	msc_pd: power-domain at 10044120 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044120 0x20>;
-@@ -518,7 +513,6 @@
- 	};
- 
- 	fimd: fimd at 14400000 {
--		samsung,power-domain = <&disp_pd>;
- 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
- 		clock-names = "sclk_fimd", "fimd";
- 	};
--- 
-1.7.9.5
+- Lars
