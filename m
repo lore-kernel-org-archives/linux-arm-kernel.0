@@ -1,83 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 9 Jun 2014 11:41:00 +0800
-Subject: [PATCH 5/5] ARM: dts: imx51-babbage: Fix esdhc setup
-In-Reply-To: <1400848384-3226-6-git-send-email-s.hauer@pengutronix.de>
-References: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
- <1400848384-3226-6-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140609034058.GF11061@dragon>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Mon, 9 Jun 2014 09:19:03 +0530
+Subject: [PATCH 1/4] phy: Add provision for calibrating phy.
+In-Reply-To: <1402056736-12674-2-git-send-email-gautam.vivek@samsung.com>
+References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
+ <1402056736-12674-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <20140609034902.GA2625@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 23, 2014 at 02:33:04PM +0200, Sascha Hauer wrote:
-> - Move cd/wp pinctrl from the hog group to the esdhc groups
-> - use gpio for card detection / write protection on esdhc2 since
->   the controller based detection does not work
-> - Fix cd gpio polarity for esdhc1. This is wrong and currently
->   only works because the imx esdhc driver ignores the polarity.
+On Fri, Jun 06, 2014 at 08:12:12PM +0800, Vivek Gautam wrote:
+> Some PHY controllers may need to calibrate certain
+> PHY settings after initialization of the controller and
+> sometimes even after initializing the PHY-consumer too.
+> Add support for the same in order to let consumers do so in need.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: vivek Gautam <gautam.vivek@samsung.com>
 > ---
->  arch/arm/boot/dts/imx51-babbage.dts | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+>  drivers/phy/phy-core.c  |   36 ++++++++++++++++++++++++++++++++++++
+>  include/linux/phy/phy.h |    7 +++++++
+>  2 files changed, 43 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index 9e9deb2..28d4553 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -134,15 +134,15 @@
->  &esdhc1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_esdhc1>;
-> -	fsl,cd-controller;
-> -	fsl,wp-controller;
-> +	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
-> +	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
->  	status = "okay";
->  };
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index 74d4346..92d31a3 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -376,6 +376,42 @@ int phy_power_off(struct phy *phy)
+>  EXPORT_SYMBOL_GPL(phy_power_off);
 >  
->  &esdhc2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_esdhc2>;
-> -	cd-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-> +	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
->  	wp-gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
->  	status = "okay";
->  };
-> @@ -300,10 +300,6 @@
->  	imx51-babbage {
->  		pinctrl_hog: hoggrp {
->  			fsl,pins = <
-> -				MX51_PAD_GPIO1_0__SD1_CD     0x20d5
-> -				MX51_PAD_GPIO1_1__SD1_WP     0x20d5
-> -				MX51_PAD_GPIO1_5__GPIO1_5    0x100
-> -				MX51_PAD_GPIO1_6__GPIO1_6    0x100
->  				MX51_PAD_EIM_A27__GPIO2_21   0x5
->  				MX51_PAD_CSPI1_SS0__GPIO4_24 0x85
->  				MX51_PAD_CSPI1_SS1__GPIO4_25 0x85
-> @@ -330,6 +326,8 @@
->  
->  		pinctrl_esdhc1: esdhc1grp {
->  			fsl,pins = <
-> +				MX51_PAD_GPIO1_0__GPIO1_0		0x20d5
-> +				MX51_PAD_GPIO1_1__GPIO1_1		0x20d5
+>  /**
+> + * phy_calibrate - calibrate a phy post initialization
+> + * @phy: Pointer to 'phy' from consumer
+> + *
+> + * For certain PHYs, it may be needed to calibrate few phy parameters
+> + * post initialization. The need to calibrate may arise after the
 
-The pad config value 0x20d5 still makes sense here when switching to
-GPIO function?  Probably should be 0x100 like what we have in esdhc2grp?
+For USB you may need to calibrate phy after each new connection. If
+so, why not to use already existing struct usb_phy's notify_connect.
 
-Shawn
-
->  				MX51_PAD_SD1_CMD__SD1_CMD		0x400020d5
->  				MX51_PAD_SD1_CLK__SD1_CLK		0x20d5
->  				MX51_PAD_SD1_DATA0__SD1_DATA0		0x20d5
-> @@ -341,6 +339,8 @@
->  
->  		pinctrl_esdhc2: esdhc2grp {
->  			fsl,pins = <
-> +				MX51_PAD_GPIO1_5__GPIO1_5		0x100
-> +				MX51_PAD_GPIO1_6__GPIO1_6		0x100
->  				MX51_PAD_SD2_CMD__SD2_CMD		0x400020d5
->  				MX51_PAD_SD2_CLK__SD2_CLK		0x20d5
->  				MX51_PAD_SD2_DATA0__SD2_DATA0		0x20d5
-> -- 
-> 2.0.0.rc0
-> 
+        pratyush
