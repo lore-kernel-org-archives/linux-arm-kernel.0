@@ -1,33 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 10 Jun 2014 00:22:07 +0200
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
-In-Reply-To: <20140609194917.GH5099@sirena.org.uk>
-References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
- <3122018.iBNBjMKNbN@vostro.rjw.lan> <20140609194917.GH5099@sirena.org.uk>
-Message-ID: <1976508.Da0u8DZI5B@vostro.rjw.lan>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Jun 2014 17:13:45 -0500
+Subject: [PATCH] ARM: mvebu: Fix broken SoC ID detection
+In-Reply-To: <1402347165-19988-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1402347165-19988-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CAL_JsqLwZV2TNuTz_ZacwD9iZVL6Weg1wsDoSofg86k6qAZnNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 09, 2014 08:49:17 PM Mark Brown wrote:
-> On Fri, Jun 06, 2014 at 11:15:06PM +0200, Rafael J. Wysocki wrote:
-> > On Friday, June 06, 2014 02:08:50 PM Mark Brown wrote:
-> 
-> > > Yes, the conversion to make ARCH_HAS_OPP unused is in Raphael's tree for
-> > > the merge window.
-> 
-> > Perhaps already merged?
-> 
-> Yes, looks like it is.
+On Mon, Jun 9, 2014 at 3:52 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Currently the mvebu boards need to detect the SoC revision in order to apply
+> some quirks needed to workaround issues found on I2C and thermal controllers
+> present only in very early SoC.
+>
+> This detection requires PCI address translation to work, so we need to
+> explicitly select OF_ADDRESS_PCI.
+>
+> This can be considered a partial revert of the following commit, that
+> wrongly removed the option selection:
+>
+> commit 55400f3a1f89e39761f45c19f6e4235a329c400b
+> Author: Rob Herring <robh@kernel.org>
+> Date:   Tue Apr 22 14:15:52 2014 -0500
+>
+>     ARM: mvebu: clean-up unneeded kconfig selects
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-But it doesn't apply for me on top of the current Linus' tree.
+Thanks for fixing it.
 
-Can you please rebase?
+Acked-by: Rob Herring <robh@kernel.org>
 
-Rafael
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140610/1f4a686e/attachment.sig>
+Rob
