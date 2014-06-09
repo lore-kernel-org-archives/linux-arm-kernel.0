@@ -1,46 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 8 Jun 2014 23:13:29 -0300
-Subject: [PATCH] dt/documentation: add specification of dma bus information
-In-Reply-To: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAOMZO5Ceg9RpC8Lgt0BwGTuaz-Z2614Die2PrbtT_j4QYjL_sA@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 9 Jun 2014 10:15:36 +0800
+Subject: [PATCH] ARM: dts: imx6: add missing compatible and clock
+ properties for kpp
+In-Reply-To: <1402052579-22803-1-git-send-email-LW@KARO-electronics.de>
+References: <1402052579-22803-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140609021535.GX8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 5, 2014 at 12:22 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Recently we introduced the generic device tree infrastructure for couple of DMA
-> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
-> its useful for future users.
->
-> The "dma-ranges" property is intended to be used for describing the
-> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
->
-> The "dma-coherent" property is intended to be used for identifying devices
-> supported coherent DMA operations.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Fri, Jun 06, 2014 at 01:02:59PM +0200, Lothar Wa?mann wrote:
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 > ---
->  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->
-> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
-> index 1f013bd..f0120c1 100644
-> --- a/Documentation/devicetree/booting-without-of.txt
-> +++ b/Documentation/devicetree/booting-without-of.txt
-> @@ -51,6 +51,8 @@ Table of Contents
->
->    VIII - Specifying device power management information (sleep property)
->
-> +  VIV - Specifying dma bus information
+>  arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
 
-"9" in Roman numeral is "IX"
+Applied, thanks.
+
+Shawn
+
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index ce05991..3266d01 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -466,8 +466,10 @@
+>  			};
+>  
+>  			kpp: kpp at 020b8000 {
+> +				compatible = "fsl,imx6q-kpp", "fsl,imx21-kpp";
+>  				reg = <0x020b8000 0x4000>;
+>  				interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks 62>; /* IPG clock */
+>  			};
+>  
+>  			wdog1: wdog at 020bc000 {
+> -- 
+> 1.7.10.4
+> 
