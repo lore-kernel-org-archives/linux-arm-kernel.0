@@ -1,36 +1,165 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Jun 2014 15:21:15 +0200
-Subject: [PATCH v2 1/5] pinctrl: sunxi: Fix sunxi_irq_cfg_reg not working
- for irqs >= 8
-In-Reply-To: <20140602101808.GB27722@lukather>
-References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
- <1401544899-405-2-git-send-email-hdegoede@redhat.com>
- <20140602101808.GB27722@lukather>
-Message-ID: <CACRpkdZ=jmj_ioob6EPM1GXKt-nfLiebnMeLwW7skuJtA3hCTQ@mail.gmail.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 9 Jun 2014 14:24:29 +0100
+Subject: [PATCH] arm64: Add flush_cache_vmap call in __early_set_fixmap
+In-Reply-To: <20140609110356.GD25590@arm.com>
+References: <1402050590-23877-1-git-send-email-leif.lindholm@linaro.org>
+ <1402065449.15402.2.camel@deneb.redhat.com>
+ <20140606145324.GE4179@bivouac.eciton.net>
+ <1402067373.15402.9.camel@deneb.redhat.com>
+ <20140609110356.GD25590@arm.com>
+Message-ID: <20140609132429.GF4179@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 2, 2014 at 12:18 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sat, May 31, 2014 at 04:01:35PM +0200, Hans de Goede wrote:
->> Rename SUNXI_IRQ_NUMBER to IRQ_PER_BANK as it no longer represents the total
->> number of irqs and use it instead of the number of irqs-per-reg when
->> calculating the bank to use for the various sunxi_irq_xxx_reg functions.
->> This fixes sunxi_irq_cfg_reg using the wrong bank for irqs >= 8.
->>
->> Also sunxi_irq_cfg_reg_from_bank returns the address of pio_int_cfg0, add an
->> offset to the register returned for irqs living in the pio_int_cfg[1-3].
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> Good catch, I've squashed it into my serie with minor modifications
-> (remove the cfg_reg_from_bank that doesn't make any sense).
+On Mon, Jun 09, 2014 at 12:03:56PM +0100, Catalin Marinas wrote:
+> > > > > __early_set_fixmap does not do any synchronization when called to set a
+> > > > > fixmap entry. Add call to flush_vmap_cache().
+> 
+> Did you hit a problem or it was just for safety?
 
-I'm more than a little confused by your and Hans parallell patch
-series to sunxi now :-)
+This fixes an abort when accessing early UEFI configuration tables on
+a hardware platform. (The issue can not be triggered with the FVM Base
+Model, even with cache modelling enabled.)
 
-I will try to apply your patches first, then Hans' as you're the
-maintainer of this driver.
+> > > > I'm confused by the commit message mentioning synchronization but
+> > > > the code doing a cache flush. I see that arm64 implementation of
+> > > > flush_cache_vmap() is just a dsb(). If it is synchronization that
+> > > > we need here (and it certainly looks like we do), why not just add
+> > > > the dsb() directly to make that clear?
+> > > 
+> > > It needs this Linux-semantically for the same reason remap_page_range
+> > > needs it. From the ARM architectural point of view, the reason is that
+> > > the translation table walk is considered a separate observer from the
+> > > core data interface.
+> > > 
+> > > But since there is a common Linux semantic for this, I preferred
+> > > reusing that over just throwing in a dsb(). My interpretation of
+> > > flush_cache_vmap() was "flush mappings from cache, so they can be
+> > > picked up by table walk". While we don't technically need to flush the
+> > > cache here, the underlying requirement is the same.
+> > 
+> > But the range you are flushing is not a range seen by the table walk
+> > observer. I just think it is clearer to explicitly show that it is
+> > the pte write which we want the table walk to see rather than to
+> > rely on the implicit behavior of a cache flush routine.
+> 
+> I think that's a valid point. flush_cache_vmap() is used to remove any
+> cached entries for the ioremap/vmap'ed range. That's not the aim here.
+> 
+> As an optimisation, set_pte() doesn't have a dsb(). We do this on the
+> clearing/invalidating path via the TLB flushing routines but not on the
+> re-enabling path. Here we just added dsb() in the relevant functions
+> that were called from the generic code (flush_cache_vmap,
+> update_mmu_cache).
+> 
+> A quick grep through the kernel shows that we have other set_pte() calls
+> without additional dsb() like create_mapping(), I think kvm_set_pte() as
+> well.
+> 
+> So I'm proposing an alternative patch (which needs some benchmarking as
+> well to see if anything is affected, maybe application startup time).
 
-Yours,
-Linus Walleij
+I'm happy for any fix which can be included in 3.16.
+
+But is the dsb(ishst) sufficient? We need to also prevent reads from
+overtaking the set_pte(). i.e.:
+
+ptr = early_ioremap(phys_addr, size);
+if (ptr && strcmp(ptr, "magic") == 0)
+   ...
+
+Does it not require a dsb(ish)?
+ 
+> ------------------8<-------------------------------
+> 
+> From b5cd0fff5cb044fa32cbaa4eebd2f00690922567 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Mon, 9 Jun 2014 11:55:03 +0100
+> Subject: [PATCH] arm64: Use DSB after page table update
+> 
+> As an optimisation, set_pte() does not contain a DSB instruction to
+> ensure the observability of the page table update before subsequent
+> memory accesses or TLB maintenance. Such barrier is placed in the
+> flush_tlb_*() functions and flush_cache_vmap()/update_mmu_cache().
+> However, there are still places where this barrier is missed like
+> create_mapping().
+> 
+> This patch adds a dsb(ishst) call in set_pte() but only when the entry
+> being written is valid. For invalid entries, there is always a
+> subsequent TLB maintenance containing the DSB.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/cacheflush.h | 11 +----------
+>  arch/arm64/include/asm/pgtable.h    |  8 ++++++++
+>  arch/arm64/include/asm/tlbflush.h   |  5 -----
+>  3 files changed, 9 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index a5176cf32dad..8fdf37d83014 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -138,19 +138,10 @@ static inline void __flush_icache_all(void)
+>  #define flush_icache_page(vma,page)	do { } while (0)
+>  
+>  /*
+> - * flush_cache_vmap() is used when creating mappings (eg, via vmap,
+> - * vmalloc, ioremap etc) in kernel space for pages.  On non-VIPT
+> - * caches, since the direct-mappings of these pages may contain cached
+> - * data, we need to do a full cache flush to ensure that writebacks
+> - * don't corrupt data placed into these pages via the new mappings.
+> + * Not required on AArch64 with VIPT caches.
+>   */
+>  static inline void flush_cache_vmap(unsigned long start, unsigned long end)
+>  {
+> -	/*
+> -	 * set_pte_at() called from vmap_pte_range() does not
+> -	 * have a DSB after cleaning the cache line.
+> -	 */
+> -	dsb(ish);
+>  }
+>  
+>  static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index aa150ed99f22..2d03af6a2225 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -136,6 +136,7 @@ extern struct page *empty_zero_page;
+>  #define pte_write(pte)		(!!(pte_val(pte) & PTE_WRITE))
+>  #define pte_exec(pte)		(!(pte_val(pte) & PTE_UXN))
+>  
+> +#define pte_valid(pte)		(!!(pte_val(pte) & PTE_VALID))
+>  #define pte_valid_user(pte) \
+>  	((pte_val(pte) & (PTE_VALID | PTE_USER)) == (PTE_VALID | PTE_USER))
+>  
+> @@ -184,6 +185,13 @@ static inline pte_t pte_mkspecial(pte_t pte)
+>  static inline void set_pte(pte_t *ptep, pte_t pte)
+>  {
+>  	*ptep = pte;
+> +
+> +	/*
+> +	 * If !pte_valid(pte), the DSB is handled by the TLB invalidation
+> +	 * operation.
+> +	 */
+> +	if (pte_valid(pte))
+> +		dsb(ishst);
+>  }
+>  
+>  extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
+> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> index b9349c4513ea..b28b970123dc 100644
+> --- a/arch/arm64/include/asm/tlbflush.h
+> +++ b/arch/arm64/include/asm/tlbflush.h
+> @@ -130,11 +130,6 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+>  static inline void update_mmu_cache(struct vm_area_struct *vma,
+>  				    unsigned long addr, pte_t *ptep)
+>  {
+> -	/*
+> -	 * set_pte() does not have a DSB, so make sure that the page table
+> -	 * write is visible.
+> -	 */
+> -	dsb(ishst);
+>  }
+>  
+>  #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
