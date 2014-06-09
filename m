@@ -1,54 +1,89 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 9 Jun 2014 23:38:31 +0100
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
-Message-ID: <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Tue, 10 Jun 2014 00:49:50 +0200
+Subject: [PATCH v2 1/3] arm: multi_v7: enable igb, stmpe, lm95245, pwm leds
+Message-ID: <1741a33cd88cd5525f3c50c0e0cacc0853a3512a.1402350905.git.marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 09, 2014 at 06:03:31PM +0100, Doug Anderson wrote:
+The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
+i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller, PWM
+LEDs generically accessible from user space and an LM95245 temperature
+sensor chip. The later three can also be found on the Colibri T30
+module.
 
-[...]
+While at it move the NEON entry down to its proper place to have it all
+nicely ordered again.
 
-> Cold boot and resume from suspend are detected via various special
-> flags in various special locations.  Resume from suspend looks at
-> INFORM1 (0x10048004) for flags.  This register is 0 during a cold boot
-> and has special values set by the kernel at resume time.
-> 
-> It also looks as if some code looks at 0x10040900 (PMU_SPARE0) to help
-> tell initial cold boot and secondary CPU bringup.
+Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+---
+Changes since v1:
+- Forget about spidev for now.
 
-Ok, thanks a lot. It looks like firmware paths should be ready to
-detect cold vs warm boot, and hopefully do not rely on a specific
-MPIDR to come up first out of power states.
+ arch/arm/configs/multi_v7_defconfig |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-> > I am asking to check if on this platform CPUidle (where the notion of
-> > primary CPU disappears) has a chance to run properly.
-> 
-> I believe it should be possible, but we don't have CPUidle implemented
-> in our current system.  Abhilash may be able to comment more.
-
-I am interested in more insights, that's very helpful thanks.
-
-> > Probably CPUidle won't attain idle states where IRAM content is lost, but I
-> > am still worried about the primary vs secondaries firmware boot behaviour.
-> 
-> I don't think iRAM can be turned off for CPUidle.
-
-It might be added a system state but I doubt that too and if you are
-relying on registers for jump addresses that's not even a problem in
-the first place.
-
-> > What happens on reboot from suspend to RAM (or to put it differently,
-> > what does secure firmware do on reboot from suspend to RAM - in
-> > particular how is the "jump" address to bootloader/kernel set ?)
-> 
-> Should be described above now.
-
-Thank you very much.
-
-Lorenzo
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 19dbddb..b0b996e 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -66,7 +66,6 @@ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_VEXPRESS_CA9X4=y
+ CONFIG_ARCH_WM8850=y
+ CONFIG_ARCH_ZYNQ=y
+-CONFIG_NEON=y
+ CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+@@ -83,6 +82,7 @@ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_STAT_DETAILS=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_CPU_IDLE=y
++CONFIG_NEON=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -134,6 +134,7 @@ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
+ CONFIG_MACB=y
+ CONFIG_NET_CALXEDA_XGMAC=y
++CONFIG_IGB=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
+ CONFIG_KS8851=y
+@@ -157,6 +158,8 @@ CONFIG_KEYBOARD_TEGRA=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_KEYBOARD_CROS_EC=y
+ CONFIG_MOUSE_PS2_ELANTECH=y
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_STMPE=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MPU3050=y
+ CONFIG_SERIO_AMBAKMI=y
+@@ -222,6 +225,7 @@ CONFIG_POWER_RESET_AS3722=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_SUN6I=y
+ CONFIG_SENSORS_LM90=y
++CONFIG_SENSORS_LM95245=y
+ CONFIG_THERMAL=y
+ CONFIG_DOVE_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+@@ -233,6 +237,7 @@ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
+ CONFIG_MFD_MAX8907=y
+ CONFIG_MFD_SEC_CORE=y
++CONFIG_MFD_STMPE=y
+ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65090=y
+ CONFIG_MFD_TPS6586X=y
+@@ -315,6 +320,9 @@ CONFIG_MMC_MVSDIO=y
+ CONFIG_MMC_SUNXI=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_EXYNOS=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_PWM=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
+-- 
+1.7.9.5
