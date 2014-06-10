@@ -1,79 +1,177 @@
-From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Tue, 10 Jun 2014 12:18:33 +0530
-Subject: exynos5420-peach-pi: linux-next boot fails unless mau_epll left
- enabled?
-In-Reply-To: <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
-References: <7hoay6sxjl.fsf@paris.lan>
- <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
-Message-ID: <CAOD6ATpZWEg9d7WnZ8tg9_uQJ29vMoucaOwh0_tbdRSDRj25cw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 10 Jun 2014 14:53:16 +0800
+Subject: [linux-sunxi] [PATCH v2 1/4] crypto: Add Allwinner Security
+ System crypto accelerator
+In-Reply-To: <1402311551-19564-2-git-send-email-clabbe.montjoie@gmail.com>
+References: <1402311551-19564-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1402311551-19564-2-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <CAGb2v65NdYrY3N0Oi8f7NtdWJYoiR0HnTk7n6hmG44BnDbZoyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi,
 
-We tested on 3 "peach-pi" boards. We are not observing this issue.
-
-Even I tried with the below defconfig mentioned by you. No issues observed.
-https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/master/eclass/cros-kernel/exynos5_defconfig
-
-This is the u-boot version currently we are using.
-U-Boot 2013.04 (Feb 13 2014 - 16:35:03) for Peach
-
-Can you provide us more inputs like uboot version or any extra patches
-you applied?
-Also try removing all power domain nodes from exynos5420.dtsi and
-check whether it is reproduced.
-
-Regards,
-Shaik Ameer Basha
-
-
-
-On Tue, Jun 10, 2014 at 3:21 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> ping for any Samsung folks that might be able to explain this.
+On Mon, Jun 9, 2014 at 6:59 PM, LABBE Corentin
+<clabbe.montjoie@gmail.com> wrote:
+> Add support for the Security System included in Allwinner SoC A20.
+> The Security System is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
 >
-> On Thu, Jun 5, 2014 at 5:15 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> Hello,
->>
->> I'm trying to boot next-20140605[1] on my recently arrived Chromebook2
->> (peach-pi) and was not getting to userspace.  Comparing notes with Doug
->> Anderson, his was booting just fine, so after some debugging and adding
->> 'clk_ignore_unused' to the command-line, it started booting fine.
->>
->> So then, I tracked it down to which clock was causing the problems and
->> found that it's the mau_epll clock gating that's causing the problem,
->> and leaving it enabled[1] allows me to boot again.
->>
->> Any ideas what's going on here?
->>
->> And in particular, any ideas why it would affect my board and not other
->> boards like Doug's?
->>
->> Thanks,
->>
->> Kevin
->>
->> [1] Using this defconfig:
->> https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/master/eclass/cros-kernel/exynos5_defconfig
->>
->> [2]
->> diff --git a/drivers/clk/samsung/clk-exynos5420.c
->> b/drivers/clk/samsung/clk-exynos5420.c
->> index 61eccf0dd72f..ed175088ee7e 100644
->> --- a/drivers/clk/samsung/clk-exynos5420.c
->> +++ b/drivers/clk/samsung/clk-exynos5420.c
->> @@ -911,7 +911,7 @@ static struct samsung_gate_clock
->> exynos5x_gate_clks[] __initdata = {
->>                         SRC_MASK_TOP2, 24, 0, 0),
->>
->>         GATE(CLK_MAU_EPLL, "mau_epll", "mout_mau_epll_clk",
->> -                       SRC_MASK_TOP7, 20, 0, 0),
->> +                       SRC_MASK_TOP7, 20, CLK_IGNORE_UNUSED, 0),
->>
->>         /* sclk */
->>         GATE(CLK_SCLK_UART0, "sclk_uart0", "dout_uart0",
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> ---
+>  drivers/crypto/sunxi-ss/Makefile               |  16 ++
+>  drivers/crypto/sunxi-ss/sunxi-ss-cipher-3des.c | 118 ++++++++
+>  drivers/crypto/sunxi-ss/sunxi-ss-cipher-aes.c  | 130 +++++++++
+>  drivers/crypto/sunxi-ss/sunxi-ss-cipher-des.c  | 118 ++++++++
+>  drivers/crypto/sunxi-ss/sunxi-ss-cipher.c      | 362 +++++++++++++++++++++++++
+>  drivers/crypto/sunxi-ss/sunxi-ss-cipher.h      |   8 +
+>  drivers/crypto/sunxi-ss/sunxi-ss-hash-md5.c    |  69 +++++
+>  drivers/crypto/sunxi-ss/sunxi-ss-hash-sha1.c   |  69 +++++
+>  drivers/crypto/sunxi-ss/sunxi-ss-hash.c        | 228 ++++++++++++++++
+>  drivers/crypto/sunxi-ss/sunxi-ss-hash.h        |   9 +
+>  drivers/crypto/sunxi-ss/sunxi-ss-rng.c         | 115 ++++++++
+>  drivers/crypto/sunxi-ss/sunxi-ss.c             | 190 +++++++++++++
+>  drivers/crypto/sunxi-ss/sunxi-ss.h             | 161 +++++++++++
+>  13 files changed, 1593 insertions(+)
+>  create mode 100644 drivers/crypto/sunxi-ss/Makefile
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher-3des.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher-aes.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher-des.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher.h
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash-md5.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash-sha1.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash.h
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-rng.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss.c
+>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss.h
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/crypto/sunxi-ss/Makefile b/drivers/crypto/sunxi-ss/Makefile
+> new file mode 100644
+> index 0000000..de4556b
+> --- /dev/null
+> +++ b/drivers/crypto/sunxi-ss/Makefile
+> @@ -0,0 +1,16 @@
+> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS) += sunxi-ss.o
+> +
+> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_PRNG) += sunxi-ss-rng.o
+> +
+> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_DES) += sunxi-ss-des.o
+> +sunxi-ss-des-y += sunxi-ss-cipher-des.o sunxi-ss-cipher.o
+> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_3DES) += sunxi-ss-3des.o
+> +sunxi-ss-3des-y += sunxi-ss-cipher-3des.o sunxi-ss-cipher.o
+> +
+> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_AES) += sunxi-ss-aes.o
+> +sunxi-ss-aes-y += sunxi-ss-cipher-aes.o sunxi-ss-cipher.o
+
+I just tried building Hans' (CC-ed) sunxi-devel branch, which
+includes this series, with all the Security System options enabled.
+
+It doesn't build:
+
+  LD      drivers/crypto/sunxi-ss/built-in.o
+drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_cipher_init':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
+multiple definition of `sunxi_cipher_init'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_des_poll':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
+multiple definition of `sunxi_des_poll'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_aes_poll':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
+multiple definition of `sunxi_aes_poll'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_cipher_exit':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
+multiple definition of `sunxi_cipher_exit'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_cipher_init':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
+multiple definition of `sunxi_cipher_init'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_des_poll':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
+multiple definition of `sunxi_des_poll'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_aes_poll':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
+multiple definition of `sunxi_aes_poll'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_cipher_exit':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
+multiple definition of `sunxi_cipher_exit'
+drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_init':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:7:
+multiple definition of `sunxi_hash_init'
+drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:7:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_finup':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:204:
+multiple definition of `sunxi_hash_finup'
+drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:204:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_digest':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:216:
+multiple definition of `sunxi_hash_digest'
+drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:216:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_update':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:44:
+multiple definition of `sunxi_hash_update'
+drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:44:
+first defined here
+drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_final':
+/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:115:
+multiple definition of `sunxi_hash_final'
+drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:115:
+first defined here
+scripts/Makefile.build:397: recipe for target
+'drivers/crypto/sunxi-ss/built-in.o' failed
+make[3]: *** [drivers/crypto/sunxi-ss/built-in.o] Error 1
+scripts/Makefile.build:465: recipe for target 'drivers/crypto/sunxi-ss' failed
+make[2]: *** [drivers/crypto/sunxi-ss] Error 2
+scripts/Makefile.build:465: recipe for target 'drivers/crypto' failed
+make[1]: *** [drivers/crypto] Error 2
+Makefile:878: recipe for target 'drivers' failed
+make: *** [drivers] Error 2
+
+
+What's seems to be happening is that sunxi-ss-cipher.c is
+being compiled and included multiple times, once for each
+different cipher.
+
+So sunxi-ss-cipher-{aes,3des,des}.o all have a copy of
+sunxi-ss-cipher.c compiled in. And during the link phase,
+the linker finds multiple definitions and fails.
+
+What would probably work is have a common Kconfig option
+such as CONFIG_CRYPTO_DEV_SUNXI_SS_CIPHER, have each cipher
+Kconfig option select this one, and have this option trigger
+the build of the common functions.
+
+> +
+> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_MD5) += sunxi-ss-md5.o
+> +sunxi-ss-md5-y += sunxi-ss-hash.o sunxi-ss-hash-md5.o
+> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_SHA1) += sunxi-ss-sha1.o
+> +sunxi-ss-sha1-y += sunxi-ss-hash.o sunxi-ss-hash-sha1.o
+
+Same goes for the hash part. sunxi-ss-hash.c included twice,
+once for md5 and once for sha1.
+
+[snip]
+
+Note that I only tried statically linked builds, not modules.
+
+
+Cheers
+ChenYu
