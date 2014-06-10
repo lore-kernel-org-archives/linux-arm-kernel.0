@@ -1,65 +1,54 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 10 Jun 2014 12:25:51 +0200
-Subject: [PATCH v13 10/10] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
-In-Reply-To: <1402395951-7988-1-git-send-email-denis@eukrea.com>
-References: <1402395951-7988-1-git-send-email-denis@eukrea.com>
-Message-ID: <1402395951-7988-10-git-send-email-denis@eukrea.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Jun 2014 11:39:01 +0100
+Subject: [PATCH] arm64: Add flush_cache_vmap call in __early_set_fixmap
+In-Reply-To: <20140609163954.GA22876@linaro.org>
+References: <1402050590-23877-1-git-send-email-leif.lindholm@linaro.org>
+ <1402065449.15402.2.camel@deneb.redhat.com>
+ <20140606145324.GE4179@bivouac.eciton.net>
+ <1402067373.15402.9.camel@deneb.redhat.com>
+ <20140609110356.GD25590@arm.com>
+ <20140609132429.GF4179@bivouac.eciton.net>
+ <20140609133859.GB18487@localhost>
+ <20140609163954.GA22876@linaro.org>
+Message-ID: <20140610103901.GB3523@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v11->v13:
-- No changes
-ChangeLog v9->v11:
-- Now uses the drm-panel instead of the display-timings.
+On Mon, Jun 09, 2014 at 05:40:05PM +0100, Steve Capper wrote:
+> On Mon, Jun 09, 2014 at 02:38:59PM +0100, Catalin Marinas wrote:
+> > On Mon, Jun 09, 2014 at 02:24:29PM +0100, Leif Lindholm wrote:
+> > > On Mon, Jun 09, 2014 at 12:03:56PM +0100, Catalin Marinas wrote:
+> > > > A quick grep through the kernel shows that we have other set_pte() calls
+> > > > without additional dsb() like create_mapping(), I think kvm_set_pte() as
+> > > > well.
+> > > > 
+> > > > So I'm proposing an alternative patch (which needs some benchmarking as
+> > > > well to see if anything is affected, maybe application startup time).
+> > > 
+> > > I'm happy for any fix which can be included in 3.16.
+> > 
+> > Steve Capper made a point about performance. He'll follow up.
+> 
+> My concern was initially about splitting THPs, as with a 64K granule,
+> we will have 2048 calls to set_pte_at in a loop. Having thought about
+> it, these should be relatively rare events though.
 
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
-- The backlight is now on at boot.
+Are there any THP benchmarks?
 
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
+> There will be an impact on various aspects of the memory system (for
+> instance fork), but this will need to be measured.
 
-ChangeLog v5->v6:
-- Reordered the Cc list.
+There is but I don't think we have an easy around. Grep'ing the kernel
+for set_pte_at() shows several places where this is called without a
+corresponding DSB (currently only as part of flush_cache_vmap and
+update_mmu_cache).
 
-ChangeLog v3->v5:
-- Updated to the new GPIO defines.
+For example, insert_page(), though insert_pfn() calls update_mmu_cache()
+and it even has a comment "why not for insert page?".
 
-ChangeLog v2->v3:
-- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds backlight support.
-- Added some interested people in the Cc list, and removed some people that
-  might be annoyed by the receiving of that patch which is unrelated to their
-  subsystem.
----
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+So we need to run some benchmarks to assess the impact. If significant,
+we can look at alternatives (in addition to the above, possibly adding
+barriers to arch_leave_lazy_mmu_mode).
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-index d273d09..6e36dae 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -17,9 +17,19 @@
- 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
- 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
- 
-+	backlight: backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight_1>;
-+		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <1>;
-+		default-on;
-+	};
-+
- 	panel: panel {
- 		compatible = "eukrea,mbimxsd51-cmo-qvga", "simple-panel";
- 		power-supply = <&reg_lcd_3v3>;
-+		backlight = <&backlight>;
- 	};
- 
- 	reg_lcd_3v3: lcd-en {
 -- 
-1.7.9.5
+Catalin
