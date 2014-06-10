@@ -1,52 +1,38 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 10 Jun 2014 21:18:34 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jun 2014 21:21:12 +0200
 Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <539754E5.3030408@redhat.com>
-References: <20140328184517.GA27219@cbox>
- <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
- <53973AA8.9020301@codeaurora.org>
- <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
- <539754E5.3030408@redhat.com>
-Message-ID: <53975A0A.8090802@redhat.com>
+In-Reply-To: <5397360B.80102@huawei.com>
+References: <20140328184517.GA27219@cbox> <5397360B.80102@huawei.com>
+Message-ID: <9128476.SiMN0btvWc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 10/06/2014 20:56, Paolo Bonzini ha scritto:
-> Il 10/06/2014 20:08, Peter Maydell ha scritto:
->> On 10 June 2014 18:04, Christopher Covington <cov@codeaurora.org> wrote:
->>> On 06/10/2014 10:42 AM, Peter Maydell wrote:
->>>> I just noticed that this doesn't mandate that the platform
->>>> provides an RTC. As I understand it, the UEFI spec mandates
->>>> that there's an RTC (could somebody more familiar with UEFI
->>>> than me confirm/deny that?) so we should probably put one here.
->>>
->>> Pardon my ignorance, but what exactly disqualifies Generic Timer
->>> implementations from being used as Real Time Clocks?
->>
->> So my naive view was that an RTC actually had to have
->> support for dealing with real (wall) clock time, ie
->> knowing it's 2014 and not 1970. The generic timers are
->> just timers. Or am I wrong and UEFI doesn't really
->> require that?
->
-> The real-time clock provides four UEFI runtime services (GetTime,
-> SetTime, GetWakeupTime, SetWakeupTime).  The spec says that you can
-> return EFI_DEVICE_ERROR from GetTime/SetTime if "the time could not be
-> retrieved/set due to a hardware error", but I don't think this is enough
-> to make these two optional.  By comparison, GetWakeupTime/SetWakeupTime
-> can also return EFI_UNSUPPORTED.
->
-> So I agree that the RTC is required in UEFI.
+On Tuesday 10 June 2014 18:44:59 Claudio Fontana wrote:
+> I just wanted to share with you guys how we are using virtualization
+> on ARM64 over here for the OSv project.
+> By skipping steps like UEFI, grub, firmware load, etc we strive to
+> keep our application launch time low.
+> Is this going to create problems for us in the future if you start
+> requiring every VM to boot using those instead?
 
-... that said, just like I thought was the case for the serial console, 
-do we need to specify the exact hardware models?
+My feeling is that it's out of scope for this specification.
+What you are doing is great, and you should keep doing it that way.
 
-We can just say that the VM can expect UEFI boot and runtime services to 
-work.  This includes variable services, time services, the serial 
-console protocols and more.  It's up to the implementation to provide 
-enough devices to support the firmware, and it's out of this spec's 
-scope to specify the firmware's implementation.
+It does mean that your applications are aware of which hypervisor
+they are running on, and you have to manage them using OSv specific
+tools on the host.
 
-I think even the serial devices should be removed.
+The VM System Specification however is meant to provide a way to
+distribute a file system image for a virtual machine that can run
+on any compliant hypervisor using any compliant management tools.
+The reason it goes through all the boot loader steps is to make it
+much closer to a real system, so distros don't have to special-case
+this.
 
-Paolo
+If you don't care about that, you can just install the tools on
+the host to manage your OSv application without a boot loader.
+In particular, you can support multiple targets on OSv: e.g.
+native Xen, native KVM, and portable standard hypervisor following
+the ARM VM System Spec.
+
+	Arnd
