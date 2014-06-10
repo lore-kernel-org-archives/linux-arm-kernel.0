@@ -1,38 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jun 2014 21:21:12 +0200
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <5397360B.80102@huawei.com>
-References: <20140328184517.GA27219@cbox> <5397360B.80102@huawei.com>
-Message-ID: <9128476.SiMN0btvWc@wuerfel>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 10 Jun 2014 21:25:40 +0200
+Subject: [PATCH 1/2 v2] spi: s3c64xx: use "cs-gpios" from spi node instead
+ of "cs-gpio"
+In-Reply-To: <CAD=FV=WgvyF-P+69SdmCGX0jxJ3FVxpa+AcgQKg-Emya_W-w3Q@mail.gmail.com>
+References: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>	<1402394881-31564-2-git-send-email-ch.naveen@samsung.com>
+ <CAD=FV=WgvyF-P+69SdmCGX0jxJ3FVxpa+AcgQKg-Emya_W-w3Q@mail.gmail.com>
+Message-ID: <53975BB4.6040104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 June 2014 18:44:59 Claudio Fontana wrote:
-> I just wanted to share with you guys how we are using virtualization
-> on ARM64 over here for the OSv project.
-> By skipping steps like UEFI, grub, firmware load, etc we strive to
-> keep our application launch time low.
-> Is this going to create problems for us in the future if you start
-> requiring every VM to boot using those instead?
+On 10.06.2014 20:26, Doug Anderson wrote:
+> Naveen,
+> 
+> Not a full review, but a few quick things I happened to notice:
+> 
+> On Tue, Jun 10, 2014 at 3:08 AM, Naveen Krishna Chatradhi
+> <ch.naveen@samsung.com> wrote:
+>> @@ -94,7 +93,6 @@ Example:
+>>                         spi-max-frequency = <10000>;
+>>
+>>                         controller-data {
+>> -                               cs-gpio = <&gpa2 5 1 0 3>;
+>>                                 samsung,spi-feedback-delay = <0>;
+> 
+> In a future patch (not this one!) it might make sense to also move
+> spi-feedback-delay out.
+> 
+> 
+>> +static struct s3c64xx_spi_csinfo *s3c64xx_get_cs_gpios(struct spi_device *spi)
+> 
+> I believe that you can make use of the fact that the SPI core already
+> got these GPIOs for you.  See of_spi_register_master().  Everything
+> you need ought to be in master->num_chipselect and master->cs_gpios.
+> 
+> Strangely, it doesn't look like any other drivers use this, so
+> possibly I'm confused...
+> 
+> 
+>> @@ -806,9 +815,14 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>>         struct s3c64xx_spi_info *sci;
+>>         int err;
+>>
+>> +       if (!spi->dev.of_node) {
+>> +               dev_err(&spi->dev, "device node not found\n");
+>> +               return -EINVAL;
+>> +       }
+> 
+> This seems incredibly broken.  You're saying that the SPI driver no
+> longer works without the device tree?  I don't think that's desirable,
+> but I suppose I could be wrong.
+> 
+> Also note that you still left an "if" test below for trying to deal
+> with the fact that there is no "of_node".
 
-My feeling is that it's out of scope for this specification.
-What you are doing is great, and you should keep doing it that way.
+This driver can be also used by non-DT platforms (namely s3c2443,
+s3c64xx and s5p*) and so this assumption is wrong.
 
-It does mean that your applications are aware of which hypervisor
-they are running on, and you have to manage them using OSv specific
-tools on the host.
-
-The VM System Specification however is meant to provide a way to
-distribute a file system image for a virtual machine that can run
-on any compliant hypervisor using any compliant management tools.
-The reason it goes through all the boot loader steps is to make it
-much closer to a real system, so distros don't have to special-case
-this.
-
-If you don't care about that, you can just install the tools on
-the host to manage your OSv application without a boot loader.
-In particular, you can support multiple targets on OSv: e.g.
-native Xen, native KVM, and portable standard hypervisor following
-the ARM VM System Spec.
-
-	Arnd
+Best regards,
+Tomasz
