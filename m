@@ -1,34 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Jun 2014 11:10:21 +0100
-Subject: [PATCH] ARM: debug: fix broken DEBUG_LL_INCLUDE for multi platform
-In-Reply-To: <1402394236-14778-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1402394236-14778-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20140610101021.GX23430@n2100.arm.linux.org.uk>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Tue, 10 Jun 2014 15:37:59 +0530
+Subject: [PATCH 0/2 v2] spi: s3c64xx: use "cs-gpios" in spi node instead of
+ "cs-gpio"
+Message-ID: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 10:57:16AM +0100, Srinivas Kandagatla wrote:
-> On multi_v7_defconfig using def_bool in Kconfig can override the selection
-> made as part of DEBUG_LL. This is because def_bool will set the config to true
-> if the expression evaluates to true, which is what was happening in
-> multi_v7_defconfig. ARCH_SPEAR13XX selects DEBUG_UART_PL01X overiding any
-> previous DEBUG_LL selections.
-> 
-> Making the def_bool to bool and depends made sense in this case, and
-> fixes the issue too.
+Currently, spi-s3c64xx.c needs "cs-gpio" chip select GPIO to be
+defined under "controller-data" node under each slave node.
 
-NAK.
+&spi_x {
+        cs-gpios <>;
+        ...
+        slave_node {
 
-1. you haven't tested this - if you select DEBUG_BCM2835 in the choice,
-   it will select DEBUG_UART_PL01X, which, with your patch, will not
-   have its new dependencies satisfied.
+                controller-data {
+                        cs-gpio = <>;
+                        ...
+                };
+                ...
+        };
+        ...
+};
 
-2. there is nothing to select this debug option on the platforms which
-   you make it depend upon.
+Where as, SPI core and many other drivers uses "cs-gpios" for
+from device tree node.
 
-The real solution here is to convert these (and the other) remaining
-platforms to the choice mechanism.  Same for the 8250 one.
+Hence, make changes in spi-s3c64xx.c driver to make use of
+"cs-gpios" from SPI node(parent) instead of "cs-gpio" defined in
+slaves "controller-data"(child) node.
+
+Also, fixes a compilation warning and corrects the DTS nodes for
+Exynos4210 based SMDKv310, Exynos4412 based Trats2, Exynos5250 based
+SMDK5250 boards.
+
+Naveen Krishna Chatradhi (2):
+based on for-next branch of spi.git
+  spi: s3c64xx: use "cs-gpios" from spi node instead of "cs-gpio"
+
+based on for-next branch of linuxsamsung.git
+  ARM: DTS: move "cs-gpio" from "controller-data" to under spi node
+
+ .../devicetree/bindings/spi/spi-samsung.txt        |    8 ++-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |    2 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 +-
+ drivers/spi/spi-s3c64xx.c                          |   56 ++++++++++++--------
+ 5 files changed, 41 insertions(+), 29 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
