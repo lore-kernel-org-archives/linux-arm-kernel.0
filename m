@@ -1,58 +1,149 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 10 Jun 2014 11:09:13 -0700
-Subject: [PATCH 1/2 v2] spi: s3c64xx: use "cs-gpios" from spi node instead
- of "cs-gpio"
-In-Reply-To: <CAHfPSqAq9L5Zu7z3-y6Y2pG8AhE4Y1j8DE35LDfMW_DYc_x-gw@mail.gmail.com>
-References: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>
- <1402394881-31564-2-git-send-email-ch.naveen@samsung.com>
- <5396E051.8050803@samsung.com>
- <CAHfPSqAq9L5Zu7z3-y6Y2pG8AhE4Y1j8DE35LDfMW_DYc_x-gw@mail.gmail.com>
-Message-ID: <CAD=FV=XtdgKEg7fTHe+tsFM1Y_YwqNNk_DBW7ZX83YERGJsHBg@mail.gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 10 Jun 2014 11:23:17 -0700
+Subject: [PATCH v7 4/4] arm: dirty page logging 2nd stage page fault
+ handling support
+In-Reply-To: <20140608120530.GH3279@lvm>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1401837567-5527-5-git-send-email-m.smarduch@samsung.com>
+ <20140608120530.GH3279@lvm>
+Message-ID: <53974D15.3070508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen / Sylwester,
+On 06/08/2014 05:05 AM, Christoffer Dall wrote:
+> On Tue, Jun 03, 2014 at 04:19:27PM -0700, Mario Smarduch wrote:
+>> This patch adds support for handling 2nd stage page faults during migration,
+>> it disables faulting in huge pages, and disolves huge pages to page tables.
+> 
+> s/disolves/dissolves/g
+Will do.
+> 
+>> In case migration is canceled huge pages will be used again.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/kvm/mmu.c |   36 ++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 34 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 1c546c9..aca4fbf 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -966,6 +966,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+>>  	struct vm_area_struct *vma;
+>>  	pfn_t pfn;
+>> +	/* Get logging status, if dirty_bitmap is not NULL then logging is on */
+>> +	bool logging_active = !!memslot->dirty_bitmap;
+> 
+>>  
+>>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+>>  	if (fault_status == FSC_PERM && !write_fault) {
+>> @@ -1019,10 +1021,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	spin_lock(&kvm->mmu_lock);
+>>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>>  		goto out_unlock;
+>> -	if (!hugetlb && !force_pte)
+>> +
+>> +	/* When logging don't spend cycles to check for huge pages */
+> 
+> drop the comment: either explain the entire clause (which would be too
+> long) or don't explain anything.
+> 
+Ok.
+>> +	if (!hugetlb && !force_pte && !logging_active)
+> 
+> instead of having all this, can't you just change 
+> 
+> if (is_vm_hugetlb_page(vma)) to
+> if (is_vm_hugetlb_page(vma) && !logging_active)
+> 
+> then you're also not mucking around with the gfn etc.
 
-On Tue, Jun 10, 2014 at 4:00 AM, Naveen Krishna Ch
-<naveenkrishna.ch@gmail.com> wrote:
->> Can we support both "cs-gpio" and "cs-gpios" for backward compatibility ?
->> After your change all DTBs using the original pattern will not work with
->> new kernels any more. At least I would expect such backward compatibility
->> maintained for few kernel releases.
->
-> The reason behind removing the "cs-gpio" or not providing backward
-> compatibility was
->
-> 1. Since spi-core started using "cs-gpios" string from spi device node
-> several months ago.
->   The spi-s3c64xx.c driver is partially broken for more than 6 months.
->
-> 2. Supporting "cs-gpio" would add extra bit of code.
->
-> I've corrected the dts files that were using "cs-gpio" under
-> "controller-data"(child node)
-> to use "cs-gpio" from spi device node (parent node).
->
-> I will make another version if you insist.
+I didn't want to modify this function too much, but if that's ok that 
+simplifies things a lot.
 
-Yup, as near as I can tell this has been broken since (3146bee spi:
-s3c64xx: Added provision for dedicated cs pin).  That landed June 25th
-of 2013 into the SPI tree.
+> 
+>>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>>  
+>> -	if (hugetlb) {
+>> +	/*
+>> +	 * Force all not present/perm faults to PTE handling, address both
+>> +	 * PMD and PTE faults
+>> +	 */
+> 
+> I don't understand this comment?  In which case does this apply?
+> 
+The cases I see here -
+- huge page permission fault is forced into page table code while logging
+- pte permission/not present handled by page table code as before.
+>> +	if (hugetlb && !logging_active) {
+>>  		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+>>  		new_pmd = pmd_mkhuge(new_pmd);
+>>  		if (writable) {
+>> @@ -1034,6 +1042,22 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	} else {
+>>  		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+>>  		if (writable) {
+>> +			/*
+>> +			 * If pmd is  mapping a huge page then clear it and let
+>> +			 * stage2_set_pte() create a pte table. At the sametime
+>> +			 * you write protect the pte (PAGE_S2 pgprot_t).
+>> +			 */
+>> +			if (logging_active) {
+>> +				pmd_t *pmd;
+>> +				if (hugetlb) {
+>> +					pfn += pte_index(fault_ipa);
+>> +					gfn = fault_ipa >> PAGE_SHIFT;
+>> +					new_pte = pfn_pte(pfn, PAGE_S2);
+>> +				}
+>> +				pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
+>> +				if (pmd && kvm_pmd_huge(*pmd))
+>> +					clear_pmd_entry(kvm, pmd, fault_ipa);
+>> +			}
+> 
+> now instead of all this, you just need to check for kvm_pmd_huge() in
+> stage2_set_pte() and if that's true, you clear it, and then then install
+> your new pte.
 
-...so clearly nobody was really testing Samsung's SPI driver on ToT
-Linux.  1 year of unnoticed brokenness seems like enough time that we
-could do away with the old code.  If someone comes out of the woodwork
-and claims a dire need to support the old binding then it can be added
-then.
+Yes this really simplifies things!
 
-In-tree users of this appear to be:
+> 
+>>  			kvm_set_s2pte_writable(&new_pte);
+>>  			kvm_set_pfn_dirty(pfn);
+>>  		}
+>> @@ -1041,6 +1065,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+>>  	}
+>>  
+>> +	/*
+>> +	 * Log the dirty page in dirty_bitmap[], call regardless if logging is
+>> +	 * disabled or enabled both cases handled safely.
+>> +	 * TODO: for larger page size mark mulitple dirty page bits for each
+>> +	 *       4k page.
+>> +	 */
+>> +	if (writable)
+>> +		mark_page_dirty(kvm, gfn);
+> 
+> what if you just faulted in a page on a read which wasn't present
+> before but it happens to belong to a writeable memslot, is that page
+> then dirty? hmmm.
+> 
+A bug, must also check if it was a write fault not just that we're dealing with
+a writable region. This one could be pretty bad on performance, not to mention
+in accurate. It will be interesting to see new test results, glad you caught
+that.
 
-arch/arm/boot/dts/exynos4210-smdkv310.dts:
- cs-gpio = <&gpc1 2 0>;
-arch/arm/boot/dts/exynos4412-trats2.dts:
- cs-gpio = <&gpb 5 0>;
-arch/arm/boot/dts/exynos5250-smdk5250.dts:
- cs-gpio = <&gpa2 5 0>;
-
-...and I guess nobody has bothered using the SPI flash on those boards
-for the last year?
+Thanks,
+  Mario.
+> 
+>>  
+>>  out_unlock:
+>>  	spin_unlock(&kvm->mmu_lock);
+>> -- 
+>> 1.7.9.5
+>>
+> 
+> Thanks,
+> -Christoffer
+> 
