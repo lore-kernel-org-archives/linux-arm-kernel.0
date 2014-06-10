@@ -1,34 +1,28 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 10 Jun 2014 12:16:20 +0100
-Subject: [PATCH] ARM: qcom: select GSBI from mach kconfig
-Message-ID: <1402398980-24664-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 10 Jun 2014 13:43:31 +0200
+Subject: [PATCH v4 01/11] ARM: EXYNOS: Make exynos machine_ops as static
+In-Reply-To: <1399704998-13321-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399704998-13321-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <5396EF63.8030506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds GSBI selection automatically from mach kconfig, As GSBI
-seems to be the very basic SOC specific driver and serial driver depends on it.
-I think this option should be selected via mach kconfig rather than adding
-it to any defconfig.
+Hi Pankaj,
 
-Without this patch multi_v7_defconfig can not show up console on
-IFC6410.
+On 10.05.2014 08:56, Pankaj Dubey wrote:
+> As machine function ops are used only in this file let's make
+> them static. Also remove unused and unwanted declarations from
+> common.h.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.h |    8 --------
+>  arch/arm/mach-exynos/exynos.c |    6 +++---
+>  2 files changed, 3 insertions(+), 11 deletions(-)
+> 
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/mach-qcom/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-index 5bac591..d68d7ee 100644
---- a/arch/arm/mach-qcom/Kconfig
-+++ b/arch/arm/mach-qcom/Kconfig
-@@ -7,6 +7,7 @@ config ARCH_QCOM
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_SMP
- 	select QCOM_SCM if SMP
-+	select QCOM_GSBI
- 	help
- 	  Support for Qualcomm's devicetree based systems.
- 
--- 
-1.9.1
+Best regards,
+Tomasz
