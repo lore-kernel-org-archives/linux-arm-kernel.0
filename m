@@ -1,64 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jun 2014 16:47:55 +0200
-Subject: [PATCH v5 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
- controller support
-In-Reply-To: <20140610143604.GC7054@lukather>
-References: <1402408036-5235-1-git-send-email-boris.brezillon@free-electrons.com>
- <6454089.IP8IFVsofj@wuerfel> <20140610143604.GC7054@lukather>
-Message-ID: <13219561.hrRmVFjmAv@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jun 2014 16:01:00 +0100
+Subject: ARM: MACH_CPUIMX27 or MACH_EUKREA_CPUIMX27?
+In-Reply-To: <1402410909.3798.32.camel@x220>
+References: <1402410909.3798.32.camel@x220>
+Message-ID: <20140610150100.GY23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 June 2014 16:36:04 Maxime Ripard wrote:
-> On Tue, Jun 10, 2014 at 03:54:56PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 10 June 2014 15:47:16 Boris BREZILLON wrote:
-> > > 
-> > > +config I2C_SUN6I_P2WI
-> > > +       tristate "Allwinner sun6i internal P2WI controller"
-> > > +       depends on ARCH_SUNXI
-> > > +       help
-> > > +         If you say yes to this option, support will be included for the
-> > > +         P2WI (Push/Pull 2 Wire Interface) controller embedded in some sunxi
-> > > +         SOCs.
-> > > +         The P2WI looks like an SMBus controller (which supports only byte
-> > > +         accesses), except that it only supports one slave device.
-> > > +         This interface is used to connect to specific PMIC devices (like the
-> > > +         AXP221).
-> > > +
-> > 
-> > Sorry for the stupid question, but why is this an i2c driver if the
-> > hardware protocol is completely different?
+On Tue, Jun 10, 2014 at 04:35:09PM +0200, Paul Bolle wrote:
+> 0) Summary: either the Kconfig symbol MACH_CPUIMX27 or the reference to
+> CONFIG_MACH_EUKREA_CPUIMX27 in arch/arm/tools/mach-types should probably
+> be renamed (once again).
 > 
-> It's not completely different. It deviates, but still looks very
-> similar to i2c, and to be precise, SMBus.
+> 1) An entry for CONFIG_MACH_CPUIMX27 was added to mach-types in v2.6.29.
 > 
-> You'll have the full discussion that led to do this in i2c here:
-> http://www.spinics.net/lists/linux-i2c/msg15066.html
+> 2) The Kconfig symbol MACH_EUKREA_CPUIMX27 was added in v2.6.32.
 > 
-> Also, one significant thing to take into account is that the
-> communication with a device starts as I2C, only to switch to this
-> protocol after some initialization sequence.
-
-Ok, sounds good.
-
-> > I understand that a lot of devices can be driven using either spi or
-> > i2c, and we have two sets of {directories,maintainers,bus_types,...}
-> > for them. Your description sounds like this is a separate option
-> > that isn't any closer to i2c than it is to spi.
+> 3) That Kconfig symbol was renamed to MACH_CPUIMX27 in v2.6.34, too
+> match the reference in mach-types mentioned in 1).
 > 
-> That's not true. It's *much* closer from I2C than it is from SPI.
-
-Ok.
-
-> > Would it perhaps be better to expose it only as a regmap rather than
-> > an i2c host?
+> 4) But then the reference in mach-types was also renamed, to
+> MACH_EUKREA_CPUIMX27, in v3.1.
 > 
-> That could be a solution, but is it a common practice to define a bus
-> adapter driver in a regmap driver?
+> 5) The net effect is that machine_is_eukrea_cpuimx27() equals 0 since
+> v3.1. That macro is used only once, in sound/soc/fsl/eukrea-tlv320.c. If
+> people still care about it then either the Kconfig symbol or the
+> reference in mach-types should be renamed.
 
-No, not yet.
+This is caused by the way mach-types is dealt with, and I've told people
+/many/ times exactly how it's done - but still they don't get it.
 
-Maybe Boris can just put an explanation into the changeset description
-of the driver so other people are able to find it more easily.
+The information is stored in a database, where the database is accessible
+via the web.
 
-	Arnd
+Every so often, I download from that website a new copy of the mach-types
+file and commit the update.  Due to the shere number of changes, it is
+impossible to go through one by one working out whether it's changed in
+the kernel or whether it's a change which has happened via the website.
+
+Once a platform has been merged into mainline, the symbols are not allowed
+to be changed from that point on, because to do so breaks the ability for
+people to update this file in older/newer kernels.
+
+So, if mach-types says that it is MACH_EUKREA_CPUIMX27, then that is what
+the symbol is supposed to be (and to try and change it will cause problems.)
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
