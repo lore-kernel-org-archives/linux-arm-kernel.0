@@ -1,125 +1,120 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 10 Jun 2014 09:27:44 +0800
-Subject: [PATCH 08/12] clk: mmp: add clock type master
+Date: Tue, 10 Jun 2014 09:27:46 +0800
+Subject: [PATCH 10/12] clk: mmp: add device tree support for composite type
+ clock
 In-Reply-To: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
 References: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1402363668-25806-9-git-send-email-chao.xie@marvell.com>
+Message-ID: <1402363668-25806-11-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
-To support device tree for clock, we need pass the register
-base and range to the clock.
-There are many clock share same range of registers.
-For example, clk1 has register as 0xd4210010 while clk2
-has 0xd42100c0. If we map the register seperately. There
-will waste some space. If there are many clocks like that,
-the waste will be huge.
-clock type "master node" will map the register for all clocks
-that listed as its child in DT file. Each clock will invoke
-the APIs provided by "master node" to get its register base.
-The following is a exmaple of master clock usage in DT file
-
-apmu_clocks {
-	compatible = "marvell,mmp-clk-master";
-	reg = <0xd4210000 0x1000>;
-
-	ck1 {
-		marvell,reg-offset = <0 0x10>;
-	};
-
-	clk2 {
-		marvell,reg-offset = <0 0xc0>;
-	};
-}
+To parse composite clock from device tree file, there are some
+rules.
+The clock to be composited will be the child of the composite
+clock in device tree file.
+It can support the composition of (mux,div,gate) clock defined
+as common clock and (mix,gate) defined only for MMP series.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- .../devicetree/bindings/clock/mmp/clk-master       |  47 +++++
- drivers/clk/mmp/Makefile                           |   4 +
- drivers/clk/mmp/clk-master-node.c                  | 195 +++++++++++++++++++++
- drivers/clk/mmp/clk.h                              |   7 +
- 4 files changed, 253 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-master
- create mode 100644 drivers/clk/mmp/clk-master-node.c
 
-diff --git a/Documentation/devicetree/bindings/clock/mmp/clk-master b/Documentation/devicetree/bindings/clock/mmp/clk-master
+Conflicts:
+	drivers/clk/mmp/Makefile
+---
+ .../devicetree/bindings/clock/mmp/clk-composite    |  58 +++++
+ drivers/clk/mmp/Makefile                           |   2 +-
+ drivers/clk/mmp/clk-of-composite.c                 | 253 +++++++++++++++++++++
+ drivers/clk/mmp/clk.h                              |  14 ++
+ 4 files changed, 326 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-composite
+ create mode 100644 drivers/clk/mmp/clk-of-composite.c
+
+diff --git a/Documentation/devicetree/bindings/clock/mmp/clk-composite b/Documentation/devicetree/bindings/clock/mmp/clk-composite
 new file mode 100644
-index 0000000..b6acde1
+index 0000000..224968c
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/mmp/clk-master
-@@ -0,0 +1,47 @@
-+Binding for Marvell MMP series master clock.
++++ b/Documentation/devicetree/bindings/clock/mmp/clk-composite
+@@ -0,0 +1,58 @@
++Binding for Marvell MMP series composite clock
 +
-+The MMP related device tree support for clock based on the clock type not clock
-+controller. So specific SOC, user need define the DT file for the clock such as
-+pxa910-clock.dtsi.
++The common clock defines a general composite clock with div/mux/gate.
++Because MMP series has clock need combines the div/mux together, so
++there is a new type of clock "mix". The "mix" clock can also be
++composited with gate clock. In fact, many mix clocks and gate clocks
++share same registers.
 +
-+Almost all types of clock will need parameter as "register", and it will map the
-+"register" before access it. If every clock map the "register" seperately, there
-+will be a lot of waste.
-+
-+A master clock is defined for this kind of situation. It will be responsible for
-+map the registers for all clocks that lists as its children in DT file.
++In the device tree file, the clock to be composited should be child
++of the composite clock.
 +
 +Required properties
-+- compatible : It should be "marvell,mmp-clk-master".
++- compatible : It should be "marvell,mmp-clk-composite" for (mix, gate)
++               composition, or "marvell,mmp-clk-general-composite" for
++               (mux, div, gate) composition.
 +
-+
-+Optional properties:
-+- reg : The register start and range the master clock covered.
-+
-+Optional properties for child node:
-+- marvell,reg-offset : It is a two-values item - <register_index regiser_offset>.
-+                   Master node will map the registers for all its children. So
-+                   for the child it need to pass the information about register
-+                   index and offset. "register_index" indicates which register space
-+                   it from because master clock can have mutiple register space in
-+                   "reg". "register_offset" indicates the offset in the register
-+                   space.
 +
 +Examples
-+There are two clocks, clk1 has register at 0xd4210010, and clk2 has register at
-+0xd42100c0.
++1. There are three clocks mux1, div1, gate1.
 +
 +apmu_clk {
 +	compatible = "marvell,mmp-clk-master";
-+	reg = <0xd4210000 0x1000>;
++	reg = <0xde210000 0x1000>;
 +
-+	clk1 {
-+		...
-+		marvell,reg-offset = <0 0x10>;
-+	};
++	general_composite_clk {
++		compatible = "marvell,mmp-clk-general-composite";
 +
-+	clk2 {
-+		...
-+		marvell,reg-offset = <0 0xc0>;
++		mux1 {
++			...
++		};
++		div1 {
++			...
++		};
++		gate1 {
++			...
++		};
 +	};
 +};
++
++2. There are two clocks mix1, gate2
++
++apmu_clk {
++	compatible = "marvell,mmp-clk-master";
++	reg = <0xde210000 0x1000>;
++
++	composite_clk {
++		compatible = "marvell,mmp-clk-composite";
++
++		mix1 {
++			...
++		};
++		gate2 {
++			...
++		};
++	};
++};
++
++
 diff --git a/drivers/clk/mmp/Makefile b/drivers/clk/mmp/Makefile
-index 2cd7d94..518931e 100644
+index e8810b6..84dce78 100644
 --- a/drivers/clk/mmp/Makefile
 +++ b/drivers/clk/mmp/Makefile
-@@ -5,6 +5,10 @@
- obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o clk-gate.o	\
+@@ -6,7 +6,7 @@ obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o clk-gate.o	\
  	 clk-mix-composite.o
  
-+ifneq ($(CONFIG_OF),)
-+obj-y += clk-master-node.o
-+endif
-+
+ ifneq ($(CONFIG_OF),)
+-obj-y += clk-master-node.o lock.o
++obj-y += clk-master-node.o lock.o clk-of-composite.o
+ endif
+ 
  obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
- obj-$(CONFIG_CPU_PXA910) += clk-pxa910.o
- obj-$(CONFIG_CPU_MMP2) += clk-mmp2.o
-diff --git a/drivers/clk/mmp/clk-master-node.c b/drivers/clk/mmp/clk-master-node.c
+diff --git a/drivers/clk/mmp/clk-of-composite.c b/drivers/clk/mmp/clk-of-composite.c
 new file mode 100644
-index 0000000..584f72f
+index 0000000..403ebe2
 --- /dev/null
-+++ b/drivers/clk/mmp/clk-master-node.c
-@@ -0,0 +1,195 @@
++++ b/drivers/clk/mmp/clk-of-composite.c
+@@ -0,0 +1,253 @@
 +/*
-+ * mmp master clock source file
++ * mmp mix(div and mux) clock operation source file
 + *
 + * Copyright (C) 2014 Marvell
 + * Chao Xie <chao.xie@marvell.com>
@@ -135,197 +130,262 @@ index 0000000..584f72f
 +#include <linux/slab.h>
 +#include <linux/list.h>
 +#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/ioport.h>
 +
 +#include "clk.h"
 +
-+#define MAX_REG		8
-+
-+struct mmp_clk_master_node {
-+	unsigned int reg_base[MAX_REG];
-+	void __iomem *reg[MAX_REG];
++struct mmp_clk_composite_member {
 +	struct device_node *np;
++	struct clk_hw *hw;
++	const struct clk_ops *ops;
++	int num_parents;
++	const char **parent_names;
++};
++
++struct mmp_clk_composite_node {
++	struct device_node *np;
++	struct mmp_clk_composite_member *members[MMP_CLK_COMPOSITE_TYPE_MAX];
 +	struct list_head node;
 +};
 +
-+static LIST_HEAD(master_list);
-+static DEFINE_MUTEX(master_mutex);
++static LIST_HEAD(composite_list);
++static DEFINE_MUTEX(composite_mutex);
 +
-+static void mmp_clk_master_setup(struct device_node *np)
++int of_mmp_clk_composite_add_member(struct device_node *np, struct clk_hw *hw,
++				const struct clk_ops *ops, int type)
 +{
-+	struct mmp_clk_master_node *node;
-+	struct resource res;
++	struct device_node *parent_np;
++	struct mmp_clk_composite_node *node;
++	struct mmp_clk_composite_member *member;
++	unsigned int found = 0;
++	size_t size;
 +	int i, ret;
 +
-+	node = kzalloc(sizeof(*node), GFP_KERNEL);
-+	if (!node) {
-+		pr_err("%s:%s failed to allocate master node.\n",
-+			__func__, np->name);
-+		return;
-+	}
++	mutex_lock(&composite_mutex);
 +
-+	for (i = 0; i < MAX_REG; i++) {
-+		ret = of_address_to_resource(np, i, &res);
-+		if (ret)
++	parent_np = of_get_next_parent(np);
++
++	list_for_each_entry(node, &composite_list, node) {
++		if (node->np == parent_np) {
++			found = 1;
 +			break;
-+		node->reg_base[i] = res.start;
-+		node->reg[i] = ioremap(res.start, resource_size(&res));
-+		if (!node->reg[i]) {
-+			pr_err("%s:%s failed to map register.\n",
-+				__func__, np->name);
-+			goto error;
 +		}
 +	}
 +
-+	node->np = np;
-+	INIT_LIST_HEAD(&node->node);
++	if (!found) {
++		pr_err("%s:%s can not find member %s\n",
++			__func__, parent_np->name, np->name);
++		ret = -ENOENT;
++		goto out;
++	}
 +
-+	mutex_lock(&master_mutex);
++	if (node->members[type]) {
++		pr_err("%s:%s already has type %d,when add member %s\n",
++			__func__, parent_np->name, type, np->name);
++		ret = -EBUSY;
++		goto out;
++	}
 +
-+	list_add(&node->node, &master_list);
++	member = kzalloc(sizeof(*member), GFP_KERNEL);
++	if (!member) {
++		pr_err("%s:%s failed to allocate member.\n",
++			__func__, parent_np->name);
++		ret = -ENOMEM;
++		goto out;
++	}
++	member->np = np;
++	member->hw = hw;
++	member->ops = ops;
 +
-+	mutex_unlock(&master_mutex);
-+
-+	return;
-+error:
-+	for (i--; i >= 0; i--)
-+		iounmap(node->reg[i]);
-+
-+	kfree(node);
-+}
-+
-+struct of_device_id mmp_clk_master_of_id[] = {
-+	{
-+		.compatible = "marvell,mmp-clk-master",
-+		.data = mmp_clk_master_setup,
-+	},
-+	{ },
-+};
-+
-+static struct mmp_clk_master_node *get_master_node(struct device_node *child)
-+{
-+	struct device_node *master;
-+	struct mmp_clk_master_node *node;
-+
-+	/* Find the master device node */
-+	master = child;
-+	do {
-+		master = of_get_next_parent(master);
-+	} while (!of_match_node(mmp_clk_master_of_id, master));
-+
-+	mutex_lock(&master_mutex);
-+
-+	list_for_each_entry(node, &master_list, node) {
-+		if (node->np == master) {
-+			mutex_unlock(&master_mutex);
-+			return node;
++	ret = of_clk_get_parent_count(np);
++	if (ret >= 1) {
++		member->num_parents = ret;
++		size = sizeof(*member->parent_names) * member->num_parents;
++		member->parent_names = kzalloc(size, GFP_KERNEL);
++		if (!member->parent_names) {
++			pr_err("%s:%s failed to allocate parent_names.\n",
++				__func__, parent_np->name);
++			ret = -ENOMEM;
++			goto member_free;
 +		}
++		for (i = 0; i < member->num_parents; i++)
++			member->parent_names[i] =
++					of_clk_get_parent_name(np, i);
++	} else {
++		member->num_parents = 0;
++		member->parent_names = NULL;
 +	}
 +
-+	mutex_unlock(&master_mutex);
++	node->members[type] = member;
 +
-+	return NULL;
++	ret = 0;
++	goto out;
++
++member_free:
++	kfree(member);
++out:
++	mutex_unlock(&composite_mutex);
++
++	return ret;
 +}
 +
-+static void __iomem *get_child_reg(struct device_node *child,
-+				unsigned int reg_index,
-+				unsigned int *reg_base)
++static void of_mmp_clk_composite_setup(struct device_node *np)
 +{
-+	struct mmp_clk_master_node *node;
-+
-+	if (reg_index >= MAX_REG) {
-+		pr_err("%s:%s reg_index too big.\n", __func__, child->name);
-+		return NULL;
-+	}
-+
-+	node = get_master_node(child);
-+	if (!node) {
-+		pr_err("%s:%s failed to get master node\n",
-+			__func__, child->name);
-+		return NULL;
-+	}
-+
-+	*reg_base = node->reg_base[reg_index];
-+
-+	return node->reg[reg_index];
-+}
-+
-+void __iomem *of_mmp_clk_get_reg(struct device_node *np,
-+					unsigned int index,
-+					unsigned int *reg_phys)
-+{
-+	const __be32 *prop;
-+	unsigned int proplen, size;
-+	u32 reg_index, reg_offset;
-+	unsigned int reg_base;
-+	void __iomem *reg;
-+
-+	prop = of_get_property(np, "marvell,reg-offset", &proplen);
-+	if (!prop) {
-+		pr_err("%s:%s can not find marvell,reg-offset\n",
-+			__func__, np->name);
-+		return NULL;
-+	}
-+
-+	size = proplen / sizeof(u32);
-+
-+	if ((proplen % sizeof(u32)) || (size <= (index * 2))) {
-+		pr_err("%s:%s prop len is not correct\n",
-+			__func__, np->name);
-+		return NULL;
-+	}
-+
-+	reg_index = be32_to_cpup(prop + index * 2);
-+	reg_offset = be32_to_cpup(prop + index * 2 + 1);
-+	reg = get_child_reg(np, reg_index, &reg_base);
-+	if (!reg) {
-+		pr_err("%s:%s failed to get reg\n",
-+			__func__, np->name);
-+		return NULL;
-+	}
-+
-+	*reg_phys = reg_base + reg_offset;
-+
-+	return reg + reg_offset;
-+}
-+
-+struct device_node *of_mmp_clk_master_init(struct device_node *from)
-+{
-+	struct device_node *parent, *child;
++	struct mmp_clk_composite_node *node;
++	struct mmp_clk_composite_member *mix, *gate;
++	struct device_node *child;
++	struct clk *clk;
 +	const struct of_device_id *match;
 +	of_clk_init_cb_t clk_init_cb;
 +
-+	parent = from;
-+	parent = of_find_matching_node_and_match(from, mmp_clk_master_of_id,
-+						&match);
-+	if (parent) {
-+		clk_init_cb = (of_clk_init_cb_t)match->data;
-+		clk_init_cb(parent);
-+		for_each_child_of_node(parent, child) {
-+			match = of_match_node(&__clk_of_table, child);
-+			if (!match)
-+				continue;
-+			clk_init_cb = (of_clk_init_cb_t)match->data;
-+			clk_init_cb(child);
-+		}
++	node = kzalloc(sizeof(*node), GFP_KERNEL);
++	if (!node) {
++		pr_err("%s:%s failed to allocate node\n", __func__, np->name);
++		return;
 +	}
 +
-+	return parent;
++	INIT_LIST_HEAD(&node->node);
++	node->np = np;
++
++	mutex_lock(&composite_mutex);
++	list_add(&node->node, &composite_list);
++	mutex_unlock(&composite_mutex);
++
++	for_each_child_of_node(np, child) {
++		match = of_match_node(&__clk_of_table, child);
++		clk_init_cb = (of_clk_init_cb_t)match->data;
++		clk_init_cb(child);
++	}
++
++	mix = node->members[MMP_CLK_COMPOSITE_TYPE_MUXMIX];
++	gate = node->members[MMP_CLK_COMPOSITE_TYPE_GATE];
++	if (!mix || !gate) {
++		pr_err("%s:%s failed to parse members.\n", __func__, np->name);
++		goto error;
++	}
++
++	clk = mmp_clk_register_composite(NULL, np->name,
++				mix->parent_names, mix->num_parents,
++				mix->hw, mix->ops,
++				gate->hw, gate->ops, 0);
++	if (!IS_ERR(clk))
++		of_clk_add_provider(np, of_clk_src_simple_get, clk);
++
++	return;
++
++error:
++	mutex_lock(&composite_mutex);
++	list_del(&node->node);
++	mutex_unlock(&composite_mutex);
++	kfree(node);
++}
++
++static void of_mmp_clk_general_composite_setup(struct device_node *np)
++{
++	struct mmp_clk_composite_node *node;
++	struct mmp_clk_composite_member *mux, *gate, *div;
++	struct device_node *child;
++	struct clk *clk;
++	const char **parent_names;
++	int num_parents;
++	const struct of_device_id *match;
++	of_clk_init_cb_t clk_init_cb;
++
++	node = kzalloc(sizeof(*node), GFP_KERNEL);
++	if (!node) {
++		pr_err("%s:%s failed to allocate node\n", __func__, np->name);
++		return;
++	}
++
++	INIT_LIST_HEAD(&node->node);
++	node->np = np;
++
++	mutex_lock(&composite_mutex);
++	list_add(&node->node, &composite_list);
++	mutex_unlock(&composite_mutex);
++
++	for_each_child_of_node(np, child) {
++		match = of_match_node(&__clk_of_table, child);
++		clk_init_cb = (of_clk_init_cb_t)match->data;
++		clk_init_cb(child);
++	}
++
++	mux = node->members[MMP_CLK_COMPOSITE_TYPE_MUXMIX];
++	gate = node->members[MMP_CLK_COMPOSITE_TYPE_GATE];
++	div = node->members[MMP_CLK_COMPOSITE_TYPE_DIV];
++
++	if ((!mux && !div) || (!mux && !gate) || (!gate && !div)) {
++		pr_err("%s:%s failed to parse members.\n", __func__, np->name);
++		goto error;
++	}
++
++	if (mux) {
++		parent_names = mux->parent_names;
++		num_parents = mux->num_parents;
++	} else {
++		parent_names = div->parent_names;
++		num_parents = div->num_parents;
++	}
++
++	clk = clk_register_composite(NULL, np->name,
++				parent_names, num_parents,
++				mux ? mux->hw : NULL, mux ? mux->ops : NULL,
++				div ? div->hw : NULL, div ? div->ops : NULL,
++				gate ? gate->hw : NULL,
++				gate ? gate->ops : NULL, 0);
++	if (!IS_ERR(clk))
++		of_clk_add_provider(np, of_clk_src_simple_get, clk);
++
++	return;
++
++error:
++	mutex_lock(&composite_mutex);
++	list_del(&node->node);
++	mutex_unlock(&composite_mutex);
++	kfree(node);
++}
++
++CLK_OF_DECLARE(mmp_clk_composite, "marvell,mmp-clk-composite",
++		of_mmp_clk_composite_setup);
++CLK_OF_DECLARE(mmp_clk_general_composite, "marvell,mmp-clk-general-composite",
++		of_mmp_clk_general_composite_setup);
++
++int of_mmp_clk_is_composite(struct device_node *np)
++{
++	struct device_node *parent_np;
++	struct mmp_clk_composite_node *node;
++
++	parent_np = of_get_next_parent(np);
++	mutex_lock(&composite_mutex);
++	list_for_each_entry(node, &composite_list, node) {
++		if (node->np == parent_np) {
++			mutex_unlock(&composite_mutex);
++			return 1;
++		}
++	}
++	mutex_unlock(&composite_mutex);
++
++	return 0;
 +}
 diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
-index 9827a4f..6d8c3b3 100644
+index e06a228..66d0fd4 100644
 --- a/drivers/clk/mmp/clk.h
 +++ b/drivers/clk/mmp/clk.h
-@@ -140,6 +140,13 @@ extern struct clk *mmp_clk_register_composite(struct device *dev,
- 			unsigned long flags);
+@@ -152,6 +152,20 @@ extern spinlock_t *of_mmp_clk_get_spinlock(struct device_node *np,
+ 					   unsigned int reg_base);
  
  
-+/* Master clock exported APIs and data. */
-+extern void __iomem *of_mmp_clk_get_reg(struct device_node *np,
-+					unsigned int reg_index,
-+					unsigned int *reg_phys);
-+struct device_node *of_mmp_clk_master_init(struct device_node *from);
++/* DT support for composiste type clock. */
++enum {
++	MMP_CLK_COMPOSITE_TYPE_MUXMIX,
++	MMP_CLK_COMPOSITE_TYPE_DIV,
++	MMP_CLK_COMPOSITE_TYPE_GATE,
++	MMP_CLK_COMPOSITE_TYPE_MAX,
++};
++
++extern int of_mmp_clk_composite_add_member(struct device_node *np,
++				struct clk_hw *hw,
++				const struct clk_ops *ops, int type);
++extern int of_mmp_clk_is_composite(struct device_node *np);
 +
 +
  extern struct clk *mmp_clk_register_pll2(const char *name,
