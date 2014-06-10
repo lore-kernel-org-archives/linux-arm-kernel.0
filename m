@@ -1,77 +1,70 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 10 Jun 2014 13:31:06 +0100
-Subject: [PATCH v7 1/7] of: Provide function to request and map memory
-In-Reply-To: <CAL_Jsq+yi+fdN1vHK6Wwx7Jzmvz3qd6z=8sO8+q==YRmBCGdww@mail.gmail.com>
-References: <1401989181-4712-1-git-send-email-matthias.bgg@gmail.com>
- <1401989181-4712-2-git-send-email-matthias.bgg@gmail.com>
- <CAL_Jsq+KS8W6kZpCSpd68Oku7neFxPVLct1j=AYaXnyvOD3tGA@mail.gmail.com>
- <20140607055953.569D6C4099E@trevor.secretlab.ca>
- <CAL_Jsq+yi+fdN1vHK6Wwx7Jzmvz3qd6z=8sO8+q==YRmBCGdww@mail.gmail.com>
-Message-ID: <CACxGe6uthx3hzgDjEbHs+9itjLSVX1fWX=F7Y2S0z2F=s56G5A@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 10 Jun 2014 14:33:01 +0200
+Subject: [PATCH 1/2] ARM: at91/at91_dt_defconfig: enable sound support
+In-Reply-To: <1402047426-4058-1-git-send-email-voice.shen@atmel.com>
+References: <1402047426-4058-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <5396FAFD.9070302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 9, 2014 at 3:36 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Sat, Jun 7, 2014 at 12:59 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Fri, 6 Jun 2014 10:19:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
->>> On Thu, Jun 5, 2014 at 12:26 PM, Matthias Brugger
->>> <matthias.bgg@gmail.com> wrote:
->>> > A call to of_iomap does not request the memory region.
->>> > This patch adds the function of_io_request_and_map which requests
->>> > the memory region before mapping it.
->>> >
->>> > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>> > ---
->>> >  drivers/of/address.c       |   28 ++++++++++++++++++++++++++++
->>> >  include/linux/of_address.h |    8 ++++++++
->>> >  2 files changed, 36 insertions(+)
->>> >
->>> > diff --git a/drivers/of/address.c b/drivers/of/address.c
->>> > index cb4242a..c55b107 100644
->>> > --- a/drivers/of/address.c
->>> > +++ b/drivers/of/address.c
->>> > @@ -721,3 +721,31 @@ void __iomem *of_iomap(struct device_node *np, int index)
->>> >         return ioremap(res.start, resource_size(&res));
->>> >  }
->>> >  EXPORT_SYMBOL(of_iomap);
->>> > +
->>> > +/**
->>> > + * of_io_request_and_map - Requests a resource and maps the memory mapped IO
->>> > + *                        for a given device_node
->>>
->>> I believe docbook requires this to be 1 line.
->>>
->>> > + * @device:    the device whose io range will be mapped
->>> > + * @index:     index of the io range
->>> > + * @name:      name of the resource
->>> > + *
->>> > + * Returns a pointer to the requested and mapped memory
->>> > + */
->>> > +void __iomem *of_io_request_and_map(struct device_node *np, int index, char *name)
->>> > +{
->>> > +       struct resource res;
->>> > +       void __iomem *mem;
->>> > +
->>> > +       if (of_address_to_resource(np, index, &res))
->>> > +               return NULL;
->>> > +
->>> > +       if (!request_mem_region(res.start, resource_size(&res), name))
->>>
->>> Use the np->name here and drop the name parameter.
->>
->> Name here would be the name of the owner (the driver), not the name of
->> the node. Passing the name separately is fine by me.
->
-> This function is for when there is no driver. If there is a driver,
-> the devm_* functions should be used. I would like to see some standard
-> naming and consistency here rather than allowing random strings or
-> NULL to be passed by the caller.
+On 06/06/2014 11:37, Bo Shen :
+> As sound support depends on ssc, i2c and dma, so also enable them.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-The node name doesn't provide a whole lot of help here though because
-we want to identify the code creating the resource, not the node. I'm
-not going to make a big deal about it. I've told Matthias on IRC that
-he can go ahead and merge it because it is a very minor issue. If you
-feel strongly about it, then we'll get him to change it or do a
-follow-up patch to change the function signature.
 
-g.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Added to at91-3.17-defconfig. Thanks.
+
+> ---
+>  arch/arm/configs/at91_dt_defconfig | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+> index 300ded9..bd0a307 100644
+> --- a/arch/arm/configs/at91_dt_defconfig
+> +++ b/arch/arm/configs/at91_dt_defconfig
+> @@ -77,6 +77,7 @@ CONFIG_BLK_DEV_RAM_COUNT=4
+>  CONFIG_BLK_DEV_RAM_SIZE=8192
+>  CONFIG_ATMEL_PWM=y
+>  CONFIG_ATMEL_TCLIB=y
+> +CONFIG_ATMEL_SSC=y
+>  CONFIG_SCSI=y
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_SCSI_MULTI_LUN=y
+> @@ -128,6 +129,7 @@ CONFIG_SERIAL_ATMEL=y
+>  CONFIG_SERIAL_ATMEL_CONSOLE=y
+>  CONFIG_HW_RANDOM=y
+>  CONFIG_I2C=y
+> +CONFIG_I2C_AT91=y
+>  CONFIG_I2C_GPIO=y
+>  CONFIG_SPI=y
+>  CONFIG_SPI_ATMEL=y
+> @@ -149,6 +151,13 @@ CONFIG_FONT_8x8=y
+>  CONFIG_FONT_ACORN_8x8=y
+>  CONFIG_FONT_MINI_4x6=y
+>  CONFIG_LOGO=y
+> +CONFIG_SOUND=y
+> +CONFIG_SND=y
+> +CONFIG_SND_SOC=y
+> +CONFIG_SND_ATMEL_SOC=y
+> +CONFIG_SND_AT91_SOC_SAM9G20_WM8731=y
+> +CONFIG_SND_ATMEL_SOC_WM8904=y
+> +CONFIG_SND_AT91_SOC_SAM9X5_WM8731=y
+>  CONFIG_USB=y
+>  CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+>  CONFIG_USB_EHCI_HCD=y
+> @@ -178,6 +187,7 @@ CONFIG_RTC_DRV_RV3029C2=y
+>  CONFIG_RTC_DRV_AT91RM9200=y
+>  CONFIG_RTC_DRV_AT91SAM9=y
+>  CONFIG_DMADEVICES=y
+> +CONFIG_AT_HDMAC=y
+>  # CONFIG_IOMMU_SUPPORT is not set
+>  CONFIG_EXT4_FS=y
+>  CONFIG_FANOTIFY=y
+> 
+
+
+-- 
+Nicolas Ferre
