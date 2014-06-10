@@ -1,49 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 10 Jun 2014 01:17:29 -0700
-Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to double
- clock initialization
-In-Reply-To: <CAOesGMiUyOTLMi56cMN9V8Ft0w2X_g0_HzA+cfuYnZyf2=iiMA@mail.gmail.com>
-References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
- <CAOesGMifjnTDUcsweOwsw9fFgsE7b4q3wsASfP8YL-uMH5KiPA@mail.gmail.com>
- <CAPTRvHn7yTt6mC1fjEn5Ra9yx=GZ1DyNQtGWvHsDd_LkuiM_wA@mail.gmail.com>
- <1500417.9RFCmzklxv@flatron> <20131216210915.GD3185@sirena.org.uk>
- <20131217151424.GB11138@opensource.wolfsonmicro.com>
- <CAOesGMiUyOTLMi56cMN9V8Ft0w2X_g0_HzA+cfuYnZyf2=iiMA@mail.gmail.com>
-Message-ID: <CAOesGMgS=+TDHgX29nbbNQ_X2Vk76L5WxZvS9FHAF0hs2MBm+g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jun 2014 10:21:09 +0200
+Subject: [RFC/PATCH] ARM: mvebu: Don't apply the quirks if the SoC
+ revision is unknown
+In-Reply-To: <1402342036-9168-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1402342036-9168-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5621673.VW5TXctBgm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 17, 2013 at 11:12 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Dec 17, 2013 at 7:14 AM, Charles Keepax
-> <ckeepax@opensource.wolfsonmicro.com> wrote:
->> On Mon, Dec 16, 2013 at 09:09:15PM +0000, Mark Brown wrote:
->>> On Sat, Dec 14, 2013 at 04:41:06AM -0800, Tomasz Figa wrote:
->>>
->>> >  - Wolfson Cragganmore 6410 - Mark Brown (copied) is using it for some
->>> >    testing of audio codec AFAIK, but I'm not sure if you can get that
->>> >    anywhere.
->>>
->>> Essentially no, though you could try asking nicely.  It's not suitable
->>> for a test farm anyway without a SD mux as the only bootloader supported
->>> is Qi which only boots from flash.
->>
->> Yeah, we don't have that many spare at the moment and whilst we
->> do use them fairly regularly we are not produce new boards
->> anymore.
->
-> Yeah, sounds unlikely to be a good fit.
->
-> Something like the tiny6410's would be useful. They seem to mostly be
-> available with LCD panels though, which ups the price a bit. I'll keep
-> an eye out for one.
+On Monday 09 June 2014 16:27:16 Ezequiel Garcia wrote:
+> We currently skip the I2C and thermal quirks only if the SoC revision is
+> known to be one that does not need them. If the SoC revision cannot be
+> obtained, the current behavior is to apply the quirk assuming it's needed.
+> 
+> This commit changes this, by requiring the SoC revision to be known in order
+> to peform a quirk.
 
-FWIW, I came across a store at Guang Hua Digital Plaza today that had
-the tiny6410+SDK board on display, and ended up buying one. It'll take
-me a little while to wire it up for testing.
+This clearly needs a better description if we want to apply it. We had
+a rather long discussion when the code was first added exactly this
+way and you should explain which of the assumptions we made back then
+are now incorrect.
 
-Seems like there's no upstream u-boot support for the board, so
-getting something onto it that can network boot seems to be a long
-shot. We'll see what I can cobble together.
+Is it ever wrong (as opposed to inefficient) to apply the quirk even on a
+newer SoC?
 
+IIRC, the reasoning was that almost all machines have the new SoC version,
+so they should have their DTs marked with the correct IDs already.
 
--Olof
+	Arnd
+
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 594262b..14bf590 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -89,13 +89,15 @@ static void __init i2c_quirk(void)
+>  {
+>  	struct device_node *np;
+>  	u32 dev, rev;
+> +	int res;
+>  
+>  	/*
+>  	 * Only revisons more recent than A0 support the offload
+>  	 * mechanism. We can exit only if we are sure that we can
+>  	 * get the SoC revision and it is more recent than A0.
+>  	 */
+> -	if (mvebu_get_soc_id(&dev, &rev) == 0 && rev > MV78XX0_A0_REV)
+> +	res = mvebu_get_soc_id(&dev, &rev);
+> +	if (res < 0 || (res == 0 &&  rev > MV78XX0_A0_REV))
+>  		return;
+>  
+>  	for_each_compatible_node(np, NULL, "marvell,mv78230-i2c") {
+> @@ -119,8 +121,10 @@ static void __init thermal_quirk(void)
+>  {
+>  	struct device_node *np;
+>  	u32 dev, rev;
+> +	int res;
+>  
+> -	if (mvebu_get_soc_id(&dev, &rev) == 0 && rev > ARMADA_375_Z1_REV)
+> +	res = mvebu_get_soc_id(&dev, &rev);
+> +	if (res < 0 || (res == 0 && rev > ARMADA_375_Z1_REV))
+>  		return;
+>  
+>  	for_each_compatible_node(np, NULL, "marvell,armada375-thermal") {
+> 
