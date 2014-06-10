@@ -1,22 +1,17 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 10 Jun 2014 14:51:23 -0400
-Subject: [PATCH v2 4/8] PCI: designware: add msi controller functions for
- v3.65 hw
+Date: Tue, 10 Jun 2014 14:51:25 -0400
+Subject: [PATCH v2 6/8] phy: Add serdes phy driver for keystone
 In-Reply-To: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
 References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1402426287-31157-5-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1402426287-31157-7-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dw msi controller functions for v3.65 hw. This adds dw_v3_65_msi_chip
-and dw_v3_65_msi_domain_ops so that can be used on this version of the hw.
-This required since MSI irq registers reside in the application space
-for v3.65 hw. The functions are used by v3.65 dw pci core functions to
-support implementation of PCI controllers based on this hw version.
-
-While at it, move the ATU hw specific variable and msi irq to a separate
-struct inside a union and add another struct inside the union to hold
-dw v3.65 specific variables.
+This phy driver added to support keystone PCI driver. This is
+a generic phy driver and can work with multiple hardware IPs
+available on Keystone SoC. The hw vendor that provides the phy
+hw published only registers and their values. So this driver
+uses these hard coded values to initialize the phy.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
@@ -40,265 +35,304 @@ CC: Randy Dunlap <rdunlap@infradead.org>
 CC: Grant Likely <grant.likely@linaro.org> 
 
 ---
- drivers/pci/host/Kconfig            |    5 ++
- drivers/pci/host/Makefile           |    1 +
- drivers/pci/host/pci-dw-v3_65-msi.c |  149 +++++++++++++++++++++++++++++++++++
- drivers/pci/host/pci-dw-v3_65.h     |   20 +++++
- drivers/pci/host/pcie-designware.h  |   21 +++--
- 5 files changed, 191 insertions(+), 5 deletions(-)
- create mode 100644 drivers/pci/host/pci-dw-v3_65-msi.c
- create mode 100644 drivers/pci/host/pci-dw-v3_65.h
+ .../bindings/phy/phy-keystone-serdes.txt           |   25 +++
+ drivers/phy/Kconfig                                |    6 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-keystone-serdes.c                  |  230 ++++++++++++++++++++
+ 4 files changed, 262 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
+ create mode 100644 drivers/phy/phy-keystone-serdes.c
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index a6f67ec..2fcd9f9 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -9,6 +9,11 @@ config PCI_MVEBU
- config PCIE_DW
- 	bool
- 
-+config PCI_DW_V3_65
-+	bool "Designware PCIe h/w v3.65"
-+	help
-+	   Say Y here if the DW h/w version is 3.65
-+
- config PCI_EXYNOS
- 	bool "Samsung Exynos PCIe controller"
- 	depends on SOC_EXYNOS5440
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 13fb333..28af710 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -4,3 +4,4 @@ obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
- obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
- obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
- obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
-+obj-$(CONFIG_PCI_DW_V3_65) += pci-dw-v3_65-msi.o
-diff --git a/drivers/pci/host/pci-dw-v3_65-msi.c b/drivers/pci/host/pci-dw-v3_65-msi.c
+diff --git a/Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt b/Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
 new file mode 100644
-index 0000000..a26ffdd
+index 0000000..612c7b5
 --- /dev/null
-+++ b/drivers/pci/host/pci-dw-v3_65-msi.c
-@@ -0,0 +1,149 @@
++++ b/Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
+@@ -0,0 +1,25 @@
++TI Keystone SerDes Phy: DT documentation
++=======================================
++
++Required properties:
++ - compatible: should be "ti,keystone-serdes-phy";
++ - reg: base address and length of the SerDes register set
++ - reg-names: should be "reg_serdes", name of the reg SerDes register set
++ - #phy-cells: from the generic phy bindings, must be 0;
++
++Exampel for Keystone PCIE,
++
++		pcie0_phy: serdes_phy at 2320000 {
++			#phy-cells = <0>;
++			compatible = "ti,keystone-serdes-phy";
++			reg = <0x02320000 0x4000>;
++			reg-names = "reg_serdes";
++		};
++
++
++Then the PHY can be used in PCIe controller node as
++
++pcie at 21800000 {
++	phys = <&pcie0_phy>;
++	phy-names = "pcie-phy";
++};
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 4906c27..8b652a4 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -167,4 +167,10 @@ config PHY_XGENE
+ 	help
+ 	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+ 
++config PHY_TI_KEYSTONE_SERDES
++	bool "TI Keystone SerDes PHY support"
++	depends on ARCH_KEYSTONE
++	select GENERIC_PHY
++	help
++	  This option enables support for TI Keystone SerDes PHY.
+ endmenu
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 7728518..c9f2dd4 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -19,3 +19,4 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
+ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
+ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+ obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
++obj-$(CONFIG_PHY_TI_KEYSTONE_SERDES)	+= phy-keystone-serdes.o
+diff --git a/drivers/phy/phy-keystone-serdes.c b/drivers/phy/phy-keystone-serdes.c
+new file mode 100644
+index 0000000..6d52ab4
+--- /dev/null
++++ b/drivers/phy/phy-keystone-serdes.c
+@@ -0,0 +1,230 @@
 +/*
-+ * Designware(dw) MSI controller version 3.65
++ * Keystone SerDes Phy driver code
 + *
-+ * Copyright (C) 2013-2014 Texas Instruments., Ltd.
++ * Copyright (C) 2013-2014 Texas Instruments, Inc.
 + *		http://www.ti.com
 + *
 + * Author: Murali Karicheri <m-karicheri2@ti.com>
-+ *
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/of_irq.h>
-+#include <linux/kernel.h>
-+#include <linux/msi.h>
-+#include <linux/pci.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/phy/phy.h>
++#include <linux/platform_device.h>
 +
-+#include "pcie-designware.h"
++#define reg_dump(addr, mask) \
++		pr_debug("reg %p has value %x\n", (void *)addr, \
++			(readl(addr) & ~mask))
 +
-+#define MSI_IRQ				0x054
-+#define MSI0_IRQ_STATUS			0x104
-+#define MSI0_IRQ_ENABLE_SET		0x108
-+#define MSI0_IRQ_ENABLE_CLR		0x10c
-+#define IRQ_STATUS			0x184
-+#define IRQ_EOI                         0x050
-+#define MSI_IRQ_OFFSET			4
-+
-+static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
-+{
-+	return sys->private_data;
-+}
-+
-+static inline void update_reg_offset_bit_pos(u32 offset, u32 *reg_offset,
-+					u32 *bit_pos)
-+{
-+	*reg_offset = offset % 8;
-+	*bit_pos = offset >> 3;
-+}
-+
-+inline u32 dw_v3_65_get_msi_data(struct pcie_port *pp)
-+{
-+	return pp->app.start + MSI_IRQ;
-+}
-+
-+void dw_v3_65_handle_msi_irq(struct pcie_port *pp, int offset)
-+{
-+	u32 pending, vector;
-+	int src, virq;
-+
-+	pending = readl(pp->va_app_base + MSI0_IRQ_STATUS + (offset << 4));
-+	/*
-+	 * MSI0, Status bit 0-3 shows vectors 0, 8, 16, 24, MSI1 status bit
-+	 * shows 1, 9, 17, 25 and so forth
-+	 */
-+	for (src = 0; src < 4; src++) {
-+		if (BIT(src) & pending) {
-+			vector = offset + (src << 3);
-+			virq = irq_linear_revmap(pp->irq_domain, vector);
-+			dev_dbg(pp->dev,
-+				"irq: bit %d, vector %d, virq %d\n",
-+				 src, vector, virq);
-+			generic_handle_irq(virq);
-+		}
-+	}
-+}
-+
-+static void dw_v3_65_msi_irq_ack(struct irq_data *d)
-+{
-+	u32 offset, reg_offset, bit_pos;
-+	unsigned int irq = d->irq;
-+	struct msi_desc *msi;
-+	struct pcie_port *pp;
-+
-+	msi = irq_get_msi_desc(irq);
-+	pp = sys_to_pcie(msi->dev->bus->sysdata);
-+	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-+
-+	writel(BIT(bit_pos),
-+		pp->va_app_base + MSI0_IRQ_STATUS + (reg_offset << 4));
-+	writel(reg_offset + MSI_IRQ_OFFSET, pp->va_app_base + IRQ_EOI);
-+}
-+
-+static void dw_v3_65_msi_irq_mask(struct irq_data *d)
-+{
-+	u32 offset, reg_offset, bit_pos;
-+	unsigned int irq = d->irq;
-+	struct msi_desc *msi;
-+	struct pcie_port *pp;
-+
-+	msi = irq_get_msi_desc(irq);
-+	pp = sys_to_pcie(msi->dev->bus->sysdata);
-+	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-+
-+	/* mask the end point if PVM implemented */
-+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+		if (msi->msi_attrib.maskbit)
-+			mask_msi_irq(d);
-+	}
-+
-+	writel(BIT(bit_pos),
-+		pp->va_app_base + MSI0_IRQ_ENABLE_CLR + (reg_offset << 4));
-+}
-+
-+static void dw_v3_65_msi_irq_unmask(struct irq_data *d)
-+{
-+	u32 offset, reg_offset, bit_pos;
-+	unsigned int irq = d->irq;
-+	struct msi_desc *msi;
-+	struct pcie_port *pp;
-+
-+	msi = irq_get_msi_desc(irq);
-+	pp = sys_to_pcie(msi->dev->bus->sysdata);
-+	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-+
-+	/* mask the end point if PVM implemented */
-+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+		if (msi->msi_attrib.maskbit)
-+			unmask_msi_irq(d);
-+	}
-+
-+	writel(BIT(bit_pos),
-+		pp->va_app_base + MSI0_IRQ_ENABLE_SET + (reg_offset << 4));
-+}
-+
-+static struct irq_chip dw_v3_65_msi_chip = {
-+	.name = "PCI-DW-MSI-OLD",
-+	.irq_ack = dw_v3_65_msi_irq_ack,
-+	.irq_mask = dw_v3_65_msi_irq_mask,
-+	.irq_unmask = dw_v3_65_msi_irq_unmask,
++/* mask bits point to bits being modified */
++#define reg_rmw(addr, value, mask) \
++		writel(((readl(addr) & (~(mask))) | \
++			(value & (mask))), (addr))
++struct serdes_config {
++	u32 reg;
++	u32 val;
++	u32 mask;
 +};
 +
-+static int dw_v3_65_msi_map(struct irq_domain *domain, unsigned int irq,
-+			irq_hw_number_t hwirq)
++struct ks_serdes_phy {
++	struct device *dev;
++	void __iomem *base;
++};
++
++static struct serdes_config ks_100mhz_5gbps_serdes[] = {
++	{0x0000, 0x00000800, 0x0000ff00},
++	{0x0060, 0x00041c5c, 0x00ffffff},
++	{0x0064, 0x0343c700, 0xffffff00},
++	{0x006c, 0x00000012, 0x000000ff},
++	{0x0068, 0x00070000, 0x00ff0000},
++	{0x0078, 0x0000c000, 0x0000ff00},
++
++	{0x0200, 0x00000000, 0x000000ff},
++	{0x0204, 0x5e000080, 0xff0000ff},
++	{0x0208, 0x00000006, 0x000000ff},
++	{0x0210, 0x00000023, 0x000000ff},
++	{0x0214, 0x2e003060, 0xff00ffff},
++	{0x0218, 0x76000000, 0xff000000},
++	{0x022c, 0x00200002, 0x00ff00ff},
++	{0x02a0, 0xffee0000, 0xffff0000},
++	{0x02a4, 0x0000000f, 0x000000ff},
++	{0x0204, 0x5e000000, 0xff000000},
++	{0x0208, 0x00000006, 0x000000ff},
++	{0x0278, 0x00002000, 0x0000ff00},
++	{0x0280, 0x00280028, 0x00ff00ff},
++	{0x0284, 0x2d0f0385, 0xffffffff},
++	{0x0250, 0xd0000000, 0xff000000},
++	{0x0284, 0x00000085, 0x000000ff},
++	{0x0294, 0x20000000, 0xff000000},
++
++	{0x0400, 0x00000000, 0x000000ff},
++	{0x0404, 0x5e000080, 0xff0000ff},
++	{0x0408, 0x00000006, 0x000000ff},
++	{0x0410, 0x00000023, 0x000000ff},
++	{0x0414, 0x2e003060, 0xff00ffff},
++	{0x0418, 0x76000000, 0xff000000},
++	{0x042c, 0x00200002, 0x00ff00ff},
++	{0x04a0, 0xffee0000, 0xffff0000},
++	{0x04a4, 0x0000000f, 0x000000ff},
++	{0x0404, 0x5e000000, 0xff000000},
++	{0x0408, 0x00000006, 0x000000ff},
++	{0x0478, 0x00002000, 0x0000ff00},
++	{0x0480, 0x00280028, 0x00ff00ff},
++	{0x0484, 0x2d0f0385, 0xffffffff},
++	{0x0450, 0xd0000000, 0xff000000},
++	{0x0494, 0x20000000, 0xff000000},
++
++	{0x0604, 0x00000080, 0x000000ff},
++	{0x0600, 0x00000000, 0x000000ff},
++	{0x0604, 0x5e000000, 0xff000000},
++	{0x0608, 0x00000006, 0x000000ff},
++	{0x0610, 0x00000023, 0x000000ff},
++	{0x0614, 0x2e003060, 0xff00ffff},
++	{0x0618, 0x76000000, 0xff000000},
++	{0x062c, 0x00200002, 0x00ff00ff},
++	{0x06a0, 0xffee0000, 0xffff0000},
++	{0x06a4, 0x0000000f, 0x000000ff},
++	{0x0604, 0x5e000000, 0xff000000},
++	{0x0608, 0x00000006, 0x000000ff},
++	{0x0678, 0x00002000, 0x0000ff00},
++	{0x0680, 0x00280028, 0x00ff00ff},
++	{0x0684, 0x2d0f0385, 0xffffffff},
++	{0x0650, 0xd0000000, 0xff000000},
++	{0x0694, 0x20000000, 0xff000000},
++
++	{0x0800, 0x00000000, 0x000000ff},
++	{0x0804, 0x5e000080, 0xff0000ff},
++	{0x0808, 0x00000006, 0x000000ff},
++	{0x0810, 0x00000023, 0x000000ff},
++	{0x0814, 0x2e003060, 0xff00ffff},
++	{0x0818, 0x76000000, 0xff000000},
++	{0x082c, 0x00200002, 0x00ff00ff},
++	{0x08a0, 0xffee0000, 0xffff0000},
++	{0x08a4, 0x0000000f, 0x000000ff},
++	{0x0804, 0x5e000000, 0xff000000},
++	{0x0808, 0x00000006, 0x000000ff},
++	{0x0878, 0x00002000, 0x0000ff00},
++	{0x0880, 0x00280028, 0x00ff00ff},
++	{0x0884, 0x2d0f0385, 0xffffffff},
++	{0x0850, 0xd0000000, 0xff000000},
++	{0x0894, 0x20000000, 0xff000000},
++
++	{0x0a00, 0x00000100, 0x0000ff00},
++	{0x0a08, 0x00e12c08, 0x00ffffff},
++	{0x0a0c, 0x00000081, 0x000000ff},
++	{0x0a18, 0x00e80000, 0x00ff0000},
++	{0x0a30, 0x002f2f00, 0x00ffff00},
++	{0x0a4c, 0xac820000, 0xffff0000},
++	{0x0a54, 0xc0000000, 0xff000000},
++	{0x0a58, 0x00001441, 0x0000ffff},
++	{0x0a84, 0x00000301, 0x0000ffff},
++
++	{0x0a8c, 0x81030000, 0xffff0000},
++	{0x0a90, 0x00006001, 0x0000ffff},
++	{0x0a94, 0x01000000, 0xff000000},
++	{0x0aa0, 0x81000000, 0xff000000},
++	{0x0abc, 0xff000000, 0xff000000},
++	{0x0ac0, 0x0000008b, 0x000000ff},
++
++	{0x0000, 0x00000003, 0x000000ff},
++	{0x0a00, 0x0000009f, 0x000000ff},
++
++	{0x0a44, 0x5f733d00, 0xffffff00},
++	{0x0a48, 0x00fdca00, 0x00ffff00},
++	{0x0a5c, 0x00000000, 0xffff0000},
++	{0x0a60, 0x00008000, 0xffffffff},
++	{0x0a64, 0x0c581220, 0xffffffff},
++	{0x0a68, 0xe13b0602, 0xffffffff},
++	{0x0a6c, 0xb8074cc1, 0xffffffff},
++	{0x0a70, 0x3f02e989, 0xffffffff},
++	{0x0a74, 0x00000001, 0x000000ff},
++	{0x0b14, 0x00370000, 0x00ff0000},
++	{0x0b10, 0x37000000, 0xff000000},
++	{0x0b14, 0x0000005d, 0x000000ff},
++};
++
++static int ks_serdes_phy_init(struct phy *phy)
 +{
-+	irq_set_chip_and_handler(irq, &dw_v3_65_msi_chip, handle_level_irq);
-+	irq_set_chip_data(irq, domain->host_data);
-+	set_irq_flags(irq, IRQF_VALID);
++	struct serdes_config *p;
++	struct ks_serdes_phy *ks_phy = phy_get_drvdata(phy);
++
++	int i;
++
++	for (i = 0, p = &ks_100mhz_5gbps_serdes[0];
++		i < ARRAY_SIZE(ks_100mhz_5gbps_serdes);
++		i++, p++) {
++		reg_rmw((ks_phy->base + p->reg), p->val, p->mask);
++		reg_dump((ks_phy->base + p->reg), p->mask);
++	}
++	msleep(20);
 +
 +	return 0;
 +}
 +
-+const struct irq_domain_ops dw_v3_65_msi_domain_ops = {
-+	.map = dw_v3_65_msi_map,
++static struct phy_ops ks_serdes_phy_ops = {
++	.init		= ks_serdes_phy_init,
++	.owner		= THIS_MODULE,
 +};
-diff --git a/drivers/pci/host/pci-dw-v3_65.h b/drivers/pci/host/pci-dw-v3_65.h
-new file mode 100644
-index 0000000..689256a
---- /dev/null
-+++ b/drivers/pci/host/pci-dw-v3_65.h
-@@ -0,0 +1,20 @@
-+/*
-+ * Designware(dw) v3.65 controller common includes
-+ *
-+ * Copyright (C) 2013-2014 Texas Instruments., Ltd.
-+ *		http://www.ti.com
-+ *
-+ * Author: Murali Karicheri <m-karicheri2@ti.com>
-+ *
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
 +
-+#define MAX_LEGACY_IRQS		4
++static int ks_serdes_phy_probe(struct platform_device *pdev)
++{
++	struct phy_provider *phy_provider;
++	struct device *dev = &pdev->dev;
++	struct ks_serdes_phy *ks_phy;
++	struct phy *phy;
++	struct resource *res;
 +
-+/* v3.65 specific MSI controller APIs/definitions */
-+extern const struct irq_domain_ops dw_v3_65_msi_domain_ops;
-+void dw_v3_65_handle_msi_irq(struct pcie_port *pp, int offset);
-+u32 dw_v3_65_get_msi_data(struct pcie_port *pp);
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index 3a6a6eb..05bb590 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -35,16 +35,27 @@ struct pcie_port {
- 	struct device		*dev;
- 	u8			root_bus_nr;
- 	void __iomem		*dbi_base;
--	u64			cfg0_base;
--	void __iomem		*va_cfg0_base;
--	u64			cfg1_base;
--	void __iomem		*va_cfg1_base;
- 	/*
- 	 * v3.65 DW hw implements application register space for
- 	 * MSI and has no ATU view port
- 	 */
- #define DW_V3_65		BIT(0)
- 	u32			version;
-+	union {
-+		/* New DW hw specific */
-+		struct {
-+			u64			cfg0_base;
-+			void __iomem		*va_cfg0_base;
-+			u64			cfg1_base;
-+			void __iomem		*va_cfg1_base;
-+			int			msi_irq;
-+		};
-+		/* v3.65 DW hw specific */
-+		struct  {
-+			void __iomem		*va_app_base;
-+			struct resource		app;
-+		};
-+	};
- 	u64			io_base;
- 	u64			mem_base;
- 	spinlock_t		conf_lock;
-@@ -55,7 +66,7 @@ struct pcie_port {
- 	int			irq;
- 	u32			lanes;
- 	struct pcie_host_ops	*ops;
--	int			msi_irq;
-+	/* msi irq domain */
- 	struct irq_domain	*irq_domain;
- 	unsigned long		msi_data;
- 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
++	ks_phy = devm_kzalloc(dev, sizeof(*ks_phy), GFP_KERNEL);
++	if (!ks_phy)
++		return -ENOMEM;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg_serdes");
++	ks_phy->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ks_phy->base))
++		return PTR_ERR(ks_phy->base);
++
++	ks_phy->dev = dev;
++	phy = devm_phy_create(dev, &ks_serdes_phy_ops, NULL);
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
++
++	phy_set_drvdata(phy, ks_phy);
++	phy_provider = devm_of_phy_provider_register(ks_phy->dev,
++				of_phy_simple_xlate);
++
++	if (IS_ERR(phy_provider))
++		return PTR_ERR(phy_provider);
++
++	dev_info(dev, "Keystone SerDes phy initialized\n");
++	return 0;
++}
++
++static const struct of_device_id ks_serdes_phy_of_match[] = {
++	{ .compatible = "ti,keystone-serdes-phy" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, ks_serdes_phy_of_match);
++
++static struct platform_driver ks_serdes_phy_driver = {
++	.probe	= ks_serdes_phy_probe,
++	.driver = {
++		.of_match_table	= ks_serdes_phy_of_match,
++		.name  = "ti,keystone-serdes-phy",
++		.owner = THIS_MODULE,
++	}
++};
++module_platform_driver(ks_serdes_phy_driver);
++
++MODULE_DESCRIPTION("TI Keystone SerDes PHY driver");
++MODULE_LICENSE("GPL V2");
++MODULE_AUTHOR("Murali Karicheri <m-karicheri2@ti.com>");
 -- 
 1.7.9.5
