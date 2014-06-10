@@ -1,71 +1,43 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 10 Jun 2014 10:40:40 -0300
-Subject: [RFC/PATCH] ARM: mvebu: Don't apply the quirks if the SoC
- revision is unknown
-In-Reply-To: <5621673.VW5TXctBgm@wuerfel>
-References: <1402342036-9168-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <5621673.VW5TXctBgm@wuerfel>
-Message-ID: <20140610134040.GA1991@arch.cereza>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 10 Jun 2014 15:47:14 +0200
+Subject: [PATCH v5 0/2] i2c: sunxi: add P2WI controller support
+Message-ID: <1402408036-5235-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-Thanks for taking a look.
+This series adds support for the P2WI block used by some Allwinner boards
+to interface with the AXP221 PMIC.
 
-On 10 Jun 10:21 AM, Arnd Bergmann wrote:
-> On Monday 09 June 2014 16:27:16 Ezequiel Garcia wrote:
-> > We currently skip the I2C and thermal quirks only if the SoC revision is
-> > known to be one that does not need them. If the SoC revision cannot be
-> > obtained, the current behavior is to apply the quirk assuming it's needed.
-> > 
-> > This commit changes this, by requiring the SoC revision to be known in order
-> > to peform a quirk.
-> 
-> This clearly needs a better description if we want to apply it. We had
-> a rather long discussion when the code was first added exactly this
-> way and you should explain which of the assumptions we made back then
-> are now incorrect.
-> 
-> Is it ever wrong (as opposed to inefficient) to apply the quirk even on a
-> newer SoC?
-> 
+Best Regards,
 
-Yes, for the thermal quirk it is wrong as it consists in changing the compatible
-string and moving the registers around.
+Boris
 
-So if you apply the quirk on a SoC that doesn't need it, thermal won't work.
+Changes since v4:
+- add P2WI protocol description in driver header comment
+- remove unneeded i2c address check
+- remove unneeded irq field from p2wi struct
 
-> IIRC, the reasoning was that almost all machines have the new SoC version,
+Changes since v3:
+- update the DT bindings doc
+- fix a comment that was no longer true
 
-Agreed, and that's why I think it's better to *not* apply the quirk unless the
-SoC revision can be properly obtained and matched as needing it.
+Changes since v2:
+- drop the initialization (switch from I2C to P2WI mode) part
+- print devm_ioremap_resource err code
 
-> so they should have their DTs marked with the correct IDs already.
-> 
+Boris BREZILLON (2):
+  i2c: sunxi: add P2WI DT bindings documentation
+  i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface) controller support
 
-Hm.. I guess the I2C and thermal quirks don't work the same way. Here's how
-the latter works.
+ .../devicetree/bindings/i2c/i2c-sunxi-p2wi.txt     |  41 +++
+ drivers/i2c/busses/Kconfig                         |  12 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-sun6i-p2wi.c                | 356 +++++++++++++++++++++
+ 4 files changed, 410 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
+ create mode 100644 drivers/i2c/busses/i2c-sun6i-p2wi.c
 
-The driver supports two different compatible strings:
-"armada375-thermal" and "armada375-z1-thermal". However, we don't expect the
-user to know the revision, so the quirk code detects the SoC revision and
-changes the compatible string if needed.
-
-In addition, given the register offsets are different in the Z1 revision,
-we workaround that by moving them in the quirk code, before the thermal
-driver probes.
-
-So, there's no "correct ID in the devicetree", as we assume the devicetree
-works for the new SoC and only apply changes if we detect the SoC revision
-needs the workaround.
-
-Under this scheme, this commit makes a requirement to know the SoC revision
-before applying a quirk, where the current code applies it blindly.
-
-However, I'm not sure if this is correct for the I2C quirk. Maybe I was
-too fast assuming it was.
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.3.2
