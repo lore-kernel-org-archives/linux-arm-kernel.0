@@ -1,39 +1,40 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 10 Jun 2014 20:56:37 +0200
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
-References: <20140328184517.GA27219@cbox>
- <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
- <53973AA8.9020301@codeaurora.org>
- <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
-Message-ID: <539754E5.3030408@redhat.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 10 Jun 2014 13:59:25 -0500
+Subject: [PATCH] mmc: sdhci-msm: Fix fallout from sdhci refactoring
+In-Reply-To: <1402424839-25514-1-git-send-email-sboyd@codeaurora.org>
+References: <1402424839-25514-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <BB4C39AE-74FB-4F10-B08C-CA036C11F1D5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 10/06/2014 20:08, Peter Maydell ha scritto:
-> On 10 June 2014 18:04, Christopher Covington <cov@codeaurora.org> wrote:
->> On 06/10/2014 10:42 AM, Peter Maydell wrote:
->>> I just noticed that this doesn't mandate that the platform
->>> provides an RTC. As I understand it, the UEFI spec mandates
->>> that there's an RTC (could somebody more familiar with UEFI
->>> than me confirm/deny that?) so we should probably put one here.
->>
->> Pardon my ignorance, but what exactly disqualifies Generic Timer
->> implementations from being used as Real Time Clocks?
->
-> So my naive view was that an RTC actually had to have
-> support for dealing with real (wall) clock time, ie
-> knowing it's 2014 and not 1970. The generic timers are
-> just timers. Or am I wrong and UEFI doesn't really
-> require that?
 
-The real-time clock provides four UEFI runtime services (GetTime, 
-SetTime, GetWakeupTime, SetWakeupTime).  The spec says that you can 
-return EFI_DEVICE_ERROR from GetTime/SetTime if "the time could not be 
-retrieved/set due to a hardware error", but I don't think this is enough 
-to make these two optional.  By comparison, GetWakeupTime/SetWakeupTime 
-can also return EFI_UNSUPPORTED.
+On Jun 10, 2014, at 1:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-So I agree that the RTC is required in UEFI.
+> The sdhci core was refactored recently and some of those
+> refactorings required changes in every sdhci platform driver.
+> Those updates happened around the same time as when the msm
+> driver was merged so the refactorings missed the msm driver.
+> Hook in the basic library functions so that we can boot apq8074
+> dragonboards again instead of crashing when we try to jump to
+> NULL function pointers.
+> 
+> Reported-by: Kevin Hilman <khilman@linaro.org>
+> Cc: Georgi Djakov <gdjakov@mm-sol.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> 
+> Patch based on next-20140610
+> 
+> drivers/mmc/host/sdhci-msm.c | 4 ++++
+> 1 file changed, 4 insertions(+)
 
-Paolo
+Acked-by: Kumar Gala <galak@codeaurora.org>
+
+Feel free to pick up this version of the patch and ignore mine.
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
