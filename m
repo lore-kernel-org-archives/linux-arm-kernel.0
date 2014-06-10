@@ -1,128 +1,36 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Tue, 10 Jun 2014 14:43:15 +0200
-Subject: [PATCH v3 2/4] crypto: Update makefile and Kconfig for Security System
+Date: Tue, 10 Jun 2014 14:43:17 +0200
+Subject: [PATCH v3 4/4] ARM: sunxi: dt: Add DT bindings documentation for
+ SUNXI Security System
 In-Reply-To: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1402404197-4236-3-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1402404197-4236-5-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add necessary changes for configuring and compiling the Security System driver.
+This patch adds documentation for Device-Tree bindings for the Security
+System cryptographic accelerator driver.
 
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/Kconfig  | 91 +++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/crypto/Makefile |  1 +
- 2 files changed, 92 insertions(+)
+ Documentation/devicetree/bindings/crypto/sunxi-ss.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/sunxi-ss.txt
 
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 03ccdb0..ed1c918 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -418,4 +418,95 @@ config CRYPTO_DEV_MXS_DCP
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called mxs-dcp.
- 
-+config CRYPTO_DEV_SUNXI_SS
-+	tristate "Support for Allwinner Security System cryptographic accelerator"
-+	depends on ARCH_SUNXI
-+	help
-+	  Some Allwinner SoC have a crypto accelerator named
-+	  Security System. Select this if you want to use it.
+diff --git a/Documentation/devicetree/bindings/crypto/sunxi-ss.txt b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
+new file mode 100644
+index 0000000..a566803
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
+@@ -0,0 +1,9 @@
++* Allwinner Security System found on A20 SoC
 +
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called sunxi-ss.
++Required properties:
++- compatible : Should be "allwinner,sun7i-a20-crypto".
++- reg: Should contain the Security System register location and length.
++- interrupts: Should contain the IRQ line for the Security System.
++- clocks : A phandle to the functional clock node of the Security System module
++- clock-names : Name of the functional clock, should be "ahb" and "mod".
 +
-+if CRYPTO_DEV_SUNXI_SS
-+config CRYPTO_DEV_SUNXI_SS_PRNG
-+	tristate "Security System PRNG"
-+	select CRYPTO_RNG2
-+	help
-+	  If you enable this option, the SS will provide a pseudo random
-+	  number generator.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called sunxi-ss-prng.
-+
-+config CRYPTO_DEV_SUNXI_SS_HASH
-+	tristate "Security System hash common"
-+	help
-+	  Common parts of Security System shared by hash algorithms.
-+
-+config CRYPTO_DEV_SUNXI_SS_CIPHER
-+	tristate "Security System cipher common"
-+	help
-+	  Common parts of Security System shared by cipher algorithms.
-+
-+config CRYPTO_DEV_SUNXI_SS_MD5
-+	tristate "Security System MD5"
-+	select CRYPTO_MD5
-+	select CRYPTO_DEV_SUNXI_SS_HASH
-+	help
-+	  If you enable this option, the SS will provide MD5 hardware
-+	  acceleration.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called sunxi-ss-md5.
-+
-+config CRYPTO_DEV_SUNXI_SS_SHA1
-+	tristate "Security System SHA1"
-+	select CRYPTO_SHA1
-+	select CRYPTO_DEV_SUNXI_SS_HASH
-+	help
-+	  If you enable this option, the SS will provide SHA1 hardware
-+	  acceleration.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called sunxi-ss-sha1.
-+
-+config CRYPTO_DEV_SUNXI_SS_AES
-+	tristate "Security System AES"
-+	select CRYPTO_AES
-+	select CRYPTO_BLKCIPHER
-+	select CRYPTO_DEV_SUNXI_SS_CIPHER
-+	help
-+	  If you enable this option, the SS will provide AES hardware
-+	  acceleration.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called sunxi-ss-aes.
-+
-+config CRYPTO_DEV_SUNXI_SS_DES
-+	tristate "Security System DES"
-+	select CRYPTO_DES
-+	select CRYPTO_BLKCIPHER
-+	select CRYPTO_DEV_SUNXI_SS_CIPHER
-+	help
-+	  If you enable this option, the SS will provide DES hardware
-+	  acceleration.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called sunxi-ss-des.
-+
-+config CRYPTO_DEV_SUNXI_SS_3DES
-+	tristate "Security System 3DES"
-+	select CRYPTO_DES
-+	select CRYPTO_BLKCIPHER
-+	select CRYPTO_DEV_SUNXI_SS_CIPHER
-+	help
-+	  If you enable this option, the SS will provide 3DES hardware
-+	  acceleration.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called sunxi-ss-3des.
-+
-+endif #CRYPTO_DEV_SUNXI_SS
-+
- endif # CRYPTO_HW
-diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
-index 482f090..855292a 100644
---- a/drivers/crypto/Makefile
-+++ b/drivers/crypto/Makefile
-@@ -23,3 +23,4 @@ obj-$(CONFIG_CRYPTO_DEV_S5P) += s5p-sss.o
- obj-$(CONFIG_CRYPTO_DEV_SAHARA) += sahara.o
- obj-$(CONFIG_CRYPTO_DEV_TALITOS) += talitos.o
- obj-$(CONFIG_CRYPTO_DEV_UX500) += ux500/
-+obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS) += sunxi-ss/
 -- 
 1.8.5.5
