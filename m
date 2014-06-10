@@ -1,19 +1,26 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 10 Jun 2014 14:51:25 -0400
-Subject: [PATCH v2 6/8] phy: Add serdes phy driver for keystone
+Date: Tue, 10 Jun 2014 14:51:26 -0400
+Subject: [PATCH v2 7/8] PCI: keystone: add pcie driver based on designware
+ core driver
 In-Reply-To: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
 References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1402426287-31157-7-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1402426287-31157-8-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This phy driver added to support keystone PCI driver. This is
-a generic phy driver and can work with multiple hardware IPs
-available on Keystone SoC. The hw vendor that provides the phy
-hw published only registers and their values. So this driver
-uses these hard coded values to initialize the phy.
+keystone pcie hardware is based on designware version 3.65.
+This driver make use of the functions from pci-dw-old.c and
+pci-dw-old-msi.c to implement the driver.
+
+Driver mainly handle the platform specific part of the
+PCI driver and depends on DW Old driver to configure
+application specific registers. Also routes the irq events
+and ack the interrupt after the same is acked by the end
+point device driver. This requires irqchip implementation
+for legacy and MSI irq handling.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
 CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
 CC: Russell King <linux@arm.linux.org.uk>
@@ -35,304 +42,575 @@ CC: Randy Dunlap <rdunlap@infradead.org>
 CC: Grant Likely <grant.likely@linaro.org> 
 
 ---
- .../bindings/phy/phy-keystone-serdes.txt           |   25 +++
- drivers/phy/Kconfig                                |    6 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-keystone-serdes.c                  |  230 ++++++++++++++++++++
- 4 files changed, 262 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
- create mode 100644 drivers/phy/phy-keystone-serdes.c
+ .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
+ .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
+ drivers/pci/host/Kconfig                           |    7 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-keystone.c                    |  418 ++++++++++++++++++++
+ 5 files changed, 524 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
+ create mode 100644 drivers/pci/host/pci-keystone.c
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt b/Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
+diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+index d6fae13..3ea00f9 100644
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -81,3 +81,45 @@ Board specific DT Entry:
+ 	pcie at 2a0000 {
+ 		reset-gpio = <&pin_ctrl 22 0>;
+ 	};
++
++* Synopsys Designware PCIe interface for v3.65 hardware.
++========================================================
++
++v3.65 hardware has application registers for msi/irq and inbound/outbound
++translation configuration. So the core designware driver has changes to
++support this difference in hardware. Following are the diffs:-
++
++Required Properties:
++- compatible: should contain additionally "snps,dw-pcie-v3.65" to identify
++  v3.65 hardware.
++- reg: index0 should be base addresses and lengths of the config space (first
++  4K for RC and next 4K for EP). index1 is base address and length of
++  application space (4K). Other indexes are specific to an implementation.
++- interrupts: N/A
++- clock-names: from common clock binding: should be "pcie"
++
++Other Required properties are present
++
++Example
++
++	pcie at 21800000 {
++		compatible = "ti,keystone-pcie", "snps,dw-pcie-v3.65", "snps,dw-pcie";
++		device_type = "pci";
++		clocks = <&clkpcie>;
++		clock-names = "pcie";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		reg =  <0x21801000 0x2000>, <0x21800000 0x1000>;
++
++		ranges = <0x81000000 0 0x00000000 0x24000000 0 0x00004000   /* downstream I/O */
++			  0x82000000 0 0x50000000 0x50000000 0 0x10000000>; /* non-prefetchable memory */
++
++		num-lanes = <2>;
++
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0 0 0 1 &pcie_intc 0>, // INT A
++				<0 0 0 2 &pcie_intc 1>, // INT B
++				<0 0 0 3 &pcie_intc 2>, // INT C
++				<0 0 0 4 &pcie_intc 3>; // INT D
++	};
+diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
 new file mode 100644
-index 0000000..612c7b5
+index 0000000..dd72cb2
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
-@@ -0,0 +1,25 @@
-+TI Keystone SerDes Phy: DT documentation
-+=======================================
++++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+@@ -0,0 +1,56 @@
++DT binding documentation for Keystone PCI Controller
++====================================================
 +
-+Required properties:
-+ - compatible: should be "ti,keystone-serdes-phy";
-+ - reg: base address and length of the SerDes register set
-+ - reg-names: should be "reg_serdes", name of the reg SerDes register set
-+ - #phy-cells: from the generic phy bindings, must be 0;
++Keystone PCI Controller is compliant to Designware PCI controller v3.65.
++Please refer to Documentation/devicetree/bindings/pci/designware-pci.txt
++for the details. Additional attributes are described here.
 +
-+Exampel for Keystone PCIE,
++Required Properties:-
 +
-+		pcie0_phy: serdes_phy at 2320000 {
-+			#phy-cells = <0>;
-+			compatible = "ti,keystone-serdes-phy";
-+			reg = <0x02320000 0x4000>;
-+			reg-names = "reg_serdes";
-+		};
++reg:  index 2 is the base address and length of PCI mode configuration register
++      index 3 is the base address and length of PCI device ID register.
 +
++pcie_msi_intc : Interrupt controller device node for MSI irq chip
++	interrupt-cells: should be set to 1
++	interrupt-parent: Parent interrupt controller phandle
++	interrupts: GIC interrupt lines connected to PCI MSI interrupt lines
 +
-+Then the PHY can be used in PCIe controller node as
++ Example:
++	pcie_msi_intc: msi-interrupt-controller {
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 30 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 31 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 32 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 33 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 34 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 35 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
++	};
 +
-+pcie at 21800000 {
-+	phys = <&pcie0_phy>;
-+	phy-names = "pcie-phy";
-+};
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 4906c27..8b652a4 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -167,4 +167,10 @@ config PHY_XGENE
- 	help
- 	  This option enables support for APM X-Gene SoC multi-purpose PHY.
++pcie_intc: Interrupt controller device node for Legacy irq chip
++	interrupt-cells: should be set to 1
++	interrupt-parent: Parent interrupt controller phandle
++	interrupts: GIC interrupt lines connected to PCI Legacy interrupt lines
++
++ Example:
++	pcie_intc: legacy-interrupt-controller {
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 27 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
++			<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
++	};
++
++Optional properties:-
++	phys: phandle to Generic Keystone SerDes phy for PCI
++	phy-names: name of the Generic Keystine SerDes phy for PCI
++	  - If boot loader already does PCI link establishment, then phys and
++	    phy-names shouldn't be present.
++	ti,enable-linktrain - Enable Link training.
++	  - If boot loader already does PCI link establishment, then this
++	    shouldn't be present.
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 2fcd9f9..a019b77 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -38,4 +38,11 @@ config PCI_RCAR_GEN2
+ 	  There are 3 internal PCI controllers available with a single
+ 	  built-in EHCI/OHCI host controller present on each one.
  
-+config PHY_TI_KEYSTONE_SERDES
-+	bool "TI Keystone SerDes PHY support"
++config PCI_KEYSTONE
++	bool "TI Keystone PCIe controller"
 +	depends on ARCH_KEYSTONE
-+	select GENERIC_PHY
-+	help
-+	  This option enables support for TI Keystone SerDes PHY.
++	select PCIE_DW
++	select PCI_DW_V3_65
++	select PCIEPORTBUS
++	select PHY_TI_KEYSTONE_SERDES
  endmenu
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 7728518..c9f2dd4 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -19,3 +19,4 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
- phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
- phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
- obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-+obj-$(CONFIG_PHY_TI_KEYSTONE_SERDES)	+= phy-keystone-serdes.o
-diff --git a/drivers/phy/phy-keystone-serdes.c b/drivers/phy/phy-keystone-serdes.c
+diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+index b44a878..d7c1857 100644
+--- a/drivers/pci/host/Makefile
++++ b/drivers/pci/host/Makefile
+@@ -5,3 +5,4 @@ obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
+ obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
+ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
+ obj-$(CONFIG_PCI_DW_V3_65) += pci-dw-v3_65-msi.o pci-dw-v3_65.o
++obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone.o
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
 new file mode 100644
-index 0000000..6d52ab4
+index 0000000..d82ac7f
 --- /dev/null
-+++ b/drivers/phy/phy-keystone-serdes.c
-@@ -0,0 +1,230 @@
++++ b/drivers/pci/host/pci-keystone.c
+@@ -0,0 +1,418 @@
 +/*
-+ * Keystone SerDes Phy driver code
++ * PCIe host controller driver for Texas Instruments Keystone SoCs
 + *
-+ * Copyright (C) 2013-2014 Texas Instruments, Inc.
++ * Copyright (C) 2013-2014 Texas Instruments., Ltd.
 + *		http://www.ti.com
 + *
 + * Author: Murali Karicheri <m-karicheri2@ti.com>
++ * Implementation based on pci-exynos.c and pcie-designware.c
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
++#include <linux/irqchip/chained_irq.h>
 +#include <linux/clk.h>
 +#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
++#include <linux/irqdomain.h>
 +#include <linux/module.h>
++#include <linux/msi.h>
++#include <linux/of_irq.h>
 +#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/phy/phy.h>
++#include <linux/of_pci.h>
 +#include <linux/platform_device.h>
++#include <linux/phy/phy.h>
++#include <linux/resource.h>
++#include <linux/signal.h>
 +
-+#define reg_dump(addr, mask) \
-+		pr_debug("reg %p has value %x\n", (void *)addr, \
-+			(readl(addr) & ~mask))
++#include "pcie-designware.h"
++#include "pci-dw-v3_65.h"
 +
-+/* mask bits point to bits being modified */
-+#define reg_rmw(addr, value, mask) \
-+		writel(((readl(addr) & (~(mask))) | \
-+			(value & (mask))), (addr))
-+struct serdes_config {
-+	u32 reg;
-+	u32 val;
-+	u32 mask;
++#define DRIVER_NAME	"keystone-pcie"
++
++/* driver specific constants */
++#define MAX_MSI_HOST_IRQS		8
++#define MAX_LEGACY_HOST_IRQS		4
++
++/* RC mode settings */
++#define PCIE_RC_MODE		(BIT(2))
++#define PCIE_MODE_MASK		(BIT(1) | BIT(2))
++
++/* DEV_STAT_CTRL */
++#define PCIE_CAP_BASE       0x70
++
++struct keystone_pcie {
++	struct	clk		*clk;
++	int			en_link_train;
++	struct	pcie_port	pp;
++	void __iomem		*va_reg_pciid;
++
++	int			num_legacy_host_irqs;
++	int			legacy_host_irqs[MAX_LEGACY_HOST_IRQS];
++	struct			device_node *legacy_intc_np;
++
++	int			num_msi_host_irqs;
++	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
++	struct			device_node *msi_intc_np;
 +};
 +
-+struct ks_serdes_phy {
-+	struct device *dev;
-+	void __iomem *base;
-+};
++#define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
 +
-+static struct serdes_config ks_100mhz_5gbps_serdes[] = {
-+	{0x0000, 0x00000800, 0x0000ff00},
-+	{0x0060, 0x00041c5c, 0x00ffffff},
-+	{0x0064, 0x0343c700, 0xffffff00},
-+	{0x006c, 0x00000012, 0x000000ff},
-+	{0x0068, 0x00070000, 0x00ff0000},
-+	{0x0078, 0x0000c000, 0x0000ff00},
-+
-+	{0x0200, 0x00000000, 0x000000ff},
-+	{0x0204, 0x5e000080, 0xff0000ff},
-+	{0x0208, 0x00000006, 0x000000ff},
-+	{0x0210, 0x00000023, 0x000000ff},
-+	{0x0214, 0x2e003060, 0xff00ffff},
-+	{0x0218, 0x76000000, 0xff000000},
-+	{0x022c, 0x00200002, 0x00ff00ff},
-+	{0x02a0, 0xffee0000, 0xffff0000},
-+	{0x02a4, 0x0000000f, 0x000000ff},
-+	{0x0204, 0x5e000000, 0xff000000},
-+	{0x0208, 0x00000006, 0x000000ff},
-+	{0x0278, 0x00002000, 0x0000ff00},
-+	{0x0280, 0x00280028, 0x00ff00ff},
-+	{0x0284, 0x2d0f0385, 0xffffffff},
-+	{0x0250, 0xd0000000, 0xff000000},
-+	{0x0284, 0x00000085, 0x000000ff},
-+	{0x0294, 0x20000000, 0xff000000},
-+
-+	{0x0400, 0x00000000, 0x000000ff},
-+	{0x0404, 0x5e000080, 0xff0000ff},
-+	{0x0408, 0x00000006, 0x000000ff},
-+	{0x0410, 0x00000023, 0x000000ff},
-+	{0x0414, 0x2e003060, 0xff00ffff},
-+	{0x0418, 0x76000000, 0xff000000},
-+	{0x042c, 0x00200002, 0x00ff00ff},
-+	{0x04a0, 0xffee0000, 0xffff0000},
-+	{0x04a4, 0x0000000f, 0x000000ff},
-+	{0x0404, 0x5e000000, 0xff000000},
-+	{0x0408, 0x00000006, 0x000000ff},
-+	{0x0478, 0x00002000, 0x0000ff00},
-+	{0x0480, 0x00280028, 0x00ff00ff},
-+	{0x0484, 0x2d0f0385, 0xffffffff},
-+	{0x0450, 0xd0000000, 0xff000000},
-+	{0x0494, 0x20000000, 0xff000000},
-+
-+	{0x0604, 0x00000080, 0x000000ff},
-+	{0x0600, 0x00000000, 0x000000ff},
-+	{0x0604, 0x5e000000, 0xff000000},
-+	{0x0608, 0x00000006, 0x000000ff},
-+	{0x0610, 0x00000023, 0x000000ff},
-+	{0x0614, 0x2e003060, 0xff00ffff},
-+	{0x0618, 0x76000000, 0xff000000},
-+	{0x062c, 0x00200002, 0x00ff00ff},
-+	{0x06a0, 0xffee0000, 0xffff0000},
-+	{0x06a4, 0x0000000f, 0x000000ff},
-+	{0x0604, 0x5e000000, 0xff000000},
-+	{0x0608, 0x00000006, 0x000000ff},
-+	{0x0678, 0x00002000, 0x0000ff00},
-+	{0x0680, 0x00280028, 0x00ff00ff},
-+	{0x0684, 0x2d0f0385, 0xffffffff},
-+	{0x0650, 0xd0000000, 0xff000000},
-+	{0x0694, 0x20000000, 0xff000000},
-+
-+	{0x0800, 0x00000000, 0x000000ff},
-+	{0x0804, 0x5e000080, 0xff0000ff},
-+	{0x0808, 0x00000006, 0x000000ff},
-+	{0x0810, 0x00000023, 0x000000ff},
-+	{0x0814, 0x2e003060, 0xff00ffff},
-+	{0x0818, 0x76000000, 0xff000000},
-+	{0x082c, 0x00200002, 0x00ff00ff},
-+	{0x08a0, 0xffee0000, 0xffff0000},
-+	{0x08a4, 0x0000000f, 0x000000ff},
-+	{0x0804, 0x5e000000, 0xff000000},
-+	{0x0808, 0x00000006, 0x000000ff},
-+	{0x0878, 0x00002000, 0x0000ff00},
-+	{0x0880, 0x00280028, 0x00ff00ff},
-+	{0x0884, 0x2d0f0385, 0xffffffff},
-+	{0x0850, 0xd0000000, 0xff000000},
-+	{0x0894, 0x20000000, 0xff000000},
-+
-+	{0x0a00, 0x00000100, 0x0000ff00},
-+	{0x0a08, 0x00e12c08, 0x00ffffff},
-+	{0x0a0c, 0x00000081, 0x000000ff},
-+	{0x0a18, 0x00e80000, 0x00ff0000},
-+	{0x0a30, 0x002f2f00, 0x00ffff00},
-+	{0x0a4c, 0xac820000, 0xffff0000},
-+	{0x0a54, 0xc0000000, 0xff000000},
-+	{0x0a58, 0x00001441, 0x0000ffff},
-+	{0x0a84, 0x00000301, 0x0000ffff},
-+
-+	{0x0a8c, 0x81030000, 0xffff0000},
-+	{0x0a90, 0x00006001, 0x0000ffff},
-+	{0x0a94, 0x01000000, 0xff000000},
-+	{0x0aa0, 0x81000000, 0xff000000},
-+	{0x0abc, 0xff000000, 0xff000000},
-+	{0x0ac0, 0x0000008b, 0x000000ff},
-+
-+	{0x0000, 0x00000003, 0x000000ff},
-+	{0x0a00, 0x0000009f, 0x000000ff},
-+
-+	{0x0a44, 0x5f733d00, 0xffffff00},
-+	{0x0a48, 0x00fdca00, 0x00ffff00},
-+	{0x0a5c, 0x00000000, 0xffff0000},
-+	{0x0a60, 0x00008000, 0xffffffff},
-+	{0x0a64, 0x0c581220, 0xffffffff},
-+	{0x0a68, 0xe13b0602, 0xffffffff},
-+	{0x0a6c, 0xb8074cc1, 0xffffffff},
-+	{0x0a70, 0x3f02e989, 0xffffffff},
-+	{0x0a74, 0x00000001, 0x000000ff},
-+	{0x0b14, 0x00370000, 0x00ff0000},
-+	{0x0b10, 0x37000000, 0xff000000},
-+	{0x0b14, 0x0000005d, 0x000000ff},
-+};
-+
-+static int ks_serdes_phy_init(struct phy *phy)
++static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
 +{
-+	struct serdes_config *p;
-+	struct ks_serdes_phy *ks_phy = phy_get_drvdata(phy);
++	struct pcie_port *pp = &ks_pcie->pp;
++	int count = 200;
 +
++	dw_pcie_setup_rc(pp);
++
++	/* check if the link is up or not */
++	while (!dw_pcie_link_up(pp)) {
++		usleep_range(100, 1000);
++		if (--count)
++			continue;
++		dev_err(pp->dev, "phy link never came up\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static void ks_pcie_msi_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
++	u32 offset = irq - ks_pcie->msi_host_irqs[0];
++	struct pcie_port *pp = &ks_pcie->pp;
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++
++	dev_dbg(pp->dev, "ks_pcie_msi_irq_handler, irq %d\n", irq);
++
++	/*
++	 * The chained irq handler installation would have replaced normal
++	 * interrupt driver handler so we need to take care of mask/unmask and
++	 * ack operation.
++	 */
++	chained_irq_enter(chip, desc);
++	dw_v3_65_handle_msi_irq(pp, offset);
++	chained_irq_exit(chip, desc);
++}
++
++/**
++ * ks_pcie_legacy_irq_handler() - Handle legacy interrupt
++ * @irq: IRQ line for legacy interrupts
++ * @desc: Pointer to irq descriptor
++ *
++ * Traverse through pending legacy interrupts and invoke handler for each. Also
++ * takes care of interrupt controller level mask/ack operation.
++ */
++static void ks_pcie_legacy_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
++	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct pcie_port *pp = &ks_pcie->pp;
++
++	dev_dbg(ks_pcie->pp.dev, ": Handling legacy irq %d\n", irq);
++
++	/*
++	 * The chained irq handler installation would have replaced normal
++	 * interrupt driver handler so we need to take care of mask/unmask and
++	 * ack operation.
++	 */
++	chained_irq_enter(chip, desc);
++	dw_v3_65_handle_legacy_irq(pp, irq_offset);
++	chained_irq_exit(chip, desc);
++}
++
++static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
++					   char *controller, int *num_irqs)
++{
++	int temp, max_host_irqs, legacy = 1, *host_irqs, ret = -EINVAL;
++	struct device *dev = ks_pcie->pp.dev;
++	struct device_node *np_pcie = dev->of_node, **np_temp;
++
++	if (!strcmp(controller, "msi-interrupt-controller"))
++		legacy = 0;
++
++	if (legacy) {
++		np_temp = &ks_pcie->legacy_intc_np;
++		max_host_irqs = MAX_LEGACY_HOST_IRQS;
++		host_irqs = &ks_pcie->legacy_host_irqs[0];
++	} else {
++		np_temp = &ks_pcie->msi_intc_np;
++		max_host_irqs = MAX_MSI_HOST_IRQS;
++		host_irqs =  &ks_pcie->msi_host_irqs[0];
++	}
++
++	/* interrupt controller is in a child node */
++	*np_temp = of_find_node_by_name(np_pcie, controller);
++	if (!(*np_temp)) {
++		dev_err(dev, "Node for %s is absent\n", controller);
++		goto out;
++	}
++	temp = of_irq_count(*np_temp);
++	if (!temp)
++		goto out;
++	if (temp > max_host_irqs)
++		dev_warn(dev, "Too many %s interrupts defined %u\n",
++			(legacy ? "legacy" : "MSI"), temp);
++
++	/*
++	 * support upto max_host_irqs. In dt from index 0 to 3 (legacy) or 0 to
++	 * 7 (MSI)
++	 */
++	for (temp = 0; temp < max_host_irqs; temp++) {
++		host_irqs[temp] = irq_of_parse_and_map(*np_temp, temp);
++		if (host_irqs[temp] < 0)
++			break;
++	}
++	if (temp) {
++		*num_irqs = temp;
++		ret = 0;
++	}
++out:
++	return ret;
++}
++
++static void ks_pcie_enable_interrupts(struct keystone_pcie *ks_pcie)
++{
++	struct pcie_port *pp = &ks_pcie->pp;
 +	int i;
 +
-+	for (i = 0, p = &ks_100mhz_5gbps_serdes[0];
-+		i < ARRAY_SIZE(ks_100mhz_5gbps_serdes);
-+		i++, p++) {
-+		reg_rmw((ks_phy->base + p->reg), p->val, p->mask);
-+		reg_dump((ks_phy->base + p->reg), p->mask);
++	/* Legacy IRQ */
++	for (i = 0; i < ks_pcie->num_legacy_host_irqs; i++) {
++		irq_set_handler_data(ks_pcie->legacy_host_irqs[i], ks_pcie);
++		irq_set_chained_handler(ks_pcie->legacy_host_irqs[i],
++					ks_pcie_legacy_irq_handler);
 +	}
-+	msleep(20);
++	dw_v3_65_enable_legacy_irqs(pp);
++
++	/* MSI IRQ */
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		for (i = 0; i < ks_pcie->num_msi_host_irqs; i++) {
++			irq_set_chained_handler(ks_pcie->msi_host_irqs[i],
++				ks_pcie_msi_irq_handler);
++			irq_set_handler_data(ks_pcie->msi_host_irqs[i],
++						ks_pcie);
++
++		}
++	}
++
++	return;
++}
++
++/*
++ * When a PCI device does not exist during config cycles, keystone host gets a
++ * bus error instead of returning 0xffffffff. This handler always returns 0
++ * for this kind of faults.
++ */
++static int
++keystone_pcie_fault(unsigned long addr, unsigned int fsr,
++		struct pt_regs *regs)
++{
++	unsigned long instr = *(unsigned long *) instruction_pointer(regs);
++
++	if ((instr & 0x0e100090) == 0x00100090) {
++		int reg = (instr >> 12) & 15;
++
++		regs->uregs[reg] = -1;
++		regs->ARM_pc += 4;
++	}
 +
 +	return 0;
 +}
 +
-+static struct phy_ops ks_serdes_phy_ops = {
-+	.init		= ks_serdes_phy_init,
-+	.owner		= THIS_MODULE,
++static void __init ks_pcie_host_init(struct pcie_port *pp)
++{
++	u32 vendor_device_id, val;
++	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
++
++	ks_pcie_establish_link(ks_pcie);
++	dw_v3_65_disable_bars(pp);
++	dw_v3_65_setup_ob_regs(pp);
++	ks_pcie_enable_interrupts(ks_pcie);
++	writew(PCI_IO_RANGE_TYPE_32 | (PCI_IO_RANGE_TYPE_32 << 8),
++			pp->dbi_base + PCI_IO_BASE);
++
++	/* update the Vendor ID */
++	vendor_device_id = readl(ks_pcie->va_reg_pciid);
++	writew((vendor_device_id >> 16), pp->dbi_base + PCI_DEVICE_ID);
++
++	/* update the DEV_STAT_CTRL to publish right mrrs */
++	val = readl(pp->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
++	val &= ~PCI_EXP_DEVCTL_READRQ;
++	/* set the mrrs to 256 bytes */
++	val |= BIT(12);
++	writel(val, pp->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
++
++	/*
++	 * PCIe access errors that result into OCP errors are caught by ARM as
++	 * "External aborts"
++	 */
++	hook_fault_code(17, keystone_pcie_fault, SIGBUS, 0,
++			"Asynchronous external abort");
++}
++
++int ks_pcie_link_up(struct pcie_port *pp)
++{
++	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
++
++	return dw_v3_65_pcie_link_up(pp, ks_pcie->en_link_train);
++}
++
++static struct pcie_host_ops keystone_pcie_host_ops = {
++	.rd_other_conf = dw_v3_65_rd_other_conf,
++	.wr_other_conf = dw_v3_65_wr_other_conf,
++	.link_up = ks_pcie_link_up,
++	.host_init = ks_pcie_host_init,
++	.get_msi_data = dw_v3_65_get_msi_data,
 +};
 +
-+static int ks_serdes_phy_probe(struct platform_device *pdev)
++static int add_pcie_port(struct keystone_pcie *ks_pcie,
++			 struct platform_device *pdev)
 +{
-+	struct phy_provider *phy_provider;
-+	struct device *dev = &pdev->dev;
-+	struct ks_serdes_phy *ks_phy;
-+	struct phy *phy;
-+	struct resource *res;
++	struct pcie_port *pp = &ks_pcie->pp;
++	int ret;
 +
-+	ks_phy = devm_kzalloc(dev, sizeof(*ks_phy), GFP_KERNEL);
-+	if (!ks_phy)
-+		return -ENOMEM;
++	ret = ks_pcie_get_irq_controller_info(ks_pcie,
++					"legacy-interrupt-controller",
++					&ks_pcie->num_legacy_host_irqs);
++	if (ret)
++		return ret;
 +
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg_serdes");
-+	ks_phy->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(ks_phy->base))
-+		return PTR_ERR(ks_phy->base);
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		ret = ks_pcie_get_irq_controller_info(ks_pcie,
++						"msi-interrupt-controller",
++						&ks_pcie->num_msi_host_irqs);
++		if (ret)
++			return ret;
++	}
 +
-+	ks_phy->dev = dev;
-+	phy = devm_phy_create(dev, &ks_serdes_phy_ops, NULL);
-+	if (IS_ERR(phy))
-+		return PTR_ERR(phy);
++	pp->root_bus_nr = -1;
++	pp->ops = &keystone_pcie_host_ops;
++	spin_lock_init(&pp->conf_lock);
++	ret = dw_v3_65_pcie_host_init(pp, ks_pcie->legacy_intc_np,
++				      ks_pcie->msi_intc_np);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to initialize host\n");
++		return ret;
++	}
 +
-+	phy_set_drvdata(phy, ks_phy);
-+	phy_provider = devm_of_phy_provider_register(ks_phy->dev,
-+				of_phy_simple_xlate);
-+
-+	if (IS_ERR(phy_provider))
-+		return PTR_ERR(phy_provider);
-+
-+	dev_info(dev, "Keystone SerDes phy initialized\n");
-+	return 0;
++	return ret;
 +}
 +
-+static const struct of_device_id ks_serdes_phy_of_match[] = {
-+	{ .compatible = "ti,keystone-serdes-phy" },
++static const struct of_device_id ks_pcie_of_match[] = {
++	{
++		.type = "pci",
++		.compatible = "ti,keystone-pcie",
++	},
 +	{ },
 +};
-+MODULE_DEVICE_TABLE(of, ks_serdes_phy_of_match);
++MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
 +
-+static struct platform_driver ks_serdes_phy_driver = {
-+	.probe	= ks_serdes_phy_probe,
-+	.driver = {
-+		.of_match_table	= ks_serdes_phy_of_match,
-+		.name  = "ti,keystone-serdes-phy",
-+		.owner = THIS_MODULE,
++static int __exit ks_pcie_remove(struct platform_device *pdev)
++{
++	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
++
++	clk_disable_unprepare(ks_pcie->clk);
++
++	return 0;
++}
++
++static int __init ks_pcie_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device *dev = &pdev->dev;
++	struct keystone_pcie *ks_pcie;
++	struct pcie_port *pp;
++	struct resource *res;
++	void __iomem *reg_p;
++	struct phy *phy;
++	int ret = 0;
++	u32 val;
++
++	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
++				GFP_KERNEL);
++	if (!ks_pcie) {
++		dev_err(dev, "no memory for keystone pcie\n");
++		return -ENOMEM;
 +	}
-+};
-+module_platform_driver(ks_serdes_phy_driver);
 +
-+MODULE_DESCRIPTION("TI Keystone SerDes PHY driver");
-+MODULE_LICENSE("GPL V2");
++	pp = &ks_pcie->pp;
++
++	/* If phy is initialized by a boot loader, the below can be skipped */
++	phy = devm_phy_get(dev, "pcie-phy");
++	if (phy) {
++		ret = phy_init(phy);
++		if (ret < 0)
++			return ret;
++	}
++
++	/* index 0 is the config reg. space address */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	pp->cfg = *res;
++
++	/* index 1 is the application reg. space address */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	pp->app = *res;
++
++	/* index 2 is the devcfg register for RC mode settings */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
++	reg_p = devm_ioremap_resource(dev, res);
++	if (IS_ERR(reg_p))
++		return PTR_ERR(reg_p);
++
++	/* enable RC mode in devcfg */
++	val = readl(reg_p);
++	val &= ~PCIE_MODE_MASK;
++	val |= PCIE_RC_MODE;
++	writel(val, reg_p);
++
++	/* index 3 is to read PCI DEVICE_ID */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
++	reg_p = devm_ioremap_resource(dev, res);
++	if (IS_ERR(reg_p))
++		return PTR_ERR(reg_p);
++	ks_pcie->va_reg_pciid = reg_p;
++
++	/* check if we need to enable link training */
++	ks_pcie->en_link_train =
++		(of_get_property(np, "ti,enable-linktrain", NULL) != NULL);
++
++	pp->dev = dev;
++	platform_set_drvdata(pdev, ks_pcie);
++	ks_pcie->clk = devm_clk_get(dev, "pcie");
++	if (IS_ERR(ks_pcie->clk)) {
++		dev_err(dev, "Failed to get pcie rc clock\n");
++		return PTR_ERR(ks_pcie->clk);
++	}
++	ret = clk_prepare_enable(ks_pcie->clk);
++	if (ret)
++		return ret;
++
++	ret = add_pcie_port(ks_pcie, pdev);
++	if (ret < 0)
++		goto fail_clk;
++
++	return 0;
++fail_clk:
++	clk_disable_unprepare(ks_pcie->clk);
++
++	return ret;
++}
++
++static struct platform_driver ks_pcie_driver __refdata = {
++	.probe  = ks_pcie_probe,
++	.remove = __exit_p(ks_pcie_remove),
++	.driver = {
++		.name	= "keystone-pcie",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(ks_pcie_of_match),
++	},
++};
++
++module_platform_driver(ks_pcie_driver);
++
 +MODULE_AUTHOR("Murali Karicheri <m-karicheri2@ti.com>");
++MODULE_DESCRIPTION("Keystone PCIe host controller driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.9.5
