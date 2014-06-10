@@ -1,48 +1,43 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 10 Jun 2014 13:21:50 -0700
-Subject: [PATCH 1/2 v2] spi: s3c64xx: use "cs-gpios" from spi node instead
- of "cs-gpio"
-In-Reply-To: <539763BF.1030209@gmail.com>
-References: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>
- <1402394881-31564-2-git-send-email-ch.naveen@samsung.com>
- <53976154.60308@gmail.com>
- <CAD=FV=X5nLM3Yqkvk+UqVZPFzVNHmPDn3y+euYDwZ3M2bG+0Cg@mail.gmail.com>
- <539763BF.1030209@gmail.com>
-Message-ID: <CAD=FV=V9Qd=aYDAkJuic2DbBaY=0E5UpNnnBHfEBqE5rvYLKVw@mail.gmail.com>
+From: dianders@google.com (Doug Anderson)
+Date: Tue, 10 Jun 2014 13:26:22 -0700
+Subject: exynos5420-peach-pi: linux-next boot fails unless mau_epll left
+ enabled?
+In-Reply-To: <539764AF.4090409@collabora.co.uk>
+References: <7hoay6sxjl.fsf@paris.lan>
+ <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
+ <CAOD6ATpZWEg9d7WnZ8tg9_uQJ29vMoucaOwh0_tbdRSDRj25cw@mail.gmail.com>
+ <CAD=FV=UsVQm_pLNtPwZMNCQQSSVrx=6M8eJrNRS8VyWMQzYtAQ@mail.gmail.com>
+ <539764AF.4090409@collabora.co.uk>
+Message-ID: <CAD=FV=UdCp0dG7tnzaSnWxhtnU46ttMOUht00DL=bfvbbt7mXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+Javier,
 
-On Tue, Jun 10, 2014 at 12:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 10.06.2014 21:58, Doug Anderson wrote:
->> Tomasz,
->>
->> On Tue, Jun 10, 2014 at 12:49 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> This is wrong. The "cs-gpios" property is supposed to be an array,
->>> indexed by chip select number of SPI devices (indicated by their "reg"
->>> properties).
->>>
->>> Moreover, is there a need to parse this manually in this driver? I can
->>> see respective parsing code in of_spi_register_master().
->>
->> I noticed this too (see my response), but I was confused about the
->> fact that nobody else uses the array created by
->> of_spi_register_master().  Any idea why?
+On Tue, Jun 10, 2014 at 1:03 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Yes, I did not have this issue before. However... I installed the latest Peach
+> pit recovery image you provided me and mainline kernel started to hang on boot.
+> I remembered this thread so tested Kevin's patch which make it boot again.
 >
-> Hmm, I can see of_spi_register_master() assigning allocated pointer to
-> master->cs_gpios, which is then used in spi_add_device() as follows:
+> You said that chain-booting u-boot runs the sound init code but did you try
+> booting a signed FIT image using the verified u-boot?
+
+Right, I'd bet that it's actually verified boot that's calling the
+sound init code (probably just in case it needs to beep at the user).
+...so this would happen even without chain booting.  I haven't tried
+signing / booting without chain booting, but I can totally believe it
+would hang just as easily.
+
+
+> I'm asking because I'm see the hang both when chain-booting nv-u-boot from a
+> kernel partition and booting a signed FIT image with the verified u-boot.
 >
->         if (master->cs_gpios)
->                 spi->cs_gpio = master->cs_gpios[spi->chip_select];
+> So it seems this is a regression in latest U-boot and I didn't run into this
+> before due having an older RW U-Boot on my Peach pit?
 
-OK.  I haven't traced through all the code, but I did notice:
-
-* spi-gpio.c: has its own cs_gpios[0], initted with of_get_named_gpio()
-* spi-dw-mmio.c, spi-efm32.c, spi-imx.c, spi-pl022.c, spi-sirf.c all
-seem to be looking at "cs-gpios" directly.
-
-...but I see now that you're right that most drivers don't need to
-actually look at cs_gpios and can just look at the device itself.
+You must have had a very old RW U-Boot, possibly one before audio
+support was added.  I think we just need to fix this in the kernel so
+it doesn't hang.
 
 -Doug
