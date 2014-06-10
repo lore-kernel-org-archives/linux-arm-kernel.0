@@ -1,69 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Jun 2014 16:36:04 +0200
-Subject: [PATCH v5 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
- controller support
-In-Reply-To: <6454089.IP8IFVsofj@wuerfel>
-References: <1402408036-5235-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402408036-5235-3-git-send-email-boris.brezillon@free-electrons.com>
- <6454089.IP8IFVsofj@wuerfel>
-Message-ID: <20140610143604.GC7054@lukather>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 10 Jun 2014 15:42:04 +0100
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <20140328184517.GA27219@cbox>
+References: <20140328184517.GA27219@cbox>
+Message-ID: <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 28 March 2014 18:45, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> ARM VM System Specification
+> ===========================
+>
 
-On Tue, Jun 10, 2014 at 03:54:56PM +0200, Arnd Bergmann wrote:
-> On Tuesday 10 June 2014 15:47:16 Boris BREZILLON wrote:
-> > 
-> > +config I2C_SUN6I_P2WI
-> > +       tristate "Allwinner sun6i internal P2WI controller"
-> > +       depends on ARCH_SUNXI
-> > +       help
-> > +         If you say yes to this option, support will be included for the
-> > +         P2WI (Push/Pull 2 Wire Interface) controller embedded in some sunxi
-> > +         SOCs.
-> > +         The P2WI looks like an SMBus controller (which supports only byte
-> > +         accesses), except that it only supports one slave device.
-> > +         This interface is used to connect to specific PMIC devices (like the
-> > +         AXP221).
-> > +
-> 
-> Sorry for the stupid question, but why is this an i2c driver if the
-> hardware protocol is completely different?
+> The virtual hardware platform must provide a number of mandatory
+> peripherals:
+>
+>   Serial console:  The platform should provide a console,
+>   based on an emulated pl011, a virtio-console, or a Xen PV console.
+>
+>   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
+>   limits the the number of virtual CPUs to 8 cores, newer GIC versions
+>   removes this limitation.
+>
+>   The ARM virtual timer and counter should be available to the VM as
+>   per the ARM Generic Timers specification in the ARM ARM [1].
 
-It's not completely different. It deviates, but still looks very
-similar to i2c, and to be precise, SMBus.
+I just noticed that this doesn't mandate that the platform
+provides an RTC. As I understand it, the UEFI spec mandates
+that there's an RTC (could somebody more familiar with UEFI
+than me confirm/deny that?) so we should probably put one here.
 
-You'll have the full discussion that led to do this in i2c here:
-http://www.spinics.net/lists/linux-i2c/msg15066.html
+Suggested wording:
 
-Also, one significant thing to take into account is that the
-communication with a device starts as I2C, only to switch to this
-protocol after some initialization sequence.
+ RTC: The platform should provide a real time clock, based
+ on an emulated pl031 or mc146818.
 
-> I understand that a lot of devices can be driven using either spi or
-> i2c, and we have two sets of {directories,maintainers,bus_types,...}
-> for them. Your description sounds like this is a separate option
-> that isn't any closer to i2c than it is to spi.
+and in the guest-support section later:
 
-That's not true. It's *much* closer from I2C than it is from SPI.
+ The guest OS must include support for pl031 and mc146818 RTC.
 
-> Would it perhaps be better to expose it only as a regmap rather than
-> an i2c host?
+(QEMU is going to provide a PL031, because that's the standard
+ARM primecell device for this and it's what's in the vexpress.
+kvmtool looks like it's going to provide mc146818, because
+that's the standard x86 RTC and kvmtool happens to already
+emulate that.)
 
-That could be a solution, but is it a common practice to define a bus
-adapter driver in a regmap driver?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140610/45786f14/attachment.sig>
+thanks
+-- PMM
