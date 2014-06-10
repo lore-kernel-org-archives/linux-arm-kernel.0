@@ -1,185 +1,160 @@
-From: clabbe.montjoie@gmail.com (Corentin LABBE)
-Date: Tue, 10 Jun 2014 09:36:16 +0200
-Subject: [linux-sunxi] [PATCH v2 1/4] crypto: Add Allwinner Security System
- crypto accelerator
-In-Reply-To: <CAGb2v65NdYrY3N0Oi8f7NtdWJYoiR0HnTk7n6hmG44BnDbZoyA@mail.gmail.com>
-References: <1402311551-19564-1-git-send-email-clabbe.montjoie@gmail.com>
- <1402311551-19564-2-git-send-email-clabbe.montjoie@gmail.com>
- <CAGb2v65NdYrY3N0Oi8f7NtdWJYoiR0HnTk7n6hmG44BnDbZoyA@mail.gmail.com>
-Message-ID: <5396B570.80608@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 10 Jun 2014 09:45:10 +0200
+Subject: [PATCH 0/5] Add Maxim 77802 PMIC support
+In-Reply-To: <53963B5D.8090908@collabora.co.uk>
+References: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402309011.17650.9.camel@AMDC1943>
+ <CAD=FV=U2zPJ=NohDjGvJKfmwJzQhphtVMefM0p_hvFVoReauhQ@mail.gmail.com>
+ <53963B5D.8090908@collabora.co.uk>
+Message-ID: <1402386310.6989.22.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/14 08:53, Chen-Yu Tsai wrote:
-> Hi,
+On wto, 2014-06-10 at 00:55 +0200, Javier Martinez Canillas wrote:
+> Hello Krzystof,
 > 
-> On Mon, Jun 9, 2014 at 6:59 PM, LABBE Corentin
-> <clabbe.montjoie@gmail.com> wrote:
->> Add support for the Security System included in Allwinner SoC A20.
->> The Security System is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
->>
->> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
->> ---
->>  drivers/crypto/sunxi-ss/Makefile               |  16 ++
->>  drivers/crypto/sunxi-ss/sunxi-ss-cipher-3des.c | 118 ++++++++
->>  drivers/crypto/sunxi-ss/sunxi-ss-cipher-aes.c  | 130 +++++++++
->>  drivers/crypto/sunxi-ss/sunxi-ss-cipher-des.c  | 118 ++++++++
->>  drivers/crypto/sunxi-ss/sunxi-ss-cipher.c      | 362 +++++++++++++++++++++++++
->>  drivers/crypto/sunxi-ss/sunxi-ss-cipher.h      |   8 +
->>  drivers/crypto/sunxi-ss/sunxi-ss-hash-md5.c    |  69 +++++
->>  drivers/crypto/sunxi-ss/sunxi-ss-hash-sha1.c   |  69 +++++
->>  drivers/crypto/sunxi-ss/sunxi-ss-hash.c        | 228 ++++++++++++++++
->>  drivers/crypto/sunxi-ss/sunxi-ss-hash.h        |   9 +
->>  drivers/crypto/sunxi-ss/sunxi-ss-rng.c         | 115 ++++++++
->>  drivers/crypto/sunxi-ss/sunxi-ss.c             | 190 +++++++++++++
->>  drivers/crypto/sunxi-ss/sunxi-ss.h             | 161 +++++++++++
->>  13 files changed, 1593 insertions(+)
->>  create mode 100644 drivers/crypto/sunxi-ss/Makefile
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher-3des.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher-aes.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher-des.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-cipher.h
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash-md5.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash-sha1.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-hash.h
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss-rng.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss.c
->>  create mode 100644 drivers/crypto/sunxi-ss/sunxi-ss.h
->>
->> diff --git a/drivers/crypto/sunxi-ss/Makefile b/drivers/crypto/sunxi-ss/Makefile
->> new file mode 100644
->> index 0000000..de4556b
->> --- /dev/null
->> +++ b/drivers/crypto/sunxi-ss/Makefile
->> @@ -0,0 +1,16 @@
->> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS) += sunxi-ss.o
->> +
->> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_PRNG) += sunxi-ss-rng.o
->> +
->> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_DES) += sunxi-ss-des.o
->> +sunxi-ss-des-y += sunxi-ss-cipher-des.o sunxi-ss-cipher.o
->> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_3DES) += sunxi-ss-3des.o
->> +sunxi-ss-3des-y += sunxi-ss-cipher-3des.o sunxi-ss-cipher.o
->> +
->> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_AES) += sunxi-ss-aes.o
->> +sunxi-ss-aes-y += sunxi-ss-cipher-aes.o sunxi-ss-cipher.o
+> Thanks a lot for your feedback.
 > 
-> I just tried building Hans' (CC-ed) sunxi-devel branch, which
-> includes this series, with all the Security System options enabled.
+> On 06/09/2014 06:04 PM, Doug Anderson wrote:
+> > Krzystof,
+> > 
+> > On Mon, Jun 9, 2014 at 3:16 AM, Krzysztof Kozlowski
+> > <k.kozlowski@samsung.com> wrote:
+> >> On pon, 2014-06-09 at 11:37 +0200, Javier Martinez Canillas wrote:
+> >>> MAX77802 is a PMIC that contains 10 high efficiency Buck regulators,
+> >>> 32 Low-dropout (LDO) regulators, two 32kHz buffered clock outputs,
+> >>> a Real-Time-Clock (RTC) and a I2C interface to program the individual
+> >>> regulators, clocks and the RTC.
+> >>>
+> >>> This series are based on drivers added by Simon Glass to the Chrome OS
+> >>> kernel and adds support for the Maxim 77802 Power Management IC, their
+> >>> regulators, clocks, RTC and I2C interface. It is composed of patches:
+> >>>
+> >>> [PATCH 1/5] mfd: Add driver for Maxim 77802 Power Management IC
+> >>> [PATCH 2/5] regulator: Add driver for Maxim 77802 PMIC regulators
+> >>> [PATCH 3/5] clk: Add driver for Maxim 77802 PMIC clocks
+> >>> [PATCH 4/5] rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
+> >>> [PATCH 5/5] ARM: dts: Add max77802 device node for exynos5420-peach-pit
+> >>>
+> >>> Patches 1-4 add support for the different devices and Patch 5 enables
+> >>> the MAX77802 PMIC on the Exynos5420 based Peach pit board.
+> >>
+> >>
+> >> Hi,
+> >>
+> >> The main mfd, mfd irq, clk and rtc drivers look very similar to max77686
+> >> drivers. I haven't checked other Maxim drivers but I think there will be
+> >> a lot of similarities with them also. It is almost common for Maxim
+> >> chipsets to share components between each other.
+> >>
+> >> I think there is no need in duplicating all that stuff once again in new
+> >> driver for another Maxim-almost-the-same-as-others-XYZ chipset. Just
+> >> merge it with max77686 (or other better candidate).
+> >>
+> >> The only difference is in regulator driver. I am not sure whether this
+> >> is a result of differences in chip or differences in driver design.
+> > 
+> > Yes, we thought the same thing when we added support for the max77802
+> > in the ChromeOS tree.  Unfortunately it didn't work out half as well
+> > as we thought it would.  When Javier was asking advice about sending
+> > things upstream we suggested that perhaps he should split the two up.
+> > 
+> > 
+> > You can see the result of the combined driver the ChromeOS tree (the
+> > code there is older, probably misnamed as max77xxx, and doesn't have
+> > the proper clock pieces, but you can get the gist):
+> > 
+> > https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/regulator/max77xxx-regulator.c
+> > https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/rtc/rtc-max77xxx.c
+> > 
+> > 
+> > Specific problems that made it ugly to have a combined driver:
+> > 
+> > * The RTC has many subtle differences between the 77686 and 77802.
+> > They expanded it to handle a 200 year timeframe instead of 100 and
+> > that meant that they had to shuffle the bits around everywhere.  They
+> > also moved it to have the same i2c address as the main PMIC so all
+> > addresses are different (see max77686_map in the RTC link above).
+> >
+> > * The regulator itself has similar concepts between the two, but the
+> > list of bucks / ldos and how they behave is quite different.  Trying
+> > to understand the complex tables in
+> > <https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/drivers/regulator/max77xxx-regulator.c>
+> > was not easy.
+> > 
+> > 
 > 
-> It doesn't build:
+> There are other differences that were not mentioned:
 > 
->   LD      drivers/crypto/sunxi-ss/built-in.o
-> drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_cipher_init':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
-> multiple definition of `sunxi_cipher_init'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_des_poll':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
-> multiple definition of `sunxi_des_poll'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_aes_poll':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
-> multiple definition of `sunxi_aes_poll'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-3des.o: In function `sunxi_cipher_exit':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
-> multiple definition of `sunxi_cipher_exit'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_cipher_init':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
-> multiple definition of `sunxi_cipher_init'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:24:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_des_poll':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
-> multiple definition of `sunxi_des_poll'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:218:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_aes_poll':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
-> multiple definition of `sunxi_aes_poll'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:33:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-aes.o: In function `sunxi_cipher_exit':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
-> multiple definition of `sunxi_cipher_exit'
-> drivers/crypto/sunxi-ss/sunxi-ss-des.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c:29:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_init':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:7:
-> multiple definition of `sunxi_hash_init'
-> drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:7:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_finup':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:204:
-> multiple definition of `sunxi_hash_finup'
-> drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:204:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_digest':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:216:
-> multiple definition of `sunxi_hash_digest'
-> drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:216:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_update':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:44:
-> multiple definition of `sunxi_hash_update'
-> drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:44:
-> first defined here
-> drivers/crypto/sunxi-ss/sunxi-ss-sha1.o: In function `sunxi_hash_final':
-> /home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:115:
-> multiple definition of `sunxi_hash_final'
-> drivers/crypto/sunxi-ss/sunxi-ss-md5.o:/home/wens/sunxi/linux/drivers/crypto/sunxi-ss/sunxi-ss-hash.c:115:
-> first defined here
-> scripts/Makefile.build:397: recipe for target
-> 'drivers/crypto/sunxi-ss/built-in.o' failed
-> make[3]: *** [drivers/crypto/sunxi-ss/built-in.o] Error 1
-> scripts/Makefile.build:465: recipe for target 'drivers/crypto/sunxi-ss' failed
-> make[2]: *** [drivers/crypto/sunxi-ss] Error 2
-> scripts/Makefile.build:465: recipe for target 'drivers/crypto' failed
-> make[1]: *** [drivers/crypto] Error 2
-> Makefile:878: recipe for target 'drivers' failed
-> make: *** [drivers] Error 2
-> 
-> 
-> What's seems to be happening is that sunxi-ss-cipher.c is
-> being compiled and included multiple times, once for each
-> different cipher.
-> 
-> So sunxi-ss-cipher-{aes,3des,des}.o all have a copy of
-> sunxi-ss-cipher.c compiled in. And during the link phase,
-> the linker finds multiple definitions and fails.
-> 
-> What would probably work is have a common Kconfig option
-> such as CONFIG_CRYPTO_DEV_SUNXI_SS_CIPHER, have each cipher
-> Kconfig option select this one, and have this option trigger
-> the build of the common functions.
-> 
->> +
->> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_MD5) += sunxi-ss-md5.o
->> +sunxi-ss-md5-y += sunxi-ss-hash.o sunxi-ss-hash-md5.o
->> +obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS_SHA1) += sunxi-ss-sha1.o
->> +sunxi-ss-sha1-y += sunxi-ss-hash.o sunxi-ss-hash-sha1.o
-> 
-> Same goes for the hash part. sunxi-ss-hash.c included twice,
-> once for md5 and once for sha1.
-> 
-> [snip]
-> 
-> Note that I only tried statically linked builds, not modules.
-> 
-> 
-> Cheers
-> ChenYu
-> 
+> - The max77802 uses a single register to enable RTC alarm while max77686 uses 1
+> bit from a set of registers.
 
-Thanks for your reports, I forgot to test with static kernel.
-I will send an updated patch soon.
+But still this will be one additional 'if' statement in one common
+code...
 
-Regards
+> - Each chip has some regulators that are not available and you have to take care
+> of those exceptions (e.g: LDO16, LDO22 and LD31 on max77802).
+
+Missing/new regulator does not look like a problem to me in combined
+driver from ChromeOS. The main problem with combined driver for
+regulators is that you still need to provide all the
+regulator_ops/regulator_desc for each of the chipsets. Thus the combined
+driver is almost as big as two drivers.
+
+> - The max77802 has 2 clocks outputs while the max77686 has three.
+
+This leads to one exception in combined clock driver. This will still
+reduce LOC.
+
+> So, as Doug said there are many differences on these two chips besides the
+> regulators. It's true that these two drivers share a lot of the structure and
+> there is code duplication (this applies to most maxim drivers btw) but I have my
+> doubts that the combined approach will make the code more easy to maintain.
+> 
+> The biggest problem is the i2c addresses space being different so you need an
+> indirection level to access registers and have duplicated registers definition
+> for each chip.
+
+Yep, I agree. I had the same problem with S5M/S2M RTC driver and I am
+not quite sure that I've chosen the right solution :).
+
+> > If we really need to write a single driver it certainly can be done,
+> > but please look at the above to be sure this is what you want.
+> > 
+> >
+> 
+> Yes, if the combined driver is preferred over having a separate driver for
+> max77802 then I will try to find the more elegant way to merge both drivers. But
+> I tried to do it already and I can't say I liked the end result more than having
+> two separate drivers.
+> 
+> > NOTE: it's possible that things could be more sane with more driver
+> > redesign, possibly making things more data driven.  The thing that
+> > would be really nice to do would be to avoid all of the crazy
+> > "regulator_zzz_desc_zzz" macros, maybe?  I'd have to actually try
+> > doing it to be sure it's cleaner, though...
+> > 
+> 
+> Another option is to use an hybrid approach. Merge the mfd core, irq and clk
+> drivers but have different platform drivers for rtc and regulators.
+
+I think that would be the best solution. Probably it would be useful to
+convert the max77686 IRQ code to regmap_irq_chip but I do not insist on
+that.
+
+Best regards,
+Krzysztof
+
+
+> Still the
+> end result is not great imho but better than trying merging the regulators and
+> RTC drivers where most of the differences are.
+
+
+> 
+> > 
+> > -Doug
+> > 
+> 
+> Best regards,
+> Javier
