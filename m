@@ -1,54 +1,20 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 11 Jun 2014 02:45:21 +0400
-Subject: [PATCH v2] ARM: shmobile: henninger: add I2C2 DT support
-Message-ID: <201406110245.22692.sergei.shtylyov@cogentembedded.com>
+Date: Wed, 11 Jun 2014 03:04:18 +0400
+Subject: [PATCH 0/2] Add VIN and ADV7180 DT support for R8A7791/Henninger board
+Message-ID: <201406110304.18976.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Henninger board dependent part of the I2C2 device node.
+Hello.
 
-Based on the Koelsch I2C2 device tree patch by Wolfram Sang.
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-v3.15-20140610' tag plus the Henninger I2C2 DT support patch
+that I posted earlier. Here we add the VIN and ADV7180 video decoder device
+tree support on the R8A7791/Henninger board. The patchset requires Ben Dooks'
+adv7180, rcar_vin, and soc_camera DT support patches posted back in April in
+order to work.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+[1/2] ARM: shmobile: r8a7791: add VIN DT support
+[2/2] ARM: shmobile: henninger: add VIN0/ADV7180 DT support
 
----
-This patch is against 'renesas-devel-v3.15-20140610' tag of Simon Horman's
-'renesas.git' repo.
-
-Changes in version 2:
-- removed I2C devices, to be added by separate patches.
-
- arch/arm/boot/dts/r8a7791-henninger.dts |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -110,6 +110,11 @@
- 		renesas,function = "sdhi2";
- 	};
- 
-+	i2c2_pins: i2c2 {
-+		renesas,groups = "i2c2";
-+		renesas,function = "i2c2";
-+	};
-+
- 	qspi_pins: spi0 {
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
-@@ -170,6 +175,14 @@
- 	status = "okay";
- };
- 
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
- &qspi {
- 	pinctrl-0 = <&qspi_pins>;
- 	pinctrl-names = "default";
+WBR, Sergei
