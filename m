@@ -1,31 +1,27 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 10 Jun 2014 02:15:16 +0200
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
-In-Reply-To: <20140609225142.GA5099@sirena.org.uk>
-References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
- <1976508.Da0u8DZI5B@vostro.rjw.lan> <20140609225142.GA5099@sirena.org.uk>
-Message-ID: <1857766.e38RV3V2OT@vostro.rjw.lan>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Tue, 10 Jun 2014 01:16:18 +0000
+Subject: [PATCH 0/9] ARM: Berlin: USB support
+In-Reply-To: <53958913.8080708@gmail.com>
+References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140609043019.GA32255@shlinux1.ap.freescale.net>
+ <53958913.8080708@gmail.com>
+Message-ID: <63fc1fa8280b498182ebf8a3654732b9@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 09, 2014 11:51:42 PM Mark Brown wrote:
+ 
 > 
-> --fYgRtaZIy+F1uhp1
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
+> we are early in the cycle and I feel there will be a v2 of the chipidea
+> stub. IMHO, controlling the vbus regulator should not be business of the
+> phy driver, so ci will have to deal with it.
 > 
-> On Tue, Jun 10, 2014 at 12:22:07AM +0200, Rafael J. Wysocki wrote:
-> > On Monday, June 09, 2014 08:49:17 PM Mark Brown wrote:
-> 
-> > > Yes, looks like it is.
-> 
-> > But it doesn't apply for me on top of the current Linus' tree.
-> 
-> > Can you please rebase?
-> 
-> It probably depends on other people's trees too, I just killed all the
-> usages in -next - I gather the SH trees added some new ones for example.
-> I'd expect it'll apply after the merge window, if not that's the time to
-> look at it.
 
-OK
+vbus handling has already in chipidea common code, it treats vbus as a regulator.
+So, the glue layer only needs to register and add vbus-supply to dts file, no source
+code change is needed.
+
+Peter
+
+> Anyways, good to know you are fine with it already!
+> 
+> Sebastian
