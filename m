@@ -1,65 +1,265 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jun 2014 10:21:09 +0200
-Subject: [RFC/PATCH] ARM: mvebu: Don't apply the quirks if the SoC
- revision is unknown
-In-Reply-To: <1402342036-9168-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1402342036-9168-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5621673.VW5TXctBgm@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 10 Jun 2014 10:38:50 +0200
+Subject: [RESEND2 PATCH v4 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire
+ Interface) controller support
+In-Reply-To: <1401785392-26602-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1401785392-26602-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1401785392-26602-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140610083850.GB2620@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 June 2014 16:27:16 Ezequiel Garcia wrote:
-> We currently skip the I2C and thermal quirks only if the SoC revision is
-> known to be one that does not need them. If the SoC revision cannot be
-> obtained, the current behavior is to apply the quirk assuming it's needed.
+On Tue, Jun 03, 2014 at 10:49:52AM +0200, Boris BREZILLON wrote:
+> The P2WI looks like an SMBus controller which only supports byte data
+> transfers. But, it differs from standard SMBus protocol on several
+> aspects:
+> - it supports only one slave device, and thus drop the address field
+> - it adds a parity bit every 8bits of data
+> - only one read access is required to read a byte (instead of a read
+>   followed by a write access in standard SMBus protocol)
+> - there's no Ack bit after each byte transfer
 > 
-> This commit changes this, by requiring the SoC revision to be known in order
-> to peform a quirk.
+> This means this bus cannot be used to interface with standard SMBus
+> devices (the only known device to support this interface is the AXP221
+> PMIC).
 
-This clearly needs a better description if we want to apply it. We had
-a rather long discussion when the code was first added exactly this
-way and you should explain which of the assumptions we made back then
-are now incorrect.
+Good description. Should be a comment at the top of the driver to spread
+the word.
 
-Is it ever wrong (as opposed to inefficient) to apply the quirk even on a
-newer SoC?
-
-IIRC, the reasoning was that almost all machines have the new SoC version,
-so they should have their DTs marked with the correct IDs already.
-
-	Arnd
-
-> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-> index 594262b..14bf590 100644
-> --- a/arch/arm/mach-mvebu/board-v7.c
-> +++ b/arch/arm/mach-mvebu/board-v7.c
-> @@ -89,13 +89,15 @@ static void __init i2c_quirk(void)
->  {
->  	struct device_node *np;
->  	u32 dev, rev;
-> +	int res;
->  
->  	/*
->  	 * Only revisons more recent than A0 support the offload
->  	 * mechanism. We can exit only if we are sure that we can
->  	 * get the SoC revision and it is more recent than A0.
->  	 */
-> -	if (mvebu_get_soc_id(&dev, &rev) == 0 && rev > MV78XX0_A0_REV)
-> +	res = mvebu_get_soc_id(&dev, &rev);
-> +	if (res < 0 || (res == 0 &&  rev > MV78XX0_A0_REV))
->  		return;
->  
->  	for_each_compatible_node(np, NULL, "marvell,mv78230-i2c") {
-> @@ -119,8 +121,10 @@ static void __init thermal_quirk(void)
->  {
->  	struct device_node *np;
->  	u32 dev, rev;
-> +	int res;
->  
-> -	if (mvebu_get_soc_id(&dev, &rev) == 0 && rev > ARMADA_375_Z1_REV)
-> +	res = mvebu_get_soc_id(&dev, &rev);
-> +	if (res < 0 || (res == 0 && rev > ARMADA_375_Z1_REV))
->  		return;
->  
->  	for_each_compatible_node(np, NULL, "marvell,armada375-thermal") {
 > 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/i2c/busses/Kconfig          |  12 ++
+>  drivers/i2c/busses/Makefile         |   1 +
+>  drivers/i2c/busses/i2c-sun6i-p2wi.c | 349 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 362 insertions(+)
+>  create mode 100644 drivers/i2c/busses/i2c-sun6i-p2wi.c
+
+...
+
+> +struct p2wi {
+> +	struct i2c_adapter adapter;
+> +	struct completion complete;
+> +	unsigned int irq;
+
+Can be a local variable in probe.
+
+> +	unsigned int status;
+> +	void __iomem *regs;
+> +	struct clk *clk;
+> +	struct reset_control *rstc;
+> +	int slave_addr;
+> +};
+> +
+> +static irqreturn_t p2wi_interrupt(int irq, void *dev_id)
+> +{
+> +	struct p2wi *p2wi = dev_id;
+> +	unsigned long status;
+> +
+> +	status = readl(p2wi->regs + P2WI_INTS);
+> +	p2wi->status = status;
+> +
+> +	/* Clear interrupts */
+> +	status &= (P2WI_INTS_LOAD_BSY | P2WI_INTS_TRANS_ERR |
+> +		   P2WI_INTS_TRANS_OVER);
+> +	writel(status, p2wi->regs + P2WI_INTS);
+> +
+> +	complete(&p2wi->complete);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static u32 p2wi_functionality(struct i2c_adapter *adap)
+> +{
+> +	return I2C_FUNC_SMBUS_BYTE_DATA;
+> +}
+> +
+> +static int p2wi_smbus_xfer(struct i2c_adapter *adap, u16 addr,
+> +			   unsigned short flags, char read_write,
+> +			   u8 command, int size, union i2c_smbus_data *data)
+> +{
+> +	struct p2wi *p2wi = i2c_get_adapdata(adap);
+> +	unsigned long dlen = P2WI_DLEN_DATA_LENGTH(1);
+> +
+> +	if (addr > 0xff ||
+
+Why 0xff? Does the PMIC support that? I2C addresses are 7-bit. You
+won't even have a slave device if it has an illegal i2c address, so this
+shouldn't happen.
+
+> +	    (p2wi->slave_addr >= 0 && addr != p2wi->slave_addr)) {
+> +		dev_err(&adap->dev, "invalid P2WI address\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (!data)
+> +		return -EINVAL;
+> +
+> +	writel(command, p2wi->regs + P2WI_DADDR0);
+> +
+> +	if (read_write == I2C_SMBUS_READ)
+> +		dlen |= P2WI_DLEN_READ;
+> +	else
+> +		writel(data->byte, p2wi->regs + P2WI_DATA0);
+> +
+> +	writel(dlen, p2wi->regs + P2WI_DLEN);
+> +
+> +	if (readl(p2wi->regs + P2WI_CTRL) & P2WI_CTRL_START_TRANS) {
+> +		dev_err(&adap->dev, "P2WI bus busy\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	reinit_completion(&p2wi->complete);
+> +
+> +	writel(P2WI_INTS_LOAD_BSY | P2WI_INTS_TRANS_ERR | P2WI_INTS_TRANS_OVER,
+> +	       p2wi->regs + P2WI_INTE);
+> +
+> +	writel(P2WI_CTRL_START_TRANS | P2WI_CTRL_GLOBAL_INT_ENB,
+> +	       p2wi->regs + P2WI_CTRL);
+> +
+> +	wait_for_completion(&p2wi->complete);
+> +
+> +	if (p2wi->status & P2WI_INTS_LOAD_BSY) {
+> +		dev_err(&adap->dev, "P2WI bus busy\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	if (p2wi->status & P2WI_INTS_TRANS_ERR) {
+> +		dev_err(&adap->dev, "P2WI bus xfer error\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (read_write == I2C_SMBUS_READ)
+> +		data->byte = readl(p2wi->regs + P2WI_DATA0);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct i2c_algorithm p2wi_algo = {
+> +	.smbus_xfer = p2wi_smbus_xfer,
+> +	.functionality = p2wi_functionality,
+> +};
+> +
+> +static const struct of_device_id p2wi_of_match_table[] = {
+> +	{ .compatible = "allwinner,sun6i-a31-p2wi" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, p2wi_of_match_table);
+> +
+> +static int p2wi_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct device_node *childnp;
+> +	unsigned long parent_clk_freq;
+> +	u32 clk_freq = 100000;
+> +	struct resource *r;
+> +	struct p2wi *p2wi;
+> +	u32 slave_addr;
+> +	int clk_div;
+> +	int ret;
+> +
+> +	of_property_read_u32(np, "clock-frequency", &clk_freq);
+> +	if (clk_freq > P2WI_MAX_FREQ) {
+> +		dev_err(dev,
+> +			"required clock-frequency (%u Hz) is too high (max = 6MHz)",
+> +			clk_freq);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (of_get_child_count(np) > 1) {
+> +		dev_err(dev, "P2WI only supports one slave device\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	p2wi = devm_kzalloc(dev, sizeof(struct p2wi), GFP_KERNEL);
+> +	if (!p2wi) {
+> +		dev_err(dev, "failed to allocate p2wi struct\n");
+
+No error strings for OOM.
+
+> +		return -ENOMEM;
+> +	}
+> +
+> +	p2wi->slave_addr = -1;
+> +
+> +	/*
+> +	 * Authorize a p2wi node without any children to be able to use an
+> +	 * i2c-dev from userpace.
+> +	 * In this case the slave_addr is set to -1 and won't be checked when
+> +	 * launching a P2WI transfer.
+> +	 */
+> +	childnp = of_get_next_available_child(np, NULL);
+> +	if (childnp) {
+> +		ret = of_property_read_u32(childnp, "reg", &slave_addr);
+> +		if (ret || slave_addr > 0xff) {
+
+Again: Is 8 bit range important here? Otherwise I'd leave the check to the
+core.
+
+> +			dev_err(dev, "invalid slave address on node %s\n",
+> +				childnp->full_name);
+> +			return -EINVAL;
+> +		}
+> +
+> +		p2wi->slave_addr = slave_addr;
+> +	}
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	p2wi->regs = devm_ioremap_resource(dev, r);
+> +	if (IS_ERR(p2wi->regs)) {
+> +		ret = PTR_ERR(p2wi->regs);
+> +		dev_err(dev, "failed to retrieve iomem resource: %d\n", ret);
+
+devm_ioremap_resource prints errors on its own.
+
+> +		return ret;
+> +	}
+> +
+> +	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), pdev->name);
+> +	ret = platform_get_irq(pdev, 0);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to retrieve irq: %d\n", ret);
+> +		return ret;
+> +	}
+> +	p2wi->irq = ret;
+> +
+> +	p2wi->clk = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(p2wi->clk)) {
+> +		ret = PTR_ERR(p2wi->clk);
+> +		dev_err(dev, "failed to retrieve clk: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(p2wi->clk);
+> +	if (ret) {
+> +		dev_err(dev, "failed to enable clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	parent_clk_freq = clk_get_rate(p2wi->clk);
+> +
+> +	p2wi->rstc = devm_reset_control_get(dev, NULL);
+> +	if (IS_ERR(p2wi->rstc)) {
+> +		ret = PTR_ERR(p2wi->rstc);
+> +		dev_err(dev, "failed to retrieve reset controller: %d\n",
+> +			ret);
+
+My general suggestion: Don't be too strict on the 80 char limit. IMO this dangling
+'ret' is not more readable.
+
+> +		goto err_clk_disable;
+> +	}
+
+Regards,
+
+   Wolfram
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140610/cabb5e19/attachment.sig>
