@@ -1,40 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 10 Jun 2014 17:24:38 +0200
-Subject: [PATCH] Documentation: arm: add URLs to public datasheets for the
- Marvell Armada 370 SoC
-In-Reply-To: <1402413878-20224-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1402413878-20224-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1402413878-20224-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 10 Jun 2014 17:28:45 +0200
+Subject: [PATCH] ARM: dts: exynos4: Fix reg sizes of GIC
+In-Reply-To: <5388CB76.2030806@samsung.com>
+References: <1400855960-22033-1-git-send-email-t.figa@samsung.com>
+ <53886E53.70206@gmail.com> <5388CB76.2030806@samsung.com>
+Message-ID: <5397242D.8040303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell has very recently released a public version of the "Functional
-specifications" and "Hardware specifications" datasheets for the
-Marvell Armada 370 SoC. This allows contributors and developers not
-under NDA with Marvell to get more details about this SoC than what
-the current kernel code shows, and hopefully allows to improve the
-support for this SoC in the mainline kernel, as well as in other
-projects.
+Hi Kukjin,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- Documentation/arm/Marvell/README | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+On 30.05.2014 20:18, Kukjin Kim wrote:
+> On 05/30/14 20:41, Tomasz Figa wrote:
+>> Hi,
+>>
+>> On 23.05.2014 16:39, Tomasz Figa wrote:
+>>> This patch fixes reg entry sizes in GIC node that were not large enough
+>>> to cover whole regions.
+>>>
+>>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>>> ---
+>>>   arch/arm/boot/dts/exynos4.dtsi | 2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+>>> index b8ece4b..fbaf426 100644
+>>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>>> @@ -113,7 +113,7 @@
+>>>   		compatible = "arm,cortex-a9-gic";
+>>>   		#interrupt-cells =<3>;
+>>>   		interrupt-controller;
+>>> -		reg =<0x10490000 0x1000>,<0x10480000 0x100>;
+>>> +		reg =<0x10490000 0x10000>,<0x10480000 0x10000>;
+>>>   	};
+>>>
+>>>   	combiner: interrupt-controller at 10440000 {
+>>>
+>>
+>> Ping.
+>>
+> Yeah, SZ_64K is used for GIC_CPU and GIC_DIST before moving on DT 
+> support. Applied, but I need to check this is required for stable tree...
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index 963ec44..920dfd2 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -83,7 +83,9 @@ EBU Armada family
-         88F6710
-         88F6707
-         88F6W11
--    Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/Marvell_ARMADA_370_SoC.pdf
-+    Product Brief:   http://www.marvell.com/embedded-processors/armada-300/assets/Marvell_ARMADA_370_SoC.pdf
-+    Hardware Spec:   http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-datasheet.pdf
-+    Functional Spec: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-FunctionalSpec-datasheet.pdf
- 
-   Armada 375 Flavors:
- 	88F6720
--- 
-2.0.0
+Not sure if you already managed, but I think it might not be necessary
+in stable trees, as the (correct) static mapping is still there and it
+causes ioremap() to return correctly mapped area, ignoring the length
+specified in device tree.
+
+Best regards,
+Tomasz
