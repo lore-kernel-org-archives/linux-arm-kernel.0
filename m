@@ -1,224 +1,144 @@
-From: claudio.fontana@huawei.com (Claudio Fontana)
-Date: Tue, 10 Jun 2014 18:44:59 +0200
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <20140328184517.GA27219@cbox>
-References: <20140328184517.GA27219@cbox>
-Message-ID: <5397360B.80102@huawei.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 10 Jun 2014 12:49:01 -0400 (EDT)
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <20140610141446.GA3519@arm.com>
+References: <alpine.LFD.2.11.1406062340480.25775@knanqh.ubzr>
+ <20140607175618.GA25068@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1406071431490.25775@knanqh.ubzr>
+ <20140607223614.GA26641@e102568-lin.cambridge.arm.com>
+ <CAOesGMj+itYr-daqxfX=J3Ss+7YdWhUUzBWTW3FqVEH8tXqt-A@mail.gmail.com>
+ <20140608124530.GA31921@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1406081138070.25775@knanqh.ubzr> <7hsindq07l.fsf@paris.lan>
+ <20140609222604.GA16889@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1406092254220.25775@knanqh.ubzr>
+ <20140610141446.GA3519@arm.com>
+Message-ID: <alpine.LFD.2.11.1406101149520.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On Tue, 10 Jun 2014, Catalin Marinas wrote:
 
-I just wanted to share with you guys how we are using virtualization on ARM64 over here for the OSv project.
-I don't know if that's something that could be useful for your specification effort.
+> Hi Nico,
+> 
+> Sorry, I can't stay away from this thread ;)
 
-In OSv, creating and starting a VM to some level means starting an application.
-That is, OSv should be a very thin bare bones guest server OS, which also acts as a kind of run-time library for an application to run.
-All the devices are assumed to be virtualized and heavily relying on virtio.
+;-)
 
-Therefore we see a higher need for quick VM launch than it might be for other use cases.
+> On Tue, Jun 10, 2014 at 12:25:47AM -0400, Nicolas Pitre wrote:
+> > On Mon, 9 Jun 2014, Lorenzo Pieralisi wrote:
+> > > 4) When I am talking about firmware I am talking about sequences that
+> > >    are very close to HW (disabling C bit, cleaning caches, exiting
+> > >    coherency). Erratas notwithstanding, they are being standardized at
+> > >    ARM the best we can. They might even end up being implemented in HW
+> > >    in the not so far future. I understand they are tricky, I understand
+> > >    they take lots of time to implement them and to debug them, what I
+> > >    want to say is that they are becoming standard and we _must_ reuse the
+> > >    same code for all ARM platforms. You can implement them in MCPM (see
+> > >    (1)) or in firmware (and please do not start painting me as firmware
+> > >    hugger here, I am referring to standard power down sequences that
+> > >    again, are very close to HW state machines 
+> > 
+> > That's where the disconnect lies.  On the one hand you say "I understand 
+> > they are tricky, I understand they take lots of time to implement them 
+> > and to debug them" and on the other hand you say "They might end up being 
+> > implemented in HW in the not so far future."  That simply makes no 
+> > economical sense at all!
+> 
+> It makes lots of sense, though not from a software maintainability
+> perspective. It would be nice if everything still looked like ARM7TDMI
+> but in the race for performance (vs power), hardware becomes more
+> complex and it's not just the CPU but adjacent parts like interconnects,
+> caches, asynchronous bridges, voltage shifters, memory controllers,
+> clocks/PLLs etc. Many of these are simply hidden from the high level OS
+> like Linux because the OS assumes certain configuration (e.g. access to
+> memory) and it's only the hardware itself that knows in what order they
+> can be turned on or off (when triggered explicitly by the OS or an
+> external event).
 
-One aspect of this is that we currently start executing the image directly (no UEFI involved on the guest),
-and in some cases we might not need a full fledged file system at all,
-as the communication can happen via virtio channels.
+I agree when the hardware has to handle parallel dependencies ordered in 
+waterfall style. In such cases there is usually no point relying on 
+software to implement what is nevertheless simple determinism with 
+no possible alternative usage.
 
-We do have a need for ACPI for discovery of information like gic addresses, timers, interrupts... (no interest on device trees, really), and of PCI-E.
+But the *most* important thing is what you put in parents, so let me 
+emphasize on what you just said:
 
-By skipping steps like UEFI, grub, firmware load, etc we strive to keep our application launch time low.
-Is this going to create problems for us in the future if you start requiring every VM to boot using those instead?
+	When triggered _explicitly_ by the OS or external events
 
-Thank you for your comments,
+> Having an dedicated power controller (e.g. M-class
+> processor) to handle some of these is a rather flexible approach, other
+> bits require RTL (and usually impossible to update).
 
-Claudio
+The M-class processor should be treated the same way as firmware.  It 
+ought to be flexible (certainly more than hardwired hardware), but it 
+shares all the same downsides as firmware and the same concerns apply.
 
+> > When some operation is 1) tricky and takes time to debug, and 2) not 
+> > performance critical (no one is trying to get in and out of idle or 
+> > hibernation a billion times per second), then you should never ever put 
+> > such a thing in firmware, and hardware should be completely out of the 
+> > question!
+> 
+> I agree that things can go wrong (both in hardware and software, no
+> matter where it runs) but please don't think that such power
+> architecture has been specifically engineered to hide the hardware from
+> Linux. It's a necessity for complex systems and the optimal solution is
+> not always simplification (it's not just ARM+vendors doing this, just
+> look at the power model of modern x86 processors, hidden nicely from the
+> software behind a few registers while making things harder for scheduler
+> which cannot rely on a constant performance level; but it's a trade-off
+> they are happy to make).
 
-On 28.03.2014 19:45, Christoffer Dall wrote:
-> ARM VM System Specification
-> ===========================
+I'll claim that this is a bad tradeoff.  And the reason why some 
+hardware architects might think it is a good one is because so far we 
+really sucked at software based power management in Linux (and possibly 
+other OSes as well).  Hence the (fairly recent) realization that power 
+management has to be integrated and under control of the scheduler 
+rather than existing as some ad hoc subsystem.
+
+The reaction from the hardware people often is "the software is crap and 
+makes our hardware look bad, we know better, so let's make it easier on 
+those poor software dudes by handling power management in hardware 
+instead".  But ultimately the hardware just can't predict things like 
+software can.  It might do a better job than the current software state 
+of affairs, but most likely not be as efficient as a proper software 
+architecture.  The hardware may only be reactive, whereas the software 
+can be proactive (when properly done that is).
+
+I sense from your paragraph above that ARM might be going the same 
+direction as X86 and that would be very sad.  Maybe the best compromise 
+would be for all knobs to be made available to software if software 
+wants to turn off the hardware auto-pilot and take control.  This way 
+the hardware guys would cover their arses while still allowing for the 
+possibility that software might be able to out perform the hardware 
+solution.
+
+> > >    and more importantly if they
+> > >    HAVE to run in secure world that's the only solution we have unless you
+> > >    want to split race conditions between kernel and secure world).
+> > 
+> > If they HAVE to run in secure world then your secure world architecture 
+> > is simply misdesigned, period.  Someone must have ignored the economics 
+> > of modern software development to have come up with this.
 > 
-> Goal
-> ----
-> The goal of this spec is to allow suitably-built OS images to run on
-> all ARM virtualization solutions, such as KVM or Xen.
-> 
-> Recommendations in this spec are valid for aarch32 and aarch64 alike, and
-> they aim to be hypervisor agnostic.
-> 
-> Note that simply adhering to the SBSA [2] is not a valid approach, for
-> example because the SBSA mandates EL2, which will not be available for
-> VMs.  Further, this spec also covers the aarch32 execution mode, not
-> covered in the SBSA.
-> 
-> 
-> Image format
-> ------------
-> The image format, as presented to the VM, needs to be well-defined in
-> order for prepared disk images to be bootable across various
-> virtualization implementations.
-> 
-> The raw disk format as presented to the VM must be partitioned with a
-> GUID Partition Table (GPT).  The bootable software must be placed in the
-> EFI System Partition (ESP), using the UEFI removable media path, and
-> must be an EFI application complying to the UEFI Specification 2.4
-> Revision A [6].
-> 
-> The ESP partition's GPT entry's partition type GUID must be
-> C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
-> formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
-> 
-> The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
-> execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
-> state as specified in Section 3.3 (3.3 (Boot Option Variables Default Boot
-> Behavior) and 3.4.1.1 (Removable Media Boot Behavior) in [6].
-> 
-> This ensures that tools for both Xen and KVM can load a binary UEFI
-> firmware which can read and boot the EFI application in the disk image.
-> 
-> A typical scenario will be GRUB2 packaged as an EFI application, which
-> mounts the system boot partition and boots Linux.
-> 
-> 
-> Virtual Firmware
-> ----------------
-> The VM system must be UEFI compliant in order to be able to boot the EFI
-> application in the ESP.  It is recommended that this is achieved by
-> loading a UEFI binary as the first software executed by the VM, which
-> then executes the EFI application.  The UEFI implementation should be
-> compliant with UEFI Specification 2.4 Revision A [6] or later.
-> 
-> This document strongly recommends that the VM implementation supports
-> persistent environment storage for virtual firmware implementation in
-> order to ensure probable use cases such as adding additional disk images
-> to a VM or running installers to perform upgrades.
-> 
-> This document strongly recommends that VM implementations implement
-> persistent variable storage for their UEFI implementation.  Persistent
-> variable storage shall be a property of a VM instance, but shall not be
-> stored as part of a portable disk image.  Portable disk images shall
-> conform to the UEFI removable disk requirements from the UEFI spec and
-> cannot rely on on a pre-configured UEFI environment.
-> 
-> The binary UEFI firmware implementation should not be distributed as
-> part of the VM image, but is specific to the VM implementation.
-> 
-> 
-> Hardware Description
-> --------------------
-> The VM system must be UEFI compliant and therefore the UEFI system table
-> will provide a means to access hardware description data.
-> 
-> The VM implementation must provide through its UEFI implementation:
-> 
->   a complete FDT which describes the entire VM system and will boot
->   mainline kernels driven by device tree alone
-> 
-> For more information about the arm and arm64 boot conventions, see
-> Documentation/arm/Booting and Documentation/arm64/booting.txt in the
-> Linux kernel source tree.
-> 
-> For more information about UEFI booting, see [4] and [5].
-> 
-> 
-> VM Platform
-> -----------
-> The specification does not mandate any specific memory map.  The guest
-> OS must be able to enumerate all processing elements, devices, and
-> memory through HW description data (FDT) or a bus-specific
-> mechanism such as PCI.
-> 
-> If aarch64 physical CPUs implement support for the aarch32 execution
-> state in EL1 and EL0 execution, it is recommended that the VM
-> implementation supports booting the VM at EL1 in both aarch32 and
-> aarch64 execution states.
-> 
-> The virtual hardware platform must provide a number of mandatory
-> peripherals:
-> 
->   Serial console:  The platform should provide a console,
->   based on an emulated pl011, a virtio-console, or a Xen PV console.
-> 
->   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
->   limits the the number of virtual CPUs to 8 cores, newer GIC versions
->   removes this limitation.
-> 
->   The ARM virtual timer and counter should be available to the VM as
->   per the ARM Generic Timers specification in the ARM ARM [1].
-> 
-> It is strongly recommended that the VM implementation provides a
-> hotpluggable bus to support hotplug of at least block and network
-> devices.  Suitable buses include a virtual PCIe bus and the Xen PV bus.
-> 
-> For the VM image to be compliant with this spec, the following applies
-> for the guest OS in the VM image:
-> 
->   The guest OS must include support for pl011 UART, virtio-console, and
->   the Xen PV console.
-> 
->   The guest OS must include support for GICv2 and any available newer
->   version of the GIC architecture to maintain compatibility with older
->   VM implementations.
-> 
->   It is strongly recommended to include support for all available
->   (block, network, console, balloon) virtio-pci, virtio-mmio, and Xen PV
->   drivers in the guest OS kernel or initial ramdisk.
-> 
-> 
-> Other common peripherals for block devices, networking, and more can
-> (and typically will) be provided, but OS software written and compiled
-> to run on ARM VMs cannot make any assumptions about which variations
-> of these should exist or which implementation they use (e.g. VirtIO or
-> Xen PV).  See "Hardware Description" above.
-> 
-> 
-> Changes from previous versions of this RFC
-> ------------------------------------------
-> Changes v1-v2:
->  - Clearly specify that the guest must support the pl011,
->    virtio-console, and Xen PV console.  (Note that it was discussed to
->    mandate a pl011 during Linaro Connect Asia 2014, but that was under the
->    impression that the SBSA specification was an output-only no-irq
->    serial port, which is not the case.  The only two benefits from
->    mandating a specific serial type was to handle "console=ttyAMA0"
->    kernel command line parameters and earlyprintk; Grant Likely has
->    submitted patches to avoid the need for "console=" parameters, and
->    Rob Herring has submitted patches for paravirtualized earlyprintk
->    consoles.)
->  - Reference EFI specification for bootable paths.
->  - Remove discussion on ACPI boot methods and do not suggest ACPI
->    support in VMs.
->  - Add specification about UEFI persistent variable storage and
->    portability.
-> 
-> 
-> References
-> ----------
-> [1]: The ARM Architecture Reference Manual, ARMv8, Issue A.b
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
-> 
-> [2]: ARM Server Base System Architecture
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029/index.html
-> 
-> [3]: The ARM Generic Interrupt Controller Architecture Specifications v2.0
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
-> 
-> [4]: http://www.secretlab.ca/archives/27
-> 
-> [5]: https://git.linaro.org/people/leif.lindholm/linux.git/blob/refs/heads/uefi-for-upstream:/Documentation/arm/uefi.txt
-> 
-> [6]: UEFI Specification 2.4 Revision A
-> http://www.uefi.org/sites/default/files/resources/2_4_Errata_A.pdf
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+> That's the trade-off between software complexity and hardware cost,
+> gates, power consumption. You can do proper physical separation of the
+> secure services but this would require a separate CPU that is rarely
+> used and adds to the overall SoC cost. On large scale hardware
+> deployment, it's exactly economics that matter and these translate into
+> hardware cost. The software cost is irrelevant here, whether we like it
+> or not.
+
+I agree with you on the hardware cost (and the same argument applies to 
+power management by the way).  But once the hardware is there, the 
+software cost has to be optimized the same way.
+
+>From a cost perspective, firmware is always a magnitude more costly to 
+develop and to fix and maintain afterwards than kernel code.  So, 
+without requiring full physical separation increasing the hardware cost, 
+I think the software architecture would benefit from a rethought, 
+possibly with the help of small and cheap hardware enhancements.  I 
+really think not enough attention has been dedicated to that aspect.
 
 
--- 
-Claudio Fontana
-Server Virtualization Architect
-Huawei Technologies Duesseldorf GmbH
-Riesstra?e 25 - 80992 M?nchen
-
-office: +49 89 158834 4135
-mobile: +49 15253060158
+Nicolas
