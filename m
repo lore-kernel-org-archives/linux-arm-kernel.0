@@ -1,30 +1,55 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 10 Jun 2014 11:49:27 -0400 (EDT)
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
- <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
- <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
- <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 10 Jun 2014 12:49:02 -0300
+Subject: [RFC/PATCH] ARM: mvebu: Don't apply the quirks if the SoC
+ revision is unknown
+In-Reply-To: <53972698.8030704@free-electrons.com>
+References: <1402342036-9168-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <5621673.VW5TXctBgm@wuerfel> <20140610134040.GA1991@arch.cereza>
+ <53972698.8030704@free-electrons.com>
+Message-ID: <20140610154902.GA5539@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Jun 2014, Doug Anderson wrote:
+Hi Gregory,
 
-> My S-state knowledge is not strong, but I believe that Lorenzo's
-> questions matter if we're using S2 for CPUidle (where we actually turn
-> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
-> (where we just enter WFI/WFE).
+On 10 Jun 05:39 PM, Gregory CLEMENT wrote:
+> On 10/06/2014 15:40, Ezequiel Garcia wrote:
+> > On 10 Jun 10:21 AM, Arnd Bergmann wrote:
+> >> On Monday 09 June 2014 16:27:16 Ezequiel Garcia wrote:
+> >>> We currently skip the I2C and thermal quirks only if the SoC revision is
+> >>> known to be one that does not need them. If the SoC revision cannot be
+> >>> obtained, the current behavior is to apply the quirk assuming it's needed.
+> >>>
+> >>> This commit changes this, by requiring the SoC revision to be known in order
+> >>> to peform a quirk.
+> >>
+> >> This clearly needs a better description if we want to apply it. We had
+> >> a rather long discussion when the code was first added exactly this
+> >> way and you should explain which of the assumptions we made back then
+> >> are now incorrect.
+> >>
+> >> Is it ever wrong (as opposed to inefficient) to apply the quirk even on a
+> >> newer SoC?
+> >>
+> > 
+> > Yes, for the thermal quirk it is wrong as it consists in changing the compatible
+> > string and moving the registers around.
+> > 
+> > So if you apply the quirk on a SoC that doesn't need it, thermal won't work.
 > 
-> I believe that in ChromeOS we use S1 CPUidle and that it works fine.
-> We've never implemented S2 that I'm aware of.
+> Actually it is the opposite for the I2C quirk. If you don't apply it on an SoC
+> which needs it then the i2C won't work, whereas if you apply it on an SoC which
+> don't need it, then you won't benefit of an optimization but the I2C will remain
+> usable.
+> 
+> So with your change we can have a situation where the i2c is no more usable.
+> That's why I would prefer that you don't modify the i2c quirk.
+> 
 
-You'll have to rely on MCPM for that.  That's probably why it hasn't 
-been implemented before.
-
-
-Nicolas
+Thanks a lot for clarifying this point. I'll prepare a v2, changing only the
+thermal quirk, and explaining the difference in a comment and in the commit
+log.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
