@@ -1,56 +1,37 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Tue, 10 Jun 2014 15:23:20 +0530
-Subject: [PATCH 2/3] spi: s3c64xx: remove a compilation warning with an
- assignment
-In-Reply-To: <CAK5sBcGfE0fsZ1wZX79GOhXBXkSAn3YFt2MsuMcbFnvV_Cw=wA@mail.gmail.com>
-References: <1402390859-28287-1-git-send-email-ch.naveen@samsung.com>
- <1402390859-28287-3-git-send-email-ch.naveen@samsung.com>
- <CAK5sBcGfE0fsZ1wZX79GOhXBXkSAn3YFt2MsuMcbFnvV_Cw=wA@mail.gmail.com>
-Message-ID: <CAHfPSqA-8UK0gFxdB_NHDL+HeRoK3Yrm_2kwp71e0oSL6u=wSg@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 10 Jun 2014 10:57:16 +0100
+Subject: [PATCH] ARM: debug: fix broken DEBUG_LL_INCLUDE for multi platform
+Message-ID: <1402394236-14778-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sachin,
+On multi_v7_defconfig using def_bool in Kconfig can override the selection
+made as part of DEBUG_LL. This is because def_bool will set the config to true
+if the expression evaluates to true, which is what was happening in
+multi_v7_defconfig. ARCH_SPEAR13XX selects DEBUG_UART_PL01X overiding any
+previous DEBUG_LL selections.
 
-On 10 June 2014 15:15, Sachin Kamat <spk.linux@gmail.com> wrote:
-> Hi Naveen,
->
-> On Tue, Jun 10, 2014 at 2:30 PM, Naveen Krishna Chatradhi
-> <ch.naveen@samsung.com> wrote:
->> This patch returns an integer error value instead of the
->> pointer.
->>
->> "warning: return makes integer from pointer without a cast"
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Cc: Doug Anderson <dianders@chromium.org>
->> ---
->>  drivers/spi/spi-s3c64xx.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->> index 0c6013f..4594dde 100644
->> --- a/drivers/spi/spi-s3c64xx.c
->> +++ b/drivers/spi/spi-s3c64xx.c
->> @@ -817,7 +817,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
->>
->>         if (!spi->dev.of_node) {
->>                 dev_err(&spi->dev, "device node not found\n");
->> -               return ERR_PTR(-EINVAL);
->> +               return -EINVAL;
->
-> Isn't this warning introduced by the previous patch (patch1/3)?
-> If so then this patch should be squashed into that.
-You are right, I've introduced this warning in the 1st patch.
-But, realized it only latter. Will spin along with the documentation.
->
-> --
-> Regards,
-> Sachin.
+Making the def_bool to bool and depends made sense in this case, and
+fixes the issue too.
 
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm/Kconfig.debug | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8f90595..53d653c1 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1021,7 +1021,8 @@ config DEBUG_LL_INCLUDE
+ 
+ # Compatibility options for PL01x
+ config DEBUG_UART_PL01X
+-	def_bool ARCH_EP93XX || \
++	bool
++	depends on ARCH_EP93XX || \
+ 		ARCH_INTEGRATOR || \
+ 		ARCH_SPEAR3XX || \
+ 		ARCH_SPEAR6XX || \
 -- 
-Shine bright,
-(: Nav :)
+1.9.1
