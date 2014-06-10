@@ -1,770 +1,84 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 10 Jun 2014 17:59:19 +0200
-Subject: [PATCH] omap: Add devicetree for Gumstix Pepper board
-In-Reply-To: <1402087916-14857-1-git-send-email-ashcharles@gmail.com>
-References: <1402087916-14857-1-git-send-email-ashcharles@gmail.com>
-Message-ID: <53972B57.6010802@epfl.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 10 Jun 2014 18:32:27 +0200
+Subject: [PATCH 1/2] misc: atmel-ssc: support to read ssc version
+In-Reply-To: <1402040495-10320-1-git-send-email-voice.shen@atmel.com>
+References: <1402040495-10320-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <5397331B.1040903@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ash,
+On 06/06/2014 09:41, Bo Shen :
+> Read SSC IP version to check whether it supports frame sync
+> length extension feature.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-On 06/06/2014 10:51 PM, Ash Charles wrote:
-> This adds the Gumstix Pepper[1] single-board computer based on the
-> TI AM335x processor. Schematics are available [2].
-> 
-> [1] https://store.gumstix.com/index.php/products/344/
-> [2] https://pubs.gumstix.com/boards/PEPPER/
-> 
-> Signed-off-by: Ash Charles <ashcharles@gmail.com>
+No. We already have 2 compatible versions for the DT or id table. Simply
+add one.
+Please use this infrastructure to describe such features, I don't want
+to mix the approaches: "compatible string" xor "IP revision".
+
+The DT of the product will then describe on which version of the IP it
+can rely to have this feature.
+
+Best regards,
+
 > ---
->  MAINTAINERS                         |   6 +
->  arch/arm/boot/dts/Makefile          |   3 +-
->  arch/arm/boot/dts/am335x-pepper.dts | 661 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 669 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/am335x-pepper.dts
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 51ebb77..d44e2e3 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6427,6 +6427,12 @@ L:	linux-omap at vger.kernel.org
->  S:	Maintained
->  F:	arch/arm/boot/dts/am335x-nano.dts
+>  drivers/misc/atmel-ssc.c  | 7 +++++++
+>  include/linux/atmel-ssc.h | 3 +++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+> index 22de137..9f49bcb 100644
+> --- a/drivers/misc/atmel-ssc.c
+> +++ b/drivers/misc/atmel-ssc.c
+> @@ -136,6 +136,7 @@ static int ssc_probe(struct platform_device *pdev)
+>  	struct resource *regs;
+>  	struct ssc_device *ssc;
+>  	const struct atmel_ssc_platform_data *plat_dat;
+> +	u32 version;
 >  
-> +OMAP/GUMSTIX PEPPER MACHINE SUPPORT
-> +M:	Ash Charles <ashcharles@gmail.com>
-> +L:	linux-omap at vger.kernel.org
-> +S:	Maintained
-> +F:	arch/arm/boot/dts/am335x-pepper.dts
-> +
-
-It is not very common to add oneself as the maintainer of a single .dts
-file. I could only found the am335x-nano.dts with such a way of doing.
-Usually get_maintainer.pl will also take into account the commit author
-and properly handle this case.
-
->  OMFS FILESYSTEM
->  M:	Bob Copeland <me@bobcopeland.com>
->  L:	linux-karma-devel at lists.sourceforge.net
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a81a24c..9e0352f 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -277,7 +277,8 @@ dtb-$(CONFIG_SOC_AM33XX) += am335x-base0033.dtb \
->  	am335x-boneblack.dtb \
->  	am335x-evm.dtb \
->  	am335x-evmsk.dtb \
-> -	am335x-nano.dtb
-> +	am335x-nano.dtb \
-> +	am335x-pepper.dtb
->  dtb-$(CONFIG_ARCH_OMAP4) += omap4-duovero-parlor.dtb \
->  	omap4-panda.dtb \
->  	omap4-panda-a4.dtb \
-> diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
-> new file mode 100644
-> index 0000000..27d9b75
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am335x-pepper.dts
-> @@ -0,0 +1,661 @@
-> +/*
-> + * Copyright (C) 2014 Gumstix, Inc. - https://www.gumstix.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +#include "am33xx.dtsi"
-> +
-> +/ {
-> +	model = "Gumstix Pepper";
-> +	compatible = "gumstix,am335x-pepper", "ti,am33xx";
-> +
-> +	cpus {
-> +		cpu at 0 {
-> +			cpu0-supply = <&dcdc3_reg>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x20000000>; /* 512 MB */
-> +	};
-> +
-> +	buttons: user_buttons {
-> +		compatible = "gpio-keys";
-> +	};
-> +
-
-For all the boards that I have seen, all the properties of a new node
-are declared at the same place, where you put some of them at the end. I
-have not a strong opinion on this, but I find it a bit more difficult to
-read.
-
-> +	leds: user_leds {
-> +		compatible = "gpio-leds";
-> +	};
-> +
-> +	panel: lcd_panel {
-> +		compatible = "ti,tilcdc,panel";
-> +	};
-> +
-> +	sound: sound_iface {
-> +		compatible = "ti,da830-evm-audio";
-> +	};
-> +
-> +	vbat: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +	};
-> +
-> +	v3v3c_reg: fixedregulator at 1 {
-> +		compatible = "regulator-fixed";
-> +	};
-> +
-> +	vdd5_reg: fixedregulator at 2 {
-> +		compatible = "regulator-fixed";
-> +	};
-> +};
-> +
-> +/* I2C Busses */
-> +&i2c0 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins>;
-> +
-> +	clock-frequency = <400000>;
-> +
-> +	tps: tps at 24 {
-> +		reg = <0x24>;
-> +	};
-> +
-> +	eeprom: eeprom at 50 {
-> +		compatible = "at,24c256";
-> +		reg = <0x50>;
-> +	};
-> +
-> +	audio_codec: tlv320aic3106 at 1b {
-> +		compatible = "ti,tlv320aic3106";
-> +		reg = <0x1b>;
-> +	};
-> +
-> +	accel: lis331dlh at 1d {
-> +		compatible = "st,lis3lv02d";
-> +		reg = <0x1d>;
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins>;
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&am33xx_pinmux {
-> +	i2c0_pins: pinmux_i2c0 {
-> +		pinctrl-single,pins = <
-> +			0x188 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_sda.i2c0_sda */
-> +			0x18c (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c0_scl.i2c0_scl */
-> +		>;
-> +	};
-> +	i2c1_pins: pinmux_i2c1 {
-> +		pinctrl-single,pins = <
-> +			0x10C (PIN_INPUT_PULLUP | MUX_MODE3)	/* mii1_crs,i2c1_sda */
-> +			0x110 (PIN_INPUT_PULLUP | MUX_MODE3)	/* mii1_rxerr,i2c1_scl */
-> +		>;
-> +	};
-> +};
-> +
-
-Splitting the pinmux is also unusual, but in this case I found it more
-readable.
-
-> +/* Accelerometer */
-> +&accel {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&accel_pins>;
-> +
-> +	Vdd-supply = <&ldo3_reg>;
-> +	Vdd_IO-supply = <&ldo3_reg>;
-> +	st,irq1-click;
-> +	st,wakeup-x-lo;
-> +	st,wakeup-x-hi;
-> +	st,wakeup-y-lo;
-> +	st,wakeup-y-hi;
-> +	st,wakeup-z-lo;
-> +	st,wakeup-z-hi;
-> +	st,min-limit-x = <92>;
-> +	st,max-limit-x = <14>;
-> +	st,min-limit-y = <14>;
-> +	st,max-limit-y = <92>;
-> +	st,min-limit-z = <92>;
-> +	st,max-limit-z = <14>;
-> +};
-> +
-> +&am33xx_pinmux {
-> +	accel_pins: pinmux_accel {
-> +		pinctrl-single,pins = <
-> +			0x98 (PIN_INPUT_PULLUP | MUX_MODE7)   /* gpmc_wen.gpio2_4 */
-
-The INT pin of the LIS33 chip seems to be push-pull, thus enabling the
-pullup on the SoC side will increase the current consumption when held down.
-
-> +		>;
-> +	};
-> +};
-> +
-> +/* Audio */
-> +&audio_codec {
-> +	status = "okay";
-> +
-> +	gpio-reset = <&gpio1 16 GPIO_ACTIVE_LOW>;
-> +	AVDD-supply = <&ldo3_reg>;
-> +	IOVDD-supply = <&ldo3_reg>;
-> +	DRVDD-supply = <&ldo3_reg>;
-> +	DVDD-supply = <&dcdc1_reg>;
-> +};
-> +
-> +&sound {
-> +	ti,model = "AM335x-EVM";
-> +	ti,audio-codec = <&audio_codec>;
-> +	ti,mcasp-controller = <&mcasp0>;
-> +	ti,codec-clock-rate = <12000000>;
-> +	ti,audio-routing =
-> +		"Headphone Jack",	"HPLOUT",
-> +		"Headphone Jack",	"HPROUT",
-> +		"LINE1L",		"Line In";
-> +};
-> +
-> +&mcasp0 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&audio_pins>;
-> +
-> +	op-mode = <0>;	/* MCASP_ISS_MODE */
-> +	tdm-slots = <2>;
-> +	serial-dir = <
-> +		1 2 0 0
-> +		0 0 0 0
-> +		0 0 0 0
-> +		0 0 0 0
-> +	>;
-> +	tx-num-evt = <1>;
-> +	rx-num-evt = <1>;
-> +};
-> +
-> +&am33xx_pinmux {
-> +	audio_pins: pinmux_audio {
-> +		pinctrl-single,pins = <
-> +			0x1AC (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_ahcklx.mcasp0_ahclkx */
-> +			0x194 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_fsx.mcasp0_fsx */
-> +			0x190 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_aclkx.mcasp0_aclkx */
-> +			0x198 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_axr0.mcasp0_axr0 */
-> +			0x1A8 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp0_axr1.mcasp0_axr1 */
-> +			0x40 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a0.gpio1_16 */
-
-You already have an external pullup in your design, so this one seems
-superfluous.
-
-> +		>;
-> +	};
-> +};
-> +
-> +/* Display: 24-bit LCD Screen */
-> +&panel {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&lcd_pins>;
-> +	panel-info {
-> +		ac-bias = <255>;
-> +		ac-bias-intrpt = <0>;
-> +		dma-burst-sz = <16>;
-> +		bpp = <32>;
-> +		fdd = <0x80>;
-> +		sync-edge = <0>;
-> +		sync-ctrl = <1>;
-> +		raster-order = <0>;
-> +		fifo-th = <0>;
-> +	};
-> +	display-timings {
-> +		native-mode = <&timing0>;
-> +		timing0: 480x272 {
-> +			clock-frequency = <18400000>;
-> +			hactive = <480>;
-> +			vactive = <272>;
-> +			hfront-porch = <8>;
-> +			hback-porch = <4>;
-> +			hsync-len = <41>;
-> +			vfront-porch = <4>;
-> +			vback-porch = <2>;
-> +			vsync-len = <10>;
-> +			hsync-active = <1>;
-> +			vsync-active = <1>;
-> +		};
-> +	};
-> +};
-> +
-> +&lcdc {
-> +	status = "okay";
-> +};
-> +
-> +&am33xx_pinmux {
-> +	lcd_pins: pinmux_lcd {
-> +		pinctrl-single,pins = <
-> +			0xa0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data0.lcd_data0 */
-> +			0xa4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data1.lcd_data1 */
-> +			0xa8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data2.lcd_data2 */
-> +			0xac (PIN_OUTPUT | MUX_MODE0)	/* lcd_data3.lcd_data3 */
-> +			0xb0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data4.lcd_data4 */
-> +			0xb4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data5.lcd_data5 */
-> +			0xb8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data6.lcd_data6 */
-> +			0xbc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data7.lcd_data7 */
-> +			0xc0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data8.lcd_data8 */
-> +			0xc4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data9.lcd_data9 */
-> +			0xc8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data10.lcd_data10 */
-> +			0xcc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data11.lcd_data11 */
-> +			0xd0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data12.lcd_data12 */
-> +			0xd4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data13.lcd_data13 */
-> +			0xd8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data14.lcd_data14 */
-> +			0xdc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data15.lcd_data15 */
-> +			0x20 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad8.lcd_data16 */
-> +			0x24 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad9.lcd_data17 */
-> +			0x28 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad10.lcd_data18 */
-> +			0x2c (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad11.lcd_data19 */
-> +			0x30 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad12.lcd_data20 */
-> +			0x34 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad13.lcd_data21 */
-> +			0x38 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad14.lcd_data22 */
-> +			0x3c (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad15.lcd_data23 */
-> +			0xe0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_vsync.lcd_vsync */
-> +			0xe4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_hsync.lcd_hsync */
-> +			0xe8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_pclk.lcd_pclk */
-> +			0xec (PIN_OUTPUT | MUX_MODE0)	/* lcd_ac_bias_en.lcd_ac_bias_en */
-> +			/* Display Enable */
-> +			0x6c (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a11.gpio1_27 */
-> +		>;
-> +	};
-> +};
-> +
-> +/* Ethernet */
-> +&cpsw_emac0 {
-> +	status = "okay";
-> +	phy_id = <&davinci_mdio>, <0>;
-> +	phy-mode = "rgmii";
-> +};
-> +
-> +&cpsw_emac1 {
-> +	status = "okay";
-> +	phy_id = <&davinci_mdio>, <1>;
-> +	phy-mode = "rgmii";
-> +};
-> +
-> +&davinci_mdio {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mdio_pins>;
-> +};
-> +
-> +&mac {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ethernet_pins>;
-> +};
-> +
-> +
-> +&am33xx_pinmux {
-> +	ethernet_pins: pinmux_ethernet {
-> +		pinctrl-single,pins = <
-> +			0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txen.rgmii1_tctl */
-> +			0x118 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxdv.rgmii1_rctl */
-> +			0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd3.rgmii1_td3 */
-> +			0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd2.rgmii1_td2 */
-> +			0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td1 */
-> +			0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td0 */
-> +			0x12c (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_txclk.rgmii1_tclk */
-> +			0x130 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxclk.rgmii1_rclk */
-> +			0x134 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd3.rgmii1_rxd3 */
-> +			0x138 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd2.rgmii1_rxd2 */
-> +			0x13c (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd1.rgmii1_rxd1 */
-> +			0x140 (PIN_INPUT_PULLUP | MUX_MODE2)	/* mii1_rxd0.rgmii1_rxd0 */
-> +			/* ethernet interrupt */
-> +			0x144 (PIN_INPUT_PULLUP | MUX_MODE7)	/* rmii2_refclk.gpio0_29 */
-> +			/* ethernet PHY nReset */
-> +			0x108 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* mii1_col.gpio3_0 */
-> +		>;
-> +	};
-> +
-> +	mdio_pins: pinmux_mdio {
-> +		pinctrl-single,pins = <
-> +			0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-> +			0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
-> +		>;
-> +	};
-> +};
-> +
-> +/* MMC */
-> +&mmc1 {
-> +	/* Bootable SD card slot */
-> +	status = "okay";
-> +	vmmc-supply = <&ldo3_reg>;
-> +	bus-width = <4>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sd_pins>;
-> +	cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
-> +};
-> +
-> +&mmc2 {
-> +	/* eMMC (not populated) on MMC #2 */
-> +	status = "disabled";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_pins>;
-> +	vmmc-supply = <&ldo3_reg>;
-> +	bus-width = <8>;
-> +	ti,non-removable;
-> +};
-> +
-> +&edma {
-> +	/* Map eDMA MMC2 Events from Crossbar */
-> +	ti,edma-xbar-event-map = /bits/ 16 <1 12
-> +                                            2 13>;
-> +};
-> +
-> +
-> +&mmc3 {
-> +	/* Wifi & Bluetooth on MMC #3 */
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&wireless_pins>;
-> +	vmmmc-supply = <&v3v3c_reg>;
-> +	bus-width = <4>;
-> +	ti,non-removable;
-> +	dmas = <&edma 12
-> +		&edma 13>;
-> +	dma-names = "tx", "rx";
-> +};
-> +
-> +
-> +&am33xx_pinmux {
-> +	sd_pins: pinmux_sd_card {
-> +		pinctrl-single,pins = <
-> +			0xf0 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat0.mmc0_dat0 */
-> +			0xf4 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat1.mmc0_dat1 */
-> +			0xf8 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat2.mmc0_dat2 */
-> +			0xfc (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat3.mmc0_dat3 */
-> +			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_clk.mmc0_clk */
-> +			0x104 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_cmd.mmc0_cmd */
-> +			0x160 (PIN_INPUT | MUX_MODE7)		/* spi0_cs1.gpio0_6 */
-> +		>;
-> +	};
-> +	emmc_pins: pinmux_emmc {
-> +		pinctrl-single,pins = <
-> +			0x80 (PIN_INPUT_PULLUP | MUX_MODE2)	/* gpmc_csn1.mmc1_clk */
-> +			0x84 (PIN_INPUT_PULLUP | MUX_MODE2)	/* gpmc_csn2.mmc1_cmd */
-> +			0x00 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad0.mmc1_dat0 */
-> +			0x04 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad1.mmc1_dat1 */
-> +			0x08 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad2.mmc1_dat2 */
-> +			0x0c (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad3.mmc1_dat3 */
-> +			0x10 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad4.mmc1_dat4 */
-> +			0x14 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad5.mmc1_dat5 */
-> +			0x18 (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad6.mmc1_dat6 */
-> +			0x1c (PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_ad7.mmc1_dat7 */
-> +			/* EMMC nReset */
-> +			0x74 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_wpn.gpio0_31 */
-> +		>;
-> +	};
-> +	wireless_pins: pinmux_wireless {
-> +		pinctrl-single,pins = <
-> +			0x44 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a1.mmc2_dat0 */
-> +			0x48 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a2.mmc2_dat1 */
-> +			0x4c (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_a3.mmc2_dat2 */
-> +			0x78 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_ben1.mmc2_dat3 */
-> +			0x88 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_csn3.mmc2_cmd */
-> +			0x8c (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_clk.mmc1_clk */
-> +			/* WLAN nReset */
-> +			0x60 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_a8.gpio1_24 */
-> +			/* WLAN nPower down */
-> +			0x70 (PIN_OUTPUT_PULLUP | MUX_MODE7)	/* gpmc_wait0.gpio0_30 */
-> +			/* 32kHz Clock */
-> +			0x1b4 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* xdma_event_intr1.clkout2 */
-> +		>;
-> +	};
-> +};
-> +
-> +/* Power */
-> +&vbat {
-> +	regulator-name = "vbat";
-> +	regulator-min-microvolt = <5000000>;
-> +	regulator-max-microvolt = <5000000>;
-> +	regulator-always-on;
-> +};
-> +
-> +&v3v3c_reg {
-> +	regulator-name = "v3v3c_reg";
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	vin-supply = <&vbat>;
-> +	regulator-always-on;
-> +};
-> +
-> +&vdd5_reg {
-> +	regulator-name = "vdd5_reg";
-> +	regulator-min-microvolt = <5000000>;
-> +	regulator-max-microvolt = <5000000>;
-> +	regulator-always-on;
-> +	vin-supply = <&vbat>;
-> +};
-> +
-> +/include/ "tps65217.dtsi"
-> +
-> +&tps {
-> +	backlight {
-> +		isel = <1>; /* ISET1 */
-> +		fdim = <200>; /* TPS65217_BL_FDIM_200HZ */
-> +		default-brightness = <80>;
-> +	};
-> +
-> +	regulators {
-> +		dcdc1_reg: regulator at 0 {
-> +			/* VDD_1V8 system supply */
-> +			regulator-always-on;
-> +		};
-> +
-> +		dcdc2_reg: regulator at 1 {
-> +			/* VDD_CORE voltage limits 0.95V - 1.26V with +/-4% tolerance */
-> +			regulator-name = "vdd_core";
-> +			regulator-min-microvolt = <925000>;
-> +			regulator-max-microvolt = <1325000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		dcdc3_reg: regulator at 2 {
-> +			/* VDD_MPU voltage limits 0.95V - 1.1V with +/-4% tolerance */
-> +			regulator-name = "vdd_mpu";
-> +			regulator-min-microvolt = <925000>;
-> +			regulator-max-microvolt = <1150000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		ldo1_reg: regulator at 3 {
-> +			/* VRTC 1.8V always-on supply */
-> +			regulator-always-on;
-> +		};
-> +
-> +		ldo2_reg: regulator at 4 {
-> +			/* 3.3V rail */
-> +			regulator-always-on;
-> +		};
-> +
-> +		ldo3_reg: regulator at 5 {
-> +			/* VDD_3V3A 3.3V rail */
-> +			regulator-always-on;
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +
-> +		ldo4_reg: regulator at 6 {
-> +			/* VDD_3V3B 3.3V rail */
-> +			regulator-always-on;
-> +		};
-
-Why are all the regulators always on? Most of them should be managed
-automatically if you have correct dependencies, shouldn't they?
-
-> +	};
-> +};
-> +
-> +/* SPI Busses */
-> +&spi0 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&spi0_pins>;
-> +};
-> +
-> +&am33xx_pinmux {
-> +	spi0_pins: pinmux_spi0 {
-> +		pinctrl-single,pins = <
-> +			0x150 (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_sclk.spi0_sclk */
-> +			0x15C (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_cs0.spi0_cs0 */
-> +			0x154 (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_d0.spi0_d0 */
-> +			0x158 (PIN_INPUT_PULLUP | MUX_MODE0) /* spi0_d1.spi0_d1 */
-> +		>;
-> +	};
-> +};
-> +
-> +/* Touch Screen */
-> +&tscadc {
-> +	status = "okay";
-> +	tsc {
-> +		ti,wires = <4>;
-> +		ti,x-plate-resistance = <200>;
-> +		ti,coordinate-readouts = <5>;
-> +		ti,wire-config = <0x00 0x11 0x22 0x33>;
-> +	};
-> +
-> +	adc {
-> +		ti,adc-channels = <4 5 6 7>;
-> +	};
-> +};
-> +
-> +/* UARTs */
-> +&uart0 {
-> +	/* Serial Console */
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins>;
-> +};
-> +
-> +&uart1 {
-> +	/* Broken out to J6 header */
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins>;
-> +};
-> +
-> +&am33xx_pinmux {
-> +	uart0_pins: pinmux_uart0 {
-> +		pinctrl-single,pins = <
-> +			0x170 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
-> +			0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
-> +		>;
-> +	};
-> +	uart1_pins: pinmux_uart1 {
-> +		pinctrl-single,pins = <
-> +			0x178 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart1_ctsn.uart1_ctsn */
-> +			0x17C (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart1_rtsn.uart1_rtsn */
-> +			0x180 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart1_rxd.uart1_rxd */
-> +			0x184 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart1_txd.uart1_txd */
-> +		>;
-> +	};
-> +};
-> +
-> +/* USB */
-> +&usb {
-> +	status = "okay";
-> +
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&usb_pins>;
-> +};
-> +
-> +&usb_ctrl_mod {
-> +	status = "okay";
-> +};
-> +
-> +&usb0_phy {
-> +	status = "okay";
-> +};
-> +
-> +&usb1_phy {
-> +	status = "okay";
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
-> +        dr_mode = "host";
-> +};
-> +
-> +&usb1 {
-> +	status = "okay";
-> +        dr_mode = "host";
-> +};
-> +
-> +&cppi41dma {
-> +	status = "okay";
-> +};
-> +
-> +&am33xx_pinmux {
-> +	usb_pins: pinmux_usb {
-> +		pinctrl-single,pins = <
-> +			/* USB0 Over-Current (active low) */
-> +			0x64 (PIN_INPUT | MUX_MODE7)	/* gpmc_a9.gpio1_25 */
-> +			/* USB1 Over-Current (active low) */
-> +			0x68 (PIN_INPUT | MUX_MODE7)	/* gpmc_a10.gpio1_26 */
-> +		>;
-> +	};
-> +};
-> +
-> +/* User IO */
-> +&leds {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&user_leds_pins>;
-> +
-> +	led at 0 {
-> +		label = "pepper:user0:blue";
-> +		gpios = <&gpio1 20 GPIO_ACTIVE_HIGH>;
-> +		linux,default-trigger = "none";
-> +		default-state = "off";
-> +	};
-> +
-> +	led at 1 {
-> +		label = "pepper:user1:red";
-> +		gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
-> +		linux,default-trigger = "none";
-> +		default-state = "off";
-> +	};
-> +};
-> +
-> +&buttons {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&user_buttons_pins>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	button at 0 {
-> +		label = "home";
-> +		linux,code = <102>;
-
-You can use the key codes defined in <dt-bindings/input/input.h>.
-
-> +		gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
-> +		gpio-key,wakeup;
-> +	};
-> +
-> +	button at 1 {
-> +		label = "menu";
-> +		linux,code = <139>;
-
-KEY_MENU
-
-> +		gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
-> +		gpio-key,wakeup;
-> +	};
-> +
-> +	buttons at 2 {
-> +		label = "power";
-> +		linux,code = <116>;
-
-KEY_POWER
-
-> +		gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
-> +		gpio-key,wakeup;
-> +	};
-> +};
-> +
-> +&am33xx_pinmux {
-> +	user_leds_pins: pinmux_user_leds {
-> +		pinctrl-single,pins = <
-> +			0x50 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a4.gpio1_20 */
-> +			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_a5.gpio1_21 */
-
-Why enabling the pulldown on an output gpio? You will increase the power
-consumption when driving high.
-
-> +		>;
-> +	};
-> +
-> +	user_buttons_pins: pinmux_user_buttons {
-> +		pinctrl-single,pins = <
-> +			0x58 (PIN_INPUT_PULLUP | MUX_MODE7)	/* gpmc_a6.gpio1_22 */
-> +			0x5C (PIN_INPUT_PULLUP | MUX_MODE7)	/* gpmc_a7.gpio1_21 */
-> +			0x164 (PIN_INPUT_PULLUP | MUX_MODE7)	/* gpmc_a8.gpio0_7 */
-> +		>;
-> +	};
-> +};
+>  	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
+>  	if (!ssc) {
+> @@ -173,8 +174,14 @@ static int ssc_probe(struct platform_device *pdev)
+>  	clk_prepare_enable(ssc->clk);
+>  	ssc_writel(ssc->regs, IDR, -1);
+>  	ssc_readl(ssc->regs, SR);
+> +	version = ssc_readl(ssc->regs, VERSION);
+>  	clk_disable_unprepare(ssc->clk);
+>  
+> +	if (version >= 0x300)
+> +		ssc->has_fslen_ext = 1;
+> +	else
+> +		ssc->has_fslen_ext = 0;
+> +
+>  	ssc->irq = platform_get_irq(pdev, 0);
+>  	if (!ssc->irq) {
+>  		dev_dbg(&pdev->dev, "could not get irq\n");
+> diff --git a/include/linux/atmel-ssc.h b/include/linux/atmel-ssc.h
+> index 571a12e..9ee1b68 100644
+> --- a/include/linux/atmel-ssc.h
+> +++ b/include/linux/atmel-ssc.h
+> @@ -19,6 +19,7 @@ struct ssc_device {
+>  	int			user;
+>  	int			irq;
+>  	bool			clk_from_rk_pin;
+> +	int			has_fslen_ext;
+>  };
+>  
+>  struct ssc_device * __must_check ssc_request(unsigned int ssc_num);
+> @@ -258,6 +259,8 @@ void ssc_free(struct ssc_device *ssc);
+>  #define SSC_IMR_TXSYN_SIZE			 1
+>  #define SSC_IMR_TXSYN_OFFSET			10
+>  
+> +#define SSC_VERSION			0x000000fc
+> +
+>  /* SSC PDC Receive Pointer Register */
+>  #define SSC_PDC_RPR			0x00000100
+>  
 > 
 
-Regards,
 
-Florian
+-- 
+Nicolas Ferre
