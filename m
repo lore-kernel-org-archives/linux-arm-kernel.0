@@ -1,73 +1,49 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 10 Jun 2014 13:42:11 +0530
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
- <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
-Message-ID: <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Jun 2014 01:17:29 -0700
+Subject: [PATCH CRITICAL] ARM: s3c64xx: dt: Fix boot failure due to double
+ clock initialization
+In-Reply-To: <CAOesGMiUyOTLMi56cMN9V8Ft0w2X_g0_HzA+cfuYnZyf2=iiMA@mail.gmail.com>
+References: <1386964779-29457-1-git-send-email-tomasz.figa@gmail.com>
+ <CAOesGMifjnTDUcsweOwsw9fFgsE7b4q3wsASfP8YL-uMH5KiPA@mail.gmail.com>
+ <CAPTRvHn7yTt6mC1fjEn5Ra9yx=GZ1DyNQtGWvHsDd_LkuiM_wA@mail.gmail.com>
+ <1500417.9RFCmzklxv@flatron> <20131216210915.GD3185@sirena.org.uk>
+ <20131217151424.GB11138@opensource.wolfsonmicro.com>
+ <CAOesGMiUyOTLMi56cMN9V8Ft0w2X_g0_HzA+cfuYnZyf2=iiMA@mail.gmail.com>
+Message-ID: <CAOesGMgS=+TDHgX29nbbNQ_X2Vk76L5WxZvS9FHAF0hs2MBm+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 June 2014 04:08, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Mon, Jun 09, 2014 at 06:03:31PM +0100, Doug Anderson wrote:
->
-> [...]
->
->> Cold boot and resume from suspend are detected via various special
->> flags in various special locations.  Resume from suspend looks at
->> INFORM1 (0x10048004) for flags.  This register is 0 during a cold boot
->> and has special values set by the kernel at resume time.
+On Tue, Dec 17, 2013 at 11:12 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Dec 17, 2013 at 7:14 AM, Charles Keepax
+> <ckeepax@opensource.wolfsonmicro.com> wrote:
+>> On Mon, Dec 16, 2013 at 09:09:15PM +0000, Mark Brown wrote:
+>>> On Sat, Dec 14, 2013 at 04:41:06AM -0800, Tomasz Figa wrote:
+>>>
+>>> >  - Wolfson Cragganmore 6410 - Mark Brown (copied) is using it for some
+>>> >    testing of audio codec AFAIK, but I'm not sure if you can get that
+>>> >    anywhere.
+>>>
+>>> Essentially no, though you could try asking nicely.  It's not suitable
+>>> for a test farm anyway without a SD mux as the only bootloader supported
+>>> is Qi which only boots from flash.
 >>
->> It also looks as if some code looks at 0x10040900 (PMU_SPARE0) to help
->> tell initial cold boot and secondary CPU bringup.
+>> Yeah, we don't have that many spare at the moment and whilst we
+>> do use them fairly regularly we are not produce new boards
+>> anymore.
 >
-> Ok, thanks a lot. It looks like firmware paths should be ready to
-> detect cold vs warm boot, and hopefully do not rely on a specific
-> MPIDR to come up first out of power states.
+> Yeah, sounds unlikely to be a good fit.
 >
->> > I am asking to check if on this platform CPUidle (where the notion of
->> > primary CPU disappears) has a chance to run properly.
->>
->> I believe it should be possible, but we don't have CPUidle implemented
->> in our current system.  Abhilash may be able to comment more.
->
+> Something like the tiny6410's would be useful. They seem to mostly be
+> available with LCD panels though, which ups the price a bit. I'll keep
+> an eye out for one.
 
-Cpuidle is implemented for exynos5420, and is tested on chromebook.
+FWIW, I came across a store at Guang Hua Digital Plaza today that had
+the tiny6410+SDK board on display, and ended up buying one. It'll take
+me a little while to wire it up for testing.
 
-
-> I am interested in more insights, that's very helpful thanks.
->
->> > Probably CPUidle won't attain idle states where IRAM content is lost, but I
->> > am still worried about the primary vs secondaries firmware boot behaviour.
->>
->> I don't think iRAM can be turned off for CPUidle.
-
-Yes thats true.
->
-> It might be added a system state but I doubt that too and if you are
-> relying on registers for jump addresses that's not even a problem in
-> the first place.
->
->> > What happens on reboot from suspend to RAM (or to put it differently,
->> > what does secure firmware do on reboot from suspend to RAM - in
->> > particular how is the "jump" address to bootloader/kernel set ?)
->>
->> Should be described above now.
->
-> Thank you very much.
->
-> Lorenzo
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Seems like there's no upstream u-boot support for the board, so
+getting something onto it that can network boot seems to be a long
+shot. We'll see what I can cobble together.
 
 
-
--- 
-with warm regards,
-Chander Kashyap
+-Olof
