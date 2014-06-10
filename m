@@ -1,168 +1,33 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Jun 2014 12:51:34 +0200
-Subject: [PATCH 21/24] ARM: ux500: Initial support for power domains
+Date: Tue, 10 Jun 2014 12:51:35 +0200
+Subject: [PATCH 22/24] ARM: ux500: Enable Kconfig for the generic power domain
 In-Reply-To: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
 References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1402397497-26737-22-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1402397497-26737-23-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ux500 SoC uses the generic power domain and requires the domains to
-be specified through DT.
-
-Currently the callbacks for handling power gating are empty functions
-which shall be implemented once each device are handled properly from a
-runtime PM perspective.
+Since ux500 uses genpd, this will enable the power domain support.
 
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/mach-ux500/Makefile     |    1 +
- arch/arm/mach-ux500/pm.c         |    4 ++
- arch/arm/mach-ux500/pm_domains.c |   77 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-ux500/pm_domains.h |   17 +++++++++
- 4 files changed, 99 insertions(+)
- create mode 100644 arch/arm/mach-ux500/pm_domains.c
- create mode 100644 arch/arm/mach-ux500/pm_domains.h
+ arch/arm/mach-ux500/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 9741de95..4418a50 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -9,5 +9,6 @@ obj-$(CONFIG_MACH_MOP500)	+= board-mop500-regulators.o \
- 				board-mop500-audio.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-+obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index b41a42d..aaf8cfd 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -33,6 +33,7 @@ config UX500_SOC_DB8500
+ 	select PINCTRL_AB8540
+ 	select REGULATOR
+ 	select REGULATOR_DB8500_PRCMU
++	select PM_GENERIC_DOMAINS if PM
  
- CFLAGS_hotplug.o		+= -march=armv7-a
-diff --git a/arch/arm/mach-ux500/pm.c b/arch/arm/mach-ux500/pm.c
-index b80a9a2..2cb587b 100644
---- a/arch/arm/mach-ux500/pm.c
-+++ b/arch/arm/mach-ux500/pm.c
-@@ -17,6 +17,7 @@
- #include <linux/platform_data/arm-ux500-pm.h>
+ menu "Ux500 target platform (boards)"
  
- #include "db8500-regs.h"
-+#include "pm_domains.h"
- 
- /* ARM WFI Standby signal register */
- #define PRCM_ARM_WFI_STANDBY    (prcmu_base + 0x130)
-@@ -191,4 +192,7 @@ void __init ux500_pm_init(u32 phy_base, u32 size)
- 
- 	/* Set up ux500 suspend callbacks. */
- 	suspend_set_ops(UX500_SUSPEND_OPS);
-+
-+	/* Initialize ux500 power domains */
-+	ux500_pm_domains_init();
- }
-diff --git a/arch/arm/mach-ux500/pm_domains.c b/arch/arm/mach-ux500/pm_domains.c
-new file mode 100644
-index 0000000..dbc115b
---- /dev/null
-+++ b/arch/arm/mach-ux500/pm_domains.c
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright (C) 2014 Linaro Ltd.
-+ *
-+ * Author: Ulf Hansson <ulf.hansson@linaro.org>
-+ * License terms: GNU General Public License (GPL) version 2
-+ *
-+ * Implements power domains as generic power domains for ux500.
-+ */
-+#include <linux/printk.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/pm_domain.h>
-+
-+#include <dt-bindings/arm/ux500_pm_domains.h>
-+#include "pm_domains.h"
-+
-+static int pd_power_off(struct generic_pm_domain *domain)
-+{
-+	/*
-+	 * Handle the gating of the power domain regulator here.
-+	 * Drivers/subsystems operating the devices in the power domain needs
-+	 * to handle register context save/restore to be able to enable power
-+	 * domain gating/ungating.
-+	 */
-+	return 0;
-+}
-+
-+static int pd_power_on(struct generic_pm_domain *domain)
-+{
-+	/*
-+	 * Handle the ungating of the power domain regulator here.
-+	 * Drivers/subsystems operating the devices in the power domain needs
-+	 * to handle register context save/restore to be able to enable power
-+	 * domain gating/ungating.
-+	 */
-+	return 0;
-+}
-+
-+static struct generic_pm_domain ux500_pm_domain_vape = {
-+	.name = "VAPE",
-+	.power_off = pd_power_off,
-+	.power_on = pd_power_on,
-+};
-+
-+static struct generic_pm_domain *ux500_pm_domains[NR_DOMAINS] = {
-+	[DOMAIN_VAPE] = &ux500_pm_domain_vape,
-+};
-+
-+static struct of_device_id ux500_pm_domain_matches[] = {
-+	{ .compatible = "stericsson,ux500-pm-domains", },
-+	{ },
-+};
-+
-+int __init ux500_pm_domains_init(void)
-+{
-+	struct device_node *np;
-+	struct genpd_onecell_data *genpd_data;
-+	int i;
-+
-+	np = of_find_matching_node(NULL, ux500_pm_domain_matches);
-+	if (!np)
-+		return -ENODEV;
-+
-+	genpd_data = kzalloc(sizeof(*genpd_data), GFP_KERNEL);
-+	if (!genpd_data)
-+		return -ENOMEM;
-+
-+	genpd_data->domain_num = ARRAY_SIZE(ux500_pm_domains);
-+	genpd_data->domains = ux500_pm_domains;
-+
-+	for (i = 0; i < ARRAY_SIZE(ux500_pm_domains); ++i)
-+		pm_genpd_init(ux500_pm_domains[i], NULL, false);
-+
-+	of_genpd_add_provider(np, of_genpd_xlate_onecell, genpd_data);
-+	return 0;
-+}
-diff --git a/arch/arm/mach-ux500/pm_domains.h b/arch/arm/mach-ux500/pm_domains.h
-new file mode 100644
-index 0000000..263d3ba
---- /dev/null
-+++ b/arch/arm/mach-ux500/pm_domains.h
-@@ -0,0 +1,17 @@
-+/*
-+ * Copyright (C) 2014 Linaro Ltd.
-+ *
-+ * Author: Ulf Hansson <ulf.hansson@linaro.org>
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#ifndef __MACH_UX500_PM_DOMAINS_H
-+#define __MACH_UX500_PM_DOMAINS_H
-+
-+#ifdef CONFIG_PM_GENERIC_DOMAINS
-+extern int __init ux500_pm_domains_init(void);
-+#else
-+static inline int ux500_pm_domains_init(void) { return 0; }
-+#endif
-+
-+#endif
 -- 
 1.7.9.5
