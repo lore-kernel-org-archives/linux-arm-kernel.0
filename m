@@ -1,92 +1,33 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Jun 2014 12:51:25 +0200
-Subject: [PATCH 12/24] PM / Domains: Remove pm_genpd_syscore_switch() API
+Date: Tue, 10 Jun 2014 12:51:28 +0200
+Subject: [PATCH 15/24] ARM: exynos: Leave disabling of unused pm domains to
+ genpd
 In-Reply-To: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
 References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1402397497-26737-13-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1402397497-26737-16-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm_genpd_syscore_poweroff() API and pm_genpd_syscore_poweron() API
-makes the pm_genpd_syscore_switch() API redundant.
+Since genpd at late init, will try to disable unused domains we don't
+need to handle it from here as well.
 
-Moreover, since there are no active users, let's just remove it.
-
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain.c |   17 ++++++++++++++---
- include/linux/pm_domain.h   |   16 ++++------------
- 2 files changed, 18 insertions(+), 15 deletions(-)
+ arch/arm/mach-exynos/exynos.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 3b29477..2d20766 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1293,13 +1293,13 @@ static void pm_genpd_complete(struct device *dev)
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index bc43e22..82ab996 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -193,7 +193,6 @@ void __init exynos_init_late(void)
+ 		/* to be supported later */
+ 		return;
+ 
+-	pm_genpd_poweroff_unused();
+ 	exynos_pm_init();
  }
- 
- /**
-- * pm_genpd_syscore_switch - Switch power during system core suspend or resume.
-+ * genpd_syscore_switch - Switch power during system core suspend or resume.
-  * @dev: Device that normally is marked as "always on" to switch power for.
-  *
-  * This routine may only be called during the system core (syscore) suspend or
-  * resume phase for devices whose "always on" flags are set.
-  */
--void pm_genpd_syscore_switch(struct device *dev, bool suspend)
-+static void genpd_syscore_switch(struct device *dev, bool suspend)
- {
- 	struct generic_pm_domain *genpd;
- 
-@@ -1315,7 +1315,18 @@ void pm_genpd_syscore_switch(struct device *dev, bool suspend)
- 		genpd->suspended_count--;
- 	}
- }
--EXPORT_SYMBOL_GPL(pm_genpd_syscore_switch);
-+
-+void pm_genpd_syscore_poweroff(struct device *dev)
-+{
-+	genpd_syscore_switch(dev, true);
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweroff);
-+
-+void pm_genpd_syscore_poweron(struct device *dev)
-+{
-+	genpd_syscore_switch(dev, false);
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
- 
- #else
- 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 0e6205e..eacf6a1 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -249,21 +249,13 @@ static inline void pm_genpd_poweroff_unused(void) {}
- #endif
- 
- #ifdef CONFIG_PM_GENERIC_DOMAINS_SLEEP
--extern void pm_genpd_syscore_switch(struct device *dev, bool suspend);
-+extern void pm_genpd_syscore_poweroff(struct device *dev);
-+extern void pm_genpd_syscore_poweron(struct device *dev);
- #else
--static inline void pm_genpd_syscore_switch(struct device *dev, bool suspend) {}
-+static inline void pm_genpd_syscore_poweroff(struct device *dev) {}
-+static inline void pm_genpd_syscore_poweron(struct device *dev) {}
- #endif
- 
--static inline void pm_genpd_syscore_poweroff(struct device *dev)
--{
--	pm_genpd_syscore_switch(dev, true);
--}
--
--static inline void pm_genpd_syscore_poweron(struct device *dev)
--{
--	pm_genpd_syscore_switch(dev, false);
--}
--
- /* OF power domain providers */
- struct of_device_id;
  
 -- 
 1.7.9.5
