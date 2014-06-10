@@ -1,57 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 10 Jun 2014 13:11:48 +0200
-Subject: [PATCH v2 4/4] ARM: tegra: jetson-tk1: Add XUSB pad controller
-In-Reply-To: <1402398708-10722-1-git-send-email-thierry.reding@gmail.com>
-References: <1402398708-10722-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1402398708-10722-4-git-send-email-thierry.reding@gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 10 Jun 2014 12:16:20 +0100
+Subject: [PATCH] ARM: qcom: select GSBI from mach kconfig
+Message-ID: <1402398980-24664-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+This patch adds GSBI selection automatically from mach kconfig, As GSBI
+seems to be the very basic SOC specific driver and serial driver depends on it.
+I think this option should be selected via mach kconfig rather than adding
+it to any defconfig.
 
-Assign lanes to the XUSB pads as used on the Jetson TK1.
+Without this patch multi_v7_defconfig can not show up console on
+IFC6410.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/tegra124-jetson-tk1.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/mach-qcom/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-index e31fb61a81d3..38d30877057c 100644
---- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-+++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-@@ -1619,6 +1619,32 @@
- 		nvidia,sys-clock-req-active-high;
- 	};
+diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+index 5bac591..d68d7ee 100644
+--- a/arch/arm/mach-qcom/Kconfig
++++ b/arch/arm/mach-qcom/Kconfig
+@@ -7,6 +7,7 @@ config ARCH_QCOM
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_SMP
+ 	select QCOM_SCM if SMP
++	select QCOM_GSBI
+ 	help
+ 	  Support for Qualcomm's devicetree based systems.
  
-+	padctl at 0,7009f000 {
-+		pinctrl-0 = <&padctl_default>;
-+		pinctrl-names = "default";
-+
-+		padctl_default: pinmux {
-+			usb3 {
-+				nvidia,lanes = "pcie-0", "pcie-1";
-+				nvidia,function = "usb3";
-+				nvidia,iddq = <0>;
-+			};
-+
-+			pcie {
-+				nvidia,lanes = "pcie-2", "pcie-3",
-+					       "pcie-4";
-+				nvidia,function = "pcie";
-+				nvidia,iddq = <0>;
-+			};
-+
-+			sata {
-+				nvidia,lanes = "sata-0";
-+				nvidia,function = "sata";
-+				nvidia,iddq = <0>;
-+			};
-+		};
-+	};
-+
- 	/* SD card */
- 	sdhci at 0,700b0400 {
- 		status = "okay";
 -- 
-1.9.2
+1.9.1
