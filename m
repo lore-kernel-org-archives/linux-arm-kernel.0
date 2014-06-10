@@ -1,46 +1,38 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 10 Jun 2014 13:04:40 -0400
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
-References: <20140328184517.GA27219@cbox>
- <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
-Message-ID: <53973AA8.9020301@codeaurora.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 10 Jun 2014 19:10:35 +0200
+Subject: [PATCH v4 06/11] ARM: EXYNOS: Add support for mapping PMU base
+ address via DT
+In-Reply-To: <1399704998-13321-7-git-send-email-pankaj.dubey@samsung.com>
+References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399704998-13321-7-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <53973C0B.2000903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi,
 
-On 06/10/2014 10:42 AM, Peter Maydell wrote:
-> On 28 March 2014 18:45, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> ARM VM System Specification
->> ===========================
->>
+On 10.05.2014 08:56, Pankaj Dubey wrote:
+> From: Young-Gun Jang <yg1004.jang@samsung.com>
 > 
->> The virtual hardware platform must provide a number of mandatory
->> peripherals:
->>
->>   Serial console:  The platform should provide a console,
->>   based on an emulated pl011, a virtio-console, or a Xen PV console.
->>
->>   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
->>   limits the the number of virtual CPUs to 8 cores, newer GIC versions
->>   removes this limitation.
->>
->>   The ARM virtual timer and counter should be available to the VM as
->>   per the ARM Generic Timers specification in the ARM ARM [1].
+> Add support for mapping Samsung Power Management Unit (PMU)
+> base address from device tree. This patch also adds helper
+> function as "get_exynos_pmuregmap". This function can be used
+> by other machine files such as "pm.c", "hotplug.c" for accessing
+> PMU regmap handle.
 > 
-> I just noticed that this doesn't mandate that the platform
-> provides an RTC. As I understand it, the UEFI spec mandates
-> that there's an RTC (could somebody more familiar with UEFI
-> than me confirm/deny that?) so we should probably put one here.
 
-Pardon my ignorance, but what exactly disqualifies Generic Timer
-implementations from being used as Real Time Clocks?
+I don't think there is a need to use regmap to provide access to PMU to
+such low level code such as pm.c or hotplug.c. Moreover, I believe that
+it might be undesirable in some cases, e.g. very low level code running
+at early resume or late suspend.
 
-Thanks,
-Christopher
+IMHO, based on what we now have for SYSRAM, you could simply map PMU
+from device tree one time, before SMP init, and keep the address in some
+globally accessible variable, like those for SYSRAM we have right now
+(sysram_base_addr, sysram_ns_base_addr -> pmu_base_addr).
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Then, registration of the normal syscon would happen through standard
+platform driver mechanisms and no special early handling would be necessary.
+
+Best regards,
+Tomasz
