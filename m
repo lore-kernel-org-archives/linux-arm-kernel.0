@@ -1,277 +1,172 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 10 Jun 2014 11:10:47 +0200
-Subject: [RESEND2 PATCH v4 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire
- Interface) controller support
-In-Reply-To: <5396C7BD.3040008@free-electrons.com>
-References: <1401785392-26602-1-git-send-email-boris.brezillon@free-electrons.com>
- <1401785392-26602-3-git-send-email-boris.brezillon@free-electrons.com>
- <20140610083850.GB2620@katana> <5396C7BD.3040008@free-electrons.com>
-Message-ID: <5396CB97.3000207@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 10 Jun 2014 10:19:38 +0100
+Subject: Problems booting exynos5420 with >1 CPU
+In-Reply-To: <alpine.LFD.2.11.1406092254220.25775@knanqh.ubzr>
+References: <alpine.LFD.2.11.1406062340480.25775@knanqh.ubzr>
+ <20140607175618.GA25068@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1406071431490.25775@knanqh.ubzr>
+ <20140607223614.GA26641@e102568-lin.cambridge.arm.com>
+ <CAOesGMj+itYr-daqxfX=J3Ss+7YdWhUUzBWTW3FqVEH8tXqt-A@mail.gmail.com>
+ <20140608124530.GA31921@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1406081138070.25775@knanqh.ubzr>
+ <7hsindq07l.fsf@paris.lan>
+ <20140609222604.GA16889@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1406092254220.25775@knanqh.ubzr>
+Message-ID: <20140610091938.GA20944@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 10, 2014 at 05:25:47AM +0100, Nicolas Pitre wrote:
+> On Mon, 9 Jun 2014, Lorenzo Pieralisi wrote:
+> 
+> > I commented on Nico's patch because I did not like how it was
+> > implemented (at least remove the CPU PM notifier calls please, because
+> > they are not needed).
+> 
+> OK no problem.  That's easy enough.  I added them to play it safe as a 
+> test patch in case some VFP content could be lost somehow by looping 
+> back through the CPU init code for example, and needed to be saved.
 
-On 10/06/2014 10:54, Boris BREZILLON wrote:
-> Hello Wolfram,
->
-> On 10/06/2014 10:38, Wolfram Sang wrote:
->> On Tue, Jun 03, 2014 at 10:49:52AM +0200, Boris BREZILLON wrote:
->>> The P2WI looks like an SMBus controller which only supports byte data
->>> transfers. But, it differs from standard SMBus protocol on several
->>> aspects:
->>> - it supports only one slave device, and thus drop the address field
->>> - it adds a parity bit every 8bits of data
->>> - only one read access is required to read a byte (instead of a read
->>>   followed by a write access in standard SMBus protocol)
->>> - there's no Ack bit after each byte transfer
->>>
->>> This means this bus cannot be used to interface with standard SMBus
->>> devices (the only known device to support this interface is the AXP221
->>> PMIC).
->> Good description. Should be a comment at the top of the driver to spread
->> the word.
-> Sure, I'll copy this description in the driver.
->
->>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> ---
->>>  drivers/i2c/busses/Kconfig          |  12 ++
->>>  drivers/i2c/busses/Makefile         |   1 +
->>>  drivers/i2c/busses/i2c-sun6i-p2wi.c | 349 ++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 362 insertions(+)
->>>  create mode 100644 drivers/i2c/busses/i2c-sun6i-p2wi.c
->> ...
->>
->>> +struct p2wi {
->>> +	struct i2c_adapter adapter;
->>> +	struct completion complete;
->>> +	unsigned int irq;
->> Can be a local variable in probe.
-> Yes, I'll remove it from this structure.
->
->>> +	unsigned int status;
->>> +	void __iomem *regs;
->>> +	struct clk *clk;
->>> +	struct reset_control *rstc;
->>> +	int slave_addr;
->>> +};
->>> +
->>> +static irqreturn_t p2wi_interrupt(int irq, void *dev_id)
->>> +{
->>> +	struct p2wi *p2wi = dev_id;
->>> +	unsigned long status;
->>> +
->>> +	status = readl(p2wi->regs + P2WI_INTS);
->>> +	p2wi->status = status;
->>> +
->>> +	/* Clear interrupts */
->>> +	status &= (P2WI_INTS_LOAD_BSY | P2WI_INTS_TRANS_ERR |
->>> +		   P2WI_INTS_TRANS_OVER);
->>> +	writel(status, p2wi->regs + P2WI_INTS);
->>> +
->>> +	complete(&p2wi->complete);
->>> +
->>> +	return IRQ_HANDLED;
->>> +}
->>> +
->>> +static u32 p2wi_functionality(struct i2c_adapter *adap)
->>> +{
->>> +	return I2C_FUNC_SMBUS_BYTE_DATA;
->>> +}
->>> +
->>> +static int p2wi_smbus_xfer(struct i2c_adapter *adap, u16 addr,
->>> +			   unsigned short flags, char read_write,
->>> +			   u8 command, int size, union i2c_smbus_data *data)
->>> +{
->>> +	struct p2wi *p2wi = i2c_get_adapdata(adap);
->>> +	unsigned long dlen = P2WI_DLEN_DATA_LENGTH(1);
->>> +
->>> +	if (addr > 0xff ||
->> Why 0xff? Does the PMIC support that? I2C addresses are 7-bit. You
->> won't even have a slave device if it has an illegal i2c address, so this
->> shouldn't happen.
-> The P2WI protocol supports 8bits addresses, hence I added this 0xff check.
-> Anyway, the PMIC I use (AXP221) is assigned the 0x68 address, and I
-> don't think there are a lot of P2WI compatible devices in the wild, so
-> we can just assume 7bits addresses are fine and rely on the core code
-> checks.
+Ok, thanks.
 
-My bad, the P2WI protocol does not have any address concept.
-The 0xff value come from the P2WI_PMCR_PMU_DEV_ADDR field which is
-specified to be 8 bits large.
-Anyway, this does not change the fact that we can remove this check.
+> > I also said that's the only thing he could do, and I still think 
+> > that's not a nice way to use the cpu_suspend API for something it was 
+> > not designed for, that's what I wanted to say, period.
+> 
+> Well... Maybe it wasn't designed for that, but it certainly can be used 
+> for that. And with no modifications to the core code, making this 
+> solution fairly elegant.  This is not so different from, say, the BPF 
+> code being reused for seccomp_filters. BPF wasn't designed for system 
+> call filtering, but it happens to work well.
 
->
->>> +	    (p2wi->slave_addr >= 0 && addr != p2wi->slave_addr)) {
->>> +		dev_err(&adap->dev, "invalid P2WI address\n");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	if (!data)
->>> +		return -EINVAL;
->>> +
->>> +	writel(command, p2wi->regs + P2WI_DADDR0);
->>> +
->>> +	if (read_write == I2C_SMBUS_READ)
->>> +		dlen |= P2WI_DLEN_READ;
->>> +	else
->>> +		writel(data->byte, p2wi->regs + P2WI_DATA0);
->>> +
->>> +	writel(dlen, p2wi->regs + P2WI_DLEN);
->>> +
->>> +	if (readl(p2wi->regs + P2WI_CTRL) & P2WI_CTRL_START_TRANS) {
->>> +		dev_err(&adap->dev, "P2WI bus busy\n");
->>> +		return -EBUSY;
->>> +	}
->>> +
->>> +	reinit_completion(&p2wi->complete);
->>> +
->>> +	writel(P2WI_INTS_LOAD_BSY | P2WI_INTS_TRANS_ERR | P2WI_INTS_TRANS_OVER,
->>> +	       p2wi->regs + P2WI_INTE);
->>> +
->>> +	writel(P2WI_CTRL_START_TRANS | P2WI_CTRL_GLOBAL_INT_ENB,
->>> +	       p2wi->regs + P2WI_CTRL);
->>> +
->>> +	wait_for_completion(&p2wi->complete);
->>> +
->>> +	if (p2wi->status & P2WI_INTS_LOAD_BSY) {
->>> +		dev_err(&adap->dev, "P2WI bus busy\n");
->>> +		return -EBUSY;
->>> +	}
->>> +
->>> +	if (p2wi->status & P2WI_INTS_TRANS_ERR) {
->>> +		dev_err(&adap->dev, "P2WI bus xfer error\n");
->>> +		return -ENXIO;
->>> +	}
->>> +
->>> +	if (read_write == I2C_SMBUS_READ)
->>> +		data->byte = readl(p2wi->regs + P2WI_DATA0);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static const struct i2c_algorithm p2wi_algo = {
->>> +	.smbus_xfer = p2wi_smbus_xfer,
->>> +	.functionality = p2wi_functionality,
->>> +};
->>> +
->>> +static const struct of_device_id p2wi_of_match_table[] = {
->>> +	{ .compatible = "allwinner,sun6i-a31-p2wi" },
->>> +	{}
->>> +};
->>> +MODULE_DEVICE_TABLE(of, p2wi_of_match_table);
->>> +
->>> +static int p2wi_probe(struct platform_device *pdev)
->>> +{
->>> +	struct device *dev = &pdev->dev;
->>> +	struct device_node *np = dev->of_node;
->>> +	struct device_node *childnp;
->>> +	unsigned long parent_clk_freq;
->>> +	u32 clk_freq = 100000;
->>> +	struct resource *r;
->>> +	struct p2wi *p2wi;
->>> +	u32 slave_addr;
->>> +	int clk_div;
->>> +	int ret;
->>> +
->>> +	of_property_read_u32(np, "clock-frequency", &clk_freq);
->>> +	if (clk_freq > P2WI_MAX_FREQ) {
->>> +		dev_err(dev,
->>> +			"required clock-frequency (%u Hz) is too high (max = 6MHz)",
->>> +			clk_freq);
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	if (of_get_child_count(np) > 1) {
->>> +		dev_err(dev, "P2WI only supports one slave device\n");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	p2wi = devm_kzalloc(dev, sizeof(struct p2wi), GFP_KERNEL);
->>> +	if (!p2wi) {
->>> +		dev_err(dev, "failed to allocate p2wi struct\n");
->> No error strings for OOM.
-> I'll drop this line.
->
->>> +		return -ENOMEM;
->>> +	}
->>> +
->>> +	p2wi->slave_addr = -1;
->>> +
->>> +	/*
->>> +	 * Authorize a p2wi node without any children to be able to use an
->>> +	 * i2c-dev from userpace.
->>> +	 * In this case the slave_addr is set to -1 and won't be checked when
->>> +	 * launching a P2WI transfer.
->>> +	 */
->>> +	childnp = of_get_next_available_child(np, NULL);
->>> +	if (childnp) {
->>> +		ret = of_property_read_u32(childnp, "reg", &slave_addr);
->>> +		if (ret || slave_addr > 0xff) {
->> Again: Is 8 bit range important here? Otherwise I'd leave the check to the
->> core.
->>
->>> +			dev_err(dev, "invalid slave address on node %s\n",
->>> +				childnp->full_name);
->>> +			return -EINVAL;
->>> +		}
->>> +
->>> +		p2wi->slave_addr = slave_addr;
->>> +	}
->>> +
->>> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +	p2wi->regs = devm_ioremap_resource(dev, r);
->>> +	if (IS_ERR(p2wi->regs)) {
->>> +		ret = PTR_ERR(p2wi->regs);
->>> +		dev_err(dev, "failed to retrieve iomem resource: %d\n", ret);
->> devm_ioremap_resource prints errors on its own.
-> Ditto
->
->>> +		return ret;
->>> +	}
->>> +
->>> +	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), pdev->name);
->>> +	ret = platform_get_irq(pdev, 0);
->>> +	if (ret < 0) {
->>> +		dev_err(dev, "failed to retrieve irq: %d\n", ret);
->>> +		return ret;
->>> +	}
->>> +	p2wi->irq = ret;
->>> +
->>> +	p2wi->clk = devm_clk_get(dev, NULL);
->>> +	if (IS_ERR(p2wi->clk)) {
->>> +		ret = PTR_ERR(p2wi->clk);
->>> +		dev_err(dev, "failed to retrieve clk: %d\n",
->>> +			ret);
->>> +		return ret;
->>> +	}
->>> +
->>> +	ret = clk_prepare_enable(p2wi->clk);
->>> +	if (ret) {
->>> +		dev_err(dev, "failed to enable clk: %d\n", ret);
->>> +		return ret;
->>> +	}
->>> +
->>> +	parent_clk_freq = clk_get_rate(p2wi->clk);
->>> +
->>> +	p2wi->rstc = devm_reset_control_get(dev, NULL);
->>> +	if (IS_ERR(p2wi->rstc)) {
->>> +		ret = PTR_ERR(p2wi->rstc);
->>> +		dev_err(dev, "failed to retrieve reset controller: %d\n",
->>> +			ret);
->> My general suggestion: Don't be too strict on the 80 char limit. IMO this dangling
->> 'ret' is not more readable.
-> Okay, I'll fix that.
->
->
-> Thanks for your review.
->
-> Best Regards,
->
-> Boris
->
+You defined yourself "not a small thing", you know what you are doing
+and that's enough for me. Please respect that when I reviewed it I thought
+that was a hack. cpu_suspend is being used for many things in the kernel
+and consolidating that took a while, please comment the code, that's all I
+am asking you.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> > If I am allowed to say something, here is a couple of thoughts.
+> > 
+> > 1) CCI snoops and DVM enablement are secure operations, to do them in
+> >    non-secure world this must be overriden in firmware. You can argue,
+> >    you can think whatever you want, that's a fact. So, to use this
+> >    code SMP bit in SCTLR and CCI enablement must become non-secure
+> >    operations. This is a boot requirement for MCPM, right or wrong
+> >    it is up to platform designers to judge. If CCI and SMP enablement
+> >    are secure operations, we should not start adding random SMC calls
+> >    in the kernel, since managing coherency in the kernel would become
+> >    problematic, with lots of platform quirks. We do not want that to
+> >    happen, and I think we all agree on this.
+> 
+> One could certainly question the need for so many controls handled in 
+> secure world.  But that is not the point.
+> 
+> Here we're talking about MCPM.  That implies the kernel has control over 
+> SCTLR.SMP and the CCI.  If those things aren't under the kernel's 
+> control, then MCPM is of no use to you.
+
+ACTLR.SMP for the sake of precision and it was my typo, sorry. That's
+all I wanted to read, so nothing to add.
+
+> Therefore, if you do want to use MCPM, then this implies the kernel has 
+> access to the CCI. And if it has access to it, then it should turn it on 
+> by itself in all cases to be consistent, not only in half of the cases.
+
+I agree.
+
+> > 2) (1) must be documented.
+> 
+> Absolutely.  But let's be coherent in the implementation so the 
+> documentation is as simple as it can be.
+
+Ditto.
+
+> > 3) When I talked about consequences for CPUidle (implicit), I was referring
+> >    to all sort of hacks we had to come up to bring devices like SPC
+> >    (remember ? I remember very very well unfortunately for me), or whatever
+> >    power controller up in the kernel early, too early to fit in any
+> >    existing kernel device framework. There is still no solution to that, and
+> >    the only way that code can exist is in mach- code. Right or wrong,
+> >    that's a second fact and in my opinion that's not nice for the ARM
+> >    kernel.
+> 
+> I disagree.  This can perfectly be turned into driver code. If we need 
+> it too early for existing kernel device framework to handle this 
+> properly, then the solution is to extend the existing framework or 
+> create another one specially for that purpose.  This may not be obvious 
+> when TC2 is the first/only platform in that situation, but if more 
+> platforms have the same need then it'll be easier to abstract 
+> commonalities into a framework.
+> 
+> Saying that no framework exists today or/and upstream maintainers are 
+> being difficult is _not_ a reason for throwing your hands up and e.g. 
+> shoving all this code into firmware instead.
+
+You have a point, as long as we are all aware and we do not forget this
+is a major problem, not a minor one. I do want to see a consolidate
+story for CPUidle for ARM and this bullet is definitely part of the
+picture. On a side note, you made me smile, it sounded like I wanted
+to bury SPC code in firmware or anywhere else as long as it is not in the
+kernel, which in a way is a true statement since I abhor that code =)
+
+> > 4) When I am talking about firmware I am talking about sequences that
+> >    are very close to HW (disabling C bit, cleaning caches, exiting
+> >    coherency). Erratas notwithstanding, they are being standardized at
+> >    ARM the best we can. They might even end up being implemented in HW
+> >    in the not so far future. I understand they are tricky, I understand
+> >    they take lots of time to implement them and to debug them, what I
+> >    want to say is that they are becoming standard and we _must_ reuse the
+> >    same code for all ARM platforms. You can implement them in MCPM (see
+> >    (1)) or in firmware (and please do not start painting me as firmware
+> >    hugger here, I am referring to standard power down sequences that
+> >    again, are very close to HW state machines 
+> 
+> That's where the disconnect lies.  On the one hand you say "I understand 
+> they are tricky, I understand they take lots of time to implement them 
+> and to debug them" and on the other hand you say "They might end up being 
+> implemented in HW in the not so far future."  That simply makes no 
+> economical sense at all!
+
+I wanted to say Nico that those operations are so intrinsic for all ARM
+cores you can almost think of them as part of the ISA and certainly
+HW knows it better than SW when a processor has nothing to do, it does
+idle core units all the time without software interaction, going power off
+(on cue) could just be one step further and solve those pesky races in HW.
+
+> When some operation is 1) tricky and takes time to debug, and 2) not 
+> performance critical (no one is trying to get in and out of idle or 
+> hibernation a billion times per second), then you should never ever put 
+> such a thing in firmware, and hardware should be completely out of the 
+> question!
+
+We can debate this offline, it is an interesting topic in particular on
+the performance critical side of things; as for firmware see my point
+on security, as I already mentioned.
+
+> >    and more importantly if they
+> >    HAVE to run in secure world that's the only solution we have unless you
+> >    want to split race conditions between kernel and secure world).
+> 
+> If they HAVE to run in secure world then your secure world architecture 
+> is simply misdesigned, period.  Someone must have ignored the economics 
+> of modern software development to have come up with this.
+
+That's your opinion and I respect that. What I said, and that's a fact
+not an opinion, is that if those operations are required to be secure in a
+platform, there is not much you can do apart from preventing races where the
+race conditions are, ie in secure world.
+
+> > 5) I agree that the CCI enablement in TC2 (bootmon for cold boot and
+> >    kernel for warm-boot is wrong, nothing to say and it was not the
+> >    reason I commented on Nico's patch - I think I explained to you
+> >    thoroughly why now).
+> 
+> OK. Let's start by agreeing on the spirit behind my patch then.  The 
+> actual patch implementation details are a secondary concern and open for 
+> discussion.
+
+I agree on the spirit of the patch, my concern was about its implementation.
+
+Thank you, this was a constructive discussion.
+
+Lorenzo
