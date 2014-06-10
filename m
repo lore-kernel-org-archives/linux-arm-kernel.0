@@ -1,118 +1,194 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 10 Jun 2014 21:45:11 +0200
-Subject: [PATCH v5 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
- controller support
-In-Reply-To: <1402408036-5235-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1402408036-5235-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402408036-5235-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140610194511.GC3122@katana>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Tue, 10 Jun 2014 12:45:06 -0700
+Subject: [PATCH 3.13 066/160] genirq: Allow forcing cpu affinity of interrupts
+In-Reply-To: <1402429600-20477-1-git-send-email-kamal@canonical.com>
+References: <1402429600-20477-1-git-send-email-kamal@canonical.com>
+Message-ID: <1402429600-20477-67-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+3.13.11.3 -stable review patch.  If anyone has any objections, please let me know.
 
-compiling this driver gives me:
+------------------
 
-drivers/i2c/busses/i2c-sun6i-p2wi.c: In function 'p2wi_probe':
-drivers/i2c/busses/i2c-sun6i-p2wi.c:272:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
-drivers/i2c/busses/i2c-sun6i-p2wi.c:272:13: warning: assignment makes pointer from integer without a cast [enabled by default]
+From: Thomas Gleixner <tglx@linutronix.de>
 
-> diff --git a/drivers/i2c/busses/i2c-sun6i-p2wi.c b/drivers/i2c/busses/i2c-sun6i-p2wi.c
-> new file mode 100644
-> index 0000000..4f7b93f
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-sun6i-p2wi.c
-> @@ -0,0 +1,356 @@
-> +/*
-> + * P2WI (Push-Pull Two Wire Interface) bus driver.
-> + *
-> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + *
-> + * The P2WI controller looks like an SMBus controller which only supports byte
-> + * data transfers. But, it differs from standard SMBus protocol on several
-> + * aspects:
-> + * - it supports only one slave device, and thus drop the address field
-> + * - it adds a parity bit every 8bits of data
-> + * - only one read access is required to read a byte (instead of a write
-> + *   followed by a read access in standard SMBus protocol)
-> + * - there's no Ack bit after each byte transfer
-> + *
-> + * This means this bus cannot be used to interface with standard SMBus
-> + * devices (the only known device to support this interface is the AXP221
-> + * PMIC).
-> + *
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/slab.h>
-> +#include <linux/module.h>
-> +#include <linux/spinlock.h>
+commit 01f8fa4f01d8362358eb90e412bd7ae18a3ec1ad upstream.
 
-Unneeded. Please check other includes, too.
+The current implementation of irq_set_affinity() refuses rightfully to
+route an interrupt to an offline cpu.
 
-> +#include <linux/i2c.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/delay.h>
-> +#include <linux/clk.h>
-> +#include <linux/reset.h>
-> +
+But there is a special case, where this is actually desired. Some of
+the ARM SoCs have per cpu timers which require setting the affinity
+during cpu startup where the cpu is not yet in the online mask.
 
-...
+If we can't do that, then the local timer interrupt for the about to
+become online cpu is routed to some random online cpu.
 
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	p2wi->regs = devm_ioremap_resource(dev, r);
-> +	if (IS_ERR(p2wi->regs)) {
-> +		ret = PTR_ERR(p2wi->regs);
-> +		return ret;
-> +	}
+The developers of the affected machines tried to work around that
+issue, but that results in a massive mess in that timer code.
 
-return PTR_ERR(...)?
+We have a yet unused argument in the set_affinity callbacks of the irq
+chips, which I added back then for a similar reason. It was never
+required so it got not used. But I'm happy that I never removed it.
 
-> +
-> +	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), pdev->name);
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		dev_err(dev, "failed to retrieve irq: %d\n", ret);
-> +		return irq;
-> +	}
-> +
-> +	p2wi->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(p2wi->clk)) {
-> +		ret = PTR_ERR(p2wi->clk);
-> +		dev_err(dev, "failed to retrieve clk: %d\n",
-> +			ret);
+That allows us to implement a sane handling of the above scenario. So
+the affected SoC drivers can add the required force handling to their
+interrupt chip, switch the timer code to irq_force_affinity() and
+things just work.
 
-dangling ret.
+This does not affect any existing user of irq_set_affinity().
 
-> +		return ret;
-> +	}
-> +
+Tagged for stable to allow a simple fix of the affected SoC clock
+event drivers.
 
-...
+Reported-and-tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>,
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org,
+Link: http://lkml.kernel.org/r/20140416143315.717251504 at linutronix.de
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ arch/mips/cavium-octeon/octeon-irq.c |  2 +-
+ include/linux/interrupt.h            | 35 ++++++++++++++++++++++++++++++++++-
+ include/linux/irq.h                  |  3 ++-
+ kernel/irq/manage.c                  | 17 ++++++-----------
+ 4 files changed, 43 insertions(+), 14 deletions(-)
 
-> +MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com>");
-> +MODULE_DESCRIPTION("Allwinner P2WI driver");
-> +MODULE_LICENSE("GPL");
-
-"GPL v2"
-
-Thanks,
-
-   Wolfram
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140610/28722f8e/attachment.sig>
+diff --git a/arch/mips/cavium-octeon/octeon-irq.c b/arch/mips/cavium-octeon/octeon-irq.c
+index 25fbfae..ab7dc01 100644
+--- a/arch/mips/cavium-octeon/octeon-irq.c
++++ b/arch/mips/cavium-octeon/octeon-irq.c
+@@ -635,7 +635,7 @@ static void octeon_irq_cpu_offline_ciu(struct irq_data *data)
+ 		cpumask_clear(&new_affinity);
+ 		cpumask_set_cpu(cpumask_first(cpu_online_mask), &new_affinity);
+ 	}
+-	__irq_set_affinity_locked(data, &new_affinity);
++	irq_set_affinity_locked(data, &new_affinity, false);
+ }
+ 
+ static int octeon_irq_ciu_set_affinity(struct irq_data *data,
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index db43b58..c88e76c 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -197,7 +197,40 @@ static inline int check_wakeup_irqs(void) { return 0; }
+ 
+ extern cpumask_var_t irq_default_affinity;
+ 
+-extern int irq_set_affinity(unsigned int irq, const struct cpumask *cpumask);
++/* Internal implementation. Use the helpers below */
++extern int __irq_set_affinity(unsigned int irq, const struct cpumask *cpumask,
++			      bool force);
++
++/**
++ * irq_set_affinity - Set the irq affinity of a given irq
++ * @irq:	Interrupt to set affinity
++ * @mask:	cpumask
++ *
++ * Fails if cpumask does not contain an online CPU
++ */
++static inline int
++irq_set_affinity(unsigned int irq, const struct cpumask *cpumask)
++{
++	return __irq_set_affinity(irq, cpumask, false);
++}
++
++/**
++ * irq_force_affinity - Force the irq affinity of a given irq
++ * @irq:	Interrupt to set affinity
++ * @mask:	cpumask
++ *
++ * Same as irq_set_affinity, but without checking the mask against
++ * online cpus.
++ *
++ * Solely for low level cpu hotplug code, where we need to make per
++ * cpu interrupts affine before the cpu becomes online.
++ */
++static inline int
++irq_force_affinity(unsigned int irq, const struct cpumask *cpumask)
++{
++	return __irq_set_affinity(irq, cpumask, true);
++}
++
+ extern int irq_can_set_affinity(unsigned int irq);
+ extern int irq_select_affinity(unsigned int irq);
+ 
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 7dc1003..ef1ac9f 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -385,7 +385,8 @@ extern void remove_percpu_irq(unsigned int irq, struct irqaction *act);
+ 
+ extern void irq_cpu_online(void);
+ extern void irq_cpu_offline(void);
+-extern int __irq_set_affinity_locked(struct irq_data *data,  const struct cpumask *cpumask);
++extern int irq_set_affinity_locked(struct irq_data *data,
++				   const struct cpumask *cpumask, bool force);
+ 
+ #if defined(CONFIG_SMP) && defined(CONFIG_GENERIC_PENDING_IRQ)
+ void irq_move_irq(struct irq_data *data);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index d3bf660..66a1b46 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -150,7 +150,7 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
+ 	struct irq_chip *chip = irq_data_get_irq_chip(data);
+ 	int ret;
+ 
+-	ret = chip->irq_set_affinity(data, mask, false);
++	ret = chip->irq_set_affinity(data, mask, force);
+ 	switch (ret) {
+ 	case IRQ_SET_MASK_OK:
+ 		cpumask_copy(data->affinity, mask);
+@@ -162,7 +162,8 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
+ 	return ret;
+ }
+ 
+-int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
++int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
++			    bool force)
+ {
+ 	struct irq_chip *chip = irq_data_get_irq_chip(data);
+ 	struct irq_desc *desc = irq_data_to_desc(data);
+@@ -172,7 +173,7 @@ int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
+ 		return -EINVAL;
+ 
+ 	if (irq_can_move_pcntxt(data)) {
+-		ret = irq_do_set_affinity(data, mask, false);
++		ret = irq_do_set_affinity(data, mask, force);
+ 	} else {
+ 		irqd_set_move_pending(data);
+ 		irq_copy_pending(desc, mask);
+@@ -187,13 +188,7 @@ int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
+ 	return ret;
+ }
+ 
+-/**
+- *	irq_set_affinity - Set the irq affinity of a given irq
+- *	@irq:		Interrupt to set affinity
+- *	@mask:		cpumask
+- *
+- */
+-int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
++int __irq_set_affinity(unsigned int irq, const struct cpumask *mask, bool force)
+ {
+ 	struct irq_desc *desc = irq_to_desc(irq);
+ 	unsigned long flags;
+@@ -203,7 +198,7 @@ int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
+ 		return -EINVAL;
+ 
+ 	raw_spin_lock_irqsave(&desc->lock, flags);
+-	ret =  __irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask);
++	ret = irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask, force);
+ 	raw_spin_unlock_irqrestore(&desc->lock, flags);
+ 	return ret;
+ }
+-- 
+1.9.1
