@@ -1,70 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 10 Jun 2014 15:32:34 -0500
-Subject: [PATCH 1/2 v2] spi: s3c64xx: use "cs-gpios" from spi node instead
- of "cs-gpio"
-In-Reply-To: <CAD=FV=XtdgKEg7fTHe+tsFM1Y_YwqNNk_DBW7ZX83YERGJsHBg@mail.gmail.com>
-References: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>
- <1402394881-31564-2-git-send-email-ch.naveen@samsung.com>
- <5396E051.8050803@samsung.com>
- <CAHfPSqAq9L5Zu7z3-y6Y2pG8AhE4Y1j8DE35LDfMW_DYc_x-gw@mail.gmail.com>
- <CAD=FV=XtdgKEg7fTHe+tsFM1Y_YwqNNk_DBW7ZX83YERGJsHBg@mail.gmail.com>
-Message-ID: <CAL_JsqLk7rfDaf4gn5_p3dcSNBfQ9BF3U8mUqBQ6YjKWXb5tDg@mail.gmail.com>
+From: tony.luck@gmail.com (Tony Luck)
+Date: Tue, 10 Jun 2014 13:52:08 -0700
+Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
+In-Reply-To: <CAL_JsqKvoO9acX==-LdD6boO=B3xr=ijra_G0uqRZGzACZZUJg@mail.gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+ <1397859600-11507-4-git-send-email-robherring2@gmail.com>
+ <CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>
+ <CAL_JsqKux+BTHeYo6XEzzQMAFJZHVjbURM973oHT=t698GbJbA@mail.gmail.com>
+ <20140503220731.GA10927@kroah.com>
+ <20140503221658.GA13403@kroah.com>
+ <CA+8MBb+7f1bOnJjJWj1vxa0UNuQwz7OGRDR_QFTxOT=9cynabQ@mail.gmail.com>
+ <CA+8MBbKE1E2uq9LefiDAV9hv2Z8OTkjx9mkXjE6_--F_emRC8A@mail.gmail.com>
+ <CAL_JsqKvoO9acX==-LdD6boO=B3xr=ijra_G0uqRZGzACZZUJg@mail.gmail.com>
+Message-ID: <CA+8MBbLooWm9xys+gYa5uL1eVTH-qzaR+RaZgsrqV-8XkqGadQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 1:09 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Naveen / Sylwester,
->
-> On Tue, Jun 10, 2014 at 4:00 AM, Naveen Krishna Ch
-> <naveenkrishna.ch@gmail.com> wrote:
->>> Can we support both "cs-gpio" and "cs-gpios" for backward compatibility ?
->>> After your change all DTBs using the original pattern will not work with
->>> new kernels any more. At least I would expect such backward compatibility
->>> maintained for few kernel releases.
->>
->> The reason behind removing the "cs-gpio" or not providing backward
->> compatibility was
->>
->> 1. Since spi-core started using "cs-gpios" string from spi device node
->> several months ago.
->>   The spi-s3c64xx.c driver is partially broken for more than 6 months.
->>
->> 2. Supporting "cs-gpio" would add extra bit of code.
->>
->> I've corrected the dts files that were using "cs-gpio" under
->> "controller-data"(child node)
->> to use "cs-gpio" from spi device node (parent node).
->>
->> I will make another version if you insist.
->
-> Yup, as near as I can tell this has been broken since (3146bee spi:
-> s3c64xx: Added provision for dedicated cs pin).  That landed June 25th
-> of 2013 into the SPI tree.
->
-> ...so clearly nobody was really testing Samsung's SPI driver on ToT
-> Linux.  1 year of unnoticed brokenness seems like enough time that we
-> could do away with the old code.  If someone comes out of the woodwork
-> and claims a dire need to support the old binding then it can be added
-> then.
->
-> In-tree users of this appear to be:
->
-> arch/arm/boot/dts/exynos4210-smdkv310.dts:
->  cs-gpio = <&gpc1 2 0>;
-> arch/arm/boot/dts/exynos4412-trats2.dts:
->  cs-gpio = <&gpb 5 0>;
-> arch/arm/boot/dts/exynos5250-smdk5250.dts:
->  cs-gpio = <&gpa2 5 0>;
->
-> ...and I guess nobody has bothered using the SPI flash on those boards
-> for the last year?
+On Mon, Jun 9, 2014 at 4:18 PM, Rob Herring <robherring2@gmail.com> wrote:
+> It should do auto detect of the baud-rate if it is not specified which
+> for 8250 is just reading the baud-rate divider and calculating the
+> baud-rate using the uart clock. It should just reprogram the divider
+> with the same divider value. I don't see anything obvious why this
+> would have broken.
 
-I always try to warn people if they are breaking compatibility, but in
-this case I agree it is okay. Presumably no one expects BSD or vxworks
-support for this platform either?
+Something very weird is happening.  Output is good so long as I put the
+trailing ",115200" on the command line.
 
-For the binding change:
+But I made early_serial8250_setup() printk() the return value it got
+from probe_baud() - in case is was somehow getting 115201 or some
+other silly value ... nope. Exactly 115200.
 
-Acked-by: Rob Herring <robh@kernel.org>
+I also can't explain why the "noise" comes and goes a dozen
+times during boot,
 
-Rob
+Does some other place in the kernel look at the "uart..." command
+line argument?
+
+-Tony
