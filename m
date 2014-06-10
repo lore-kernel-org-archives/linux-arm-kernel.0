@@ -1,48 +1,73 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 10 Jun 2014 10:01:59 +0200
-Subject: [PATCH 5/5] ARM: dts: imx51-babbage: Fix esdhc setup
-In-Reply-To: <20140609034058.GF11061@dragon>
-References: <1400848384-3226-1-git-send-email-s.hauer@pengutronix.de>
- <1400848384-3226-6-git-send-email-s.hauer@pengutronix.de>
- <20140609034058.GF11061@dragon>
-Message-ID: <20140610100159.7a45f9e1@ipc1.ka-ro>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 10 Jun 2014 13:42:11 +0530
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+Message-ID: <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo wrote:
-> On Fri, May 23, 2014 at 02:33:04PM +0200, Sascha Hauer wrote:
-> > - Move cd/wp pinctrl from the hog group to the esdhc groups
-> > - use gpio for card detection / write protection on esdhc2 since
-> >   the controller based detection does not work
-> > - Fix cd gpio polarity for esdhc1. This is wrong and currently
-> >   only works because the imx esdhc driver ignores the polarity.
-> > 
-[...]
-> > @@ -330,6 +326,8 @@
-> >  
-> >  		pinctrl_esdhc1: esdhc1grp {
-> >  			fsl,pins = <
-> > +				MX51_PAD_GPIO1_0__GPIO1_0		0x20d5
-> > +				MX51_PAD_GPIO1_1__GPIO1_1		0x20d5
-> 
-> The pad config value 0x20d5 still makes sense here when switching to
-> GPIO function?  Probably should be 0x100 like what we have in esdhc2grp?
+On 10 June 2014 04:08, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Mon, Jun 09, 2014 at 06:03:31PM +0100, Doug Anderson wrote:
 >
-The pad config 0x20d5 doesn't make any sense at all because according
-to the Ref. Manual only bits 0..2 and 4..8 (mask 0x01f7) are defined for
-those pads. Thus 0x2000 doesn't serve any purpose at all.
+> [...]
+>
+>> Cold boot and resume from suspend are detected via various special
+>> flags in various special locations.  Resume from suspend looks at
+>> INFORM1 (0x10048004) for flags.  This register is 0 during a cold boot
+>> and has special values set by the kernel at resume time.
+>>
+>> It also looks as if some code looks at 0x10040900 (PMU_SPARE0) to help
+>> tell initial cold boot and secondary CPU bringup.
+>
+> Ok, thanks a lot. It looks like firmware paths should be ready to
+> detect cold vs warm boot, and hopefully do not rely on a specific
+> MPIDR to come up first out of power states.
+>
+>> > I am asking to check if on this platform CPUidle (where the notion of
+>> > primary CPU disappears) has a chance to run properly.
+>>
+>> I believe it should be possible, but we don't have CPUidle implemented
+>> in our current system.  Abhilash may be able to comment more.
+>
+
+Cpuidle is implemented for exynos5420, and is tested on chromebook.
 
 
-Lothar Wa?mann
+> I am interested in more insights, that's very helpful thanks.
+>
+>> > Probably CPUidle won't attain idle states where IRAM content is lost, but I
+>> > am still worried about the primary vs secondaries firmware boot behaviour.
+>>
+>> I don't think iRAM can be turned off for CPUidle.
+
+Yes thats true.
+>
+> It might be added a system state but I doubt that too and if you are
+> relying on registers for jump addresses that's not even a problem in
+> the first place.
+>
+>> > What happens on reboot from suspend to RAM (or to put it differently,
+>> > what does secure firmware do on reboot from suspend to RAM - in
+>> > particular how is the "jump" address to bootloader/kernel set ?)
+>>
+>> Should be described above now.
+>
+> Thank you very much.
+>
+> Lorenzo
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+with warm regards,
+Chander Kashyap
