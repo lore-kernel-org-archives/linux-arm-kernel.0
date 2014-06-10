@@ -1,102 +1,103 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Jun 2014 11:43:59 +0100
-Subject: [PATCH v4 02/20] arm64: initial support for GICv3
-In-Reply-To: <5396820F.3000806@huawei.com> (Abel's message of "Tue, 10 Jun
- 2014 04:57:03 +0100")
-References: <1400176719-31275-1-git-send-email-marc.zyngier@arm.com>
- <1400176719-31275-3-git-send-email-marc.zyngier@arm.com>
- <539020A5.6070807@huawei.com>
- <87zjhrvj8g.fsf@approximate.cambridge.arm.com>
- <539533B6.201@huawei.com>
- <87bnu2iifr.fsf@approximate.cambridge.arm.com>
- <5396820F.3000806@huawei.com>
-Message-ID: <87ppihf3io.fsf@approximate.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 10 Jun 2014 11:47:00 +0100
+Subject: [PATCH] ARM: debug: fix broken DEBUG_LL_INCLUDE for multi platform
+In-Reply-To: <20140610101021.GX23430@n2100.arm.linux.org.uk>
+References: <1402394236-14778-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20140610101021.GX23430@n2100.arm.linux.org.uk>
+Message-ID: <5396E224.1070806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10 2014 at  4:57:03 am BST, Abel <wuyun.wu@huawei.com> wrote:
-> On 2014/6/9 16:41, Marc Zyngier wrote:
->
->> On Mon, Jun 09 2014 at  5:10:30 am BST, Abel <wuyun.wu@huawei.com> wrote:
->>> As for the interrupts here, the ones entered into this 'if' clause, I
->>> think they are expected already been mapped into this irq_domain.
->> 
->> Mapped or not is not the problem. Think of a (broken) implementation
->> that would generate random IDs in the irq_nr..1021 range. You'd end up
->> with the deadlock situation I've outlined above.
->> 
->> And actually, irq_find_mapping can fail, and I should handle this.
->
->
-> Yes, makes sense. This case should be properly handled.
-> And I still have two questions.
-> a) Does this scenario really exist or necessary? I mean, part of interrupts
->    mapped while others which belongs to the same interrupt controller are not.
 
-Not that I know of. But consider this cheap defensive programming. It is
-actually cheaper to check against a constant boundary than do a load and
-check against a variable. Safer, faster.
 
-> b) Why 1021?
+On 10/06/14 11:10, Russell King - ARM Linux wrote:
+> On Tue, Jun 10, 2014 at 10:57:16AM +0100, Srinivas Kandagatla wrote:
+>> On multi_v7_defconfig using def_bool in Kconfig can override the selection
+>> made as part of DEBUG_LL. This is because def_bool will set the config to true
+>> if the expression evaluates to true, which is what was happening in
+>> multi_v7_defconfig. ARCH_SPEAR13XX selects DEBUG_UART_PL01X overiding any
+>> previous DEBUG_LL selections.
+>>
+>> Making the def_bool to bool and depends made sense in this case, and
+>> fixes the issue too.
+>
+> NAK.
+>
+> 1. you haven't tested this - if you select DEBUG_BCM2835 in the choice,
+>     it will select DEBUG_UART_PL01X, which, with your patch, will not
+>     have its new dependencies satisfied.
 
-The maximum SPI ID is 1020.
+I see your point.
+>
+> 2. there is nothing to select this debug option on the platforms which
+>     you make it depend upon.
 
 >
->>>>
->>>>>> +                     irqnr = irq_find_mapping(gic_data.domain, irqnr);
->>>>>> +                     handle_IRQ(irqnr, regs);
->>>>>> +                     continue;
->>>>>> +             }
->>>>>> +             if (irqnr < 16) {
->>>>>> +                     gic_write_eoir(irqnr);
->>>>>> +#ifdef CONFIG_SMP
->>>>>> +                     handle_IPI(irqnr, regs);
->>>>>> +#else
->>>>>> +                     WARN_ONCE(true, "Unexpected SGI received!\n");
->>>>>> +#endif
->>>>>> +                     continue;
->>>>>> +             }
->>>>>> +     } while (irqnr != 0x3ff);
->>>>>> +}
->>>>>> +
->>>>>> +static void __init gic_dist_init(void)
->>>>>> +{
->>>>>> +     unsigned int i;
->>>>>> +     u64 affinity;
->>>>>> +     void __iomem *base = gic_data.dist_base;
->>>>>> +
->>>>>> +     /* Disable the distributor */
->>>>>> +     writel_relaxed(0, base + GICD_CTLR);
->>>>>
->>>>>
->>>>> I'm not sure whether waiting for write pending here is
->>>>> necessary. What do you think?
->>>>
->>>> Hmmm. That's a good point. The spec says the RWP tracks the completion
->>>> of writes that change (among other things) the state of an interrupt
->>>> group enable. But the next line will perform a wait_for_rwp anyway after
->>>> having disabled all SPIs. So no, I don't think we need to wait. We
->>>> guaranteed to get a consistent state after the call to gic_dist_config.
->>>
->>>
->>> The spec also says that software must ensure the interrupt is disabled before
->>> changing its routing/priority/group information, see chapter 4.5.5 in v18.
->> 
->> That's only to ensure consistency when a single interrupt is being
->> reconfigured, and that's what the code already does. In this particular
->> context, waiting for RWP looks completely superfluous.
+> The real solution here is to convert these (and the other) remaining
+> platforms to the choice mechanism.  Same for the 8250 one.
 >
-> It's reasonable to think GIC having been enabled by boot loader or
-> something else in the boot procedure. And here not waiting for RWP may
-> cause hardware implementation defined behavior, that is configuring an
-> enabled interrupt. It's beyond the scope of the GIC architecture, and
-> vendors also don't want to see this happen.
+Yes, I can see the mess here,
 
-Well, I guess that since this is a one-off thing, it doesn't really add
-an extra synchronization. As long as it gives you peace of mind... ;-)
+Choice menu already provides options for selecting pl01x and 8250 via 
+DEBUG_LL_UART_PL01X and DEBUG_LL_UART_8250 options. so I don't see point 
+of having dependencies or def_bool options for PL01X and 8250. Other 
+then getting them selected automatically and overriding DEBUG_LL selections.
 
-Thanks,
+This new patch removes those dependencies or default selections and 
+forces the platforms to go via choice mechanism.
 
-	M.
+What do you think?
+
+Subject: [PATCH v2] ARM: debug: fix broken DEBUG_LL_INCLUDE for multi 
+platform
+
+On multi_v7_defconfig using def_bool in Kconfig can override the selection
+made as part of DEBUG_LL. This is because def_bool will set the config 
+to true
+if the expression evaluates to true, which is what was happening in
+multi_v7_defconfig. ARCH_SPEAR13XX selects DEBUG_UART_PL01X overiding any
+previous DEBUG_LL selections.
+
+Making the def_bool to bool made sense in this case, and fixes the issue 
+too.
+This means that the platforms should go via DEBUG_LL choice mechanism to
+select PL01X or 8250 debug uart.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+  arch/arm/Kconfig.debug | 17 +++--------------
+  1 file changed, 3 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 40ee328..ce676bb 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -962,22 +962,11 @@ config DEBUG_LL_INCLUDE
+  	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
+  	default "mach/debug-macro.S"
+
+-# Compatibility options for PL01x
+  config DEBUG_UART_PL01X
+-	def_bool ARCH_EP93XX || \
+-		ARCH_INTEGRATOR || \
+-		ARCH_SPEAR3XX || \
+-		ARCH_SPEAR6XX || \
+-		ARCH_SPEAR13XX || \
+-		ARCH_VERSATILE
+-
+-# Compatibility options for 8250
++	bool
++
+  config DEBUG_UART_8250
+-	def_bool ARCH_DOVE || ARCH_EBSA110 || \
+-		(FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
+-		ARCH_GEMINI || ARCH_IOP13XX || ARCH_IOP32X || \
+-		ARCH_IOP33X || ARCH_IXP4XX || ARCH_KIRKWOOD || \
+-		ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
++	bool
+
+  config DEBUG_UART_PHYS
+  	hex "Physical base address of debug UART"
 -- 
-Jazz is not dead. It just smells funny.
+
+--srini
