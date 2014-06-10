@@ -1,5 +1,5 @@
 From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 10 Jun 2014 21:18:13 +0200
+Date: Tue, 10 Jun 2014 21:18:34 +0200
 Subject: [RFC v2] ARM VM System Specification
 In-Reply-To: <539754E5.3030408@redhat.com>
 References: <20140328184517.GA27219@cbox>
@@ -7,7 +7,7 @@ References: <20140328184517.GA27219@cbox>
  <53973AA8.9020301@codeaurora.org>
  <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
  <539754E5.3030408@redhat.com>
-Message-ID: <539759F5.4020206@redhat.com>
+Message-ID: <53975A0A.8090802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -46,5 +46,7 @@ work.  This includes variable services, time services, the serial
 console protocols and more.  It's up to the implementation to provide 
 enough devices to support the firmware, and it's out of this spec's 
 scope to specify the firmware's implementation.
+
+I think even the serial devices should be removed.
 
 Paolo
