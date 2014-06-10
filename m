@@ -1,105 +1,217 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 10 Jun 2014 09:27:36 +0800
-Subject: [PATCH 00/12] clk: mmp: clock device tree support
-Message-ID: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
+Date: Tue, 10 Jun 2014 09:27:42 +0800
+Subject: [PATCH 06/12] clk: mmp: add mmp private gate clock
+In-Reply-To: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
+References: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1402363668-25806-7-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
-The patch set focuses at support device tree for clock.
+Some SOCes have this kind of the gate clock
+1. There are some bits to control the gate not only one bit.
+2. Some clocks has operations of "out of reset" and "enable".
+   To enable clock, we need do "out of reset" and "enable".
+   To disable clock, we may not need "set to reset". It depends
+   on the SOCes' design.
+3. It is not always that "1" is to enable while "0" is to disable
+   when write register.
 
-The first part of the patches
-  clk: mmp: add prefix "mmp" for structures defined for clk-frac
-  clk: mmp: add spin lock for clk-frac
-  clk: mmp: add init callback for clk-frac
-  clk: mmp: move definiton of mmp_clk_frac to clk.h
-It enhances the clk-frac.
+So we have to define the "mask", "enable_val", "disable_val" for
+this kind of gate clock.
 
-The second part of the patches
-  clk: mmp: add clock type mix
-  clk: mmp: add mmp private gate clock
-  clk: mmp: add clock type composite for mix
-It add three new types of clocks.
-
-The third part of the patches
-  clk: mmp: add clock type master
-  clk: mmp: add spin lock automatic detection from device tree
-  clk: mmp: add device tree support for composite type clock
-  clk: mmp: add device tree support for clocks.
-It add the device tree support. The whole clock tree is not
-defined in .c file, but be parsed from the device tree file.
-
-The final part of the patches
-  arm: mmp: support clock device tree for mmp platforms
-Change the mmp platform to use device tree to parse the clocks.
-
-Chao Xie (12):
-  clk: mmp: add prefix "mmp" for structures defined for clk-frac
-  clk: mmp: add spin lock for clk-frac
-  clk: mmp: add init callback for clk-frac
-  clk: mmp: move definiton of mmp_clk_frac to clk.h
-  clk: mmp: add clock type mix
-  clk: mmp: add mmp private gate clock
-  clk: mmp: add clock type composite for mix
-  clk: mmp: add clock type master
-  clk: mmp: add spin lock automatic detection from device tree
-  clk: mmp: add device tree support for composite type clock
-  clk: mmp: add device tree support for clocks.
-  arm: mmp: support clock device tree for mmp platforms
-
- .../devicetree/bindings/clock/mmp/clk-composite    |  58 ++
- .../devicetree/bindings/clock/mmp/clk-div          |  28 +
- .../devicetree/bindings/clock/mmp/clk-factor       |  28 +
- .../devicetree/bindings/clock/mmp/clk-gate         |  41 ++
- .../devicetree/bindings/clock/mmp/clk-master       |  47 ++
- .../devicetree/bindings/clock/mmp/clk-mix          |  38 ++
- .../devicetree/bindings/clock/mmp/clk-mux          |  20 +
- Documentation/devicetree/bindings/clock/mmp/lock   |  44 ++
- arch/arm/boot/dts/mmp2-clock.dtsi                  | 575 +++++++++++++++++
- arch/arm/boot/dts/mmp2.dtsi                        |  11 +
- arch/arm/boot/dts/pxa168-clock.dtsi                | 443 +++++++++++++
- arch/arm/boot/dts/pxa168.dtsi                      |  10 +
- arch/arm/boot/dts/pxa910-clock.dtsi                | 388 ++++++++++++
- arch/arm/boot/dts/pxa910.dtsi                      |  10 +
- arch/arm/mach-mmp/Kconfig                          |   7 +-
- arch/arm/mach-mmp/Makefile                         |   2 +-
- arch/arm/mach-mmp/common.h                         |   1 +
- arch/arm/mach-mmp/mmp-dt.c                         |  57 +-
- arch/arm/mach-mmp/mmp2-dt.c                        |  50 --
- drivers/clk/mmp/Makefile                           |   7 +-
- drivers/clk/mmp/clk-frac.c                         |  74 ++-
- drivers/clk/mmp/clk-gate.c                         | 133 ++++
- drivers/clk/mmp/clk-master-node.c                  | 195 ++++++
- drivers/clk/mmp/clk-mix-composite.c                | 195 ++++++
- drivers/clk/mmp/clk-mix.c                          | 419 +++++++++++++
- drivers/clk/mmp/clk-mmp2.c                         |   6 +-
- drivers/clk/mmp/clk-of-composite.c                 | 253 ++++++++
- drivers/clk/mmp/clk-of.c                           | 689 +++++++++++++++++++++
- drivers/clk/mmp/clk-pxa168.c                       |   6 +-
- drivers/clk/mmp/clk-pxa910.c                       |   6 +-
- drivers/clk/mmp/clk.h                              | 164 ++++-
- drivers/clk/mmp/lock.c                             | 159 +++++
- 32 files changed, 4035 insertions(+), 129 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-composite
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-div
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-factor
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-gate
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-master
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-mix
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/clk-mux
- create mode 100644 Documentation/devicetree/bindings/clock/mmp/lock
- create mode 100644 arch/arm/boot/dts/mmp2-clock.dtsi
- create mode 100644 arch/arm/boot/dts/pxa168-clock.dtsi
- create mode 100644 arch/arm/boot/dts/pxa910-clock.dtsi
- delete mode 100644 arch/arm/mach-mmp/mmp2-dt.c
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ drivers/clk/mmp/Makefile   |   2 +-
+ drivers/clk/mmp/clk-gate.c | 133 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk.h      |  21 +++++++
+ 3 files changed, 155 insertions(+), 1 deletion(-)
  create mode 100644 drivers/clk/mmp/clk-gate.c
- create mode 100644 drivers/clk/mmp/clk-master-node.c
- create mode 100644 drivers/clk/mmp/clk-mix-composite.c
- create mode 100644 drivers/clk/mmp/clk-mix.c
- create mode 100644 drivers/clk/mmp/clk-of-composite.c
- create mode 100644 drivers/clk/mmp/clk-of.c
- create mode 100644 drivers/clk/mmp/lock.c
 
+diff --git a/drivers/clk/mmp/Makefile b/drivers/clk/mmp/Makefile
+index 8bfee860..2855f7b 100644
+--- a/drivers/clk/mmp/Makefile
++++ b/drivers/clk/mmp/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for mmp specific clk
+ #
+ 
+-obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o
++obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o clk-gate.o
+ 
+ obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
+ obj-$(CONFIG_CPU_PXA910) += clk-pxa910.o
+diff --git a/drivers/clk/mmp/clk-gate.c b/drivers/clk/mmp/clk-gate.c
+new file mode 100644
+index 0000000..adbd9d6
+--- /dev/null
++++ b/drivers/clk/mmp/clk-gate.c
+@@ -0,0 +1,133 @@
++/*
++ * mmp gate clock operation source file
++ *
++ * Copyright (C) 2014 Marvell
++ * Chao Xie <chao.xie@marvell.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++
++#include "clk.h"
++
++/*
++ * Some clocks will have mutiple bits to enable the clocks, and
++ * the bits to disable the clock is not same as enabling bits.
++ */
++
++#define to_clk_mmp_gate(hw)	container_of(hw, struct mmp_clk_gate, hw)
++
++static int mmp_clk_gate_enable(struct clk_hw *hw)
++{
++	struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
++	struct clk *clk = hw->clk;
++	unsigned long flags = 0;
++	unsigned long rate;
++	u32 tmp;
++
++	if (gate->lock)
++		spin_lock_irqsave(gate->lock, flags);
++
++	tmp = readl(gate->reg);
++	tmp &= ~gate->mask;
++	tmp |= gate->val_enable;
++	writel(tmp, gate->reg);
++
++	if (gate->lock)
++		spin_unlock_irqrestore(gate->lock, flags);
++
++	if (gate->flags & MMP_CLK_GATE_NEED_DELAY) {
++		rate = __clk_get_rate(clk);
++		/* Need delay 2 cycles. */
++		udelay(2000000/rate);
++	}
++
++	return 0;
++}
++
++static void mmp_clk_gate_disable(struct clk_hw *hw)
++{
++	struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
++	unsigned long flags = 0;
++	u32 tmp;
++
++	if (gate->lock)
++		spin_lock_irqsave(gate->lock, flags);
++
++	tmp = readl(gate->reg);
++	tmp &= ~gate->mask;
++	tmp |= gate->val_disable;
++	writel(tmp, gate->reg);
++
++	if (gate->lock)
++		spin_unlock_irqrestore(gate->lock, flags);
++}
++
++static int mmp_clk_gate_is_enabled(struct clk_hw *hw)
++{
++	struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
++	unsigned long flags = 0;
++	u32 tmp;
++
++	if (gate->lock)
++		spin_lock_irqsave(gate->lock, flags);
++
++	tmp = readl(gate->reg);
++
++	if (gate->lock)
++		spin_unlock_irqrestore(gate->lock, flags);
++
++	return (tmp & gate->mask) == gate->val_enable;
++}
++
++const struct clk_ops mmp_clk_gate_ops = {
++	.enable = mmp_clk_gate_enable,
++	.disable = mmp_clk_gate_disable,
++	.is_enabled = mmp_clk_gate_is_enabled,
++};
++
++struct clk *mmp_clk_register_gate(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *reg, u32 mask, u32 val_enable, u32 val_disable,
++		unsigned int gate_flags, spinlock_t *lock)
++{
++	struct mmp_clk_gate *gate;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	/* allocate the gate */
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate) {
++		pr_err("%s:%s could not allocate gate clk\n", __func__, name);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	init.name = name;
++	init.ops = &mmp_clk_gate_ops;
++	init.flags = flags | CLK_IS_BASIC;
++	init.parent_names = (parent_name ? &parent_name : NULL);
++	init.num_parents = (parent_name ? 1 : 0);
++
++	/* struct clk_gate assignments */
++	gate->reg = reg;
++	gate->mask = mask;
++	gate->val_enable = val_enable;
++	gate->val_disable = val_disable;
++	gate->flags = gate_flags;
++	gate->lock = lock;
++	gate->hw.init = &init;
++
++	clk = clk_register(dev, &gate->hw);
++
++	if (IS_ERR(clk))
++		kfree(gate);
++
++	return clk;
++}
+diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
+index 426616b..9096f0a 100644
+--- a/drivers/clk/mmp/clk.h
++++ b/drivers/clk/mmp/clk.h
+@@ -99,6 +99,27 @@ extern struct clk *mmp_clk_register_mix(struct device *dev,
+ 					spinlock_t *lock);
+ 
+ 
++/* Clock type "gate". MMP private gate */
++#define MMP_CLK_GATE_NEED_DELAY		BIT(0)
++
++struct mmp_clk_gate {
++	struct clk_hw hw;
++	void __iomem *reg;
++	u32 mask;
++	u32 val_enable;
++	u32 val_disable;
++	unsigned int flags;
++	spinlock_t *lock;
++};
++
++extern const struct clk_ops mmp_clk_gate_ops;
++extern struct clk *mmp_clk_register_gate(struct device *dev, const char *name,
++			const char *parent_name, unsigned long flags,
++			void __iomem *reg, u32 mask, u32 val_enable,
++			u32 val_disable, unsigned int gate_flags,
++			spinlock_t *lock);
++
++
+ extern struct clk *mmp_clk_register_pll2(const char *name,
+ 		const char *parent_name, unsigned long flags);
+ extern struct clk *mmp_clk_register_apbc(const char *name,
 -- 
 1.8.3.2
