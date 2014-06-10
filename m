@@ -1,132 +1,79 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 10 Jun 2014 00:25:47 -0400 (EDT)
-Subject: Problems booting exynos5420 with >1 CPU
-In-Reply-To: <20140609222604.GA16889@e102568-lin.cambridge.arm.com>
-References: <alpine.LFD.2.11.1406061740280.25775@knanqh.ubzr>
- <CAM4voam5KDicwLAt3EA1UC7M+EciGccrnMUKxoR-5c8xT8-zSQ@mail.gmail.com>
- <alpine.LFD.2.11.1406062340480.25775@knanqh.ubzr>
- <20140607175618.GA25068@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1406071431490.25775@knanqh.ubzr>
- <20140607223614.GA26641@e102568-lin.cambridge.arm.com>
- <CAOesGMj+itYr-daqxfX=J3Ss+7YdWhUUzBWTW3FqVEH8tXqt-A@mail.gmail.com>
- <20140608124530.GA31921@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1406081138070.25775@knanqh.ubzr>
- <7hsindq07l.fsf@paris.lan>
- <20140609222604.GA16889@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1406092254220.25775@knanqh.ubzr>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Tue, 10 Jun 2014 12:18:33 +0530
+Subject: exynos5420-peach-pi: linux-next boot fails unless mau_epll left
+ enabled?
+In-Reply-To: <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
+References: <7hoay6sxjl.fsf@paris.lan>
+ <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
+Message-ID: <CAOD6ATpZWEg9d7WnZ8tg9_uQJ29vMoucaOwh0_tbdRSDRj25cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Jun 2014, Lorenzo Pieralisi wrote:
+Hi Kevin,
 
-> I commented on Nico's patch because I did not like how it was
-> implemented (at least remove the CPU PM notifier calls please, because
-> they are not needed).
+We tested on 3 "peach-pi" boards. We are not observing this issue.
 
-OK no problem.  That's easy enough.  I added them to play it safe as a 
-test patch in case some VFP content could be lost somehow by looping 
-back through the CPU init code for example, and needed to be saved.
+Even I tried with the below defconfig mentioned by you. No issues observed.
+https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/master/eclass/cros-kernel/exynos5_defconfig
 
-> I also said that's the only thing he could do, and I still think 
-> that's not a nice way to use the cpu_suspend API for something it was 
-> not designed for, that's what I wanted to say, period.
+This is the u-boot version currently we are using.
+U-Boot 2013.04 (Feb 13 2014 - 16:35:03) for Peach
 
-Well... Maybe it wasn't designed for that, but it certainly can be used 
-for that. And with no modifications to the core code, making this 
-solution fairly elegant.  This is not so different from, say, the BPF 
-code being reused for seccomp_filters. BPF wasn't designed for system 
-call filtering, but it happens to work well.
+Can you provide us more inputs like uboot version or any extra patches
+you applied?
+Also try removing all power domain nodes from exynos5420.dtsi and
+check whether it is reproduced.
 
-> If I am allowed to say something, here is a couple of thoughts.
-> 
-> 1) CCI snoops and DVM enablement are secure operations, to do them in
->    non-secure world this must be overriden in firmware. You can argue,
->    you can think whatever you want, that's a fact. So, to use this
->    code SMP bit in SCTLR and CCI enablement must become non-secure
->    operations. This is a boot requirement for MCPM, right or wrong
->    it is up to platform designers to judge. If CCI and SMP enablement
->    are secure operations, we should not start adding random SMC calls
->    in the kernel, since managing coherency in the kernel would become
->    problematic, with lots of platform quirks. We do not want that to
->    happen, and I think we all agree on this.
-
-One could certainly question the need for so many controls handled in 
-secure world.  But that is not the point.
-
-Here we're talking about MCPM.  That implies the kernel has control over 
-SCTLR.SMP and the CCI.  If those things aren't under the kernel's 
-control, then MCPM is of no use to you.
-
-Therefore, if you do want to use MCPM, then this implies the kernel has 
-access to the CCI. And if it has access to it, then it should turn it on 
-by itself in all cases to be consistent, not only in half of the cases.
-
-> 2) (1) must be documented.
-
-Absolutely.  But let's be coherent in the implementation so the 
-documentation is as simple as it can be.
-
-> 3) When I talked about consequences for CPUidle (implicit), I was referring
->    to all sort of hacks we had to come up to bring devices like SPC
->    (remember ? I remember very very well unfortunately for me), or whatever
->    power controller up in the kernel early, too early to fit in any
->    existing kernel device framework. There is still no solution to that, and
->    the only way that code can exist is in mach- code. Right or wrong,
->    that's a second fact and in my opinion that's not nice for the ARM
->    kernel.
-
-I disagree.  This can perfectly be turned into driver code. If we need 
-it too early for existing kernel device framework to handle this 
-properly, then the solution is to extend the existing framework or 
-create another one specially for that purpose.  This may not be obvious 
-when TC2 is the first/only platform in that situation, but if more 
-platforms have the same need then it'll be easier to abstract 
-commonalities into a framework.
-
-Saying that no framework exists today or/and upstream maintainers are 
-being difficult is _not_ a reason for throwing your hands up and e.g. 
-shoving all this code into firmware instead.
-
-> 4) When I am talking about firmware I am talking about sequences that
->    are very close to HW (disabling C bit, cleaning caches, exiting
->    coherency). Erratas notwithstanding, they are being standardized at
->    ARM the best we can. They might even end up being implemented in HW
->    in the not so far future. I understand they are tricky, I understand
->    they take lots of time to implement them and to debug them, what I
->    want to say is that they are becoming standard and we _must_ reuse the
->    same code for all ARM platforms. You can implement them in MCPM (see
->    (1)) or in firmware (and please do not start painting me as firmware
->    hugger here, I am referring to standard power down sequences that
->    again, are very close to HW state machines 
-
-That's where the disconnect lies.  On the one hand you say "I understand 
-they are tricky, I understand they take lots of time to implement them 
-and to debug them" and on the other hand you say "They might end up being 
-implemented in HW in the not so far future."  That simply makes no 
-economical sense at all!
-
-When some operation is 1) tricky and takes time to debug, and 2) not 
-performance critical (no one is trying to get in and out of idle or 
-hibernation a billion times per second), then you should never ever put 
-such a thing in firmware, and hardware should be completely out of the 
-question!
-
->    and more importantly if they
->    HAVE to run in secure world that's the only solution we have unless you
->    want to split race conditions between kernel and secure world).
-
-If they HAVE to run in secure world then your secure world architecture 
-is simply misdesigned, period.  Someone must have ignored the economics 
-of modern software development to have come up with this.
-
-> 5) I agree that the CCI enablement in TC2 (bootmon for cold boot and
->    kernel for warm-boot is wrong, nothing to say and it was not the
->    reason I commented on Nico's patch - I think I explained to you
->    thoroughly why now).
-
-OK. Let's start by agreeing on the spirit behind my patch then.  The 
-actual patch implementation details are a secondary concern and open for 
-discussion.
+Regards,
+Shaik Ameer Basha
 
 
-Nicolas
+
+On Tue, Jun 10, 2014 at 3:21 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> ping for any Samsung folks that might be able to explain this.
+>
+> On Thu, Jun 5, 2014 at 5:15 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Hello,
+>>
+>> I'm trying to boot next-20140605[1] on my recently arrived Chromebook2
+>> (peach-pi) and was not getting to userspace.  Comparing notes with Doug
+>> Anderson, his was booting just fine, so after some debugging and adding
+>> 'clk_ignore_unused' to the command-line, it started booting fine.
+>>
+>> So then, I tracked it down to which clock was causing the problems and
+>> found that it's the mau_epll clock gating that's causing the problem,
+>> and leaving it enabled[1] allows me to boot again.
+>>
+>> Any ideas what's going on here?
+>>
+>> And in particular, any ideas why it would affect my board and not other
+>> boards like Doug's?
+>>
+>> Thanks,
+>>
+>> Kevin
+>>
+>> [1] Using this defconfig:
+>> https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/master/eclass/cros-kernel/exynos5_defconfig
+>>
+>> [2]
+>> diff --git a/drivers/clk/samsung/clk-exynos5420.c
+>> b/drivers/clk/samsung/clk-exynos5420.c
+>> index 61eccf0dd72f..ed175088ee7e 100644
+>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>> @@ -911,7 +911,7 @@ static struct samsung_gate_clock
+>> exynos5x_gate_clks[] __initdata = {
+>>                         SRC_MASK_TOP2, 24, 0, 0),
+>>
+>>         GATE(CLK_MAU_EPLL, "mau_epll", "mout_mau_epll_clk",
+>> -                       SRC_MASK_TOP7, 20, 0, 0),
+>> +                       SRC_MASK_TOP7, 20, CLK_IGNORE_UNUSED, 0),
+>>
+>>         /* sclk */
+>>         GATE(CLK_SCLK_UART0, "sclk_uart0", "dout_uart0",
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
