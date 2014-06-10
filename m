@@ -1,106 +1,191 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Jun 2014 00:15:19 +0200
-Subject: [PATCH 02/24] drivercore: Bind/unbind power domain on probe/remove
-In-Reply-To: <53977BC1.5000301@gmail.com>
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0hUT0QPGWeDM9WoxnobaL5eoNi5UFrUUZrQ1gSBCX=aVg@mail.gmail.com>
- <CAPDyKFqWZdA4ZisJvCDP8j6D2_A8oRAHkjikddyGSwpToFg-Gw@mail.gmail.com>
- <1894835.cKK4602bPf@vostro.rjw.lan>
- <20140610212731.GA11191@kroah.com> <53977BC1.5000301@gmail.com>
-Message-ID: <CAPDyKFo+QOhKvOO-C_t-oH7D9=whRF-WRf5w3dP=oTym7=6z6A@mail.gmail.com>
+From: ashcharles@gmail.com (Ash Charles)
+Date: Tue, 10 Jun 2014 15:19:08 -0700
+Subject: [PATCH] omap: Add devicetree for Gumstix Pepper board
+In-Reply-To: <53972B57.6010802@epfl.ch>
+References: <1402087916-14857-1-git-send-email-ashcharles@gmail.com>
+ <53972B57.6010802@epfl.ch>
+Message-ID: <CAK8F28kEi7TfnOCXk1S8bX8PpE_fQLHBFALg5GmtEk6iaTbf=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 June 2014 23:42, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 10.06.2014 23:27, Greg Kroah-Hartman wrote:
->> On Tue, Jun 10, 2014 at 11:27:45PM +0200, Rafael J. Wysocki wrote:
->>> On Tuesday, June 10, 2014 02:53:26 PM Ulf Hansson wrote:
->>>> On 10 June 2014 14:11, Rafael J. Wysocki <rafael@kernel.org> wrote:
->>>>> On Tue, Jun 10, 2014 at 12:51 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>>> From: Tomasz Figa <t.figa@samsung.com>
->>>>>>
->>>>>> On a number of platforms, devices are part of controllable power
->>>>>> domains, which need to be enabled before such devices can be accessed
->>>>>> and may be powered down when the device is idle to save some power.
->>>>>> This means that on systems that support power domain control using
->>>>>> generic power domains subsystem, it is necessary to add device to its
->>>>>> power domain before binding a driver to it and remove it from its power
->>>>>> domain after its driver is unbound to make sure that an unused device
->>>>>> does not affect power domain state.
->>>>>>
->>>>>> Since this is not limited to particular busses and specific
->>>>>> archs/platforms,
->>>>>
->>>>> Actually, this isn't correrct.  It is limited to the platforms that
->>>>> use Device Trees now.
->>>>
->>>> Correct, we should update the commit message/docs.
->>>>
->>>>>
->>>>> Moreover, it is not consistent with the way we add devices to the ACPI PM
->>>>> domain, which is the ACPI counterpart of this.
->>>>
->>>> I am not sure why you think consistency for ACPI is important here.
->>>> ACPI PM will still be able to handle it's domain/device registering as
->>>> before. There are even other pm_domains that don't use genpd which
->>>> need to handle this themselves.
->>>
->>> My point is that doing things like that in different places for different
->>> firmware interfaces is confusing and likely to lead to coding mistakes in
->>> the future.
->>>
->>>> Or are you saying that you prefer bus notifiers in favour of making
->>>> use of the driver core for this matter?
->>>
->>> Well, please grep for acpi_dev_pm_attach() and see where it is done.
->>> Surely not in drivers/base/dd.c.  Also I'm not sure why you're talking
->>> about bus notifiers in this context.
->>>
->>>> Shouldn't the driver core handle most of the common things for a device
->>>> driver?
->>>
->>> Common, yes.  Platform-specific, no.
->>>
->>>> Let's compare how the pinctrls are being managed in the driver core, for
->>>> example.
->>>
->>> pinctrl has Device Trees support only at the moment (as far as firmware
->>> interfaces go) and quite frankly I'm not sure if/how we'll need to change
->>> it to cover ACPI as well.
->>>
->>> But for power domains, please keep that stuff away from dd.c.  That is,
->>> unless Greg specifically disagrees with me and decides to apply this
->>> patch regardless. :-)
->>
->> Nope, no disagreement from me toward you at all here, keep up the good
->> work :)
+On Tue, Jun 10, 2014 at 8:59 AM, Florian Vaussard
+<florian.vaussard@epfl.ch> wrote:
+> It is not very common to add oneself as the maintainer of a single .dts
+> file. I could only found the am335x-nano.dts with such a way of doing.
+> Usually get_maintainer.pl will also take into account the commit author
+> and properly handle this case.
+Okay--I'll remove this.  Ironically, I was looking at the nano to make
+sure I'd done everything I needed to ;-).
+...
+> For all the boards that I have seen, all the properties of a new node
+> are declared at the same place, where you put some of them at the end. I
+> have not a strong opinion on this, but I find it a bit more difficult to
+> read.
+...
+> Splitting the pinmux is also unusual, but in this case I found it more
+> readable.
+My goal both by moving the properties and the pinmux was to separate
+out chunks of functionality into discrete sections.  It makes it easy
+to resolve an issue with a specific board feature (e.g. LEDs) or adapt
+for a new board version as the pinmux and any node properties are
+grouped together.
+I recognize this is something of a personal bias though so I can
+certainly re-organize if this is stylistically bad.
+...
+>> +&am33xx_pinmux {
+>> +     accel_pins: pinmux_accel {
+>> +             pinctrl-single,pins = <
+>> +                     0x98 (PIN_INPUT_PULLUP | MUX_MODE7)   /* gpmc_wen.gpio2_4 */
 >
-> OK, so proposed solution is to put this in:
+> The INT pin of the LIS33 chip seems to be push-pull, thus enabling the
+> pullup on the SoC side will increase the current consumption when held down.
+Good catch.
+...
+>> +&am33xx_pinmux {
+>> +     audio_pins: pinmux_audio {
+>> +             pinctrl-single,pins = <
+>> +                     0x1AC (PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_ahcklx.mcasp0_ahclkx */
+>> +                     0x194 (PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_fsx.mcasp0_fsx */
+>> +                     0x190 (PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_aclkx.mcasp0_aclkx */
+>> +                     0x198 (PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_axr0.mcasp0_axr0 */
+>> +                     0x1A8 (PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_axr1.mcasp0_axr1 */
+>> +                     0x40 (PIN_OUTPUT_PULLUP | MUX_MODE7)    /* gpmc_a0.gpio1_16 */
 >
-> - platform_drv_probe(),
-> - spi_drv_probe(),
-> - i2c_device_probe(),
-> - amba_probe(),
+> You already have an external pullup in your design, so this one seems
+> superfluous.
+You're correct.  Changed.
+...
+>> +/* Power */
+>> +&vbat {
+>> +     regulator-name = "vbat";
+>> +     regulator-min-microvolt = <5000000>;
+>> +     regulator-max-microvolt = <5000000>;
+>> +     regulator-always-on;
+removed regulator-always-on
+>> +};
+>> +
+>> +&v3v3c_reg {
+>> +     regulator-name = "v3v3c_reg";
+>> +     regulator-min-microvolt = <3300000>;
+>> +     regulator-max-microvolt = <3300000>;
+>> +     vin-supply = <&vbat>;
+>> +     regulator-always-on;
+removed regulator-always-on
+>> +};
+>> +
+>> +&vdd5_reg {
+>> +     regulator-name = "vdd5_reg";
+>> +     regulator-min-microvolt = <5000000>;
+>> +     regulator-max-microvolt = <5000000>;
+>> +     regulator-always-on;
+removed regulator-always-on
+>> +     vin-supply = <&vbat>;
+>> +};
+>> +
+>> +/include/ "tps65217.dtsi"
+>> +
+>> +&tps {
+>> +     backlight {
+>> +             isel = <1>; /* ISET1 */
+>> +             fdim = <200>; /* TPS65217_BL_FDIM_200HZ */
+>> +             default-brightness = <80>;
+>> +     };
+>> +
+>> +     regulators {
+>> +             dcdc1_reg: regulator at 0 {
+>> +                     /* VDD_1V8 system supply */
+>> +                     regulator-always-on;
+removed regulator-always-on
+>> +             };
+>> +
+>> +             dcdc2_reg: regulator at 1 {
+>> +                     /* VDD_CORE voltage limits 0.95V - 1.26V with +/-4% tolerance */
+>> +                     regulator-name = "vdd_core";
+>> +                     regulator-min-microvolt = <925000>;
+>> +                     regulator-max-microvolt = <1325000>;
+>> +                     regulator-boot-on;
+>> +                     regulator-always-on;
+removed regulator-always-on
+>> +             };
+>> +
+>> +             dcdc3_reg: regulator at 2 {
+>> +                     /* VDD_MPU voltage limits 0.95V - 1.1V with +/-4% tolerance */
+>> +                     regulator-name = "vdd_mpu";
+>> +                     regulator-min-microvolt = <925000>;
+>> +                     regulator-max-microvolt = <1150000>;
+>> +                     regulator-boot-on;
+>> +                     regulator-always-on;
+removed regulator-always-on
+>> +             };
+>> +
+>> +             ldo1_reg: regulator at 3 {
+>> +                     /* VRTC 1.8V always-on supply */
+>> +                     regulator-always-on;
+This is the backup supply shouldn't be switched off.
+>> +             };
+>> +
+>> +             ldo2_reg: regulator at 4 {
+>> +                     /* 3.3V rail */
+>> +                     regulator-always-on;
+removed regulator-always-on
+>> +             };
+>> +
+>> +             ldo3_reg: regulator at 5 {
+>> +                     /* VDD_3V3A 3.3V rail */
+>> +                     regulator-always-on;
+removed regulator-always-on
+>> +                     regulator-min-microvolt = <3300000>;
+>> +                     regulator-max-microvolt = <3300000>;
+>> +             };
+>> +
+>> +             ldo4_reg: regulator at 6 {
+>> +                     /* VDD_3V3B 3.3V rail */
+>> +                     regulator-always-on;
+removed regulator-always-on
+>> +             };
 >
-> ...
+> Why are all the regulators always on? Most of them should be managed
+> automatically if you have correct dependencies, shouldn't they?
+A little cargo-cult I fear.  I've removed as noted above.
+...
+> You can use the key codes defined in <dt-bindings/input/input.h>.
+Ah--cool.  Will do.
 >
-> - and any other bus type, which can have devices instantiated from DT.
+>> +             gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
+>> +             gpio-key,wakeup;
+>> +     };
+>> +
+>> +     button at 1 {
+>> +             label = "menu";
+>> +             linux,code = <139>;
 >
-> If this is what you mean, I still think putting this in dd is cleaner
-> and more scalable, but I'm not going to insist, as I believe you have
-> good reasons to prefer this approach over current one.
+> KEY_MENU
+>
+>> +             gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
+>> +             gpio-key,wakeup;
+>> +     };
+>> +
+>> +     buttons at 2 {
+>> +             label = "power";
+>> +             linux,code = <116>;
+>
+> KEY_POWER
+>
+>> +             gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+>> +             gpio-key,wakeup;
+>> +     };
+>> +};
+>> +
+>> +&am33xx_pinmux {
+>> +     user_leds_pins: pinmux_user_leds {
+>> +             pinctrl-single,pins = <
+>> +                     0x50 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)  /* gpmc_a4.gpio1_20 */
+>> +                     0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)  /* gpmc_a5.gpio1_21 */
+>
+> Why enabling the pulldown on an output gpio? You will increase the power
+> consumption when driving high.
+These work fine as simple outputs.
 
-I am not so sure we should ignore scalability.
+Thanks for your careful review Florian.  Much appreciated.
 
-Currently there are SoCs those that uses bus notifiers to handle the
-device registration for it's pm_domain. When each of them converts to
-use bus' ->probe() function instead, they will have their own version
-of acpi_dev_pm_attach(), and the scalability becomes an issue.
-
-An option could be to invent a common "pm_domain_attach_dev() API",
-which will check what kind of power domain the device may reside in.
-In principle invoke acpi_dev_pm_attach() and if no attachment happens,
-try genpd_bind_domain().
-
-Kind regards
-Ulf Hansson
+--Ash
