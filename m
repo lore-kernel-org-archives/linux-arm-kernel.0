@@ -1,464 +1,235 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Jun 2014 12:51:14 +0200
-Subject: [PATCH 01/24] base: power: Add generic OF-based power domain look-up
-In-Reply-To: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1402397497-26737-2-git-send-email-ulf.hansson@linaro.org>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Tue, 10 Jun 2014 16:30:29 +0530
+Subject: [PATCH 1/2 v2] spi: s3c64xx: use "cs-gpios" from spi node instead
+ of "cs-gpio"
+In-Reply-To: <5396E051.8050803@samsung.com>
+References: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>
+ <1402394881-31564-2-git-send-email-ch.naveen@samsung.com>
+ <5396E051.8050803@samsung.com>
+Message-ID: <CAHfPSqAq9L5Zu7z3-y6Y2pG8AhE4Y1j8DE35LDfMW_DYc_x-gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+Hello Sylwester,
 
-This patch introduces generic code to perform power domain look-up using
-device tree and automatically bind devices to their power domains.
-Generic device tree binding is introduced to specify power domains of
-devices in their device tree nodes.
+Thanks for the review.
+On 10 June 2014 16:09, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> On 10/06/14 12:08, Naveen Krishna Chatradhi wrote:
+>> Currently, spi-s3c64xx.c needs "cs-gpio" chip select GPIO to be
+>> defined under "controller-data" node under each slave node.
+>>
+>> &spi_x {
+>>       cs-gpios <>;
+>>       ...
+>>       slave_node {
+>>
+>>               controller-data {
+>>                       cs-gpio = <>;
+>>                       ...
+>>               };
+>>               ...
+>>       };
+>>       ...
+>> };
+>>
+>> Where as, SPI core and many other drivers uses "cs-gpios" for
+>> from device tree node.
+>>
+>> Hence, make changes in spi-s3c64xx.c driver to make use of
+>> "cs-gpios" from SPI node(parent) instead of "cs-gpio" defined in
+>> slaves "controller-data"(child) node.
+>>
+>> Also updates the Device tree Documentation.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> ---
+>> Changes since v1:
+>> 1. fixed a compilation warning thus squashing the other patch into this.
+>> 2. Updated device tree description in spi-samsung.txt
+>>
+>>  .../devicetree/bindings/spi/spi-samsung.txt        |    8 ++-
+>>  drivers/spi/spi-s3c64xx.c                          |   56 ++++++++++++--------
+>>  2 files changed, 38 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>> index 86aa061..13bfcb5 100644
+>> --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>> +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>> @@ -42,15 +42,13 @@ Optional Board Specific Properties:
+>>  - num-cs: Specifies the number of chip select lines supported. If
+>>    not specified, the default number of chip select lines is set to 1.
+>>
+>> +- cs-gpios: should specify GPIOs used for chipselects (see spi-bus.txt)
+>> +
+>>  SPI Controller specific data in SPI slave nodes:
+>>
+>>  - The spi slave nodes should provide the following information which is required
+>>    by the spi controller.
+>>
+>> -  - cs-gpio: A gpio specifier that specifies the gpio line used as
+>> -    the slave select line by the spi controller. The format of the gpio
+>> -    specifier depends on the gpio controller.
+>> -
+>>    - samsung,spi-feedback-delay: The sampling phase shift to be applied on the
+>>      miso line (to account for any lag in the miso line). The following are the
+>>      valid values.
+>> @@ -85,6 +83,7 @@ Example:
+>>               #size-cells = <0>;
+>>               pinctrl-names = "default";
+>>               pinctrl-0 = <&spi0_bus>;
+>> +             cs-gpios = <&gpa2 5 1 0 3>;
+>
+> While at it, please change the GPIO specifier format, this one is not
+> valid any more.
+Sure,  i will club it with the other comments.
+>
+>>               w25q80bw at 0 {
+>>                       #address-cells = <1>;
+>> @@ -94,7 +93,6 @@ Example:
+>>                       spi-max-frequency = <10000>;
+>>
+>>                       controller-data {
+>> -                             cs-gpio = <&gpa2 5 1 0 3>;
+>>                               samsung,spi-feedback-delay = <0>;
+>>                       };
+>>
+>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+>> index 75a5696..4594dde 100644
+>> --- a/drivers/spi/spi-s3c64xx.c
+>> +++ b/drivers/spi/spi-s3c64xx.c
+>> @@ -750,47 +750,56 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
+>>  }
+>>
+>>  static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+>> -                             struct spi_device *spi)
+>> +                             struct spi_device *spi,
+>> +                             struct s3c64xx_spi_csinfo *cs)
+>>  {
+>> -     struct s3c64xx_spi_csinfo *cs;
+>> -     struct device_node *slave_np, *data_np = NULL;
+>> -     struct s3c64xx_spi_driver_data *sdd;
+>> +     struct device_node *data_np = NULL;
+>>       u32 fb_delay = 0;
+>>
+>> -     sdd = spi_master_get_devdata(spi->master);
+>> -     slave_np = spi->dev.of_node;
+>> -     if (!slave_np) {
+>> -             dev_err(&spi->dev, "device node not found\n");
+>> +     data_np = of_get_child_by_name(spi->dev.of_node, "controller-data");
+>> +     if (!data_np) {
+>> +             dev_err(&spi->dev, "child node 'controller-data' not found\n");
+>>               return ERR_PTR(-EINVAL);
+>>       }
+>>
+>> -     data_np = of_get_child_by_name(slave_np, "controller-data");
+>> -     if (!data_np) {
+>> -             dev_err(&spi->dev, "child node 'controller-data' not found\n");
+>> +     of_property_read_u32(data_np, "samsung,spi-feedback-delay", &fb_delay);
+>> +     cs->fb_delay = fb_delay;
+>> +     of_node_put(data_np);
+>> +
+>> +     return cs;
+>> +}
+>> +
+>> +static struct s3c64xx_spi_csinfo *s3c64xx_get_cs_gpios(struct spi_device *spi)
+>> +{
+>> +     struct device_node *parent_np = NULL;
+>> +     struct s3c64xx_spi_driver_data *sdd;
+>> +     struct s3c64xx_spi_csinfo *cs;
+>> +
+>> +     parent_np = of_get_parent(spi->dev.of_node);
+>> +     if (!parent_np) {
+>> +             dev_err(&spi->dev, "Parent node not found\n");
+>>               return ERR_PTR(-EINVAL);
+>>       }
+>>
+>> +     sdd = spi_master_get_devdata(spi->master);
+>> +
+>>       cs = kzalloc(sizeof(*cs), GFP_KERNEL);
+>>       if (!cs) {
+>> -             of_node_put(data_np);
+>> +             of_node_put(parent_np);
+>>               return ERR_PTR(-ENOMEM);
+>>       }
+>>
+>>       /* The CS line is asserted/deasserted by the gpio pin */
+>>       if (sdd->cs_gpio)
+>> -             cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
+>> +             cs->line = of_get_named_gpio(parent_np, "cs-gpios", 0);
+>
+> Can we support both "cs-gpio" and "cs-gpios" for backward compatibility ?
+> After your change all DTBs using the original pattern will not work with
+> new kernels any more. At least I would expect such backward compatibility
+> maintained for few kernel releases.
 
-Backwards compatibility with legacy Samsung-specific power domain
-bindings is provided, but for now the new code is not compiled when
-CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
-will change as soon as Exynos power domain code gets converted to use
-the generic framework in further patch.
+The reason behind removing the "cs-gpio" or not providing backward
+compatibility was
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Reviewed-by: Mark Brown <broonie@linaro.org>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-Reviewed-by: Philipp Zabel <philipp.zabel@gmail.com>
-[on i.MX6 GK802]
-Tested-by: Philipp Zabel <philipp.zabel@gmail.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- .../devicetree/bindings/power/power_domain.txt     |   51 ++++
- drivers/base/power/domain.c                        |  283 ++++++++++++++++++++
- include/linux/pm_domain.h                          |   46 ++++
- kernel/power/Kconfig                               |    4 +
- 4 files changed, 384 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+1. Since spi-core started using "cs-gpios" string from spi device node
+several months ago.
+  The spi-s3c64xx.c driver is partially broken for more than 6 months.
 
-diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-new file mode 100644
-index 0000000..303d0a9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/power_domain.txt
-@@ -0,0 +1,51 @@
-+* Generic power domains
-+
-+System on chip designs are often divided into multiple power domains that
-+can be used for power gating of selected IP blocks for power saving by
-+reduced leakage current.
-+
-+This device tree binding can be used to bind power domain consumer devices
-+with their power domains provided by power domain providers. A power domain
-+provider can be represented by any node in the device tree and can provide
-+one or more power domains. A consumer node can refer to the provider by
-+a phandle and a set of phandle arguments (so called power domain specifier)
-+of length specified by #power-domain-cells property in the power domain
-+provider node.
-+
-+==Power domain providers==
-+
-+Required properties:
-+ - #power-domain-cells : Number of cells in a power domain specifier;
-+   Typically 0 for nodes representing a single power domain and 1 for nodes
-+   providing multiple power domains (e.g. power controllers), but can be
-+   any value as specified by device tree binding documentation of particular
-+   provider.
-+
-+Example:
-+
-+	power: power-controller at 12340000 {
-+		compatible = "foo,power-controller";
-+		reg = <0x12340000 0x1000>;
-+		#power-domain-cells = <1>;
-+	};
-+
-+The node above defines a power controller that is a power domain provider
-+and expects one cell as its phandle argument.
-+
-+==Power domain consumers==
-+
-+Required properties:
-+ - power-domains : A phandle and power domain specifier as defined by bindings
-+                   of power controller specified by phandle.
-+
-+Example:
-+
-+	leaky-device at 12350000 {
-+		compatible = "foo,i-leak-current";
-+		reg = <0x12350000 0x1000>;
-+		power-domains = <&power 0>;
-+	};
-+
-+The node above defines a typical power domain consumer device, which is located
-+inside power domain with index 0 of power controller represented by node with
-+label "power".
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index eee55c1..dc766a7 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -8,6 +8,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/io.h>
-+#include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_qos.h>
-@@ -2189,3 +2190,285 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
- 	list_add(&genpd->gpd_list_node, &gpd_list);
- 	mutex_unlock(&gpd_list_lock);
- }
-+
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+/*
-+ * Device Tree based power domain providers.
-+ *
-+ * The code below implements generic device tree based power domain providers
-+ * that bind device tree nodes with generic power domains registered in the
-+ * system.
-+ *
-+ * Any driver that registers generic power domains and need to support binding
-+ * of devices to these domains is supposed to register a power domain provider,
-+ * which maps a power domain specifier retrieved from device tree to a power
-+ * domain.
-+ *
-+ * Two simple mapping functions have been provided for convenience:
-+ *  - of_genpd_xlate_simple() for 1:1 device tree node to domain mapping,
-+ *  - of_genpd_xlate_onecell() for mapping of multiple domains per node
-+ *    by index.
-+ */
-+
-+/**
-+ * struct of_genpd_provider - Power domain provider registration structure
-+ * @link: Entry in global list of domain providers
-+ * @node: Pointer to device tree node of domain provider
-+ * @xlate: Provider-specific xlate callback mapping a set of specifier cells
-+ *         into a power domain.
-+ * @data: context pointer to be passed into @xlate callback
-+ */
-+struct of_genpd_provider {
-+	struct list_head link;
-+
-+	struct device_node *node;
-+	genpd_xlate_t xlate;
-+	void *data;
-+};
-+
-+/* List of registered power domain providers. */
-+static LIST_HEAD(of_genpd_providers);
-+/* Mutex to protect the list above. */
-+static DEFINE_MUTEX(of_genpd_mutex);
-+
-+/**
-+ * of_genpd_xlate_simple() - Xlate function for direct node-domain mapping
-+ * @genpdspec: OF phandle args to map into a power domain
-+ * @data: xlate function private data - pointer to struct generic_pm_domain
-+ *
-+ * This is a generic xlate function that can be used to model power domains
-+ * that have their own device tree nodes. The private data of xlate function
-+ * needs to be a valid pointer to struct generic_pm_domain.
-+ */
-+struct generic_pm_domain *of_genpd_xlate_simple(
-+					struct of_phandle_args *genpdspec,
-+					void *data)
-+{
-+	if (genpdspec->args_count != 0)
-+		return ERR_PTR(-EINVAL);
-+	return data;
-+}
-+EXPORT_SYMBOL_GPL(of_genpd_xlate_simple);
-+
-+/**
-+ * of_genpd_xlate_onecell() - Xlate function for providers using single index.
-+ * @genpdspec: OF phandle args to map into a power domain
-+ * @data: xlate function private data - pointer to struct genpd_onecell_data
-+ *
-+ * This is a generic xlate function that can be used to model simple power
-+ * domain controllers that have one device tree node and provide multiple
-+ * power domains. A single cell is used as an index to an array of power
-+ * domains specified in genpd_onecell_data struct when registering the
-+ * provider.
-+ */
-+struct generic_pm_domain *of_genpd_xlate_onecell(
-+					struct of_phandle_args *genpdspec,
-+					void *data)
-+{
-+	struct genpd_onecell_data *genpd_data = data;
-+	unsigned int idx = genpdspec->args[0];
-+
-+	if (genpdspec->args_count != 1)
-+		return ERR_PTR(-EINVAL);
-+
-+	if (idx >= genpd_data->domain_num) {
-+		pr_err("%s: invalid domain index %d\n", __func__, idx);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	return genpd_data->domains[idx];
-+}
-+EXPORT_SYMBOL_GPL(of_genpd_xlate_onecell);
-+
-+/**
-+ * of_genpd_add_provider() - Register a domain provider for a node
-+ * @np: Device node pointer associated with domain provider.
-+ * @xlate: Callback for decoding domain from phandle arguments.
-+ * @data: Context pointer for @genpd_src_get callback.
-+ */
-+int of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-+			  void *data)
-+{
-+	struct of_genpd_provider *cp;
-+
-+	cp = kzalloc(sizeof(*cp), GFP_KERNEL);
-+	if (!cp)
-+		return -ENOMEM;
-+
-+	cp->node = of_node_get(np);
-+	cp->data = data;
-+	cp->xlate = xlate;
-+
-+	mutex_lock(&of_genpd_mutex);
-+	list_add(&cp->link, &of_genpd_providers);
-+	mutex_unlock(&of_genpd_mutex);
-+	pr_debug("Added domain provider from %s\n", np->full_name);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_genpd_add_provider);
-+
-+/**
-+ * of_genpd_del_provider() - Remove a previously registered domain provider
-+ * @np: Device node pointer associated with domain provider
-+ */
-+void of_genpd_del_provider(struct device_node *np)
-+{
-+	struct of_genpd_provider *cp;
-+
-+	mutex_lock(&of_genpd_mutex);
-+	list_for_each_entry(cp, &of_genpd_providers, link) {
-+		if (cp->node == np) {
-+			list_del(&cp->link);
-+			of_node_put(cp->node);
-+			kfree(cp);
-+			break;
-+		}
-+	}
-+	mutex_unlock(&of_genpd_mutex);
-+}
-+EXPORT_SYMBOL_GPL(of_genpd_del_provider);
-+
-+/**
-+ * of_genpd_get_from_provider() - Look-up power domain
-+ * @genpdspec: OF phandle args to use for look-up
-+ *
-+ * Looks for domain provider under node specified by @genpdspec and if found
-+ * uses xlate function of the provider to map phandle args to a power domain.
-+ *
-+ * Returns a valid pointer to struct generic_pm_domain on success or ERR_PTR()
-+ * on failure.
-+ */
-+static struct generic_pm_domain *of_genpd_get_from_provider(
-+					struct of_phandle_args *genpdspec)
-+{
-+	struct generic_pm_domain *genpd = ERR_PTR(-EPROBE_DEFER);
-+	struct of_genpd_provider *provider;
-+
-+	mutex_lock(&of_genpd_mutex);
-+
-+	/* Check if we have such a provider in our array */
-+	list_for_each_entry(provider, &of_genpd_providers, link) {
-+		if (provider->node == genpdspec->np)
-+			genpd = provider->xlate(genpdspec, provider->data);
-+		if (!IS_ERR(genpd))
-+			break;
-+	}
-+
-+	mutex_unlock(&of_genpd_mutex);
-+
-+	return genpd;
-+}
-+
-+/*
-+ * Device<->domain binding using Device Tree look-up.
-+ *
-+ * The purpose of code below is to manage assignment of devices to their
-+ * power domains in an automatic fashion, based on data read from device tree.
-+ * The two functions, genpd_bind_domain() and genpd_unbind_domain() are
-+ * intended to be called by higher level code that manages devices, i.e.
-+ * really_probe() and __device_release_driver() to respectively bind and
-+ * unbind device from its power domain.
-+ *
-+ * Both generic and legacy Samsung-specific DT bindings are supported to
-+ * keep backwards compatibility with existing DTBs.
-+ */
-+
-+/**
-+ * genpd_bind_domain - Bind device to its power domain using Device Tree.
-+ * @dev: Device to bind to its power domain.
-+ *
-+ * Tries to parse power domain specifier from device's OF node and if succeeds
-+ * attaches the device to retrieved power domain.
-+ *
-+ * Returns 0 on success or negative error code otherwise.
-+ */
-+int genpd_bind_domain(struct device *dev)
-+{
-+	struct of_phandle_args pd_args;
-+	struct generic_pm_domain *pd;
-+	int ret;
-+
-+	if (!dev->of_node)
-+		return 0;
-+
-+	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
-+					"#power-domain-cells", 0, &pd_args);
-+	if (ret < 0) {
-+		if (ret != -ENOENT)
-+			return ret;
-+
-+		/*
-+		 * Try legacy Samsung-specific bindings
-+		 * (for backwards compatibility of DT ABI)
-+		 */
-+		pd_args.args_count = 0;
-+		pd_args.np = of_parse_phandle(dev->of_node,
-+						"samsung,power-domain", 0);
-+		if (!pd_args.np)
-+			return 0;
-+	}
-+
-+	pd = of_genpd_get_from_provider(&pd_args);
-+	if (IS_ERR(pd)) {
-+		if (PTR_ERR(pd) != -EPROBE_DEFER)
-+			dev_err(dev, "failed to find power domain: %ld\n",
-+				PTR_ERR(pd));
-+		return PTR_ERR(pd);
-+	}
-+
-+	dev_dbg(dev, "adding to power domain %s\n", pd->name);
-+
-+	while (1) {
-+		ret = pm_genpd_add_device(pd, dev);
-+		if (ret != -EAGAIN)
-+			break;
-+		cond_resched();
-+	}
-+
-+	if (ret < 0) {
-+		dev_err(dev, "failed to add to power domain %s: %d",
-+			pd->name, ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * genpd_unbind_domain - Unbind device from its power domain.
-+ * @dev: Device to unbind from its power domain.
-+ *
-+ * Unbinds device from power domain previously bound to it.
-+ *
-+ * Returns 0 on success or negative error code otherwise.
-+ */
-+int genpd_unbind_domain(struct device *dev)
-+{
-+	struct generic_pm_domain *pd = dev_to_genpd(dev);
-+	int ret;
-+
-+	if (!dev->of_node || IS_ERR(pd))
-+		return 0;
-+
-+	dev_dbg(dev, "removing from power domain %s\n", pd->name);
-+
-+	while (1) {
-+		ret = pm_genpd_remove_device(pd, dev);
-+		if (ret != -EAGAIN)
-+			break;
-+		cond_resched();
-+	}
-+
-+	if (ret < 0) {
-+		dev_err(dev, "failed to remove from power domain %s: %d",
-+			pd->name, ret);
-+		return ret;
-+	}
-+
-+	/* Check if domain can be powered off after removing this device. */
-+	genpd_queue_power_off_work(pd);
-+
-+	return 0;
-+}
-+#endif
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 7c1d252..04473d4 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -310,4 +310,50 @@ static inline void pm_genpd_syscore_poweron(struct device *dev)
- 	pm_genpd_syscore_switch(dev, false);
- }
- 
-+/* OF power domain providers */
-+struct of_device_id;
-+
-+struct genpd_onecell_data {
-+	struct generic_pm_domain **domains;
-+	unsigned int domain_num;
-+};
-+
-+typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
-+						   void *data);
-+
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+int of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-+			  void *data);
-+void of_genpd_del_provider(struct device_node *np);
-+
-+struct generic_pm_domain *of_genpd_xlate_simple(
-+					struct of_phandle_args *genpdspec,
-+					void *data);
-+struct generic_pm_domain *of_genpd_xlate_onecell(
-+					struct of_phandle_args *genpdspec,
-+					void *data);
-+
-+int genpd_bind_domain(struct device *dev);
-+int genpd_unbind_domain(struct device *dev);
-+#else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
-+static inline int of_genpd_add_provider(struct device_node *np,
-+					genpd_xlate_t xlate, void *data)
-+{
-+	return 0;
-+}
-+static inline void of_genpd_del_provider(struct device_node *np) {}
-+
-+#define of_genpd_xlate_simple		NULL
-+#define of_genpd_xlate_onecell		NULL
-+
-+static inline int genpd_bind_domain(struct device *dev)
-+{
-+	return 0;
-+}
-+static inline int genpd_unbind_domain(struct device *dev)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
-+
- #endif /* _LINUX_PM_DOMAIN_H */
-diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-index 9a83d78..03b1551 100644
---- a/kernel/power/Kconfig
-+++ b/kernel/power/Kconfig
-@@ -305,6 +305,10 @@ config PM_GENERIC_DOMAINS_RUNTIME
- 	def_bool y
- 	depends on PM_RUNTIME && PM_GENERIC_DOMAINS
- 
-+config PM_GENERIC_DOMAINS_OF
-+	def_bool y
-+	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
-+
- config CPU_PM
- 	bool
- 	depends on SUSPEND || CPU_IDLE
+2. Supporting "cs-gpio" would add extra bit of code.
+
+I've corrected the dts files that were using "cs-gpio" under
+"controller-data"(child node)
+to use "cs-gpio" from spi device node (parent node).
+
+I will make another version if you insist.
+>
+>>       if (!gpio_is_valid(cs->line)) {
+>>               dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
+>> -             kfree(cs);
+>> -             of_node_put(data_np);
+>> +             of_node_put(parent_np);
+>>               return ERR_PTR(-EINVAL);
+>>       }
+>>
+>> -     of_property_read_u32(data_np, "samsung,spi-feedback-delay", &fb_delay);
+>> -     cs->fb_delay = fb_delay;
+>> -     of_node_put(data_np);
+>> -     return cs;
+>> +     return s3c64xx_get_slave_ctrldata(spi, cs);
+>>  }
+>>
+>>  /*
+>> @@ -806,9 +815,14 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>>       struct s3c64xx_spi_info *sci;
+>>       int err;
+>>
+>> +     if (!spi->dev.of_node) {
+>> +             dev_err(&spi->dev, "device node not found\n");
+>> +             return -EINVAL;
+>> +     }
+>> +
+>>       sdd = spi_master_get_devdata(spi->master);
+>>       if (!cs && spi->dev.of_node) {
+>> -             cs = s3c64xx_get_slave_ctrldata(spi);
+>> +             cs = s3c64xx_get_cs_gpios(spi);
+>>               spi->controller_data = cs;
+>>       }
+>>
+>> @@ -1077,7 +1091,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+>>       sdd->sfr_start = mem_res->start;
+>>       sdd->cs_gpio = true;
+>>       if (pdev->dev.of_node) {
+>> -             if (!of_find_property(pdev->dev.of_node, "cs-gpio", NULL))
+>> +             if (!of_find_property(pdev->dev.of_node, "cs-gpios", NULL))
+>>                       sdd->cs_gpio = false;
+>
+> Ditto.
+I can do that, once we are finalized on having backward compatibility.
+>
+>>               ret = of_alias_get_id(pdev->dev.of_node, "spi");
+>
+> --
+> Thanks!
+> Sylwester
+
+
+
 -- 
-1.7.9.5
+Shine bright,
+(: Nav :)
