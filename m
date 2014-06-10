@@ -1,172 +1,80 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 10 Jun 2014 10:19:38 +0100
-Subject: Problems booting exynos5420 with >1 CPU
-In-Reply-To: <alpine.LFD.2.11.1406092254220.25775@knanqh.ubzr>
-References: <alpine.LFD.2.11.1406062340480.25775@knanqh.ubzr>
- <20140607175618.GA25068@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1406071431490.25775@knanqh.ubzr>
- <20140607223614.GA26641@e102568-lin.cambridge.arm.com>
- <CAOesGMj+itYr-daqxfX=J3Ss+7YdWhUUzBWTW3FqVEH8tXqt-A@mail.gmail.com>
- <20140608124530.GA31921@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1406081138070.25775@knanqh.ubzr>
- <7hsindq07l.fsf@paris.lan>
- <20140609222604.GA16889@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1406092254220.25775@knanqh.ubzr>
-Message-ID: <20140610091938.GA20944@e102568-lin.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 10 Jun 2014 11:22:40 +0200
+Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
+ support
+In-Reply-To: <539663A0.9080507@samsung.com>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
+ <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
+Message-ID: <20140610092240.GF1388@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 05:25:47AM +0100, Nicolas Pitre wrote:
-> On Mon, 9 Jun 2014, Lorenzo Pieralisi wrote:
-> 
-> > I commented on Nico's patch because I did not like how it was
-> > implemented (at least remove the CPU PM notifier calls please, because
-> > they are not needed).
-> 
-> OK no problem.  That's easy enough.  I added them to play it safe as a 
-> test patch in case some VFP content could be lost somehow by looping 
-> back through the CPU init code for example, and needed to be saved.
-
-Ok, thanks.
-
-> > I also said that's the only thing he could do, and I still think 
-> > that's not a nice way to use the cpu_suspend API for something it was 
-> > not designed for, that's what I wanted to say, period.
-> 
-> Well... Maybe it wasn't designed for that, but it certainly can be used 
-> for that. And with no modifications to the core code, making this 
-> solution fairly elegant.  This is not so different from, say, the BPF 
-> code being reused for seccomp_filters. BPF wasn't designed for system 
-> call filtering, but it happens to work well.
-
-You defined yourself "not a small thing", you know what you are doing
-and that's enough for me. Please respect that when I reviewed it I thought
-that was a hack. cpu_suspend is being used for many things in the kernel
-and consolidating that took a while, please comment the code, that's all I
-am asking you.
-
-> > If I am allowed to say something, here is a couple of thoughts.
+On Mon, Jun 09, 2014 at 06:47:12PM -0700, Mario Smarduch wrote:
+> On 06/08/2014 05:05 AM, Christoffer Dall wrote:
+> > On Fri, Jun 06, 2014 at 10:33:41AM -0700, Mario Smarduch wrote:
+> >> kvm_vm_ioctl_get_dirty_log() is generic used by x86, ARM. x86 recent patch 
+> >> changed this function, this patch picks up those changes, re-tested everything
+> >> works. Applies cleanly with other patches.
+> >>
+> >> This patch adds support for keeping track of VM dirty pages. As dirty page log
+> >> is retrieved, the pages that have been written are write protected again for
+> >> next write and log read.
+> >>
+> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> >> ---
+> >>  arch/arm/include/asm/kvm_host.h |    3 ++
+> >>  arch/arm/kvm/arm.c              |    5 ---
+> >>  arch/arm/kvm/mmu.c              |   79 +++++++++++++++++++++++++++++++++++
+> >>  arch/x86/kvm/x86.c              |   86 ---------------------------------------
+> >>  virt/kvm/kvm_main.c             |   86 +++++++++++++++++++++++++++++++++++++++
+> >>  5 files changed, 168 insertions(+), 91 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> >> index 59565f5..b760f9c 100644
+> >> --- a/arch/arm/include/asm/kvm_host.h
+> >> +++ b/arch/arm/include/asm/kvm_host.h
+> >> @@ -232,5 +232,8 @@ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+> >>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+> >>  
+> >>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+> >> +void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
+> >> +	struct kvm_memory_slot *slot,
+> >> +	gfn_t gfn_offset, unsigned long mask);
 > > 
-> > 1) CCI snoops and DVM enablement are secure operations, to do them in
-> >    non-secure world this must be overriden in firmware. You can argue,
-> >    you can think whatever you want, that's a fact. So, to use this
-> >    code SMP bit in SCTLR and CCI enablement must become non-secure
-> >    operations. This is a boot requirement for MCPM, right or wrong
-> >    it is up to platform designers to judge. If CCI and SMP enablement
-> >    are secure operations, we should not start adding random SMC calls
-> >    in the kernel, since managing coherency in the kernel would become
-> >    problematic, with lots of platform quirks. We do not want that to
-> >    happen, and I think we all agree on this.
+> > Do all other architectures implement this function?  arm64?
 > 
-> One could certainly question the need for so many controls handled in 
-> secure world.  But that is not the point.
+> Besides arm, x86 but the function is not generic.
+> > 
+
+you're now calling this from generic code, so all architecture must
+implement it, and the prototype should proably be in
+include/linux/kvm_host.h, not in the arch-specific headers.
+
+> >>  
+> >>  #endif /* __ARM_KVM_HOST_H__ */
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index dfd63ac..f06fb21 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -780,11 +780,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+> >>  	}
+> >>  }
+> >>  
+> >> -int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+> >> -{
+> >> -	return -EINVAL;
+> >> -}
+> >> -
+> > 
+> > What about the other architectures implementing this function?
 > 
-> Here we're talking about MCPM.  That implies the kernel has control over 
-> SCTLR.SMP and the CCI.  If those things aren't under the kernel's 
-> control, then MCPM is of no use to you.
+> Six architectures define this function. With this patch this
+> function is generic in kvm_main.c used by x86.
 
-ACTLR.SMP for the sake of precision and it was my typo, sorry. That's
-all I wanted to read, so nothing to add.
+But you're not defining it as a weak symbol (and I don't suspect that
+you should unless other archs do this in a *very* different way), so you
+need to either remove it from the other archs, make it a weak symbol (I
+hope this is not the case) or do something else.
 
-> Therefore, if you do want to use MCPM, then this implies the kernel has 
-> access to the CCI. And if it has access to it, then it should turn it on 
-> by itself in all cases to be consistent, not only in half of the cases.
-
-I agree.
-
-> > 2) (1) must be documented.
-> 
-> Absolutely.  But let's be coherent in the implementation so the 
-> documentation is as simple as it can be.
-
-Ditto.
-
-> > 3) When I talked about consequences for CPUidle (implicit), I was referring
-> >    to all sort of hacks we had to come up to bring devices like SPC
-> >    (remember ? I remember very very well unfortunately for me), or whatever
-> >    power controller up in the kernel early, too early to fit in any
-> >    existing kernel device framework. There is still no solution to that, and
-> >    the only way that code can exist is in mach- code. Right or wrong,
-> >    that's a second fact and in my opinion that's not nice for the ARM
-> >    kernel.
-> 
-> I disagree.  This can perfectly be turned into driver code. If we need 
-> it too early for existing kernel device framework to handle this 
-> properly, then the solution is to extend the existing framework or 
-> create another one specially for that purpose.  This may not be obvious 
-> when TC2 is the first/only platform in that situation, but if more 
-> platforms have the same need then it'll be easier to abstract 
-> commonalities into a framework.
-> 
-> Saying that no framework exists today or/and upstream maintainers are 
-> being difficult is _not_ a reason for throwing your hands up and e.g. 
-> shoving all this code into firmware instead.
-
-You have a point, as long as we are all aware and we do not forget this
-is a major problem, not a minor one. I do want to see a consolidate
-story for CPUidle for ARM and this bullet is definitely part of the
-picture. On a side note, you made me smile, it sounded like I wanted
-to bury SPC code in firmware or anywhere else as long as it is not in the
-kernel, which in a way is a true statement since I abhor that code =)
-
-> > 4) When I am talking about firmware I am talking about sequences that
-> >    are very close to HW (disabling C bit, cleaning caches, exiting
-> >    coherency). Erratas notwithstanding, they are being standardized at
-> >    ARM the best we can. They might even end up being implemented in HW
-> >    in the not so far future. I understand they are tricky, I understand
-> >    they take lots of time to implement them and to debug them, what I
-> >    want to say is that they are becoming standard and we _must_ reuse the
-> >    same code for all ARM platforms. You can implement them in MCPM (see
-> >    (1)) or in firmware (and please do not start painting me as firmware
-> >    hugger here, I am referring to standard power down sequences that
-> >    again, are very close to HW state machines 
-> 
-> That's where the disconnect lies.  On the one hand you say "I understand 
-> they are tricky, I understand they take lots of time to implement them 
-> and to debug them" and on the other hand you say "They might end up being 
-> implemented in HW in the not so far future."  That simply makes no 
-> economical sense at all!
-
-I wanted to say Nico that those operations are so intrinsic for all ARM
-cores you can almost think of them as part of the ISA and certainly
-HW knows it better than SW when a processor has nothing to do, it does
-idle core units all the time without software interaction, going power off
-(on cue) could just be one step further and solve those pesky races in HW.
-
-> When some operation is 1) tricky and takes time to debug, and 2) not 
-> performance critical (no one is trying to get in and out of idle or 
-> hibernation a billion times per second), then you should never ever put 
-> such a thing in firmware, and hardware should be completely out of the 
-> question!
-
-We can debate this offline, it is an interesting topic in particular on
-the performance critical side of things; as for firmware see my point
-on security, as I already mentioned.
-
-> >    and more importantly if they
-> >    HAVE to run in secure world that's the only solution we have unless you
-> >    want to split race conditions between kernel and secure world).
-> 
-> If they HAVE to run in secure world then your secure world architecture 
-> is simply misdesigned, period.  Someone must have ignored the economics 
-> of modern software development to have come up with this.
-
-That's your opinion and I respect that. What I said, and that's a fact
-not an opinion, is that if those operations are required to be secure in a
-platform, there is not much you can do apart from preventing races where the
-race conditions are, ie in secure world.
-
-> > 5) I agree that the CCI enablement in TC2 (bootmon for cold boot and
-> >    kernel for warm-boot is wrong, nothing to say and it was not the
-> >    reason I commented on Nico's patch - I think I explained to you
-> >    thoroughly why now).
-> 
-> OK. Let's start by agreeing on the spirit behind my patch then.  The 
-> actual patch implementation details are a secondary concern and open for 
-> discussion.
-
-I agree on the spirit of the patch, my concern was about its implementation.
-
-Thank you, this was a constructive discussion.
-
-Lorenzo
+-Christoffer
