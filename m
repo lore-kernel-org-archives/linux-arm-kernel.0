@@ -1,33 +1,31 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 9 Jun 2014 16:57:07 -0700
-Subject: [PATCH 0/5] Add Maxim 77802 PMIC support
-In-Reply-To: <53963B5D.8090908@collabora.co.uk>
-References: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402309011.17650.9.camel@AMDC1943>
- <CAD=FV=U2zPJ=NohDjGvJKfmwJzQhphtVMefM0p_hvFVoReauhQ@mail.gmail.com>
- <53963B5D.8090908@collabora.co.uk>
-Message-ID: <CAD=FV=WknbbqSojDD4pe-Xpd6J4LxkjU-O9JwQjU+gnh+6N=4A@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 10 Jun 2014 02:15:16 +0200
+Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP
+In-Reply-To: <20140609225142.GA5099@sirena.org.uk>
+References: <1402051016-28853-1-git-send-email-broonie@kernel.org>
+ <1976508.Da0u8DZI5B@vostro.rjw.lan> <20140609225142.GA5099@sirena.org.uk>
+Message-ID: <1857766.e38RV3V2OT@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Monday, June 09, 2014 11:51:42 PM Mark Brown wrote:
+> 
+> --fYgRtaZIy+F1uhp1
+> Content-Type: text/plain; charset=us-ascii
+> Content-Disposition: inline
+> 
+> On Tue, Jun 10, 2014 at 12:22:07AM +0200, Rafael J. Wysocki wrote:
+> > On Monday, June 09, 2014 08:49:17 PM Mark Brown wrote:
+> 
+> > > Yes, looks like it is.
+> 
+> > But it doesn't apply for me on top of the current Linus' tree.
+> 
+> > Can you please rebase?
+> 
+> It probably depends on other people's trees too, I just killed all the
+> usages in -next - I gather the SH trees added some new ones for example.
+> I'd expect it'll apply after the merge window, if not that's the time to
+> look at it.
 
-On Mon, Jun 9, 2014 at 3:55 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
->> * The RTC has many subtle differences between the 77686 and 77802.
->> They expanded it to handle a 200 year timeframe instead of 100 and
->> that meant that they had to shuffle the bits around everywhere.  They
->> also moved it to have the same i2c address as the main PMIC so all
->> addresses are different (see max77686_map in the RTC link above).
->>
-> There are other differences that were not mentioned:
->
-> - The max77802 uses a single register to enable RTC alarm while max77686 uses 1
-> bit from a set of registers.
-
-Ironically this is one and the same issue, but you're right that it's
-more major than I made it out to be.  See RTCYEARA2.  My theory is
-that to account for more possible year values they needed all 8 bits.
-That meant that the enable bit needed to move to a different register.
-...and once you moved one enable you might as well move them all, I
-guess.
+OK
