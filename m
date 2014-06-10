@@ -1,48 +1,44 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 11 Jun 2014 08:44:49 +0900
-Subject: [RESEND PATCH] ARM: EXYNOS: Fix the sequence of secondary CPU boot
- for Exynos3250
-In-Reply-To: <5397963F.30109@gmail.com>
-References: <1402442827-2321-1-git-send-email-cw00.choi@samsung.com>
- <5397963F.30109@gmail.com>
-Message-ID: <53979871.2020903@samsung.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Jun 2014 16:48:26 -0700
+Subject: [RFC] irqchip: gic: always mask interrupts during suspend
+In-Reply-To: <alpine.DEB.2.10.1406110129270.5170@nanos>
+References: <1402442098-21093-1-git-send-email-computersforpeace@gmail.com>
+ <alpine.DEB.2.10.1406110129270.5170@nanos>
+Message-ID: <20140610234826.GK3599@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2014 08:35 AM, Tomasz Figa wrote:
-> Hi Chanwoo,
+On Wed, Jun 11, 2014 at 01:34:39AM +0200, Thomas Gleixner wrote:
+> On Tue, 10 Jun 2014, Brian Norris wrote:
+> > Other random thought: it seems like any irqchip driver which does lazy IRQ
+> > masking ought to use IRQCHIP_MASK_ON_SUSPEND. So maybe the IRQ core should just
+> > do something like:
+> > 
+> > 	if (!chip->irq_disable)
+> > 		chip->flags |= IRQCHIP_MASK_ON_SUSPEND;
 > 
-> On 11.06.2014 01:27, Chanwoo Choi wrote:
->> This patch set AUTOWAKEUP_EN bit to ARM_CORE_CONFIGURATION register
->> because Exynos3250 removes WFE in secure mode so that turn on automatically
->> after setting CORE_LOCAL_PWR_EN. Also, This patch use dbs_sev() macro
->> to guarantee the data synchronization of command instead of IPI_WAKEUP
->> because Exynos3250 don't have WFE mode in secue mode.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos/platsmp.c  | 9 ++++++++-
->>  arch/arm/mach-exynos/pm.c       | 8 ++++++--
->>  arch/arm/mach-exynos/regs-pmu.h | 4 ++++
->>  3 files changed, 18 insertions(+), 3 deletions(-)
->>
+> No. Lazy irq disable and the suspend logic are different beasts.
+
+OK, fair enough. Drop that random thought then. It's not in the patch
+content anyway.
+
+> That's up to the platform to decide this. Just for the record: there
+> is a world outside of ARM...
+
+OK. But GIC is ARM-specific, so we can still constrain this patch and
+related topics to the world of ARM.
+
+> But that brings me to a different question:
 > 
-> This patch seems to be unneeded with Krzysztof's patch send a while ago
-> [1]. As reported by Krzysztof, that patch apparently fixes SMP support
-> on Exynos3250 and is much smaller and less invasive.
-> 
-> [1] - http://thread.gmane.org/gmane.linux.kernel.samsung-soc/32809
+>     Why are you not putting that customization into the device tree
+>     instead of trying to add this to some random arch/arm/mach-foo
+>     files?
 
-OK,
-But Krzysztof's patch didn't include set S5P_CORE_AUTOWAKEUP_EN in EXYNOS_ARM_CORE_CONFIGURATION(cpu).
-and then use arch_send_wakeup_ipi_mask(cpumask_of(cpu)) command instead of dsb_sev(). Exynos3250 don't need
-send IPI message.
+I'm not adding customization to arch/arm/mach-foo files. I'm trying to
+remove it.
 
-I'll send next patch which include only S5P_CORE_AUTOWAKEUP_EN and without sending IPI message.
+This property could be added to device tree, if there was really a valid
+use case for a GIC which leaves its interrupts unmasked for suspend. My
+question in this patch is essentially: does such a use case exist?
 
-Krzysztof's patch used of_machine_is_compatible("samsung,exynos3250") instead of soc_is_exynos3250().
-Did you agree? If you agree to use of_machine_is_compatible(), I'll use it on next patch(v2).
-
-Best Regards,
-Chanwoo Choi
+Brian
