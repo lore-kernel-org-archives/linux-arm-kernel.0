@@ -1,107 +1,146 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 10 Jun 2014 12:25:44 +0200
-Subject: =?UTF-8?q?=5BPATCH=20v13=2003/10=5D=20imx-drm=3A=20Correct=20BGR666=20and=20the=20board=27s=20dts=20that=20use=20them=2E?=
+Date: Tue, 10 Jun 2014 12:25:46 +0200
+Subject: [PATCH v13 05/10] ARM: dts: imx5*,
+ imx6*: correct display-timings nodes.
 In-Reply-To: <1402395951-7988-1-git-send-email-denis@eukrea.com>
 References: <1402395951-7988-1-git-send-email-denis@eukrea.com>
-Message-ID: <1402395951-7988-3-git-send-email-denis@eukrea.com>
+Message-ID: <1402395951-7988-5-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current BGR666 is not consistent with the other color mapings like BGR24.
-BGR666 should be in the same byte order than BGR24.
+The imx-drm driver can't use the de-active and
+pixelclk-active display-timings properties yet.
+
+Instead the data-enable and the pixel data clock
+polarity are hardcoded in the imx-drm driver.
+
+So theses properties are now set to keep
+the same behaviour when imx-drm will start
+using them.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
-ChangeLog v10->v13:
-- Rebased
+ChangeLog v10->v11:
+- imx53-tx53-x03x.dts change was removed because it 
+  already had the correct setting.
 ChangeLog v9->v10:
-- Rebased.
-- Added Philipp Zabel's Ack.
-- Included Lothar Wa?mann's suggestion about imx-ldb.c.
-- Shortened the patch title
-
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
-
-ChangeLog v7->v8:
-- Shrinked even more the Cc list.
-
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
-
-ChangeLog v5->v6:
-- Remove people not concerned by this patch from the Cc list.
-- Added a better explanation of the change.
-
-ChangeLog v5:
-- New patch.
+- New patch that was splitted out of:
+  "staging imx-drm: Use de-active and pixelclk-active
+  display-timings."
 ---
- arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
- arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
- drivers/staging/imx-drm/imx-ldb.c       |    4 ++--
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
- 4 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/imx51-babbage.dts       |    2 ++
+ arch/arm/boot/dts/imx53-m53evk.dts        |    2 ++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi     |    2 ++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi     |    2 ++
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi |    2 ++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi  |    2 ++
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  |    2 ++
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi    |    2 ++
+ 8 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index c5a9a24..7b3851d 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -18,7 +18,7 @@
- 
- 	display at di1 {
- 		compatible = "fsl,imx-parallel-display";
--		interface-pix-fmt = "bgr666";
-+		interface-pix-fmt = "rgb666";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1>;
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index ee51a10..b64a9e3 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -56,6 +56,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
  
 diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index d5d146a..4b036b4 100644
+index 4b036b4..d03ced7 100644
 --- a/arch/arm/boot/dts/imx53-m53evk.dts
 +++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -24,7 +24,7 @@
- 	soc {
- 		display1: display at di1 {
- 			compatible = "fsl,imx-parallel-display";
--			interface-pix-fmt = "bgr666";
-+			interface-pix-fmt = "rgb666";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ipu_disp1>;
- 
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index 7e3f019..5d22e40 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -188,11 +188,11 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
- 	switch (imx_ldb_ch->chno) {
- 	case 0:
- 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
--			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
-+			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
- 		break;
- 	case 1:
- 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
--			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
-+			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
- 		break;
- 	default:
- 		dev_err(ldb->dev, "unable to config di%d panel format\n",
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index 9d0324d..cd250d5 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -440,9 +440,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 
- 	/* bgr666 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
- 
- 	/* lvds666 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_LVDS666);
+@@ -41,6 +41,8 @@
+ 					vfront-porch = <9>;
+ 					vsync-len = <3>;
+ 					vsync-active = <1>;
++					de-active = <1>;
++					pixelclk-active = <0>;
+ 				};
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index d3125f0..7f993d6 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -512,6 +512,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 532347f..e06cf9e 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -534,6 +534,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 4c4b175..bcf5178 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -353,6 +353,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 009abd6..230bbc6 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -405,6 +405,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 6df6127..9f6b406 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -353,6 +353,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index e446192..3297779 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -494,6 +494,8 @@
+ 				vfront-porch = <7>;
+ 				hsync-len = <60>;
+ 				vsync-len = <10>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+ 	};
 -- 
 1.7.9.5
