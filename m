@@ -1,41 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jun 2014 21:15:14 +0200
-Subject: [RFC PATCH] dma: at_xdmac: creation of the atmel eXtended DMA
- Controller driver
-In-Reply-To: <20140610154118.GA4254@lukather>
-References: <1401179736-8235-1-git-send-email-ludovic.desroches@atmel.com>
- <20140610154118.GA4254@lukather>
-Message-ID: <6544148.4RKn2Y8vCE@wuerfel>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 10 Jun 2014 21:18:13 +0200
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <539754E5.3030408@redhat.com>
+References: <20140328184517.GA27219@cbox>
+ <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
+ <53973AA8.9020301@codeaurora.org>
+ <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
+ <539754E5.3030408@redhat.com>
+Message-ID: <539759F5.4020206@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 27, 2014 at 10:35:36AM +0200, Ludovic Desroches wrote:
-> +static struct dma_chan *at_xdmac_xlate(struct of_phandle_args *dma_spec,
-> +                                    struct of_dma *of_dma)
-> +{
-> +     struct at_xdmac_chan    *atchan;
-> +     struct dma_chan         *chan;
-> +     dma_cap_mask_t          mask;
-> +     struct platform_device  *pdev = of_find_device_by_node(dma_spec->np);
+Il 10/06/2014 20:56, Paolo Bonzini ha scritto:
+> Il 10/06/2014 20:08, Peter Maydell ha scritto:
+>> On 10 June 2014 18:04, Christopher Covington <cov@codeaurora.org> wrote:
+>>> On 06/10/2014 10:42 AM, Peter Maydell wrote:
+>>>> I just noticed that this doesn't mandate that the platform
+>>>> provides an RTC. As I understand it, the UEFI spec mandates
+>>>> that there's an RTC (could somebody more familiar with UEFI
+>>>> than me confirm/deny that?) so we should probably put one here.
+>>>
+>>> Pardon my ignorance, but what exactly disqualifies Generic Timer
+>>> implementations from being used as Real Time Clocks?
+>>
+>> So my naive view was that an RTC actually had to have
+>> support for dealing with real (wall) clock time, ie
+>> knowing it's 2014 and not 1970. The generic timers are
+>> just timers. Or am I wrong and UEFI doesn't really
+>> require that?
+>
+> The real-time clock provides four UEFI runtime services (GetTime,
+> SetTime, GetWakeupTime, SetWakeupTime).  The spec says that you can
+> return EFI_DEVICE_ERROR from GetTime/SetTime if "the time could not be
+> retrieved/set due to a hardware error", but I don't think this is enough
+> to make these two optional.  By comparison, GetWakeupTime/SetWakeupTime
+> can also return EFI_UNSUPPORTED.
+>
+> So I agree that the RTC is required in UEFI.
 
-No need to search through all the device nodes, you can look up the
-device from of_dma->of_dma_data.
+... that said, just like I thought was the case for the serial console, 
+do we need to specify the exact hardware models?
 
-> +     if (dma_spec->args_count != 2) {
-> +             dev_err(&pdev->dev, "dma phandler args: bad number of args\n");
-> +             return NULL;
-> +     }
-> +
-> +     dma_cap_zero(mask);
-> +     dma_cap_set(DMA_SLAVE, mask);
-> +     chan = dma_request_channel(mask, NULL, NULL);
-> +     if (!chan) {
-> +             dev_err(&pdev->dev, "can't get a dma channel\n");
-> +             return NULL;
-> +     }
+We can just say that the VM can expect UEFI boot and runtime services to 
+work.  This includes variable services, time services, the serial 
+console protocols and more.  It's up to the implementation to provide 
+enough devices to support the firmware, and it's out of this spec's 
+scope to specify the firmware's implementation.
 
-You must use dma_get_any_slave_channel. dma_request_channel gives you a
-channel from a random dma engine that is present in the system, not
-necessarily the one you are managing here.
-
-	Arnd
+Paolo
