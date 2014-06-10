@@ -1,55 +1,127 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 10 Jun 2014 09:27:42 +0800
-Subject: [PATCH 06/12] clk: mmp: add mmp private gate clock
+Date: Tue, 10 Jun 2014 09:27:45 +0800
+Subject: [PATCH 09/12] clk: mmp: add spin lock automatic detection from device
+ tree
 In-Reply-To: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
 References: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1402363668-25806-7-git-send-email-chao.xie@marvell.com>
+Message-ID: <1402363668-25806-10-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
-Some SOCes have this kind of the gate clock
-1. There are some bits to control the gate not only one bit.
-2. Some clocks has operations of "out of reset" and "enable".
-   To enable clock, we need do "out of reset" and "enable".
-   To disable clock, we may not need "set to reset". It depends
-   on the SOCes' design.
-3. It is not always that "1" is to enable while "0" is to disable
-   when write register.
-
-So we have to define the "mask", "enable_val", "disable_val" for
-this kind of gate clock.
+For Marvell MMP series SOC, many clocks share same register.
+In the operations of these clock, a spin lock is needed to avoid
+confilicts.
+When parse the clock from the device tree and register the clock,
+we do not know whether it share the register with others.
+So a common API is provided to get the spin lock for the clock based
+on device tree support.
+The general idea is record the node (clock device node, regsiter),
+and before register a new clock, search the node list based on
+register. If a node is found, return the shared spin lock, or create
+a new.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- drivers/clk/mmp/Makefile   |   2 +-
- drivers/clk/mmp/clk-gate.c | 133 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/mmp/clk.h      |  21 +++++++
- 3 files changed, 155 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/mmp/clk-gate.c
 
+Conflicts:
+	drivers/clk/mmp/Makefile
+---
+ Documentation/devicetree/bindings/clock/mmp/lock |  44 +++++++
+ drivers/clk/mmp/Makefile                         |   2 +-
+ drivers/clk/mmp/clk.h                            |   5 +
+ drivers/clk/mmp/lock.c                           | 159 +++++++++++++++++++++++
+ 4 files changed, 209 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mmp/lock
+ create mode 100644 drivers/clk/mmp/lock.c
+
+diff --git a/Documentation/devicetree/bindings/clock/mmp/lock b/Documentation/devicetree/bindings/clock/mmp/lock
+new file mode 100644
+index 0000000..7e7b5bc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/mmp/lock
+@@ -0,0 +1,44 @@
++Binding of spin lock support for Marvell MMP series clock
++
++Because some clocks share same register, spinlock need to be used to avoid
++conflicts.
++
++The spin lock sharing detection is based on regsiter address, and it is
++automatically. To support some clocks, the spin lock is not based on
++register address, some properies are provided.
++The properites are used as part of clock's properties in clock device tree
++files.
++
++Optional properties:
++marvell,mmp-clk-spinlock-new : Skip the automatic detection based on
++			       register address. Direclty create a new
++			       spin lock.
++marvell,mmp-clk-spinlock : It is handle. It points to the clock that share
++			   same spin lock.
++
++Examples:
++
++Assume that clk1, clk2, clk3 share same spin lock.
++
++apmu_clk {
++	compatible = "marvell,mmp-clk-master";
++	...
++
++	clk1 {
++		...
++		marvell,mmp-clk-spinlock-new;
++		...
++	};
++
++	clk2 {
++		...
++		mmp-clk-spinlock = <&clk1>;
++		...
++	};
++
++	clk3 {
++		...
++		mmp-clk-spinlock = <&clk1>;
++		...
++	};
++};
 diff --git a/drivers/clk/mmp/Makefile b/drivers/clk/mmp/Makefile
-index 8bfee860..2855f7b 100644
+index 518931e..e8810b6 100644
 --- a/drivers/clk/mmp/Makefile
 +++ b/drivers/clk/mmp/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for mmp specific clk
- #
+@@ -6,7 +6,7 @@ obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o clk-gate.o	\
+ 	 clk-mix-composite.o
  
--obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o
-+obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o clk-gate.o
+ ifneq ($(CONFIG_OF),)
+-obj-y += clk-master-node.o
++obj-y += clk-master-node.o lock.o
+ endif
  
  obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
- obj-$(CONFIG_CPU_PXA910) += clk-pxa910.o
-diff --git a/drivers/clk/mmp/clk-gate.c b/drivers/clk/mmp/clk-gate.c
+diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
+index 6d8c3b3..e06a228 100644
+--- a/drivers/clk/mmp/clk.h
++++ b/drivers/clk/mmp/clk.h
+@@ -147,6 +147,11 @@ extern void __iomem *of_mmp_clk_get_reg(struct device_node *np,
+ struct device_node *of_mmp_clk_master_init(struct device_node *from);
+ 
+ 
++/* spin lock sharing support. */
++extern spinlock_t *of_mmp_clk_get_spinlock(struct device_node *np,
++					   unsigned int reg_base);
++
++
+ extern struct clk *mmp_clk_register_pll2(const char *name,
+ 		const char *parent_name, unsigned long flags);
+ extern struct clk *mmp_clk_register_apbc(const char *name,
+diff --git a/drivers/clk/mmp/lock.c b/drivers/clk/mmp/lock.c
 new file mode 100644
-index 0000000..adbd9d6
+index 0000000..e2e246c
 --- /dev/null
-+++ b/drivers/clk/mmp/clk-gate.c
-@@ -0,0 +1,133 @@
++++ b/drivers/clk/mmp/lock.c
+@@ -0,0 +1,159 @@
 +/*
-+ * mmp gate clock operation source file
++ * mmp mix(div and mux) clock operation source file
 + *
 + * Copyright (C) 2014 Marvell
 + * Chao Xie <chao.xie@marvell.com>
@@ -59,159 +131,153 @@ index 0000000..adbd9d6
 + * warranty of any kind, whether express or implied.
 + */
 +
++#include <linux/clk.h>
 +#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
 +#include <linux/err.h>
-+#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/list.h>
++#include <linux/of.h>
 +
-+#include "clk.h"
-+
-+/*
-+ * Some clocks will have mutiple bits to enable the clocks, and
-+ * the bits to disable the clock is not same as enabling bits.
-+ */
-+
-+#define to_clk_mmp_gate(hw)	container_of(hw, struct mmp_clk_gate, hw)
-+
-+static int mmp_clk_gate_enable(struct clk_hw *hw)
-+{
-+	struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
-+	struct clk *clk = hw->clk;
-+	unsigned long flags = 0;
-+	unsigned long rate;
-+	u32 tmp;
-+
-+	if (gate->lock)
-+		spin_lock_irqsave(gate->lock, flags);
-+
-+	tmp = readl(gate->reg);
-+	tmp &= ~gate->mask;
-+	tmp |= gate->val_enable;
-+	writel(tmp, gate->reg);
-+
-+	if (gate->lock)
-+		spin_unlock_irqrestore(gate->lock, flags);
-+
-+	if (gate->flags & MMP_CLK_GATE_NEED_DELAY) {
-+		rate = __clk_get_rate(clk);
-+		/* Need delay 2 cycles. */
-+		udelay(2000000/rate);
-+	}
-+
-+	return 0;
-+}
-+
-+static void mmp_clk_gate_disable(struct clk_hw *hw)
-+{
-+	struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
-+	unsigned long flags = 0;
-+	u32 tmp;
-+
-+	if (gate->lock)
-+		spin_lock_irqsave(gate->lock, flags);
-+
-+	tmp = readl(gate->reg);
-+	tmp &= ~gate->mask;
-+	tmp |= gate->val_disable;
-+	writel(tmp, gate->reg);
-+
-+	if (gate->lock)
-+		spin_unlock_irqrestore(gate->lock, flags);
-+}
-+
-+static int mmp_clk_gate_is_enabled(struct clk_hw *hw)
-+{
-+	struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
-+	unsigned long flags = 0;
-+	u32 tmp;
-+
-+	if (gate->lock)
-+		spin_lock_irqsave(gate->lock, flags);
-+
-+	tmp = readl(gate->reg);
-+
-+	if (gate->lock)
-+		spin_unlock_irqrestore(gate->lock, flags);
-+
-+	return (tmp & gate->mask) == gate->val_enable;
-+}
-+
-+const struct clk_ops mmp_clk_gate_ops = {
-+	.enable = mmp_clk_gate_enable,
-+	.disable = mmp_clk_gate_disable,
-+	.is_enabled = mmp_clk_gate_is_enabled,
++struct mmp_clk_spinlock_node {
++	struct device_node *share;
++	struct list_head node;
 +};
 +
-+struct clk *mmp_clk_register_gate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u32 mask, u32 val_enable, u32 val_disable,
-+		unsigned int gate_flags, spinlock_t *lock)
-+{
-+	struct mmp_clk_gate *gate;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	/* allocate the gate */
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate) {
-+		pr_err("%s:%s could not allocate gate clk\n", __func__, name);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	init.name = name;
-+	init.ops = &mmp_clk_gate_ops;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = (parent_name ? &parent_name : NULL);
-+	init.num_parents = (parent_name ? 1 : 0);
-+
-+	/* struct clk_gate assignments */
-+	gate->reg = reg;
-+	gate->mask = mask;
-+	gate->val_enable = val_enable;
-+	gate->val_disable = val_disable;
-+	gate->flags = gate_flags;
-+	gate->lock = lock;
-+	gate->hw.init = &init;
-+
-+	clk = clk_register(dev, &gate->hw);
-+
-+	if (IS_ERR(clk))
-+		kfree(gate);
-+
-+	return clk;
-+}
-diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
-index 426616b..9096f0a 100644
---- a/drivers/clk/mmp/clk.h
-+++ b/drivers/clk/mmp/clk.h
-@@ -99,6 +99,27 @@ extern struct clk *mmp_clk_register_mix(struct device *dev,
- 					spinlock_t *lock);
- 
- 
-+/* Clock type "gate". MMP private gate */
-+#define MMP_CLK_GATE_NEED_DELAY		BIT(0)
-+
-+struct mmp_clk_gate {
-+	struct clk_hw hw;
-+	void __iomem *reg;
-+	u32 mask;
-+	u32 val_enable;
-+	u32 val_disable;
-+	unsigned int flags;
-+	spinlock_t *lock;
++struct mmp_clk_spinlock {
++	spinlock_t lock;
++	struct device_node *owner;
++	unsigned int reg_base;
++	struct list_head share_list;
++	struct list_head node;
 +};
 +
-+extern const struct clk_ops mmp_clk_gate_ops;
-+extern struct clk *mmp_clk_register_gate(struct device *dev, const char *name,
-+			const char *parent_name, unsigned long flags,
-+			void __iomem *reg, u32 mask, u32 val_enable,
-+			u32 val_disable, unsigned int gate_flags,
-+			spinlock_t *lock);
++static LIST_HEAD(lock_list);
 +
++static DEFINE_MUTEX(lock_mutex);
 +
- extern struct clk *mmp_clk_register_pll2(const char *name,
- 		const char *parent_name, unsigned long flags);
- extern struct clk *mmp_clk_register_apbc(const char *name,
++static struct mmp_clk_spinlock_node *create_lock_node(struct device_node *np)
++{
++	struct mmp_clk_spinlock_node *node;
++
++	node = kzalloc(sizeof(*node), GFP_KERNEL);
++	if (!node) {
++		pr_err("%s:%s failed to allocate spinlock node.\n",
++			__func__, np->name);
++		return NULL;
++	}
++
++	node->share = np;
++
++	return node;
++}
++
++static struct mmp_clk_spinlock *create_lock(struct device_node *np,
++					    unsigned int reg_base)
++{
++	struct mmp_clk_spinlock *lock;
++
++	lock = kzalloc(sizeof(*lock), GFP_KERNEL);
++	if (!lock) {
++		pr_err("%s:%s failed to allocate spinlock.\n",
++			__func__, np->name);
++		return NULL;
++	}
++
++	lock->owner = np;
++	lock->reg_base = reg_base;
++	INIT_LIST_HEAD(&lock->node);
++	INIT_LIST_HEAD(&lock->share_list);
++	spin_lock_init(&lock->lock);
++
++	return lock;
++}
++
++static struct mmp_clk_spinlock *find_lock_by_np(struct device_node *np)
++{
++	struct mmp_clk_spinlock *lock;
++
++	list_for_each_entry(lock, &lock_list, node) {
++		if (lock->owner == np)
++			return lock;
++	}
++
++	return NULL;
++}
++
++static struct mmp_clk_spinlock *find_lock_by_reg_base(unsigned int reg_base)
++{
++	struct mmp_clk_spinlock *lock;
++
++	list_for_each_entry(lock, &lock_list, node) {
++		if (lock->reg_base == reg_base)
++			return lock;
++	}
++
++	return NULL;
++}
++
++spinlock_t *of_mmp_clk_get_spinlock(struct device_node *np,
++					unsigned int reg_base)
++{
++	struct mmp_clk_spinlock *lock;
++	struct mmp_clk_spinlock_node *node;
++	struct device_node *owner;
++
++	if (of_property_read_bool(np, "marvell,mmp-clk-spinlock-new")) {
++
++		mutex_lock(&lock_mutex);
++
++		lock = find_lock_by_np(np);
++		if (!lock) {
++			lock = create_lock(np, reg_base);
++			if (lock)
++				list_add(&lock->node, &lock_list);
++		}
++
++		mutex_unlock(&lock_mutex);
++
++		return &lock->lock;
++	}
++
++	if (of_find_property(np, "marvell,mmp-clk-spinlock", NULL)) {
++
++		mutex_lock(&lock_mutex);
++
++		owner = of_parse_phandle(np, "marvell,mmp-clk-spinlock", 0);
++		lock = find_lock_by_np(owner);
++	} else {
++
++		mutex_lock(&lock_mutex);
++
++		lock = find_lock_by_reg_base(reg_base);
++	}
++
++	if (!lock) {
++		lock = create_lock(np, reg_base);
++		if (lock)
++			list_add(&lock->node, &lock_list);
++	}
++
++	if (!lock) {
++		mutex_unlock(&lock_mutex);
++		pr_err("%s:%s failed to get spinlock\n", __func__, np->name);
++		return NULL;
++	}
++
++	node = create_lock_node(np);
++	if (!node) {
++		mutex_unlock(&lock_mutex);
++		pr_err("%s:%s failed to create spinlock node\n",
++			__func__, np->name);
++		return NULL;
++	}
++	node->share = np;
++	list_add(&node->node, &lock->share_list);
++
++	mutex_unlock(&lock_mutex);
++
++	return &lock->lock;
++}
++
 -- 
 1.8.3.2
