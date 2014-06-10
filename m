@@ -1,44 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 10 Jun 2014 11:27:19 -0700
-Subject: [PATCH] mmc: sdhci-msm: Fix fallout from sdhci refactoring
-Message-ID: <1402424839-25514-1-git-send-email-sboyd@codeaurora.org>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 10 Jun 2014 20:33:40 +0200
+Subject: [PATCH] Marvell releases a public Armada 370 datasheet
+In-Reply-To: <1402413878-20224-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1402413878-20224-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140610183340.GP21890@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdhci core was refactored recently and some of those
-refactorings required changes in every sdhci platform driver.
-Those updates happened around the same time as when the msm
-driver was merged so the refactorings missed the msm driver.
-Hook in the basic library functions so that we can boot apq8074
-dragonboards again instead of crashing when we try to jump to
-NULL function pointers.
+Hi Thomas,
 
-Reported-by: Kevin Hilman <khilman@linaro.org>
-Cc: Georgi Djakov <gdjakov@mm-sol.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+On Tue, Jun 10, 2014 at 05:24:37PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> Marvell has very recently (last week) released a public version of the
+> datasheet for the Marvell Armada 370 SoC. This is a very good news for
+> all the developers and contributors interested by the Armada 370.
 
-Patch based on next-20140610
+Wow, many many thanks to the Marvell team for opening their mind on this
+(and of course to you Thomas and Greg for convincing them). While I do
+have access to this doc now (and it helped me fix a few issues already),
+I expect that many enthousiast NAS owners will help improve the support
+for these really nice chips!
 
- drivers/mmc/host/sdhci-msm.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Hoping that future chips will be documented much sooner next time!
 
-diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
-index acb0e9eb55f1..40573a58486a 100644
---- a/drivers/mmc/host/sdhci-msm.c
-+++ b/drivers/mmc/host/sdhci-msm.c
-@@ -468,6 +468,10 @@ MODULE_DEVICE_TABLE(of, sdhci_msm_dt_match);
- 
- static struct sdhci_ops sdhci_msm_ops = {
- 	.platform_execute_tuning = sdhci_msm_execute_tuning,
-+	.reset = sdhci_reset,
-+	.set_clock = sdhci_set_clock,
-+	.set_bus_width = sdhci_set_bus_width,
-+	.set_uhs_signaling = sdhci_set_uhs_signaling,
- };
- 
- static int sdhci_msm_probe(struct platform_device *pdev)
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Cheers,
+Willy
