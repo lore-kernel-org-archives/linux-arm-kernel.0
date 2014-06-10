@@ -1,58 +1,51 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 10 Jun 2014 14:49:18 +0200
-Subject: [PATCH] ARM: exynos: move sysram info to exynos.c
-In-Reply-To: <1401770866-1975-1-git-send-email-olof@lixom.net>
-References: <1401770866-1975-1-git-send-email-olof@lixom.net>
-Message-ID: <5396FECE.7010405@samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 10 Jun 2014 14:53:26 +0200
+Subject: [PATCH 02/24] drivercore: Bind/unbind power domain on probe/remove
+In-Reply-To: <CAJZ5v0hUT0QPGWeDM9WoxnobaL5eoNi5UFrUUZrQ1gSBCX=aVg@mail.gmail.com>
+References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
+ <1402397497-26737-3-git-send-email-ulf.hansson@linaro.org>
+ <CAJZ5v0hUT0QPGWeDM9WoxnobaL5eoNi5UFrUUZrQ1gSBCX=aVg@mail.gmail.com>
+Message-ID: <CAPDyKFqWZdA4ZisJvCDP8j6D2_A8oRAHkjikddyGSwpToFg-Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 10 June 2014 14:11, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Tue, Jun 10, 2014 at 12:51 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> From: Tomasz Figa <t.figa@samsung.com>
+>>
+>> On a number of platforms, devices are part of controllable power
+>> domains, which need to be enabled before such devices can be accessed
+>> and may be powered down when the device is idle to save some power.
+>> This means that on systems that support power domain control using
+>> generic power domains subsystem, it is necessary to add device to its
+>> power domain before binding a driver to it and remove it from its power
+>> domain after its driver is unbound to make sure that an unused device
+>> does not affect power domain state.
+>>
+>> Since this is not limited to particular busses and specific
+>> archs/platforms,
+>
+> Actually, this isn't correrct.  It is limited to the platforms that
+> use Device Trees now.
 
-On 03.06.2014 06:47, Olof Johansson wrote:
-> This solves a problem with building with CONFIG_SMP=n due to missing
-> sysram_base_addr (or sysram_ns_base_addr) variables.
-> 
-> The new setup method is more awkward than I'd like for it to be, but
-> it can't be done in init_early() since ioremap is not yet available,
-> but it needs to happen before SMP.
-> 
-> Reported-by: Russell King <linux@arm.linux.org.uk>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
-> 
-> I'm not entirely happy with the solution here, especially the dual
-> call path. The platsmp.c->exynos.c call isn't ideal either but I'm less
-> worried about that. Seemed overkill to create a new c file just for this.
-> 
-> I've tested to make sure this still works on arndale, and the build
-> errors as reported by Russell are definitely gone.
+Correct, we should update the commit message/docs.
 
-In general, I'm okay with this patch, so if nobody is willing to find a
-better way feel free to add my Reviewed-by.
+>
+> Moreover, it is not consistent with the way we add devices to the ACPI PM
+> domain, which is the ACPI counterpart of this.
 
-> 
-> Better ideas welcome.
-> 
+I am not sure why you think consistency for ACPI is important here.
+ACPI PM will still be able to handle it's domain/device registering as
+before. There are even other pm_domains that don't use genpd which
+need to handle this themselves.
 
-Probably the best idea would be to find a way to always call
-exynos_sysram_init() after DT unflattening and before SMP
-initialization. Some platforms (e.g. tegra) abuse .init_irq callback for
-this, e.g.:
+Or are you saying that you prefer bus notifiers in favour of making
+use of the driver core for this matter? Shouldn't the driver core
+handle most of the common things for a device driver? Let's compare
+how the pinctrls are being managed in the driver core, for example.
 
-mach-tegra/tegra.c:
-	static void __init tegra_dt_init_irq(void)
-	{
-		tegra_pmc_init_irq();
-		tegra_init_irq();
-		irqchip_init();
-		tegra_legacy_irq_syscore_init();
-	}
+Kind regards
+Ulf Hansson
 
-We could do the same on Exynos if this is considered better.
-
-Best regards,
-Tomasz
+>
+> Rafael
