@@ -1,49 +1,128 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Tue, 10 Jun 2014 14:43:13 +0200
-Subject: [PATCH v3] crypto: Add Allwinner Security System crypto accelerator
-Message-ID: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
+Date: Tue, 10 Jun 2014 14:43:15 +0200
+Subject: [PATCH v3 2/4] crypto: Update makefile and Kconfig for Security System
+In-Reply-To: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1402404197-4236-3-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Add necessary changes for configuring and compiling the Security System driver.
 
-This is the driver for the Security System included in Allwinner SoC A20.
-The Security System (SS for short) is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
-It could be found on others Allwinner SoC: 
-- A10s and A31 diagram speak about it with precisions (AES/DES/3DES/Md5/SHA1/PRNG)
-- A10 and A13 manual give the same datasheet for SS than A20
-- A23 speak about a security system but without precisions
-But I do not have access on any of those hardware, tests are welcome.
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+ drivers/crypto/Kconfig  | 91 +++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/crypto/Makefile |  1 +
+ 2 files changed, 92 insertions(+)
 
-This driver currently supports:
-- MD5 and SHA1 hash algorithms
-- AES block cipher in CBC mode with 128/196/256bits keys.
-- DES and 3DES block cipher in CBC mode
-- PRNG
-The driver exposes all those algorithms through the kernel cryptographic API.
-
-The driver support only CPU driven (aka poll mode) transfer mode since the DMA engine of the A20 does not have a driver yet.
-
-Changes since v2:
-- Fix Makefile and Kconfig for static kernel.
-
-Changes since v1:
-- annotate ss->base as __iomem
-- regroup all mutex in the ss_ctx structure
-- splited driver in 7 modules (core md5 sha1 aes des 3des prng) in sunxi-ss directory
-- use dev_exit_p() for .remove
-- added missing CRYPTO_BLKCIPHER dep in Kconfig
-- use ahash instead of shash
-- use ablkcipher instead of blkcipher
-- use crypto_rng_ctx instead of crypto_tfm_ctx
-- set seed as an u32
-- drop useless comment decoration
-- drop useless debug
-- ss_ctx is now a static pointer and whole structure being allocated
-- fix the platform_get_resource/devm_ioremap_resource pattern
-- invert getting die id and configuring clock
-- set clock value as a const unsigned long
-- add MODULE_ALIAS
-- use define names more consistency (SS_xxx)
-- fix PRNG errors
-- respell SS to Security System in DT documentation
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index 03ccdb0..ed1c918 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -418,4 +418,95 @@ config CRYPTO_DEV_MXS_DCP
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called mxs-dcp.
+ 
++config CRYPTO_DEV_SUNXI_SS
++	tristate "Support for Allwinner Security System cryptographic accelerator"
++	depends on ARCH_SUNXI
++	help
++	  Some Allwinner SoC have a crypto accelerator named
++	  Security System. Select this if you want to use it.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called sunxi-ss.
++
++if CRYPTO_DEV_SUNXI_SS
++config CRYPTO_DEV_SUNXI_SS_PRNG
++	tristate "Security System PRNG"
++	select CRYPTO_RNG2
++	help
++	  If you enable this option, the SS will provide a pseudo random
++	  number generator.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called sunxi-ss-prng.
++
++config CRYPTO_DEV_SUNXI_SS_HASH
++	tristate "Security System hash common"
++	help
++	  Common parts of Security System shared by hash algorithms.
++
++config CRYPTO_DEV_SUNXI_SS_CIPHER
++	tristate "Security System cipher common"
++	help
++	  Common parts of Security System shared by cipher algorithms.
++
++config CRYPTO_DEV_SUNXI_SS_MD5
++	tristate "Security System MD5"
++	select CRYPTO_MD5
++	select CRYPTO_DEV_SUNXI_SS_HASH
++	help
++	  If you enable this option, the SS will provide MD5 hardware
++	  acceleration.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called sunxi-ss-md5.
++
++config CRYPTO_DEV_SUNXI_SS_SHA1
++	tristate "Security System SHA1"
++	select CRYPTO_SHA1
++	select CRYPTO_DEV_SUNXI_SS_HASH
++	help
++	  If you enable this option, the SS will provide SHA1 hardware
++	  acceleration.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called sunxi-ss-sha1.
++
++config CRYPTO_DEV_SUNXI_SS_AES
++	tristate "Security System AES"
++	select CRYPTO_AES
++	select CRYPTO_BLKCIPHER
++	select CRYPTO_DEV_SUNXI_SS_CIPHER
++	help
++	  If you enable this option, the SS will provide AES hardware
++	  acceleration.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called sunxi-ss-aes.
++
++config CRYPTO_DEV_SUNXI_SS_DES
++	tristate "Security System DES"
++	select CRYPTO_DES
++	select CRYPTO_BLKCIPHER
++	select CRYPTO_DEV_SUNXI_SS_CIPHER
++	help
++	  If you enable this option, the SS will provide DES hardware
++	  acceleration.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called sunxi-ss-des.
++
++config CRYPTO_DEV_SUNXI_SS_3DES
++	tristate "Security System 3DES"
++	select CRYPTO_DES
++	select CRYPTO_BLKCIPHER
++	select CRYPTO_DEV_SUNXI_SS_CIPHER
++	help
++	  If you enable this option, the SS will provide 3DES hardware
++	  acceleration.
++
++	  To compile this driver as a module, choose M here: the module
++	  will be called sunxi-ss-3des.
++
++endif #CRYPTO_DEV_SUNXI_SS
++
+ endif # CRYPTO_HW
+diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
+index 482f090..855292a 100644
+--- a/drivers/crypto/Makefile
++++ b/drivers/crypto/Makefile
+@@ -23,3 +23,4 @@ obj-$(CONFIG_CRYPTO_DEV_S5P) += s5p-sss.o
+ obj-$(CONFIG_CRYPTO_DEV_SAHARA) += sahara.o
+ obj-$(CONFIG_CRYPTO_DEV_TALITOS) += talitos.o
+ obj-$(CONFIG_CRYPTO_DEV_UX500) += ux500/
++obj-$(CONFIG_CRYPTO_DEV_SUNXI_SS) += sunxi-ss/
+-- 
+1.8.5.5
