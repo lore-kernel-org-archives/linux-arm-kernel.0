@@ -1,78 +1,98 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 10 Jun 2014 09:27:39 +0800
-Subject: [PATCH 03/12] clk: mmp: add init callback for clk-frac
+Date: Tue, 10 Jun 2014 09:27:40 +0800
+Subject: [PATCH 04/12] clk: mmp: move definiton of mmp_clk_frac to clk.h
 In-Reply-To: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
 References: <1402363668-25806-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1402363668-25806-4-git-send-email-chao.xie@marvell.com>
+Message-ID: <1402363668-25806-5-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
-For the clk-frac, if it has table, we need to make
-sure that the initial clock rate is one item of the
-table.
-If it is not, we use the first item in the table by default.
+Move the definition of structure of mmp_clk_frac to
+clk.h.
+So device tree support can use this structure.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/clk/mmp/clk-frac.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ drivers/clk/mmp/clk-frac.c |  8 --------
+ drivers/clk/mmp/clk.h      | 32 ++++++++++++++++++++++----------
+ 2 files changed, 22 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/clk/mmp/clk-frac.c b/drivers/clk/mmp/clk-frac.c
-index e29d006..1876d2c 100644
+index 1876d2c..eeba52c 100644
 --- a/drivers/clk/mmp/clk-frac.c
 +++ b/drivers/clk/mmp/clk-frac.c
-@@ -118,10 +118,50 @@ static int clk_factor_set_rate(struct clk_hw *hw, unsigned long drate,
- 	return 0;
- }
+@@ -23,14 +23,6 @@
+  */
  
-+void clk_factor_init(struct clk_hw *hw)
-+{
-+	struct mmp_clk_factor *factor = to_clk_factor(hw);
-+	struct mmp_clk_factor_masks *masks = factor->masks;
-+	u32 val, num, den;
-+	int i;
-+	unsigned long flags = 0;
+ #define to_clk_factor(hw) container_of(hw, struct mmp_clk_factor, hw)
+-struct mmp_clk_factor {
+-	struct clk_hw		hw;
+-	void __iomem		*base;
+-	struct mmp_clk_factor_masks	*masks;
+-	struct mmp_clk_factor_tbl	*ftbl;
+-	unsigned int		ftbl_cnt;
+-	spinlock_t *lock;
+-};
+ 
+ static long clk_factor_round_rate(struct clk_hw *hw, unsigned long drate,
+ 		unsigned long *prate)
+diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
+index b71b717..d267639 100644
+--- a/drivers/clk/mmp/clk.h
++++ b/drivers/clk/mmp/clk.h
+@@ -7,12 +7,14 @@
+ #define APBC_NO_BUS_CTRL	BIT(0)
+ #define APBC_POWER_CTRL		BIT(1)
+ 
 +
-+	if (factor->lock)
-+		spin_lock_irqsave(factor->lock, flags);
-+
-+	val = readl(factor->base);
-+
-+	/* calculate numerator */
-+	num = (val >> masks->num_shift) & masks->num_mask;
-+
-+	/* calculate denominator */
-+	den = (val >> masks->den_shift) & masks->den_mask;
-+
-+	for (i = 0; i < factor->ftbl_cnt; i++)
-+		if (den == factor->ftbl[i].den && num == factor->ftbl[i].num)
-+			break;
-+
-+	if (i >= factor->ftbl_cnt) {
-+		val &= ~(masks->num_mask << masks->num_shift);
-+		val |= (factor->ftbl[0].num & masks->num_mask) <<
-+			masks->num_shift;
-+
-+		val &= ~(masks->den_mask << masks->den_shift);
-+		val |= (factor->ftbl[0].den & masks->den_mask) <<
-+			masks->den_shift;
-+
-+		writel(val, factor->base);
-+	}
-+
-+	if (factor->lock)
-+		spin_unlock_irqrestore(factor->lock, flags);
-+}
-+
- static struct clk_ops clk_factor_ops = {
- 	.recalc_rate = clk_factor_recalc_rate,
- 	.round_rate = clk_factor_round_rate,
- 	.set_rate = clk_factor_set_rate,
-+	.init = clk_factor_init,
++/* Clock type "factor" */
+ struct mmp_clk_factor_masks {
+-	unsigned int	factor;
+-	unsigned int	num_mask;
+-	unsigned int	den_mask;
+-	unsigned int	num_shift;
+-	unsigned int	den_shift;
++	unsigned int factor;
++	unsigned int num_mask;
++	unsigned int den_mask;
++	unsigned int num_shift;
++	unsigned int den_shift;
  };
  
- struct clk *mmp_clk_register_factor(const char *name, const char *parent_name,
+ struct mmp_clk_factor_tbl {
+@@ -20,6 +22,21 @@ struct mmp_clk_factor_tbl {
+ 	unsigned int den;
+ };
+ 
++struct mmp_clk_factor {
++	struct clk_hw hw;
++	void __iomem *base;
++	struct mmp_clk_factor_masks *masks;
++	struct mmp_clk_factor_tbl *ftbl;
++	unsigned int ftbl_cnt;
++	spinlock_t *lock;
++};
++
++extern struct clk *mmp_clk_register_factor(const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *base, struct mmp_clk_factor_masks *masks,
++		struct mmp_clk_factor_tbl *ftbl, unsigned int ftbl_cnt,
++		spinlock_t *lock);
++
+ extern struct clk *mmp_clk_register_pll2(const char *name,
+ 		const char *parent_name, unsigned long flags);
+ extern struct clk *mmp_clk_register_apbc(const char *name,
+@@ -28,9 +45,4 @@ extern struct clk *mmp_clk_register_apbc(const char *name,
+ extern struct clk *mmp_clk_register_apmu(const char *name,
+ 		const char *parent_name, void __iomem *base, u32 enable_mask,
+ 		spinlock_t *lock);
+-extern struct clk *mmp_clk_register_factor(const char *name,
+-		const char *parent_name, unsigned long flags,
+-		void __iomem *base, struct mmp_clk_factor_masks *masks,
+-		struct mmp_clk_factor_tbl *ftbl, unsigned int ftbl_cnt,
+-		spinlock_t *lock);
+ #endif
 -- 
 1.8.3.2
