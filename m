@@ -1,34 +1,58 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 10 Jun 2014 19:08:39 +0100
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <53973AA8.9020301@codeaurora.org>
-References: <20140328184517.GA27219@cbox>
- <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
- <53973AA8.9020301@codeaurora.org>
-Message-ID: <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 10 Jun 2014 11:09:13 -0700
+Subject: [PATCH 1/2 v2] spi: s3c64xx: use "cs-gpios" from spi node instead
+ of "cs-gpio"
+In-Reply-To: <CAHfPSqAq9L5Zu7z3-y6Y2pG8AhE4Y1j8DE35LDfMW_DYc_x-gw@mail.gmail.com>
+References: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>
+ <1402394881-31564-2-git-send-email-ch.naveen@samsung.com>
+ <5396E051.8050803@samsung.com>
+ <CAHfPSqAq9L5Zu7z3-y6Y2pG8AhE4Y1j8DE35LDfMW_DYc_x-gw@mail.gmail.com>
+Message-ID: <CAD=FV=XtdgKEg7fTHe+tsFM1Y_YwqNNk_DBW7ZX83YERGJsHBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 June 2014 18:04, Christopher Covington <cov@codeaurora.org> wrote:
-> On 06/10/2014 10:42 AM, Peter Maydell wrote:
->> I just noticed that this doesn't mandate that the platform
->> provides an RTC. As I understand it, the UEFI spec mandates
->> that there's an RTC (could somebody more familiar with UEFI
->> than me confirm/deny that?) so we should probably put one here.
+Naveen / Sylwester,
+
+On Tue, Jun 10, 2014 at 4:00 AM, Naveen Krishna Ch
+<naveenkrishna.ch@gmail.com> wrote:
+>> Can we support both "cs-gpio" and "cs-gpios" for backward compatibility ?
+>> After your change all DTBs using the original pattern will not work with
+>> new kernels any more. At least I would expect such backward compatibility
+>> maintained for few kernel releases.
 >
-> Pardon my ignorance, but what exactly disqualifies Generic Timer
-> implementations from being used as Real Time Clocks?
+> The reason behind removing the "cs-gpio" or not providing backward
+> compatibility was
+>
+> 1. Since spi-core started using "cs-gpios" string from spi device node
+> several months ago.
+>   The spi-s3c64xx.c driver is partially broken for more than 6 months.
+>
+> 2. Supporting "cs-gpio" would add extra bit of code.
+>
+> I've corrected the dts files that were using "cs-gpio" under
+> "controller-data"(child node)
+> to use "cs-gpio" from spi device node (parent node).
+>
+> I will make another version if you insist.
 
-So my naive view was that an RTC actually had to have
-support for dealing with real (wall) clock time, ie
-knowing it's 2014 and not 1970. The generic timers are
-just timers. Or am I wrong and UEFI doesn't really
-require that?
+Yup, as near as I can tell this has been broken since (3146bee spi:
+s3c64xx: Added provision for dedicated cs pin).  That landed June 25th
+of 2013 into the SPI tree.
 
-It's also handy if you're booting Linux directly without
-UEFI, since it means you can actually have a /dev/rtc0
-(and QEMU's implementation at least will correctly give
-you the time based on the host's RTC).
+...so clearly nobody was really testing Samsung's SPI driver on ToT
+Linux.  1 year of unnoticed brokenness seems like enough time that we
+could do away with the old code.  If someone comes out of the woodwork
+and claims a dire need to support the old binding then it can be added
+then.
 
-thanks
--- PMM
+In-tree users of this appear to be:
+
+arch/arm/boot/dts/exynos4210-smdkv310.dts:
+ cs-gpio = <&gpc1 2 0>;
+arch/arm/boot/dts/exynos4412-trats2.dts:
+ cs-gpio = <&gpb 5 0>;
+arch/arm/boot/dts/exynos5250-smdk5250.dts:
+ cs-gpio = <&gpa2 5 0>;
+
+...and I guess nobody has bothered using the SPI flash on those boards
+for the last year?
