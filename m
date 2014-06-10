@@ -1,50 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Jun 2014 16:01:00 +0100
-Subject: ARM: MACH_CPUIMX27 or MACH_EUKREA_CPUIMX27?
-In-Reply-To: <1402410909.3798.32.camel@x220>
-References: <1402410909.3798.32.camel@x220>
-Message-ID: <20140610150100.GY23430@n2100.arm.linux.org.uk>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 10 Jun 2014 16:03:20 +0100
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
+References: <20140328184517.GA27219@cbox>
+ <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
+Message-ID: <1402412600.20641.25.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 04:35:09PM +0200, Paul Bolle wrote:
-> 0) Summary: either the Kconfig symbol MACH_CPUIMX27 or the reference to
-> CONFIG_MACH_EUKREA_CPUIMX27 in arch/arm/tools/mach-types should probably
-> be renamed (once again).
+On Tue, 2014-06-10 at 15:42 +0100, Peter Maydell wrote:
+> On 28 March 2014 18:45, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > ARM VM System Specification
+> > ===========================
+> >
 > 
-> 1) An entry for CONFIG_MACH_CPUIMX27 was added to mach-types in v2.6.29.
+> > The virtual hardware platform must provide a number of mandatory
+> > peripherals:
+> >
+> >   Serial console:  The platform should provide a console,
+> >   based on an emulated pl011, a virtio-console, or a Xen PV console.
+> >
+> >   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
+> >   limits the the number of virtual CPUs to 8 cores, newer GIC versions
+> >   removes this limitation.
+> >
+> >   The ARM virtual timer and counter should be available to the VM as
+> >   per the ARM Generic Timers specification in the ARM ARM [1].
 > 
-> 2) The Kconfig symbol MACH_EUKREA_CPUIMX27 was added in v2.6.32.
+> I just noticed that this doesn't mandate that the platform
+> provides an RTC. As I understand it, the UEFI spec mandates
+> that there's an RTC (could somebody more familiar with UEFI
+> than me confirm/deny that?) so we should probably put one here.
+
+Isn't that already done transitively via the requirement to provide a
+UEFI environment?
+
+I thought the RTC was exposed via UEFI Runtime Service, in which case
+it's mostly a hypervisor internal issue how time is provided to the
+(hypervisor provided) UEFI implementation, the guest OS just uses the
+runtime services interfaces.
+
+Given that do we also need to standardise on a guest OS visible clock
+device too? I'm not sure if we do or not, but if yes then I have a
+couple of comments on the suggested wording (you can probably guess what
+they are going to be...):
+
+> Suggested wording:
 > 
-> 3) That Kconfig symbol was renamed to MACH_CPUIMX27 in v2.6.34, too
-> match the reference in mach-types mentioned in 1).
+>  RTC: The platform should provide a real time clock, based
+>  on an emulated pl031 or mc146818.
+
+We would need to include the Xen PV wallclock here too.
+
+> and in the guest-support section later:
 > 
-> 4) But then the reference in mach-types was also renamed, to
-> MACH_EUKREA_CPUIMX27, in v3.1.
-> 
-> 5) The net effect is that machine_is_eukrea_cpuimx27() equals 0 since
-> v3.1. That macro is used only once, in sound/soc/fsl/eukrea-tlv320.c. If
-> people still care about it then either the Kconfig symbol or the
-> reference in mach-types should be renamed.
+>  The guest OS must include support for pl031 and mc146818 RTC.
 
-This is caused by the way mach-types is dealt with, and I've told people
-/many/ times exactly how it's done - but still they don't get it.
+and here.
 
-The information is stored in a database, where the database is accessible
-via the web.
-
-Every so often, I download from that website a new copy of the mach-types
-file and commit the update.  Due to the shere number of changes, it is
-impossible to go through one by one working out whether it's changed in
-the kernel or whether it's a change which has happened via the website.
-
-Once a platform has been merged into mainline, the symbols are not allowed
-to be changed from that point on, because to do so breaks the ability for
-people to update this file in older/newer kernels.
-
-So, if mach-types says that it is MACH_EUKREA_CPUIMX27, then that is what
-the symbol is supposed to be (and to try and change it will cause problems.)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Ian.
