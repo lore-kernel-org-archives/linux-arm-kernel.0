@@ -1,43 +1,70 @@
-From: dianders@google.com (Doug Anderson)
-Date: Tue, 10 Jun 2014 13:26:22 -0700
-Subject: exynos5420-peach-pi: linux-next boot fails unless mau_epll left
- enabled?
-In-Reply-To: <539764AF.4090409@collabora.co.uk>
-References: <7hoay6sxjl.fsf@paris.lan>
- <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
- <CAOD6ATpZWEg9d7WnZ8tg9_uQJ29vMoucaOwh0_tbdRSDRj25cw@mail.gmail.com>
- <CAD=FV=UsVQm_pLNtPwZMNCQQSSVrx=6M8eJrNRS8VyWMQzYtAQ@mail.gmail.com>
- <539764AF.4090409@collabora.co.uk>
-Message-ID: <CAD=FV=UdCp0dG7tnzaSnWxhtnU46ttMOUht00DL=bfvbbt7mXQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 10 Jun 2014 15:32:34 -0500
+Subject: [PATCH 1/2 v2] spi: s3c64xx: use "cs-gpios" from spi node instead
+ of "cs-gpio"
+In-Reply-To: <CAD=FV=XtdgKEg7fTHe+tsFM1Y_YwqNNk_DBW7ZX83YERGJsHBg@mail.gmail.com>
+References: <1402394881-31564-1-git-send-email-ch.naveen@samsung.com>
+ <1402394881-31564-2-git-send-email-ch.naveen@samsung.com>
+ <5396E051.8050803@samsung.com>
+ <CAHfPSqAq9L5Zu7z3-y6Y2pG8AhE4Y1j8DE35LDfMW_DYc_x-gw@mail.gmail.com>
+ <CAD=FV=XtdgKEg7fTHe+tsFM1Y_YwqNNk_DBW7ZX83YERGJsHBg@mail.gmail.com>
+Message-ID: <CAL_JsqLk7rfDaf4gn5_p3dcSNBfQ9BF3U8mUqBQ6YjKWXb5tDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
-
-On Tue, Jun 10, 2014 at 1:03 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Yes, I did not have this issue before. However... I installed the latest Peach
-> pit recovery image you provided me and mainline kernel started to hang on boot.
-> I remembered this thread so tested Kevin's patch which make it boot again.
+On Tue, Jun 10, 2014 at 1:09 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Naveen / Sylwester,
 >
-> You said that chain-booting u-boot runs the sound init code but did you try
-> booting a signed FIT image using the verified u-boot?
-
-Right, I'd bet that it's actually verified boot that's calling the
-sound init code (probably just in case it needs to beep at the user).
-...so this would happen even without chain booting.  I haven't tried
-signing / booting without chain booting, but I can totally believe it
-would hang just as easily.
-
-
-> I'm asking because I'm see the hang both when chain-booting nv-u-boot from a
-> kernel partition and booting a signed FIT image with the verified u-boot.
+> On Tue, Jun 10, 2014 at 4:00 AM, Naveen Krishna Ch
+> <naveenkrishna.ch@gmail.com> wrote:
+>>> Can we support both "cs-gpio" and "cs-gpios" for backward compatibility ?
+>>> After your change all DTBs using the original pattern will not work with
+>>> new kernels any more. At least I would expect such backward compatibility
+>>> maintained for few kernel releases.
+>>
+>> The reason behind removing the "cs-gpio" or not providing backward
+>> compatibility was
+>>
+>> 1. Since spi-core started using "cs-gpios" string from spi device node
+>> several months ago.
+>>   The spi-s3c64xx.c driver is partially broken for more than 6 months.
+>>
+>> 2. Supporting "cs-gpio" would add extra bit of code.
+>>
+>> I've corrected the dts files that were using "cs-gpio" under
+>> "controller-data"(child node)
+>> to use "cs-gpio" from spi device node (parent node).
+>>
+>> I will make another version if you insist.
 >
-> So it seems this is a regression in latest U-boot and I didn't run into this
-> before due having an older RW U-Boot on my Peach pit?
+> Yup, as near as I can tell this has been broken since (3146bee spi:
+> s3c64xx: Added provision for dedicated cs pin).  That landed June 25th
+> of 2013 into the SPI tree.
+>
+> ...so clearly nobody was really testing Samsung's SPI driver on ToT
+> Linux.  1 year of unnoticed brokenness seems like enough time that we
+> could do away with the old code.  If someone comes out of the woodwork
+> and claims a dire need to support the old binding then it can be added
+> then.
+>
+> In-tree users of this appear to be:
+>
+> arch/arm/boot/dts/exynos4210-smdkv310.dts:
+>  cs-gpio = <&gpc1 2 0>;
+> arch/arm/boot/dts/exynos4412-trats2.dts:
+>  cs-gpio = <&gpb 5 0>;
+> arch/arm/boot/dts/exynos5250-smdk5250.dts:
+>  cs-gpio = <&gpa2 5 0>;
+>
+> ...and I guess nobody has bothered using the SPI flash on those boards
+> for the last year?
 
-You must have had a very old RW U-Boot, possibly one before audio
-support was added.  I think we just need to fix this in the kernel so
-it doesn't hang.
+I always try to warn people if they are breaking compatibility, but in
+this case I agree it is okay. Presumably no one expects BSD or vxworks
+support for this platform either?
 
--Doug
+For the binding change:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
