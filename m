@@ -1,61 +1,53 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 10 Jun 2014 16:03:20 +0100
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
-References: <20140328184517.GA27219@cbox>
- <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
-Message-ID: <1402412600.20641.25.camel@kazak.uk.xensource.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 10 Jun 2014 08:21:59 -0700
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+Message-ID: <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-06-10 at 15:42 +0100, Peter Maydell wrote:
-> On 28 March 2014 18:45, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > ARM VM System Specification
-> > ===========================
-> >
-> 
-> > The virtual hardware platform must provide a number of mandatory
-> > peripherals:
-> >
-> >   Serial console:  The platform should provide a console,
-> >   based on an emulated pl011, a virtio-console, or a Xen PV console.
-> >
-> >   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
-> >   limits the the number of virtual CPUs to 8 cores, newer GIC versions
-> >   removes this limitation.
-> >
-> >   The ARM virtual timer and counter should be available to the VM as
-> >   per the ARM Generic Timers specification in the ARM ARM [1].
-> 
-> I just noticed that this doesn't mandate that the platform
-> provides an RTC. As I understand it, the UEFI spec mandates
-> that there's an RTC (could somebody more familiar with UEFI
-> than me confirm/deny that?) so we should probably put one here.
+Chander,
 
-Isn't that already done transitively via the requirement to provide a
-UEFI environment?
+On Tue, Jun 10, 2014 at 1:12 AM, Chander Kashyap
+<chander.kashyap@linaro.org> wrote:
+> On 10 June 2014 04:08, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> On Mon, Jun 09, 2014 at 06:03:31PM +0100, Doug Anderson wrote:
+>>
+>> [...]
+>>
+>>> Cold boot and resume from suspend are detected via various special
+>>> flags in various special locations.  Resume from suspend looks at
+>>> INFORM1 (0x10048004) for flags.  This register is 0 during a cold boot
+>>> and has special values set by the kernel at resume time.
+>>>
+>>> It also looks as if some code looks at 0x10040900 (PMU_SPARE0) to help
+>>> tell initial cold boot and secondary CPU bringup.
+>>
+>> Ok, thanks a lot. It looks like firmware paths should be ready to
+>> detect cold vs warm boot, and hopefully do not rely on a specific
+>> MPIDR to come up first out of power states.
+>>
+>>> > I am asking to check if on this platform CPUidle (where the notion of
+>>> > primary CPU disappears) has a chance to run properly.
+>>>
+>>> I believe it should be possible, but we don't have CPUidle implemented
+>>> in our current system.  Abhilash may be able to comment more.
+>>
+>
+> Cpuidle is implemented for exynos5420, and is tested on chromebook.
 
-I thought the RTC was exposed via UEFI Runtime Service, in which case
-it's mostly a hypervisor internal issue how time is provided to the
-(hypervisor provided) UEFI implementation, the guest OS just uses the
-runtime services interfaces.
+My S-state knowledge is not strong, but I believe that Lorenzo's
+questions matter if we're using S2 for CPUidle (where we actually turn
+off power and hot unplug CPUs) but not when we're using S1 for CPUidle
+(where we just enter WFI/WFE).
 
-Given that do we also need to standardise on a guest OS visible clock
-device too? I'm not sure if we do or not, but if yes then I have a
-couple of comments on the suggested wording (you can probably guess what
-they are going to be...):
+I believe that in ChromeOS we use S1 CPUidle and that it works fine.
+We've never implemented S2 that I'm aware of.
 
-> Suggested wording:
-> 
->  RTC: The platform should provide a real time clock, based
->  on an emulated pl031 or mc146818.
-
-We would need to include the Xen PV wallclock here too.
-
-> and in the guest-support section later:
-> 
->  The guest OS must include support for pl031 and mc146818 RTC.
-
-and here.
-
-Ian.
+-Doug
