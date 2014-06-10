@@ -1,311 +1,71 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 10 Jun 2014 15:40:13 +0200
-Subject: [PATCH v3 5/6] regulator: add support for regulator set
- registration
-In-Reply-To: <1401183535-31003-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
- <1401183535-31003-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53970ABD.4030402@free-electrons.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 10 Jun 2014 10:40:40 -0300
+Subject: [RFC/PATCH] ARM: mvebu: Don't apply the quirks if the SoC
+ revision is unknown
+In-Reply-To: <5621673.VW5TXctBgm@wuerfel>
+References: <1402342036-9168-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <5621673.VW5TXctBgm@wuerfel>
+Message-ID: <20140610134040.GA1991@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Hi Arnd,
 
-Did you have time to take a look at this patch ?
+Thanks for taking a look.
 
-I'd like to post a new version of this series addressing Lee's comments,
-but it would be great to have your feedback on this patch before posting
-a new version.
+On 10 Jun 10:21 AM, Arnd Bergmann wrote:
+> On Monday 09 June 2014 16:27:16 Ezequiel Garcia wrote:
+> > We currently skip the I2C and thermal quirks only if the SoC revision is
+> > known to be one that does not need them. If the SoC revision cannot be
+> > obtained, the current behavior is to apply the quirk assuming it's needed.
+> > 
+> > This commit changes this, by requiring the SoC revision to be known in order
+> > to peform a quirk.
+> 
+> This clearly needs a better description if we want to apply it. We had
+> a rather long discussion when the code was first added exactly this
+> way and you should explain which of the assumptions we made back then
+> are now incorrect.
+> 
+> Is it ever wrong (as opposed to inefficient) to apply the quirk even on a
+> newer SoC?
+> 
 
-Best Regards,
+Yes, for the thermal quirk it is wrong as it consists in changing the compatible
+string and moving the registers around.
 
-Boris
+So if you apply the quirk on a SoC that doesn't need it, thermal won't work.
 
-On 27/05/2014 11:38, Boris BREZILLON wrote:
-> PMIC devices often provide several regulators, and these regulators are
-> all using the same regmap and are all attached to the same device (the
-> PMIC device).
->
-> Add helper functions (both simple and resource managed versions) to
-> register and unregister such kind of regulator set.
->
-> This implementation handles self dependency issues where one regulator
-> provided the PMIC depends on another one provided by the same PMIC.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/regulator/core.c         | 106 +++++++++++++++++++++++++++++++++++++++
->  drivers/regulator/devres.c       |  68 +++++++++++++++++++++++++
->  include/linux/regulator/driver.h |  51 +++++++++++++++++++
->  3 files changed, 225 insertions(+)
->
-> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-> index 9a09f3c..7703853 100644
-> --- a/drivers/regulator/core.c
-> +++ b/drivers/regulator/core.c
-> @@ -3595,6 +3595,112 @@ void regulator_unregister(struct regulator_dev *rdev)
->  EXPORT_SYMBOL_GPL(regulator_unregister);
->  
->  /**
-> + * regulator_set_register - register a set of regulators
-> + * @config: runtime configuration for regulator set
-> + *
-> + * Called by regulator drivers to register a set of regulators.
-> + * Returns a valid pointer to struct regulator_set on success
-> + * or an ERR_PTR() on error.
-> + */
-> +struct regulator_set *
-> +regulator_set_register(const struct regulator_set_config *config)
-> +{
-> +	struct regulator_set *rset;
-> +	int prev_nregistered = -1;
-> +	int nregistered = 0;
-> +	int ret;
-> +	int i;
-> +
-> +	if (!config->descs || !config->nregulators)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	rset = kzalloc(sizeof(*rset) +
-> +		       (config->nregulators * sizeof(struct regulator_dev *)),
-> +		       GFP_KERNEL);
-> +	if (!rset)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	rset->nregulators = config->nregulators;
-> +
-> +	while (nregistered < config->nregulators &&
-> +	       prev_nregistered < nregistered) {
-> +
-> +		prev_nregistered = nregistered;
-> +
-> +		for (i = 0; i < config->nregulators; i++) {
-> +			struct regulator_config conf;
-> +			struct regulator_dev *regulator;
-> +
-> +			if (rset->regulators[i])
-> +				continue;
-> +
-> +			memset(&conf, 0, sizeof(conf));
-> +
-> +			conf.dev = config->dev;
-> +			conf.regmap = config->regmap;
-> +			conf.driver_data = config->driver_data;
-> +			if (config->matches && config->matches[i].init_data)
-> +				conf.init_data = config->matches[i].init_data;
-> +			else if (config->init_data)
-> +				conf.init_data = config->init_data[i];
-> +
-> +			if (config->matches)
-> +				conf.of_node = config->matches[i].of_node;
-> +
-> +			regulator = regulator_register(&config->descs[i],
-> +						       &conf);
-> +			if (IS_ERR(regulator)) {
-> +				ret = PTR_ERR(regulator);
-> +				if (ret == -EPROBE_DEFER)
-> +					continue;
-> +
-> +				goto err;
-> +			}
-> +
-> +			rset->regulators[i] = regulator;
-> +			nregistered++;
-> +		}
-> +	}
-> +
-> +	if (nregistered < config->nregulators) {
-> +		ret = -EPROBE_DEFER;
-> +		goto err;
-> +	}
-> +
-> +	return rset;
-> +
-> +err:
-> +	for (i = 0; i < config->nregulators; i++) {
-> +		if (rset->regulators[i])
-> +			regulator_unregister(rset->regulators[i]);
-> +	}
-> +
-> +	kfree(rset);
-> +
-> +	return ERR_PTR(ret);
-> +}
-> +EXPORT_SYMBOL_GPL(regulator_set_register);
-> +
-> +/**
-> + * regulator_set_unregister - unregister regulator set
-> + * @rset: regulator set to unregister
-> + *
-> + * Called by regulator drivers to unregister a regulator set.
-> + */
-> +void regulator_set_unregister(struct regulator_set *rset)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < rset->nregulators; i++) {
-> +		if (rset->regulators[i])
-> +			regulator_unregister(rset->regulators[i]);
-> +	}
-> +
-> +	kfree(rset);
-> +}
-> +EXPORT_SYMBOL_GPL(regulator_set_unregister);
-> +
-> +/**
->   * regulator_suspend_prepare - prepare regulators for system wide suspend
->   * @state: system suspend state
->   *
-> diff --git a/drivers/regulator/devres.c b/drivers/regulator/devres.c
-> index f44818b..a34f34c 100644
-> --- a/drivers/regulator/devres.c
-> +++ b/drivers/regulator/devres.c
-> @@ -251,6 +251,74 @@ void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev)
->  }
->  EXPORT_SYMBOL_GPL(devm_regulator_unregister);
->  
-> +static void devm_rset_release(struct device *dev, void *res)
-> +{
-> +	regulator_set_unregister(*(struct regulator_set **)res);
-> +}
-> +
-> +/**
-> + * devm_regulator_set_register - Resource managed regulator_set_register()
-> + * @dev: device registering the regulator set
-> + * @config: runtime configuration for regulator set
-> + *
-> + * Called by regulator drivers to register a set of regulators.  Returns a
-> + * valid pointer to struct regulator_set on success or an ERR_PTR() on
-> + * error.  The regulator will automatically be released when the device
-> + * is unbound.
-> + */
-> +struct regulator_set *
-> +devm_regulator_set_register(struct device *dev,
-> +			    const struct regulator_set_config *config)
-> +{
-> +	struct regulator_set **ptr, *rset;
-> +
-> +	ptr = devres_alloc(devm_rset_release, sizeof(*ptr),
-> +			   GFP_KERNEL);
-> +	if (!ptr)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	rset = regulator_set_register(config);
-> +	if (!IS_ERR(rset)) {
-> +		*ptr = rset;
-> +		devres_add(dev, ptr);
-> +	} else {
-> +		devres_free(ptr);
-> +	}
-> +
-> +	return rset;
-> +}
-> +EXPORT_SYMBOL_GPL(devm_regulator_set_register);
-> +
-> +static int devm_rset_match(struct device *dev, void *res, void *data)
-> +{
-> +	struct regulator_set **r = res;
-> +	if (!r || !*r) {
-> +		WARN_ON(!r || !*r);
-> +		return 0;
-> +	}
-> +	return *r == data;
-> +}
-> +
-> +/**
-> + * devm_regulator_set_unregister - Resource managed regulator_set_unregister()
-> + * @dev: device unregistering the regulator set
-> + * @rset: regulator set to release
-> + *
-> + * Unregister a regulator set registered with devm_regulator_set_register().
-> + * Normally this function will not need to be called and the resource
-> + * management code will ensure that the resource is freed.
-> + */
-> +void devm_regulator_set_unregister(struct device *dev,
-> +				   struct regulator_set *rset)
-> +{
-> +	int rc;
-> +
-> +	rc = devres_release(dev, devm_rdev_release, devm_rset_match, rset);
-> +	if (rc != 0)
-> +		WARN_ON(rc);
-> +}
-> +EXPORT_SYMBOL_GPL(devm_regulator_unregister);
-> +
->  struct regulator_supply_alias_match {
->  	struct device *dev;
->  	const char *id;
-> diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-> index bbe03a1..b683f68 100644
-> --- a/include/linux/regulator/driver.h
-> +++ b/include/linux/regulator/driver.h
-> @@ -350,6 +350,48 @@ struct regulator_dev {
->  	unsigned int ena_gpio_state:1;
->  };
->  
-> +/**
-> + * struct regulator_set_config - Dynamic regulator set descriptor
-> + *
-> + * This structure describe a regulator and each regulator in this set
-> + * will be registered using informations passed through regulator_desc
-> + * and of_regulator_match tables.
-> + *
-> + * @dev: struct device providing the regulator set.
-> + * @driver_data: private driver data for this regulator set.
-> + * @regmap: regmap to use for core regmap helpers if dev_get_regulator() is
-> + *          insufficient.
-> + * @descs: table of regulator descriptors.
-> + * @matches: table of DT regulator descriptors. This table should have
-> + *           been filled by the of_regulator_match function.
-> + * @init_data: a table of init_data in case matches is NULL or the init_data
-> + *             of the match entry is NULL.
-> + * @nregulators: number of regulators in the regulator set.
-> + */
-> +struct regulator_set_config {
-> +	struct device *dev;
-> +	void *driver_data;
-> +	struct regmap *regmap;
-> +	const struct regulator_desc *descs;
-> +	const struct of_regulator_match *matches;
-> +	const struct regulator_init_data **init_data;
-> +	int nregulators;
-> +};
-> +
-> +/*
-> + * struct regulator_set - Regulator set
-> + *
-> + * This structure stores a set of regulator devices provided by a single
-> + * device (e.g. a PMIC device).
-> + *
-> + * @nregulators: number of regulators in the set
-> + * @regulators: regulators table
-> + */
-> +struct regulator_set {
-> +	int nregulators;
-> +	struct regulator_dev *regulators[0];
-> +};
-> +
->  struct regulator_dev *
->  regulator_register(const struct regulator_desc *regulator_desc,
->  		   const struct regulator_config *config);
-> @@ -360,6 +402,15 @@ devm_regulator_register(struct device *dev,
->  void regulator_unregister(struct regulator_dev *rdev);
->  void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev);
->  
-> +struct regulator_set *
-> +regulator_set_register(const struct regulator_set_config *config);
-> +struct regulator_set *
-> +devm_regulator_set_register(struct device *dev,
-> +			    const struct regulator_set_config *config);
-> +void regulator_set_unregister(struct regulator_set *rset);
-> +void devm_regulator_set_unregister(struct device *dev,
-> +				   struct regulator_set *rset);
-> +
->  int regulator_notifier_call_chain(struct regulator_dev *rdev,
->  				  unsigned long event, void *data);
->  
+> IIRC, the reasoning was that almost all machines have the new SoC version,
 
+Agreed, and that's why I think it's better to *not* apply the quirk unless the
+SoC revision can be properly obtained and matched as needing it.
+
+> so they should have their DTs marked with the correct IDs already.
+> 
+
+Hm.. I guess the I2C and thermal quirks don't work the same way. Here's how
+the latter works.
+
+The driver supports two different compatible strings:
+"armada375-thermal" and "armada375-z1-thermal". However, we don't expect the
+user to know the revision, so the quirk code detects the SoC revision and
+changes the compatible string if needed.
+
+In addition, given the register offsets are different in the Z1 revision,
+we workaround that by moving them in the quirk code, before the thermal
+driver probes.
+
+So, there's no "correct ID in the devicetree", as we assume the devicetree
+works for the new SoC and only apply changes if we detect the SoC revision
+needs the workaround.
+
+Under this scheme, this commit makes a requirement to know the SoC revision
+before applying a quirk, where the current code applies it blindly.
+
+However, I'm not sure if this is correct for the I2C quirk. Maybe I was
+too fast assuming it was.
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
 http://free-electrons.com
