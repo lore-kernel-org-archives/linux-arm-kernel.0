@@ -1,75 +1,64 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 10 Jun 2014 16:46:06 +0200
-Subject: [PATCH v3 6/6] ARM: EXYNOS: Refactoring to remove soc_is_exynos
- macros from exynos
-In-Reply-To: <1399706419-13976-7-git-send-email-pankaj.dubey@samsung.com>
-References: <1399706287-13919-1-git-send-email-y@samsung.com>
- <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
- <1399706419-13976-7-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53971A2E.2010104@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Jun 2014 16:47:55 +0200
+Subject: [PATCH v5 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
+ controller support
+In-Reply-To: <20140610143604.GC7054@lukather>
+References: <1402408036-5235-1-git-send-email-boris.brezillon@free-electrons.com>
+ <6454089.IP8IFVsofj@wuerfel> <20140610143604.GC7054@lukather>
+Message-ID: <13219561.hrRmVFjmAv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
-
-On 10.05.2014 09:20, Pankaj Dubey wrote:
-> This patch enables chipid driver for ARCH_EXYNOS and refactors
-> machine code as well as exynos cpufreq driver code for using
-> chipid driver for identification of SoC ID and SoC rev.
+On Tuesday 10 June 2014 16:36:04 Maxime Ripard wrote:
+> On Tue, Jun 10, 2014 at 03:54:56PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 10 June 2014 15:47:16 Boris BREZILLON wrote:
+> > > 
+> > > +config I2C_SUN6I_P2WI
+> > > +       tristate "Allwinner sun6i internal P2WI controller"
+> > > +       depends on ARCH_SUNXI
+> > > +       help
+> > > +         If you say yes to this option, support will be included for the
+> > > +         P2WI (Push/Pull 2 Wire Interface) controller embedded in some sunxi
+> > > +         SOCs.
+> > > +         The P2WI looks like an SMBus controller (which supports only byte
+> > > +         accesses), except that it only supports one slave device.
+> > > +         This interface is used to connect to specific PMIC devices (like the
+> > > +         AXP221).
+> > > +
+> > 
+> > Sorry for the stupid question, but why is this an i2c driver if the
+> > hardware protocol is completely different?
 > 
-> This patch also updates DT binding information in exynos4 and
-> exynos5 dtsi file. As to differentiate product id bit-mask we need
-> separate compatible string for exynos4 and exynos5. Hoping this will
-> be helpful in future as bit-mask and bit-shift bit may differ.
-> Added binding information as well.
+> It's not completely different. It deviates, but still looks very
+> similar to i2c, and to be precise, SMBus.
+> 
+> You'll have the full discussion that led to do this in i2c here:
+> http://www.spinics.net/lists/linux-i2c/msg15066.html
+> 
+> Also, one significant thing to take into account is that the
+> communication with a device starts as I2C, only to switch to this
+> protocol after some initialization sequence.
 
-[snip]
+Ok, sounds good.
 
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index d0482c2..9d6ec84 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -20,13 +20,13 @@
->  #include <linux/smp.h>
->  #include <linux/io.h>
->  #include <linux/of_address.h>
-> +#include <linux/exynos-soc.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/smp_plat.h>
->  #include <asm/smp_scu.h>
->  #include <asm/firmware.h>
->  
-> -#include <plat/cpu.h>
->  #include <mach/map.h>
->  
->  #include "common.h"
-> @@ -59,7 +59,8 @@ static void __init exynos_smp_prepare_sram(void)
->  
->  static inline void __iomem *cpu_boot_reg_base(void)
->  {
-> -	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-> +	if (is_soc_id_compatible(EXYNOS4210) &&
-> +			is_soc_rev_compatible(EXYNOS4210_REV_1_1))
+> > I understand that a lot of devices can be driven using either spi or
+> > i2c, and we have two sets of {directories,maintainers,bus_types,...}
+> > for them. Your description sounds like this is a separate option
+> > that isn't any closer to i2c than it is to spi.
+> 
+> That's not true. It's *much* closer from I2C than it is from SPI.
 
-Well, how is this any better than what is already there? When adding a
-new SoC, you will likely have to add another series of "||"s or "&&"s
-with specific SoC IDs, when using this kind of API. This is not the point.
+Ok.
 
-For now, all those things can be replaced simply with
-of_machine_is_compatible() (except checks for samsung_rev()), but in the
-end they need to be properly abstracted. The goal is to be able to add
-support for new SoC, which requires identical steps to perform certain
-things as already supported SoCs, without explicitly stating this in
-driver code.
+> > Would it perhaps be better to expose it only as a regmap rather than
+> > an i2c host?
+> 
+> That could be a solution, but is it a common practice to define a bus
+> adapter driver in a regmap driver?
 
-E.g. Exynos5250 is already supported, while Exynos5251 shows up. Let's
-say it has exactly the same secondary CPU boot-up method as Exynos5250,
-but to enter suspend mode, the same steps as on Exynos5260 have to be
-performed. With any kind of per-SoC check API, you will have to add
-soc_is_exynos5251() or is_soc_id_compatible(EXYNOS5251) in CPU bring-up
-code and low-level suspend code, even though all the functional code is
-already there.
+No, not yet.
 
-Best regards,
-Tomasz
+Maybe Boris can just put an explanation into the changeset description
+of the driver so other people are able to find it more easily.
+
+	Arnd
