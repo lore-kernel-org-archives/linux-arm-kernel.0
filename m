@@ -1,36 +1,41 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Tue, 10 Jun 2014 14:43:17 +0200
-Subject: [PATCH v3 4/4] ARM: sunxi: dt: Add DT bindings documentation for
- SUNXI Security System
+Date: Tue, 10 Jun 2014 14:43:16 +0200
+Subject: [PATCH v3 3/4] ARM: sun7i: dt: Add Security System to A20 SoC DTS
 In-Reply-To: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1402404197-4236-5-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1402404197-4236-4-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for Device-Tree bindings for the Security
-System cryptographic accelerator driver.
+The Security System is a hardware cryptographic accelerator that support
+AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+It could be found on many Allwinner SoC.
+
+This patch enable the Security System on the Allwinner A20 SoC Device-tree.
 
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- Documentation/devicetree/bindings/crypto/sunxi-ss.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/sunxi-ss.txt
+ arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/sunxi-ss.txt b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
-new file mode 100644
-index 0000000..a566803
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/sunxi-ss.txt
-@@ -0,0 +1,9 @@
-+* Allwinner Security System found on A20 SoC
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 6acdbdf..19b1ced 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -529,6 +529,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		crypto: crypto-engine at 01c15000 {
++			compatible = "allwinner,sun7i-a20-crypto";
++			reg = <0x01c15000 0x1000>;
++			interrupts = <0 86 4>;
++			clocks = <&ahb_gates 5>, <&ss_clk>;
++			clock-names = "ahb", "mod";
++		};
 +
-+Required properties:
-+- compatible : Should be "allwinner,sun7i-a20-crypto".
-+- reg: Should contain the Security System register location and length.
-+- interrupts: Should contain the IRQ line for the Security System.
-+- clocks : A phandle to the functional clock node of the Security System module
-+- clock-names : Name of the functional clock, should be "ahb" and "mod".
-+
+ 		spi2: spi at 01c17000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c17000 0x1000>;
 -- 
 1.8.5.5
