@@ -1,13 +1,13 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 11 Jun 2014 18:14:41 +0800
-Subject: [PATCH v2 3/4] dts: atmel: at91sam9rl: switch ssc compatible string
+Date: Wed, 11 Jun 2014 18:14:42 +0800
+Subject: [PATCH v2 4/4] dts: atmel: at91sam9g20: switch ssc compatible string
 In-Reply-To: <1402481682-9811-1-git-send-email-voice.shen@atmel.com>
 References: <1402481682-9811-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1402481682-9811-4-git-send-email-voice.shen@atmel.com>
+Message-ID: <1402481682-9811-5-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the SSC integrate in at91sam9rl support frame sync length
+As the SSC integrate in at91sam9g20 support frame sync length
 extension, so switch compatible string to support this feature.
 
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
@@ -15,30 +15,23 @@ Signed-off-by: Bo Shen <voice.shen@atmel.com>
 Changes in v2:
   - New
 
- arch/arm/boot/dts/at91sam9rl.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/at91sam9g20.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-index 1da1831..fa32de9 100644
---- a/arch/arm/boot/dts/at91sam9rl.dtsi
-+++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-@@ -203,7 +203,7 @@
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index b8e7946..dcd39fe 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -22,6 +22,10 @@
+ 				compatible = "atmel,at91sam9g20-i2c";
  			};
  
- 			ssc0: ssc at fffc0000 {
--				compatible = "atmel,at91rm9200-ssc";
++			ssc0: ssc at fffbc000 {
 +				compatible = "atmel,at91sam9rl-ssc";
- 				reg = <0xfffc0000 0x4000>;
- 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
-@@ -212,7 +212,7 @@
++			};
++
+ 			adc0: adc at fffe0000 {
+ 				atmel,adc-startup-time = <40>;
  			};
- 
- 			ssc1: ssc at fffc4000 {
--				compatible = "atmel,at91rm9200-ssc";
-+				compatible = "atmel,at91sam9rl-ssc";
- 				reg = <0xfffc4000 0x4000>;
- 				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
 -- 
 1.8.5.2
