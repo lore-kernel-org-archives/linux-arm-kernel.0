@@ -1,29 +1,88 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 11 Jun 2014 09:50:38 -0700
-Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
- always enabled
-In-Reply-To: <1402464739-19044-2-git-send-email-tushar.b@samsung.com> (Tushar
- Behera's message of "Wed, 11 Jun 2014 11:02:17 +0530")
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
-Message-ID: <7ha99jjspt.fsf@paris.lan>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 11 Jun 2014 10:14:02 -0700
+Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16, rebased
+In-Reply-To: <20140611084519.GA22486@lukather>
+References: <20140611084519.GA22486@lukather>
+Message-ID: <20140611171402.6562.38902@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera <tushar.b@samsung.com> writes:
+Quoting Maxime Ripard (2014-06-11 01:45:19)
+> Hi Mike,
+> 
+> Like you asked on IRC, here is the clocks additions for the Allwinner
+> SoCs, rebased on your current clk-next.
 
-> When the output clock of AUDSS mux is disabled, we are getting kernel
-> oops while doing a clk_get() on other clocks provided by AUDSS. 
->
-> Though user manual doesn't specify this dependency, we came across
-> this issue while disabling the parent of AUDSS mux clocks.
->
-> Keeping the parents of AUDSS mux always enabled fixes this issue.
+Pulled.
 
-While this patch works (and fixes the boot problem for me), it seems
-like it's papering over the real problem.
+Thanks,
+Mike
 
-Seems like the right fix is actually modelling the clocks properly so
-that enabling a child clock ensures that the parent is also enabled.
-
-Kevin
+> 
+> Thanks,
+> Maxime
+> 
+> The following changes since commit 3f6eec9969d24f91a3909d51e86e007ca5efd4c4:
+> 
+>   Merge branch 'for-v3.16/ti-clk-drv' of github.com:t-kristo/linux-pm into clk-next (2014-06-10 16:53:25 -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+>   https://github.com/mripard/linux.git tags/sunxi-clk-for-3.16-2
+> 
+> for you to fetch changes up to 5c89a8b65760a60eea38e0b172d04152ec03a067:
+> 
+>   clk: sunxi: document PRCM clock compatible strings (2014-06-11 10:25:03 +0200)
+> 
+> ----------------------------------------------------------------
+> Rebase of Emilio's clk-sunxi-for-3.16 on top of clk-next
+> 
+> Fixed a few compilation warnings exposed by a patch introduced during the 3.16
+> merge window.
+> 
+> Original tag message:
+> 
+> Allwinner sunXi SoCs clock changes
+> 
+> This pull contains some new code to add support for A31 clocks by Maxime
+> and Boris. It also reworks the driver a bit to avoid having a huge
+> single file when we have a full folder for ourselves, and separating
+> different functional units makes sense.
+> 
+> ----------------------------------------------------------------
+> Boris BREZILLON (2):
+>       clk: sunxi: add PRCM (Power/Reset/Clock Management) clks support
+>       clk: sunxi: document PRCM clock compatible strings
+> 
+> Emilio L?pez (1):
+>       clk: sunxi: document new A31 USB clock compatible
+> 
+> Maxime Ripard (7):
+>       clk: sunxi: Implement A31 USB clock
+>       clk: sunxi: Remove calls to clk_put
+>       clk: sunxi: Move the 24M oscillator to a file of its own
+>       clk: sunxi: Move the GMAC clock to a file of its own
+>       clk: sunxi: Rework clock protection code
+>       clk: sun6i: Protect CPU clock
+>       clk: sun6i: Protect SDRAM gating bit
+> 
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
+>  drivers/clk/sunxi/Makefile                        |   4 +
+>  drivers/clk/sunxi/clk-a10-hosc.c                  |  73 +++++++
+>  drivers/clk/sunxi/clk-a20-gmac.c                  | 119 +++++++++++
+>  drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  99 +++++++++
+>  drivers/clk/sunxi/clk-sun6i-apb0.c                |  77 +++++++
+>  drivers/clk/sunxi/clk-sun6i-ar100.c               | 233 +++++++++++++++++++++
+>  drivers/clk/sunxi/clk-sunxi.c                     | 239 +++++-----------------
+>  8 files changed, 661 insertions(+), 187 deletions(-)
+>  create mode 100644 drivers/clk/sunxi/clk-a10-hosc.c
+>  create mode 100644 drivers/clk/sunxi/clk-a20-gmac.c
+>  create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+>  create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0.c
+>  create mode 100644 drivers/clk/sunxi/clk-sun6i-ar100.c
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
