@@ -1,53 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Jun 2014 22:21:43 +0200
-Subject: [PATCH 00/24] PM / Domains: Generic OF-based support and cleanups
-In-Reply-To: <CAJZ5v0gcHSGf5DBYC-KLtOCveo---vQdSmdUKCqU7pNMKcXbww@mail.gmail.com>
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
- <7hlht3gvas.fsf@paris.lan>
- <CAJZ5v0gcHSGf5DBYC-KLtOCveo---vQdSmdUKCqU7pNMKcXbww@mail.gmail.com>
-Message-ID: <CAPDyKFqpmqBUAFc-ztbF-Q4K=okAnzW0qqK9-+nr+-jwv=c1zQ@mail.gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 11 Jun 2014 13:22:57 -0700
+Subject: [RFC 0/5] Two-phase seccomp and an x86_64 fast path
+Message-ID: <cover.1402517933.git.luto@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 June 2014 20:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Wed, Jun 11, 2014 at 8:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
->>
->>> Parts of this patchset has been posted earlier. To be able to smoothly continue
->>> my work in re-factoring genpd I have collected patches into this patchset.
->>>
->>> The complete patchset is available at the linux-pm_linux-next_genpd branch at:
->>> git.linaro.org/people/ulf.hansson/linux-2.6.git
->>> This branch is based upon Rafael's linux-pm tree's linux-next branch.
->>>
->>> And important note. There are dependencies througout this patchset, which means
->>> the all need to go together. I suggest we use Rafael's tree, thus I seek for
->>> acks from the affected ARM SoC maintainers.
->>
->> At least on the surface, there are at least 3 separate series going on
->> here
->>
->> 1) DT support for genpd
->> 2) various genpd cleanups
->> 3) ux500 support
->>
->> Clearly they are related, but it would be easier to review if a large
->> series like this is broken up into smaller series where the cover
->> letters describe the dependencies between them
->
-> Agreed.
->
-> And if they are sent in such an order that the bits the rest depends on
-> go first and are settled before the next series is even submitted.
+On my VM, getpid takes about 70ns.  Before this patchset, adding a
+single-instruction always-accept seccomp filter added about 134ns of
+overhead to getpid.  With this patchset, the overhead is down to about
+13ns.
 
-Right. Let me split it up and resend.
+I'd really appreciate careful review from all relevant arch
+maintainers for patch 1.
 
-Also, note - the reason for adding the ux500 genpd support in this
-patchset, was to provide an example of how the new DT bindings would
-be used.
+This is an RFC for now.  I'll submit a non-RFC version after the merge
+window ends.
 
-Kind regards
-Ulf Hansson
+Andy Lutomirski (5):
+  seccomp,x86,arm,mips,s390: Remove nr parameter from secure_computing
+  x86_64,entry: Treat regs->ax the same in fastpath and slowpath
+    syscalls
+  seccomp: Refactor the filter callback and the API
+  seccomp: Allow arch code to provide seccomp_data
+  x86,seccomp: Add a seccomp fastpath
 
->
-> Rafael
+ arch/arm/kernel/ptrace.c       |   7 +-
+ arch/mips/kernel/ptrace.c      |   2 +-
+ arch/s390/kernel/ptrace.c      |   2 +-
+ arch/x86/include/asm/calling.h |   6 +-
+ arch/x86/kernel/entry_64.S     |  52 ++++++++-
+ arch/x86/kernel/ptrace.c       |   2 +-
+ arch/x86/kernel/vsyscall_64.c  |   2 +-
+ include/linux/seccomp.h        |  25 +++--
+ kernel/seccomp.c               | 244 +++++++++++++++++++++++++++--------------
+ 9 files changed, 241 insertions(+), 101 deletions(-)
+
+-- 
+1.9.3
