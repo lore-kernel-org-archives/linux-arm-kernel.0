@@ -1,50 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 Jun 2014 00:28:15 +0900
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>	<20140607181221.GB25068@e102568-lin.cambridge.arm.com>	<CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>	<20140609223831.GB16889@e102568-lin.cambridge.arm.com>	<CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>	<CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>	<alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>	<CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
- <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
-Message-ID: <5398758F.4080306@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 11 Jun 2014 17:30:09 +0200
+Subject: [PATCH 2/5] ARM: Get outer cache .write_sec callback from mach_desc
+ only if not NULL
+In-Reply-To: <1402500612-4778-1-git-send-email-t.figa@samsung.com>
+References: <1402500612-4778-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1402500612-4778-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/14 00:19, Doug Anderson wrote:
-> Chander,
->
-> On Tue, Jun 10, 2014 at 9:52 PM, Chander Kashyap<k.chander@samsung.com>  wrote:
->> Hi Doug,
->>
->> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre<nicolas.pitre@linaro.org>  wrote:
->>> On Tue, 10 Jun 2014, Doug Anderson wrote:
->>>
->>>> My S-state knowledge is not strong, but I believe that Lorenzo's
->>>> questions matter if we're using S2 for CPUidle (where we actually turn
->>>> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
->>>> (where we just enter WFI/WFE).
->>>>
->>
->> No Its not plain WFI.
->>
->> All cores in Exynos5420 can be powered off independently.
->> This functionality has been tested.
->>
->> Below is the link for the posted patches.
->>
->> https://lkml.org/lkml/2014/6/10/194
->>
->> And as Nicolas wrote, these patches need MCPM for that.
->
-> Most excellent!  I should have been more clear that I only knew about
-> how CPUidle worked in our local production kernel.  There I'm pretty
-> sure CPUidle is just WFI/WFE.  If you've got patches to do better then
-> that's great!
->
-> ...can you confirm that my patch doesn't interfere with your improved
-> CPUidle?  It's been Acked by Nicolas (thanks!) so I'd imagine it will
-> land shortly.  Kukjin: I assume you'll be taking this?
->
-Sure, I will ;-)
+Certain platforms (i.e. Exynos) might need to set .write_sec callback
+from firmware initialization which is happenning in .init_early callback
+of machine descriptor. However current code will overwrite the pointer
+with whatever is present in machine descriptor, even though it can be
+already set earlier. This patch fixes this by making the assignment
+conditional, depending on whether current .write_sec callback is NULL.
 
-Thanks,
-Kukjin
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/kernel/irq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c42576..e7383b9 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -125,7 +125,8 @@ void __init init_IRQ(void)
+ 
+ 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
+ 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
+-		outer_cache.write_sec = machine_desc->l2c_write_sec;
++		if (!outer_cache.write_sec)
++			outer_cache.write_sec = machine_desc->l2c_write_sec;
+ 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+ 				   machine_desc->l2c_aux_mask);
+ 		if (ret)
+-- 
+1.9.3
