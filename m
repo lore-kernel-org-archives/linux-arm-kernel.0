@@ -1,86 +1,101 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Jun 2014 10:45:19 +0200
-Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16, rebased
-Message-ID: <20140611084519.GA22486@lukather>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 11 Jun 2014 10:50:43 +0200
+Subject: [PATCH] Exynos4: cpuidle: support dual CPUs with AFTR state
+In-Reply-To: <1396604925-18383-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1396604925-18383-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1402476643.32147.6.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On pi?, 2014-04-04 at 11:48 +0200, Daniel Lezcano wrote:
+> The following driver is for exynos4210. I did not yet finished the other boards, so
+> I created a specific driver for 4210 which could be merged later.
+> 
+> The driver is based on Colin Cross's driver found at:
+> 
+> https://android.googlesource.com/kernel/exynos/+/e686b1ec67423c40b4fdf811f9a4dfa3b393a010%5E%5E!/
+> 
+> This one was based on a 3.4 kernel and an old API.
+> 
+> It has been refreshed, simplified and based on the recent code cleanup I sent
+> today.
+> 
+> The AFTR could be entered when all the cpus (except cpu0) are down. In order to
+> reach this situation, the couple idle states are used.
+> 
+> There is a sync barrier at the entry and the exit of the low power function. So
+> all cpus will enter and exit the function at the same time.
+> 
+> At this point, CPU0 knows the other cpu will power down itself. CPU0 waits for
+> the CPU1 to be powered down and then initiate the AFTR power down sequence.
+> 
+> No interrupts are handled by CPU1, this is why we switch to the timer broadcast
+> even if the local timer is not impacted by the idle state.
+> 
+> When CPU0 wakes up, it powers up CPU1 and waits for it to boot. Then they both
+> exit the idle function.
+> 
+> This driver allows the exynos4210 to have the same power consumption at idle
+> time than the one when we have to unplug CPU1 in order to let CPU0 to reach
+> the AFTR state.
+> 
+> This patch is a RFC because, we have to find a way to remove the macros
+> definitions and cpu powerdown function without pulling the arch dependent
+> headers.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-exynos/common.c        |   11 +-
+>  drivers/cpuidle/Kconfig.arm          |    8 ++
+>  drivers/cpuidle/Makefile             |    1 +
+>  drivers/cpuidle/cpuidle-exynos4210.c |  226 ++++++++++++++++++++++++++++++++++
+>  4 files changed, 245 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/cpuidle/cpuidle-exynos4210.c
 
-Like you asked on IRC, here is the clocks additions for the Allwinner
-SoCs, rebased on your current clk-next.
+(...)
 
-Thanks,
-Maxime
+> diff --git a/drivers/cpuidle/cpuidle-exynos4210.c b/drivers/cpuidle/cpuidle-exynos4210.c
+> new file mode 100644
+> index 0000000..56f6d51
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-exynos4210.c
+> @@ -0,0 +1,226 @@
+> +/*
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Copyright (c) 2014 Linaro : Daniel Lezcano <daniel.lezcano@linaro.org>
+> + *		http://www.linaro.org
+> + *
+> + * Based on the work of Colin Cross <ccross@android.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/cpuidle.h>
+> +#include <linux/cpu_pm.h>
+> +#include <linux/io.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <asm/proc-fns.h>
+> +#include <asm/suspend.h>
+> +#include <asm/cpuidle.h>
+> +
+> +#include <plat/pm.h>
+> +#include <plat/cpu.h>
+> +#include <plat/map-base.h>
+> +#include <plat/map-s5p.h>
+> +
+> +static atomic_t exynos_idle_barrier;
 
-The following changes since commit 3f6eec9969d24f91a3909d51e86e007ca5efd4c4:
+Hi,
 
-  Merge branch 'for-v3.16/ti-clk-drv' of github.com:t-kristo/linux-pm into clk-next (2014-06-10 16:53:25 -0700)
+Shouldn't the exynos_idle_barrier be initialized here?
 
-are available in the git repository at:
+I know you sent the patch almost 2 months ago but I stomped on this
+while testing it on Exynos3250.
 
-
-  https://github.com/mripard/linux.git tags/sunxi-clk-for-3.16-2
-
-for you to fetch changes up to 5c89a8b65760a60eea38e0b172d04152ec03a067:
-
-  clk: sunxi: document PRCM clock compatible strings (2014-06-11 10:25:03 +0200)
-
-----------------------------------------------------------------
-Rebase of Emilio's clk-sunxi-for-3.16 on top of clk-next
-
-Fixed a few compilation warnings exposed by a patch introduced during the 3.16
-merge window.
-
-Original tag message:
-
-Allwinner sunXi SoCs clock changes
-
-This pull contains some new code to add support for A31 clocks by Maxime
-and Boris. It also reworks the driver a bit to avoid having a huge
-single file when we have a full folder for ourselves, and separating
-different functional units makes sense.
-
-----------------------------------------------------------------
-Boris BREZILLON (2):
-      clk: sunxi: add PRCM (Power/Reset/Clock Management) clks support
-      clk: sunxi: document PRCM clock compatible strings
-
-Emilio L?pez (1):
-      clk: sunxi: document new A31 USB clock compatible
-
-Maxime Ripard (7):
-      clk: sunxi: Implement A31 USB clock
-      clk: sunxi: Remove calls to clk_put
-      clk: sunxi: Move the 24M oscillator to a file of its own
-      clk: sunxi: Move the GMAC clock to a file of its own
-      clk: sunxi: Rework clock protection code
-      clk: sun6i: Protect CPU clock
-      clk: sun6i: Protect SDRAM gating bit
-
- Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
- drivers/clk/sunxi/Makefile                        |   4 +
- drivers/clk/sunxi/clk-a10-hosc.c                  |  73 +++++++
- drivers/clk/sunxi/clk-a20-gmac.c                  | 119 +++++++++++
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  99 +++++++++
- drivers/clk/sunxi/clk-sun6i-apb0.c                |  77 +++++++
- drivers/clk/sunxi/clk-sun6i-ar100.c               | 233 +++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                     | 239 +++++-----------------
- 8 files changed, 661 insertions(+), 187 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-a10-hosc.c
- create mode 100644 drivers/clk/sunxi/clk-a20-gmac.c
- create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0-gates.c
- create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0.c
- create mode 100644 drivers/clk/sunxi/clk-sun6i-ar100.c
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140611/827e7e4f/attachment.sig>
+Best regards,
+Krzysztof
