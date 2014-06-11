@@ -1,31 +1,25 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Wed, 11 Jun 2014 11:27:44 +0530
-Subject: [PATCHv3 0/3] arm:dma-mapping Refactoring iommu dma-mapping code
-In-Reply-To: <20140611032316.GB3758@kroah.com>
-References: <1402044161-32980-1-git-send-email-ritesh.harjani@gmail.com>
- <CAD15agZdquB5Ak5JT_2HRDtrAQ=j-d3UfrJr6ZS9eijD2ibBUg@mail.gmail.com>
- <20140611032316.GB3758@kroah.com>
-Message-ID: <CAD15agZupppRr9zreruap6DrYsjuEj_knGPf2LG43d9GVjBzUQ@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 11 Jun 2014 09:04:33 +0300
+Subject: [patch] char: xilinx_hwicap: missing error code if ioremap() fails
+Message-ID: <20140611060433.GB7569@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Return -ENOMEM instead of success if ioremap() fails.
 
-On Wed, Jun 11, 2014 at 8:53 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Wed, Jun 11, 2014 at 08:27:54AM +0530, Ritesh Harjani wrote:
->> Hi Will/Catalin/Marek...
->>
->> Any comments on this patch series ??
->
-> It's the middle of the merge window, we can't do anything right now and
-> are all swamped with other work, give people some time...
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+---
+Static checker stuff, I can't compile this.
 
-Sure, thanks for the reply.
-
->
-> greg k-h
-
-
-Thanks
-Ritesh
+diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+index f6345f9..9b1a5ac 100644
+--- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
++++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+@@ -661,6 +661,7 @@ static int hwicap_setup(struct device *dev, int id,
+ 	drvdata->base_address = ioremap(drvdata->mem_start, drvdata->mem_size);
+ 	if (!drvdata->base_address) {
+ 		dev_err(dev, "ioremap() failed\n");
++		retval = -ENOMEM;
+ 		goto failed2;
+ 	}
+ 
