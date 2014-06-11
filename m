@@ -1,72 +1,59 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 11 Jun 2014 09:44:08 -0400
-Subject: [PATCH] arm/ftrace: Fix function_return_addr() to
- function_return_address()
-In-Reply-To: <CAMuHMdWm+hpumykRG2FudDPYSVODv1WoU6_tPv5D3HCPDQtDSw@mail.gmail.com>
-References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
- <CAMuHMdWs9i4pBNbn-RTpv_-K5W7YGED=KtEtFSci=7YHdNKpfw@mail.gmail.com>
- <20140611092330.7930eff2@gandalf.local.home>
- <CAMuHMdWm+hpumykRG2FudDPYSVODv1WoU6_tPv5D3HCPDQtDSw@mail.gmail.com>
-Message-ID: <20140611094408.0a6dedc3@gandalf.local.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Jun 2014 16:04:14 +0200
+Subject: [PATCH v1] of/irq: do irq resolution in platform_get_irq_byname()
+In-Reply-To: <CAGb2v64f8Wju6dtVuVN2x=9YVGA-=RXozzhpJZNspKZ05f=jtA@mail.gmail.com>
+References: <1400582523-22684-1-git-send-email-grygorii.strashko@ti.com>
+ <20140523080333.66720C4176E@trevor.secretlab.ca>
+ <CAGa+x85mOHtNAj-UHgK2_z8zWAF=qwFcRcUgHTR-byNiX7heHA@mail.gmail.com>
+ <CAL_JsqLm3wfVS+au+JUbhBhxz=LuVpepH6GxabCQhPowhbw77g@mail.gmail.com>
+ <20140528071855.GJ4227@lee--X1>
+ <CACRpkdYgkEOjLamYu5uKSgs3iTNJ-w5XkbeygKjRdR-bNdETfg@mail.gmail.com>
+ <CAGb2v64f8Wju6dtVuVN2x=9YVGA-=RXozzhpJZNspKZ05f=jtA@mail.gmail.com>
+Message-ID: <CACRpkdadSYFG-KaVYmUnf+gKzFKgEQBhABK7RWVgUv=sX-Up-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Jun 2014 15:38:49 +0200
-Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+On Wed, May 28, 2014 at 10:49 AM, Chen-Yu Tsai <wens@csie.org> wrote:
 
-> Hi Steven,
-> 
-> On Wed, Jun 11, 2014 at 3:23 PM, Steven Rostedt <rostedt@goodmis.org> wrote:
-> > The clean up of CALLER_ADDR*() functions required the archs to either
-> > use the default __builtin_return_address(X) (where X > 0) or override
-> > it with something the arch can use. To override it, the arch would
-> > define function_return_address(x).
-> 
-> ftrace_return_address(x)
-> 
-> > The arm architecture requires this to be redefined but instead of
-> > defining function_return_address(x) it defined function_return_addr(x).
-> 
-> ftrace_return_address(x) ... ftrace_return_address(x)
+> Log says musb is wrestling control over some pins with some other driver:
+>
+> [    1.441497] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
+> requested by a03e0000.usb_per5; cannot claim for musb-hdrc.0.auto
+> [    1.453369] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.0.auto)
+> status -22
+> [    1.460571] pinctrl-nomadik soc:pinctrl: could not request pin 256
+> (GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
+> [    1.472076] musb-hdrc musb-hdrc.0.auto: Error applying setting,
+> reverse things back
+> [    1.479827] HS USB OTG: no transceiver configured
+> [    1.484558] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
+> with status -517
+> [    1.492309] platform musb-hdrc.0.auto: Driver musb-hdrc requests
+> probe deferral
+> [    1.500183] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
+> requested by a03e0000.usb_per5; cannot claim for musb-hdrc.0.auto
+> [    1.512023] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.0.auto)
+> status -22
+> [    1.519226] pinctrl-nomadik soc:pinctrl: could not request pin 256
+> (GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
+> [    1.530731] musb-ux500 musb-hdrc.0.auto: Error applying setting,
+> reverse things back
+> [    1.539184] pinctrl-nomadik soc:pinctrl: pin GPIO256_AF28 already
+> requested by a03e0000.usb_per5; cannot claim for musb-hdrc.1.auto
+> [    1.551025] pinctrl-nomadik soc:pinctrl: pin-256 (musb-hdrc.1.auto)
+> status -22
+> [    1.558258] pinctrl-nomadik soc:pinctrl: could not request pin 256
+> (GPIO256_AF28) from group usb_a_1  on device pinctrl-nomadik
+> [    1.569732] musb-hdrc musb-hdrc.1.auto: Error applying setting,
+> reverse things back
+> [    1.577453] HS USB OTG: no transceiver configured
+>
+> [ .. repeats until the end .. ]
+>
+> I think this is not related to this patch.
 
-As long as I got the patch part right ;-)
+No that is fixed i this patch:
+http://marc.info/?l=linux-usb&m=140239049219096&w=2
 
-Will, please update the change log with the correct name. Including the
-subject. Thanks!
-
--- Steve
-
-> 
-> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-> 
-> Nevertheless, your patch kills the warnings. Thanks!
-> 
-> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> 
-> > ----
-> > diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-> > index eb577f4..39eb16b 100644
-> > --- a/arch/arm/include/asm/ftrace.h
-> > +++ b/arch/arm/include/asm/ftrace.h
-> > @@ -52,7 +52,7 @@ extern inline void *return_address(unsigned int level)
-> >
-> >  #endif
-> >
-> > -#define ftrace_return_addr(n) return_address(n)
-> > +#define ftrace_return_address(n) return_address(n)
-> >
-> >  #endif /* ifndef __ASSEMBLY__ */
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+Yours,
+Linus Walleij
