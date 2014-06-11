@@ -1,101 +1,57 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Wed, 11 Jun 2014 17:44:21 +0530
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <20140611101353.GA18781@e102568-lin.cambridge.arm.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
- <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
- <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
- <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
- <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
- <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
- <20140611101353.GA18781@e102568-lin.cambridge.arm.com>
-Message-ID: <CADWw7OghkwkMbU=eZG=OhxVowNJy_12UOo_pNYnXbimF73Uwdw@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 11 Jun 2014 14:15:06 +0200
+Subject: [RFC PATCH] input, touch, atmel_mxt_ts: use atmel driver
+In-Reply-To: <5398465B.7060101@itdev.co.uk>
+References: <1402468526-9165-1-git-send-email-hs@denx.de>
+ <5398465B.7060101@itdev.co.uk>
+Message-ID: <5398484A.9090904@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 3:43 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Jun 11, 2014 at 05:52:10AM +0100, Chander Kashyap wrote:
->> Hi Doug,
->>
->> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > On Tue, 10 Jun 2014, Doug Anderson wrote:
->> >
->> >> My S-state knowledge is not strong, but I believe that Lorenzo's
->> >> questions matter if we're using S2 for CPUidle (where we actually turn
->> >> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
->> >> (where we just enter WFI/WFE).
->> >>
->>
->> No Its not plain WFI.
->>
->> All cores in Exynos5420 can be powered off independently.
->> This functionality has been tested.
->>
->> Below is the link for the posted patches.
->>
->> https://lkml.org/lkml/2014/6/10/194
->>
->> And as Nicolas wrote, these patches need MCPM for that.
->
-> Chander, I cast a look into the code and I have a question
-> (you also told me on CPUidle review that only core off
-> is supported in CPUidle).
->
-> When you say all cores can be powered off independently, do
-> you also mean that clusters can be powered off (in CPUidle) ?
->
-> I am pointing this out since in the MCPM backend I noticed:
->
-> "/* TODO: Turn off the cluster here to save power. */"
->
-> I do not see any cluster power down request in the down path.
->
-> If I am wrong, ignore my message, I am just writing to help.
->
-> If you can only power down cores, but not the clusters on idle,
-> please keep in mind that you are currently cleaning and invalidating
-> the L2 when last man is running and this must not be taken
-> lightly since, if L2 stays on, that's a massive energy waste
-> for nothing.
->
-> So, if clusters stay up, you _have_ to tweak the MCPM backend slightly
-> to avoid cleaning L2, that's pivotal.
+Hello Nick,
 
-Hi Lorenzo,
-Cluster shutdown is in progress. Abhilash will add support for that.
-
-https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31104.html
-
-
->
-> Lorenzo
->
+Am 11.06.2014 14:06, schrieb Nick Dyer:
+> Heiko Schocher wrote:
+>> try to bring the driver from
+>> https://github.com/ndyer/linux for-next
 >>
->> >> I believe that in ChromeOS we use S1 CPUidle and that it works fine.
->> >> We've never implemented S2 that I'm aware of.
->> >
->> > You'll have to rely on MCPM for that.  That's probably why it hasn't
->> > been implemented before.
->> >
->> >
->> > Nicolas
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+>> to mainline. Post this as a RFC, to see if this is possible...
 >>
+>> based on:
+>> commit dda0a5570574cfe467c1c794cf7a17e1d742ec02 ("Input:
+>> atmel_mxt_ts - implement improved debug message interface")
+>>
+>> from Nick Dyer<nick.dyer@itdev.co.uk>
+>>
+>> added:
+>> - remove some (not all) checkpatch warnings
+>> - Add support for voltage regulator
+>> - Add support for Device Tree support
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> My thinking has been that the maintainers will more likely accept a series
+> of small patches than to make such a huge change to the entire driver, my
+> for-next tree is where I'm working on this, and I plan to post another set
+> of 15 patches soon, when I've fixed up some issues to do with probe/remove
+> cycles.
+
+Sound good!
+
+> You should note that my for-next branch has moved on slightly since you
+> have taken this, because I have implemented device tree support and changed
+> the config download to use the request_firmware_async() function.
+
+Oh, I take a look at this, thanks!
+
+> Your device tree stuff for mach-goni.c looks really useful, however - if
+> you can send me a patch for that against my current for-next branch I can
+> include it with my version of the device tree support.
+
+Ok, I send you this ASAP.
+
+Thanks for this info.
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
