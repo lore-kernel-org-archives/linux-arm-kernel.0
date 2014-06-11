@@ -1,30 +1,70 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 11 Jun 2014 10:36:30 +0200
-Subject: [PATCH v5 0/7] ARM: berlin: add AHCI support
-In-Reply-To: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140611083630.GA32216@kwain>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 11 Jun 2014 10:39:39 +0200
+Subject: [PATCH v6 1/2] i2c: sunxi: add P2WI DT bindings documentation
+In-Reply-To: <1402475980-15513-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1402475980-15513-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1402475980-15513-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+P2WI (Push/Pull 2 Wire Interface) is an SMBus like bus used to communicate
+with some PMICs (like the AXP221).
 
-On Mon, May 26, 2014 at 04:51:41PM +0200, Antoine T?nart wrote:
-> This series adds the support for Berlin SoC AHCI controller. The
-> controller allows to use the SATA host interface and, for example, the
-> eSATA port on the BG2Q.
-> 
-> The series adds a PHY driver to control the two SATA ports available,
-> and adds a generic compatible to use the existing ahci_platform driver.
-> 
-> Also enable the eSATA interface on the BG2Q DMP.
+Document P2WI DT bindings which are pretty much the same as the one defined
+for the marvell's mv64xxx controller.
 
-Any news on this series?
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ .../devicetree/bindings/i2c/i2c-sunxi-p2wi.txt     | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
 
-
-Antoine
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt b/Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
+new file mode 100644
+index 0000000..6b76548
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
+@@ -0,0 +1,41 @@
++
++* Allwinner P2WI (Push/Pull 2 Wire Interface) controller
++
++Required properties :
++
++ - reg             : Offset and length of the register set for the device.
++ - compatible      : Should one of the following:
++                     - "allwinner,sun6i-a31-p2wi"
++ - interrupts      : The interrupt line connected to the P2WI peripheral.
++ - clocks          : The gate clk connected to the P2WI peripheral.
++ - resets          : The reset line connected to the P2WI peripheral.
++
++Optional properties :
++
++ - clock-frequency : Desired P2WI bus clock frequency in Hz. If not set the
++default frequency is 100kHz
++
++A P2WI may contain one child node encoding a P2WI slave device.
++
++Slave device properties:
++  Required properties:
++   - reg           : the I2C slave address used during the initialization
++                     process to switch from I2C to P2WI mode
++
++Example:
++
++	p2wi at 01f03400 {
++		compatible = "allwinner,sun6i-a31-p2wi";
++		reg = <0x01f03400 0x400>;
++		interrupts = <0 39 4>;
++		clocks = <&apb0_gates 3>;
++		clock-frequency = <6000000>;
++		resets = <&apb0_rst 3>;
++
++		axp221: pmic at 68 {
++			compatible = "x-powers,axp221";
++			reg = <0x68>;
++
++			/* ... */
++		};
++	};
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.2
