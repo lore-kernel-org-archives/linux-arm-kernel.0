@@ -1,94 +1,73 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 11 Jun 2014 11:16:34 -0700
-Subject: [PATCH 02/24] drivercore: Bind/unbind power domain on probe/remove
-In-Reply-To: <53977BC1.5000301@gmail.com> (Tomasz Figa's message of "Tue, 10
- Jun 2014 23:42:25 +0200")
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0hUT0QPGWeDM9WoxnobaL5eoNi5UFrUUZrQ1gSBCX=aVg@mail.gmail.com>
- <CAPDyKFqWZdA4ZisJvCDP8j6D2_A8oRAHkjikddyGSwpToFg-Gw@mail.gmail.com>
- <1894835.cKK4602bPf@vostro.rjw.lan> <20140610212731.GA11191@kroah.com>
- <53977BC1.5000301@gmail.com>
-Message-ID: <7h38fbia65.fsf@paris.lan>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 11 Jun 2014 20:18:20 +0200
+Subject: [PATCH 1/2 v3] spi: s3c64xx: use "cs-gpios" from spi node instead
+ of "cs-gpio"
+In-Reply-To: <539896FB.4050702@gmail.com>
+References: <1402468318-7342-1-git-send-email-ch.naveen@samsung.com>
+ <539839D6.1050305@collabora.co.uk>
+ <CAHfPSqCYqTRBBH56y81na-t18pvoPmyWobZwXNgkrtq=H_79CQ@mail.gmail.com>
+ <5398918F.4060800@collabora.co.uk> <539896FB.4050702@gmail.com>
+Message-ID: <53989D6C.5080806@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa <tomasz.figa@gmail.com> writes:
+Hello Tomasz,
 
-> On 10.06.2014 23:27, Greg Kroah-Hartman wrote:
->> On Tue, Jun 10, 2014 at 11:27:45PM +0200, Rafael J. Wysocki wrote:
->>> On Tuesday, June 10, 2014 02:53:26 PM Ulf Hansson wrote:
->>>> On 10 June 2014 14:11, Rafael J. Wysocki <rafael@kernel.org> wrote:
->>>>> On Tue, Jun 10, 2014 at 12:51 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>>> From: Tomasz Figa <t.figa@samsung.com>
->>>>>>
->>>>>> On a number of platforms, devices are part of controllable power
->>>>>> domains, which need to be enabled before such devices can be accessed
->>>>>> and may be powered down when the device is idle to save some power.
->>>>>> This means that on systems that support power domain control using
->>>>>> generic power domains subsystem, it is necessary to add device to its
->>>>>> power domain before binding a driver to it and remove it from its power
->>>>>> domain after its driver is unbound to make sure that an unused device
->>>>>> does not affect power domain state.
->>>>>>
->>>>>> Since this is not limited to particular busses and specific
->>>>>> archs/platforms,
+On 06/11/2014 07:50 PM, Tomasz Figa wrote:
+> On 11.06.2014 19:27, Javier Martinez Canillas wrote:
+>> On 06/11/2014 01:38 PM, Naveen Krishna Ch wrote:
+>>> On 11 June 2014 16:43, Javier Martinez Canillas
+>>> <javier.martinez@collabora.co.uk> wrote:
+>>>> On 06/11/2014 08:31 AM, Naveen Krishna Chatradhi wrote:
+> 
+> [snip]
+> 
+>>>>
+>>>>>               return ERR_PTR(-EINVAL);
+>>>>>       }
+>>>>> +     cs->line = spi->cs_gpio;
 >>>>>
->>>>> Actually, this isn't correrct.  It is limited to the platforms that
->>>>> use Device Trees now.
 >>>>
->>>> Correct, we should update the commit message/docs.
->>>>
->>>>>
->>>>> Moreover, it is not consistent with the way we add devices to the ACPI PM
->>>>> domain, which is the ACPI counterpart of this.
->>>>
->>>> I am not sure why you think consistency for ACPI is important here.
->>>> ACPI PM will still be able to handle it's domain/device registering as
->>>> before. There are even other pm_domains that don't use genpd which
->>>> need to handle this themselves.
+>>>> I wonder why are you keeping cs->line? AFAICT it's only used in
+>>>> s3c64xx_spi_setup() to request the GPIO and since you get the struct spi_device
+>>>> pointer as a parameter then you can just use spi->s_gpio instead.
+>>> I'm trying not to touch the non-DT part of the code.
 >>>
->>> My point is that doing things like that in different places for different
->>> firmware interfaces is confusing and likely to lead to coding mistakes in
->>> the future.
+>>> struct s3c64xx_spi_csinfo *cs = spi->controller_data;
 >>>
->>>> Or are you saying that you prefer bus notifiers in favour of making
->>>> use of the driver core for this matter?
->>>
->>> Well, please grep for acpi_dev_pm_attach() and see where it is done.
->>> Surely not in drivers/base/dd.c.  Also I'm not sure why you're talking
->>> about bus notifiers in this context.
->>>
->>>> Shouldn't the driver core handle most of the common things for a device
->>>> driver?
->>>
->>> Common, yes.  Platform-specific, no.
->>>
->>>> Let's compare how the pinctrls are being managed in the driver core, for
->>>> example.
->>>
->>> pinctrl has Device Trees support only at the moment (as far as firmware
->>> interfaces go) and quite frankly I'm not sure if/how we'll need to change
->>> it to cover ACPI as well.
->>>
->>> But for power domains, please keep that stuff away from dd.c.  That is,
->>> unless Greg specifically disagrees with me and decides to apply this
->>> patch regardless. :-)
+>>> This will update the cs->line and cs->fb_delay in case of non-DT.
 >> 
->> Nope, no disagreement from me toward you at all here, keep up the good
->> work :)
->
-> OK, so proposed solution is to put this in:
->
-> - platform_drv_probe(),
-> - spi_drv_probe(),
-> - i2c_device_probe(),
-> - amba_probe(),
->
-> ...
->
-> - and any other bus type, which can have devices instantiated from DT.
+>> I see, then I prefer the opposite and do something like this on s3c64xx_spi_probe():
+>> 
+>> if (!pdev->dev.of_node)
+>>        spi->cs_gpio = cs->line;
+> 
+> Hmm, as far as I understand, spi here is spi_device, not spi_master. I
+> don't think you have access to SPI devices on your bus in controller
+> probe().
+> 
 
-Since this is a DT feature, what about calling
-__pm_genpd_of_add_device()  when the power-domain nodes are discovered?
+Right, I was actually looking at s3c64xx_spi_setup() when I wrote that but for
+some reason I got confused and thought it was the probe() function.
 
-Kevin
+Sorry for the confusion.
+
+> What I think could work is reworking the driver to:
+> 
+> - in DT case, don't do anything in the driver about the GPIO chip
+> select, because it will be handled automatically by the core.
+> 
+> - in non-DT case, in s3c64xx_spi_setup(), just take the GPIO pin from
+> s3c64xx_spi_csinfo struct passed through spi->controller_data, request
+> it and save it to spi->cs_gpio,
+> 
+> - in non-DT case, in s3c64xx_spi_cleanup(), free the GPIO requested in
+> s3c64xx_spi_setup() and set spi->cs_gpio to -ENOENT (as done initially
+> in spi_alloc_device()).
+> 
+> Best regards,
+> Tomasz
+> 
+
+Best regards,
+Javier
