@@ -1,28 +1,53 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 11 Jun 2014 15:14:40 +0100
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <CACxGe6tPQFbbUcJJmoxkAdVAp9b1AcGB_Xdwh_Mu4m6P1j_zRA@mail.gmail.com>
-References: <20140328184517.GA27219@cbox>
- <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
- <53973AA8.9020301@codeaurora.org>
- <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
- <539754E5.3030408@redhat.com>
- <CACxGe6tPQFbbUcJJmoxkAdVAp9b1AcGB_Xdwh_Mu4m6P1j_zRA@mail.gmail.com>
-Message-ID: <CAFEAcA-vFmoci85x8bvNcL7wAH2UHj30cJxxnw0u876P92iBXg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jun 2014 16:35:38 +0200
+Subject: [PATCH] [media] staging: allow omap4iss to be modular
+Message-ID: <5192928.MkINji4uKU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 June 2014 12:33, Grant Likely <grant.likely@linaro.org> wrote:
-> In practical terms, yes the VM needs to provide an RTC interface, but
-> I don't think it needs to appear in this spec, even if the kernel
-> accesses it directly. Portable images should use the UEFI service.
+The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
+of which can be loadable modules. This causes build failures
+if we want the camera driver to be built-in.
 
-I think it might helpful to include some implementation notes
-to the effect that the VM needs to provide certain things to
-the associated UEFI implementation but that these aren't
-part of the specification and the guest OS is expected to
-use the UEFI interfaces, just for the sake of clarity for people
-who aren't too familiar with what UEFI requires or provides.
+This can be solved by turning the option into "tristate",
+which unfortunately causes another problem, because the
+driver incorrectly calls a platform-internal interface
+for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
+To work around that, we can export those symbols, but
+that isn't really the correct solution, as we should not
+have dependencies on platform code this way.
 
-thanks
--- PMM
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+This is one of just two patches we currently need to get
+'make allmodconfig' to build again on ARM.
+
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 751f354..05d2d98 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -190,11 +190,13 @@ u32 omap4_ctrl_pad_readl(u16 offset)
+ {
+ 	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
+ }
++EXPORT_SYMBOL_GPL(omap4_ctrl_pad_readl);
+ 
+ void omap4_ctrl_pad_writel(u32 val, u16 offset)
+ {
+ 	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
+ }
++EXPORT_SYMBOL_GPL(omap4_ctrl_pad_writel);
+ 
+ #ifdef CONFIG_ARCH_OMAP3
+ 
+diff --git a/drivers/staging/media/omap4iss/Kconfig b/drivers/staging/media/omap4iss/Kconfig
+index 78b0fba..0c3e3c1 100644
+--- a/drivers/staging/media/omap4iss/Kconfig
++++ b/drivers/staging/media/omap4iss/Kconfig
+@@ -1,5 +1,5 @@
+ config VIDEO_OMAP4
+-	bool "OMAP 4 Camera support"
++	tristate "OMAP 4 Camera support"
+ 	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	---help---
