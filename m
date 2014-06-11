@@ -1,53 +1,37 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 11 Jun 2014 09:35:25 +0200
-Subject: [RFC PATCH] dma: at_xdmac: creation of the atmel eXtended DMA
- Controller driver
-In-Reply-To: <6544148.4RKn2Y8vCE@wuerfel>
-References: <1401179736-8235-1-git-send-email-ludovic.desroches@atmel.com>
- <20140610154118.GA4254@lukather> <6544148.4RKn2Y8vCE@wuerfel>
-Message-ID: <20140611073525.GQ1701@ldesroches-Latitude-E6320>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 11 Jun 2014 09:39:34 +0200
+Subject: Question on perf counter
+In-Reply-To: <CALU2kfkKzVkPgvhDbk_MuTwhi7Jyo1g6Na7+uwQG=CMq2uFq8g@mail.gmail.com>
+References: <CALU2kfkKzVkPgvhDbk_MuTwhi7Jyo1g6Na7+uwQG=CMq2uFq8g@mail.gmail.com>
+Message-ID: <CAORVsuWSis8-w_iB_2pgvs=ptkspjdXpENEb_AA3-hgAZivkkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 09:15:14PM +0200, Arnd Bergmann wrote:
-> On Tue, May 27, 2014 at 10:35:36AM +0200, Ludovic Desroches wrote:
-> > +static struct dma_chan *at_xdmac_xlate(struct of_phandle_args *dma_spec,
-> > +                                    struct of_dma *of_dma)
-> > +{
-> > +     struct at_xdmac_chan    *atchan;
-> > +     struct dma_chan         *chan;
-> > +     dma_cap_mask_t          mask;
-> > +     struct platform_device  *pdev = of_find_device_by_node(dma_spec->np);
-> 
-> No need to search through all the device nodes, you can look up the
-> device from of_dma->of_dma_data.
+Matt,
 
-Thanks for the tip.
+On Wed, Jun 11, 2014 at 3:07 AM, Mathew Li <mathew.li100@gmail.com> wrote:
+> Hi All,
+>
+> I have a piece of kernel code (actually some assembly functions) on
+> ARM-v8. I want to know how many cycles CPU is taking to execute them.
+> I believe I could use performance counter for this job. So are there
+> some APIs in kernel for performance counter for ARM-v8 which I could
+> make use of?
 
-> 
-> > +     if (dma_spec->args_count != 2) {
-> > +             dev_err(&pdev->dev, "dma phandler args: bad number of args\n");
-> > +             return NULL;
-> > +     }
-> > +
-> > +     dma_cap_zero(mask);
-> > +     dma_cap_set(DMA_SLAVE, mask);
-> > +     chan = dma_request_channel(mask, NULL, NULL);
-> > +     if (!chan) {
-> > +             dev_err(&pdev->dev, "can't get a dma channel\n");
-> > +             return NULL;
-> > +     }
-> 
-> You must use dma_get_any_slave_channel. dma_request_channel gives you a
-> channel from a random dma engine that is present in the system, not
-> necessarily the one you are managing here.
+The kernel has the profiling tools for that.
+Perf has a lot of features that you need to experiment with. Cf.
+https://wiki.linaro.org/LEG/Engineering/TOOLS/tracing-and-profiling-tools
+and https://wiki.yoctoproject.org/wiki/Tracing_and_Profiling for
+detailed information and usage of perf, ftrace ...
 
-It is planned to use dma_get_any_slave_channel but currently I am doing
-tests on a 3.10 kernel that's why I am still using dma_request_channel.
+Regards,
+Jean
 
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> Thanks!
+> Matt
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
