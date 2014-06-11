@@ -1,70 +1,108 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 11 Jun 2014 17:33:55 -0400
-Subject: [PATCH] arm64: fix MAX_ORDER for 64K pagesize
-Message-ID: <1402522435-13884-1-git-send-email-msalter@redhat.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 11 Jun 2014 14:56:58 -0700
+Subject: [RFC 5/5] x86,seccomp: Add a seccomp fastpath
+In-Reply-To: <CAADnVQKt5FnShkZeQewbfnU1kHM-gLs3hCZMf5xcgFzyRDLX7A@mail.gmail.com>
+References: <cover.1402517933.git.luto@amacapital.net>
+ <9e11cd988a0f120606e37b5e275019754e2774da.1402517933.git.luto@amacapital.net>
+ <CAADnVQKt5FnShkZeQewbfnU1kHM-gLs3hCZMf5xcgFzyRDLX7A@mail.gmail.com>
+Message-ID: <CALCETrXoqqKC=T5Wvj+CDYQFte1s_=npDvQ2UYW0j=AanEgR1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE
-I get this at early boot:
+On Wed, Jun 11, 2014 at 2:29 PM, Alexei Starovoitov
+<alexei.starovoitov@gmail.com> wrote:
+> On Wed, Jun 11, 2014 at 1:23 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>> On my VM, getpid takes about 70ns.  Before this patch, adding a
+>> single-instruction always-accept seccomp filter added about 134ns of
+>> overhead to getpid.  With this patch, the overhead is down to about
+>> 13ns.
+>
+> interesting.
+> Is this the gain from patch 4 into patch 5 or from patch 0 to patch 5?
+> 13ns is still with seccomp enabled, but without filters?
 
-  SMP: Total of 8 processors activated.
-  devtmpfs: initialized
-  Unable to handle kernel NULL pointer dereference at virtual address 00000008
-  pgd = fffffe0000050000
-  [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
-  Internal error: Oops: 96000006 [#1] SMP
-  Modules linked in:
-  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
-  task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
-  PC is at __list_add+0x10/0xd4
-  LR is at free_one_page+0x270/0x638
-  ...
-  Call trace:
-  [<fffffe00003ee970>] __list_add+0x10/0xd4
-  [<fffffe000019c478>] free_one_page+0x26c/0x638
-  [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
-  [<fffffe000019d5e8>] __free_pages+0x74/0xbc
-  [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
-  [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
-  [<fffffe0000090418>] do_one_initcall+0xc4/0x154
-  [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
-  [<fffffe00007520a0>] kernel_init+0xc/0xd4
+13ns is with the simplest nonempty filter.  I hope that empty filters
+don't work.
 
-This happens in this configuration because __free_one_page() is called
-with an order greater than MAX_ORDER, accesses past zone->free_list[]
-and passes a bogus list_head to list_add().
+>
+>> I'm not really thrilled by this patch.  It has two main issues:
+>>
+>> 1. Calling into code in kernel/seccomp.c from assembly feels ugly.
+>>
+>> 2. The x86 64-bit syscall entry now has four separate code paths:
+>> fast, seccomp only, audit only, and slow.  This kind of sucks.
+>> Would it be worth trying to rewrite the whole thing in C with a
+>> two-phase slow path approach like I'm using here for seccomp?
+>>
+>> Signed-off-by: Andy Lutomirski <luto@amacapital.net>
+>> ---
+>>  arch/x86/kernel/entry_64.S | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/seccomp.h    |  4 ++--
+>>  2 files changed, 47 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/x86/kernel/entry_64.S b/arch/x86/kernel/entry_64.S
+>> index f9e713a..feb32b2 100644
+>> --- a/arch/x86/kernel/entry_64.S
+>> +++ b/arch/x86/kernel/entry_64.S
+>> @@ -683,6 +683,45 @@ sysret_signal:
+>>         FIXUP_TOP_OF_STACK %r11, -ARGOFFSET
+>>         jmp int_check_syscall_exit_work
+>>
+>> +#ifdef CONFIG_SECCOMP
+>> +       /*
+>> +        * Fast path for seccomp without any other slow path triggers.
+>> +        */
+>> +seccomp_fastpath:
+>> +       /* Build seccomp_data */
+>> +       pushq %r9                               /* args[5] */
+>> +       pushq %r8                               /* args[4] */
+>> +       pushq %r10                              /* args[3] */
+>> +       pushq %rdx                              /* args[2] */
+>> +       pushq %rsi                              /* args[1] */
+>> +       pushq %rdi                              /* args[0] */
+>> +       pushq RIP-ARGOFFSET+6*8(%rsp)           /* rip */
 
-arch/arm64/Kconfig has:
+>> +       pushq %rax                              /* nr and junk */
+>> +       movl $AUDIT_ARCH_X86_64, 4(%rsp)        /* arch */
 
-  config FORCE_MAX_ZONEORDER
-	int
-	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
-	default "11"
+It wouldn't shock me if this pair of instructions were
+microarchitecturally bad.  Maybe I can save a few more cycles by using
+bitwise arithmetic or a pair of movls and explicit rsp manipulation
+here.  I haven't tried.
 
-So with THP turned off MAX_ORDER == 11 but init_cma_reserved_pageblock()
-passes __free_pages() an order of pageblock_order which is based on
-(HPAGE_SHIFT - PAGE_SHIFT) which is 13 for 64K pages. I worked around
-this by removing the THP test so FORCE_MAX_ZONEORDER is always 14 for
-ARM64_64K_PAGES.
+>> +       movq %rsp, %rdi
+>> +       call seccomp_phase1
+>
+> the assembler code is pretty much repeating what C does in
+> populate_seccomp_data(). Assuming the whole gain came from
+> patch 5 why asm version is so much faster than C?
+>
+> it skips SAVE/RESTORE_REST... what else?
+> If the most of the gain is from all patches combined (mainly from
+> 2 phase approach) then why bother with asm?
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The whole gain should be patch 5, but there are three things going on here.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7295419..42a334e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -269,7 +269,7 @@ config XEN
- 
- config FORCE_MAX_ZONEORDER
- 	int
--	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
-+	default "14" if ARM64_64K_PAGES
- 	default "11"
- 
- endmenu
--- 
-1.9.0
+The biggest win is skipping int_ret_from_sys_call.  IRET sucks.
+There's some extra win from skipping SAVE/RESTORE_REST, but I haven't
+benchmarked that.  I would guess it's on the order of 5ns.  In theory
+a one-pass implementation could skip int_ret_from_sys_call, but that
+will be awkward to implement correctly.
+
+The other benefit is generating seccomp_data in assembly.  It saves
+about 7ns.  This is likely due to avoiding all the indirection in
+syscall_xyz and to avoiding prodding at flags to figure out the arch
+token.
+
+Fiddling with branch prediction made no difference that I could measure.
+
+>
+> Somehow it feels that the gain is due to better branch prediction
+> in asm version. If you change few 'unlikely' in C to 'likely', it may
+> get to the same performance...
+>
+> btw patches #1-3 look good to me. especially #1 is nice.
+
+Thanks :)
+
+--Andy
