@@ -1,36 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Jun 2014 12:27:12 +0200
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <alpine.DEB.2.02.1406111035190.13771@kaball.uk.xensource.com>
-References: <20140328184517.GA27219@cbox> <5397360B.80102@huawei.com>
- <alpine.DEB.2.02.1406111035190.13771@kaball.uk.xensource.com>
-Message-ID: <13066173.0bm0kfOsEt@wuerfel>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 11 Jun 2014 12:11:44 +0100
+Subject: [PATCH 1/2] clk: qcom: add clocks necessary for apq8064 sdcc
+In-Reply-To: <53981DE1.3070007@suse.de>
+References: <1402433906-19309-1-git-send-email-sboyd@codeaurora.org>
+ <1402433906-19309-2-git-send-email-sboyd@codeaurora.org>
+ <53981DE1.3070007@suse.de>
+Message-ID: <53983970.4050502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 June 2014 10:50:04 Stefano Stabellini wrote:
-> Although not in the ARM VM System Specification, Xen is certainly going
-> to support a fast boot path without UEFI firmware. I guess KVM will too.
-> You'll have to rely on hypervisor specific mechanisms to achieve it.
-> 
-> In fact I wouldn't worry about UEFI when you need ACPI, that is not in
-> this specification. Moreover the only hypervisor supporting virtio on
-> ARM is KVM as far as I know.
 
-Ah right, I missed the part about ACPI.
 
-> > One aspect of this is that we currently start executing the image directly (no UEFI involved on the guest),
-> > and in some cases we might not need a full fledged file system at all,
-> > as the communication can happen via virtio channels.
-> > 
-> > We do have a need for ACPI for discovery of information like gic addresses, 
-> > timers, interrupts... (no interest on device trees, really), and of PCI-E.
+On 11/06/14 10:14, Andreas F?rber wrote:
+>> This patch adds clocks necessary for SD card controller on apq8064 SOC.
+>> >Without this patch the clocks are visible to the sdcc driver.
+> Was this maybe meant to read "invisible"?
 
-I wonder how you'd expect to find the ACPI data when there is no UEFI.
-It's not likely that any hypervisor would ship with an ACPI implementation
-that is independent of UEFI, because Linux (or any other full OS for
-that matter) would support that scenario. You could of course link OSv
-with an ACPI binary that is specific to KVM, but then I don't know why
-you wouldn't just hardcode the data in OSv directly.
+You are correct it was suposed to be not visible, will fix it.
 
-	Arnd
+>
+> Regards,
+> Andreas
+>
