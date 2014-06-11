@@ -1,232 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 11 Jun 2014 13:48:05 +0200
-Subject: [PATCH] ARM: tegra: powergate: Use PMC register accessors
-Message-ID: <1402487285-5626-1-git-send-email-thierry.reding@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jun 2014 13:58:49 +0200
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <CACxGe6tPQFbbUcJJmoxkAdVAp9b1AcGB_Xdwh_Mu4m6P1j_zRA@mail.gmail.com>
+References: <20140328184517.GA27219@cbox> <539754E5.3030408@redhat.com>
+ <CACxGe6tPQFbbUcJJmoxkAdVAp9b1AcGB_Xdwh_Mu4m6P1j_zRA@mail.gmail.com>
+Message-ID: <4478880.643uirndOk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Wednesday 11 June 2014 12:33:30 Grant Likely wrote:
+> On Tue, Jun 10, 2014 at 7:56 PM, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> > Il 10/06/2014 20:08, Peter Maydell ha scritto:
+> >
+> >> On 10 June 2014 18:04, Christopher Covington <cov@codeaurora.org> wrote:
+> >>>
+> >>> On 06/10/2014 10:42 AM, Peter Maydell wrote:
+> >>>>
+> >>>> I just noticed that this doesn't mandate that the platform
+> >>>> provides an RTC. As I understand it, the UEFI spec mandates
+> >>>> that there's an RTC (could somebody more familiar with UEFI
+> >>>> than me confirm/deny that?) so we should probably put one here.
+> >>>
+> >>>
+> >>> Pardon my ignorance, but what exactly disqualifies Generic Timer
+> >>> implementations from being used as Real Time Clocks?
+> >>
+> >>
+> >> So my naive view was that an RTC actually had to have
+> >> support for dealing with real (wall) clock time, ie
+> >> knowing it's 2014 and not 1970. The generic timers are
+> >> just timers. Or am I wrong and UEFI doesn't really
+> >> require that?
+> >
+> >
+> > The real-time clock provides four UEFI runtime services (GetTime, SetTime,
+> > GetWakeupTime, SetWakeupTime).  The spec says that you can return
+> > EFI_DEVICE_ERROR from GetTime/SetTime if "the time could not be
+> > retrieved/set due to a hardware error", but I don't think this is enough to
+> > make these two optional.  By comparison, GetWakeupTime/SetWakeupTime can
+> > also return EFI_UNSUPPORTED.
+> 
+> In practical terms, yes the VM needs to provide an RTC interface, but
+> I don't think it needs to appear in this spec, even if the kernel
+> accesses it directly. Portable images should use the UEFI service.
 
-Instead of I/O remapping the registers itself, make the powergate API
-use the PMC register accessors from the PMC implementation.
+It sounds like it should be in the spec then, if we want people building
+portable images to include the efi-rtc driver.
 
-This is necessary to allow these drivers to be moved out of arch/arm,
-which in turn will be needed to share code with 64-bit Tegra SoCs.
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/mach-tegra/pmc.c       | 13 +------------
- arch/arm/mach-tegra/pmc.h       | 13 +++++++++++++
- arch/arm/mach-tegra/powergate.c | 40 ++++++++++++++--------------------------
- 3 files changed, 28 insertions(+), 38 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index 7c7123e7557b..f8c86b49a1db 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -17,7 +17,6 @@
- 
- #include <linux/kernel.h>
- #include <linux/clk.h>
--#include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/tegra-powergate.h>
-@@ -60,9 +59,9 @@ static u8 tegra_cpu_domains[] = {
- };
- static DEFINE_SPINLOCK(tegra_powergate_lock);
- 
--static void __iomem *tegra_pmc_base;
- static bool tegra_pmc_invert_interrupt;
- static struct clk *tegra_pclk;
-+void __iomem *tegra_pmc_base;
- 
- struct pmc_pm_data {
- 	u32 cpu_good_time;	/* CPU power good time in uS */
-@@ -80,16 +79,6 @@ struct pmc_pm_data {
- };
- static struct pmc_pm_data pmc_pm_data;
- 
--static inline u32 tegra_pmc_readl(u32 reg)
--{
--	return readl(tegra_pmc_base + reg);
--}
--
--static inline void tegra_pmc_writel(u32 val, u32 reg)
--{
--	writel(val, tegra_pmc_base + reg);
--}
--
- static int tegra_pmc_get_cpu_powerdomain_id(int cpuid)
- {
- 	if (cpuid <= 0 || cpuid >= num_possible_cpus())
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-index 59e19c344298..139a30867cb2 100644
---- a/arch/arm/mach-tegra/pmc.h
-+++ b/arch/arm/mach-tegra/pmc.h
-@@ -18,6 +18,7 @@
- #ifndef __MACH_TEGRA_PMC_H
- #define __MACH_TEGRA_PMC_H
- 
-+#include <linux/io.h>
- #include <linux/reboot.h>
- 
- enum tegra_suspend_mode {
-@@ -37,6 +38,18 @@ void tegra_pmc_pm_set(enum tegra_suspend_mode mode);
- void tegra_pmc_suspend_init(void);
- #endif
- 
-+extern void __iomem *tegra_pmc_base;
-+
-+static inline u32 tegra_pmc_readl(u32 reg)
-+{
-+	return readl(tegra_pmc_base + reg);
-+}
-+
-+static inline void tegra_pmc_writel(u32 val, u32 reg)
-+{
-+	writel(val, tegra_pmc_base + reg);
-+}
-+
- bool tegra_pmc_cpu_is_powered(int cpuid);
- int tegra_pmc_cpu_power_on(int cpuid);
- int tegra_pmc_cpu_remove_clamping(int cpuid);
-diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
-index 4cefc5cd6bed..f5fe5c5fa3f5 100644
---- a/arch/arm/mach-tegra/powergate.c
-+++ b/arch/arm/mach-tegra/powergate.c
-@@ -32,7 +32,7 @@
- #include <linux/tegra-powergate.h>
- 
- #include "fuse.h"
--#include "iomap.h"
-+#include "pmc.h"
- 
- #define DPD_SAMPLE		0x020
- #define  DPD_SAMPLE_ENABLE	(1 << 0)
-@@ -85,18 +85,6 @@ static const u8 tegra124_cpu_domains[] = {
- 
- static DEFINE_SPINLOCK(tegra_powergate_lock);
- 
--static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
--
--static u32 pmc_read(unsigned long reg)
--{
--	return readl(pmc + reg);
--}
--
--static void pmc_write(u32 val, unsigned long reg)
--{
--	writel(val, pmc + reg);
--}
--
- static int tegra_powergate_set(int id, bool new_state)
- {
- 	bool status;
-@@ -104,14 +92,14 @@ static int tegra_powergate_set(int id, bool new_state)
- 
- 	spin_lock_irqsave(&tegra_powergate_lock, flags);
- 
--	status = pmc_read(PWRGATE_STATUS) & (1 << id);
-+	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
- 
- 	if (status == new_state) {
- 		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
- 		return 0;
- 	}
- 
--	pmc_write(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
-+	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
- 
- 	spin_unlock_irqrestore(&tegra_powergate_lock, flags);
- 
-@@ -142,7 +130,7 @@ int tegra_powergate_is_powered(int id)
- 	if (id < 0 || id >= tegra_num_powerdomains)
- 		return -EINVAL;
- 
--	status = pmc_read(PWRGATE_STATUS) & (1 << id);
-+	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
- 	return !!status;
- }
- 
-@@ -159,7 +147,7 @@ int tegra_powergate_remove_clamping(int id)
- 	 */
- 	if (tegra_chip_id == TEGRA124) {
- 		if (id == TEGRA_POWERGATE_3D) {
--			pmc_write(0, GPU_RG_CNTRL);
-+			tegra_pmc_writel(0, GPU_RG_CNTRL);
- 			return 0;
- 		}
- 	}
-@@ -175,7 +163,7 @@ int tegra_powergate_remove_clamping(int id)
- 	else
- 		mask = (1 << id);
- 
--	pmc_write(mask, REMOVE_CLAMPING);
-+	tegra_pmc_writel(mask, REMOVE_CLAMPING);
- 
- 	return 0;
- }
-@@ -425,12 +413,12 @@ static int tegra_io_rail_prepare(int id, unsigned long *request,
- 	rate = clk_get_rate(clk);
- 	clk_put(clk);
- 
--	pmc_write(DPD_SAMPLE_ENABLE, DPD_SAMPLE);
-+	tegra_pmc_writel(DPD_SAMPLE_ENABLE, DPD_SAMPLE);
- 
- 	/* must be@least 200 ns, in APB (PCLK) clock cycles */
- 	value = DIV_ROUND_UP(1000000000, rate);
- 	value = DIV_ROUND_UP(200, value);
--	pmc_write(value, SEL_DPD_TIM);
-+	tegra_pmc_writel(value, SEL_DPD_TIM);
- 
- 	return 0;
- }
-@@ -443,7 +431,7 @@ static int tegra_io_rail_poll(unsigned long offset, unsigned long mask,
- 	timeout = jiffies + msecs_to_jiffies(timeout);
- 
- 	while (time_after(timeout, jiffies)) {
--		value = pmc_read(offset);
-+		value = tegra_pmc_readl(offset);
- 		if ((value & mask) == val)
- 			return 0;
- 
-@@ -455,7 +443,7 @@ static int tegra_io_rail_poll(unsigned long offset, unsigned long mask,
- 
- static void tegra_io_rail_unprepare(void)
- {
--	pmc_write(DPD_SAMPLE_DISABLE, DPD_SAMPLE);
-+	tegra_pmc_writel(DPD_SAMPLE_DISABLE, DPD_SAMPLE);
- }
- 
- int tegra_io_rail_power_on(int id)
-@@ -470,11 +458,11 @@ int tegra_io_rail_power_on(int id)
- 
- 	mask = 1 << bit;
- 
--	value = pmc_read(request);
-+	value = tegra_pmc_readl(request);
- 	value |= mask;
- 	value &= ~IO_DPD_REQ_CODE_MASK;
- 	value |= IO_DPD_REQ_CODE_OFF;
--	pmc_write(value, request);
-+	tegra_pmc_writel(value, request);
- 
- 	err = tegra_io_rail_poll(status, mask, 0, 250);
- 	if (err < 0)
-@@ -498,11 +486,11 @@ int tegra_io_rail_power_off(int id)
- 
- 	mask = 1 << bit;
- 
--	value = pmc_read(request);
-+	value = tegra_pmc_readl(request);
- 	value |= mask;
- 	value &= ~IO_DPD_REQ_CODE_MASK;
- 	value |= IO_DPD_REQ_CODE_ON;
--	pmc_write(value, request);
-+	tegra_pmc_writel(value, request);
- 
- 	err = tegra_io_rail_poll(status, mask, mask, 250);
- 	if (err < 0)
--- 
-1.9.2
+	Arnd
