@@ -1,40 +1,54 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 11 Jun 2014 11:13:02 +0200
-Subject: [PATCH 04/11] pinctrl: sunxi: Properly handle level triggered
- gpio interrupts
-In-Reply-To: <CACRpkdZ5_21aFBSJBXDzgorcEKeR9Pv5fVgmeVrBw1zDawVptA@mail.gmail.com>
-References: <1401090486-4414-1-git-send-email-hdegoede@redhat.com>	<1401090486-4414-5-git-send-email-hdegoede@redhat.com>
- <CACRpkdZ5_21aFBSJBXDzgorcEKeR9Pv5fVgmeVrBw1zDawVptA@mail.gmail.com>
-Message-ID: <53981D9E.8010401@redhat.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Wed, 11 Jun 2014 11:14:09 +0200
+Subject: [PATCH 1/2] clk: qcom: add clocks necessary for apq8064 sdcc
+In-Reply-To: <1402433906-19309-2-git-send-email-sboyd@codeaurora.org>
+References: <1402433906-19309-1-git-send-email-sboyd@codeaurora.org>
+ <1402433906-19309-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <53981DE1.3070007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Am 10.06.2014 22:58, schrieb Stephen Boyd:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> This patch adds clocks necessary for SD card controller on apq8064 SOC.
+> Without this patch the clocks are visible to the sdcc driver.
 
-On 06/11/2014 11:00 AM, Linus Walleij wrote:
-> On Mon, May 26, 2014 at 9:47 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> 
->> For level triggered gpio interrupts we need to use handle_fasteoi_irq,
->> like we do with the irq-sunxi-nmi driver. This is necessary to give threaded
->> interrupt handlers a chance to actuall clear the source of the interrupt
->> (which may involve sleeping waitnig for i2c / spi / mmc transfers), before
->> acknowledging the interrupt.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> I haven't seen any feedback on the pin controller patches in this
-> series from Maxime, I might have missed it due to being tied to
-> some other patch in the series.
-> 
-> Anyway, this needs to be rebased and reposted anyway, I
-> just merged some base patches from Maxime for external
-> interrupts that will go in after the merge window, I need some
-> help to figure out what and how to merge here.
-
-No problem I plan to do a rebased v2 of the pinctrl bits in
-this series (and only the pinctrl bits) with some remarks
-from Maxime fixed soon.
+Was this maybe meant to read "invisible"?
 
 Regards,
+Andreas
 
-Hans
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Reviewed-by: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/clk/qcom/gcc-msm8960.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
+> index f4ffd91901f8..c47a75829b2b 100644
+> --- a/drivers/clk/qcom/gcc-msm8960.c
+> +++ b/drivers/clk/qcom/gcc-msm8960.c
+> @@ -2876,6 +2876,14 @@ static struct clk_regmap *gcc_apq8064_clks[] = {
+>  	[GSBI7_QUP_SRC] = &gsbi7_qup_src.clkr,
+>  	[GSBI7_QUP_CLK] = &gsbi7_qup_clk.clkr,
+>  	[GSBI7_H_CLK] = &gsbi7_h_clk.clkr,
+> +	[SDC1_SRC] = &sdc1_src.clkr,
+> +	[SDC1_CLK] = &sdc1_clk.clkr,
+> +	[SDC2_SRC] = &sdc2_src.clkr,
+> +	[SDC2_CLK] = &sdc2_clk.clkr,
+> +	[SDC3_SRC] = &sdc3_src.clkr,
+> +	[SDC3_CLK] = &sdc3_clk.clkr,
+> +	[SDC4_SRC] = &sdc4_src.clkr,
+> +	[SDC4_CLK] = &sdc4_clk.clkr,
+>  };
+>  
+>  static const struct regmap_config gcc_msm8960_regmap_config = {
+> 
+
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
