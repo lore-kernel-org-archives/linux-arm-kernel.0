@@ -1,50 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 11 Jun 2014 09:31:57 -0600
-Subject: [RFC] irqchip: gic: always mask interrupts during suspend
-In-Reply-To: <20140610234826.GK3599@ld-irv-0074>
-References: <1402442098-21093-1-git-send-email-computersforpeace@gmail.com>
- <alpine.DEB.2.10.1406110129270.5170@nanos>
- <20140610234826.GK3599@ld-irv-0074>
-Message-ID: <5398766D.1070900@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 12 Jun 2014 00:42:28 +0900
+Subject: [PATCH] ARM: dts: exynos4: Fix reg sizes of GIC
+In-Reply-To: <5397242D.8040303@samsung.com>
+References: <1400855960-22033-1-git-send-email-t.figa@samsung.com>
+ <53886E53.70206@gmail.com> <5388CB76.2030806@samsung.com>
+ <5397242D.8040303@samsung.com>
+Message-ID: <539878E4.8040005@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2014 05:48 PM, Brian Norris wrote:
-> On Wed, Jun 11, 2014 at 01:34:39AM +0200, Thomas Gleixner wrote:
->> On Tue, 10 Jun 2014, Brian Norris wrote:
->>> Other random thought: it seems like any irqchip driver which does lazy IRQ
->>> masking ought to use IRQCHIP_MASK_ON_SUSPEND. So maybe the IRQ core should just
->>> do something like:
->>>
->>> 	if (!chip->irq_disable)
->>> 		chip->flags |= IRQCHIP_MASK_ON_SUSPEND;
->>
->> No. Lazy irq disable and the suspend logic are different beasts.
-> 
-> OK, fair enough. Drop that random thought then. It's not in the patch
-> content anyway.
-> 
->> That's up to the platform to decide this. Just for the record: there
->> is a world outside of ARM...
-> 
-> OK. But GIC is ARM-specific, so we can still constrain this patch and
-> related topics to the world of ARM.
-> 
->> But that brings me to a different question:
->>
->>     Why are you not putting that customization into the device tree
->>     instead of trying to add this to some random arch/arm/mach-foo
->>     files?
-> 
-> I'm not adding customization to arch/arm/mach-foo files. I'm trying to
-> remove it.
-> 
-> This property could be added to device tree, if there was really a valid
-> use case for a GIC which leaves its interrupts unmasked for suspend. My
-> question in this patch is essentially: does such a use case exist?
+On 06/11/14 00:28, Tomasz Figa wrote:
+> Hi Kukjin,
+>
+Hi Tomasz,
 
-DT should genernally only contain data that's expected to vary between
-boards, or just possibly between SoCs. Anything that the kernel knows
-simply because it knows what HW model it's driving has no place in DT,
-since it just adds redundant work to parse the DT and end up with the
-same data.
+> On 30.05.2014 20:18, Kukjin Kim wrote:
+>> On 05/30/14 20:41, Tomasz Figa wrote:
+>>> Hi,
+>>>
+>>> On 23.05.2014 16:39, Tomasz Figa wrote:
+>>>> This patch fixes reg entry sizes in GIC node that were not large enough
+>>>> to cover whole regions.
+>>>>
+>>>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/exynos4.dtsi | 2 +-
+>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+>>>> index b8ece4b..fbaf426 100644
+>>>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>>>> @@ -113,7 +113,7 @@
+>>>>    		compatible = "arm,cortex-a9-gic";
+>>>>    		#interrupt-cells =<3>;
+>>>>    		interrupt-controller;
+>>>> -		reg =<0x10490000 0x1000>,<0x10480000 0x100>;
+>>>> +		reg =<0x10490000 0x10000>,<0x10480000 0x10000>;
+>>>>    	};
+>>>>
+>>>>    	combiner: interrupt-controller at 10440000 {
+>>>>
+>>>
+>>> Ping.
+>>>
+>> Yeah, SZ_64K is used for GIC_CPU and GIC_DIST before moving on DT
+>> support. Applied, but I need to check this is required for stable tree...
+>
+> Not sure if you already managed, but I think it might not be necessary
+> in stable trees, as the (correct) static mapping is still there and it
+> causes ioremap() to return correctly mapped area, ignoring the length
+> specified in device tree.
+>
+Yes, agreed. this is not required for stable tree...
+
+Thanks,
+Kukjin
