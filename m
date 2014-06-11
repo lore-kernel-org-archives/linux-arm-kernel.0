@@ -1,37 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 Jun 2014 14:04:52 +0200
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <CACxGe6vzGrNxqdanhUX3G-dvN-jVrX9YQyOA==h0Vnv_sf-aTA@mail.gmail.com>
-References: <20140328184517.GA27219@cbox> <5397360B.80102@huawei.com>
- <alpine.DEB.2.02.1406111035190.13771@kaball.uk.xensource.com>
- <20140611095540.GD24286@lvm>
- <CACxGe6vzGrNxqdanhUX3G-dvN-jVrX9YQyOA==h0Vnv_sf-aTA@mail.gmail.com>
-Message-ID: <20140611120452.GE24286@lvm>
+From: nick.dyer@itdev.co.uk (Nick Dyer)
+Date: Wed, 11 Jun 2014 13:06:51 +0100
+Subject: [RFC PATCH] input, touch, atmel_mxt_ts: use atmel driver
+In-Reply-To: <1402468526-9165-1-git-send-email-hs@denx.de>
+References: <1402468526-9165-1-git-send-email-hs@denx.de>
+Message-ID: <5398465B.7060101@itdev.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 12:28:40PM +0100, Grant Likely wrote:
-> On Wed, Jun 11, 2014 at 10:55 AM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > Agree with what Stefano says, and I strongly recommend you reconsider
-> > your position on FDT vs. ACPI for ARM VMs, but it's completely up to
-> > you of course :)
+Heiko Schocher wrote:
+> try to bring the driver from
+> https://github.com/ndyer/linux for-next
 > 
-> Not entirely. 
-
-of course it's up to them what they want to do.
-
-> The plan right now is to only support ACPI when booting
-> with UEFI. If they don't use UEFI, then ACPI will not be available. If
-> OSv only supports ACPI, then it is forced to use the UEFI boot path.
+> to mainline. Post this as a RFC, to see if this is possible...
 > 
-The plan right now is to not support ACPI in VMs at all, as per the last
-discussion at LCA14.  If an when someone wants to add that, fine, but
-the spec mandates FDT describing the full system.
+> based on:
+> commit dda0a5570574cfe467c1c794cf7a17e1d742ec02 ("Input:
+> atmel_mxt_ts - implement improved debug message interface")
+> 
+> from Nick Dyer <nick.dyer@itdev.co.uk>
+> 
+> added:
+> - remove some (not all) checkpatch warnings
+> - Add support for voltage regulator
+> - Add support for Device Tree support
 
-If OSv wants to hack a KVM implementation or provide a static ACPI blob
-coupled to OSv that happens to describe the KVM/ARM/QEMU system model,
-then they can do that.  Crazy, it sounds to me, but as I said, up to the
-OSv guys.
+My thinking has been that the maintainers will more likely accept a series
+of small patches than to make such a huge change to the entire driver, my
+for-next tree is where I'm working on this, and I plan to post another set
+of 15 patches soon, when I've fixed up some issues to do with probe/remove
+cycles.
 
--Christoffer
+You should note that my for-next branch has moved on slightly since you
+have taken this, because I have implemented device tree support and changed
+the config download to use the request_firmware_async() function.
+
+Your device tree stuff for mach-goni.c looks really useful, however - if
+you can send me a patch for that against my current for-next branch I can
+include it with my version of the device tree support.
+
+all the best
+
+Nick
