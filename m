@@ -1,61 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Jun 2014 10:50:31 +0200
-Subject: [PATCH] ARM: ux500: add some DB8500 DMA channel info
-Message-ID: <1402476631-12860-1-git-send-email-linus.walleij@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 11 Jun 2014 10:55:57 +0200
+Subject: [PATCH v6 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
+ controller support
+In-Reply-To: <1402475980-15513-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1402475980-15513-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402475980-15513-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140611085557.GA2676@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds some missing DMA channel information to the disabled
-MMC/SD/SDIO blocks number 3 and 5, and notes that the assignment
-of MSP channels vary with ASIC variant.
+> +MODULE_LICENSE("GPL");
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+"GPL v2"
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index e41eedca3ce3..9d2323020d34 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -875,6 +875,10 @@
- 			reg = <0x80119000 0x1000>;
- 			interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
- 
-+			dmas = <&dma 41 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 41 0 0x0>; /* Logical - MemToDev */
-+			dma-names = "rx", "tx";
-+
- 			clocks = <&prcc_kclk 2 5>, <&prcc_pclk 2 7>;
- 			clock-names = "sdi", "apb_pclk";
- 
-@@ -901,6 +905,10 @@
- 			reg = <0x80008000 0x1000>;
- 			interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
- 
-+			dmas = <&dma 43 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 43 0 0x0>; /* Logical - MemToDev */
-+			dma-names = "rx", "tx";
-+
- 			clocks = <&prcc_kclk 3 7>, <&prcc_pclk 3 7>;
- 			clock-names = "sdi", "apb_pclk";
- 
-@@ -929,6 +937,7 @@
- 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
- 
-+			/* This DMA channel only exist on DB8500 v1 */
- 			dmas = <&dma 30 0 0x10>; /* Logical - MemToDev - HighPrio */
- 			dma-names = "tx";
- 
-@@ -962,6 +971,7 @@
- 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
- 
-+			/* This DMA channel only exist on DB8500 v2 */
- 			dmas = <&dma 30 0 0x12>; /* Logical - DevToMem - HighPrio */
- 			dma-names = "rx";
- 
--- 
-1.9.3
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140611/f91aeb32/attachment.sig>
