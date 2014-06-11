@@ -1,58 +1,84 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 11 Jun 2014 12:02:10 -0700
-Subject: [PATCH] clocksource: arch_arm_timer: Fix timecounter
- initialization
-In-Reply-To: <1402475861-15354-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1402475861-15354-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <5398A7B2.6030807@codeaurora.org>
+From: himangi774@gmail.com (Himangi Saraogi)
+Date: Thu, 12 Jun 2014 00:48:44 +0530
+Subject: [PATCH v2] uhci-platform: use devm_ioremap resource
+Message-ID: <20140611191844.GA13009@himangi-Dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/14 01:37, Xiubo Li wrote:
-> The third parameter(u64 start_tstamp) of timecounter_init() should
-> be the start time by ns, not a cycle counter.
->
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..6c3cfd8 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -426,7 +426,7 @@ struct timecounter *arch_timer_get_timecounter(void)
->  
->  static void __init arch_counter_register(unsigned type)
->  {
-> -	u64 start_count;
-> +	u64 start_count, start_ns;
->  
->  	/* Register the CP15 based counter if we have one */
->  	if (type & ARCH_CP15_TIMER)
-> @@ -438,7 +438,8 @@ static void __init arch_counter_register(unsigned type)
->  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
->  	cyclecounter.mult = clocksource_counter.mult;
->  	cyclecounter.shift = clocksource_counter.shift;
-> -	timecounter_init(&timecounter, &cyclecounter, start_count);
-> +	start_ns = cyclecounter_cyc2ns(&cyclecounter, start_count);
-> +	timecounter_init(&timecounter, &cyclecounter, start_ns);
->  
->  	/* 56 bits minimum, so we assume worst case rollover */
->  	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+This patch replaces the memory allocation using request_mem_region and
+the ioremap by a single call to managed interface devm_ioremap_reource.
+The corresponding calls to release_mem_region and iounmap in the probe
+and release functions are now unnecessary and are removed. Also a label
+is done away with and linux/device.h is added to make sure the devm_*()
+outine declarations are unambiguously available.
 
-This doesn't make much sense. We're converting start_count, which could
-be a very large number, into nanoseconds. It looks like we're assuming
-the counter always starts at 0 which is not always true if you sit in a
-bootloader for a long time. Perhaps it would be better to just do
+Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
+Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+---
+v2: pass correct arguments to devm_ioremap_resource
+Not compile tested due to incompatible architecture.
 
-    timecounter_init(&timecounter, &cyclecounter, 0);
+ drivers/usb/host/uhci-platform.c | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
 
-or
-
-    timecounter_init(&timecounter, &cyclecounter,
-ktime_to_ns(ktime_get_real()));
-
+diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
+index 01833ab..b987f1d 100644
+--- a/drivers/usb/host/uhci-platform.c
++++ b/drivers/usb/host/uhci-platform.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <linux/of.h>
++#include <linux/device.h>
+ #include <linux/platform_device.h>
+ 
+ static int uhci_platform_init(struct usb_hcd *hcd)
+@@ -88,33 +89,22 @@ static int uhci_hcd_platform_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 
+-	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+-		pr_err("%s: request_mem_region failed\n", __func__);
+-		ret = -EBUSY;
++	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(hcd->regs)) {
++		ret = PTR_ERR(hcd->regs);
+ 		goto err_rmr;
+ 	}
+-
+-	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
+-	if (!hcd->regs) {
+-		pr_err("%s: ioremap failed\n", __func__);
+-		ret = -ENOMEM;
+-		goto err_irq;
+-	}
+ 	uhci = hcd_to_uhci(hcd);
+ 
+ 	uhci->regs = hcd->regs;
+ 
+ 	ret = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
+ 	if (ret)
+-		goto err_uhci;
++		goto err_rmr;
+ 
+ 	device_wakeup_enable(hcd->self.controller);
+ 	return 0;
+ 
+-err_uhci:
+-	iounmap(hcd->regs);
+-err_irq:
+-	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ err_rmr:
+ 	usb_put_hcd(hcd);
+ 
+@@ -126,8 +116,6 @@ static int uhci_hcd_platform_remove(struct platform_device *pdev)
+ 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+ 
+ 	usb_remove_hcd(hcd);
+-	iounmap(hcd->regs);
+-	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ 	usb_put_hcd(hcd);
+ 
+ 	return 0;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
