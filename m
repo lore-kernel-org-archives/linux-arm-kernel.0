@@ -1,42 +1,135 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 11 Jun 2014 20:14:02 +0200 (CEST)
-Subject: [PATCH v8 2/7] clocksource: Add support for the Mediatek SoCs
-In-Reply-To: <1402490055-15197-3-git-send-email-matthias.bgg@gmail.com>
-References: <1402490055-15197-1-git-send-email-matthias.bgg@gmail.com>
- <1402490055-15197-3-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <alpine.DEB.2.10.1406112012460.5170@nanos>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 11 Jun 2014 14:15:16 -0400 (EDT)
+Subject: [PATCH v4 1/6] Documentation: arm: define DT idle states bindings
+In-Reply-To: <1402503520-8611-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1402503520-8611-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.11.1406111240010.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Jun 2014, Matthias Brugger wrote:
-> +static void mtk_clkevt_mode(enum clock_event_mode mode,
-> +				struct clock_event_device *clk)
-> +{
-> +	struct mtk_clock_event_device *evt = to_mtk_clk(clk);
+On Wed, 11 Jun 2014, Lorenzo Pieralisi wrote:
+
+> ARM based platforms implement a variety of power management schemes that
+> allow processors to enter idle states at run-time.
+> The parameters defining these idle states vary on a per-platform basis forcing
+> the OS to hardcode the state parameters in platform specific static tables
+> whose size grows as the number of platforms supported in the kernel increases
+> and hampers device drivers standardization.
+> 
+> Therefore, this patch aims at standardizing idle state device tree bindings for
+> ARM platforms. Bindings define idle state parameters inclusive of entry methods
+> and state latencies, to allow operating systems to retrieve the configuration
+> entries from the device tree and initialize the related power management
+> drivers, paving the way for common code in the kernel to deal with idle
+> states and removing the need for static data in current and previous kernel
+> versions.
+
+Following the offline discussion with Charles, I've some comments.
+
+[...]
+
+> +Idle state parameters (eg entry latency) are platform specific and 
+need to be
+> +characterized with bindings that provide the required information to OSPM
+> +code so that it can build the required tables and use them at runtime.
+
+[...]
+
+> +	- entry-latency-us
+> +		Usage: Required
+> +		Value type: <prop-encoded-array>
+> +		Definition: u32 value representing worst case latency
+> +			    in microseconds required to enter the idle state.
 > +
-> +	mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
+> +	- exit-latency-us
+> +		Usage: Required
+> +		Value type: <prop-encoded-array>
+> +		Definition: u32 value representing worst case latency
+> +			    in microseconds required to exit the idle state.
 > +
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_PERIODIC:
-> +		mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
-> +		mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
-> +		break;
-> +	case CLOCK_EVT_MODE_ONESHOT:
-> +		mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
+> +	- min-residency-us
+> +		Usage: Required
+> +		Value type: <prop-encoded-array>
+> +		Definition: u32 value representing duration in microseconds
+> +			    after which this state becomes more energy
+> +			    efficient than any shallower states.
 
-Why start the timer here? The code will call set next event right away.
+I think this would benefit from a clearer definition.  For example, 
+should the min-residency-us value include or exclude the entry and exit 
+delays?  I think it should since that's what the cpuidle code will have 
+to use when testing against expected delay before next wakeup event in 
+any case.  Some of your examples don't assume it is the case though, as 
+the min-residency-us is smaller than entry+exit delays.
 
-> +		break;
-> +	case CLOCK_EVT_MODE_UNUSED:
-> +	case CLOCK_EVT_MODE_SHUTDOWN:
-> +	default:
-> +		/* No more interrupts will occur as source is disabled */
-> +		break;
-> +	}
-> +}
+Also I think we'd need a 4th value to fully characterize a state: worst 
+case wake-up latency for QoS purposes.
 
-Looks good otherwise.
+Let's illustrate the different periods on a time line to make it clearer
+(hmmm let's see how this can be managed on a braille display :-O ):
 
-Thanks,
+EXEC:	Normal CPU execution.
 
-	tglx
+PREP:	Preparation phase before committing the hardware to idle mode
+	like cache flushing. This is abortable on pending wake-up 
+	event conditions. The abort latency is assumed to be negligible 
+	(i.e. less than the ENTRY + EXIT duration). If aborted, we go 
+	back to EXEC. This phase is optional. If not abortable, this 
+	should be included in the ENTRY phase instead.
+
+ENTRY:	The hardware is committed to idle mode. This period must run to
+	completion up to IDLE before anything else can happen.
+
+IDLE:	This is the actual power-saving idle period. This may last 
+	between 0 and infinite time, until a wake-up event occurs.
+
+EXIT:	Period during which the CPU is brought back to operational
+	mode (EXEC).
+
+...__[EXEC]__|__[PREP]--|__[ENTRY]__|__[IDLE]__|___[EXIT]_--|__[EXEC]__...
+             |          |           |          |            |
+
+             |<-- entry-latency --->|
+
+                                               |<- exit-  ->|
+                                               |  latency   |
+
+             |<-------------- min-residency --------------->|
+
+                        |<----- worst_wakeup_latency ------>|
+
+entry-latency: Worst case latency required to enter the idle state.  The 
+exit_latency may be guaranteed only after entry-latency has passed.
+
+min-residency: Minimum period, including preparation, entry and exit, 
+for a given power mode to be worthwhile energy wise.  It must be at 
+least equal to entry_latency + exit_latency.
+
+worst_wakeup_latency: Maximum delay between the signaling of a wake-up 
+event and the CPU being able to execute normal code again. If not 
+specified, this is assumed to be entry-latency + exit_latency.
+
+Notes:
+
+The cpuidle code would only care about min-residency to select the most 
+appropriate mode based on the expected delay before the next event.
+
+The scheduler will care about the following in the near future:
+
+wakeup_delay = exit_latency + max(entry_latency - (now - entry_timestamp), 0)
+
+In other words, the scheduler would wake up the CPU with the shortest 
+wake-up latency.  This wake-up latency must take into account the entry 
+latency if that period has not expired.  Here the abortable nature of 
+the PREP period is ignored on purpose because it cannot be relied upon 
+(e.g. if the cache is mostly clean then the PREP deadline may occur much 
+sooner than expected).
+
+And pmqos would only care about worst_wakeup_latency.
+
+So... I hope this is useful.  I think the above ascii art could be part 
+of your documentation to explain it all.
+
+
+
+Nicolas
