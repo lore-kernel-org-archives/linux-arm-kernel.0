@@ -1,142 +1,70 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Wed, 11 Jun 2014 14:29:20 -0700
-Subject: [RFC 5/5] x86,seccomp: Add a seccomp fastpath
-In-Reply-To: <9e11cd988a0f120606e37b5e275019754e2774da.1402517933.git.luto@amacapital.net>
-References: <cover.1402517933.git.luto@amacapital.net>
- <9e11cd988a0f120606e37b5e275019754e2774da.1402517933.git.luto@amacapital.net>
-Message-ID: <CAADnVQKt5FnShkZeQewbfnU1kHM-gLs3hCZMf5xcgFzyRDLX7A@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 11 Jun 2014 17:33:55 -0400
+Subject: [PATCH] arm64: fix MAX_ORDER for 64K pagesize
+Message-ID: <1402522435-13884-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 1:23 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On my VM, getpid takes about 70ns.  Before this patch, adding a
-> single-instruction always-accept seccomp filter added about 134ns of
-> overhead to getpid.  With this patch, the overhead is down to about
-> 13ns.
+With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE
+I get this at early boot:
 
-interesting.
-Is this the gain from patch 4 into patch 5 or from patch 0 to patch 5?
-13ns is still with seccomp enabled, but without filters?
+  SMP: Total of 8 processors activated.
+  devtmpfs: initialized
+  Unable to handle kernel NULL pointer dereference at virtual address 00000008
+  pgd = fffffe0000050000
+  [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
+  Internal error: Oops: 96000006 [#1] SMP
+  Modules linked in:
+  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
+  task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
+  PC is at __list_add+0x10/0xd4
+  LR is at free_one_page+0x270/0x638
+  ...
+  Call trace:
+  [<fffffe00003ee970>] __list_add+0x10/0xd4
+  [<fffffe000019c478>] free_one_page+0x26c/0x638
+  [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
+  [<fffffe000019d5e8>] __free_pages+0x74/0xbc
+  [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
+  [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
+  [<fffffe0000090418>] do_one_initcall+0xc4/0x154
+  [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
+  [<fffffe00007520a0>] kernel_init+0xc/0xd4
 
-> I'm not really thrilled by this patch.  It has two main issues:
->
-> 1. Calling into code in kernel/seccomp.c from assembly feels ugly.
->
-> 2. The x86 64-bit syscall entry now has four separate code paths:
-> fast, seccomp only, audit only, and slow.  This kind of sucks.
-> Would it be worth trying to rewrite the whole thing in C with a
-> two-phase slow path approach like I'm using here for seccomp?
->
-> Signed-off-by: Andy Lutomirski <luto@amacapital.net>
-> ---
->  arch/x86/kernel/entry_64.S | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/seccomp.h    |  4 ++--
->  2 files changed, 47 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/x86/kernel/entry_64.S b/arch/x86/kernel/entry_64.S
-> index f9e713a..feb32b2 100644
-> --- a/arch/x86/kernel/entry_64.S
-> +++ b/arch/x86/kernel/entry_64.S
-> @@ -683,6 +683,45 @@ sysret_signal:
->         FIXUP_TOP_OF_STACK %r11, -ARGOFFSET
->         jmp int_check_syscall_exit_work
->
-> +#ifdef CONFIG_SECCOMP
-> +       /*
-> +        * Fast path for seccomp without any other slow path triggers.
-> +        */
-> +seccomp_fastpath:
-> +       /* Build seccomp_data */
-> +       pushq %r9                               /* args[5] */
-> +       pushq %r8                               /* args[4] */
-> +       pushq %r10                              /* args[3] */
-> +       pushq %rdx                              /* args[2] */
-> +       pushq %rsi                              /* args[1] */
-> +       pushq %rdi                              /* args[0] */
-> +       pushq RIP-ARGOFFSET+6*8(%rsp)           /* rip */
-> +       pushq %rax                              /* nr and junk */
-> +       movl $AUDIT_ARCH_X86_64, 4(%rsp)        /* arch */
-> +       movq %rsp, %rdi
-> +       call seccomp_phase1
+This happens in this configuration because __free_one_page() is called
+with an order greater than MAX_ORDER, accesses past zone->free_list[]
+and passes a bogus list_head to list_add().
 
-the assembler code is pretty much repeating what C does in
-populate_seccomp_data(). Assuming the whole gain came from
-patch 5 why asm version is so much faster than C?
-it skips SAVE/RESTORE_REST... what else?
-If the most of the gain is from all patches combined (mainly from
-2 phase approach) then why bother with asm?
+arch/arm64/Kconfig has:
 
-Somehow it feels that the gain is due to better branch prediction
-in asm version. If you change few 'unlikely' in C to 'likely', it may
-get to the same performance...
+  config FORCE_MAX_ZONEORDER
+	int
+	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+	default "11"
 
-btw patches #1-3 look good to me. especially #1 is nice.
+So with THP turned off MAX_ORDER == 11 but init_cma_reserved_pageblock()
+passes __free_pages() an order of pageblock_order which is based on
+(HPAGE_SHIFT - PAGE_SHIFT) which is 13 for 64K pages. I worked around
+this by removing the THP test so FORCE_MAX_ZONEORDER is always 14 for
+ARM64_64K_PAGES.
 
-> +       addq $8*8, %rsp
-> +       cmpq $1, %rax
-> +       ja seccomp_invoke_phase2
-> +       LOAD_ARGS 0  /* restore clobbered regs */
-> +       jb system_call_fastpath
-> +       jmp ret_from_sys_call
-> +
-> +seccomp_invoke_phase2:
-> +       SAVE_REST
-> +       FIXUP_TOP_OF_STACK %rdi
-> +       movq %rax,%rdi
-> +       call seccomp_phase2
-> +
-> +       /* if seccomp says to skip, then set orig_ax to -1 and skip */
-> +       test %eax,%eax
-> +       jz 1f
-> +       movq $-1, ORIG_RAX(%rsp)
-> +1:
-> +       mov ORIG_RAX(%rsp), %rax                /* reload rax */
-> +       jmp system_call_post_trace              /* and maybe do the syscall */
-> +#endif
-> +
->  #ifdef CONFIG_AUDITSYSCALL
->         /*
->          * Fast path for syscall audit without full syscall trace.
-> @@ -717,6 +756,10 @@ sysret_audit:
->
->         /* Do syscall tracing */
->  tracesys:
-> +#ifdef CONFIG_SECCOMP
-> +       testl $(_TIF_WORK_SYSCALL_ENTRY & ~_TIF_SECCOMP),TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET)
-> +       jz seccomp_fastpath
-> +#endif
->  #ifdef CONFIG_AUDITSYSCALL
->         testl $(_TIF_WORK_SYSCALL_ENTRY & ~_TIF_SYSCALL_AUDIT),TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET)
->         jz auditsys
-> @@ -725,6 +768,8 @@ tracesys:
->         FIXUP_TOP_OF_STACK %rdi
->         movq %rsp,%rdi
->         call syscall_trace_enter
-> +
-> +system_call_post_trace:
->         /*
->          * Reload arg registers from stack in case ptrace changed them.
->          * We don't reload %rax because syscall_trace_enter() returned
-> diff --git a/include/linux/seccomp.h b/include/linux/seccomp.h
-> index 4fc7a84..d3d4c52 100644
-> --- a/include/linux/seccomp.h
-> +++ b/include/linux/seccomp.h
-> @@ -37,8 +37,8 @@ static inline int secure_computing(void)
->  #define SECCOMP_PHASE1_OK      0
->  #define SECCOMP_PHASE1_SKIP    1
->
-> -extern u32 seccomp_phase1(struct seccomp_data *sd);
-> -int seccomp_phase2(u32 phase1_result);
-> +asmlinkage __visible extern u32 seccomp_phase1(struct seccomp_data *sd);
-> +asmlinkage __visible int seccomp_phase2(u32 phase1_result);
->  #else
->  extern void secure_computing_strict(int this_syscall);
->  #endif
-> --
-> 1.9.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7295419..42a334e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -269,7 +269,7 @@ config XEN
+ 
+ config FORCE_MAX_ZONEORDER
+ 	int
+-	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
++	default "14" if ARM64_64K_PAGES
+ 	default "11"
+ 
+ endmenu
+-- 
+1.9.0
