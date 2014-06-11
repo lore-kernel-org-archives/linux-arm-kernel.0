@@ -1,98 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 11 Jun 2014 17:18:40 +0100
-Subject: [PATCH v4 6/6] arm64: boot: dts: update rtsm aemv8 dts with PSCI and
- idle states
-In-Reply-To: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1402503520-8611-7-git-send-email-lorenzo.pieralisi@arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 11 Jun 2014 19:19:02 +0300
+Subject: [PATCH v7 3/5] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <53987CA4.4040506@wwwdotorg.org>
+References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
+ <53984FE3.6010509@nvidia.com>
+ <20140611152551.GH5961@tbergstrom-lnx.Nvidia.com>
+ <53987CA4.4040506@wwwdotorg.org>
+Message-ID: <20140611161901.GI5961@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the RTSM dts file with PSCI bindings and nodes
-describing the AEMv8 model idle states parameters.
+On Wed, Jun 11, 2014 at 05:58:28PM +0200, Stephen Warren wrote:
+> On 06/11/2014 09:25 AM, Peter De Schrijver wrote:
+> > On Wed, Jun 11, 2014 at 02:47:31PM +0200, Mikko Perttunen wrote:
+> >> On 05/06/14 16:09, Peter De Schrijver wrote:
+> >> ...
+> >>> +int tegra_fuse_readl(u32 offset, u32 *val)
+> >>> +{
+> >>> +       if (!fuse_readl)
+> >>> +               return -ENXIO;
+> >>> +
+> >>> +       *val = fuse_readl(offset);
+> >>> +
+> >>> +       return 0;
+> >>> +}
+> >>> +
+> >>
+> >> -EPROBE_DEFER would be a better error value, so that drivers can work 
+> > 
+> > Ok.
+> > 
+> >> even if they are initially probed before the fuse driver. Of course, if 
+> >> the fuse initialization is moved into machine init then this is a non-issue.
+> > 
+> > The exported function will always be initialized later because on Tegra20 it
+> > requires APB DMA to be available. If you read the fuses directly, the system
+> > sometimes hangs.
+> 
+> That's not true in the current code. IIRC, the bug was that *if* an APB
+> DMA access to anything and a CPU access to the fuses happen at the same
+> time, then there can be a hang. As such, the current fuse code accesses
+> the fuses directly (without potential for a hang) if the APB DMA driver
+> is not available, but once the driver becomes available, it reads the
+> fuses through DMA instead. Does the new code not do that?
+> 
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 44 +++++++++++++++++++++++++++-------
- 1 file changed, 36 insertions(+), 8 deletions(-)
+I'm not so sure about that. I have seen the hang when dumping all fuses using
+sysfs in an otherwise idle system booted from initrd. I don't think there
+should be any APB DMA activity going on then?
 
-diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-index d79de9c..4051ffb 100644
---- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-+++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-@@ -27,37 +27,65 @@
- 		serial3 = &v2m_serial3;
- 	};
- 
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+		cpu_suspend = <0xc4000001>;
-+		cpu_off = <0x84000002>;
-+		cpu_on = <0xc4000003>;
-+	};
-+
- 	cpus {
- 		#address-cells = <2>;
- 		#size-cells = <0>;
- 
-+		idle-states {
-+			entry-method = "arm,psci";
-+
-+			CPU_SLEEP_0: cpu-sleep-0 {
-+				compatible = "arm,idle-state";
-+				entry-method-param = <0x0010000>;
-+				entry-latency-us = <40>;
-+				exit-latency-us = <100>;
-+				min-residency-us = <150>;
-+			};
-+
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				entry-method-param = <0x1010000>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <1000>;
-+				min-residency-us = <2500>;
-+			};
-+		};
-+
- 		cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x0>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x1>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 		cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x2>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 		cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,armv8";
- 			reg = <0x0 0x3>;
--			enable-method = "spin-table";
--			cpu-release-addr = <0x0 0x8000fff8>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 		};
- 	};
- 
--- 
-1.8.4
+Cheers,
+
+Peter.
