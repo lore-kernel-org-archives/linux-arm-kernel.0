@@ -1,38 +1,45 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 11 Jun 2014 20:40:15 +0100 (BST)
-Subject: [PATCH v2] uhci-platform: use devm_ioremap resource
-In-Reply-To: <Pine.LNX.4.44L0.1406111528170.890-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1406111528170.890-100000@iolanthe.rowland.org>
-Message-ID: <alpine.DEB.2.10.1406112038420.2576@hadrien>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 11 Jun 2014 16:14:42 -0400
+Subject: [PATCH] arm64: fix build error in sigcontext.h
+Message-ID: <1402517682-13061-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > v2: pass correct arguments to devm_ioremap_resource
-> > Not compile tested due to incompatible architecture.
->
-> uhci-platform is compatible with all architectures.  But you have to
-> add it to the .config file by hand.
+I'm seeing this build failure for arm64:
 
-What should one do exactly?  I added
+    CC [M]  Documentation/filesystems/configfs/configfs_example_macros.o
+  In file included from /usr/include/bits/sigcontext.h:27:0,
+                   from /usr/include/signal.h:340,
+                   from /usr/include/sys/wait.h:30,
+                   from Documentation/accounting/getdelays.c:24:
+  .../linux/usr/include/asm/sigcontext.h:61:2: error: unknown type name ?u64?
+    u64 esr;
+    ^
+  make[2]: *** [Documentation/accounting/getdelays] Error 1
 
-CONFIG_USB_UHCI_PLATFORM=y
+This was introduced by commit 15af1942dd61ee23:
 
-to the end of my .config file, but then running make just overwrites it:
+  arm64: Expose ESR_EL1 information to user when SIGSEGV/SIGBUS
 
-> make drivers/usb/host/uhci-platform.o
-scripts/kconfig/conf --silentoldconfig Kconfig
-#
-# configuration written to .config
-#
-  CHK     include/config/kernel.release
-  CHK     include/generated/uapi/linux/version.h
-  CHK     include/generated/utsrelease.h
-  CALL    scripts/checksyscalls.sh
-  CC      drivers/usb/host/uhci-platform.o
-drivers/usb/host/uhci-platform.c:13:38: warning: ?struct usb_hcd? declared
-inside parameter list [enabled by default]
- static int uhci_platform_init(struct usb_hcd *hcd)
-                                      ^
+Using __u64 instead of u64 fixes the problem.
 
-thanks,
-julia
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/include/uapi/asm/sigcontext.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
+index b72cf40..ee469be 100644
+--- a/arch/arm64/include/uapi/asm/sigcontext.h
++++ b/arch/arm64/include/uapi/asm/sigcontext.h
+@@ -58,7 +58,7 @@ struct fpsimd_context {
+ 
+ struct esr_context {
+ 	struct _aarch64_ctx head;
+-	u64 esr;
++	__u64 esr;
+ };
+ 
+ #endif /* _UAPI__ASM_SIGCONTEXT_H */
+-- 
+1.9.0
