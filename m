@@ -1,104 +1,232 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 11 Jun 2014 13:46:36 +0200
-Subject: [PATCH] dma-mapping: Provide write-combine allocations
-Message-ID: <1402487196-5433-1-git-send-email-thierry.reding@gmail.com>
+Date: Wed, 11 Jun 2014 13:48:05 +0200
+Subject: [PATCH] ARM: tegra: powergate: Use PMC register accessors
+Message-ID: <1402487285-5626-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-Provide an implementation for dma_{alloc,free,mmap}_writecombine() when
-the architecture supports DMA attributes.
+Instead of I/O remapping the registers itself, make the powergate API
+use the PMC register accessors from the PMC implementation.
+
+This is necessary to allow these drivers to be moved out of arch/arm,
+which in turn will be needed to share code with 64-bit Tegra SoCs.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/include/asm/dma-mapping.h       | 16 ----------------
- include/asm-generic/dma-mapping-common.h |  8 --------
- include/linux/dma-mapping.h              | 26 ++++++++++++++++++++++++++
- 3 files changed, 26 insertions(+), 24 deletions(-)
+ arch/arm/mach-tegra/pmc.c       | 13 +------------
+ arch/arm/mach-tegra/pmc.h       | 13 +++++++++++++
+ arch/arm/mach-tegra/powergate.c | 40 ++++++++++++++--------------------------
+ 3 files changed, 28 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index c45b61a4b4a5..85738b200023 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -265,22 +265,6 @@ extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 			void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 			struct dma_attrs *attrs);
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index 7c7123e7557b..f8c86b49a1db 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -17,7 +17,6 @@
  
--static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
--				       dma_addr_t *dma_handle, gfp_t flag)
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
+-#include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/tegra-powergate.h>
+@@ -60,9 +59,9 @@ static u8 tegra_cpu_domains[] = {
+ };
+ static DEFINE_SPINLOCK(tegra_powergate_lock);
+ 
+-static void __iomem *tegra_pmc_base;
+ static bool tegra_pmc_invert_interrupt;
+ static struct clk *tegra_pclk;
++void __iomem *tegra_pmc_base;
+ 
+ struct pmc_pm_data {
+ 	u32 cpu_good_time;	/* CPU power good time in uS */
+@@ -80,16 +79,6 @@ struct pmc_pm_data {
+ };
+ static struct pmc_pm_data pmc_pm_data;
+ 
+-static inline u32 tegra_pmc_readl(u32 reg)
 -{
--	DEFINE_DMA_ATTRS(attrs);
--	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
--	return dma_alloc_attrs(dev, size, dma_handle, flag, &attrs);
+-	return readl(tegra_pmc_base + reg);
 -}
 -
--static inline void dma_free_writecombine(struct device *dev, size_t size,
--				     void *cpu_addr, dma_addr_t dma_handle)
+-static inline void tegra_pmc_writel(u32 val, u32 reg)
 -{
--	DEFINE_DMA_ATTRS(attrs);
--	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
--	return dma_free_attrs(dev, size, cpu_addr, dma_handle, &attrs);
+-	writel(val, tegra_pmc_base + reg);
 -}
 -
- /*
-  * This can be called during early boot to increase the size of the atomic
-  * coherent DMA pool above the default value of 256KiB. It must be called
-diff --git a/include/asm-generic/dma-mapping-common.h b/include/asm-generic/dma-mapping-common.h
-index de8bf89940f8..d137431bf26f 100644
---- a/include/asm-generic/dma-mapping-common.h
-+++ b/include/asm-generic/dma-mapping-common.h
-@@ -205,14 +205,6 @@ dma_mmap_attrs(struct device *dev, struct vm_area_struct *vma, void *cpu_addr,
+ static int tegra_pmc_get_cpu_powerdomain_id(int cpuid)
+ {
+ 	if (cpuid <= 0 || cpuid >= num_possible_cpus())
+diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
+index 59e19c344298..139a30867cb2 100644
+--- a/arch/arm/mach-tegra/pmc.h
++++ b/arch/arm/mach-tegra/pmc.h
+@@ -18,6 +18,7 @@
+ #ifndef __MACH_TEGRA_PMC_H
+ #define __MACH_TEGRA_PMC_H
  
- #define dma_mmap_coherent(d, v, c, h, s) dma_mmap_attrs(d, v, c, h, s, NULL)
++#include <linux/io.h>
+ #include <linux/reboot.h>
  
--static inline int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
--		      void *cpu_addr, dma_addr_t dma_addr, size_t size)
--{
--	DEFINE_DMA_ATTRS(attrs);
--	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
--	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, &attrs);
--}
--
- int
- dma_common_get_sgtable(struct device *dev, struct sg_table *sgt,
- 		       void *cpu_addr, dma_addr_t dma_addr, size_t size);
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 931b70986272..d5d388160f42 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -263,6 +263,32 @@ struct dma_attrs;
- #define dma_unmap_sg_attrs(dev, sgl, nents, dir, attrs) \
- 	dma_unmap_sg(dev, sgl, nents, dir)
+ enum tegra_suspend_mode {
+@@ -37,6 +38,18 @@ void tegra_pmc_pm_set(enum tegra_suspend_mode mode);
+ void tegra_pmc_suspend_init(void);
+ #endif
  
-+#else
-+static inline void *dma_alloc_writecombine(struct device *dev, size_t size,
-+					   dma_addr_t *dma_addr, gfp_t gfp)
++extern void __iomem *tegra_pmc_base;
++
++static inline u32 tegra_pmc_readl(u32 reg)
 +{
-+	DEFINE_DMA_ATTRS(attrs);
-+	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-+	return dma_alloc_attrs(dev, size, dma_addr, gfp, &attrs);
++	return readl(tegra_pmc_base + reg);
 +}
 +
-+static inline void dma_free_writecombine(struct device *dev, size_t size,
-+					 void *cpu_addr, dma_addr_t dma_addr)
++static inline void tegra_pmc_writel(u32 val, u32 reg)
 +{
-+	DEFINE_DMA_ATTRS(attrs);
-+	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-+	return dma_free_attrs(dev, size, cpu_addr, dma_addr, &attrs);
++	writel(val, tegra_pmc_base + reg);
 +}
 +
-+static inline int dma_mmap_writecombine(struct device *dev,
-+					struct vm_area_struct *vma,
-+					void *cpu_addr, dma_addr_t dma_addr,
-+					size_t size)
-+{
-+	DEFINE_DMA_ATTRS(attrs);
-+	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &attrs);
-+	return dma_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, &attrs);
-+}
- #endif /* CONFIG_HAVE_DMA_ATTRS */
+ bool tegra_pmc_cpu_is_powered(int cpuid);
+ int tegra_pmc_cpu_power_on(int cpuid);
+ int tegra_pmc_cpu_remove_clamping(int cpuid);
+diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
+index 4cefc5cd6bed..f5fe5c5fa3f5 100644
+--- a/arch/arm/mach-tegra/powergate.c
++++ b/arch/arm/mach-tegra/powergate.c
+@@ -32,7 +32,7 @@
+ #include <linux/tegra-powergate.h>
  
- #ifdef CONFIG_NEED_DMA_MAP_STATE
+ #include "fuse.h"
+-#include "iomap.h"
++#include "pmc.h"
+ 
+ #define DPD_SAMPLE		0x020
+ #define  DPD_SAMPLE_ENABLE	(1 << 0)
+@@ -85,18 +85,6 @@ static const u8 tegra124_cpu_domains[] = {
+ 
+ static DEFINE_SPINLOCK(tegra_powergate_lock);
+ 
+-static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+-
+-static u32 pmc_read(unsigned long reg)
+-{
+-	return readl(pmc + reg);
+-}
+-
+-static void pmc_write(u32 val, unsigned long reg)
+-{
+-	writel(val, pmc + reg);
+-}
+-
+ static int tegra_powergate_set(int id, bool new_state)
+ {
+ 	bool status;
+@@ -104,14 +92,14 @@ static int tegra_powergate_set(int id, bool new_state)
+ 
+ 	spin_lock_irqsave(&tegra_powergate_lock, flags);
+ 
+-	status = pmc_read(PWRGATE_STATUS) & (1 << id);
++	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
+ 
+ 	if (status == new_state) {
+ 		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
+ 		return 0;
+ 	}
+ 
+-	pmc_write(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
++	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
+ 
+ 	spin_unlock_irqrestore(&tegra_powergate_lock, flags);
+ 
+@@ -142,7 +130,7 @@ int tegra_powergate_is_powered(int id)
+ 	if (id < 0 || id >= tegra_num_powerdomains)
+ 		return -EINVAL;
+ 
+-	status = pmc_read(PWRGATE_STATUS) & (1 << id);
++	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
+ 	return !!status;
+ }
+ 
+@@ -159,7 +147,7 @@ int tegra_powergate_remove_clamping(int id)
+ 	 */
+ 	if (tegra_chip_id == TEGRA124) {
+ 		if (id == TEGRA_POWERGATE_3D) {
+-			pmc_write(0, GPU_RG_CNTRL);
++			tegra_pmc_writel(0, GPU_RG_CNTRL);
+ 			return 0;
+ 		}
+ 	}
+@@ -175,7 +163,7 @@ int tegra_powergate_remove_clamping(int id)
+ 	else
+ 		mask = (1 << id);
+ 
+-	pmc_write(mask, REMOVE_CLAMPING);
++	tegra_pmc_writel(mask, REMOVE_CLAMPING);
+ 
+ 	return 0;
+ }
+@@ -425,12 +413,12 @@ static int tegra_io_rail_prepare(int id, unsigned long *request,
+ 	rate = clk_get_rate(clk);
+ 	clk_put(clk);
+ 
+-	pmc_write(DPD_SAMPLE_ENABLE, DPD_SAMPLE);
++	tegra_pmc_writel(DPD_SAMPLE_ENABLE, DPD_SAMPLE);
+ 
+ 	/* must be@least 200 ns, in APB (PCLK) clock cycles */
+ 	value = DIV_ROUND_UP(1000000000, rate);
+ 	value = DIV_ROUND_UP(200, value);
+-	pmc_write(value, SEL_DPD_TIM);
++	tegra_pmc_writel(value, SEL_DPD_TIM);
+ 
+ 	return 0;
+ }
+@@ -443,7 +431,7 @@ static int tegra_io_rail_poll(unsigned long offset, unsigned long mask,
+ 	timeout = jiffies + msecs_to_jiffies(timeout);
+ 
+ 	while (time_after(timeout, jiffies)) {
+-		value = pmc_read(offset);
++		value = tegra_pmc_readl(offset);
+ 		if ((value & mask) == val)
+ 			return 0;
+ 
+@@ -455,7 +443,7 @@ static int tegra_io_rail_poll(unsigned long offset, unsigned long mask,
+ 
+ static void tegra_io_rail_unprepare(void)
+ {
+-	pmc_write(DPD_SAMPLE_DISABLE, DPD_SAMPLE);
++	tegra_pmc_writel(DPD_SAMPLE_DISABLE, DPD_SAMPLE);
+ }
+ 
+ int tegra_io_rail_power_on(int id)
+@@ -470,11 +458,11 @@ int tegra_io_rail_power_on(int id)
+ 
+ 	mask = 1 << bit;
+ 
+-	value = pmc_read(request);
++	value = tegra_pmc_readl(request);
+ 	value |= mask;
+ 	value &= ~IO_DPD_REQ_CODE_MASK;
+ 	value |= IO_DPD_REQ_CODE_OFF;
+-	pmc_write(value, request);
++	tegra_pmc_writel(value, request);
+ 
+ 	err = tegra_io_rail_poll(status, mask, 0, 250);
+ 	if (err < 0)
+@@ -498,11 +486,11 @@ int tegra_io_rail_power_off(int id)
+ 
+ 	mask = 1 << bit;
+ 
+-	value = pmc_read(request);
++	value = tegra_pmc_readl(request);
+ 	value |= mask;
+ 	value &= ~IO_DPD_REQ_CODE_MASK;
+ 	value |= IO_DPD_REQ_CODE_ON;
+-	pmc_write(value, request);
++	tegra_pmc_writel(value, request);
+ 
+ 	err = tegra_io_rail_poll(status, mask, mask, 250);
+ 	if (err < 0)
 -- 
 1.9.2
