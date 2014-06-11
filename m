@@ -1,104 +1,63 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 11 Jun 2014 17:18:34 +0100
-Subject: [PATCH v4 0/6] ARM generic idle states
-Message-ID: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed, 11 Jun 2014 17:18:36 +0100
+Subject: [PATCH v4 2/6] Documentation: devicetree: psci: define CPU suspend
+ parameter
+In-Reply-To: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1402503520-8611-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is v4 of a previous posting:
+OS layers built on top of PSCI to enter low-power states require the
+power_state parameter to be passed to the PSCI CPU suspend method.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/253693.html
+This parameter is specific to a power state and platform specific,
+therefore must be provided by firmware to the OS in order to enable
+proper call sequence.
 
-Changes in v4:
+This patch adds a property in the PSCI bindings that describes how
+the CPU suspend power_state parameter should be defined in DT in
+all device nodes that rely on PSCI CPU suspend method usage.
 
-- States sorting using exit-latency
-- Added cosmetic review comments
-- Dropped RFC tag
-- Rebased against 3.15
+Reviewed-by: Sebastian Capella <sebcape@gmail.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-Changes in v3:
-
-- Streamlined the idle states bindings and added them to the series
-  http://www.spinics.net/lists/arm-kernel/msg316299.html
-- Sorting states through min-residency+exit-latency
-- Added debug strings formatting
-- Reworded min-residency-us idle state property
-- Removed power-domain properties from idle states waiting for code
-  examples requiring them to be defined
-
-Changes in v2:
-
-- Moved OF parsing code to drivers/cpuidle
-- Improved states detection and sorting through linked list
-- Split code in generic and ARM64 specific bits
-- Moved idle enter function into ARM64 idle driver
-- Refactored PSCI idle states register function
-- Renamed suspend operations and moved detection to ARM64 idle driver
-- Changed the way CPUIDLE_FLAG_TIMER_STOP is handled
-- Simplified idle state nodes parsing since according to the latest
-  bindings idle state nodes are a flat list, not hierarchical anymore
-- Used min-residency-us to sort the states, to be further discussed
-
-Idle states on most ARM platforms can be characterized by a set of
-parameters that are platform agnostic and describe the HW idle states
-features. So far, CPU idle drivers for ARM platforms required the definition
-of parameters through static tables, duplicating control data for different
-platforms. Moreover, the lack of standardization on firmware interfaces
-hampered any standardization effort, resulting in CPU idle drivers for ARM
-platforms containing duplicated code and platform specific power down routines.
-
-The introduction of the PSCI firmware interface, and more in general, well
-defined suspend back-ends, allows the definition of generic idle states and
-the respective kernel infrastructure to support them.
-
-Building on top of DT idle states bindings, that standardize idle states
-parameters and corresponding suspend back-ends, this patchset provides code
-that parses DT idle states nodes and builds at run-time the control data
-infrastructure required by the ARM CPU idle drivers.
-
-Idle states define an entry method (eg PSCI), that requires the respective
-ARM64 kernel back-end to be invoked to initialize idle states parameters, so
-that when the idle driver executes the back-end specific entry method a table
-look-up can be carried out to retrieve the corresponding idle state parameter.
-
-On legacy ARM platforms, the OF idle states are just used to initialize
-states data.
-
-The idle states bindings can be extended with new back-ends; the ARM64 CPUidle
-driver must be updated accordingly so that the corresponding back
-end initializer can be invoked at boot time for parameters initialization.
-
-Patchset has been tested on AEM v8 models, on top of bootwrapper PSCI CPU
-SUSPEND implementation which provides simulated core power gating.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg316299.html
-
-Lorenzo Pieralisi (6):
-  Documentation: arm: define DT idle states bindings
-  Documentation: devicetree: psci: define CPU suspend parameter
-  drivers: cpuidle: implement OF based idle states infrastructure
-  arm64: add PSCI CPU_SUSPEND based cpu_suspend support
-  drivers: cpuidle: CPU idle ARM64 driver
-  arm64: boot: dts: update rtsm aemv8 dts with PSCI and idle states
-
- Documentation/devicetree/bindings/arm/cpus.txt     |   8 +
- .../devicetree/bindings/arm/idle-states.txt        | 507 +++++++++++++++++++++
- Documentation/devicetree/bindings/arm/psci.txt     |  12 +-
- arch/arm64/boot/dts/rtsm_ve-aemv8a.dts             |  44 +-
- arch/arm64/include/asm/psci.h                      |   4 +
- arch/arm64/kernel/psci.c                           | 103 +++++
- drivers/cpuidle/Kconfig                            |  14 +
- drivers/cpuidle/Kconfig.arm64                      |  13 +
- drivers/cpuidle/Makefile                           |   5 +
- drivers/cpuidle/cpuidle-arm64.c                    | 168 +++++++
- drivers/cpuidle/of_idle_states.c                   | 282 ++++++++++++
- drivers/cpuidle/of_idle_states.h                   |   8 +
- 12 files changed, 1159 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/idle-states.txt
- create mode 100644 drivers/cpuidle/Kconfig.arm64
- create mode 100644 drivers/cpuidle/cpuidle-arm64.c
- create mode 100644 drivers/cpuidle/of_idle_states.c
- create mode 100644 drivers/cpuidle/of_idle_states.h
-
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index b4a58f3..fae3eed 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -50,6 +50,14 @@ Main node optional properties:
+ 
+  - migrate       : Function ID for MIGRATE operation
+ 
++Device tree nodes that require usage of PSCI CPU_SUSPEND function (ie idle
++states bindings[1]) must specify the following properties:
++
++- entry-method-param
++		Usage: Required for idle states bindings [1].
++		Value type: <u32>
++		Definition: power_state parameter to pass to the PSCI
++			    suspend call.
+ 
+ Example:
+ 
+@@ -64,7 +72,6 @@ Case 1: PSCI v0.1 only.
+ 		migrate		= <0x95c10003>;
+ 	};
+ 
+-
+ Case 2: PSCI v0.2 only
+ 
+ 	psci {
+@@ -88,3 +95,6 @@ Case 3: PSCI v0.2 and PSCI v0.1.
+ 
+ 		...
+ 	};
++
++[1] Kernel documentation - ARM idle states bindings
++    Documentation/devicetree/bindings/arm/idle-states.txt
 -- 
 1.8.4
