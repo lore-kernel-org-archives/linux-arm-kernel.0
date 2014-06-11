@@ -1,41 +1,51 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 11 Jun 2014 11:24:41 +0800
-Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
-In-Reply-To: <53958CCE.5080307@atmel.com>
-References: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
- <53958CCE.5080307@atmel.com>
-Message-ID: <5397CBF9.800@atmel.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Wed, 11 Jun 2014 10:22:10 +0530
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+ <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
+ <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+Message-ID: <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Hi Doug,
 
-On 06/09/2014 06:30 PM, Josh Wu wrote:
-> Hi, Bo
+On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 10 Jun 2014, Doug Anderson wrote:
 >
-> Thanks for the patch.
+>> My S-state knowledge is not strong, but I believe that Lorenzo's
+>> questions matter if we're using S2 for CPUidle (where we actually turn
+>> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
+>> (where we just enter WFI/WFE).
+>>
+
+No Its not plain WFI.
+
+All cores in Exynos5420 can be powered off independently.
+This functionality has been tested.
+
+Below is the link for the posted patches.
+
+https://lkml.org/lkml/2014/6/10/194
+
+And as Nicolas wrote, these patches need MCPM for that.
+
+>> I believe that in ChromeOS we use S1 CPUidle and that it works fine.
+>> We've never implemented S2 that I'm aware of.
 >
-> On 6/6/2014 4:02 PM, Bo Shen wrote:
->> If the ecc parameter is not the same as definition, when the
->> mtd core check these parameters, it will give the unexpected
->> result.
-> Could you be more specific to tell what kind of result will happened?
-
-For example:
-When try to calculate how many bits can correct in one page according to 
-the definition, it will give the wrong result.
-
-one page correct bits = (mtd->writesize * ecc->strength) / ecc->size;
-
-take the following use case as an example:
-mtd->writesize = 2048 bytes,
-ecc->strength = 4 bytes, (for 512 bytes)
-
-before this patch, the ecc->size = 2048, so the result is 4 bytes.
-
-after this patch, the ecc->size = 512, so the result is 16 bytes.
-
-The maximum correct bytes is 16 bytes while not 4 bytes. So, if not align
-
-Best Regards,
-Bo Shen
+> You'll have to rely on MCPM for that.  That's probably why it hasn't
+> been implemented before.
+>
+>
+> Nicolas
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
