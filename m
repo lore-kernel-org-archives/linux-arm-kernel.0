@@ -1,114 +1,60 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 11 Jun 2014 10:32:45 -0700
-Subject: BUG: Bad page state in process swapper pfn:00000
-In-Reply-To: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>
-References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>
-Message-ID: <539892BD.8020403@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 11 Jun 2014 19:50:51 +0200
+Subject: [PATCH 1/2 v3] spi: s3c64xx: use "cs-gpios" from spi node instead
+ of "cs-gpio"
+In-Reply-To: <5398918F.4060800@collabora.co.uk>
+References: <1402468318-7342-1-git-send-email-ch.naveen@samsung.com>
+ <539839D6.1050305@collabora.co.uk>
+ <CAHfPSqCYqTRBBH56y81na-t18pvoPmyWobZwXNgkrtq=H_79CQ@mail.gmail.com>
+ <5398918F.4060800@collabora.co.uk>
+Message-ID: <539896FB.4050702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11.06.2014 19:27, Javier Martinez Canillas wrote:
+> On 06/11/2014 01:38 PM, Naveen Krishna Ch wrote:
+>> On 11 June 2014 16:43, Javier Martinez Canillas
+>> <javier.martinez@collabora.co.uk> wrote:
+>>> On 06/11/2014 08:31 AM, Naveen Krishna Chatradhi wrote:
 
-Thanks for the bisect.
+[snip]
 
-On 6/11/2014 4:40 AM, Geert Uytterhoeven wrote:
-> With current mainline, I get an early crash on r8a7791/koelsch:
+>>>
+>>>>               return ERR_PTR(-EINVAL);
+>>>>       }
+>>>> +     cs->line = spi->cs_gpio;
+>>>>
+>>>
+>>> I wonder why are you keeping cs->line? AFAICT it's only used in
+>>> s3c64xx_spi_setup() to request the GPIO and since you get the struct spi_device
+>>> pointer as a parameter then you can just use spi->s_gpio instead.
+>> I'm trying not to touch the non-DT part of the code.
+>>
+>> struct s3c64xx_spi_csinfo *cs = spi->controller_data;
+>>
+>> This will update the cs->line and cs->fb_delay in case of non-DT.
 > 
-> BUG: Bad page state in process swapper  pfn:00000
-> page:ee20b000 count:0 mapcount:0 mapping:66756200 index:0x65726566
-> page flags: 0x74656b63(locked|error|lru|active|owner_priv_1|arch_1|private|writeback|head|swapcache
-> |reclaim|mlocked)
-> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
-> bad because of flags:
-> page flags: 0x212861(locked|lru|active|private|writeback|swapcache|mlocked)
+> I see, then I prefer the opposite and do something like this on s3c64xx_spi_probe():
 > 
-> I bisected it to
-> 
-> commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
-> Author: Laura Abbott <lauraa@codeaurora.org>
-> Date:   Sun Apr 13 22:54:58 2014 +0100
-> 
->     ARM: 8025/1: Get rid of meminfo
-> 
->     memblock is now fully integrated into the kernel and is the prefered
->     method for tracking memory. Rather than reinvent the wheel with
->     meminfo, migrate to using memblock directly instead of meminfo as
->     an intermediate.
-> 
->     Acked-by: Jason Cooper <jason@lakedaemon.net>
->     Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->     Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->     Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->     Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->     Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
->     Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> As this is a quite intrusive change, it cannot be reverted on top of mainline.
-> 
-> The commit before (1c8c3cf0b5239388e712508a85821f4718f4d889)
-> does work. Dmesg difference between them:
-> 
->  Uncompressing Linux... done, booting the kernel.
->  Booting Linux on physical CPU 0x0
-> -Linux version 3.15.0-rc1-koelsch-reference-00027-g1c8c3cf0b523-dirty
-> (geert at ramsan) (gcc version 4.6.3 (GCC) ) #174 SMP Wed Jun 11 13:19:00
-> CEST 2014
-> +Linux version 3.15.0-rc1-koelsch-reference-00028-g1c2f87c22566-dirty
-> (geert at ramsan) (gcc version 4.6.3 (GCC) ) #175 SMP Wed Jun 11 13:20:28
-> CEST 2014
->  CPU: ARMv7 Processor [413fc0f2] revision 2 (ARMv7), cr=10c5347d
->  CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> -Ignoring memory at 0x200000000 outside 32-bit physical address space
->  Machine model: Koelsch
->  bootconsole [earlycon0] enabled
->  debug: ignoring loglevel setting.
-> -Truncating RAM at 40000000-bfffffff to -6f7fffff (vmalloc region overlap).
-> +Truncating RAM at 0x00000000-0xc0000000 to -0x6f800000
+> if (!pdev->dev.of_node)
+>        spi->cs_gpio = cs->line;
 
-I'm guessing this is the issue right there.
+Hmm, as far as I understand, spi here is spi_device, not spi_master. I
+don't think you have access to SPI devices on your bus in controller
+probe().
 
-        memory at 40000000 {
-                device_type = "memory";
-                reg = <0 0x40000000 0 0x40000000>;
-        };
+What I think could work is reworking the driver to:
 
-        memory at 200000000 {
-                device_type = "memory";
-                reg = <2 0x00000000 0 0x40000000>;
-        };
+- in DT case, don't do anything in the driver about the GPIO chip
+select, because it will be handled automatically by the core.
 
-Those are the memory nodes from r8a7791-koelsch.dts. It looks like the memory
-outside 32-bit address range is not being dropped. It was suggested to drop
-early_init_dt_add_memory_arch which called arm_add_memory and just use the
-generic of code directly but the problem is arm_add_memory does additional
-bounds checking. It looks like early_init_dt_add_memory_arch in
-drivers/of/fdt.c checks for overflow on u64 types but not for overflow
-on phys_addr_t (32 bits) which is what memblock_add actually uses. 
+- in non-DT case, in s3c64xx_spi_setup(), just take the GPIO pin from
+s3c64xx_spi_csinfo struct passed through spi->controller_data, request
+it and save it to spi->cs_gpio,
 
-For a quick test, can you try bringing back early_init_dt_add_memory_arch
-and see if that fixes the problem:
+- in non-DT case, in s3c64xx_spi_cleanup(), free the GPIO requested in
+s3c64xx_spi_setup() and set spi->cs_gpio to -ENOENT (as done initially
+in spi_alloc_device()).
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index e94a157..ea9ce92 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -27,6 +27,10 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-+void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-+{
-+       arm_add_memory(base, size);
-+}
- 
- #ifdef CONFIG_SMP
- extern struct of_cpu_method __cpu_method_of_table[];
-
-Thanks,
-Laura
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Tomasz
