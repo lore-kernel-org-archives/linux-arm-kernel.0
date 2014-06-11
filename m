@@ -1,89 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 11 Jun 2014 12:25:04 +0200
-Subject: [PATCH v2 1/4] ASoC: atmel-ssc: distinguish whether SSC supports
- fslen ext
-In-Reply-To: <1402481682-9811-2-git-send-email-voice.shen@atmel.com>
-References: <1402481682-9811-1-git-send-email-voice.shen@atmel.com>
- <1402481682-9811-2-git-send-email-voice.shen@atmel.com>
-Message-ID: <53982E80.5070908@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jun 2014 12:27:12 +0200
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <alpine.DEB.2.02.1406111035190.13771@kaball.uk.xensource.com>
+References: <20140328184517.GA27219@cbox> <5397360B.80102@huawei.com>
+ <alpine.DEB.2.02.1406111035190.13771@kaball.uk.xensource.com>
+Message-ID: <13066173.0bm0kfOsEt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 12:14, Bo Shen :
-> Add compatible string to distinguish whether SSC supports
-> frame sync length extension.
+On Wednesday 11 June 2014 10:50:04 Stefano Stabellini wrote:
+> Although not in the ARM VM System Specification, Xen is certainly going
+> to support a fast boot path without UEFI firmware. I guess KVM will too.
+> You'll have to rely on hypervisor specific mechanisms to achieve it.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> In fact I wouldn't worry about UEFI when you need ACPI, that is not in
+> this specification. Moreover the only hypervisor supporting virtio on
+> ARM is KVM as far as I know.
 
-Ok, I am fine with this one:
+Ah right, I missed the part about ACPI.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > One aspect of this is that we currently start executing the image directly (no UEFI involved on the guest),
+> > and in some cases we might not need a full fledged file system at all,
+> > as the communication can happen via virtio channels.
+> > 
+> > We do have a need for ACPI for discovery of information like gic addresses, 
+> > timers, interrupts... (no interest on device trees, really), and of PCI-E.
 
-> ---
-> Changes in v2:
->   - Using compatible string to distinguish whether SSC supports
->     frame sync length extension to replace check IP version.
-> 
->  drivers/misc/atmel-ssc.c  | 13 +++++++++++++
->  include/linux/atmel-ssc.h |  1 +
->  2 files changed, 14 insertions(+)
-> 
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index 22de137..60843a2 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -83,10 +83,17 @@ EXPORT_SYMBOL(ssc_free);
->  
->  static struct atmel_ssc_platform_data at91rm9200_config = {
->  	.use_dma = 0,
-> +	.has_fslen_ext = 0,
-> +};
-> +
-> +static struct atmel_ssc_platform_data at91sam9rl_config = {
-> +	.use_dma = 0,
-> +	.has_fslen_ext = 1,
->  };
->  
->  static struct atmel_ssc_platform_data at91sam9g45_config = {
->  	.use_dma = 1,
-> +	.has_fslen_ext = 1,
->  };
->  
->  static const struct platform_device_id atmel_ssc_devtypes[] = {
-> @@ -94,6 +101,9 @@ static const struct platform_device_id atmel_ssc_devtypes[] = {
->  		.name = "at91rm9200_ssc",
->  		.driver_data = (unsigned long) &at91rm9200_config,
->  	}, {
-> +		.name = "at91sam9rl_ssc",
-> +		.driver_data = (unsigned long) &at91sam9rl_config,
-> +	}, {
->  		.name = "at91sam9g45_ssc",
->  		.driver_data = (unsigned long) &at91sam9g45_config,
->  	}, {
-> @@ -107,6 +117,9 @@ static const struct of_device_id atmel_ssc_dt_ids[] = {
->  		.compatible = "atmel,at91rm9200-ssc",
->  		.data = &at91rm9200_config,
->  	}, {
-> +		.compatible = "atmel,at91sam9rl-ssc",
-> +		.data = &at91sam9rl_config,
-> +	}, {
->  		.compatible = "atmel,at91sam9g45-ssc",
->  		.data = &at91sam9g45_config,
->  	}, {
-> diff --git a/include/linux/atmel-ssc.h b/include/linux/atmel-ssc.h
-> index 571a12e..e8dd408 100644
-> --- a/include/linux/atmel-ssc.h
-> +++ b/include/linux/atmel-ssc.h
-> @@ -7,6 +7,7 @@
->  
->  struct atmel_ssc_platform_data {
->  	int			use_dma;
-> +	int			has_fslen_ext;
->  };
->  
->  struct ssc_device {
-> 
+I wonder how you'd expect to find the ACPI data when there is no UEFI.
+It's not likely that any hypervisor would ship with an ACPI implementation
+that is independent of UEFI, because Linux (or any other full OS for
+that matter) would support that scenario. You could of course link OSv
+with an ACPI binary that is specific to KVM, but then I don't know why
+you wouldn't just hardcode the data in OSv directly.
 
-
--- 
-Nicolas Ferre
+	Arnd
