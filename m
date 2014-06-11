@@ -1,37 +1,62 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Jun 2014 22:34:48 +0200
-Subject: [PATCH 07/24] ARM: shmobile: Drop dev_irq_safe from r8a7779 genpd
- config
-In-Reply-To: <7ha99jiabs.fsf@paris.lan>
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
- <1402397497-26737-8-git-send-email-ulf.hansson@linaro.org>
- <7ha99jiabs.fsf@paris.lan>
-Message-ID: <CAPDyKFq7hdK=3jtni=nr4R6LVXubZZH3xc7=VkP5_CLQ4xaRQQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 11 Jun 2014 16:45:03 -0400 (EDT)
+Subject: [PATCH v2] uhci-platform: use devm_ioremap resource
+In-Reply-To: <alpine.DEB.2.10.1406112038420.2576@hadrien>
+Message-ID: <Pine.LNX.4.44L0.1406111639420.890-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 June 2014 20:13, Kevin Hilman <khilman@linaro.org> wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
->
->> The dev_irq_safe configuration is redundant, genpd don't have any
->> special treatmeant for handling it.  Let's remove it.
->
-> Why?
->
-> The genpd core needs to handle irq_safe properly eventully (right now it
-> just doesn't call power_off/power_on callbacks, but that needs to be
-> implmenented.  c.f commit 0aa2a22169)
->
-> If we remove these flags from platforms, we're taking away information
-> that the platform maintainers have specified tha will be useful when
-> full support is avialble.
+On Wed, 11 Jun 2014, Julia Lawall wrote:
 
-For sure this is needed in _some_ form. But before we even figured out
-how to support irq_safe genpd's, why even bother to support a
-configuration for it?
+> > > v2: pass correct arguments to devm_ioremap_resource
+> > > Not compile tested due to incompatible architecture.
+> >
+> > uhci-platform is compatible with all architectures.  But you have to
+> > add it to the .config file by hand.
+> 
+> What should one do exactly?  I added
+> 
+> CONFIG_USB_UHCI_PLATFORM=y
+> 
+> to the end of my .config file, but then running make just overwrites it:
 
-Currently I think it good enough to use the per device irq_safe
-option, and then let's see how handling of these devices evolves.
+By golly, you're right...  I didn't realize it would do that.
 
-Kind regards
-Uffe
+I guess you have to edit the drivers/usb/host/Kconfig file, changing
+
+config USB_UHCI_PLATFORM
+	bool
+	default y if ARCH_VT8500
+
+to
+
+config USB_UHCI_PLATFORM
+	bool
+	default y
+
+or something equivalent.
+
+> 
+> > make drivers/usb/host/uhci-platform.o
+> scripts/kconfig/conf --silentoldconfig Kconfig
+> #
+> # configuration written to .config
+> #
+>   CHK     include/config/kernel.release
+>   CHK     include/generated/uapi/linux/version.h
+>   CHK     include/generated/utsrelease.h
+>   CALL    scripts/checksyscalls.sh
+>   CC      drivers/usb/host/uhci-platform.o
+> drivers/usb/host/uhci-platform.c:13:38: warning: ?struct usb_hcd? declared
+> inside parameter list [enabled by default]
+>  static int uhci_platform_init(struct usb_hcd *hcd)
+
+Do
+
+	make drivers/usb/host/uhci-hcd.o
+
+instead of
+
+	make drivers/usb/host/uhci-platform.o
+
+Alan Stern
