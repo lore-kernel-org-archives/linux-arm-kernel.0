@@ -1,29 +1,101 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 11 Jun 2014 14:07:40 +0200
-Subject: mvebu: build error in -next
-In-Reply-To: <20140609185550.GA5034@arch.cereza>
-References: <20140609185550.GA5034@arch.cereza>
-Message-ID: <20140611140740.1bbe4a94@free-electrons.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Wed, 11 Jun 2014 17:44:21 +0530
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <20140611101353.GA18781@e102568-lin.cambridge.arm.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+ <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
+ <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+ <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
+ <20140611101353.GA18781@e102568-lin.cambridge.arm.com>
+Message-ID: <CADWw7OghkwkMbU=eZG=OhxVowNJy_12UOo_pNYnXbimF73Uwdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+On Wed, Jun 11, 2014 at 3:43 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Jun 11, 2014 at 05:52:10AM +0100, Chander Kashyap wrote:
+>> Hi Doug,
+>>
+>> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Tue, 10 Jun 2014, Doug Anderson wrote:
+>> >
+>> >> My S-state knowledge is not strong, but I believe that Lorenzo's
+>> >> questions matter if we're using S2 for CPUidle (where we actually turn
+>> >> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
+>> >> (where we just enter WFI/WFE).
+>> >>
+>>
+>> No Its not plain WFI.
+>>
+>> All cores in Exynos5420 can be powered off independently.
+>> This functionality has been tested.
+>>
+>> Below is the link for the posted patches.
+>>
+>> https://lkml.org/lkml/2014/6/10/194
+>>
+>> And as Nicolas wrote, these patches need MCPM for that.
+>
+> Chander, I cast a look into the code and I have a question
+> (you also told me on CPUidle review that only core off
+> is supported in CPUidle).
+>
+> When you say all cores can be powered off independently, do
+> you also mean that clusters can be powered off (in CPUidle) ?
+>
+> I am pointing this out since in the MCPM backend I noticed:
+>
+> "/* TODO: Turn off the cluster here to save power. */"
+>
+> I do not see any cluster power down request in the down path.
+>
+> If I am wrong, ignore my message, I am just writing to help.
+>
+> If you can only power down cores, but not the clusters on idle,
+> please keep in mind that you are currently cleaning and invalidating
+> the L2 when last man is running and this must not be taken
+> lightly since, if L2 stays on, that's a massive energy waste
+> for nothing.
+>
+> So, if clusters stay up, you _have_ to tweak the MCPM backend slightly
+> to avoid cleaning L2, that's pivotal.
 
-On Mon, 9 Jun 2014 15:55:50 -0300, Ezequiel Garcia wrote:
+Hi Lorenzo,
+Cluster shutdown is in progress. Abhilash will add support for that.
 
-> It seems we have a build error in latest -next (20140606):
-> 
-> arch/arm/mach-mvebu/built-in.o: In function `armada_370_xp_cpu_resume':
-> /home/zeta/fast/linux/next/arch/arm/mach-mvebu/pmsu.c:145: undefined reference to `cpu_resume'
-> arch/arm/mach-mvebu/built-in.o: In function `armada_370_xp_cpu_suspend':
-> /home/zeta/fast/linux/next/arch/arm/mach-mvebu/pmsu.c:223: undefined reference to `cpu_suspend'
-> 
-> Find the config is enclosed; it's probably just a few ifdef's to add.
+https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31104.html
 
-Thanks for reporting this, I've just sent a patch to fix it.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> Lorenzo
+>
+>>
+>> >> I believe that in ChromeOS we use S1 CPUidle and that it works fine.
+>> >> We've never implemented S2 that I'm aware of.
+>> >
+>> > You'll have to rely on MCPM for that.  That's probably why it hasn't
+>> > been implemented before.
+>> >
+>> >
+>> > Nicolas
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
