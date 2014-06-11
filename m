@@ -1,26 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 11 Jun 2014 14:38:25 +0200
-Subject: [PATCH v8 4/7] vendor-prefixes: add prefix for Mediaktek Inc.
-In-Reply-To: <1402490055-15197-5-git-send-email-matthias.bgg@gmail.com>
-References: <1402490055-15197-1-git-send-email-matthias.bgg@gmail.com>
- <1402490055-15197-5-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <CAMuHMdX68Mb9QijkQTisLZapZitUY+EuCGfqXP4LJHOeb-_VVw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 11 Jun 2014 16:41:33 +0400
+Subject: [PATCH 0/2] Add VIN and ADV7180 DT support for R8A7791/Henninger
+ board
+In-Reply-To: <20140610235445.GE20738@verge.net.au>
+References: <201406110304.18976.sergei.shtylyov@cogentembedded.com>
+ <20140610235445.GE20738@verge.net.au>
+Message-ID: <53984E7D.8010909@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 2:34 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> +mediatek       MediaTek Inc.
+Hello.
 
-The one-line summary says "MediakTek Inc.".
+On 06/11/2014 03:54 AM, Simon Horman wrote:
 
-Gr{oetje,eeting}s,
+>>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+>> 'renesas-devel-v3.15-20140610' tag plus the Henninger I2C2 DT support patch
+>> that I posted earlier. Here we add the VIN and ADV7180 video decoder device
+>> tree support on the R8A7791/Henninger board. The patchset requires Ben Dooks'
+>> adv7180, rcar_vin, and soc_camera DT support patches posted back in April in
+>> order to work.
 
-                        Geert
+> I wonder what the status of those (driver?) patches are.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+    Someone in CodeThink is working on them, I was told. I had to fix them up 
+somewhat in order for them to compile.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> In general I prefer bindings to be accepted before they are used.
+
+    No argument here. I just have my own schedule.
+
+WBR, Sergei
