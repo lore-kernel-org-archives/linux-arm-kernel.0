@@ -1,41 +1,32 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 11 Jun 2014 20:32:15 +0200
-Subject: [PATCH 00/24] PM / Domains: Generic OF-based support and cleanups
-In-Reply-To: <7hlht3gvas.fsf@paris.lan>
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
- <7hlht3gvas.fsf@paris.lan>
-Message-ID: <CAJZ5v0gcHSGf5DBYC-KLtOCveo---vQdSmdUKCqU7pNMKcXbww@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 11 Jun 2014 14:38:51 -0400 (EDT)
+Subject: [PATCH v4 3/6] drivers: cpuidle: implement OF based idle states
+ infrastructure
+In-Reply-To: <1402503520-8611-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1402503520-8611-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.11.1406111431080.25775@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 8:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
->
->> Parts of this patchset has been posted earlier. To be able to smoothly continue
->> my work in re-factoring genpd I have collected patches into this patchset.
->>
->> The complete patchset is available at the linux-pm_linux-next_genpd branch at:
->> git.linaro.org/people/ulf.hansson/linux-2.6.git
->> This branch is based upon Rafael's linux-pm tree's linux-next branch.
->>
->> And important note. There are dependencies througout this patchset, which means
->> the all need to go together. I suggest we use Rafael's tree, thus I seek for
->> acks from the affected ARM SoC maintainers.
->
-> At least on the surface, there are at least 3 separate series going on
-> here
->
-> 1) DT support for genpd
-> 2) various genpd cleanups
-> 3) ux500 support
->
-> Clearly they are related, but it would be easier to review if a large
-> series like this is broken up into smaller series where the cover
-> letters describe the dependencies between them
+On Wed, 11 Jun 2014, Lorenzo Pieralisi wrote:
 
-Agreed.
+> On most common ARM systems, the low-power states a CPU can be put into are
+> not discoverable in HW and require device tree bindings to describe
+> power down suspend operations and idle states parameters.
+> 
+> In order to enable DT based idle states and configure idle drivers, this
+> patch implements the bulk infrastructure required to parse the device tree
+> idle states bindings and initialize the corresponding CPUidle driver states
+> data.
 
-And if they are sent in such an order that the bits the rest depends on
-go first and are settled before the next series is even submitted.
+Oh and another pet peeve of mine: given we always talk about "device 
+tree" all the time, could you s/OF/DT/ in the subject?  It's been a 
+while that DT has outgrown its OF origins.
 
-Rafael
+>  create mode 100644 drivers/cpuidle/of_idle_states.c
+>  create mode 100644 drivers/cpuidle/of_idle_states.h
+
+Ditto here, including any new symbols you introduced.
+
+Nicolas
