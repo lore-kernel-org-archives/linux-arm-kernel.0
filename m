@@ -1,108 +1,86 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 11 Jun 2014 10:58:17 +0100
-Subject: [PATCH 2/2] ARM: dts: hummingboard/cubox-i: move usb otg
- configuration to platform level
-Message-ID: <E1WufIP-0007yq-6R@rmk-PC.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 11 Jun 2014 11:13:55 +0100
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+ <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
+ <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+ <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
+Message-ID: <20140611101353.GA18781@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The configuration of the USB OTG is a platform configuration decision,
-not a microsom decision.  Move this configuration out to the platform
-level files.
+On Wed, Jun 11, 2014 at 05:52:10AM +0100, Chander Kashyap wrote:
+> Hi Doug,
+> 
+> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 10 Jun 2014, Doug Anderson wrote:
+> >
+> >> My S-state knowledge is not strong, but I believe that Lorenzo's
+> >> questions matter if we're using S2 for CPUidle (where we actually turn
+> >> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
+> >> (where we just enter WFI/WFE).
+> >>
+> 
+> No Its not plain WFI.
+> 
+> All cores in Exynos5420 can be powered off independently.
+> This functionality has been tested.
+> 
+> Below is the link for the posted patches.
+> 
+> https://lkml.org/lkml/2014/6/10/194
+> 
+> And as Nicolas wrote, these patches need MCPM for that.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/imx6dl-hummingboard.dts | 10 ++++++++++
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 10 ++++++++++
- arch/arm/boot/dts/imx6qdl-microsom.dtsi   | 13 -------------
- 3 files changed, 20 insertions(+), 13 deletions(-)
+Chander, I cast a look into the code and I have a question
+(you also told me on CPUidle review that only core off
+is supported in CPUidle).
 
-diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-index cb9691bac161..bcae32fdc4c1 100644
---- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-@@ -143,6 +143,14 @@
- 			fsl,pins = <MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0>;
- 		};
- 
-+		pinctrl_hummingboard_usbotg_id: hummingboard-usbotg-id {
-+			/*
-+			 * Similar to pinctrl_usbotg_2, but we want it
-+			 * pulled down for a fixed host connection.
-+			 */
-+			fsl,pins = <MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059>;
-+		};
-+
- 		pinctrl_hummingboard_usbotg_vbus: hummingboard-usbotg-vbus {
- 			fsl,pins = <MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x1b0b0>;
- 		};
-@@ -182,6 +190,8 @@
- };
- 
- &usbotg {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hummingboard_usbotg_id>;
- 	vbus-supply = <&reg_usbotg_vbus>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index f45380073973..b53cd8c6c44d 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -134,6 +134,14 @@
- 			fsl,pins = <MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x4001b0b0>;
- 		};
- 
-+		pinctrl_cubox_i_usbotg_id: cubox-i-usbotg-id {
-+			/*
-+			 * The Cubox-i pulls this low, but as it's pointless
-+			 * leaving it as a pull-up, even if it is just 10uA.
-+			 */
-+			fsl,pins = <MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059>;
-+		};
-+
- 		pinctrl_cubox_i_usbotg_vbus: cubox-i-usbotg-vbus {
- 			fsl,pins = <MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x4001b0b0>;
- 		};
-@@ -192,6 +200,8 @@
- };
- 
- &usbotg {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_cubox_i_usbotg_id>;
- 	vbus-supply = <&reg_usbotg_vbus>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-index a5d72895d9ce..bf5a45b0a61f 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-@@ -80,14 +80,6 @@
- 			>;
- 		};
- 
--		pinctrl_microsom_usbotg: microsom-usbotg {
--			/*
--			 * Similar to pinctrl_usbotg_2, but we want it
--			 * pulled down for a fixed host connection.
--			 */
--			fsl,pins = <MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059>;
--		};
--
- 		pinctrl_microsom_usdhc1: microsom-usdhc1 {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
-@@ -114,11 +106,6 @@
- 	fsl,uart-has-rtscts;
- };
- 
--&usbotg {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_microsom_usbotg>;
--};
--
- /* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
- &usdhc1 {
- 	card-external-vcc-supply = <&reg_brcm>;
--- 
-1.8.3.1
+When you say all cores can be powered off independently, do
+you also mean that clusters can be powered off (in CPUidle) ?
+
+I am pointing this out since in the MCPM backend I noticed:
+
+"/* TODO: Turn off the cluster here to save power. */"
+
+I do not see any cluster power down request in the down path.
+
+If I am wrong, ignore my message, I am just writing to help.
+
+If you can only power down cores, but not the clusters on idle,
+please keep in mind that you are currently cleaning and invalidating
+the L2 when last man is running and this must not be taken
+lightly since, if L2 stays on, that's a massive energy waste
+for nothing.
+
+So, if clusters stay up, you _have_ to tweak the MCPM backend slightly
+to avoid cleaning L2, that's pivotal.
+
+Lorenzo
+
+> 
+> >> I believe that in ChromeOS we use S1 CPUidle and that it works fine.
+> >> We've never implemented S2 that I'm aware of.
+> >
+> > You'll have to rely on MCPM for that.  That's probably why it hasn't
+> > been implemented before.
+> >
+> >
+> > Nicolas
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
