@@ -1,40 +1,36 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 11 Jun 2014 16:37:41 +0800
-Subject: [PATCH] clocksource: arch_arm_timer: Fix timecounter initialization
-Message-ID: <1402475861-15354-1-git-send-email-Li.Xiubo@freescale.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 11 Jun 2014 11:44:21 +0200
+Subject: [PATCH] [linux-next] arm64: ftrace: Fix comment typo
+ 'CONFIG_FUNCTION_GRAPH_FP_TEST'
+Message-ID: <1402479861.3798.63.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The third parameter(u64 start_tstamp) of timecounter_init() should
-be the start time by ns, not a cycle counter.
-
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
- drivers/clocksource/arm_arch_timer.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Untested.
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5163ec1..6c3cfd8 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -426,7 +426,7 @@ struct timecounter *arch_timer_get_timecounter(void)
- 
- static void __init arch_counter_register(unsigned type)
- {
--	u64 start_count;
-+	u64 start_count, start_ns;
- 
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_CP15_TIMER)
-@@ -438,7 +438,8 @@ static void __init arch_counter_register(unsigned type)
- 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
- 	cyclecounter.mult = clocksource_counter.mult;
- 	cyclecounter.shift = clocksource_counter.shift;
--	timecounter_init(&timecounter, &cyclecounter, start_count);
-+	start_ns = cyclecounter_cyc2ns(&cyclecounter, start_count);
-+	timecounter_init(&timecounter, &cyclecounter, start_ns);
- 
- 	/* 56 bits minimum, so we assume worst case rollover */
- 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+This typo was added in next-20140603. I've had this patch queued for
+over a week because I wanted to understand the comment I'm touching
+here. I still don't. But I figured that making sure that this comment
+uses the Kconfig macro that apparently was intended, ought to be enough
+to submit this.
+
+ arch/arm64/kernel/entry-ftrace.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+index b051871f2965..aa5f9fcbf9ee 100644
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -205,7 +205,7 @@ ENDPROC(ftrace_graph_caller)
+  *
+  * Run ftrace_return_to_handler() before going back to parent.
+  * @fp is checked against the value passed by ftrace_graph_caller()
+- * only when CONFIG_FUNCTION_GRAPH_FP_TEST is enabled.
++ * only when CONFIG_HAVE_FUNCTION_GRAPH_FP_TEST is enabled.
+  */
+ ENTRY(return_to_handler)
+ 	str	x0, [sp, #-16]!
 -- 
-1.8.5
+1.9.3
