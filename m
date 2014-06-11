@@ -1,88 +1,41 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 11 Jun 2014 20:28:59 +0200
-Subject: [PATCH 1/2 v3] spi: s3c64xx: use "cs-gpios" from spi node instead
- of "cs-gpio"
-In-Reply-To: <CAHfPSqB3V+vBCj03WLkeLQ5e7O4r+pUKQ-yZpK=tdAqVV1GuLw@mail.gmail.com>
-References: <1402468318-7342-1-git-send-email-ch.naveen@samsung.com>
- <539839D6.1050305@collabora.co.uk>
- <CAHfPSqCYqTRBBH56y81na-t18pvoPmyWobZwXNgkrtq=H_79CQ@mail.gmail.com>
- <5398918F.4060800@collabora.co.uk> <539896FB.4050702@gmail.com>
- <CAHfPSqB3V+vBCj03WLkeLQ5e7O4r+pUKQ-yZpK=tdAqVV1GuLw@mail.gmail.com>
-Message-ID: <53989FEB.1010205@gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 11 Jun 2014 20:32:15 +0200
+Subject: [PATCH 00/24] PM / Domains: Generic OF-based support and cleanups
+In-Reply-To: <7hlht3gvas.fsf@paris.lan>
+References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
+ <7hlht3gvas.fsf@paris.lan>
+Message-ID: <CAJZ5v0gcHSGf5DBYC-KLtOCveo---vQdSmdUKCqU7pNMKcXbww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.06.2014 20:23, Naveen Krishna Ch wrote:
-> Hello Tomasz,
-> 
-> On 11 June 2014 23:20, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On 11.06.2014 19:27, Javier Martinez Canillas wrote:
->>> On 06/11/2014 01:38 PM, Naveen Krishna Ch wrote:
->>>> On 11 June 2014 16:43, Javier Martinez Canillas
->>>> <javier.martinez@collabora.co.uk> wrote:
->>>>> On 06/11/2014 08:31 AM, Naveen Krishna Chatradhi wrote:
+On Wed, Jun 11, 2014 at 8:23 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+>> Parts of this patchset has been posted earlier. To be able to smoothly continue
+>> my work in re-factoring genpd I have collected patches into this patchset.
 >>
->> [snip]
+>> The complete patchset is available at the linux-pm_linux-next_genpd branch at:
+>> git.linaro.org/people/ulf.hansson/linux-2.6.git
+>> This branch is based upon Rafael's linux-pm tree's linux-next branch.
 >>
->>>>>
->>>>>>               return ERR_PTR(-EINVAL);
->>>>>>       }
->>>>>> +     cs->line = spi->cs_gpio;
->>>>>>
->>>>>
->>>>> I wonder why are you keeping cs->line? AFAICT it's only used in
->>>>> s3c64xx_spi_setup() to request the GPIO and since you get the struct spi_device
->>>>> pointer as a parameter then you can just use spi->s_gpio instead.
->>>> I'm trying not to touch the non-DT part of the code.
->>>>
->>>> struct s3c64xx_spi_csinfo *cs = spi->controller_data;
->>>>
->>>> This will update the cs->line and cs->fb_delay in case of non-DT.
->>>
->>> I see, then I prefer the opposite and do something like this on s3c64xx_spi_probe():
->>>
->>> if (!pdev->dev.of_node)
->>>        spi->cs_gpio = cs->line;
->>
->> Hmm, as far as I understand, spi here is spi_device, not spi_master. I
->> don't think you have access to SPI devices on your bus in controller
->> probe().
->>
->> What I think could work is reworking the driver to:
->>
->> - in DT case, don't do anything in the driver about the GPIO chip
->> select, because it will be handled automatically by the core.
-> But, i see that gpio_request_one is needed in _setup function in the driver.
-> Except that no other gpio related operation is needed in the driver.
+>> And important note. There are dependencies througout this patchset, which means
+>> the all need to go together. I suggest we use Rafael's tree, thus I seek for
+>> acks from the affected ARM SoC maintainers.
+>
+> At least on the surface, there are at least 3 separate series going on
+> here
+>
+> 1) DT support for genpd
+> 2) various genpd cleanups
+> 3) ux500 support
+>
+> Clearly they are related, but it would be easier to review if a large
+> series like this is broken up into smaller series where the cover
+> letters describe the dependencies between them
 
-This should be handled by SPI core as well, but apparently it isn't. So
-the scheme of work in s3c64xx_spi_setup() changes as in pseudocode below:
+Agreed.
 
-	if (!DT)
-		spi->cs_gpio = cs->line;
+And if they are sent in such an order that the bits the rest depends on
+go first and are settled before the next series is even submitted.
 
-	if (gpio_is_valid(spi->cs_gpio))
-		gpio_request_one(spi->cs_gpio);
-
-and in s3c64xx_spi_cleanup():
-
-	if (gpio_is_valid(spi->cs_gpio))
-		gpio_free(spi->cs_gpio);
-
-	if (!DT)
-		spi->cs_gpio = -ENOENT;
-
->>
->> - in non-DT case, in s3c64xx_spi_setup(), just take the GPIO pin from
->> s3c64xx_spi_csinfo struct passed through spi->controller_data, request
->> it and save it to spi->cs_gpio,
->>
->> - in non-DT case, in s3c64xx_spi_cleanup(), free the GPIO requested in
->> s3c64xx_spi_setup() and set spi->cs_gpio to -ENOENT (as done initially
->> in spi_alloc_device()).
-> Its better going back to the working way.
-
-Hmm?
-
-Best regards,
-Tomasz
+Rafael
