@@ -1,70 +1,62 @@
-From: tushar.b@samsung.com (Tushar Behera)
-Date: Wed, 11 Jun 2014 11:02:19 +0530
-Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
-In-Reply-To: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
-Message-ID: <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Wed, 11 Jun 2014 11:09:37 +0530
+Subject: exynos5420-peach-pi: linux-next boot fails unless mau_epll left
+ enabled?
+In-Reply-To: <CAD=FV=UdCp0dG7tnzaSnWxhtnU46ttMOUht00DL=bfvbbt7mXQ@mail.gmail.com>
+References: <7hoay6sxjl.fsf@paris.lan>
+ <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
+ <CAOD6ATpZWEg9d7WnZ8tg9_uQJ29vMoucaOwh0_tbdRSDRj25cw@mail.gmail.com>
+ <CAD=FV=UsVQm_pLNtPwZMNCQQSSVrx=6M8eJrNRS8VyWMQzYtAQ@mail.gmail.com>
+ <539764AF.4090409@collabora.co.uk>
+ <CAD=FV=UdCp0dG7tnzaSnWxhtnU46ttMOUht00DL=bfvbbt7mXQ@mail.gmail.com>
+Message-ID: <5397EB99.1070209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peach-pi board has MAX98090 audio codec connected on HSI2C-7 bus.
+On 06/11/2014 01:56 AM, Doug Anderson wrote:
+> Javier,
+> 
+> On Tue, Jun 10, 2014 at 1:03 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Yes, I did not have this issue before. However... I installed the latest Peach
+>> pit recovery image you provided me and mainline kernel started to hang on boot.
+>> I remembered this thread so tested Kevin's patch which make it boot again.
+>>
+>> You said that chain-booting u-boot runs the sound init code but did you try
+>> booting a signed FIT image using the verified u-boot?
+> 
+> Right, I'd bet that it's actually verified boot that's calling the
+> sound init code (probably just in case it needs to beep at the user).
+> ...so this would happen even without chain booting.  I haven't tried
+> signing / booting without chain booting, but I can totally believe it
+> would hang just as easily.
+> 
+> 
+>> I'm asking because I'm see the hang both when chain-booting nv-u-boot from a
+>> kernel partition and booting a signed FIT image with the verified u-boot.
+>>
+>> So it seems this is a regression in latest U-boot and I didn't run into this
+>> before due having an older RW U-Boot on my Peach pit?
+> 
+> You must have had a very old RW U-Boot, possibly one before audio
+> support was added.  I think we just need to fix this in the kernel so
+> it doesn't hang.
+> 
+> -Doug
+> 
 
-Signed-off-by: Tushar Behera <tushar.b@samsung.com>
----
- arch/arm/boot/dts/exynos5800-peach-pi.dts |   31 +++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Hi Kevin,
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index f3af207..76f5966 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -78,9 +78,27 @@
- 		pinctrl-0 = <&usb301_vbus_en>;
- 		enable-active-high;
- 	};
-+
-+	sound {
-+		compatible = "google,snow-audio-max98090";
-+
-+		samsung,i2s-controller = <&i2s0>;
-+		samsung,audio-codec = <&max98090>;
-+	};
-+};
-+
-+&i2s0 {
-+	status = "okay";
- };
- 
- &pinctrl_0 {
-+	max98090_irq: max98090-irq {
-+		samsung,pins = "gpx0-2";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	tpm_irq: tpm-irq {
- 		samsung,pins = "gpx1-0";
- 		samsung,pin-function = <0>;
-@@ -207,6 +225,19 @@
- 	samsung,invert-vclk;
- };
- 
-+&hsi2c_7 {
-+	status = "okay";
-+
-+	max98090: codec at 10 {
-+		compatible = "maxim,max98090";
-+		reg = <0x10>;
-+		interrupts = <2 0>;
-+		interrupt-parent = <&gpx0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&max98090_irq>;
-+	};
-+};
-+
- &hsi2c_9 {
- 	status = "okay";
- 	clock-frequency = <400000>;
+I have posted the fixes[1] in the mailing list. Please test and update.
+
+Changes:
+1 patch in drivers/clk/samsung/clk-exynos-audss.c
+1 patch in arch/arm/boot/dts/exynos5420.dtsi
+
+For testing audio in Peach-pi,
+1 patch in arch/arm/boot/dts/exynos5800-peach-pi.dts
+
+[1] [PATCH 0/3] Fix boot-hang on Peach-pit and Enable audio
+
 -- 
-1.7.9.5
+Tushar Behera
