@@ -1,73 +1,81 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 11 Jun 2014 17:56:02 +0200
-Subject: exynos5420-peach-pi: linux-next boot fails unless mau_epll left
- enabled?
-In-Reply-To: <5397EB99.1070209@gmail.com>
-References: <7hoay6sxjl.fsf@paris.lan>
- <CAGa+x86ko1N+T+QAqnY+md4+nyzza_cDt0wa-s06TdCX+27fSA@mail.gmail.com>
- <CAOD6ATpZWEg9d7WnZ8tg9_uQJ29vMoucaOwh0_tbdRSDRj25cw@mail.gmail.com>
- <CAD=FV=UsVQm_pLNtPwZMNCQQSSVrx=6M8eJrNRS8VyWMQzYtAQ@mail.gmail.com>
- <539764AF.4090409@collabora.co.uk>
- <CAD=FV=UdCp0dG7tnzaSnWxhtnU46ttMOUht00DL=bfvbbt7mXQ@mail.gmail.com>
- <5397EB99.1070209@gmail.com>
-Message-ID: <53987C12.8020406@collabora.co.uk>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 11 Jun 2014 17:58:18 +0200
+Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
+ always enabled
+In-Reply-To: <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
+Message-ID: <CABxcv=nR+QqzBkzgn6EpZenFWsGLJ0_6HW=QX13H2XYgqcF24A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tushar,
+On Wed, Jun 11, 2014 at 7:32 AM, Tushar Behera <tushar.b@samsung.com> wrote:
+> When the output clock of AUDSS mux is disabled, we are getting kernel
+> oops while doing a clk_get() on other clocks provided by AUDSS. Though
+> user manual doesn't specify this dependency, we came across this issue
+> while disabling the parent of AUDSS mux clocks.
+>
+> Keeping the parents of AUDSS mux always enabled fixes this issue.
+>
+> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos-audss.c |   17 ++++++++++++++---
+>  1 file changed, 14 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+> index 13eae14c..1542f30 100644
+> --- a/drivers/clk/samsung/clk-exynos-audss.c
+> +++ b/drivers/clk/samsung/clk-exynos-audss.c
+> @@ -30,6 +30,8 @@ static struct clk **clk_table;
+>  static void __iomem *reg_base;
+>  static struct clk_onecell_data clk_data;
+>
+> +static struct clk *pll_ref, *pll_in;
+> +
+>  #define ASS_CLK_SRC 0x0
+>  #define ASS_CLK_DIV 0x4
+>  #define ASS_CLK_GATE 0x8
+> @@ -83,7 +85,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>         const char *mout_audss_p[] = {"fin_pll", "fout_epll"};
+>         const char *mout_i2s_p[] = {"mout_audss", "cdclk0", "sclk_audio0"};
+>         const char *sclk_pcm_p = "sclk_pcm0";
+> -       struct clk *pll_ref, *pll_in, *cdclk, *sclk_audio, *sclk_pcm_in;
+> +       struct clk *cdclk, *sclk_audio, *sclk_pcm_in;
+>         const struct of_device_id *match;
+>         enum exynos_audss_clk_type variant;
+>
+> @@ -113,10 +115,14 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>
+>         pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
+>         pll_in = devm_clk_get(&pdev->dev, "pll_in");
+> -       if (!IS_ERR(pll_ref))
+> +       if (!IS_ERR(pll_ref)) {
+>                 mout_audss_p[0] = __clk_get_name(pll_ref);
+> -       if (!IS_ERR(pll_in))
+> +               clk_prepare_enable(pll_ref);
+> +       }
+> +       if (!IS_ERR(pll_in)) {
+>                 mout_audss_p[1] = __clk_get_name(pll_in);
+> +               clk_prepare_enable(pll_in);
+> +       }
+>         clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
+>                                 mout_audss_p, ARRAY_SIZE(mout_audss_p),
+>                                 CLK_SET_RATE_NO_REPARENT,
+> @@ -217,6 +223,11 @@ static int exynos_audss_clk_remove(struct platform_device *pdev)
+>                         clk_unregister(clk_table[i]);
+>         }
+>
+> +       if (!IS_ERR(pll_in))
+> +               clk_disable_unprepare(pll_in);
+> +       if (!IS_ERR(pll_ref))
+> +               clk_disable_unprepare(pll_ref);
+> +
+>         return 0;
+>  }
+>
+> --
+> 1.7.9.5
+>
 
-On 06/11/2014 07:39 AM, Tushar Behera wrote:
-> On 06/11/2014 01:56 AM, Doug Anderson wrote:
->> Javier,
->> 
->> On Tue, Jun 10, 2014 at 1:03 PM, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->>> Yes, I did not have this issue before. However... I installed the latest Peach
->>> pit recovery image you provided me and mainline kernel started to hang on boot.
->>> I remembered this thread so tested Kevin's patch which make it boot again.
->>>
->>> You said that chain-booting u-boot runs the sound init code but did you try
->>> booting a signed FIT image using the verified u-boot?
->> 
->> Right, I'd bet that it's actually verified boot that's calling the
->> sound init code (probably just in case it needs to beep at the user).
->> ...so this would happen even without chain booting.  I haven't tried
->> signing / booting without chain booting, but I can totally believe it
->> would hang just as easily.
->> 
->> 
->>> I'm asking because I'm see the hang both when chain-booting nv-u-boot from a
->>> kernel partition and booting a signed FIT image with the verified u-boot.
->>>
->>> So it seems this is a regression in latest U-boot and I didn't run into this
->>> before due having an older RW U-Boot on my Peach pit?
->> 
->> You must have had a very old RW U-Boot, possibly one before audio
->> support was added.  I think we just need to fix this in the kernel so
->> it doesn't hang.
->> 
->> -Doug
->> 
-> 
-> Hi Kevin,
-> 
-> I have posted the fixes[1] in the mailing list. Please test and update.
-> 
-> Changes:
-> 1 patch in drivers/clk/samsung/clk-exynos-audss.c
-> 1 patch in arch/arm/boot/dts/exynos5420.dtsi
-> 
-> For testing audio in Peach-pi,
-> 1 patch in arch/arm/boot/dts/exynos5800-peach-pi.dts
-> 
-> [1] [PATCH 0/3] Fix boot-hang on Peach-pit and Enable audio
-> 
-
-I tested your patches and after applying Patch 1 and 2, the kernel did not hang
-anymore. Both when booting a signed FIT image directly using the verified u-boot
-and chain-booting nv-u-boot and booting a uImage.
-
-I'll add Tested-by tags in the original patches threads.
-
-Thanks a lot and best regards,
-Javier
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
