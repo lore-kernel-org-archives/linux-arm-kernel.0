@@ -1,50 +1,72 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 Jun 2014 00:13:53 +0900
-Subject: [PATCH] ARM: Exynos : Fix build error with thumb2
-In-Reply-To: <CA+iXiiO8ED9rdyxXh9ooDhb9OcBRH52acbqA7cgGX9kvgYaCXg@mail.gmail.com>
-References: <1401119625-11309-1-git-send-email-santosh.shukla@linaro.org>	<20140602101023.GB3855@e103592.cambridge.arm.com>
- <CA+iXiiO8ED9rdyxXh9ooDhb9OcBRH52acbqA7cgGX9kvgYaCXg@mail.gmail.com>
-Message-ID: <53987231.6080200@samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 11 Jun 2014 17:15:18 +0200
+Subject: [PATCH] ARM: ux500: add some DB8500 DMA channel info
+In-Reply-To: <1402476631-12860-1-git-send-email-linus.walleij@linaro.org>
+References: <1402476631-12860-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFruyV2mOVFZZi6b0LEKuym9SmZp5dvOXM3dxECcWOtJBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/14 17:07, Santosh Shukla wrote:
-> On 2 June 2014 15:40, Dave Martin<Dave.Martin@arm.com>  wrote:
->> On Mon, May 26, 2014 at 09:23:45PM +0530, Santosh Shukla wrote:
->>> From: santosh shukla<santosh.shukla@linaro.org>
->>>
->>> Add non-global symbol .LLl2x0_regs_phys to avoid build break in thumb2 mode.
->>>
->>> IIUC, arm assembler fail to load value of "global" variable
->>> l2xo_regs_phys for thum2 mode and wrapping it in non-global symbol like
->>> .Ll2x0_regs_phys solves the build break issue.
->>>
->>> arch/arm/mach-exynos/sleep.S: Assembler messages:
->>> arch/arm/mach-exynos/sleep.S:57: Error: invalid immediate for address
->>> calculation (value = 0x00000004)
->>>
->>> fix inspired from [1]
->>>
->>> [1] https://lkml.org/lkml/2010/3/31/235
->>>
->>> Signed-off-by: santosh shukla<santosh.shukla@linaro.org>
->>
->> Reviewed-by: Dave Martin<Dave.Martin@arm.com>
->>
+On 11 June 2014 10:50, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This adds some missing DMA channel information to the disabled
+> MMC/SD/SDIO blocks number 3 and 5, and notes that the assignment
+> of MSP channels vary with ASIC variant.
 >
-> Thanks.
->
-> Hi Kukjin, if this patch ok with you then can you pick it up.
->
-Sure, I've applied this into fixes for 3.16.
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks,
-Kukjin
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Kind regards
+Uffe
 
 
->> The binutils folks insist that this is not a bug in gas.  (I disagreed, but
->> it's a grey area.)  This is the established pattern for working round this
->> issue -- looks fine to me.
->>
->> Cheers
->> ---Dave
+> ---
+>  arch/arm/boot/dts/ste-dbx5x0.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> index e41eedca3ce3..9d2323020d34 100644
+> --- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> +++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> @@ -875,6 +875,10 @@
+>                         reg = <0x80119000 0x1000>;
+>                         interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
+>
+> +                       dmas = <&dma 41 0 0x2>, /* Logical - DevToMem */
+> +                              <&dma 41 0 0x0>; /* Logical - MemToDev */
+> +                       dma-names = "rx", "tx";
+> +
+>                         clocks = <&prcc_kclk 2 5>, <&prcc_pclk 2 7>;
+>                         clock-names = "sdi", "apb_pclk";
+>
+> @@ -901,6 +905,10 @@
+>                         reg = <0x80008000 0x1000>;
+>                         interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
+>
+> +                       dmas = <&dma 43 0 0x2>, /* Logical - DevToMem */
+> +                              <&dma 43 0 0x0>; /* Logical - MemToDev */
+> +                       dma-names = "rx", "tx";
+> +
+>                         clocks = <&prcc_kclk 3 7>, <&prcc_pclk 3 7>;
+>                         clock-names = "sdi", "apb_pclk";
+>
+> @@ -929,6 +937,7 @@
+>                         interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
+>                         v-ape-supply = <&db8500_vape_reg>;
+>
+> +                       /* This DMA channel only exist on DB8500 v1 */
+>                         dmas = <&dma 30 0 0x10>; /* Logical - MemToDev - HighPrio */
+>                         dma-names = "tx";
+>
+> @@ -962,6 +971,7 @@
+>                         interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
+>                         v-ape-supply = <&db8500_vape_reg>;
+>
+> +                       /* This DMA channel only exist on DB8500 v2 */
+>                         dmas = <&dma 30 0 0x12>; /* Logical - DevToMem - HighPrio */
+>                         dma-names = "rx";
+>
+> --
+> 1.9.3
+>
