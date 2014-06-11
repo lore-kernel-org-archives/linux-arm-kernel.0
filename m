@@ -1,17 +1,19 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 11 Jun 2014 09:42:04 -0500
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Jun 2014 07:47:54 -0700
 Subject: [PATCH] [media] staging: allow omap4iss to be modular
 In-Reply-To: <5192928.MkINji4uKU@wuerfel>
 References: <5192928.MkINji4uKU@wuerfel>
-Message-ID: <53986ABC.4070302@ti.com>
+Message-ID: <20140611144754.GA17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2014 09:35 AM, Arnd Bergmann wrote:
+* Arnd Bergmann <arnd@arndb.de> [140611 07:37]:
 > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
 > of which can be loadable modules. This causes build failures
 > if we want the camera driver to be built-in.
-> 
+
+That's good news, but let's not fix it this way.
+ 
 > This can be solved by turning the option into "tristate",
 > which unfortunately causes another problem, because the
 > driver incorrectly calls a platform-internal interface
@@ -42,30 +44,16 @@ On 06/11/2014 09:35 AM, Arnd Bergmann wrote:
 > +EXPORT_SYMBOL_GPL(omap4_ctrl_pad_writel);
 >  
 >  #ifdef CONFIG_ARCH_OMAP3
->  
-> diff --git a/drivers/staging/media/omap4iss/Kconfig b/drivers/staging/media/omap4iss/Kconfig
-> index 78b0fba..0c3e3c1 100644
-> --- a/drivers/staging/media/omap4iss/Kconfig
-> +++ b/drivers/staging/media/omap4iss/Kconfig
-> @@ -1,5 +1,5 @@
->  config VIDEO_OMAP4
-> -	bool "OMAP 4 Camera support"
-> +	tristate "OMAP 4 Camera support"
->  	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
->  	select VIDEOBUF2_DMA_CONTIG
->  	---help---
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
 
-This was discussed in detail here:
-http://marc.info/?t=140198692500001&r=1&w=2
-Direct dependency from a staging driver to mach-omap2 driver is not
-something we'd like, right?
+Exporting these will likely cause immediate misuse in other
+drivers all over the place.
 
--- 
+These should just use either pinctrl-single.c instead for muxing.
+Or if they are not mux registers, we do have the syscon mapping
+available in omap4.dtsi that pbias-regulator.c is already using.
+
+Laurent, got any better ideas?
+
 Regards,
-Nishanth Menon
+
+Tony
