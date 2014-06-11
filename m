@@ -1,86 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 11 Jun 2014 13:58:10 +0200
-Subject: [PATCH 1/2] ARM: tegra: Add device tree nodes for flow controller
-Message-ID: <1402487891-6493-1-git-send-email-thierry.reding@gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 11 Jun 2014 13:02:27 +0100
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <4478880.643uirndOk@wuerfel>
+References: <20140328184517.GA27219@cbox> <539754E5.3030408@redhat.com>
+ <CACxGe6tPQFbbUcJJmoxkAdVAp9b1AcGB_Xdwh_Mu4m6P1j_zRA@mail.gmail.com>
+ <4478880.643uirndOk@wuerfel>
+Message-ID: <CACxGe6uLqqiXwUnR4rNbm+njkDe7cwZp0jByU3FA1_tDw3Gr+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Wed, Jun 11, 2014 at 12:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 11 June 2014 12:33:30 Grant Likely wrote:
+>> On Tue, Jun 10, 2014 at 7:56 PM, Paolo Bonzini <pbonzini@redhat.com> wrote:
+>> > Il 10/06/2014 20:08, Peter Maydell ha scritto:
+>> >
+>> >> On 10 June 2014 18:04, Christopher Covington <cov@codeaurora.org> wrote:
+>> >>>
+>> >>> On 06/10/2014 10:42 AM, Peter Maydell wrote:
+>> >>>>
+>> >>>> I just noticed that this doesn't mandate that the platform
+>> >>>> provides an RTC. As I understand it, the UEFI spec mandates
+>> >>>> that there's an RTC (could somebody more familiar with UEFI
+>> >>>> than me confirm/deny that?) so we should probably put one here.
+>> >>>
+>> >>>
+>> >>> Pardon my ignorance, but what exactly disqualifies Generic Timer
+>> >>> implementations from being used as Real Time Clocks?
+>> >>
+>> >>
+>> >> So my naive view was that an RTC actually had to have
+>> >> support for dealing with real (wall) clock time, ie
+>> >> knowing it's 2014 and not 1970. The generic timers are
+>> >> just timers. Or am I wrong and UEFI doesn't really
+>> >> require that?
+>> >
+>> >
+>> > The real-time clock provides four UEFI runtime services (GetTime, SetTime,
+>> > GetWakeupTime, SetWakeupTime).  The spec says that you can return
+>> > EFI_DEVICE_ERROR from GetTime/SetTime if "the time could not be
+>> > retrieved/set due to a hardware error", but I don't think this is enough to
+>> > make these two optional.  By comparison, GetWakeupTime/SetWakeupTime can
+>> > also return EFI_UNSUPPORTED.
+>>
+>> In practical terms, yes the VM needs to provide an RTC interface, but
+>> I don't think it needs to appear in this spec, even if the kernel
+>> accesses it directly. Portable images should use the UEFI service.
+>
+> It sounds like it should be in the spec then, if we want people building
+> portable images to include the efi-rtc driver.
 
-These nodes are required so that the flow controller driver can obtain
-the I/O memory region from device tree rather than hard-coding it.
+Fair enough.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/boot/dts/tegra114.dtsi | 5 +++++
- arch/arm/boot/dts/tegra124.dtsi | 5 +++++
- arch/arm/boot/dts/tegra20.dtsi  | 5 +++++
- arch/arm/boot/dts/tegra30.dtsi  | 5 +++++
- 4 files changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 90982679c161..1953113598b2 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -161,6 +161,11 @@
- 		#reset-cells = <1>;
- 	};
- 
-+	flow-controller at 60007000 {
-+		compatible = "nvidia,tegra114-flowctrl";
-+		reg = <0x60007000 0x1000>;
-+	};
-+
- 	apbdma: dma at 6000a000 {
- 		compatible = "nvidia,tegra114-apbdma";
- 		reg = <0x6000a000 0x1400>;
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 057340b980dd..0f3c869a1673 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -205,6 +205,11 @@
- 		#reset-cells = <1>;
- 	};
- 
-+	flow-controller at 0,60007000 {
-+		compatible = "nvidia,tegra124-flowctrl";
-+		reg = <0x0 0x60007000 0x0 0x1000>;
-+	};
-+
- 	gpio: gpio at 0,6000d000 {
- 		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
- 		reg = <0x0 0x6000d000 0x0 0x1000>;
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 81815416e6d3..e47ae7472e7a 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -201,6 +201,11 @@
- 		#reset-cells = <1>;
- 	};
- 
-+	flow-controller at 60007000 {
-+		compatible = "nvidia,tegra20-flowctrl";
-+		reg = <0x60007000 0x1000>;
-+	};
-+
- 	apbdma: dma at 6000a000 {
- 		compatible = "nvidia,tegra20-apbdma";
- 		reg = <0x6000a000 0x1200>;
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index e88e477bfb2c..d07baa3f840f 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -282,6 +282,11 @@
- 		#reset-cells = <1>;
- 	};
- 
-+	flow-controller at 60007000 {
-+		compatible = "nvidia,tegra30-flowctrl";
-+		reg = <0x60007000 0x1000>;
-+	};
-+
- 	apbdma: dma at 6000a000 {
- 		compatible = "nvidia,tegra30-apbdma", "nvidia,tegra20-apbdma";
- 		reg = <0x6000a000 0x1400>;
--- 
-1.9.2
+g.
