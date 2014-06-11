@@ -1,32 +1,26 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 11 Jun 2014 16:41:33 +0400
-Subject: [PATCH 0/2] Add VIN and ADV7180 DT support for R8A7791/Henninger
- board
-In-Reply-To: <20140610235445.GE20738@verge.net.au>
-References: <201406110304.18976.sergei.shtylyov@cogentembedded.com>
- <20140610235445.GE20738@verge.net.au>
-Message-ID: <53984E7D.8010909@cogentembedded.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 11 Jun 2014 15:47:31 +0300
+Subject: [PATCH v7 3/5] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
+References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <53984FE3.6010509@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 05/06/14 16:09, Peter De Schrijver wrote:
+...
+> +int tegra_fuse_readl(u32 offset, u32 *val)
+> +{
+> +       if (!fuse_readl)
+> +               return -ENXIO;
+> +
+> +       *val = fuse_readl(offset);
+> +
+> +       return 0;
+> +}
+> +
 
-On 06/11/2014 03:54 AM, Simon Horman wrote:
-
->>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
->> 'renesas-devel-v3.15-20140610' tag plus the Henninger I2C2 DT support patch
->> that I posted earlier. Here we add the VIN and ADV7180 video decoder device
->> tree support on the R8A7791/Henninger board. The patchset requires Ben Dooks'
->> adv7180, rcar_vin, and soc_camera DT support patches posted back in April in
->> order to work.
-
-> I wonder what the status of those (driver?) patches are.
-
-    Someone in CodeThink is working on them, I was told. I had to fix them up 
-somewhat in order for them to compile.
-
-> In general I prefer bindings to be accepted before they are used.
-
-    No argument here. I just have my own schedule.
-
-WBR, Sergei
+-EPROBE_DEFER would be a better error value, so that drivers can work 
+even if they are initially probed before the fuse driver. Of course, if 
+the fuse initialization is moved into machine init then this is a non-issue.
