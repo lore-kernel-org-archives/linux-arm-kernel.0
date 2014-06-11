@@ -1,54 +1,82 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 11 Jun 2014 15:32:49 -0700
-Subject: [RFC 5/5] x86,seccomp: Add a seccomp fastpath
-In-Reply-To: <CALCETrWaQZc124=6r4h+fTAY4H4LzWGFw=MB7KY5TBtB0jx9hA@mail.gmail.com>
-References: <cover.1402517933.git.luto@amacapital.net>
- <9e11cd988a0f120606e37b5e275019754e2774da.1402517933.git.luto@amacapital.net>
- <CAADnVQKt5FnShkZeQewbfnU1kHM-gLs3hCZMf5xcgFzyRDLX7A@mail.gmail.com>
- <CALCETrXoqqKC=T5Wvj+CDYQFte1s_=npDvQ2UYW0j=AanEgR1g@mail.gmail.com>
- <5398D59A.3030900@zytor.com>
- <CALCETrVMxkHcPXsEGtEc0Pr=Z80CzC0zWaQ9OdVdxi1CGuB4kQ@mail.gmail.com>
- <5398D7B4.5000303@zytor.com>
- <CALCETrWaQZc124=6r4h+fTAY4H4LzWGFw=MB7KY5TBtB0jx9hA@mail.gmail.com>
-Message-ID: <CAGXu5jL86C1yvWynBrp20CxT9COorc5++nT6OhwYCwqc7UJyHg@mail.gmail.com>
+From: rientjes@google.com (David Rientjes)
+Date: Wed, 11 Jun 2014 16:03:42 -0700 (PDT)
+Subject: [PATCH] arm64: fix MAX_ORDER for 64K pagesize
+In-Reply-To: <1402522435-13884-1-git-send-email-msalter@redhat.com>
+References: <1402522435-13884-1-git-send-email-msalter@redhat.com>
+Message-ID: <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 3:28 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Wed, Jun 11, 2014 at 3:27 PM, H. Peter Anvin <hpa@zytor.com> wrote:
->> On 06/11/2014 03:22 PM, Andy Lutomirski wrote:
->>> On Wed, Jun 11, 2014 at 3:18 PM, H. Peter Anvin <hpa@zytor.com> wrote:
->>>> On 06/11/2014 02:56 PM, Andy Lutomirski wrote:
->>>>>
->>>>> 13ns is with the simplest nonempty filter.  I hope that empty filters
->>>>> don't work.
->>>>>
->>>>
->>>> Why wouldn't they?
->>>
->>> Is it permissible to fall off the end of a BPF program?  I'm getting
->>> EINVAL trying to install an actual empty filter.  The filter I tested
->>> with was:
->>>
->>
->> What I meant was that there has to be a well-defined behavior for the
->> program falling off the end anyway, and that that should be preserved.
->>
->> I guess it is possible to require that all code paths must provably
->> reach a termination point.
->>
->
-> Dunno.  I haven't ever touched any of the actual BPF code.  This whole
-> patchset only changes the code that invokes the BPF evaluator.
+On Wed, 11 Jun 2014, Mark Salter wrote:
 
-Yes, this is how BPF works: runs to the end or exit early. With
-seccomp BPF specifically, the return value defaults to kill the
-process. If a filter was missing (NULL), or empty, or didn't
-explicitly return with a new value, the default (kill) should be
-taken.
+> With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE
+> I get this at early boot:
+> 
+>   SMP: Total of 8 processors activated.
+>   devtmpfs: initialized
+>   Unable to handle kernel NULL pointer dereference at virtual address 00000008
+>   pgd = fffffe0000050000
+>   [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
+>   Internal error: Oops: 96000006 [#1] SMP
+>   Modules linked in:
+>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
+>   task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
+>   PC is at __list_add+0x10/0xd4
+>   LR is at free_one_page+0x270/0x638
+>   ...
+>   Call trace:
+>   [<fffffe00003ee970>] __list_add+0x10/0xd4
+>   [<fffffe000019c478>] free_one_page+0x26c/0x638
+>   [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
+>   [<fffffe000019d5e8>] __free_pages+0x74/0xbc
+>   [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
+>   [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
+>   [<fffffe0000090418>] do_one_initcall+0xc4/0x154
+>   [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
+>   [<fffffe00007520a0>] kernel_init+0xc/0xd4
+> 
+> This happens in this configuration because __free_one_page() is called
+> with an order greater than MAX_ORDER, accesses past zone->free_list[]
+> and passes a bogus list_head to list_add().
+> 
+> arch/arm64/Kconfig has:
+> 
+>   config FORCE_MAX_ZONEORDER
+> 	int
+> 	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+> 	default "11"
+> 
+> So with THP turned off MAX_ORDER == 11 but init_cma_reserved_pageblock()
+> passes __free_pages() an order of pageblock_order which is based on
+> (HPAGE_SHIFT - PAGE_SHIFT) which is 13 for 64K pages. I worked around
+> this by removing the THP test so FORCE_MAX_ZONEORDER is always 14 for
+> ARM64_64K_PAGES.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm64/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7295419..42a334e 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -269,7 +269,7 @@ config XEN
+>  
+>  config FORCE_MAX_ZONEORDER
+>  	int
+> -	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+> +	default "14" if ARM64_64K_PAGES
+>  	default "11"
+>  
+>  endmenu
 
--Kees
+Any reason to not switch this to
 
--- 
-Kees Cook
-Chrome OS Security
+	ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE && CMA
+
+instead?  If pageblock_order > MAX_ORDER because of 
+HPAGE_SHIFT > PAGE_SHIFT, then cma is always going to be passing a 
+too-large-order to free_pages_prepare() via this path.
+
+Adding Michal and Marek to the cc.
