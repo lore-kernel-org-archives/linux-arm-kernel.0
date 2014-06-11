@@ -1,109 +1,53 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 11 Jun 2014 13:21:35 +0200
-Subject: [PATCH 2/2 v3] ARM: DTS: move "cs-gpio" from "controller-data"
- to under spi node
-In-Reply-To: <1402468318-7342-2-git-send-email-ch.naveen@samsung.com>
-References: <1402468318-7342-1-git-send-email-ch.naveen@samsung.com>
- <1402468318-7342-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <53983BBF.4070408@collabora.co.uk>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 11 Jun 2014 12:22:50 +0100
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <5397360B.80102@huawei.com>
+References: <20140328184517.GA27219@cbox> <5397360B.80102@huawei.com>
+Message-ID: <CACxGe6tpoCmvD0yjqf1j=priMURoVE0rMH=oQtQSn+RdG5dgGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Naveen,
+On 10 Jun 2014 17:45, "Claudio Fontana" <claudio.fontana@huawei.com> wrote:
+>
+> Hello all,
+>
+> I just wanted to share with you guys how we are using virtualization on ARM64 over here for the OSv project.
+> I don't know if that's something that could be useful for your specification effort.
+>
+> In OSv, creating and starting a VM to some level means starting an application.
+> That is, OSv should be a very thin bare bones guest server OS, which also acts as a kind of run-time library for an application to run.
+> All the devices are assumed to be virtualized and heavily relying on virtio.
+>
+> Therefore we see a higher need for quick VM launch than it might be for other use cases.
+>
+> One aspect of this is that we currently start executing the image directly (no UEFI involved on the guest),
+> and in some cases we might not need a full fledged file system at all,
+> as the communication can happen via virtio channels.
 
-On 06/11/2014 08:31 AM, Naveen Krishna Chatradhi wrote:
-> This patch moves the "cs-gpio" field from "controller-data" child
-> node to under the spi device node.
-> 
+The purpose of this spec is for creating portable disk images. It is
+intended to support the virtual-machine-looks-just-like-a-real-machine
+model, and is intended to provide exactly the same interface to
+installers as to real machines.
 
-Your patch looks good to me but I think that the commit message is inaccurate.
+It isn't really interesting for use cases like OSv or anyone who wants
+to start the kernel directly. You don't need UEFI in that case because
+the host has pre-knowledge of which kernel binary to load. In that
+regard this spec doesn't affect you.
 
-It does not move the cs-gpio property to the top SPI dev node but it replaces
-the cs-gpio from controller-data as was specified in the old binding and use the
-standard cs-gpios property expected by the SPI core as is defined in the new
-binding.
+>
+> We do have a need for ACPI for discovery of information like gic addresses, timers, interrupts... (no interest on device trees, really), and of PCI-E.
 
-Having a proper commit message is important since out-of-tree DTS can use this
-commit as a reference on how to fix their FDT in case this change broke their
-platforms.
+This may be a problem for you then. The only time we're planning to
+support ACPI in a VM is when UEFI is used for booting. Even the first
+version of this spec specifies FDT, not ACPI. FDT support is there now
+in Xen and KVM, but there is nothing for ACPI on ARM VMs.
 
-> Respective changes are preposed to spi-s3c64xx.c driver.
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> ---
-> Changes since v2:
-> None
-> 
->  arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
->  arch/arm/boot/dts/exynos4412-trats2.dts   |    2 +-
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-> index 636d166..9191491 100644
-> --- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-> +++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-> @@ -169,6 +169,7 @@
->  
->  	spi_2: spi at 13940000 {
->  		status = "okay";
-> +		cs-gpios = <&gpc1 2 0>;
->  
->  		w25x80 at 0 {
->  			#address-cells = <1>;
-> @@ -178,7 +179,6 @@
->  			spi-max-frequency = <1000000>;
->  
->  			controller-data {
-> -				cs-gpio = <&gpc1 2 0>;
->  				samsung,spi-feedback-delay = <0>;
->  			};
->  
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-> index 8a558b7..204b0de 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -512,6 +512,7 @@
->  	spi_1: spi at 13930000 {
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&spi1_bus>;
-> +		cs-gpios = <&gpb 5 0>;
->  		status = "okay";
->  
->  		s5c73m3_spi: s5c73m3 {
-> @@ -519,7 +520,6 @@
->  			spi-max-frequency = <50000000>;
->  			reg = <0>;
->  			controller-data {
-> -				cs-gpio = <&gpb 5 0>;
->  				samsung,spi-feedback-delay = <2>;
->  			};
->  		};
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index a794a70..0c6433a 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -316,6 +316,7 @@
->  	};
->  
->  	spi_1: spi at 12d30000 {
-> +		cs-gpios = <&gpa2 5 0>;
->  		status = "okay";
->  
->  		w25q80bw at 0 {
-> @@ -326,7 +327,6 @@
->  			spi-max-frequency = <1000000>;
->  
->  			controller-data {
-> -				cs-gpio = <&gpa2 5 0>;
->  				samsung,spi-feedback-delay = <0>;
->  			};
->  
-> 
+What is the objection to obtaining discovery information from FDT?
 
-Best regards,
-Javier
+> By skipping steps like UEFI, grub, firmware load, etc we strive to keep our application launch time low.
+> Is this going to create problems for us in the future if you start requiring every VM to boot using those instead?
+
+No, we're not requiring a full firmware stack to boot. As described
+above, this is only for booting disk images.
+
+g.
