@@ -1,60 +1,70 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 11 Jun 2014 19:50:51 +0200
-Subject: [PATCH 1/2 v3] spi: s3c64xx: use "cs-gpios" from spi node instead
- of "cs-gpio"
-In-Reply-To: <5398918F.4060800@collabora.co.uk>
-References: <1402468318-7342-1-git-send-email-ch.naveen@samsung.com>
- <539839D6.1050305@collabora.co.uk>
- <CAHfPSqCYqTRBBH56y81na-t18pvoPmyWobZwXNgkrtq=H_79CQ@mail.gmail.com>
- <5398918F.4060800@collabora.co.uk>
-Message-ID: <539896FB.4050702@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 11 Jun 2014 12:58:27 -0500
+Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
+In-Reply-To: <CA+8MBbLooWm9xys+gYa5uL1eVTH-qzaR+RaZgsrqV-8XkqGadQ@mail.gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>	<1397859600-11507-4-git-send-email-robherring2@gmail.com>	<CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>	<CAL_JsqKux+BTHeYo6XEzzQMAFJZHVjbURM973oHT=t698GbJbA@mail.gmail.com>	<20140503220731.GA10927@kroah.com>	<20140503221658.GA13403@kroah.com>	<CA+8MBb+7f1bOnJjJWj1vxa0UNuQwz7OGRDR_QFTxOT=9cynabQ@mail.gmail.com>	<CA+8MBbKE1E2uq9LefiDAV9hv2Z8OTkjx9mkXjE6_--F_emRC8A@mail.gmail.com>	<CAL_JsqKvoO9acX==-LdD6boO=B3xr=ijra_G0uqRZGzACZZUJg@mail.gmail.com>
+ <CA+8MBbLooWm9xys+gYa5uL1eVTH-qzaR+RaZgsrqV-8XkqGadQ@mail.gmail.com>
+Message-ID: <539898C3.8090903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.06.2014 19:27, Javier Martinez Canillas wrote:
-> On 06/11/2014 01:38 PM, Naveen Krishna Ch wrote:
->> On 11 June 2014 16:43, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->>> On 06/11/2014 08:31 AM, Naveen Krishna Chatradhi wrote:
-
-[snip]
-
->>>
->>>>               return ERR_PTR(-EINVAL);
->>>>       }
->>>> +     cs->line = spi->cs_gpio;
->>>>
->>>
->>> I wonder why are you keeping cs->line? AFAICT it's only used in
->>> s3c64xx_spi_setup() to request the GPIO and since you get the struct spi_device
->>> pointer as a parameter then you can just use spi->s_gpio instead.
->> I'm trying not to touch the non-DT part of the code.
->>
->> struct s3c64xx_spi_csinfo *cs = spi->controller_data;
->>
->> This will update the cs->line and cs->fb_delay in case of non-DT.
+On 06/10/2014 03:52 PM, Tony Luck wrote:
+> On Mon, Jun 9, 2014 at 4:18 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> It should do auto detect of the baud-rate if it is not specified which
+>> for 8250 is just reading the baud-rate divider and calculating the
+>> baud-rate using the uart clock. It should just reprogram the divider
+>> with the same divider value. I don't see anything obvious why this
+>> would have broken.
 > 
-> I see, then I prefer the opposite and do something like this on s3c64xx_spi_probe():
+> Something very weird is happening.  Output is good so long as I put the
+> trailing ",115200" on the command line.
 > 
-> if (!pdev->dev.of_node)
->        spi->cs_gpio = cs->line;
+> But I made early_serial8250_setup() printk() the return value it got
+> from probe_baud() - in case is was somehow getting 115201 or some
+> other silly value ... nope. Exactly 115200.
+> 
+> I also can't explain why the "noise" comes and goes a dozen
+> times during boot,
+> 
+> Does some other place in the kernel look at the "uart..." command
+> line argument?
 
-Hmm, as far as I understand, spi here is spi_device, not spi_master. I
-don't think you have access to SPI devices on your bus in controller
-probe().
+I think I figured it out. The function 
+serial8250_find_port_for_earlycon is failing to match 'uart' console to 
+'ttyS' console and transfer the options. It was also failing to create 
+an option string when the baud rate is probed. Can you try out the 
+below patch?
 
-What I think could work is reworking the driver to:
+Rob
 
-- in DT case, don't do anything in the driver about the GPIO chip
-select, because it will be handled automatically by the core.
-
-- in non-DT case, in s3c64xx_spi_setup(), just take the GPIO pin from
-s3c64xx_spi_csinfo struct passed through spi->controller_data, request
-it and save it to spi->cs_gpio,
-
-- in non-DT case, in s3c64xx_spi_cleanup(), free the GPIO requested in
-s3c64xx_spi_setup() and set spi->cs_gpio to -ENOENT (as done initially
-in spi_alloc_device()).
-
-Best regards,
-Tomasz
+8<-------------------------------------------------------------------
+diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+index cfef801..4858b8a 100644
+--- a/drivers/tty/serial/8250/8250_early.c
++++ b/drivers/tty/serial/8250/8250_early.c
+@@ -144,8 +144,11 @@ static int __init early_serial8250_setup(struct earlycon_device *device,
+ 	if (!(device->port.membase || device->port.iobase))
+ 		return 0;
+ 
+-	if (!device->baud)
++	if (!device->baud) {
+ 		device->baud = probe_baud(&device->port);
++		snprintf(device->options, sizeof(device->options), "%u",
++			 device->baud);
++	}
+ 
+ 	init_port(device);
+ 
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 5131b5e..d20e6d8 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -25,7 +25,7 @@
+ #include <asm/serial.h>
+ 
+ static struct console early_con = {
+-	.name =		"earlycon",
++	.name =		"uart",
+ 	.flags =	CON_PRINTBUFFER | CON_BOOT,
+ 	.index =	-1,
+ };
