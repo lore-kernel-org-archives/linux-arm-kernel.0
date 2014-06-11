@@ -1,40 +1,43 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 10 Jun 2014 20:25:12 -0700
-Subject: [PATCH v6 0/9] seccomp: add thread sync ability
-Message-ID: <1402457121-8410-1-git-send-email-keescook@chromium.org>
+Date: Tue, 10 Jun 2014 20:25:20 -0700
+Subject: [PATCH v6 8/9] ARM: add seccomp syscall
+In-Reply-To: <1402457121-8410-1-git-send-email-keescook@chromium.org>
+References: <1402457121-8410-1-git-send-email-keescook@chromium.org>
+Message-ID: <1402457121-8410-9-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[re-send with smaller CC list]
+Wires up the new seccomp syscall.
 
-This adds the ability for threads to request seccomp filter
-synchronization across their thread group (at filter attach time).
-For example, for Chrome to make sure graphic driver threads are fully
-confined after seccomp filters have been attached.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/include/uapi/asm/unistd.h |    1 +
+ arch/arm/kernel/calls.S            |    1 +
+ 2 files changed, 2 insertions(+)
 
-To support this, locking on seccomp changes is introduced, along with
-refactoring of no_new_privs. Races with thread creation/death are handled
-via tasklist_lock.
-
-This includes a new syscall (instead of adding a new prctl option),
-as suggested by Andy Lutomirski and Michael Kerrisk.
-
-Thanks!
-
--Kees
-
-v6:
- - switch from seccomp-specific lock to thread-group lock to gain atomicity
- - implement seccomp syscall across all architectures with seccomp filter
- - clean up sparse warnings around locking
-v5:
- - move includes around (drysdale)
- - drop set_nnp return value (luto)
- - use smp_load_acquire/store_release (luto)
- - merge nnp changes to seccomp always, fewer ifdef (luto)
-v4:
- - cleaned up locking further, as noticed by David Drysdale
-v3:
- - added SECCOMP_EXT_ACT_FILTER for new filter install options
-v2:
- - reworked to avoid clone races
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index ba94446c72d9..e21b4a069701 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -409,6 +409,7 @@
+ #define __NR_sched_setattr		(__NR_SYSCALL_BASE+380)
+ #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
+ #define __NR_renameat2			(__NR_SYSCALL_BASE+382)
++#define __NR_seccomp			(__NR_SYSCALL_BASE+383)
+ 
+ /*
+  * This may need to be greater than __NR_last_syscall+1 in order to
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 8f51bdcdacbb..bea85f97f363 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -392,6 +392,7 @@
+ /* 380 */	CALL(sys_sched_setattr)
+ 		CALL(sys_sched_getattr)
+ 		CALL(sys_renameat2)
++		CALL(sys_seccomp)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+-- 
+1.7.9.5
