@@ -1,58 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 Jun 2014 00:42:28 +0900
-Subject: [PATCH] ARM: dts: exynos4: Fix reg sizes of GIC
-In-Reply-To: <5397242D.8040303@samsung.com>
-References: <1400855960-22033-1-git-send-email-t.figa@samsung.com>
- <53886E53.70206@gmail.com> <5388CB76.2030806@samsung.com>
- <5397242D.8040303@samsung.com>
-Message-ID: <539878E4.8040005@samsung.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 11 Jun 2014 11:39:10 -0400 (EDT)
+Subject: [PATCH v2 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <1402064411-18244-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <Pine.LNX.4.44L0.1406111131200.890-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/14 00:28, Tomasz Figa wrote:
-> Hi Kukjin,
->
-Hi Tomasz,
+On Fri, 6 Jun 2014, Vivek Gautam wrote:
 
-> On 30.05.2014 20:18, Kukjin Kim wrote:
->> On 05/30/14 20:41, Tomasz Figa wrote:
->>> Hi,
->>>
->>> On 23.05.2014 16:39, Tomasz Figa wrote:
->>>> This patch fixes reg entry sizes in GIC node that were not large enough
->>>> to cover whole regions.
->>>>
->>>> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
->>>> ---
->>>>    arch/arm/boot/dts/exynos4.dtsi | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
->>>> index b8ece4b..fbaf426 100644
->>>> --- a/arch/arm/boot/dts/exynos4.dtsi
->>>> +++ b/arch/arm/boot/dts/exynos4.dtsi
->>>> @@ -113,7 +113,7 @@
->>>>    		compatible = "arm,cortex-a9-gic";
->>>>    		#interrupt-cells =<3>;
->>>>    		interrupt-controller;
->>>> -		reg =<0x10490000 0x1000>,<0x10480000 0x100>;
->>>> +		reg =<0x10490000 0x10000>,<0x10480000 0x10000>;
->>>>    	};
->>>>
->>>>    	combiner: interrupt-controller at 10440000 {
->>>>
->>>
->>> Ping.
->>>
->> Yeah, SZ_64K is used for GIC_CPU and GIC_DIST before moving on DT
->> support. Applied, but I need to check this is required for stable tree...
->
-> Not sure if you already managed, but I think it might not be necessary
-> in stable trees, as the (correct) static mapping is still there and it
-> causes ioremap() to return correctly mapped area, ignoring the length
-> specified in device tree.
->
-Yes, agreed. this is not required for stable tree...
+> Facilitate getting required 3.3V and 1.0V VDD supply for
+> EHCI controller on Exynos.
+> 
+> With patches for regulators' nodes merged in 3.15:
+> c8c253f ARM: dts: Add regulator entries to smdk5420
+> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+> 
+> certain perripherals will now need to ensure that,
+> they request VDD regulators in their drivers, and enable
+> them so as to make them working.
 
-Thanks,
-Kukjin
+"Certain peripherals"?  Don't you mean "certain controllers"?
+
+Does this mean some controllers don't need to use the VDD regulators?
+
+> @@ -193,7 +196,31 @@ static int exynos_ehci_probe(struct platform_device *pdev)
+>  
+>  	err = exynos_ehci_get_phy(&pdev->dev, exynos_ehci);
+>  	if (err)
+> -		goto fail_clk;
+> +		goto fail_regulator1;
+> +
+> +	exynos_ehci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
+> +	if (!IS_ERR(exynos_ehci->vdd33)) {
+> +		err = regulator_enable(exynos_ehci->vdd33);
+> +		if (err) {
+> +			dev_err(&pdev->dev,
+> +				"Failed to enable 3.3V Vdd supply\n");
+> +			goto fail_regulator1;
+> +		}
+> +	} else {
+> +		dev_warn(&pdev->dev, "Regulator 3.3V Vdd supply not found\n");
+> +	}
+
+What if this is one of the controllers that don't need to use a VDD 
+regulator?  Do you really want to print out a warning in that case?  
+Should you call devm_regulator_get_optional() instead?
+
+Alan Stern
