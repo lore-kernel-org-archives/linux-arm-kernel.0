@@ -1,79 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Jun 2014 15:36:56 +0200
-Subject: [GIT PULL 1/1] ARM: SoC updates for 3.16 (part 2)
-Message-ID: <6225322.NFUspysEqN@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 11 Jun 2014 15:38:49 +0200
+Subject: [PATCH] arm/ftrace: Fix function_return_addr() to
+ function_return_address()
+In-Reply-To: <20140611092330.7930eff2@gandalf.local.home>
+References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
+ <CAMuHMdWs9i4pBNbn-RTpv_-K5W7YGED=KtEtFSci=7YHdNKpfw@mail.gmail.com>
+ <20140611092330.7930eff2@gandalf.local.home>
+Message-ID: <CAMuHMdWm+hpumykRG2FudDPYSVODv1WoU6_tPv5D3HCPDQtDSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 3c2580173e3bc820a8f8c0db968f757b8eca7fe5:
+Hi Steven,
 
-  Merge tag 'sunxi-core-for-3.16-2' of https://github.com/mripard/linux into next/soc (2014-05-23 21:57:23 +0200)
+On Wed, Jun 11, 2014 at 3:23 PM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> The clean up of CALLER_ADDR*() functions required the archs to either
+> use the default __builtin_return_address(X) (where X > 0) or override
+> it with something the arch can use. To override it, the arch would
+> define function_return_address(x).
 
-are available in the git repository at:
+ftrace_return_address(x)
 
+> The arm architecture requires this to be redefined but instead of
+> defining function_return_address(x) it defined function_return_addr(x).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/soc2-for-3.16
+ftrace_return_address(x) ... ftrace_return_address(x)
 
-for you to fetch changes up to bbea06f3efbae5776e6c285fea59fd249eec44ff:
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
 
-  ARM: keystone: Drop use of meminfo since its not available anymore (2014-06-05 22:20:54 +0200)
+Nevertheless, your patch kills the warnings. Thanks!
 
-----------------------------------------------------------------
-ARM: SoC updates for 3.16 (part 2)
+Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-This is a small follow-up to the larger ARM SoC updates merged
-last week, almost entirely for the keystone platform.
+> ----
+> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> index eb577f4..39eb16b 100644
+> --- a/arch/arm/include/asm/ftrace.h
+> +++ b/arch/arm/include/asm/ftrace.h
+> @@ -52,7 +52,7 @@ extern inline void *return_address(unsigned int level)
+>
+>  #endif
+>
+> -#define ftrace_return_addr(n) return_address(n)
+> +#define ftrace_return_address(n) return_address(n)
+>
+>  #endif /* ifndef __ASSEMBLY__ */
 
-The main change here is to use the new dma-ranges parsing code
-that came in through Russell's ARM tree. This allows the keystone
-platform to do cache-coherent DMA and to finally support all the
-available physical memory when LPAE is enabled.
+Gr{oetje,eeting}s,
 
-Aside from this, the keystone reset driver has been rewritten,
-and there is a small bug fix to allow building the orion5x platform
-again.
+                        Geert
 
-----------------------------------------------------------------
-Arnd Bergmann (4):
-      Merge tag 'dt-dma-properties-for-arm' of git://git.kernel.org/.../ssantosh/linux-keystone into depends/dma-ranges
-      Merge branch 'depends/dma-ranges' into next/soc
-      Merge tag 'keystone-soc' of git://git.kernel.org/.../ssantosh/linux-keystone into next/soc
-      ARM: orion5x: fix mvebu_mbus_dt_init call
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Brian Norris (1):
-      ARM: configs: keystone: add MTD_SPI_NOR (new dependency for M25P80)
-
-Ivan Khoronzhuk (3):
-      ARM: keystone: remove redundant reset stuff
-      ARM: dts: keystone: update reset node to work with reset driver
-      ARM: configs: keystone: enable reset driver support
-
-Lad Prabhakar (1):
-      ARM: configs: keystone: drop CONFIG_COMMON_CLK_DEBUG
-
-Olof Johansson (1):
-      Merge tag 'keystone-soc-2' of git://git.kernel.org/.../ssantosh/linux-keystone into next/soc2
-
-Santosh Shilimkar (3):
-      ARM: keystone: Switch over to coherent memory address space
-      ARM: keystone: Update the dma offset for non-dt platform devices
-      ARM: keystone: Drop use of meminfo since its not available anymore
-
- arch/arm/boot/dts/keystone.dtsi         |  14 +++-
- arch/arm/configs/integrator_defconfig   |   1 -
- arch/arm/configs/keystone_defconfig     |   5 +-
- arch/arm/configs/sunxi_defconfig        |   1 -
- arch/arm/configs/vt8500_v6_v7_defconfig |   1 -
- arch/arm/include/asm/dma-mapping.h      |  25 +++++++-
- arch/arm/mach-keystone/keystone.c       | 100 ++++++++++++++++++++---------
- arch/arm/mach-keystone/memory.h         |  24 +++++++
- arch/arm/mach-keystone/platsmp.c        |  18 +++++-
- arch/arm/mach-orion5x/board-dt.c        |   2 +-
- arch/arm/mm/dma-mapping.c               |   4 +-
- drivers/of/address.c                    | 110 ++++++++++++++++++++++++++++++++
- drivers/of/platform.c                   |  65 +++++++++++++++++--
- include/linux/device.h                  |   2 +
- include/linux/dma-mapping.h             |   7 ++
- include/linux/of_address.h              |  14 ++++
- 16 files changed, 347 insertions(+), 46 deletions(-)
- create mode 100644 arch/arm/mach-keystone/memory.h
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
