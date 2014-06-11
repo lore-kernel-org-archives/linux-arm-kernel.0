@@ -1,88 +1,291 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 11 Jun 2014 10:14:02 -0700
-Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16, rebased
-In-Reply-To: <20140611084519.GA22486@lukather>
-References: <20140611084519.GA22486@lukather>
-Message-ID: <20140611171402.6562.38902@quantum>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 11 Jun 2014 19:27:43 +0200
+Subject: [PATCH 1/2 v3] spi: s3c64xx: use "cs-gpios" from spi node instead
+ of "cs-gpio"
+In-Reply-To: <CAHfPSqCYqTRBBH56y81na-t18pvoPmyWobZwXNgkrtq=H_79CQ@mail.gmail.com>
+References: <1402468318-7342-1-git-send-email-ch.naveen@samsung.com>
+ <539839D6.1050305@collabora.co.uk>
+ <CAHfPSqCYqTRBBH56y81na-t18pvoPmyWobZwXNgkrtq=H_79CQ@mail.gmail.com>
+Message-ID: <5398918F.4060800@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-06-11 01:45:19)
-> Hi Mike,
-> 
-> Like you asked on IRC, here is the clocks additions for the Allwinner
-> SoCs, rebased on your current clk-next.
+Hello Naveen,
 
-Pulled.
+On 06/11/2014 01:38 PM, Naveen Krishna Ch wrote:
+> Hello Javier,
+> 
+> On 11 June 2014 16:43, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Hello Naveen,
+>>
+>> Thanks a lot for your patches and sorry that I didn't review your prior two
+>> versions but I didn't have the time yesterday.
+>>
+>> On 06/11/2014 08:31 AM, Naveen Krishna Chatradhi wrote:
+>>> Currently, spi-s3c64xx.c needs "cs-gpio" chip select GPIO to be
+>>> defined under "controller-data" node under each slave node.
+>>>
+>>
+>> I think that the commit message is not clear enough about the intentions behind
+>> your patch.
+>>
+>> It's not only that spi-s3c64xx needs a cs-gpio chip to be defined under
+>> controller-data dev node while all other SPI drivers expects cs-gpios at the top
+>> level, but more important that currently s3c64xx driver expects to have both
+>> cs-gpio (singular) at the top level *and* cs-gpio in controller data which
+>> doesn't make too much sense.
+>>
+>>> &spi_x {
+>>>       cs-gpios <>;
+>>>       ...
+>>
+>> As I said, currently it expects cs-gpio (singular) not cs-gpios (plural) as your
+>> example. It's important to have a correct commit message so future code
+>> archaeologists can have a proper picture of the situation if needed.
+> Will add some explanation in the example, for it to be clear.
+>>
+>>>       slave_node {
+>>>
+>>>               controller-data {
+>>>                       cs-gpio = <>;
+>>>                       ...
+>>>               };
+>>>               ...
+>>>       };
+>>>       ...
+>>> };
+>>>
+>>> Where as, SPI core and many other drivers uses "cs-gpios" for
+>>> from device tree node.
+>>>
+>>> Hence, make changes in spi-s3c64xx.c driver to make use of
+>>> "cs-gpios" from SPI node(parent) instead of "cs-gpio" defined in
+>>> slaves "controller-data"(child) node.
+>>>
+>>
+>> So, the problem is not that the binding is not consistent with other SPI drivers
+>> (that would have been bad but acceptable IMHO) but that it is completely broken.
+>> And since we have to fix it which means breaking the ABI anyways, it is better
+>> to make it consistent with other drivers and SPI core.
+> Will take this point for the while rewriting the commit messages
+>>
+>>> Also updates the Device tree Documentation.
+>>>
+>>
+>> While I agree with others that a binding that has been broken for a year is a
+>> binding that appears to not be used a lot, we should be more vocal about this
+>> and why breaking backward compatibility is the right approach in this case.
+>>
+>> So, in the (theoretical?) case that users find that their platform stopped to
+>> work with their current FDT, it will be easy for them to figure out what commit
+>> break it, what was the motivation to break the ABI and what changes are needed
+>> on their DTS to make it work again.
+>>
+>> Adding the sha1 of the culprit commit (3146bee spi: s3c64xx: Added provision for
+>> dedicated cs pin) that puts us in this situation will also be useful. Since the
+>> date of that commit is part of the rationale behind this change. (e.g: nobody
+>> cared about this binding and so can be changed).
+> Will take this point for the while rewriting the commit messages
 
-Thanks,
-Mike
+Awesome, thanks.
 
+>>
+>>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>> Cc: Doug Anderson <dianders@chromium.org>
+>>> Cc: Tomasz Figa <t.figa@samsung.com>
+>>> ---
+>>> Changes since v2:
+>>> 1. updated the gpios usage in Documentation
+>>> 2. use the spi->cs_gpio in the driver, instead of parsing the node again.
+>>> 3. Corrected error check of the of.node and during gpio_free
+>>>
+>>>  .../devicetree/bindings/spi/spi-samsung.txt        |    8 +++-----
+>>>  drivers/spi/spi-s3c64xx.c                          |   18 ++++++------------
+>>>  2 files changed, 9 insertions(+), 17 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>>> index 86aa061..2d29dac 100644
+>>> --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>>> +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>>> @@ -42,15 +42,13 @@ Optional Board Specific Properties:
+>>>  - num-cs: Specifies the number of chip select lines supported. If
+>>>    not specified, the default number of chip select lines is set to 1.
+>>>
+>>> +- cs-gpios: should specify GPIOs used for chipselects (see spi-bus.txt)
+>>> +
+>>>  SPI Controller specific data in SPI slave nodes:
+>>>
+>>>  - The spi slave nodes should provide the following information which is required
+>>>    by the spi controller.
+>>>
+>>> -  - cs-gpio: A gpio specifier that specifies the gpio line used as
+>>> -    the slave select line by the spi controller. The format of the gpio
+>>> -    specifier depends on the gpio controller.
+>>> -
+>>>    - samsung,spi-feedback-delay: The sampling phase shift to be applied on the
+>>>      miso line (to account for any lag in the miso line). The following are the
+>>>      valid values.
+>>> @@ -85,6 +83,7 @@ Example:
+>>>               #size-cells = <0>;
+>>>               pinctrl-names = "default";
+>>>               pinctrl-0 = <&spi0_bus>;
+>>> +             cs-gpios = <&gpa2 5 0>;
+>>>
+>>>               w25q80bw at 0 {
+>>>                       #address-cells = <1>;
+>>> @@ -94,7 +93,6 @@ Example:
+>>>                       spi-max-frequency = <10000>;
+>>>
+>>>                       controller-data {
+>>> -                             cs-gpio = <&gpa2 5 1 0 3>;
+>>>                               samsung,spi-feedback-delay = <0>;
+>>>                       };
+>>>
+>>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+>>> index 75a5696..842b148 100644
+>>> --- a/drivers/spi/spi-s3c64xx.c
+>>> +++ b/drivers/spi/spi-s3c64xx.c
+>>> @@ -772,24 +772,19 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+>>>
+>>>       cs = kzalloc(sizeof(*cs), GFP_KERNEL);
+>>>       if (!cs) {
+>>> -             of_node_put(data_np);
+>>
+>> Why are you removing this?
+>>
+>> You are not removing the call to of_get_child_by_name(slave_np,
+>> "controller-data") so on failure data_np reference counter still needs to be
+>> decremented.
+>>
+>>>               return ERR_PTR(-ENOMEM);
+>>>       }
+>>>
+>>> -     /* The CS line is asserted/deasserted by the gpio pin */
+>>> -     if (sdd->cs_gpio)
+>>> -             cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
+>>> -
+>>> -     if (!gpio_is_valid(cs->line)) {
+>>> +     if (!gpio_is_valid(spi->cs_gpio)) {
+>>>               dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
+>>> -             kfree(cs);
+>>> -             of_node_put(data_np);
+>>
+>> Again, it's wrong to remove this of_node_put(data_np) call.
+> Actually, i wanted to move down the of_get_child_by_name() to before
+> of_property_read_u32() call.
+
+Yeah, the wrong removals seemed to me like a left over from a previous attempt
+to reorganize the code.
+
+>>
+>>>               return ERR_PTR(-EINVAL);
+>>>       }
+>>> +     cs->line = spi->cs_gpio;
+>>>
+>>
+>> I wonder why are you keeping cs->line? AFAICT it's only used in
+>> s3c64xx_spi_setup() to request the GPIO and since you get the struct spi_device
+>> pointer as a parameter then you can just use spi->s_gpio instead.
+> I'm trying not to touch the non-DT part of the code.
 > 
-> Thanks,
-> Maxime
+> struct s3c64xx_spi_csinfo *cs = spi->controller_data;
 > 
-> The following changes since commit 3f6eec9969d24f91a3909d51e86e007ca5efd4c4:
+> This will update the cs->line and cs->fb_delay in case of non-DT.
+
+I see, then I prefer the opposite and do something like this on s3c64xx_spi_probe():
+
+if (!pdev->dev.of_node)
+       spi->cs_gpio = cs->line;
+
+So, cs->line is only used by non-DT platforms to pass the GPIO to be used as
+chip-select line. But after that use spi->cs_gpio should be used in every place.
+If someday all the non-DT platforms are migrated to DT then only that assignment
+has to be removed instead of several lines of code using cs->line currently.
+
+Also is more consistent to use spi->cs_gpio like most SPI drivers do instead of
+a custom structure member.
+
+>>
+>>>       of_property_read_u32(data_np, "samsung,spi-feedback-delay", &fb_delay);
+>>>       cs->fb_delay = fb_delay;
+>>>       of_node_put(data_np);
+>>> +
+>>
+>> Usually is better to not mix style and functionality changes in the same patch
+>> since it makes harder to review.
+>>
+>>>       return cs;
+>>>  }
+>>>
+>>> @@ -828,8 +823,6 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>>>                                       cs->line, err);
+>>>                               goto err_gpio_req;
+>>>                       }
+>>> -
+>>> -                     spi->cs_gpio = cs->line;
+>>>               }
+>>>
+>>>               spi_set_ctldata(spi, cs);
+>>> @@ -884,7 +877,8 @@ setup_exit:
+>>>       /* setup() returns with device de-selected */
+>>>       writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+>>>
+>>> -     gpio_free(cs->line);
+>>> +     if (cs->line)
+>>> +             gpio_free(cs->line);
+>>
+>> Same here, we can just get rid of cs->line and use gpio_free(spi->cs_gpio) instead.
+> This is to keep the non-DT part untouched.
+
+I don't get why you don't want to change legacy platform code if that means
+improving the driver. If you don't feel confident with your changes because you
+don't have access to the non-DT platform to test then you can post your patches
+as RFC or ask people to with access to those platforms to test and collect some
+Tested-by tags before the patch is merged.
+
+>>
+>>>       spi_set_ctldata(spi, NULL);
+>>>
+>>>  err_gpio_req:
+>>> @@ -1077,7 +1071,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+>>>       sdd->sfr_start = mem_res->start;
+>>>       sdd->cs_gpio = true;
+>>>       if (pdev->dev.of_node) {
+>>> -             if (!of_find_property(pdev->dev.of_node, "cs-gpio", NULL))
+>>> +             if (!of_find_property(pdev->dev.of_node, "cs-gpios", NULL))
+>>>                       sdd->cs_gpio = false;
+>>
+>> I think we can get rid of sdd->cs_gpio as well. You can always use
+>> gpio_is_valid(spi->cs_gpio) or if (master->cs_gpios) to figure out if the SPI
+>> device has a cs-gpios array associated.
+> This is to keep the non-DT part untouched
+
+sdd->cs_gpio has nothing to do with non-DT platforms AFAIU. It was introduced in
+the commit that initially broke this binding and it's redundant information.
+
+It's assigned to true on s3c64xx_spi_probe() and then set to false only if
+of_find_property(pdev->dev.of_node, "cs-gpios", NULL) fails.
+
+But you don't need an additional variable to get that info since
+gpio_is_valid(spi->cs_gpio) or if (master->cs_gpios) can tell you the same AFAIK.
+
+>>
+>>>
+>>>               ret = of_alias_get_id(pdev->dev.of_node, "spi");
+>>>
+>>
+>> Best regards,
+>> Javier
+> Will re-spin after waiting for a couple of more comments.
+
+Perfect, thanks a lot!
+
+> Thanks for your review.
 > 
->   Merge branch 'for-v3.16/ti-clk-drv' of github.com:t-kristo/linux-pm into clk-next (2014-06-10 16:53:25 -0700)
 > 
-> are available in the git repository at:
-> 
-> 
->   https://github.com/mripard/linux.git tags/sunxi-clk-for-3.16-2
-> 
-> for you to fetch changes up to 5c89a8b65760a60eea38e0b172d04152ec03a067:
-> 
->   clk: sunxi: document PRCM clock compatible strings (2014-06-11 10:25:03 +0200)
-> 
-> ----------------------------------------------------------------
-> Rebase of Emilio's clk-sunxi-for-3.16 on top of clk-next
-> 
-> Fixed a few compilation warnings exposed by a patch introduced during the 3.16
-> merge window.
-> 
-> Original tag message:
-> 
-> Allwinner sunXi SoCs clock changes
-> 
-> This pull contains some new code to add support for A31 clocks by Maxime
-> and Boris. It also reworks the driver a bit to avoid having a huge
-> single file when we have a full folder for ourselves, and separating
-> different functional units makes sense.
-> 
-> ----------------------------------------------------------------
-> Boris BREZILLON (2):
->       clk: sunxi: add PRCM (Power/Reset/Clock Management) clks support
->       clk: sunxi: document PRCM clock compatible strings
-> 
-> Emilio L?pez (1):
->       clk: sunxi: document new A31 USB clock compatible
-> 
-> Maxime Ripard (7):
->       clk: sunxi: Implement A31 USB clock
->       clk: sunxi: Remove calls to clk_put
->       clk: sunxi: Move the 24M oscillator to a file of its own
->       clk: sunxi: Move the GMAC clock to a file of its own
->       clk: sunxi: Rework clock protection code
->       clk: sun6i: Protect CPU clock
->       clk: sun6i: Protect SDRAM gating bit
-> 
->  Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
->  drivers/clk/sunxi/Makefile                        |   4 +
->  drivers/clk/sunxi/clk-a10-hosc.c                  |  73 +++++++
->  drivers/clk/sunxi/clk-a20-gmac.c                  | 119 +++++++++++
->  drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  99 +++++++++
->  drivers/clk/sunxi/clk-sun6i-apb0.c                |  77 +++++++
->  drivers/clk/sunxi/clk-sun6i-ar100.c               | 233 +++++++++++++++++++++
->  drivers/clk/sunxi/clk-sunxi.c                     | 239 +++++-----------------
->  8 files changed, 661 insertions(+), 187 deletions(-)
->  create mode 100644 drivers/clk/sunxi/clk-a10-hosc.c
->  create mode 100644 drivers/clk/sunxi/clk-a20-gmac.c
->  create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0-gates.c
->  create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0.c
->  create mode 100644 drivers/clk/sunxi/clk-sun6i-ar100.c
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+
+Best regards,
+Javier
