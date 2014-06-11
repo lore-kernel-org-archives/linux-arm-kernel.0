@@ -1,50 +1,62 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 11 Jun 2014 14:34:15 +0200
-Subject: [PATCH v8 7/7] arm: mediatek: add dts for Aquaris5 mobile phone
-In-Reply-To: <1402490055-15197-1-git-send-email-matthias.bgg@gmail.com>
-References: <1402490055-15197-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1402490055-15197-8-git-send-email-matthias.bgg@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 11 Jun 2014 14:34:50 +0200
+Subject: [PATCH v8 1/8] ftrace: make CALLER_ADDRx macros more generic
+In-Reply-To: <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <CAMuHMdWs9i4pBNbn-RTpv_-K5W7YGED=KtEtFSci=7YHdNKpfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aquaris5 is a mobile phone based on the MT6589 SoC.
+On Wed, Apr 30, 2014 at 11:54 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Most archs with HAVE_ARCH_CALLER_ADDR have the almost same definitions
+> of CALLER_ADDRx(n), and so put them into linux/ftrace.h.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm/boot/dts/mt6589-aquaris5.dts |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
+On arm (at least shmobile_defconfig and versatile_defconfig) with gcc 4.6.3:
 
-diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-new file mode 100644
-index 0000000..443b446
---- /dev/null
-+++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (c) 2014 MundoReader S.L.
-+ * Author: Matthias Brugger <matthias.bgg@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "mt6589.dtsi"
-+
-+/ {
-+	model = "bq Aquaris5";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
--- 
-1.7.9.5
+kernel/sched/core.c: In function 'get_parent_ip':
+kernel/sched/core.c:2520:10: warning: unsupported argument to
+'__builtin_return_address' [enabled by default]
+kernel/sched/core.c:2522:11: warning: unsupported argument to
+'__builtin_return_address' [enabled by default]
+
+With gcc 4.9.0:
+
+kernel/sched/core.c: In function 'get_parent_ip':
+include/linux/ftrace.h:627:36: warning: unsupported argument to
+'__builtin_return_address'
+ #  define ftrace_return_address(n) __builtin_return_address(n)
+                                    ^
+include/linux/ftrace.h:635:38: note: in expansion of macro
+'ftrace_return_address'
+ #define CALLER_ADDR2 ((unsigned long)ftrace_return_address(2))
+                                      ^
+kernel/sched/core.c:2520:10: note: in expansion of macro 'CALLER_ADDR2'
+   addr = CALLER_ADDR2;
+          ^
+include/linux/ftrace.h:627:36: warning: unsupported argument to
+'__builtin_return_address'
+ #  define ftrace_return_address(n) __builtin_return_address(n)
+                                    ^
+include/linux/ftrace.h:636:38: note: in expansion of macro
+'ftrace_return_address'
+ #define CALLER_ADDR3 ((unsigned long)ftrace_return_address(3))
+                                      ^
+kernel/sched/core.c:2522:11: note: in expansion of macro 'CALLER_ADDR3'
+    addr = CALLER_ADDR3;
+           ^
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
