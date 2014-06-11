@@ -1,58 +1,38 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 11 Jun 2014 15:32:27 -0400 (EDT)
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 11 Jun 2014 20:40:15 +0100 (BST)
 Subject: [PATCH v2] uhci-platform: use devm_ioremap resource
-In-Reply-To: <20140611191844.GA13009@himangi-Dell>
-Message-ID: <Pine.LNX.4.44L0.1406111528170.890-100000@iolanthe.rowland.org>
+In-Reply-To: <Pine.LNX.4.44L0.1406111528170.890-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1406111528170.890-100000@iolanthe.rowland.org>
+Message-ID: <alpine.DEB.2.10.1406112038420.2576@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Jun 2014, Himangi Saraogi wrote:
+> > v2: pass correct arguments to devm_ioremap_resource
+> > Not compile tested due to incompatible architecture.
+>
+> uhci-platform is compatible with all architectures.  But you have to
+> add it to the .config file by hand.
 
-> This patch replaces the memory allocation using request_mem_region and
-> the ioremap by a single call to managed interface devm_ioremap_reource.
-> The corresponding calls to release_mem_region and iounmap in the probe
-> and release functions are now unnecessary and are removed. Also a label
-> is done away with and linux/device.h is added to make sure the devm_*()
-> outine declarations are unambiguously available.
-> 
-> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
-> Acked-by: Julia Lawall <julia.lawall@lip6.fr>
-> ---
-> v2: pass correct arguments to devm_ioremap_resource
-> Not compile tested due to incompatible architecture.
+What should one do exactly?  I added
 
-uhci-platform is compatible with all architectures.  But you have to 
-add it to the .config file by hand.
+CONFIG_USB_UHCI_PLATFORM=y
 
->  drivers/usb/host/uhci-platform.c | 22 +++++-----------------
->  1 file changed, 5 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
-> index 01833ab..b987f1d 100644
-> --- a/drivers/usb/host/uhci-platform.c
-> +++ b/drivers/usb/host/uhci-platform.c
-> @@ -8,6 +8,7 @@
->   */
->  
->  #include <linux/of.h>
-> +#include <linux/device.h>
->  #include <linux/platform_device.h>
->  
->  static int uhci_platform_init(struct usb_hcd *hcd)
-> @@ -88,33 +89,22 @@ static int uhci_hcd_platform_probe(struct platform_device *pdev)
->  	hcd->rsrc_start = res->start;
->  	hcd->rsrc_len = resource_size(res);
->  
-> -	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-> -		pr_err("%s: request_mem_region failed\n", __func__);
-> -		ret = -EBUSY;
-> +	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(hcd->regs)) {
-> +		ret = PTR_ERR(hcd->regs);
->  		goto err_rmr;
+to the end of my .config file, but then running make just overwrites it:
 
-Again, you didn't adjust the statement label.  The "rmr" in err_rmr 
-stands for "request_mem_region", so it is clearly out of place in your 
-patch.
+> make drivers/usb/host/uhci-platform.o
+scripts/kconfig/conf --silentoldconfig Kconfig
+#
+# configuration written to .config
+#
+  CHK     include/config/kernel.release
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  CALL    scripts/checksyscalls.sh
+  CC      drivers/usb/host/uhci-platform.o
+drivers/usb/host/uhci-platform.c:13:38: warning: ?struct usb_hcd? declared
+inside parameter list [enabled by default]
+ static int uhci_platform_init(struct usb_hcd *hcd)
+                                      ^
 
-Alan Stern
+thanks,
+julia
