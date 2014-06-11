@@ -1,108 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Jun 2014 08:02:32 -0700
-Subject: [PATCH] [media] staging: allow omap4iss to be modular
-In-Reply-To: <7948240.P51u2omQa4@wuerfel>
-References: <5192928.MkINji4uKU@wuerfel> <53986ABC.4070302@ti.com>
- <7948240.P51u2omQa4@wuerfel>
-Message-ID: <20140611150231.GB17845@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 12 Jun 2014 00:13:53 +0900
+Subject: [PATCH] ARM: Exynos : Fix build error with thumb2
+In-Reply-To: <CA+iXiiO8ED9rdyxXh9ooDhb9OcBRH52acbqA7cgGX9kvgYaCXg@mail.gmail.com>
+References: <1401119625-11309-1-git-send-email-santosh.shukla@linaro.org>	<20140602101023.GB3855@e103592.cambridge.arm.com>
+ <CA+iXiiO8ED9rdyxXh9ooDhb9OcBRH52acbqA7cgGX9kvgYaCXg@mail.gmail.com>
+Message-ID: <53987231.6080200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140611 07:51]:
-> On Wednesday 11 June 2014 09:42:04 Nishanth Menon wrote:
-> > On 06/11/2014 09:35 AM, Arnd Bergmann wrote:
-> > > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
-> > > of which can be loadable modules. This causes build failures
-> > > if we want the camera driver to be built-in.
-> > > 
-> > > This can be solved by turning the option into "tristate",
-> > > which unfortunately causes another problem, because the
-> > > driver incorrectly calls a platform-internal interface
-> > > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
-> > > To work around that, we can export those symbols, but
-> > > that isn't really the correct solution, as we should not
-> > > have dependencies on platform code this way.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > ---
-> > > This is one of just two patches we currently need to get
-> > > 'make allmodconfig' to build again on ARM.
-> > > 
-> > > diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-> > > index 751f354..05d2d98 100644
-> > > --- a/arch/arm/mach-omap2/control.c
-> > > +++ b/arch/arm/mach-omap2/control.c
-> > > @@ -190,11 +190,13 @@ u32 omap4_ctrl_pad_readl(u16 offset)
-> > >  {
-> > >  	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
-> > >  }
-> > > +EXPORT_SYMBOL_GPL(omap4_ctrl_pad_readl);
-> > >  
-> > >  void omap4_ctrl_pad_writel(u32 val, u16 offset)
-> > >  {
-> > >  	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
-> > >  }
-> > > +EXPORT_SYMBOL_GPL(omap4_ctrl_pad_writel);
-> > >  
-> > >  #ifdef CONFIG_ARCH_OMAP3
-> > >  
-> > > diff --git a/drivers/staging/media/omap4iss/Kconfig b/drivers/staging/media/omap4iss/Kconfig
-> > > index 78b0fba..0c3e3c1 100644
-> > > --- a/drivers/staging/media/omap4iss/Kconfig
-> > > +++ b/drivers/staging/media/omap4iss/Kconfig
-> > > @@ -1,5 +1,5 @@
-> > >  config VIDEO_OMAP4
-> > > -	bool "OMAP 4 Camera support"
-> > > +	tristate "OMAP 4 Camera support"
-> > >  	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
-> > >  	select VIDEOBUF2_DMA_CONTIG
-> > >  	---help---
-> > > 
-> > 
-> > This was discussed in detail here:
-> > http://marc.info/?t=140198692500001&r=1&w=2
-> > Direct dependency from a staging driver to mach-omap2 driver is not
-> > something we'd like, right?
-> 
-> So it was decided to just leave ARM allmodconfig broken?
-> 
-> Why not at least do this instead?
-> 
-> 8<----
-> From 3a965f4fd5a6b3ef4a66aa4e7c916cfd34fd5706 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Tue, 21 Jan 2014 09:32:43 +0100
-> Subject: [PATCH] [media] staging: tighten omap4iss dependencies
-> 
-> The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
-> of which can be loadable modules. This causes build failures
-> if we want the camera driver to be built-in.
-> 
-> This can be solved by turning the option into "tristate",
-> which unfortunately causes another problem, because the
-> driver incorrectly calls a platform-internal interface
-> for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
-> 
-> Instead, this patch just forbids the invalid configurations
-> and ensures that the driver can only be built if all its
-> dependencies are built-in.
- 
-Makes sense to me if the media people are OK with this:
+On 06/04/14 17:07, Santosh Shukla wrote:
+> On 2 June 2014 15:40, Dave Martin<Dave.Martin@arm.com>  wrote:
+>> On Mon, May 26, 2014 at 09:23:45PM +0530, Santosh Shukla wrote:
+>>> From: santosh shukla<santosh.shukla@linaro.org>
+>>>
+>>> Add non-global symbol .LLl2x0_regs_phys to avoid build break in thumb2 mode.
+>>>
+>>> IIUC, arm assembler fail to load value of "global" variable
+>>> l2xo_regs_phys for thum2 mode and wrapping it in non-global symbol like
+>>> .Ll2x0_regs_phys solves the build break issue.
+>>>
+>>> arch/arm/mach-exynos/sleep.S: Assembler messages:
+>>> arch/arm/mach-exynos/sleep.S:57: Error: invalid immediate for address
+>>> calculation (value = 0x00000004)
+>>>
+>>> fix inspired from [1]
+>>>
+>>> [1] https://lkml.org/lkml/2010/3/31/235
+>>>
+>>> Signed-off-by: santosh shukla<santosh.shukla@linaro.org>
+>>
+>> Reviewed-by: Dave Martin<Dave.Martin@arm.com>
+>>
+>
+> Thanks.
+>
+> Hi Kukjin, if this patch ok with you then can you pick it up.
+>
+Sure, I've applied this into fixes for 3.16.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Thanks,
+Kukjin
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/staging/media/omap4iss/Kconfig b/drivers/staging/media/omap4iss/Kconfig
-> index 78b0fba..8afc6fe 100644
-> --- a/drivers/staging/media/omap4iss/Kconfig
-> +++ b/drivers/staging/media/omap4iss/Kconfig
-> @@ -1,6 +1,6 @@
->  config VIDEO_OMAP4
->  	bool "OMAP 4 Camera support"
-> -	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
-> +	depends on VIDEO_V4L2=y && VIDEO_V4L2_SUBDEV_API && I2C=y && ARCH_OMAP4
->  	select VIDEOBUF2_DMA_CONTIG
->  	---help---
->  	  Driver for an OMAP 4 ISS controller.
-> 
+
+>> The binutils folks insist that this is not a bug in gas.  (I disagreed, but
+>> it's a grey area.)  This is the established pattern for working round this
+>> issue -- looks fine to me.
+>>
+>> Cheers
+>> ---Dave
