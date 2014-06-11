@@ -1,19 +1,58 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 10 Jun 2014 20:23:16 -0700
-Subject: [PATCHv3 0/3] arm:dma-mapping Refactoring iommu dma-mapping code
-In-Reply-To: <CAD15agZdquB5Ak5JT_2HRDtrAQ=j-d3UfrJr6ZS9eijD2ibBUg@mail.gmail.com>
-References: <1402044161-32980-1-git-send-email-ritesh.harjani@gmail.com>
- <CAD15agZdquB5Ak5JT_2HRDtrAQ=j-d3UfrJr6ZS9eijD2ibBUg@mail.gmail.com>
-Message-ID: <20140611032316.GB3758@kroah.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 10 Jun 2014 20:25:13 -0700
+Subject: [PATCH v6 1/9] seccomp: create internal mode-setting function
+In-Reply-To: <1402457121-8410-1-git-send-email-keescook@chromium.org>
+References: <1402457121-8410-1-git-send-email-keescook@chromium.org>
+Message-ID: <1402457121-8410-2-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 08:27:54AM +0530, Ritesh Harjani wrote:
-> Hi Will/Catalin/Marek...
-> 
-> Any comments on this patch series ??
+In preparation for having other callers of the seccomp mode setting
+logic, split the prctl entry point away from the core logic that performs
+seccomp mode setting.
 
-It's the middle of the merge window, we can't do anything right now and
-are all swamped with other work, give people some time...
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ kernel/seccomp.c |   16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-greg k-h
+diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+index f6d76bebe69f..552b972b8f83 100644
+--- a/kernel/seccomp.c
++++ b/kernel/seccomp.c
+@@ -465,7 +465,7 @@ long prctl_get_seccomp(void)
+ }
+ 
+ /**
+- * prctl_set_seccomp: configures current->seccomp.mode
++ * seccomp_set_mode: internal function for setting seccomp mode
+  * @seccomp_mode: requested mode to use
+  * @filter: optional struct sock_fprog for use with SECCOMP_MODE_FILTER
+  *
+@@ -478,7 +478,7 @@ long prctl_get_seccomp(void)
+  *
+  * Returns 0 on success or -EINVAL on failure.
+  */
+-long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
++static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
+ {
+ 	long ret = -EINVAL;
+ 
+@@ -509,3 +509,15 @@ long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
+ out:
+ 	return ret;
+ }
++
++/**
++ * prctl_set_seccomp: configures current->seccomp.mode
++ * @seccomp_mode: requested mode to use
++ * @filter: optional struct sock_fprog for use with SECCOMP_MODE_FILTER
++ *
++ * Returns 0 on success or -EINVAL on failure.
++ */
++long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
++{
++	return seccomp_set_mode(seccomp_mode, filter);
++}
+-- 
+1.7.9.5
