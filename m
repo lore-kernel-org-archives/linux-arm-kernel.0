@@ -1,115 +1,53 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 11 Jun 2014 09:03:52 +0200
-Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
- support
-In-Reply-To: <53974998.70001@samsung.com>
-References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
- <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
- <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
-Message-ID: <20140611070352.GC24286@lvm>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 11 Jun 2014 09:35:25 +0200
+Subject: [RFC PATCH] dma: at_xdmac: creation of the atmel eXtended DMA
+ Controller driver
+In-Reply-To: <6544148.4RKn2Y8vCE@wuerfel>
+References: <1401179736-8235-1-git-send-email-ludovic.desroches@atmel.com>
+ <20140610154118.GA4254@lukather> <6544148.4RKn2Y8vCE@wuerfel>
+Message-ID: <20140611073525.GQ1701@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 11:08:24AM -0700, Mario Smarduch wrote:
-> On 06/10/2014 02:22 AM, Christoffer Dall wrote:
-> > On Mon, Jun 09, 2014 at 06:47:12PM -0700, Mario Smarduch wrote:
-> >> On 06/08/2014 05:05 AM, Christoffer Dall wrote:
-> >>> On Fri, Jun 06, 2014 at 10:33:41AM -0700, Mario Smarduch wrote:
-> >>>> kvm_vm_ioctl_get_dirty_log() is generic used by x86, ARM. x86 recent patch 
-> >>>> changed this function, this patch picks up those changes, re-tested everything
-> >>>> works. Applies cleanly with other patches.
-> >>>>
-> >>>> This patch adds support for keeping track of VM dirty pages. As dirty page log
-> >>>> is retrieved, the pages that have been written are write protected again for
-> >>>> next write and log read.
-> >>>>
-> >>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >>>> ---
-> >>>>  arch/arm/include/asm/kvm_host.h |    3 ++
-> >>>>  arch/arm/kvm/arm.c              |    5 ---
-> >>>>  arch/arm/kvm/mmu.c              |   79 +++++++++++++++++++++++++++++++++++
-> >>>>  arch/x86/kvm/x86.c              |   86 ---------------------------------------
-> >>>>  virt/kvm/kvm_main.c             |   86 +++++++++++++++++++++++++++++++++++++++
-> >>>>  5 files changed, 168 insertions(+), 91 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >>>> index 59565f5..b760f9c 100644
-> >>>> --- a/arch/arm/include/asm/kvm_host.h
-> >>>> +++ b/arch/arm/include/asm/kvm_host.h
-> >>>> @@ -232,5 +232,8 @@ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
-> >>>>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
-> >>>>  
-> >>>>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
-> >>>> +void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-> >>>> +	struct kvm_memory_slot *slot,
-> >>>> +	gfn_t gfn_offset, unsigned long mask);
-> >>>
-> >>> Do all other architectures implement this function?  arm64?
-> >>
-> >> Besides arm, x86 but the function is not generic.
-> >>>
-> > 
-> > you're now calling this from generic code, so all architecture must
-> > implement it, and the prototype should proably be in
-> > include/linux/kvm_host.h, not in the arch-specific headers.
-> Ah ok.
-> > 
-> >>>>  
-> >>>>  #endif /* __ARM_KVM_HOST_H__ */
-> >>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >>>> index dfd63ac..f06fb21 100644
-> >>>> --- a/arch/arm/kvm/arm.c
-> >>>> +++ b/arch/arm/kvm/arm.c
-> >>>> @@ -780,11 +780,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-> >>>>  	}
-> >>>>  }
-> >>>>  
-> >>>> -int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
-> >>>> -{
-> >>>> -	return -EINVAL;
-> >>>> -}
-> >>>> -
-> >>>
-> >>> What about the other architectures implementing this function?
-> >>
-> >> Six architectures define this function. With this patch this
-> >> function is generic in kvm_main.c used by x86.
-> > 
-> > But you're not defining it as a weak symbol (and I don't suspect that
-> > you should unless other archs do this in a *very* different way), so you
-> > need to either remove it from the other archs, make it a weak symbol (I
-> > hope this is not the case) or do something else.
-> Mistake on my part I just cut and paste Xiaos x86's recent upstream patch and 
-> didn't add weak definition.
+On Tue, Jun 10, 2014 at 09:15:14PM +0200, Arnd Bergmann wrote:
+> On Tue, May 27, 2014 at 10:35:36AM +0200, Ludovic Desroches wrote:
+> > +static struct dma_chan *at_xdmac_xlate(struct of_phandle_args *dma_spec,
+> > +                                    struct of_dma *of_dma)
+> > +{
+> > +     struct at_xdmac_chan    *atchan;
+> > +     struct dma_chan         *chan;
+> > +     dma_cap_mask_t          mask;
+> > +     struct platform_device  *pdev = of_find_device_by_node(dma_spec->np);
 > 
-> I looked at IA64, MIPS (two of them ), S390 somewhat similar but quite 
-> different implementations. They use a sync version, where the dirty bitmaps 
-> are maintained at arch level and then copied to memslot->dirty_bitmap. There 
-> is only commonality between x86 and ARM right now, x86 uses
-> memslot->dirty_bitmap directly.
+> No need to search through all the device nodes, you can look up the
+> device from of_dma->of_dma_data.
+
+Thanks for the tip.
+
 > 
-> Maybe this function should go back to architecture layer, it's
-> unlikely it can become generic across all architectures.
+> > +     if (dma_spec->args_count != 2) {
+> > +             dev_err(&pdev->dev, "dma phandler args: bad number of args\n");
+> > +             return NULL;
+> > +     }
+> > +
+> > +     dma_cap_zero(mask);
+> > +     dma_cap_set(DMA_SLAVE, mask);
+> > +     chan = dma_request_channel(mask, NULL, NULL);
+> > +     if (!chan) {
+> > +             dev_err(&pdev->dev, "can't get a dma channel\n");
+> > +             return NULL;
+> > +     }
 > 
-> There is also the issue of kvm_flush_remote_tlbs(), that's also weak,
-> the generic one is using IPIs. Since it's only used in mmu.c maybe make 
-> this one static.
+> You must use dma_get_any_slave_channel. dma_request_channel gives you a
+> channel from a random dma engine that is present in the system, not
+> necessarily the one you are managing here.
+
+It is planned to use dma_get_any_slave_channel but currently I am doing
+tests on a 3.10 kernel that's why I am still using dma_request_channel.
+
 > 
-So I don't see a lot of use of weak symbols in kvm_main.c (actually on
-kvmarm/next I don't see any), but we do want to share code when more
-than one architecture implements something in the exact same way, like
-it seems x86 and ARM is doing here for this particular function.
-
-I think the KVM scheme is usually to check for some define, like:
-
-#ifdef KVM_ARCH_HAVE_GET_DIRTY_LOG
-	ret = kvm_arch_get_dirty_log(...);
-#else
-	ret = kvm_get_dirty_log(...);
-#endif
-
-but Paolo may have a more informed oppinion of how to deal with these.
-
-Thanks,
--Christoffer
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
