@@ -1,86 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 11 Jun 2014 21:19:10 +0200
-Subject: BUG: Bad page state in process swapper pfn:00000
-In-Reply-To: <539892BD.8020403@codeaurora.org>
-References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>
- <539892BD.8020403@codeaurora.org>
-Message-ID: <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 11 Jun 2014 15:32:27 -0400 (EDT)
+Subject: [PATCH v2] uhci-platform: use devm_ioremap resource
+In-Reply-To: <20140611191844.GA13009@himangi-Dell>
+Message-ID: <Pine.LNX.4.44L0.1406111528170.890-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Thu, 12 Jun 2014, Himangi Saraogi wrote:
 
-On Wed, Jun 11, 2014 at 7:32 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> On 6/11/2014 4:40 AM, Geert Uytterhoeven wrote:
->> With current mainline, I get an early crash on r8a7791/koelsch:
->>
->> BUG: Bad page state in process swapper  pfn:00000
->> page:ee20b000 count:0 mapcount:0 mapping:66756200 index:0x65726566
->> page flags: 0x74656b63(locked|error|lru|active|owner_priv_1|arch_1|private|writeback|head|swapcache
->> |reclaim|mlocked)
->> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
->> bad because of flags:
->> page flags: 0x212861(locked|lru|active|private|writeback|swapcache|mlocked)
->>
->> I bisected it to
->>
->> commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
->> Author: Laura Abbott <lauraa@codeaurora.org>
->> Date:   Sun Apr 13 22:54:58 2014 +0100
->>
->>     ARM: 8025/1: Get rid of meminfo
+> This patch replaces the memory allocation using request_mem_region and
+> the ioremap by a single call to managed interface devm_ioremap_reource.
+> The corresponding calls to release_mem_region and iounmap in the probe
+> and release functions are now unnecessary and are removed. Also a label
+> is done away with and linux/device.h is added to make sure the devm_*()
+> outine declarations are unambiguously available.
+> 
+> Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
+> Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+> ---
+> v2: pass correct arguments to devm_ioremap_resource
+> Not compile tested due to incompatible architecture.
 
->> -Truncating RAM at 40000000-bfffffff to -6f7fffff (vmalloc region overlap).
->> +Truncating RAM at 0x00000000-0xc0000000 to -0x6f800000
->
-> I'm guessing this is the issue right there.
->
->         memory at 40000000 {
->                 device_type = "memory";
->                 reg = <0 0x40000000 0 0x40000000>;
->         };
->
->         memory at 200000000 {
->                 device_type = "memory";
->                 reg = <2 0x00000000 0 0x40000000>;
->         };
->
-> Those are the memory nodes from r8a7791-koelsch.dts. It looks like the memory
-> outside 32-bit address range is not being dropped. It was suggested to drop
-> early_init_dt_add_memory_arch which called arm_add_memory and just use the
-> generic of code directly but the problem is arm_add_memory does additional
-> bounds checking. It looks like early_init_dt_add_memory_arch in
-> drivers/of/fdt.c checks for overflow on u64 types but not for overflow
-> on phys_addr_t (32 bits) which is what memblock_add actually uses.
->
-> For a quick test, can you try bringing back early_init_dt_add_memory_arch
-> and see if that fixes the problem:
->
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index e94a157..ea9ce92 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -27,6 +27,10 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
->
-> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-> +{
-> +       arm_add_memory(base, size);
-> +}
->
->  #ifdef CONFIG_SMP
->  extern struct of_cpu_method __cpu_method_of_table[];
+uhci-platform is compatible with all architectures.  But you have to 
+add it to the .config file by hand.
 
-Thanks, my board boots again after applying this quick hack.
+>  drivers/usb/host/uhci-platform.c | 22 +++++-----------------
+>  1 file changed, 5 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
+> index 01833ab..b987f1d 100644
+> --- a/drivers/usb/host/uhci-platform.c
+> +++ b/drivers/usb/host/uhci-platform.c
+> @@ -8,6 +8,7 @@
+>   */
+>  
+>  #include <linux/of.h>
+> +#include <linux/device.h>
+>  #include <linux/platform_device.h>
+>  
+>  static int uhci_platform_init(struct usb_hcd *hcd)
+> @@ -88,33 +89,22 @@ static int uhci_hcd_platform_probe(struct platform_device *pdev)
+>  	hcd->rsrc_start = res->start;
+>  	hcd->rsrc_len = resource_size(res);
+>  
+> -	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+> -		pr_err("%s: request_mem_region failed\n", __func__);
+> -		ret = -EBUSY;
+> +	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(hcd->regs)) {
+> +		ret = PTR_ERR(hcd->regs);
+>  		goto err_rmr;
 
-Gr{oetje,eeting}s,
+Again, you didn't adjust the statement label.  The "rmr" in err_rmr 
+stands for "request_mem_region", so it is clearly out of place in your 
+patch.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Alan Stern
