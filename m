@@ -1,70 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Jun 2014 12:58:27 -0500
-Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
-In-Reply-To: <CA+8MBbLooWm9xys+gYa5uL1eVTH-qzaR+RaZgsrqV-8XkqGadQ@mail.gmail.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>	<1397859600-11507-4-git-send-email-robherring2@gmail.com>	<CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>	<CAL_JsqKux+BTHeYo6XEzzQMAFJZHVjbURM973oHT=t698GbJbA@mail.gmail.com>	<20140503220731.GA10927@kroah.com>	<20140503221658.GA13403@kroah.com>	<CA+8MBb+7f1bOnJjJWj1vxa0UNuQwz7OGRDR_QFTxOT=9cynabQ@mail.gmail.com>	<CA+8MBbKE1E2uq9LefiDAV9hv2Z8OTkjx9mkXjE6_--F_emRC8A@mail.gmail.com>	<CAL_JsqKvoO9acX==-LdD6boO=B3xr=ijra_G0uqRZGzACZZUJg@mail.gmail.com>
- <CA+8MBbLooWm9xys+gYa5uL1eVTH-qzaR+RaZgsrqV-8XkqGadQ@mail.gmail.com>
-Message-ID: <539898C3.8090903@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 11 Jun 2014 11:13:11 -0700
+Subject: [PATCH 07/24] ARM: shmobile: Drop dev_irq_safe from r8a7779 genpd
+ config
+In-Reply-To: <1402397497-26737-8-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Tue, 10 Jun 2014 12:51:20 +0200")
+References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
+ <1402397497-26737-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <7ha99jiabs.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2014 03:52 PM, Tony Luck wrote:
-> On Mon, Jun 9, 2014 at 4:18 PM, Rob Herring <robherring2@gmail.com> wrote:
->> It should do auto detect of the baud-rate if it is not specified which
->> for 8250 is just reading the baud-rate divider and calculating the
->> baud-rate using the uart clock. It should just reprogram the divider
->> with the same divider value. I don't see anything obvious why this
->> would have broken.
-> 
-> Something very weird is happening.  Output is good so long as I put the
-> trailing ",115200" on the command line.
-> 
-> But I made early_serial8250_setup() printk() the return value it got
-> from probe_baud() - in case is was somehow getting 115201 or some
-> other silly value ... nope. Exactly 115200.
-> 
-> I also can't explain why the "noise" comes and goes a dozen
-> times during boot,
-> 
-> Does some other place in the kernel look at the "uart..." command
-> line argument?
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-I think I figured it out. The function 
-serial8250_find_port_for_earlycon is failing to match 'uart' console to 
-'ttyS' console and transfer the options. It was also failing to create 
-an option string when the baud rate is probed. Can you try out the 
-below patch?
+> The dev_irq_safe configuration is redundant, genpd don't have any
+> special treatmeant for handling it.  Let's remove it.
 
-Rob
+Why?
 
-8<-------------------------------------------------------------------
-diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
-index cfef801..4858b8a 100644
---- a/drivers/tty/serial/8250/8250_early.c
-+++ b/drivers/tty/serial/8250/8250_early.c
-@@ -144,8 +144,11 @@ static int __init early_serial8250_setup(struct earlycon_device *device,
- 	if (!(device->port.membase || device->port.iobase))
- 		return 0;
- 
--	if (!device->baud)
-+	if (!device->baud) {
- 		device->baud = probe_baud(&device->port);
-+		snprintf(device->options, sizeof(device->options), "%u",
-+			 device->baud);
-+	}
- 
- 	init_port(device);
- 
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index 5131b5e..d20e6d8 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -25,7 +25,7 @@
- #include <asm/serial.h>
- 
- static struct console early_con = {
--	.name =		"earlycon",
-+	.name =		"uart",
- 	.flags =	CON_PRINTBUFFER | CON_BOOT,
- 	.index =	-1,
- };
+The genpd core needs to handle irq_safe properly eventully (right now it
+just doesn't call power_off/power_on callbacks, but that needs to be
+implmenented.  c.f commit 0aa2a22169)
+
+If we remove these flags from platforms, we're taking away information
+that the platform maintainers have specified tha will be useful when
+full support is avialble.
+
+Kevin
