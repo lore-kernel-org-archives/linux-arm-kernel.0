@@ -1,165 +1,104 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Jun 2014 17:16:05 +0100
-Subject: [PATCH v4 02/20] arm64: initial support for GICv3
-In-Reply-To: <CALicx6vz6JZsMDmEVUMarsTd67xK1r+HjVTD0Jg94U6LD9bk3w@mail.gmail.com>
-References: <CALicx6vz6JZsMDmEVUMarsTd67xK1r+HjVTD0Jg94U6LD9bk3w@mail.gmail.com>
-Message-ID: <539880C5.6020203@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 11 Jun 2014 17:18:34 +0100
+Subject: [PATCH v4 0/6] ARM generic idle states
+Message-ID: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vijay,
+This patch is v4 of a previous posting:
 
-On 11/06/14 16:52, Vijay Kilari wrote:
->  Hi Marc,
-> 
-> [...]
->> +
->> +static void gic_write_pmr(u64 val)
->> +{
->> +       asm volatile("msr " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
->> +}
->> +
->> +static void gic_write_ctlr(u64 val)
->> +{
->> +       asm volatile("msr " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
->> +       isb();
->> +}
->> +
->> +static void gic_write_grpen1(u64 val)
->> +{
->> +       asm volatile("msr " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
->> +       isb();
-> 
->  As per 4.4.11 of PRD03-GENC-010745 17.0 specification
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/253693.html
 
-First thing (not relevant to your question), I'd suggest you upgrade to
-a *recent* version of the spec.
+Changes in v4:
 
-> execution of DSB after write to ICC_{PMR,IAR, EOI, IGRPEN} etc will
-> ensure the observability of GIC register access. However here you are using
-> isb(). Is that ok?
+- States sorting using exit-latency
+- Added cosmetic review comments
+- Dropped RFC tag
+- Rebased against 3.15
 
-I think it depends whether or not you want all effects to be
-synchronously observable in the whole system. We already have barriers
-on exception returns that will ensure the observability of all these.
-Adding them on a per access basis is likely to degrade performance.
+Changes in v3:
 
->> +}
-> [...]
-> 
->> +static int gic_populate_rdist(void)
->> +{
->> +       u64 mpidr = cpu_logical_map(smp_processor_id());
->> +       u64 typer;
->> +       u32 aff;
->> +       int i;
->> +
->> +       /*
->> +        * Convert affinity to a 32bit value that can be matched to
->> +        * GICR_TYPER bits [63:32].
->> +        */
->> +       aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
->> +              MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
->> +              MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
->> +              MPIDR_AFFINITY_LEVEL(mpidr, 0));
->> +
->> +       for (i = 0; i < gic_data.redist_regions; i++) {
->> +               void __iomem *ptr = gic_data.redist_base[i];
->> +               u32 reg;
->> +
->> +               reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
->> +               if (reg != 0x30 && reg != 0x40) { /* We're in trouble... */
->> +                       pr_warn("No redistributor present @%p\n", ptr);
->> +                       break;
->> +               }
->> +
->> +               do {
->> +                       typer = readq_relaxed(ptr + GICR_TYPER);
->> +                       if ((typer >> 32) == aff) {
->> +                               gic_data_rdist_rd_base() = ptr;
->> +                               pr_info("CPU%d: found redistributor %llx @%p\n",
->> +                                       smp_processor_id(),
->> +                                       (unsigned long long)mpidr, ptr);
->> +                               return 0;
->> +                       }
->> +
->> +                       if (gic_data.redist_stride) {
->> +                               ptr += gic_data.redist_stride;
->> +                       } else {
->> +                               ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
->> +                               if (typer & GICR_TYPER_VLPIS)
->> +                                       ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
->> +                       }
->> +               } while (!(typer & GICR_TYPER_LAST));
->> +       }
->> +
-> [...]
-> 
->> +
-> [...]
->> +
->> +static int __init gic_of_init(struct device_node *node, struct device_node *parent)
->> +{
->> +       void __iomem *dist_base;
->> +       void __iomem **redist_base;
->> +       u64 redist_stride;
->> +       u32 redist_regions;
->> +       u32 reg;
->> +       int gic_irqs;
->> +       int err;
->> +       int i;
->> +
->> +       dist_base = of_iomap(node, 0);
->> +       if (!dist_base) {
->> +               pr_err("%s: unable to map gic dist registers\n",
->> +                       node->full_name);
->> +               return -ENXIO;
->> +       }
->> +
->> +       reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
->> +       if (reg != 0x30 && reg != 0x40) {
->> +               pr_err("%s: no distributor detected, giving up\n",
->> +                       node->full_name);
->> +               err = -ENODEV;
->> +               goto out_unmap_dist;
->> +       }
->> +
->> +       if (of_property_read_u32(node, "#redistributor-regions", &redist_regions))
->> +               redist_regions = 1;
->> +
->> +       redist_base = kzalloc(sizeof(*redist_base) * redist_regions, GFP_KERNEL);
->> +       if (!redist_base) {
->> +               err = -ENOMEM;
->> +               goto out_unmap_dist;
->> +       }
->> +
->> +       for (i = 0; i < redist_regions; i++) {
->> +               redist_base[i] = of_iomap(node, 1 + i);
->> +               if (!redist_base[i]) {
->> +                       pr_err("%s: couldn't map region %d\n",
->> +                              node->full_name, i);
->> +                       err = -ENODEV;
->> +                       goto out_unmap_rdist;
->> +               }
->> +       }
->> +
->> +       if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
->> +               redist_stride = 0;
-> 
-> why can't redist_stride be set to 2 * SZ_64K by default if redist_stride is not
-> available in dt? Because in populate_redist() if stride is set to 0,
-> the redistributor search
->  pointer is incremented by 2 * SZ_64K?
+- Streamlined the idle states bindings and added them to the series
+  http://www.spinics.net/lists/arm-kernel/msg316299.html
+- Sorting states through min-residency+exit-latency
+- Added debug strings formatting
+- Reworded min-residency-us idle state property
+- Removed power-domain properties from idle states waiting for code
+  examples requiring them to be defined
 
-Because redist_stride is supposed to give you the absolute stride,
-irrespective of the GIC implementing VLPIs or not.
+Changes in v2:
 
-If you read again the code in populate_redist(), you'll see that the
-default (with redist_stride == 0) is to adapt to what TYPER says about
-the features your GIC supports.
+- Moved OF parsing code to drivers/cpuidle
+- Improved states detection and sorting through linked list
+- Split code in generic and ARM64 specific bits
+- Moved idle enter function into ARM64 idle driver
+- Refactored PSCI idle states register function
+- Renamed suspend operations and moved detection to ARM64 idle driver
+- Changed the way CPUIDLE_FLAG_TIMER_STOP is handled
+- Simplified idle state nodes parsing since according to the latest
+  bindings idle state nodes are a flat list, not hierarchical anymore
+- Used min-residency-us to sort the states, to be further discussed
 
-Thanks,
+Idle states on most ARM platforms can be characterized by a set of
+parameters that are platform agnostic and describe the HW idle states
+features. So far, CPU idle drivers for ARM platforms required the definition
+of parameters through static tables, duplicating control data for different
+platforms. Moreover, the lack of standardization on firmware interfaces
+hampered any standardization effort, resulting in CPU idle drivers for ARM
+platforms containing duplicated code and platform specific power down routines.
 
-	M.
+The introduction of the PSCI firmware interface, and more in general, well
+defined suspend back-ends, allows the definition of generic idle states and
+the respective kernel infrastructure to support them.
+
+Building on top of DT idle states bindings, that standardize idle states
+parameters and corresponding suspend back-ends, this patchset provides code
+that parses DT idle states nodes and builds at run-time the control data
+infrastructure required by the ARM CPU idle drivers.
+
+Idle states define an entry method (eg PSCI), that requires the respective
+ARM64 kernel back-end to be invoked to initialize idle states parameters, so
+that when the idle driver executes the back-end specific entry method a table
+look-up can be carried out to retrieve the corresponding idle state parameter.
+
+On legacy ARM platforms, the OF idle states are just used to initialize
+states data.
+
+The idle states bindings can be extended with new back-ends; the ARM64 CPUidle
+driver must be updated accordingly so that the corresponding back
+end initializer can be invoked at boot time for parameters initialization.
+
+Patchset has been tested on AEM v8 models, on top of bootwrapper PSCI CPU
+SUSPEND implementation which provides simulated core power gating.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg316299.html
+
+Lorenzo Pieralisi (6):
+  Documentation: arm: define DT idle states bindings
+  Documentation: devicetree: psci: define CPU suspend parameter
+  drivers: cpuidle: implement OF based idle states infrastructure
+  arm64: add PSCI CPU_SUSPEND based cpu_suspend support
+  drivers: cpuidle: CPU idle ARM64 driver
+  arm64: boot: dts: update rtsm aemv8 dts with PSCI and idle states
+
+ Documentation/devicetree/bindings/arm/cpus.txt     |   8 +
+ .../devicetree/bindings/arm/idle-states.txt        | 507 +++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/psci.txt     |  12 +-
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts             |  44 +-
+ arch/arm64/include/asm/psci.h                      |   4 +
+ arch/arm64/kernel/psci.c                           | 103 +++++
+ drivers/cpuidle/Kconfig                            |  14 +
+ drivers/cpuidle/Kconfig.arm64                      |  13 +
+ drivers/cpuidle/Makefile                           |   5 +
+ drivers/cpuidle/cpuidle-arm64.c                    | 168 +++++++
+ drivers/cpuidle/of_idle_states.c                   | 282 ++++++++++++
+ drivers/cpuidle/of_idle_states.h                   |   8 +
+ 12 files changed, 1159 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/idle-states.txt
+ create mode 100644 drivers/cpuidle/Kconfig.arm64
+ create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+ create mode 100644 drivers/cpuidle/of_idle_states.c
+ create mode 100644 drivers/cpuidle/of_idle_states.h
+
 -- 
-Jazz is not dead. It just smells funny...
+1.8.4
