@@ -1,101 +1,124 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 11 Jun 2014 22:04:36 +0900
-Subject: [PATCH 1/2] ARM: exynos: cleanup kconfig option display
-In-Reply-To: <1402409170-1314-2-git-send-email-robherring2@gmail.com>
-References: <1402409170-1314-1-git-send-email-robherring2@gmail.com>
- <1402409170-1314-2-git-send-email-robherring2@gmail.com>
-Message-ID: <07fc01cf8575$b4fbc360$1ef34a20$@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 11 Jun 2014 14:15:00 +0100
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <CADWw7OghkwkMbU=eZG=OhxVowNJy_12UOo_pNYnXbimF73Uwdw@mail.gmail.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+ <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
+ <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+ <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
+ <20140611101353.GA18781@e102568-lin.cambridge.arm.com>
+ <CADWw7OghkwkMbU=eZG=OhxVowNJy_12UOo_pNYnXbimF73Uwdw@mail.gmail.com>
+Message-ID: <20140611131500.GA19884@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring wrote:
+On Wed, Jun 11, 2014 at 01:14:21PM +0100, Chander Kashyap wrote:
+> On Wed, Jun 11, 2014 at 3:43 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Wed, Jun 11, 2014 at 05:52:10AM +0100, Chander Kashyap wrote:
+> >> Hi Doug,
+> >>
+> >> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> > On Tue, 10 Jun 2014, Doug Anderson wrote:
+> >> >
+> >> >> My S-state knowledge is not strong, but I believe that Lorenzo's
+> >> >> questions matter if we're using S2 for CPUidle (where we actually turn
+> >> >> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
+> >> >> (where we just enter WFI/WFE).
+> >> >>
+> >>
+> >> No Its not plain WFI.
+> >>
+> >> All cores in Exynos5420 can be powered off independently.
+> >> This functionality has been tested.
+> >>
+> >> Below is the link for the posted patches.
+> >>
+> >> https://lkml.org/lkml/2014/6/10/194
+> >>
+> >> And as Nicolas wrote, these patches need MCPM for that.
+> >
+> > Chander, I cast a look into the code and I have a question
+> > (you also told me on CPUidle review that only core off
+> > is supported in CPUidle).
+> >
+> > When you say all cores can be powered off independently, do
+> > you also mean that clusters can be powered off (in CPUidle) ?
+> >
+> > I am pointing this out since in the MCPM backend I noticed:
+> >
+> > "/* TODO: Turn off the cluster here to save power. */"
+> >
+> > I do not see any cluster power down request in the down path.
+> >
+> > If I am wrong, ignore my message, I am just writing to help.
+> >
+> > If you can only power down cores, but not the clusters on idle,
+> > please keep in mind that you are currently cleaning and invalidating
+> > the L2 when last man is running and this must not be taken
+> > lightly since, if L2 stays on, that's a massive energy waste
+> > for nothing.
+> >
+> > So, if clusters stay up, you _have_ to tweak the MCPM backend slightly
+> > to avoid cleaning L2, that's pivotal.
 > 
-> From: Rob Herring <robh@kernel.org>
+> Hi Lorenzo,
+> Cluster shutdown is in progress. Abhilash will add support for that.
 > 
-> The addition of Exynos to multi-platform configs creates a mess of config
-> options with options appearing before the Exynos config option. This is
-> due to arch/arm/plat-samsung/Kconfig being included out of order with the
-> other Samsung platform kconfig files. Reorder the kconfig files and move
-> all the options into a sub-menu. Some of the options are dead, so remove
-> those as well.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg31104.html
 
-Looks nice to me :-)
+Hi Chander,
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+thanks. So, as a heads-up:
 
-Thanks,
-Kukjin
+1) if you merge CPUidle support now, as it is it is at least suboptimal, may
+   even burn more energy than it saves. Latencies in the bL idle driver
+   are likely to be wrong, since they are for cluster shutdown and for
+   TC2, not core power gating that should require shorter target_residencies.
+   On top of that, L2 is cleaned and invalidated for nothing.
+2) when cluster support is merged, you might want to extend the CPUidle
+   driver to add an additional state (ie C1 core gating, C2 cluster
+   gating) and to do that you should extend the driver and the MCPM
+   back-end accordingly, I discussed that with Nico already some time ago
+   and actually it should be fairly easy to do but we have got to talk
+   about that.
 
-> Cc: linux-samsung-soc at vger.kernel.org
-> ---
->  arch/arm/Kconfig              |  3 +--
->  arch/arm/plat-samsung/Kconfig | 17 +++--------------
->  2 files changed, 4 insertions(+), 16 deletions(-)
+Thank you,
+Lorenzo
+
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 87b63fd..cbf0c37 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1009,8 +1009,6 @@ source "arch/arm/mach-rockchip/Kconfig"
 > 
->  source "arch/arm/mach-sa1100/Kconfig"
+> >
+> > Lorenzo
+> >
+> >>
+> >> >> I believe that in ChromeOS we use S1 CPUidle and that it works fine.
+> >> >> We've never implemented S2 that I'm aware of.
+> >> >
+> >> > You'll have to rely on MCPM for that.  That's probably why it hasn't
+> >> > been implemented before.
+> >> >
+> >> >
+> >> > Nicolas
+> >> >
+> >> > _______________________________________________
+> >> > linux-arm-kernel mailing list
+> >> > linux-arm-kernel at lists.infradead.org
+> >> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> Please read the FAQ at  http://www.tux.org/lkml/
+> >>
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> -source "arch/arm/plat-samsung/Kconfig"
-> -
->  source "arch/arm/mach-socfpga/Kconfig"
-> 
->  source "arch/arm/mach-spear/Kconfig"
-> @@ -1028,6 +1026,7 @@ source "arch/arm/mach-s5pc100/Kconfig"
->  source "arch/arm/mach-s5pv210/Kconfig"
-> 
->  source "arch/arm/mach-exynos/Kconfig"
-> +source "arch/arm/plat-samsung/Kconfig"
-> 
->  source "arch/arm/mach-shmobile/Kconfig"
-> 
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index 243dfcb..ac032cd 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -35,27 +35,15 @@ config SAMSUNG_PM
->  	  Base platform power management code for samsung code
-> 
->  if PLAT_SAMSUNG
-> +menu "Samsung Common options"
-> 
->  # boot configurations
-> 
->  comment "Boot options"
-> 
-> -config S3C_BOOT_ERROR_RESET
-> -	bool "S3C Reboot on decompression error"
-> -	help
-> -	  Say y here to use the watchdog to reset the system if the
-> -	  kernel decompressor detects an error during decompression.
-> -
-> -config S3C_BOOT_UART_FORCE_FIFO
-> -       bool "Force UART FIFO on during boot process"
-> -       default y
-> -       help
-> -         Say Y here to force the UART FIFOs on during the kernel
-> -	 uncompressor
-> -
-> -
->  config S3C_LOWLEVEL_UART_PORT
->  	int "S3C UART to use for low-level messages"
-> +	depends on ARCH_S3C64XX
->  	default 0
->  	help
->  	  Choice of which UART port to use for the low-level messages,
-> @@ -503,4 +491,5 @@ config DEBUG_S3C_UART
->  	default "2" if DEBUG_S3C_UART2
->  	default "3" if DEBUG_S3C_UART3
-> 
-> +endmenu
->  endif
-> --
-> 1.9.1
