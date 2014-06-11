@@ -1,51 +1,50 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 11 Jun 2014 17:30:07 +0200
-Subject: [PATCH 0/5] Handle non-secure L2C initialization on Exynos4
-Message-ID: <1402500612-4778-1-git-send-email-t.figa@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 11 Jun 2014 09:31:57 -0600
+Subject: [RFC] irqchip: gic: always mask interrupts during suspend
+In-Reply-To: <20140610234826.GK3599@ld-irv-0074>
+References: <1402442098-21093-1-git-send-email-computersforpeace@gmail.com>
+ <alpine.DEB.2.10.1406110129270.5170@nanos>
+ <20140610234826.GK3599@ld-irv-0074>
+Message-ID: <5398766D.1070900@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series intends to add support for L2 cache on Exynos4 SoCs on boards
-running under secure firmware, which requires certain initialization steps
-to be done with help of firmware, as selected registers are writable only
-from secure mode.
+On 06/10/2014 05:48 PM, Brian Norris wrote:
+> On Wed, Jun 11, 2014 at 01:34:39AM +0200, Thomas Gleixner wrote:
+>> On Tue, 10 Jun 2014, Brian Norris wrote:
+>>> Other random thought: it seems like any irqchip driver which does lazy IRQ
+>>> masking ought to use IRQCHIP_MASK_ON_SUSPEND. So maybe the IRQ core should just
+>>> do something like:
+>>>
+>>> 	if (!chip->irq_disable)
+>>> 		chip->flags |= IRQCHIP_MASK_ON_SUSPEND;
+>>
+>> No. Lazy irq disable and the suspend logic are different beasts.
+> 
+> OK, fair enough. Drop that random thought then. It's not in the patch
+> content anyway.
+> 
+>> That's up to the platform to decide this. Just for the record: there
+>> is a world outside of ARM...
+> 
+> OK. But GIC is ARM-specific, so we can still constrain this patch and
+> related topics to the world of ARM.
+> 
+>> But that brings me to a different question:
+>>
+>>     Why are you not putting that customization into the device tree
+>>     instead of trying to add this to some random arch/arm/mach-foo
+>>     files?
+> 
+> I'm not adding customization to arch/arm/mach-foo files. I'm trying to
+> remove it.
+> 
+> This property could be added to device tree, if there was really a valid
+> use case for a GIC which leaves its interrupts unmasked for suspend. My
+> question in this patch is essentially: does such a use case exist?
 
-First three patches extend existing support for secure write in L2C driver
-to account for design of secure firmware running on Exynos. Namely:
- 1) direct read access to certain registers is needed on Exynos, because
-    secure firmware calls set several registers at once,
- 2) not all boards are running secure firmware, so .write_sec callback
-    needs to be installed in Exynos firmware ops initialization code,
- 3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
-    is not allowed and so must use l2c_write_sec as well.
-Those patches might affect other platforms using .write_sec callback, so
-I'd like to kindly ask any interested people for testing.
-
-Further two patches add impelmentation of .write_sec for Exynos secure
-firmware and necessary DT nodes to enable L2 cache.
-
-Tested on Exynos4210-based Universal C210 board (without secure firmware)
-and Exynos4412-based TRATS2 board (with secure firmware).
-
-Tomasz Figa (5):
-  ARM: mm: cache-l2x0: Add base address argument to write_sec callback
-  ARM: Get outer cache .write_sec callback from mach_desc only if not
-    NULL
-  ARM: mm: cache-l2x0: Use l2c_write_sec() for LATENCY_CTRL registers
-  ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
-  ARM: dts: exynos4: Add nodes for L2 cache controller
-
- arch/arm/boot/dts/exynos4210.dtsi  |  9 ++++++
- arch/arm/boot/dts/exynos4x12.dtsi  |  9 ++++++
- arch/arm/include/asm/mach/arch.h   |  3 +-
- arch/arm/include/asm/outercache.h  |  2 +-
- arch/arm/kernel/irq.c              |  3 +-
- arch/arm/mach-exynos/firmware.c    | 61 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-highbank/highbank.c  |  3 +-
- arch/arm/mach-omap2/omap4-common.c |  3 +-
- arch/arm/mach-ux500/cache-l2x0.c   |  3 +-
- arch/arm/mm/cache-l2x0.c           | 10 +++----
- 10 files changed, 95 insertions(+), 11 deletions(-)
-
--- 
-1.9.3
+DT should genernally only contain data that's expected to vary between
+boards, or just possibly between SoCs. Anything that the kernel knows
+simply because it knows what HW model it's driving has no place in DT,
+since it just adds redundant work to parse the DT and end up with the
+same data.
