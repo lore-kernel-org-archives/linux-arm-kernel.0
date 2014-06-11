@@ -1,35 +1,64 @@
-From: tony.luck@gmail.com (Tony Luck)
-Date: Wed, 11 Jun 2014 15:20:23 -0700
-Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
-In-Reply-To: <539898C3.8090903@gmail.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
- <1397859600-11507-4-git-send-email-robherring2@gmail.com>
- <CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>
- <CAL_JsqKux+BTHeYo6XEzzQMAFJZHVjbURM973oHT=t698GbJbA@mail.gmail.com>
- <20140503220731.GA10927@kroah.com>
- <20140503221658.GA13403@kroah.com>
- <CA+8MBb+7f1bOnJjJWj1vxa0UNuQwz7OGRDR_QFTxOT=9cynabQ@mail.gmail.com>
- <CA+8MBbKE1E2uq9LefiDAV9hv2Z8OTkjx9mkXjE6_--F_emRC8A@mail.gmail.com>
- <CAL_JsqKvoO9acX==-LdD6boO=B3xr=ijra_G0uqRZGzACZZUJg@mail.gmail.com>
- <CA+8MBbLooWm9xys+gYa5uL1eVTH-qzaR+RaZgsrqV-8XkqGadQ@mail.gmail.com>
- <539898C3.8090903@gmail.com>
-Message-ID: <CA+8MBbKq8B8iECOYuanbM7wyJVFbW8TYkAw9JjiQ8s+H4V34CQ@mail.gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 11 Jun 2014 15:22:40 -0700
+Subject: [RFC 5/5] x86,seccomp: Add a seccomp fastpath
+In-Reply-To: <5398D59A.3030900@zytor.com>
+References: <cover.1402517933.git.luto@amacapital.net>
+ <9e11cd988a0f120606e37b5e275019754e2774da.1402517933.git.luto@amacapital.net>
+ <CAADnVQKt5FnShkZeQewbfnU1kHM-gLs3hCZMf5xcgFzyRDLX7A@mail.gmail.com>
+ <CALCETrXoqqKC=T5Wvj+CDYQFte1s_=npDvQ2UYW0j=AanEgR1g@mail.gmail.com>
+ <5398D59A.3030900@zytor.com>
+Message-ID: <CALCETrVMxkHcPXsEGtEc0Pr=Z80CzC0zWaQ9OdVdxi1CGuB4kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 10:58 AM, Rob Herring <robherring2@gmail.com> wrote:
-> I think I figured it out. The function
-> serial8250_find_port_for_earlycon is failing to match 'uart' console to
-> 'ttyS' console and transfer the options. It was also failing to create
-> an option string when the baud rate is probed. Can you try out the
-> below patch?
+On Wed, Jun 11, 2014 at 3:18 PM, H. Peter Anvin <hpa@zytor.com> wrote:
+> On 06/11/2014 02:56 PM, Andy Lutomirski wrote:
+>>
+>> 13ns is with the simplest nonempty filter.  I hope that empty filters
+>> don't work.
+>>
+>
+> Why wouldn't they?
 
-Rob,
+Is it permissible to fall off the end of a BPF program?  I'm getting
+EINVAL trying to install an actual empty filter.  The filter I tested
+with was:
 
-That works.  Thanks for digging deeper into this.
+#include <unistd.h>
+#include <linux/filter.h>
+#include <linux/seccomp.h>
+#include <sys/syscall.h>
+#include <err.h>
+#include <sys/prctl.h>
+#include <stddef.h>
+#include <stdio.h>
 
-Here's a tag for when you push that patch:
+int main(int argc, char **argv)
+{
+    int rc;
 
-Reported-and-tested-by: Tony Luck <tony.luck@intel.com>
+    struct sock_filter filter[] = {
+        BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW),
+    };
 
--Tony
+    struct sock_fprog prog = {
+        .len = (unsigned short)(sizeof(filter)/sizeof(filter[0])),
+        .filter = filter,
+    };
+
+    if (argc < 2) {
+        printf("Usage: null_seccomp PATH ARGS...\n");
+        return 1;
+    }
+
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
+        err(1, "PR_SET_NO_NEW_PRIVS");
+    if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog))
+        err(1, "PR_SET_SECCOMP");
+
+    execv(argv[1], argv + 1);
+    err(1, argv[1]);
+}
+
+
+--Andy
