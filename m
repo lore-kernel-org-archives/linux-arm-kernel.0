@@ -1,35 +1,66 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 11 Jun 2014 15:40:16 +0900
-Subject: [patch] char: xilinx_hwicap: missing error code if ioremap() fails
-In-Reply-To: <20140611060433.GB7569@mwanda>
-References: <20140611060433.GB7569@mwanda>
-Message-ID: <000001cf8540$017e4f90$047aeeb0$%han@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 Jun 2014 08:54:12 +0200
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <53975A0A.8090802@redhat.com>
+References: <20140328184517.GA27219@cbox>
+ <CAFEAcA-isiLax0UASTMkedwGXWOaBdR7N1t2o87XYDkj5nt5ig@mail.gmail.com>
+ <53973AA8.9020301@codeaurora.org>
+ <CAFEAcA8RttCvbOAw-m-W6C-mh1o4hj6nqGMkDbRsSF6ZoQZ7Kg@mail.gmail.com>
+ <539754E5.3030408@redhat.com> <53975A0A.8090802@redhat.com>
+Message-ID: <20140611065412.GA24286@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 11, 2014 3:05 PM, Dan Carpenter wrote:
+On Tue, Jun 10, 2014 at 09:18:34PM +0200, Paolo Bonzini wrote:
+> Il 10/06/2014 20:56, Paolo Bonzini ha scritto:
+> >Il 10/06/2014 20:08, Peter Maydell ha scritto:
+> >>On 10 June 2014 18:04, Christopher Covington <cov@codeaurora.org> wrote:
+> >>>On 06/10/2014 10:42 AM, Peter Maydell wrote:
+> >>>>I just noticed that this doesn't mandate that the platform
+> >>>>provides an RTC. As I understand it, the UEFI spec mandates
+> >>>>that there's an RTC (could somebody more familiar with UEFI
+> >>>>than me confirm/deny that?) so we should probably put one here.
+> >>>
+> >>>Pardon my ignorance, but what exactly disqualifies Generic Timer
+> >>>implementations from being used as Real Time Clocks?
+> >>
+> >>So my naive view was that an RTC actually had to have
+> >>support for dealing with real (wall) clock time, ie
+> >>knowing it's 2014 and not 1970. The generic timers are
+> >>just timers. Or am I wrong and UEFI doesn't really
+> >>require that?
+> >
+> >The real-time clock provides four UEFI runtime services (GetTime,
+> >SetTime, GetWakeupTime, SetWakeupTime).  The spec says that you can
+> >return EFI_DEVICE_ERROR from GetTime/SetTime if "the time could not be
+> >retrieved/set due to a hardware error", but I don't think this is enough
+> >to make these two optional.  By comparison, GetWakeupTime/SetWakeupTime
+> >can also return EFI_UNSUPPORTED.
+> >
+> >So I agree that the RTC is required in UEFI.
 > 
-> Return -ENOMEM instead of success if ioremap() fails.
+> ... that said, just like I thought was the case for the serial
+> console, do we need to specify the exact hardware models?
 > 
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> We can just say that the VM can expect UEFI boot and runtime
+> services to work.  This includes variable services, time services,
+> the serial console protocols and more.  It's up to the
+> implementation to provide enough devices to support the firmware,
+> and it's out of this spec's scope to specify the firmware's
+> implementation.
+> 
+> I think even the serial devices should be removed.
+> 
+The problem is that the most common user problem with ARM VMs are that
+they boot the thing, and then get no output.  So we wanted some way to
+make sure we know that the kernel should be able to print to a console.
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+UEFI does provide DBG2 output, but that's only during boot time service
+(so I'm told), and we need to mandate something that will work  when
+the kernel boots.
 
-Best regards,
-Jingoo Han
+If kernels actually do use the UEFI runtime services and have no need
+for direct access to an RTC when runing in a UEFI compliant system, then
+I agree with not specifying the hardware details.
 
-> ---
-> Static checker stuff, I can't compile this.
-> 
-> diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-> index f6345f9..9b1a5ac 100644
-> --- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-> +++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-> @@ -661,6 +661,7 @@ static int hwicap_setup(struct device *dev, int id,
->  	drvdata->base_address = ioremap(drvdata->mem_start, drvdata->mem_size);
->  	if (!drvdata->base_address) {
->  		dev_err(dev, "ioremap() failed\n");
-> +		retval = -ENOMEM;
->  		goto failed2;
->  	}
-> 
+-Christoffer
