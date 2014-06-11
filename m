@@ -1,33 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 11 Jun 2014 10:31:07 +0200
-Subject: [PATCH] Marvell releases a public Armada 370 datasheet
-In-Reply-To: <20140611102628.7e06c8f0@free-electrons.com>
-References: <1402413878-20224-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140611102628.7e06c8f0@free-electrons.com>
-Message-ID: <20140611083107.GG24672@lunn.ch>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 11 Jun 2014 10:36:30 +0200
+Subject: [PATCH v5 0/7] ARM: berlin: add AHCI support
+In-Reply-To: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1401115908-2742-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140611083630.GA32216@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> One thing I forgot to mention and that Ezequiel Garcia reminded me is
-> that the Armada XP actually shares a lot of peripherals with the Armada
-> 370. So the Armada 370 datasheet can also be very useful for people
-> working on Armada XP, since the vast majority of the peripherals are
-> essentially the same.
+Hi all,
 
-Hi Thomas
+On Mon, May 26, 2014 at 04:51:41PM +0200, Antoine T?nart wrote:
+> This series adds the support for Berlin SoC AHCI controller. The
+> controller allows to use the SATA host interface and, for example, the
+> eSATA port on the BG2Q.
+> 
+> The series adds a PHY driver to control the two SATA ports available,
+> and adds a generic compatible to use the existing ahci_platform driver.
+> 
+> Also enable the eSATA interface on the BG2Q DMP.
 
-It is great to see that Marvell have released the document. Also the
-success with getting the new SoCs into mainline so fast has been
-really good. Lets hope device manufactures take the hint and use
-mainline, not some hacked up branch.
+Any news on this series?
 
-As to shared peripherals between 370 and XP, could you make a quick
-list of where they are different? The thermal sensor is one, if i
-remember correctly, but that already has a driver. The list does not
-need to be too detailed, it could be just "compatible/different" for
-each peripheral. It is just enough to stop somebody bashing there head
-against a brick wall because the registers are different and they
-don't know it.
 
-Thanks
-	Andrew
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
