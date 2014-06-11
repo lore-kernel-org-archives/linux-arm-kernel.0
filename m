@@ -1,36 +1,32 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 11 Jun 2014 11:44:21 +0200
-Subject: [PATCH] [linux-next] arm64: ftrace: Fix comment typo
- 'CONFIG_FUNCTION_GRAPH_FP_TEST'
-Message-ID: <1402479861.3798.63.camel@x220>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 11 Jun 2014 15:14:25 +0530
+Subject: [PATCH] phy: sun4i: depend on RESET_CONTROLLER
+In-Reply-To: <20140611091035.GD4254@lukather>
+References: <1400871088-16894-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140611091035.GD4254@lukather>
+Message-ID: <539824F9.6050302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
+Hi,
 
-This typo was added in next-20140603. I've had this patch queued for
-over a week because I wanted to understand the comment I'm touching
-here. I still don't. But I figured that making sure that this comment
-uses the Kconfig macro that apparently was intended, ought to be enough
-to submit this.
+On Wednesday 11 June 2014 02:40 PM, Maxime Ripard wrote:
+> Hi Kishon,
+> 
+> On Fri, May 23, 2014 at 08:51:28PM +0200, Maxime Ripard wrote:
+>> The driver depend on the reset framework in a mandatory way. Make sure
+>> reset_control_get is defined by adding this dependency in Kconfig
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Ping?
 
- arch/arm64/kernel/entry-ftrace.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Will queue once -rc1 is tagged.
 
-diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index b051871f2965..aa5f9fcbf9ee 100644
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -205,7 +205,7 @@ ENDPROC(ftrace_graph_caller)
-  *
-  * Run ftrace_return_to_handler() before going back to parent.
-  * @fp is checked against the value passed by ftrace_graph_caller()
-- * only when CONFIG_FUNCTION_GRAPH_FP_TEST is enabled.
-+ * only when CONFIG_HAVE_FUNCTION_GRAPH_FP_TEST is enabled.
-  */
- ENTRY(return_to_handler)
- 	str	x0, [sp, #-16]!
--- 
-1.9.3
+Cheers
+Kishon
+
+> 
+> Maxime
+> 
