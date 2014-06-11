@@ -1,81 +1,44 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 11 Jun 2014 17:58:18 +0200
-Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
- always enabled
-In-Reply-To: <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
-Message-ID: <CABxcv=nR+QqzBkzgn6EpZenFWsGLJ0_6HW=QX13H2XYgqcF24A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 11 Jun 2014 09:58:28 -0600
+Subject: [PATCH v7 3/5] misc: fuse: Add efuse driver for Tegra
+In-Reply-To: <20140611152551.GH5961@tbergstrom-lnx.Nvidia.com>
+References: <1401973754-19701-1-git-send-email-pdeschrijver@nvidia.com>
+ <1401973754-19701-4-git-send-email-pdeschrijver@nvidia.com>
+ <53984FE3.6010509@nvidia.com>
+ <20140611152551.GH5961@tbergstrom-lnx.Nvidia.com>
+Message-ID: <53987CA4.4040506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 7:32 AM, Tushar Behera <tushar.b@samsung.com> wrote:
-> When the output clock of AUDSS mux is disabled, we are getting kernel
-> oops while doing a clk_get() on other clocks provided by AUDSS. Though
-> user manual doesn't specify this dependency, we came across this issue
-> while disabling the parent of AUDSS mux clocks.
->
-> Keeping the parents of AUDSS mux always enabled fixes this issue.
->
-> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos-audss.c |   17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-> index 13eae14c..1542f30 100644
-> --- a/drivers/clk/samsung/clk-exynos-audss.c
-> +++ b/drivers/clk/samsung/clk-exynos-audss.c
-> @@ -30,6 +30,8 @@ static struct clk **clk_table;
->  static void __iomem *reg_base;
->  static struct clk_onecell_data clk_data;
->
-> +static struct clk *pll_ref, *pll_in;
-> +
->  #define ASS_CLK_SRC 0x0
->  #define ASS_CLK_DIV 0x4
->  #define ASS_CLK_GATE 0x8
-> @@ -83,7 +85,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
->         const char *mout_audss_p[] = {"fin_pll", "fout_epll"};
->         const char *mout_i2s_p[] = {"mout_audss", "cdclk0", "sclk_audio0"};
->         const char *sclk_pcm_p = "sclk_pcm0";
-> -       struct clk *pll_ref, *pll_in, *cdclk, *sclk_audio, *sclk_pcm_in;
-> +       struct clk *cdclk, *sclk_audio, *sclk_pcm_in;
->         const struct of_device_id *match;
->         enum exynos_audss_clk_type variant;
->
-> @@ -113,10 +115,14 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
->
->         pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
->         pll_in = devm_clk_get(&pdev->dev, "pll_in");
-> -       if (!IS_ERR(pll_ref))
-> +       if (!IS_ERR(pll_ref)) {
->                 mout_audss_p[0] = __clk_get_name(pll_ref);
-> -       if (!IS_ERR(pll_in))
-> +               clk_prepare_enable(pll_ref);
-> +       }
-> +       if (!IS_ERR(pll_in)) {
->                 mout_audss_p[1] = __clk_get_name(pll_in);
-> +               clk_prepare_enable(pll_in);
-> +       }
->         clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
->                                 mout_audss_p, ARRAY_SIZE(mout_audss_p),
->                                 CLK_SET_RATE_NO_REPARENT,
-> @@ -217,6 +223,11 @@ static int exynos_audss_clk_remove(struct platform_device *pdev)
->                         clk_unregister(clk_table[i]);
->         }
->
-> +       if (!IS_ERR(pll_in))
-> +               clk_disable_unprepare(pll_in);
-> +       if (!IS_ERR(pll_ref))
-> +               clk_disable_unprepare(pll_ref);
-> +
->         return 0;
->  }
->
-> --
-> 1.7.9.5
->
+On 06/11/2014 09:25 AM, Peter De Schrijver wrote:
+> On Wed, Jun 11, 2014 at 02:47:31PM +0200, Mikko Perttunen wrote:
+>> On 05/06/14 16:09, Peter De Schrijver wrote:
+>> ...
+>>> +int tegra_fuse_readl(u32 offset, u32 *val)
+>>> +{
+>>> +       if (!fuse_readl)
+>>> +               return -ENXIO;
+>>> +
+>>> +       *val = fuse_readl(offset);
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>
+>> -EPROBE_DEFER would be a better error value, so that drivers can work 
+> 
+> Ok.
+> 
+>> even if they are initially probed before the fuse driver. Of course, if 
+>> the fuse initialization is moved into machine init then this is a non-issue.
+> 
+> The exported function will always be initialized later because on Tegra20 it
+> requires APB DMA to be available. If you read the fuses directly, the system
+> sometimes hangs.
 
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+That's not true in the current code. IIRC, the bug was that *if* an APB
+DMA access to anything and a CPU access to the fuses happen at the same
+time, then there can be a hang. As such, the current fuse code accesses
+the fuses directly (without potential for a hang) if the APB DMA driver
+is not available, but once the driver becomes available, it reads the
+fuses through DMA instead. Does the new code not do that?
