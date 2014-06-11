@@ -1,58 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Jun 2014 10:47:57 +0200
-Subject: [PATCH v6 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
- controller support
-In-Reply-To: <1402475980-15513-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1402475980-15513-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402475980-15513-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <4433415.Jcexj2E6Ru@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 Jun 2014 10:45:19 +0200
+Subject: [GIT PULL] Allwinner sunXi clock changes for 3.16, rebased
+Message-ID: <20140611084519.GA22486@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 June 2014 10:39:40 Boris BREZILLON wrote:
-> The P2WI controller looks like an SMBus controller which only supports byte
-> data transfers. But, it differs from standard SMBus protocol on several
-> aspects:
-> - it supports only one slave device, and thus drop the address field
-> - it adds a parity bit every 8bits of data
-> - only one read access is required to read a byte (instead of a write
->   followed by a read access in standard SMBus protocol)
-> - there's no Ack bit after each byte transfer
-> 
-> This means this bus cannot be used to interface with standard SMBus
-> devices (the only known device to support this interface is the AXP221
-> PMIC).
-> However the P2WI protocol is close enough to SMBus to be integrated in
-> the I2C subsystem (see this thread [1] for detailed reasons that led to
-> integrating this driver in the I2C subsystem).
-> 
-> [1] http://www.spinics.net/lists/linux-i2c/msg15066.html
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi Mike,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Like you asked on IRC, here is the clocks additions for the Allwinner
+SoCs, rebased on your current clk-next.
 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index c94db1c..a6023fe 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -771,6 +771,18 @@ config I2C_STU300
->           This driver can also be built as a module. If so, the module
->           will be called i2c-stu300.
->  
-> +config I2C_SUN6I_P2WI
-> +       tristate "Allwinner sun6i internal P2WI controller"
-> +       depends on MACH_SUN6I && RESET_CONTROLLER
+Thanks,
+Maxime
 
-One very minor comment: I wonder if we should make this 
+The following changes since commit 3f6eec9969d24f91a3909d51e86e007ca5efd4c4:
 
-	depends on RESET_CONTROLLER
-	depends on MACH_SUN6I || COMPILE_TEST
+  Merge branch 'for-v3.16/ti-clk-drv' of github.com:t-kristo/linux-pm into clk-next (2014-06-10 16:53:25 -0700)
 
-instead so we have better build coverage. I haven't tested if building
-on other architectures works, or if there are additional dependencies.
+are available in the git repository at:
 
-No need to change this if there are no other comments.
 
-	Arnd
+  https://github.com/mripard/linux.git tags/sunxi-clk-for-3.16-2
+
+for you to fetch changes up to 5c89a8b65760a60eea38e0b172d04152ec03a067:
+
+  clk: sunxi: document PRCM clock compatible strings (2014-06-11 10:25:03 +0200)
+
+----------------------------------------------------------------
+Rebase of Emilio's clk-sunxi-for-3.16 on top of clk-next
+
+Fixed a few compilation warnings exposed by a patch introduced during the 3.16
+merge window.
+
+Original tag message:
+
+Allwinner sunXi SoCs clock changes
+
+This pull contains some new code to add support for A31 clocks by Maxime
+and Boris. It also reworks the driver a bit to avoid having a huge
+single file when we have a full folder for ourselves, and separating
+different functional units makes sense.
+
+----------------------------------------------------------------
+Boris BREZILLON (2):
+      clk: sunxi: add PRCM (Power/Reset/Clock Management) clks support
+      clk: sunxi: document PRCM clock compatible strings
+
+Emilio L?pez (1):
+      clk: sunxi: document new A31 USB clock compatible
+
+Maxime Ripard (7):
+      clk: sunxi: Implement A31 USB clock
+      clk: sunxi: Remove calls to clk_put
+      clk: sunxi: Move the 24M oscillator to a file of its own
+      clk: sunxi: Move the GMAC clock to a file of its own
+      clk: sunxi: Rework clock protection code
+      clk: sun6i: Protect CPU clock
+      clk: sun6i: Protect SDRAM gating bit
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
+ drivers/clk/sunxi/Makefile                        |   4 +
+ drivers/clk/sunxi/clk-a10-hosc.c                  |  73 +++++++
+ drivers/clk/sunxi/clk-a20-gmac.c                  | 119 +++++++++++
+ drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  99 +++++++++
+ drivers/clk/sunxi/clk-sun6i-apb0.c                |  77 +++++++
+ drivers/clk/sunxi/clk-sun6i-ar100.c               | 233 +++++++++++++++++++++
+ drivers/clk/sunxi/clk-sunxi.c                     | 239 +++++-----------------
+ 8 files changed, 661 insertions(+), 187 deletions(-)
+ create mode 100644 drivers/clk/sunxi/clk-a10-hosc.c
+ create mode 100644 drivers/clk/sunxi/clk-a20-gmac.c
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-apb0.c
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-ar100.c
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140611/827e7e4f/attachment.sig>
