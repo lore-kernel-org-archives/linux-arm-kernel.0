@@ -1,60 +1,55 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 12 Jun 2014 11:27:16 +0200
-Subject: [GIT PULL] MMC fixes for v.3.16
-Message-ID: <CAPDyKFqjSgZs3o5qPjsFzrEHPt5_b7hwdLkqq3CdEM-OjST0JQ@mail.gmail.com>
+From: ml.lawnick@gmx.de (Michael Lawnick)
+Date: Thu, 12 Jun 2014 11:28:45 +0200
+Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
+ ACPI'ed devices
+In-Reply-To: <CACRpkda3bL=y3Dmkf59LT97Liep=XEzgE3P-YngLeD_w1qcAzQ@mail.gmail.com>
+References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>	<1401452797-29521-2-git-send-email-lee.jones@linaro.org>	<20140530123656.GC2742@katana>	<20140530133405.GB29731@lee--X1>	<20140530174800.GA4917@katana>	<20140530192516.GA4319@lee--X1>	<20140531134805.GA3287@katana>	<CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>	<538C8A59.2070907@gmx.de>	<CACRpkdbo9_xo6j7JBcjiuk6eYkqyaeMYLFsH3VczxotOmVRh1Q@mail.gmail.com>	<538EB81B.3090807@gmx.de>
+ <CACRpkda3bL=y3Dmkf59LT97Liep=XEzgE3P-YngLeD_w1qcAzQ@mail.gmail.com>
+Message-ID: <539972CD.1010004@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Am 12.06.2014 09:55, schrieb Linus Walleij:
+> On Wed, Jun 4, 2014 at 8:09 AM, Michael Lawnick <ml.lawnick@gmx.de> wrote:
+>> Am 03.06.2014 13:18, schrieb Linus Walleij:
+>>> On Mon, Jun 2, 2014 at 4:29 PM, Michael Lawnick <ml.lawnick@gmx.de> wrote:
+>>>>
+>>>> Am 02.06.2014 14:16, schrieb Linus Walleij:
+>>>
+>>>
+>>>>> Is this really so useful on embedded systems?
+>>>>>
+>>>>> I was under the impression that this method was something used
+>>>>> on say PC desktops with temperature monitors and EEPROMs
+>>>>> on some I2C link on the PCB, usage entirely optional and fun
+>>>>> for userspace hacks.
+>>>>>
+>>>> We use it for dynamic instantiating whole subsystems with multiplexers,
+>>>> sensors, controllers in an embedded system. The device list is taken from
+>>>> an
+>>>> I2C eeprom which gets read on hotplug.
+>>>
+>>>
+>>> Does this mean that you have stored the names (strings) that are used
+>>> by the Linux kernel for identifying the devices into your EEPROM?
+>>>
+>>> That means that you have made the kernel-internal device driver names
+>>> an ABI which is unfortunate :-/
+>>>
+>>> This is one of the reasons to why we insist on device tree: OS neutral
+>>> hardware description.
+>>
+>> The eeprom contains a device tree that is dynamically merged.
+>
+> That is a kind of way of saying "yes we made the kernel-internal
+> driver named an ABI" I guess?
 
-Here are some mmc fixes for 3.16.
+Sorry, I fear I don't get you. Could you please rephrase?
+Of course it might be that I'm missing some fundamental idea of device 
+tree. The mechanism we use started with K2.6 where device tree usage on 
+MIPS wasn't that intensive. Anyway the original idea of removing 
+i2c_table now moved towards non-mandatory usage.
 
-- Fix some various compiler warnings.
-- Make atmel-mci compile again.
-- Fix regression for sdhci-msm.
-
-Information also collected in the signed tag.
-
-Kind regards
-Ulf Hansson
-
-
-The following changes since commit 5c02c392cd2320e8d612376d6b72b6548a680923:
-
-  Merge tag 'virtio-next-for-linus' of
-git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux (2014-06-11
-21:10:33 -0700)
-
-are available in the git repository at:
-
-
-  git://git.linaro.org/people/ulf.hansson/mmc.git tags/mmc-v3.16-2
-
-for you to fetch changes up to 5d01b7684b7ebade6d9ea9c94a31357aec731ecd:
-
-  mmc: simplify SDHCI Kconfig dependencies (2014-06-12 10:51:14 +0200)
-
-----------------------------------------------------------------
-- Fix some various compiler warnings.
-- Make atmel-mci compile again.
-- Fix regression for sdhci-msm.
-
-----------------------------------------------------------------
-Arnd Bergmann (4):
-      mmc: atmel-mci: incude asm/cacheclush.h
-      mmc: mvsdio: avoid compiler warning
-      mmc: omap: don't select TPS65010
-      mmc: simplify SDHCI Kconfig dependencies
-
-Guennadi Liakhovetski (1):
-      mmc: usdhi6rol0: fix compiler warnings
-
-Stephen Boyd (1):
-      mmc: sdhci-msm: Fix fallout from sdhci refactoring
-
- drivers/mmc/host/Kconfig      |   10 ++++------
- drivers/mmc/host/atmel-mci.c  |    1 +
- drivers/mmc/host/mvsdio.c     |    2 +-
- drivers/mmc/host/sdhci-msm.c  |    4 ++++
- drivers/mmc/host/usdhi6rol0.c |   10 +++++-----
- 5 files changed, 15 insertions(+), 12 deletions(-)
+-- 
+KR
+Michael
