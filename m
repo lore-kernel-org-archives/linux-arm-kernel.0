@@ -1,41 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 17:20:14 +0100
-Subject: [PATCH 0/5] Handle non-secure L2C initialization on Exynos4
-In-Reply-To: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
-References: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
-Message-ID: <20140612162014.GA3705@n2100.arm.linux.org.uk>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Thu, 12 Jun 2014 09:29:59 -0700
+Subject: [PATCH v4 00/14] ARM/ARM64: KVM: big endian host support
+Message-ID: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 02:38:49PM +0100, Daniel Drake wrote:
-> From 2e67231f10ed0b05c2bacfdd05774fe21315d6da Mon Sep 17 00:00:00 2001
-> From: Gu1 <gu1@aeroxteam.fr>
-> Date: Mon, 21 Jan 2013 04:13:56 +0100
-> Subject: [PATCH] ARM: EXYNOS: Add secure firmware support for l2x0 init
-> 
-> Conflicts:
-> 	arch/arm/mm/cache-l2x0.c
+Hi Christoffer, Marc,
 
-For this patch... it's a big NAK because it's taking us right back down
-the route of a totally fucked up cache-l2x0.c driver.
+Could you please look at updated ARM BE KVM series. We worked
+separately on specific patches, I believe now they should look
+OK.
 
-Why can't you people write stuff properly?  There's already another set
-of patches on this mailing list which want to pass the virtual base
-address of the l2x0 controller to l2c_write_sec() so that various
-registers can be read back, because the platform's secure API can
-only update several registers at the same time.
+Changes since previous V3 version of series [1]:
 
-This is the same pattern that is revealed in this patch.  So, what
-this means is that the l2c_write_sec API is wrong.  We need to come
-up with a *replacement* API which allows the platforms to do this
-kind of setup in a *clean* way, and stop creating rotten hacks like
-this which just makes long term maintanence a nightmare.
+o Updated Review-by Acked-by tags where appropriate
 
-So... please start doing stuff properly.  If you don't, you're going
-to be getting more flames from me, especially if you start doing this
-kind of hackery on code that I've been cleaning up to get rid of such
-crap.
+o 'ARM: KVM: __kvm_vcpu_run function return result fix in BE case'
+patch changed __ARMEB__ to CONFIG_CPU_ENDIAN_BE8 as Marc suggested
+
+o 'ARM: KVM: one_reg coproc set and get BE fixes' patch was 
+siginificantly reworked based on separate thread discussion with
+Christoffer - In short summry now we fix only oddball places where
+reg_[from|to]_user function is used in case target variable 
+mismatching register size
+
+o 'ARM64: KVM: fix vgic_bitmap_get_reg function for BE 64bit case'
+incorporated Christoffer's review comments about code comments
+(spelling, grammar, etc)
+
+o 'ARM64: KVM: set and get of sys registers in BE case' changed
+patch siginificantly based on separate email thread feedback from
+Christoffer and Marc - now patch just removes comment about
+reg_[to|form]_user being little endian, since it handles only
+64 bit register size current code is endian agnostic.
+
+o 'ARM64: KVM: fix big endian issue in access_vm_reg for 32bit guest'
+incorporoated Christoffer's review comments - two macros 
+vcpu_cp15_64_high and vcpu_cp15_64_low now introduced which
+defined differently between BE and LE cases
+
+Series were tested on top of v3.15. On V7 4 combinations, BE/LE 
+host x BE/LE guest, were tested with TC2. On V8 8 combinations,
+BE/LE host x BE/LE guest x 32/64 bit guest, were tested on
+Fast models.
+
+Thanks,
+Victor
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255849.html
+
+Victor Kamensky (14):
+  ARM: KVM: switch hypervisor into BE mode in case of BE host
+  ARM: KVM: fix vgic V7 assembler code to work in BE image
+  ARM: KVM: handle 64bit values passed to mrcc or from mcrr instructions
+    in BE case
+  ARM: KVM: __kvm_vcpu_run function return result fix in BE case
+  ARM: KVM: vgic mmio should hold data as LE bytes array in BE case
+  ARM: KVM: MMIO support BE host running LE code
+  ARM: KVM: one_reg coproc set and get BE fixes
+  ARM: KVM: enable KVM in Kconfig on big-endian systems
+  ARM64: KVM: MMIO support BE host running LE code
+  ARM64: KVM: store kvm_vcpu_fault_info est_el2 as word
+  ARM64: KVM: fix vgic_bitmap_get_reg function for BE 64bit case
+  ARM64: KVM: vgic_elrsr and vgic_eisr need to be byteswapped in BE case
+  ARM64: KVM: set and get of sys registers in BE case
+  ARM64: KVM: fix big endian issue in access_vm_reg for 32bit guest
+
+ arch/arm/include/asm/kvm_asm.h       | 18 ++++++++
+ arch/arm/include/asm/kvm_emulate.h   | 22 ++++++++--
+ arch/arm/kvm/Kconfig                 |  2 +-
+ arch/arm/kvm/coproc.c                | 84 ++++++++++++++++++++++++++++++++----
+ arch/arm/kvm/init.S                  |  7 ++-
+ arch/arm/kvm/interrupts.S            |  9 +++-
+ arch/arm/kvm/interrupts_head.S       | 20 +++++++--
+ arch/arm64/include/asm/kvm_emulate.h | 22 ++++++++++
+ arch/arm64/include/asm/kvm_host.h    |  8 ++++
+ arch/arm64/kvm/hyp.S                 |  9 +++-
+ arch/arm64/kvm/sys_regs.c            | 10 ++---
+ virt/kvm/arm/vgic.c                  | 28 ++++++++++--
+ 12 files changed, 207 insertions(+), 32 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.1.4
