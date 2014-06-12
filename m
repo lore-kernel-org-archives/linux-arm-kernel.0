@@ -1,51 +1,239 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 12 Jun 2014 09:05:59 -0700
-Subject: [PATCH V2 08/19] irqchip: crossbar: fix checkpatch warning
-In-Reply-To: <20140612153226.GE8664@titan.lakedaemon.net>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-9-git-send-email-r.sricharan@ti.com>
- <20140612131042.GU8664@titan.lakedaemon.net> <5399AC9C.4080602@ti.com>
- <1402582711.9947.17.camel@joe-AO725>
- <20140612153226.GE8664@titan.lakedaemon.net>
-Message-ID: <1402589159.12385.4.camel@joe-AO725>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Thu, 12 Jun 2014 21:36:50 +0530
+Subject: [PATCH 1/3 v4] spi: s3c64xx: fix broken "cs_gpios" usage in the
+ driver
+In-Reply-To: <5399B273.5050500@collabora.co.uk>
+References: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
+ <5399B273.5050500@collabora.co.uk>
+Message-ID: <CAHfPSqAPKOYWJKw2+16gMcYuiq0syQ-p19_6rRvjbN9kUO-5Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-06-12 at 11:32 -0400, Jason Cooper wrote:
+Hello Javier,
 
-Hi Jason.
+On 12 June 2014 19:30, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Naveen,
+>
+> On 06/12/2014 03:13 PM, Naveen Krishna Chatradhi wrote:
+>> Since, (3146bee spi: s3c64xx: Added provision for dedicated cs pin)
+>>
+>> spi-s3c64xx.c driver expects
+>> 1. chip select gpios from "cs-gpio"(singular) under the
+>>    "controller-data" node of the client/slave device of the SPI.
+>>
+>> 2. "cs-gpio"(singular) entry to be present in the SPI device node.
+>>
+>> Eg of current broken usage:
+>> &spi_1 {
+>>       cs-gpio <>;     /* this entry is checked during probe */
+>>       ...
+>>       slave_node {
+>>               controller-data {
+>>                       cs-gpio <&gpioa2 5 0>;
+>>                       /* This field is parsed during .setup() */
+>>               }
+>>       };
+>> };
+>>
+>> The following dts files which were using this driver. But,
+>> din't have the "cs-gpio" entry under SPI node.
+>> -- arch/arm/boot/dts/exynos4210-smdkv310.dts
+>> -- arch/arm/boot/dts/exynos4412-trats2.dts
+>> -- arch/arm/boot/dts/exynos5250-smdk5250.dts
+>>
+>> Also, the SPI core and many drivers moved on to using "cs-gpios"
+>> from SPI node and removed the gpio handling code from drivers
+>> (including spi-s3c64xx.c).
+>>
+>> Hence, spi-s3c64xx.c is broken since "Jun 21 11:26:12 2013" and
+>> considering the time with no compliants about the breakage.
+>>
+>> We are assuming it is safe to remove the "cs-gpio"(singular) usage
+>> from device tree binding of spi-samsung.txt and makes appropriate
+>> changes in the driver to use "cs-gpios"(plural) from
+>> SPI device node.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> Cc: Tomasz Figa <t.figa@samsung.com>
+>> ---
+>
+> Usually when you send a new version of a series is good to keep a history of the
+> patch-set so reviewers don't have to look at the previous threads in order to
+> see what changed from version to version.
 
-> > But bugfix backports haven't been much of an issue in
-> > other subsystems with fairly active whitespace/style
-> > changes.
-> 
-> Most of the mvebu fixes we've had that failed to apply were generally
-> due to a large whitespace change (dts node shuffling, admittedly not
-> checkpatch-related).
+Yes, I usually keep track of all the changes in my previous CLs.
+But, I missed it in this version my bad.
 
-So not due to this.
+>
+> Anything that is between "---" and the actual diff is not part of a commit and
+> tools like git am omits that part so that's were you usually describe the history.
 
->   I've also frequently been stymied by code cleanups
-> when using git blame to find the commit introducing a regression.
+I've used it in my earlier patches.
+Anyway, Thanks for the detailed information.
 
-git blame -w can frequently help there.
+>
+>>  .../devicetree/bindings/spi/spi-samsung.txt        |    8 ++--
+>>  drivers/spi/spi-s3c64xx.c                          |   41 ++++++++------------
+>>  2 files changed, 20 insertions(+), 29 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>> index 86aa061..2d29dac 100644
+>> --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>> +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+>> @@ -42,15 +42,13 @@ Optional Board Specific Properties:
+>>  - num-cs: Specifies the number of chip select lines supported. If
+>>    not specified, the default number of chip select lines is set to 1.
+>>
+>> +- cs-gpios: should specify GPIOs used for chipselects (see spi-bus.txt)
+>> +
+>>  SPI Controller specific data in SPI slave nodes:
+>>
+>>  - The spi slave nodes should provide the following information which is required
+>>    by the spi controller.
+>>
+>> -  - cs-gpio: A gpio specifier that specifies the gpio line used as
+>> -    the slave select line by the spi controller. The format of the gpio
+>> -    specifier depends on the gpio controller.
+>> -
+>>    - samsung,spi-feedback-delay: The sampling phase shift to be applied on the
+>>      miso line (to account for any lag in the miso line). The following are the
+>>      valid values.
+>> @@ -85,6 +83,7 @@ Example:
+>>               #size-cells = <0>;
+>>               pinctrl-names = "default";
+>>               pinctrl-0 = <&spi0_bus>;
+>> +             cs-gpios = <&gpa2 5 0>;
+>>
+>>               w25q80bw at 0 {
+>>                       #address-cells = <1>;
+>> @@ -94,7 +93,6 @@ Example:
+>>                       spi-max-frequency = <10000>;
+>>
+>>                       controller-data {
+>> -                             cs-gpio = <&gpa2 5 1 0 3>;
+>>                               samsung,spi-feedback-delay = <0>;
+>>                       };
+>>
+>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+>> index 75a5696..b888c66 100644
+>> --- a/drivers/spi/spi-s3c64xx.c
+>> +++ b/drivers/spi/spi-s3c64xx.c
+>> @@ -197,7 +197,6 @@ struct s3c64xx_spi_driver_data {
+>>       struct s3c64xx_spi_dma_data     tx_dma;
+>>       struct s3c64xx_spi_port_config  *port_conf;
+>>       unsigned int                    port_id;
+>> -     bool                            cs_gpio;
+>>  };
+>>
+>>  static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
+>> @@ -776,17 +775,6 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+>>               return ERR_PTR(-ENOMEM);
+>>       }
+>>
+>> -     /* The CS line is asserted/deasserted by the gpio pin */
+>> -     if (sdd->cs_gpio)
+>> -             cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
+>> -
+>> -     if (!gpio_is_valid(cs->line)) {
+>> -             dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
+>> -             kfree(cs);
+>> -             of_node_put(data_np);
+>> -             return ERR_PTR(-EINVAL);
+>> -     }
+>> -
+>>       of_property_read_u32(data_np, "samsung,spi-feedback-delay", &fb_delay);
+>>       cs->fb_delay = fb_delay;
+>>       of_node_put(data_np);
+>> @@ -812,6 +800,10 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>>               spi->controller_data = cs;
+>>       }
+>>
+>> +     /* For the non-DT platforms derive chip selects from controller data */
+>> +     if (!spi->dev.of_node)
+>> +             spi->cs_gpio = cs->line;
+>> +
+>>       if (IS_ERR_OR_NULL(cs)) {
+>>               dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
+>>               return -ENODEV;
+>> @@ -819,17 +811,19 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+>>
+>>       if (!spi_get_ctldata(spi)) {
+>>               /* Request gpio only if cs line is asserted by gpio pins */
+>> -             if (sdd->cs_gpio) {
+>> -                     err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
+>> -                                     dev_name(&spi->dev));
+>> +             if (gpio_is_valid(spi->cs_gpio)) {
+>> +                     err = gpio_request_one(spi->cs_gpio,
+>> +                                             GPIOF_OUT_INIT_HIGH,
+>> +                                             dev_name(&spi->dev));
+>>                       if (err) {
+>>                               dev_err(&spi->dev,
+>>                                       "Failed to get /CS gpio [%d]: %d\n",
+>> -                                     cs->line, err);
+>> +                                     spi->cs_gpio, err);
+>>                               goto err_gpio_req;
+>>                       }
+>> -
+>> -                     spi->cs_gpio = cs->line;
+>> +             } else {
+>> +                     dev_err(&spi->dev, "chip select gpio is invalid\n");
+>> +                     return -EINVAL;
+>>               }
+>>
+>>               spi_set_ctldata(spi, cs);
+>> @@ -884,7 +878,8 @@ setup_exit:
+>>       /* setup() returns with device de-selected */
+>>       writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+>>
+>> -     gpio_free(cs->line);
+>> +     if (gpio_is_valid(spi->cs_gpio))
+>> +             gpio_free(spi->cs_gpio);
+>>       spi_set_ctldata(spi, NULL);
+>>
+>>  err_gpio_req:
+>> @@ -900,10 +895,12 @@ static void s3c64xx_spi_cleanup(struct spi_device *spi)
+>>       struct s3c64xx_spi_driver_data *sdd;
+>>
+>>       sdd = spi_master_get_devdata(spi->master);
+>> -     if (spi->cs_gpio) {
+>> +     if (gpio_is_valid(spi->cs_gpio)) {
+>>               gpio_free(spi->cs_gpio);
+>>               if (spi->dev.of_node)
+>>                       kfree(cs);
+>> +             else
+>> +                     spi->cs_gpio = -ENOENT;
+>>       }
+>>       spi_set_ctldata(spi, NULL);
+>>  }
+>> @@ -1075,11 +1072,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+>>       sdd->cntrlr_info = sci;
+>>       sdd->pdev = pdev;
+>>       sdd->sfr_start = mem_res->start;
+>> -     sdd->cs_gpio = true;
+>>       if (pdev->dev.of_node) {
+>> -             if (!of_find_property(pdev->dev.of_node, "cs-gpio", NULL))
+>> -                     sdd->cs_gpio = false;
+>> -
+>>               ret = of_alias_get_id(pdev->dev.of_node, "spi");
+>>               if (ret < 0) {
+>>                       dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
+>>
+>
+> Your changes look good to me now.
+>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-> So, my general rule is: If you're submitting a patch to make checkpatch
-> be quiet, re-assess the need.  If you're making changes and you can fix
-> some checkpatch items while you're there, then do so.
+Thanks for your review.
+>
+> Best regards,
+> Javier
 
-Decent rule.
 
-> There are certainly legitimate checkpatch-only patches, I just don't
-> think this is one qualifies.
 
-Of course it's the maintainer's choice (and last I saw,
-that's you) to ignore whatever doesn't fit the appropriate
-vision for the code.
-
-$ ./scripts/get_maintainer.pl -f drivers/irqchip/irq-crossbar.c
-Thomas Gleixner <tglx@linutronix.de> (maintainer:IRQCHIP DRIVERS)
-Jason Cooper <jason@lakedaemon.net> (maintainer:IRQCHIP DRIVERS)
-...
-
-cheers, Joe
+-- 
+Shine bright,
+(: Nav :)
