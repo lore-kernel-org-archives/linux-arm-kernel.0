@@ -1,56 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 15:23:54 +0100
-Subject: [PATCH] drm: imx: use GENERIC_IRQ_CHIP
-In-Reply-To: <7367559.qEUUbIia3C@wuerfel>
-References: <7367559.qEUUbIia3C@wuerfel>
-Message-ID: <20140612142354.GI23430@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 12 Jun 2014 07:25:15 -0700
+Subject: [PATCH] [media] staging: allow omap4iss to be modular
+In-Reply-To: <7460455.eZRbtzsNrd@wuerfel>
+References: <5192928.MkINji4uKU@wuerfel> <7948240.P51u2omQa4@wuerfel>
+ <2046469.GckHavNRr1@avalon> <7460455.eZRbtzsNrd@wuerfel>
+Message-ID: <20140612142515.GA7653@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 04:05:32PM +0200, Arnd Bergmann wrote:
-> This driver defines its own irqchip using the generic chip
-> infrastructure, and hence needs the GENERIC_IRQ_CHIP Kconfig
-> symbol enabled, or get this build error:
+On Thu, Jun 12, 2014 at 04:15:32PM +0200, Arnd Bergmann wrote:
+> On Thursday 12 June 2014 16:12:17 Laurent Pinchart wrote:
+> > > From 3a965f4fd5a6b3ef4a66aa4e7c916cfd34fd5706 Mon Sep 17 00:00:00 2001
+> > > From: Arnd Bergmann <arnd@arndb.de>
+> > > Date: Tue, 21 Jan 2014 09:32:43 +0100
+> > > Subject: [PATCH] [media] staging: tighten omap4iss dependencies
+> > > 
+> > > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
+> > > of which can be loadable modules. This causes build failures
+> > > if we want the camera driver to be built-in.
+> > > 
+> > > This can be solved by turning the option into "tristate",
+> > > which unfortunately causes another problem, because the
+> > > driver incorrectly calls a platform-internal interface
+> > > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
+> > > 
+> > > Instead, this patch just forbids the invalid configurations
+> > > and ensures that the driver can only be built if all its
+> > > dependencies are built-in.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > 
+> > Should I take this in my tree for v3.17 or would you like to fast-track it ?
+> > 
 > 
-> drivers/built-in.o: In function `ipu_probe':
-> :(.text+0x49ea4c): undefined reference to `irq_generic_chip_ops'
-> :(.text+0x49ea5c): undefined reference to `irq_alloc_domain_generic_chips'
-> :(.text+0x49ea60): undefined reference to `irq_get_domain_generic_chip'
-> :(.text+0x49ea64): undefined reference to `irq_gc_ack_set_bit'
-> :(.text+0x49ea6c): undefined reference to `irq_gc_mask_clr_bit'
-> :(.text+0x49ea70): undefined reference to `irq_gc_mask_set_bit'
+> I'd actually like to see it in 3.15 as a stable backport if possible,
 
-Let's take a step back, and ask the obvious question: is it reasonable
-to make use if GENERIC_IRQ_CHIP in this driver?
+It's not stable material, sorry.
 
-Bear in mind that this is a platform driver (and so can be unbound), and
-the IRQ domain stuff does not support tear-down.  This code contains this...
+> but definitely in 3.16. What is the normal path for staging/media
+> but fix patches?
 
-static void ipu_irq_exit(struct ipu_soc *ipu)
-{
-        int i, irq;
+Through Mauro's tree.
 
-        irq_set_chained_handler(ipu->irq_err, NULL);
-        irq_set_handler_data(ipu->irq_err, NULL);
-        irq_set_chained_handler(ipu->irq_sync, NULL);
-        irq_set_handler_data(ipu->irq_sync, NULL);
-
-        /* TODO: remove irq_domain_generic_chips */
-
-        for (i = 0; i < IPU_NUM_IRQS; i++) {
-                irq = irq_linear_revmap(ipu->domain, i);
-                if (irq)
-                        irq_dispose_mapping(irq);
-        }
-
-        irq_domain_remove(ipu->domain);
-}
-
-which rather hints at it being more broken than just the above.
-
-So, I think you're just papering over the symptom of a broken
-implementation with your patch...
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+greg k-h
