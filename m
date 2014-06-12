@@ -1,130 +1,68 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 12 Jun 2014 17:20:30 -0600
-Subject: [PATCH v4 4/4] arm64: Add APM X-Gene SoC EDAC DTS entries
-In-Reply-To: <1402615230-4763-4-git-send-email-lho@apm.com>
-References: <1402615230-4763-1-git-send-email-lho@apm.com>
- <1402615230-4763-2-git-send-email-lho@apm.com>
- <1402615230-4763-3-git-send-email-lho@apm.com>
- <1402615230-4763-4-git-send-email-lho@apm.com>
-Message-ID: <1402615230-4763-5-git-send-email-lho@apm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 12 Jun 2014 16:25:59 -0700
+Subject: [PATCH 1/3 v4] spi: s3c64xx: fix broken "cs_gpios" usage in the
+ driver
+In-Reply-To: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
+References: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <CAD=FV=W473vmwPVJUSqMF+w-OwYp5kv1aOAR78voko964kPHAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC EDAC DTS entries.
+Naveen,
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   97 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 97 insertions(+), 0 deletions(-)
+On Thu, Jun 12, 2014 at 6:13 AM, Naveen Krishna Chatradhi
+<ch.naveen@samsung.com> wrote:
+> Since, (3146bee spi: s3c64xx: Added provision for dedicated cs pin)
+>
+> spi-s3c64xx.c driver expects
+> 1. chip select gpios from "cs-gpio"(singular) under the
+>    "controller-data" node of the client/slave device of the SPI.
+>
+> 2. "cs-gpio"(singular) entry to be present in the SPI device node.
+>
+> Eg of current broken usage:
+> &spi_1 {
+>         cs-gpio <>;     /* this entry is checked during probe */
+>         ...
+>         slave_node {
+>                 controller-data {
+>                         cs-gpio <&gpioa2 5 0>;
+>                         /* This field is parsed during .setup() */
+>                 }
+>         };
+> };
+>
+> The following dts files which were using this driver. But,
+> din't have the "cs-gpio" entry under SPI node.
+> -- arch/arm/boot/dts/exynos4210-smdkv310.dts
+> -- arch/arm/boot/dts/exynos4412-trats2.dts
+> -- arch/arm/boot/dts/exynos5250-smdk5250.dts
+>
+> Also, the SPI core and many drivers moved on to using "cs-gpios"
+> from SPI node and removed the gpio handling code from drivers
+> (including spi-s3c64xx.c).
+>
+> Hence, spi-s3c64xx.c is broken since "Jun 21 11:26:12 2013" and
+> considering the time with no compliants about the breakage.
+>
+> We are assuming it is safe to remove the "cs-gpio"(singular) usage
+> from device tree binding of spi-samsung.txt and makes appropriate
+> changes in the driver to use "cs-gpios"(plural) from
+> SPI device node.
+>
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  .../devicetree/bindings/spi/spi-samsung.txt        |    8 ++--
+>  drivers/spi/spi-s3c64xx.c                          |   41 ++++++++------------
+>  2 files changed, 20 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 93f4b2d..6042a99 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -269,6 +269,103 @@
- 			interrupts = <0x0 0x4c 0x4>;
- 		};
- 
-+		edacmc0: edacmc0 at 7e800000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e800000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc1: edacmc1 at 7e840000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e840000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc2: edacmc2 at 7e880000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e880000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc3: edacmc3 at 7e8c0000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e8c0000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd0: edacpmd0 at 7c000000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c000000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd1: edacpmd1 at 7c200000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c200000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd2: edacpmd2 at 7c400000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c400000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd3: edacpmd3 at 7c600000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c600000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacl3: edacl3 at 7e600000 {
-+			compatible = "apm,xgene-edac-l3";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e600000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacsoc: edacsoc at 7e930000 {
-+			compatible = "apm,xgene-edac-soc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e930000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>,
-+				     <0x0 0x27 0x4>;
-+		};
-+
- 		phy1: phy at 1f21a000 {
- 			compatible = "apm,xgene-phy";
- 			reg = <0x0 0x1f21a000 0x0 0x100>;
--- 
-1.5.5
+I'm not planning to do an in-depth review of this patch since it seems
+that others are on top of it, but I've tested it.  With it (and some
+patches that haven't been sent up yet) I can talk to the EC on
+exynos5420-pit.
+
+Tested-by: Doug Anderson <dianders@chromium.org>
