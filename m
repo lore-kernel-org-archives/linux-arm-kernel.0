@@ -1,101 +1,114 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 12 Jun 2014 16:07:53 +0200
-Subject: [PATCH 3/3 v4] ARM: DTS: fix the chip select gpios definition
- in the SPI nodes
-In-Reply-To: <1402578821-27338-3-git-send-email-ch.naveen@samsung.com>
-References: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
- <1402578821-27338-3-git-send-email-ch.naveen@samsung.com>
-Message-ID: <5399B439.1010300@collabora.co.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 12 Jun 2014 16:12:17 +0200
+Subject: [PATCH] [media] staging: allow omap4iss to be modular
+In-Reply-To: <7948240.P51u2omQa4@wuerfel>
+References: <5192928.MkINji4uKU@wuerfel> <53986ABC.4070302@ti.com>
+ <7948240.P51u2omQa4@wuerfel>
+Message-ID: <2046469.GckHavNRr1@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Naveen,
+Hi Arnd,
 
-On 06/12/2014 03:13 PM, Naveen Krishna Chatradhi wrote:
-> This patch replaces the "cs-gpio" from "controller-data" node
-> as was specified in the old binding and use the standard
-> "cs-gpios" property expected by the SPI core as is defined in
-> the new binding.
+On Wednesday 11 June 2014 16:49:31 Arnd Bergmann wrote:
+> On Wednesday 11 June 2014 09:42:04 Nishanth Menon wrote:
+> > On 06/11/2014 09:35 AM, Arnd Bergmann wrote:
+> > > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
+> > > of which can be loadable modules. This causes build failures
+> > > if we want the camera driver to be built-in.
+> > > 
+> > > This can be solved by turning the option into "tristate",
+> > > which unfortunately causes another problem, because the
+> > > driver incorrectly calls a platform-internal interface
+> > > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
+> > > To work around that, we can export those symbols, but
+> > > that isn't really the correct solution, as we should not
+> > > have dependencies on platform code this way.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > > This is one of just two patches we currently need to get
+> > > 'make allmodconfig' to build again on ARM.
+> > > 
+> > > diff --git a/arch/arm/mach-omap2/control.c
+> > > b/arch/arm/mach-omap2/control.c
+> > > index 751f354..05d2d98 100644
+> > > --- a/arch/arm/mach-omap2/control.c
+> > > +++ b/arch/arm/mach-omap2/control.c
+> > > @@ -190,11 +190,13 @@ u32 omap4_ctrl_pad_readl(u16 offset)
+> > >  {
+> > >  	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
+> > >  }
+> > > +EXPORT_SYMBOL_GPL(omap4_ctrl_pad_readl);
+> > > 
+> > >  void omap4_ctrl_pad_writel(u32 val, u16 offset)
+> > >  {
+> > >  	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
+> > >  }
+> > > +EXPORT_SYMBOL_GPL(omap4_ctrl_pad_writel);
+> > > 
+> > >  #ifdef CONFIG_ARCH_OMAP3
+> > > 
+> > > diff --git a/drivers/staging/media/omap4iss/Kconfig
+> > > b/drivers/staging/media/omap4iss/Kconfig index 78b0fba..0c3e3c1 100644
+> > > --- a/drivers/staging/media/omap4iss/Kconfig
+> > > +++ b/drivers/staging/media/omap4iss/Kconfig
+> > > @@ -1,5 +1,5 @@
+> > >  config VIDEO_OMAP4
+> > > -	bool "OMAP 4 Camera support"
+> > > +	tristate "OMAP 4 Camera support"
+> > >  	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
+> > >  	select VIDEOBUF2_DMA_CONTIG
+> > >  	---help---
+> > 
+> > This was discussed in detail here:
+> > http://marc.info/?t=140198692500001&r=1&w=2
+> > Direct dependency from a staging driver to mach-omap2 driver is not
+> > something we'd like, right?
 > 
-> Respective changes are preposed to spi-s3c64xx.c driver.
-> @ http://www.spinics.net/lists/linux-samsung-soc/msg32282.html
+> So it was decided to just leave ARM allmodconfig broken?
 > 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
->  arch/arm/boot/dts/exynos4412-trats2.dts   |    2 +-
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> Why not at least do this instead?
 > 
-> diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-> index 636d166..9191491 100644
-> --- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-> +++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-> @@ -169,6 +169,7 @@
->  
->  	spi_2: spi at 13940000 {
->  		status = "okay";
-> +		cs-gpios = <&gpc1 2 0>;
->  
->  		w25x80 at 0 {
->  			#address-cells = <1>;
-> @@ -178,7 +179,6 @@
->  			spi-max-frequency = <1000000>;
->  
->  			controller-data {
-> -				cs-gpio = <&gpc1 2 0>;
->  				samsung,spi-feedback-delay = <0>;
->  			};
->  
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-> index 8a558b7..204b0de 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -512,6 +512,7 @@
->  	spi_1: spi at 13930000 {
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&spi1_bus>;
-> +		cs-gpios = <&gpb 5 0>;
->  		status = "okay";
->  
->  		s5c73m3_spi: s5c73m3 {
-> @@ -519,7 +520,6 @@
->  			spi-max-frequency = <50000000>;
->  			reg = <0>;
->  			controller-data {
-> -				cs-gpio = <&gpb 5 0>;
->  				samsung,spi-feedback-delay = <2>;
->  			};
->  		};
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index a794a70..0c6433a 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -316,6 +316,7 @@
->  	};
->  
->  	spi_1: spi at 12d30000 {
-> +		cs-gpios = <&gpa2 5 0>;
->  		status = "okay";
->  
->  		w25q80bw at 0 {
-> @@ -326,7 +327,6 @@
->  			spi-max-frequency = <1000000>;
->  
->  			controller-data {
-> -				cs-gpio = <&gpa2 5 0>;
->  				samsung,spi-feedback-delay = <0>;
->  			};
->  
+> 8<----
+> From 3a965f4fd5a6b3ef4a66aa4e7c916cfd34fd5706 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Tue, 21 Jan 2014 09:32:43 +0100
+> Subject: [PATCH] [media] staging: tighten omap4iss dependencies
 > 
+> The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
+> of which can be loadable modules. This causes build failures
+> if we want the camera driver to be built-in.
+> 
+> This can be solved by turning the option into "tristate",
+> which unfortunately causes another problem, because the
+> driver incorrectly calls a platform-internal interface
+> for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
+> 
+> Instead, this patch just forbids the invalid configurations
+> and ensures that the driver can only be built if all its
+> dependencies are built-in.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Looks good to me.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Should I take this in my tree for v3.17 or would you like to fast-track it ?
 
-Best regards,
-Javier
+> diff --git a/drivers/staging/media/omap4iss/Kconfig
+> b/drivers/staging/media/omap4iss/Kconfig index 78b0fba..8afc6fe 100644
+> --- a/drivers/staging/media/omap4iss/Kconfig
+> +++ b/drivers/staging/media/omap4iss/Kconfig
+> @@ -1,6 +1,6 @@
+>  config VIDEO_OMAP4
+>  	bool "OMAP 4 Camera support"
+> -	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
+> +	depends on VIDEO_V4L2=y && VIDEO_V4L2_SUBDEV_API && I2C=y && ARCH_OMAP4
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	---help---
+>  	  Driver for an OMAP 4 ISS controller.
+
+-- 
+Regards,
+
+Laurent Pinchart
