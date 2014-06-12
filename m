@@ -1,36 +1,67 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 12 Jun 2014 20:56:46 +0200
-Subject: Aw: Re: [PATCH] ARM: dts: Initial ODROID U2 support
-In-Reply-To: <trinity-980edcd5-a3eb-42ff-b755-cea7c1c6cd0d-1402579141856@3capp-gmx-bs65>
-References: <1402577077-7835-1-git-send-email-drake@endlessm.com>,
- <5399A526.6040303@samsung.com>
- <trinity-980edcd5-a3eb-42ff-b755-cea7c1c6cd0d-1402579141856@3capp-gmx-bs65>
-Message-ID: <5399F7EE.2050001@gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 12 Jun 2014 14:13:24 -0500
+Subject: [PATCH 3/3] ata: qcom: Add device tree bindings information
+In-Reply-To: <1402600404-19214-1-git-send-email-galak@codeaurora.org>
+References: <1402600404-19214-1-git-send-email-galak@codeaurora.org>
+Message-ID: <1402600404-19214-3-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tobias,
+Add device tree binding for Qualcomm AHCI SATA controller and specifically
+the sata controller on the IPQ806x family of SoCs.
 
-On 12.06.2014 15:19, Tobias Jakobi wrote:
-> Hello Marek,
-> 
-> since you pointed out HDMI support on the ODROID, I assume you've looked into that. I've posted about some issues with HDMI PHY and mixer some days ago here:
-> http://www.spinics.net/lists/linux-samsung-soc/msg31643.html
-> 
-> Tomasz already suggested on IRC to CC some more people, who have worked in that area. Maybe you have an idea what is going wrong there?
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ .../devicetree/bindings/ata/qcom-sata.txt          | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/qcom-sata.txt
 
-Empirically we have managed to find that after bypassing the Video
-Processor and using the Mixer alone [1], LCD0 power domain is no longer
-needed for HDMI operation.
-
-However there is still an issue with power-up and/or -down sequences
-causing the whole system to hang when trying to power on and off HDMI
-repeatedly. This is to be investigated yet.
-
-[1] This can be achieved by setting .is_vp_enabled of
-exynos4210_mxr_drv_data to 0, assuming that you have a patch applied
-which adds appropriate compatible string to mixer_match_types[],
-pointing to that struct.
-
-Best regards,
-Tomasz
+diff --git a/Documentation/devicetree/bindings/ata/qcom-sata.txt b/Documentation/devicetree/bindings/ata/qcom-sata.txt
+new file mode 100644
+index 0000000..5e74e41
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/qcom-sata.txt
+@@ -0,0 +1,40 @@
++* Qualcomm AHCI SATA Controller
++
++SATA nodes are defined to describe on-chip Serial ATA controllers.
++Each SATA controller should have its own node.
++
++Required properties:
++- compatible		: compatible list, contains "qcom,msm-ahci"
++- interrupts		: <interrupt mapping for SATA IRQ>
++- reg			: <registers mapping>
++- phys			: Must contain exactly one entry as specified
++			  in phy-bindings.txt
++- phy-names		: Must be "sata-phy"
++
++Required properties for "qcom,ipq806x-ahci" compatible:
++- clocks		: Must contain an entry for each entry in clock-names.
++- clock-names		: Shall be:
++				"slave_iface" - Fabric port AHB clock for SATA
++				"iface" - AHB clock
++				"core" - core clock
++				"rxoob" - RX out-of-band clock
++				"pmalive" - Power Module Alive clock
++
++Example:
++	sata at 29000000 {
++		compatible = "qcom,ipq806x-ahci", "qcom,msm-ahci";
++		reg = <0x29000000 0x180>;
++
++		interrupts = <0 209 0x0>;
++
++		clocks = <&gcc SFAB_SATA_S_H_CLK>,
++			 <&gcc SATA_H_CLK>,
++			 <&gcc SATA_A_CLK>,
++			 <&gcc SATA_RXOOB_CLK>,
++			 <&gcc SATA_PMALIVE_CLK>;
++		clock-names = "slave_iface", "iface", "core",
++				"rxoob", "pmalive";
++
++		phys = <&sata_phy>;
++		phy-names = "sata-phy";
++	};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
