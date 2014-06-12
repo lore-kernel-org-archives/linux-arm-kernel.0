@@ -1,23 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Jun 2014 10:46:13 +0200
-Subject: [PATCH 2/4] of: Add NVIDIA Tegra XUSB pad controller binding
-In-Reply-To: <5390F5C7.5070301@wwwdotorg.org>
-References: <1401894990-30092-1-git-send-email-thierry.reding@gmail.com>
- <1401894990-30092-2-git-send-email-thierry.reding@gmail.com>
- <53909F31.4050603@wwwdotorg.org> <20140605220833.GA28817@ulmo>
- <5390F5C7.5070301@wwwdotorg.org>
-Message-ID: <CACRpkdZxS3UKaykTXsaGADCWmvfpAW_nhbxYHLSh44HMXLWvCg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 12 Jun 2014 09:46:19 +0100
+Subject: [PATCH v4 3/6] drivers: cpuidle: implement OF based idle states
+ infrastructure
+In-Reply-To: <alpine.LFD.2.11.1406111420450.25775@knanqh.ubzr>
+References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1402503520-8611-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.11.1406111420450.25775@knanqh.ubzr>
+Message-ID: <20140612084619.GA29295@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 6, 2014 at 12:57 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Wed, Jun 11, 2014 at 07:24:12PM +0100, Nicolas Pitre wrote:
+> On Wed, 11 Jun 2014, Lorenzo Pieralisi wrote:
+> 
+> > +config OF_IDLE_STATES
+> > +        bool "Idle states DT support"
+> > +	depends on ARM || ARM64
+> > +	default n
+> 
+> The default for default is n already, so you don't have to default to 
+> the default's default.
 
-> In my opinion, the headers *are*
-> part of the bindings, so of course anyone either reading DT bindings, or
-> parsing DT, must have the headers, and hence the headers must be bundled
-> with the DT files or with the bindings wherever they go.
+Ok, thanks for spotting that.
 
-I agree 100% with Stephen's stance. Reference the headers.
-
-Yours,
-Linus Walleij
+Lorenzo
