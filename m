@@ -1,28 +1,73 @@
-From: andy.jhshiu@gmail.com (Andy Hsu)
-Date: Thu, 12 Jun 2014 08:32:12 -0700
-Subject: [PATCH 1/1] Remove an extra operation: The ESR has been stored into
- x1, and should be directly pass to do_sp_pc_abort function
-Message-ID: <1402587132-4853-1-git-send-email-andy.jhshiu@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Jun 2014 11:32:26 -0400
+Subject: [PATCH V2 08/19] irqchip: crossbar: fix checkpatch warning
+In-Reply-To: <1402582711.9947.17.camel@joe-AO725>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <1402574007-13987-9-git-send-email-r.sricharan@ti.com>
+ <20140612131042.GU8664@titan.lakedaemon.net>
+ <5399AC9C.4080602@ti.com> <1402582711.9947.17.camel@joe-AO725>
+Message-ID: <20140612153226.GE8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hey Joe,
 
-Signed-off-by: Andy Hsu <andy.jhshiu@gmail.com>
----
- arch/arm64/kernel/entry.S |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+On Thu, Jun 12, 2014 at 07:18:31AM -0700, Joe Perches wrote:
+> On Thu, 2014-06-12 at 19:05 +0530, Sricharan R wrote:
+> > On Thursday 12 June 2014 06:40 PM, Jason Cooper wrote:
+> > > On Thu, Jun 12, 2014 at 05:23:16PM +0530, Sricharan R wrote:
+> > >> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+> []
+> > >> @@ -34,7 +34,8 @@ struct crossbar_device {
+> > >>  	uint *irq_map;
+> > >>  	void __iomem *crossbar_base;
+> > >>  	int *register_offsets;
+> > >> -	void (*write) (int, int);
+> > >> +
+> > >> +	void (*write)(int, int);
+> > > 
+> > > The empty line here looks bogus to me.
+> 
+> Good eye.  It's unnecessary.
+> 
+> > > Did you re-run checkpatch after fixing the unnecessary space to
+> > > see if it still complained about having a 'blank line after
+> > > declarations'?
+> > > 
+> >  Yes, it still complains even after fixing unnecessary space.
+> 
+> It's a checkpatch defect.
+> 
+> It's been fixed by:
+> https://lkml.org/lkml/2014/6/6/426
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index fa78916..56ef569 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -275,7 +275,6 @@ el1_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x0, far_el1
--	mov	x1, x25
- 	mov	x2, sp
- 	b	do_sp_pc_abort
- el1_undef:
--- 
-1.7.0.4
+Ah, good to know.
+
+> > > I'm generally opposed to these sorts of checkpatch patches, especially
+> > > when they are just warnings.  It's great for a new driver in the staging
+> > > tree, but it makes backporting future bugfixes that much harder when
+> > > drivers have been live in mainline.
+> 
+> Blind adherence to checkpatch isn't always a great idea.
+
+Agreed.
+
+> But bugfix backports haven't been much of an issue in
+> other subsystems with fairly active whitespace/style
+> changes.
+
+Most of the mvebu fixes we've had that failed to apply were generally
+due to a large whitespace change (dts node shuffling, admittedly not
+checkpatch-related).  I've also frequently been stymied by code cleanups
+when using git blame to find the commit introducing a regression.
+
+So, my general rule is: If you're submitting a patch to make checkpatch
+be quiet, re-assess the need.  If you're making changes and you can fix
+some checkpatch items while you're there, then do so.
+
+There are certainly legitimate checkpatch-only patches, I just don't
+think this is one qualifies.
+
+thx,
+
+Jason.
