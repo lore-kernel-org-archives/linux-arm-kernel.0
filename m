@@ -1,93 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Jun 2014 15:16:27 +0200
-Subject: [PATCH 1/2] [RFC] ASoC: samsung: move s3c24xx over to dmaengine
-In-Reply-To: <4306380.m7SZhHfhaK@wuerfel>
-References: <6123933.aGtaUr149J@wuerfel> <20140605133606.GX2520@sirena.org.uk>
- <4306380.m7SZhHfhaK@wuerfel>
-Message-ID: <5498575.LeGAfDJTRA@wuerfel>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Thu, 12 Jun 2014 18:43:41 +0530
+Subject: [PATCH 3/3 v4] ARM: DTS: fix the chip select gpios definition in the
+ SPI nodes
+In-Reply-To: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
+References: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1402578821-27338-3-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 June 2014 16:04:03 Arnd Bergmann wrote:
-> On Thursday 05 June 2014 14:36:06 Mark Brown wrote:
-> > On Thu, Jun 05, 2014 at 03:20:50PM +0200, Arnd Bergmann wrote:
-> > > The s3c24xx sound support keeps giving randconfig build errors, this
-> > > is a new attempt to solve it by moving the driver over to use dmaengine
-> > > exclusively.
-> > 
-> > We already have a patch pending for this, it's just waiting until after
-> > the merge window to avoid bisection breakage since it depends on
-> > dmaengine changes.
-> 
-> Ok, very good.
+This patch replaces the "cs-gpio" from "controller-data" node
+as was specified in the old binding and use the standard
+"cs-gpios" property expected by the SPI core as is defined in
+the new binding.
 
-Actually, I think it would still be good to do something about the
-samsung/ac97.c file, which is the only reason we are keeping the
-SAMSUNG_DMADEV code around that is part of the dependency chain
-Russell posted, and it's definitely broken on anything but s3c24xx.
+Respective changes are preposed to spi-s3c64xx.c driver.
+@ http://www.spinics.net/lists/linux-samsung-soc/msg32282.html
 
-If we do something like the patch below, we can just disable
-SAMSUNG_DMADEV already, which simplifies the dependency chains
-a lot. We can then remove that code entirely in 3.17.
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts   |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Note that for !CONFIG_S3C24XX_DMA, the code is currently broken,
-as samsung_dma_get_ops()->started is a NULL pointer for dmadev.
-
-	Arnd
-
-diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
-index 68d9303..1db1028 100644
---- a/sound/soc/samsung/ac97.c
-+++ b/sound/soc/samsung/ac97.c
-@@ -225,9 +225,11 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
- 				struct snd_soc_dai *dai)
- {
- 	u32 ac_glbctrl;
-+#ifdef CONFIG_S3C24XX_DMA
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct s3c_dma_params *dma_data =
- 		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
-+#endif
+diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+index 636d166..9191491 100644
+--- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
++++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+@@ -169,6 +169,7 @@
  
- 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-@@ -253,10 +255,9 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	spi_2: spi at 13940000 {
+ 		status = "okay";
++		cs-gpios = <&gpc1 2 0>;
  
- 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 		w25x80 at 0 {
+ 			#address-cells = <1>;
+@@ -178,7 +179,6 @@
+ 			spi-max-frequency = <1000000>;
  
--	if (!dma_data->ops)
--		dma_data->ops = samsung_dma_get_ops();
--
--	dma_data->ops->started(dma_data->channel);
-+#ifdef CONFIG_S3C24XX_DMA
-+	s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
-+#endif
+ 			controller-data {
+-				cs-gpio = <&gpc1 2 0>;
+ 				samsung,spi-feedback-delay = <0>;
+ 			};
  
- 	return 0;
- }
-@@ -265,9 +266,11 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
- 				    int cmd, struct snd_soc_dai *dai)
- {
- 	u32 ac_glbctrl;
-+#ifdef CONFIG_S3C24XX_DMA
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct s3c_dma_params *dma_data =
- 		snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
-+#endif
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 8a558b7..204b0de 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -512,6 +512,7 @@
+ 	spi_1: spi at 13930000 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi1_bus>;
++		cs-gpios = <&gpb 5 0>;
+ 		status = "okay";
  
- 	ac_glbctrl = readl(s3c_ac97.regs + S3C_AC97_GLBCTRL);
- 	ac_glbctrl &= ~S3C_AC97_GLBCTRL_MICINTM_MASK;
-@@ -287,10 +290,9 @@ static int s3c_ac97_mic_trigger(struct snd_pcm_substream *substream,
+ 		s5c73m3_spi: s5c73m3 {
+@@ -519,7 +520,6 @@
+ 			spi-max-frequency = <50000000>;
+ 			reg = <0>;
+ 			controller-data {
+-				cs-gpio = <&gpb 5 0>;
+ 				samsung,spi-feedback-delay = <2>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index a794a70..0c6433a 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -316,6 +316,7 @@
+ 	};
  
- 	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+ 	spi_1: spi at 12d30000 {
++		cs-gpios = <&gpa2 5 0>;
+ 		status = "okay";
  
--	if (!dma_data->ops)
--		dma_data->ops = samsung_dma_get_ops();
--
--	dma_data->ops->started(dma_data->channel);
-+#ifdef CONFIG_S3C24XX_DMA
-+	s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
-+#endif
+ 		w25q80bw at 0 {
+@@ -326,7 +327,6 @@
+ 			spi-max-frequency = <1000000>;
  
- 	return 0;
- }
+ 			controller-data {
+-				cs-gpio = <&gpa2 5 0>;
+ 				samsung,spi-feedback-delay = <0>;
+ 			};
+ 
+-- 
+1.7.9.5
