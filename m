@@ -1,22 +1,30 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:15 +0530
-Subject: [PATCH V2 07/19] irqchip: crossbar: fix sparse warnings
+Date: Thu, 12 Jun 2014 17:23:16 +0530
+Subject: [PATCH V2 08/19] irqchip: crossbar: fix checkpatch warning
 In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402574007-13987-8-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402574007-13987-9-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-There is absolutely no need for crossbar driver to expose functions and
-variables into global namespace. So make them all static
+remove un-necessary space in function pointer.
 
-Fixes sparse warnings:
-drivers/irqchip/irq-crossbar.c:129:29: warning: symbol 'routable_irq_domain_ops' was not declared. Should it be static?
-drivers/irqchip/irq-crossbar.c:252:5: warning: symbol 'dra_irqs_unused' was not declared. Should it be static?
-drivers/irqchip/irq-crossbar.c:253:22: warning: symbol 'cb_dra_data' was not declared. Should it be static?
-drivers/irqchip/irq-crossbar.c:261:12: warning: symbol 'irqcrossbar_init' was not declared. Should it be static?
+Fixes checkpatch warning:
+WARNING: Unnecessary space before function pointer arguments
+ #37: FILE: drivers/irqchip/irq-crossbar.c:37:
+ +	void (*write) (int, int);
+
+WARNING: Missing a blank line after declarations
++	int *register_offsets;
++	void (*write)(int, int);
+
+WARNING: Prefer kcalloc over kzalloc with multiply
++	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
+
+WARNING: Prefer kcalloc over kzalloc with multiply
++	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
@@ -24,36 +32,36 @@ Signed-off-by: Nishanth Menon <nm@ti.com>
  1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index c5415ae..5da9d36 100644
+index 5da9d36..58790d4 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -16,6 +16,7 @@
- #include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/irqchip/irq-crossbar.h>
+@@ -34,7 +34,8 @@ struct crossbar_device {
+ 	uint *irq_map;
+ 	void __iomem *crossbar_base;
+ 	int *register_offsets;
+-	void (*write) (int, int);
++
++	void (*write)(int, int);
+ };
  
- #define IRQ_FREE	-1
- #define IRQ_RESERVED	-2
-@@ -126,7 +127,7 @@ found:
- 	return 0;
- }
+ /**
+@@ -150,7 +151,7 @@ static int __init crossbar_of_init(struct device_node *node,
+ 		goto err1;
  
--const struct irq_domain_ops routable_irq_domain_ops = {
-+static const struct irq_domain_ops routable_irq_domain_ops = {
- 	.map = crossbar_domain_map,
- 	.unmap = crossbar_domain_unmap,
- 	.xlate = crossbar_domain_xlate
-@@ -249,8 +250,8 @@ err1:
- }
+ 	of_property_read_u32(node, "ti,max-irqs", &max);
+-	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
++	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
+ 	if (!cb->irq_map)
+ 		goto err2;
  
- /* irq number 10 cannot be used because of hw bug */
--int dra_irqs_unused[] = { 10 };
--struct crossbar_data cb_dra_data = { dra_irqs_unused,
-+static int dra_irqs_unused[] = { 10 };
-+static struct crossbar_data cb_dra_data = { dra_irqs_unused,
- 				     ARRAY_SIZE(dra_irqs_unused), 0 };
+@@ -176,7 +177,7 @@ static int __init crossbar_of_init(struct device_node *node,
+ 		}
+ 	}
  
- static const struct of_device_id crossbar_match[] __initconst = {
+-	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
++	cb->register_offsets = kcalloc(max, sizeof(int), GFP_KERNEL);
+ 	if (!cb->register_offsets)
+ 		goto err3;
+ 
 -- 
 1.7.9.5
