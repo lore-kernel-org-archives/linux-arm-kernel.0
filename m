@@ -1,75 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Jun 2014 15:37:18 +0200
-Subject: Kconfig fails: big select-based circular dependency
-In-Reply-To: <20140612130330.GG23430@n2100.arm.linux.org.uk>
-References: <20140607090944.GL23430@n2100.arm.linux.org.uk>
- <10376496.xoRI3F9EzH@wuerfel> <20140612130330.GG23430@n2100.arm.linux.org.uk>
-Message-ID: <6046244.oz0lY2JOaZ@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Jun 2014 09:39:17 -0400
+Subject: [PATCH V2 12/19] irqchip: crossbar: return proper error value
+In-Reply-To: <1402574007-13987-13-git-send-email-r.sricharan@ti.com>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <1402574007-13987-13-git-send-email-r.sricharan@ti.com>
+Message-ID: <20140612133917.GY8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 June 2014 14:03:30 Russell King - ARM Linux wrote:
-> On Thu, Jun 12, 2014 at 02:19:45PM +0200, Arnd Bergmann wrote:
-> > On Thursday 12 June 2014 12:34:45 Russell King - ARM Linux wrote:
-> > > On Thu, Jun 12, 2014 at 12:31:19PM +0200, Arnd Bergmann wrote:
-> > > > On Thursday 12 June 2014 10:47:45 Russell King - ARM Linux wrote:
-> > > > > If no one responds, I'll assume that no one is interested, and I'll
-> > > > > just create a pile of patches removing a bunch of these idiotic select
-> > > > > statements at random to break this loop.
-> > > > 
-> > > > I missed the original mail, and I don't remember seeing this particular
-> > > > dependency chain.
-> > > > 
-> > > > > On Sat, Jun 07, 2014 at 10:09:44AM +0100, Russell King - ARM Linux wrote:
-> > > > > > This is getting silly:
-> > > > > > 
-> > > > > > scripts/kconfig/conf --silentoldconfig Kconfig
-> > > > > > drivers/dma/Kconfig:5:error: recursive dependency detected!
-> > > > > > drivers/dma/Kconfig:5:  symbol DMADEVICES is selected by SAMSUNG_DMADEV
-> > > > 
-> > > > The 'select DMADEVICES' from plat-samsung/Kconfig is certainly wrong,
-> > > > we shouldn't do that, but I'd do some extended build regression tests
-> > > > to ensure that it doesn't cause other problems.
-> > > > 
-> > > > I'll have a look.
-> > > 
-> > > Yes, SAMSUNG_DMADEV looks like it's a shim layer between DMA engine and
-> > > the old Samsung platform private DMA API.  I suspect SAMSUNG_DMADEV should
-> > > be selected by the drivers which make use of this shim iff DMADEVICES is
-> > > enabled.
-> > 
-> > FWIW, SAMSUNG_DMADEV should get removed in 3.17. At the moment
-> > there is only one user (sound/soc/samsung/ac97.c), and that is
-> > broken because it calls a NULL function pointer returned from
-> > samsung_dma_get_ops().
+On Thu, Jun 12, 2014 at 05:23:20PM +0530, Sricharan R wrote:
+> From: Nishanth Menon <nm@ti.com>
 > 
-> Well, we can't wait for 3.17 to fix this, because attempting to build
-> an allyesconfig/allmodconfig/randconfig today fails.  Just look at the
-> failures of those four configurations on my autobuilder over the last
-> few days.
+> crossbar_of_init always returns -ENOMEM in case of errors, return proper
+> error results in case of failures.
 
-I didn't say we should not fix it, I just meant we don't need to spend
-too much time on a perfect solution for code that is going away and that
-is already not used anywhere.
+Please describe what the other possible failures are and how the changes
+are more correct.
 
-I've just replied to an older thread "Re: [PATCH 1/2] [RFC] ASoC: samsung:
-move s3c24xx over to dmaengine" with a patch that would let us kill off
-the code right away, or at least disable it in Kconfig.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  drivers/irqchip/irq-crossbar.c |   15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+> index fea3e5d..524e6e9 100644
+> --- a/drivers/irqchip/irq-crossbar.c
+> +++ b/drivers/irqchip/irq-crossbar.c
+> @@ -140,20 +140,26 @@ static const struct irq_domain_ops routable_irq_domain_ops = {
+>  static int __init crossbar_of_init(struct device_node *node,
+>  				   const struct crossbar_data *data)
+>  {
+> -	int i, size, max, reserved = 0, entry, safe_map;
+> +	int i, size, max = 0, reserved = 0, entry, safe_map;
+>  	const __be32 *irqsr;
+>  	const int *irqsk = NULL;
+> +	int ret = -ENOMEM;
+>  
+>  	cb = kzalloc(sizeof(*cb), GFP_KERNEL);
+>  
+>  	if (!cb)
+> -		return -ENOMEM;
+> +		return ret;
+>  
+>  	cb->crossbar_base = of_iomap(node, 0);
+>  	if (!cb->crossbar_base)
+>  		goto err1;
+>  
+>  	of_property_read_u32(node, "ti,max-irqs", &max);
+> +	if (!max) {
+> +		pr_err("missing 'ti,max-irqs' property\n");
+> +		ret = -EINVAL;
+> +		goto err2;
+> +	}
+>  	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
+>  	if (!cb->irq_map)
+>  		goto err2;
+> @@ -174,6 +180,7 @@ static int __init crossbar_of_init(struct device_node *node,
+>  						   i, &entry);
+>  			if (entry > max) {
+>  				pr_err("Invalid reserved entry\n");
+> +				ret = -EINVAL;
+>  				goto err3;
+>  			}
+>  			cb->irq_map[entry] = IRQ_RESERVED;
+> @@ -198,6 +205,7 @@ static int __init crossbar_of_init(struct device_node *node,
+>  		break;
+>  	default:
+>  		pr_err("Invalid reg-size property\n");
+> +		ret = -EINVAL;
+>  		goto err4;
+>  		break;
+>  	}
+> @@ -225,6 +233,7 @@ static int __init crossbar_of_init(struct device_node *node,
+>  
+>  			if (entry > max) {
+>  				pr_err("Invalid skip entry\n");
+> +				ret = -EINVAL;
+>  				goto err4;
+>  			}
+>  			cb->irq_map[entry] = IRQ_SKIP;
+> @@ -250,7 +259,7 @@ err2:
+>  	iounmap(cb->crossbar_base);
+>  err1:
+>  	kfree(cb);
+> -	return -ENOMEM;
+> +	return ret;
+>  }
 
-For some reason, I can't reproduce the failure you see in your build system,
-I tried torvalds/master and next/master today and I have also done
-allmodconfig and randconfig builds in the past few days on slightly
-older versions.
+So, where is the change to the successful initialization?  Shouldn't it
+now set ret = 0?
 
-> In some cases, kconf generates a configuration, spitting out these
-> warnings, but then when you try and build that configuration, it then
-> goes on to complain that some symbols need user input.  In other words,
-> the first resulting configuration file from the make allyesconfig/
-> allmodconfig/randconfig is invalid because the dependencies have not
-> reached stability.
+This whole function seems to be a hodge-podge of different error
+handling styles, which led to the memory leak fixed earlier in this
+series.
 
-I think it just gives up when it sees a recursive dependency, so instead
-you start out with whatever the oldconfig was, rather than actually
-building the 'allmodconfig' you asked for.
+Please go over this function, choose sane labels, and consolidate _all_
+returns to the end of the function.
 
-	Arnd
+thx,
+
+Jason.
