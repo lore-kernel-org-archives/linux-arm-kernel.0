@@ -1,58 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Jun 2014 18:00:07 +0200
-Subject: [PATCH 1/2] drm/panel: remove unnecessary dependencies
-In-Reply-To: <E1Wv7GZ-0004SJ-PO@rmk-PC.arm.linux.org.uk>
-References: <E1Wv7GZ-0004SJ-PO@rmk-PC.arm.linux.org.uk>
-Message-ID: <4955669.feOMdjBDuA@wuerfel>
+Date: Thu, 12 Jun 2014 18:01:53 +0200
+Subject: [PATCH 2/2] drm/panel: make DRM_PANEL_LD9040 depend on SPI
+In-Reply-To: <E1Wv7Ge-0004SN-Sk@rmk-PC.arm.linux.org.uk>
+References: <E1Wv7Ge-0004SN-Sk@rmk-PC.arm.linux.org.uk>
+Message-ID: <4631432.m2S6KTlMps@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 June 2014 16:50:15 Russell King wrote:
-> DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
-> DRM_PANEL && DRM.  This is nonsense for two reasons:
+On Thursday 12 June 2014 16:50:20 Russell King wrote:
+> Rather than DRM_PANEL_LD9040 selecting SPI, which then results in an
+> increase in the probability of Kconf reporting circular dependencies
+> (we're one "select" away from that right now), make this depend on
+> SPI instead.  This is akin to having some driver select DRM.
 > 
-> (a) DRM_PANEL already depends on DRM, so DRM_PANEL can not be enabled
-> without DRM first being enabled.  Hence the && DRM is useless.
+> Having some drivers depend on a subsystem, and other drivers select a
+> subsystem is a recipe for circular dependencies, and there's really no
+> need for it.
 > 
-> (b) These two configs are already beneath a menu which depends on
-> DRM_PANEL being enabled; these options will not be visible without
-> DRM_PANEL already being enabled.
+> The potential circular dependency (which can be caused today by the
+> addition of selecting DRM_PANEL from DRM_IMX_LDB) is:
 > 
-> Let's just remove this unnecessary verbosity.
+>   symbol DMADEVICES is selected by SAMSUNG_DMADEV
+>   symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
+>   symbol S3C64XX_PL080 is selected by SPI_S3C64XX
+>   symbol SPI_S3C64XX depends on SPI
+>   symbol SPI is selected by DRM_PANEL_LD9040
+>   symbol DRM_PANEL_LD9040 depends on DRM_PANEL
+>   symbol DRM_PANEL is selected by DRM_IMX_LDB
+>   symbol DRM_IMX_LDB depends on MFD_SYSCON
+>   symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
+>   symbol POWER_RESET_KEYSTONE depends on POWER_SUPPLY
+>   symbol POWER_SUPPLY is selected by HID_SONY
+>   symbol HID_SONY depends on NEW_LEDS
+>   symbol NEW_LEDS is selected by BACKLIGHT_ADP8860
+>   symbol BACKLIGHT_ADP8860 depends on BACKLIGHT_CLASS_DEVICE
+>   symbol BACKLIGHT_CLASS_DEVICE is selected by FB_MX3
+>   symbol FB_MX3 depends on MX3_IPU
+>   symbol MX3_IPU depends on DMADEVICES
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-Unfortunately, this is wrong, because the current expression
-exploits one of the finer details of Kconfig syntax:
-
->  drivers/gpu/drm/panel/Kconfig | 2 --
->  1 file changed, 2 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-> index 4ec874da5668..44aea730b3aa 100644
-> --- a/drivers/gpu/drm/panel/Kconfig
-> +++ b/drivers/gpu/drm/panel/Kconfig
-> @@ -18,14 +18,12 @@ config DRM_PANEL_SIMPLE
->  
->  config DRM_PANEL_LD9040
->         tristate "LD9040 RGB/SPI panel"
-> -       depends on DRM && DRM_PANEL
->         depends on OF
->         select SPI
->         select VIDEOMODE_HELPERS
->  
->  config DRM_PANEL_S6E8AA0
->         tristate "S6E8AA0 DSI video mode panel"
-> -       depends on DRM && DRM_PANEL
->         depends on OF
->         select DRM_MIPI_DSI
->         select VIDEOMODE_HELPERS
 
-DRM_PANEL is bool, while DRM is tristate. If DRM=m and DRM_PANEL=y,
-these two options can only be 'n' or 'm' but not 'y' with the current
-code, but they can be 'y' if you drop the explicit DRM dependency,
-which will cause a link failure.
-
-The DRM_PANEL dependency can be removed, it is indeed unnecessary.
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
