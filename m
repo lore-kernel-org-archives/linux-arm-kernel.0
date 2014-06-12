@@ -1,51 +1,31 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 18:51:08 +0530
-Subject: [PATCH V2 10/19] irqchip: crossbar: DRA7: Fix unused crossbar list
-In-Reply-To: <20140612131600.GW8664@titan.lakedaemon.net>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-11-git-send-email-r.sricharan@ti.com>
- <20140612131600.GW8664@titan.lakedaemon.net>
-Message-ID: <5399A944.40000@ti.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Thu, 12 Jun 2014 14:24:29 +0100
+Subject: [PATCH] ARM: dts: Initial ODROID U2 support
+In-Reply-To: <5399A526.6040303@samsung.com>
+References: <1402577077-7835-1-git-send-email-drake@endlessm.com>
+ <5399A526.6040303@samsung.com>
+Message-ID: <CAD8Lp45LW06L+uub7qm0t3yzX43wkO621vAuprh9UdAE4B-qYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Thu, Jun 12, 2014 at 2:03 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Thanks for posting, however I have already prepared dts for Odroid X2
+> and U3 with complete USB support. HDMI needs a few little tweaks, but I
+> hope it can be also merged soon.
+>
+> I'm waiting for v3.16-rc1 to rebase them onto latest mainline and post
+> here. I will check if I can integrate your patch to them.
 
-On Thursday 12 June 2014 06:46 PM, Jason Cooper wrote:
-> On Thu, Jun 12, 2014 at 05:23:18PM +0530, Sricharan R wrote:
->> From: Rajendra Nayak <rnayak@ti.com>
->>
->> On DRA7 compatible IRQ crossbar, IRQ 10 default mapped to L3_APP_IRQ,
->> IRQ133 is default mapped to NMI pin, 139 and 140 crossbars are
->> unused(not routed). Mark these as unused crossbar IRQs.
->>
->> Technical Reference Manual documentation update expected
->> DRA72x-TRMINC00067 is being used to track the update.
->>
->> Reported-by: Nishanth Menon <nm@ti.com>
->> Reported-by: Sricharan R <r.sricharan@ti.com>
->> Reported-by: Suman Anna <s-anna@ti.com>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> ---
->>  drivers/irqchip/irq-crossbar.c |    4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
->> index 7d4db07..42a2e62 100644
->> --- a/drivers/irqchip/irq-crossbar.c
->> +++ b/drivers/irqchip/irq-crossbar.c
->> @@ -253,8 +253,8 @@ err1:
->>  	return -ENOMEM;
->>  }
->>  
->> -/* irq number 10 cannot be used because of hw bug */
->> -static int dra_irqs_unused[] = { 10 };
->> +/* irq number 10,133,139 and 140 cannot be used because of hw bug */
->> +static int dra_irqs_unused[] = { 10 , 133, 139, 140 };
-> 
-> see my earlier comment regarding a potential dts property.
-> 
-Ok, if dts would be the better approach then I can change this.
+Nice, thanks. I took a quick glance at your work and indeed it looks
+much more complete. I don't think you have anything to add from my
+patch.
 
-Regards,
- Sricharan
+Just one request, please be sure to submit this work after -rc1 comes
+out even if HDMI is not working at first. Too many people have started
+working on this and then stopped short of actually sending any code
+upstream. If you CC me on the patches I'll try to help with reviews
+too.
+
+Thanks,
+Daniel
