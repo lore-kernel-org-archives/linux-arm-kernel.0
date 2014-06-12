@@ -1,85 +1,65 @@
 From: minchan@kernel.org (Minchan Kim)
-Date: Thu, 12 Jun 2014 14:18:53 +0900
-Subject: [PATCH v2 01/10] DMA, CMA: clean-up log message
-In-Reply-To: <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
+Date: Thu, 12 Jun 2014 14:25:43 +0900
+Subject: [PATCH v2 02/10] DMA, CMA: fix possible memory leak
+In-Reply-To: <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
 References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <20140612051853.GD12415@bbox>
+ <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <20140612052543.GE12415@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joonsoo,
+On Thu, Jun 12, 2014 at 12:21:39PM +0900, Joonsoo Kim wrote:
+> We should free memory for bitmap when we find zone mis-match,
+> otherwise this memory will leak.
 
-On Thu, Jun 12, 2014 at 12:21:38PM +0900, Joonsoo Kim wrote:
-> We don't need explicit 'CMA:' prefix, since we already define prefix
-> 'cma:' in pr_fmt. So remove it.
+Then, -stable stuff?
+
 > 
-> And, some logs print function name and others doesn't. This looks
-> bad to me, so I unify log format to print function name consistently.
-> 
-> Lastly, I add one more debug log on cma_activate_area().
-
-When I take a look, it just indicates cma_activate_area was called or not,
-without what range for the area was reserved successfully so I couldn't see
-the intention for new message. Description should explain it so that everybody
-can agree on your claim.
-
+> Additionally, I copy code comment from ppc kvm's cma code to notify
+> why we need to check zone mis-match.
 > 
 > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 > 
 > diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 83969f8..bd0bb81 100644
+> index bd0bb81..fb0cdce 100644
 > --- a/drivers/base/dma-contiguous.c
 > +++ b/drivers/base/dma-contiguous.c
-> @@ -144,7 +144,7 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
->  	}
+> @@ -177,14 +177,24 @@ static int __init cma_activate_area(struct cma *cma)
+>  		base_pfn = pfn;
+>  		for (j = pageblock_nr_pages; j; --j, pfn++) {
+>  			WARN_ON_ONCE(!pfn_valid(pfn));
+> +			/*
+> +			 * alloc_contig_range requires the pfn range
+> +			 * specified to be in the same zone. Make this
+> +			 * simple by forcing the entire CMA resv range
+> +			 * to be in the same zone.
+> +			 */
+>  			if (page_zone(pfn_to_page(pfn)) != zone)
+> -				return -EINVAL;
+> +				goto err;
+
+At a first glance, I thought it would be better to handle such error
+before activating.
+So when I see the registration code(ie, dma_contiguous_revere_area),
+I realized it is impossible because we didn't set up zone yet. :(
+
+If so, when we detect to fail here, it would be better to report more
+meaningful error message like what was successful zone and what is
+new zone and failed pfn number?
+
+>  		}
+>  		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
+>  	} while (--i);
 >  
->  	if (selected_size && !dma_contiguous_default_area) {
-> -		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
-> +		pr_debug("%s(): reserving %ld MiB for global area\n", __func__,
->  			 (unsigned long)selected_size / SZ_1M);
->  
->  		dma_contiguous_reserve_area(selected_size, selected_base,
-> @@ -163,8 +163,9 @@ static int __init cma_activate_area(struct cma *cma)
->  	unsigned i = cma->count >> pageblock_order;
->  	struct zone *zone;
->  
-> -	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-> +	pr_debug("%s()\n", __func__);
->  
-> +	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
->  	if (!cma->bitmap)
->  		return -ENOMEM;
->  
-> @@ -234,7 +235,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->  
->  	/* Sanity checks */
->  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
-> -		pr_err("Not enough slots for CMA reserved regions!\n");
-> +		pr_err("%s(): Not enough slots for CMA reserved regions!\n",
-> +			__func__);
->  		return -ENOSPC;
->  	}
->  
-> @@ -274,14 +276,15 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->  	*res_cma = cma;
->  	cma_area_count++;
->  
-> -	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
-> -		(unsigned long)base);
-> +	pr_info("%s(): reserved %ld MiB at %08lx\n",
-> +		__func__, (unsigned long)size / SZ_1M, (unsigned long)base);
->  
->  	/* Architecture specific contiguous memory fixup. */
->  	dma_contiguous_early_fixup(base, size);
+>  	mutex_init(&cma->lock);
 >  	return 0;
->  err:
-> -	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
-> +	pr_err("%s(): failed to reserve %ld MiB\n",
-> +		__func__, (unsigned long)size / SZ_1M);
->  	return ret;
+> +
+> +err:
+> +	kfree(cma->bitmap);
+> +	return -EINVAL;
 >  }
 >  
+>  static struct cma cma_areas[MAX_CMA_AREAS];
 > -- 
 > 1.7.9.5
 
