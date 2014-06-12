@@ -1,38 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 12 Jun 2014 03:53:40 +0400
-Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add VIN DT support
-In-Reply-To: <201406110306.08759.sergei.shtylyov@cogentembedded.com>
-References: <201406110304.18976.sergei.shtylyov@cogentembedded.com>
- <201406110306.08759.sergei.shtylyov@cogentembedded.com>
-Message-ID: <5398EC04.5040802@cogentembedded.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 12 Jun 2014 00:12:56 +0000
+Subject: [PATCH 0/2] arm64 bootwrapper fixes
+Message-ID: <cover.1402531738.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Catalin,
 
-On 06/11/2014 03:06 AM, Sergei Shtylyov wrote:
+Here are two fixes for the arm64 bootwrapper.  The first is a critical makefile
+fix, the second a minor configure fix.  Please consider.
 
-> Define the generic R8A7791 parts of the VIN[0-2] device nodes. Add aliases for
-> the VIN[0-2] device nodes.
+-Geoff
 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> ---
->   arch/arm/boot/dts/r8a7791.dtsi |   27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
+The following changes since commit 09d7031d5642ff1d81c0dede9b86822d67b6b52a:
 
-> Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-[...]
-> @@ -518,6 +521,30 @@
->   		status = "disabled";
->   	};
->
-> +	vin0: video at e6ef0000 {
-> +		compatible = "renesas,vin-r8a7790";
+  boot-wrapper: arm64: add support for GICv3 (2014-05-09 18:43:52 +0100)
 
-    Duh, should have been "renesas,vin-r8a7791"...
+are available in the git repository at:
 
-WBR, Sergei
+  git://git.linaro.org/people/geoff.levand/boot-wrapper-aarch64.git master
+
+for you to fetch changes up to 8ad2293111bbd60ddecd071be34734c2b46415df:
+
+  configure: Fixes for --enable-xxx (2014-06-11 17:07:54 -0700)
+
+----------------------------------------------------------------
+Geoff Levand (2):
+      Makefile: Add local perl module include path
+      configure: Fixes for --enable-xxx
+
+ Makefile.am  | 14 +++++++-------
+ configure.ac | 19 +++++++++----------
+ 2 files changed, 16 insertions(+), 17 deletions(-)
+
+-- 
+1.9.1
