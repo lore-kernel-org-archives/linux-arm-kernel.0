@@ -1,79 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Jun 2014 17:30:06 +0200
-Subject: [PATCH] drm: imx: use GENERIC_IRQ_CHIP
-In-Reply-To: <20140612150418.GJ23430@n2100.arm.linux.org.uk>
-References: <7367559.qEUUbIia3C@wuerfel> <18338077.DHE9A0xGC1@wuerfel>
- <20140612150418.GJ23430@n2100.arm.linux.org.uk>
-Message-ID: <4447748.CqSILDNGQQ@wuerfel>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 12 Jun 2014 17:31:41 +0200
+Subject: [PATCH] [media] staging: allow omap4iss to be modular
+In-Reply-To: <20140612151534.GF17845@atomide.com>
+References: <5192928.MkINji4uKU@wuerfel> <2207210.T6NoNSQSCo@avalon>
+ <20140612151534.GF17845@atomide.com>
+Message-ID: <1689719.caqIIBS1Wn@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 June 2014 16:04:19 Russell King - ARM Linux wrote:
-> On Thu, Jun 12, 2014 at 04:51:26PM +0200, Arnd Bergmann wrote:
-> > On Thursday 12 June 2014 15:23:54 Russell King - ARM Linux wrote:
-> > > On Thu, Jun 12, 2014 at 04:05:32PM +0200, Arnd Bergmann wrote:
-> > > > This driver defines its own irqchip using the generic chip
-> > > > infrastructure, and hence needs the GENERIC_IRQ_CHIP Kconfig
-> > > > symbol enabled, or get this build error:
-> > > > 
-> > > > drivers/built-in.o: In function `ipu_probe':
-> > > > :(.text+0x49ea4c): undefined reference to `irq_generic_chip_ops'
-> > > > :(.text+0x49ea5c): undefined reference to `irq_alloc_domain_generic_chips'
-> > > > :(.text+0x49ea60): undefined reference to `irq_get_domain_generic_chip'
-> > > > :(.text+0x49ea64): undefined reference to `irq_gc_ack_set_bit'
-> > > > :(.text+0x49ea6c): undefined reference to `irq_gc_mask_clr_bit'
-> > > > :(.text+0x49ea70): undefined reference to `irq_gc_mask_set_bit'
+Hi Tony,
+
+On Thursday 12 June 2014 08:15:35 Tony Lindgren wrote:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140612 07:52]:
+> > On Wednesday 11 June 2014 07:47:54 Tony Lindgren wrote:
+> > > These should just use either pinctrl-single.c instead for muxing.
+> > > Or if they are not mux registers, we do have the syscon mapping
+> > > available in omap4.dtsi that pbias-regulator.c is already using.
 > > > 
-> > > Let's take a step back, and ask the obvious question: is it reasonable
-> > > to make use if GENERIC_IRQ_CHIP in this driver?
+> > > Laurent, got any better ideas?
 > > 
-> > While I haven't looked at this driver in particular, I know that
-> > Thomas Gleixner has been rather upset in the past when new irqchip
-> > drivers got introduced that were reimplementing the generic irqchip
-> > rather than using it.
+> > The ISS driver needs to write a single register, which contains several
+> > independent fields. They thus need to be controlled by a single driver.
+> > Some of them might be considered to be related to pinmuxing (although I
+> > disagree on that), others are certainly not about muxing (there are clock
+> > gate bits for instance).
 > > 
-> > You can argue over whether it should be an irqchip at all or not,
-> > I don't know, and I simply had to assume that this part of the
-> > code is ok.
+> > Using the syscon mapping seems like the best option. I'll give it a try.
 > 
-> The question was more whether "peripheral" drivers should register their
-> own irqchips to split a single IRQ into multiple separate Linux IRQs.
-> We don't have PCI devices behaving like that... and I don't think we
-> should allow it as a general rule.
-
-There are two cases I can think of where it makes sense for a driver
-to register an irqchip: gpio extenders and multi-function-device (mfd).
-It's quite common for both to do this.
-
-For the IPU, it can be seen as a form of MFD, since there are multiple
-real drivers in other subsystems that are part of the IPU. It doesn't
-have to be done this way, but it seems like a reasonable way to me.
-
-For architecture independent drivers (i.e. most PCI drivers), we
-can't do it like this because not all architectures support IRQ
-domains.
-
-> > This seems more like a second bug in a related part of the code
-> > to me. Looking at other generic irqchip users, it seems like
-> > the same bug exists in gpio-dwapb.c, gpio-ml-ioh.c, gpio-pch.c
-> > and possibly others, which are all loadable modules using a
-> > generic irqchip that can't be freed.
+> OK if it's not strictly pinctrl related then let's not use
+> pinctrl-single,bits for it. You may be able to implement one or more
+> framework drivers for it for pinctrl/regulator/clock/transceiver
+> whatever that register is doing.
 > 
-> Generally, that means either (a) the subsystem being used does not
-> support the approach, or (b) the subsystem is being inappropriately
-> used.
-> 
-> In the case of (a), it means a discussion whether support for it
-> should be added.  If the answer to that is no, then we need these
-> drivers to become modules which can only be loaded _and_ drivers
-> which can never be unbound.
-> 
-> In the case of (b) it means that the real bug is that the driver is
-> making use of the subsystem (irqchip in this case) that it should not
-> be using.
+> In any case it's best to have that handling in a separate helper driver
+> somewhere as it's a separate piece of hardware from the camera module.
+> If it does not fit into any existing frameworks then it's best to have
+> it in a separate driver with the camera driver.
 
-Yes, makes sense. I believe this is just a missing feature in
-the generic irqchip code. We keep extending this drive when needed,
+The register contains the following fields that control the two CSI2 PHYs 
+(PHY1 and PHY2).
 
+31    CAMERARX_CSI22_LANEENABLE2   PHY2 Lane 2 (CSI22_DX2, CSI22_DY2) Enable
+30    CAMERARX_CSI22_LANEENABLE1   PHY2 Lane 1 (CSI22_DX1, CSI22_DY1) Enable
+29    CAMERARX_CSI22_LANEENABLE0   PHY2 Lane 0 (CSI22_DX0, CSI22_DY0) Enable
+28    CAMERARX_CSI21_LANEENABLE4   PHY1 Lane 4 (CSI21_DX4, CSI21_DY4) Enable
+27    CAMERARX_CSI21_LANEENABLE3   PHY1 Lane 3 (CSI21_DX3, CSI21_DY3) Enable
+26    CAMERARX_CSI21_LANEENABLE2   PHY1 Lane 2 (CSI21_DX2, CSI21_DY2) Enable
+25    CAMERARX_CSI21_LANEENABLE1   PHY1 Lane 1 (CSI21_DX1, CSI21_DY1) Enable
+24    CAMERARX_CSI21_LANEENABLE0   PHY1 Lane 0 (CSI21_DX0, CSI21_DY0) Enable
+21    CAMERARX_CSI22_CTRLCLKEN     PHY2 Clock Enable
+20:19 CAMERARX_CSI22_CAMMODE       PHY2 Mode (CCP2, CSI1, CSI2)
+18    CAMERARX_CSI21_CTRLCLKEN     PHY1 Clock Enable
+17:16 CAMERARX_CSI21_CAMMODE       PHY1 Mode (CCP2, CSI1, CSI2)
 
-	Arnd
+Bits 18 and 21 could be exposed through CCF. Bits 24 to 31 enable/disable the 
+CSI2 lanes, so it could be argued that they could be exposed through the 
+pinctrl framework. However, they need to be configured independently, possibly 
+at runtime. I'm thus not sure pinctrl would be a good idea. Bits 17:16 and 
+20:19 don't fit in existing frameworks.
+
+Given that this register is specific to the ISS, I think handling it as a 
+separate device through a separate driver would only complicate the 
+implementation without any real benefit.
+
+-- 
+Regards,
+
+Laurent Pinchart
