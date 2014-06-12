@@ -1,30 +1,20 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 12 Jun 2014 17:38:40 +0800
-Subject: [PATCH] ARM: dts: berlin2q.dtsi: set L2CC tag and data latency as 2
- cycles
-Message-ID: <1402565920-5636-1-git-send-email-jszhang@marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Jun 2014 10:44:23 +0100
+Subject: [PATCH] ARM: dts: berlin2q.dtsi: set L2CC tag and data latency
+ as 2 cycles
+In-Reply-To: <1402565920-5636-1-git-send-email-jszhang@marvell.com>
+References: <1402565920-5636-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20140612094423.GC23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For all BG2Q SoCs, 2 cycles is the best/correct value
+On Thu, Jun 12, 2014 at 05:38:40PM +0800, Jisheng Zhang wrote:
+> For all BG2Q SoCs, 2 cycles is the best/correct value
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+It would be a good idea to set all these parameters if you need to set
+them at all - in other words, setting arm,dirty-latency as well, as
+that's all part of the timing specification.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 635a16a..3f95dc5 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -90,6 +90,8 @@
- 			compatible = "arm,pl310-cache";
- 			reg = <0xac0000 0x1000>;
- 			cache-level = <2>;
-+			arm,data-latency = <2 2 2>;
-+			arm,tag-latency = <2 2 2>;
- 		};
- 
- 		scu: snoop-control-unit at ad0000 {
 -- 
-2.0.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
