@@ -1,36 +1,49 @@
 From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Thu, 12 Jun 2014 12:21:45 +0900
-Subject: [PATCH v2 08/10] mm, cma: clean-up cma allocation error path
+Date: Thu, 12 Jun 2014 12:21:39 +0900
+Subject: [PATCH v2 02/10] DMA, CMA: fix possible memory leak
 In-Reply-To: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
 References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <1402543307-29800-9-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can remove one call sites for clear_cma_bitmap() if we first
-call it before checking error number.
+We should free memory for bitmap when we find zone mis-match,
+otherwise this memory will leak.
+
+Additionally, I copy code comment from ppc kvm's cma code to notify
+why we need to check zone mis-match.
 
 Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-diff --git a/mm/cma.c b/mm/cma.c
-index 1e1b017..01a0713 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -282,11 +282,12 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
- 		if (ret == 0) {
- 			page = pfn_to_page(pfn);
- 			break;
--		} else if (ret != -EBUSY) {
--			clear_cma_bitmap(cma, pfn, count);
--			break;
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index bd0bb81..fb0cdce 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -177,14 +177,24 @@ static int __init cma_activate_area(struct cma *cma)
+ 		base_pfn = pfn;
+ 		for (j = pageblock_nr_pages; j; --j, pfn++) {
+ 			WARN_ON_ONCE(!pfn_valid(pfn));
++			/*
++			 * alloc_contig_range requires the pfn range
++			 * specified to be in the same zone. Make this
++			 * simple by forcing the entire CMA resv range
++			 * to be in the same zone.
++			 */
+ 			if (page_zone(pfn_to_page(pfn)) != zone)
+-				return -EINVAL;
++				goto err;
  		}
+ 		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
+ 	} while (--i);
+ 
+ 	mutex_init(&cma->lock);
+ 	return 0;
 +
- 		clear_cma_bitmap(cma, pfn, count);
-+		if (ret != -EBUSY)
-+			break;
-+
- 		pr_debug("%s(): memory range at %p is busy, retrying\n",
- 			 __func__, pfn_to_page(pfn));
- 		/* try again with a bit different memory target */
++err:
++	kfree(cma->bitmap);
++	return -EINVAL;
+ }
+ 
+ static struct cma cma_areas[MAX_CMA_AREAS];
 -- 
 1.7.9.5
