@@ -1,92 +1,116 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 12 Jun 2014 17:09:32 +0200
-Subject: [PATCHv5 3/3] ARM: mvebu: update L2/PCIe deadlock workaround after
- L2CC cleanup
+Date: Thu, 12 Jun 2014 17:09:30 +0200
+Subject: [PATCHv5 1/3] ARM: mm: add support for HW coherent systems in PL310
+ cache
 In-Reply-To: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1402585772-10405-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1402585772-10405-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 497a92308af8e9385fa3d135f7f416a997e4b93b ("ARM: mvebu:
-implement L2/PCIe deadlock workaround") introduced some logic in
-coherency.c to adjust the PL310 cache controller Device Tree node of
-Armada 375 and Armada 38x platform to include the 'arm,io-coherent'
-property if the system is running with hardware I/O coherency enabled.
+When a PL310 cache is used on a system that provides hardware
+coherency, the outer cache sync operation is useless, and can be
+skipped. Moreover, on some systems, it is harmful as it causes
+deadlocks between the Marvell coherency mechanism, the Marvell PCIe
+controller and the Cortex-A9.
 
-However, with the L2CC driver cleanup done by Russell King, the
-initialization of the L2CC driver has been moved earlier, and is now
-part of the init_IRQ() ARM function in
-arch/arm/kernel/irq.c. Therefore, calling coherency_init() in
-->init_time() is now too late, as the Device Tree property gets added
-too late (after the L2CC driver has been initialized).
+To avoid this, this commit introduces a new Device Tree property
+'arm,io-coherent' for the L2 cache controller node, valid only for the
+PL310 cache. It identifies the usage of the PL310 cache in an I/O
+coherent configuration. Internally, it makes the driver disable the
+outer cache sync operation.
 
-In order to fix this, this commit removes the ->init_time() callback
-use in board-v7.c and replaces it with an ->init_irq() callback. We
-therefore no longer use the default ->init_irq() callback, but we now
-use the default ->init_time() callback.
+Note that technically speaking, a fully coherent system wouldn't
+require any of the other .outer_cache operations. However, in
+practice, when booting secondary CPUs, these are not yet coherent, and
+therefore a set of cache maintenance operations are necessary at this
+point. This explains why we keep the other .outer_cache operations and
+only ->sync is disabled.
 
-In this newly introduced ->init_irq() callback, we call irqchip_init()
-which is the default behavior when ->init_irq() isn't defined, and
-then do the initialization related to the coherency: SCU, coherency
-fabric, and mvebu-mbus (which is needed to start secondary CPUs).
+While in theory any write to a PL310 register could cause the
+deadlock, in practice, disabling ->sync is sufficient to workaround
+the deadlock, since the other cache maintenance operations are only
+used in very specific situations.
+
+Contrary to previous versions of this patch, this new version does not
+simply NULL-ify the ->sync member, because the l2c_init_data
+structures are now 'const' and therefore cannot be modified, which is
+a good thing. Therefore, this patch introduces a separate
+l2c_init_data instance, called of_l2c310_coherent_data.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/board-v7.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+This patch is based on the latest mainline, as it depends on the L2CC
+cleanup from Russell King.
 
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 804c952..b2524d6 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -23,6 +23,7 @@
- #include <linux/mbus.h>
- #include <linux/signal.h>
- #include <linux/slab.h>
-+#include <linux/irqchip.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -71,10 +72,9 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
- 	return 1;
- }
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ Documentation/devicetree/bindings/arm/l2cc.txt |  3 +++
+ arch/arm/mm/cache-l2x0.c                       | 31 ++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index b513cb8..af527ee 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -40,6 +40,9 @@ Optional properties:
+ - arm,filter-ranges : <start length> Starting address and length of window to
+   filter. Addresses in the filter window are directed to the M1 port. Other
+   addresses will go to the M0 port.
++- arm,io-coherent : indicates that the system is operating in an hardware
++  I/O coherent mode. Valid only when the arm,pl310-cache compatible
++  string is used.
+ - interrupts : 1 combined interrupt.
+ - cache-id-part: cache id part number to be used if it is not present
+   on hardware
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index efc5cab..076172b 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1069,6 +1069,33 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+ };
  
--static void __init mvebu_timer_and_clk_init(void)
-+static void __init mvebu_init_irq(void)
- {
--	of_clk_init(NULL);
--	clocksource_of_init();
-+	irqchip_init();
- 	mvebu_scu_enable();
- 	coherency_init();
- 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
-@@ -194,7 +194,7 @@ DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.l2c_aux_mask	= ~0,
- 	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= mvebu_dt_init,
--	.init_time	= mvebu_timer_and_clk_init,
-+	.init_irq       = mvebu_init_irq,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_370_xp_dt_compat,
- MACHINE_END
-@@ -207,7 +207,7 @@ static const char * const armada_375_dt_compat[] = {
- DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--	.init_time	= mvebu_timer_and_clk_init,
-+	.init_irq       = mvebu_init_irq,
- 	.init_machine	= mvebu_dt_init,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_375_dt_compat,
-@@ -222,7 +222,7 @@ static const char * const armada_38x_dt_compat[] = {
- DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--	.init_time	= mvebu_timer_and_clk_init,
-+	.init_irq       = mvebu_init_irq,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_38x_dt_compat,
- MACHINE_END
+ /*
++ * This is a variant of the of_l2c310_data with .sync set to
++ * NULL. Outer sync operations are not needed when the system is I/O
++ * coherent, and potentially harmful in certain situations (PCIe/PL310
++ * deadlock on Armada 375/38x due to hardware I/O coherency). The
++ * other operations are kept because they are infrequent (therefore do
++ * not cause the deadlock in practice) and needed for secondary CPU
++ * boot and other power management activities.
++ */
++static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
++	.type = "L2C-310 Coherent",
++	.way_size_0 = SZ_8K,
++	.num_lock = 8,
++	.of_parse = l2c310_of_parse,
++	.enable = l2c310_enable,
++	.fixup = l2c310_fixup,
++	.save  = l2c310_save,
++	.outer_cache = {
++		.inv_range   = l2c210_inv_range,
++		.clean_range = l2c210_clean_range,
++		.flush_range = l2c210_flush_range,
++		.flush_all   = l2c210_flush_all,
++		.disable     = l2c310_disable,
++		.resume      = l2c310_resume,
++	},
++};
++
++/*
+  * Note that the end addresses passed to Linux primitives are
+  * noninclusive, while the hardware cache range operations use
+  * inclusive start and end addresses.
+@@ -1487,6 +1514,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 
+ 	data = of_match_node(l2x0_ids, np)->data;
+ 
++	if (of_device_is_compatible(np, "arm,pl310-cache") &&
++	    of_property_read_bool(np, "arm,io-coherent"))
++		data = &of_l2c310_coherent_data;
++
+ 	old_aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+ 	if (old_aux != ((old_aux & aux_mask) | aux_val)) {
+ 		pr_warn("L2C: platform modifies aux control register: 0x%08x -> 0x%08x\n",
 -- 
 2.0.0
