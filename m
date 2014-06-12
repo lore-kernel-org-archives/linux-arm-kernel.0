@@ -1,38 +1,47 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 12 Jun 2014 09:30:09 -0700
-Subject: [PATCH v4 10/14] ARM64: KVM: store kvm_vcpu_fault_info est_el2 as word
+Date: Thu, 12 Jun 2014 09:30:12 -0700
+Subject: [PATCH v4 13/14] ARM64: KVM: set and get of sys registers in BE case
 In-Reply-To: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
 References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1402590613-3341-11-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1402590613-3341-14-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-esr_el2 field of struct kvm_vcpu_fault_info has u32 type.
-It should be stored as word. Current code works in LE case
-because existing puts least significant word of x1 into
-esr_el2, and it puts most significant work of x1 into next
-field, which accidentally is OK because it is updated again
-by next instruction. But existing code breaks in BE case.
+Since size of all sys registers is always 8 bytes. Current
+code is actually endian agnostic. Just clean it up a bit.
+Removed comment about little endian. Change type of pointer
+from 'void *' to 'u64 *' to enforce stronger type checking.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kvm/sys_regs.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 2c56012..0620691 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -824,7 +824,7 @@ el1_trap:
- 	mrs	x2, far_el2
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 0324458..8e65e31 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -776,17 +776,15 @@ static struct sys_reg_desc invariant_sys_regs[] = {
+ 	  NULL, get_ctr_el0 },
+ };
  
- 2:	mrs	x0, tpidr_el2
--	str	x1, [x0, #VCPU_ESR_EL2]
-+	str	w1, [x0, #VCPU_ESR_EL2]
- 	str	x2, [x0, #VCPU_FAR_EL2]
- 	str	x3, [x0, #VCPU_HPFAR_EL2]
+-static int reg_from_user(void *val, const void __user *uaddr, u64 id)
++static int reg_from_user(u64 *val, const void __user *uaddr, u64 id)
+ {
+-	/* This Just Works because we are little endian. */
+ 	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
+ 		return -EFAULT;
+ 	return 0;
+ }
  
+-static int reg_to_user(void __user *uaddr, const void *val, u64 id)
++static int reg_to_user(void __user *uaddr, const u64 *val, u64 id)
+ {
+-	/* This Just Works because we are little endian. */
+ 	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
+ 		return -EFAULT;
+ 	return 0;
 -- 
 1.8.1.4
