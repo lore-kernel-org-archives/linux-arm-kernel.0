@@ -1,72 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 15:17:51 +0100
-Subject: Kconfig fails: big select-based circular dependency
-In-Reply-To: <6046244.oz0lY2JOaZ@wuerfel>
-References: <20140607090944.GL23430@n2100.arm.linux.org.uk>
- <10376496.xoRI3F9EzH@wuerfel> <20140612130330.GG23430@n2100.arm.linux.org.uk>
- <6046244.oz0lY2JOaZ@wuerfel>
-Message-ID: <20140612141751.GH23430@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 12 Jun 2014 07:18:31 -0700
+Subject: [PATCH V2 08/19] irqchip: crossbar: fix checkpatch warning
+In-Reply-To: <5399AC9C.4080602@ti.com>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <1402574007-13987-9-git-send-email-r.sricharan@ti.com>
+ <20140612131042.GU8664@titan.lakedaemon.net> <5399AC9C.4080602@ti.com>
+Message-ID: <1402582711.9947.17.camel@joe-AO725>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 03:37:18PM +0200, Arnd Bergmann wrote:
-> I didn't say we should not fix it, I just meant we don't need to spend
-> too much time on a perfect solution for code that is going away and that
-> is already not used anywhere.
-> 
-> I've just replied to an older thread "Re: [PATCH 1/2] [RFC] ASoC: samsung:
-> move s3c24xx over to dmaengine" with a patch that would let us kill off
-> the code right away, or at least disable it in Kconfig.
-> 
-> For some reason, I can't reproduce the failure you see in your build system,
-> I tried torvalds/master and next/master today and I have also done
-> allmodconfig and randconfig builds in the past few days on slightly
-> older versions.
+On Thu, 2014-06-12 at 19:05 +0530, Sricharan R wrote:
+> On Thursday 12 June 2014 06:40 PM, Jason Cooper wrote:
+> > On Thu, Jun 12, 2014 at 05:23:16PM +0530, Sricharan R wrote:
+> >> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+[]
+> >> @@ -34,7 +34,8 @@ struct crossbar_device {
+> >>  	uint *irq_map;
+> >>  	void __iomem *crossbar_base;
+> >>  	int *register_offsets;
+> >> -	void (*write) (int, int);
+> >> +
+> >> +	void (*write)(int, int);
+> > 
+> > The empty line here looks bogus to me.
 
-That's because you don't have this commit:
+Good eye.  It's unnecessary.
 
-Author: Philipp Zabel <p.zabel@pengutronix.de>
-Date:   Thu Mar 6 14:54:39 2014 +0100
+>   Did you re-run checkpatch after
+> > fixing the unnecessary space to see if it still complained about having
+> > a 'blank line after declarations'?
+> > 
+>  Yes, it still complains even after fixing unnecessary space.
 
-    imx-drm: imx-ldb: add drm_panel support
-    
-    This patch allows to optionally attach the lvds-channel to a panel
-    supported by a drm_panel driver instead of supplying the modes via
-    device tree.
+It's a checkpatch defect.
 
-    Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-    [Fixed build error due to missing select on DRM_PANEL --rmk]
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+It's been fixed by:
+https://lkml.org/lkml/2014/6/6/426
 
-diff --git a/drivers/staging/imx-drm/Kconfig b/drivers/staging/imx-drm/Kconfig
-index c6e8ba7b3e4e..92fb52cbd3a2 100644
---- a/drivers/staging/imx-drm/Kconfig
-+++ b/drivers/staging/imx-drm/Kconfig
-@@ -35,6 +35,7 @@ config DRM_IMX_TVE
- config DRM_IMX_LDB
-        tristate "Support for LVDS displays"
-        depends on DRM_IMX && MFD_SYSCON
-+       select DRM_PANEL
-        help
-          Choose this to enable the internal LVDS Display Bridge (LDB)
-          found on i.MX53 and i.MX6 processors.
+> > I'm generally opposed to these sorts of checkpatch patches, especially
+> > when they are just warnings.  It's great for a new driver in the staging
+> > tree, but it makes backporting future bugfixes that much harder when
+> > drivers have been live in mainline.
 
-which introduces the final nail in the loop - and as imx-ldb really
-does require DRM_PANEL support, and DRM_PANEL is not a user selectable
-symbol, the above addition is an entirely reasonable thing to do.
+Blind adherence to checkpatch isn't always a great idea.
 
-The above commit /was/ going to go in during this merge window (along with
-three others) had I not been soo hacked off with the crap change handling
-and the general dysfunctional ARM community that we seem to have in the
-kernel community now, and ended up walking totally away from kernel
-maintanence for much of the last cycle... we're only /just/ starting to
-find out all the problems that my MMC patch series caused... and there's
-/still/ outstanding issues with the L2C patch series which /still/ have
-not been resolved - both of which are now part of mainline so people will
-now be forced to deal with these issues.  That's not the right way, but
-it seems to be the /only/ way to get things done in todays dysfunctional
-environment.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+But bugfix backports haven't been much of an issue in
+other subsystems with fairly active whitespace/style
+changes.
