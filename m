@@ -1,138 +1,58 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 12 Jun 2014 16:42:35 +0100
-Subject: [PATCH v3] ARM: add get_user() support for 8 byte types
-Message-ID: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 12 Jun 2014 16:50:20 +0100
+Subject: [PATCH 2/2] drm/panel: make DRM_PANEL_LD9040 depend on SPI
+Message-ID: <E1Wv7Ge-0004SN-Sk@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new atomic modeset/pageflip ioctl being developed in DRM requires
-get_user() to work for 64bit types (in addition to just put_user()).
+Rather than DRM_PANEL_LD9040 selecting SPI, which then results in an
+increase in the probability of Kconf reporting circular dependencies
+(we're one "select" away from that right now), make this depend on
+SPI instead.  This is akin to having some driver select DRM.
 
-v1: original
-v2: pass correct size to check_uaccess, and better handling of narrowing
-    double word read with __get_user_xb() (Russell King's suggestion)
-v3: fix a couple of checkpatch issues
+Having some drivers depend on a subsystem, and other drivers select a
+subsystem is a recipe for circular dependencies, and there's really no
+need for it.
 
-Signed-off-by: Rob Clark <robdclark@gmail.com>
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+The potential circular dependency (which can be caused today by the
+addition of selecting DRM_PANEL from DRM_IMX_LDB) is:
+
+  symbol DMADEVICES is selected by SAMSUNG_DMADEV
+  symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
+  symbol S3C64XX_PL080 is selected by SPI_S3C64XX
+  symbol SPI_S3C64XX depends on SPI
+  symbol SPI is selected by DRM_PANEL_LD9040
+  symbol DRM_PANEL_LD9040 depends on DRM_PANEL
+  symbol DRM_PANEL is selected by DRM_IMX_LDB
+  symbol DRM_IMX_LDB depends on MFD_SYSCON
+  symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
+  symbol POWER_RESET_KEYSTONE depends on POWER_SUPPLY
+  symbol POWER_SUPPLY is selected by HID_SONY
+  symbol HID_SONY depends on NEW_LEDS
+  symbol NEW_LEDS is selected by BACKLIGHT_ADP8860
+  symbol BACKLIGHT_ADP8860 depends on BACKLIGHT_CLASS_DEVICE
+  symbol BACKLIGHT_CLASS_DEVICE is selected by FB_MX3
+  symbol FB_MX3 depends on MX3_IPU
+  symbol MX3_IPU depends on DMADEVICES
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
+ drivers/gpu/drm/panel/Kconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Notes:
-    I'd like to wake this patch up again. It was rejected back in 2012 on
-    the grounds that other architectures (notably x86-32) didn't implement
-    this so adding for ARM risked portability problems in drivers. However
-    shortly after the discussion (in fact I believe that as a *result* of
-    that discussion) support for 64-bit get_user() was added for x86-32.
-    
-    A quick review of different architectures uaccess.h shows that ARM is
-    in the minority (even after excluding 64-bit architectures) in not
-    implementing this feature.
-    
-    The reasons to wake it up are the same as before. Recent contributions,
-    including to DRM[1] and binder[2] would prefer to use the 64-bit values
-    in their interfaces without gotchas like having to use copy_from_user().
-    
-    [1] http://thread.gmane.org/gmane.comp.video.dri.devel/102135/focus=102149
-    [2] http://thread.gmane.org/gmane.linux.kernel/1653448/focus=1653449
-
- arch/arm/include/asm/uaccess.h | 18 +++++++++++++++++-
- arch/arm/lib/getuser.S         | 17 ++++++++++++++++-
- 2 files changed, 33 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 75d9579..5f7db3fb 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -107,6 +107,7 @@ static inline void set_fs(mm_segment_t fs)
- extern int __get_user_1(void *);
- extern int __get_user_2(void *);
- extern int __get_user_4(void *);
-+extern int __get_user_8(void *);
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index 44aea730b3aa..583062857d9f 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -18,8 +18,7 @@ config DRM_PANEL_SIMPLE
  
- #define __GUP_CLOBBER_1	"lr", "cc"
- #ifdef CONFIG_CPU_USE_DOMAINS
-@@ -115,6 +116,7 @@ extern int __get_user_4(void *);
- #define __GUP_CLOBBER_2 "lr", "cc"
- #endif
- #define __GUP_CLOBBER_4	"lr", "cc"
-+#define __GUP_CLOBBER_8	"lr", "cc"
+ config DRM_PANEL_LD9040
+ 	tristate "LD9040 RGB/SPI panel"
+-	depends on OF
+-	select SPI
++	depends on OF && SPI
+ 	select VIDEOMODE_HELPERS
  
- #define __get_user_x(__r2,__p,__e,__l,__s)				\
- 	   __asm__ __volatile__ (					\
-@@ -125,11 +127,19 @@ extern int __get_user_4(void *);
- 		: "0" (__p), "r" (__l)					\
- 		: __GUP_CLOBBER_##__s)
- 
-+/* narrowing a double-word get into a single 32bit word register: */
-+#ifdef BIG_ENDIAN
-+#define __get_user_xb(__r2, __p, __e, __l, __s)				\
-+	__get_user_x(__r2, (uintptr_t)__p + 4, __e, __l, __s)
-+#else
-+#define __get_user_xb __get_user_x
-+#endif
-+
- #define __get_user_check(x,p)							\
- 	({								\
- 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
- 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
--		register unsigned long __r2 asm("r2");			\
-+		register typeof(x) __r2 asm("r2");			\
- 		register unsigned long __l asm("r1") = __limit;		\
- 		register int __e asm("r0");				\
- 		switch (sizeof(*(__p))) {				\
-@@ -142,6 +152,12 @@ extern int __get_user_4(void *);
- 		case 4:							\
- 			__get_user_x(__r2, __p, __e, __l, 4);		\
- 			break;						\
-+		case 8:							\
-+			if (sizeof((x)) < 8)				\
-+				__get_user_xb(__r2, __p, __e, __l, 4);	\
-+			else						\
-+				__get_user_x(__r2, __p, __e, __l, 8);	\
-+			break;						\
- 		default: __e = __get_user_bad(); break;			\
- 		}							\
- 		x = (typeof(*(p))) __r2;				\
-diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-index 9b06bb4..ed98707 100644
---- a/arch/arm/lib/getuser.S
-+++ b/arch/arm/lib/getuser.S
-@@ -18,7 +18,7 @@
-  * Inputs:	r0 contains the address
-  *		r1 contains the address limit, which must be preserved
-  * Outputs:	r0 is the error code
-- *		r2 contains the zero-extended value
-+ *		r2, r3 contains the zero-extended value
-  *		lr corrupted
-  *
-  * No other registers must be altered.  (see <asm/uaccess.h>
-@@ -66,6 +66,19 @@ ENTRY(__get_user_4)
- 	mov	pc, lr
- ENDPROC(__get_user_4)
- 
-+ENTRY(__get_user_8)
-+	check_uaccess r0, 8, r1, r2, __get_user_bad
-+#ifdef CONFIG_THUMB2_KERNEL
-+5: TUSER(ldr)	r2, [r0]
-+6: TUSER(ldr)	r3, [r0, #4]
-+#else
-+5: TUSER(ldr)	r2, [r0], #4
-+6: TUSER(ldr)	r3, [r0]
-+#endif
-+	mov	r0, #0
-+	mov	pc, lr
-+ENDPROC(__get_user_8)
-+
- __get_user_bad:
- 	mov	r2, #0
- 	mov	r0, #-EFAULT
-@@ -77,4 +90,6 @@ ENDPROC(__get_user_bad)
- 	.long	2b, __get_user_bad
- 	.long	3b, __get_user_bad
- 	.long	4b, __get_user_bad
-+	.long	5b, __get_user_bad
-+	.long	6b, __get_user_bad
- .popsection
+ config DRM_PANEL_S6E8AA0
 -- 
-1.9.3
+1.8.3.1
