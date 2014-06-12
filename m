@@ -1,171 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 16:58:44 +0100
-Subject: [PATCH v3] ARM: add get_user() support for 8 byte types
-In-Reply-To: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
-References: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140612155843.GK23430@n2100.arm.linux.org.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 12 Jun 2014 18:58:28 +0300
+Subject: [PATCH v2 2/3] ARM: choose highest resolution delay timer
+In-Reply-To: <1402588713-18766-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1402588713-18766-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1402588713-18766-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 04:42:35PM +0100, Daniel Thompson wrote:
-> A new atomic modeset/pageflip ioctl being developed in DRM requires
-> get_user() to work for 64bit types (in addition to just put_user()).
-> 
-> v1: original
-> v2: pass correct size to check_uaccess, and better handling of narrowing
->     double word read with __get_user_xb() (Russell King's suggestion)
-> v3: fix a couple of checkpatch issues
+In case there are several possible delay timers, choose the one with the
+highest resolution. This code relies on the fact secondary CPUs have not yet
+been brought online when register_current_timer_delay() is called. This is
+ensured by implementing calibration_delay_done(),
 
-This is still unsafe.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/lib/delay.c |   26 ++++++++++++++++++++++----
+ 1 files changed, 22 insertions(+), 4 deletions(-)
 
->  #define __get_user_check(x,p)							\
->  	({								\
->  		unsigned long __limit = current_thread_info()->addr_limit - 1; \
->  		register const typeof(*(p)) __user *__p asm("r0") = (p);\
-> -		register unsigned long __r2 asm("r2");			\
-> +		register typeof(x) __r2 asm("r2");			\
-
-So, __r2 becomes the type of 'x'.  If 'x' is a 64-bit type, and *p is
-an 8-bit, 16-bit, or 32-bit type, this fails horribly by leaving the
-upper word of __r2 undefined.
-
-__r2 must follow the size of the value we are reading.  I think the
-last solution which was proposed was this:
-
- arch/arm/include/asm/uaccess.h |   17 +++++++++++++----
- arch/arm/lib/getuser.S         |   33 ++++++++++++++++++++++++++++++++-
- 2 files changed, 45 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 72abdc5..747f2cb 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -93,6 +93,9 @@ static inline void set_fs(mm_segment_t fs)
- 		: "cc"); \
- 	flag; })
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index 5306de3..312d43e 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -19,6 +19,7 @@
+  * Author: Will Deacon <will.deacon@arm.com>
+  */
  
-+#define __inttype(x) \
-+	__typeof__(__builtin_choose_expr(sizeof(x) > sizeof(0UL), 0ULL, 0UL))
++#include <linux/clocksource.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+@@ -36,6 +37,7 @@ struct arm_delay_ops arm_delay_ops = {
+ 
+ static const struct delay_timer *delay_timer;
+ static bool delay_calibrated;
++static u64 delay_res;
+ 
+ int read_current_timer(unsigned long *timer_val)
+ {
+@@ -47,6 +49,11 @@ int read_current_timer(unsigned long *timer_val)
+ }
+ EXPORT_SYMBOL_GPL(read_current_timer);
+ 
++static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
++{
++	return (cyc * mult) >> shift;
++}
 +
- /*
-  * Single-value transfer routines.  They automatically use the right
-  * size if we just have the right pointer type.  Note that the functions
-@@ -107,14 +110,16 @@ static inline void set_fs(mm_segment_t fs)
- extern int __get_user_1(void *);
- extern int __get_user_2(void *);
- extern int __get_user_4(void *);
-+extern int __get_user_8(void *);
+ static void __timer_delay(unsigned long cycles)
+ {
+ 	cycles_t start = get_cycles();
+@@ -69,18 +76,24 @@ static void __timer_udelay(unsigned long usecs)
  
--#define __GUP_CLOBBER_1	"lr", "cc"
-+#define __GUP_CLOBBER_1 "lr", "cc"
- #ifdef CONFIG_CPU_USE_DOMAINS
--#define __GUP_CLOBBER_2	"ip", "lr", "cc"
-+#define __GUP_CLOBBER_2 "ip", "lr", "cc"
- #else
- #define __GUP_CLOBBER_2 "lr", "cc"
- #endif
--#define __GUP_CLOBBER_4	"lr", "cc"
-+#define __GUP_CLOBBER_4 "lr", "cc"
-+#define __GUP_CLOBBER_8 "lr", "cc"
- 
- #define __get_user_x(__r2,__p,__e,__l,__s)				\
- 	   __asm__ __volatile__ (					\
-@@ -129,7 +134,7 @@ extern int __get_user_4(void *);
- 	({								\
- 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
- 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
--		register unsigned long __r2 asm("r2");			\
-+		register __inttype(*p) __r2 asm("r2");			\
- 		register unsigned long __l asm("r1") = __limit;		\
- 		register int __e asm("r0");				\
- 		switch (sizeof(*(__p))) {				\
-@@ -142,6 +147,9 @@ extern int __get_user_4(void *);
- 		case 4:							\
- 			__get_user_x(__r2, __p, __e, __l, 4);		\
- 			break;						\
-+		case 8:							\
-+			__get_user_x(__r2, __p, __e, __l, 8);		\
-+			break;						\
- 		default: __e = __get_user_bad(); break;			\
- 		}							\
- 		x = (typeof(*(p))) __r2;				\
-@@ -150,6 +158,7 @@ extern int __get_user_4(void *);
- 
- #define get_user(x,p)							\
- 	({								\
-+		__chk_user_ptr(ptr);					\
- 		might_fault();						\
- 		__get_user_check(x,p);					\
- 	 })
-diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-index 9b06bb4..3583c83 100644
---- a/arch/arm/lib/getuser.S
-+++ b/arch/arm/lib/getuser.S
-@@ -18,7 +18,7 @@
-  * Inputs:	r0 contains the address
-  *		r1 contains the address limit, which must be preserved
-  * Outputs:	r0 is the error code
-- *		r2 contains the zero-extended value
-+ *		r2/r3 contains the zero-extended value
-  *		lr corrupted
-  *
-  * No other registers must be altered.  (see <asm/uaccess.h>
-@@ -32,6 +32,14 @@
- #include <asm/errno.h>
- #include <asm/domain.h>
- 
-+#ifdef __ARMEB__
-+#define rlo8	r3
-+#define rhi8	r2
-+#else
-+#define	rlo8	r2
-+#define rhi8	r3
-+#endif
+ void __init register_current_timer_delay(const struct delay_timer *timer)
+ {
+-	if (!delay_calibrated) {
+-		pr_info("Switching to timer-based delay loop\n");
++	u32 new_mult, new_shift;
++	u64 res;
 +
- ENTRY(__get_user_1)
- 	check_uaccess r0, 1, r1, r2, __get_user_bad
- 1: TUSER(ldrb)	r2, [r0]
-@@ -66,15 +74,38 @@ ENTRY(__get_user_4)
- 	mov	pc, lr
- ENDPROC(__get_user_4)
- 
-+ENTRY(__get_user_8)
-+	check_uaccess r0, 4, r1, r2, __get_user_bad8
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+#define	GU8_FIXUPS	5b, 6b
-+5:	ldrt	rlo8, [r0], #4
-+6:	ldrt	rhi8, [r0], #0
-+#elif __LINUX_ARM_ARCH__ >= 6
-+#define	GU8_FIXUPS	5b
-+5:	ldrd	r2, [r0]
-+#else
-+#define	GU8_FIXUPS	5b, 6b
-+5:	ldr	rlo8, [r0, #0]
-+6:	ldr	rhi8, [r0, #4]
-+#endif
-+	mov	r0, #0
-+	mov	pc, lr
++	clocks_calc_mult_shift(&new_mult, &new_shift, timer->freq,
++			       NSEC_PER_SEC, 3600);
++	res = cyc_to_ns(1ULL, new_mult, new_shift);
 +
-+__get_user_bad8:
-+	mov	r3, #0
- __get_user_bad:
- 	mov	r2, #0
- 	mov	r0, #-EFAULT
- 	mov	pc, lr
- ENDPROC(__get_user_bad)
-+ENDPROC(__get_user_bad8)
++	if (!delay_calibrated && (!delay_res || (res < delay_res))) {
++		pr_info("Switching to timer-based delay loop, resolution %lluns\n", res);
+ 		delay_timer			= timer;
+ 		lpj_fine			= timer->freq / HZ;
++		delay_res			= res;
  
- .pushsection __ex_table, "a"
- 	.long	1b, __get_user_bad
- 	.long	2b, __get_user_bad
- 	.long	3b, __get_user_bad
- 	.long	4b, __get_user_bad
-+	.irp	param, GU8_FIXUPS
-+	.long	\param, __get_user_bad8
-+	.endr
- .popsection
-
-
+ 		/* cpufreq may scale loops_per_jiffy, so keep a private copy */
+ 		arm_delay_ops.ticks_per_jiffy	= lpj_fine;
+ 		arm_delay_ops.delay		= __timer_delay;
+ 		arm_delay_ops.const_udelay	= __timer_const_udelay;
+ 		arm_delay_ops.udelay		= __timer_udelay;
+-
+-		delay_calibrated		= true;
+ 	} else {
+ 		pr_info("Ignoring duplicate/late registration of read_current_timer delay\n");
+ 	}
+@@ -91,3 +104,8 @@ unsigned long calibrate_delay_is_known(void)
+ 	delay_calibrated = true;
+ 	return lpj_fine;
+ }
++
++void calibration_delay_done(void)
++{
++	delay_calibrated = true;
++}
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.7.rc0.72.g4b5ea.dirty
