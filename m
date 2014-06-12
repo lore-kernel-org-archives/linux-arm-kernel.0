@@ -1,29 +1,28 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 12 Jun 2014 09:47:45 +0200
-Subject: [PATCH] mmc: atmel-mci: add 0x600 IP version
-Message-ID: <1402559265-18340-1-git-send-email-ludovic.desroches@atmel.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Thu, 12 Jun 2014 16:56:38 +0900
+Subject: [PATCH v2 10/10] mm, cma: use spinlock instead of mutex
+In-Reply-To: <20140612074029.GB12663@bbox>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-11-git-send-email-iamjoonsoo.kim@lge.com>
+ <20140612074029.GB12663@bbox>
+Message-ID: <20140612075638.GD20199@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Thu, Jun 12, 2014 at 04:40:29PM +0900, Minchan Kim wrote:
+> On Thu, Jun 12, 2014 at 12:21:47PM +0900, Joonsoo Kim wrote:
+> > Currently, we should take the mutex for manipulating bitmap.
+> > This job may be really simple and short so we don't need to sleep
+> > if contended. So I change it to spinlock.
+> 
+> I'm not sure it would be good always.
+> Maybe you remember we discussed about similar stuff about bitmap
+> searching in vmap friend internally, which was really painful
+> when it was fragmented. So, at least we need number if you really want
+> and I hope the number from ARM machine most popular platform for CMA
+> at the moment.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c |    1 +
- 1 file changed, 1 insertion(+)
+Good Point!! Agreed. I will drop this one in next spin and re-submit
+in separate patchset after some testing.
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 1b4b064..9c4c191 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2306,6 +2306,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
- 
- 	/* keep only major version number */
- 	switch (version & 0xf00) {
-+	case 0x600:
- 	case 0x500:
- 		host->caps.has_odd_clk_div = 1;
- 	case 0x400:
--- 
-1.7.9.5
+Thanks.
