@@ -1,103 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 12:34:45 +0100
-Subject: Kconfig fails: big select-based circular dependency
-In-Reply-To: <6077426.uLBS643pC0@wuerfel>
-References: <20140607090944.GL23430@n2100.arm.linux.org.uk>
- <20140612094745.GD23430@n2100.arm.linux.org.uk> <6077426.uLBS643pC0@wuerfel>
-Message-ID: <20140612113445.GF23430@n2100.arm.linux.org.uk>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 12 Jun 2014 13:38:11 +0200
+Subject: [PATCH v2 09/10] mm,
+ cma: move output param to the end of param list
+In-Reply-To: <1402543307-29800-10-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-10-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <xa1twqcmicik.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 12:31:19PM +0200, Arnd Bergmann wrote:
-> On Thursday 12 June 2014 10:47:45 Russell King - ARM Linux wrote:
-> > If no one responds, I'll assume that no one is interested, and I'll
-> > just create a pile of patches removing a bunch of these idiotic select
-> > statements at random to break this loop.
-> 
-> I missed the original mail, and I don't remember seeing this particular
-> dependency chain.
-> 
-> > On Sat, Jun 07, 2014 at 10:09:44AM +0100, Russell King - ARM Linux wrote:
-> > > This is getting silly:
-> > > 
-> > > scripts/kconfig/conf --silentoldconfig Kconfig
-> > > drivers/dma/Kconfig:5:error: recursive dependency detected!
-> > > drivers/dma/Kconfig:5:  symbol DMADEVICES is selected by SAMSUNG_DMADEV
-> 
-> The 'select DMADEVICES' from plat-samsung/Kconfig is certainly wrong,
-> we shouldn't do that, but I'd do some extended build regression tests
-> to ensure that it doesn't cause other problems.
-> 
-> I'll have a look.
+On Thu, Jun 12 2014, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> Conventionally, we put output param to the end of param list.
+> cma_declare_contiguous() doesn't look like that, so change it.
 
-Yes, SAMSUNG_DMADEV looks like it's a shim layer between DMA engine and
-the old Samsung platform private DMA API.  I suspect SAMSUNG_DMADEV should
-be selected by the drivers which make use of this shim iff DMADEVICES is
-enabled.
+Perhaps the function should be changed to return an error-pointer?
 
-> > > arch/arm/plat-samsung/Kconfig:412:      symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
+> Additionally, move down cma_areas reference code to the position
+> where it is really needed.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-I think killing the select statement against S3C64XX_PL080 of this shim is
-also a correct move - I suspect that's just there to make Kconfig life
-easier (which is not really a valid reason for adding a select statement
-to a major subsystem.)
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
-> > > arch/arm/mach-s3c64xx/Kconfig:20:       symbol S3C64XX_PL080 is selected by SPI_S3C64XX
-
-As I said in my reply to Paul, this select should also be killed.  At
-the very least, it should be turned into "depends on S3C64XX_PL080 if
-ARCH_S3C64XX".
-
-Since the comments in the driver say that the driver depends on having a
-DMA engine, I'd suggest also adding a dependency on DMADEVICES as well,
-to encode that explicit requirement in the Kconfig language:
-
-config SPI_S3C64XX
-	tristate "Samsung S3C64XX series type SPI"
-	depends on PLAT_SAMSUNG && DMADEVICES
-	depends on S3C64XX_PL080 if ARCH_S3C64XX
-
-The driver will cleanly fail if it can't get the DMA channels that it
-requires to operate, so we don't need to do anything more than this here.
-
-> > > drivers/spi/Kconfig:429:        symbol SPI_S3C64XX depends on SPI
-> > > drivers/spi/Kconfig:8:  symbol SPI is selected by DRM_PANEL_LD9040
-> 
-> 'select SPI' is also really bad. This seems trivial to replace with
-> 'depends on SPI'. This is the only driver that uses select here.
-
-Definitely.
-
-> > > drivers/gpu/drm/panel/Kconfig:19:       symbol DRM_PANEL_LD9040 depends on DRM_PANEL
-> > > drivers/gpu/drm/panel/Kconfig:1:        symbol DRM_PANEL is selected by DRM_IMX_LDB
-> > > drivers/staging/imx-drm/Kconfig:35:     symbol DRM_IMX_LDB depends on MFD_SYSCON
-> > > drivers/mfd/Kconfig:722:        symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
-> 
-> We have 10 drivers doing 'select MFD_SYSCON' and 9 drivers doing
-> 'depends on MFD_SYSCON'. Either one would work if we did those
-> consistently, here the problem is really mixing the two.
-
-Indeed - we need clear policies on this stuff, because as we get different
-platforms doing different things (as is the case in this scenario), we are
-only going to see an increase in this problem.
-
-Also, I don't think we should do just one change to break this loop - this
-is a sign of a much bigger disease.  We are heading towards the situation
-where adding just one 'select' or 'depends on' statement between two symbols,
-thereby adding just one more dependency to an already tightly linked graph
-can cause a circular dependency.
-
-We need to stop this behaviour ASAP, and kill off as many of these
-ill-considered or wrong dependencies as possible, otherwise we're risking
-Kconfig becoming unmaintainable.
-
-Whenever we see a new 'select' statment appearing in a patch for something
-which is not a utility symbol, we need to ask what the justification is
-for it being there, and evaluate whether it's reasonable (ideally, this
-should be detailed in the commit log.)
-
-(I define a utility symbol as one whose primary purpose is to be selected.)
+>
+> diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
+> index 28ec226..97613ea 100644
+> --- a/arch/powerpc/kvm/book3s_hv_builtin.c
+> +++ b/arch/powerpc/kvm/book3s_hv_builtin.c
+> @@ -184,7 +184,7 @@ void __init kvm_cma_reserve(void)
+>  
+>  		align_size = max(kvm_rma_pages << PAGE_SHIFT, align_size);
+>  		cma_declare_contiguous(selected_size, 0, 0, align_size,
+> -			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, &kvm_cma, false);
+> +			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, false, &kvm_cma);
+>  	}
+>  }
+>  
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index f177f73..bfd4553 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -149,7 +149,7 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+>  {
+>  	int ret;
+>  
+> -	ret = cma_declare_contiguous(size, base, limit, 0, 0, res_cma, fixed);
+> +	ret = cma_declare_contiguous(size, base, limit, 0, 0, fixed, res_cma);
+>  	if (ret)
+>  		return ret;
+>  
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> index e38efe9..e53eead 100644
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -6,7 +6,7 @@ struct cma;
+>  extern int __init cma_declare_contiguous(phys_addr_t size,
+>  				phys_addr_t base, phys_addr_t limit,
+>  				phys_addr_t alignment, int order_per_bit,
+> -				struct cma **res_cma, bool fixed);
+> +				bool fixed, struct cma **res_cma);
+>  extern struct page *cma_alloc(struct cma *cma, int count, unsigned int align);
+>  extern bool cma_release(struct cma *cma, struct page *pages, int count);
+>  #endif
+> diff --git a/mm/cma.c b/mm/cma.c
+> index 01a0713..22a5b23 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -142,8 +142,8 @@ core_initcall(cma_init_reserved_areas);
+>   * @limit: End address of the reserved memory (optional, 0 for any).
+>   * @alignment: Alignment for the contiguous memory area, should be power of 2
+>   * @order_per_bit: Order of pages represented by one bit on bitmap.
+> - * @res_cma: Pointer to store the created cma region.
+>   * @fixed: hint about where to place the reserved area
+> + * @res_cma: Pointer to store the created cma region.
+>   *
+>   * This function reserves memory from early allocator. It should be
+>   * called by arch specific code once the early allocator (memblock or bootmem)
+> @@ -156,9 +156,9 @@ core_initcall(cma_init_reserved_areas);
+>  int __init cma_declare_contiguous(phys_addr_t size,
+>  				phys_addr_t base, phys_addr_t limit,
+>  				phys_addr_t alignment, int order_per_bit,
+> -				struct cma **res_cma, bool fixed)
+> +				bool fixed, struct cma **res_cma)
+>  {
+> -	struct cma *cma = &cma_areas[cma_area_count];
+> +	struct cma *cma;
+>  	int ret = 0;
+>  
+>  	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
+> @@ -214,6 +214,7 @@ int __init cma_declare_contiguous(phys_addr_t size,
+>  	 * Each reserved area must be initialised later, when more kernel
+>  	 * subsystems (like slab allocator) are available.
+>  	 */
+> +	cma = &cma_areas[cma_area_count];
+>  	cma->base_pfn = PFN_DOWN(base);
+>  	cma->count = size >> PAGE_SHIFT;
+>  	cma->order_per_bit = order_per_bit;
+> -- 
+> 1.7.9.5
+>
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
