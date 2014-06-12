@@ -1,88 +1,25 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Jun 2014 13:16:54 -0700
-Subject: [PATCH 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
-In-Reply-To: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
-References: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
-Message-ID: <539A0AB6.90200@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 12 Jun 2014 22:17:45 +0200
+Subject: [PATCH] i2c: sun6-p2wi: fix erroneous error message
+In-Reply-To: <1402558321-18981-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <53994cdd.dj2lZ0lrPyPuIr9Z%fengguang.wu@intel.com>
+ <1402558321-18981-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140612201745.GA2623@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/14 12:18, Kumar Gala wrote:
-> +
-> +struct qcom_ipq806x_sata_phy {
-> +	struct device *dev;
+> I know you've already applied my series to your for-next tree, but let me
+> know if you want me to squash this patch into the P2WI series and send a v8.
 
-Is this used?
+I can't rebase my for-next.
 
-> +	void __iomem *mmio;
-> +	struct clk *cfg_clk;
-[...]
-> +
-> +static int qcom_ipq806x_sata_phy_init(struct phy *generic_phy)
-> +{
-> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
-> +	u32 reg = 0;
+Had it already fixed locally, just forgot to send out due to NMI.
 
-unnecessary initialization
-
-> +
-> +static int qcom_ipq806x_sata_phy_exit(struct phy *generic_phy)
-> +{
-> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
-> +	u32 reg = 0;
-
-unnecessary initialization
-
->
-> +static int qcom_ipq806x_sata_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct qcom_ipq806x_sata_phy *phy;
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	struct phy_provider *phy_provider;
-> +	struct phy *generic_phy;
-> +	int ret;
-> +
-> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-> +	if (!phy) {
-> +		dev_err(dev, "%s: failed to allocate phy\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	phy->mmio = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(phy->mmio)) {
-> +		dev_err(dev, "%s: phy mmio get resource failed\n", __func__);
-
-Unnecessary error message.
-
-> +		return PTR_ERR(phy->mmio);
-> +	}
-> +
-> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-> +	if (IS_ERR(phy_provider)) {
-> +		dev_err(dev, "%s: failed to register phy\n", __func__);
-> +		return PTR_ERR(phy_provider);
-> +	}
-> +
-> +	generic_phy = devm_phy_create(dev, &qcom_ipq806x_sata_phy_ops, NULL);
-> +	if (IS_ERR(generic_phy)) {
-> +		dev_err(dev, "%s: failed to create phy\n", __func__);
-> +		return PTR_ERR(generic_phy);
-> +	}
-> +
-> +	phy->cfg_clk = devm_clk_get(dev, "cfg");
-> +	if (IS_ERR(phy->cfg_clk)) {
-> +		dev_err(dev, "Failed to get sata cfg clock\n");
-> +		return PTR_ERR(phy->cfg_clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(phy->cfg_clk);
-> +	if (ret)
-> +		return ret;
-
-Shouldn't there be a remove that disables this clock?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140612/3a5f58ae/attachment.sig>
