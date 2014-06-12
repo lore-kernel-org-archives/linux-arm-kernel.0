@@ -1,97 +1,48 @@
-From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
-Date: Thu, 12 Jun 2014 10:20:18 +0530
-Subject: [PATCH v2 04/10] DMA,
- CMA: support alignment constraint on cma region
-In-Reply-To: <1402543307-29800-5-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-5-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <87oaxypw8l.fsf@linux.vnet.ibm.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 12 Jun 2014 13:08:09 +0800
+Subject: [PATCH RFC v2 0/3] Add support for Hisilicon SMMU architecture
+Message-ID: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
+Changes in v2:
 
-> ppc kvm's cma area management needs alignment constraint on
-> cma region. So support it to prepare generalization of cma area
-> management functionality.
->
-> Additionally, add some comments which tell us why alignment
-> constraint is needed on cma region.
->
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+- Split Hisilicon smmu implementation in a separate file, hisi-smmu.c
+- Refactor arm-smmu.c. Some direct call hardware dependent functions replaced
+  with hooks. And move common struct and marco definition into arm-smmu.h
+- Merge the description of Hisilicon private properties into arm,smmu.txt
 
-Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
+Hisilicon smmu is similar to arm-smmu, some code can be direct reused. For
+example: map and unmap, device tree configuration, and the software framework.
+I found that, abstract about 11 hardware dependent functions in arm-smmu.c is
+enough . Abstract means use hooks to replace the direct call of functions. Now,
+if need to support Hisilicon SMMU or others arm smmu variants, just selective
+rewrite these hooks. And I add a dt_cfg_probe hook, to allow each variant parse
+their hardware special configuration. Finally, flush_pgtable is a special case,
+hardware independent but maybe referenced. So, total 13 hooks.
 
->
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 8a44c82..bc4c171 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -32,6 +32,7 @@
->  #include <linux/swap.h>
->  #include <linux/mm_types.h>
->  #include <linux/dma-contiguous.h>
-> +#include <linux/log2.h>
->
->  struct cma {
->  	unsigned long	base_pfn;
-> @@ -219,6 +220,7 @@ core_initcall(cma_init_reserved_areas);
->   * @size: Size of the reserved area (in bytes),
->   * @base: Base address of the reserved area optional, use 0 for any
->   * @limit: End address of the reserved memory (optional, 0 for any).
-> + * @alignment: Alignment for the contiguous memory area, should be power of 2
->   * @res_cma: Pointer to store the created cma region.
->   * @fixed: hint about where to place the reserved area
->   *
-> @@ -233,15 +235,15 @@ core_initcall(cma_init_reserved_areas);
->   */
->  static int __init __dma_contiguous_reserve_area(phys_addr_t size,
->  				phys_addr_t base, phys_addr_t limit,
-> +				phys_addr_t alignment,
->  				struct cma **res_cma, bool fixed)
->  {
->  	struct cma *cma = &cma_areas[cma_area_count];
-> -	phys_addr_t alignment;
->  	int ret = 0;
->
-> -	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
-> -		 (unsigned long)size, (unsigned long)base,
-> -		 (unsigned long)limit);
-> +	pr_debug("%s(size %lx, base %08lx, limit %08lx align_order %08lx)\n",
-> +		__func__, (unsigned long)size, (unsigned long)base,
-> +		(unsigned long)limit, (unsigned long)alignment);
->
->  	/* Sanity checks */
->  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
-> @@ -253,8 +255,17 @@ static int __init __dma_contiguous_reserve_area(phys_addr_t size,
->  	if (!size)
->  		return -EINVAL;
->
-> -	/* Sanitise input arguments */
-> -	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
-> +	if (alignment && !is_power_of_2(alignment))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Sanitise input arguments.
-> +	 * CMA area should be at least MAX_ORDER - 1 aligned. Otherwise,
-> +	 * CMA area could be merged into other MIGRATE_TYPE by buddy mechanism
-> +	 * and CMA property will be broken.
-> +	 */
-> +	alignment = max(alignment,
-> +		(phys_addr_t)PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
->  	base = ALIGN(base, alignment);
->  	size = ALIGN(size, alignment);
->  	limit &= ~(alignment - 1);
-> @@ -302,7 +313,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->  {
->  	int ret;
->
-> -	ret = __dma_contiguous_reserve_area(size, base, limit, res_cma, fixed);
-> +	ret = __dma_contiguous_reserve_area(size, base, limit, 0,
-> +						res_cma, fixed);
->  	if (ret)
->  		return ret;
->
-> -- 
-> 1.7.9.5
+Additional:
+Arnd Bergmann told me to pay attention to the discussion of "devicetree: Add
+generic IOMMU device tree bindings". But, this subject is still discussing, no
+conclusion now. Besides, exclude the Hisilicon private properties, all keep the
+same to arm-smmu. So, I think this version is not relate to the discussion now.
+
+Zhen Lei (3):
+  iommu/arm: Adjust code to facilitate support arm smmu variants
+  iommu/hisilicon: Add support for Hisilicon Ltd. System MMU
+    architecture
+  documentation/iommu: Add description of Hisilicon SMMU private
+    binding
+
+ .../devicetree/bindings/iommu/arm,smmu.txt         |  16 +
+ drivers/iommu/Kconfig                              |   7 +
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/arm-smmu.c                           | 190 +++---
+ drivers/iommu/arm-smmu.h                           | 165 +++++
+ drivers/iommu/hisi-smmu.c                          | 662 +++++++++++++++++++++
+ 6 files changed, 927 insertions(+), 114 deletions(-)
+ create mode 100644 drivers/iommu/arm-smmu.h
+ create mode 100644 drivers/iommu/hisi-smmu.c
+
+--
+1.8.0
