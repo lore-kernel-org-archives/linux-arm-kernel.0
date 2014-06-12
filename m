@@ -1,49 +1,56 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 12 Jun 2014 07:18:31 -0700
-Subject: [PATCH V2 08/19] irqchip: crossbar: fix checkpatch warning
-In-Reply-To: <5399AC9C.4080602@ti.com>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-9-git-send-email-r.sricharan@ti.com>
- <20140612131042.GU8664@titan.lakedaemon.net> <5399AC9C.4080602@ti.com>
-Message-ID: <1402582711.9947.17.camel@joe-AO725>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Jun 2014 15:23:54 +0100
+Subject: [PATCH] drm: imx: use GENERIC_IRQ_CHIP
+In-Reply-To: <7367559.qEUUbIia3C@wuerfel>
+References: <7367559.qEUUbIia3C@wuerfel>
+Message-ID: <20140612142354.GI23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-06-12 at 19:05 +0530, Sricharan R wrote:
-> On Thursday 12 June 2014 06:40 PM, Jason Cooper wrote:
-> > On Thu, Jun 12, 2014 at 05:23:16PM +0530, Sricharan R wrote:
-> >> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-[]
-> >> @@ -34,7 +34,8 @@ struct crossbar_device {
-> >>  	uint *irq_map;
-> >>  	void __iomem *crossbar_base;
-> >>  	int *register_offsets;
-> >> -	void (*write) (int, int);
-> >> +
-> >> +	void (*write)(int, int);
-> > 
-> > The empty line here looks bogus to me.
+On Thu, Jun 12, 2014 at 04:05:32PM +0200, Arnd Bergmann wrote:
+> This driver defines its own irqchip using the generic chip
+> infrastructure, and hence needs the GENERIC_IRQ_CHIP Kconfig
+> symbol enabled, or get this build error:
+> 
+> drivers/built-in.o: In function `ipu_probe':
+> :(.text+0x49ea4c): undefined reference to `irq_generic_chip_ops'
+> :(.text+0x49ea5c): undefined reference to `irq_alloc_domain_generic_chips'
+> :(.text+0x49ea60): undefined reference to `irq_get_domain_generic_chip'
+> :(.text+0x49ea64): undefined reference to `irq_gc_ack_set_bit'
+> :(.text+0x49ea6c): undefined reference to `irq_gc_mask_clr_bit'
+> :(.text+0x49ea70): undefined reference to `irq_gc_mask_set_bit'
 
-Good eye.  It's unnecessary.
+Let's take a step back, and ask the obvious question: is it reasonable
+to make use if GENERIC_IRQ_CHIP in this driver?
 
->   Did you re-run checkpatch after
-> > fixing the unnecessary space to see if it still complained about having
-> > a 'blank line after declarations'?
-> > 
->  Yes, it still complains even after fixing unnecessary space.
+Bear in mind that this is a platform driver (and so can be unbound), and
+the IRQ domain stuff does not support tear-down.  This code contains this...
 
-It's a checkpatch defect.
+static void ipu_irq_exit(struct ipu_soc *ipu)
+{
+        int i, irq;
 
-It's been fixed by:
-https://lkml.org/lkml/2014/6/6/426
+        irq_set_chained_handler(ipu->irq_err, NULL);
+        irq_set_handler_data(ipu->irq_err, NULL);
+        irq_set_chained_handler(ipu->irq_sync, NULL);
+        irq_set_handler_data(ipu->irq_sync, NULL);
 
-> > I'm generally opposed to these sorts of checkpatch patches, especially
-> > when they are just warnings.  It's great for a new driver in the staging
-> > tree, but it makes backporting future bugfixes that much harder when
-> > drivers have been live in mainline.
+        /* TODO: remove irq_domain_generic_chips */
 
-Blind adherence to checkpatch isn't always a great idea.
+        for (i = 0; i < IPU_NUM_IRQS; i++) {
+                irq = irq_linear_revmap(ipu->domain, i);
+                if (irq)
+                        irq_dispose_mapping(irq);
+        }
 
-But bugfix backports haven't been much of an issue in
-other subsystems with fairly active whitespace/style
-changes.
+        irq_domain_remove(ipu->domain);
+}
+
+which rather hints at it being more broken than just the above.
+
+So, I think you're just papering over the symptom of a broken
+implementation with your patch...
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
