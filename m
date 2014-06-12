@@ -1,116 +1,150 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 12 Jun 2014 17:09:30 +0200
-Subject: [PATCHv5 1/3] ARM: mm: add support for HW coherent systems in PL310
- cache
-In-Reply-To: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1402585772-10405-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 12 Jun 2014 17:09:29 +0200
+Subject: [PATCHv5 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+ deadlock
+Message-ID: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a PL310 cache is used on a system that provides hardware
-coherency, the outer cache sync operation is useless, and can be
-skipped. Moreover, on some systems, it is harmful as it causes
-deadlocks between the Marvell coherency mechanism, the Marvell PCIe
-controller and the Cortex-A9.
+Russell, Will, Catalin,
 
-To avoid this, this commit introduces a new Device Tree property
-'arm,io-coherent' for the L2 cache controller node, valid only for the
-PL310 cache. It identifies the usage of the PL310 cache in an I/O
-coherent configuration. Internally, it makes the driver disable the
-outer cache sync operation.
+This patch series adresses a problem that affects the newer Marvell
+Armada 375 and 38x SOCs, based on Cortex-A9+PL310, combined with the
+Marvell PCIe hardware unit. When the hardware I/O coherency is
+enabled, the combination of Cortex-A9/PL310/Marvell PCIe hardware unit
+will quickly cause a deadlock when the PCIe bus is stressed.
 
-Note that technically speaking, a fully coherent system wouldn't
-require any of the other .outer_cache operations. However, in
-practice, when booting secondary CPUs, these are not yet coherent, and
-therefore a set of cache maintenance operations are necessary at this
-point. This explains why we keep the other .outer_cache operations and
-only ->sync is disabled.
+The workaround for this problem has been suggested by ARM, and
+consists in two things:
 
-While in theory any write to a PL310 register could cause the
-deadlock, in practice, disabling ->sync is sufficient to workaround
-the deadlock, since the other cache maintenance operations are only
-used in very specific situations.
+ (1) Map the PCIe regions as strongly-ordered
 
-Contrary to previous versions of this patch, this new version does not
-simply NULL-ify the ->sync member, because the l2c_init_data
-structures are now 'const' and therefore cannot be modified, which is
-a good thing. Therefore, this patch introduces a separate
-l2c_init_data instance, called of_l2c310_coherent_data.
+ (2) Disable the outer cache sync of the PL310 when hardware I/O
+     coherency is used, since it is unneeded and causes the deadlock.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-This patch is based on the latest mainline, as it depends on the L2CC
-cleanup from Russell King.
+Some of the problems have already been solved and the corresponding
+patches merged mainline. However, due to the L2CC cleanup done by
+Russell King, the change to the PL310 driver was not merged, and there
+are some consequences to the L2CC cleanup that need to be
+addressed. The following three patches address those problems:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
+ * PATCH 1/3 extends the l2x0 cache driver with a new property
+   "arm,io-coherent", valid for the PL310, which makes the driver
+   disable the outer cache sync operation. This patch should be routed
+   through Russell's tree.
+
+ * PATCH 2/3 moves the registration of a quirk later, and is merely a
+   preparation for PATCH 3/3. It should be merged by the mvebu
+   maintainers.
+
+ * PATCH 3/3 moves the initialization of the SCU, coherency and
+   mvebu-mbus earlier (to ->init_irq instead of ->init_time), because
+   we must adjust the Device Tree property of the PL310 cache
+   controller *before* the L2CC driver is initialized, and it is
+   initialized right after ->init_irq() is called. It should be merged
+   by the mvebu maintainers.
+
+This patch series is based on the current Linus tree, at
+dfb945473ae8528fd885607b6fa843c676745e0c. Let me know if this is the
+right tree to base this code on, or if it should be based on some
+other version or tree.
+
+Without this patch series, doing heavy PCIe traffic (like running 6 or
+7 parallel dd processes reading from a SATA drive) during a few dozens
+of seconds is sufficient to completely deadlock the system, so this is
+really a bug fix.
+
+Changes since v5:
+
+ - Drop patches that have been merged during the 3.16 merge window.
+
+ - Adapt the L2CC driver changes to the cleanups made by Russell King.
+
+ - Add patches to ensure the L2CC DT property is added before the L2CC
+   driver is initialized.
+
+Changes since v4:
+
+ - Re-introduce the patch to allow sub-architectures to override the
+   memory type used for PCI I/O mappings, since switching to
+   strongly-ordered for all platforms does not seem to be well
+   accepted/understood at this point.
+
+ - Remove the of_device_is_compatible() check for the PL310, when
+   testing for 'arm,io-coherent'. Suggested by Rob Herring. However,
+   the code tetsing 'arm,io-coherent' cannot be moved into
+   pl310_of_setup(), because this function is called *before* the
+   'outer_cache' structure is initialized.
+
+ - Add a separate patch to use the pci_ioremap_set_mem_type() API in
+   mach-mvebu/coherency.c.
+
+Changes since v3:
+
+ - Withdrawn all Acked-by tags since the changes compared to v3 are
+   quite significant.
+
+ - Instead of introducing a small mechanism to allow each
+   sub-architecture to override the memory type used for PCI I/O
+   mappings, simply make all of them mapped MT_UNCACHED instead of
+   MT_DEVICE, as suggested by Arnd Bergmann. This also has the nice
+   consequence that there is no longer a build dependency between
+   PATCH 3/3 and PATCH 1/3. Suggested by Arnd Bergmann.
+
+ - Change the name of the new property of the PL310 DT binding from
+   the too generic 'dma-coherent' to 'arm,io-coherent'. Suggested by
+   Rob Herring.
+
+ - Instead of adding a complete set of L2 cache operations in
+   cache-l2x0.c, simply nullify the outer_cache.sync operation when
+   'arm,io-coherent' is specified. Suggested by Rob Herring.
+
+ - Move the Armada 375/38x specific code from mach-mvebu/board-v7.c to
+   mach-mvebu/coherency.c, which makes more sense. Suggested by Arnd
+   Bergmann.
+
+Changes since v2:
+
+ - Added Acked-by from Catalin on "ARM: mm: allow sub-architectures to
+   override PCI I/O memory type".
+
+ - Dropped the patch fixing the of_update_property() function, since
+   we're no longer using it.
+
+ - Instead of using a different compatible string to identify PL310
+   used in an I/O coherent configuration, use a separate boolean
+   property. Suggested by Catalin.
+
+ - Rework the mach-mvebu/coherency.c to add the boolean property
+   "dma-coherent" when needed instead of updating the compatible
+   string of the cache controller.
+
+Changes since v1:
+
+ - Instead of introducing separate l2x0 initialization functions, rely
+   on a separate compatible string to identify whether we're coherent
+   or not. The compatible string *has* to be modified at runtime,
+   because Armada 375 and 38x are only I/O coherent when in SMP
+   mode. In non-SMP mode, they are not I/O coherent, so we cannot
+   change the DT to 'arm,pl310-coherent-cache'.
+
+ - Addition of the drivers/of fix to be able to use
+   of_update_property() early and fix up the PL310 compatible string,
+   as explained in the previous item.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (3):
+  ARM: mm: add support for HW coherent systems in PL310 cache
+  ARM: mvebu: move Armada 375 external abort logic as a quirk
+  ARM: mvebu: update L2/PCIe deadlock workaround after L2CC cleanup
+
  Documentation/devicetree/bindings/arm/l2cc.txt |  3 +++
+ arch/arm/mach-mvebu/board-v7.c                 | 29 +++++++++++++++---------
  arch/arm/mm/cache-l2x0.c                       | 31 ++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
+ 3 files changed, 53 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index b513cb8..af527ee 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -40,6 +40,9 @@ Optional properties:
- - arm,filter-ranges : <start length> Starting address and length of window to
-   filter. Addresses in the filter window are directed to the M1 port. Other
-   addresses will go to the M0 port.
-+- arm,io-coherent : indicates that the system is operating in an hardware
-+  I/O coherent mode. Valid only when the arm,pl310-cache compatible
-+  string is used.
- - interrupts : 1 combined interrupt.
- - cache-id-part: cache id part number to be used if it is not present
-   on hardware
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index efc5cab..076172b 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1069,6 +1069,33 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
- };
- 
- /*
-+ * This is a variant of the of_l2c310_data with .sync set to
-+ * NULL. Outer sync operations are not needed when the system is I/O
-+ * coherent, and potentially harmful in certain situations (PCIe/PL310
-+ * deadlock on Armada 375/38x due to hardware I/O coherency). The
-+ * other operations are kept because they are infrequent (therefore do
-+ * not cause the deadlock in practice) and needed for secondary CPU
-+ * boot and other power management activities.
-+ */
-+static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
-+	.type = "L2C-310 Coherent",
-+	.way_size_0 = SZ_8K,
-+	.num_lock = 8,
-+	.of_parse = l2c310_of_parse,
-+	.enable = l2c310_enable,
-+	.fixup = l2c310_fixup,
-+	.save  = l2c310_save,
-+	.outer_cache = {
-+		.inv_range   = l2c210_inv_range,
-+		.clean_range = l2c210_clean_range,
-+		.flush_range = l2c210_flush_range,
-+		.flush_all   = l2c210_flush_all,
-+		.disable     = l2c310_disable,
-+		.resume      = l2c310_resume,
-+	},
-+};
-+
-+/*
-  * Note that the end addresses passed to Linux primitives are
-  * noninclusive, while the hardware cache range operations use
-  * inclusive start and end addresses.
-@@ -1487,6 +1514,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 
- 	data = of_match_node(l2x0_ids, np)->data;
- 
-+	if (of_device_is_compatible(np, "arm,pl310-cache") &&
-+	    of_property_read_bool(np, "arm,io-coherent"))
-+		data = &of_l2c310_coherent_data;
-+
- 	old_aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- 	if (old_aux != ((old_aux & aux_mask) | aux_val)) {
- 		pr_warn("L2C: platform modifies aux control register: 0x%08x -> 0x%08x\n",
 -- 
 2.0.0
