@@ -1,49 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 12 Jun 2014 10:05:08 -0400
-Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from
- getting mapped to crossbar
-In-Reply-To: <20140612135715.GE17845@atomide.com>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
- <20140612125134.GS8664@titan.lakedaemon.net>
- <20140612135715.GE17845@atomide.com>
-Message-ID: <20140612140508.GC8664@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Jun 2014 16:05:32 +0200
+Subject: [PATCH] drm: imx: use GENERIC_IRQ_CHIP
+Message-ID: <7367559.qEUUbIia3C@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 06:57:15AM -0700, Tony Lindgren wrote:
-> * Jason Cooper <jason@lakedaemon.net> [140612 05:52]:
-> > On Thu, Jun 12, 2014 at 05:23:11PM +0530, Sricharan R wrote:
-> > > From: Nishanth Menon <nm@ti.com>
-> > > 
-> > > When, in the system due to varied reasons, interrupts might be unusable
-> > > due to hardware behavior, but register maps do exist, then those interrupts
-> > > should be skipped while mapping irq to crossbars.
-> > > 
-> > > Signed-off-by: Nishanth Menon <nm@ti.com>
-> > > Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > Tony, have you applied these somewhere already?
-> 
-> I think some of these I had applied into a branch ready for
-> merging but then it was discovered that further changes
-> were needed and the branch was dropped.
+This driver defines its own irqchip using the generic chip
+infrastructure, and hence needs the GENERIC_IRQ_CHIP Kconfig
+symbol enabled, or get this build error:
 
-Ok.
+drivers/built-in.o: In function `ipu_probe':
+:(.text+0x49ea4c): undefined reference to `irq_generic_chip_ops'
+:(.text+0x49ea5c): undefined reference to `irq_alloc_domain_generic_chips'
+:(.text+0x49ea60): undefined reference to `irq_get_domain_generic_chip'
+:(.text+0x49ea64): undefined reference to `irq_gc_ack_set_bit'
+:(.text+0x49ea6c): undefined reference to `irq_gc_mask_clr_bit'
+:(.text+0x49ea70): undefined reference to `irq_gc_mask_set_bit'
 
-> Sricharan, please remove my Signed-off-by from this series.
-> If I end up applying it for merging my scripts will add it
-> automatically.
+Cc: Dave Airlie <airlied@redhat.com>
+Cc: dri-devel at lists.freedesktop.org
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Do you have other changes outside of irqchip depending on this series?
-If so, I can set up a topic branch for you guys to base off of.
-Otherwise, I'll just apply them to irqchip/core when they're ready.
-
-Also, Sricharan, when you respin this, please clearly identify (in the
-comment section) those patches that need to be flagged for stable.  It
-would be helpful if they were the first patches in the series as well.
-
-thx,
-
-Jason.
+diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
+index 2f228a2..01864a5 100644
+--- a/drivers/gpu/ipu-v3/Kconfig
++++ b/drivers/gpu/ipu-v3/Kconfig
+@@ -2,6 +2,7 @@ config IMX_IPUV3_CORE
+ 	tristate "IPUv3 core support"
+ 	depends on SOC_IMX5 || SOC_IMX6Q || SOC_IMX6SL || ARCH_MULTIPLATFORM
+ 	depends on RESET_CONTROLLER
++	select GENERIC_IRQ_CHIP
+ 	help
+ 	  Choose this if you have a i.MX5/6 system and want to use the Image
+ 	  Processing Unit. This option only enables IPU base support.
