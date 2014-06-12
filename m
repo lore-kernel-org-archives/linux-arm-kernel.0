@@ -1,28 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Jun 2014 09:31:43 +0200
-Subject: [PATCH v2] pinctrl: hide CONFIG_PINMUX and CONFIG_PINCONF
-In-Reply-To: <1401782556-5210-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1401782556-5210-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CACRpkdaVxSMHAQ5q=Z3cC5cQRUwXx-bus7XQFjuGqOW1+R4Dtw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 12 Jun 2014 09:32:01 +0200
+Subject: [PATCH] i2c: sun6-p2wi: fix erroneous error message
+In-Reply-To: <53994cdd.dj2lZ0lrPyPuIr9Z%fengguang.wu@intel.com>
+References: <53994cdd.dj2lZ0lrPyPuIr9Z%fengguang.wu@intel.com>
+Message-ID: <1402558321-18981-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 3, 2014 at 10:02 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+The variable containing the return value of platform_get_irq is irq not
+ret, this means the error code printed in the error message will be false.
 
-> These symbols are supposed to be selected by the drivers actually needing
-> them. The only situation where it would make sense to enable them without a
-> driver selecting them is when an out-of-tree pinctrl driver is used or
-> for compile testing.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Changes since v1:
->   - allow enabling with COMPILE_TEST
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+---
 
-Had some mixed feelings and back-and-forth about this patch
-(I like the visual feedback in menuconfig) but eventually decided
-that simplicity is better so applied the patch (for v3.17)
+Hello Wolfram,
 
-Yours,
-Linus Walleij
+This patch fixes a bug reported by Fengguang's build robot.
+
+I know you've already applied my series to your for-next tree, but let me
+know if you want me to squash this patch into the P2WI series and send a v8.
+
+Best Regards,
+
+Boris
+
+ drivers/i2c/busses/i2c-sun6i-p2wi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-sun6i-p2wi.c b/drivers/i2c/busses/i2c-sun6i-p2wi.c
+index f1d3e6f..5d2d678 100644
+--- a/drivers/i2c/busses/i2c-sun6i-p2wi.c
++++ b/drivers/i2c/busses/i2c-sun6i-p2wi.c
+@@ -240,7 +240,7 @@ static int p2wi_probe(struct platform_device *pdev)
+ 	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), pdev->name);
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+-		dev_err(dev, "failed to retrieve irq: %d\n", ret);
++		dev_err(dev, "failed to retrieve irq: %d\n", irq);
+ 		return irq;
+ 	}
+ 
+-- 
+1.8.3.2
