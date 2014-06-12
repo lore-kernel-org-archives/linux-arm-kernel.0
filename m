@@ -1,102 +1,48 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Thu, 12 Jun 2014 16:40:29 +0900
-Subject: [PATCH v2 10/10] mm, cma: use spinlock instead of mutex
-In-Reply-To: <1402543307-29800-11-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-11-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <20140612074029.GB12663@bbox>
+From: tushar.b@samsung.com (Tushar Behera)
+Date: Thu, 12 Jun 2014 13:10:24 +0530
+Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
+ always enabled
+In-Reply-To: <7ha99jjspt.fsf@paris.lan>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
+ <7ha99jjspt.fsf@paris.lan>
+Message-ID: <CAC5m3Bwj1HEWSQd7rx6Zn5vbUPKFqeT_X0PL3mAxRw0FNkK=QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 12:21:47PM +0900, Joonsoo Kim wrote:
-> Currently, we should take the mutex for manipulating bitmap.
-> This job may be really simple and short so we don't need to sleep
-> if contended. So I change it to spinlock.
+On Wed, Jun 11, 2014 at 10:20 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> Tushar Behera <tushar.b@samsung.com> writes:
+>
+>> When the output clock of AUDSS mux is disabled, we are getting kernel
+>> oops while doing a clk_get() on other clocks provided by AUDSS.
+>>
+>> Though user manual doesn't specify this dependency, we came across
+>> this issue while disabling the parent of AUDSS mux clocks.
+>>
+>> Keeping the parents of AUDSS mux always enabled fixes this issue.
+>
+> While this patch works (and fixes the boot problem for me), it seems
+> like it's papering over the real problem.
+>
 
-I'm not sure it would be good always.
-Maybe you remember we discussed about similar stuff about bitmap
-searching in vmap friend internally, which was really painful
-when it was fragmented. So, at least we need number if you really want
-and I hope the number from ARM machine most popular platform for CMA
-at the moment.
+Thanks for testing.
 
-> 
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> 
-> diff --git a/mm/cma.c b/mm/cma.c
-> index 22a5b23..3085e8c 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -27,6 +27,7 @@
->  #include <linux/memblock.h>
->  #include <linux/err.h>
->  #include <linux/mm.h>
-> +#include <linux/spinlock.h>
->  #include <linux/mutex.h>
->  #include <linux/sizes.h>
->  #include <linux/slab.h>
-> @@ -36,7 +37,7 @@ struct cma {
->  	unsigned long	count;
->  	unsigned long	*bitmap;
->  	int order_per_bit; /* Order of pages represented by one bit */
-> -	struct mutex	lock;
-> +	spinlock_t	lock;
->  };
->  
->  /*
-> @@ -72,9 +73,9 @@ static void clear_cma_bitmap(struct cma *cma, unsigned long pfn, int count)
->  	bitmapno = (pfn - cma->base_pfn) >> cma->order_per_bit;
->  	nr_bits = cma_bitmap_pages_to_bits(cma, count);
->  
-> -	mutex_lock(&cma->lock);
-> +	spin_lock(&cma->lock);
->  	bitmap_clear(cma->bitmap, bitmapno, nr_bits);
-> -	mutex_unlock(&cma->lock);
-> +	spin_unlock(&cma->lock);
->  }
->  
->  static int __init cma_activate_area(struct cma *cma)
-> @@ -112,7 +113,7 @@ static int __init cma_activate_area(struct cma *cma)
->  		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
->  	} while (--i);
->  
-> -	mutex_init(&cma->lock);
-> +	spin_lock_init(&cma->lock);
->  	return 0;
->  
->  err:
-> @@ -261,11 +262,11 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
->  	nr_bits = cma_bitmap_pages_to_bits(cma, count);
->  
->  	for (;;) {
-> -		mutex_lock(&cma->lock);
-> +		spin_lock(&cma->lock);
->  		bitmapno = bitmap_find_next_zero_area(cma->bitmap,
->  					bitmap_maxno, start, nr_bits, mask);
->  		if (bitmapno >= bitmap_maxno) {
-> -			mutex_unlock(&cma->lock);
-> +			spin_unlock(&cma->lock);
->  			break;
->  		}
->  		bitmap_set(cma->bitmap, bitmapno, nr_bits);
-> @@ -274,7 +275,7 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
->  		 * our exclusive use. If the migration fails we will take the
->  		 * lock again and unmark it.
->  		 */
-> -		mutex_unlock(&cma->lock);
-> +		spin_unlock(&cma->lock);
->  
->  		pfn = cma->base_pfn + (bitmapno << cma->order_per_bit);
->  		mutex_lock(&cma_mutex);
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> Seems like the right fix is actually modelling the clocks properly so
+> that enabling a child clock ensures that the parent is also enabled.
+>
 
--- 
-Kind regards,
-Minchan Kim
+Patch 2/3 was to ensure we have proper clock tree defined for
+Exynos5420. While testing with audio disabled, that patch alone fixed
+the issue. But when audio was enabled (and hence I2S0 was trying to
+access the clocks), we got some kernel oops during late booting, hence
+I came up this solution.
+
+The solution might be a little half-baked because of the urgency to
+push the fix, but will try to dig more into the issue on Monday when I
+resume office.
+
+> Kevin
+
+Thanks,
+--
+Tushar
