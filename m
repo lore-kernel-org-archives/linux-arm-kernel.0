@@ -1,71 +1,71 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 12 Jun 2014 16:52:10 +0200
-Subject: [PATCH] [media] staging: allow omap4iss to be modular
-In-Reply-To: <20140611144754.GA17845@atomide.com>
-References: <5192928.MkINji4uKU@wuerfel> <20140611144754.GA17845@atomide.com>
-Message-ID: <2207210.T6NoNSQSCo@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Jun 2014 16:51:26 +0200
+Subject: [PATCH] drm: imx: use GENERIC_IRQ_CHIP
+In-Reply-To: <20140612142354.GI23430@n2100.arm.linux.org.uk>
+References: <7367559.qEUUbIia3C@wuerfel>
+ <20140612142354.GI23430@n2100.arm.linux.org.uk>
+Message-ID: <18338077.DHE9A0xGC1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Wednesday 11 June 2014 07:47:54 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [140611 07:37]:
-> > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
-> > of which can be loadable modules. This causes build failures
-> > if we want the camera driver to be built-in.
-> 
-> That's good news, but let's not fix it this way.
-> 
-> > This can be solved by turning the option into "tristate",
-> > which unfortunately causes another problem, because the
-> > driver incorrectly calls a platform-internal interface
-> > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
-> > To work around that, we can export those symbols, but
-> > that isn't really the correct solution, as we should not
-> > have dependencies on platform code this way.
+On Thursday 12 June 2014 15:23:54 Russell King - ARM Linux wrote:
+> On Thu, Jun 12, 2014 at 04:05:32PM +0200, Arnd Bergmann wrote:
+> > This driver defines its own irqchip using the generic chip
+> > infrastructure, and hence needs the GENERIC_IRQ_CHIP Kconfig
+> > symbol enabled, or get this build error:
 > > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > This is one of just two patches we currently need to get
-> > 'make allmodconfig' to build again on ARM.
-> > 
-> > diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-> > index 751f354..05d2d98 100644
-> > --- a/arch/arm/mach-omap2/control.c
-> > +++ b/arch/arm/mach-omap2/control.c
-> > @@ -190,11 +190,13 @@ u32 omap4_ctrl_pad_readl(u16 offset)
-> >  {
-> >  	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
-> >  }
-> > +EXPORT_SYMBOL_GPL(omap4_ctrl_pad_readl);
-> > 
-> >  void omap4_ctrl_pad_writel(u32 val, u16 offset)
-> >  {
-> >  	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
-> >  }
-> > +EXPORT_SYMBOL_GPL(omap4_ctrl_pad_writel);
-> > 
-> >  #ifdef CONFIG_ARCH_OMAP3
+> > drivers/built-in.o: In function `ipu_probe':
+> > :(.text+0x49ea4c): undefined reference to `irq_generic_chip_ops'
+> > :(.text+0x49ea5c): undefined reference to `irq_alloc_domain_generic_chips'
+> > :(.text+0x49ea60): undefined reference to `irq_get_domain_generic_chip'
+> > :(.text+0x49ea64): undefined reference to `irq_gc_ack_set_bit'
+> > :(.text+0x49ea6c): undefined reference to `irq_gc_mask_clr_bit'
+> > :(.text+0x49ea70): undefined reference to `irq_gc_mask_set_bit'
 > 
-> Exporting these will likely cause immediate misuse in other
-> drivers all over the place.
+> Let's take a step back, and ask the obvious question: is it reasonable
+> to make use if GENERIC_IRQ_CHIP in this driver?
+
+While I haven't looked at this driver in particular, I know that
+Thomas Gleixner has been rather upset in the past when new irqchip
+drivers got introduced that were reimplementing the generic irqchip
+rather than using it.
+
+You can argue over whether it should be an irqchip at all or not,
+I don't know, and I simply had to assume that this part of the
+code is ok.
+
+> Bear in mind that this is a platform driver (and so can be unbound), and
+> the IRQ domain stuff does not support tear-down.  This code contains this...
 > 
-> These should just use either pinctrl-single.c instead for muxing.
-> Or if they are not mux registers, we do have the syscon mapping
-> available in omap4.dtsi that pbias-regulator.c is already using.
+> static void ipu_irq_exit(struct ipu_soc *ipu)
+> {
+>         int i, irq;
 > 
-> Laurent, got any better ideas?
+>         irq_set_chained_handler(ipu->irq_err, NULL);
+>         irq_set_handler_data(ipu->irq_err, NULL);
+>         irq_set_chained_handler(ipu->irq_sync, NULL);
+>         irq_set_handler_data(ipu->irq_sync, NULL);
+> 
+>         /* TODO: remove irq_domain_generic_chips */
+> 
+>         for (i = 0; i < IPU_NUM_IRQS; i++) {
+>                 irq = irq_linear_revmap(ipu->domain, i);
+>                 if (irq)
+>                         irq_dispose_mapping(irq);
+>         }
+> 
+>         irq_domain_remove(ipu->domain);
+> }
+> 
+> which rather hints at it being more broken than just the above.
+> 
+> So, I think you're just papering over the symptom of a broken
+> implementation with your patch...
 
-The ISS driver needs to write a single register, which contains several 
-independent fields. They thus need to be controlled by a single driver. Some 
-of them might be considered to be related to pinmuxing (although I disagree on 
-that), others are certainly not about muxing (there are clock gate bits for 
-instance).
+This seems more like a second bug in a related part of the code
+to me. Looking at other generic irqchip users, it seems like
+the same bug exists in gpio-dwapb.c, gpio-ml-ioh.c, gpio-pch.c
+and possibly others, which are all loadable modules using a
+generic irqchip that can't be freed.
 
-Using the syscon mapping seems like the best option. I'll give it a try.
-
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
