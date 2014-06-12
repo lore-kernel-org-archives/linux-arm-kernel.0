@@ -1,65 +1,187 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Jun 2014 16:28:39 +0200
-Subject: [PATCH] [media] staging: allow omap4iss to be modular
-In-Reply-To: <20140612142515.GA7653@kroah.com>
-References: <5192928.MkINji4uKU@wuerfel> <7460455.eZRbtzsNrd@wuerfel>
- <20140612142515.GA7653@kroah.com>
-Message-ID: <4327970.JdCWevprmq@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 12 Jun 2014 16:43:07 +0200
+Subject: [PATCH] arm64/crypto: fix and improve GHASH secure hash implementation
+Message-ID: <1402584187-17114-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 June 2014 07:25:15 Greg KH wrote:
-> On Thu, Jun 12, 2014 at 04:15:32PM +0200, Arnd Bergmann wrote:
-> > On Thursday 12 June 2014 16:12:17 Laurent Pinchart wrote:
-> > > > From 3a965f4fd5a6b3ef4a66aa4e7c916cfd34fd5706 Mon Sep 17 00:00:00 2001
-> > > > From: Arnd Bergmann <arnd@arndb.de>
-> > > > Date: Tue, 21 Jan 2014 09:32:43 +0100
-> > > > Subject: [PATCH] [media] staging: tighten omap4iss dependencies
-> > > > 
-> > > > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
-> > > > of which can be loadable modules. This causes build failures
-> > > > if we want the camera driver to be built-in.
-> > > > 
-> > > > This can be solved by turning the option into "tristate",
-> > > > which unfortunately causes another problem, because the
-> > > > driver incorrectly calls a platform-internal interface
-> > > > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
-> > > > 
-> > > > Instead, this patch just forbids the invalid configurations
-> > > > and ensures that the driver can only be built if all its
-> > > > dependencies are built-in.
-> > > > 
-> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > 
-> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > 
-> > > Should I take this in my tree for v3.17 or would you like to fast-track it ?
-> > > 
-> > 
-> > I'd actually like to see it in 3.15 as a stable backport if possible,
-> 
-> It's not stable material, sorry.
+This fixes a bug in the arm64 GHASH implementation, and switches to a faster,
+polynomial multiplication based reduction instead of one that uses
+shifts and rotates.
 
-To clarify, I was talking about second version of the patch,
-not the original one. It just does this:
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
->  config VIDEO_OMAP4
->       bool "OMAP 4 Camera support"
-> -     depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
-> +     depends on VIDEO_V4L2=y && VIDEO_V4L2_SUBDEV_API && I2C=y && ARCH_OMAP4
->       select VIDEOBUF2_DMA_CONTIG
->       ---help---
->         Driver for an OMAP 4 ISS controller.
+This is a bug fix and a performance optimization in a single patch. As the code
+has never worked correctly and was merged just a couple of days ago, I am
+assuming this is OK but if anyone would prefer the bug fix separately, I'm happy
+to split them as well.
 
-which enforces that configurations that cannot be compiled
-will not be selectable in Kconfig, so we can have allmodconfig
-working. I thought that was ok for -stable.
+Ard.
 
-> > but definitely in 3.16. What is the normal path for staging/media
-> > but fix patches?
-> 
-> Through Mauro's tree.
+ arch/arm64/crypto/ghash-ce-core.S | 92 ++++++++++++++++-----------------------
+ arch/arm64/crypto/ghash-ce-glue.c |  5 ++-
+ 2 files changed, 41 insertions(+), 56 deletions(-)
 
-Ok.
-
-	Arnd
+diff --git a/arch/arm64/crypto/ghash-ce-core.S b/arch/arm64/crypto/ghash-ce-core.S
+index b9e6eaf41c9b..dc457015884e 100644
+--- a/arch/arm64/crypto/ghash-ce-core.S
++++ b/arch/arm64/crypto/ghash-ce-core.S
+@@ -3,14 +3,6 @@
+  *
+  * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
+  *
+- * Based on arch/x86/crypto/ghash-pmullni-intel_asm.S
+- *
+- * Copyright (c) 2009 Intel Corp.
+- *   Author: Huang Ying <ying.huang@intel.com>
+- *           Vinodh Gopal
+- *           Erdinc Ozturk
+- *           Deniz Karakoyunlu
+- *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms of the GNU General Public License version 2 as published
+  * by the Free Software Foundation.
+@@ -19,13 +11,15 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ 
+-	DATA	.req	v0
+-	SHASH	.req	v1
+-	IN1	.req	v2
++	SHASH	.req	v0
++	SHASH2	.req	v1
+ 	T1	.req	v2
+ 	T2	.req	v3
+-	T3	.req	v4
+-	VZR	.req	v5
++	MASK	.req	v4
++	XL	.req	v5
++	XM	.req	v6
++	XH	.req	v7
++	IN1	.req	v7
+ 
+ 	.text
+ 	.arch		armv8-a+crypto
+@@ -35,61 +29,51 @@
+ 	 *			   struct ghash_key const *k, const char *head)
+ 	 */
+ ENTRY(pmull_ghash_update)
+-	ld1		{DATA.16b}, [x1]
+ 	ld1		{SHASH.16b}, [x3]
+-	eor		VZR.16b, VZR.16b, VZR.16b
++	ld1		{XL.16b}, [x1]
++	movi		MASK.16b, #0xe1
++	ext		SHASH2.16b, SHASH.16b, SHASH.16b, #8
++	shl		MASK.2d, MASK.2d, #57
++	eor		SHASH2.16b, SHASH2.16b, SHASH.16b
+ 
+ 	/* do the head block first, if supplied */
+ 	cbz		x4, 0f
+-	ld1		{IN1.2d}, [x4]
++	ld1		{T1.2d}, [x4]
+ 	b		1f
+ 
+-0:	ld1		{IN1.2d}, [x2], #16
++0:	ld1		{T1.2d}, [x2], #16
+ 	sub		w0, w0, #1
+-1:	ext		IN1.16b, IN1.16b, IN1.16b, #8
+-CPU_LE(	rev64		IN1.16b, IN1.16b	)
+-	eor		DATA.16b, DATA.16b, IN1.16b
+ 
+-	/* multiply DATA by SHASH in GF(2^128) */
+-	ext		T2.16b, DATA.16b, DATA.16b, #8
+-	ext		T3.16b, SHASH.16b, SHASH.16b, #8
+-	eor		T2.16b, T2.16b, DATA.16b
+-	eor		T3.16b, T3.16b, SHASH.16b
++1:	/* multiply XL by SHASH in GF(2^128) */
++CPU_LE(	rev64		T1.16b, T1.16b	)
+ 
+-	pmull2		T1.1q, SHASH.2d, DATA.2d	// a1 * b1
+-	pmull		DATA.1q, SHASH.1d, DATA.1d	// a0 * b0
+-	pmull		T2.1q, T2.1d, T3.1d		// (a1 + a0)(b1 + b0)
+-	eor		T2.16b, T2.16b, T1.16b		// (a0 * b1) + (a1 * b0)
+-	eor		T2.16b, T2.16b, DATA.16b
++	ext		T2.16b, XL.16b, XL.16b, #8
++	ext		IN1.16b, T1.16b, T1.16b, #8
++	eor		T1.16b, T1.16b, T2.16b
++	eor		XL.16b, XL.16b, IN1.16b
+ 
+-	ext		T3.16b, VZR.16b, T2.16b, #8
+-	ext		T2.16b, T2.16b, VZR.16b, #8
+-	eor		DATA.16b, DATA.16b, T3.16b
+-	eor		T1.16b, T1.16b, T2.16b	// <T1:DATA> is result of
+-						// carry-less multiplication
++	pmull2		XH.1q, SHASH.2d, XL.2d		// a1 * b1
++	eor		T1.16b, T1.16b, XL.16b
++	pmull		XL.1q, SHASH.1d, XL.1d		// a0 * b0
++	pmull		XM.1q, SHASH2.1d, T1.1d		// (a1 + a0)(b1 + b0)
+ 
+-	/* first phase of the reduction */
+-	shl		T3.2d, DATA.2d, #1
+-	eor		T3.16b, T3.16b, DATA.16b
+-	shl		T3.2d, T3.2d, #5
+-	eor		T3.16b, T3.16b, DATA.16b
+-	shl		T3.2d, T3.2d, #57
+-	ext		T2.16b, VZR.16b, T3.16b, #8
+-	ext		T3.16b, T3.16b, VZR.16b, #8
+-	eor		DATA.16b, DATA.16b, T2.16b
+-	eor		T1.16b, T1.16b, T3.16b
++	ext		T1.16b, XL.16b, XH.16b, #8
++	eor		T2.16b, XL.16b, XH.16b
++	eor		XM.16b, XM.16b, T1.16b
++	eor		XM.16b, XM.16b, T2.16b
++	pmull		T2.1q, XL.1d, MASK.1d
+ 
+-	/* second phase of the reduction */
+-	ushr		T2.2d, DATA.2d, #5
+-	eor		T2.16b, T2.16b, DATA.16b
+-	ushr		T2.2d, T2.2d, #1
+-	eor		T2.16b, T2.16b, DATA.16b
+-	ushr		T2.2d, T2.2d, #1
+-	eor		T1.16b, T1.16b, T2.16b
+-	eor		DATA.16b, DATA.16b, T1.16b
++	mov		XH.d[0], XM.d[1]
++	mov		XM.d[1], XL.d[0]
++
++	eor		XL.16b, XM.16b, T2.16b
++	ext		T2.16b, XL.16b, XL.16b, #8
++	pmull		XL.1q, XL.1d, MASK.1d
++	eor		T2.16b, T2.16b, XH.16b
++	eor		XL.16b, XL.16b, T2.16b
+ 
+ 	cbnz		w0, 0b
+ 
+-	st1		{DATA.16b}, [x1]
++	st1		{XL.16b}, [x1]
+ 	ret
+ ENDPROC(pmull_ghash_update)
+diff --git a/arch/arm64/crypto/ghash-ce-glue.c b/arch/arm64/crypto/ghash-ce-glue.c
+index b92baf3f68c7..833ec1e3f3e9 100644
+--- a/arch/arm64/crypto/ghash-ce-glue.c
++++ b/arch/arm64/crypto/ghash-ce-glue.c
+@@ -67,11 +67,12 @@ static int ghash_update(struct shash_desc *desc, const u8 *src,
+ 		blocks = len / GHASH_BLOCK_SIZE;
+ 		len %= GHASH_BLOCK_SIZE;
+ 
+-		kernel_neon_begin_partial(6);
++		kernel_neon_begin_partial(8);
+ 		pmull_ghash_update(blocks, ctx->digest, src, key,
+ 				   partial ? ctx->buf : NULL);
+ 		kernel_neon_end();
+ 		src += blocks * GHASH_BLOCK_SIZE;
++		partial = 0;
+ 	}
+ 	if (len)
+ 		memcpy(ctx->buf + partial, src, len);
+@@ -88,7 +89,7 @@ static int ghash_final(struct shash_desc *desc, u8 *dst)
+ 
+ 		memset(ctx->buf + partial, 0, GHASH_BLOCK_SIZE - partial);
+ 
+-		kernel_neon_begin_partial(6);
++		kernel_neon_begin_partial(8);
+ 		pmull_ghash_update(1, ctx->digest, ctx->buf, key, NULL);
+ 		kernel_neon_end();
+ 	}
+-- 
+1.8.3.2
