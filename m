@@ -1,67 +1,43 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:16 +0530
-Subject: [PATCH V2 08/19] irqchip: crossbar: fix checkpatch warning
+Date: Thu, 12 Jun 2014 17:23:18 +0530
+Subject: [PATCH V2 10/19] irqchip: crossbar: DRA7: Fix unused crossbar list
 In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402574007-13987-9-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402574007-13987-11-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+From: Rajendra Nayak <rnayak@ti.com>
 
-remove un-necessary space in function pointer.
+On DRA7 compatible IRQ crossbar, IRQ 10 default mapped to L3_APP_IRQ,
+IRQ133 is default mapped to NMI pin, 139 and 140 crossbars are
+unused(not routed). Mark these as unused crossbar IRQs.
 
-Fixes checkpatch warning:
-WARNING: Unnecessary space before function pointer arguments
- #37: FILE: drivers/irqchip/irq-crossbar.c:37:
- +	void (*write) (int, int);
+Technical Reference Manual documentation update expected
+DRA72x-TRMINC00067 is being used to track the update.
 
-WARNING: Missing a blank line after declarations
-+	int *register_offsets;
-+	void (*write)(int, int);
-
-WARNING: Prefer kcalloc over kzalloc with multiply
-+	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
-
-WARNING: Prefer kcalloc over kzalloc with multiply
-+	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Reported-by: Nishanth Menon <nm@ti.com>
+Reported-by: Sricharan R <r.sricharan@ti.com>
+Reported-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 5da9d36..58790d4 100644
+index 7d4db07..42a2e62 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -34,7 +34,8 @@ struct crossbar_device {
- 	uint *irq_map;
- 	void __iomem *crossbar_base;
- 	int *register_offsets;
--	void (*write) (int, int);
-+
-+	void (*write)(int, int);
- };
+@@ -253,8 +253,8 @@ err1:
+ 	return -ENOMEM;
+ }
  
- /**
-@@ -150,7 +151,7 @@ static int __init crossbar_of_init(struct device_node *node,
- 		goto err1;
- 
- 	of_property_read_u32(node, "ti,max-irqs", &max);
--	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
-+	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
- 	if (!cb->irq_map)
- 		goto err2;
- 
-@@ -176,7 +177,7 @@ static int __init crossbar_of_init(struct device_node *node,
- 		}
- 	}
- 
--	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
-+	cb->register_offsets = kcalloc(max, sizeof(int), GFP_KERNEL);
- 	if (!cb->register_offsets)
- 		goto err3;
+-/* irq number 10 cannot be used because of hw bug */
+-static int dra_irqs_unused[] = { 10 };
++/* irq number 10,133,139 and 140 cannot be used because of hw bug */
++static int dra_irqs_unused[] = { 10 , 133, 139, 140 };
+ static struct crossbar_data cb_dra_data = { dra_irqs_unused,
+ 				     ARRAY_SIZE(dra_irqs_unused), 0 };
  
 -- 
 1.7.9.5
