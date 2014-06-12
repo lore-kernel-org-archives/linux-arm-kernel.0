@@ -1,30 +1,49 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Thu, 12 Jun 2014 12:52:24 -0400
-Subject: [RFC v2 1/3] Mailbox: Add support for ACPI
-In-Reply-To: <1402591692-7736-2-git-send-email-ashwin.chaugule@linaro.org>
-References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
- <1402591692-7736-2-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <CAJ5Y-ea6teac4xksRTxrt5bxEHpUXumgypD5PJwnn39oYxN4Fg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 12 Jun 2014 09:53:57 -0700
+Subject: [PATCH 3/3] clocksource: exynos_mct: Optimize register reads with
+ ldmia
+In-Reply-To: <alpine.DEB.2.10.1406042004140.3319@nanos>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+ <1401903034-20074-3-git-send-email-dianders@chromium.org>
+ <alpine.DEB.2.10.1406042004140.3319@nanos>
+Message-ID: <CAD=FV=VSPF8rD_JQivxizSkwMfjkKC6QeL_fDC_0RQvHQsYRCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+Thomas,
 
-On 12 June 2014 12:48, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
-> The current mailbox framework only supports DT based bindings.
-> Add another mechanism for mailbox clients to register with mailbox
-> controllers and request for specific mailbox channels. This enables
-> usage of the mailbox framework on kernels with ACPI support.
+On Wed, Jun 4, 2014 at 11:05 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Wed, 4 Jun 2014, Doug Anderson wrote:
 >
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> ---
->  drivers/mailbox/mailbox.c          | 155 ++++++++++++++++++++++++-------------
->  include/linux/mailbox_client.h     |   3 +
->  include/linux/mailbox_controller.h |   6 ++
->  3 files changed, 112 insertions(+), 52 deletions(-)
+>> As we saw in (clocksource: exynos_mct: cache mct upper count), the
+>> time spent reading the MCT shows up fairly high in real-world
+>> profiles.  That means that it's worth some optimization.
+>>
+>> We get a roughly 10% speedup in userspace gettimeofday() by using an
+>> ldmia to read the two halfs of the MCT.  That seems like a worthwhile
+>> thing to do.
+>>
+>> Before: 1173084 us for 1000000 gettimeofday in userspace
+>> After:  1045674 us for 1000000 gettimeofday in userspace
+>>
+>> NOTE: we could actually do better than this if we really wanted to.
+>> Technically we could register the clocksource as a 32-bit timer and
+>> only use the "lower" half.  Doing so brings us down to 1014429 us for
+>> 1000000 gettimeofday in userspace (and doesn't even require assembly
+>> code).  That would be an alternative to this change.
 >
+> I was about to ask exactly that question: What's the advantage of the
+> 64 bit dance there? AFAICT nothing.
 
-Can you please try this change on your platform(s) with DT support?
+Are you explicitly naking the 64-bit version of these patches?  If so
+I'll send out the 32-bit version right away.  If nothing else we
+should get the ftrace fix (patch 1 in this series) landed ASAP since
+that fixes a regression.  I'd like to make the 32-bit decision first
+though since fixing the regression is easier in the 32-bit version.
 
-Cheers,
-Ashwin
+Roughly: with the 64-bit version there's no question that we're not
+regressing anyone's functionality or performance and it's nearly as
+fast as the 32-bit version.  The 32-bit version is simpler / faster
+but has the potential to cause (unknown) problems.
+
+-Doug
