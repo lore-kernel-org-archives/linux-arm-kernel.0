@@ -1,163 +1,512 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Jun 2014 14:19:45 +0200
-Subject: Kconfig fails: big select-based circular dependency
-In-Reply-To: <20140612113445.GF23430@n2100.arm.linux.org.uk>
-References: <20140607090944.GL23430@n2100.arm.linux.org.uk>
- <6077426.uLBS643pC0@wuerfel> <20140612113445.GF23430@n2100.arm.linux.org.uk>
-Message-ID: <10376496.xoRI3F9EzH@wuerfel>
+From: drake@endlessm.com (Daniel Drake)
+Date: Thu, 12 Jun 2014 13:44:37 +0100
+Subject: [PATCH] ARM: dts: Initial ODROID U2 support
+Message-ID: <1402577077-7835-1-git-send-email-drake@endlessm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 June 2014 12:34:45 Russell King - ARM Linux wrote:
-> On Thu, Jun 12, 2014 at 12:31:19PM +0200, Arnd Bergmann wrote:
-> > On Thursday 12 June 2014 10:47:45 Russell King - ARM Linux wrote:
-> > > If no one responds, I'll assume that no one is interested, and I'll
-> > > just create a pile of patches removing a bunch of these idiotic select
-> > > statements at random to break this loop.
-> > 
-> > I missed the original mail, and I don't remember seeing this particular
-> > dependency chain.
-> > 
-> > > On Sat, Jun 07, 2014 at 10:09:44AM +0100, Russell King - ARM Linux wrote:
-> > > > This is getting silly:
-> > > > 
-> > > > scripts/kconfig/conf --silentoldconfig Kconfig
-> > > > drivers/dma/Kconfig:5:error: recursive dependency detected!
-> > > > drivers/dma/Kconfig:5:  symbol DMADEVICES is selected by SAMSUNG_DMADEV
-> > 
-> > The 'select DMADEVICES' from plat-samsung/Kconfig is certainly wrong,
-> > we shouldn't do that, but I'd do some extended build regression tests
-> > to ensure that it doesn't cause other problems.
-> > 
-> > I'll have a look.
-> 
-> Yes, SAMSUNG_DMADEV looks like it's a shim layer between DMA engine and
-> the old Samsung platform private DMA API.  I suspect SAMSUNG_DMADEV should
-> be selected by the drivers which make use of this shim iff DMADEVICES is
-> enabled.
+This dts adds initial support for the popular ODROID U2/U3 development
+boards based on Exynos4412.
 
-FWIW, SAMSUNG_DMADEV should get removed in 3.17. At the moment
-there is only one user (sound/soc/samsung/ac97.c), and that is
-broken because it calls a NULL function pointer returned from
-samsung_dma_get_ops().
+This file comes from larger work by Alban Browaeys, but I removed the
+items that aren't immediately working on mainline kernels yet (USB,
+HDMI, etc).
 
-> > > > arch/arm/plat-samsung/Kconfig:412:      symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
-> 
-> I think killing the select statement against S3C64XX_PL080 of this shim is
-> also a correct move - I suspect that's just there to make Kconfig life
-> easier (which is not really a valid reason for adding a select statement
-> to a major subsystem.)
-> 
-> > > > arch/arm/mach-s3c64xx/Kconfig:20:       symbol S3C64XX_PL080 is selected by SPI_S3C64XX
-> 
-> As I said in my reply to Paul, this select should also be killed.  At
-> the very least, it should be turned into "depends on S3C64XX_PL080 if
-> ARCH_S3C64XX".
-> 
-> Since the comments in the driver say that the driver depends on having a
-> DMA engine, I'd suggest also adding a dependency on DMADEVICES as well,
-> to encode that explicit requirement in the Kconfig language:
-> 
-> config SPI_S3C64XX
-> 	tristate "Samsung S3C64XX series type SPI"
-> 	depends on PLAT_SAMSUNG && DMADEVICES
-> 	depends on S3C64XX_PL080 if ARCH_S3C64XX
-> 
-> The driver will cleanly fail if it can't get the DMA channels that it
-> requires to operate, so we don't need to do anything more than this here.
+This leaves us with a reasonable starting point for further development:
+basic bootup and shutdown works, plus LED, eMMC, SD, and serial.
 
-I have struggled with this dependency a few times before, the conversion
-from the samsung specific DMA driver to dmaengine did not go well, and we
-still see the fallout from that here.
+Signed-off-by: Daniel Drake <drake@endlessm.com>
+---
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/exynos4412-odroidu2.dts | 468 ++++++++++++++++++++++++++++++
+ 2 files changed, 469 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4412-odroidu2.dts
 
-It seems this particular case was just a mistake that Tomasz made in
-3faecea70b0 "spi: s3c64xx: Always select S3C64XX_PL080 when ARCH_S3C64XX
-is enabled" when the correct conversion would have been to drop the
-dependency.
-
-However, the arch/arm/plat-samsung/dma-ops.c code relies on either
-S3C64XX_PL080 or PL330_DMA (but not both!) to be enabled, and the
-dependency in the SPI driver happens to ensure that at the moment.
-
-When we remove it here, we have to change the plat-samsung code to
-either do the select there or fix it properly. I'm inclined to go
-for a hack here, because this code is going away anyway.
-
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 8a22df5..704dbc6 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -416,6 +416,7 @@ config SAMSUNG_DMADEV
- 	select DMADEVICES
- 	select PL330_DMA if (ARCH_EXYNOS5 || ARCH_EXYNOS4 || CPU_S5PV210 || CPU_S5PC100 || \
- 					CPU_S5P6450 || CPU_S5P6440)
-+	select S3C64XX_PL080 if ARCH_S3C64XX
- 	help
- 	  Use DMA device engine for PL330 DMAC.
- 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 213b5cb..33d935c 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -422,7 +422,6 @@ config SPI_S3C24XX_FIQ
- config SPI_S3C64XX
- 	tristate "Samsung S3C64XX series type SPI"
- 	depends on PLAT_SAMSUNG
--	select S3C64XX_PL080 if ARCH_S3C64XX
- 	help
- 	  SPI driver for Samsung S3C64XX and newer SoCs.
- 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index d863722..8c1fe01 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -20,7 +20,6 @@ config CPU_S3C6410
- config S3C64XX_PL080
- 	bool "S3C64XX DMA using generic PL08x driver"
- 	select AMBA_PL08X
--	select SAMSUNG_DMADEV
- 
- config S3C64XX_SETUP_SDHCI
- 	bool
-
-This would also avoid changing the defconfigs.
-
-> > > > drivers/gpu/drm/panel/Kconfig:19:       symbol DRM_PANEL_LD9040 depends on DRM_PANEL
-> > > > drivers/gpu/drm/panel/Kconfig:1:        symbol DRM_PANEL is selected by DRM_IMX_LDB
-> > > > drivers/staging/imx-drm/Kconfig:35:     symbol DRM_IMX_LDB depends on MFD_SYSCON
-> > > > drivers/mfd/Kconfig:722:        symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
-> > 
-> > We have 10 drivers doing 'select MFD_SYSCON' and 9 drivers doing
-> > 'depends on MFD_SYSCON'. Either one would work if we did those
-> > consistently, here the problem is really mixing the two.
-> 
-> Indeed - we need clear policies on this stuff, because as we get different
-> platforms doing different things (as is the case in this scenario), we are
-> only going to see an increase in this problem.
-> 
-> Also, I don't think we should do just one change to break this loop - this
-> is a sign of a much bigger disease.  We are heading towards the situation
-> where adding just one 'select' or 'depends on' statement between two symbols,
-> thereby adding just one more dependency to an already tightly linked graph
-> can cause a circular dependency.
-> 
-> We need to stop this behaviour ASAP, and kill off as many of these
-> ill-considered or wrong dependencies as possible, otherwise we're risking
-> Kconfig becoming unmaintainable.
-> 
-> Whenever we see a new 'select' statment appearing in a patch for something
-> which is not a utility symbol, we need to ask what the justification is
-> for it being there, and evaluate whether it's reasonable (ideally, this
-> should be detailed in the commit log.)
-> 
-> (I define a utility symbol as one whose primary purpose is to be selected.)
-
-Agreed. Ideally a symbol that gets selected by another one would always
-be a 'silent' one, i.e. not also be user selectable, but we can't really
-enforce that with thousands of symbols not following that.
-
-One common scenario seems valid, too: A platform selects a driver or
-subsystem, and the platform specific driver has a dependency on that.
-Things just get this messy if the driver itself does the select.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5986ff6..bd89b23 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -66,6 +66,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos4210-smdkv310.dtb \
+ 	exynos4210-trats.dtb \
+ 	exynos4210-universal_c210.dtb \
++	exynos4412-odroidu2.dtb \
+ 	exynos4412-odroidx.dtb \
+ 	exynos4412-origen.dtb \
+ 	exynos4412-smdk4412.dtb \
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu2.dts b/arch/arm/boot/dts/exynos4412-odroidu2.dts
+new file mode 100644
+index 0000000..a164522
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4412-odroidu2.dts
+@@ -0,0 +1,468 @@
++/*
++ * Hardkernel's Exynos4412 based ODROID-U2 board device tree source
++ *
++ * Copyright (c) 2013 Alban Browaeys <prahal@yahoo.com>
++ *
++ * Based on exynos4412-odroidx.dts
++ * Copyright (c) 2012 Dongjin Kim <tobetter@gmail.com>
++ *
++ * Based on exynos4412-origen.dts
++ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Device tree source file for Hardkernel's ODROID-U2 board which is based on
++ * Samsung's Exynos4412 SoC.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/dts-v1/;
++#include "exynos4412.dtsi"
++
++/ {
++	model = "Hardkernel ODROID-U2/U3 board based on Exynos4412";
++	compatible = "hardkernel,odroid-u2", "samsung,exynos4412", "samsung,exynos4";
++
++	chosen {
++		bootargs = "console=ttySAC1,115200";
++	};
++
++	memory {
++		reg = <0x40000000 0x80000000>;
++	};
++
++	firmware at 0203F000 {
++		compatible = "samsung,secure-firmware";
++		reg = <0x0203F000 0x1000>;
++	};
++
++	watchdog at 10060000 {
++		status = "okay";
++	};
++
++	g2d at 10800000 {
++		status = "okay";
++	};
++
++	fixed-rate-clocks {
++		xxti {
++			compatible = "samsung,clock-xxti", "fixed-clock";
++			clock-frequency = <0>;
++		};
++
++		xusbxti {
++			compatible = "samsung,clock-xusbxti", "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		led1 {
++			label = "led1:heart";
++			gpios = <&gpc1 0 1>;
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	mmc at 12550000 {
++		pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8 &sd4_nreset_out>;
++		pinctrl-names = "default";
++		vmmc-supply = <&ldo20_reg &ldo22_reg>;
++		status = "okay";
++
++		num-slots = <1>;
++		supports-highspeed;
++		broken-cd;
++		keep-power-in-suspend;
++		non-removable;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-ciu-div = <3>;
++		samsung,dw-mshc-sdr-timing = <1 1>;
++		samsung,dw-mshc-ddr-timing = <2 1>;
++		samsung,dw-mshc-hwreset-gpio = <&gpk1 2 1>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <8>;
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++
++		reg_p3v3: p3v3 at 0 {
++			compatible = "regulator-fixed";
++			regulator-name = "p3v3_en";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpa1 1 3>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		reg_sysvdd: p5v0 at 1 {
++			compatible = "regulator-fixed";
++			regulator-name = "p5v0";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		spkvdd:jack at 2 {
++			compatible = "regulator-fixed";
++			regulator-name = "spkvdd-supply";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			vin-supply = <&reg_sysvdd>;
++		};
++	};
++
++	pinctrl at 11000000 {
++		sd4_nreset_out: sd4-nreset-out {
++			samsung,pins = "gpk1-2";
++			samsung,pin-function = <4>;
++			samsung,pin-pud = <0>;
++			samsung,pin-drv = <0>;
++		};
++
++		eint26: ext-int26 {
++			samsung,pins = "gpx3-2";
++			samsung,pin-function = <0xf>;
++			samsung,pin-pud = <0>;
++			samsung,pin-drv = <0>;
++		};
++	};
++
++	sdhci at 12530000 {
++		bus-width = <4>;
++		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
++		pinctrl-names = "default";
++		vmmc-supply = <&ldo4_reg &ldo21_reg>;
++		status = "okay";
++	};
++
++	serial at 13800000 {
++		status = "okay";
++	};
++
++	serial at 13810000 {
++		status = "okay";
++	};
++
++	serial at 13820000 {
++		status = "okay";
++	};
++
++	serial at 13830000 {
++		status = "okay";
++	};
++
++	i2c_0: i2c at 13860000 {
++		pinctrl-0 = <&i2c0_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-slave-addr = <0x10>;
++		samsung,i2c-max-bus-freq = <400000>;
++
++		max77686_pmic at 09 {
++			compatible = "maxim,max77686";
++			interrupts-extended = <&gpx3 2 1>, <&gpx1 2 1>;
++			reg = <0x09>;
++			pinctrl-0 = <&eint26>;
++			pinctrl-names = "default";
++			#clock-cells = <1>;
++
++			voltage-regulators {
++				ldo1_reg: ldo1 {
++					regulator-compatible = "LDO1";
++					regulator-name = "VDD_ALIVE_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo2_reg: ldo2 {
++					regulator-compatible = "LDO2";
++					regulator-name = "VDDQ_M1_2_1.8V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++				};
++
++				ldo3_reg: ldo3 {
++					regulator-compatible = "LDO3";
++					regulator-name = "VDDQ_EXT_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo4_reg: ldo4 {
++					regulator-compatible = "LDO4";
++					regulator-name = "VDDQ_MMC2_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo5_reg: ldo5 {
++					regulator-compatible = "LDO5";
++					regulator-name = "VDDQ_MMC1_3_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo6_reg: ldo6 {
++					regulator-compatible = "LDO6";
++					regulator-name = "VDD10_MPLL_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo7_reg: ldo7 {
++					regulator-compatible = "LDO7";
++					regulator-name = "VDD10_EPLL_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo8_reg: ldo8 {
++					regulator-compatible = "LDO8";
++					regulator-name = "VDD10_MIPI_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo9_reg: ldo9 {
++					regulator-compatible = "LDO9";
++					regulator-name = "VT_CORE_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++				};
++
++				ldo10_reg: ldo10 {
++					regulator-compatible = "LDO10";
++					regulator-name = "VDD18_MIPI_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-boot-on;
++				};
++
++				ldo11_reg: ldo11 {
++					regulator-compatible = "LDO11";
++					regulator-name = "VDD18_ABB1_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo12_reg: ldo12 {
++					regulator-compatible = "LDO12";
++					regulator-name = "VDD33_USB_3.3V";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo13_reg: ldo13 {
++					regulator-compatible = "LDO13";
++					regulator-name = "VDDQ_C2C_W_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo14_reg: ldo14 {
++					regulator-compatible = "LDO14";
++					regulator-name = "VDD18_ABB0_2_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo15_reg: ldo15 {
++					regulator-compatible = "LDO15";
++					regulator-name = "VDD10_HSIC_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo16_reg: ldo16 {
++					regulator-compatible = "LDO16";
++					regulator-name = "VDD18_HSIC_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo17_reg: ldo17 {
++					regulator-compatible = "LDO17";
++					regulator-name = "VDDQ_CAM_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++				};
++
++				ldo18_reg: ldo18 {
++					regulator-compatible = "LDO18";
++					regulator-name = "VDDQ_ISP_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				ldo19_reg: ldo19 {
++					regulator-compatible = "LDO19";
++					regulator-name = "VT_CAM_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				ldo20_reg: ldo20 {
++					regulator-compatible = "LDO20";
++					regulator-name = "LDO20_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-boot-on;
++				};
++
++				ldo21_reg: ldo21 {
++					regulator-compatible = "LDO21";
++					regulator-name = "LDO21_3.3V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo22_reg: ldo22 {
++					regulator-compatible = "LDO22";
++					regulator-name = "VMEM_VDD_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo23_reg: ldo23 {
++					regulator-compatible = "LDO23";
++					regulator-name = "VDD_TOUCH_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo24_reg: ldo24 {
++					regulator-compatible = "LDO24";
++					regulator-name = "VDD_TOUCHLED_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldo25_reg: ldo25 {
++					regulator-compatible = "LDO25";
++					regulator-name = "VDDQ_LCD_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo26_reg: ldo26 {
++					regulator-compatible = "LDO26";
++					regulator-name = "VDD_MOTOR_3.0V";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++				};
++
++				buck1_reg: buck1 {
++					regulator-compatible = "BUCK1";
++					regulator-name = "vdd_mif";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck2_reg: buck2 {
++					regulator-compatible = "BUCK2";
++					regulator-name = "vdd_arm";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1500000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck3_reg: buck3 {
++					regulator-compatible = "BUCK3";
++					regulator-name = "vdd_int";
++					regulator-min-microvolt = <1125000>;
++					regulator-max-microvolt = <1125000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck4_reg: buck4 {
++					regulator-compatible = "BUCK4";
++					regulator-name = "vdd_g3d";
++					regulator-min-microvolt = <850000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck5_reg: buck5 {
++					regulator-compatible = "BUCK5";
++					regulator-name = "VDDQ_CKEM1_2_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++				};
++
++				buck6_reg: buck6 {
++					regulator-compatible = "BUCK6";
++					regulator-name = "BUCK6_1.35V";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++				};
++
++				buck7_reg: buck7 {
++					regulator-compatible = "BUCK7";
++					regulator-name = "BUCK7_2.0V";
++					regulator-min-microvolt = <2000000>;
++					regulator-max-microvolt = <2000000>;
++					regulator-always-on;
++				};
++
++				buck8_reg: buck8 {
++					regulator-compatible = "BUCK8";
++					regulator-name = "BUCK8_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck9_reg: buck9 {
++					regulator-compatible = "BUCK9";
++					regulator-name = "BUCK9_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++				};
++			};
++		};
++	};
++};
+-- 
+1.9.1
