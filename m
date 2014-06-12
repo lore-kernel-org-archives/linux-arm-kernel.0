@@ -1,122 +1,166 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 11 Jun 2014 19:51:31 -0700
-Subject: BUG: Bad page state in process swapper pfn:00000
-In-Reply-To: <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
-References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>	<539892BD.8020403@codeaurora.org>
- <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
-Message-ID: <539915B3.9050904@codeaurora.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Wed, 11 Jun 2014 19:53:04 -0700
+Subject: [PATCH v7 4/4] arm: dirty page logging 2nd stage page fault
+ handling support
+In-Reply-To: <20140611065848.GB24286@lvm>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1401837567-5527-5-git-send-email-m.smarduch@samsung.com>
+ <20140608120530.GH3279@lvm> <53974D15.3070508@samsung.com>
+ <20140611065848.GB24286@lvm>
+Message-ID: <53991610.9060104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/11/2014 12:19 PM, Geert Uytterhoeven wrote:
-> Hi Laura,
-> 
-> On Wed, Jun 11, 2014 at 7:32 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
->> On 6/11/2014 4:40 AM, Geert Uytterhoeven wrote:
->>> With current mainline, I get an early crash on r8a7791/koelsch:
+On 06/10/2014 11:58 PM, Christoffer Dall wrote:
+> On Tue, Jun 10, 2014 at 11:23:17AM -0700, Mario Smarduch wrote:
+>> On 06/08/2014 05:05 AM, Christoffer Dall wrote:
+>>> On Tue, Jun 03, 2014 at 04:19:27PM -0700, Mario Smarduch wrote:
+>>>> This patch adds support for handling 2nd stage page faults during migration,
+>>>> it disables faulting in huge pages, and disolves huge pages to page tables.
 >>>
->>> BUG: Bad page state in process swapper  pfn:00000
->>> page:ee20b000 count:0 mapcount:0 mapping:66756200 index:0x65726566
->>> page flags: 0x74656b63(locked|error|lru|active|owner_priv_1|arch_1|private|writeback|head|swapcache
->>> |reclaim|mlocked)
->>> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
->>> bad because of flags:
->>> page flags: 0x212861(locked|lru|active|private|writeback|swapcache|mlocked)
+>>> s/disolves/dissolves/g
+>> Will do.
 >>>
->>> I bisected it to
+>>>> In case migration is canceled huge pages will be used again.
+>>>>
+>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>> ---
+>>>>  arch/arm/kvm/mmu.c |   36 ++++++++++++++++++++++++++++++++++--
+>>>>  1 file changed, 34 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>>> index 1c546c9..aca4fbf 100644
+>>>> --- a/arch/arm/kvm/mmu.c
+>>>> +++ b/arch/arm/kvm/mmu.c
+>>>> @@ -966,6 +966,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+>>>>  	struct vm_area_struct *vma;
+>>>>  	pfn_t pfn;
+>>>> +	/* Get logging status, if dirty_bitmap is not NULL then logging is on */
+>>>> +	bool logging_active = !!memslot->dirty_bitmap;
 >>>
->>> commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
->>> Author: Laura Abbott <lauraa@codeaurora.org>
->>> Date:   Sun Apr 13 22:54:58 2014 +0100
+>>>>  
+>>>>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+>>>>  	if (fault_status == FSC_PERM && !write_fault) {
+>>>> @@ -1019,10 +1021,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>  	spin_lock(&kvm->mmu_lock);
+>>>>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>>>>  		goto out_unlock;
+>>>> -	if (!hugetlb && !force_pte)
+>>>> +
+>>>> +	/* When logging don't spend cycles to check for huge pages */
 >>>
->>>     ARM: 8025/1: Get rid of meminfo
+>>> drop the comment: either explain the entire clause (which would be too
+>>> long) or don't explain anything.
+>>>
+>> Ok.
+>>>> +	if (!hugetlb && !force_pte && !logging_active)
+>>>
+>>> instead of having all this, can't you just change 
+>>>
+>>> if (is_vm_hugetlb_page(vma)) to
+>>> if (is_vm_hugetlb_page(vma) && !logging_active)
+>>>
+>>> then you're also not mucking around with the gfn etc.
+>>
+>> I didn't want to modify this function too much, but if that's ok that 
+>> simplifies things a lot.
+>>
 > 
->>> -Truncating RAM at 40000000-bfffffff to -6f7fffff (vmalloc region overlap).
->>> +Truncating RAM at 0x00000000-0xc0000000 to -0x6f800000
->>
->> I'm guessing this is the issue right there.
->>
->>         memory at 40000000 {
->>                 device_type = "memory";
->>                 reg = <0 0x40000000 0 0x40000000>;
->>         };
->>
->>         memory at 200000000 {
->>                 device_type = "memory";
->>                 reg = <2 0x00000000 0 0x40000000>;
->>         };
->>
->> Those are the memory nodes from r8a7791-koelsch.dts. It looks like the memory
->> outside 32-bit address range is not being dropped. It was suggested to drop
->> early_init_dt_add_memory_arch which called arm_add_memory and just use the
->> generic of code directly but the problem is arm_add_memory does additional
->> bounds checking. It looks like early_init_dt_add_memory_arch in
->> drivers/of/fdt.c checks for overflow on u64 types but not for overflow
->> on phys_addr_t (32 bits) which is what memblock_add actually uses.
->>
->> For a quick test, can you try bringing back early_init_dt_add_memory_arch
->> and see if that fixes the problem:
->>
->> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
->> index e94a157..ea9ce92 100644
->> --- a/arch/arm/kernel/devtree.c
->> +++ b/arch/arm/kernel/devtree.c
->> @@ -27,6 +27,10 @@
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach-types.h>
->>
->> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
->> +{
->> +       arm_add_memory(base, size);
->> +}
->>
->>  #ifdef CONFIG_SMP
->>  extern struct of_cpu_method __cpu_method_of_table[];
+> Don't worry about the changes as much as the resulting code.  If
+> something requires a lot of refactoring, usually that can be handled by
+> splitting up renames, factoring out functions, etc. into multiple
+> smaller patches.
 > 
-> Thanks, my board boots again after applying this quick hack.
+>>>
+>>>>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>>>>  
+>>>> -	if (hugetlb) {
+>>>> +	/*
+>>>> +	 * Force all not present/perm faults to PTE handling, address both
+>>>> +	 * PMD and PTE faults
+>>>> +	 */
+>>>
+>>> I don't understand this comment?  In which case does this apply?
+>>>
+>> The cases I see here -
+>> - huge page permission fault is forced into page table code while logging
+>> - pte permission/not present handled by page table code as before.
+> 
+> Hmm, the wording doesn't really work for me.  I don't think this comment
+> adds anything or is required, when getting this deep into the fault
+> handler etc., one better understand what's going on.
+> 
+> The most suitable place for a comment in this work is probably in
+> stage2_set_pte() where you can now detect a kvm_pmd_huge(), when you add
+> that, you may want to add a small comment that this only happens when
+> logging dirty pages.
+> 
+>>>> +	if (hugetlb && !logging_active) {
+>>>>  		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+>>>>  		new_pmd = pmd_mkhuge(new_pmd);
+>>>>  		if (writable) {
+>>>> @@ -1034,6 +1042,22 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>  	} else {
+>>>>  		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+>>>>  		if (writable) {
+>>>> +			/*
+>>>> +			 * If pmd is  mapping a huge page then clear it and let
+>>>> +			 * stage2_set_pte() create a pte table. At the sametime
+>>>> +			 * you write protect the pte (PAGE_S2 pgprot_t).
+>>>> +			 */
+>>>> +			if (logging_active) {
+>>>> +				pmd_t *pmd;
+>>>> +				if (hugetlb) {
+>>>> +					pfn += pte_index(fault_ipa);
+>>>> +					gfn = fault_ipa >> PAGE_SHIFT;
+>>>> +					new_pte = pfn_pte(pfn, PAGE_S2);
+>>>> +				}
+>>>> +				pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
+>>>> +				if (pmd && kvm_pmd_huge(*pmd))
+>>>> +					clear_pmd_entry(kvm, pmd, fault_ipa);
+>>>> +			}
+>>>
+>>> now instead of all this, you just need to check for kvm_pmd_huge() in
+>>> stage2_set_pte() and if that's true, you clear it, and then then install
+>>> your new pte.
+>>
+>> Yes this really simplifies things!
+>>
+>>>
+>>>>  			kvm_set_s2pte_writable(&new_pte);
+>>>>  			kvm_set_pfn_dirty(pfn);
+>>>>  		}
+>>>> @@ -1041,6 +1065,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+>>>>  	}
+>>>>  
+>>>> +	/*
+>>>> +	 * Log the dirty page in dirty_bitmap[], call regardless if logging is
+>>>> +	 * disabled or enabled both cases handled safely.
+>>>> +	 * TODO: for larger page size mark mulitple dirty page bits for each
+>>>> +	 *       4k page.
+>>>> +	 */
+>>>> +	if (writable)
+>>>> +		mark_page_dirty(kvm, gfn);
+>>>
+>>> what if you just faulted in a page on a read which wasn't present
+>>> before but it happens to belong to a writeable memslot, is that page
+>>> then dirty? hmmm.
+>>>
+>> A bug, must also check if it was a write fault not just that we're dealing with
+>> a writable region. This one could be pretty bad on performance, not to mention
+>> in accurate. It will be interesting to see new test results, glad you caught
+>> that.
+>>
+> ok, please fix.
+> 
+> Thanks,
+> -Christoffer
 > 
 
-Great! Russell are you okay with taking the above as a fix or would you prefer
-I fixup drivers/of/fdt.c right now? 
+So I'll start on next iteration, make sure it builds cleanly on all the
+architecture. Follow up with Paolo on how to handle the generic
+functions. I think arm64 will need some extra work.
 
-
-Thanks,
-Laura
-
-----8<----
->From 14bda557a108ad197e7c5f040f50ca024b45cc17 Mon Sep 17 00:00:00 2001
-From: Laura Abbott <lauraa@codeaurora.org>
-Date: Wed, 11 Jun 2014 19:39:29 -0700
-Subject: [PATCH] arm: Bring back early_init_dt_add_memory_arch
-
-Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) removed
-early_init_dt_add_memory_arch in favor of using the common method.
-The common method does not currently check for memory outside of
-32-bit bounds which may lead to memory being incorrectly added to
-the system. Bring back early_init_dt_add_memory_arch for now until
-the generic function can be fixed up.
-
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/kernel/devtree.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index e94a157..ea9ce92 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -27,6 +27,10 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-+void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-+{
-+	arm_add_memory(base, size);
-+}
- 
- #ifdef CONFIG_SMP
- extern struct of_cpu_method __cpu_method_of_table[];
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+- Mario
