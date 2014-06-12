@@ -1,60 +1,144 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 12 Jun 2014 16:06:52 +0200
-Subject: [PATCH 2/3 v4] spi: s3c64xx: for DT platofrms always get the
- chipselect info from DT node
-In-Reply-To: <1402578821-27338-2-git-send-email-ch.naveen@samsung.com>
-References: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
- <1402578821-27338-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <5399B3FC.5030605@collabora.co.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Jun 2014 10:07:29 -0400
+Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from
+ getting mapped to crossbar
+In-Reply-To: <5399A8D5.6070105@ti.com>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
+ <20140612125134.GS8664@titan.lakedaemon.net>
+ <5399A8D5.6070105@ti.com>
+Message-ID: <20140612140729.GD8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Naveen,
-
-On 06/12/2014 03:13 PM, Naveen Krishna Chatradhi wrote:
-> Use controller_data structure only for the Non Device tree  platforms.
-> For Device tree platforms, always derive the chipselect info from
-> DT node.
+On Thu, Jun 12, 2014 at 06:49:17PM +0530, Sricharan R wrote:
+> Hi Jason,
 > 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> ---
->  drivers/spi/spi-s3c64xx.c |   11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
+> On Thursday 12 June 2014 06:21 PM, Jason Cooper wrote:
+> > On Thu, Jun 12, 2014 at 05:23:11PM +0530, Sricharan R wrote:
+> >> From: Nishanth Menon <nm@ti.com>
+> >>
+> >> When, in the system due to varied reasons, interrupts might be unusable
+> >> due to hardware behavior, but register maps do exist, then those interrupts
+> >> should be skipped while mapping irq to crossbars.
+> >>
+> >> Signed-off-by: Nishanth Menon <nm@ti.com>
+> >> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> >> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > Tony, have you applied these somewhere already?
+> > 
+> >> ---
+> >>  drivers/irqchip/irq-crossbar.c |   47 ++++++++++++++++++++++++++++++++++++----
+> >>  1 file changed, 43 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+> >> index 51d4b87..847f6e3 100644
+> >> --- a/drivers/irqchip/irq-crossbar.c
+> >> +++ b/drivers/irqchip/irq-crossbar.c
+> >> @@ -13,11 +13,13 @@
+> >>  #include <linux/io.h>
+> >>  #include <linux/of_address.h>
+> >>  #include <linux/of_irq.h>
+> >> +#include <linux/of_device.h>
+> >>  #include <linux/slab.h>
+> >>  #include <linux/irqchip/arm-gic.h>
+> >>  
+> >>  #define IRQ_FREE	-1
+> >>  #define IRQ_RESERVED	-2
+> >> +#define IRQ_SKIP	-3
+> >>  #define GIC_IRQ_START	32
+> >>  
+> >>  /*
+> >> @@ -34,6 +36,16 @@ struct crossbar_device {
+> >>  	void (*write) (int, int);
+> >>  };
+> >>  
+> >> +/**
+> >> + * struct crossbar_data: Platform specific data
+> >> + * @irqs_unused: array of irqs that cannot be used because of hw erratas
+> >> + * @size: size of the irqs_unused array
+> >> + */
+> >> +struct crossbar_data {
+> >> +	const uint *irqs_unused;
+> >> +	const uint size;
+> >> +};
+> >> +
+> >>  static struct crossbar_device *cb;
+> >>  
+> >>  static inline void crossbar_writel(int irq_no, int cb_no)
+> >> @@ -119,10 +131,12 @@ const struct irq_domain_ops routable_irq_domain_ops = {
+> >>  	.xlate = crossbar_domain_xlate
+> >>  };
+> >>  
+> >> -static int __init crossbar_of_init(struct device_node *node)
+> >> +static int __init crossbar_of_init(struct device_node *node,
+> >> +				   const struct crossbar_data *data)
+> >>  {
+> >>  	int i, size, max, reserved = 0, entry;
+> >>  	const __be32 *irqsr;
+> >> +	const int *irqsk = NULL;
+> >>  
+> >>  	cb = kzalloc(sizeof(*cb), GFP_KERNEL);
+> >>  
+> >> @@ -194,6 +208,22 @@ static int __init crossbar_of_init(struct device_node *node)
+> >>  		reserved += size;
+> >>  	}
+> >>  
+> >> +	/* Skip the ones marked as unused */
+> >> +	if (data) {
+> >> +		irqsk = data->irqs_unused;
+> >> +		size = data->size;
+> >> +
+> >> +		for (i = 0; i < size; i++) {
+> >> +			entry = irqsk[i];
+> >> +
+> >> +			if (entry > max) {
+> >> +				pr_err("Invalid skip entry\n");
+> >> +				goto err3;
+> >> +			}
+> >> +			cb->irq_map[entry] = IRQ_SKIP;
+> >> +		}
+> >> +	}
+> >> +
+> >>  	register_routable_domain_ops(&routable_irq_domain_ops);
+> >>  	return 0;
+> >>  
+> >> @@ -208,18 +238,27 @@ err1:
+> >>  	return -ENOMEM;
+> >>  }
+> >>  
+> >> +/* irq number 10 cannot be used because of hw bug */
+> >> +int dra_irqs_unused[] = { 10 };
+> >> +struct crossbar_data cb_dra_data = { dra_irqs_unused,
+> >> +				     ARRAY_SIZE(dra_irqs_unused) };
+> >> +
+> >>  static const struct of_device_id crossbar_match[] __initconst = {
+> >> -	{ .compatible = "ti,irq-crossbar" },
+> >> +	{ .compatible = "ti,irq-crossbar", .data = &cb_dra_data },
+> >>  	{}
+> >>  };
+> > 
+> > This is a bug in all implementations of this IP?  Or, a specific
+> > SoC's implementation?  Would this be better expressed in the dts via a
+> > property?  Can we expect future implementations to be fixed?
+> > 
+> > thx,
+> > 
+> > Jason.
+>  Infact this and PATCH#10 should be merged. I will change that.
 > 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index b888c66..f27e15d 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -795,14 +795,15 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
->  	int err;
->  
->  	sdd = spi_master_get_devdata(spi->master);
-> -	if (!cs && spi->dev.of_node) {
-> +	if (spi->dev.of_node) {
->  		cs = s3c64xx_get_slave_ctrldata(spi);
->  		spi->controller_data = cs;
-> -	}
-> -
-> -	/* For the non-DT platforms derive chip selects from controller data */
-> -	if (!spi->dev.of_node)
-> +	} else {
-> +		/* For the non-DT platforms derive chip
-> +		 * selects from controller data
-> +		 */
->  		spi->cs_gpio = cs->line;
-> +	}
->  
->  	if (IS_ERR_OR_NULL(cs)) {
->  		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
-> 
+>  So in Socs's (2 so far) that do have a crossbar, some irqs are mapped
+>  through a crossbar and some are directly wired to the irqchip.
+>  These 'unused irqs' are those which are directly wired but they still
+>  have a crossbar register. Their routing cannot be changed. So this
+>  is not really expected usage of the crossbar hw ip. We initially thought
+>  having a dts property separately for this, but took this path to avoid
+>  loading the dts with additional bindings which may not be generic.
 
-Personally I wouldn't have this change as a separate patch since it's too
-related to what you changed in Patch 1. But it's just a nitpick.
+How do you plan to handle future SoCs with this IP and possibly
+different hard-wired irqs?
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+thx,
 
-Best regards,
-Javier
+Jason.
