@@ -1,128 +1,85 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:11 +0530
-Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from getting
- mapped to crossbar
+Date: Thu, 12 Jun 2014 17:23:12 +0530
+Subject: [PATCH V2 04/19] irqchip: crossbar: Initialise the crossbar with a
+ safe value
 In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402574007-13987-5-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-When, in the system due to varied reasons, interrupts might be unusable
-due to hardware behavior, but register maps do exist, then those interrupts
-should be skipped while mapping irq to crossbars.
+Since crossbar is s/w configurable, the initial settings of the
+crossbar cannot be assumed to be sane. This implies that:
+a) On initialization all un-reserved crossbars must be initialized to
+   a known 'safe' value.
+b) When unmapping the interrupt, the safe value must be written to
+   ensure that the crossbar mapping matches with interrupt controller
+   usage.
+
+So provide a safe value in the compatible data to map if
+'0' is not safe for the platform and use it during init and unmap
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/irqchip/irq-crossbar.c |   47 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 43 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-crossbar.c |   14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 51d4b87..847f6e3 100644
+index 847f6e3..287d3ce 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -13,11 +13,13 @@
- #include <linux/io.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/irqchip/arm-gic.h>
- 
- #define IRQ_FREE	-1
- #define IRQ_RESERVED	-2
-+#define IRQ_SKIP	-3
- #define GIC_IRQ_START	32
- 
- /*
-@@ -34,6 +36,16 @@ struct crossbar_device {
- 	void (*write) (int, int);
+@@ -44,6 +44,7 @@ struct crossbar_device {
+ struct crossbar_data {
+ 	const uint *irqs_unused;
+ 	const uint size;
++	const uint safe_map;
  };
  
-+/**
-+ * struct crossbar_data: Platform specific data
-+ * @irqs_unused: array of irqs that cannot be used because of hw erratas
-+ * @size: size of the irqs_unused array
-+ */
-+struct crossbar_data {
-+	const uint *irqs_unused;
-+	const uint size;
-+};
-+
  static struct crossbar_device *cb;
- 
- static inline void crossbar_writel(int irq_no, int cb_no)
-@@ -119,10 +131,12 @@ const struct irq_domain_ops routable_irq_domain_ops = {
- 	.xlate = crossbar_domain_xlate
- };
- 
--static int __init crossbar_of_init(struct device_node *node)
-+static int __init crossbar_of_init(struct device_node *node,
-+				   const struct crossbar_data *data)
+@@ -134,7 +135,7 @@ const struct irq_domain_ops routable_irq_domain_ops = {
+ static int __init crossbar_of_init(struct device_node *node,
+ 				   const struct crossbar_data *data)
  {
- 	int i, size, max, reserved = 0, entry;
+-	int i, size, max, reserved = 0, entry;
++	int i, size, max, reserved = 0, entry, safe_map;
  	const __be32 *irqsr;
-+	const int *irqsk = NULL;
+ 	const int *irqsk = NULL;
  
- 	cb = kzalloc(sizeof(*cb), GFP_KERNEL);
+@@ -212,6 +213,7 @@ static int __init crossbar_of_init(struct device_node *node,
+ 	if (data) {
+ 		irqsk = data->irqs_unused;
+ 		size = data->size;
++		safe_map = data->safe_map;
  
-@@ -194,6 +208,22 @@ static int __init crossbar_of_init(struct device_node *node)
- 		reserved += size;
+ 		for (i = 0; i < size; i++) {
+ 			entry = irqsk[i];
+@@ -222,6 +224,14 @@ static int __init crossbar_of_init(struct device_node *node,
+ 			}
+ 			cb->irq_map[entry] = IRQ_SKIP;
+ 		}
++
++		for (i = 0; i < max; i++) {
++			if (cb->irq_map[i] == IRQ_RESERVED ||
++			    cb->irq_map[i] == IRQ_SKIP)
++				continue;
++
++			cb->write(i, safe_map);
++		}
  	}
  
-+	/* Skip the ones marked as unused */
-+	if (data) {
-+		irqsk = data->irqs_unused;
-+		size = data->size;
-+
-+		for (i = 0; i < size; i++) {
-+			entry = irqsk[i];
-+
-+			if (entry > max) {
-+				pr_err("Invalid skip entry\n");
-+				goto err3;
-+			}
-+			cb->irq_map[entry] = IRQ_SKIP;
-+		}
-+	}
-+
  	register_routable_domain_ops(&routable_irq_domain_ops);
- 	return 0;
+@@ -241,7 +251,7 @@ err1:
+ /* irq number 10 cannot be used because of hw bug */
+ int dra_irqs_unused[] = { 10 };
+ struct crossbar_data cb_dra_data = { dra_irqs_unused,
+-				     ARRAY_SIZE(dra_irqs_unused) };
++				     ARRAY_SIZE(dra_irqs_unused), 0 };
  
-@@ -208,18 +238,27 @@ err1:
- 	return -ENOMEM;
- }
- 
-+/* irq number 10 cannot be used because of hw bug */
-+int dra_irqs_unused[] = { 10 };
-+struct crossbar_data cb_dra_data = { dra_irqs_unused,
-+				     ARRAY_SIZE(dra_irqs_unused) };
-+
  static const struct of_device_id crossbar_match[] __initconst = {
--	{ .compatible = "ti,irq-crossbar" },
-+	{ .compatible = "ti,irq-crossbar", .data = &cb_dra_data },
- 	{}
- };
- 
- int __init irqcrossbar_init(void)
- {
- 	struct device_node *np;
--	np = of_find_matching_node(NULL, crossbar_match);
-+	const struct of_device_id *of_id;
-+	const struct crossbar_data *cdata;
-+
-+	np = of_find_matching_node_and_match(NULL, crossbar_match, &of_id);
- 	if (!np)
- 		return -ENODEV;
- 
--	crossbar_of_init(np);
-+	cdata = of_id->data;
-+	crossbar_of_init(np, cdata);
- 	return 0;
- }
+ 	{ .compatible = "ti,irq-crossbar", .data = &cb_dra_data },
 -- 
 1.7.9.5
