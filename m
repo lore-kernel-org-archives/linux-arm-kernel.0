@@ -1,58 +1,50 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:25 +0530
-Subject: [PATCH V2 17/19] irqchip: crossbar: introduce centralized check for
- crossbar write
+Date: Thu, 12 Jun 2014 17:23:26 +0530
+Subject: [PATCH V2 18/19] Documentation: dt: OMAP: crossbar: add description
+ for interrupt consumer
 In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402574007-13987-18-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402574007-13987-19-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-This is a basic check to ensure that crossbar register needs to be
-written. This ensures that we have a common check which is used in
-both map and unmap logic.
+The current crossbar description does not include the description
+required for the consumer of the crossbar, a.k.a devices whoes events
+pass through the crossbar into the GIC interrupt controller.
+
+So, provide documentation for the same.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |   14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/arm/omap/crossbar.txt      |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index cf69c4d..745ad0a 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -96,10 +96,20 @@ static inline int allocate_free_irq(int cb_no)
- 	return -ENODEV;
- }
- 
-+static inline bool needs_crossbar_write(irq_hw_number_t hw)
-+{
-+	if (hw > GIC_IRQ_START)
-+		return true;
+diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+index 6d2e2f5..816d11b 100644
+--- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
++++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+@@ -27,3 +27,20 @@ Examples:
+ 			ti,reg-size = <2>;
+ 			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
+ 		};
 +
-+	return false;
-+}
++Consumer:
++========
++See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt and
++Documentation/devicetree/bindings/arm/gic.txt for further details.
 +
- static int crossbar_domain_map(struct irq_domain *d, unsigned int irq,
- 			       irq_hw_number_t hw)
- {
--	cb->write(hw - GIC_IRQ_START, cb->irq_map[hw - GIC_IRQ_START]);
-+	if (needs_crossbar_write(hw))
-+		cb->write(hw - GIC_IRQ_START, cb->irq_map[hw - GIC_IRQ_START]);
++An interrupt consumer on an SoC using crossbar will use:
++	interrupts = <GIC_SPI request_number interrupt_level>
++request number shall be between 0 to that described by
++"ti,max-crossbar-sources"
 +
- 	return 0;
- }
- 
-@@ -117,7 +127,7 @@ static void crossbar_domain_unmap(struct irq_domain *d, unsigned int irq)
- {
- 	irq_hw_number_t hw = irq_get_irq_data(irq)->hwirq;
- 
--	if (hw > GIC_IRQ_START)
-+	if (needs_crossbar_write(hw))
- 		cb->irq_map[hw - GIC_IRQ_START] = IRQ_FREE;
- }
- 
++Example:
++	device_x at 0x4a023000 {
++		/* Crossbar 8 used */
++		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++		...
++	};
 -- 
 1.7.9.5
