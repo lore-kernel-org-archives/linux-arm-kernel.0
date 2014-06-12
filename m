@@ -1,52 +1,92 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 11 Jun 2014 20:02:52 -0700
-Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
- support
-In-Reply-To: <20140611070352.GC24286@lvm>
-References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
- <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
- <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
- <20140611070352.GC24286@lvm>
-Message-ID: <5399185C.3010503@samsung.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Thu, 12 Jun 2014 12:21:46 +0900
+Subject: [PATCH v2 09/10] mm, cma: move output param to the end of param list
+In-Reply-To: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <1402543307-29800-10-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
-   for ARM dirty page logging we have couple functions
-that are generic.
+Conventionally, we put output param to the end of param list.
+cma_declare_contiguous() doesn't look like that, so change it.
 
-- kvm_vm_ioctl_get_dirty_log - is identical to x86 version
-- kvm_flush_remote_tlbs - ARM version does hardware broadcast
-  it's different from the generic one in kvm_main.c
+Additionally, move down cma_areas reference code to the position
+where it is really needed.
 
-How to proceed to make these generic? Please see below
-from Christoffer.
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-Current patch moves kvm_vm_ioctl_get_dirty_log() into kvm_main.c
-and labels it and kvm_flush_remote_tlbs weak.
-
-Please advise.
-
-Thanks,
-- Mario
-
-
-> So I don't see a lot of use of weak symbols in kvm_main.c (actually on
-> kvmarm/next I don't see any), but we do want to share code when more
-> than one architecture implements something in the exact same way, like
-> it seems x86 and ARM is doing here for this particular function.
-> 
-> I think the KVM scheme is usually to check for some define, like:
-> 
-> #ifdef KVM_ARCH_HAVE_GET_DIRTY_LOG
-> 	ret = kvm_arch_get_dirty_log(...);
-> #else
-> 	ret = kvm_get_dirty_log(...);
-> #endif
-> 
-> but Paolo may have a more informed oppinion of how to deal with these.
-> 
-> Thanks,
-> -Christoffer
-> 
+diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
+index 28ec226..97613ea 100644
+--- a/arch/powerpc/kvm/book3s_hv_builtin.c
++++ b/arch/powerpc/kvm/book3s_hv_builtin.c
+@@ -184,7 +184,7 @@ void __init kvm_cma_reserve(void)
+ 
+ 		align_size = max(kvm_rma_pages << PAGE_SHIFT, align_size);
+ 		cma_declare_contiguous(selected_size, 0, 0, align_size,
+-			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, &kvm_cma, false);
++			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, false, &kvm_cma);
+ 	}
+ }
+ 
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index f177f73..bfd4553 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -149,7 +149,7 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ {
+ 	int ret;
+ 
+-	ret = cma_declare_contiguous(size, base, limit, 0, 0, res_cma, fixed);
++	ret = cma_declare_contiguous(size, base, limit, 0, 0, fixed, res_cma);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/include/linux/cma.h b/include/linux/cma.h
+index e38efe9..e53eead 100644
+--- a/include/linux/cma.h
++++ b/include/linux/cma.h
+@@ -6,7 +6,7 @@ struct cma;
+ extern int __init cma_declare_contiguous(phys_addr_t size,
+ 				phys_addr_t base, phys_addr_t limit,
+ 				phys_addr_t alignment, int order_per_bit,
+-				struct cma **res_cma, bool fixed);
++				bool fixed, struct cma **res_cma);
+ extern struct page *cma_alloc(struct cma *cma, int count, unsigned int align);
+ extern bool cma_release(struct cma *cma, struct page *pages, int count);
+ #endif
+diff --git a/mm/cma.c b/mm/cma.c
+index 01a0713..22a5b23 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -142,8 +142,8 @@ core_initcall(cma_init_reserved_areas);
+  * @limit: End address of the reserved memory (optional, 0 for any).
+  * @alignment: Alignment for the contiguous memory area, should be power of 2
+  * @order_per_bit: Order of pages represented by one bit on bitmap.
+- * @res_cma: Pointer to store the created cma region.
+  * @fixed: hint about where to place the reserved area
++ * @res_cma: Pointer to store the created cma region.
+  *
+  * This function reserves memory from early allocator. It should be
+  * called by arch specific code once the early allocator (memblock or bootmem)
+@@ -156,9 +156,9 @@ core_initcall(cma_init_reserved_areas);
+ int __init cma_declare_contiguous(phys_addr_t size,
+ 				phys_addr_t base, phys_addr_t limit,
+ 				phys_addr_t alignment, int order_per_bit,
+-				struct cma **res_cma, bool fixed)
++				bool fixed, struct cma **res_cma)
+ {
+-	struct cma *cma = &cma_areas[cma_area_count];
++	struct cma *cma;
+ 	int ret = 0;
+ 
+ 	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
+@@ -214,6 +214,7 @@ int __init cma_declare_contiguous(phys_addr_t size,
+ 	 * Each reserved area must be initialised later, when more kernel
+ 	 * subsystems (like slab allocator) are available.
+ 	 */
++	cma = &cma_areas[cma_area_count];
+ 	cma->base_pfn = PFN_DOWN(base);
+ 	cma->count = size >> PAGE_SHIFT;
+ 	cma->order_per_bit = order_per_bit;
+-- 
+1.7.9.5
