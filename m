@@ -1,37 +1,109 @@
 From: lho@apm.com (Loc Ho)
-Date: Thu, 12 Jun 2014 17:20:27 -0600
-Subject: [PATCH v4 1/4] MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
-In-Reply-To: <1402615230-4763-1-git-send-email-lho@apm.com>
+Date: Thu, 12 Jun 2014 17:20:28 -0600
+Subject: [PATCH v4 2/4] Documentation: Add documentation for the APM X-Gene
+ SoC EDAC DTS binding
+In-Reply-To: <1402615230-4763-2-git-send-email-lho@apm.com>
 References: <1402615230-4763-1-git-send-email-lho@apm.com>
-Message-ID: <1402615230-4763-2-git-send-email-lho@apm.com>
+ <1402615230-4763-2-git-send-email-lho@apm.com>
+Message-ID: <1402615230-4763-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a MAINTAINERS entry for APM X-Gene SoC EDAC driver.
+This patch adds documentation for the APM X-Gene SoC EDAC DTS binding.
 
+Signed-off-by: Feng Kan <fkan@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- MAINTAINERS |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |   81 ++++++++++++++++++++
+ 1 files changed, 81 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e67ea24..ecef44c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3321,6 +3321,14 @@ W:	bluesmoke.sourceforge.net
- S:	Maintained
- F:	drivers/edac/sb_edac.c
- 
-+EDAC-XGENE
-+APPLIED MICRO (APM) X-GENE SOC EDAC
-+M:     Loc Ho <lho@apm.com>
-+M:     Feng Kan <fkan@apm.com>
-+S:     Supported
-+F:     drivers/edac/xgene_edac.c
-+F:     Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+new file mode 100644
+index 0000000..fc3dbbc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+@@ -0,0 +1,81 @@
++* APM X-Gene EDAC nodes
 +
- EDIROL UA-101/UA-1000 DRIVER
- M:	Clemens Ladisch <clemens@ladisch.de>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
++EDAC nodes are defined to describe on-chip error detection and correction.
++There are four types of EDAC:
++
++  memory controller	- Memory controller
++  PMD (L1/L2)		- Processor module unit (PMD) L1/L2 cache
++  L3			- CPU L3 cache
++  SoC			- SoC IP such as SATA, Ethernet, and etc
++
++The following section describes the memory controller DT node binding.
++
++Required properties:
++- compatible		: Shall be "apm,xgene-edac-mc".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the CSW resource.
++			  Third resource shall be the MCB-A resource.
++			  Fourth resource shall be the MCB-B resource.
++			  Fifth resource shall be the MCU resource.
++- interrupts            : Interrupt-specifier for MCU error IRQ(s).
++
++The following section describes the L1/L2 DT node binding.
++
++- compatible		: Shall be "apm,xgene-edac-pmd".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the PMD resource.
++			  Third resource shall be the PMD efuse resource.
++- interrupts            : Interrupt-specifier for PMD error IRQ(s).
++
++The following section describes the L3 DT node binding.
++
++- compatible		: Shall be "apm,xgene-edac-l3".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the L3 resource.
++- interrupts            : Interrupt-specifier for L3 error IRQ(s).
++
++The following section describes the SOC DT node binding.
++
++- compatible		: Shall be "apm,xgene-edac-soc"".
++- reg			: First resource shall be the PCP resource.
++			  Second resource shall be the SOC resource.
++- interrupts		: nterrupt-specifier for SoC error IRQ(s).
++
++Example:
++	edacmc0: edacmc0 at 7e800000 {
++		compatible = "apm,xgene-edac-mc";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7e200000 0x0 0x1000>,
++		      <0x0 0x7e700000 0x0 0x1000>,
++		      <0x0 0x7e720000 0x0 0x1000>,
++		      <0x0 0x7e800000 0x0 0x1000>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>;
++	};
++
++	edacl3: edacl3 at 7e600000 {
++		compatible = "apm,xgene-edac-l3";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7e600000 0x0 0x1000>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>;
++	};
++
++	edacpmd0: edacpmd0 at 7c000000 {
++		compatible = "apm,xgene-edac-pmd";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7c000000 0x0 0x200000>,
++		      <0x0 0x1054a000 0x0 0x10>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>;
++	};
++
++	edacsoc: edacsoc at 7e930000 {
++		compatible = "apm,xgene-edac-soc";
++		reg = <0x0 0x78800000 0x0 0x1000>,
++		      <0x0 0x7e930000 0x0 0x1000>;
++		interrupts = <0x0 0x20 0x4>,
++			     <0x0 0x21 0x4>,
++			     <0x0 0x27 0x4>;
++	};
++
 -- 
 1.5.5
