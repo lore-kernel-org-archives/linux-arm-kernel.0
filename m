@@ -1,67 +1,76 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Thu, 12 Jun 2014 07:45:36 +0000
-Subject: [PATCH] clocksource: arch_arm_timer: Fix timecounter
- initialization
-In-Reply-To: <5398A7B2.6030807@codeaurora.org>
-References: <1402475861-15354-1-git-send-email-Li.Xiubo@freescale.com>
- <5398A7B2.6030807@codeaurora.org>
-Message-ID: <bce193f3fc264abf82ff52ef69f0b86a@BY2PR03MB505.namprd03.prod.outlook.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 12 Jun 2014 08:47:05 +0100
+Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
+ v3.16
+In-Reply-To: <20140612054348.GC17845@atomide.com>
+References: <1401214140-9828-1-git-send-email-tony@atomide.com>
+ <20140528071313.GH4227@lee--X1> <20140528180607.GB4707@atomide.com>
+ <20140602163841.GC11004@atomide.com>
+ <20140603080632.GC3060@lee--X1>
+ <20140612054348.GC17845@atomide.com>
+Message-ID: <20140612074705.GB11421@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  drivers/clocksource/arm_arch_timer.c | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/clocksource/arm_arch_timer.c
-> b/drivers/clocksource/arm_arch_timer.c
-> > index 5163ec1..6c3cfd8 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -426,7 +426,7 @@ struct timecounter *arch_timer_get_timecounter(void)
-> >
-> >  static void __init arch_counter_register(unsigned type)
-> >  {
-> > -	u64 start_count;
-> > +	u64 start_count, start_ns;
-> >
-> >  	/* Register the CP15 based counter if we have one */
-> >  	if (type & ARCH_CP15_TIMER)
-> > @@ -438,7 +438,8 @@ static void __init arch_counter_register(unsigned type)
-> >  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-> >  	cyclecounter.mult = clocksource_counter.mult;
-> >  	cyclecounter.shift = clocksource_counter.shift;
-> > -	timecounter_init(&timecounter, &cyclecounter, start_count);
-> > +	start_ns = cyclecounter_cyc2ns(&cyclecounter, start_count);
-> > +	timecounter_init(&timecounter, &cyclecounter, start_ns);
-> >
-> >  	/* 56 bits minimum, so we assume worst case rollover */
-> >  	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+On Wed, 11 Jun 2014, Tony Lindgren wrote:
+
+> * Lee Jones <lee.jones@linaro.org> [140603 01:08]:
+> > On Mon, 02 Jun 2014, Tony Lindgren wrote:
+> > > * Tony Lindgren <tony@atomide.com> [140528 11:11]:
+> > > > * Lee Jones <lee.jones@linaro.org> [140528 00:14]:
+> > > > > Thanks Tony, here's the pull-request:
+> > > > > 
+> > > > > The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+> > > > > 
+> > > > >   Linux 3.14 (2014-03-30 20:40:15 -0700)
+> > > > > 
+> > > > > are available in the git repository at:
+> > > > > 
+> > > > >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
+> > > > > 
+> > > > > for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
+> > > > > 
+> > > > >   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
+> > > > > 
+> > > > > ----------------------------------------------------------------
+> > > > > Second immutable branch between MFD and OMAP due for the v3.16 merge window.
+> > > > 
+> > > > Thanks a lot, this will make it easier for me to chase down potential
+> > > > PM related regressions ;) I'm merging this for testing only into the
+> > > > linux-omap master branch, no need for me to include it into any
+> > > > of my upstream heading branches.
+> > > 
+> > > Lee, I'm not seeing this in linux next, did you maybe forget to merge
+> > > it into the MFD tree?
+> > 
+> > I didn't forget, but I didn't do it either. :)
+> > 
+> > I have re-merged all of the IBs this morning, so should be in -next
+> > by tomorrow.
 > 
-> This doesn't make much sense. We're converting start_count, which could
-> be a very large number, into nanoseconds. It looks like we're assuming
-> the counter always starts at 0 which is not always true if you sit in a
-> bootloader for a long time. 
+> Still not seeing this branch being merged..
 
-Yes, the counter here may usually start counting at bootloader time from zero.
+Oh crap, I see what's happened and it's completely my fault.
 
+If you read the final merge commit carefully:
 
-> Perhaps it would be better to just do
-> 
->     timecounter_init(&timecounter, &cyclecounter, 0);
-> 
-> or
-> 
->     timecounter_init(&timecounter, &cyclecounter,
-> ktime_to_ns(ktime_get_real()));
-> 
+28fee3f: ("Merge branches 'ib-from-asoc-3.16', 'ib-from-pm-3.16',
+'ib-from-regulator-3.16', 'ib-mfd-gpio-3.16' and
+'ib-mfd-mmc-memstick-3.16', tags 'ib-mfd-extcon-3.16',
+'ib-mfd-omap-3.16' and 'ib-mfd-regulator-3.16' into
+ibs-for-mfd-merged")
 
-Here the ktime_get_real() will always return 0, before setting the system clock,
-Like:
+I appear to have a _branch_ AND a _tag_ called ib-mfd-omap-3.16 and it
+looks like Git has taken the tag as a preference. heads/ib-mfd-omap-3.16
+is actually at tag/ib-mfd-omap-3.16-1 (notice the appended '-1'),
+which contains your most recent patches.  Since I created the MFD-OMAP
+shared branch I have changed the naming convention to avoid this sort
+of ambiguity.  I'll send a second MFD pull-request to Linus today.
 
-"rtc-ds3232 1-0068: setting system clock to 2014-06-12 13:01:24 UTC (1402578084)"
+Sorry Tony.
 
-And if so, why not just set it to 0 ? And by the way, 0 is must here ?
-
-Thanks,
-BRs
-Xiubo
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
