@@ -1,72 +1,37 @@
-From: zhangyanfei@cn.fujitsu.com (Zhang Yanfei)
-Date: Thu, 12 Jun 2014 16:19:02 +0800
-Subject: [PATCH v2 02/10] DMA, CMA: fix possible memory leak
-In-Reply-To: <20140612060211.GC30128@js1304-P5Q-DELUXE>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
- <20140612052543.GE12415@bbox> <20140612060211.GC30128@js1304-P5Q-DELUXE>
-Message-ID: <53996276.20906@cn.fujitsu.com>
+From: jaewon02.kim@samsung.com (Jaewon Kim)
+Date: Thu, 12 Jun 2014 17:23:12 +0900
+Subject: [PATCH] ARM: dts: exynos4: fix pwm-cells in pwm node
+Message-ID: <1402561392-21702-1-git-send-email-jaewon02.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2014 02:02 PM, Joonsoo Kim wrote:
-> On Thu, Jun 12, 2014 at 02:25:43PM +0900, Minchan Kim wrote:
->> On Thu, Jun 12, 2014 at 12:21:39PM +0900, Joonsoo Kim wrote:
->>> We should free memory for bitmap when we find zone mis-match,
->>> otherwise this memory will leak.
->>
->> Then, -stable stuff?
-> 
-> I don't think so. This is just possible leak candidate, so we don't
-> need to push this to stable tree.
-> 
->>
->>>
->>> Additionally, I copy code comment from ppc kvm's cma code to notify
->>> why we need to check zone mis-match.
->>>
->>> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->>>
->>> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
->>> index bd0bb81..fb0cdce 100644
->>> --- a/drivers/base/dma-contiguous.c
->>> +++ b/drivers/base/dma-contiguous.c
->>> @@ -177,14 +177,24 @@ static int __init cma_activate_area(struct cma *cma)
->>>  		base_pfn = pfn;
->>>  		for (j = pageblock_nr_pages; j; --j, pfn++) {
->>>  			WARN_ON_ONCE(!pfn_valid(pfn));
->>> +			/*
->>> +			 * alloc_contig_range requires the pfn range
->>> +			 * specified to be in the same zone. Make this
->>> +			 * simple by forcing the entire CMA resv range
->>> +			 * to be in the same zone.
->>> +			 */
->>>  			if (page_zone(pfn_to_page(pfn)) != zone)
->>> -				return -EINVAL;
->>> +				goto err;
->>
->> At a first glance, I thought it would be better to handle such error
->> before activating.
->> So when I see the registration code(ie, dma_contiguous_revere_area),
->> I realized it is impossible because we didn't set up zone yet. :(
->>
->> If so, when we detect to fail here, it would be better to report more
->> meaningful error message like what was successful zone and what is
->> new zone and failed pfn number?
-> 
-> What I want to do in early phase of this patchset is to make cma code
-> on DMA APIs similar to ppc kvm's cma code. ppc kvm's cma code already
-> has this error handling logic, so I make this patch.
-> 
-> If we think that we need more things, we can do that on general cma code
-> after merging this patchset.
-> 
+pwm-cells should be 3. Third cell is optional PWM flags.
+And This flag supported by this binding is PWM_POLARITY_INVERTED
 
-Yeah, I also like the idea. After all, this patchset aims to a general CMA
-management, we could improve more after this patchset. So
+Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Acked-by: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
-
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index b8ece4b..b687e53 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -548,13 +548,13 @@
+ 		status = "disabled";
+ 	};
+ 
+-	pwm at 139D0000 {
++	pwm: pwm at 139D0000 {
+ 		compatible = "samsung,exynos4210-pwm";
+ 		reg = <0x139D0000 0x1000>;
+ 		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
+ 		clocks = <&clock CLK_PWM>;
+ 		clock-names = "timers";
+-		#pwm-cells = <2>;
++		#pwm-cells = <3>;
+ 		status = "disabled";
+ 	};
+ 
 -- 
-Thanks.
-Zhang Yanfei
+1.7.9.5
