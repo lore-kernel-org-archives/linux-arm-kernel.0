@@ -1,29 +1,76 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 12 Jun 2014 18:15:03 +0800
-Subject: [PATCH] ARM: dts: berlin2q.dtsi: set L2CC tag and data latency
- as 2 cycles
-In-Reply-To: <20140612094423.GC23430@n2100.arm.linux.org.uk>
-References: <1402565920-5636-1-git-send-email-jszhang@marvell.com>
- <20140612094423.GC23430@n2100.arm.linux.org.uk>
-Message-ID: <20140612181503.06562a38@xhacker>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 12 Jun 2014 12:19:54 +0200
+Subject: [PATCH v2 05/10] DMA, CMA: support arbitrary bitmap granularity
+In-Reply-To: <1402543307-29800-6-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-6-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <xa1t61k6juph.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Thu, Jun 12 2014, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> ppc kvm's cma region management requires arbitrary bitmap granularity,
+> since they want to reserve very large memory and manage this region
+> with bitmap that one bit for several pages to reduce management overheads.
+> So support arbitrary bitmap granularity for following generalization.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-On Thu, 12 Jun 2014 02:44:23 -0700
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
-> On Thu, Jun 12, 2014 at 05:38:40PM +0800, Jisheng Zhang wrote:
-> > For all BG2Q SoCs, 2 cycles is the best/correct value
-> 
-> It would be a good idea to set all these parameters if you need to set
-> them at all - in other words, setting arm,dirty-latency as well, as
-> that's all part of the timing specification.
-> 
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index bc4c171..9bc9340 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -38,6 +38,7 @@ struct cma {
+>  	unsigned long	base_pfn;
+>  	unsigned long	count;
 
-Thanks for reviewing this patch. I will check with SoC people to find the correct
-dirty-latency value.
+Have you considered replacing count with maxno?
 
-Thanks,
-Jisheng
+>  	unsigned long	*bitmap;
+> +	int order_per_bit; /* Order of pages represented by one bit */
+
+I'd make it unsigned.
+
+>  	struct mutex	lock;
+>  };
+>  
+> +static void clear_cma_bitmap(struct cma *cma, unsigned long pfn, int
+> count)
+
+For consistency cma_clear_bitmap would make more sense I think.  On the
+other hand, you're just moving stuff around so perhaps renaming the
+function at this point is not worth it any more.
+
+> +{
+> +	unsigned long bitmapno, nr_bits;
+> +
+> +	bitmapno = (pfn - cma->base_pfn) >> cma->order_per_bit;
+> +	nr_bits = cma_bitmap_pages_to_bits(cma, count);
+> +
+> +	mutex_lock(&cma->lock);
+> +	bitmap_clear(cma->bitmap, bitmapno, nr_bits);
+> +	mutex_unlock(&cma->lock);
+> +}
+> +
+>  static int __init cma_activate_area(struct cma *cma)
+>  {
+> -	int bitmap_size = BITS_TO_LONGS(cma->count) * sizeof(long);
+> +	int bitmap_maxno = cma_bitmap_maxno(cma);
+> +	int bitmap_size = BITS_TO_LONGS(bitmap_maxno) * sizeof(long);
+>  	unsigned long base_pfn = cma->base_pfn, pfn = base_pfn;
+>  	unsigned i = cma->count >> pageblock_order;
+>  	struct zone *zone;
+
+bitmap_maxno is never used again, perhaps:
+
++	int bitmap_size = BITS_TO_LONGS(cma_bitmap_maxno(cma)) * sizeof(long);
+
+instead? Up to you.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
