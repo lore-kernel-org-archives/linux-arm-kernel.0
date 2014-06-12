@@ -1,62 +1,74 @@
 From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Thu, 12 Jun 2014 12:21:37 +0900
-Subject: [PATCH v2 00/10] CMA: generalize CMA reserved area management code
-Message-ID: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+Date: Thu, 12 Jun 2014 12:21:38 +0900
+Subject: [PATCH v2 01/10] DMA, CMA: clean-up log message
+In-Reply-To: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, there are two users on CMA functionality, one is the DMA
-subsystem and the other is the kvm on powerpc. They have their own code
-to manage CMA reserved area even if they looks really similar.
->From my guess, it is caused by some needs on bitmap management. Kvm side
-wants to maintain bitmap not for 1 page, but for more size. Eventually it
-use bitmap where one bit represents 64 pages.
+We don't need explicit 'CMA:' prefix, since we already define prefix
+'cma:' in pr_fmt. So remove it.
 
-When I implement CMA related patches, I should change those two places
-to apply my change and it seem to be painful to me. I want to change
-this situation and reduce future code management overhead through
-this patch.
+And, some logs print function name and others doesn't. This looks
+bad to me, so I unify log format to print function name consistently.
 
-This change could also help developer who want to use CMA in their
-new feature development, since they can use CMA easily without
-copying & pasting this reserved area management code.
+Lastly, I add one more debug log on cma_activate_area().
 
-v2:
-  Although this patchset looks very different with v1, the end result,
-  that is, mm/cma.c is same with v1's one. So I carry Ack to patch 6-7.
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-Patch 1-5 prepare some features to cover ppc kvm's requirements.
-Patch 6-7 generalize CMA reserved area management code and change users
-to use it.
-Patch 8-10 clean-up minor things.
-
-Joonsoo Kim (10):
-  DMA, CMA: clean-up log message
-  DMA, CMA: fix possible memory leak
-  DMA, CMA: separate core cma management codes from DMA APIs
-  DMA, CMA: support alignment constraint on cma region
-  DMA, CMA: support arbitrary bitmap granularity
-  CMA: generalize CMA reserved area management functionality
-  PPC, KVM, CMA: use general CMA reserved area management framework
-  mm, cma: clean-up cma allocation error path
-  mm, cma: move output param to the end of param list
-  mm, cma: use spinlock instead of mutex
-
- arch/powerpc/kvm/book3s_hv_builtin.c |   17 +-
- arch/powerpc/kvm/book3s_hv_cma.c     |  240 ------------------------
- arch/powerpc/kvm/book3s_hv_cma.h     |   27 ---
- drivers/base/Kconfig                 |   10 -
- drivers/base/dma-contiguous.c        |  248 ++-----------------------
- include/linux/cma.h                  |   12 ++
- include/linux/dma-contiguous.h       |    3 +-
- mm/Kconfig                           |   11 ++
- mm/Makefile                          |    1 +
- mm/cma.c                             |  333 ++++++++++++++++++++++++++++++++++
- 10 files changed, 382 insertions(+), 520 deletions(-)
- delete mode 100644 arch/powerpc/kvm/book3s_hv_cma.c
- delete mode 100644 arch/powerpc/kvm/book3s_hv_cma.h
- create mode 100644 include/linux/cma.h
- create mode 100644 mm/cma.c
-
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 83969f8..bd0bb81 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -144,7 +144,7 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
+ 	}
+ 
+ 	if (selected_size && !dma_contiguous_default_area) {
+-		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
++		pr_debug("%s(): reserving %ld MiB for global area\n", __func__,
+ 			 (unsigned long)selected_size / SZ_1M);
+ 
+ 		dma_contiguous_reserve_area(selected_size, selected_base,
+@@ -163,8 +163,9 @@ static int __init cma_activate_area(struct cma *cma)
+ 	unsigned i = cma->count >> pageblock_order;
+ 	struct zone *zone;
+ 
+-	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
++	pr_debug("%s()\n", __func__);
+ 
++	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+ 	if (!cma->bitmap)
+ 		return -ENOMEM;
+ 
+@@ -234,7 +235,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 
+ 	/* Sanity checks */
+ 	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+-		pr_err("Not enough slots for CMA reserved regions!\n");
++		pr_err("%s(): Not enough slots for CMA reserved regions!\n",
++			__func__);
+ 		return -ENOSPC;
+ 	}
+ 
+@@ -274,14 +276,15 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 	*res_cma = cma;
+ 	cma_area_count++;
+ 
+-	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+-		(unsigned long)base);
++	pr_info("%s(): reserved %ld MiB at %08lx\n",
++		__func__, (unsigned long)size / SZ_1M, (unsigned long)base);
+ 
+ 	/* Architecture specific contiguous memory fixup. */
+ 	dma_contiguous_early_fixup(base, size);
+ 	return 0;
+ err:
+-	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
++	pr_err("%s(): failed to reserve %ld MiB\n",
++		__func__, (unsigned long)size / SZ_1M);
+ 	return ret;
+ }
+ 
 -- 
 1.7.9.5
