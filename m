@@ -1,38 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Jun 2014 16:54:00 +0200
-Subject: [PATCH] arm64/crypto: fix and improve GHASH secure hash
- implementation
-In-Reply-To: <20140612144847.GC8970@arm.com>
-References: <1402584187-17114-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140612144847.GC8970@arm.com>
-Message-ID: <CAKv+Gu950YjVtQQ3fST-h3bUy+qAoQv=hBRoe0ekaxADGNK4ng@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 12 Jun 2014 17:00:40 +0200
+Subject: [PATCH] [media] staging: allow omap4iss to be modular
+In-Reply-To: <4327970.JdCWevprmq@wuerfel>
+References: <5192928.MkINji4uKU@wuerfel> <20140612142515.GA7653@kroah.com>
+ <4327970.JdCWevprmq@wuerfel>
+Message-ID: <2967185.eJLTMz7aAr@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 June 2014 16:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Jun 12, 2014 at 03:43:07PM +0100, Ard Biesheuvel wrote:
->> This fixes a bug in the arm64 GHASH implementation, and switches to a faster,
->> polynomial multiplication based reduction instead of one that uses
->> shifts and rotates.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> This is a bug fix and a performance optimization in a single patch.
->
-> Thanks. I'll push it after -rc1.
->
->> As the code has never worked correctly and was merged just a couple of
->> days ago,
->
-> IIRC you said you tested the crypto patches.
->
+Hi Arnd,
 
-Yes, I did. Unfortunately [as I found out today] the built-in test
-suite for GHASH consists of a single test vector, which happens to
-pass with the old code. I will be submitting a patch to linux-crypto
-shortly to add more test vectors that would have caught this
-particular bug.
+On Thursday 12 June 2014 16:28:39 Arnd Bergmann wrote:
+> On Thursday 12 June 2014 07:25:15 Greg KH wrote:
+> > On Thu, Jun 12, 2014 at 04:15:32PM +0200, Arnd Bergmann wrote:
+> > > On Thursday 12 June 2014 16:12:17 Laurent Pinchart wrote:
+> > > > > From 3a965f4fd5a6b3ef4a66aa4e7c916cfd34fd5706 Mon Sep 17 00:00:00
+> > > > > 2001
+> > > > > From: Arnd Bergmann <arnd@arndb.de>
+> > > > > Date: Tue, 21 Jan 2014 09:32:43 +0100
+> > > > > Subject: [PATCH] [media] staging: tighten omap4iss dependencies
+> > > > > 
+> > > > > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
+> > > > > of which can be loadable modules. This causes build failures
+> > > > > if we want the camera driver to be built-in.
+> > > > > 
+> > > > > This can be solved by turning the option into "tristate",
+> > > > > which unfortunately causes another problem, because the
+> > > > > driver incorrectly calls a platform-internal interface
+> > > > > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
+> > > > > 
+> > > > > Instead, this patch just forbids the invalid configurations
+> > > > > and ensures that the driver can only be built if all its
+> > > > > dependencies are built-in.
+> > > > > 
+> > > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > 
+> > > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > 
+> > > > Should I take this in my tree for v3.17 or would you like to
+> > > > fast-track it ?> > 
+> > > I'd actually like to see it in 3.15 as a stable backport if possible,
+> > 
+> > It's not stable material, sorry.
+> 
+> To clarify, I was talking about second version of the patch,
+> not the original one. It just does this:
+>
+> >  config VIDEO_OMAP4
+> >       bool "OMAP 4 Camera support"
+> > -     depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
+> > +     depends on VIDEO_V4L2=y && VIDEO_V4L2_SUBDEV_API && I2C=y &&
+> > ARCH_OMAP4
+> >       select VIDEOBUF2_DMA_CONTIG
+> >       ---help---
+> >         Driver for an OMAP 4 ISS controller.
+> 
+> which enforces that configurations that cannot be compiled
+> will not be selectable in Kconfig, so we can have allmodconfig
+> working. I thought that was ok for -stable.
+> 
+> > > but definitely in 3.16. What is the normal path for staging/media
+> > > but fix patches?
+> > 
+> > Through Mauro's tree.
+> 
+> Ok.
+
+I've applied the patch to my tree and will send a pull request to Mauro for 
+v3.16 as soon as you reach an agreement with Greg on whether I should add CC: 
+stable or not.
 
 -- 
-Ard.
+Regards,
+
+Laurent Pinchart
