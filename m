@@ -1,91 +1,122 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu, 12 Jun 2014 10:39:29 +0800
-Subject: [PATCH v2 2/2] clk: hix5hd2: add sd clk
-In-Reply-To: <1402540769-6156-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1402540769-6156-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1402540769-6156-3-git-send-email-zhangfei.gao@linaro.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 11 Jun 2014 19:51:31 -0700
+Subject: BUG: Bad page state in process swapper pfn:00000
+In-Reply-To: <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
+References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>	<539892BD.8020403@codeaurora.org>
+ <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
+Message-ID: <539915B3.9050904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiancheng Xue <xuejiancheng@huawei.com>
+On 6/11/2014 12:19 PM, Geert Uytterhoeven wrote:
+> Hi Laura,
+> 
+> On Wed, Jun 11, 2014 at 7:32 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> On 6/11/2014 4:40 AM, Geert Uytterhoeven wrote:
+>>> With current mainline, I get an early crash on r8a7791/koelsch:
+>>>
+>>> BUG: Bad page state in process swapper  pfn:00000
+>>> page:ee20b000 count:0 mapcount:0 mapping:66756200 index:0x65726566
+>>> page flags: 0x74656b63(locked|error|lru|active|owner_priv_1|arch_1|private|writeback|head|swapcache
+>>> |reclaim|mlocked)
+>>> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+>>> bad because of flags:
+>>> page flags: 0x212861(locked|lru|active|private|writeback|swapcache|mlocked)
+>>>
+>>> I bisected it to
+>>>
+>>> commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
+>>> Author: Laura Abbott <lauraa@codeaurora.org>
+>>> Date:   Sun Apr 13 22:54:58 2014 +0100
+>>>
+>>>     ARM: 8025/1: Get rid of meminfo
+> 
+>>> -Truncating RAM at 40000000-bfffffff to -6f7fffff (vmalloc region overlap).
+>>> +Truncating RAM at 0x00000000-0xc0000000 to -0x6f800000
+>>
+>> I'm guessing this is the issue right there.
+>>
+>>         memory at 40000000 {
+>>                 device_type = "memory";
+>>                 reg = <0 0x40000000 0 0x40000000>;
+>>         };
+>>
+>>         memory at 200000000 {
+>>                 device_type = "memory";
+>>                 reg = <2 0x00000000 0 0x40000000>;
+>>         };
+>>
+>> Those are the memory nodes from r8a7791-koelsch.dts. It looks like the memory
+>> outside 32-bit address range is not being dropped. It was suggested to drop
+>> early_init_dt_add_memory_arch which called arm_add_memory and just use the
+>> generic of code directly but the problem is arm_add_memory does additional
+>> bounds checking. It looks like early_init_dt_add_memory_arch in
+>> drivers/of/fdt.c checks for overflow on u64 types but not for overflow
+>> on phys_addr_t (32 bits) which is what memblock_add actually uses.
+>>
+>> For a quick test, can you try bringing back early_init_dt_add_memory_arch
+>> and see if that fixes the problem:
+>>
+>> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+>> index e94a157..ea9ce92 100644
+>> --- a/arch/arm/kernel/devtree.c
+>> +++ b/arch/arm/kernel/devtree.c
+>> @@ -27,6 +27,10 @@
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach-types.h>
+>>
+>> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+>> +{
+>> +       arm_add_memory(base, size);
+>> +}
+>>
+>>  #ifdef CONFIG_SMP
+>>  extern struct of_cpu_method __cpu_method_of_table[];
+> 
+> Thanks, my board boots again after applying this quick hack.
+> 
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+Great! Russell are you okay with taking the above as a fix or would you prefer
+I fixup drivers/of/fdt.c right now? 
+
+
+Thanks,
+Laura
+
+----8<----
+>From 14bda557a108ad197e7c5f040f50ca024b45cc17 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Wed, 11 Jun 2014 19:39:29 -0700
+Subject: [PATCH] arm: Bring back early_init_dt_add_memory_arch
+
+Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) removed
+early_init_dt_add_memory_arch in favor of using the common method.
+The common method does not currently check for memory outside of
+32-bit bounds which may lead to memory being incorrectly added to
+the system. Bring back early_init_dt_add_memory_arch for now until
+the generic function can be fixed up.
+
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- drivers/clk/hisilicon/clk-hix5hd2.c       |   21 +++++++++++++++------
- include/dt-bindings/clock/hix5hd2-clock.h |    4 ++++
- 2 files changed, 19 insertions(+), 6 deletions(-)
+ arch/arm/kernel/devtree.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
-index 2114ee3..5638818 100644
---- a/drivers/clk/hisilicon/clk-hix5hd2.c
-+++ b/drivers/clk/hisilicon/clk-hix5hd2.c
-@@ -50,9 +50,9 @@ static const char *sfc_mux_p[] __initconst = {
- 		"24m", "150m", "200m", "100m", "75m", };
- static u32 sfc_mux_table[] = {0, 4, 5, 6, 7};
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index e94a157..ea9ce92 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -27,6 +27,10 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
  
--static const char *sdio1_mux_p[] __initconst = {
-+static const char *sdio_mux_p[] __initconst = {
- 		"75m", "100m", "50m", "15m", };
--static u32 sdio1_mux_table[] = {0, 1, 2, 3};
-+static u32 sdio_mux_table[] = {0, 1, 2, 3};
++void __init early_init_dt_add_memory_arch(u64 base, u64 size)
++{
++	arm_add_memory(base, size);
++}
  
- static const char *fephy_mux_p[] __initconst = { "25m", "125m"};
- static u32 fephy_mux_table[] = {0, 1};
-@@ -61,20 +61,29 @@ static u32 fephy_mux_table[] = {0, 1};
- static struct hisi_mux_clock hix5hd2_mux_clks[] __initdata = {
- 	{ HIX5HD2_SFC_MUX, "sfc_mux", sfc_mux_p, ARRAY_SIZE(sfc_mux_p),
- 		CLK_SET_RATE_PARENT, 0x5c, 8, 3, 0, sfc_mux_table, },
--	{ HIX5HD2_MMC_MUX, "mmc_mux", sdio1_mux_p, ARRAY_SIZE(sdio1_mux_p),
--		CLK_SET_RATE_PARENT, 0xa0, 8, 2, 0, sdio1_mux_table, },
-+	{ HIX5HD2_MMC_MUX, "mmc_mux", sdio_mux_p, ARRAY_SIZE(sdio_mux_p),
-+		CLK_SET_RATE_PARENT, 0xa0, 8, 2, 0, sdio_mux_table, },
-+	{ HIX5HD2_SD_MUX, "sd_mux", sdio_mux_p, ARRAY_SIZE(sdio_mux_p),
-+		CLK_SET_RATE_PARENT, 0x9c, 8, 2, 0, sdio_mux_table, },
- 	{ HIX5HD2_FEPHY_MUX, "fephy_mux",
- 		fephy_mux_p, ARRAY_SIZE(fephy_mux_p),
- 		CLK_SET_RATE_PARENT, 0x120, 8, 2, 0, fephy_mux_table, },
- };
- 
- static struct hisi_gate_clock hix5hd2_gate_clks[] __initdata = {
--	/*sfc*/
-+	/* sfc */
- 	{ HIX5HD2_SFC_CLK, "clk_sfc", "sfc_mux",
- 		CLK_SET_RATE_PARENT, 0x5c, 0, 0, },
- 	{ HIX5HD2_SFC_RST, "rst_sfc", "clk_sfc",
- 		CLK_SET_RATE_PARENT, 0x5c, 4, CLK_GATE_SET_TO_DISABLE, },
--	/*sdio1*/
-+	/* sdio0 */
-+	{ HIX5HD2_SD_BIU_CLK, "clk_sd_biu", "200m",
-+		CLK_SET_RATE_PARENT, 0x9c, 0, 0, },
-+	{ HIX5HD2_SD_CIU_CLK, "clk_sd_ciu", "sd_mux",
-+		CLK_SET_RATE_PARENT, 0x9c, 1, 0, },
-+	{ HIX5HD2_SD_CIU_RST, "rst_sd_ciu", "clk_sd_ciu",
-+		CLK_SET_RATE_PARENT, 0x9c, 4, CLK_GATE_SET_TO_DISABLE, },
-+	/* sdio1 */
- 	{ HIX5HD2_MMC_BIU_CLK, "clk_mmc_biu", "200m",
- 		CLK_SET_RATE_PARENT, 0xa0, 0, 0, },
- 	{ HIX5HD2_MMC_CIU_CLK, "clk_mmc_ciu", "mmc_mux",
-diff --git a/include/dt-bindings/clock/hix5hd2-clock.h b/include/dt-bindings/clock/hix5hd2-clock.h
-index e328669..5bd4135 100644
---- a/include/dt-bindings/clock/hix5hd2-clock.h
-+++ b/include/dt-bindings/clock/hix5hd2-clock.h
-@@ -46,6 +46,7 @@
- #define HIX5HD2_SFC_MUX			64
- #define HIX5HD2_MMC_MUX			65
- #define HIX5HD2_FEPHY_MUX		66
-+#define HIX5HD2_SD_MUX			67
- 
- /* gate clocks */
- #define HIX5HD2_SFC_RST			128
-@@ -56,6 +57,9 @@
- #define HIX5HD2_FWD_BUS_CLK		133
- #define HIX5HD2_FWD_SYS_CLK		134
- #define HIX5HD2_MAC0_PHY_CLK		135
-+#define HIX5HD2_SD_CIU_CLK		136
-+#define HIX5HD2_SD_BIU_CLK		137
-+#define HIX5HD2_SD_CIU_RST		138
- 
- /* complex */
- #define HIX5HD2_MAC0_CLK		192
+ #ifdef CONFIG_SMP
+ extern struct of_cpu_method __cpu_method_of_table[];
 -- 
-1.7.9.5
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
