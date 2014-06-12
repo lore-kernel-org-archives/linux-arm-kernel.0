@@ -1,54 +1,41 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 12 Jun 2014 17:09:43 +0100
-Subject: [PATCH v2 1/2] drm/panel: remove unnecessary dependencies
-Message-ID: <E1Wv7ZP-0004Wb-3J@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Jun 2014 17:20:14 +0100
+Subject: [PATCH 0/5] Handle non-secure L2C initialization on Exynos4
+In-Reply-To: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
+References: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
+Message-ID: <20140612162014.GA3705@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
-DRM_PANEL && DRM.  This is nonsense for two reasons:
+On Thu, Jun 12, 2014 at 02:38:49PM +0100, Daniel Drake wrote:
+> From 2e67231f10ed0b05c2bacfdd05774fe21315d6da Mon Sep 17 00:00:00 2001
+> From: Gu1 <gu1@aeroxteam.fr>
+> Date: Mon, 21 Jan 2013 04:13:56 +0100
+> Subject: [PATCH] ARM: EXYNOS: Add secure firmware support for l2x0 init
+> 
+> Conflicts:
+> 	arch/arm/mm/cache-l2x0.c
 
-(a) DRM_PANEL already depends on DRM, so DRM_PANEL can not be enabled
-without DRM first being enabled.  Hence the && DRM is useless.
+For this patch... it's a big NAK because it's taking us right back down
+the route of a totally fucked up cache-l2x0.c driver.
 
-(b) These two configs are already beneath a menu which depends on
-DRM_PANEL being enabled; these options will not be visible without
-DRM_PANEL already being enabled.
+Why can't you people write stuff properly?  There's already another set
+of patches on this mailing list which want to pass the virtual base
+address of the l2x0 controller to l2c_write_sec() so that various
+registers can be read back, because the platform's secure API can
+only update several registers at the same time.
 
-Let's just remove this unnecessary verbosity.
+This is the same pattern that is revealed in this patch.  So, what
+this means is that the l2c_write_sec API is wrong.  We need to come
+up with a *replacement* API which allows the platforms to do this
+kind of setup in a *clean* way, and stop creating rotten hacks like
+this which just makes long term maintanence a nightmare.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpu/drm/panel/Kconfig | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+So... please start doing stuff properly.  If you don't, you're going
+to be getting more flames from me, especially if you start doing this
+kind of hackery on code that I've been cleaning up to get rid of such
+crap.
 
-diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index 4ec874da5668..d83958d39f43 100644
---- a/drivers/gpu/drm/panel/Kconfig
-+++ b/drivers/gpu/drm/panel/Kconfig
-@@ -5,7 +5,7 @@ config DRM_PANEL
- 	  Panel registration and lookup framework.
- 
- menu "Display Panels"
--	depends on DRM_PANEL
-+	depends on DRM && DRM_PANEL
- 
- config DRM_PANEL_SIMPLE
- 	tristate "support for simple panels"
-@@ -18,14 +18,12 @@ config DRM_PANEL_SIMPLE
- 
- config DRM_PANEL_LD9040
- 	tristate "LD9040 RGB/SPI panel"
--	depends on DRM && DRM_PANEL
- 	depends on OF
- 	select SPI
- 	select VIDEOMODE_HELPERS
- 
- config DRM_PANEL_S6E8AA0
- 	tristate "S6E8AA0 DSI video mode panel"
--	depends on DRM && DRM_PANEL
- 	depends on OF
- 	select DRM_MIPI_DSI
- 	select VIDEOMODE_HELPERS
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
