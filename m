@@ -1,50 +1,37 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 12 Jun 2014 14:18:44 -0500
-Subject: [PATCH 2/2] phy: qcom: Add device tree bindings information
-In-Reply-To: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
-References: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1402600724-20651-2-git-send-email-galak@codeaurora.org>
+From: rjwysocki@gmail.com (Rafael Wysocki)
+Date: Thu, 12 Jun 2014 21:33:42 +0200
+Subject: [PATCH 02/24] drivercore: Bind/unbind power domain on probe/remove
+In-Reply-To: <20140612163901.GZ5099@sirena.org.uk>
+References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
+ <20140610212731.GA11191@kroah.com> <53977BC1.5000301@gmail.com>
+ <2753039.YD6R0RpJkS@vostro.rjw.lan>
+ <20140612163901.GZ5099@sirena.org.uk>
+Message-ID: <CAJZ5v0goz_oE5V7kmYdTjKjMSuW33-sK+C60pS-iNe8Aim8UZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding spec for Qualcomm SoC PHYs, starting with the SATA PHY on
-the IPQ806x family of SoCs.
+On Thu, Jun 12, 2014 at 6:39 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Jun 11, 2014 at 02:18:44AM +0200, Rafael J. Wysocki wrote:
+>> On Tuesday, June 10, 2014 11:42:25 PM Tomasz Figa wrote:
+>
+>> > OK, so proposed solution is to put this in:
+>
+>> > - platform_drv_probe(),
+>> > - spi_drv_probe(),
+>> > - i2c_device_probe(),
+>> > - amba_probe(),
+>
+>> Yes.  Specifically, those are bus types that don't do their own power
+>> management.
+>
+> This sounds tedious.  Can we not instead introduce some generic helpers
+> which all such buses call/use and then implement the hooks in there
+> (along with anything else that they should all do)?
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- Documentation/devicetree/bindings/phy/qcom-phy.txt | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/qcom-phy.txt
+Well, good idea.
 
-diff --git a/Documentation/devicetree/bindings/phy/qcom-phy.txt b/Documentation/devicetree/bindings/phy/qcom-phy.txt
-new file mode 100644
-index 0000000..76bfbd0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/qcom-phy.txt
-@@ -0,0 +1,23 @@
-+Qualcomm IPQ806x SATA PHY Controller
-+------------------------------------
-+
-+SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
-+Each SATA PHY controller should have its own node.
-+
-+Required properties:
-+- compatible: compatible list, contains "qcom,ipq806x-sata-phy"
-+- reg: offset and length of the SATA PHY register set;
-+- #phy-cells: must be zero
-+- clocks: must be exactly one entry
-+- clock-names: must be "cfg"
-+
-+Example:
-+	sata_phy: sata-phy at 1b400000 {
-+		compatible = "qcom,ipq806x-sata-phy";
-+		reg = <0x1b400000 0x200>;
-+
-+		clocks = <&gcc SATA_PHY_CFG_CLK>;
-+		clock-names = "cfg";
-+
-+		#phy-cells = <0>;
-+	};
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> There must be other things that all these buses are having to cut'n'paste.
+
+Quite likely.
+
+Rafael
