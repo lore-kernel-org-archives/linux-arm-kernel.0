@@ -1,45 +1,59 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:14 +0530
-Subject: [PATCH V2 06/19] irqchip: crossbar: remove IS_ERR_VALUE check
+Date: Thu, 12 Jun 2014 17:23:15 +0530
+Subject: [PATCH V2 07/19] irqchip: crossbar: fix sparse warnings
 In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402574007-13987-7-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402574007-13987-8-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-IS_ERR_VALUE makes sense only *if* there could be valid values in
-negative error range. But in the cases that we do use it, there is no
-such case. Just remove the same.
+There is absolutely no need for crossbar driver to expose functions and
+variables into global namespace. So make them all static
+
+Fixes sparse warnings:
+drivers/irqchip/irq-crossbar.c:129:29: warning: symbol 'routable_irq_domain_ops' was not declared. Should it be static?
+drivers/irqchip/irq-crossbar.c:252:5: warning: symbol 'dra_irqs_unused' was not declared. Should it be static?
+drivers/irqchip/irq-crossbar.c:253:22: warning: symbol 'cb_dra_data' was not declared. Should it be static?
+drivers/irqchip/irq-crossbar.c:261:12: warning: symbol 'irqcrossbar_init' was not declared. Should it be static?
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index de021638..c5415ae 100644
+index c5415ae..5da9d36 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -110,15 +110,15 @@ static int crossbar_domain_xlate(struct irq_domain *d,
- 				 unsigned long *out_hwirq,
- 				 unsigned int *out_type)
- {
--	unsigned long ret;
-+	int ret;
+@@ -16,6 +16,7 @@
+ #include <linux/of_device.h>
+ #include <linux/slab.h>
+ #include <linux/irqchip/arm-gic.h>
++#include <linux/irqchip/irq-crossbar.h>
  
- 	ret = get_prev_map_irq(intspec[1]);
--	if (!IS_ERR_VALUE(ret))
-+	if (ret >= 0)
- 		goto found;
+ #define IRQ_FREE	-1
+ #define IRQ_RESERVED	-2
+@@ -126,7 +127,7 @@ found:
+ 	return 0;
+ }
  
- 	ret = allocate_free_irq(intspec[1]);
+-const struct irq_domain_ops routable_irq_domain_ops = {
++static const struct irq_domain_ops routable_irq_domain_ops = {
+ 	.map = crossbar_domain_map,
+ 	.unmap = crossbar_domain_unmap,
+ 	.xlate = crossbar_domain_xlate
+@@ -249,8 +250,8 @@ err1:
+ }
  
--	if (IS_ERR_VALUE(ret))
-+	if (ret < 0)
- 		return ret;
+ /* irq number 10 cannot be used because of hw bug */
+-int dra_irqs_unused[] = { 10 };
+-struct crossbar_data cb_dra_data = { dra_irqs_unused,
++static int dra_irqs_unused[] = { 10 };
++static struct crossbar_data cb_dra_data = { dra_irqs_unused,
+ 				     ARRAY_SIZE(dra_irqs_unused), 0 };
  
- found:
+ static const struct of_device_id crossbar_match[] __initconst = {
 -- 
 1.7.9.5
