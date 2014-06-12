@@ -1,54 +1,101 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Jun 2014 09:55:21 +0200
-Subject: [PATCH] i2c: Make I2C ID tables non-mandatory for DT'ed and/or
- ACPI'ed devices
-In-Reply-To: <538EB81B.3090807@gmx.de>
-References: <1401452797-29521-1-git-send-email-lee.jones@linaro.org>
- <1401452797-29521-2-git-send-email-lee.jones@linaro.org>
- <20140530123656.GC2742@katana> <20140530133405.GB29731@lee--X1>
- <20140530174800.GA4917@katana> <20140530192516.GA4319@lee--X1>
- <20140531134805.GA3287@katana>
- <CACRpkdZvyfA0aaJe3YuevXfA2pTZLRPZ3mQpitL6qD7=qE0Xyg@mail.gmail.com>
- <538C8A59.2070907@gmx.de>
- <CACRpkdbo9_xo6j7JBcjiuk6eYkqyaeMYLFsH3VczxotOmVRh1Q@mail.gmail.com>
- <538EB81B.3090807@gmx.de>
-Message-ID: <CACRpkda3bL=y3Dmkf59LT97Liep=XEzgE3P-YngLeD_w1qcAzQ@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 12 Jun 2014 15:58:45 +0800
+Subject: [PATCH v2] mtd: atmel_nand: make ecc parameters same as definition
+Message-ID: <1402559925-20910-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 4, 2014 at 8:09 AM, Michael Lawnick <ml.lawnick@gmx.de> wrote:
-> Am 03.06.2014 13:18, schrieb Linus Walleij:
->> On Mon, Jun 2, 2014 at 4:29 PM, Michael Lawnick <ml.lawnick@gmx.de> wrote:
->>>
->>> Am 02.06.2014 14:16, schrieb Linus Walleij:
->>
->>
->>>> Is this really so useful on embedded systems?
->>>>
->>>> I was under the impression that this method was something used
->>>> on say PC desktops with temperature monitors and EEPROMs
->>>> on some I2C link on the PCB, usage entirely optional and fun
->>>> for userspace hacks.
->>>>
->>> We use it for dynamic instantiating whole subsystems with multiplexers,
->>> sensors, controllers in an embedded system. The device list is taken from
->>> an
->>> I2C eeprom which gets read on hotplug.
->>
->>
->> Does this mean that you have stored the names (strings) that are used
->> by the Linux kernel for identifying the devices into your EEPROM?
->>
->> That means that you have made the kernel-internal device driver names
->> an ABI which is unfortunate :-/
->>
->> This is one of the reasons to why we insist on device tree: OS neutral
->> hardware description.
->
-> The eeprom contains a device tree that is dynamically merged.
+If the ecc parameter is not the same as definition, when the
+mtd core check these parameters, it will give the error result.
 
-That is a kind of way of saying "yes we made the kernel-internal
-driver named an ABI" I guess?
+Take the following as an example:
 
-Yours,
-Linus Walleij
+Calculate how many bits can be corrected in one page.
+According to the ecc parameters definition,
+
+one page correct bits = (mtd->writesize * ecc->strength) / ecc->size
+
+take the following use case as an example:
+mtd->writesize = 2048 bytes
+ecc->strength = 4 bytes (for 512 bytes)
+
+before this patch, the ecc->size = 2048, so the result is 4 bytes.
+after this patch, the ecc->size = 512, so the result is 16 bytes.
+
+So, align the ecc parameters the same as definition to correct
+this kind of error.
+
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Acked-by: Josh Wu <josh.wu@atmel.com>
+---
+Changes in v2:
+  - Enhancement the commit message.
+
+ drivers/mtd/nand/atmel_nand.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 4ce181a..4f5348f 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -861,12 +861,11 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
+ {
+ 	struct nand_chip *nand_chip = mtd->priv;
+ 	struct atmel_nand_host *host = nand_chip->priv;
+-	int i, err_nbr, eccbytes;
++	int i, err_nbr;
+ 	uint8_t *buf_pos;
+ 	int total_err = 0;
+ 
+-	eccbytes = nand_chip->ecc.bytes;
+-	for (i = 0; i < eccbytes; i++)
++	for (i = 0; i < nand_chip->ecc.total; i++)
+ 		if (ecc[i] != 0xff)
+ 			goto normal_check;
+ 	/* Erased page, return OK */
+@@ -928,7 +927,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+ 	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
+ {
+ 	struct atmel_nand_host *host = chip->priv;
+-	int eccsize = chip->ecc.size;
++	int eccsize = chip->ecc.size * chip->ecc.steps;
+ 	uint8_t *oob = chip->oob_poi;
+ 	uint32_t *eccpos = chip->ecc.layout->eccpos;
+ 	uint32_t stat;
+@@ -1169,8 +1168,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		goto err;
+ 	}
+ 
+-	/* ECC is calculated for the whole page (1 step) */
+-	nand_chip->ecc.size = mtd->writesize;
++	nand_chip->ecc.size = sector_size;
+ 
+ 	/* set ECC page size and oob layout */
+ 	switch (mtd->writesize) {
+@@ -1185,18 +1183,20 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		host->pmecc_index_of = host->pmecc_rom_base +
+ 			host->pmecc_lookup_table_offset;
+ 
+-		nand_chip->ecc.steps = 1;
++		nand_chip->ecc.steps = host->pmecc_sector_number;
+ 		nand_chip->ecc.strength = cap;
+-		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector *
++		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector;
++		nand_chip->ecc.total = host->pmecc_bytes_per_sector *
+ 				       host->pmecc_sector_number;
+-		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
++		if (nand_chip->ecc.total > mtd->oobsize - 2) {
+ 			dev_err(host->dev, "No room for ECC bytes\n");
+ 			err_no = -EINVAL;
+ 			goto err;
+ 		}
+ 		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
+ 					mtd->oobsize,
+-					nand_chip->ecc.bytes);
++					nand_chip->ecc.total);
++
+ 		nand_chip->ecc.layout = &atmel_pmecc_oobinfo;
+ 		break;
+ 	case 512:
+-- 
+1.8.5.2
