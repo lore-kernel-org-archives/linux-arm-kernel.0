@@ -1,67 +1,65 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:08 +0530
-Subject: [PATCH V2 00/19] irqchip: crossbar: driver fixes
-Message-ID: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+Date: Thu, 12 Jun 2014 17:23:10 +0530
+Subject: [PATCH V2 02/19] irqchip: crossbar: check for premapped crossbar
+ before allocating
+In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402574007-13987-3-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series does some cleanups, fixes for handling two interrupts
-getting mapped twice to same crossbar and provides support for
-hardwired IRQ and crossbar definitions.
+From: Nishanth Menon <nm@ti.com>
 
-On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10,
-131, 132, 133 are direct wired to hardware blocks bypassing
-crossbar. This quirky implementation is *NOT* supposed to be the
-expectation of crossbar hardware usage. This series adds support
-to represent such hard-wired irqs through DT and avoid generic
-allocation/programming of crossbar in the driver.
+If irq_of_parse_and_map is executed twice, the same crossbar is mapped to two
+different GIC interrupts. This is completely undesirable. Instead, check
+if the requested crossbar event is pre-allocated and provide that GIC
+mapping back to caller if already allocated.
 
-This way of supporting hard-wired irqs was a result of
-the below discussions.
-http://www.spinics.net/lists/arm-kernel/msg329946.html
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/irqchip/irq-crossbar.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Based on 3.15 mainline.
-
-All the patches are available here
- git at github.com:Sricharanti/sricharan.git crossbar_updates
-
-The fixes series[1] earlier posted is merged in to this.
-[1] http://www.spinics.net/lists/arm-kernel/msg328273.html
-
-[V2] Merged the above series and rebased on 3.15 mainline
-
-Nishanth Menon (16):
-  irqchip: crossbar: dont use '0' to mark reserved interrupts
-  irqchip: crossbar: check for premapped crossbar before allocating
-  irqchip: crossbar: Skip some irqs from getting mapped to crossbar
-  irqchip: crossbar: Initialise the crossbar with a safe value
-  irqchip: crossbar: Change allocation logic by reversing search for
-    free irqs
-  irqchip: crossbar: remove IS_ERR_VALUE check
-  irqchip: crossbar: fix sparse warnings
-  irqchip: crossbar: fix checkpatch warning
-  irqchip: crossbar: fix kerneldoc warning
-  irqchip: crossbar: fix memory leak incase of invalid entry
-  irqchip: crossbar: return proper error value
-  irqchip: crossbar: change the goto naming
-  irqchip: crossbar: introduce ti,max-crossbar-sources to identify
-    valid crossbar mapping
-  irqchip: crossbar: introduce centralized check for crossbar write
-  Documentation: dt: OMAP: crossbar: add description for interrupt
-    consumer
-  irqchip: crossbar allow for quirky hardware with direct hardwiring of
-    GIC
-
-Rajendra Nayak (1):
-  irqchip: crossbar: DRA7: Fix unused crossbar list
-
-Sricharan R (2):
-  irqchip: crossbar: set cb pointer to null in case of error
-  irqchip: crossbar: Add kerneldoc for crossbar_domain_unmap callback
-
- .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
- drivers/irqchip/irq-crossbar.c                     |  193 +++++++++++++++++---
- 2 files changed, 191 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+index 20105bc..51d4b87 100644
+--- a/drivers/irqchip/irq-crossbar.c
++++ b/drivers/irqchip/irq-crossbar.c
+@@ -51,6 +51,17 @@ static inline void crossbar_writeb(int irq_no, int cb_no)
+ 	writeb(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
+ }
+ 
++static inline int get_prev_map_irq(int cb_no)
++{
++	int i;
++
++	for (i = 0; i < cb->int_max; i++)
++		if (cb->irq_map[i] == cb_no)
++			return i;
++
++	return -ENODEV;
++}
++
+ static inline int allocate_free_irq(int cb_no)
+ {
+ 	int i;
+@@ -88,11 +99,16 @@ static int crossbar_domain_xlate(struct irq_domain *d,
+ {
+ 	unsigned long ret;
+ 
++	ret = get_prev_map_irq(intspec[1]);
++	if (!IS_ERR_VALUE(ret))
++		goto found;
++
+ 	ret = allocate_free_irq(intspec[1]);
+ 
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+ 
++found:
+ 	*out_hwirq = ret + GIC_IRQ_START;
+ 	return 0;
+ }
 -- 
 1.7.9.5
