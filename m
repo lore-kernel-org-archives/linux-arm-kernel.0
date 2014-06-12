@@ -1,33 +1,123 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 12 Jun 2014 16:26:55 -0700
-Subject: [PATCH 2/3 v4] spi: s3c64xx: for DT platofrms always get the
- chipselect info from DT node
-In-Reply-To: <1402578821-27338-2-git-send-email-ch.naveen@samsung.com>
-References: <1402578821-27338-1-git-send-email-ch.naveen@samsung.com>
- <1402578821-27338-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAD=FV=VoNbe_Hrr0tNTyQGyYcaUopAwzWAqMQG8HX+xcyVzD0A@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 13 Jun 2014 01:46:17 +0200
+Subject: [PATCH v13 06/10] drm: drm_display_mode: add signal polarity flags
+In-Reply-To: <1402395951-7988-6-git-send-email-denis@eukrea.com>
+References: <1402395951-7988-1-git-send-email-denis@eukrea.com>
+ <1402395951-7988-6-git-send-email-denis@eukrea.com>
+Message-ID: <1420822.gvkeme0UiB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen,
+Hi Denis,
 
-On Thu, Jun 12, 2014 at 6:13 AM, Naveen Krishna Chatradhi
-<ch.naveen@samsung.com> wrote:
-> Use controller_data structure only for the Non Device tree  platforms.
-> For Device tree platforms, always derive the chipselect info from
-> DT node.
->
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
+Thank you for the patch.
+
+On Tuesday 10 June 2014 12:25:47 Denis Carikli wrote:
+> We need a way to pass signal polarity informations
+>   between DRM panels, and the display drivers.
+> 
+> To do that, a pol_flags field was added to drm_display_mode.
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
->  drivers/spi/spi-s3c64xx.c |   11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
+> ChangeLog v12->v13:
+> - Added Docbook documentation for pol_flags the struct field.
+> - Removed the _PRESERVE	defines: it was used by patches
+>   against the imx_drm driver. Now theses patches have been
+>   adapted not to require that defines.
+> ChangeLog v11->v12:
+> - Rebased: This patch now applies against drm_modes.h
+> - Rebased: It now uses the new DRM_MODE_FLAG_POL_DE flags defines names
+> 
+> ChangeLog v10->v11:
+> - Since the imx-drm won't be able to retrive its regulators
+>   from the device tree when using display-timings nodes,
+>   and that I was told that the drm simple-panel driver
+>   already supported that, I then, instead, added what was
+>   lacking to make the eukrea displays work with the
+>   drm-simple-panel driver.
+> 
+>   That required a way to get back the display polarity
+>   informations from the imx-drm driver without affecting
+>   userspace.
+> ---
+>  Documentation/DocBook/drm.tmpl |   30 ++++++++++++++++++++++++++++++
+>  include/drm/drm_modes.h        |    6 ++++++
+>  2 files changed, 36 insertions(+)
+> 
+> diff --git a/Documentation/DocBook/drm.tmpl b/Documentation/DocBook/drm.tmpl
+> index c526d81..29c0e5a 100644
+> --- a/Documentation/DocBook/drm.tmpl
+> +++ b/Documentation/DocBook/drm.tmpl
+> @@ -2292,6 +2292,36 @@ void intel_crt_init(struct drm_device *dev)
+>              and <structfield>height_mm</structfield> fields are only used
+> internally during EDID parsing and should not be set when creating modes
+> manually. </para>
+> +          <para>
+> +            The <structfield>pol_flags</structfield> value represents the
+> display
+> +            signal polarity flags, it can be a combination of
+> +            <variablelist>
+> +              <varlistentry>
+> +                <term>DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE</term>
+> +                 <listitem><para>
+> +                     drive pixel data on falling edge, sample data on
+> rising edge.
+> +                 </para></listitem>
+> +              </varlistentry>
+> +              <varlistentry>
+> +                <term>DRM_MODE_FLAG_POL_PIXDATA_POSEDGE</term>
+> +                <listitem><para>
+> +                  Drive pixel data on rising edge, sample data on falling
+> edge.
+> +                </para></listitem>
+> +              </varlistentry>
+> +              <varlistentry>
+> +                <term>DRM_MODE_FLAG_POL_DE_LOW</term>
+> +                <listitem><para>
+> +                  data-enable pulse is active low
+> +                </para></listitem>
+> +              </varlistentry>
+> +              <varlistentry>
+> +                <term>DRM_MODE_FLAG_POL_DE_HIGH</term>
+> +                <listitem><para>
+> +                  data-enable pulse is active low
 
-I'm not planning to do an in-depth review of this patch since it seems
-that others are on top of it, but I've tested it.  With it (and some
-patches that haven't been sent up yet) I can talk to the EC on
-exynos5420-pit (which uses device tree for specifying the cs-gpios)
+I assume you mean active high here.
 
-Tested-by: Doug Anderson <dianders@chromium.org>
+> +                </para></listitem>
+> +              </varlistentry>
+> +            </variablelist>
+> +          </para>
+>          </listitem>
+>          <listitem>
+>            <synopsis>int (*mode_valid)(struct drm_connector *connector,
+> diff --git a/include/drm/drm_modes.h b/include/drm/drm_modes.h
+> index 91d0582..c5cbe31 100644
+> --- a/include/drm/drm_modes.h
+> +++ b/include/drm/drm_modes.h
+> @@ -93,6 +93,11 @@ enum drm_mode_status {
+> 
+>  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+> 
+> +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
+> +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
+> +#define DRM_MODE_FLAG_POL_DE_LOW		BIT(3)
+> +#define DRM_MODE_FLAG_POL_DE_HIGH		BIT(4)
+> +
+>  struct drm_display_mode {
+>  	/* Header */
+>  	struct list_head head;
+> @@ -144,6 +149,7 @@ struct drm_display_mode {
+>  	int vrefresh;		/* in Hz */
+>  	int hsync;		/* in kHz */
+>  	enum hdmi_picture_aspect picture_aspect_ratio;
+> +	unsigned int pol_flags;
+>  };
+> 
+>  /* mode specified on the command line */
+
+-- 
+Regards,
+
+Laurent Pinchart
