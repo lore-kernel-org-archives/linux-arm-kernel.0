@@ -1,55 +1,55 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 12 Jun 2014 11:47:16 +0200
-Subject: [PATCH v2 02/10] DMA, CMA: fix possible memory leak
-In-Reply-To: <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <xa1tha3qjw7v.fsf@mina86.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Jun 2014 10:47:45 +0100
+Subject: Kconfig fails: big select-based circular dependency
+In-Reply-To: <20140607090944.GL23430@n2100.arm.linux.org.uk>
+References: <20140607090944.GL23430@n2100.arm.linux.org.uk>
+Message-ID: <20140612094745.GD23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12 2014, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
-> We should free memory for bitmap when we find zone mis-match,
-> otherwise this memory will leak.
->
-> Additionally, I copy code comment from ppc kvm's cma code to notify
-> why we need to check zone mis-match.
->
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Ping.
 
-Reviewed-by: Michal Nazarewicz <mina86@mina86.com>
+This causes randconfig and all*config to fail without building
+anything.
 
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index bd0bb81..fb0cdce 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -177,14 +177,24 @@ static int __init cma_activate_area(struct cma *cma)
->  		base_pfn = pfn;
->  		for (j = pageblock_nr_pages; j; --j, pfn++) {
->  			WARN_ON_ONCE(!pfn_valid(pfn));
-> +			/*
-> +			 * alloc_contig_range requires the pfn range
-> +			 * specified to be in the same zone. Make this
-> +			 * simple by forcing the entire CMA resv range
-> +			 * to be in the same zone.
-> +			 */
->  			if (page_zone(pfn_to_page(pfn)) != zone)
-> -				return -EINVAL;
-> +				goto err;
->  		}
->  		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
->  	} while (--i);
->  
->  	mutex_init(&cma->lock);
->  	return 0;
-> +
-> +err:
-> +	kfree(cma->bitmap);
-> +	return -EINVAL;
->  }
+If no one responds, I'll assume that no one is interested, and I'll
+just create a pile of patches removing a bunch of these idiotic select
+statements at random to break this loop.
+
+On Sat, Jun 07, 2014 at 10:09:44AM +0100, Russell King - ARM Linux wrote:
+> This is getting silly:
+> 
+> scripts/kconfig/conf --silentoldconfig Kconfig
+> drivers/dma/Kconfig:5:error: recursive dependency detected!
+> drivers/dma/Kconfig:5:  symbol DMADEVICES is selected by SAMSUNG_DMADEV
+> arch/arm/plat-samsung/Kconfig:412:      symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
+> arch/arm/mach-s3c64xx/Kconfig:20:       symbol S3C64XX_PL080 is selected by SPI_S3C64XX
+> drivers/spi/Kconfig:429:        symbol SPI_S3C64XX depends on SPI
+> drivers/spi/Kconfig:8:  symbol SPI is selected by DRM_PANEL_LD9040
+> drivers/gpu/drm/panel/Kconfig:19:       symbol DRM_PANEL_LD9040 depends on DRM_PANEL
+> drivers/gpu/drm/panel/Kconfig:1:        symbol DRM_PANEL is selected by DRM_IMX_LDB
+> drivers/staging/imx-drm/Kconfig:35:     symbol DRM_IMX_LDB depends on MFD_SYSCON
+> drivers/mfd/Kconfig:722:        symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
+> drivers/power/reset/Kconfig:76: symbol POWER_RESET_KEYSTONE depends on POWER_SUPPLY
+> drivers/power/Kconfig:1:        symbol POWER_SUPPLY is selected by HID_SONY
+> drivers/hid/Kconfig:622:        symbol HID_SONY depends on NEW_LEDS
+> drivers/leds/Kconfig:8: symbol NEW_LEDS is selected by BACKLIGHT_ADP8860
+> drivers/video/backlight/Kconfig:327:    symbol BACKLIGHT_ADP8860 depends on BACKLIGHT_CLASS_DEVICE
+> drivers/video/backlight/Kconfig:156:    symbol BACKLIGHT_CLASS_DEVICE is selected by FB_MX3
+> drivers/video/fbdev/Kconfig:2333:       symbol FB_MX3 depends on MX3_IPU
+> drivers/dma/Kconfig:121:        symbol MX3_IPU depends on DMADEVICES
+> 
+> This is a good illustration why the select disease is truely bad...
+> 
+> -- 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
