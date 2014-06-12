@@ -1,74 +1,82 @@
 From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Thu, 12 Jun 2014 12:21:38 +0900
-Subject: [PATCH v2 01/10] DMA, CMA: clean-up log message
+Date: Thu, 12 Jun 2014 12:21:47 +0900
+Subject: [PATCH v2 10/10] mm, cma: use spinlock instead of mutex
 In-Reply-To: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
 References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <1402543307-29800-11-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need explicit 'CMA:' prefix, since we already define prefix
-'cma:' in pr_fmt. So remove it.
-
-And, some logs print function name and others doesn't. This looks
-bad to me, so I unify log format to print function name consistently.
-
-Lastly, I add one more debug log on cma_activate_area().
+Currently, we should take the mutex for manipulating bitmap.
+This job may be really simple and short so we don't need to sleep
+if contended. So I change it to spinlock.
 
 Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index 83969f8..bd0bb81 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -144,7 +144,7 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
- 	}
+diff --git a/mm/cma.c b/mm/cma.c
+index 22a5b23..3085e8c 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -27,6 +27,7 @@
+ #include <linux/memblock.h>
+ #include <linux/err.h>
+ #include <linux/mm.h>
++#include <linux/spinlock.h>
+ #include <linux/mutex.h>
+ #include <linux/sizes.h>
+ #include <linux/slab.h>
+@@ -36,7 +37,7 @@ struct cma {
+ 	unsigned long	count;
+ 	unsigned long	*bitmap;
+ 	int order_per_bit; /* Order of pages represented by one bit */
+-	struct mutex	lock;
++	spinlock_t	lock;
+ };
  
- 	if (selected_size && !dma_contiguous_default_area) {
--		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
-+		pr_debug("%s(): reserving %ld MiB for global area\n", __func__,
- 			 (unsigned long)selected_size / SZ_1M);
+ /*
+@@ -72,9 +73,9 @@ static void clear_cma_bitmap(struct cma *cma, unsigned long pfn, int count)
+ 	bitmapno = (pfn - cma->base_pfn) >> cma->order_per_bit;
+ 	nr_bits = cma_bitmap_pages_to_bits(cma, count);
  
- 		dma_contiguous_reserve_area(selected_size, selected_base,
-@@ -163,8 +163,9 @@ static int __init cma_activate_area(struct cma *cma)
- 	unsigned i = cma->count >> pageblock_order;
- 	struct zone *zone;
- 
--	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-+	pr_debug("%s()\n", __func__);
- 
-+	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
- 	if (!cma->bitmap)
- 		return -ENOMEM;
- 
-@@ -234,7 +235,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- 
- 	/* Sanity checks */
- 	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
--		pr_err("Not enough slots for CMA reserved regions!\n");
-+		pr_err("%s(): Not enough slots for CMA reserved regions!\n",
-+			__func__);
- 		return -ENOSPC;
- 	}
- 
-@@ -274,14 +276,15 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- 	*res_cma = cma;
- 	cma_area_count++;
- 
--	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
--		(unsigned long)base);
-+	pr_info("%s(): reserved %ld MiB at %08lx\n",
-+		__func__, (unsigned long)size / SZ_1M, (unsigned long)base);
- 
- 	/* Architecture specific contiguous memory fixup. */
- 	dma_contiguous_early_fixup(base, size);
- 	return 0;
- err:
--	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
-+	pr_err("%s(): failed to reserve %ld MiB\n",
-+		__func__, (unsigned long)size / SZ_1M);
- 	return ret;
+-	mutex_lock(&cma->lock);
++	spin_lock(&cma->lock);
+ 	bitmap_clear(cma->bitmap, bitmapno, nr_bits);
+-	mutex_unlock(&cma->lock);
++	spin_unlock(&cma->lock);
  }
  
+ static int __init cma_activate_area(struct cma *cma)
+@@ -112,7 +113,7 @@ static int __init cma_activate_area(struct cma *cma)
+ 		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
+ 	} while (--i);
+ 
+-	mutex_init(&cma->lock);
++	spin_lock_init(&cma->lock);
+ 	return 0;
+ 
+ err:
+@@ -261,11 +262,11 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
+ 	nr_bits = cma_bitmap_pages_to_bits(cma, count);
+ 
+ 	for (;;) {
+-		mutex_lock(&cma->lock);
++		spin_lock(&cma->lock);
+ 		bitmapno = bitmap_find_next_zero_area(cma->bitmap,
+ 					bitmap_maxno, start, nr_bits, mask);
+ 		if (bitmapno >= bitmap_maxno) {
+-			mutex_unlock(&cma->lock);
++			spin_unlock(&cma->lock);
+ 			break;
+ 		}
+ 		bitmap_set(cma->bitmap, bitmapno, nr_bits);
+@@ -274,7 +275,7 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
+ 		 * our exclusive use. If the migration fails we will take the
+ 		 * lock again and unmark it.
+ 		 */
+-		mutex_unlock(&cma->lock);
++		spin_unlock(&cma->lock);
+ 
+ 		pfn = cma->base_pfn + (bitmapno << cma->order_per_bit);
+ 		mutex_lock(&cma_mutex);
 -- 
 1.7.9.5
