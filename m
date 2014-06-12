@@ -1,61 +1,77 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Jun 2014 18:47:48 +0200
-Subject: [PATCH 0/5] Handle non-secure L2C initialization on Exynos4
-In-Reply-To: <20140612162014.GA3705@n2100.arm.linux.org.uk>
-References: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
- <20140612162014.GA3705@n2100.arm.linux.org.uk>
-Message-ID: <5399D9B4.5030901@samsung.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Thu, 12 Jun 2014 12:48:09 -0400
+Subject: [RFC v2 0/3] ACPI Platform Communication Channel driver
+Message-ID: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello,
 
-On 12.06.2014 18:20, Russell King - ARM Linux wrote:
-> On Thu, Jun 12, 2014 at 02:38:49PM +0100, Daniel Drake wrote:
->> From 2e67231f10ed0b05c2bacfdd05774fe21315d6da Mon Sep 17 00:00:00 2001
->> From: Gu1 <gu1@aeroxteam.fr>
->> Date: Mon, 21 Jan 2013 04:13:56 +0100
->> Subject: [PATCH] ARM: EXYNOS: Add secure firmware support for l2x0 init
->>
->> Conflicts:
->> 	arch/arm/mm/cache-l2x0.c
-> 
-> For this patch... it's a big NAK because it's taking us right back down
-> the route of a totally fucked up cache-l2x0.c driver.
+This patchset adds initial support for the PCC (Platform Communication Channel)
+interface as described in the current ACPI 5.0a spec. See Section 14 of the
+ACPI spec - http://acpi.info/DOWNLOADS/ACPI_5_Errata%20A.pdf for more details on
+how PCC works.
 
-This is just an old, internal patch that was not going to be upstreamed.
-I just posted another series yesterday[1], hopefully doing it the right
-way. Looking forward for review comments.
+In brief PCC (Platform Communication Channel) is a generic means for PCC clients,
+to talk to the firmware. The PCC register space is typically memory mapped IO and
+uses a doorbell mechanism to communicate synchronously from the OS to the firmware.
+The PCC driver is completely agnostic to the protocol implemented by the PCC clients.
+It only implements the enumeration of PCC channels and the low level transport mechanism
+and leaves the rest to the PCC clients.
 
-[1] http://thread.gmane.org/gmane.linux.kernel/1722989
+The PCC is meant to be useable in the future by clients such as CPPC
+(Collaborative Processor Performance Control), RAS (Reliability,
+Availability and Serviceability) and MPST (Memory Power State Tables) and possibly others.
 
-> 
-> Why can't you people write stuff properly?  There's already another set
-> of patches on this mailing list which want to pass the virtual base
-> address of the l2x0 controller to l2c_write_sec() so that various
-> registers can be read back, because the platform's secure API can
-> only update several registers at the same time.
+While the PCC clients will come as following patches whenever they're ready, I wanted
+to get feedback on this common driver and hope that it could be merged upstream. This
+should hopefully help various folks that are working on drivers that rely on the PCC
+interface.
 
-Probably the series you mention is [1]? :)
+Cheers,
+Ashwin
 
-> 
-> This is the same pattern that is revealed in this patch.  So, what
-> this means is that the l2c_write_sec API is wrong.  We need to come
-> up with a *replacement* API which allows the platforms to do this
-> kind of setup in a *clean* way, and stop creating rotten hacks like
-> this which just makes long term maintanence a nightmare.
-> 
-> So... please start doing stuff properly.  If you don't, you're going
-> to be getting more flames from me, especially if you start doing this
-> kind of hackery on code that I've been cleaning up to get rid of such
-> crap.
-> 
+=== Testing Methodology ===
 
-Yes, I fully agree. Fortunately that was not supposed to hit upstream.
+The PCC test driver in [2/2] is a simple driver that was used to
+demonstrate how PCC clients would use the PCC driver. The PCC driver was
+tested by sending multiple PCC READS and PCC WRITES across a shared memory
+region on an MSM ARMv7 platform. This memory is shared between an apps processor
+and a power controller processor. So, one end of the PCC channel is the PCC test driver
+running on the apps processor and the other end is a debugger script
+(running on a JTAG debugger) thats attached to the power processor. The debugger
+script is busy looping on the doorbell address waiting for a bit to flip. This bit
+indicates a synchronous communication from the apps processor. The doorbell is rung
+when the OS sends a PCC READ or PCC WRITE command. The PCC communication channel
+is simply a few fake 32 bit registers that are incremented by the OS and the debugger
+script. The OS increments the registers and then sends the PCC WRITE command. On a PCC
+READ, the script increments these registers and then OS reads them back. The values
+are always incremented by 1 by either end, so we know what value to expect for each
+PCC READ/WRITE.
 
-You've done a lot of great work to refactor this driver (thanks!), which
-made it possible to support Exynos secure firmware in a sane way and
-this is how it should be done.
 
-Best regards,
-Tomasz
+=== Changelog ===
+
+Changes since V1:
+
+-	Integration with Mailbox framework - https://lkml.org/lkml/2014/5/15/49
+
+
+Ashwin Chaugule (3):
+  Mailbox: Add support for ACPI
+  ACPI: Add support for Platform Communication Channel
+  PCC test driver
+
+ drivers/acpi/Makefile              |   2 +-
+ drivers/acpi/pcc-test.c            | 208 ++++++++++++++++++++++++++++++++++
+ drivers/acpi/pcc.c                 | 225 +++++++++++++++++++++++++++++++++++++
+ drivers/mailbox/Kconfig            |  11 ++
+ drivers/mailbox/mailbox.c          | 155 ++++++++++++++++---------
+ include/linux/mailbox_client.h     |   3 +
+ include/linux/mailbox_controller.h |   6 +
+ 7 files changed, 557 insertions(+), 53 deletions(-)
+ create mode 100644 drivers/acpi/pcc-test.c
+ create mode 100644 drivers/acpi/pcc.c
+
+-- 
+1.8.3.2
