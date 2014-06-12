@@ -1,98 +1,61 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:27 +0530
-Subject: [PATCH V2 19/19] irqchip: crossbar allow for quirky hardware with
- direct hardwiring of GIC
-In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402574007-13987-20-git-send-email-r.sricharan@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 12 Jun 2014 13:57:03 +0200
+Subject: Kconfig fails: big select-based circular dependency
+In-Reply-To: <20140612113445.GF23430@n2100.arm.linux.org.uk>
+References: <20140607090944.GL23430@n2100.arm.linux.org.uk>
+ <20140612094745.GD23430@n2100.arm.linux.org.uk>
+ <6077426.uLBS643pC0@wuerfel>
+ <20140612113445.GF23430@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdV0F_FhtJwrzJLbxTbQPKs1XzR=Yb0wjMw2TBuXNPObpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+On Thu, Jun 12, 2014 at 1:34 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>> > > drivers/gpu/drm/panel/Kconfig:19:       symbol DRM_PANEL_LD9040 depends on DRM_PANEL
+>> > > drivers/gpu/drm/panel/Kconfig:1:        symbol DRM_PANEL is selected by DRM_IMX_LDB
+>> > > drivers/staging/imx-drm/Kconfig:35:     symbol DRM_IMX_LDB depends on MFD_SYSCON
+>> > > drivers/mfd/Kconfig:722:        symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
+>>
+>> We have 10 drivers doing 'select MFD_SYSCON' and 9 drivers doing
+>> 'depends on MFD_SYSCON'. Either one would work if we did those
+>> consistently, here the problem is really mixing the two.
+>
+> Indeed - we need clear policies on this stuff, because as we get different
+> platforms doing different things (as is the case in this scenario), we are
+> only going to see an increase in this problem.
+>
+> Also, I don't think we should do just one change to break this loop - this
+> is a sign of a much bigger disease.  We are heading towards the situation
+> where adding just one 'select' or 'depends on' statement between two symbols,
+> thereby adding just one more dependency to an already tightly linked graph
+> can cause a circular dependency.
+>
+> We need to stop this behaviour ASAP, and kill off as many of these
+> ill-considered or wrong dependencies as possible, otherwise we're risking
+> Kconfig becoming unmaintainable.
+>
+> Whenever we see a new 'select' statment appearing in a patch for something
+> which is not a utility symbol, we need to ask what the justification is
+> for it being there, and evaluate whether it's reasonable (ideally, this
+> should be detailed in the commit log.)
+>
+> (I define a utility symbol as one whose primary purpose is to be selected.)
 
-On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10, 131,
-132, 133 are direct wired to hardware blocks bypassing crossbar.
-This quirky implementation is *NOT* supposed to be the expectation
-of crossbar hardware usage. However, these are already marked in our
-description of the hardware with SKIP and RESERVED where appropriate.
+"primary purpose".
 
-Unfortunately, we need to be able to refer to these hardwired IRQs.
-So, to request these, crossbar driver can use the existing information
-from it's table that these SKIP/RESERVED maps are direct wired sources
-and generic allocation/programming of crossbar should be avoided.
+Should we have a better separation between select and depends, i.e.
+should kconf plainly reject both being used on the same symbol?
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- .../devicetree/bindings/arm/omap/crossbar.txt      |   12 ++++++++++--
- drivers/irqchip/irq-crossbar.c                     |   20 ++++++++++++++++++--
- 2 files changed, 28 insertions(+), 4 deletions(-)
+Is it ever valid to have a symbol that's both selected and used with depends on?
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 816d11b..7476d9b 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -35,8 +35,10 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
- 
- An interrupt consumer on an SoC using crossbar will use:
- 	interrupts = <GIC_SPI request_number interrupt_level>
--request number shall be between 0 to that described by
--"ti,max-crossbar-sources"
-+When the request number is between 0 to that described by
-+"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
-+request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
-+quirky hardware mapping direct to GIC.
- 
- Example:
- 	device_x at 0x4a023000 {
-@@ -44,3 +46,9 @@ Example:
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		...
- 	};
-+
-+	device_y at 0x4a033000 {
-+		/* Direct mapped GIC SPI 1 used */
-+		interrupts = <GIC_SPI 401 IRQ_TYPE_LEVEL_HIGH>;
-+		...
-+	};
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 745ad0a..2b61bbb 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -98,8 +98,13 @@ static inline int allocate_free_irq(int cb_no)
- 
- static inline bool needs_crossbar_write(irq_hw_number_t hw)
- {
--	if (hw > GIC_IRQ_START)
--		return true;
-+	int cb_no;
-+
-+	if (hw > GIC_IRQ_START) {
-+		cb_no = cb->irq_map[hw - GIC_IRQ_START];
-+		if (cb_no != IRQ_RESERVED && cb_no != IRQ_SKIP)
-+			return true;
-+	}
- 
- 	return false;
- }
-@@ -139,8 +144,19 @@ static int crossbar_domain_xlate(struct irq_domain *d,
- {
- 	int ret;
- 	int req_num = intspec[1];
-+	int direct_map_num;
- 
- 	if (req_num >= cb->max_crossbar_sources) {
-+		direct_map_num = req_num - cb->max_crossbar_sources;
-+		if (direct_map_num < cb->int_max) {
-+			ret = cb->irq_map[direct_map_num];
-+			if (ret == IRQ_RESERVED || ret == IRQ_SKIP) {
-+				/* We use the interrupt num as h/w irq num */
-+				ret = direct_map_num;
-+				goto found;
-+			}
-+		}
-+
- 		pr_err("%s: requested crossbar number %d > max %d\n",
- 		       __func__, req_num, cb->max_crossbar_sources);
- 		return -EINVAL;
--- 
-1.7.9.5
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
