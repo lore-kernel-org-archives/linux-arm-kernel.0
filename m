@@ -1,61 +1,61 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 12 Jun 2014 09:30:08 -0700
-Subject: [PATCH v4 09/14] ARM64: KVM: MMIO support BE host running LE code
+Date: Thu, 12 Jun 2014 09:30:10 -0700
+Subject: [PATCH v4 11/14] ARM64: KVM: fix vgic_bitmap_get_reg function for BE
+ 64bit case
 In-Reply-To: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
 References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1402590613-3341-10-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1402590613-3341-12-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of guest CPU running in LE mode and host runs in
-BE mode we need byteswap data, so read/write is emulated correctly.
+Fix vgic_bitmap_get_reg function to return 'right' word address of
+'unsigned long' bitmap value in case of BE 64bit image.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index dd8ecfc..fdc3e21 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -213,6 +213,17 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
- 		default:
- 			return be64_to_cpu(data);
- 		}
-+	} else {
-+		switch (len) {
-+		case 1:
-+			return data & 0xff;
-+		case 2:
-+			return le16_to_cpu(data & 0xffff);
-+		case 4:
-+			return le32_to_cpu(data & 0xffffffff);
-+		default:
-+			return le64_to_cpu(data);
-+		}
- 	}
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 529c336..b4ffd82 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -101,14 +101,34 @@ static u32 vgic_nr_lr;
  
- 	return data;		/* Leave LE untouched */
-@@ -233,6 +244,17 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
- 		default:
- 			return cpu_to_be64(data);
- 		}
-+	} else {
-+		switch (len) {
-+		case 1:
-+			return data & 0xff;
-+		case 2:
-+			return cpu_to_le16(data & 0xffff);
-+		case 4:
-+			return cpu_to_le32(data & 0xffffffff);
-+		default:
-+			return cpu_to_le64(data);
-+		}
- 	}
+ static unsigned int vgic_maint_irq;
  
- 	return data;		/* Leave LE untouched */
++/*
++ * struct vgic_bitmap contains unions that provide two views of
++ * the same data. In one case it is an array of registers of
++ * u32's, and in the other case it is a bitmap of unsigned
++ * longs.
++ *
++ * This does not work on 64-bit BE systems, because the bitmap access
++ * will store two consecutive 32-bit words with the higher-addressed
++ * register's bits at the lower index and the lower-addressed register's
++ * bits at the higher index.
++ *
++ * Therefore, swizzle the register index when accessing the 32-bit word
++ * registers to access the right register's value.
++ */
++#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 64
++#define REG_OFFSET_SWIZZLE	1
++#else
++#define REG_OFFSET_SWIZZLE	0
++#endif
++
+ static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
+ 				int cpuid, u32 offset)
+ {
+ 	offset >>= 2;
+ 	if (!offset)
+-		return x->percpu[cpuid].reg;
++		return x->percpu[cpuid].reg + (offset ^ REG_OFFSET_SWIZZLE);
+ 	else
+-		return x->shared.reg + offset - 1;
++		return x->shared.reg + ((offset - 1) ^ REG_OFFSET_SWIZZLE);
+ }
+ 
+ static int vgic_bitmap_get_irq_val(struct vgic_bitmap *x,
 -- 
 1.8.1.4
