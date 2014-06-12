@@ -1,64 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 16:04:19 +0100
-Subject: [PATCH] drm: imx: use GENERIC_IRQ_CHIP
-In-Reply-To: <18338077.DHE9A0xGC1@wuerfel>
-References: <7367559.qEUUbIia3C@wuerfel>
- <20140612142354.GI23430@n2100.arm.linux.org.uk> <18338077.DHE9A0xGC1@wuerfel>
-Message-ID: <20140612150418.GJ23430@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 12 Jun 2014 17:09:31 +0200
+Subject: [PATCHv5 2/3] ARM: mvebu: move Armada 375 external abort logic as a
+ quirk
+In-Reply-To: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1402585772-10405-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 04:51:26PM +0200, Arnd Bergmann wrote:
-> On Thursday 12 June 2014 15:23:54 Russell King - ARM Linux wrote:
-> > On Thu, Jun 12, 2014 at 04:05:32PM +0200, Arnd Bergmann wrote:
-> > > This driver defines its own irqchip using the generic chip
-> > > infrastructure, and hence needs the GENERIC_IRQ_CHIP Kconfig
-> > > symbol enabled, or get this build error:
-> > > 
-> > > drivers/built-in.o: In function `ipu_probe':
-> > > :(.text+0x49ea4c): undefined reference to `irq_generic_chip_ops'
-> > > :(.text+0x49ea5c): undefined reference to `irq_alloc_domain_generic_chips'
-> > > :(.text+0x49ea60): undefined reference to `irq_get_domain_generic_chip'
-> > > :(.text+0x49ea64): undefined reference to `irq_gc_ack_set_bit'
-> > > :(.text+0x49ea6c): undefined reference to `irq_gc_mask_clr_bit'
-> > > :(.text+0x49ea70): undefined reference to `irq_gc_mask_set_bit'
-> > 
-> > Let's take a step back, and ask the obvious question: is it reasonable
-> > to make use if GENERIC_IRQ_CHIP in this driver?
-> 
-> While I haven't looked at this driver in particular, I know that
-> Thomas Gleixner has been rather upset in the past when new irqchip
-> drivers got introduced that were reimplementing the generic irqchip
-> rather than using it.
-> 
-> You can argue over whether it should be an irqchip at all or not,
-> I don't know, and I simply had to assume that this part of the
-> code is ok.
+In preparation to a small re-organization of the initialization
+sequence in board-v7.c, this commit moves the registration of the
+custom external abort handler on Armada 375 later in the boot
+sequence, and makes it more similar to the other quirks that we
+already have. There is indeed no need to register this abort handler
+particularly early, it simply needs to be registered before switching
+to userspace.
 
-The question was more whether "peripheral" drivers should register their
-own irqchips to split a single IRQ into multiple separate Linux IRQs.
-We don't have PCI devices behaving like that... and I don't think we
-should allow it as a general rule.
+In addition to this, this commit makes the registration of the custom
+abort handler conditional on Armada 375 Z1, because Armada 375 A0 and
+later iterations are not affected by the issue.
 
-> This seems more like a second bug in a related part of the code
-> to me. Looking at other generic irqchip users, it seems like
-> the same bug exists in gpio-dwapb.c, gpio-ml-ioh.c, gpio-pch.c
-> and possibly others, which are all loadable modules using a
-> generic irqchip that can't be freed.
+This commit was tested on both Armada 375 Z1 and Armada 375 A0
+platforms.
 
-Generally, that means either (a) the subsystem being used does not
-support the approach, or (b) the subsystem is being inappropriately
-used.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/board-v7.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-In the case of (a), it means a discussion whether support for it
-should be added.  If the answer to that is no, then we need these
-drivers to become modules which can only be loaded _and_ drivers
-which can never be unbound.
-
-In the case of (b) it means that the real bug is that the driver is
-making use of the subsystem (irqchip in this case) that it should not
-be using.
-
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 8bb742f..804c952 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -78,10 +78,17 @@ static void __init mvebu_timer_and_clk_init(void)
+ 	mvebu_scu_enable();
+ 	coherency_init();
+ 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
++}
++
++static void __init external_abort_quirk(void)
++{
++	u32 dev, rev;
+ 
+-	if (of_machine_is_compatible("marvell,armada375"))
+-		hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
+-				"imprecise external abort");
++	if (mvebu_get_soc_id(&dev, &rev) == 0 && rev > ARMADA_375_Z1_REV)
++		return;
++
++	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
++			"imprecise external abort");
+ }
+ 
+ static void __init i2c_quirk(void)
+@@ -169,8 +176,10 @@ static void __init mvebu_dt_init(void)
+ {
+ 	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
+ 		i2c_quirk();
+-	if (of_machine_is_compatible("marvell,a375-db"))
++	if (of_machine_is_compatible("marvell,a375-db")) {
++		external_abort_quirk();
+ 		thermal_quirk();
++	}
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+2.0.0
