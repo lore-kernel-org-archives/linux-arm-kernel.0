@@ -1,66 +1,117 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 17:04:34 +0100
-Subject: [PATCH 1/2] drm/panel: remove unnecessary dependencies
-In-Reply-To: <4955669.feOMdjBDuA@wuerfel>
-References: <E1Wv7GZ-0004SJ-PO@rmk-PC.arm.linux.org.uk>
- <4955669.feOMdjBDuA@wuerfel>
-Message-ID: <20140612160434.GL23430@n2100.arm.linux.org.uk>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 12 Jun 2014 19:53:42 +0300
+Subject: [RFC PATCH 1/2] clk: of: introduce of_clk_get_from_set()
+In-Reply-To: <1402592023-13416-1-git-send-email-grygorii.strashko@ti.com>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <1402592023-13416-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1402592023-13416-2-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 06:00:07PM +0200, Arnd Bergmann wrote:
-> On Thursday 12 June 2014 16:50:15 Russell King wrote:
-> > DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
-> > DRM_PANEL && DRM.  This is nonsense for two reasons:
-> > 
-> > (a) DRM_PANEL already depends on DRM, so DRM_PANEL can not be enabled
-> > without DRM first being enabled.  Hence the && DRM is useless.
-> > 
-> > (b) These two configs are already beneath a menu which depends on
-> > DRM_PANEL being enabled; these options will not be visible without
-> > DRM_PANEL already being enabled.
-> > 
-> > Let's just remove this unnecessary verbosity.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Unfortunately, this is wrong, because the current expression
-> exploits one of the finer details of Kconfig syntax:
-> 
-> >  drivers/gpu/drm/panel/Kconfig | 2 --
-> >  1 file changed, 2 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-> > index 4ec874da5668..44aea730b3aa 100644
-> > --- a/drivers/gpu/drm/panel/Kconfig
-> > +++ b/drivers/gpu/drm/panel/Kconfig
-> > @@ -18,14 +18,12 @@ config DRM_PANEL_SIMPLE
-> >  
-> >  config DRM_PANEL_LD9040
-> >         tristate "LD9040 RGB/SPI panel"
-> > -       depends on DRM && DRM_PANEL
-> >         depends on OF
-> >         select SPI
-> >         select VIDEOMODE_HELPERS
-> >  
-> >  config DRM_PANEL_S6E8AA0
-> >         tristate "S6E8AA0 DSI video mode panel"
-> > -       depends on DRM && DRM_PANEL
-> >         depends on OF
-> >         select DRM_MIPI_DSI
-> >         select VIDEOMODE_HELPERS
-> 
-> DRM_PANEL is bool, while DRM is tristate. If DRM=m and DRM_PANEL=y,
-> these two options can only be 'n' or 'm' but not 'y' with the current
-> code, but they can be 'y' if you drop the explicit DRM dependency,
-> which will cause a link failure.
-> 
-> The DRM_PANEL dependency can be removed, it is indeed unnecessary.
+In many case it's useful to divide device's clocks into
+few sets according to their designation.
+- some clocks can be optional for the device
+- some clocks can be managed by PM frameworks (like clock_ops for example)
+  while some need to be managed by driver directly.
 
-In which case, that's a bug for DRM_PANEL_SIMPLE which uses the same
-mechanism.  Since everything is going to be in the same boat, the
-menu should depend on DRM && DRM_PANEL.
+This patch introduces new API of_clk_get_from_set() which allows
+the callers to specify additional prefix to be used together with
+generic DT clocks list property name "clocks".
 
+In the example bellow, the caller asks CLK framework to retrieve
+clock from the clocks list "clkops-clocks" and not from "clocks":
+DT:
+	usb: usb at 2680000 {
+		compatible = "ti,keystone-dwc3";
+		[...]
+		clkops-clocks = <&clkusb>;
+
+Code:
+	clk = of_clk_get_from_set(np, "clkops", 0);
+
+This changes will not affect on already existed code.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/clk/clkdev.c |   24 ++++++++++++++++++++++--
+ include/linux/clk.h  |    7 +++++++
+ 2 files changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index f890b90..2308518 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -53,7 +53,8 @@ struct clk *of_clk_get_by_clkspec(struct of_phandle_args *clkspec)
+ 	return clk;
+ }
+ 
+-struct clk *of_clk_get(struct device_node *np, int index)
++static struct clk *of_clk_get_named(struct device_node *np,
++		const char *propname, int index)
+ {
+ 	struct of_phandle_args clkspec;
+ 	struct clk *clk;
+@@ -62,7 +63,7 @@ struct clk *of_clk_get(struct device_node *np, int index)
+ 	if (index < 0)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
++	rc = of_parse_phandle_with_args(np, propname, "#clock-cells", index,
+ 					&clkspec);
+ 	if (rc)
+ 		return ERR_PTR(rc);
+@@ -71,8 +72,27 @@ struct clk *of_clk_get(struct device_node *np, int index)
+ 	of_node_put(clkspec.np);
+ 	return clk;
+ }
++
++struct clk *of_clk_get(struct device_node *np, int index)
++{
++	return of_clk_get_named(np, "clocks", index);
++}
+ EXPORT_SYMBOL(of_clk_get);
+ 
++struct clk *of_clk_get_from_set(struct device_node *np,
++		const char *set_id, int index)
++{
++	char prop_name[32]; /* 32 is max size of property name */
++
++	if (set_id)
++		snprintf(prop_name, 32, "%s-clocks", set_id);
++	else
++		snprintf(prop_name, 32, "clocks");
++
++	return of_clk_get_named(np, prop_name, index);
++}
++EXPORT_SYMBOL(of_clk_get_from_set);
++
+ /**
+  * of_clk_get_by_name() - Parse and lookup a clock referenced by a device node
+  * @np: pointer to clock consumer node
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index fb5e097..fc8865a 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -397,6 +397,8 @@ struct of_phandle_args;
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+ struct clk *of_clk_get(struct device_node *np, int index);
++struct clk *of_clk_get_from_set(struct device_node *np,
++		const char *set_id, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+ #else
+@@ -409,6 +411,11 @@ static inline struct clk *of_clk_get_by_name(struct device_node *np,
+ {
+ 	return ERR_PTR(-ENOENT);
+ }
++static inline struct clk *of_clk_get_from_set(struct device_node *np,
++					const char *set_id, int index)
++{
++	return ERR_PTR(-ENOENT);
++}
+ #endif
+ 
+ #endif
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
