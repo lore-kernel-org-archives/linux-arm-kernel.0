@@ -1,49 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 12 Jun 2014 09:22:21 +0200
-Subject: [PATCH v2 2/4] pinctrl: Add NVIDIA Tegra XUSB pad controller
- support
-In-Reply-To: <CAL1qeaGKUGjSzriDGptR+h23+bS3ZWuStz6koPURCstkFbEjNA@mail.gmail.com>
-References: <1402398708-10722-1-git-send-email-thierry.reding@gmail.com>
- <1402398708-10722-2-git-send-email-thierry.reding@gmail.com>
- <CAL1qeaGKUGjSzriDGptR+h23+bS3ZWuStz6koPURCstkFbEjNA@mail.gmail.com>
-Message-ID: <20140612072220.GC17027@ulmo>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Jun 2014 09:26:40 +0200
+Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
+In-Reply-To: <539954CD.5080309@atmel.com>
+References: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
+ <53958CCE.5080307@atmel.com> <5397CBF9.800@atmel.com>
+ <539954CD.5080309@atmel.com>
+Message-ID: <53995630.6040902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 01:23:59PM -0700, Andrew Bresticker wrote:
-> On Tue, Jun 10, 2014 at 4:11 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
-[...]
-> > +static int tegra_xusb_padctl_pinconf_group_set(struct pinctrl_dev *pinctrl,
-> > +                                              unsigned int group,
-> > +                                              unsigned long *configs,
-> > +                                              unsigned int num_configs)
-> > +{
-> > +       struct tegra_xusb_padctl *padctl = pinctrl_dev_get_drvdata(pinctrl);
-> > +       const struct tegra_xusb_padctl_lane *lane;
-> > +       enum tegra_xusb_padctl_param param;
-> > +       unsigned int i;
-> > +       u32 value;
-> > +
-> > +       lane = &padctl->soc->lanes[group];
-> > +
-> > +       for (i = 0; i < num_configs; i++) {
-> > +               param = TEGRA_XUSB_PADCTL_UNPACK_PARAM(configs[i]);
-> > +               value = TEGRA_XUSB_PADCTL_UNPACK_VALUE(configs[i]);
-> > +
-> > +               switch (param) {
-> > +               case TEGRA_XUSB_PADCTL_IDDQ:
-> > +                       value = padctl_readl(padctl, lane->offset);
+On 12/06/2014 09:20, Josh Wu :
+> Hi, Bo
 > 
-> This overwrites the configuration value - probably want to use a
-> separate variable for the register value.
+> On 6/11/2014 11:24 AM, Bo Shen wrote:
+>> Hi Josh,
+>>
+>> On 06/09/2014 06:30 PM, Josh Wu wrote:
+>>> Hi, Bo
+>>>
+>>> Thanks for the patch.
+>>>
+>>> On 6/6/2014 4:02 PM, Bo Shen wrote:
+>>>> If the ecc parameter is not the same as definition, when the
+>>>> mtd core check these parameters, it will give the unexpected
+>>>> result.
+>>> Could you be more specific to tell what kind of result will happened?
+>>
+>> For example:
+>> When try to calculate how many bits can correct in one page according 
+>> to the definition, it will give the wrong result.
+>>
+>> one page correct bits = (mtd->writesize * ecc->strength) / ecc->size;
+>>
+>> take the following use case as an example:
+>> mtd->writesize = 2048 bytes,
+>> ecc->strength = 4 bytes, (for 512 bytes)
+>>
+>> before this patch, the ecc->size = 2048, so the result is 4 bytes.
+>>
+>> after this patch, the ecc->size = 512, so the result is 16 bytes.
+>>
+>> The maximum correct bytes is 16 bytes while not 4 bytes. So, if not align
+> 
+> That is clear enough, thanks. The patch is fine to me. so
+> Acked-by: Josh Wu <josh.wu@atmel.com>
 
-Good catch, thanks.
+So I advice to add this additional information to the commit message:
+Can you send a v2 with enhanced commit message.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140612/8e8deb93/attachment.sig>
+Thanks, bye,
+-- 
+Nicolas Ferre
