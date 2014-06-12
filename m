@@ -1,48 +1,60 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Thu, 12 Jun 2014 14:51:42 +0530
-Subject: [PATCH] ARM: dts: exynos4: fix pwm-cells in pwm node
-In-Reply-To: <1402561392-21702-1-git-send-email-jaewon02.kim@samsung.com>
-References: <1402561392-21702-1-git-send-email-jaewon02.kim@samsung.com>
-Message-ID: <CAK5sBcGyDJ9n+_ei_p-5ukW0NMW_ytSXv8dGkkMx2TquDFWBOQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 12 Jun 2014 11:27:16 +0200
+Subject: [GIT PULL] MMC fixes for v.3.16
+Message-ID: <CAPDyKFqjSgZs3o5qPjsFzrEHPt5_b7hwdLkqq3CdEM-OjST0JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaewon,
+Hi Linus,
 
-On Thu, Jun 12, 2014 at 1:53 PM, Jaewon Kim <jaewon02.kim@samsung.com> wrote:
-> pwm-cells should be 3. Third cell is optional PWM flags.
-> And This flag supported by this binding is PWM_POLARITY_INVERTED
->
-> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4.dtsi |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index b8ece4b..b687e53 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -548,13 +548,13 @@
->                 status = "disabled";
->         };
->
-> -       pwm at 139D0000 {
-> +       pwm: pwm at 139D0000 {
+Here are some mmc fixes for 3.16.
 
-unrelated change.
+- Fix some various compiler warnings.
+- Make atmel-mci compile again.
+- Fix regression for sdhci-msm.
 
->                 compatible = "samsung,exynos4210-pwm";
->                 reg = <0x139D0000 0x1000>;
->                 interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
->                 clocks = <&clock CLK_PWM>;
->                 clock-names = "timers";
-> -               #pwm-cells = <2>;
-> +               #pwm-cells = <3>;
->                 status = "disabled";
->         };
+Information also collected in the signed tag.
 
-Otherwise looks good.
-Reviewed-by: Sachin Kamat <sachin.kamat@samsung.com>
+Kind regards
+Ulf Hansson
 
-Regards,
-Sachin
+
+The following changes since commit 5c02c392cd2320e8d612376d6b72b6548a680923:
+
+  Merge tag 'virtio-next-for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux (2014-06-11
+21:10:33 -0700)
+
+are available in the git repository at:
+
+
+  git://git.linaro.org/people/ulf.hansson/mmc.git tags/mmc-v3.16-2
+
+for you to fetch changes up to 5d01b7684b7ebade6d9ea9c94a31357aec731ecd:
+
+  mmc: simplify SDHCI Kconfig dependencies (2014-06-12 10:51:14 +0200)
+
+----------------------------------------------------------------
+- Fix some various compiler warnings.
+- Make atmel-mci compile again.
+- Fix regression for sdhci-msm.
+
+----------------------------------------------------------------
+Arnd Bergmann (4):
+      mmc: atmel-mci: incude asm/cacheclush.h
+      mmc: mvsdio: avoid compiler warning
+      mmc: omap: don't select TPS65010
+      mmc: simplify SDHCI Kconfig dependencies
+
+Guennadi Liakhovetski (1):
+      mmc: usdhi6rol0: fix compiler warnings
+
+Stephen Boyd (1):
+      mmc: sdhci-msm: Fix fallout from sdhci refactoring
+
+ drivers/mmc/host/Kconfig      |   10 ++++------
+ drivers/mmc/host/atmel-mci.c  |    1 +
+ drivers/mmc/host/mvsdio.c     |    2 +-
+ drivers/mmc/host/sdhci-msm.c  |    4 ++++
+ drivers/mmc/host/usdhi6rol0.c |   10 +++++-----
+ 5 files changed, 15 insertions(+), 12 deletions(-)
