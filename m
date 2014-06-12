@@ -1,47 +1,61 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 12 Jun 2014 09:30:12 -0700
-Subject: [PATCH v4 13/14] ARM64: KVM: set and get of sys registers in BE case
+Date: Thu, 12 Jun 2014 09:30:13 -0700
+Subject: [PATCH v4 14/14] ARM64: KVM: fix big endian issue in access_vm_reg
+ for 32bit guest
 In-Reply-To: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
 References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1402590613-3341-14-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1402590613-3341-15-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since size of all sys registers is always 8 bytes. Current
-code is actually endian agnostic. Just clean it up a bit.
-Removed comment about little endian. Change type of pointer
-from 'void *' to 'u64 *' to enforce stronger type checking.
+Fix issue with 32bit guests running on top of BE KVM host.
+Indexes of high and low words of 64bit cp15 register are
+swapped in case of big endian code, since 64bit cp15 state is
+restored or saved with double word write or read instruction.
+
+Define helper macros to access high low words of 64bit cp15
+register.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+ arch/arm64/kvm/sys_regs.c         | 4 ++--
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 0a1d697..e9d2e11 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -140,6 +140,14 @@ struct kvm_vcpu_arch {
+ #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+ #define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
+ 
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
++#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
++#else
++#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
++#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
++#endif
++
+ struct kvm_vm_stat {
+ 	u32 remote_tlb_flush;
+ };
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 0324458..8e65e31 100644
+index 8e65e31..71aa9b0 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -776,17 +776,15 @@ static struct sys_reg_desc invariant_sys_regs[] = {
- 	  NULL, get_ctr_el0 },
- };
- 
--static int reg_from_user(void *val, const void __user *uaddr, u64 id)
-+static int reg_from_user(u64 *val, const void __user *uaddr, u64 id)
- {
--	/* This Just Works because we are little endian. */
- 	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
- 		return -EFAULT;
- 	return 0;
+@@ -137,9 +137,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+ 	if (!p->is_aarch32) {
+ 		vcpu_sys_reg(vcpu, r->reg) = val;
+ 	} else {
+-		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
++		vcpu_cp15_64_low(vcpu, r->reg) = val & 0xffffffffUL;
+ 		if (!p->is_32bit)
+-			vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
++			vcpu_cp15_64_high(vcpu, r->reg) = val >> 32;
+ 	}
+ 	return true;
  }
- 
--static int reg_to_user(void __user *uaddr, const void *val, u64 id)
-+static int reg_to_user(void __user *uaddr, const u64 *val, u64 id)
- {
--	/* This Just Works because we are little endian. */
- 	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
- 		return -EFAULT;
- 	return 0;
 -- 
 1.8.1.4
