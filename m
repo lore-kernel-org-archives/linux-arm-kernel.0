@@ -1,48 +1,60 @@
-From: tushar.b@samsung.com (Tushar Behera)
-Date: Thu, 12 Jun 2014 13:10:24 +0530
-Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
- always enabled
-In-Reply-To: <7ha99jjspt.fsf@paris.lan>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
- <7ha99jjspt.fsf@paris.lan>
-Message-ID: <CAC5m3Bwj1HEWSQd7rx6Zn5vbUPKFqeT_X0PL3mAxRw0FNkK=QQ@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 12 Jun 2014 15:45:08 +0800
+Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
+In-Reply-To: <53995630.6040902@atmel.com>
+References: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
+ <53958CCE.5080307@atmel.com> <5397CBF9.800@atmel.com>
+ <539954CD.5080309@atmel.com> <53995630.6040902@atmel.com>
+Message-ID: <53995A84.1090908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 10:20 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Tushar Behera <tushar.b@samsung.com> writes:
->
->> When the output clock of AUDSS mux is disabled, we are getting kernel
->> oops while doing a clk_get() on other clocks provided by AUDSS.
+Hi Nicolas,
+
+On 06/12/2014 03:26 PM, Nicolas Ferre wrote:
+> On 12/06/2014 09:20, Josh Wu :
+>> Hi, Bo
 >>
->> Though user manual doesn't specify this dependency, we came across
->> this issue while disabling the parent of AUDSS mux clocks.
+>> On 6/11/2014 11:24 AM, Bo Shen wrote:
+>>> Hi Josh,
+>>>
+>>> On 06/09/2014 06:30 PM, Josh Wu wrote:
+>>>> Hi, Bo
+>>>>
+>>>> Thanks for the patch.
+>>>>
+>>>> On 6/6/2014 4:02 PM, Bo Shen wrote:
+>>>>> If the ecc parameter is not the same as definition, when the
+>>>>> mtd core check these parameters, it will give the unexpected
+>>>>> result.
+>>>> Could you be more specific to tell what kind of result will happened?
+>>>
+>>> For example:
+>>> When try to calculate how many bits can correct in one page according
+>>> to the definition, it will give the wrong result.
+>>>
+>>> one page correct bits = (mtd->writesize * ecc->strength) / ecc->size;
+>>>
+>>> take the following use case as an example:
+>>> mtd->writesize = 2048 bytes,
+>>> ecc->strength = 4 bytes, (for 512 bytes)
+>>>
+>>> before this patch, the ecc->size = 2048, so the result is 4 bytes.
+>>>
+>>> after this patch, the ecc->size = 512, so the result is 16 bytes.
+>>>
+>>> The maximum correct bytes is 16 bytes while not 4 bytes. So, if not align
 >>
->> Keeping the parents of AUDSS mux always enabled fixes this issue.
+>> That is clear enough, thanks. The patch is fine to me. so
+>> Acked-by: Josh Wu <josh.wu@atmel.com>
 >
-> While this patch works (and fixes the boot problem for me), it seems
-> like it's papering over the real problem.
+> So I advice to add this additional information to the commit message:
+> Can you send a v2 with enhanced commit message.
+
+OK, no problem.
+
+> Thanks, bye,
 >
 
-Thanks for testing.
-
-> Seems like the right fix is actually modelling the clocks properly so
-> that enabling a child clock ensures that the parent is also enabled.
->
-
-Patch 2/3 was to ensure we have proper clock tree defined for
-Exynos5420. While testing with audio disabled, that patch alone fixed
-the issue. But when audio was enabled (and hence I2S0 was trying to
-access the clocks), we got some kernel oops during late booting, hence
-I came up this solution.
-
-The solution might be a little half-baked because of the urgency to
-push the fix, but will try to dig more into the issue on Monday when I
-resume office.
-
-> Kevin
-
-Thanks,
---
-Tushar
+Best Regards,
+Bo Shen
