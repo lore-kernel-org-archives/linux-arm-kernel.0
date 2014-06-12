@@ -1,85 +1,56 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 12 Jun 2014 10:56:37 +0200
-Subject: [PATCH v2 01/10] DMA, CMA: clean-up log message
-In-Reply-To: <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <xa1tlht2jyka.fsf@mina86.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 12 Jun 2014 10:59:55 +0200
+Subject: [PATCH] mmc: sdhci-msm: Fix fallout from sdhci refactoring
+In-Reply-To: <1402424839-25514-1-git-send-email-sboyd@codeaurora.org>
+References: <1402424839-25514-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAPDyKFrK9daz4BvfmggLiGRfndxi24+Kqb=qVT2VFaf9XtTg0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12 2014, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
-> We don't need explicit 'CMA:' prefix, since we already define prefix
-> 'cma:' in pr_fmt. So remove it.
+On 10 June 2014 20:27, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> The sdhci core was refactored recently and some of those
+> refactorings required changes in every sdhci platform driver.
+> Those updates happened around the same time as when the msm
+> driver was merged so the refactorings missed the msm driver.
+> Hook in the basic library functions so that we can boot apq8074
+> dragonboards again instead of crashing when we try to jump to
+> NULL function pointers.
 >
-> And, some logs print function name and others doesn't. This looks
-> bad to me, so I unify log format to print function name consistently.
+> Reported-by: Kevin Hilman <khilman@linaro.org>
+> Cc: Georgi Djakov <gdjakov@mm-sol.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Thanks!
+
+Applied for fixes.
+
+Kind regards
+Uffe
+
+> ---
 >
-> Lastly, I add one more debug log on cma_activate_area().
-
-I don't particularly care what format of logs you choose, so:
-
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
-
-even though I'd go without empty ?()?.
-
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> Patch based on next-20140610
 >
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 83969f8..bd0bb81 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -144,7 +144,7 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
->  	}
->  
->  	if (selected_size && !dma_contiguous_default_area) {
-> -		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
-> +		pr_debug("%s(): reserving %ld MiB for global area\n", __func__,
->  			 (unsigned long)selected_size / SZ_1M);
->  
->  		dma_contiguous_reserve_area(selected_size, selected_base,
-> @@ -163,8 +163,9 @@ static int __init cma_activate_area(struct cma *cma)
->  	unsigned i = cma->count >> pageblock_order;
->  	struct zone *zone;
->  
-> -	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-> +	pr_debug("%s()\n", __func__);
->  
-> +	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
->  	if (!cma->bitmap)
->  		return -ENOMEM;
->  
-> @@ -234,7 +235,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->  
->  	/* Sanity checks */
->  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
-> -		pr_err("Not enough slots for CMA reserved regions!\n");
-> +		pr_err("%s(): Not enough slots for CMA reserved regions!\n",
-> +			__func__);
->  		return -ENOSPC;
->  	}
->  
-> @@ -274,14 +276,15 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->  	*res_cma = cma;
->  	cma_area_count++;
->  
-> -	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
-> -		(unsigned long)base);
-> +	pr_info("%s(): reserved %ld MiB at %08lx\n",
-> +		__func__, (unsigned long)size / SZ_1M, (unsigned long)base);
->  
->  	/* Architecture specific contiguous memory fixup. */
->  	dma_contiguous_early_fixup(base, size);
->  	return 0;
->  err:
-> -	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
-> +	pr_err("%s(): failed to reserve %ld MiB\n",
-> +		__func__, (unsigned long)size / SZ_1M);
->  	return ret;
->  }
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+>  drivers/mmc/host/sdhci-msm.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+> index acb0e9eb55f1..40573a58486a 100644
+> --- a/drivers/mmc/host/sdhci-msm.c
+> +++ b/drivers/mmc/host/sdhci-msm.c
+> @@ -468,6 +468,10 @@ MODULE_DEVICE_TABLE(of, sdhci_msm_dt_match);
+>
+>  static struct sdhci_ops sdhci_msm_ops = {
+>         .platform_execute_tuning = sdhci_msm_execute_tuning,
+> +       .reset = sdhci_reset,
+> +       .set_clock = sdhci_set_clock,
+> +       .set_bus_width = sdhci_set_bus_width,
+> +       .set_uhs_signaling = sdhci_set_uhs_signaling,
+>  };
+>
+>  static int sdhci_msm_probe(struct platform_device *pdev)
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+>
