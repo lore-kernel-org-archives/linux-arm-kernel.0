@@ -1,31 +1,97 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Thu, 12 Jun 2014 10:19:17 +0530
-Subject: [PATCH] ARM: exynos: Fix warning by constifying 'reg' in
- exynos_fdt_map_chipid()
-In-Reply-To: <CAKohponQhitVO2zX0+=5bU76vC=+ofpqZo1F5CxyUDDD24prhw@mail.gmail.com>
-References: <3c6b5c1f19fcbee39a3f0a0bd2c9ddd811d5e619.1402547301.git.viresh.kumar@linaro.org>
- <CAKohponQhitVO2zX0+=5bU76vC=+ofpqZo1F5CxyUDDD24prhw@mail.gmail.com>
-Message-ID: <CAK5sBcEcvXKFypDAx2E+fGZHk-VLhfbxU4QydvQTs2nTjb47pQ@mail.gmail.com>
+From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
+Date: Thu, 12 Jun 2014 10:20:18 +0530
+Subject: [PATCH v2 04/10] DMA,
+ CMA: support alignment constraint on cma region
+In-Reply-To: <1402543307-29800-5-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-5-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <87oaxypw8l.fsf@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
 
-On Thu, Jun 12, 2014 at 10:04 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Fix Sachin's id, looks like he left Linaro ..
+> ppc kvm's cma area management needs alignment constraint on
+> cma region. So support it to prepare generalization of cma area
+> management functionality.
 >
-> On 12 June 2014 10:00, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> exynos_fdt_map_chipid() was recently added with: cbf08b9 (ARM: EXYNOS:
->> Consolidate exynos4 and exynos5 machine files) and generates this warning:
->>
->> arch/arm/mach-exynos/exynos.c: In function ?exynos_fdt_map_chipid?:
->> arch/arm/mach-exynos/exynos.c:208:6: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
->>
->> Constify 'reg' to fix it.
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Additionally, add some comments which tell us why alignment
+> constraint is needed on cma region.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-I have already posted a patch [1] to fix this.
-Kukjin, can you please queue this up.
+Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
 
-[1] http://www.spinics.net/lists/arm-kernel/msg328216.html
+>
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 8a44c82..bc4c171 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/swap.h>
+>  #include <linux/mm_types.h>
+>  #include <linux/dma-contiguous.h>
+> +#include <linux/log2.h>
+>
+>  struct cma {
+>  	unsigned long	base_pfn;
+> @@ -219,6 +220,7 @@ core_initcall(cma_init_reserved_areas);
+>   * @size: Size of the reserved area (in bytes),
+>   * @base: Base address of the reserved area optional, use 0 for any
+>   * @limit: End address of the reserved memory (optional, 0 for any).
+> + * @alignment: Alignment for the contiguous memory area, should be power of 2
+>   * @res_cma: Pointer to store the created cma region.
+>   * @fixed: hint about where to place the reserved area
+>   *
+> @@ -233,15 +235,15 @@ core_initcall(cma_init_reserved_areas);
+>   */
+>  static int __init __dma_contiguous_reserve_area(phys_addr_t size,
+>  				phys_addr_t base, phys_addr_t limit,
+> +				phys_addr_t alignment,
+>  				struct cma **res_cma, bool fixed)
+>  {
+>  	struct cma *cma = &cma_areas[cma_area_count];
+> -	phys_addr_t alignment;
+>  	int ret = 0;
+>
+> -	pr_debug("%s(size %lx, base %08lx, limit %08lx)\n", __func__,
+> -		 (unsigned long)size, (unsigned long)base,
+> -		 (unsigned long)limit);
+> +	pr_debug("%s(size %lx, base %08lx, limit %08lx align_order %08lx)\n",
+> +		__func__, (unsigned long)size, (unsigned long)base,
+> +		(unsigned long)limit, (unsigned long)alignment);
+>
+>  	/* Sanity checks */
+>  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+> @@ -253,8 +255,17 @@ static int __init __dma_contiguous_reserve_area(phys_addr_t size,
+>  	if (!size)
+>  		return -EINVAL;
+>
+> -	/* Sanitise input arguments */
+> -	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+> +	if (alignment && !is_power_of_2(alignment))
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Sanitise input arguments.
+> +	 * CMA area should be at least MAX_ORDER - 1 aligned. Otherwise,
+> +	 * CMA area could be merged into other MIGRATE_TYPE by buddy mechanism
+> +	 * and CMA property will be broken.
+> +	 */
+> +	alignment = max(alignment,
+> +		(phys_addr_t)PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
+>  	base = ALIGN(base, alignment);
+>  	size = ALIGN(size, alignment);
+>  	limit &= ~(alignment - 1);
+> @@ -302,7 +313,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+>  {
+>  	int ret;
+>
+> -	ret = __dma_contiguous_reserve_area(size, base, limit, res_cma, fixed);
+> +	ret = __dma_contiguous_reserve_area(size, base, limit, 0,
+> +						res_cma, fixed);
+>  	if (ret)
+>  		return ret;
+>
+> -- 
+> 1.7.9.5
