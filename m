@@ -1,60 +1,67 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 12 Jun 2014 15:45:08 +0800
-Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
-In-Reply-To: <53995630.6040902@atmel.com>
-References: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
- <53958CCE.5080307@atmel.com> <5397CBF9.800@atmel.com>
- <539954CD.5080309@atmel.com> <53995630.6040902@atmel.com>
-Message-ID: <53995A84.1090908@atmel.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Thu, 12 Jun 2014 07:45:36 +0000
+Subject: [PATCH] clocksource: arch_arm_timer: Fix timecounter
+ initialization
+In-Reply-To: <5398A7B2.6030807@codeaurora.org>
+References: <1402475861-15354-1-git-send-email-Li.Xiubo@freescale.com>
+ <5398A7B2.6030807@codeaurora.org>
+Message-ID: <bce193f3fc264abf82ff52ef69f0b86a@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+> >  drivers/clocksource/arm_arch_timer.c | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/clocksource/arm_arch_timer.c
+> b/drivers/clocksource/arm_arch_timer.c
+> > index 5163ec1..6c3cfd8 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -426,7 +426,7 @@ struct timecounter *arch_timer_get_timecounter(void)
+> >
+> >  static void __init arch_counter_register(unsigned type)
+> >  {
+> > -	u64 start_count;
+> > +	u64 start_count, start_ns;
+> >
+> >  	/* Register the CP15 based counter if we have one */
+> >  	if (type & ARCH_CP15_TIMER)
+> > @@ -438,7 +438,8 @@ static void __init arch_counter_register(unsigned type)
+> >  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+> >  	cyclecounter.mult = clocksource_counter.mult;
+> >  	cyclecounter.shift = clocksource_counter.shift;
+> > -	timecounter_init(&timecounter, &cyclecounter, start_count);
+> > +	start_ns = cyclecounter_cyc2ns(&cyclecounter, start_count);
+> > +	timecounter_init(&timecounter, &cyclecounter, start_ns);
+> >
+> >  	/* 56 bits minimum, so we assume worst case rollover */
+> >  	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+> 
+> This doesn't make much sense. We're converting start_count, which could
+> be a very large number, into nanoseconds. It looks like we're assuming
+> the counter always starts at 0 which is not always true if you sit in a
+> bootloader for a long time. 
 
-On 06/12/2014 03:26 PM, Nicolas Ferre wrote:
-> On 12/06/2014 09:20, Josh Wu :
->> Hi, Bo
->>
->> On 6/11/2014 11:24 AM, Bo Shen wrote:
->>> Hi Josh,
->>>
->>> On 06/09/2014 06:30 PM, Josh Wu wrote:
->>>> Hi, Bo
->>>>
->>>> Thanks for the patch.
->>>>
->>>> On 6/6/2014 4:02 PM, Bo Shen wrote:
->>>>> If the ecc parameter is not the same as definition, when the
->>>>> mtd core check these parameters, it will give the unexpected
->>>>> result.
->>>> Could you be more specific to tell what kind of result will happened?
->>>
->>> For example:
->>> When try to calculate how many bits can correct in one page according
->>> to the definition, it will give the wrong result.
->>>
->>> one page correct bits = (mtd->writesize * ecc->strength) / ecc->size;
->>>
->>> take the following use case as an example:
->>> mtd->writesize = 2048 bytes,
->>> ecc->strength = 4 bytes, (for 512 bytes)
->>>
->>> before this patch, the ecc->size = 2048, so the result is 4 bytes.
->>>
->>> after this patch, the ecc->size = 512, so the result is 16 bytes.
->>>
->>> The maximum correct bytes is 16 bytes while not 4 bytes. So, if not align
->>
->> That is clear enough, thanks. The patch is fine to me. so
->> Acked-by: Josh Wu <josh.wu@atmel.com>
->
-> So I advice to add this additional information to the commit message:
-> Can you send a v2 with enhanced commit message.
+Yes, the counter here may usually start counting at bootloader time from zero.
 
-OK, no problem.
 
-> Thanks, bye,
->
+> Perhaps it would be better to just do
+> 
+>     timecounter_init(&timecounter, &cyclecounter, 0);
+> 
+> or
+> 
+>     timecounter_init(&timecounter, &cyclecounter,
+> ktime_to_ns(ktime_get_real()));
+> 
 
-Best Regards,
-Bo Shen
+Here the ktime_get_real() will always return 0, before setting the system clock,
+Like:
+
+"rtc-ds3232 1-0068: setting system clock to 2014-06-12 13:01:24 UTC (1402578084)"
+
+And if so, why not just set it to 0 ? And by the way, 0 is must here ?
+
+Thanks,
+BRs
+Xiubo
