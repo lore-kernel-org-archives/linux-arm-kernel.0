@@ -1,28 +1,140 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Thu, 12 Jun 2014 15:20:40 +0200
-Subject: [PATCHv4 0/5] mtd: gpmi: make blockmark swapping optional
-Message-ID: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 12 Jun 2014 18:49:17 +0530
+Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from getting
+ mapped to crossbar
+In-Reply-To: <20140612125134.GS8664@titan.lakedaemon.net>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
+ <20140612125134.GS8664@titan.lakedaemon.net>
+Message-ID: <5399A8D5.6070105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With a flash-based BBT there is no reason to move the Factory Bad
-Block Marker from the data area buffer (to where it is mapped by the
-GPMI NAND controller) to the OOB buffer. Thus, make this feature
-configurable via DT. This is required for the Ka-Ro electronics
-i.MX6 platforms.
+Hi Jason,
 
-Changes wrt. v2:
-- added a warning for i.MX28 to the binding documentation
-- fixed the gpmi_ecc_read_subpage() routine which turned on blockmark
-  swapping unconditionally
-- use !GPMI_IS_MX23() in place of this->swap_block_mark (which were
-  synonymous the original code) in gpmi_ecc_read_oob() and
-  gpmi_block_markbad()
-- make nand-on-flash-bbt a prerequisite for this feature
+On Thursday 12 June 2014 06:21 PM, Jason Cooper wrote:
+> On Thu, Jun 12, 2014 at 05:23:11PM +0530, Sricharan R wrote:
+>> From: Nishanth Menon <nm@ti.com>
+>>
+>> When, in the system due to varied reasons, interrupts might be unusable
+>> due to hardware behavior, but register maps do exist, then those interrupts
+>> should be skipped while mapping irq to crossbars.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> Tony, have you applied these somewhere already?
+> 
+>> ---
+>>  drivers/irqchip/irq-crossbar.c |   47 ++++++++++++++++++++++++++++++++++++----
+>>  1 file changed, 43 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+>> index 51d4b87..847f6e3 100644
+>> --- a/drivers/irqchip/irq-crossbar.c
+>> +++ b/drivers/irqchip/irq-crossbar.c
+>> @@ -13,11 +13,13 @@
+>>  #include <linux/io.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/of_irq.h>
+>> +#include <linux/of_device.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/irqchip/arm-gic.h>
+>>  
+>>  #define IRQ_FREE	-1
+>>  #define IRQ_RESERVED	-2
+>> +#define IRQ_SKIP	-3
+>>  #define GIC_IRQ_START	32
+>>  
+>>  /*
+>> @@ -34,6 +36,16 @@ struct crossbar_device {
+>>  	void (*write) (int, int);
+>>  };
+>>  
+>> +/**
+>> + * struct crossbar_data: Platform specific data
+>> + * @irqs_unused: array of irqs that cannot be used because of hw erratas
+>> + * @size: size of the irqs_unused array
+>> + */
+>> +struct crossbar_data {
+>> +	const uint *irqs_unused;
+>> +	const uint size;
+>> +};
+>> +
+>>  static struct crossbar_device *cb;
+>>  
+>>  static inline void crossbar_writel(int irq_no, int cb_no)
+>> @@ -119,10 +131,12 @@ const struct irq_domain_ops routable_irq_domain_ops = {
+>>  	.xlate = crossbar_domain_xlate
+>>  };
+>>  
+>> -static int __init crossbar_of_init(struct device_node *node)
+>> +static int __init crossbar_of_init(struct device_node *node,
+>> +				   const struct crossbar_data *data)
+>>  {
+>>  	int i, size, max, reserved = 0, entry;
+>>  	const __be32 *irqsr;
+>> +	const int *irqsk = NULL;
+>>  
+>>  	cb = kzalloc(sizeof(*cb), GFP_KERNEL);
+>>  
+>> @@ -194,6 +208,22 @@ static int __init crossbar_of_init(struct device_node *node)
+>>  		reserved += size;
+>>  	}
+>>  
+>> +	/* Skip the ones marked as unused */
+>> +	if (data) {
+>> +		irqsk = data->irqs_unused;
+>> +		size = data->size;
+>> +
+>> +		for (i = 0; i < size; i++) {
+>> +			entry = irqsk[i];
+>> +
+>> +			if (entry > max) {
+>> +				pr_err("Invalid skip entry\n");
+>> +				goto err3;
+>> +			}
+>> +			cb->irq_map[entry] = IRQ_SKIP;
+>> +		}
+>> +	}
+>> +
+>>  	register_routable_domain_ops(&routable_irq_domain_ops);
+>>  	return 0;
+>>  
+>> @@ -208,18 +238,27 @@ err1:
+>>  	return -ENOMEM;
+>>  }
+>>  
+>> +/* irq number 10 cannot be used because of hw bug */
+>> +int dra_irqs_unused[] = { 10 };
+>> +struct crossbar_data cb_dra_data = { dra_irqs_unused,
+>> +				     ARRAY_SIZE(dra_irqs_unused) };
+>> +
+>>  static const struct of_device_id crossbar_match[] __initconst = {
+>> -	{ .compatible = "ti,irq-crossbar" },
+>> +	{ .compatible = "ti,irq-crossbar", .data = &cb_dra_data },
+>>  	{}
+>>  };
+> 
+> This is a bug in all implementations of this IP?  Or, a specific
+> SoC's implementation?  Would this be better expressed in the dts via a
+> property?  Can we expect future implementations to be fixed?
+> 
+> thx,
+> 
+> Jason.
+ Infact this and PATCH#10 should be merged. I will change that.
 
-patch added:
-- add an additional option to turn of BB mark writing
+ So in Socs's (2 so far) that do have a crossbar, some irqs are mapped
+ through a crossbar and some are directly wired to the irqchip.
+ These 'unused irqs' are those which are directly wired but they still
+ have a crossbar register. Their routing cannot be changed. So this
+ is not really expected usage of the crossbar hw ip. We initially thought
+ having a dts property separately for this, but took this path to avoid
+ loading the dts with additional bindings which may not be generic.
 
-Changes wrt. v3:
-- added two code cleanup patches
-- added a patch to turn of NAND_BBT_CREATE, if blockmark swapping is disabled
+Regards,
+ Sricharan 
+ 
+ 
