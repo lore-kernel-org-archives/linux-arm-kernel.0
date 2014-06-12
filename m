@@ -1,54 +1,56 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 12 Jun 2014 13:08:12 +0800
-Subject: [PATCH RFC v2 3/3] documentation/iommu: Add description of Hisilicon
- SMMU private binding
-In-Reply-To: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1402549692-5224-4-git-send-email-thunder.leizhen@huawei.com>
+From: Wei.Yang@windriver.com (Wei.Yang at windriver.com)
+Date: Thu, 12 Jun 2014 13:16:08 +0800
+Subject: [PATCH v1] fs2dt: Refine kdump device_tree sort
+Message-ID: <1402550168-7826-1-git-send-email-Wei.Yang@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a description of private properties for the Hisilicon
-System MMU architecture.
+From: Yang Wei <Wei.Yang@windriver.com>
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+The commit b02d735bf was to rearrange the device-tree entries, and
+assumed that these entries are sorted in the ascending order. but
+acctually when I was validating kexec and kdump, the order of
+serial node still is changed. We should not only compare the length
+of directory name, but also compare the directory name, it would
+ensure that the order of device node is really in ascending order.
+
+Signed-off-by: Yang Wei <Wei.Yang@windriver.com>
 ---
- Documentation/devicetree/bindings/iommu/arm,smmu.txt | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ kexec/fs2dt.c |   13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index f284b99..75b1351 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -15,6 +15,7 @@ conditions.
-                         "arm,smmu-v2"
-                         "arm,mmu-400"
-                         "arm,mmu-500"
-+                        "hisilicon,smmu-v1"
+		It is validated on Freescale t4240qds.
 
-                   depending on the particular implementation and/or the
-                   version of the architecture implemented.
-@@ -54,6 +55,21 @@ conditions.
-                   aliases of secure registers have to be used during
-                   SMMU configuration.
-
-+** Hisilicon SMMU private properties:
-+
-+- smmu-force-memtype : A list of StreamIDs which not translate address but
-+                  translate attributes. The StreamIDs list here can not be
-+                  used for map(translation) mode again.
-+                  StreamID first, then the type list below:
-+                  1, cahceable, WBRAWA, Normal outer and inner write-back
-+                  2, non-cacheable, Normal outer and inner non-cacheable
-+                  3, device, nGnRE
-+                  others, bypass
-+
-+- smmu-bypass-vmid   : Specify which context bank is used for bypass mode.
-+                  If omit, vmid=255 is default. If bypass and map mode can
-+                  share a same S2CR, config vmid=0.
-+
- Example:
-
-         smmu {
---
-1.8.0
+diff --git a/kexec/fs2dt.c b/kexec/fs2dt.c
+index 1e5f074..0bffaf5 100644
+--- a/kexec/fs2dt.c
++++ b/kexec/fs2dt.c
+@@ -479,6 +479,9 @@ static int comparefunc(const struct dirent **dentry1,
+ {
+ 	char *str1 = (*(struct dirent **)dentry1)->d_name;
+ 	char *str2 = (*(struct dirent **)dentry2)->d_name;
++	char* ptr1 = strchr(str1, '@');
++	char* ptr2 = strchr(str2, '@');
++	int len1, len2;
+ 
+ 	/*
+ 	 * strcmp scans from left to right and fails to idetify for some
+@@ -486,9 +489,13 @@ static int comparefunc(const struct dirent **dentry1,
+ 	 * Therefore, we get the wrong sorted order like memory at 10000000 and
+ 	 * memory at f000000.
+ 	 */
+-	if (strchr(str1, '@') && strchr(str2, '@') &&
+-		(strlen(str1) > strlen(str2)))
+-		return 1;
++	if (ptr1 && ptr2) {
++		len1 = ptr1 - str1;
++		len2 = ptr2 - str2;
++		if (!strncmp(str1, str2, len1 >len2 ? len1: len2) &&
++					(strlen(str1) > strlen(str2)))
++				return 1;
++	}
+ 
+ 	return strcmp(str1, str2);
+ }
+-- 
+1.7.9.5
