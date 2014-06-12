@@ -1,55 +1,41 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 12 Jun 2014 16:13:40 +0200
-Subject: [PATCH 0/5] Handle non-secure L2C initialization on Exynos4
-In-Reply-To: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
-References: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
-Message-ID: <5399B594.2040205@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Jun 2014 16:15:32 +0200
+Subject: [PATCH] [media] staging: allow omap4iss to be modular
+In-Reply-To: <2046469.GckHavNRr1@avalon>
+References: <5192928.MkINji4uKU@wuerfel> <7948240.P51u2omQa4@wuerfel>
+ <2046469.GckHavNRr1@avalon>
+Message-ID: <7460455.eZRbtzsNrd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thursday 12 June 2014 16:12:17 Laurent Pinchart wrote:
+> > From 3a965f4fd5a6b3ef4a66aa4e7c916cfd34fd5706 Mon Sep 17 00:00:00 2001
+> > From: Arnd Bergmann <arnd@arndb.de>
+> > Date: Tue, 21 Jan 2014 09:32:43 +0100
+> > Subject: [PATCH] [media] staging: tighten omap4iss dependencies
+> > 
+> > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
+> > of which can be loadable modules. This causes build failures
+> > if we want the camera driver to be built-in.
+> > 
+> > This can be solved by turning the option into "tristate",
+> > which unfortunately causes another problem, because the
+> > driver incorrectly calls a platform-internal interface
+> > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
+> > 
+> > Instead, this patch just forbids the invalid configurations
+> > and ensures that the driver can only be built if all its
+> > dependencies are built-in.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> Should I take this in my tree for v3.17 or would you like to fast-track it ?
+> 
 
-On 12.06.2014 15:38, Daniel Drake wrote:
-> Hi Tomasz,
-> 
-> Thanks for working on this!
-> 
-> I have just tried this, against Linus master
-> 64b2d1fbbfda07765dae3f601862796a61b2c451.
-> Added patch "ARM: dts: Initial ODROID U2 support" and booted on
-> ODROID-U2. I believe this board has the security enabled.
-> 
-> Unfortunately, it hangs during early boot. With earlyprintk the last
-> messages seen are:
-> 
-> L2C: platform modifies aux control register: 0x02070000 -> 0x3e470001
-> L2C: platform provided aux values permit register corruption.
-> L2C: DT/platform modifies aux control register: 0x02070000 -> 0x3e470001
-> L2C-310 enabling early BRESP for Cortex-A9
-> L2C-310: enabling full line of zeros but not enabled in Cortex-A9
-> L2C-310 ID prefetch enabled, offset 1 lines
-> L2C-310 dynamic clock gating enabled, standby mode enabled
-> L2C-310 cache controller enabled, 16 ways, 1024 kB
-> L2C-310: CACHE_ID 0x4100c4c8, AUX_CTRL 0x7e470001
-> 
+I'd actually like to see it in 3.15 as a stable backport if possible,
+but definitely in 3.16. What is the normal path for staging/media
+but fix patches?
 
-Thanks for testing. We have some ODROIDs U2 and U3 here too so I'll try
-to reproduce and investigate the issue.
-
-> I then tried to go back to the earlier patch "ARM: EXYNOS: Add secure
-> firmware support for l2x0 init" (attached, needed a rebase) but that
-> one also now hangs at:
-> 
-> L2C: platform modifies aux control register: 0x02070000 -> 0x3e470001
-> 
-> It did work on 3.14 though. Looking at the changelogs, many changes
-> have been made to l2x0 recently. Can you confirm that you have tested
-> your patches against a kernel with all of Russell King's recent
-> changes?
-
-I'm usually working on latest linux-next, so I'm pretty sure all the
-mentioned patches were already in my tree. The base for this series was
-next-20140610 tag of linux-next tree.
-
-Best regards,
-Tomasz
+	Arnd
