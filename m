@@ -1,63 +1,33 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 12 Jun 2014 09:30:05 -0700
-Subject: [PATCH v4 06/14] ARM: KVM: MMIO support BE host running LE code
+Date: Thu, 12 Jun 2014 09:30:07 -0700
+Subject: [PATCH v4 08/14] ARM: KVM: enable KVM in Kconfig on big-endian systems
 In-Reply-To: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
 References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1402590613-3341-7-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1402590613-3341-9-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of status register E bit is not set (LE mode) and host runs in
-BE mode we need byteswap data, so read/write is emulated correctly.
+Previous patches addresses ARMV7 big-endian virtualiztion,
+kvm related issues, so enable ARM_VIRT_EXT for big-endian
+now.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ arch/arm/kvm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 0fa90c9..69b7469 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -185,9 +185,16 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
- 		default:
- 			return be32_to_cpu(data);
- 		}
-+	} else {
-+		switch (len) {
-+		case 1:
-+			return data & 0xff;
-+		case 2:
-+			return le16_to_cpu(data & 0xffff);
-+		default:
-+			return le32_to_cpu(data);
-+		}
- 	}
--
--	return data;		/* Leave LE untouched */
- }
- 
- static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-@@ -203,9 +210,16 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
- 		default:
- 			return cpu_to_be32(data);
- 		}
-+	} else {
-+		switch (len) {
-+		case 1:
-+			return data & 0xff;
-+		case 2:
-+			return cpu_to_le16(data & 0xffff);
-+		default:
-+			return cpu_to_le32(data);
-+		}
- 	}
--
--	return data;		/* Leave LE untouched */
- }
- 
- #endif /* __ARM_KVM_EMULATE_H__ */
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 4be5bb1..466bd29 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -23,7 +23,7 @@ config KVM
+ 	select HAVE_KVM_CPU_RELAX_INTERCEPT
+ 	select KVM_MMIO
+ 	select KVM_ARM_HOST
+-	depends on ARM_VIRT_EXT && ARM_LPAE && !CPU_BIG_ENDIAN
++	depends on ARM_VIRT_EXT && ARM_LPAE
+ 	---help---
+ 	  Support hosting virtualized guest machines. You will also
+ 	  need to select one or more of the processor modules below.
 -- 
 1.8.1.4
