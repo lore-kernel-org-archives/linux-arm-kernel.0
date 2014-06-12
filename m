@@ -1,61 +1,38 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 12 Jun 2014 09:30:10 -0700
-Subject: [PATCH v4 11/14] ARM64: KVM: fix vgic_bitmap_get_reg function for BE
- 64bit case
+Date: Thu, 12 Jun 2014 09:30:09 -0700
+Subject: [PATCH v4 10/14] ARM64: KVM: store kvm_vcpu_fault_info est_el2 as word
 In-Reply-To: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
 References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1402590613-3341-12-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1402590613-3341-11-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix vgic_bitmap_get_reg function to return 'right' word address of
-'unsigned long' bitmap value in case of BE 64bit image.
+esr_el2 field of struct kvm_vcpu_fault_info has u32 type.
+It should be stored as word. Current code works in LE case
+because existing puts least significant word of x1 into
+esr_el2, and it puts most significant work of x1 into next
+field, which accidentally is OK because it is updated again
+by next instruction. But existing code breaks in BE case.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 529c336..b4ffd82 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -101,14 +101,34 @@ static u32 vgic_nr_lr;
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 2c56012..0620691 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -824,7 +824,7 @@ el1_trap:
+ 	mrs	x2, far_el2
  
- static unsigned int vgic_maint_irq;
+ 2:	mrs	x0, tpidr_el2
+-	str	x1, [x0, #VCPU_ESR_EL2]
++	str	w1, [x0, #VCPU_ESR_EL2]
+ 	str	x2, [x0, #VCPU_FAR_EL2]
+ 	str	x3, [x0, #VCPU_HPFAR_EL2]
  
-+/*
-+ * struct vgic_bitmap contains unions that provide two views of
-+ * the same data. In one case it is an array of registers of
-+ * u32's, and in the other case it is a bitmap of unsigned
-+ * longs.
-+ *
-+ * This does not work on 64-bit BE systems, because the bitmap access
-+ * will store two consecutive 32-bit words with the higher-addressed
-+ * register's bits at the lower index and the lower-addressed register's
-+ * bits at the higher index.
-+ *
-+ * Therefore, swizzle the register index when accessing the 32-bit word
-+ * registers to access the right register's value.
-+ */
-+#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 64
-+#define REG_OFFSET_SWIZZLE	1
-+#else
-+#define REG_OFFSET_SWIZZLE	0
-+#endif
-+
- static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
- 				int cpuid, u32 offset)
- {
- 	offset >>= 2;
- 	if (!offset)
--		return x->percpu[cpuid].reg;
-+		return x->percpu[cpuid].reg + (offset ^ REG_OFFSET_SWIZZLE);
- 	else
--		return x->shared.reg + offset - 1;
-+		return x->shared.reg + ((offset - 1) ^ REG_OFFSET_SWIZZLE);
- }
- 
- static int vgic_bitmap_get_irq_val(struct vgic_bitmap *x,
 -- 
 1.8.1.4
