@@ -1,104 +1,51 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Thu, 12 Jun 2014 16:19:31 +0900
-Subject: [PATCH v2 09/10] mm, cma: move output param to the end of param
- list
-In-Reply-To: <1402543307-29800-10-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-10-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <20140612071930.GL12415@bbox>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 12 Jun 2014 15:20:45 +0800
+Subject: [PATCH] mtd: atmel_nand: make ecc parameters same as definition
+In-Reply-To: <5397CBF9.800@atmel.com>
+References: <1402041728-12056-1-git-send-email-voice.shen@atmel.com>
+ <53958CCE.5080307@atmel.com> <5397CBF9.800@atmel.com>
+Message-ID: <539954CD.5080309@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 12:21:46PM +0900, Joonsoo Kim wrote:
-> Conventionally, we put output param to the end of param list.
-> cma_declare_contiguous() doesn't look like that, so change it.
+Hi, Bo
 
-If you says "Conventionally", I'd like to suggest one more thing.
-Conventionally, we put 'base' ahead 'size' but dma_contiguous_reserve_area
-is opposite.
+On 6/11/2014 11:24 AM, Bo Shen wrote:
+> Hi Josh,
+>
+> On 06/09/2014 06:30 PM, Josh Wu wrote:
+>> Hi, Bo
+>>
+>> Thanks for the patch.
+>>
+>> On 6/6/2014 4:02 PM, Bo Shen wrote:
+>>> If the ecc parameter is not the same as definition, when the
+>>> mtd core check these parameters, it will give the unexpected
+>>> result.
+>> Could you be more specific to tell what kind of result will happened?
+>
+> For example:
+> When try to calculate how many bits can correct in one page according 
+> to the definition, it will give the wrong result.
+>
+> one page correct bits = (mtd->writesize * ecc->strength) / ecc->size;
+>
+> take the following use case as an example:
+> mtd->writesize = 2048 bytes,
+> ecc->strength = 4 bytes, (for 512 bytes)
+>
+> before this patch, the ecc->size = 2048, so the result is 4 bytes.
+>
+> after this patch, the ecc->size = 512, so the result is 16 bytes.
+>
+> The maximum correct bytes is 16 bytes while not 4 bytes. So, if not align
 
-> 
-> Additionally, move down cma_areas reference code to the position
-> where it is really needed.
-> 
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> 
-> diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
-> index 28ec226..97613ea 100644
-> --- a/arch/powerpc/kvm/book3s_hv_builtin.c
-> +++ b/arch/powerpc/kvm/book3s_hv_builtin.c
-> @@ -184,7 +184,7 @@ void __init kvm_cma_reserve(void)
->  
->  		align_size = max(kvm_rma_pages << PAGE_SHIFT, align_size);
->  		cma_declare_contiguous(selected_size, 0, 0, align_size,
-> -			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, &kvm_cma, false);
-> +			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, false, &kvm_cma);
->  	}
->  }
->  
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index f177f73..bfd4553 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -149,7 +149,7 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
->  {
->  	int ret;
->  
-> -	ret = cma_declare_contiguous(size, base, limit, 0, 0, res_cma, fixed);
-> +	ret = cma_declare_contiguous(size, base, limit, 0, 0, fixed, res_cma);
->  	if (ret)
->  		return ret;
->  
-> diff --git a/include/linux/cma.h b/include/linux/cma.h
-> index e38efe9..e53eead 100644
-> --- a/include/linux/cma.h
-> +++ b/include/linux/cma.h
-> @@ -6,7 +6,7 @@ struct cma;
->  extern int __init cma_declare_contiguous(phys_addr_t size,
->  				phys_addr_t base, phys_addr_t limit,
->  				phys_addr_t alignment, int order_per_bit,
-> -				struct cma **res_cma, bool fixed);
-> +				bool fixed, struct cma **res_cma);
->  extern struct page *cma_alloc(struct cma *cma, int count, unsigned int align);
->  extern bool cma_release(struct cma *cma, struct page *pages, int count);
->  #endif
-> diff --git a/mm/cma.c b/mm/cma.c
-> index 01a0713..22a5b23 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -142,8 +142,8 @@ core_initcall(cma_init_reserved_areas);
->   * @limit: End address of the reserved memory (optional, 0 for any).
->   * @alignment: Alignment for the contiguous memory area, should be power of 2
->   * @order_per_bit: Order of pages represented by one bit on bitmap.
-> - * @res_cma: Pointer to store the created cma region.
->   * @fixed: hint about where to place the reserved area
-> + * @res_cma: Pointer to store the created cma region.
->   *
->   * This function reserves memory from early allocator. It should be
->   * called by arch specific code once the early allocator (memblock or bootmem)
-> @@ -156,9 +156,9 @@ core_initcall(cma_init_reserved_areas);
->  int __init cma_declare_contiguous(phys_addr_t size,
->  				phys_addr_t base, phys_addr_t limit,
->  				phys_addr_t alignment, int order_per_bit,
-> -				struct cma **res_cma, bool fixed)
-> +				bool fixed, struct cma **res_cma)
->  {
-> -	struct cma *cma = &cma_areas[cma_area_count];
-> +	struct cma *cma;
->  	int ret = 0;
->  
->  	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
-> @@ -214,6 +214,7 @@ int __init cma_declare_contiguous(phys_addr_t size,
->  	 * Each reserved area must be initialised later, when more kernel
->  	 * subsystems (like slab allocator) are available.
->  	 */
-> +	cma = &cma_areas[cma_area_count];
->  	cma->base_pfn = PFN_DOWN(base);
->  	cma->count = size >> PAGE_SHIFT;
->  	cma->order_per_bit = order_per_bit;
-> -- 
-> 1.7.9.5
+That is clear enough, thanks. The patch is fine to me. so
+Acked-by: Josh Wu <josh.wu@atmel.com>
 
--- 
-Kind regards,
-Minchan Kim
+>
+> Best Regards,
+> Bo Shen
+
+Best Regards,
+Josh Wu
