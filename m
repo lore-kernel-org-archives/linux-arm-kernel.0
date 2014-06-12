@@ -1,61 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 12 Jun 2014 08:59:02 -0700
-Subject: [PATCH] [media] staging: allow omap4iss to be modular
-In-Reply-To: <4327970.JdCWevprmq@wuerfel>
-References: <5192928.MkINji4uKU@wuerfel> <7460455.eZRbtzsNrd@wuerfel>
- <20140612142515.GA7653@kroah.com> <4327970.JdCWevprmq@wuerfel>
-Message-ID: <20140612155902.GA9702@kroah.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 12 Jun 2014 18:58:26 +0300
+Subject: [PATCH 0/3] Use Tegra's microsecond counter for udelay()
+Message-ID: <1402588713-18766-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 04:28:39PM +0200, Arnd Bergmann wrote:
-> On Thursday 12 June 2014 07:25:15 Greg KH wrote:
-> > On Thu, Jun 12, 2014 at 04:15:32PM +0200, Arnd Bergmann wrote:
-> > > On Thursday 12 June 2014 16:12:17 Laurent Pinchart wrote:
-> > > > > From 3a965f4fd5a6b3ef4a66aa4e7c916cfd34fd5706 Mon Sep 17 00:00:00 2001
-> > > > > From: Arnd Bergmann <arnd@arndb.de>
-> > > > > Date: Tue, 21 Jan 2014 09:32:43 +0100
-> > > > > Subject: [PATCH] [media] staging: tighten omap4iss dependencies
-> > > > > 
-> > > > > The OMAP4 camera support depends on I2C and VIDEO_V4L2, both
-> > > > > of which can be loadable modules. This causes build failures
-> > > > > if we want the camera driver to be built-in.
-> > > > > 
-> > > > > This can be solved by turning the option into "tristate",
-> > > > > which unfortunately causes another problem, because the
-> > > > > driver incorrectly calls a platform-internal interface
-> > > > > for omap4_ctrl_pad_readl/omap4_ctrl_pad_writel.
-> > > > > 
-> > > > > Instead, this patch just forbids the invalid configurations
-> > > > > and ensures that the driver can only be built if all its
-> > > > > dependencies are built-in.
-> > > > > 
-> > > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > > 
-> > > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > > 
-> > > > Should I take this in my tree for v3.17 or would you like to fast-track it ?
-> > > > 
-> > > 
-> > > I'd actually like to see it in 3.15 as a stable backport if possible,
-> > 
-> > It's not stable material, sorry.
-> 
-> To clarify, I was talking about second version of the patch,
-> not the original one. It just does this:
-> 
-> >  config VIDEO_OMAP4
-> >       bool "OMAP 4 Camera support"
-> > -     depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
-> > +     depends on VIDEO_V4L2=y && VIDEO_V4L2_SUBDEV_API && I2C=y && ARCH_OMAP4
-> >       select VIDEOBUF2_DMA_CONTIG
-> >       ---help---
-> >         Driver for an OMAP 4 ISS controller.
-> 
-> which enforces that configurations that cannot be compiled
-> will not be selectable in Kconfig, so we can have allmodconfig
-> working. I thought that was ok for -stable.
+This patchset introduces support for Tegra's microsecond counter as the
+udelay() timer. This is useful on Tegra SoCs which do not have an arch timer
+such as Tegra20 and Tegra30. Using the microsecond counter instead of a delay
+based loop avoids potential problems during cpu frequency changes.
 
-Ah, yes, that one works, sorry, I was thinking of the first one.
+The set consists of 3 patches:
 
-greg k-h
+Patch 1 introduces a new call which is used by the ARM architecture delay
+timer code to prevent changing the delay timer after calibration is finished
+and thus can be in use.
+
+Patch 2 adds logic to choose the delay timer with the highest resolution. This
+allows the same registration code to be used on all Tegra SoCs and yet use the
+higher resolution arch timer when available (eg on Tegra114 or Tegra124).
+
+Patch 3 adds the actual delay timer code.
+
+Patch set has been verified on ventana (Tegra20), beaver (Tegra30),
+dalmore (Tegra114) and jetson TK1 (Tegra124).
+
+Changes since v1:
+* Address review comments
+
+What needs to be done to make progress on this one? I think it's really useful
+to have this when CPU DVFS is available.
+
+Peter De Schrijver (3):
+  kernel: add calibration_delay_done()
+  ARM: choose highest resolution delay timer
+  clocksource: tegra: Use us counter as delay timer
+
+ arch/arm/lib/delay.c                |   26 ++++++++++++++++++++++----
+ drivers/clocksource/tegra20_timer.c |   13 +++++++++++++
+ init/calibrate.c                    |   11 +++++++++++
+ 3 files changed, 46 insertions(+), 4 deletions(-)
+
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
