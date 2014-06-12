@@ -1,46 +1,34 @@
 From: tushar.b@samsung.com (Tushar Behera)
-Date: Thu, 12 Jun 2014 12:59:23 +0530
+Date: Thu, 12 Jun 2014 13:00:53 +0530
 Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
  always enabled
-In-Reply-To: <20140611165027.6562.64928@quantum>
+In-Reply-To: <539891D0.8090309@gmail.com>
 References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
  <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
- <20140611165027.6562.64928@quantum>
-Message-ID: <CAC5m3BwR9WhiiDqUw1A6FjmzAnQ02xCBxOeAaY2nt3CRqTz+oQ@mail.gmail.com>
+ <539891D0.8090309@gmail.com>
+Message-ID: <CAC5m3BwYTSBW9WxH+f002aU1mMQH-0_WbGUiPgsabOh8C-YV+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 10:20 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Tushar Behera (2014-06-10 22:32:17)
+On Wed, Jun 11, 2014 at 10:58 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Tushar,
+>
+> On 11.06.2014 07:32, Tushar Behera wrote:
 >> When the output clock of AUDSS mux is disabled, we are getting kernel
 >> oops while doing a clk_get() on other clocks provided by AUDSS. Though
 >> user manual doesn't specify this dependency, we came across this issue
 >> while disabling the parent of AUDSS mux clocks.
 >
-> Hi Tushar,
+> Could you provide more data about this oops? E.g. kernel log, platforms
+> it affects (just peach-pit or also others), test case, extra patches
+> applied on top of mainline (if any).
 >
-> Can you help me understand better what the actual problem is? What is
-> the root cause of the kernel oops?
-
-Currently AUDSS mux has two parents, XXTI crystal and MAU_EPLL clock.
-As per observation, when the output of AUDSS mux is gated, we are not
-able to do any operation on the clocks provided by MAU block (mostly
-the clocks used by ADMA and audio blocks).
-
->
-> You mention calling clk_get on child clocks of the AUDSS mux fails, but
-> I cannot imagine why. How can the enable/disable state of a clock affect
-> the ability to clk_get other clocks?
+> I don't like this solution, because keeping a clock always enabled is
+> usually not desirable and this driver is also used on other platforms
+> than peach-pit, so this change will affect all of them.
 >
 
-I might have a little vogue while updating the commit message
-(mentioning about clk_get which surely is only a s/w operation), but
-there is definitely some issue with handling those clocks under given
-scenario.
+I will update later after doing similar tests on other platforms.
 
-I am on leave till end of this week, so I will update you more with
-the logs on Monday.
-
-Thanks,
---
-Tushar
+> Best regards,
+> Tomasz
