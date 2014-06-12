@@ -1,101 +1,80 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 12 Jun 2014 15:58:45 +0800
-Subject: [PATCH v2] mtd: atmel_nand: make ecc parameters same as definition
-Message-ID: <1402559925-20910-1-git-send-email-voice.shen@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 Jun 2014 01:00:31 -0700
+Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
+ v3.16
+In-Reply-To: <20140612074705.GB11421@lee--X1>
+References: <1401214140-9828-1-git-send-email-tony@atomide.com>
+ <20140528071313.GH4227@lee--X1> <20140528180607.GB4707@atomide.com>
+ <20140602163841.GC11004@atomide.com>
+ <20140603080632.GC3060@lee--X1>
+ <20140612054348.GC17845@atomide.com>
+ <20140612074705.GB11421@lee--X1>
+Message-ID: <20140612080030.GD17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the ecc parameter is not the same as definition, when the
-mtd core check these parameters, it will give the error result.
+* Lee Jones <lee.jones@linaro.org> [140612 00:48]:
+> On Wed, 11 Jun 2014, Tony Lindgren wrote:
+> 
+> > * Lee Jones <lee.jones@linaro.org> [140603 01:08]:
+> > > On Mon, 02 Jun 2014, Tony Lindgren wrote:
+> > > > * Tony Lindgren <tony@atomide.com> [140528 11:11]:
+> > > > > * Lee Jones <lee.jones@linaro.org> [140528 00:14]:
+> > > > > > Thanks Tony, here's the pull-request:
+> > > > > > 
+> > > > > > The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+> > > > > > 
+> > > > > >   Linux 3.14 (2014-03-30 20:40:15 -0700)
+> > > > > > 
+> > > > > > are available in the git repository at:
+> > > > > > 
+> > > > > >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
+> > > > > > 
+> > > > > > for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
+> > > > > > 
+> > > > > >   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
+> > > > > > 
+> > > > > > ----------------------------------------------------------------
+> > > > > > Second immutable branch between MFD and OMAP due for the v3.16 merge window.
+> > > > > 
+> > > > > Thanks a lot, this will make it easier for me to chase down potential
+> > > > > PM related regressions ;) I'm merging this for testing only into the
+> > > > > linux-omap master branch, no need for me to include it into any
+> > > > > of my upstream heading branches.
+> > > > 
+> > > > Lee, I'm not seeing this in linux next, did you maybe forget to merge
+> > > > it into the MFD tree?
+> > > 
+> > > I didn't forget, but I didn't do it either. :)
+> > > 
+> > > I have re-merged all of the IBs this morning, so should be in -next
+> > > by tomorrow.
+> > 
+> > Still not seeing this branch being merged..
+> 
+> Oh crap, I see what's happened and it's completely my fault.
+> 
+> If you read the final merge commit carefully:
+> 
+> 28fee3f: ("Merge branches 'ib-from-asoc-3.16', 'ib-from-pm-3.16',
+> 'ib-from-regulator-3.16', 'ib-mfd-gpio-3.16' and
+> 'ib-mfd-mmc-memstick-3.16', tags 'ib-mfd-extcon-3.16',
+> 'ib-mfd-omap-3.16' and 'ib-mfd-regulator-3.16' into
+> ibs-for-mfd-merged")
+> 
+> I appear to have a _branch_ AND a _tag_ called ib-mfd-omap-3.16 and it
+> looks like Git has taken the tag as a preference. heads/ib-mfd-omap-3.16
+> is actually at tag/ib-mfd-omap-3.16-1 (notice the appended '-1'),
+> which contains your most recent patches.  Since I created the MFD-OMAP
+> shared branch I have changed the naming convention to avoid this sort
+> of ambiguity.  I'll send a second MFD pull-request to Linus today.
 
-Take the following as an example:
-
-Calculate how many bits can be corrected in one page.
-According to the ecc parameters definition,
-
-one page correct bits = (mtd->writesize * ecc->strength) / ecc->size
-
-take the following use case as an example:
-mtd->writesize = 2048 bytes
-ecc->strength = 4 bytes (for 512 bytes)
-
-before this patch, the ecc->size = 2048, so the result is 4 bytes.
-after this patch, the ecc->size = 512, so the result is 16 bytes.
-
-So, align the ecc parameters the same as definition to correct
-this kind of error.
-
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Acked-by: Josh Wu <josh.wu@atmel.com>
----
-Changes in v2:
-  - Enhancement the commit message.
-
- drivers/mtd/nand/atmel_nand.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 4ce181a..4f5348f 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -861,12 +861,11 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
- {
- 	struct nand_chip *nand_chip = mtd->priv;
- 	struct atmel_nand_host *host = nand_chip->priv;
--	int i, err_nbr, eccbytes;
-+	int i, err_nbr;
- 	uint8_t *buf_pos;
- 	int total_err = 0;
+Heh OK yeah I've hit that also at some point :)
  
--	eccbytes = nand_chip->ecc.bytes;
--	for (i = 0; i < eccbytes; i++)
-+	for (i = 0; i < nand_chip->ecc.total; i++)
- 		if (ecc[i] != 0xff)
- 			goto normal_check;
- 	/* Erased page, return OK */
-@@ -928,7 +927,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
- 	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
- {
- 	struct atmel_nand_host *host = chip->priv;
--	int eccsize = chip->ecc.size;
-+	int eccsize = chip->ecc.size * chip->ecc.steps;
- 	uint8_t *oob = chip->oob_poi;
- 	uint32_t *eccpos = chip->ecc.layout->eccpos;
- 	uint32_t stat;
-@@ -1169,8 +1168,7 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
- 		goto err;
- 	}
- 
--	/* ECC is calculated for the whole page (1 step) */
--	nand_chip->ecc.size = mtd->writesize;
-+	nand_chip->ecc.size = sector_size;
- 
- 	/* set ECC page size and oob layout */
- 	switch (mtd->writesize) {
-@@ -1185,18 +1183,20 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
- 		host->pmecc_index_of = host->pmecc_rom_base +
- 			host->pmecc_lookup_table_offset;
- 
--		nand_chip->ecc.steps = 1;
-+		nand_chip->ecc.steps = host->pmecc_sector_number;
- 		nand_chip->ecc.strength = cap;
--		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector *
-+		nand_chip->ecc.bytes = host->pmecc_bytes_per_sector;
-+		nand_chip->ecc.total = host->pmecc_bytes_per_sector *
- 				       host->pmecc_sector_number;
--		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
-+		if (nand_chip->ecc.total > mtd->oobsize - 2) {
- 			dev_err(host->dev, "No room for ECC bytes\n");
- 			err_no = -EINVAL;
- 			goto err;
- 		}
- 		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
- 					mtd->oobsize,
--					nand_chip->ecc.bytes);
-+					nand_chip->ecc.total);
-+
- 		nand_chip->ecc.layout = &atmel_pmecc_oobinfo;
- 		break;
- 	case 512:
--- 
-1.8.5.2
+> Sorry Tony.
+
+No problem, good to hear you got it figured out.
+
+Regards,
+
+Tony
