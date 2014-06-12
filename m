@@ -1,42 +1,84 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 12 Jun 2014 10:04:44 +0530
-Subject: [PATCH] ARM: exynos: Fix warning by constifying 'reg' in
- exynos_fdt_map_chipid()
-In-Reply-To: <3c6b5c1f19fcbee39a3f0a0bd2c9ddd811d5e619.1402547301.git.viresh.kumar@linaro.org>
-References: <3c6b5c1f19fcbee39a3f0a0bd2c9ddd811d5e619.1402547301.git.viresh.kumar@linaro.org>
-Message-ID: <CAKohponQhitVO2zX0+=5bU76vC=+ofpqZo1F5CxyUDDD24prhw@mail.gmail.com>
+From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
+Date: Thu, 12 Jun 2014 10:11:19 +0530
+Subject: [PATCH v2 01/10] DMA, CMA: clean-up log message
+In-Reply-To: <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <87y4x2pwnk.fsf@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix Sachin's id, looks like he left Linaro ..
+Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
 
-On 12 June 2014 10:00, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> exynos_fdt_map_chipid() was recently added with: cbf08b9 (ARM: EXYNOS:
-> Consolidate exynos4 and exynos5 machine files) and generates this warning:
+> We don't need explicit 'CMA:' prefix, since we already define prefix
+> 'cma:' in pr_fmt. So remove it.
 >
-> arch/arm/mach-exynos/exynos.c: In function ?exynos_fdt_map_chipid?:
-> arch/arm/mach-exynos/exynos.c:208:6: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
+> And, some logs print function name and others doesn't. This looks
+> bad to me, so I unify log format to print function name consistently.
 >
-> Constify 'reg' to fix it.
+> Lastly, I add one more debug log on cma_activate_area().
 >
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/mach-exynos/exynos.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 >
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 90aab4d..b71598a 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -198,7 +198,7 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
->                                         int depth, void *data)
->  {
->         struct map_desc iodesc;
-> -       __be32 *reg;
-> +       const __be32 *reg;
->         int len;
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 83969f8..bd0bb81 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -144,7 +144,7 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
+>  	}
 >
->         if (!of_flat_dt_is_compatible(node, "samsung,exynos4210-chipid") &&
-> --
-> 2.0.0.rc2
+>  	if (selected_size && !dma_contiguous_default_area) {
+> -		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
+> +		pr_debug("%s(): reserving %ld MiB for global area\n", __func__,
+>  			 (unsigned long)selected_size / SZ_1M);
+
+Do we need to do function(), or just function:. I have seen the later
+usage in other parts of the kernel.
+
 >
+>  		dma_contiguous_reserve_area(selected_size, selected_base,
+> @@ -163,8 +163,9 @@ static int __init cma_activate_area(struct cma *cma)
+>  	unsigned i = cma->count >> pageblock_order;
+>  	struct zone *zone;
+>
+> -	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+> +	pr_debug("%s()\n", __func__);
+
+why ?
+
+>
+> +	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+>  	if (!cma->bitmap)
+>  		return -ENOMEM;
+>
+> @@ -234,7 +235,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+>
+>  	/* Sanity checks */
+>  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+> -		pr_err("Not enough slots for CMA reserved regions!\n");
+> +		pr_err("%s(): Not enough slots for CMA reserved regions!\n",
+> +			__func__);
+>  		return -ENOSPC;
+>  	}
+>
+> @@ -274,14 +276,15 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+>  	*res_cma = cma;
+>  	cma_area_count++;
+>
+> -	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+> -		(unsigned long)base);
+> +	pr_info("%s(): reserved %ld MiB at %08lx\n",
+> +		__func__, (unsigned long)size / SZ_1M, (unsigned long)base);
+>
+>  	/* Architecture specific contiguous memory fixup. */
+>  	dma_contiguous_early_fixup(base, size);
+>  	return 0;
+>  err:
+> -	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
+> +	pr_err("%s(): failed to reserve %ld MiB\n",
+> +		__func__, (unsigned long)size / SZ_1M);
+>  	return ret;
+>  }
+>
+> -- 
+> 1.7.9.5
