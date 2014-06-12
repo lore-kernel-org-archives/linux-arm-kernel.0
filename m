@@ -1,33 +1,94 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 12 Jun 2014 14:34:09 -0500
-Subject: [Patch v2 0/3] spi: qup: Fixes and new version support
-Message-ID: <1402601652-24641-1-git-send-email-agross@codeaurora.org>
+Date: Thu, 12 Jun 2014 14:34:10 -0500
+Subject: [Patch v2 1/3] spi: qup: Remove chip select function
+In-Reply-To: <1402601652-24641-1-git-send-email-agross@codeaurora.org>
+References: <1402601652-24641-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1402601652-24641-2-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches provides a few fixes for the SPI QUP driver and support for
-an earlier version of the QUP.
+This patch removes the chip select function.  Chip select should instead be
+supported using GPIOs, defining the DT entry "cs-gpios", and letting the SPI
+core assert/deassert the chip select as it sees fit.
 
-The first patch removes the use of the controller's own chip select
-functionality.  The user should instead use GPIOs and make use of the SPI core's
-GPIO chip select feature.
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ .../devicetree/bindings/spi/qcom,spi-qup.txt       |    6 ++++
+ drivers/spi/spi-qup.c                              |   33 ++++----------------
+ 2 files changed, 12 insertions(+), 27 deletions(-)
 
-The second patch addresses failures during probing of slave devices that
-required SPI transactions.  The spi_register_master needs to be called after
-the runtime pm is initialized.
-
-The last patch adds support for V1.1.1 of the QUP.  This version of the
-controller is present in earlier devices (APQ8064, IPQ8064, and MSM8960).
-
-Andy Gross (3):
-  spi: qup: Remove chip select function
-  spi: qup: Fix order of spi_register_master
-  spi: qup: Add support for v1.1.1
-
- .../devicetree/bindings/spi/qcom,spi-qup.txt       |   12 ++-
- drivers/spi/spi-qup.c                              |   80 +++++++++-----------
- 2 files changed, 46 insertions(+), 46 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt b/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
+index b82a268..bee6ff2 100644
+--- a/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
++++ b/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
+@@ -23,6 +23,12 @@ Optional properties:
+ - spi-max-frequency: Specifies maximum SPI clock frequency,
+                      Units - Hz. Definition as per
+                      Documentation/devicetree/bindings/spi/spi-bus.txt
++- num-cs:	total number of chipselects
++- cs-gpios:	should specify GPIOs used for chipselects.
++		The gpios will be referred to as reg = <index> in the SPI child
++		nodes.  If unspecified, a single SPI device without a chip
++		select can be used.
++
+ 
+ SPI slave nodes must be children of the SPI master node and can contain
+ properties described in Documentation/devicetree/bindings/spi/spi-bus.txt
+diff --git a/drivers/spi/spi-qup.c b/drivers/spi/spi-qup.c
+index fc1de86..3938c62 100644
+--- a/drivers/spi/spi-qup.c
++++ b/drivers/spi/spi-qup.c
+@@ -424,31 +424,6 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
+ 	return 0;
+ }
+ 
+-static void spi_qup_set_cs(struct spi_device *spi, bool enable)
+-{
+-	struct spi_qup *controller = spi_master_get_devdata(spi->master);
+-
+-	u32 iocontol, mask;
+-
+-	iocontol = readl_relaxed(controller->base + SPI_IO_CONTROL);
+-
+-	/* Disable auto CS toggle and use manual */
+-	iocontol &= ~SPI_IO_C_MX_CS_MODE;
+-	iocontol |= SPI_IO_C_FORCE_CS;
+-
+-	iocontol &= ~SPI_IO_C_CS_SELECT_MASK;
+-	iocontol |= SPI_IO_C_CS_SELECT(spi->chip_select);
+-
+-	mask = SPI_IO_C_CS_N_POLARITY_0 << spi->chip_select;
+-
+-	if (enable)
+-		iocontol |= mask;
+-	else
+-		iocontol &= ~mask;
+-
+-	writel_relaxed(iocontol, controller->base + SPI_IO_CONTROL);
+-}
+-
+ static int spi_qup_transfer_one(struct spi_master *master,
+ 			      struct spi_device *spi,
+ 			      struct spi_transfer *xfer)
+@@ -571,12 +546,16 @@ static int spi_qup_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	/* use num-cs unless not present or out of range */
++	if (of_property_read_u16(dev->of_node, "num-cs",
++			&master->num_chipselect) ||
++			(master->num_chipselect > SPI_NUM_CHIPSELECTS))
++		master->num_chipselect = SPI_NUM_CHIPSELECTS;
++
+ 	master->bus_num = pdev->id;
+ 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP;
+-	master->num_chipselect = SPI_NUM_CHIPSELECTS;
+ 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(4, 32);
+ 	master->max_speed_hz = max_freq;
+-	master->set_cs = spi_qup_set_cs;
+ 	master->transfer_one = spi_qup_transfer_one;
+ 	master->dev.of_node = pdev->dev.of_node;
+ 	master->auto_runtime_pm = true;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
