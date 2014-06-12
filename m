@@ -1,17 +1,88 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 12 Jun 2014 14:15:50 -0600
-Subject: [PATCH 1/2] ARM: tegra: Add device tree nodes for flow controller
-In-Reply-To: <1402487891-6493-1-git-send-email-thierry.reding@gmail.com>
-References: <1402487891-6493-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <539A0A76.40604@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 12 Jun 2014 13:16:54 -0700
+Subject: [PATCH 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
+In-Reply-To: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
+References: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
+Message-ID: <539A0AB6.90200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2014 05:58 AM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> These nodes are required so that the flow controller driver can obtain
-> the I/O memory region from device tree rather than hard-coding it.
+On 06/12/14 12:18, Kumar Gala wrote:
+> +
+> +struct qcom_ipq806x_sata_phy {
+> +	struct device *dev;
 
-I don't see a file in Documentation/devicetree/bindings that describes
-these nodes...
+Is this used?
+
+> +	void __iomem *mmio;
+> +	struct clk *cfg_clk;
+[...]
+> +
+> +static int qcom_ipq806x_sata_phy_init(struct phy *generic_phy)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
+> +	u32 reg = 0;
+
+unnecessary initialization
+
+> +
+> +static int qcom_ipq806x_sata_phy_exit(struct phy *generic_phy)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
+> +	u32 reg = 0;
+
+unnecessary initialization
+
+>
+> +static int qcom_ipq806x_sata_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	struct phy_provider *phy_provider;
+> +	struct phy *generic_phy;
+> +	int ret;
+> +
+> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+> +	if (!phy) {
+> +		dev_err(dev, "%s: failed to allocate phy\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	phy->mmio = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(phy->mmio)) {
+> +		dev_err(dev, "%s: phy mmio get resource failed\n", __func__);
+
+Unnecessary error message.
+
+> +		return PTR_ERR(phy->mmio);
+> +	}
+> +
+> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +	if (IS_ERR(phy_provider)) {
+> +		dev_err(dev, "%s: failed to register phy\n", __func__);
+> +		return PTR_ERR(phy_provider);
+> +	}
+> +
+> +	generic_phy = devm_phy_create(dev, &qcom_ipq806x_sata_phy_ops, NULL);
+> +	if (IS_ERR(generic_phy)) {
+> +		dev_err(dev, "%s: failed to create phy\n", __func__);
+> +		return PTR_ERR(generic_phy);
+> +	}
+> +
+> +	phy->cfg_clk = devm_clk_get(dev, "cfg");
+> +	if (IS_ERR(phy->cfg_clk)) {
+> +		dev_err(dev, "Failed to get sata cfg clock\n");
+> +		return PTR_ERR(phy->cfg_clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(phy->cfg_clk);
+> +	if (ret)
+> +		return ret;
+
+Shouldn't there be a remove that disables this clock?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
