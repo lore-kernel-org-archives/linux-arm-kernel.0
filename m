@@ -1,20 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jun 2014 10:44:23 +0100
-Subject: [PATCH] ARM: dts: berlin2q.dtsi: set L2CC tag and data latency
- as 2 cycles
-In-Reply-To: <1402565920-5636-1-git-send-email-jszhang@marvell.com>
-References: <1402565920-5636-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20140612094423.GC23430@n2100.arm.linux.org.uk>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 12 Jun 2014 11:47:16 +0200
+Subject: [PATCH v2 02/10] DMA, CMA: fix possible memory leak
+In-Reply-To: <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-3-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <xa1tha3qjw7v.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 05:38:40PM +0800, Jisheng Zhang wrote:
-> For all BG2Q SoCs, 2 cycles is the best/correct value
+On Thu, Jun 12 2014, Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> We should free memory for bitmap when we find zone mis-match,
+> otherwise this memory will leak.
+>
+> Additionally, I copy code comment from ppc kvm's cma code to notify
+> why we need to check zone mis-match.
+>
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-It would be a good idea to set all these parameters if you need to set
-them at all - in other words, setting arm,dirty-latency as well, as
-that's all part of the timing specification.
+Reviewed-by: Michal Nazarewicz <mina86@mina86.com>
+
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index bd0bb81..fb0cdce 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -177,14 +177,24 @@ static int __init cma_activate_area(struct cma *cma)
+>  		base_pfn = pfn;
+>  		for (j = pageblock_nr_pages; j; --j, pfn++) {
+>  			WARN_ON_ONCE(!pfn_valid(pfn));
+> +			/*
+> +			 * alloc_contig_range requires the pfn range
+> +			 * specified to be in the same zone. Make this
+> +			 * simple by forcing the entire CMA resv range
+> +			 * to be in the same zone.
+> +			 */
+>  			if (page_zone(pfn_to_page(pfn)) != zone)
+> -				return -EINVAL;
+> +				goto err;
+>  		}
+>  		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
+>  	} while (--i);
+>  
+>  	mutex_init(&cma->lock);
+>  	return 0;
+> +
+> +err:
+> +	kfree(cma->bitmap);
+> +	return -EINVAL;
+>  }
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
