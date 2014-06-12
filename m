@@ -1,30 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Jun 2014 12:50:19 -0700
-Subject: [PATCH 2/3] ata: Add Qualcomm ARM SoC AHCI SATA host controller
- driver
-In-Reply-To: <1402600404-19214-2-git-send-email-galak@codeaurora.org>
-References: <1402600404-19214-1-git-send-email-galak@codeaurora.org>
- <1402600404-19214-2-git-send-email-galak@codeaurora.org>
-Message-ID: <539A047B.3010306@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 12 Jun 2014 13:45:27 -0600
+Subject: [PATCH v2 3/3] arm: tegra: initial support for apalis t30
+In-Reply-To: <95c131deb3e410e8defc9fe125dc662bdb276310.1402353627.git.marcel@ziswiler.com>
+References: <dadd07f9ed693d6bcf541764b62a2caf4cc38630.1402353627.git.marcel@ziswiler.com>
+ <95c131deb3e410e8defc9fe125dc662bdb276310.1402353627.git.marcel@ziswiler.com>
+Message-ID: <539A0357.6070403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/14 12:13, Kumar Gala wrote:
-> +static int qcom_ahci_probe(struct platform_device *pdev)
-> +{
-> +	struct ahci_host_priv *hpriv;
-> +	struct clk *rxoob_clk;
-> +	int rc;
-> +
-> +	hpriv = ahci_platform_get_resources(pdev);
-> +	if (IS_ERR(hpriv))
-> +		return PTR_ERR(hpriv);
-> +
-> +	/* Try and set the rxoob clk to 100Mhz */
-> +	rxoob_clk = of_clk_get_by_name(pdev->dev.of_node, "rxoob");
+On 06/09/2014 04:52 PM, Marcel Ziswiler wrote:
+> This patch adds the device tree to support Toradex Apalis T30, a
+> computer on module which can be used on different carrier boards.
 
-Any reason we can't use devm_clk_get() here?
+This looks OK; I'll apply once the merge window is done.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+
+> +	pwmleds {
+...
+> +		pwm3 {
+> +		pwm2 {
+> +		pwm1 {
+
+Those still aren't sorted. I'll try and remember to fix that when I
+apply it.
