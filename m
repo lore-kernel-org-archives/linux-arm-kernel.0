@@ -1,58 +1,106 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 19:09:31 +0530
-Subject: [PATCH V2 09/19] irqchip: crossbar: fix kerneldoc warning
-In-Reply-To: <20140612131434.GV8664@titan.lakedaemon.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Jun 2014 09:41:39 -0400
+Subject: [PATCH V2 13/19] irqchip: crossbar: change the goto naming
+In-Reply-To: <1402574007-13987-14-git-send-email-r.sricharan@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-10-git-send-email-r.sricharan@ti.com>
- <20140612131434.GV8664@titan.lakedaemon.net>
-Message-ID: <5399AD93.40601@ti.com>
+ <1402574007-13987-14-git-send-email-r.sricharan@ti.com>
+Message-ID: <20140612134139.GZ8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Thursday 12 June 2014 06:44 PM, Jason Cooper wrote:
-> On Thu, Jun 12, 2014 at 05:23:17PM +0530, Sricharan R wrote:
->> From: Nishanth Menon <nm@ti.com>
->>
->> kernel doc style is wrong in code. fix it to squelch
->> kerneldoc warnings:
+On Thu, Jun 12, 2014 at 05:23:21PM +0530, Sricharan R wrote:
+> From: Nishanth Menon <nm@ti.com>
 > 
-> I would re-word the above to mention that we need to add missing
-> properties for kerneldoc (@write, @safemap), and we're doing some
-> cleanup of harmless warnings while we are here.
+> Using err1,2,3,4 etc makes it hard to ensure a new exit path in the
+> middle will not result in spurious changes, so rename the error paths
+> as per the function it does.
 > 
- Ok, will do this.
-
->> Warning(drivers/irqchip/irq-crossbar.c:27): missing initial short description on line:
->>  * struct crossbar_device: crossbar device description
->> Info(drivers/irqchip/irq-crossbar.c:27): Scanning doc for struct
->> Warning(drivers/irqchip/irq-crossbar.c:39): No description found for parameter 'write'
->> Warning(drivers/irqchip/irq-crossbar.c:42): missing initial short description on line:
->>  * struct crossbar_data: Platform specific data
->> Info(drivers/irqchip/irq-crossbar.c:42): Scanning doc for struct
->> Warning(drivers/irqchip/irq-crossbar.c:50): No description found for parameter 'safe_map'
->> 4 warnings
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  drivers/irqchip/irq-crossbar.c |    7 +++++--
->>  1 file changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
->> index 58790d4..7d4db07 100644
->> --- a/drivers/irqchip/irq-crossbar.c
->> +++ b/drivers/irqchip/irq-crossbar.c
->> @@ -23,11 +23,13 @@
->>  #define IRQ_SKIP	-3
->>  #define GIC_IRQ_START	32
->>  
->> -/*
->> +/**
->> + * struct crossbar_device - crossbar device descriptio
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  drivers/irqchip/irq-crossbar.c |   22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
 > 
-> s/descriptio/description/
- Ok, will correct.
+> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+> index 524e6e9..cf0d79f 100644
+> --- a/drivers/irqchip/irq-crossbar.c
+> +++ b/drivers/irqchip/irq-crossbar.c
+> @@ -152,17 +152,17 @@ static int __init crossbar_of_init(struct device_node *node,
+>  
+>  	cb->crossbar_base = of_iomap(node, 0);
+>  	if (!cb->crossbar_base)
+> -		goto err1;
+> +		goto err_cb;
+>  
+>  	of_property_read_u32(node, "ti,max-irqs", &max);
+>  	if (!max) {
+>  		pr_err("missing 'ti,max-irqs' property\n");
+>  		ret = -EINVAL;
+> -		goto err2;
+> +		goto err_base;
+>  	}
+>  	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
+>  	if (!cb->irq_map)
+> -		goto err2;
+> +		goto err_base;
+>  
+>  	cb->int_max = max;
+>  
+> @@ -181,7 +181,7 @@ static int __init crossbar_of_init(struct device_node *node,
+>  			if (entry > max) {
+>  				pr_err("Invalid reserved entry\n");
+>  				ret = -EINVAL;
+> -				goto err3;
+> +				goto err_irq_map;
+>  			}
+>  			cb->irq_map[entry] = IRQ_RESERVED;
+>  		}
+> @@ -189,7 +189,7 @@ static int __init crossbar_of_init(struct device_node *node,
+>  
+>  	cb->register_offsets = kcalloc(max, sizeof(int), GFP_KERNEL);
+>  	if (!cb->register_offsets)
+> -		goto err3;
+> +		goto err_irq_map;
+>  
+>  	of_property_read_u32(node, "ti,reg-size", &size);
+>  
+> @@ -206,7 +206,7 @@ static int __init crossbar_of_init(struct device_node *node,
+>  	default:
+>  		pr_err("Invalid reg-size property\n");
+>  		ret = -EINVAL;
+> -		goto err4;
+> +		goto err_reg_offset;
+>  		break;
+>  	}
+>  
+> @@ -234,7 +234,7 @@ static int __init crossbar_of_init(struct device_node *node,
+>  			if (entry > max) {
+>  				pr_err("Invalid skip entry\n");
+>  				ret = -EINVAL;
+> -				goto err4;
+> +				goto err_reg_offset;
+>  			}
+>  			cb->irq_map[entry] = IRQ_SKIP;
+>  		}
+> @@ -251,13 +251,13 @@ static int __init crossbar_of_init(struct device_node *node,
+>  	register_routable_domain_ops(&routable_irq_domain_ops);
+>  	return 0;
+>  
+> -err4:
+> +err_reg_offset:
+>  	kfree(cb->register_offsets);
+> -err3:
+> +err_irq_map:
+>  	kfree(cb->irq_map);
+> -err2:
+> +err_base:
+>  	iounmap(cb->crossbar_base);
+> -err1:
+> +err_cb:
+>  	kfree(cb);
+>  	return ret;
 
-Regards,
- Sricharan
+Ahhh :-)  Ignore my previous request.
+
+thx,
+
+Jason.
