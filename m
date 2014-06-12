@@ -1,37 +1,48 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 12 Jun 2014 10:19:32 +0100
-Subject: [PATCH v4 3/6] drivers: cpuidle: implement OF based idle states
- infrastructure
-In-Reply-To: <alpine.LFD.2.11.1406111431080.25775@knanqh.ubzr>
-References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1402503520-8611-4-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.11.1406111431080.25775@knanqh.ubzr>
-Message-ID: <20140612091932.GC29295@e102568-lin.cambridge.arm.com>
+From: sachin.kamat@samsung.com (Sachin Kamat)
+Date: Thu, 12 Jun 2014 14:51:42 +0530
+Subject: [PATCH] ARM: dts: exynos4: fix pwm-cells in pwm node
+In-Reply-To: <1402561392-21702-1-git-send-email-jaewon02.kim@samsung.com>
+References: <1402561392-21702-1-git-send-email-jaewon02.kim@samsung.com>
+Message-ID: <CAK5sBcGyDJ9n+_ei_p-5ukW0NMW_ytSXv8dGkkMx2TquDFWBOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 07:38:51PM +0100, Nicolas Pitre wrote:
-> On Wed, 11 Jun 2014, Lorenzo Pieralisi wrote:
-> 
-> > On most common ARM systems, the low-power states a CPU can be put into are
-> > not discoverable in HW and require device tree bindings to describe
-> > power down suspend operations and idle states parameters.
-> > 
-> > In order to enable DT based idle states and configure idle drivers, this
-> > patch implements the bulk infrastructure required to parse the device tree
-> > idle states bindings and initialize the corresponding CPUidle driver states
-> > data.
-> 
-> Oh and another pet peeve of mine: given we always talk about "device 
-> tree" all the time, could you s/OF/DT/ in the subject?  It's been a 
-> while that DT has outgrown its OF origins.
+Hi Jaewon,
 
-> >  create mode 100644 drivers/cpuidle/of_idle_states.c
-> >  create mode 100644 drivers/cpuidle/of_idle_states.h
-> 
-> Ditto here, including any new symbols you introduced.
+On Thu, Jun 12, 2014 at 1:53 PM, Jaewon Kim <jaewon02.kim@samsung.com> wrote:
+> pwm-cells should be 3. Third cell is optional PWM flags.
+> And This flag supported by this binding is PWM_POLARITY_INVERTED
+>
+> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index b8ece4b..b687e53 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -548,13 +548,13 @@
+>                 status = "disabled";
+>         };
+>
+> -       pwm at 139D0000 {
+> +       pwm: pwm at 139D0000 {
 
-Yes you have a point, I will do.
+unrelated change.
 
-Thanks,
-Lorenzo
+>                 compatible = "samsung,exynos4210-pwm";
+>                 reg = <0x139D0000 0x1000>;
+>                 interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
+>                 clocks = <&clock CLK_PWM>;
+>                 clock-names = "timers";
+> -               #pwm-cells = <2>;
+> +               #pwm-cells = <3>;
+>                 status = "disabled";
+>         };
+
+Otherwise looks good.
+Reviewed-by: Sachin Kamat <sachin.kamat@samsung.com>
+
+Regards,
+Sachin
