@@ -1,57 +1,36 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 12 Jun 2014 13:21:09 +0900
-Subject: [PATCH v2 1/2] usb: ehci-exynos: Make provision for vdd regulators
-In-Reply-To: <Pine.LNX.4.44L0.1406111131200.890-100000@iolanthe.rowland.org>
-References: <1402064411-18244-1-git-send-email-gautam.vivek@samsung.com>
- <Pine.LNX.4.44L0.1406111131200.890-100000@iolanthe.rowland.org>
-Message-ID: <003801cf85f5$bc7ca200$3575e600$%han@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 12 Jun 2014 10:00:02 +0530
+Subject: [PATCH] ARM: exynos: Fix warning by constifying 'reg' in
+ exynos_fdt_map_chipid()
+Message-ID: <3c6b5c1f19fcbee39a3f0a0bd2c9ddd811d5e619.1402547301.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 12, 2014 12:39 AM, Alan Stern wrote:
-> On Fri, 6 Jun 2014, Vivek Gautam wrote:
-> 
-> > Facilitate getting required 3.3V and 1.0V VDD supply for
-> > EHCI controller on Exynos.
-> >
-> > With patches for regulators' nodes merged in 3.15:
-> > c8c253f ARM: dts: Add regulator entries to smdk5420
-> > 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
-> >
-> > certain perripherals will now need to ensure that,
-> > they request VDD regulators in their drivers, and enable
-> > them so as to make them working.
-> 
-> "Certain peripherals"?  Don't you mean "certain controllers"?
-> 
-> Does this mean some controllers don't need to use the VDD regulators?
-> 
-> > @@ -193,7 +196,31 @@ static int exynos_ehci_probe(struct platform_device *pdev)
-> >
-> >  	err = exynos_ehci_get_phy(&pdev->dev, exynos_ehci);
-> >  	if (err)
-> > -		goto fail_clk;
-> > +		goto fail_regulator1;
-> > +
-> > +	exynos_ehci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
-> > +	if (!IS_ERR(exynos_ehci->vdd33)) {
-> > +		err = regulator_enable(exynos_ehci->vdd33);
-> > +		if (err) {
-> > +			dev_err(&pdev->dev,
-> > +				"Failed to enable 3.3V Vdd supply\n");
-> > +			goto fail_regulator1;
-> > +		}
-> > +	} else {
-> > +		dev_warn(&pdev->dev, "Regulator 3.3V Vdd supply not found\n");
-> > +	}
-> 
-> What if this is one of the controllers that don't need to use a VDD
-> regulator?  Do you really want to print out a warning in that case?
-> Should you call devm_regulator_get_optional() instead?
+exynos_fdt_map_chipid() was recently added with: cbf08b9 (ARM: EXYNOS:
+Consolidate exynos4 and exynos5 machine files) and generates this warning:
 
-I agree with Alan's suggestion. This warning message is not
-proper, when USB controllers that don't need a VDD regulator
-are used. The devm_regulator_get_optional() looks better.
+arch/arm/mach-exynos/exynos.c: In function ?exynos_fdt_map_chipid?:
+arch/arm/mach-exynos/exynos.c:208:6: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
 
-Best regards,
-Jingoo Han
+Constify 'reg' to fix it.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-exynos/exynos.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 90aab4d..b71598a 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -198,7 +198,7 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+ 					int depth, void *data)
+ {
+ 	struct map_desc iodesc;
+-	__be32 *reg;
++	const __be32 *reg;
+ 	int len;
+ 
+ 	if (!of_flat_dt_is_compatible(node, "samsung,exynos4210-chipid") &&
+-- 
+2.0.0.rc2
