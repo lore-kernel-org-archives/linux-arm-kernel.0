@@ -1,33 +1,45 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 12 Jun 2014 17:23:22 +0530
-Subject: [PATCH V2 14/19] irqchip: crossbar: set cb pointer to null in case of
- error
+Date: Thu, 12 Jun 2014 17:23:23 +0530
+Subject: [PATCH V2 15/19] irqchip: crossbar: Add kerneldoc for
+ crossbar_domain_unmap callback
 In-Reply-To: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402574007-13987-15-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402574007-13987-16-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If crossbar_of_init returns with a error, then set the cb pointer
-to null.
+The crossbar_domain_map/unmap callbacks need not be called same number
+of times for a particular irq. But still use counting is not needed
+here, because unmap(irq) gets called when irq_desc(irq) is disposed.
+After this the irq is anyways unusable and have to mapped again.
+
+Adding the above kerneldoc for unmap callback clarity.
 
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/irqchip/irq-crossbar.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index cf0d79f..5f3e75a 100644
+index 5f3e75a..2a73a66 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -259,6 +259,8 @@ err_base:
- 	iounmap(cb->crossbar_base);
- err_cb:
- 	kfree(cb);
-+
-+	cb = NULL;
- 	return ret;
+@@ -101,6 +101,16 @@ static int crossbar_domain_map(struct irq_domain *d, unsigned int irq,
+ 	return 0;
  }
  
++/**
++ * crossbar_domain_unmap - unmap a crossbar<->irq connection
++ * @d: domain of irq to unmap
++ * @irq: virq number
++ *
++ * The map/unmap callbacks need not be called same number of times for
++ * a particular irq. But still use counting is not needed here, because
++ * unmap(irq) gets called when irq_desc(irq) is disposed. After this the
++ * irq is anyways unusuable and have to be mapped again.
++ */
+ static void crossbar_domain_unmap(struct irq_domain *d, unsigned int irq)
+ {
+ 	irq_hw_number_t hw = irq_get_irq_data(irq)->hwirq;
 -- 
 1.7.9.5
