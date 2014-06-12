@@ -1,80 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Jun 2014 01:00:31 -0700
-Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
- v3.16
-In-Reply-To: <20140612074705.GB11421@lee--X1>
-References: <1401214140-9828-1-git-send-email-tony@atomide.com>
- <20140528071313.GH4227@lee--X1> <20140528180607.GB4707@atomide.com>
- <20140602163841.GC11004@atomide.com>
- <20140603080632.GC3060@lee--X1>
- <20140612054348.GC17845@atomide.com>
- <20140612074705.GB11421@lee--X1>
-Message-ID: <20140612080030.GD17845@atomide.com>
+From: zhangyanfei@cn.fujitsu.com (Zhang Yanfei)
+Date: Thu, 12 Jun 2014 16:15:07 +0800
+Subject: [PATCH v2 01/10] DMA, CMA: clean-up log message
+In-Reply-To: <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <5399618B.7040809@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140612 00:48]:
-> On Wed, 11 Jun 2014, Tony Lindgren wrote:
+On 06/12/2014 11:21 AM, Joonsoo Kim wrote:
+> We don't need explicit 'CMA:' prefix, since we already define prefix
+> 'cma:' in pr_fmt. So remove it.
 > 
-> > * Lee Jones <lee.jones@linaro.org> [140603 01:08]:
-> > > On Mon, 02 Jun 2014, Tony Lindgren wrote:
-> > > > * Tony Lindgren <tony@atomide.com> [140528 11:11]:
-> > > > > * Lee Jones <lee.jones@linaro.org> [140528 00:14]:
-> > > > > > Thanks Tony, here's the pull-request:
-> > > > > > 
-> > > > > > The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
-> > > > > > 
-> > > > > >   Linux 3.14 (2014-03-30 20:40:15 -0700)
-> > > > > > 
-> > > > > > are available in the git repository at:
-> > > > > > 
-> > > > > >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/mfd-omap-v3.16-1
-> > > > > > 
-> > > > > > for you to fetch changes up to 43fef47f94a1ae46fb2720dada32fa3b5547bee2:
-> > > > > > 
-> > > > > >   mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle (2014-05-28 08:06:18 +0100)
-> > > > > > 
-> > > > > > ----------------------------------------------------------------
-> > > > > > Second immutable branch between MFD and OMAP due for the v3.16 merge window.
-> > > > > 
-> > > > > Thanks a lot, this will make it easier for me to chase down potential
-> > > > > PM related regressions ;) I'm merging this for testing only into the
-> > > > > linux-omap master branch, no need for me to include it into any
-> > > > > of my upstream heading branches.
-> > > > 
-> > > > Lee, I'm not seeing this in linux next, did you maybe forget to merge
-> > > > it into the MFD tree?
-> > > 
-> > > I didn't forget, but I didn't do it either. :)
-> > > 
-> > > I have re-merged all of the IBs this morning, so should be in -next
-> > > by tomorrow.
-> > 
-> > Still not seeing this branch being merged..
+> And, some logs print function name and others doesn't. This looks
+> bad to me, so I unify log format to print function name consistently.
 > 
-> Oh crap, I see what's happened and it's completely my fault.
+> Lastly, I add one more debug log on cma_activate_area().
 > 
-> If you read the final merge commit carefully:
-> 
-> 28fee3f: ("Merge branches 'ib-from-asoc-3.16', 'ib-from-pm-3.16',
-> 'ib-from-regulator-3.16', 'ib-mfd-gpio-3.16' and
-> 'ib-mfd-mmc-memstick-3.16', tags 'ib-mfd-extcon-3.16',
-> 'ib-mfd-omap-3.16' and 'ib-mfd-regulator-3.16' into
-> ibs-for-mfd-merged")
-> 
-> I appear to have a _branch_ AND a _tag_ called ib-mfd-omap-3.16 and it
-> looks like Git has taken the tag as a preference. heads/ib-mfd-omap-3.16
-> is actually at tag/ib-mfd-omap-3.16-1 (notice the appended '-1'),
-> which contains your most recent patches.  Since I created the MFD-OMAP
-> shared branch I have changed the naming convention to avoid this sort
-> of ambiguity.  I'll send a second MFD pull-request to Linus today.
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 
-Heh OK yeah I've hit that also at some point :)
- 
-> Sorry Tony.
+Reviewed-by: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
 
-No problem, good to hear you got it figured out.
+> 
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 83969f8..bd0bb81 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -144,7 +144,7 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
+>  	}
+>  
+>  	if (selected_size && !dma_contiguous_default_area) {
+> -		pr_debug("%s: reserving %ld MiB for global area\n", __func__,
+> +		pr_debug("%s(): reserving %ld MiB for global area\n", __func__,
+>  			 (unsigned long)selected_size / SZ_1M);
+>  
+>  		dma_contiguous_reserve_area(selected_size, selected_base,
+> @@ -163,8 +163,9 @@ static int __init cma_activate_area(struct cma *cma)
+>  	unsigned i = cma->count >> pageblock_order;
+>  	struct zone *zone;
+>  
+> -	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+> +	pr_debug("%s()\n", __func__);
+>  
+> +	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+>  	if (!cma->bitmap)
+>  		return -ENOMEM;
+>  
+> @@ -234,7 +235,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+>  
+>  	/* Sanity checks */
+>  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+> -		pr_err("Not enough slots for CMA reserved regions!\n");
+> +		pr_err("%s(): Not enough slots for CMA reserved regions!\n",
+> +			__func__);
+>  		return -ENOSPC;
+>  	}
+>  
+> @@ -274,14 +276,15 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+>  	*res_cma = cma;
+>  	cma_area_count++;
+>  
+> -	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+> -		(unsigned long)base);
+> +	pr_info("%s(): reserved %ld MiB at %08lx\n",
+> +		__func__, (unsigned long)size / SZ_1M, (unsigned long)base);
+>  
+>  	/* Architecture specific contiguous memory fixup. */
+>  	dma_contiguous_early_fixup(base, size);
+>  	return 0;
+>  err:
+> -	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
+> +	pr_err("%s(): failed to reserve %ld MiB\n",
+> +		__func__, (unsigned long)size / SZ_1M);
+>  	return ret;
+>  }
+>  
+> 
 
-Regards,
 
-Tony
+-- 
+Thanks.
+Zhang Yanfei
