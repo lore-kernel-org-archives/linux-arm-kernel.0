@@ -1,80 +1,88 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jun 2014 18:01:09 +0200
-Subject: [PATCH 07/14] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
+Date: Fri, 13 Jun 2014 18:01:10 +0200
+Subject: [PATCH 08/14] ARM: integrator: fix section mismatch problem
 In-Reply-To: <1402675276-538682-1-git-send-email-arnd@arndb.de>
 References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
-Message-ID: <1402675276-538682-8-git-send-email-arnd@arndb.de>
+Message-ID: <1402675276-538682-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Cooper <jason@lakedaemon.net>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
-soldered on RAM, and a DIMM slot for expansion.
+This addresses a section mismatch problem in the IM-PD1
+driver in the Integrator/AP.
 
-Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
-the following failure when attempting to boot a big-endian kernel:
+The IM-PD1 contains a VIC interrupt controller and therefore
+the driver calls vic_init_cascaded() which is marked __init as
+irqchips are simply not hot-pluggable and specifically the VIC
+is assumed to initiate only on boot.
 
-  686 slab pages
-  17 pages shared
-  0 pages swap cached
-  [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
-  Kernel panic - not syncing: Out of memory and no killable processes...
+However the module driver model of the Integrator LM bus
+assumes that logic tile drivers can be probed at runtime. This
+is not really the case for IM-PD1: these tiles are detected at
+boot and they cannot be plugged into a running system. Before
+this patch it is of course possible to modprobe them later.
 
-  CPU: 1 PID: 351 Comm: kworker/u4:0 Not tainted 3.15.0-rc8-next-20140603 #1
-  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
-  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
-  [<c0802500>] (dump_stack) from [<c0800068>] (panic+0x90/0x21c)
-  [<c0800068>] (panic) from [<c02b5704>] (out_of_memory+0x320/0x340)
-  [<c02b5704>] (out_of_memory) from [<c02b93a0>] (__alloc_pages_nodemask+0x874/0x930)
-  [<c02b93a0>] (__alloc_pages_nodemask) from [<c02d446c>] (handle_mm_fault+0x744/0x96c)
-  [<c02d446c>] (handle_mm_fault) from [<c02cf250>] (__get_user_pages+0xd0/0x4c0)
-  [<c02cf250>] (__get_user_pages) from [<c02f3598>] (get_arg_page+0x54/0xbc)
-  [<c02f3598>] (get_arg_page) from [<c02f3878>] (copy_strings+0x278/0x29c)
-  [<c02f3878>] (copy_strings) from [<c02f38bc>] (copy_strings_kernel+0x20/0x28)
-  [<c02f38bc>] (copy_strings_kernel) from [<c02f4f1c>] (do_execve+0x3a8/0x4c8)
-  [<c02f4f1c>] (do_execve) from [<c025ac10>] (____call_usermodehelper+0x15c/0x194)
-  [<c025ac10>] (____call_usermodehelper) from [<c020e9b8>] (ret_from_fork+0x14/0x3c)
-  CPU0: stopping
-  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.15.0-rc8-next-20140603 #1
-  [<c0215a54>] (unwind_backtrace) from [<c021160c>] (show_stack+0x10/0x14)
-  [<c021160c>] (show_stack) from [<c0802500>] (dump_stack+0x78/0x94)
-  [<c0802500>] (dump_stack) from [<c021429c>] (handle_IPI+0x138/0x174)
-  [<c021429c>] (handle_IPI) from [<c02087f0>] (armada_370_xp_handle_irq+0xb0/0xcc)
-  [<c02087f0>] (armada_370_xp_handle_irq) from [<c0212100>] (__irq_svc+0x40/0x50)
-  Exception stack(0xc0b6bf68 to 0xc0b6bfb0)
-  bf60:                   e9fad598 00000000 00f509a3 00000000 c0b6a000 c0b724c4
-  bf80: c0b72458 c0b6a000 00000000 00000000 c0b66da0 c0b6a000 00000000 c0b6bfb0
-  bfa0: c027bb94 c027bb24 60000313 ffffffff
-  [<c0212100>] (__irq_svc) from [<c027bb24>] (cpu_startup_entry+0x54/0x214)
-  [<c027bb24>] (cpu_startup_entry) from [<c0ac5b30>] (start_kernel+0x318/0x37c)
-  [<c0ac5b30>] (start_kernel) from [<00208078>] (0x208078)
-  ---[ end Kernel panic - not syncing: Out of memory and no killable processes...
+By first forcing the IM-PD1 to bool we make sure this driver
+gets compiled into the kernel, and we know it will be probed
+only at boot time when the tiles are detected, so we can tag
+its probe function __init_refok as we know it won't be called
+after boot now, and the section mismatch problem goes away.
 
-A similar failure will also occur if ARM_ATAG_DTB_COMPAT isn't selected.
+As a side effect, sysfs binding from userspace becomes
+impossible, so we tag the driver to suppress the bind/unbind
+sysfs attributes.
 
-Fix this by setting a sane default (1 GB) in the dts file.
-
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-Tested-by: Kevin Hilman <khilman@linaro.org>
-Cc: <stable@vger.kernel.org> #v3.13+
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-integrator/Kconfig |  2 +-
+ arch/arm/mach-integrator/impd1.c | 12 +++++++++++-
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index e5c6a04..4e5a59e 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -25,7 +25,7 @@
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index ba43321..64f8e25 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -28,7 +28,7 @@ config ARCH_CINTEGRATOR
+ 	bool
  
- 	memory {
- 		device_type = "memory";
--		reg = <0 0x00000000 0 0xC0000000>; /* 3 GB */
-+		reg = <0 0x00000000 0 0x40000000>; /* 1 GB soldered on */
- 	};
+ config INTEGRATOR_IMPD1
+-	tristate "Include support for Integrator/IM-PD1"
++	bool "Include support for Integrator/IM-PD1"
+ 	depends on ARCH_INTEGRATOR_AP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_VIC
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 0e870ea..3ce8807 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -308,7 +308,12 @@ static struct impd1_device impd1_devs[] = {
+  */
+ #define IMPD1_VALID_IRQS 0x00000bffU
  
- 	soc {
+-static int __init impd1_probe(struct lm_device *dev)
++/*
++ * As this module is bool, it is OK to have this as __init_refok() - no
++ * probe calls will be done after the initial system bootup, as devices
++ * are discovered as part of the machine startup.
++ */
++static int __init_refok impd1_probe(struct lm_device *dev)
+ {
+ 	struct impd1_module *impd1;
+ 	int irq_base;
+@@ -397,6 +402,11 @@ static void impd1_remove(struct lm_device *dev)
+ static struct lm_driver impd1_driver = {
+ 	.drv = {
+ 		.name	= "impd1",
++		/*
++		 * As we're dropping the probe() function, suppress driver
++		 * binding from sysfs.
++		 */
++		.suppress_bind_attrs = true,
+ 	},
+ 	.probe		= impd1_probe,
+ 	.remove		= impd1_remove,
 -- 
 1.8.3.2
