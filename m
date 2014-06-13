@@ -1,45 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 13 Jun 2014 09:17:20 -0400
-Subject: [PATCH V2 16/19] irqchip: crossbar: introduce
- ti,max-crossbar-sources to identify valid crossbar mapping
-In-Reply-To: <539AD87C.8000004@ti.com>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-17-git-send-email-r.sricharan@ti.com>
- <20140612135453.GB8664@titan.lakedaemon.net>
- <539AD87C.8000004@ti.com>
-Message-ID: <20140613131720.GI8664@titan.lakedaemon.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 13 Jun 2014 15:17:39 +0200
+Subject: [PATCH v3 1/2] drm/panel: consolidate unnecessary explicit
+ dependencies
+In-Reply-To: <E1WvRBL-0007qq-2D@rmk-PC.arm.linux.org.uk>
+References: <E1WvRBL-0007qq-2D@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140613131738.GA5568@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 04:24:52PM +0530, Sricharan R wrote:
-> On Thursday 12 June 2014 07:24 PM, Jason Cooper wrote:
-> > On Thu, Jun 12, 2014 at 05:23:24PM +0530, Sricharan R wrote:
-...
-> >> +	of_property_read_u32(node, "ti,max-crossbar-sources",
-> >> +			     &cb->max_crossbar_sources);
-> >> +	if (!cb->max_crossbar_sources) {
-> >> +		pr_err("missing 'ti,max-crossbar-sources' property\n");
-> >> +		ret = -EINVAL;
-> >> +		goto err_base;
-> >> +	}
-> > 
-> > This completely breaks all boards using old dtbs.  Please set
-> > max_crossbar_sources to a sane value (400) when the property is missing.
-> > 
-> >> +
-> >>  	of_property_read_u32(node, "ti,max-irqs", &max);
-> >>  	if (!max) {
-> >>  		pr_err("missing 'ti,max-irqs' property\n");
-> > 
-> > I know this is context, but you may want to look at this property as
-> > well and set it to a sane value instead of erroring out.
-> > 
->  crossbar dts node itself is not there in any dts yet. So this is not applicable
->  for any old boards. Any future dts with crossbar node should have this property
->  defined.
+On Fri, Jun 13, 2014 at 02:06:11PM +0100, Russell King wrote:
+> DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
+> DRM_PANEL && DRM, whereas DRM_PANEL_SIMPLE relies upon the dependency
+> on the menu.
+> 
+> We do not need to use explicit dependencies if we make the menu depend
+> on DRM_PANEL && DRM - this will implicitly make each entry in the menu
+> depend on DRM_PANEL && DRM without this needing to be explicitly stated
+> against every entry.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/gpu/drm/panel/Kconfig | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 
-Now that I see the dra7.dtsi changes, I fully agree.
+Applied, thanks.
 
-thx,
-
-Jason.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140613/c9420170/attachment-0001.sig>
