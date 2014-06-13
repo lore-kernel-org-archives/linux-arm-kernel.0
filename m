@@ -1,27 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jun 2014 16:10:17 +0200
-Subject: [PATCH v2 1/3] arm: multi_v7: enable igb, stmpe, lm95245, pwm leds
-In-Reply-To: <1741a33cd88cd5525f3c50c0e0cacc0853a3512a.1402350905.git.marcel@ziswiler.com>
-References: <1741a33cd88cd5525f3c50c0e0cacc0853a3512a.1402350905.git.marcel@ziswiler.com>
-Message-ID: <201406131610.18048.arnd@arndb.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 13 Jun 2014 16:19:28 +0200
+Subject: [PATCH 0/3] ARM: at91/dt: clock fixes
+In-Reply-To: <1402667001-11207-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1402667001-11207-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <539B0870.2020807@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 June 2014, Marcel Ziswiler wrote:
-> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
-> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller, PWM
-> LEDs generically accessible from user space and an LM95245 temperature
-> sensor chip. The later three can also be found on the Colibri T30
-> module.
-> 
-> While at it move the NEON entry down to its proper place to have it all
-> nicely ordered again.
-> 
-> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
 
-Stephen, Thierry,
+On 13/06/2014 15:43, Alexandre Belloni wrote:
+> Some clocks were not properly defined:
+>  - ICPLL and OUT values for PLLA got mixed on sam9x5 and sam9n12
+>  - mainck was not correctly defined on sam9261
 
-do you want me to queue it up directly, or do you want to put it into
-a tegra fixes branch?
+On the whole series:
 
-	Arnd
+Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+
+Thanks.
+
+Boris
+>
+> Alexandre Belloni (3):
+>   ARM: at91/dt: sam9x5: correct PLLA ICPLL and OUT values
+>   ARM: at91/dt: sam9n12: correct PLLA ICPLL and OUT values
+>   ARM: at91/dt: sam9261: correctly define mainck
+>
+>  arch/arm/boot/dts/at91sam9261.dtsi | 10 ++++++++--
+>  arch/arm/boot/dts/at91sam9n12.dtsi |  4 ++--
+>  arch/arm/boot/dts/at91sam9x5.dtsi  |  4 ++--
+>  3 files changed, 12 insertions(+), 6 deletions(-)
+>
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
