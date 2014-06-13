@@ -1,65 +1,43 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Fri, 13 Jun 2014 11:26:12 +0400
-Subject: [PATCH 1/2] ARM: i.MX system: Simplify handling watchdog clock
-Message-ID: <1402644373-8408-1-git-send-email-shc_work@mail.ru>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 13 Jun 2014 16:43:07 +0900
+Subject: [PATCH v2] ARM: shmobile: koelsch: Add support HSCIF1
+In-Reply-To: <10020827.IyD6srEo7g@avalon>
+References: <1402367659-21117-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+ <CANqRtoT9OjX--sh3ab1R-j=ommqU3vvh1EzDoNQfkwZL39FSZQ@mail.gmail.com>
+ <20140610070044.GB29303@verge.net.au> <10020827.IyD6srEo7g@avalon>
+Message-ID: <20140613074306.GA15286@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch simplifies handling watchdog clock a bit.
-As an additional change, now we properly check WDT clock in a reset
-function.
+On Fri, Jun 13, 2014 at 09:01:27AM +0200, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Tuesday 10 June 2014 16:00:48 Simon Horman wrote:
+> > On Tue, Jun 10, 2014 at 01:14:27PM +0900, Magnus Damm wrote:
+> > > On Tue, Jun 10, 2014 at 11:34 AM, Nobuhiro Iwamatsu wrote:
+> > > > Koelsch can use HSCIF1 insetead of SCIF1 as serial port. But if we want
+> > > > to use, we will need to disable the GPIO key and remodeling of the
+> > > > board. Therefore status of hscif1 does not set the "okay".
+> > > > 
+> > > > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> > > > ---
+> > > > 
+> > > >  V2: Remove hscif1_clk from renesas,groups. This pin does not use.
+> > > 
+> > > Thanks for updating the patch. This looks fine to me.
+> > > 
+> > > Acked-by: Magnus Damm <damm+renesas@opensource.se>
+> > 
+> > Thanks, I will queue this up.
+> 
+> Sorry for the late reply, but I have some doubts about this. The HRX0 and
+> HTX0 signals are connected to push buttons and used as GPIOs. Beside,
+> they're not routed to serial port transceiver. If we want to use HSCIF0
+> on those pins on Koelsch and extension board must be connected to the
+> EXIO C connector, and two resistors and two capacitors should be
+> unsoldered. I thus don't think the Koeslch DT should contain pinmux data
+> for the HSCIF0 device. If an extension board is used and HSCIF0 needed,
+> then the DT file for the extension board should define pinmuxing for the
+> serial port.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/system.c | 20 +++++++-------------
- 1 file changed, 7 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 3b0733e..ae521f3 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -42,7 +42,7 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
- {
- 	unsigned int wcr_enable;
- 
--	if (wdog_clk)
-+	if (!IS_ERR_OR_NULL(wdog_clk))
- 		clk_enable(wdog_clk);
- 
- 	if (cpu_is_mx1())
-@@ -79,13 +79,10 @@ void __init mxc_arch_reset_init(void __iomem *base)
- 	wdog_base = base;
- 
- 	wdog_clk = clk_get_sys("imx2-wdt.0", NULL);
--	if (IS_ERR(wdog_clk)) {
-+	if (IS_ERR(wdog_clk))
- 		pr_warn("%s: failed to get wdog clock\n", __func__);
--		wdog_clk = NULL;
--		return;
--	}
--
--	clk_prepare(wdog_clk);
-+	else
-+		clk_prepare(wdog_clk);
- }
- 
- void __init mxc_arch_reset_init_dt(void)
-@@ -97,13 +94,10 @@ void __init mxc_arch_reset_init_dt(void)
- 	WARN_ON(!wdog_base);
- 
- 	wdog_clk = of_clk_get(np, 0);
--	if (IS_ERR(wdog_clk)) {
-+	if (IS_ERR(wdog_clk))
- 		pr_warn("%s: failed to get wdog clock\n", __func__);
--		wdog_clk = NULL;
--		return;
--	}
--
--	clk_prepare(wdog_clk);
-+	else
-+		clk_prepare(wdog_clk);
- }
- 
- #ifdef CONFIG_CACHE_L2X0
--- 
-1.8.5.5
+If you would like me to revert this patch I am happy to consider doing so.
