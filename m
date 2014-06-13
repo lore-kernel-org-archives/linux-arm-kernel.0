@@ -1,28 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Jun 2014 09:29:16 -0500
-Subject: [RFC v3 1/9] arm: fiq: arbitrary mappings from IRQ to FIQ virqs
-In-Reply-To: <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
-References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <CAL_JsqK-jCQjCCw4qfJOCfNKLVRDTAYSYsGpmYLDzoSVsBaHrA@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 13 Jun 2014 15:30:20 +0100
+Subject: [STLinux Kernel] Latest mainline (3.16 merge window) does not
+ boot in B2020/STiH416
+In-Reply-To: <539AFCF5.90206@linaro.org>
+References: <539AF5B0.6060509@linaro.org>
+ <20140613131051.GA28309@griffinp-ThinkPad-X1-Carbon-2nd>
+ <539AFCF5.90206@linaro.org>
+Message-ID: <20140613143020.GA29920@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 5, 2014 at 4:53 AM, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
-> Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
-> virq into a FIQ virq. This is too inflexible for multi-platform kernels
-> and makes runtime error checking impossible.
->
-> We solve this by introducing a flexible mapping that allows interrupt
-> controllers that support FIQ to register those mappings. This, in turn,
-> makes it much possible for drivers in DT kernels to gain access to
-> FIQ virqs.
+Hi Daniel,
 
-I don't get why you need a separate linux irq numbers for FIQ. Isn't
-enabling FIQ simply a property of an irq like edge vs. level trigger?
-Also, given the constraints on FIQ, we can't really have more that 1
-IRQ assigned to FIQ.
+> Thanks Pete. Adding this parameter fixes the problem.
+> 
+> Any idea why?
 
-Rob
+Some of the interconnect / core clocks aren't handled properly atm.
+
+I just added some debug in drivers/clk and without clk_ignore_unused
+we turn off the clock to DDR :-(
+
+[    9.760022] IP-Config: Got DHCP answer from 192.168.0.1, my address is 192.168.0.104
+[    9.767831] IP-Config: Complete:
+[    9.771065]      device=eth0, hwaddr=5a:83:c2:c5:02:0f, ipaddr=192.168.0.104, mask=255.255.255.0, gw=192.168.0.1
+[    9.781238]      host=192.168.0.104, domain=, nis-domain=(none)
+[    9.787155]      bootserver=0.0.0.0, rootserver=192.168.0.10, rootpath=
+[    9.793589]      nameserver0=192.168.0.1
+[    9.797718] clk-m-pix-hdmirx-sas clk->name
+[    9.801809] clk-s-tmds-fromphy clk->name
+[    9.805727] clk-sysin clk->name
+[    9.808855] clockgen-gpu-pll clk->name
+[    9.812597] clockgen-ddr-pll clk->name
+[    9.816340] clockgen-ddr1 clk->name
+[    9.819816] clockgen-ddr0 clk->name
+
+regards,
+
+Pete.
