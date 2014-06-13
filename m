@@ -1,130 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jun 2014 12:15:56 +0200
-Subject: [PATCH] ARM: samsung: make SAMSUNG_DMADEV optional
-Message-ID: <5267520.dQojiXcaqm@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jun 2014 11:20:19 +0100
+Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
+In-Reply-To: <20140613121121.7e7dc8e6@free-electrons.com>
+References: <20140526162643.GB3693@n2100.arm.linux.org.uk>
+ <20140527111542.6a49833f@free-electrons.com>
+ <20140527094749.GE3693@n2100.arm.linux.org.uk>
+ <20140527135216.7eaf3b3f@free-electrons.com>
+ <20140527121806.GF3693@n2100.arm.linux.org.uk>
+ <20140527143745.386c77d9@free-electrons.com>
+ <20140528112450.GH3693@n2100.arm.linux.org.uk>
+ <20140530100819.1208149f@free-electrons.com>
+ <20140530092044.GO3693@n2100.arm.linux.org.uk>
+ <20140613121121.7e7dc8e6@free-electrons.com>
+Message-ID: <20140613102019.GQ23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only remaining driver using the samsung dmadev code is the broken
-samsung-ac97 sound driver. However, as found by Russell's autobuilder,
-the elaborate dependency chains around it cause problems with
-circular dependencies.
+On Fri, Jun 13, 2014 at 12:11:21PM +0200, Thomas Petazzoni wrote:
+> On Fri, 30 May 2014 10:20:44 +0100, Russell King - ARM Linux wrote:
+> > > Again, have you looked at the PATCH RFCv1 for this patch series? My
+> > > first version was doing *exactly* what you suggest: only make the few
+> > > call sites of is_smp() I was interested in to return true for the
+> > > specific platforms that needed it.
+> > 
+> > No, and I don't intend to, because it's probably well buried.
+> 
+> Well, it's not that buried since it only dates back from last month and
+> is available at
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256258.html.
+> I think looking at the prior versions of a patch series is kind of
+> important to understand the various solutions that have been
+> discussed/explored, especially when comments made on later versions
+> reflect back on things that where already proposed in earlier versions.
 
-This is an attempt to simplify those dependencies by making the
-SAMSUNG_DMADEV option user-selectable. I also try to keep the
-default settings for all related options unchanged, so we don't
-introduce any regressions against earlier testing on linux-next.
+For me, "last month" is as good as buried.  With already 2300 messages
+this month alone, I'm not going to be looking back through last months
+8297 messages.  If it wasn't sent during the last week, it's buried.
 
-In particular, all s3c64xx and s5p* platforms keep selecting the
-pl330 and pl08x drivers they require, but the select statement
-is now moved towards the main platform option, and it remains
-optional by unselecting CONFIG_DMADEVICES.
+> Right, understood. Since we have a special proc_info entry for Armada
+> 370/XP (as they are PJ4B and not Cortex-A based), this means we can
+> ensure the cache policy is write-allocate for both UP and SMP for those
+> processors.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-I'd like to apply this into the fixes branch for 3.16. It should
-help with the circular dependencies that Russell is seeing, and
-also simplify the cleanups we have planned for 3.17.
+Yep.
 
-Any feedback, testing, NAK?
+> I spoke briefly about this with Albin Tonnerre from ARM, and his
+> feedback is that it should not cause any problem to set the SMP bit and
+> the shareable attribute even on non-SMP Cortex-A9 processors such as
+> the Aegis. If that's correct, then we could do it for all Cortex-A9,
+> without having to know whether what we have is a SoC from Marvell with
+> I/O coherency or any other Cortex-A9 based SoC.
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index d863722..eff95e9 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -18,9 +18,9 @@ config CPU_S3C6410
- 	  Enable S3C6410 CPU support
- 
- config S3C64XX_PL080
--	bool "S3C64XX DMA using generic PL08x driver"
-+	def_bool DMADEVICES
-+	select ARM_AMBA
- 	select AMBA_PL08X
--	select SAMSUNG_DMADEV
- 
- config S3C64XX_SETUP_SDHCI
- 	bool
-diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
-index 6480d5c..a564953 100644
---- a/arch/arm/mach-s5p64x0/Kconfig
-+++ b/arch/arm/mach-s5p64x0/Kconfig
-@@ -9,16 +9,18 @@ if ARCH_S5P64X0
- 
- config CPU_S5P6440
- 	bool
-+	select ARM_AMBA
-+	select PL330_DMA if DMADEVICES
- 	select S5P_SLEEP if PM
--	select SAMSUNG_DMADEV
- 	select SAMSUNG_WAKEMASK if PM
- 	help
- 	  Enable S5P6440 CPU support
- 
- config CPU_S5P6450
- 	bool
-+	select ARM_AMBA
-+	select PL330_DMA if DMADEVICES
- 	select S5P_SLEEP if PM
--	select SAMSUNG_DMADEV
- 	select SAMSUNG_WAKEMASK if PM
- 	help
- 	  Enable S5P6450 CPU support
-diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-index c3d5360..769cb0c 100644
---- a/arch/arm/mach-s5pc100/Kconfig
-+++ b/arch/arm/mach-s5pc100/Kconfig
-@@ -9,8 +9,9 @@ if ARCH_S5PC100
- 
- config CPU_S5PC100
- 	bool
-+	select ARM_AMBA
-+	select PL330_DMA if DMADEVICES
- 	select S5P_EXT_INT
--	select SAMSUNG_DMADEV
- 	help
- 	  Enable S5PC100 CPU support
- 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index ede09e6..94fbf3b 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -11,10 +11,11 @@ if ARCH_S5PV210
- 
- config CPU_S5PV210
- 	bool
-+	select ARM_AMBA
-+	select PL330_DMA if DMADEVICES
- 	select S5P_EXT_INT
- 	select S5P_PM if PM
- 	select S5P_SLEEP if PM
--	select SAMSUNG_DMADEV
- 	help
- 	  Enable S5PV210 CPU support
- 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index f8c1bde..d27908c 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -408,17 +408,16 @@ config SAMSUNG_PM_GPIO
- 	  Include legacy GPIO power management code for platforms not using
- 	  pinctrl-samsung driver.
- 
--endif
--
- config SAMSUNG_DMADEV
--	bool
--	select ARM_AMBA
-+	bool "Use legacy Samsung DMA abstraction"
-+	depends on CPU_S5PV210 || CPU_S5PC100 || ARCH_S5P64X0 || ARCH_S3C64XX
- 	select DMADEVICES
--	select PL330_DMA if (ARCH_EXYNOS5 || ARCH_EXYNOS4 || CPU_S5PV210 || CPU_S5PC100 || \
--					CPU_S5P6450 || CPU_S5P6440)
-+	default y
- 	help
- 	  Use DMA device engine for PL330 DMAC.
- 
-+endif
-+
- config S5P_DEV_MFC
- 	bool
- 	help
+Setting the sharable attribute is not really a good idea - implementations
+are permitted to treat a writeback sharable mapping as uncacheable, which
+would be a severe performance degredation to single core CPUs.
+
+The patches I sent during this thread are now merged into mainline.  The
+setting of the shared bit, and the memory cache policy are now both
+derived from the proc_info structures, specifically the __cpu_mm_mmu_flags
+member.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
