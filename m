@@ -1,66 +1,25 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 13 Jun 2014 07:54:45 +0200
-Subject: [PATCH v2 1/2] drm/panel: remove unnecessary dependencies
-In-Reply-To: <E1Wv7ZP-0004Wb-3J@rmk-PC.arm.linux.org.uk>
-References: <E1Wv7ZP-0004Wb-3J@rmk-PC.arm.linux.org.uk>
-Message-ID: <539A9225.90304@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 13 Jun 2014 15:08:09 +0900
+Subject: [PATCH 0/4] cpufreq: Use cpufreq-cpu0 driver for Exynos3250
+Message-ID: <1402639693-31108-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+This patchset use cpufreq-cpu0 driver to support Exynos3250 cpufreq. So, this
+patchset is based on following patchset[1] by Thomas Abraham.
+ [1] http://www.spinics.net/lists/linux-samsung-soc/msg31593.html
 
-Thanks for both fixes. Just one nitpick.
+Chanwoo Choi (4):
+  clk: samsung: exynos3250: Use cpu-clock provider type to support cpufreq
+  clk: samsung: Add support for cpu clocks of Exynos3250
+  Documentation: devicetree: Add cpu clock configuration data binding for Exynos3250
+  ARM: dts: Exynos: Add cpu clock table and armclk divider table for Exynos3250
 
-On 06/12/2014 06:09 PM, Russell King wrote:
-> DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
-> DRM_PANEL && DRM.  This is nonsense for two reasons:
-> 
-> (a) DRM_PANEL already depends on DRM, so DRM_PANEL can not be enabled
-> without DRM first being enabled.  Hence the && DRM is useless.
+ .../devicetree/bindings/clock/exynos3250-clock.txt | 32 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos3250.dtsi                  | 28 +++++++++++++++++++
+ drivers/clk/samsung/clk-cpu.c                      | 31 +++++++++++++++++----
+ drivers/clk/samsung/clk-exynos3250.c               | 14 +++++++---
+ 4 files changed, 96 insertions(+), 9 deletions(-)
 
-This reason is invalid and do not describe the patch anymore.
-
-Regards
-Andrzej
-
-> 
-> (b) These two configs are already beneath a menu which depends on
-> DRM_PANEL being enabled; these options will not be visible without
-> DRM_PANEL already being enabled.
-> 
-> Let's just remove this unnecessary verbosity.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/gpu/drm/panel/Kconfig | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-> index 4ec874da5668..d83958d39f43 100644
-> --- a/drivers/gpu/drm/panel/Kconfig
-> +++ b/drivers/gpu/drm/panel/Kconfig
-> @@ -5,7 +5,7 @@ config DRM_PANEL
->  	  Panel registration and lookup framework.
->  
->  menu "Display Panels"
-> -	depends on DRM_PANEL
-> +	depends on DRM && DRM_PANEL
->  
->  config DRM_PANEL_SIMPLE
->  	tristate "support for simple panels"
-> @@ -18,14 +18,12 @@ config DRM_PANEL_SIMPLE
->  
->  config DRM_PANEL_LD9040
->  	tristate "LD9040 RGB/SPI panel"
-> -	depends on DRM && DRM_PANEL
->  	depends on OF
->  	select SPI
->  	select VIDEOMODE_HELPERS
->  
->  config DRM_PANEL_S6E8AA0
->  	tristate "S6E8AA0 DSI video mode panel"
-> -	depends on DRM && DRM_PANEL
->  	depends on OF
->  	select DRM_MIPI_DSI
->  	select VIDEOMODE_HELPERS
-> 
+-- 
+1.8.0
