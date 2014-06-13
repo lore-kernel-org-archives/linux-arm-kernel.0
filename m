@@ -1,23 +1,67 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 13 Jun 2014 13:41:02 -0700
-Subject: [PATCH v6 6/9] seccomp: add "seccomp" syscall
-In-Reply-To: <1402457121-8410-7-git-send-email-keescook@chromium.org>
-References: <1402457121-8410-1-git-send-email-keescook@chromium.org>
- <1402457121-8410-7-git-send-email-keescook@chromium.org>
-Message-ID: <CALCETrVYVB0pMj61T9ZCAhgL6WYHAdDjiDe81O0e4tTQLtjDiQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Jun 2014 15:46:43 -0500
+Subject: [PATCH 4/4] ARM: dts: imx6qdl: Enable CODA960 VPU
+In-Reply-To: <1402679641-868-4-git-send-email-p.zabel@pengutronix.de>
+References: <1402679641-868-1-git-send-email-p.zabel@pengutronix.de>
+ <1402679641-868-4-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CAL_JsqL+o+CCRUzXaAmBJBGSxt60k_858S7wQT4TLY0kZC9jgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 8:25 PM, Kees Cook <keescook@chromium.org> wrote:
-> This adds the new "seccomp" syscall with both an "operation" and "flags"
-> parameter for future expansion. The third argument is a pointer value,
-> used with the SECCOMP_SET_MODE_FILTER operation. Currently, flags must
-> be 0. This is functionally equivalent to prctl(PR_SET_SECCOMP, ...).
+On Fri, Jun 13, 2014 at 12:14 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> This patch adds links to the on-chip SRAM and reset controller nodes
+> and switches the interrupts. Make the BIT processor interrupt, which exists on
+> all variants, the first one. The JPEG unit interrupt, which does not exist on
+> i.MX27 and i.MX5 thus is an optional second interrupt.
+> Use different compatible strings for i.MX6Q/D and i.MX6S/DL, as they have to
+> load separate firmware images for some reason.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6dl.dtsi  |  4 ++++
+>  arch/arm/boot/dts/imx6q.dtsi   |  4 ++++
+>  arch/arm/boot/dts/imx6qdl.dtsi | 10 ++++++++--
+>  3 files changed, 16 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index 5c5f574..fbbdfca 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -110,3 +110,7 @@
+>                       "di0_sel", "di1_sel",
+>                       "di0", "di1";
+>  };
+> +
+> +&vpu {
+> +       compatible = "fsl,imx6dl-vpu", "cnm,coda960";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index addd3f8..2c1dbf8 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -291,3 +291,7 @@
+>                 };
+>         };
+>  };
+> +
+> +&vpu {
+> +       compatible = "fsl,imx6q-vpu", "cnm,coda960";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index eca0971..2052303 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -315,9 +315,15 @@
+>                         };
+>
+>                         vpu: vpu at 02040000 {
+> +                               compatible = "cnm,coda960";
+>                                 reg = <0x02040000 0x3c000>;
+> -                               interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>,
+> -                                            <0 12 IRQ_TYPE_LEVEL_HIGH>;
+> +                               interrupts = <0 12 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <0 3 IRQ_TYPE_LEVEL_HIGH>;
 
-Question for the linux-abi people:
+Is there an existing user? This would break things if so.
 
-What's the preferred way to do this these days?  This syscall is a
-general purpose "adjust the seccomp state" thing.  The alternative
-would be a specific new syscall to add a filter with a flags argument.
-
---Andy
+Rob
