@@ -1,49 +1,71 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Fri, 13 Jun 2014 21:55:36 +0530
-Subject: [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for
- secure mode
-In-Reply-To: <5388D129.6000706@samsung.com>
-References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
- <5388CBB9.1050003@suse.de> <5388D129.6000706@samsung.com>
-Message-ID: <CAK5sBcE9XoRKWoQbas1CcvuYNAnfnXUGBO-CA=TdQTkF61OjOQ@mail.gmail.com>
+From: wad@chromium.org (Will Drewry)
+Date: Fri, 13 Jun 2014 11:29:26 -0500
+Subject: [RFC 5/5] x86,seccomp: Add a seccomp fastpath
+In-Reply-To: <CAGXu5jL86C1yvWynBrp20CxT9COorc5++nT6OhwYCwqc7UJyHg@mail.gmail.com>
+References: <cover.1402517933.git.luto@amacapital.net>
+ <9e11cd988a0f120606e37b5e275019754e2774da.1402517933.git.luto@amacapital.net>
+ <CAADnVQKt5FnShkZeQewbfnU1kHM-gLs3hCZMf5xcgFzyRDLX7A@mail.gmail.com>
+ <CALCETrXoqqKC=T5Wvj+CDYQFte1s_=npDvQ2UYW0j=AanEgR1g@mail.gmail.com>
+ <5398D59A.3030900@zytor.com>
+ <CALCETrVMxkHcPXsEGtEc0Pr=Z80CzC0zWaQ9OdVdxi1CGuB4kQ@mail.gmail.com>
+ <5398D7B4.5000303@zytor.com>
+ <CALCETrWaQZc124=6r4h+fTAY4H4LzWGFw=MB7KY5TBtB0jx9hA@mail.gmail.com>
+ <CAGXu5jL86C1yvWynBrp20CxT9COorc5++nT6OhwYCwqc7UJyHg@mail.gmail.com>
+Message-ID: <CABqD9hbgPCSgXNCOreSV3b+yBsO9fLYtYr-ShtfOoH=uZEYa3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin,
-
-On Sat, May 31, 2014 at 12:12 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 05/31/14 03:19, Andreas F?rber wrote:
->>
->> Am 28.05.2014 06:13, schrieb Sachin Kamat:
+On Wed, Jun 11, 2014 at 5:32 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Wed, Jun 11, 2014 at 3:28 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>> On Wed, Jun 11, 2014 at 3:27 PM, H. Peter Anvin <hpa@zytor.com> wrote:
+>>> On 06/11/2014 03:22 PM, Andy Lutomirski wrote:
+>>>> On Wed, Jun 11, 2014 at 3:18 PM, H. Peter Anvin <hpa@zytor.com> wrote:
+>>>>> On 06/11/2014 02:56 PM, Andy Lutomirski wrote:
+>>>>>>
+>>>>>> 13ns is with the simplest nonempty filter.  I hope that empty filters
+>>>>>> don't work.
+>>>>>>
+>>>>>
+>>>>> Why wouldn't they?
+>>>>
+>>>> Is it permissible to fall off the end of a BPF program?  I'm getting
+>>>> EINVAL trying to install an actual empty filter.  The filter I tested
+>>>> with was:
+>>>>
 >>>
->>> Almost all Exynos-series of SoCs that run in secure mode don't need
->>> additional offset for every CPU, with Exynos4412 being the only
->>> exception.
+>>> What I meant was that there has to be a well-defined behavior for the
+>>> program falling off the end anyway, and that that should be preserved.
 >>>
->>> Tested on Origen-Quad (Exynos4412) and Arndale-Octa (Exynos5420).
+>>> I guess it is possible to require that all code paths must provably
+>>> reach a termination point.
 >>>
->>> While at it, fix the coding style (space around *).
->>>
->>> Signed-off-by: Sachin Kamat<sachin.kamat@linaro.org>
->>> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
->>> ---
->>>   arch/arm/mach-exynos/firmware.c |    9 +++++++--
->>>   1 file changed, 7 insertions(+), 2 deletions(-)
 >>
->>
->> Fixes ODROID-XU (Exynos5410) as well - thought it had been a prereq to
->> applying the 5410 patches...
->>
->> Tested-by: Andreas F?rber<afaerber@suse.de>
->>
-> Andreas, thanks for your test :-)
+>> Dunno.  I haven't ever touched any of the actual BPF code.  This whole
+>> patchset only changes the code that invokes the BPF evaluator.
 >
-> Sachin, How about exynos4210, 5250, 5260 and 5440?...
-> I need to check again, honestly I don't remember all of Exynos SoCs'
-> different things ;-) Then will apply into fixes for 3.16.
+> Yes, this is how BPF works: runs to the end or exit early. With
+> seccomp BPF specifically, the return value defaults to kill the
+> process. If a filter was missing (NULL), or empty, or didn't
+> explicitly return with a new value, the default (kill) should be
+> taken.
 
-ping..
+Yup - this is just a property of BPF (and a nice one :)
 
- --
-Regards,
-Sachin.
+On seccomp_attach_filter this check fires:
+  if (fprog->len == 0 || fprog->len > BPF_MAXINSNS)
+    return -EINVAL;
+
+As well as in sk_chk_filter:
+  if (flen == 0 || flen > BPF_MAXINSNS)
+    return -EINVAL;
+
+And:
+  /* last instruction must be a RET code */
+  switch (filter[flen - 1].code) {
+    case BPF_S_RET_K:
+    case BPF_S_RET_A:
+      return check_load_and_stores(filter, flen);
+  }
+
+cheers!
+will
