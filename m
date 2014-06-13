@@ -1,98 +1,88 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Fri, 13 Jun 2014 09:29:52 +0530
-Subject: [PATCH 3/3 v5] ARM: DTS: fix the chip select gpios definition in the
- SPI nodes
-In-Reply-To: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
-References: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1402631992-500-3-git-send-email-ch.naveen@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 Jun 2014 22:30:44 -0700
+Subject: [PATCH] [media] staging: allow omap4iss to be modular
+In-Reply-To: <1689719.caqIIBS1Wn@avalon>
+References: <5192928.MkINji4uKU@wuerfel> <2207210.T6NoNSQSCo@avalon>
+ <20140612151534.GF17845@atomide.com> <1689719.caqIIBS1Wn@avalon>
+Message-ID: <20140613053044.GG17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the "cs-gpio" from "controller-data" node
-as was specified in the old binding and use the standard
-"cs-gpios" property expected by the SPI core as is defined in
-the new binding.
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140612 08:32]:
+> Hi Tony,
+> 
+> On Thursday 12 June 2014 08:15:35 Tony Lindgren wrote:
+> > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140612 07:52]:
+> > > On Wednesday 11 June 2014 07:47:54 Tony Lindgren wrote:
+> > > > These should just use either pinctrl-single.c instead for muxing.
+> > > > Or if they are not mux registers, we do have the syscon mapping
+> > > > available in omap4.dtsi that pbias-regulator.c is already using.
+> > > > 
+> > > > Laurent, got any better ideas?
+> > > 
+> > > The ISS driver needs to write a single register, which contains several
+> > > independent fields. They thus need to be controlled by a single driver.
+> > > Some of them might be considered to be related to pinmuxing (although I
+> > > disagree on that), others are certainly not about muxing (there are clock
+> > > gate bits for instance).
+> > > 
+> > > Using the syscon mapping seems like the best option. I'll give it a try.
+> > 
+> > OK if it's not strictly pinctrl related then let's not use
+> > pinctrl-single,bits for it. You may be able to implement one or more
+> > framework drivers for it for pinctrl/regulator/clock/transceiver
+> > whatever that register is doing.
+> > 
+> > In any case it's best to have that handling in a separate helper driver
+> > somewhere as it's a separate piece of hardware from the camera module.
+> > If it does not fit into any existing frameworks then it's best to have
+> > it in a separate driver with the camera driver.
+> 
+> The register contains the following fields that control the two CSI2 PHYs 
+> (PHY1 and PHY2).
+> 
+> 31    CAMERARX_CSI22_LANEENABLE2   PHY2 Lane 2 (CSI22_DX2, CSI22_DY2) Enable
+> 30    CAMERARX_CSI22_LANEENABLE1   PHY2 Lane 1 (CSI22_DX1, CSI22_DY1) Enable
+> 29    CAMERARX_CSI22_LANEENABLE0   PHY2 Lane 0 (CSI22_DX0, CSI22_DY0) Enable
+> 28    CAMERARX_CSI21_LANEENABLE4   PHY1 Lane 4 (CSI21_DX4, CSI21_DY4) Enable
+> 27    CAMERARX_CSI21_LANEENABLE3   PHY1 Lane 3 (CSI21_DX3, CSI21_DY3) Enable
+> 26    CAMERARX_CSI21_LANEENABLE2   PHY1 Lane 2 (CSI21_DX2, CSI21_DY2) Enable
+> 25    CAMERARX_CSI21_LANEENABLE1   PHY1 Lane 1 (CSI21_DX1, CSI21_DY1) Enable
+> 24    CAMERARX_CSI21_LANEENABLE0   PHY1 Lane 0 (CSI21_DX0, CSI21_DY0) Enable
+> 21    CAMERARX_CSI22_CTRLCLKEN     PHY2 Clock Enable
+> 20:19 CAMERARX_CSI22_CAMMODE       PHY2 Mode (CCP2, CSI1, CSI2)
+> 18    CAMERARX_CSI21_CTRLCLKEN     PHY1 Clock Enable
+> 17:16 CAMERARX_CSI21_CAMMODE       PHY1 Mode (CCP2, CSI1, CSI2)
+> 
+> Bits 18 and 21 could be exposed through CCF. Bits 24 to 31 enable/disable the 
+> CSI2 lanes, so it could be argued that they could be exposed through the 
+> pinctrl framework. However, they need to be configured independently, possibly 
+> at runtime. I'm thus not sure pinctrl would be a good idea. Bits 17:16 and 
+> 20:19 don't fit in existing frameworks.
 
-Respective changes are preposed to spi-s3c64xx.c driver.
-@ http://www.spinics.net/lists/linux-samsung-soc/msg32282.html
+OK thanks for the info. Sounds like drivers/phy might be the right location
+for it then and then the phy driver can use the syscon regmap.
+ 
+> Given that this register is specific to the ISS, I think handling it as a 
+> separate device through a separate driver would only complicate the 
+> implementation without any real benefit.
 
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Cc: Tomasz Figa <t.figa@samsung.com>
----
-Changes since v4:
-1. Added reviewed by from Javier and Doug.
-2. Maintained the "status" and "cs-gpios" ordering
+Even though it's one register, it shoud still be treated separately from
+the camera driver. The problems with keeping the register access to the
+control module in the camera driver are at least following:
 
-Changes since v3:
-None
+1. They live in separate hardware modules that can be clocked separately
 
- arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
- arch/arm/boot/dts/exynos4412-trats2.dts   |    2 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+2. Doing a read-back to flush a posted write in one hardware module most
+   likely won't flush the write to other and that can lead into hard to
+   find mysterious bugs
 
-diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-index 636d166..676e6e0 100644
---- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-+++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-@@ -168,6 +168,7 @@
- 	};
- 
- 	spi_2: spi at 13940000 {
-+		cs-gpios = <&gpc1 2 0>;
- 		status = "okay";
- 
- 		w25x80 at 0 {
-@@ -178,7 +179,6 @@
- 			spi-max-frequency = <1000000>;
- 
- 			controller-data {
--				cs-gpio = <&gpc1 2 0>;
- 				samsung,spi-feedback-delay = <0>;
- 			};
- 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 8a558b7..204b0de 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -512,6 +512,7 @@
- 	spi_1: spi at 13930000 {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&spi1_bus>;
-+		cs-gpios = <&gpb 5 0>;
- 		status = "okay";
- 
- 		s5c73m3_spi: s5c73m3 {
-@@ -519,7 +520,6 @@
- 			spi-max-frequency = <50000000>;
- 			reg = <0>;
- 			controller-data {
--				cs-gpio = <&gpb 5 0>;
- 				samsung,spi-feedback-delay = <2>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index a794a70..0c6433a 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -316,6 +316,7 @@
- 	};
- 
- 	spi_1: spi at 12d30000 {
-+		cs-gpios = <&gpa2 5 0>;
- 		status = "okay";
- 
- 		w25q80bw at 0 {
-@@ -326,7 +327,6 @@
- 			spi-max-frequency = <1000000>;
- 
- 			controller-data {
--				cs-gpio = <&gpa2 5 0>;
- 				samsung,spi-feedback-delay = <0>;
- 			};
- 
--- 
-1.7.9.5
+3. If we ever have a common system control module driver, we need to
+   rewrite all the system control module register tinkering in the drivers
+
+So it's best to try to use an existing framework for it. That avoids
+tons of pain later on ;)
+
+Regards,
+
+Tony
