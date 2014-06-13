@@ -1,40 +1,31 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 13 Jun 2014 12:01:39 +0530
-Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from getting
- mapped to crossbar
-In-Reply-To: <20140612135715.GE17845@atomide.com>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
- <20140612125134.GS8664@titan.lakedaemon.net>
- <20140612135715.GE17845@atomide.com>
-Message-ID: <539A9ACB.7060208@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 13 Jun 2014 12:06:55 +0530
+Subject: [PATCH 0/4] cpufreq: Use cpufreq-cpu0 driver for Exynos3250
+In-Reply-To: <1402639693-31108-1-git-send-email-cw00.choi@samsung.com>
+References: <1402639693-31108-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAKohponQkBwDQWuOczotKn763Ne+_jSSG3B03r+xRh7-zwURvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 June 2014 07:27 PM, Tony Lindgren wrote:
-> * Jason Cooper <jason@lakedaemon.net> [140612 05:52]:
->> On Thu, Jun 12, 2014 at 05:23:11PM +0530, Sricharan R wrote:
->>> From: Nishanth Menon <nm@ti.com>
->>>
->>> When, in the system due to varied reasons, interrupts might be unusable
->>> due to hardware behavior, but register maps do exist, then those interrupts
->>> should be skipped while mapping irq to crossbars.
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->>> Signed-off-by: Tony Lindgren <tony@atomide.com>
->>
->> Tony, have you applied these somewhere already?
-> 
-> I think some of these I had applied into a branch ready for
-> merging but then it was discovered that further changes
-> were needed and the branch was dropped.
-> 
-> Sricharan, please remove my Signed-off-by from this series.
-> If I end up applying it for merging my scripts will add it
-> automatically.
-> 
- Ok, will remove it.
+cpufreq at vger.kernel.org is dead now. Anyway you should be using linux-pm
+instead.
 
-Regards,
- Sricharan
+On 13 June 2014 11:38, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patchset use cpufreq-cpu0 driver to support Exynos3250 cpufreq. So, this
+> patchset is based on following patchset[1] by Thomas Abraham.
+>  [1] http://www.spinics.net/lists/linux-samsung-soc/msg31593.html
+>
+> Chanwoo Choi (4):
+>   clk: samsung: exynos3250: Use cpu-clock provider type to support cpufreq
+>   clk: samsung: Add support for cpu clocks of Exynos3250
+>   Documentation: devicetree: Add cpu clock configuration data binding for Exynos3250
+>   ARM: dts: Exynos: Add cpu clock table and armclk divider table for Exynos3250
+>
+>  .../devicetree/bindings/clock/exynos3250-clock.txt | 32 ++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos3250.dtsi                  | 28 +++++++++++++++++++
+>  drivers/clk/samsung/clk-cpu.c                      | 31 +++++++++++++++++----
+>  drivers/clk/samsung/clk-exynos3250.c               | 14 +++++++---
+>  4 files changed, 96 insertions(+), 9 deletions(-)
+
+Nothing really cpufreq specific. Would *eagerly* wait for the patch that
+removes existing driver files :)
