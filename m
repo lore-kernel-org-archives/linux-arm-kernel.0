@@ -1,123 +1,81 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 13 Jun 2014 01:46:17 +0200
-Subject: [PATCH v13 06/10] drm: drm_display_mode: add signal polarity flags
-In-Reply-To: <1402395951-7988-6-git-send-email-denis@eukrea.com>
-References: <1402395951-7988-1-git-send-email-denis@eukrea.com>
- <1402395951-7988-6-git-send-email-denis@eukrea.com>
-Message-ID: <1420822.gvkeme0UiB@avalon>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 13 Jun 2014 02:22:40 +0200
+Subject: [PATCH 2/2] ARM: dts: mx5: Move the display out of soc {} node
+In-Reply-To: <1402618960-9735-1-git-send-email-marex@denx.de>
+References: <1402618960-9735-1-git-send-email-marex@denx.de>
+Message-ID: <1402618960-9735-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+Move the display {} node out of the soc {} node . This just aligns
+the DT with other boards, there is no functional change.
 
-Thank you for the patch.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx53-m53evk.dts | 48 ++++++++++++++++++--------------------
+ 1 file changed, 23 insertions(+), 25 deletions(-)
 
-On Tuesday 10 June 2014 12:25:47 Denis Carikli wrote:
-> We need a way to pass signal polarity informations
->   between DRM panels, and the display drivers.
-> 
-> To do that, a pol_flags field was added to drm_display_mode.
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v12->v13:
-> - Added Docbook documentation for pol_flags the struct field.
-> - Removed the _PRESERVE	defines: it was used by patches
->   against the imx_drm driver. Now theses patches have been
->   adapted not to require that defines.
-> ChangeLog v11->v12:
-> - Rebased: This patch now applies against drm_modes.h
-> - Rebased: It now uses the new DRM_MODE_FLAG_POL_DE flags defines names
-> 
-> ChangeLog v10->v11:
-> - Since the imx-drm won't be able to retrive its regulators
->   from the device tree when using display-timings nodes,
->   and that I was told that the drm simple-panel driver
->   already supported that, I then, instead, added what was
->   lacking to make the eukrea displays work with the
->   drm-simple-panel driver.
-> 
->   That required a way to get back the display polarity
->   informations from the imx-drm driver without affecting
->   userspace.
-> ---
->  Documentation/DocBook/drm.tmpl |   30 ++++++++++++++++++++++++++++++
->  include/drm/drm_modes.h        |    6 ++++++
->  2 files changed, 36 insertions(+)
-> 
-> diff --git a/Documentation/DocBook/drm.tmpl b/Documentation/DocBook/drm.tmpl
-> index c526d81..29c0e5a 100644
-> --- a/Documentation/DocBook/drm.tmpl
-> +++ b/Documentation/DocBook/drm.tmpl
-> @@ -2292,6 +2292,36 @@ void intel_crt_init(struct drm_device *dev)
->              and <structfield>height_mm</structfield> fields are only used
-> internally during EDID parsing and should not be set when creating modes
-> manually. </para>
-> +          <para>
-> +            The <structfield>pol_flags</structfield> value represents the
-> display
-> +            signal polarity flags, it can be a combination of
-> +            <variablelist>
-> +              <varlistentry>
-> +                <term>DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE</term>
-> +                 <listitem><para>
-> +                     drive pixel data on falling edge, sample data on
-> rising edge.
-> +                 </para></listitem>
-> +              </varlistentry>
-> +              <varlistentry>
-> +                <term>DRM_MODE_FLAG_POL_PIXDATA_POSEDGE</term>
-> +                <listitem><para>
-> +                  Drive pixel data on rising edge, sample data on falling
-> edge.
-> +                </para></listitem>
-> +              </varlistentry>
-> +              <varlistentry>
-> +                <term>DRM_MODE_FLAG_POL_DE_LOW</term>
-> +                <listitem><para>
-> +                  data-enable pulse is active low
-> +                </para></listitem>
-> +              </varlistentry>
-> +              <varlistentry>
-> +                <term>DRM_MODE_FLAG_POL_DE_HIGH</term>
-> +                <listitem><para>
-> +                  data-enable pulse is active low
-
-I assume you mean active high here.
-
-> +                </para></listitem>
-> +              </varlistentry>
-> +            </variablelist>
-> +          </para>
->          </listitem>
->          <listitem>
->            <synopsis>int (*mode_valid)(struct drm_connector *connector,
-> diff --git a/include/drm/drm_modes.h b/include/drm/drm_modes.h
-> index 91d0582..c5cbe31 100644
-> --- a/include/drm/drm_modes.h
-> +++ b/include/drm/drm_modes.h
-> @@ -93,6 +93,11 @@ enum drm_mode_status {
-> 
->  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
-> 
-> +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
-> +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
-> +#define DRM_MODE_FLAG_POL_DE_LOW		BIT(3)
-> +#define DRM_MODE_FLAG_POL_DE_HIGH		BIT(4)
-> +
->  struct drm_display_mode {
->  	/* Header */
->  	struct list_head head;
-> @@ -144,6 +149,7 @@ struct drm_display_mode {
->  	int vrefresh;		/* in Hz */
->  	int hsync;		/* in kHz */
->  	enum hdmi_picture_aspect picture_aspect_ratio;
-> +	unsigned int pol_flags;
->  };
-> 
->  /* mode specified on the command line */
-
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index 3a04b9e..c4956b0 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -21,33 +21,31 @@
+ 		      <0xb0000000 0x20000000>;
+ 	};
+ 
+-	soc {
+-		display1: display at di1 {
+-			compatible = "fsl,imx-parallel-display";
+-			interface-pix-fmt = "bgr666";
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_ipu_disp1>;
+-
+-			display-timings {
+-				800x480p60 {
+-					native-mode;
+-					clock-frequency = <31500000>;
+-					hactive = <800>;
+-					vactive = <480>;
+-					hfront-porch = <40>;
+-					hback-porch = <88>;
+-					hsync-len = <128>;
+-					vback-porch = <33>;
+-					vfront-porch = <9>;
+-					vsync-len = <3>;
+-					vsync-active = <1>;
+-				};
++	display1: display at di1 {
++		compatible = "fsl,imx-parallel-display";
++		interface-pix-fmt = "bgr666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu_disp1>;
++
++		display-timings {
++			800x480p60 {
++				native-mode;
++				clock-frequency = <31500000>;
++				hactive = <800>;
++				vactive = <480>;
++				hfront-porch = <40>;
++				hback-porch = <88>;
++				hsync-len = <128>;
++				vback-porch = <33>;
++				vfront-porch = <9>;
++				vsync-len = <3>;
++				vsync-active = <1>;
+ 			};
++		};
+ 
+-			port {
+-				display1_in: endpoint {
+-					remote-endpoint = <&ipu_di1_disp1>;
+-				};
++		port {
++			display1_in: endpoint {
++				remote-endpoint = <&ipu_di1_disp1>;
+ 			};
+ 		};
+ 	};
 -- 
-Regards,
-
-Laurent Pinchart
+2.0.0.rc2
