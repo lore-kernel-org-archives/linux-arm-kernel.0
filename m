@@ -1,81 +1,55 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Fri, 13 Jun 2014 17:24:20 +0530
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <5398758F.4080306@samsung.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
- <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
- <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
- <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
- <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
- <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
- <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
- <5398758F.4080306@samsung.com>
-Message-ID: <CADWw7Oh=A_cg_hqu8DZ1t_iacOGgWediLp3K3viFYHMNAPkqRw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jun 2014 14:02:01 +0200
+Subject: [PATCH] [RFC] [media] omap3isp: try to fix dependencies
+Message-ID: <46586956.hxqoJOmDbk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 8:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 06/12/14 00:19, Doug Anderson wrote:
->>
->> Chander,
->>
->> On Tue, Jun 10, 2014 at 9:52 PM, Chander Kashyap<k.chander@samsung.com>
->> wrote:
->>>
->>> Hi Doug,
->>>
->>> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre<nicolas.pitre@linaro.org>
->>> wrote:
->>>>
->>>> On Tue, 10 Jun 2014, Doug Anderson wrote:
->>>>
->>>>> My S-state knowledge is not strong, but I believe that Lorenzo's
->>>>> questions matter if we're using S2 for CPUidle (where we actually turn
->>>>> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
->>>>> (where we just enter WFI/WFE).
->>>>>
->>>
->>> No Its not plain WFI.
->>>
->>> All cores in Exynos5420 can be powered off independently.
->>> This functionality has been tested.
->>>
->>> Below is the link for the posted patches.
->>>
->>> https://lkml.org/lkml/2014/6/10/194
->>>
->>> And as Nicolas wrote, these patches need MCPM for that.
->>
->>
->> Most excellent!  I should have been more clear that I only knew about
->> how CPUidle worked in our local production kernel.  There I'm pretty
->> sure CPUidle is just WFI/WFE.  If you've got patches to do better then
->> that's great!
->>
->> ...can you confirm that my patch doesn't interfere with your improved
->> CPUidle?  It's been Acked by Nicolas (thanks!) so I'd imagine it will
->> land shortly.  Kukjin: I assume you'll be taking this?
->>
+commit 2a0a5472af5c ("omap3isp: Use the ARM DMA IOMMU-aware operations")
+brought the omap3isp driver closer to using standard APIs, but also
+introduced two problems:
 
-This patch is effectively changing the mcpm_entry_point address from
-nsbase + 0x1c to nsbase + 0x8
+a) it selects a particular IOMMU driver for no good reason. This just
+   causes hard to track dependency chains, in my case breaking an
+   experimental patch set that tries to reenable !MMU support on ARM
+   multiplatform kernels. Since the driver doesn't have a dependency
+   on the actual IOMMU implementation (other than sitting on the same
+   SoC), this changes the 'select OMAP_IOMMU' to a generic 'depends on
+   IOMMU_API' that reflects the actual usage.
 
-Hence while integrating with mainline u-boot we need to take care for
-new mcpm_entry_point address.
+b) The driver incorrectly calls into low-level helpers designed to
+   be used by the IOMMU implementation:
+   arm_iommu_{create,attach,release}_mapping. I'm not fixing this
+   here, but adding a FIXME and a dependency on ARM_DMA_USE_IOMMU.
+   I believe the correct solution is to move the calls into the
+   omap iommu driver that currently doesn't have them, and change
+   the isp driver to call generic functions.
 
-With Chromebook it works straightforward.
+In addition, this also adds the missing 'select VIDEOBUF2_DMA_CONTIG'
+that is needed since fbac1400bd1 ("[media] omap3isp: Move to videobuf2")
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+----
 
-> Sure, I will ;-)
->
-> Thanks,
-> Kukjin
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Hi Laurent,
+
+Could you have a look at this? It's possible I'm missing something
+important here, but this is what I currently need to get randconfig
+builds to use the omap3isp driver.
+
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index 8108c69..15bf61b 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -94,8 +94,9 @@ config VIDEO_M32R_AR_M64278
+ config VIDEO_OMAP3
+ 	tristate "OMAP 3 Camera support"
+ 	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3
+-	select ARM_DMA_USE_IOMMU
+-	select OMAP_IOMMU
++	depends on ARM_DMA_USE_IOMMU # FIXME: use iommu API instead of low-level ARM calls
++	depends on IOMMU_API
++	select VIDEOBUF2_DMA_CONTIG
+ 	---help---
+ 	  Driver for an OMAP 3 camera controller.
+ 
