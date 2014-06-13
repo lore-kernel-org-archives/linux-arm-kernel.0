@@ -1,27 +1,52 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 13 Jun 2014 11:34:48 +0100
-Subject: [PATCH] OMAP: add deprecation message for legacy omap DMA API
-Message-ID: <E1WvOoq-0002cL-Q0@rmk-PC.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 13 Jun 2014 12:49 +0200
+Subject: [PATCH v2] ARM: shmobile: koelsch: Add support HSCIF1
+In-Reply-To: <20140613074306.GA15286@verge.net.au>
+References: <1402367659-21117-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+ <10020827.IyD6srEo7g@avalon> <20140613074306.GA15286@verge.net.au>
+Message-ID: <9058795.dyXpcFtuGJ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/plat-omap/dma.c | 2 ++
- 1 file changed, 2 insertions(+)
+Hi Simon,
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index b5608b1f9fbd..1c98659bbf89 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -698,6 +698,8 @@ int omap_request_dma(int dev_id, const char *dev_name,
- 	unsigned long flags;
- 	struct omap_dma_lch *chan;
- 
-+	WARN(strcmp(dev_name, "DMA engine"), "Using deprecated platform DMA API - please update to DMA engine");
-+
- 	spin_lock_irqsave(&dma_chan_lock, flags);
- 	for (ch = 0; ch < dma_chan_count; ch++) {
- 		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
+On Friday 13 June 2014 16:43:07 Simon Horman wrote:
+> On Fri, Jun 13, 2014 at 09:01:27AM +0200, Laurent Pinchart wrote:
+> > On Tuesday 10 June 2014 16:00:48 Simon Horman wrote:
+> > > On Tue, Jun 10, 2014 at 01:14:27PM +0900, Magnus Damm wrote:
+> > > > On Tue, Jun 10, 2014 at 11:34 AM, Nobuhiro Iwamatsu wrote:
+> > > > > Koelsch can use HSCIF1 insetead of SCIF1 as serial port. But if we
+> > > > > want
+> > > > > to use, we will need to disable the GPIO key and remodeling of the
+> > > > > board. Therefore status of hscif1 does not set the "okay".
+> > > > > 
+> > > > > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> > > > > ---
+> > > > > 
+> > > > >  V2: Remove hscif1_clk from renesas,groups. This pin does not use.
+> > > > 
+> > > > Thanks for updating the patch. This looks fine to me.
+> > > > 
+> > > > Acked-by: Magnus Damm <damm+renesas@opensource.se>
+> > > 
+> > > Thanks, I will queue this up.
+> > 
+> > Sorry for the late reply, but I have some doubts about this. The HRX0 and
+> > HTX0 signals are connected to push buttons and used as GPIOs. Beside,
+> > they're not routed to serial port transceiver. If we want to use HSCIF0
+> > on those pins on Koelsch and extension board must be connected to the
+> > EXIO C connector, and two resistors and two capacitors should be
+> > unsoldered. I thus don't think the Koeslch DT should contain pinmux data
+> > for the HSCIF0 device. If an extension board is used and HSCIF0 needed,
+> > then the DT file for the extension board should define pinmuxing for the
+> > serial port.
+> 
+> If you would like me to revert this patch I am happy to consider doing so.
+
+That's one option, but I'd like to get feedback on my point of view before 
+reverting it. Who knows, I might be wrong ;-)
+
 -- 
-1.8.3.1
+Regards,
+
+Laurent Pinchart
