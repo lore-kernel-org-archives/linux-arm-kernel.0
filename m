@@ -1,62 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Jun 2014 00:53:25 -0700
-Subject: [PATCH] [media] staging: allow omap4iss to be modular
-In-Reply-To: <1830688.7p3Fp6u7a2@avalon>
-References: <5192928.MkINji4uKU@wuerfel> <1689719.caqIIBS1Wn@avalon>
- <20140613053044.GG17845@atomide.com> <1830688.7p3Fp6u7a2@avalon>
-Message-ID: <20140613075325.GO17845@atomide.com>
+From: chiau.ee.chew@intel.com (Chew Chiau Ee)
+Date: Fri, 13 Jun 2014 23:57:25 +0800
+Subject: [PATCH v2] spi/pxa2xx: fix incorrect SW mode chipselect setting for
+ BayTrail LPSS SPI
+Message-ID: <1402675045-22460-1-git-send-email-chiau.ee.chew@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140612 23:48]:
-> On Thursday 12 June 2014 22:30:44 Tony Lindgren wrote:
-> > 
-> > 1. They live in separate hardware modules that can be clocked separately
-> 
-> Actually I don't think that's true. The CSI2 PHY is part of the camera device, 
-> with all its registers but the one above in the camera device register space. 
-> For some weird reason a couple of bits were pushed to the control module, but 
-> that doesn't make the CSI2 PHY itself a separate device.
+From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
 
-Yes they are separate. Anything in the system control module is
-a separate hardware module from the other devices. So in this case
-the CSI2 PHY is part of the system control module, not the camera
-module.
+It was observed that after module removal followed by insertion,
+the SW mode chipselect is not properly set. Thus causing transfer
+failure due to incorrect CS toggling.
 
-> > 2. Doing a read-back to flush a posted write in one hardware module most
-> >    likely won't flush the write to other and that can lead into hard to
-> >    find mysterious bugs
-> 
-> The OMAP4 ISS driver can just read back the CAMERA_RX register, can't it ?
+Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+---
+ drivers/spi/spi-pxa2xx.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-Right, but you would have to do readbacks both from the phy register and
-camera register to ensure writes get written. It's best to keep the
-logic completely separate especially considering that they can be
-clocked separately.
-
-> > 3. If we ever have a common system control module driver, we need to
-> >    rewrite all the system control module register tinkering in the drivers
-> 
-> Sure, but that's already the case today, as the OMAP4 ISS driver already 
-> accesses the control module register directly. I won't make that worse :-)
-
-Well it's in staging for a reason :)
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index a98df7e..fe79210 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -118,6 +118,7 @@ static void lpss_ssp_setup(struct driver_data *drv_data)
+ 	 */
+ 	orig = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
  
-> > So it's best to try to use an existing framework for it. That avoids tons of
-> > pain later on ;)
-> 
-> I agree, but I don't think the PHY framework would be the right abstraction. 
-> As explained above the CSI2 PHY is part of the OMAP4 ISS, so modeling its 
-> single control module register as a PHY would be a hack. 
-
-Well that register belongs to the system control module, not the
-camera module. It's not like the camera IO space is out of registers
-or something! :)
-
-We're already handling similar control module phy cases, see for
-example drivers/phy/phy-omap-control.c. Maybe you have most of the
-code already there?
-
-Regards,
-
-Tony
++	/* Test SPI_CS_CONTROL_SW_MODE bit enabling */
+ 	value = orig | SPI_CS_CONTROL_SW_MODE;
+ 	writel(value, drv_data->ioaddr + offset + SPI_CS_CONTROL);
+ 	value = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
+@@ -126,10 +127,13 @@ static void lpss_ssp_setup(struct driver_data *drv_data)
+ 		goto detection_done;
+ 	}
+ 
+-	value &= ~SPI_CS_CONTROL_SW_MODE;
++	orig = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
++
++	/* Test SPI_CS_CONTROL_SW_MODE bit disabling */
++	value = orig & ~SPI_CS_CONTROL_SW_MODE;
+ 	writel(value, drv_data->ioaddr + offset + SPI_CS_CONTROL);
+ 	value = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
+-	if (value != orig) {
++	if (value != (orig & ~SPI_CS_CONTROL_SW_MODE)) {
+ 		offset = 0x800;
+ 		goto detection_done;
+ 	}
+-- 
+1.7.4.4
