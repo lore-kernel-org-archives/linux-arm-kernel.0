@@ -1,116 +1,71 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 14 Jun 2014 00:43:00 +0200
-Subject: [PATCH] Exynos4: cpuidle: support dual CPUs with AFTR state
-In-Reply-To: <1402476643.32147.6.camel@AMDC1943>
-References: <1396604925-18383-1-git-send-email-daniel.lezcano@linaro.org>
- <1402476643.32147.6.camel@AMDC1943>
-Message-ID: <539B7E74.7000605@linaro.org>
+From: dianders@google.com (Doug Anderson)
+Date: Fri, 13 Jun 2014 15:50:07 -0700
+Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
+In-Reply-To: <20140613220421.GD5099@sirena.org.uk>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
+ <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
+ <20140613170511.GA20112@sirena.org.uk>
+ <CAD=FV=VvkvH1TPiKttm9VXbBRnBo7kmTVK8bZZvexK=bAvaO4Q@mail.gmail.com>
+ <CAD=FV=XCk9E-7VPV=LQrdLU5fKsFHviQf79MBmC8va3gsg=Ydw@mail.gmail.com>
+ <20140613220421.GD5099@sirena.org.uk>
+Message-ID: <CAD=FV=U06JioDvvSqHyC5BZp_sKppk4i=s7DERCXG7rGHBe=xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2014 10:50 AM, Krzysztof Kozlowski wrote:
-> On pi?, 2014-04-04 at 11:48 +0200, Daniel Lezcano wrote:
->> The following driver is for exynos4210. I did not yet finished the other boards, so
->> I created a specific driver for 4210 which could be merged later.
->>
->> The driver is based on Colin Cross's driver found at:
->>
->> https://android.googlesource.com/kernel/exynos/+/e686b1ec67423c40b4fdf811f9a4dfa3b393a010%5E%5E!/
->>
->> This one was based on a 3.4 kernel and an old API.
->>
->> It has been refreshed, simplified and based on the recent code cleanup I sent
->> today.
->>
->> The AFTR could be entered when all the cpus (except cpu0) are down. In order to
->> reach this situation, the couple idle states are used.
->>
->> There is a sync barrier at the entry and the exit of the low power function. So
->> all cpus will enter and exit the function at the same time.
->>
->> At this point, CPU0 knows the other cpu will power down itself. CPU0 waits for
->> the CPU1 to be powered down and then initiate the AFTR power down sequence.
->>
->> No interrupts are handled by CPU1, this is why we switch to the timer broadcast
->> even if the local timer is not impacted by the idle state.
->>
->> When CPU0 wakes up, it powers up CPU1 and waits for it to boot. Then they both
->> exit the idle function.
->>
->> This driver allows the exynos4210 to have the same power consumption at idle
->> time than the one when we have to unplug CPU1 in order to let CPU0 to reach
->> the AFTR state.
->>
->> This patch is a RFC because, we have to find a way to remove the macros
->> definitions and cpu powerdown function without pulling the arch dependent
->> headers.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>   arch/arm/mach-exynos/common.c        |   11 +-
->>   drivers/cpuidle/Kconfig.arm          |    8 ++
->>   drivers/cpuidle/Makefile             |    1 +
->>   drivers/cpuidle/cpuidle-exynos4210.c |  226 ++++++++++++++++++++++++++++++++++
->>   4 files changed, 245 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/cpuidle/cpuidle-exynos4210.c
+Mark,
+
+On Fri, Jun 13, 2014 at 3:04 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Jun 13, 2014 at 02:58:26PM -0700, Doug Anderson wrote:
 >
-> (...)
+>> Anyway, suffice to say that the i2c core needs to be extended to
+>> handle the idea that a single device has more than one "compatible"
+>> string.  I'll leave it to an eager reader of this thread to implement
+>> this since we can also fix our own problem by just listing "max98091"
+>> in "sound/soc/codecs/max98090.c" like has always been done in the
+>> past.
 >
->> diff --git a/drivers/cpuidle/cpuidle-exynos4210.c b/drivers/cpuidle/cpuidle-exynos4210.c
->> new file mode 100644
->> index 0000000..56f6d51
->> --- /dev/null
->> +++ b/drivers/cpuidle/cpuidle-exynos4210.c
->> @@ -0,0 +1,226 @@
->> +/*
->> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * Copyright (c) 2014 Linaro : Daniel Lezcano <daniel.lezcano@linaro.org>
->> + *		http://www.linaro.org
->> + *
->> + * Based on the work of Colin Cross <ccross@android.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/cpuidle.h>
->> +#include <linux/cpu_pm.h>
->> +#include <linux/io.h>
->> +#include <linux/platform_device.h>
->> +
->> +#include <asm/proc-fns.h>
->> +#include <asm/suspend.h>
->> +#include <asm/cpuidle.h>
->> +
->> +#include <plat/pm.h>
->> +#include <plat/cpu.h>
->> +#include <plat/map-base.h>
->> +#include <plat/map-s5p.h>
->> +
->> +static atomic_t exynos_idle_barrier;
->
-> Hi,
->
-> Shouldn't the exynos_idle_barrier be initialized here?
+> Why do you need to register multiple compatible strings (I guess for
+> fallback purposes?).
 
-As it is a static data it will be initialized to zero.
+I'm no expert, but I think that's part of device tree isn't it?
 
-> I know you sent the patch almost 2 months ago but I stomped on this
-> while testing it on Exynos3250.
+In the case of max98090 and max98091, they are incredibly similar
+pieces of hardware (I think the max98091 simply has more microphones).
+If you've got a driver for a max98090 it will work just fine for a
+max98091 but you just won't get the extra microphones.
 
-No problem. And what results on exynos3250 ?
+In cases like this then device tree theory says that you should list
+both compatible strings: max98091 and max98090, right?  If your OS has
+a driver for max98091 it will use it.  ...if it doesn't but it has a
+max98090 driver it will try that one.
 
-Thanks !
+As far as I understand we _shouldn't_ lie and just say that we have a
+max98090 when we really have a max98091.  The device tree is supposed
+to describe the hardware and isn't support to care that the OS has a
+driver for max98090 but not max98091.
 
-   -- Daniel
+Ironically in our case we have a driver that supports both the 98090
+and the 98091 via autodetect.  However, it doesn't know about the
+98091 compatible string so if you list yourself as compatible with
+98091 then it won't find the driver.
 
+> A quick fix that is about as good is to take the
+> first compatible only.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+That's how the code works today, actually.  ...but as per above the
+current 98090 driver doesn't know about the 98091 compatible string,
+so:
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+compatible = "maxim,max98091", "maxim,max98090";
+
+...won't find the right driver.
+
+--
+
+The quick fix is to add max98091 to the max98090 driver and is what
+I'd suggest in this case.  ...but I still think that the above logic
+is valid and eventually the i2c core should be fixed.  Please correct
+me if I'm wrong.
+
+-Doug
