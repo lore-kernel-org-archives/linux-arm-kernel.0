@@ -1,75 +1,77 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Jun 2014 13:16:34 +0200
-Subject: [PATCH v2] ARM: shmobile: koelsch: Add support HSCIF1
-In-Reply-To: <9058795.dyXpcFtuGJ@avalon>
-References: <1402367659-21117-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
- <10020827.IyD6srEo7g@avalon> <20140613074306.GA15286@verge.net.au>
- <9058795.dyXpcFtuGJ@avalon>
-Message-ID: <CAMuHMdUd=E=TcSTPwy0xbpAcZH+voiEkjND=qzdSzG_zKdPe9g@mail.gmail.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 13 Jun 2014 17:03:53 +0530
+Subject: [PATCH v2 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <Pine.LNX.4.44L0.1406111131200.890-100000@iolanthe.rowland.org>
+References: <1402064411-18244-1-git-send-email-gautam.vivek@samsung.com>
+ <Pine.LNX.4.44L0.1406111131200.890-100000@iolanthe.rowland.org>
+Message-ID: <CAFp+6iF9GkKWDcqZNV58Z=U3ZDQdgYr8LJBF9t-BpJW90vsHdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 12:49 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Friday 13 June 2014 16:43:07 Simon Horman wrote:
->> On Fri, Jun 13, 2014 at 09:01:27AM +0200, Laurent Pinchart wrote:
->> > On Tuesday 10 June 2014 16:00:48 Simon Horman wrote:
->> > > On Tue, Jun 10, 2014 at 01:14:27PM +0900, Magnus Damm wrote:
->> > > > On Tue, Jun 10, 2014 at 11:34 AM, Nobuhiro Iwamatsu wrote:
->> > > > > Koelsch can use HSCIF1 insetead of SCIF1 as serial port. But if we
->> > > > > want
->> > > > > to use, we will need to disable the GPIO key and remodeling of the
->> > > > > board. Therefore status of hscif1 does not set the "okay".
->> > > > >
->> > > > > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
->> > > > > ---
->> > > > >
->> > > > >  V2: Remove hscif1_clk from renesas,groups. This pin does not use.
->> > > >
->> > > > Thanks for updating the patch. This looks fine to me.
->> > > >
->> > > > Acked-by: Magnus Damm <damm+renesas@opensource.se>
->> > >
->> > > Thanks, I will queue this up.
->> >
->> > Sorry for the late reply, but I have some doubts about this. The HRX0 and
->> > HTX0 signals are connected to push buttons and used as GPIOs. Beside,
->> > they're not routed to serial port transceiver. If we want to use HSCIF0
->> > on those pins on Koelsch and extension board must be connected to the
->> > EXIO C connector, and two resistors and two capacitors should be
->> > unsoldered. I thus don't think the Koeslch DT should contain pinmux data
->> > for the HSCIF0 device. If an extension board is used and HSCIF0 needed,
->> > then the DT file for the extension board should define pinmuxing for the
->> > serial port.
+Hi,
 
-You mean HRX1, HTX1, and HSCIF1?
 
-HTX1 and HRX1 can be connected to the DEBUG1 transceiver by stuffing
-zero-Ohm resisters to R834 and R835.
-
-About your comment about the resistors and capacitors, which applies to
-both HSCIF0 and HSCIF1: probably the serial port will still work if
-these are present.
-
->> If you would like me to revert this patch I am happy to consider doing so.
+On Wed, Jun 11, 2014 at 9:09 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Fri, 6 Jun 2014, Vivek Gautam wrote:
 >
-> That's one option, but I'd like to get feedback on my point of view before
-> reverting it. Who knows, I might be wrong ;-)
+>> Facilitate getting required 3.3V and 1.0V VDD supply for
+>> EHCI controller on Exynos.
+>>
+>> With patches for regulators' nodes merged in 3.15:
+>> c8c253f ARM: dts: Add regulator entries to smdk5420
+>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+>>
+>> certain perripherals will now need to ensure that,
+>> they request VDD regulators in their drivers, and enable
+>> them so as to make them working.
+>
+> "Certain peripherals"?  Don't you mean "certain controllers"?
 
-Nevertheless, I agree with Laurent.
+Right, 'certain controllers'.
 
-HSCIF1 (and HSCIF0) cannot be used on the Koelsch board as-is, hence they
-should not be present in the plain Koelsch DTS.  They should be put in
-an overlay
-DTS instead.
+>
+> Does this mean some controllers don't need to use the VDD regulators?
 
-Gr{oetje,eeting}s,
+Actually until the two patches got merged, the USB controllers were
+depending on bootloader
+for the VDD supply, wherein it was enabled, which ofcourse was bad.
+And by 'certain' i meant that above mentioned dt patches enable only the minimum
+number of regulators for the system, however leaves other for the
+drivers to enable.
+Anyways, i will re-do this commit message.
 
-                        Geert
+>
+>> @@ -193,7 +196,31 @@ static int exynos_ehci_probe(struct platform_device *pdev)
+>>
+>>       err = exynos_ehci_get_phy(&pdev->dev, exynos_ehci);
+>>       if (err)
+>> -             goto fail_clk;
+>> +             goto fail_regulator1;
+>> +
+>> +     exynos_ehci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
+>> +     if (!IS_ERR(exynos_ehci->vdd33)) {
+>> +             err = regulator_enable(exynos_ehci->vdd33);
+>> +             if (err) {
+>> +                     dev_err(&pdev->dev,
+>> +                             "Failed to enable 3.3V Vdd supply\n");
+>> +                     goto fail_regulator1;
+>> +             }
+>> +     } else {
+>> +             dev_warn(&pdev->dev, "Regulator 3.3V Vdd supply not found\n");
+>> +     }
+>
+> What if this is one of the controllers that don't need to use a VDD
+> regulator?  Do you really want to print out a warning in that case?
+> Should you call devm_regulator_get_optional() instead?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Right, better to use devm_regulator_get_optional(). Thanks for
+pointing this out.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
