@@ -1,121 +1,63 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 13 Jun 2014 16:24:52 +0530
-Subject: [PATCH V2 16/19] irqchip: crossbar: introduce ti,
- max-crossbar-sources to identify valid crossbar mapping
-In-Reply-To: <20140612135453.GB8664@titan.lakedaemon.net>
+Date: Fri, 13 Jun 2014 16:34:53 +0530
+Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from getting
+ mapped to crossbar
+In-Reply-To: <539AA08A.7010001@ti.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-17-git-send-email-r.sricharan@ti.com>
- <20140612135453.GB8664@titan.lakedaemon.net>
-Message-ID: <539AD87C.8000004@ti.com>
+ <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
+ <20140612125134.GS8664@titan.lakedaemon.net>
+ <20140612135715.GE17845@atomide.com>
+ <20140612140508.GC8664@titan.lakedaemon.net> <539AA08A.7010001@ti.com>
+Message-ID: <539ADAD5.1000904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Thursday 12 June 2014 07:24 PM, Jason Cooper wrote:
-> On Thu, Jun 12, 2014 at 05:23:24PM +0530, Sricharan R wrote:
->> From: Nishanth Menon <nm@ti.com>
+On Friday 13 June 2014 12:26 PM, Sricharan R wrote:
+> Hi Jason,
+> 
+> On Thursday 12 June 2014 07:35 PM, Jason Cooper wrote:
+>> On Thu, Jun 12, 2014 at 06:57:15AM -0700, Tony Lindgren wrote:
+>>> * Jason Cooper <jason@lakedaemon.net> [140612 05:52]:
+>>>> On Thu, Jun 12, 2014 at 05:23:11PM +0530, Sricharan R wrote:
+>>>>> From: Nishanth Menon <nm@ti.com>
+>>>>>
+>>>>> When, in the system due to varied reasons, interrupts might be unusable
+>>>>> due to hardware behavior, but register maps do exist, then those interrupts
+>>>>> should be skipped while mapping irq to crossbars.
+>>>>>
+>>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>>>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>>>>
+>>>> Tony, have you applied these somewhere already?
+>>>
+>>> I think some of these I had applied into a branch ready for
+>>> merging but then it was discovered that further changes
+>>> were needed and the branch was dropped.
 >>
->> Currently we attempt to map any crossbar value to an IRQ, however,
->> this is not correct from hardware perspective. There is a max crossbar
->> event number upto which hardware supports. So describe the same in
->> device tree using 'ti,max-crossbar-sources' property and use it to
->> validate requests.
+>> Ok.
 >>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  .../devicetree/bindings/arm/omap/crossbar.txt      |    2 ++
->>  drivers/irqchip/irq-crossbar.c                     |   21 ++++++++++++++++++--
->>  2 files changed, 21 insertions(+), 2 deletions(-)
+>>> Sricharan, please remove my Signed-off-by from this series.
+>>> If I end up applying it for merging my scripts will add it
+>>> automatically.
 >>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
->> index fb88585..6d2e2f5 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
->> @@ -10,6 +10,7 @@ Required properties:
->>  - compatible : Should be "ti,irq-crossbar"
->>  - reg: Base address and the size of the crossbar registers.
->>  - ti,max-irqs: Total number of irqs available at the interrupt controller.
->> +- ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
->>  - ti,reg-size: Size of a individual register in bytes. Every individual
->>  	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
->>  - ti,irqs-reserved: List of the reserved irq lines that are not muxed using
->> @@ -22,6 +23,7 @@ Examples:
->>  			compatible = "ti,irq-crossbar";
->>  			reg = <0x4a002a48 0x130>;
->>  			ti,max-irqs = <160>;
->> +			ti,max-crossbar-sources = <400>;
->>  			ti,reg-size = <2>;
->>  			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
->>  		};
->> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
->> index 2a73a66..cf69c4d 100644
->> --- a/drivers/irqchip/irq-crossbar.c
->> +++ b/drivers/irqchip/irq-crossbar.c
->> @@ -26,6 +26,7 @@
->>  /**
->>   * struct crossbar_device - crossbar device descriptio
->>   * @int_max: maximum number of supported interrupts
->> + * @max_crossbar_sources: Maximum number of crossbar sources
->>   * @irq_map: array of interrupts to crossbar number mapping
->>   * @crossbar_base: crossbar base address
->>   * @register_offsets: offsets for each irq number
->> @@ -33,6 +34,7 @@
->>   */
->>  struct crossbar_device {
->>  	uint int_max;
->> +	uint max_crossbar_sources;
->>  	uint *irq_map;
->>  	void __iomem *crossbar_base;
->>  	int *register_offsets;
->> @@ -126,12 +128,19 @@ static int crossbar_domain_xlate(struct irq_domain *d,
->>  				 unsigned int *out_type)
->>  {
->>  	int ret;
->> +	int req_num = intspec[1];
->>  
->> -	ret = get_prev_map_irq(intspec[1]);
->> +	if (req_num >= cb->max_crossbar_sources) {
->> +		pr_err("%s: requested crossbar number %d > max %d\n",
->> +		       __func__, req_num, cb->max_crossbar_sources);
->> +		return -EINVAL;
->> +	}
->> +
->> +	ret = get_prev_map_irq(req_num);
->>  	if (ret >= 0)
->>  		goto found;
->>  
->> -	ret = allocate_free_irq(intspec[1]);
->> +	ret = allocate_free_irq(req_num);
->>  
->>  	if (ret < 0)
->>  		return ret;
->> @@ -164,6 +173,14 @@ static int __init crossbar_of_init(struct device_node *node,
->>  	if (!cb->crossbar_base)
->>  		goto err_cb;
->>  
->> +	of_property_read_u32(node, "ti,max-crossbar-sources",
->> +			     &cb->max_crossbar_sources);
->> +	if (!cb->max_crossbar_sources) {
->> +		pr_err("missing 'ti,max-crossbar-sources' property\n");
->> +		ret = -EINVAL;
->> +		goto err_base;
->> +	}
+>> Do you have other changes outside of irqchip depending on this series?
+>> If so, I can set up a topic branch for you guys to base off of.
+>> Otherwise, I'll just apply them to irqchip/core when they're ready.
+>>
+>  There are dts changes which are dependent upon this series.
 > 
-> This completely breaks all boards using old dtbs.  Please set
-> max_crossbar_sources to a sane value (400) when the property is missing.
+>   http://www.spinics.net/lists/linux-omap/msg108116.html
 > 
->> +
->>  	of_property_read_u32(node, "ti,max-irqs", &max);
->>  	if (!max) {
->>  		pr_err("missing 'ti,max-irqs' property\n");
+>> Also, Sricharan, when you respin this, please clearly identify (in the
+>> comment section) those patches that need to be flagged for stable.  It
+>> would be helpful if they were the first patches in the series as well.
 > 
-> I know this is context, but you may want to look at this property as
-> well and set it to a sane value instead of erroring out.
-> 
- crossbar dts node itself is not there in any dts yet. So this is not applicable
- for any old boards. Any future dts with crossbar node should have this property
- defined.
+> Ok, i will point this out clearly.
+ Infact since the dts node is not present in the older kernel (even now),
+ the driver itself is not used. So i feel there is nothing to be flagged
+  for stable as such.
 
 Regards,
  Sricharan
+ 
