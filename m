@@ -1,49 +1,42 @@
-From: chiau.ee.chew@intel.com (Chew Chiau Ee)
-Date: Fri, 13 Jun 2014 23:57:25 +0800
-Subject: [PATCH v2] spi/pxa2xx: fix incorrect SW mode chipselect setting for
- BayTrail LPSS SPI
-Message-ID: <1402675045-22460-1-git-send-email-chiau.ee.chew@intel.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 13 Jun 2014 11:00:52 +0300
+Subject: [PATCH v8 0/6] efuse driver for Tegra
+In-Reply-To: <20140613072328.GK5961@tbergstrom-lnx.Nvidia.com>
+References: <1402587400-1544-1-git-send-email-pdeschrijver@nvidia.com>
+ <539A26DE.8050609@wwwdotorg.org>
+ <20140613072328.GK5961@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140613080052.GN5961@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+On Fri, Jun 13, 2014 at 09:23:28AM +0200, Peter De Schrijver wrote:
+> On Fri, Jun 13, 2014 at 12:17:02AM +0200, Stephen Warren wrote:
+> > On 06/12/2014 09:36 AM, Peter De Schrijver wrote:
+> > > This driver allows userspace to read the raw efuse data. Its userspace
+> > > interface is modelled after the sunxi_sid driver which provides similar
+> > > functionality for some Allwinner SoCs. It has been tested on
+> > > Tegra20 (ventana), Tegra30 (beaverboard), Tegra114 (dalmore) and
+> > > Tegra124 (jetson TK1).
+> > 
+> > I think this series looks OK now. However, I noticed one change in
+> > behaviour that I don't think is expected:
+> > 
+> > The current code/DTB print:
+> > Tegra Revision: A01 SKU: 0 CPU Process: 0 Core Process: 0
+> > 
+> > However, applying these patches and booting yields:
+> > Tegra Revision: A01 SKU: 0 CPU Process: 1 Core Process: 1
+> > 
+> 
+> On which board/SoC?
+> 
 
-It was observed that after module removal followed by insertion,
-the SW mode chipselect is not properly set. Thus causing transfer
-failure due to incorrect CS toggling.
+I'm guessing you're running on Tegra124 because the silicon revision reported
+is A01. If this is correct then, the current output is bogus. The current fuse
+code does not have any Tegra124 support and will fall back to reading the same
+fuse bits as on Tegra20 to determine the process IDs. You should get a warning
+message though: 'Tegra: unknown chip id'
 
-Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
----
- drivers/spi/spi-pxa2xx.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+Cheers,
 
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index a98df7e..fe79210 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -118,6 +118,7 @@ static void lpss_ssp_setup(struct driver_data *drv_data)
- 	 */
- 	orig = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
- 
-+	/* Test SPI_CS_CONTROL_SW_MODE bit enabling */
- 	value = orig | SPI_CS_CONTROL_SW_MODE;
- 	writel(value, drv_data->ioaddr + offset + SPI_CS_CONTROL);
- 	value = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
-@@ -126,10 +127,13 @@ static void lpss_ssp_setup(struct driver_data *drv_data)
- 		goto detection_done;
- 	}
- 
--	value &= ~SPI_CS_CONTROL_SW_MODE;
-+	orig = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
-+
-+	/* Test SPI_CS_CONTROL_SW_MODE bit disabling */
-+	value = orig & ~SPI_CS_CONTROL_SW_MODE;
- 	writel(value, drv_data->ioaddr + offset + SPI_CS_CONTROL);
- 	value = readl(drv_data->ioaddr + offset + SPI_CS_CONTROL);
--	if (value != orig) {
-+	if (value != (orig & ~SPI_CS_CONTROL_SW_MODE)) {
- 		offset = 0x800;
- 		goto detection_done;
- 	}
--- 
-1.7.4.4
+Peter.
