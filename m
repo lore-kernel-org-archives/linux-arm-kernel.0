@@ -1,33 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Jun 2014 23:04:21 +0100
-Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
-In-Reply-To: <CAD=FV=XCk9E-7VPV=LQrdLU5fKsFHviQf79MBmC8va3gsg=Ydw@mail.gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
- <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
- <20140613170511.GA20112@sirena.org.uk>
- <CAD=FV=VvkvH1TPiKttm9VXbBRnBo7kmTVK8bZZvexK=bAvaO4Q@mail.gmail.com>
- <CAD=FV=XCk9E-7VPV=LQrdLU5fKsFHviQf79MBmC8va3gsg=Ydw@mail.gmail.com>
-Message-ID: <20140613220421.GD5099@sirena.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 13 Jun 2014 15:22:06 -0700
+Subject: [PATCH V2 00/19] irqchip: crossbar: driver fixes
+In-Reply-To: <alpine.DEB.2.10.1406132222570.5170@nanos>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <20140613150122.GP8664@titan.lakedaemon.net>
+ <1402676074.12385.40.camel@joe-AO725>
+ <20140613163714.GR8664@titan.lakedaemon.net>
+ <1402678104.3509.1.camel@joe-AO725>
+ <20140613165458.GS8664@titan.lakedaemon.net>
+ <alpine.DEB.2.10.1406132222570.5170@nanos>
+Message-ID: <1402698126.2727.13.camel@joe-AO725>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 02:58:26PM -0700, Doug Anderson wrote:
+On Fri, 2014-06-13 at 22:38 +0200, Thomas Gleixner wrote:
+> On Fri, 13 Jun 2014, Jason Cooper wrote:
+> > On Fri, Jun 13, 2014 at 09:48:24AM -0700, Joe Perches wrote:
+> > > On Fri, 2014-06-13 at 12:37 -0400, Jason Cooper wrote:
+> > > > On Fri, Jun 13, 2014 at 09:14:34AM -0700, Joe Perches wrote:
+> > > > > On Fri, 2014-06-13 at 11:01 -0400, Jason Cooper wrote:
+> > > > > > Please format the subject lines like so:
+> > > > > > 
+> > > > > >   irqchip: crossbar: Set cb pointer ...
+> > > > > >                      ^
+> > > > > >                      |
+> > > > > >                      \-- note the capitalization
+> > > > > 
+> > > > > I suggest you don't make this a rule and focus
+> > > > > on more important stuff instead.
 
-> Anyway, suffice to say that the i2c core needs to be extended to
-> handle the idea that a single device has more than one "compatible"
-> string.  I'll leave it to an eager reader of this thread to implement
-> this since we can also fix our own problem by just listing "max98091"
-> in "sound/soc/codecs/max98090.c" like has always been done in the
-> past.
+[elided the bit that describes what a patch subject looks like]
 
-Why do you need to register multiple compatible strings (I guess for
-fallback purposes?).  A quick fix that is about as good is to take the
-first compatible only.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140613/49590638/attachment.sig>
+Documentation/SubmittingPatches simply says:
+
+The canonical patch subject line is:
+
+    Subject: [PATCH 001/123] subsystem: summary phrase
+
+It doesn't say anything about capitalization.
+
+> Sentences start with an upper case letter. Our brain is trained on
+> that rule when parsing a line.
+
+<shrug>  I don't think patch subjects are sentences.
+The docs call them phrases.
+
+> So for people who actually review patches by reading them instead of
+> running a spell checker, consistent formatting more important than
+> avoiding the random typo, which our brain just blends out in most of
+> the cases. Unfortunately also when the typo is in actual code :(
+
+That part about the code is truth.
+
+Anyway, how you spend your time is certainly up to you.
+Do what makes you happy.
+
+But if you want this specific form for your patches,
+please just document it somewhere in the kernel tree.
+
+I think that relatively commit log subjects are generally
+easy to parse as-is and don't need more strictures.
+
+I think it akin to british/american spelling uses and
+I and i.  I just don't care which people use.
+
+I did propose a mechanism to nudge people when proposed
+patch subjects don't fit some specific maintainer's idea
+of proper.
+
+https://lkml.org/lkml/2010/11/16/245
+
+cheers, Joe
