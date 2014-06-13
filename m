@@ -1,33 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 13 Jun 2014 09:20:02 +0200
-Subject: [PATCH] i2c: sun6-p2wi: fix call to snprintf
-In-Reply-To: <CAGXu5jLi5NXNsbUAn=XndDb2JSTxiVhMWbiMxtDsUOqZZhxf2A@mail.gmail.com>
-References: <CAGXu5jLi5NXNsbUAn=XndDb2JSTxiVhMWbiMxtDsUOqZZhxf2A@mail.gmail.com>
-Message-ID: <1402644002-2591-1-git-send-email-boris.brezillon@free-electrons.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 13 Jun 2014 10:23:28 +0300
+Subject: [PATCH v8 0/6] efuse driver for Tegra
+In-Reply-To: <539A26DE.8050609@wwwdotorg.org>
+References: <1402587400-1544-1-git-send-email-pdeschrijver@nvidia.com>
+ <539A26DE.8050609@wwwdotorg.org>
+Message-ID: <20140613072328.GK5961@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes possible issue in case pdev name contains formatting characters.
+On Fri, Jun 13, 2014 at 12:17:02AM +0200, Stephen Warren wrote:
+> On 06/12/2014 09:36 AM, Peter De Schrijver wrote:
+> > This driver allows userspace to read the raw efuse data. Its userspace
+> > interface is modelled after the sunxi_sid driver which provides similar
+> > functionality for some Allwinner SoCs. It has been tested on
+> > Tegra20 (ventana), Tegra30 (beaverboard), Tegra114 (dalmore) and
+> > Tegra124 (jetson TK1).
+> 
+> I think this series looks OK now. However, I noticed one change in
+> behaviour that I don't think is expected:
+> 
+> The current code/DTB print:
+> Tegra Revision: A01 SKU: 0 CPU Process: 0 Core Process: 0
+> 
+> However, applying these patches and booting yields:
+> Tegra Revision: A01 SKU: 0 CPU Process: 1 Core Process: 1
+> 
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Reported-by: Kees Cook <keescook@google.com>
----
- drivers/i2c/busses/i2c-sun6i-p2wi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On which board/SoC?
 
-diff --git a/drivers/i2c/busses/i2c-sun6i-p2wi.c b/drivers/i2c/busses/i2c-sun6i-p2wi.c
-index 5d2d678..63d1b2d 100644
---- a/drivers/i2c/busses/i2c-sun6i-p2wi.c
-+++ b/drivers/i2c/busses/i2c-sun6i-p2wi.c
-@@ -237,7 +237,8 @@ static int p2wi_probe(struct platform_device *pdev)
- 	if (IS_ERR(p2wi->regs))
- 		return PTR_ERR(p2wi->regs);
- 
--	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), pdev->name);
-+	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), "%s",
-+		 pdev->name);
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		dev_err(dev, "failed to retrieve irq: %d\n", irq);
--- 
-1.8.3.2
+Cheers,
+
+Peter.
