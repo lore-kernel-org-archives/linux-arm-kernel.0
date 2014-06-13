@@ -1,37 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Jun 2014 16:21:22 +0200
-Subject: [PATCH v2] ARM: shmobile: koelsch: Add support HSCIF1
-In-Reply-To: <1751840.oCdYe48VRu@avalon>
-References: <1402367659-21117-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
- <9058795.dyXpcFtuGJ@avalon>
- <CAMuHMdUd=E=TcSTPwy0xbpAcZH+voiEkjND=qzdSzG_zKdPe9g@mail.gmail.com>
- <1751840.oCdYe48VRu@avalon>
-Message-ID: <CAMuHMdUaO2pANQJCVceEkoJb9QuS7=BO-x3V5eSoBOEeCuOAUg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jun 2014 16:22:53 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable XADC driver
+In-Reply-To: <1401984324-6075-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1401984324-6075-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1401984324-6075-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <201406131622.54169.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Thursday 05 June 2014, Soren Brinkmann wrote:
+> The Xilinx A/D Converter is found in Xilinx devices including Zynq.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index e2d62048e198..2d1039d8c7f1 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -360,6 +360,7 @@ CONFIG_TEGRA_IOMMU_GART=y
+>  CONFIG_TEGRA_IOMMU_SMMU=y
+>  CONFIG_MEMORY=y
+>  CONFIG_IIO=y
+> +CONFIG_XILINX_XADC=y
+>  CONFIG_AK8975=y
+>  CONFIG_PWM=y
+>  CONFIG_PWM_TEGRA=y
+> -- 
 
-On Fri, Jun 13, 2014 at 3:24 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> About your comment about the resistors and capacitors, which applies to
->> both HSCIF0 and HSCIF1: probably the serial port will still work if
->> these are present.
->
-> With a 4.7?F capacitive load on the transmission line, assuming a drive
-> strength of 40mA (which is pretty high), switching between 0V and 3.3V takes
-> 388?s, corresponding to 2579 Hz. You'll have to reduce the baud rate :-)
+Applied both to fixes branch.
 
-Right, 4.7?F is a bit high. So at least the capacitor has to go for today's
-typical serial speeds.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
