@@ -1,36 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 13 Jun 2014 12:54:58 -0400
-Subject: [PATCH V2 00/19] irqchip: crossbar: driver fixes
-In-Reply-To: <1402678104.3509.1.camel@joe-AO725>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <20140613150122.GP8664@titan.lakedaemon.net>
- <1402676074.12385.40.camel@joe-AO725>
- <20140613163714.GR8664@titan.lakedaemon.net>
- <1402678104.3509.1.camel@joe-AO725>
-Message-ID: <20140613165458.GS8664@titan.lakedaemon.net>
+From: dianders@google.com (Doug Anderson)
+Date: Fri, 13 Jun 2014 10:03:50 -0700
+Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
+In-Reply-To: <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
+Message-ID: <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 09:48:24AM -0700, Joe Perches wrote:
-> On Fri, 2014-06-13 at 12:37 -0400, Jason Cooper wrote:
-> > On Fri, Jun 13, 2014 at 09:14:34AM -0700, Joe Perches wrote:
-> > > On Fri, 2014-06-13 at 11:01 -0400, Jason Cooper wrote:
-> > > > Please format the subject lines like so:
-> > > > 
-> > > >   irqchip: crossbar: Set cb pointer ...
-> > > >                      ^
-> > > >                      |
-> > > >                      \-- note the capitalization
-> > > 
-> > > I suggest you don't make this a rule and focus
-> > > on more important stuff instead.
-> > 
-> > It's not my rule.  ;-)
-> 
-> Who's rule is it then?
+Tushar,
 
-Thomas'
+On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
+> Peach-pi board has MAX98090 audio codec connected on HSI2C-7 bus.
 
-thx,
+If you want to be a stickler about it, peach-pi actually has a
+max98091.  That requires code changes to the i2c driver, though.
+...and unfortunately listing two compatible strings for i2c devices is
+broken.  :(
 
-Jason.
+
+> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts |   31 +++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index f3af207..76f5966 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -78,9 +78,27 @@
+>                 pinctrl-0 = <&usb301_vbus_en>;
+>                 enable-active-high;
+>         };
+> +
+> +       sound {
+> +               compatible = "google,snow-audio-max98090";
+> +
+> +               samsung,i2s-controller = <&i2s0>;
+> +               samsung,audio-codec = <&max98090>;
+> +       };
+> +};
+> +
+> +&i2s0 {
+> +       status = "okay";
+
+It would be awfully nice to keep diffs between exynos5420-peach-pit
+and exynos5800-peach-pi clean.  They're 99% the same.  I know this has
+already gotten messed up with DP/HDMI were added, but there's no need
+to make it worse.
+
+Could you add these nodes in the same place within the dts they were
+added in exynos5420-peach-pit?
