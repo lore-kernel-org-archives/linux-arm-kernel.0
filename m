@@ -1,32 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jun 2014 16:07:27 +0200
-Subject: [PATCH 2/2] ARM: use menuconfig for sub-arch menus
-In-Reply-To: <7872085.1SSGOVbm1y@wuerfel>
-References: <1402409170-1314-1-git-send-email-robherring2@gmail.com>
- <1402409170-1314-3-git-send-email-robherring2@gmail.com>
- <7872085.1SSGOVbm1y@wuerfel>
-Message-ID: <201406131607.27682.arnd@arndb.de>
+Date: Fri, 13 Jun 2014 16:10:17 +0200
+Subject: [PATCH v2 1/3] arm: multi_v7: enable igb, stmpe, lm95245, pwm leds
+In-Reply-To: <1741a33cd88cd5525f3c50c0e0cacc0853a3512a.1402350905.git.marcel@ziswiler.com>
+References: <1741a33cd88cd5525f3c50c0e0cacc0853a3512a.1402350905.git.marcel@ziswiler.com>
+Message-ID: <201406131610.18048.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 June 2014, Arnd Bergmann wrote:
-> On Tuesday 10 June 2014 09:06:10 Rob Herring wrote:
-> > From: Rob Herring <robh@kernel.org>
-> > 
-> > The System Type menu is getting quite long with platforms and is
-> > inconsistent in handling of sub-arch specific options. Tidy up the menu
-> > by making platform options a menuconfig entry containing any platform
-> > specific config items.
-> > 
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > 
+On Tuesday 10 June 2014, Marcel Ziswiler wrote:
+> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
+> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller, PWM
+> LEDs generically accessible from user space and an LM95245 temperature
+> sensor chip. The later three can also be found on the Colibri T30
+> module.
 > 
-> Excellent! I actually have a similar patch in my queue of stuff to
-> look at again. If there are no objections, I'd prefer to queue yours
-> up as a fix for 3.16.
+> While at it move the NEON entry down to its proper place to have it all
+> nicely ordered again.
 > 
+> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
 
+Stephen, Thierry,
 
-Queued both now in the fixes branch
+do you want me to queue it up directly, or do you want to put it into
+a tegra fixes branch?
 
 	Arnd
