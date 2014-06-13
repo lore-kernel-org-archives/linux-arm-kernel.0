@@ -1,91 +1,119 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jun 2014 18:01:13 +0200
-Subject: [PATCH 11/14] ARM: exynos: cleanup kconfig option display
-In-Reply-To: <1402675276-538682-1-git-send-email-arnd@arndb.de>
-References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
-Message-ID: <1402675276-538682-12-git-send-email-arnd@arndb.de>
+Date: Fri, 13 Jun 2014 18:01:02 +0200
+Subject: [PATCH 00/14] arm-soc fixes for 3.16 review
+Message-ID: <1402675276-538682-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+Hi Everyone,
 
-The addition of Exynos to multi-platform configs creates a mess of config
-options with options appearing before the Exynos config option. This is
-due to arch/arm/plat-samsung/Kconfig being included out of order with the
-other Samsung platform kconfig files. Reorder the kconfig files and move
-all the options into a sub-menu. Some of the options are dead, so remove
-those as well.
+here are the fixes I've picked up so far as the last pull request
+for the merge window. I'm sure there will be a lot more in the
+future, but let us know if I missed something or if any of the
+patches (in particular mine, some of which I have not posted
+before) are not ok.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig              |  3 +--
- arch/arm/plat-samsung/Kconfig | 17 +++--------------
- 2 files changed, 4 insertions(+), 16 deletions(-)
+Arnd Bergmann (6):
+  ARM: mvebu: fix randconfig builds for pmsu driver
+  ARM: omap2: fix am43xx dependency on l2x0 cache
+  ARM: keystone requires ARM_PATCH_PHYS_VIRT
+  bus/arm-cci: add dependency on OF && CPU_V7
+  remoteproc: da8xx: don't select CMA on no-MMU
+  ARM: samsung: make SAMSUNG_DMADEV optional
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9b8f528..245058b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -994,8 +994,6 @@ source "arch/arm/mach-rockchip/Kconfig"
- 
- source "arch/arm/mach-sa1100/Kconfig"
- 
--source "arch/arm/plat-samsung/Kconfig"
--
- source "arch/arm/mach-socfpga/Kconfig"
- 
- source "arch/arm/mach-spear/Kconfig"
-@@ -1013,6 +1011,7 @@ source "arch/arm/mach-s5pc100/Kconfig"
- source "arch/arm/mach-s5pv210/Kconfig"
- 
- source "arch/arm/mach-exynos/Kconfig"
-+source "arch/arm/plat-samsung/Kconfig"
- 
- source "arch/arm/mach-shmobile/Kconfig"
- 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 91911e4..301b892 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -35,27 +35,15 @@ config SAMSUNG_PM
- 	  Base platform power management code for samsung code
- 
- if PLAT_SAMSUNG
-+menu "Samsung Common options"
- 
- # boot configurations
- 
- comment "Boot options"
- 
--config S3C_BOOT_ERROR_RESET
--	bool "S3C Reboot on decompression error"
--	help
--	  Say y here to use the watchdog to reset the system if the
--	  kernel decompressor detects an error during decompression.
--
--config S3C_BOOT_UART_FORCE_FIFO
--       bool "Force UART FIFO on during boot process"
--       default y
--       help
--         Say Y here to force the UART FIFOs on during the kernel
--	 uncompressor
--
--
- config S3C_LOWLEVEL_UART_PORT
- 	int "S3C UART to use for low-level messages"
-+	depends on ARCH_S3C64XX
- 	default 0
- 	help
- 	  Choice of which UART port to use for the low-level messages,
-@@ -502,4 +490,5 @@ config DEBUG_S3C_UART
- 	default "2" if DEBUG_S3C_UART2
- 	default "3" if DEBUG_S3C_UART3
- 
-+endmenu
- endif
+Dan Carpenter (1):
+  misc: vexpress: fix error handling vexpress_syscfg_regmap_init()
+
+Jason Cooper (1):
+  ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
+
+Linus Walleij (1):
+  ARM: integrator: fix section mismatch problem
+
+Olof Johansson (1):
+  ARM: exynos: move sysram info to exynos.c
+
+Rob Herring (2):
+  ARM: exynos: cleanup kconfig option display
+  ARM: use menuconfig for sub-arch menus
+
+Sachin Kamat (1):
+  ARM: EXYNOS: Fix compilation warning
+
+Stephen Boyd (1):
+  ARM: Remove ARCH_HAS_CPUFREQ config option
+
+ arch/arm/Kconfig                                 | 20 +--------------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  2 +-
+ arch/arm/configs/omap2plus_defconfig             |  1 +
+ arch/arm/mach-bcm/Kconfig                        |  7 +++---
+ arch/arm/mach-berlin/Kconfig                     |  6 +----
+ arch/arm/mach-cns3xxx/Kconfig                    |  7 +++---
+ arch/arm/mach-davinci/Kconfig                    |  1 -
+ arch/arm/mach-exynos/Kconfig                     |  7 +-----
+ arch/arm/mach-exynos/common.h                    |  1 +
+ arch/arm/mach-exynos/exynos.c                    | 31 +++++++++++++++++++++++-
+ arch/arm/mach-exynos/platsmp.c                   | 26 ++------------------
+ arch/arm/mach-highbank/Kconfig                   |  1 -
+ arch/arm/mach-imx/Kconfig                        | 10 +++-----
+ arch/arm/mach-integrator/Kconfig                 |  2 +-
+ arch/arm/mach-integrator/impd1.c                 | 12 ++++++++-
+ arch/arm/mach-keystone/Kconfig                   |  1 +
+ arch/arm/mach-moxart/Kconfig                     |  2 +-
+ arch/arm/mach-mvebu/Kconfig                      |  8 ++----
+ arch/arm/mach-mvebu/pmsu.c                       |  9 ++++++-
+ arch/arm/mach-nomadik/Kconfig                    |  4 +--
+ arch/arm/mach-omap2/Kconfig                      | 11 +++++----
+ arch/arm/mach-omap2/common.h                     |  7 ++++++
+ arch/arm/mach-prima2/Kconfig                     |  6 ++---
+ arch/arm/mach-qcom/Kconfig                       |  6 +----
+ arch/arm/mach-s3c24xx/Kconfig                    |  2 +-
+ arch/arm/mach-s3c64xx/Kconfig                    |  4 +--
+ arch/arm/mach-s5p64x0/Kconfig                    |  6 +++--
+ arch/arm/mach-s5pc100/Kconfig                    |  3 ++-
+ arch/arm/mach-s5pv210/Kconfig                    |  3 ++-
+ arch/arm/mach-shmobile/Kconfig                   |  6 ++---
+ arch/arm/mach-spear/Kconfig                      |  1 -
+ arch/arm/mach-tegra/Kconfig                      |  8 +++---
+ arch/arm/mach-u300/Kconfig                       |  6 +----
+ arch/arm/mach-ux500/Kconfig                      |  7 +-----
+ arch/arm/mach-vexpress/Kconfig                   |  8 +++---
+ arch/arm/mach-vt8500/Kconfig                     |  1 -
+ arch/arm/mach-zynq/Kconfig                       |  1 -
+ arch/arm/plat-samsung/Kconfig                    | 28 ++++++---------------
+ drivers/bus/Kconfig                              |  2 +-
+ drivers/misc/vexpress-syscfg.c                   | 12 ++++++---
+ drivers/remoteproc/Kconfig                       |  2 +-
+ 41 files changed, 127 insertions(+), 161 deletions(-)
+
 -- 
 1.8.3.2
+
+Cc: andrew at lunn.ch
+Cc: arnd at arndb.de
+Cc: ben-linux at fluff.org
+Cc: dan.carpenter at oracle.com
+Cc: daniel.lezcano at linaro.org
+Cc: gregory.clement at free-electrons.com
+Cc: jason at lakedaemon.net
+Cc: khilman at linaro.org
+Cc: kgene.kim at samsung.com
+Cc: linus.walleij at linaro.org
+Cc: lorenzo.pieralisi at arm.com
+Cc: ohad at wizery.com
+Cc: olof at lixom.net
+Cc: pawel.moll at arm.com
+Cc: robh at kernel.org
+Cc: rtivy at ti.com
+Cc: linux at arm.linux.org.uk
+Cc: sachin.kamat at linaro.org
+Cc: santosh.shilimkar at ti.com
+Cc: sebastian.hesselbarth at gmail.com
+Cc: shawn.guo at linaro.org
+Cc: sboyd at codeaurora.org
+Cc: t.figa at samsung.com
+Cc: tony at atomide.com
+Cc: tushar.behera at linaro.org
+Cc: viresh.kumar at linaro.org
+Cc:  linux-omap at vger.kernel.org
+Cc:  linux-samsung-soc at vger.kernel.org
