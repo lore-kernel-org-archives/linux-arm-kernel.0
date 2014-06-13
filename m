@@ -1,43 +1,65 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Fri, 13 Jun 2014 11:26:13 +0400
-Subject: [PATCH 2/2] ARM: i.MX system: Add a reset fallback if base address of
- watchdog is not set
-In-Reply-To: <1402644373-8408-1-git-send-email-shc_work@mail.ru>
-References: <1402644373-8408-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1402644373-8408-2-git-send-email-shc_work@mail.ru>
+Date: Fri, 13 Jun 2014 11:26:12 +0400
+Subject: [PATCH 1/2] ARM: i.MX system: Simplify handling watchdog clock
+Message-ID: <1402644373-8408-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a reset fallback if base address of watchdog is not set.
-This is intended for a targets not compatible with imx-21 watchdog,
-i.MX1 for example.
+This patch simplifies handling watchdog clock a bit.
+As an additional change, now we properly check WDT clock in a reset
+function.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/system.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-imx/system.c | 20 +++++++-------------
+ 1 file changed, 7 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index ae521f3..3b9259b 100644
+index 3b0733e..ae521f3 100644
 --- a/arch/arm/mach-imx/system.c
 +++ b/arch/arm/mach-imx/system.c
-@@ -42,6 +42,9 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
+@@ -42,7 +42,7 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
  {
  	unsigned int wcr_enable;
  
-+	if (!wdog_base)
-+		goto reset_fallback;
-+
- 	if (!IS_ERR_OR_NULL(wdog_clk))
+-	if (wdog_clk)
++	if (!IS_ERR_OR_NULL(wdog_clk))
  		clk_enable(wdog_clk);
  
-@@ -70,6 +73,7 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
- 	/* delay to allow the serial port to show the message */
- 	mdelay(50);
+ 	if (cpu_is_mx1())
+@@ -79,13 +79,10 @@ void __init mxc_arch_reset_init(void __iomem *base)
+ 	wdog_base = base;
  
-+reset_fallback:
- 	/* we'll take a jump through zero as a poor second */
- 	soft_restart(0);
+ 	wdog_clk = clk_get_sys("imx2-wdt.0", NULL);
+-	if (IS_ERR(wdog_clk)) {
++	if (IS_ERR(wdog_clk))
+ 		pr_warn("%s: failed to get wdog clock\n", __func__);
+-		wdog_clk = NULL;
+-		return;
+-	}
+-
+-	clk_prepare(wdog_clk);
++	else
++		clk_prepare(wdog_clk);
  }
+ 
+ void __init mxc_arch_reset_init_dt(void)
+@@ -97,13 +94,10 @@ void __init mxc_arch_reset_init_dt(void)
+ 	WARN_ON(!wdog_base);
+ 
+ 	wdog_clk = of_clk_get(np, 0);
+-	if (IS_ERR(wdog_clk)) {
++	if (IS_ERR(wdog_clk))
+ 		pr_warn("%s: failed to get wdog clock\n", __func__);
+-		wdog_clk = NULL;
+-		return;
+-	}
+-
+-	clk_prepare(wdog_clk);
++	else
++		clk_prepare(wdog_clk);
+ }
+ 
+ #ifdef CONFIG_CACHE_L2X0
 -- 
 1.8.5.5
