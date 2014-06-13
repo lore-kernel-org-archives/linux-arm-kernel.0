@@ -1,20 +1,53 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Fri, 13 Jun 2014 16:10:08 +0300
-Subject: [PATCH v2] spi/pxa2xx: fix incorrect SW mode chipselect setting
- for BayTrail LPSS SPI
-In-Reply-To: <1402675045-22460-1-git-send-email-chiau.ee.chew@intel.com>
-References: <1402675045-22460-1-git-send-email-chiau.ee.chew@intel.com>
-Message-ID: <20140613131008.GK21178@lahna.fi.intel.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 13 Jun 2014 09:10:05 -0400
+Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from
+ getting mapped to crossbar
+In-Reply-To: <539AA08A.7010001@ti.com>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
+ <20140612125134.GS8664@titan.lakedaemon.net>
+ <20140612135715.GE17845@atomide.com>
+ <20140612140508.GC8664@titan.lakedaemon.net>
+ <539AA08A.7010001@ti.com>
+Message-ID: <20140613131005.GF8664@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 11:57:25PM +0800, Chew Chiau Ee wrote:
-> From: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+On Fri, Jun 13, 2014 at 12:26:10PM +0530, Sricharan R wrote:
+> On Thursday 12 June 2014 07:35 PM, Jason Cooper wrote:
+...
+> > Do you have other changes outside of irqchip depending on this series?
+> > If so, I can set up a topic branch for you guys to base off of.
+> > Otherwise, I'll just apply them to irqchip/core when they're ready.
+> > 
+>  There are dts changes which are dependent upon this series.
 > 
-> It was observed that after module removal followed by insertion,
-> the SW mode chipselect is not properly set. Thus causing transfer
-> failure due to incorrect CS toggling.
-> 
-> Signed-off-by: Chew, Chiau Ee <chiau.ee.chew@intel.com>
+>   http://www.spinics.net/lists/linux-omap/msg108116.html
 
-Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+In general, dts changes shouldn't depend on code changes or vice-versa.
+If they do, that's an indicator that we're breaking compatibility with
+older dtbs.
+
+Looking at the dra7.dtsi changes, we're redefining the interrupt
+property, which can't be good. :(
+
+Perhaps a better solution would be to add a property, say 'ti,cross-irq'
+that is the exact same format as 'interrupts', but is used by the
+crossbar driver?
+
+I'm not convinced of this yet, I suspect we may not actually have a
+dependency between the dtsi changes and the code changes.  We would have
+the ugly "if you have the crossbar node, 'interrupts' means X, if not it
+means Y" in the binding docs.  But the absence of the node prevents the
+crossbar driver from re-interpreting the interrupts property.
+
+Have you tried booting all the different scenarios?  eg:
+
+  old dtb, new driver
+  new dtb, old driver
+  old dtb, old driver
+  new dtb, new driver
+
+thx,
+
+Jason.
