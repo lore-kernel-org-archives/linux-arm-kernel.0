@@ -1,35 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jun 2014 16:22:53 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable XADC driver
-In-Reply-To: <1401984324-6075-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1401984324-6075-1-git-send-email-soren.brinkmann@xilinx.com>
- <1401984324-6075-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <201406131622.54169.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Jun 2014 09:29:16 -0500
+Subject: [RFC v3 1/9] arm: fiq: arbitrary mappings from IRQ to FIQ virqs
+In-Reply-To: <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
+References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <CAL_JsqK-jCQjCCw4qfJOCfNKLVRDTAYSYsGpmYLDzoSVsBaHrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 June 2014, Soren Brinkmann wrote:
-> The Xilinx A/D Converter is found in Xilinx devices including Zynq.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index e2d62048e198..2d1039d8c7f1 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -360,6 +360,7 @@ CONFIG_TEGRA_IOMMU_GART=y
->  CONFIG_TEGRA_IOMMU_SMMU=y
->  CONFIG_MEMORY=y
->  CONFIG_IIO=y
-> +CONFIG_XILINX_XADC=y
->  CONFIG_AK8975=y
->  CONFIG_PWM=y
->  CONFIG_PWM_TEGRA=y
-> -- 
+On Thu, Jun 5, 2014 at 4:53 AM, Daniel Thompson
+<daniel.thompson@linaro.org> wrote:
+> Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
+> virq into a FIQ virq. This is too inflexible for multi-platform kernels
+> and makes runtime error checking impossible.
+>
+> We solve this by introducing a flexible mapping that allows interrupt
+> controllers that support FIQ to register those mappings. This, in turn,
+> makes it much possible for drivers in DT kernels to gain access to
+> FIQ virqs.
 
-Applied both to fixes branch.
+I don't get why you need a separate linux irq numbers for FIQ. Isn't
+enabling FIQ simply a property of an irq like edge vs. level trigger?
+Also, given the constraints on FIQ, we can't really have more that 1
+IRQ assigned to FIQ.
 
-	Arnd
+Rob
