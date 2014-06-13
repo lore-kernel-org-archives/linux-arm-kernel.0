@@ -1,43 +1,34 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 13 Jun 2014 08:10:18 -0700
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <CADWw7Oh=A_cg_hqu8DZ1t_iacOGgWediLp3K3viFYHMNAPkqRw@mail.gmail.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
- <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
- <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
- <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
- <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
- <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
- <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
- <5398758F.4080306@samsung.com>
- <CADWw7Oh=A_cg_hqu8DZ1t_iacOGgWediLp3K3viFYHMNAPkqRw@mail.gmail.com>
-Message-ID: <CAD=FV=XkTSfHwt9Ekcy6TPGWJTJ49zMCOA9eaJVaq=q4u4Ri3Q@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 13 Jun 2014 12:15:21 -0300
+Subject: [PATCH 1/2] ARM: i.MX: Migrate Freescale i.MX27 IP Camera board
+ to devicetree
+In-Reply-To: <1402642578-2456-1-git-send-email-shc_work@mail.ru>
+References: <1402642578-2456-1-git-send-email-shc_work@mail.ru>
+Message-ID: <CAOMZO5A7xVYNMCMnSjvhXCCU28ADXFq9idbRkFBvcs3U4jssGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chander,
+On Fri, Jun 13, 2014 at 3:56 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-On Fri, Jun 13, 2014 at 4:54 AM, Chander Kashyap <k.chander@samsung.com> wrote:
-> This patch is effectively changing the mcpm_entry_point address from
-> nsbase + 0x1c to nsbase + 0x8
->
-> Hence while integrating with mainline u-boot we need to take care for
-> new mcpm_entry_point address.
->
-> With Chromebook it works straightforward.
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               reg_5v0: regulator at 0 {
+> +                       compatible = "regulator-fixed";
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_reg5v0>;
+> +                       reg = <0>;
+> +                       regulator-name = "5V0";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       gpio = <&gpio6 9 GPIO_ACTIVE_HIGH>;
+> +                       regulator-always-on;
+> +               };
 
-Can you explain more and point to the code that is using the nsbase +
-0x1c?  Specifically the only code I see that uses the nsbase + 0x1c is
-the code that is located at nsbase, which is the code we're
-overwriting here.  I'd imagine you're using U-Boot code that looks
-something like the bits that start at code_base here:
+I don't see this reg_5v0 regulator being referenced anywhere.
 
-https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/ce358daf5069f1dc145b0f9d403cfbb028271807/arch/arm/cpu/armv7/exynos/lowlevel.S
+Anyway, I am fine if you simply drop the board support file for the mx27 ipcam.
 
-With my kernel change you can completely eliminate U-Boot's
-installation of this code (or keep it, it makes no difference).
-
--Doug
+No need to add a dts for it, as I don't have access to this board anymore.
