@@ -1,88 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Jun 2014 22:30:44 -0700
-Subject: [PATCH] [media] staging: allow omap4iss to be modular
-In-Reply-To: <1689719.caqIIBS1Wn@avalon>
-References: <5192928.MkINji4uKU@wuerfel> <2207210.T6NoNSQSCo@avalon>
- <20140612151534.GF17845@atomide.com> <1689719.caqIIBS1Wn@avalon>
-Message-ID: <20140613053044.GG17845@atomide.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Fri, 13 Jun 2014 07:54:45 +0200
+Subject: [PATCH v2 1/2] drm/panel: remove unnecessary dependencies
+In-Reply-To: <E1Wv7ZP-0004Wb-3J@rmk-PC.arm.linux.org.uk>
+References: <E1Wv7ZP-0004Wb-3J@rmk-PC.arm.linux.org.uk>
+Message-ID: <539A9225.90304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140612 08:32]:
-> Hi Tony,
+Hi Russel,
+
+Thanks for both fixes. Just one nitpick.
+
+On 06/12/2014 06:09 PM, Russell King wrote:
+> DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
+> DRM_PANEL && DRM.  This is nonsense for two reasons:
 > 
-> On Thursday 12 June 2014 08:15:35 Tony Lindgren wrote:
-> > * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140612 07:52]:
-> > > On Wednesday 11 June 2014 07:47:54 Tony Lindgren wrote:
-> > > > These should just use either pinctrl-single.c instead for muxing.
-> > > > Or if they are not mux registers, we do have the syscon mapping
-> > > > available in omap4.dtsi that pbias-regulator.c is already using.
-> > > > 
-> > > > Laurent, got any better ideas?
-> > > 
-> > > The ISS driver needs to write a single register, which contains several
-> > > independent fields. They thus need to be controlled by a single driver.
-> > > Some of them might be considered to be related to pinmuxing (although I
-> > > disagree on that), others are certainly not about muxing (there are clock
-> > > gate bits for instance).
-> > > 
-> > > Using the syscon mapping seems like the best option. I'll give it a try.
-> > 
-> > OK if it's not strictly pinctrl related then let's not use
-> > pinctrl-single,bits for it. You may be able to implement one or more
-> > framework drivers for it for pinctrl/regulator/clock/transceiver
-> > whatever that register is doing.
-> > 
-> > In any case it's best to have that handling in a separate helper driver
-> > somewhere as it's a separate piece of hardware from the camera module.
-> > If it does not fit into any existing frameworks then it's best to have
-> > it in a separate driver with the camera driver.
+> (a) DRM_PANEL already depends on DRM, so DRM_PANEL can not be enabled
+> without DRM first being enabled.  Hence the && DRM is useless.
+
+This reason is invalid and do not describe the patch anymore.
+
+Regards
+Andrzej
+
 > 
-> The register contains the following fields that control the two CSI2 PHYs 
-> (PHY1 and PHY2).
+> (b) These two configs are already beneath a menu which depends on
+> DRM_PANEL being enabled; these options will not be visible without
+> DRM_PANEL already being enabled.
 > 
-> 31    CAMERARX_CSI22_LANEENABLE2   PHY2 Lane 2 (CSI22_DX2, CSI22_DY2) Enable
-> 30    CAMERARX_CSI22_LANEENABLE1   PHY2 Lane 1 (CSI22_DX1, CSI22_DY1) Enable
-> 29    CAMERARX_CSI22_LANEENABLE0   PHY2 Lane 0 (CSI22_DX0, CSI22_DY0) Enable
-> 28    CAMERARX_CSI21_LANEENABLE4   PHY1 Lane 4 (CSI21_DX4, CSI21_DY4) Enable
-> 27    CAMERARX_CSI21_LANEENABLE3   PHY1 Lane 3 (CSI21_DX3, CSI21_DY3) Enable
-> 26    CAMERARX_CSI21_LANEENABLE2   PHY1 Lane 2 (CSI21_DX2, CSI21_DY2) Enable
-> 25    CAMERARX_CSI21_LANEENABLE1   PHY1 Lane 1 (CSI21_DX1, CSI21_DY1) Enable
-> 24    CAMERARX_CSI21_LANEENABLE0   PHY1 Lane 0 (CSI21_DX0, CSI21_DY0) Enable
-> 21    CAMERARX_CSI22_CTRLCLKEN     PHY2 Clock Enable
-> 20:19 CAMERARX_CSI22_CAMMODE       PHY2 Mode (CCP2, CSI1, CSI2)
-> 18    CAMERARX_CSI21_CTRLCLKEN     PHY1 Clock Enable
-> 17:16 CAMERARX_CSI21_CAMMODE       PHY1 Mode (CCP2, CSI1, CSI2)
+> Let's just remove this unnecessary verbosity.
 > 
-> Bits 18 and 21 could be exposed through CCF. Bits 24 to 31 enable/disable the 
-> CSI2 lanes, so it could be argued that they could be exposed through the 
-> pinctrl framework. However, they need to be configured independently, possibly 
-> at runtime. I'm thus not sure pinctrl would be a good idea. Bits 17:16 and 
-> 20:19 don't fit in existing frameworks.
-
-OK thanks for the info. Sounds like drivers/phy might be the right location
-for it then and then the phy driver can use the syscon regmap.
- 
-> Given that this register is specific to the ISS, I think handling it as a 
-> separate device through a separate driver would only complicate the 
-> implementation without any real benefit.
-
-Even though it's one register, it shoud still be treated separately from
-the camera driver. The problems with keeping the register access to the
-control module in the camera driver are at least following:
-
-1. They live in separate hardware modules that can be clocked separately
-
-2. Doing a read-back to flush a posted write in one hardware module most
-   likely won't flush the write to other and that can lead into hard to
-   find mysterious bugs
-
-3. If we ever have a common system control module driver, we need to
-   rewrite all the system control module register tinkering in the drivers
-
-So it's best to try to use an existing framework for it. That avoids
-tons of pain later on ;)
-
-Regards,
-
-Tony
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/gpu/drm/panel/Kconfig | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+> index 4ec874da5668..d83958d39f43 100644
+> --- a/drivers/gpu/drm/panel/Kconfig
+> +++ b/drivers/gpu/drm/panel/Kconfig
+> @@ -5,7 +5,7 @@ config DRM_PANEL
+>  	  Panel registration and lookup framework.
+>  
+>  menu "Display Panels"
+> -	depends on DRM_PANEL
+> +	depends on DRM && DRM_PANEL
+>  
+>  config DRM_PANEL_SIMPLE
+>  	tristate "support for simple panels"
+> @@ -18,14 +18,12 @@ config DRM_PANEL_SIMPLE
+>  
+>  config DRM_PANEL_LD9040
+>  	tristate "LD9040 RGB/SPI panel"
+> -	depends on DRM && DRM_PANEL
+>  	depends on OF
+>  	select SPI
+>  	select VIDEOMODE_HELPERS
+>  
+>  config DRM_PANEL_S6E8AA0
+>  	tristate "S6E8AA0 DSI video mode panel"
+> -	depends on DRM && DRM_PANEL
+>  	depends on OF
+>  	select DRM_MIPI_DSI
+>  	select VIDEOMODE_HELPERS
+> 
