@@ -1,80 +1,69 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 13 Jun 2014 15:08:12 +0900
-Subject: [PATCH 3/4] Documentation: devicetree: Add cpu clock configuration
- data binding for Exynos3250
+Date: Fri, 13 Jun 2014 15:08:13 +0900
+Subject: [PATCH 4/4] ARM: dts: Exynos: Add cpu clock table and armclk divider
+ table for Exynos3250
 In-Reply-To: <1402639693-31108-1-git-send-email-cw00.choi@samsung.com>
 References: <1402639693-31108-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1402639693-31108-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1402639693-31108-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock block of Exynos3250 add new properties to support cpu clock provider.
-To register cpu clock provider of Exynos3250, must need armclk-provider-table
-which includes various dividers to change CPU clock to support Exynos3250 cpufreq.
+This patch add cpu clock table and armclk divier table to support
+generic cpufreq-cpu0 driver for Exynos3250.
 
-Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Tomas Abraham <thomas.ab@samsung.com>
 Cc: Tomasz Figa <t.figa@samsung.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- .../devicetree/bindings/clock/exynos3250-clock.txt | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos3250-clock.txt b/Documentation/devicetree/bindings/clock/exynos3250-clock.txt
-index aadc9c5..189b506 100644
---- a/Documentation/devicetree/bindings/clock/exynos3250-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/exynos3250-clock.txt
-@@ -13,6 +13,25 @@ Required Properties:
- 
- - #clock-cells: should be 1.
- 
-+- samsung,armclk-divider-table: when the frequency of the APLL is changed
-+  the divider clocks in CMU_CPU clock domain also need to be updated. These
-+  divider clocks have SoC specific divider clock output requirements for a
-+  specific APLL clock speeds. When APLL clock rate is changed, these divider
-+  clocks are reprogrammed with pre-determined values in order to maintain the
-+  SoC specific divider clock outputs. This property lists the divider values
-+  for divider clocks in the CMU_CPU block for supported APLL clock speeds.
-+  The format of each entry included in the arm-frequency-table should be
-+  as defined below
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 3e678fa..df0efd0 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -50,6 +50,21 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0>;
+ 			clock-frequency = <1000000000>;
++			clocks = <&cmu CLK_DIV_CORE2>;
++			clock-names = "cpu";
 +
-+      cell #1: expected arm clock parent frequency
-+      cell #2 ~ cell #7: value of clock divider in the following order
-+		corem_ratio, atb_ratio, pclk_dbg_ratio, apll_ratio,
-+		copy_ratio, hpm_ratio
-+
-+- samsung,armclk-cells: defines the number of cells in
-+  samsung,armclk-divider-table property. The value of this property depends on
-+  the SoC type.
-+
- Each clock is assigned an identifier and client nodes can use this identifier
- to specify the clock which they consume.
++			operating-points = <
++				1000000 1150000
++				900000  1112500
++				800000  1075000
++				700000  1037500
++				600000  1000000
++				500000  962500
++				400000  925000
++				300000  887500
++				200000  850000
++				100000  850000
++			>;
+ 		};
  
-@@ -26,6 +45,19 @@ Example 1: An example of a clock controller node is listed below.
- 		compatible = "samsung,exynos3250-cmu";
- 		reg = <0x10030000 0x20000>;
- 		#clock-cells = <1>;
+ 		cpu1: cpu at 1 {
+@@ -159,6 +174,19 @@
+ 			compatible = "samsung,exynos3250-cmu";
+ 			reg = <0x10030000 0x20000>;
+ 			#clock-cells = <1>;
 +
-+		samsung,armclk-cells = <7>;
-+		samsung,armclk-divider-table =
-+			<1000000 1 4 7 1 7 7>,
-+			<900000  1 3 7 1 7 7>,
-+			<800000  1 3 7 1 7 7>,
-+			<700000  1 3 7 1 7 7>,
-+			<600000  1 3 7 1 7 7>,
-+			<500000  1 3 7 1 7 7>,
-+			<400000  1 3 7 1 7 7>,
-+			<300000  1 3 5 1 7 7>,
-+			<200000  1 3 3 1 7 7>,
-+			<100000  1 1 1 1 7 7>;
- 	};
++			samsung,armclk-cells = <7>;
++			samsung,armclk-divider-table =
++				<1000000 1 4 7 1 7 7>,
++				<900000  1 3 7 1 7 7>,
++				<800000  1 3 7 1 7 7>,
++				<700000  1 3 7 1 7 7>,
++				<600000  1 3 7 1 7 7>,
++				<500000  1 3 7 1 7 7>,
++				<400000  1 3 7 1 7 7>,
++				<300000  1 3 5 1 7 7>,
++				<200000  1 3 3 1 7 7>,
++				<100000  1 1 1 1 7 7>;
+ 		};
  
- Example 2: UART controller node that consumes the clock generated by the clock
+ 		rtc: rtc at 10070000 {
 -- 
 1.8.0
