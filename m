@@ -1,20 +1,23 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 13 Jun 2014 16:40:58 -0400
-Subject: [PATCH 00/14] arm-soc fixes for 3.16 review
-In-Reply-To: <1402675276-538682-1-git-send-email-arnd@arndb.de>
-References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
-Message-ID: <20140613204058.GU8664@titan.lakedaemon.net>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Fri, 13 Jun 2014 13:41:02 -0700
+Subject: [PATCH v6 6/9] seccomp: add "seccomp" syscall
+In-Reply-To: <1402457121-8410-7-git-send-email-keescook@chromium.org>
+References: <1402457121-8410-1-git-send-email-keescook@chromium.org>
+ <1402457121-8410-7-git-send-email-keescook@chromium.org>
+Message-ID: <CALCETrVYVB0pMj61T9ZCAhgL6WYHAdDjiDe81O0e4tTQLtjDiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 06:01:02PM +0200, Arnd Bergmann wrote:
-> here are the fixes I've picked up so far as the last pull request
-> for the merge window. I'm sure there will be a lot more in the
-> future, but let us know if I missed something 
+On Tue, Jun 10, 2014 at 8:25 PM, Kees Cook <keescook@chromium.org> wrote:
+> This adds the new "seccomp" syscall with both an "operation" and "flags"
+> parameter for future expansion. The third argument is a pointer value,
+> used with the SECCOMP_SET_MODE_FILTER operation. Currently, flags must
+> be 0. This is functionally equivalent to prctl(PR_SET_SECCOMP, ...).
 
-Please see my pull request that I replied to today.  It has two dts
-fixes for NAND ECC handling.
+Question for the linux-abi people:
 
-thx,
+What's the preferred way to do this these days?  This syscall is a
+general purpose "adjust the seccomp state" thing.  The alternative
+would be a specific new syscall to add a filter with a flags argument.
 
-Jason.
+--Andy
