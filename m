@@ -1,38 +1,30 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 13 Jun 2014 17:21:39 +0200
-Subject: [PATCH v2 6/6] ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen
- controller support.
-In-Reply-To: <1402672899-6995-1-git-send-email-denis@eukrea.com>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
- <1402672899-6995-1-git-send-email-denis@eukrea.com>
-Message-ID: <1402672899-6995-7-git-send-email-denis@eukrea.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 13 Jun 2014 09:24:05 -0600
+Subject: [PATCH v2 1/3] arm: multi_v7: enable igb, stmpe, lm95245, pwm leds
+In-Reply-To: <201406131610.18048.arnd@arndb.de>
+References: <1741a33cd88cd5525f3c50c0e0cacc0853a3512a.1402350905.git.marcel@ziswiler.com>
+ <201406131610.18048.arnd@arndb.de>
+Message-ID: <539B1795.1060507@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/configs/imx_v4_v5_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+On 06/13/2014 08:10 AM, Arnd Bergmann wrote:
+> On Tuesday 10 June 2014, Marcel Ziswiler wrote:
+>> The NVIDIA Tegra 3 based Apalis T30 module contains an Intel i210 resp.
+>> i211 gigabit Ethernet controller, an STMPE811 ADC/touch controller, PWM
+>> LEDs generically accessible from user space and an LM95245 temperature
+>> sensor chip. The later three can also be found on the Colibri T30
+>> module.
+>>
+>> While at it move the NEON entry down to its proper place to have it all
+>> nicely ordered again.
+>>
+>> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+> 
+> Stephen, Thierry,
+> 
+> do you want me to queue it up directly, or do you want to put it into
+> a tegra fixes branch?
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 397f43c..b6b3674 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -98,6 +98,7 @@ CONFIG_KEYBOARD_IMX=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=m
-+CONFIG_TOUCHSCREEN_MX25=y
- CONFIG_TOUCHSCREEN_MC13783=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=m
-@@ -118,6 +119,7 @@ CONFIG_HWMON=m
- CONFIG_SENSORS_MC13783_ADC=m
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
-+CONFIG_MFD_MX25_TSADC=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
--- 
-1.7.9.5
+Taking this first patch through arm-soc is easiest to avoid conflicts on
+the shared file. I'll take 2 and 3 through the Tegra tree.
