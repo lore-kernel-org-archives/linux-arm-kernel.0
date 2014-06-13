@@ -1,53 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 13 Jun 2014 09:10:05 -0400
-Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from
- getting mapped to crossbar
-In-Reply-To: <539AA08A.7010001@ti.com>
-References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
- <20140612125134.GS8664@titan.lakedaemon.net>
- <20140612135715.GE17845@atomide.com>
- <20140612140508.GC8664@titan.lakedaemon.net>
- <539AA08A.7010001@ti.com>
-Message-ID: <20140613131005.GF8664@titan.lakedaemon.net>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 13 Jun 2014 14:10:51 +0100
+Subject: [STLinux Kernel] Latest mainline (3.16 merge window) does not
+ boot in B2020/STiH416
+In-Reply-To: <539AF5B0.6060509@linaro.org>
+References: <539AF5B0.6060509@linaro.org>
+Message-ID: <20140613131051.GA28309@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 12:26:10PM +0530, Sricharan R wrote:
-> On Thursday 12 June 2014 07:35 PM, Jason Cooper wrote:
-...
-> > Do you have other changes outside of irqchip depending on this series?
-> > If so, I can set up a topic branch for you guys to base off of.
-> > Otherwise, I'll just apply them to irqchip/core when they're ready.
-> > 
->  There are dts changes which are dependent upon this series.
+Hi Daniel,
+
+On Fri, 13 Jun 2014, Daniel Thompson wrote:
+> Hi Folks
 > 
->   http://www.spinics.net/lists/linux-omap/msg108116.html
+> Using the lastest Linus T. mainline it is no longer possible to boot a
+> B2020/STiH416.
+> 
+> The kernel boots OK and issues UART messages, but the system gets stuck
+> trying to mount the NFS root filesystem.
 
-In general, dts changes shouldn't depend on code changes or vice-versa.
-If they do, that's an indicator that we're breaking compatibility with
-older dtbs.
+Are you booting with  clk_ignore_unused kernel parameter?
 
-Looking at the dra7.dtsi changes, we're redefining the interrupt
-property, which can't be good. :(
+Its about at the point you describe that the unused clocks are disabled.
 
-Perhaps a better solution would be to add a property, say 'ti,cross-irq'
-that is the exact same format as 'interrupts', but is used by the
-crossbar driver?
+regards,
 
-I'm not convinced of this yet, I suspect we may not actually have a
-dependency between the dtsi changes and the code changes.  We would have
-the ugly "if you have the crossbar node, 'interrupts' means X, if not it
-means Y" in the binding docs.  But the absence of the node prevents the
-crossbar driver from re-interpreting the interrupts property.
-
-Have you tried booting all the different scenarios?  eg:
-
-  old dtb, new driver
-  new dtb, old driver
-  old dtb, old driver
-  new dtb, new driver
-
-thx,
-
-Jason.
+Peter.
