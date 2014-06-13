@@ -1,57 +1,126 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 13 Jun 2014 13:34:37 +0200
-Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
-In-Reply-To: <20140613102019.GQ23430@n2100.arm.linux.org.uk>
-References: <20140526162643.GB3693@n2100.arm.linux.org.uk>
- <20140527111542.6a49833f@free-electrons.com>
- <20140527094749.GE3693@n2100.arm.linux.org.uk>
- <20140527135216.7eaf3b3f@free-electrons.com>
- <20140527121806.GF3693@n2100.arm.linux.org.uk>
- <20140527143745.386c77d9@free-electrons.com>
- <20140528112450.GH3693@n2100.arm.linux.org.uk>
- <20140530100819.1208149f@free-electrons.com>
- <20140530092044.GO3693@n2100.arm.linux.org.uk>
- <20140613121121.7e7dc8e6@free-electrons.com>
- <20140613102019.GQ23430@n2100.arm.linux.org.uk>
-Message-ID: <20140613133437.1a85f287@free-electrons.com>
+From: varkab@cdac.in (Varka Bhadram)
+Date: Fri, 13 Jun 2014 17:07:10 +0530
+Subject: device tree: compilation of device tree sources
+Message-ID: <539AE266.70306@cdac.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi,
 
-On Fri, 13 Jun 2014 11:20:19 +0100, Russell King - ARM Linux wrote:
+I cloned the device tree git from: 
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/devicetree/devicetree-rebasing
 
-> > I spoke briefly about this with Albin Tonnerre from ARM, and his
-> > feedback is that it should not cause any problem to set the SMP bit and
-> > the shareable attribute even on non-SMP Cortex-A9 processors such as
-> > the Aegis. If that's correct, then we could do it for all Cortex-A9,
-> > without having to know whether what we have is a SoC from Marvell with
-> > I/O coherency or any other Cortex-A9 based SoC.
-> 
-> Setting the sharable attribute is not really a good idea - implementations
-> are permitted to treat a writeback sharable mapping as uncacheable, which
-> would be a severe performance degredation to single core CPUs.
+When i try to compile the Makefile is throwing errors like this:
 
-Then maybe we could set the shareable attribute on SMP-capable
-processors even if CONFIG_SMP is disabled? This way, those single core
-CPUs that are really not SMP capable continue to run without the
-shareable attribute, while all SMP-capable processors run with the
-shareable attribute, regardless of whether the kernel is configured
-CONFIG_SMP or not.
+DTC     src/arc/abilis_tb100_dvk.dtb
 
-> The patches I sent during this thread are now merged into mainline.  The
-> setting of the shared bit, and the memory cache policy are now both
-> derived from the proc_info structures, specifically the __cpu_mm_mmu_flags
-> member.
+dtc: invalid option -- 'i'
 
-Right. So for Armada 370/XP, I'll update the proc_info structure. We
-still have to find the right solution/compromise for the Armada 375/38x
-though.
+Usage:
 
-Thanks!
+     dtc [options] <input file>
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Options:
+
+     -h
+
+         This help text
+
+     -q
+
+         Quiet: -q suppress warnings, -qq errors, -qqq all
+
+     -I <input format>
+
+         Input formats are:
+
+             dts - device tree source text
+
+             dtb - device tree blob
+
+             fs - /proc/device-tree style directory
+
+     -o <output file>
+
+     -O <output format>
+
+         Output formats are:
+
+             dts - device tree source text
+
+             dtb - device tree blob
+
+             asm - assembler source
+
+     -V <output version>
+
+         Blob version to produce, defaults to 17 (relevant for dtb
+
+         and asm output only)
+
+     -d <output dependency file>
+
+     -R <number>
+
+         Make space for <number> reserve map entries (relevant for
+
+         dtb and asm output only)
+
+     -S <bytes>
+
+         Make the blob at least <bytes> long (extra space)
+
+     -p <bytes>
+
+         Add padding to the blob of <bytes> long (extra space)
+
+     -b <number>
+
+         Set the physical boot cpu
+
+     -f
+
+         Force - try to produce output even if the input tree has errors
+
+     -s
+
+         Sort nodes and properties before outputting (only useful for
+
+         comparing trees)
+
+     -v
+
+         Print DTC version and exit
+
+     -H <phandle format>
+
+         phandle formats are:
+
+             legacy - "linux,phandle" properties only
+
+             epapr - "phandle" properties only
+
+             both - Both "linux,phandle" and "phandle" properties
+
+make[1]: *** [src/arc/abilis_tb100_dvk.dtb] Error 3
+
+make: *** [all_arc] Error 2
+
+
+The way of using the dtc command is wrong.
+
+
+Thanks,
+Varka Bhadram
+
+-------------------------------------------------------------------------------------------------------------------------------
+[ C-DAC is on Social-Media too. Kindly follow us at:
+Facebook: https://www.facebook.com/CDACINDIA & Twitter: @cdacindia ]
+
+This e-mail is for the sole use of the intended recipient(s) and may
+contain confidential and privileged information. If you are not the
+intended recipient, please contact the sender by reply e-mail and destroy
+all copies and the original message. Any unauthorized review, use,
+disclosure, dissemination, forwarding, printing or copying of this email
+is strictly prohibited and appropriate legal action will be taken.
+-------------------------------------------------------------------------------------------------------------------------------
