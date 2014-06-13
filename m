@@ -1,73 +1,148 @@
-From: dianders@google.com (Doug Anderson)
-Date: Fri, 13 Jun 2014 14:58:26 -0700
-Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
-In-Reply-To: <CAD=FV=VvkvH1TPiKttm9VXbBRnBo7kmTVK8bZZvexK=bAvaO4Q@mail.gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
- <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
- <20140613170511.GA20112@sirena.org.uk>
- <CAD=FV=VvkvH1TPiKttm9VXbBRnBo7kmTVK8bZZvexK=bAvaO4Q@mail.gmail.com>
-Message-ID: <CAD=FV=XCk9E-7VPV=LQrdLU5fKsFHviQf79MBmC8va3gsg=Ydw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 13 Jun 2014 15:01:21 -0700
+Subject: [PATCH v6 6/9] seccomp: add "seccomp" syscall
+In-Reply-To: <CALCETrVbsGjgtHtQKftxcNJB_vY5=Dd3FckW-1C9=xgdOrR6_A@mail.gmail.com>
+References: <1402457121-8410-1-git-send-email-keescook@chromium.org>
+ <1402457121-8410-7-git-send-email-keescook@chromium.org>
+ <CAMEtUuwKRUYN_qdnCj42G3Z1UT3vMYPoJqXd2_PjV+_J3WA+8w@mail.gmail.com>
+ <CALCETrVCJvnj9yr5yhhZTn_Gq32mgSqOhMRi16Y=_LvqGOTZ5g@mail.gmail.com>
+ <CAMEtUuykiN=FvBFZLp8ieN2ymt0=opfyFee0UC9aRpcW3SQ0pg@mail.gmail.com>
+ <CALCETrVbsGjgtHtQKftxcNJB_vY5=Dd3FckW-1C9=xgdOrR6_A@mail.gmail.com>
+Message-ID: <CAGXu5jJiWiXj76aevQvHhmTdhjVDZrev9ybz+XUZDKhQfJErKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
-
-On Fri, Jun 13, 2014 at 10:13 AM, Doug Anderson <dianders@google.com> wrote:
-> Mark,
->
-> On Fri, Jun 13, 2014 at 10:05 AM, Mark Brown <broonie@kernel.org> wrote:
->> On Fri, Jun 13, 2014 at 10:03:50AM -0700, Doug Anderson wrote:
->>> On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
+On Fri, Jun 13, 2014 at 2:42 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Fri, Jun 13, 2014 at 2:37 PM, Alexei Starovoitov <ast@plumgrid.com> wrote:
+>> On Fri, Jun 13, 2014 at 2:25 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>>> On Fri, Jun 13, 2014 at 2:22 PM, Alexei Starovoitov <ast@plumgrid.com> wrote:
+>>>> On Tue, Jun 10, 2014 at 8:25 PM, Kees Cook <keescook@chromium.org> wrote:
+>>>>> This adds the new "seccomp" syscall with both an "operation" and "flags"
+>>>>> parameter for future expansion. The third argument is a pointer value,
+>>>>> used with the SECCOMP_SET_MODE_FILTER operation. Currently, flags must
+>>>>> be 0. This is functionally equivalent to prctl(PR_SET_SECCOMP, ...).
+>>>>>
+>>>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>>>> Cc: linux-api at vger.kernel.org
+>>>>> ---
+>>>>>  arch/x86/syscalls/syscall_32.tbl  |    1 +
+>>>>>  arch/x86/syscalls/syscall_64.tbl  |    1 +
+>>>>>  include/linux/syscalls.h          |    2 ++
+>>>>>  include/uapi/asm-generic/unistd.h |    4 ++-
+>>>>>  include/uapi/linux/seccomp.h      |    4 +++
+>>>>>  kernel/seccomp.c                  |   63 ++++++++++++++++++++++++++++++++-----
+>>>>>  kernel/sys_ni.c                   |    3 ++
+>>>>>  7 files changed, 69 insertions(+), 9 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/x86/syscalls/syscall_32.tbl b/arch/x86/syscalls/syscall_32.tbl
+>>>>> index d6b867921612..7527eac24122 100644
+>>>>> --- a/arch/x86/syscalls/syscall_32.tbl
+>>>>> +++ b/arch/x86/syscalls/syscall_32.tbl
+>>>>> @@ -360,3 +360,4 @@
+>>>>>  351    i386    sched_setattr           sys_sched_setattr
+>>>>>  352    i386    sched_getattr           sys_sched_getattr
+>>>>>  353    i386    renameat2               sys_renameat2
+>>>>> +354    i386    seccomp                 sys_seccomp
+>>>>> diff --git a/arch/x86/syscalls/syscall_64.tbl b/arch/x86/syscalls/syscall_64.tbl
+>>>>> index ec255a1646d2..16272a6c12b7 100644
+>>>>> --- a/arch/x86/syscalls/syscall_64.tbl
+>>>>> +++ b/arch/x86/syscalls/syscall_64.tbl
+>>>>> @@ -323,6 +323,7 @@
+>>>>>  314    common  sched_setattr           sys_sched_setattr
+>>>>>  315    common  sched_getattr           sys_sched_getattr
+>>>>>  316    common  renameat2               sys_renameat2
+>>>>> +317    common  seccomp                 sys_seccomp
+>>>>>
+>>>>>  #
+>>>>>  # x32-specific system call numbers start at 512 to avoid cache impact
+>>>>> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+>>>>> index b0881a0ed322..1713977ee26f 100644
+>>>>> --- a/include/linux/syscalls.h
+>>>>> +++ b/include/linux/syscalls.h
+>>>>> @@ -866,4 +866,6 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
+>>>>>  asmlinkage long sys_kcmp(pid_t pid1, pid_t pid2, int type,
+>>>>>                          unsigned long idx1, unsigned long idx2);
+>>>>>  asmlinkage long sys_finit_module(int fd, const char __user *uargs, int flags);
+>>>>> +asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
+>>>>> +                           const char __user *uargs);
+>>>>
+>>>> It looks odd to add 'flags' argument to syscall that is not even used.
+>>>> It don't think it will be extensible this way.
+>>>> 'uargs' is used only in 2nd command as well and it's not 'char __user *'
+>>>> but rather 'struct sock_fprog __user *'
+>>>> I think it makes more sense to define only first argument as 'int op' and the
+>>>> rest as variable length array.
+>>>> Something like:
+>>>> long sys_seccomp(unsigned int op, struct nlattr *attrs, int len);
+>>>> then different commands can interpret 'attrs' differently.
+>>>> if op == mode_strict, then attrs == NULL, len == 0
+>>>> if op == mode_filter, then attrs->nla_type == seccomp_bpf_filter
+>>>> and nla_data(attrs) is 'struct sock_fprog'
+>>>
+>>> Eww.  If the operation doesn't imply the type, then I think we've
+>>> totally screwed up.
+>>>
+>>>> If we decide to add new types of filters or new commands, the syscall prototype
+>>>> won't need to change. New commands can be added preserving backward
+>>>> compatibility.
+>>>> The basic TLV concept has been around forever in netlink world. imo makes
+>>>> sense to use it with new syscalls. Passing 'struct xxx' into syscalls
+>>>> is the thing
+>>>> of the past. TLV style is more extensible. Fields of structures can become
+>>>> optional in the future, new fields added, etc.
+>>>> 'struct nlattr' brings the same benefits to kernel api as protobuf did
+>>>> to user land.
+>>>
+>>> I see no reason to bring nl_attr into this.
+>>>
+>>> Admittedly, I've never dealt with nl_attr, but everything
+>>> netlink-related I've even been involved in has involved some sort of
+>>> API atrocity.
 >>
->>> > Peach-pi board has MAX98090 audio codec connected on HSI2C-7 bus.
->>
->>> If you want to be a stickler about it, peach-pi actually has a
->>> max98091.  That requires code changes to the i2c driver, though.
->>> ...and unfortunately listing two compatible strings for i2c devices is
->>> broken.  :(
->>
->> It is?  We should fix that if it's the case...
+>> netlink has a lot of legacy and there is genetlink which is not pretty
+>> either because of extra socket creation, binding, dealing with packet
+>> loss issues, but the key concept of variable length encoding is sound.
+>> Right now seccomp has two commands and they already don't fit
+>> into single syscall neatly. Are you saying there should be two syscalls
+>> here? What about another seccomp related command? Another syscall?
+>> imo all seccomp related commands needs to be mux/demux-ed under
+>> one syscall. What is the way to mux/demux potentially very different
+>> commands under one syscall? I cannot think of anything better than
+>> TLV style. 'struct nlattr' is what we have today and I think it works fine.
+>> I'm not suggesting to bring the whole netlink into the picture, but rather
+>> TLV style of encoding different arguments for different commands.
 >
-> Yah, I mentioned it to Mark Rutland at the last ELC and he said he
-> might take a look at it, but I probably should have posted something
-> up to the i2c list.
+> I'm unconvinced.  These are simple commands, and I think the interface
+> should be simple.  Syscalls are cheap.
 >
-> I made a half-assed attempt to fix it locally in the ChromeOS but
-> quickly found that it was going to be a much bigger job than I had
-> time for...
+> As an example, the interface could be:
 >
-> https://chromium-review.googlesource.com/#/c/184406/
+> int seccomp_add_filter(const struct sock_fprog *filter, unsigned int flags);
 >
-> IIRC i2c_new_device didn't return an error like I thought it would,
-> probably trying to deal with the fact that devices might show up at a
-> later point in time.
+> The "tsync" operation would be seccomp_add_filter(NULL,
+> SECCOMP_ADD_FILTER_TSYNC) -- it's equivalent to adding an
+> always-accept filter and syncing threads.
+
+I think you convinced me that tsync should be part of adding a filter
+(since now there are no failure side-effects), so this specific
+example I would expect EFAULT from. But ...
+
 >
->
-> Hrm, now that I think about it I wonder if the right answer is just to
-> call i2c_new_device for all the compatible strings even if it doesn't
-> return an error.  I'd have to go back and try that and re-explore this
-> code...
+> But, frankly, this kind of stuff should probably be "do operation X".
+> IIUC nl_attr is more like "do something, with these tags and values",
+> which results in oddities like whatever should happen of more than one
+> tag is set.
 
-Nope, that didn't work either.  Now I remember trying that before,
-too.  It doesn't like you registering two different devices with the
-same address:
+I have no objection to eliminating seccomp-strict from the syscall,
+and just making this the "add seccomp filter" syscall. My only
+hesitation would be that if we need something besides adding a filter
+in the future, we'd be back to extending this awkwardly or adding
+another syscall. That's why I went with the "operation" argument. I'm
+not opposed to passing attrs and len, but seccomp_add_filter does feel
+cleaner.
 
-[    2.582539] DOUG: /i2c at 12CD0000/codec at 10 (0) max98091
-[    2.587360] DOUG: /i2c at 12CD0000/codec at 10 (0) max98091
-[    2.591160] DOUG: /i2c at 12CD0000/codec at 10 (1) max98090
-[    2.596686] i2c i2c-7: Failed to register i2c client max98090 at 0x10 (-16)
+-Kees
 
-If you hack out the check for address business:
-
-sysfs: cannot create duplicate filename '/devices/12cd0000.i2c/i2c-7/7-0010'
-
-Anyway, suffice to say that the i2c core needs to be extended to
-handle the idea that a single device has more than one "compatible"
-string.  I'll leave it to an eager reader of this thread to implement
-this since we can also fix our own problem by just listing "max98091"
-in "sound/soc/codecs/max98090.c" like has always been done in the
-past.
-
-
--Doug
+-- 
+Kees Cook
+Chrome OS Security
