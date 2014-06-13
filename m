@@ -1,90 +1,43 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 13 Jun 2014 17:08:33 +0200
-Subject: [PATCH/RFC V6 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <538468B5.6090505@linaro.org>
-References: <1400520171-6698-1-git-send-email-s.nawrocki@samsung.com>
- <1400520171-6698-3-git-send-email-s.nawrocki@samsung.com>
- <538468B5.6090505@linaro.org>
-Message-ID: <539B13F1.8090804@samsung.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 13 Jun 2014 08:10:18 -0700
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <CADWw7Oh=A_cg_hqu8DZ1t_iacOGgWediLp3K3viFYHMNAPkqRw@mail.gmail.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+ <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
+ <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+ <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
+ <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
+ <5398758F.4080306@samsung.com>
+ <CADWw7Oh=A_cg_hqu8DZ1t_iacOGgWediLp3K3viFYHMNAPkqRw@mail.gmail.com>
+Message-ID: <CAD=FV=XkTSfHwt9Ekcy6TPGWJTJ49zMCOA9eaJVaq=q4u4Ri3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/05/14 12:28, Tushar Behera wrote:
-> On 05/19/2014 10:52 PM, Sylwester Nawrocki wrote:
->> This patch adds a helper function to configure clock parents and
->> rates as specified in clock-parents, clock-rates DT properties
->> for a consumer device and a call to it before driver is bound to
->> a device.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> 
-> [ ... ]
-> 
->> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
->> index 5b47210..f622733 100644
->> --- a/drivers/base/platform.c
->> +++ b/drivers/base/platform.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/pm_runtime.h>
->>  #include <linux/idr.h>
->>  #include <linux/acpi.h>
->> +#include <linux/clk/clk-conf.h>
->>
->>  #include "base.h"
->>  #include "power/power.h"
->> @@ -486,6 +487,10 @@ static int platform_drv_probe(struct device *_dev)
->>  	struct platform_device *dev = to_platform_device(_dev);
->>  	int ret;
->>
->> +	ret = of_clk_set_defaults(_dev->of_node, false);
->> +	if (ret < 0)
->> +		return ret;
->> +
-> 
-> of_clk_set_defaults() is not getting called when the related driver is
-> not registered through platform_driver_register().
-> 
-> I came across this issue while testing this patch on peach-pit board with
-> following dts change. max98090 audio codec driver is registered through
-> module_i2c_driver().
+Chander,
 
-Yes, that shouldn't be surprising, since now in this RFC the clocks setting
-is done only for platform bus devices. Similarly the above call would need to
-be added to i2c, amba, spi and maybe other busses.
+On Fri, Jun 13, 2014 at 4:54 AM, Chander Kashyap <k.chander@samsung.com> wrote:
+> This patch is effectively changing the mcpm_entry_point address from
+> nsbase + 0x1c to nsbase + 0x8
+>
+> Hence while integrating with mainline u-boot we need to take care for
+> new mcpm_entry_point address.
+>
+> With Chromebook it works straightforward.
 
-We just need to be careful to avoid attempting to set up clocks of a clock
-provider device before it is probed and actually registers its clocks.
+Can you explain more and point to the code that is using the nsbase +
+0x1c?  Specifically the only code I see that uses the nsbase + 0x1c is
+the code that is located at nsbase, which is the code we're
+overwriting here.  I'd imagine you're using U-Boot code that looks
+something like the bits that start at code_base here:
 
-I'm still not sure if we should carry on with this approach or do all the
-clocks set up in one place, similarly to disabling unused clocks. I'm afraid
-when attempting to set up all clocks at one point in time the clock parent/rate
-dependencies may get even more hairy.
+https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/ce358daf5069f1dc145b0f9d403cfbb028271807/arch/arm/cpu/armv7/exynos/lowlevel.S
 
-The deferred probe mechanism helps to resolve the dependencies when the
-clock defaults setting is done before or within a driver probe() call. Either
-for clock supplier and consumer nodes or a supplier only.
+With my kernel change you can completely eliminate U-Boot's
+installation of this code (or keep it, it makes no difference).
 
-> * arch/arm/boot/dts/exynos5420-peach-pit.dts
-> 
-> &hsi2c_7 {
-> 
-> 	status = "okay";
-> 
-> 	max98090: codec at 10 {
-> 		compatible = "maxim,max98090";
-> 		reg = <0x10>;
-> 		interrupts = <2 0>;
-> 		interrupt-parent = <&gpx0>;
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&max98090_irq>;
-> +		clocks = <&pmu_system_controller 0>;
-> +		clock-names = "mclk";
-> +		clock-parents = <&clock CLK_FIN_PLL>;
-> +		clock-rates = <24000000>;
-> 	};
-> };
-
---
-Regards,
-Sylwester
+-Doug
