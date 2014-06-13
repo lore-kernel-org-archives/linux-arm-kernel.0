@@ -1,71 +1,110 @@
-From: dianders@google.com (Doug Anderson)
-Date: Fri, 13 Jun 2014 15:50:07 -0700
-Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
-In-Reply-To: <20140613220421.GD5099@sirena.org.uk>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
- <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
- <20140613170511.GA20112@sirena.org.uk>
- <CAD=FV=VvkvH1TPiKttm9VXbBRnBo7kmTVK8bZZvexK=bAvaO4Q@mail.gmail.com>
- <CAD=FV=XCk9E-7VPV=LQrdLU5fKsFHviQf79MBmC8va3gsg=Ydw@mail.gmail.com>
- <20140613220421.GD5099@sirena.org.uk>
-Message-ID: <CAD=FV=U06JioDvvSqHyC5BZp_sKppk4i=s7DERCXG7rGHBe=xQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 13 Jun 2014 18:10:19 -0500
+Subject: [RESEND PATCH 1/2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
+References: <1402676147-3711-1-git-send-email-balbi@ti.com>
+ <1402676147-3711-2-git-send-email-balbi@ti.com>
+ <20140613162323.GH8319@saruman.home>
+ <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
+Message-ID: <20140613231019.GA24121@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Hi,
 
-On Fri, Jun 13, 2014 at 3:04 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jun 13, 2014 at 02:58:26PM -0700, Doug Anderson wrote:
->
->> Anyway, suffice to say that the i2c core needs to be extended to
->> handle the idea that a single device has more than one "compatible"
->> string.  I'll leave it to an eager reader of this thread to implement
->> this since we can also fix our own problem by just listing "max98091"
->> in "sound/soc/codecs/max98090.c" like has always been done in the
->> past.
->
-> Why do you need to register multiple compatible strings (I guess for
-> fallback purposes?).
+On Fri, Jun 13, 2014 at 07:11:58PM +0000, Paul Walmsley wrote:
+> > > From: Sathya Prakash M R <sathyap@ti.com>
+> > > 
+> > > Add DSS hwmod data for AM43xx.
+> > > 
+> > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > Acked-by: Rajendra Nayak <rnayak@ti.com>
+> > > Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> > > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > > 
+> > > Note that this patch was originally send on May 9th [1], changes were requested
+> > > and a new version was sent on May 19th [2], then on May 27th [3] Tomi pinged
+> > > maintainer again and go no response.
+> > > 
+> > > Without this patch, we cannot get display working on any AM437x devices.
+> > > 
+> > > [1] http://marc.info/?l=linux-arm-kernel&m=139963677925227&w=2
+> > > [2] http://marc.info/?l=linux-arm-kernel&m=140049799425512&w=2
+> > > [3] http://marc.info/?l=linux-arm-kernel&m=140117232826754&w=2
+> > > 
+> > >  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
+> > >  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+> > >  2 files changed, 99 insertions(+)
+> 
+> Sorry for the delay on this.  Have been corresponding with TI management 
+> to figure out what to do about patches for AM43xx.  I don't have boards or 
+> public documentation for these devices, so it's impossible for me to 
+> meaningfully review the patches.  Looks like boards and/or public docs 
+> won't be coming any time soon.
+> 
+> So for my part, here's what I'll need to merge any hwmod or PRCM patches 
+> that involve AM437x:
+> 
+> 1. A Reviewed-by: from one of the following folks (which should come from
+> a different person than who is submitting the patches):
+> 
+> Roger Quadros
+> Nishanth Menon
+> Rajendra Nayak
+> Kevin Hilman
+> Tony Lindgren
+> 
+> 2. A Tested-by: from one of the following folks (who can be the same as 
+> the person who is the same as the person who is submitting the patches):
+> 
+> Nishanth Menon
+> Rajendra Nayak
+> Kevin Hilman 
+> Tony Lindgren
 
-I'm no expert, but I think that's part of device tree isn't it?
+What you're saying here is that it's pointless for anybody else in TI to
+review and/or test patches because you will only accept such tags from
+this list of 4 ~ 5 people. It doesn't take a brain surgeon to note how
+this won't scale and, if you continue to ignore patches during the
+entire development cycle and only reply after it's too late for $this
+merge window, it won't help much.
 
-In the case of max98090 and max98091, they are incredibly similar
-pieces of hardware (I think the max98091 simply has more microphones).
-If you've got a driver for a max98090 it will work just fine for a
-max98091 but you just won't get the extra microphones.
+Quite frankly, it's very upsetting to see an affirmation that all the
+work that I (personally) and many others do is seen as "pointless" from
+your side *unless* it gets the blessing from the few folks listed above.
 
-In cases like this then device tree theory says that you should list
-both compatible strings: max98091 and max98090, right?  If your OS has
-a driver for max98091 it will use it.  ...if it doesn't but it has a
-max98090 driver it will try that one.
+This just makes it ever more difficult for anything, which is clearly
+*BROKEN* to be fixed upstream and will just contribute to people
+vanishing from mainline development.
 
-As far as I understand we _shouldn't_ lie and just say that we have a
-max98090 when we really have a max98091.  The device tree is supposed
-to describe the hardware and isn't support to care that the OS has a
-driver for max98090 but not max98091.
+The very fact that you will only accept patches blessed by the gang-of-4
+goes against the very foundations of open source development. Just
+because you don't have access to documentation - and granted, that
+_does_ make things a lot more difficult - does not mean you have to
+consider an entire company as a non-trust worthy organization. Specially
+when there are so many here who have been doing mainline development for
+quite some time.
 
-Ironically in our case we have a driver that supports both the 98090
-and the 98091 via autodetect.  However, it doesn't know about the
-98091 compatible string so if you list yourself as compatible with
-98091 then it won't find the driver.
+Anyway, whatever... I just hope that if we go through *another* merge
+window without $subject being merged, someone takes the patch because
+this already has a ridiculous amount of bureaucratic bariers to patches
+which are, to put it very bluntly, *CORRECT*.
 
-> A quick fix that is about as good is to take the
-> first compatible only.
+ps: $subject in particular, has been tested by 3 different people.
+Actually 4, if you consider Darren Etheridge who used $subject to help
+me get display working on AM437x SK.
 
-That's how the code works today, actually.  ...but as per above the
-current 98090 driver doesn't know about the 98091 compatible string,
-so:
+pps: Darren, can you reply with your (according to Paul) pointless
+Tested-by ?
 
-compatible = "maxim,max98091", "maxim,max98090";
-
-...won't find the right driver.
-
---
-
-The quick fix is to add max98091 to the max98090 driver and is what
-I'd suggest in this case.  ...but I still think that the above logic
-is valid and eventually the i2c core should be fixed.  Please correct
-me if I'm wrong.
-
--Doug
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140613/8304dc2f/attachment.sig>
