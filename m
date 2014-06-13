@@ -1,43 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 13 Jun 2014 16:43:07 +0900
-Subject: [PATCH v2] ARM: shmobile: koelsch: Add support HSCIF1
-In-Reply-To: <10020827.IyD6srEo7g@avalon>
-References: <1402367659-21117-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
- <CANqRtoT9OjX--sh3ab1R-j=ommqU3vvh1EzDoNQfkwZL39FSZQ@mail.gmail.com>
- <20140610070044.GB29303@verge.net.au> <10020827.IyD6srEo7g@avalon>
-Message-ID: <20140613074306.GA15286@verge.net.au>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 13 Jun 2014 09:45:33 +0200
+Subject: [PATCH 1/2] ARM: dts: mx5: Fix IPU port node placement
+In-Reply-To: <1402618960-9735-1-git-send-email-marex@denx.de>
+References: <1402618960-9735-1-git-send-email-marex@denx.de>
+Message-ID: <1402645533.3507.2.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 09:01:27AM +0200, Laurent Pinchart wrote:
-> Hi Simon,
+Am Freitag, den 13.06.2014, 02:22 +0200 schrieb Marek Vasut:
+> The "port" node was misplaced in the original patch, therefore making
+> the LCD dysfunctional on this board. Fix this by moving the "port" DT
+> node into the "display {}" node.
 > 
-> On Tuesday 10 June 2014 16:00:48 Simon Horman wrote:
-> > On Tue, Jun 10, 2014 at 01:14:27PM +0900, Magnus Damm wrote:
-> > > On Tue, Jun 10, 2014 at 11:34 AM, Nobuhiro Iwamatsu wrote:
-> > > > Koelsch can use HSCIF1 insetead of SCIF1 as serial port. But if we want
-> > > > to use, we will need to disable the GPIO key and remodeling of the
-> > > > board. Therefore status of hscif1 does not set the "okay".
-> > > > 
-> > > > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> > > > ---
-> > > > 
-> > > >  V2: Remove hscif1_clk from renesas,groups. This pin does not use.
-> > > 
-> > > Thanks for updating the patch. This looks fine to me.
-> > > 
-> > > Acked-by: Magnus Damm <damm+renesas@opensource.se>
-> > 
-> > Thanks, I will queue this up.
-> 
-> Sorry for the late reply, but I have some doubts about this. The HRX0 and
-> HTX0 signals are connected to push buttons and used as GPIOs. Beside,
-> they're not routed to serial port transceiver. If we want to use HSCIF0
-> on those pins on Koelsch and extension board must be connected to the
-> EXIO C connector, and two resistors and two capacitors should be
-> unsoldered. I thus don't think the Koeslch DT should contain pinmux data
-> for the HSCIF0 device. If an extension board is used and HSCIF0 needed,
-> then the DT file for the extension board should define pinmuxing for the
-> serial port.
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
 
-If you would like me to revert this patch I am happy to consider doing so.
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+thanks
+Philipp
