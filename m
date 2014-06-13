@@ -1,58 +1,40 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 13 Jun 2014 12:00:31 +0530
-Subject: [PATCH V2 08/19] irqchip: crossbar: fix checkpatch warning
-In-Reply-To: <1402589159.12385.4.camel@joe-AO725>
+Date: Fri, 13 Jun 2014 12:01:39 +0530
+Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from getting
+ mapped to crossbar
+In-Reply-To: <20140612135715.GE17845@atomide.com>
 References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
- <1402574007-13987-9-git-send-email-r.sricharan@ti.com>
- <20140612131042.GU8664@titan.lakedaemon.net> <5399AC9C.4080602@ti.com>
- <1402582711.9947.17.camel@joe-AO725>
- <20140612153226.GE8664@titan.lakedaemon.net>
- <1402589159.12385.4.camel@joe-AO725>
-Message-ID: <539A9A87.6020004@ti.com>
+ <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
+ <20140612125134.GS8664@titan.lakedaemon.net>
+ <20140612135715.GE17845@atomide.com>
+Message-ID: <539A9ACB.7060208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Thursday 12 June 2014 09:35 PM, Joe Perches wrote:
-> On Thu, 2014-06-12 at 11:32 -0400, Jason Cooper wrote:
-> 
-> Hi Jason.
-> 
->>> But bugfix backports haven't been much of an issue in
->>> other subsystems with fairly active whitespace/style
->>> changes.
+On Thursday 12 June 2014 07:27 PM, Tony Lindgren wrote:
+> * Jason Cooper <jason@lakedaemon.net> [140612 05:52]:
+>> On Thu, Jun 12, 2014 at 05:23:11PM +0530, Sricharan R wrote:
+>>> From: Nishanth Menon <nm@ti.com>
+>>>
+>>> When, in the system due to varied reasons, interrupts might be unusable
+>>> due to hardware behavior, but register maps do exist, then those interrupts
+>>> should be skipped while mapping irq to crossbars.
+>>>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
 >>
->> Most of the mvebu fixes we've had that failed to apply were generally
->> due to a large whitespace change (dts node shuffling, admittedly not
->> checkpatch-related).
+>> Tony, have you applied these somewhere already?
 > 
-> So not due to this.
+> I think some of these I had applied into a branch ready for
+> merging but then it was discovered that further changes
+> were needed and the branch was dropped.
 > 
->>   I've also frequently been stymied by code cleanups
->> when using git blame to find the commit introducing a regression.
+> Sricharan, please remove my Signed-off-by from this series.
+> If I end up applying it for merging my scripts will add it
+> automatically.
 > 
-> git blame -w can frequently help there.
-> 
->> So, my general rule is: If you're submitting a patch to make checkpatch
->> be quiet, re-assess the need.  If you're making changes and you can fix
->> some checkpatch items while you're there, then do so.
-> 
-> Decent rule.
-> 
->> There are certainly legitimate checkpatch-only patches, I just don't
->> think this is one qualifies.
-> 
-> Of course it's the maintainer's choice (and last I saw,
-> that's you) to ignore whatever doesn't fit the appropriate
-> vision for the code.
-> 
-> $ ./scripts/get_maintainer.pl -f drivers/irqchip/irq-crossbar.c
-> Thomas Gleixner <tglx@linutronix.de> (maintainer:IRQCHIP DRIVERS)
-> Jason Cooper <jason@lakedaemon.net> (maintainer:IRQCHIP DRIVERS)
- 
-  Ok, if this is not qualifying as a separate patch then i will merge
-  this with other patches in the series which touch them.
+ Ok, will remove it.
 
 Regards,
  Sricharan
