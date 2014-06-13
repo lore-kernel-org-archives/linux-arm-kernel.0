@@ -1,263 +1,58 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Fri, 13 Jun 2014 10:56:17 +0400
-Subject: [PATCH 1/2] ARM: i.MX: Migrate Freescale i.MX27 IP Camera board to
- devicetree
-Message-ID: <1402642578-2456-1-git-send-email-shc_work@mail.ru>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Fri, 13 Jun 2014 12:26:10 +0530
+Subject: [PATCH V2 03/19] irqchip: crossbar: Skip some irqs from getting
+ mapped to crossbar
+In-Reply-To: <20140612140508.GC8664@titan.lakedaemon.net>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <1402574007-13987-4-git-send-email-r.sricharan@ti.com>
+ <20140612125134.GS8664@titan.lakedaemon.net>
+ <20140612135715.GE17845@atomide.com>
+ <20140612140508.GC8664@titan.lakedaemon.net>
+Message-ID: <539AA08A.7010001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a DT support for Freescale i.MX27 IP Camera board
-and removes platform representation for this board from the tree.
+Hi Jason,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/imx27-ipcam.dts   | 106 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/Kconfig           |   9 ---
- arch/arm/mach-imx/Makefile          |   1 -
- arch/arm/mach-imx/mach-imx27ipcam.c |  77 --------------------------
- 5 files changed, 107 insertions(+), 87 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx27-ipcam.dts
- delete mode 100644 arch/arm/mach-imx/mach-imx27ipcam.c
+On Thursday 12 June 2014 07:35 PM, Jason Cooper wrote:
+> On Thu, Jun 12, 2014 at 06:57:15AM -0700, Tony Lindgren wrote:
+>> * Jason Cooper <jason@lakedaemon.net> [140612 05:52]:
+>>> On Thu, Jun 12, 2014 at 05:23:11PM +0530, Sricharan R wrote:
+>>>> From: Nishanth Menon <nm@ti.com>
+>>>>
+>>>> When, in the system due to varied reasons, interrupts might be unusable
+>>>> due to hardware behavior, but register maps do exist, then those interrupts
+>>>> should be skipped while mapping irq to crossbars.
+>>>>
+>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>>>
+>>> Tony, have you applied these somewhere already?
+>>
+>> I think some of these I had applied into a branch ready for
+>> merging but then it was discovered that further changes
+>> were needed and the branch was dropped.
+> 
+> Ok.
+> 
+>> Sricharan, please remove my Signed-off-by from this series.
+>> If I end up applying it for merging my scripts will add it
+>> automatically.
+> 
+> Do you have other changes outside of irqchip depending on this series?
+> If so, I can set up a topic branch for you guys to base off of.
+> Otherwise, I'll just apply them to irqchip/core when they're ready.
+> 
+ There are dts changes which are dependent upon this series.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0f1e8be..b681398 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -165,6 +165,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx27-apf27.dtb \
- 	imx27-apf27dev.dtb \
- 	imx27-eukrea-mbimxsd27-baseboard.dtb \
-+	imx27-ipcam.dtb \
- 	imx27-pdk.dtb \
- 	imx27-phytec-phycore-rdk.dtb \
- 	imx27-phytec-phycard-s-rdk.dtb \
-diff --git a/arch/arm/boot/dts/imx27-ipcam.dts b/arch/arm/boot/dts/imx27-ipcam.dts
-new file mode 100644
-index 0000000..8a0fd0c
---- /dev/null
-+++ b/arch/arm/boot/dts/imx27-ipcam.dts
-@@ -0,0 +1,106 @@
-+/*
-+ * Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx27.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX27 IP Camera";
-+	compatible = "fsl,imx27-ipcam", "fsl,imx27";
-+
-+	memory {
-+		reg = <0xa0000000 0x04000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		osc26m {
-+			compatible = "fsl,imx-osc26m", "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_5v0: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_reg5v0>;
-+			reg = <0>;
-+			regulator-name = "5V0";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio6 9 GPIO_ACTIVE_HIGH>;
-+			regulator-always-on;
-+		};
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
-+	phy-mode = "mii";
-+	phy-reset-gpios = <&gpio2 31 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	imx27-ipcam {
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <
-+				MX27_PAD_SD3_CMD__FEC_TXD0	0x0
-+				MX27_PAD_SD3_CLK__FEC_TXD1	0x0
-+				MX27_PAD_ATA_DATA0__FEC_TXD2	0x0
-+				MX27_PAD_ATA_DATA1__FEC_TXD3	0x0
-+				MX27_PAD_ATA_DATA2__FEC_RX_ER	0x0
-+				MX27_PAD_ATA_DATA3__FEC_RXD1	0x0
-+				MX27_PAD_ATA_DATA4__FEC_RXD2	0x0
-+				MX27_PAD_ATA_DATA5__FEC_RXD3	0x0
-+				MX27_PAD_ATA_DATA6__FEC_MDIO	0x0
-+				MX27_PAD_ATA_DATA7__FEC_MDC	0x0
-+				MX27_PAD_ATA_DATA8__FEC_CRS	0x0
-+				MX27_PAD_ATA_DATA9__FEC_TX_CLK	0x0
-+				MX27_PAD_ATA_DATA10__FEC_RXD0	0x0
-+				MX27_PAD_ATA_DATA11__FEC_RX_DV	0x0
-+				MX27_PAD_ATA_DATA12__FEC_RX_CLK	0x0
-+				MX27_PAD_ATA_DATA13__FEC_COL	0x0
-+				MX27_PAD_ATA_DATA14__FEC_TX_ER	0x0
-+				MX27_PAD_ATA_DATA15__FEC_TX_EN	0x0
-+				MX27_PAD_USBH1_RXDP__GPIO2_31	0x0 /* RST */
-+			>;
-+		};
-+
-+		pinctrl_reg5v0: reg5v0grp {
-+			fsl,pins = <
-+				MX27_PAD_IOIS16__GPIO6_9	0x0
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX27_PAD_UART1_TXD__UART1_TXD	0x0
-+				MX27_PAD_UART1_RXD__UART1_RXD	0x0
-+			>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 4cce93d..ca187be 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -397,15 +397,6 @@ config MACH_MXT_TD60
- 	  Include support for i-MXT (aka td60) platform. This
- 	  includes specific configurations for the module and its peripherals.
- 
--config MACH_IMX27IPCAM
--	bool "IMX27 IPCAM platform"
--	select IMX_HAVE_PLATFORM_IMX2_WDT
--	select IMX_HAVE_PLATFORM_IMX_UART
--	select SOC_IMX27
--	help
--	  Include support for IMX27 IPCAM platform. This includes specific
--	  configurations for the board and its peripherals.
--
- config MACH_IMX27_DT
- 	bool "Support i.MX27 platforms from device tree"
- 	select SOC_IMX27
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 2c8ca00..a364e20 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -66,7 +66,6 @@ obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
- obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
- obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
- obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
--obj-$(CONFIG_MACH_IMX27IPCAM) += mach-imx27ipcam.o
- obj-$(CONFIG_MACH_IMX27_DT) += imx27-dt.o
- 
- # i.MX31 based machines
-diff --git a/arch/arm/mach-imx/mach-imx27ipcam.c b/arch/arm/mach-imx/mach-imx27ipcam.c
-deleted file mode 100644
-index bb3ca04..0000000
---- a/arch/arm/mach-imx/mach-imx27ipcam.c
-+++ /dev/null
-@@ -1,77 +0,0 @@
--/*
-- * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * Author: Fabio Estevam <fabio.estevam@freescale.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--#include "hardware.h"
--#include "common.h"
--#include "devices-imx27.h"
--#include "iomux-mx27.h"
--
--static const int mx27ipcam_pins[] __initconst = {
--	/* UART1 */
--	PE12_PF_UART1_TXD,
--	PE13_PF_UART1_RXD,
--	/* FEC */
--	PD0_AIN_FEC_TXD0,
--	PD1_AIN_FEC_TXD1,
--	PD2_AIN_FEC_TXD2,
--	PD3_AIN_FEC_TXD3,
--	PD4_AOUT_FEC_RX_ER,
--	PD5_AOUT_FEC_RXD1,
--	PD6_AOUT_FEC_RXD2,
--	PD7_AOUT_FEC_RXD3,
--	PD8_AF_FEC_MDIO,
--	PD9_AIN_FEC_MDC,
--	PD10_AOUT_FEC_CRS,
--	PD11_AOUT_FEC_TX_CLK,
--	PD12_AOUT_FEC_RXD0,
--	PD13_AOUT_FEC_RX_DV,
--	PD14_AOUT_FEC_RX_CLK,
--	PD15_AOUT_FEC_COL,
--	PD16_AIN_FEC_TX_ER,
--	PF23_AIN_FEC_TX_EN,
--};
--
--static void __init mx27ipcam_init(void)
--{
--	imx27_soc_init();
--
--	mxc_gpio_setup_multiple_pins(mx27ipcam_pins, ARRAY_SIZE(mx27ipcam_pins),
--		"mx27ipcam");
--
--	imx27_add_imx_uart0(NULL);
--	imx27_add_fec(NULL);
--	imx27_add_imx2_wdt();
--}
--
--static void __init mx27ipcam_timer_init(void)
--{
--	mx27_clocks_init(25000000);
--}
--
--MACHINE_START(IMX27IPCAM, "Freescale IMX27IPCAM")
--	/* maintainer: Freescale Semiconductor, Inc. */
--	.atag_offset = 0x100,
--	.map_io = mx27_map_io,
--	.init_early = imx27_init_early,
--	.init_irq = mx27_init_irq,
--	.init_time	= mx27ipcam_timer_init,
--	.init_machine = mx27ipcam_init,
--	.restart	= mxc_restart,
--MACHINE_END
--- 
-1.8.5.5
+  http://www.spinics.net/lists/linux-omap/msg108116.html
+
+> Also, Sricharan, when you respin this, please clearly identify (in the
+> comment section) those patches that need to be flagged for stable.  It
+> would be helpful if they were the first patches in the series as well.
+
+Ok, i will point this out clearly.
+
+Regards,
+ Sricharan
