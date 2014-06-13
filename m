@@ -1,120 +1,206 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Fri, 13 Jun 2014 09:18:16 +0530
-Subject: [PATCH v4 3/6] drivers: cpuidle: implement OF based idle states
- infrastructure
-In-Reply-To: <20140612090339.GB29295@e102568-lin.cambridge.arm.com>
-References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1402503520-8611-4-git-send-email-lorenzo.pieralisi@arm.com>
- <CAJZ5v0gE2Jq709SXLpfrxXnHxmqcDV1FbrPPX1JYUUdHJFL_Dg@mail.gmail.com>
- <20140612090339.GB29295@e102568-lin.cambridge.arm.com>
-Message-ID: <539A7480.20606@linux.vnet.ibm.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Fri, 13 Jun 2014 09:29:50 +0530
+Subject: [PATCH 1/3 v5] spi: s3c64xx: fix broken "cs_gpios" usage in the driver
+Message-ID: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Since, (3146bee spi: s3c64xx: Added provision for dedicated cs pin)
 
-On 06/12/2014 02:33 PM, Lorenzo Pieralisi wrote:
-> [CC'ing Preeti and Paul to check their opinions]
-> 
-> Hi Rafael,
-> 
-> On Wed, Jun 11, 2014 at 07:25:49PM +0100, Rafael J. Wysocki wrote:
->> On Wed, Jun 11, 2014 at 6:18 PM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->>> On most common ARM systems, the low-power states a CPU can be put into are
->>> not discoverable in HW and require device tree bindings to describe
->>> power down suspend operations and idle states parameters.
->>>
->>> In order to enable DT based idle states and configure idle drivers, this
->>> patch implements the bulk infrastructure required to parse the device tree
->>> idle states bindings and initialize the corresponding CPUidle driver states
->>> data.
->>>
->>> Code that initializes idle states checks the CPU idle driver cpumask so
->>> that multiple CPU idle drivers can be initialized through it in the
->>> kernel. The CPU idle driver cpumask defines which idle states should be
->>> considered valid for the driver, ie idle states that are valid on a set
->>> of cpus the idle driver manages.
->>>
->>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> ---
->>>  drivers/cpuidle/Kconfig          |   9 ++
->>>  drivers/cpuidle/Makefile         |   1 +
->>>  drivers/cpuidle/of_idle_states.c | 282 +++++++++++++++++++++++++++++++++++++++
->>>  drivers/cpuidle/of_idle_states.h |   8 ++
->>>  4 files changed, 300 insertions(+)
->>>  create mode 100644 drivers/cpuidle/of_idle_states.c
->>>  create mode 100644 drivers/cpuidle/of_idle_states.h
->>>
->>> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
->>> index 1b96fb9..760ce20 100644
->>> --- a/drivers/cpuidle/Kconfig
->>> +++ b/drivers/cpuidle/Kconfig
->>> @@ -30,6 +30,15 @@ config CPU_IDLE_GOV_MENU
->>>         bool "Menu governor (for tickless system)"
->>>         default y
->>>
->>> +config OF_IDLE_STATES
->>
->> One question here.
->>
->> Do you want this to be generally useful or is it just ARM-specific?
-> 
-> The first series was targeting ARM64, then I noticed that it might be
-> used for ARM too (Daniel is working on that). Actually, I discovered
-> that Power and MIPS can reuse at least the code that initializes the
-> states data too, but I have to point out three things:
-> 
-> 1) state enter function method: in my bindings it is common for all
->    idle states, need to check if it applies to Power and MIPS too.
+spi-s3c64xx.c driver expects
+1. chip select gpios from "cs-gpio"(singular) under the
+   "controller-data" node of the client/slave device of the SPI.
 
-On PowerPC, we have a state enter function for each idle state. It will
-not be too difficult to consolidate them into one, but that is not on
-the cards right now.
+2. "cs-gpio"(singular) entry to be present in the SPI device node.
 
-> 2) CPUIDLE_FLAG_TIMER_STOP and how to set it. It is non-trivial to
->    add code that detects what idle states lose the tick device context.
->    At the moment I am adding the flag by default to all idle states
->    apart from standbywfi on ARM, but that can be optimised. Unless we
->    resort to power domains (but that's not trivial), we can add a flag
->    to the idle states in DT (ie local-timer-stop or suchlike) to support
->    that. I think that it will be frowned upon but it is worth trying, would
->    like to know what other people think about this.
+Eg of current broken usage:
+&spi_1 {
+	cs-gpio <>;	/* this entry is checked during probe */
+	...
+	slave_node {
+		controller-data {
+			cs-gpio <&gpioa2 5 0>;
+			/* This field is parsed during .setup() */
+		}
+	};
+};
 
-On PowerPC we have a bit in flag property of the idle state device node,
-which determines if timers will stop. Yes, maybe we can fix it at a
-specific bit but it may be messy.
+The following dts files which were using this driver. But,
+din't have the "cs-gpio" entry under SPI node.
+-- arch/arm/boot/dts/exynos4210-smdkv310.dts
+-- arch/arm/boot/dts/exynos4412-trats2.dts
+-- arch/arm/boot/dts/exynos5250-smdk5250.dts
 
-> 3) idle states bindings should be reviewed, I expect them to be valid
->    on other architectures too, but I need acknowledgments.
+Also, the SPI core and many drivers moved on to using "cs-gpios"
+from SPI node and removed the gpio handling code from drivers
+(including spi-s3c64xx.c).
 
-The major difference as I see it is the idle state bindings. In your
-patch there is a device node for each idle state. On PowerPC however,
-currently we have a single node with the property values of this node
-determining the idle states' name, desc etc..
+Hence, spi-s3c64xx.c is broken since "Jun 21 11:26:12 2013" and
+considering the time with no compliants about the breakage.
 
-Besides this, the names of the device tree nodes for idle states could
-be arch specific to meet some hierarchical requirements in the device
-tree. This would make it difficult for this driver to parse the idle
-states based on a generic idle state node name.
-> 
-> I think this series is not far from being ready to be upstreamed, I
-> would be certainly happy if it can be reused for other archs too so
-> just let me know.
+We are assuming it is safe to remove the "cs-gpio"(singular) usage
+from device tree binding of spi-samsung.txt and makes appropriate
+changes in the driver to use "cs-gpios"(plural) from
+SPI device node.
 
-On PowerPC there are a couple of other sanity checks that we ought to do
-before initializing the driver.
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Tested-by: Doug Anderson <dianders@chromium.org>
+Cc: Tomasz Figa <t.figa@samsung.com>
+---
+Changes since v4:
+1. Added reviewed by from Javier and Tested by from Doug
 
-So IMO, although we can press out the above mentioned differences in one
-way or the other to make way for a generic idle driver which reads from
-the device tree, I am not in favour of it since it has to concern itself
-with quite a bit of arch-specific stuff. This would anyway make it less
-and less of a generic idle driver. So its best to push this patch to be
-ARM specific.
+Changes since v3:
+1. Remove the sdd->cs_gpio and use gpio_is_valid(spi->cs_gpio) instead
+2. Keep cs->line only for Non-DT platforms and use spi->cs_gpio
+   for DT platforms
 
-Regards
-Preeti U Murthy
-> 
-> Thanks !
-> Lorenzo
-> 
+ .../devicetree/bindings/spi/spi-samsung.txt        |    8 ++--
+ drivers/spi/spi-s3c64xx.c                          |   41 ++++++++------------
+ 2 files changed, 20 insertions(+), 29 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+index 86aa061..2d29dac 100644
+--- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
++++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+@@ -42,15 +42,13 @@ Optional Board Specific Properties:
+ - num-cs: Specifies the number of chip select lines supported. If
+   not specified, the default number of chip select lines is set to 1.
+ 
++- cs-gpios: should specify GPIOs used for chipselects (see spi-bus.txt)
++
+ SPI Controller specific data in SPI slave nodes:
+ 
+ - The spi slave nodes should provide the following information which is required
+   by the spi controller.
+ 
+-  - cs-gpio: A gpio specifier that specifies the gpio line used as
+-    the slave select line by the spi controller. The format of the gpio
+-    specifier depends on the gpio controller.
+-
+   - samsung,spi-feedback-delay: The sampling phase shift to be applied on the
+     miso line (to account for any lag in the miso line). The following are the
+     valid values.
+@@ -85,6 +83,7 @@ Example:
+ 		#size-cells = <0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi0_bus>;
++		cs-gpios = <&gpa2 5 0>;
+ 
+ 		w25q80bw at 0 {
+ 			#address-cells = <1>;
+@@ -94,7 +93,6 @@ Example:
+ 			spi-max-frequency = <10000>;
+ 
+ 			controller-data {
+-				cs-gpio = <&gpa2 5 1 0 3>;
+ 				samsung,spi-feedback-delay = <0>;
+ 			};
+ 
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 75a5696..b888c66 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -197,7 +197,6 @@ struct s3c64xx_spi_driver_data {
+ 	struct s3c64xx_spi_dma_data	tx_dma;
+ 	struct s3c64xx_spi_port_config	*port_conf;
+ 	unsigned int			port_id;
+-	bool				cs_gpio;
+ };
+ 
+ static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
+@@ -776,17 +775,6 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+-	/* The CS line is asserted/deasserted by the gpio pin */
+-	if (sdd->cs_gpio)
+-		cs->line = of_get_named_gpio(data_np, "cs-gpio", 0);
+-
+-	if (!gpio_is_valid(cs->line)) {
+-		dev_err(&spi->dev, "chip select gpio is not specified or invalid\n");
+-		kfree(cs);
+-		of_node_put(data_np);
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+ 	of_property_read_u32(data_np, "samsung,spi-feedback-delay", &fb_delay);
+ 	cs->fb_delay = fb_delay;
+ 	of_node_put(data_np);
+@@ -812,6 +800,10 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 		spi->controller_data = cs;
+ 	}
+ 
++	/* For the non-DT platforms derive chip selects from controller data */
++	if (!spi->dev.of_node)
++		spi->cs_gpio = cs->line;
++
+ 	if (IS_ERR_OR_NULL(cs)) {
+ 		dev_err(&spi->dev, "No CS for SPI(%d)\n", spi->chip_select);
+ 		return -ENODEV;
+@@ -819,17 +811,19 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 
+ 	if (!spi_get_ctldata(spi)) {
+ 		/* Request gpio only if cs line is asserted by gpio pins */
+-		if (sdd->cs_gpio) {
+-			err = gpio_request_one(cs->line, GPIOF_OUT_INIT_HIGH,
+-					dev_name(&spi->dev));
++		if (gpio_is_valid(spi->cs_gpio)) {
++			err = gpio_request_one(spi->cs_gpio,
++						GPIOF_OUT_INIT_HIGH,
++						dev_name(&spi->dev));
+ 			if (err) {
+ 				dev_err(&spi->dev,
+ 					"Failed to get /CS gpio [%d]: %d\n",
+-					cs->line, err);
++					spi->cs_gpio, err);
+ 				goto err_gpio_req;
+ 			}
+-
+-			spi->cs_gpio = cs->line;
++		} else {
++			dev_err(&spi->dev, "chip select gpio is invalid\n");
++			return -EINVAL;
+ 		}
+ 
+ 		spi_set_ctldata(spi, cs);
+@@ -884,7 +878,8 @@ setup_exit:
+ 	/* setup() returns with device de-selected */
+ 	writel(S3C64XX_SPI_SLAVE_SIG_INACT, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
+ 
+-	gpio_free(cs->line);
++	if (gpio_is_valid(spi->cs_gpio))
++		gpio_free(spi->cs_gpio);
+ 	spi_set_ctldata(spi, NULL);
+ 
+ err_gpio_req:
+@@ -900,10 +895,12 @@ static void s3c64xx_spi_cleanup(struct spi_device *spi)
+ 	struct s3c64xx_spi_driver_data *sdd;
+ 
+ 	sdd = spi_master_get_devdata(spi->master);
+-	if (spi->cs_gpio) {
++	if (gpio_is_valid(spi->cs_gpio)) {
+ 		gpio_free(spi->cs_gpio);
+ 		if (spi->dev.of_node)
+ 			kfree(cs);
++		else
++			spi->cs_gpio = -ENOENT;
+ 	}
+ 	spi_set_ctldata(spi, NULL);
+ }
+@@ -1075,11 +1072,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 	sdd->cntrlr_info = sci;
+ 	sdd->pdev = pdev;
+ 	sdd->sfr_start = mem_res->start;
+-	sdd->cs_gpio = true;
+ 	if (pdev->dev.of_node) {
+-		if (!of_find_property(pdev->dev.of_node, "cs-gpio", NULL))
+-			sdd->cs_gpio = false;
+-
+ 		ret = of_alias_get_id(pdev->dev.of_node, "spi");
+ 		if (ret < 0) {
+ 			dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
+-- 
+1.7.9.5
