@@ -1,151 +1,177 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 13 Jun 2014 11:16:03 -0500
-Subject: [PATCH v2 2/3] ata: Add Qualcomm ARM SoC AHCI SATA host controller
- driver
-Message-ID: <1402676163-31574-1-git-send-email-galak@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 13 Jun 2014 11:15:46 -0500
+Subject: [RESEND PATCH 1/2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <1402676147-3711-1-git-send-email-balbi@ti.com>
+References: <1402676147-3711-1-git-send-email-balbi@ti.com>
+Message-ID: <1402676147-3711-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Qualcomm AHCI SATA controller that exists on several
-SoC and specifically the IPQ806x family of chips.  The IPQ806x SATA support
-requires the associated IPQ806x SATA PHY Driver to be enabled as well.
+From: Sathya Prakash M R <sathyap@ti.com>
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Add DSS hwmod data for AM43xx.
+
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Acked-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
-v2:
-* Fixed MODULE_LICENSE to be GPL v2
 
- drivers/ata/Kconfig     | 10 ++++++
- drivers/ata/Makefile    |  1 +
- drivers/ata/ahci_qcom.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 97 insertions(+)
- create mode 100644 drivers/ata/ahci_qcom.c
+Note that this patch was originally send on May 9th [1], changes were requested
+and a new version was sent on May 19th [2], then on May 27th [3] Tomi pinged
+maintainer again and go no response.
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 7671dba..aa88648 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -132,6 +132,16 @@ config AHCI_MVEBU
+Without this patch, we cannot get display working on any AM437x devices.
+
+[1] http://marc.info/?l=linux-arm-kernel&m=139963677925227&w=2
+[2] http://marc.info/?l=linux-arm-kernel&m=140049799425512&w=2
+[3] http://marc.info/?l=linux-arm-kernel&m=140117232826754&w=2
+
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prcm43xx.h             |  1 +
+ 2 files changed, 99 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index 5c2cc80..d2a7b6d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -19,6 +19,8 @@
+ #include "omap_hwmod.h"
+ #include "omap_hwmod_33xx_43xx_common_data.h"
+ #include "prcm43xx.h"
++#include "omap_hwmod_common_data.h"
++
  
- 	  If unsure, say N.
+ /* IP blocks */
+ static struct omap_hwmod am43xx_l4_hs_hwmod = {
+@@ -415,6 +417,70 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
+ 	},
+ };
  
-+config AHCI_QCOM
-+	tristate "Qualcomm AHCI SATA support"
-+	depends on ARCH_QCOM
-+	help
-+	  This option enables support for AHCI SATA controller
-+	  integrated into Qualcomm ARM SoC chipsets. For more
-+	  information please refer to http://www.qualcomm.com/chipsets.
++/* Display sub system - DSS */
 +
-+	  If unsure, say N.
-+
- config AHCI_SUNXI
- 	tristate "Allwinner sunxi AHCI SATA support"
- 	depends on ARCH_SUNXI
-diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
-index 5a02aee..15401e9 100644
---- a/drivers/ata/Makefile
-+++ b/drivers/ata/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
- obj-$(CONFIG_AHCI_DA850)	+= ahci_da850.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_MVEBU)	+= ahci_mvebu.o libahci.o libahci_platform.o
-+obj-$(CONFIG_AHCI_QCOM)		+= ahci_qcom.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_ST)		+= ahci_st.o libahci.o libahci_platform.o
- obj-$(CONFIG_AHCI_XGENE)	+= ahci_xgene.o libahci.o libahci_platform.o
-diff --git a/drivers/ata/ahci_qcom.c b/drivers/ata/ahci_qcom.c
-new file mode 100644
-index 0000000..bfb7a77
---- /dev/null
-+++ b/drivers/ata/ahci_qcom.c
-@@ -0,0 +1,86 @@
-+/*
-+ * Qualcomm ARM SoC AHCI SATA platform driver
-+ *
-+ * based on the AHCI SATA platform driver by Jeff Garzik and Anton Vorontsov
-+ *
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/pm.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/libata.h>
-+#include <linux/ahci_platform.h>
-+#include "ahci.h"
-+
-+static const struct ata_port_info qcom_ahci_port_info = {
-+	.flags		= AHCI_FLAG_COMMON,
-+	.pio_mask	= ATA_PIO4,
-+	.udma_mask	= ATA_UDMA6,
-+	.port_ops	= &ahci_platform_ops,
++struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
++	.manager_count		= 1,
++	.has_framedonetv_irq	= 0
 +};
 +
-+static int qcom_ahci_probe(struct platform_device *pdev)
-+{
-+	struct ahci_host_priv *hpriv;
-+	struct clk *rxoob_clk;
-+	int rc;
 +
-+	hpriv = ahci_platform_get_resources(pdev);
-+	if (IS_ERR(hpriv))
-+		return PTR_ERR(hpriv);
-+
-+	/* Try and set the rxoob clk to 100Mhz */
-+	rxoob_clk = of_clk_get_by_name(pdev->dev.of_node, "rxoob");
-+	if (IS_ERR(rxoob_clk))
-+		return PTR_ERR(rxoob_clk);
-+
-+	rc = clk_set_rate(rxoob_clk, 100000000);
-+	if (rc)
-+		return rc;
-+
-+	rc = ahci_platform_enable_resources(hpriv);
-+	if (rc)
-+		return rc;
-+
-+	rc = ahci_platform_init_host(pdev, hpriv, &qcom_ahci_port_info, 0, 0);
-+	if (rc)
-+		goto disable_resources;
-+
-+	return 0;
-+disable_resources:
-+	ahci_platform_disable_resources(hpriv);
-+	return rc;
-+}
-+
-+static const struct of_device_id qcom_ahci_of_match[] = {
-+	{ .compatible = "qcom,msm-ahci", },
-+	{},
++static struct omap_hwmod_class_sysconfig am43xx_dispc_sysc = {
++	.rev_offs	= 0x0000,
++	.sysc_offs	= 0x0010,
++	.syss_offs	= 0x0014,
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
++	.sysc_fields	= &omap_hwmod_sysc_type1,
 +};
-+MODULE_DEVICE_TABLE(of, qcom_ahci_of_match);
 +
-+static struct platform_driver qcom_ahci_driver = {
-+	.probe = qcom_ahci_probe,
-+	.remove = ata_platform_remove_one,
-+	.driver = {
-+		.name = "qcom_ahci_qcom",
-+		.owner = THIS_MODULE,
-+		.of_match_table = qcom_ahci_of_match,
++static struct omap_hwmod_class am43xx_dispc_hwmod_class = {
++	.name	= "dispc",
++	.sysc	= &am43xx_dispc_sysc,
++};
++
++static struct omap_hwmod am43xx_dss_core_hwmod = {
++	.name		= "dss_core",
++	.class		= &omap2_dss_hwmod_class,
++	.clkdm_name	= "dss_clkdm",
++	.main_clk	= "disp_clk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
 +	},
 +};
-+module_platform_driver(qcom_ahci_driver);
 +
-+MODULE_DESCRIPTION("Qualcomm AHCI SATA platform driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("ahci:qcom");
++/* display controller -dispc*/
++
++static struct omap_hwmod am43xx_dss_dispc_hwmod = {
++	.name		= "dss_dispc",
++	.class		= &am43xx_dispc_hwmod_class,
++	.clkdm_name	= "dss_clkdm",
++	.main_clk	= "disp_clk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
++		},
++	},
++	.dev_attr	= &am43xx_dss_dispc_dev_attr,
++};
++
++/*RFBI*/
++
++static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
++	.name		= "dss_rfbi",
++	.class		= &omap2_rfbi_hwmod_class,
++	.clkdm_name	= "dss_clkdm",
++	.main_clk	= "disp_clk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
++		},
++	},
++};
++
+ /* Interfaces */
+ static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+ 	.master		= &am33xx_l3_main_hwmod,
+@@ -654,6 +720,34 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
+ 	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++static struct omap_hwmod_ocp_if am43xx_dss__l3_main = {
++	.master		= &am43xx_dss_core_hwmod,
++	.slave		= &am33xx_l3_main_hwmod,
++	.clk		= "l3_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__dss = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_dss_core_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_dispc = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_dss_dispc_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__dss_rfbi = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_dss_rfbi_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_wkup__synctimer,
+ 	&am43xx_l4_ls__timer8,
+@@ -748,6 +842,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am43xx_l4_ls__ocp2scp1,
+ 	&am43xx_l3_s__usbotgss0,
+ 	&am43xx_l3_s__usbotgss1,
++	&am43xx_dss__l3_main,
++	&am43xx_l4_ls__dss,
++	&am43xx_l4_ls__dss_dispc,
++	&am43xx_l4_ls__dss_rfbi,
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index 7785be9..ad7b3e9 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -142,5 +142,6 @@
+ #define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
+ #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
+ #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
++#define AM43XX_CM_PER_DSS_CLKCTRL_OFFSET		0x0a20
+ 
+ #endif
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+2.0.0.rc1
