@@ -1,70 +1,79 @@
-From: giuseppe.condorelli@st.com (Giuseppe CONDORELLI)
-Date: Fri, 13 Jun 2014 13:23:14 +0000
-Subject: Latest mainline (3.16 merge window) does not boot in B2020/STiH416
-In-Reply-To: <539AF5B0.6060509@linaro.org>
-References: <539AF5B0.6060509@linaro.org>
-Message-ID: <DB9CA98AC012DF4FBF9AF41C875BCE91CC449A@SAFEX1NODE23.st.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 13 Jun 2014 15:24:12 +0200
+Subject: [PATCH v2] ARM: shmobile: koelsch: Add support HSCIF1
+In-Reply-To: <CAMuHMdUd=E=TcSTPwy0xbpAcZH+voiEkjND=qzdSzG_zKdPe9g@mail.gmail.com>
+References: <1402367659-21117-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+ <9058795.dyXpcFtuGJ@avalon>
+ <CAMuHMdUd=E=TcSTPwy0xbpAcZH+voiEkjND=qzdSzG_zKdPe9g@mail.gmail.com>
+Message-ID: <1751840.oCdYe48VRu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Geert,
 
-what type of messages you have?
-Is it a networking issue?
+On Friday 13 June 2014 13:16:34 Geert Uytterhoeven wrote:
+> On Fri, Jun 13, 2014 at 12:49 PM, Laurent Pinchart wrote:
+> > On Friday 13 June 2014 16:43:07 Simon Horman wrote:
+> >> On Fri, Jun 13, 2014 at 09:01:27AM +0200, Laurent Pinchart wrote:
+> >> > On Tuesday 10 June 2014 16:00:48 Simon Horman wrote:
+> >> > > On Tue, Jun 10, 2014 at 01:14:27PM +0900, Magnus Damm wrote:
+> >> > > > On Tue, Jun 10, 2014 at 11:34 AM, Nobuhiro Iwamatsu wrote:
+> >> > > > > Koelsch can use HSCIF1 insetead of SCIF1 as serial port. But if
+> >> > > > > we want to use, we will need to disable the GPIO key and
+> >> > > > > remodeling of the board. Therefore status of hscif1 does not set
+> >> > > > > the "okay".
+> >> > > > > 
+> >> > > > > Signed-off-by: Nobuhiro Iwamatsu
+> >> > > > > <nobuhiro.iwamatsu.yj@renesas.com>
+> >> > > > > ---
+> >> > > > > 
+> >> > > > >  V2: Remove hscif1_clk from renesas,groups. This pin does not
+> >> > > > >  use.
+> >> > > > 
+> >> > > > Thanks for updating the patch. This looks fine to me.
+> >> > > > 
+> >> > > > Acked-by: Magnus Damm <damm+renesas@opensource.se>
+> >> > > 
+> >> > > Thanks, I will queue this up.
+> >> > 
+> >> > Sorry for the late reply, but I have some doubts about this. The HRX0
+> >> > and HTX0 signals are connected to push buttons and used as GPIOs.
+> >> > Beside, they're not routed to serial port transceiver. If we want to
+> >> > use HSCIF0 on those pins on Koelsch and extension board must be
+> >> > connected to the EXIO C connector, and two resistors and two capacitors
+> >> > should be unsoldered. I thus don't think the Koeslch DT should contain
+> >> > pinmux data for the HSCIF0 device. If an extension board is used and
+> >> > HSCIF0 needed, then the DT file for the extension board should define
+> >> > pinmuxing for the serial port.
+> 
+> You mean HRX1, HTX1, and HSCIF1?
 
-About the inquired patch, as you can easily see via git log, the code
-introduced is disabled by default, so I think the keyscan support can be
-excluded from the "black" list.
-Indeed, if for whatever reason it was enabled and Ethernet disabled (given that its PIOs
-conflict with the second ones) it could be a reason of your failures.
-One test you can do, other than to check the dt code, is to boot via a usb network cable and
-see if the boards mount the nfs filesystem.
+*sigh*... :-)
 
-Cheers,
-Giuseppe
+> HTX1 and HRX1 can be connected to the DEBUG1 transceiver by stuffing
+> zero-Ohm resisters to R834 and R835.
+> 
+> About your comment about the resistors and capacitors, which applies to
+> both HSCIF0 and HSCIF1: probably the serial port will still work if
+> these are present.
 
->-----Original Message-----
->From: Daniel Thompson [mailto:daniel.thompson at linaro.org]
->Sent: venerd? 13 giugno 2014 14:59
->To: Gabriel FERNANDEZ
->Cc: Giuseppe CONDORELLI; Gabriel Fernandez; Maxime COQUELIN; Srinivas
->Kandagatla; Patrice CHOTARD; linux-arm-kernel at lists.infradead.org;
->kernel at stlinux.com
->Subject: Latest mainline (3.16 merge window) does not boot in B2020/STiH416
->
->Hi Folks
->
->Using the lastest Linus T. mainline it is no longer possible to boot a
->B2020/STiH416.
->
->The kernel boots OK and issues UART messages, but the system gets stuck
->trying to mount the NFS root filesystem.
->
->Configuration is multi_v7_defconfig+CGROUPS+AUTOFS4_FS+IPV6 (although
->the deviations from multi_v7_defconfig should make little difference).
->
->An automated bisect identified the first broken version as:
->--- cut here ---
->commit 948d8ffb4775705c729501f9a433d05163e2f253
->Author: Gabriel FERNANDEZ <gabriel.fernandez@st.com>
->Date:   Fri Apr 11 17:07:00 2014 +0200
->
->    ARM: STi: DT: add keyscan for stih416
->
->    Add keyscan support for stih416.
->    It is disabled by default given that it is not enabled on all boards.
->    Also there are PIOs conflict with already claimed lines.
->
->    Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->    Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
->    Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->    Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->--- cut here ---
->
->Unfortunately 'git revert 948d8ffb4775705c729501f9a433d05163e2f253' is
->insufficient to get things working when merged back to head.
->
->Feel free to ask for any help in resolving the problem.
->
->
->Daniel.
+With a 4.7?F capacitive load on the transmission line, assuming a drive 
+strength of 40mA (which is pretty high), switching between 0V and 3.3V takes 
+388?s, corresponding to 2579 Hz. You'll have to reduce the baud rate :-)
+
+> >> If you would like me to revert this patch I am happy to consider doing
+> >> so.
+> > 
+> > That's one option, but I'd like to get feedback on my point of view before
+> > reverting it. Who knows, I might be wrong ;-)
+> 
+> Nevertheless, I agree with Laurent.
+> 
+> HSCIF1 (and HSCIF0) cannot be used on the Koelsch board as-is, hence they
+> should not be present in the plain Koelsch DTS.  They should be put in
+> an overlay DTS instead.
+
+-- 
+Regards,
+
+Laurent Pinchart
