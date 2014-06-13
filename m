@@ -1,72 +1,60 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 13 Jun 2014 22:36:04 +0200
-Subject: [PATCH v2 4/4] pinctrl: sunxi: Define enable / disable irq callbacks
- for level triggered irqs
-In-Reply-To: <1402691764-17562-1-git-send-email-hdegoede@redhat.com>
-References: <1402691764-17562-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1402691764-17562-5-git-send-email-hdegoede@redhat.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 13 Jun 2014 22:38:56 +0200 (CEST)
+Subject: [PATCH V2 00/19] irqchip: crossbar: driver fixes
+In-Reply-To: <20140613165458.GS8664@titan.lakedaemon.net>
+References: <1402574007-13987-1-git-send-email-r.sricharan@ti.com>
+ <20140613150122.GP8664@titan.lakedaemon.net>
+ <1402676074.12385.40.camel@joe-AO725>
+ <20140613163714.GR8664@titan.lakedaemon.net>
+ <1402678104.3509.1.camel@joe-AO725>
+ <20140613165458.GS8664@titan.lakedaemon.net>
+Message-ID: <alpine.DEB.2.10.1406132222570.5170@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers use disable_irq / enable_irq and do the work clearing the source
-in another thread instead of using a threaded interrupt handler.
+On Fri, 13 Jun 2014, Jason Cooper wrote:
+> On Fri, Jun 13, 2014 at 09:48:24AM -0700, Joe Perches wrote:
+> > On Fri, 2014-06-13 at 12:37 -0400, Jason Cooper wrote:
+> > > On Fri, Jun 13, 2014 at 09:14:34AM -0700, Joe Perches wrote:
+> > > > On Fri, 2014-06-13 at 11:01 -0400, Jason Cooper wrote:
+> > > > > Please format the subject lines like so:
+> > > > > 
+> > > > >   irqchip: crossbar: Set cb pointer ...
+> > > > >                      ^
+> > > > >                      |
+> > > > >                      \-- note the capitalization
+> > > > 
+> > > > I suggest you don't make this a rule and focus
+> > > > on more important stuff instead.
 
-The irqchip used not having irq_disable and irq_enable callbacks in this case,
-will lead to unnecessary spurious interrupts:
+Says the one, who pesters people about typos in changelogs....
 
-On a disable_irq in a chip without a handller for this, the irq core will
-remember the disable, but not actually call into the irqchip. With a level
-triggered interrupt (where the source has not been cleared) this will lead
-to an immediate retrigger, at which point the irq-core will mask the irq.
-So having an irq_disable callback in the irqchip will save us the interrupt
-firing a 2nd time for nothing.
+WTF? Jason is doing a great job in reviewing and he knows what to
+concentrate on.
 
-Drivers using disable / enable_irq like this, will call enable_irq when
-they finally have cleared the interrupt source, without an enable_irq callback,
-this will turn into an unmask, at which point the irq will trigger immediately
-because when it was originally acked the level was still high, so the ack was
-a nop.
+> > > It's not my rule.  ;-)
+> > 
+> > Who's rule is it then?
+> 
+> Thomas'
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Sentences start with an upper case letter. Our brain is trained on
+that rule when parsing a line.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index aebd2f2..4c74e13 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -34,6 +34,7 @@
- static void sunxi_pinctrl_irq_ack(struct irq_data *d);
- static void sunxi_pinctrl_irq_mask(struct irq_data *d);
- static void sunxi_pinctrl_irq_unmask(struct irq_data *d);
-+static void sunxi_pinctrl_irq_ack_unmask(struct irq_data *d);
- static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type);
- 
- static struct sunxi_pinctrl_group *
-@@ -565,6 +566,10 @@ static struct irq_chip sunxi_pinctrl_level_irq_chip = {
- 	.irq_eoi		= sunxi_pinctrl_irq_ack,
- 	.irq_mask		= sunxi_pinctrl_irq_mask,
- 	.irq_unmask		= sunxi_pinctrl_irq_unmask,
-+	/* Define irq_enable / disable to avoid spurious irqs for drivers
-+	 * using these to suppress irqs while they clear the irq source */
-+	.irq_enable		= sunxi_pinctrl_irq_ack_unmask,
-+	.irq_disable		= sunxi_pinctrl_irq_mask,
- 	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
- 	.irq_set_type		= sunxi_pinctrl_irq_set_type,
- 	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED
-@@ -664,6 +669,12 @@ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
- 	spin_unlock_irqrestore(&pctl->lock, flags);
- }
- 
-+static void sunxi_pinctrl_irq_ack_unmask(struct irq_data *d)
-+{
-+	sunxi_pinctrl_irq_ack(d);
-+	sunxi_pinctrl_irq_unmask(d);
-+}
-+
- static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
- {
- 	struct irq_chip *chip = irq_get_chip(irq);
--- 
-2.0.0
+So for people who actually review patches by reading them instead of
+running a spell checker, consistent formatting more important than
+avoiding the random typo, which our brain just blends out in most of
+the cases. Unfortunately also when the typo is in actual code :(
+
+Thanks,
+
+	tglx
+
+
+
+
+
+
+   
+
+   
