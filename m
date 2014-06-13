@@ -1,46 +1,43 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Fri, 13 Jun 2014 10:56:18 +0400
-Subject: [PATCH 2/2] ARM: i.MX: Migrate Freescale Logic Product Development
- i.MX27 Lite-Kit board to devicetree
-In-Reply-To: <1402642578-2456-1-git-send-email-shc_work@mail.ru>
-References: <1402642578-2456-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1402642578-2456-2-git-send-email-shc_work@mail.ru>
+Date: Fri, 13 Jun 2014 10:56:17 +0400
+Subject: [PATCH 1/2] ARM: i.MX: Migrate Freescale i.MX27 IP Camera board to
+ devicetree
+Message-ID: <1402642578-2456-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a DT support for Freescale Logic Product Development
-i.MX27 Lite-Kit and removes platform representation for this board
-from the tree.
+This patch adds a DT support for Freescale i.MX27 IP Camera board
+and removes platform representation for this board from the tree.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/Makefile          |  1 +
- arch/arm/boot/dts/imx27-litekit.dts | 72 ++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/Kconfig           |  9 ----
- arch/arm/mach-imx/Makefile          |  1 -
- arch/arm/mach-imx/mach-imx27lite.c  | 83 -------------------------------------
- 5 files changed, 73 insertions(+), 93 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx27-litekit.dts
- delete mode 100644 arch/arm/mach-imx/mach-imx27lite.c
+ arch/arm/boot/dts/Makefile          |   1 +
+ arch/arm/boot/dts/imx27-ipcam.dts   | 106 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/Kconfig           |   9 ---
+ arch/arm/mach-imx/Makefile          |   1 -
+ arch/arm/mach-imx/mach-imx27ipcam.c |  77 --------------------------
+ 5 files changed, 107 insertions(+), 87 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx27-ipcam.dts
+ delete mode 100644 arch/arm/mach-imx/mach-imx27ipcam.c
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b681398..25bd629 100644
+index 0f1e8be..b681398 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -166,6 +166,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+@@ -165,6 +165,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx27-apf27.dtb \
  	imx27-apf27dev.dtb \
  	imx27-eukrea-mbimxsd27-baseboard.dtb \
- 	imx27-ipcam.dtb \
-+	imx27-litekit.dtb \
++	imx27-ipcam.dtb \
  	imx27-pdk.dtb \
  	imx27-phytec-phycore-rdk.dtb \
  	imx27-phytec-phycard-s-rdk.dtb \
-diff --git a/arch/arm/boot/dts/imx27-litekit.dts b/arch/arm/boot/dts/imx27-litekit.dts
+diff --git a/arch/arm/boot/dts/imx27-ipcam.dts b/arch/arm/boot/dts/imx27-ipcam.dts
 new file mode 100644
-index 0000000..4c1b34c
+index 0000000..8a0fd0c
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx27-litekit.dts
-@@ -0,0 +1,72 @@
++++ b/arch/arm/boot/dts/imx27-ipcam.dts
+@@ -0,0 +1,106 @@
 +/*
 + * Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
 + *
@@ -56,11 +53,40 @@ index 0000000..4c1b34c
 +#include "imx27.dtsi"
 +
 +/ {
-+	model = "Freescale Logic Product Development i.MX27 Lite-Kit";
-+	compatible = "fsl,imx27-litekit", "fsl,imx27";
++	model = "Freescale i.MX27 IP Camera";
++	compatible = "fsl,imx27-ipcam", "fsl,imx27";
 +
 +	memory {
 +		reg = <0xa0000000 0x04000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		osc26m {
++			compatible = "fsl,imx-osc26m", "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_5v0: regulator at 0 {
++			compatible = "regulator-fixed";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_reg5v0>;
++			reg = <0>;
++			regulator-name = "5V0";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio6 9 GPIO_ACTIVE_HIGH>;
++			regulator-always-on;
++		};
 +	};
 +};
 +
@@ -68,13 +94,13 @@ index 0000000..4c1b34c
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&pinctrl_fec>;
 +	phy-mode = "mii";
++	phy-reset-gpios = <&gpio2 31 GPIO_ACTIVE_LOW>;
 +	status = "okay";
 +};
 +
 +&uart1 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
 +	status = "okay";
 +};
 +
@@ -100,6 +126,13 @@ index 0000000..4c1b34c
 +				MX27_PAD_ATA_DATA13__FEC_COL	0x0
 +				MX27_PAD_ATA_DATA14__FEC_TX_ER	0x0
 +				MX27_PAD_ATA_DATA15__FEC_TX_EN	0x0
++				MX27_PAD_USBH1_RXDP__GPIO2_31	0x0 /* RST */
++			>;
++		};
++
++		pinctrl_reg5v0: reg5v0grp {
++			fsl,pins = <
++				MX27_PAD_IOIS16__GPIO6_9	0x0
 +			>;
 +		};
 +
@@ -107,54 +140,52 @@ index 0000000..4c1b34c
 +			fsl,pins = <
 +				MX27_PAD_UART1_TXD__UART1_TXD	0x0
 +				MX27_PAD_UART1_RXD__UART1_RXD	0x0
-+				MX27_PAD_UART1_CTS__UART1_CTS	0x0
-+				MX27_PAD_UART1_RTS__UART1_RTS	0x0
 +			>;
 +		};
 +	};
 +};
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index ca187be..9297cd4 100644
+index 4cce93d..ca187be 100644
 --- a/arch/arm/mach-imx/Kconfig
 +++ b/arch/arm/mach-imx/Kconfig
-@@ -357,15 +357,6 @@ config MACH_IMX27_VISSTRIM_M10
- 	  This includes specific configurations for the board and its
- 	  peripherals.
+@@ -397,15 +397,6 @@ config MACH_MXT_TD60
+ 	  Include support for i-MXT (aka td60) platform. This
+ 	  includes specific configurations for the module and its peripherals.
  
--config MACH_IMX27LITE
--	bool "LogicPD MX27 LITEKIT platform"
--	select IMX_HAVE_PLATFORM_IMX_SSI
+-config MACH_IMX27IPCAM
+-	bool "IMX27 IPCAM platform"
+-	select IMX_HAVE_PLATFORM_IMX2_WDT
 -	select IMX_HAVE_PLATFORM_IMX_UART
 -	select SOC_IMX27
 -	help
--	  Include support for MX27 LITEKIT platform. This includes specific
+-	  Include support for IMX27 IPCAM platform. This includes specific
 -	  configurations for the board and its peripherals.
 -
- config MACH_PCA100
- 	bool "Phytec phyCARD-s (pca100)"
- 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ config MACH_IMX27_DT
+ 	bool "Support i.MX27 platforms from device tree"
+ 	select SOC_IMX27
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index a364e20..12eee2a 100644
+index 2c8ca00..a364e20 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -60,7 +60,6 @@ obj-$(CONFIG_MACH_MX27ADS) += mach-mx27ads.o
- obj-$(CONFIG_MACH_PCM038) += mach-pcm038.o
- obj-$(CONFIG_MACH_PCM970_BASEBOARD) += pcm970-baseboard.o
- obj-$(CONFIG_MACH_MX27_3DS) += mach-mx27_3ds.o
--obj-$(CONFIG_MACH_IMX27LITE) += mach-imx27lite.o
- obj-$(CONFIG_MACH_IMX27_VISSTRIM_M10) += mach-imx27_visstrim_m10.o
- obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
+@@ -66,7 +66,6 @@ obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
  obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
-diff --git a/arch/arm/mach-imx/mach-imx27lite.c b/arch/arm/mach-imx/mach-imx27lite.c
+ obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
+ obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
+-obj-$(CONFIG_MACH_IMX27IPCAM) += mach-imx27ipcam.o
+ obj-$(CONFIG_MACH_IMX27_DT) += imx27-dt.o
+ 
+ # i.MX31 based machines
+diff --git a/arch/arm/mach-imx/mach-imx27ipcam.c b/arch/arm/mach-imx/mach-imx27ipcam.c
 deleted file mode 100644
-index 9992089..0000000
---- a/arch/arm/mach-imx/mach-imx27lite.c
+index bb3ca04..0000000
+--- a/arch/arm/mach-imx/mach-imx27ipcam.c
 +++ /dev/null
-@@ -1,83 +0,0 @@
+@@ -1,77 +0,0 @@
 -/*
-- * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
-- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
-- * Copyright 2009 Daniel Schaeffer (daniel.schaeffer at timesys.com)
+- * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * Author: Fabio Estevam <fabio.estevam@freescale.com>
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -167,24 +198,19 @@ index 9992089..0000000
 - * GNU General Public License for more details.
 - */
 -
--#include <linux/platform_device.h>
--#include <linux/gpio.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -#include <asm/mach/time.h>
--#include <asm/mach/map.h>
 -
+-#include "hardware.h"
 -#include "common.h"
 -#include "devices-imx27.h"
--#include "hardware.h"
 -#include "iomux-mx27.h"
 -
--static const int mx27lite_pins[] __initconst = {
+-static const int mx27ipcam_pins[] __initconst = {
 -	/* UART1 */
 -	PE12_PF_UART1_TXD,
 -	PE13_PF_UART1_RXD,
--	PE14_PF_UART1_CTS,
--	PE15_PF_UART1_RTS,
 -	/* FEC */
 -	PD0_AIN_FEC_TXD0,
 -	PD1_AIN_FEC_TXD1,
@@ -206,32 +232,31 @@ index 9992089..0000000
 -	PF23_AIN_FEC_TX_EN,
 -};
 -
--static const struct imxuart_platform_data uart_pdata __initconst = {
--	.flags = IMXUART_HAVE_RTSCTS,
--};
--
--static void __init mx27lite_init(void)
+-static void __init mx27ipcam_init(void)
 -{
 -	imx27_soc_init();
 -
--	mxc_gpio_setup_multiple_pins(mx27lite_pins, ARRAY_SIZE(mx27lite_pins),
--		"imx27lite");
--	imx27_add_imx_uart0(&uart_pdata);
+-	mxc_gpio_setup_multiple_pins(mx27ipcam_pins, ARRAY_SIZE(mx27ipcam_pins),
+-		"mx27ipcam");
+-
+-	imx27_add_imx_uart0(NULL);
 -	imx27_add_fec(NULL);
+-	imx27_add_imx2_wdt();
 -}
 -
--static void __init mx27lite_timer_init(void)
+-static void __init mx27ipcam_timer_init(void)
 -{
--	mx27_clocks_init(26000000);
+-	mx27_clocks_init(25000000);
 -}
 -
--MACHINE_START(IMX27LITE, "LogicPD i.MX27LITE")
+-MACHINE_START(IMX27IPCAM, "Freescale IMX27IPCAM")
+-	/* maintainer: Freescale Semiconductor, Inc. */
 -	.atag_offset = 0x100,
 -	.map_io = mx27_map_io,
 -	.init_early = imx27_init_early,
 -	.init_irq = mx27_init_irq,
--	.init_time	= mx27lite_timer_init,
--	.init_machine = mx27lite_init,
+-	.init_time	= mx27ipcam_timer_init,
+-	.init_machine = mx27ipcam_init,
 -	.restart	= mxc_restart,
 -MACHINE_END
 -- 
