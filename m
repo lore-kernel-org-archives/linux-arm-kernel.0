@@ -1,37 +1,21 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 13 Jun 2014 14:30:29 +0100
-Subject: [STLinux Kernel] Latest mainline (3.16 merge window) does not
- boot in B2020/STiH416
-In-Reply-To: <20140613131051.GA28309@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <539AF5B0.6060509@linaro.org>
- <20140613131051.GA28309@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <539AFCF5.90206@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jun 2014 15:32:07 +0200
+Subject: [PATCH V2] ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
+In-Reply-To: <1401889280-8528-1-git-send-email-jason@lakedaemon.net>
+References: <5388ddb9.0458440a.2be7.323c@mx.google.com>
+ <1401889280-8528-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <201406131532.08164.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/14 14:10, Peter Griffin wrote:
-> Hi Daniel,
+On Wednesday 04 June 2014, Jason Cooper wrote:
+> The OpenBlocks AX3-4 has a non-DT bootloader.  It also comes with 1GB of
+> soldered on RAM, and a DIMM slot for expansion.
 > 
-> On Fri, 13 Jun 2014, Daniel Thompson wrote:
->> Hi Folks
->>
->> Using the lastest Linus T. mainline it is no longer possible to boot a
->> B2020/STiH416.
->>
->> The kernel boots OK and issues UART messages, but the system gets stuck
->> trying to mount the NFS root filesystem.
+> Unfortunately, atags_to_fdt() doesn't work in big-endian mode, so we see
+> the following failure when attempting to boot a big-endian kernel:
 > 
-> Are you booting with  clk_ignore_unused kernel parameter?
-> 
-> Its about at the point you describe that the unused clocks are disabled.
 
-Thanks Pete. Adding this parameter fixes the problem.
+I've applied it to the fixes branch now, sorry for the delay.
 
-Any idea why?
-
-I only ask because there's very little related to the clocks in the
-patch bisect picked up (and I did manually check the predecessor before
-posting).
-
-
-Daniel.
+	Arnd
