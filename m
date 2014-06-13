@@ -1,27 +1,48 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 13 Jun 2014 15:17:39 +0200
-Subject: [PATCH v3 1/2] drm/panel: consolidate unnecessary explicit
- dependencies
-In-Reply-To: <E1WvRBL-0007qq-2D@rmk-PC.arm.linux.org.uk>
-References: <E1WvRBL-0007qq-2D@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140613131738.GA5568@ulmo>
+Date: Fri, 13 Jun 2014 15:17:58 +0200
+Subject: [PATCH v3 2/2] drm/panel: make DRM_PANEL_LD9040 depend on SPI
+In-Reply-To: <E1WvRBQ-0007wk-8e@rmk-PC.arm.linux.org.uk>
+References: <E1WvRBQ-0007wk-8e@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140613131758.GB5568@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 02:06:11PM +0100, Russell King wrote:
-> DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
-> DRM_PANEL && DRM, whereas DRM_PANEL_SIMPLE relies upon the dependency
-> on the menu.
+On Fri, Jun 13, 2014 at 02:06:16PM +0100, Russell King wrote:
+> Rather than DRM_PANEL_LD9040 selecting SPI, which then results in an
+> increase in the probability of Kconf reporting circular dependencies
+> (we're one "select" away from that right now), make this depend on
+> SPI instead.  This is akin to having some driver select DRM.
 > 
-> We do not need to use explicit dependencies if we make the menu depend
-> on DRM_PANEL && DRM - this will implicitly make each entry in the menu
-> depend on DRM_PANEL && DRM without this needing to be explicitly stated
-> against every entry.
+> Having some drivers depend on a subsystem, and other drivers select a
+> subsystem is a recipe for circular dependencies, and there's really no
+> need for it.
 > 
+> The potential circular dependency (which can be caused today by the
+> addition of selecting DRM_PANEL from DRM_IMX_LDB) is:
+> 
+>   symbol DMADEVICES is selected by SAMSUNG_DMADEV
+>   symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
+>   symbol S3C64XX_PL080 is selected by SPI_S3C64XX
+>   symbol SPI_S3C64XX depends on SPI
+>   symbol SPI is selected by DRM_PANEL_LD9040
+>   symbol DRM_PANEL_LD9040 depends on DRM_PANEL
+>   symbol DRM_PANEL is selected by DRM_IMX_LDB
+>   symbol DRM_IMX_LDB depends on MFD_SYSCON
+>   symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
+>   symbol POWER_RESET_KEYSTONE depends on POWER_SUPPLY
+>   symbol POWER_SUPPLY is selected by HID_SONY
+>   symbol HID_SONY depends on NEW_LEDS
+>   symbol NEW_LEDS is selected by BACKLIGHT_ADP8860
+>   symbol BACKLIGHT_ADP8860 depends on BACKLIGHT_CLASS_DEVICE
+>   symbol BACKLIGHT_CLASS_DEVICE is selected by FB_MX3
+>   symbol FB_MX3 depends on MX3_IPU
+>   symbol MX3_IPU depends on DMADEVICES
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->  drivers/gpu/drm/panel/Kconfig | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+>  drivers/gpu/drm/panel/Kconfig | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
 Applied, thanks.
 
@@ -32,4 +53,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140613/c9420170/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140613/db7bb3c9/attachment.sig>
