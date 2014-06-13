@@ -1,59 +1,29 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 13 Jun 2014 14:06:16 +0100
-Subject: [PATCH v3 2/2] drm/panel: make DRM_PANEL_LD9040 depend on SPI
-Message-ID: <E1WvRBQ-0007wk-8e@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jun 2014 14:06:49 +0100
+Subject: [PATCH v2 1/2] drm/panel: remove unnecessary dependencies
+In-Reply-To: <539A9225.90304@samsung.com>
+References: <E1Wv7ZP-0004Wb-3J@rmk-PC.arm.linux.org.uk>
+ <539A9225.90304@samsung.com>
+Message-ID: <20140613130648.GR23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than DRM_PANEL_LD9040 selecting SPI, which then results in an
-increase in the probability of Kconf reporting circular dependencies
-(we're one "select" away from that right now), make this depend on
-SPI instead.  This is akin to having some driver select DRM.
+On Fri, Jun 13, 2014 at 07:54:45AM +0200, Andrzej Hajda wrote:
+> Hi Russel,
+> 
+> Thanks for both fixes. Just one nitpick.
+> 
+> On 06/12/2014 06:09 PM, Russell King wrote:
+> > DRM_PANEL_LD9040 and DRM_PANEL_S6E8AA0 both explicitly depended on
+> > DRM_PANEL && DRM.  This is nonsense for two reasons:
+> > 
+> > (a) DRM_PANEL already depends on DRM, so DRM_PANEL can not be enabled
+> > without DRM first being enabled.  Hence the && DRM is useless.
+> 
+> This reason is invalid and do not describe the patch anymore.
 
-Having some drivers depend on a subsystem, and other drivers select a
-subsystem is a recipe for circular dependencies, and there's really no
-need for it.
+Thanks, expect v3 in your mailbox shortly (or already there.)
 
-The potential circular dependency (which can be caused today by the
-addition of selecting DRM_PANEL from DRM_IMX_LDB) is:
-
-  symbol DMADEVICES is selected by SAMSUNG_DMADEV
-  symbol SAMSUNG_DMADEV is selected by S3C64XX_PL080
-  symbol S3C64XX_PL080 is selected by SPI_S3C64XX
-  symbol SPI_S3C64XX depends on SPI
-  symbol SPI is selected by DRM_PANEL_LD9040
-  symbol DRM_PANEL_LD9040 depends on DRM_PANEL
-  symbol DRM_PANEL is selected by DRM_IMX_LDB
-  symbol DRM_IMX_LDB depends on MFD_SYSCON
-  symbol MFD_SYSCON is selected by POWER_RESET_KEYSTONE
-  symbol POWER_RESET_KEYSTONE depends on POWER_SUPPLY
-  symbol POWER_SUPPLY is selected by HID_SONY
-  symbol HID_SONY depends on NEW_LEDS
-  symbol NEW_LEDS is selected by BACKLIGHT_ADP8860
-  symbol BACKLIGHT_ADP8860 depends on BACKLIGHT_CLASS_DEVICE
-  symbol BACKLIGHT_CLASS_DEVICE is selected by FB_MX3
-  symbol FB_MX3 depends on MX3_IPU
-  symbol MX3_IPU depends on DMADEVICES
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpu/drm/panel/Kconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index d83958d39f43..bee9f72b3a93 100644
---- a/drivers/gpu/drm/panel/Kconfig
-+++ b/drivers/gpu/drm/panel/Kconfig
-@@ -18,8 +18,7 @@ config DRM_PANEL_SIMPLE
- 
- config DRM_PANEL_LD9040
- 	tristate "LD9040 RGB/SPI panel"
--	depends on OF
--	select SPI
-+	depends on OF && SPI
- 	select VIDEOMODE_HELPERS
- 
- config DRM_PANEL_S6E8AA0
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
