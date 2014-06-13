@@ -1,88 +1,91 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Jun 2014 18:01:10 +0200
-Subject: [PATCH 08/14] ARM: integrator: fix section mismatch problem
+Date: Fri, 13 Jun 2014 18:01:13 +0200
+Subject: [PATCH 11/14] ARM: exynos: cleanup kconfig option display
 In-Reply-To: <1402675276-538682-1-git-send-email-arnd@arndb.de>
 References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
-Message-ID: <1402675276-538682-9-git-send-email-arnd@arndb.de>
+Message-ID: <1402675276-538682-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Rob Herring <robh@kernel.org>
 
-This addresses a section mismatch problem in the IM-PD1
-driver in the Integrator/AP.
+The addition of Exynos to multi-platform configs creates a mess of config
+options with options appearing before the Exynos config option. This is
+due to arch/arm/plat-samsung/Kconfig being included out of order with the
+other Samsung platform kconfig files. Reorder the kconfig files and move
+all the options into a sub-menu. Some of the options are dead, so remove
+those as well.
 
-The IM-PD1 contains a VIC interrupt controller and therefore
-the driver calls vic_init_cascaded() which is marked __init as
-irqchips are simply not hot-pluggable and specifically the VIC
-is assumed to initiate only on boot.
-
-However the module driver model of the Integrator LM bus
-assumes that logic tile drivers can be probed at runtime. This
-is not really the case for IM-PD1: these tiles are detected at
-boot and they cannot be plugged into a running system. Before
-this patch it is of course possible to modprobe them later.
-
-By first forcing the IM-PD1 to bool we make sure this driver
-gets compiled into the kernel, and we know it will be probed
-only at boot time when the tiles are detected, so we can tag
-its probe function __init_refok as we know it won't be called
-after boot now, and the section mismatch problem goes away.
-
-As a side effect, sysfs binding from userspace becomes
-impossible, so we tag the driver to suppress the bind/unbind
-sysfs attributes.
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-integrator/Kconfig |  2 +-
- arch/arm/mach-integrator/impd1.c | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig              |  3 +--
+ arch/arm/plat-samsung/Kconfig | 17 +++--------------
+ 2 files changed, 4 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index ba43321..64f8e25 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -28,7 +28,7 @@ config ARCH_CINTEGRATOR
- 	bool
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9b8f528..245058b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -994,8 +994,6 @@ source "arch/arm/mach-rockchip/Kconfig"
  
- config INTEGRATOR_IMPD1
--	tristate "Include support for Integrator/IM-PD1"
-+	bool "Include support for Integrator/IM-PD1"
- 	depends on ARCH_INTEGRATOR_AP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_VIC
-diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
-index 0e870ea..3ce8807 100644
---- a/arch/arm/mach-integrator/impd1.c
-+++ b/arch/arm/mach-integrator/impd1.c
-@@ -308,7 +308,12 @@ static struct impd1_device impd1_devs[] = {
-  */
- #define IMPD1_VALID_IRQS 0x00000bffU
+ source "arch/arm/mach-sa1100/Kconfig"
  
--static int __init impd1_probe(struct lm_device *dev)
-+/*
-+ * As this module is bool, it is OK to have this as __init_refok() - no
-+ * probe calls will be done after the initial system bootup, as devices
-+ * are discovered as part of the machine startup.
-+ */
-+static int __init_refok impd1_probe(struct lm_device *dev)
- {
- 	struct impd1_module *impd1;
- 	int irq_base;
-@@ -397,6 +402,11 @@ static void impd1_remove(struct lm_device *dev)
- static struct lm_driver impd1_driver = {
- 	.drv = {
- 		.name	= "impd1",
-+		/*
-+		 * As we're dropping the probe() function, suppress driver
-+		 * binding from sysfs.
-+		 */
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= impd1_probe,
- 	.remove		= impd1_remove,
+-source "arch/arm/plat-samsung/Kconfig"
+-
+ source "arch/arm/mach-socfpga/Kconfig"
+ 
+ source "arch/arm/mach-spear/Kconfig"
+@@ -1013,6 +1011,7 @@ source "arch/arm/mach-s5pc100/Kconfig"
+ source "arch/arm/mach-s5pv210/Kconfig"
+ 
+ source "arch/arm/mach-exynos/Kconfig"
++source "arch/arm/plat-samsung/Kconfig"
+ 
+ source "arch/arm/mach-shmobile/Kconfig"
+ 
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 91911e4..301b892 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -35,27 +35,15 @@ config SAMSUNG_PM
+ 	  Base platform power management code for samsung code
+ 
+ if PLAT_SAMSUNG
++menu "Samsung Common options"
+ 
+ # boot configurations
+ 
+ comment "Boot options"
+ 
+-config S3C_BOOT_ERROR_RESET
+-	bool "S3C Reboot on decompression error"
+-	help
+-	  Say y here to use the watchdog to reset the system if the
+-	  kernel decompressor detects an error during decompression.
+-
+-config S3C_BOOT_UART_FORCE_FIFO
+-       bool "Force UART FIFO on during boot process"
+-       default y
+-       help
+-         Say Y here to force the UART FIFOs on during the kernel
+-	 uncompressor
+-
+-
+ config S3C_LOWLEVEL_UART_PORT
+ 	int "S3C UART to use for low-level messages"
++	depends on ARCH_S3C64XX
+ 	default 0
+ 	help
+ 	  Choice of which UART port to use for the low-level messages,
+@@ -502,4 +490,5 @@ config DEBUG_S3C_UART
+ 	default "2" if DEBUG_S3C_UART2
+ 	default "3" if DEBUG_S3C_UART3
+ 
++endmenu
+ endif
 -- 
 1.8.3.2
