@@ -1,55 +1,38 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 14 Jun 2014 20:54:05 +0400
-Subject: [PATCH v3 12/19] ARM: shmobile: r8a7790: Add CMT devices to DT
-In-Reply-To: <1402763021-4067-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1402763021-4067-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <539C7E2D.9060807@cogentembedded.com>
+Date: Sat, 14 Jun 2014 21:22:42 +0400
+Subject: [PATCH] Fixes two memory leaks in drivers/clk/sunxi/clk-sunxi.c
+In-Reply-To: <1402710473-3295-1-git-send-email-nickkrause@sympatico.ca>
+References: <1402710473-3295-1-git-send-email-nickkrause@sympatico.ca>
+Message-ID: <539C84E2.6060209@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 06/14/2014 08:23 PM, Laurent Pinchart wrote:
+On 06/14/2014 05:47 AM, Nick wrote:
 
-> Add the CMT0 and CMT1 counters to the r8a7790 device tree and make them
-> disabled by default.
+   Please sign off on your patches, they can't applied otherwise.
 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->   arch/arm/boot/dts/r8a7790.dtsi | 34 ++++++++++++++++++++++++++++++++++
->   1 file changed, 34 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 29907c9..cc32ac5 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -206,6 +206,40 @@
->   			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
->   	};
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 4264834..07b45d1 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -41,9 +41,11 @@ static void __init sun4i_osc_clk_setup(struct device_node *node)
+>   	const char *clk_name = node->name;
+>   	u32 rate;
 >
-> +	cmt0: timer at ffca0000 {
-> +		compatible = "renesas,cmt-48-gen2";
-> +		reg = <0 0xffca0000 0 0x1004>;
-> +		interrupt-parent = <&gic>;
+> -	if (of_property_read_u32(node, "clock-frequency", &rate))
+> +	if (of_property_read_u32(node, "clock-frequency", &rate)) {
+> +		kfree(fixed);
 
-   This prop is inherited from the root node, so unneeded here.
+    Eh, we only allocate 'fixed' after this point, no?
 
-> +		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
-> +		clock-names = "fck";
-> +
-> +		renesas,channels-mask = <0x60>;
-> +
-> +		status = "disabled";
-> +	};
-> +
-> +	cmt1: timer at e6130000 {
-> +		compatible = "renesas,cmt-48-gen2";
-> +		reg = <0 0xe6130000 0 0x1004>;
-> +		interrupt-parent = <&gic>;
-
-    Likewise.
+> +		kfree(gate);
+>   		return;
+> -
+> +	}
+>   	/* allocate fixed-rate and gate clock structs */
+>   	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
+>   	if (!fixed)
 
 WBR, Sergei
