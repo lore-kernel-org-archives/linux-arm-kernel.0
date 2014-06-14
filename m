@@ -1,177 +1,199 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sat, 14 Jun 2014 09:59:02 -0300
-Subject: [PATCH for v3.15] usb: musb: Fix panic upon musb_am335x module
- removal
-In-Reply-To: <20140520165510.GA28859@arch.cereza>
-References: <1400371473-2053-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <20140520165510.GA28859@arch.cereza>
-Message-ID: <20140614125902.GA1202@arch.cereza>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 14 Jun 2014 17:04:32 +0200
+Subject: [PATCH v4 07/14] ARM: KVM: one_reg coproc set and get BE fixes
+In-Reply-To: <1402590613-3341-8-git-send-email-victor.kamensky@linaro.org>
+References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
+ <1402590613-3341-8-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140614150432.GE14023@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On 20 May 01:55 PM, Ezequiel Garcia wrote:
-> On 17 May 09:04 PM, Ezequiel Garcia wrote:
-> > At probe time, the musb_am335x driver register its childs by
-> > calling of_platform_populate(), which registers all childs in
-> > the devicetree hierarchy recursively.
-> > 
-> > On the other side, the driver's remove() function uses of_device_unregister()
-> > to remove each child of musb_am335x's.
-> > 
-> > However, when musb_dsps is loaded, its devices are attached to the musb_am335x
-> > device as musb_am335x childs. Hence, musb_am335x remove() will attempt to
-> > unregister the devices registered by musb_dsps, which produces a kernel panic.
-> > 
-> > In other words, the childs in the "struct device" hierarchy are not the same
-> > as the childs in the "devicetree" hierarchy.
-> > 
-> > Ideally, we should enforce the removal of the devices registered by
-> > musb_am335x *only*, instead of all its child devices. However, because of the
-> > recursive nature of of_platform_populate, this doesn't seem possible.
-> > 
-> > Therefore, as the only solution at hand, this commit disables musb_am335x
-> > driver removal capability, preventing it from being ever removed. This was
-> > originally suggested by Sebastian Siewior:
-> > 
-> > https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104946.html
-> > 
-> > And for reference, here's the panic upon module removal:
-> > 
-> > musb-hdrc musb-hdrc.0.auto: remove, state 4
-> > usb usb1: USB disconnect, device number 1
-> > musb-hdrc musb-hdrc.0.auto: USB bus 1 deregistered
-> > Unable to handle kernel NULL pointer dereference at virtual address 0000008c
-> > pgd = de11c000
-> > [0000008c] *pgd=9e174831, *pte=00000000, *ppte=00000000
-> > Internal error: Oops: 17 [#1] ARM
-> > Modules linked in: musb_am335x(-) musb_dsps musb_hdrc usbcore usb_common
-> > CPU: 0 PID: 623 Comm: modprobe Not tainted 3.15.0-rc4-00001-g24efd13 #69
-> > task: de1b7500 ti: de122000 task.ti: de122000
-> > PC is at am335x_shutdown+0x10/0x28
-> > LR is at am335x_shutdown+0xc/0x28
-> > pc : [<c0327798>]    lr : [<c0327794>]    psr: a0000013
-> > sp : de123df8  ip : 00000004  fp : 00028f00
-> > r10: 00000000  r9 : de122000  r8 : c000e6c4
-> > r7 : de0e3c10  r6 : de0e3800  r5 : de624010  r4 : de1ec750
-> > r3 : de0e3810  r2 : 00000000  r1 : 00000001  r0 : 00000000
-> > Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> > Control: 10c5387d  Table: 9e11c019  DAC: 00000015
-> > Process modprobe (pid: 623, stack limit = 0xde122240)
-> > Stack: (0xde123df8 to 0xde124000)
-> > 3de0:                                                       de0e3810 bf054488
-> > 3e00: bf05444c de624010 60000013 bf043650 000012fc de624010 de0e3810 bf043a20
-> > 3e20: de0e3810 bf04b240 c0635b88 c02ca37c c02ca364 c02c8db0 de1b7500 de0e3844
-> > 3e40: de0e3810 c02c8e28 c0635b88 de02824c de0e3810 c02c884c de0e3800 de0e3810
-> > 3e60: de0e3818 c02c5b20 bf05417c de0e3800 de0e3800 c0635b88 de0f2410 c02ca838
-> > 3e80: bf05417c de0e3800 bf055438 c02ca8cc de0e3c10 bf054194 de0e3c10 c02ca37c
-> > 3ea0: c02ca364 c02c8db0 de1b7500 de0e3c44 de0e3c10 c02c8e28 c0635b88 de02824c
-> > 3ec0: de0e3c10 c02c884c de0e3c10 de0e3c10 de0e3c18 c02c5b20 de0e3c10 de0e3c10
-> > 3ee0: 00000000 bf059000 a0000013 c02c5bc0 00000000 bf05900c de0e3c10 c02c5c48
-> > 3f00: de0dd0c0 de1ec970 de0f2410 bf05929c de0f2444 bf05902c de0f2410 c02ca37c
-> > 3f20: c02ca364 c02c8db0 bf05929c de0f2410 bf05929c c02c94c8 bf05929c 00000000
-> > 3f40: 00000800 c02c8ab4 bf0592e0 c007fc40 c00dd820 6273756d 336d615f 00783533
-> > 3f60: c064a0ac de1b7500 de122000 de1b7500 c000e590 00000001 c000e6c4 c0060160
-> > 3f80: 00028e70 00028e70 00028ea4 00000081 60000010 00028e70 00028e70 00028ea4
-> > 3fa0: 00000081 c000e500 00028e70 00028e70 00028ea4 00000800 becb59f8 00027608
-> > 3fc0: 00028e70 00028e70 00028ea4 00000081 00000001 00000001 00000000 00028f00
-> > 3fe0: b6e6b6f0 becb59d4 000160e8 b6e6b6fc 60000010 00028ea4 00000000 00000000
-> > [<c0327798>] (am335x_shutdown) from [<bf054488>] (dsps_musb_exit+0x3c/0x4c [musb_dsps])
-> > [<bf054488>] (dsps_musb_exit [musb_dsps]) from [<bf043650>] (musb_shutdown+0x80/0x90 [musb_hdrc])
-> > [<bf043650>] (musb_shutdown [musb_hdrc]) from [<bf043a20>] (musb_remove+0x24/0x68 [musb_hdrc])
-> > [<bf043a20>] (musb_remove [musb_hdrc]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> > [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
-> > [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
-> > [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
-> > [<c02c5b20>] (device_del) from [<c02ca838>] (platform_device_del+0x14/0x9c)
-> > [<c02ca838>] (platform_device_del) from [<c02ca8cc>] (platform_device_unregister+0xc/0x20)
-> > [<c02ca8cc>] (platform_device_unregister) from [<bf054194>] (dsps_remove+0x18/0x38 [musb_dsps])
-> > [<bf054194>] (dsps_remove [musb_dsps]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> > [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
-> > [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
-> > [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
-> > [<c02c5b20>] (device_del) from [<c02c5bc0>] (device_unregister+0xc/0x20)
-> > [<c02c5bc0>] (device_unregister) from [<bf05900c>] (of_remove_populated_child+0xc/0x14 [musb_am335x])
-> > [<bf05900c>] (of_remove_populated_child [musb_am335x]) from [<c02c5c48>] (device_for_each_child+0x44/0x70)
-> > [<c02c5c48>] (device_for_each_child) from [<bf05902c>] (am335x_child_remove+0x18/0x30 [musb_am335x])
-> > [<bf05902c>] (am335x_child_remove [musb_am335x]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> > [<c02c8db0>] (__device_release_driver) from [<c02c94c8>] (driver_detach+0xb4/0xb8)
-> > [<c02c94c8>] (driver_detach) from [<c02c8ab4>] (bus_remove_driver+0x4c/0xa0)
-> > [<c02c8ab4>] (bus_remove_driver) from [<c007fc40>] (SyS_delete_module+0x128/0x1cc)
-> > [<c007fc40>] (SyS_delete_module) from [<c000e500>] (ret_fast_syscall+0x0/0x48)
-> > 
-> > Fixes: 97238b35d5bb ("usb: musb: dsps: use proper child nodes")
-> > Cc: <stable@vger.kernel.org> # v3.12+
-> > Acked-by: George Cherian <george.cherian@ti.com>
-> > Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> > ---
-> >  drivers/usb/musb/musb_am335x.c | 23 ++++++-----------------
-> >  1 file changed, 6 insertions(+), 17 deletions(-)
-> > 
-> > diff --git a/drivers/usb/musb/musb_am335x.c b/drivers/usb/musb/musb_am335x.c
-> > index d235378..1e58ed2 100644
-> > --- a/drivers/usb/musb/musb_am335x.c
-> > +++ b/drivers/usb/musb/musb_am335x.c
-> > @@ -19,21 +19,6 @@ err:
-> >  	return ret;
-> >  }
-> >  
-> > -static int of_remove_populated_child(struct device *dev, void *d)
-> > -{
-> > -	struct platform_device *pdev = to_platform_device(dev);
-> > -
-> > -	of_device_unregister(pdev);
-> > -	return 0;
-> > -}
-> > -
-> > -static int am335x_child_remove(struct platform_device *pdev)
-> > -{
-> > -	device_for_each_child(&pdev->dev, NULL, of_remove_populated_child);
-> > -	pm_runtime_disable(&pdev->dev);
-> > -	return 0;
-> > -}
-> > -
-> >  static const struct of_device_id am335x_child_of_match[] = {
-> >  	{ .compatible = "ti,am33xx-usb" },
-> >  	{  },
-> > @@ -42,13 +27,17 @@ MODULE_DEVICE_TABLE(of, am335x_child_of_match);
-> >  
-> >  static struct platform_driver am335x_child_driver = {
-> >  	.probe		= am335x_child_probe,
-> > -	.remove         = am335x_child_remove,
-> >  	.driver         = {
-> >  		.name   = "am335x-usb-childs",
-> >  		.of_match_table	= am335x_child_of_match,
-> >  	},
-> >  };
-> >  
-> > -module_platform_driver(am335x_child_driver);
-> > +static int __init am335x_child_init(void)
-> > +{
-> > +	return platform_driver_register(&am335x_child_driver);
-> > +}
-> > +module_init(am335x_child_init);
-> > +
-> >  MODULE_DESCRIPTION("AM33xx child devices");
-> >  MODULE_LICENSE("GPL v2");
-> > -- 
-> > 1.9.1
-> > 
+On Thu, Jun 12, 2014 at 09:30:06AM -0700, Victor Kamensky wrote:
+> Fix code that handles KVM_SET_ONE_REG, KVM_GET_ONE_REG ioctls to work in BE
+> image. Before this fix get/set_one_reg functions worked correctly only in
+> LE case - reg_from_user was taking 'void *' kernel address that actually could
+> be target/source memory of either 4 bytes size or 8 bytes size, and code copied
+> from/to user memory that could hold either 4 bytes register, 8 byte register
+> or pair of 4 bytes registers.
 > 
-> Felipe,
+> In order to work in endian agnostic way reg_from_user to reg_to_user functions
+> should copy register value only to kernel variable with size that matches
+> register size. In few place where size mismatch existed fix issue on macro
+> caller side.
 > 
-> Any comments on this?
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm/kvm/coproc.c | 84 +++++++++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 75 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index c58a351..bcc9a0f 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -44,6 +44,30 @@ static u32 cache_levels;
+>  /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
+>  #define CSSELR_MAX 12
+>  
+> +/*
+> + * kvm_vcpu_arch.cp15 holds cp15 registers as an array of u32, but some
+> + * of cp15 registers can be viewed either as couple of two u32 registers
+> + * or one u64 register. Current u64 register encoding is that least
+> + * significant u32 word is followed by most significant u32 word.
+> + */
+> +static inline void vcpu_cp15_reg64_set(struct kvm_vcpu *vcpu,
+> +				       const struct coproc_reg *r,
+> +				       u64 val)
+> +{
+> +	vcpu->arch.cp15[r->reg] = val & 0xffffffff;
+> +	vcpu->arch.cp15[r->reg + 1] = val >> 32;
+> +}
+> +
+> +static inline u64 vcpu_cp15_reg64_get(struct kvm_vcpu *vcpu,
+> +				      const struct coproc_reg *r)
+> +{
+> +	u64 val;
+> +	val = vcpu->arch.cp15[r->reg + 1];
+> +	val = val << 32;
+> +	val = val | vcpu->arch.cp15[r->reg];
+> +	return val;
+> +}
+> +
+>  int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+>  	kvm_inject_undefined(vcpu);
+> @@ -682,17 +706,23 @@ static struct coproc_reg invariant_cp15[] = {
+>  	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+>  };
+>  
+> +/*
+> + * Reads a register value from a userspace address to a kernel
+> + * variable. Make sure that register size matches sizeof(*__val).
+> + */
+>  static int reg_from_user(void *val, const void __user *uaddr, u64 id)
+>  {
+> -	/* This Just Works because we are little endian. */
+>  	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
+>  		return -EFAULT;
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Writes a register value to a userspace address from a kernel variable.
+> + * Make sure that register size matches sizeof(*__val).
+> + */
+>  static int reg_to_user(void __user *uaddr, const void *val, u64 id)
+>  {
+> -	/* This Just Works because we are little endian. */
+>  	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
+>  		return -EFAULT;
+>  	return 0;
+> @@ -702,6 +732,7 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
+>  {
+>  	struct coproc_params params;
+>  	const struct coproc_reg *r;
+> +	int ret;
+>  
+>  	if (!index_to_params(id, &params))
+>  		return -ENOENT;
+> @@ -710,7 +741,14 @@ static int get_invariant_cp15(u64 id, void __user *uaddr)
+>  	if (!r)
+>  		return -ENOENT;
+>  
+> -	return reg_to_user(uaddr, &r->val, id);
+> +	ret = -ENOENT;
+> +	if (KVM_REG_SIZE(id) == 4) {
+> +		u32 val = r->val;
+> +		ret = reg_to_user(uaddr, &val, id);
+> +	} else if (KVM_REG_SIZE(id) == 8) {
+> +		ret = reg_to_user(uaddr, &r->val, id);
+> +	}
+> +	return ret;
+>  }
+>  
+>  static int set_invariant_cp15(u64 id, void __user *uaddr)
+> @@ -718,7 +756,7 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
+>  	struct coproc_params params;
+>  	const struct coproc_reg *r;
+>  	int err;
+> -	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
+> +	u64 val;
+>  
+>  	if (!index_to_params(id, &params))
+>  		return -ENOENT;
+> @@ -726,7 +764,15 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
+>  	if (!r)
+>  		return -ENOENT;
+>  
+> -	err = reg_from_user(&val, uaddr, id);
+> +	err = -ENOENT;
+> +	if (KVM_REG_SIZE(id) == 4) {
+> +		u32 val32;
+> +		err = reg_from_user(&val32, uaddr, id);
+> +		if (!err)
+> +			val = val32;
+> +	} else if (KVM_REG_SIZE(id) == 8) {
+> +		err = reg_from_user(&val, uaddr, id);
+> +	}
+>  	if (err)
+>  		return err;
+>  
+> @@ -1004,6 +1050,7 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  {
+>  	const struct coproc_reg *r;
+>  	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	int ret;
+>  
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+>  		return demux_c15_get(reg->id, uaddr);
+> @@ -1015,14 +1062,23 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	if (!r)
+>  		return get_invariant_cp15(reg->id, uaddr);
+>  
+> -	/* Note: copies two regs if size is 64 bit. */
+> -	return reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
+> +	ret = -ENOENT;
+> +	if (KVM_REG_SIZE(reg->id) == 8) {
+> +		u64 val;
+> +		val = vcpu_cp15_reg64_get(vcpu, r);
+> +		ret = reg_to_user(uaddr, &val, reg->id);
+> +	} else if (KVM_REG_SIZE(reg->id) == 4) {
+> +		ret = reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
+> +	}
+> +
+> +	return ret;
+>  }
+>  
+>  int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  {
+>  	const struct coproc_reg *r;
+>  	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	int ret;
+>  
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+>  		return demux_c15_set(reg->id, uaddr);
+> @@ -1034,8 +1090,18 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	if (!r)
+>  		return set_invariant_cp15(reg->id, uaddr);
+>  
+> -	/* Note: copies two regs if size is 64 bit */
+> -	return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
+> +	ret = -ENOENT;
+> +	if (KVM_REG_SIZE(reg->id) == 8) {
+> +		u64 val;
+> +		ret = reg_from_user(&val, uaddr, reg->id);
+> +		if (!ret) {
+> +			vcpu_cp15_reg64_set(vcpu, r, val);
+> +		}
+> +	} else if (KVM_REG_SIZE(reg->id) == 4) {
+> +		ret = reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
+> +	}
+> +
+> +	return ret;
+>  }
+>  
+>  static unsigned int num_demux_regs(void)
+> -- 
+> 1.8.1.4
 > 
 
-Any comments on this? I don't like to remove a feature, but as
-explained above, I don't see any other way to solve this.
-
-The driver is currently broken. I tried using of_platform_depopulate()
-but failed.
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
