@@ -1,32 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Jun 2014 23:36:29 +0200
-Subject: [PATCH v2 2/3] mmc: Add APM X-Gene SoC SDHC controller support to
- Arasan SDHCI driver
-In-Reply-To: <9432f705-fd6a-44a6-8e04-c0455f0a551c@BN1AFFO11FD054.protection.gbl>
-References: <1401829985-5212-1-git-send-email-lho@apm.com>
- <1401829985-5212-3-git-send-email-lho@apm.com>
- <9432f705-fd6a-44a6-8e04-c0455f0a551c@BN1AFFO11FD054.protection.gbl>
-Message-ID: <5219148.cLBgakF4fc@wuerfel>
+From: cengelma@gmx.at (Christian Engelmayer)
+Date: Sat, 14 Jun 2014 23:46:38 +0200
+Subject: [PATCH] ARM: kprobes: Fix non-ANSI declaration of arch_init_kprobes()
+Message-ID: <1402782398-7602-1-git-send-email-cengelma@gmx.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 June 2014 08:09:12 Michal Simek wrote:
-> > +
-> > +static void sdhci_arasn_xgene_xlat_addr(struct sdhci_arasan_data *data,
-> > +                                    u64 dma_addr)
-> > +{
-> > +     #define AIM_AXI_HI_OFFSET       0x0000000c
-> > +     #define  AIM_AXI_ADDRESS_HI_N_WR(src) \
-> > +                                     (((u32) (src) << 20) & 0xfff00000)
-> 
-> ditto with indentation.
-> 20 should be shift
-> 0xfff00000 is mask.
-> 
-> Also you should take this opportunity and add function description
-> in kernel doc to be exactly clear what this function is doing.
+Fix sparse warning "non-ANSI function declaration of function
+'arch_init_kprobes'".
 
-Actually this should just be configured in the dma-ranges property
-I think. It's not the driver's business to do the dma translation.
+Signed-off-by: Christian Engelmayer <cengelma@gmx.at>
+---
+ arch/arm/kernel/kprobes.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	Arnd
+diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+index 6d64420..18b79a7 100644
+--- a/arch/arm/kernel/kprobes.c
++++ b/arch/arm/kernel/kprobes.c
+@@ -615,7 +615,7 @@ static struct undef_hook kprobes_arm_break_hook = {
+ 
+ #endif /* !CONFIG_THUMB2_KERNEL */
+ 
+-int __init arch_init_kprobes()
++int __init arch_init_kprobes(void)
+ {
+ 	arm_probes_decode_init();
+ #ifdef CONFIG_THUMB2_KERNEL
+-- 
+1.9.1
