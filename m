@@ -1,51 +1,70 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 14 Jun 2014 17:04:59 +0200
-Subject: [PATCH v4 12/14] ARM64: KVM: vgic_elrsr and vgic_eisr need to be
- byteswapped in BE case
-In-Reply-To: <1402590613-3341-13-git-send-email-victor.kamensky@linaro.org>
+Date: Sat, 14 Jun 2014 17:05:07 +0200
+Subject: [PATCH v4 14/14] ARM64: KVM: fix big endian issue in
+ access_vm_reg for 32bit guest
+In-Reply-To: <1402590613-3341-15-git-send-email-victor.kamensky@linaro.org>
 References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
- <1402590613-3341-13-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140614150459.GH14023@lvm>
+ <1402590613-3341-15-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140614150507.GI14023@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 09:30:11AM -0700, Victor Kamensky wrote:
-> On arm64 'u32 vgic_eisr[2];' and 'u32 vgic_elrsr[2]' are accessed as
-> one 'unsigned long *' bit fields, which has 64bit size. So we need to
-> swap least significant word with most significant word when code reads
-> those registers from h/w.
+On Thu, Jun 12, 2014 at 09:30:13AM -0700, Victor Kamensky wrote:
+> Fix issue with 32bit guests running on top of BE KVM host.
+> Indexes of high and low words of 64bit cp15 register are
+> swapped in case of big endian code, since 64bit cp15 state is
+> restored or saved with double word write or read instruction.
+> 
+> Define helper macros to access high low words of 64bit cp15
+> register.
 > 
 > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 > ---
->  arch/arm64/kvm/hyp.S | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+>  arch/arm64/kvm/sys_regs.c         | 4 ++--
+>  2 files changed, 10 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 0620691..5035b41 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -415,10 +415,17 @@ CPU_BE(	rev	w11, w11 )
->  	str	w4, [x3, #VGIC_CPU_HCR]
->  	str	w5, [x3, #VGIC_CPU_VMCR]
->  	str	w6, [x3, #VGIC_CPU_MISR]
-> +#ifndef CONFIG_CPU_BIG_ENDIAN
->  	str	w7, [x3, #VGIC_CPU_EISR]
->  	str	w8, [x3, #(VGIC_CPU_EISR + 4)]
->  	str	w9, [x3, #VGIC_CPU_ELRSR]
->  	str	w10, [x3, #(VGIC_CPU_ELRSR + 4)]
-> +#else
-> +	str	w7, [x3, #(VGIC_CPU_EISR + 4)]
-> +	str	w8, [x3, #VGIC_CPU_EISR]
-> +	str	w9, [x3, #(VGIC_CPU_ELRSR + 4)]
-> +	str	w10, [x3, #VGIC_CPU_ELRSR]
-> +#endif
->  	str	w11, [x3, #VGIC_CPU_APR]
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 0a1d697..e9d2e11 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -140,6 +140,14 @@ struct kvm_vcpu_arch {
+>  #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+>  #define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
 >  
->  	/* Clear GICH_HCR */
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
+> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
+> +#else
+> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
+> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
+> +#endif
+> +
+>  struct kvm_vm_stat {
+>  	u32 remote_tlb_flush;
+>  };
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 8e65e31..71aa9b0 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -137,9 +137,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+>  	if (!p->is_aarch32) {
+>  		vcpu_sys_reg(vcpu, r->reg) = val;
+>  	} else {
+> -		vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
+> +		vcpu_cp15_64_low(vcpu, r->reg) = val & 0xffffffffUL;
+>  		if (!p->is_32bit)
+> -			vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
+> +			vcpu_cp15_64_high(vcpu, r->reg) = val >> 32;
+>  	}
+>  	return true;
+>  }
 > -- 
 > 1.8.1.4
 > 
-I thought Marc had something here which allowed you to deal with the
-conversion in the accessor functions and avoid this patch?
+
+I thought there was a consensus here about handling 64-bit accesses
+through the 64-bit values with the vcpu_sys_reg() interface?  Did you
+give up on this for a particular reason?
 
 -Christoffer
