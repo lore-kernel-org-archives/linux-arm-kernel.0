@@ -1,98 +1,64 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 14 Jun 2014 18:23:33 +0200
-Subject: [PATCH v3 11/19] clocksource: sh_mtu2: Add DT support
+Date: Sat, 14 Jun 2014 18:23:35 +0200
+Subject: [PATCH v3 13/19] ARM: shmobile: r8a7791: Add CMT devices to DT
 In-Reply-To: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1402763021-4067-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1402763021-4067-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document DT bindings and parse them in the MTU2 driver.
+Add the CMT0 and CMT1 counters to the r8a7791 device tree and make them
+disabled by default.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- .../devicetree/bindings/timer/renesas,mtu2.txt     | 40 ++++++++++++++++++++++
- drivers/clocksource/sh_mtu2.c                      |  8 +++++
- 2 files changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+ arch/arm/boot/dts/r8a7791.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-new file mode 100644
-index 0000000..c5dd032
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-@@ -0,0 +1,40 @@
-+* Renesas R-Car Multi-Function Timer Pulse Unit 2 (MTU2)
-+
-+The MTU2 is a multi-purpose, multi-channel timer/counter with configurable
-+clock inputs and programmable compare match.
-+
-+Channels share hardware resources but their counter and compare match value
-+are independent. The MTU2 hardware supports five channels indexed from 0 to 4.
-+
-+Required Properties:
-+
-+  - compatible: must contain "renesas,mtu2"
-+
-+  - reg: base address and length of the registers block for the timer module.
-+
-+  - interrupt-parent, interrupts: interrupt specifiers for the timer, one for
-+    each entry in interrupt-names.
-+  - interrupt-names: must contain one entry named "tgi?a" for each enabled
-+    channel, where "?" is the channel index expressed as one digit from "0" to
-+    "4".
-+
-+  - clocks: a list of phandle + clock-specifier pairs, one for each entry
-+    in clock-names.
-+  - clock-names: must contain "fck" for the functional clock.
-+
-+
-+Example: R7S72100 (RZ/A1H) MTU2 node
-+
-+	mtu2: timer at fcff0000 {
-+		compatible = "renesas,mtu2";
-+		reg = <0xfcff0000 0x400>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 146 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 150 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 154 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 159 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "tgi0a", "tgi1a", "tgi2a", "tgi3a", "tgi4a";
-+		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
-+		clock-names = "fck";
-+	};
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index ebdf9d1..79387af 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -23,6 +23,7 @@
- #include <linux/ioport.h>
- #include <linux/irq.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
-@@ -502,11 +503,18 @@ static const struct platform_device_id sh_mtu2_id_table[] = {
- };
- MODULE_DEVICE_TABLE(platform, sh_mtu2_id_table);
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 380d058..b56a995 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -189,6 +189,40 @@
+ 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
  
-+static const struct of_device_id sh_mtu2_of_table[] = {
-+	{ .compatible = "renesas,mtu2" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sh_mtu2_of_table);
++	cmt0: timer at ffca0000 {
++		compatible = "renesas,cmt-48-gen2";
++		reg = <0 0xffca0000 0 0x1004>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp1_clks R8A7791_CLK_CMT0>;
++		clock-names = "fck";
 +
- static struct platform_driver sh_mtu2_device_driver = {
- 	.probe		= sh_mtu2_probe,
- 	.remove		= sh_mtu2_remove,
- 	.driver		= {
- 		.name	= "sh_mtu2",
-+		.of_match_table = of_match_ptr(sh_mtu2_of_table),
- 	},
- 	.id_table	= sh_mtu2_id_table,
- };
++		renesas,channels-mask = <0x60>;
++
++		status = "disabled";
++	};
++
++	cmt1: timer at e6130000 {
++		compatible = "renesas,cmt-48-gen2";
++		reg = <0 0xe6130000 0 0x1004>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 121 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 122 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 123 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 124 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 125 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 126 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7791_CLK_CMT1>;
++		clock-names = "fck";
++
++		renesas,channels-mask = <0xff>;
++
++		status = "disabled";
++	};
++
+ 	irqc0: interrupt-controller at e61c0000 {
+ 		compatible = "renesas,irqc-r8a7791", "renesas,irqc";
+ 		#interrupt-cells = <2>;
 -- 
 1.8.5.5
