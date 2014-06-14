@@ -1,229 +1,140 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 14 Jun 2014 22:51:02 +0200
-Subject: [RFC PATCH 1/6] arm/arm64: KVM: Rename irq_state to irq_pending
+Date: Sat, 14 Jun 2014 22:51:03 +0200
+Subject: [RFC PATCH 2/6] arm/arm64: KVM: Rename irq_active to irq_queued
 In-Reply-To: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
 References: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1402779067-34478-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1402779067-34478-3-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq_state field on the distributor struct is ambiguous in its
-meaning; the comment says it's the level of the input put, but that
-doesn't make much sense for edge-triggered interrupts.  The code
-actually uses this state variable to check if the interrupt is in the
-pending state on the distributor so clarify the comment and rename the
-actual variable and accessor methods.
+We have a special bitmap on the distributor struct to keep track of when
+level-triggered interrupts are queued on the list registers.  This was
+named irq_active, which is confusing, because the active state of an
+interrupt as per the GIC spec is a different thing, not specifically
+related to edge-triggered/level-triggered configurations but rather
+indicates an interrupt which has been ack'ed but not yet eoi'ed.
+
+Rename the bitmap and the corresponding accessor functions to irq_queued
+to clarify what this is actually used for.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
  include/kvm/arm_vgic.h |  4 ++--
- virt/kvm/arm/vgic.c    | 52 +++++++++++++++++++++++++-------------------------
- 2 files changed, 28 insertions(+), 28 deletions(-)
+ virt/kvm/arm/vgic.c    | 28 ++++++++++++++--------------
+ 2 files changed, 16 insertions(+), 16 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index f27000f..a5d55d5 100644
+index a5d55d5..10fa64b 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -86,8 +86,8 @@ struct vgic_dist {
- 	/* Interrupt enabled (one bit per IRQ) */
- 	struct vgic_bitmap	irq_enabled;
+@@ -89,8 +89,8 @@ struct vgic_dist {
+ 	/* Interrupt state is pending on the distributor */
+ 	struct vgic_bitmap	irq_pending;
  
--	/* Interrupt 'pin' level */
--	struct vgic_bitmap	irq_state;
-+	/* Interrupt state is pending on the distributor */
-+	struct vgic_bitmap	irq_pending;
+-	/* Level-triggered interrupt in progress */
+-	struct vgic_bitmap	irq_active;
++	/* Level-triggered interrupt queued on VCPU interface */
++	struct vgic_bitmap	irq_queued;
  
- 	/* Level-triggered interrupt in progress */
- 	struct vgic_bitmap	irq_active;
+ 	/* Interrupt priority. Not used yet. */
+ 	struct vgic_bytemap	irq_priority;
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 47b2983..aba960a 100644
+index aba960a..00e6bdd 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -37,7 +37,7 @@
+@@ -60,12 +60,12 @@
+  * the 'line' again. This is achieved as such:
   *
-  * - At any time, the dist->irq_pending_on_cpu is the oracle that knows if
-  *   something is pending
-- * - VGIC pending interrupts are stored on the vgic.irq_state vgic
-+ * - VGIC pending interrupts are stored on the vgic.irq_pending vgic
-  *   bitmap (this bitmap is updated by both user land ioctls and guest
-  *   mmio ops, and other in-kernel peripherals such as the
-  *   arch. timers) and indicate the 'wire' state.
-@@ -45,8 +45,8 @@
-  *   recalculated
-  * - To calculate the oracle, we need info for each cpu from
-  *   compute_pending_for_cpu, which considers:
-- *   - PPI: dist->irq_state & dist->irq_enable
-- *   - SPI: dist->irq_state & dist->irq_enable & dist->irq_spi_target
-+ *   - PPI: dist->irq_pending & dist->irq_enable
-+ *   - SPI: dist->irq_pending & dist->irq_enable & dist->irq_spi_target
-  *   - irq_spi_target is a 'formatted' version of the GICD_ICFGR
-  *     registers, stored on each vcpu. We only keep one bit of
-  *     information per interrupt, making sure that only one vcpu can
-@@ -204,21 +204,21 @@ static int vgic_dist_irq_is_pending(struct kvm_vcpu *vcpu, int irq)
+  * - When a level interrupt is moved onto a vcpu, the corresponding
+- *   bit in irq_active is set. As long as this bit is set, the line
++ *   bit in irq_queued is set. As long as this bit is set, the line
+  *   will be ignored for further interrupts. The interrupt is injected
+  *   into the vcpu with the GICH_LR_EOI bit set (generate a
+  *   maintenance interrupt on EOI).
+  * - When the interrupt is EOIed, the maintenance interrupt fires,
+- *   and clears the corresponding bit in irq_active. This allow the
++ *   and clears the corresponding bit in irq_queued. This allow the
+  *   interrupt line to be sampled again.
+  */
+ 
+@@ -179,25 +179,25 @@ static int vgic_irq_is_enabled(struct kvm_vcpu *vcpu, int irq)
+ 	return vgic_bitmap_get_irq_val(&dist->irq_enabled, vcpu->vcpu_id, irq);
+ }
+ 
+-static int vgic_irq_is_active(struct kvm_vcpu *vcpu, int irq)
++static int vgic_irq_is_queued(struct kvm_vcpu *vcpu, int irq)
  {
  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
  
--	return vgic_bitmap_get_irq_val(&dist->irq_state, vcpu->vcpu_id, irq);
-+	return vgic_bitmap_get_irq_val(&dist->irq_pending, vcpu->vcpu_id, irq);
+-	return vgic_bitmap_get_irq_val(&dist->irq_active, vcpu->vcpu_id, irq);
++	return vgic_bitmap_get_irq_val(&dist->irq_queued, vcpu->vcpu_id, irq);
  }
  
--static void vgic_dist_irq_set(struct kvm_vcpu *vcpu, int irq)
-+static void vgic_dist_irq_set_pending(struct kvm_vcpu *vcpu, int irq)
+-static void vgic_irq_set_active(struct kvm_vcpu *vcpu, int irq)
++static void vgic_irq_set_queued(struct kvm_vcpu *vcpu, int irq)
  {
  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
  
--	vgic_bitmap_set_irq_val(&dist->irq_state, vcpu->vcpu_id, irq, 1);
-+	vgic_bitmap_set_irq_val(&dist->irq_pending, vcpu->vcpu_id, irq, 1);
+-	vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id, irq, 1);
++	vgic_bitmap_set_irq_val(&dist->irq_queued, vcpu->vcpu_id, irq, 1);
  }
  
--static void vgic_dist_irq_clear(struct kvm_vcpu *vcpu, int irq)
-+static void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq)
+-static void vgic_irq_clear_active(struct kvm_vcpu *vcpu, int irq)
++static void vgic_irq_clear_queued(struct kvm_vcpu *vcpu, int irq)
  {
  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
  
--	vgic_bitmap_set_irq_val(&dist->irq_state, vcpu->vcpu_id, irq, 0);
-+	vgic_bitmap_set_irq_val(&dist->irq_pending, vcpu->vcpu_id, irq, 0);
+-	vgic_bitmap_set_irq_val(&dist->irq_active, vcpu->vcpu_id, irq, 0);
++	vgic_bitmap_set_irq_val(&dist->irq_queued, vcpu->vcpu_id, irq, 0);
  }
  
- static void vgic_cpu_irq_set(struct kvm_vcpu *vcpu, int irq)
-@@ -392,7 +392,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 					struct kvm_exit_mmio *mmio,
- 					phys_addr_t offset)
- {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
-+	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_pending,
- 				       vcpu->vcpu_id, offset);
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
-@@ -408,7 +408,7 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  struct kvm_exit_mmio *mmio,
- 					  phys_addr_t offset)
- {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
-+	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_pending,
- 				       vcpu->vcpu_id, offset);
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
-@@ -650,7 +650,7 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
- 		 * is fine, then we are only setting a few bits that were
- 		 * already set.
- 		 */
--		vgic_dist_irq_set(vcpu, irq);
-+		vgic_dist_irq_set_pending(vcpu, irq);
- 		if (irq < VGIC_NR_SGIS)
- 			dist->irq_sgi_sources[vcpu_id][irq] |= 1 << source_cpu;
- 		*lr &= ~GICH_LR_PENDING_BIT;
-@@ -929,7 +929,7 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
- 	kvm_for_each_vcpu(c, vcpu, kvm) {
- 		if (target_cpus & 1) {
- 			/* Flag the SGI as pending */
--			vgic_dist_irq_set(vcpu, sgi);
-+			vgic_dist_irq_set_pending(vcpu, sgi);
- 			dist->irq_sgi_sources[c][sgi] |= 1 << vcpu_id;
- 			kvm_debug("SGI%d from CPU%d to CPU%d\n", sgi, vcpu_id, c);
+ static int vgic_dist_irq_is_pending(struct kvm_vcpu *vcpu, int irq)
+@@ -1011,8 +1011,8 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+ 
+ 		if (!vgic_irq_is_enabled(vcpu, irq)) {
+ 			vgic_retire_lr(lr, irq, vgic_cpu);
+-			if (vgic_irq_is_active(vcpu, irq))
+-				vgic_irq_clear_active(vcpu, irq);
++			if (vgic_irq_is_queued(vcpu, irq))
++				vgic_irq_clear_queued(vcpu, irq);
  		}
-@@ -949,11 +949,11 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
- 	pend_percpu = vcpu->arch.vgic_cpu.pending_percpu;
- 	pend_shared = vcpu->arch.vgic_cpu.pending_shared;
- 
--	pending = vgic_bitmap_get_cpu_map(&dist->irq_state, vcpu_id);
-+	pending = vgic_bitmap_get_cpu_map(&dist->irq_pending, vcpu_id);
- 	enabled = vgic_bitmap_get_cpu_map(&dist->irq_enabled, vcpu_id);
- 	bitmap_and(pend_percpu, pending, enabled, VGIC_NR_PRIVATE_IRQS);
- 
--	pending = vgic_bitmap_get_shared_map(&dist->irq_state);
-+	pending = vgic_bitmap_get_shared_map(&dist->irq_pending);
- 	enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
- 	bitmap_and(pend_shared, pending, enabled, VGIC_NR_SHARED_IRQS);
- 	bitmap_and(pend_shared, pend_shared,
-@@ -1085,7 +1085,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
- 	 * our emulated gic and can get rid of them.
- 	 */
- 	if (!sources) {
--		vgic_dist_irq_clear(vcpu, irq);
-+		vgic_dist_irq_clear_pending(vcpu, irq);
- 		vgic_cpu_irq_clear(vcpu, irq);
- 		return true;
  	}
-@@ -1100,7 +1100,7 @@ static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+ }
+@@ -1095,7 +1095,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ 
+ static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+ {
+-	if (vgic_irq_is_active(vcpu, irq))
++	if (vgic_irq_is_queued(vcpu, irq))
+ 		return true; /* level interrupt, already queued */
  
  	if (vgic_queue_irq(vcpu, 0, irq)) {
- 		if (vgic_irq_is_edge(vcpu, irq)) {
--			vgic_dist_irq_clear(vcpu, irq);
-+			vgic_dist_irq_clear_pending(vcpu, irq);
+@@ -1103,7 +1103,7 @@ static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+ 			vgic_dist_irq_clear_pending(vcpu, irq);
  			vgic_cpu_irq_clear(vcpu, irq);
  		} else {
- 			vgic_irq_set_active(vcpu, irq);
-@@ -1297,7 +1297,7 @@ static void vgic_kick_vcpus(struct kvm *kvm)
+-			vgic_irq_set_active(vcpu, irq);
++			vgic_irq_set_queued(vcpu, irq);
+ 		}
  
- static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
- {
--	int is_edge = vgic_irq_is_edge(vcpu, irq);
-+	int edge_triggered = vgic_irq_is_edge(vcpu, irq);
- 	int state = vgic_dist_irq_is_pending(vcpu, irq);
+ 		return true;
+@@ -1186,7 +1186,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 				 vgic_cpu->nr_lr) {
+ 			irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
  
- 	/*
-@@ -1305,26 +1305,26 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
- 	 * - edge triggered and we have a rising edge
- 	 * - level triggered and we change level
- 	 */
--	if (is_edge)
-+	if (edge_triggered)
- 		return level > state;
- 	else
- 		return level != state;
- }
+-			vgic_irq_clear_active(vcpu, irq);
++			vgic_irq_clear_queued(vcpu, irq);
+ 			vgic_cpu->vgic_lr[lr] &= ~GICH_LR_EOI;
  
--static bool vgic_update_irq_state(struct kvm *kvm, int cpuid,
-+static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 				  unsigned int irq_num, bool level)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct kvm_vcpu *vcpu;
--	int is_edge, is_level;
-+	int edge_triggered, level_triggered;
- 	int enabled;
- 	bool ret = true;
- 
- 	spin_lock(&dist->lock);
- 
- 	vcpu = kvm_get_vcpu(kvm, cpuid);
--	is_edge = vgic_irq_is_edge(vcpu, irq_num);
--	is_level = !is_edge;
-+	edge_triggered = vgic_irq_is_edge(vcpu, irq_num);
-+	level_triggered = !edge_triggered;
- 
- 	if (!vgic_validate_injection(vcpu, irq_num, level)) {
- 		ret = false;
-@@ -1339,9 +1339,9 @@ static bool vgic_update_irq_state(struct kvm *kvm, int cpuid,
- 	kvm_debug("Inject IRQ%d level %d CPU%d\n", irq_num, level, cpuid);
- 
- 	if (level)
--		vgic_dist_irq_set(vcpu, irq_num);
-+		vgic_dist_irq_set_pending(vcpu, irq_num);
- 	else
--		vgic_dist_irq_clear(vcpu, irq_num);
-+		vgic_dist_irq_clear_pending(vcpu, irq_num);
- 
- 	enabled = vgic_irq_is_enabled(vcpu, irq_num);
- 
-@@ -1350,7 +1350,7 @@ static bool vgic_update_irq_state(struct kvm *kvm, int cpuid,
+ 			/* Any additional pending interrupt? */
+@@ -1350,7 +1350,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
  		goto out;
  	}
  
--	if (is_level && vgic_irq_is_active(vcpu, irq_num)) {
-+	if (level_triggered && vgic_irq_is_active(vcpu, irq_num)) {
+-	if (level_triggered && vgic_irq_is_active(vcpu, irq_num)) {
++	if (level_triggered && vgic_irq_is_queued(vcpu, irq_num)) {
  		/*
  		 * Level interrupt in progress, will be picked up
  		 * when EOId.
-@@ -1387,7 +1387,7 @@ out:
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level)
- {
--	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
-+	if (vgic_update_irq_pending(kvm, cpuid, irq_num, level))
- 		vgic_kick_vcpus(kvm);
- 
- 	return 0;
 -- 
 1.8.5.2
