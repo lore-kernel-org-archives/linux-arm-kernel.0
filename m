@@ -1,93 +1,67 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 14 Jun 2014 18:23:22 +0200
-Subject: [PATCH v3 00/19] Renesas CMT, MTU2 and TMU timers DT support
-Message-ID: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Sat, 14 Jun 2014 18:23:25 +0200
+Subject: [PATCH v3 03/19] clocksource: sh_cmt: Replace global spinlock with a
+ per-device spinlock
+In-Reply-To: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1402763021-4067-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The global spinlock is used to protect the shared start/stop register.
+Now that all CMT channels are handled by a single device instance, use a
+per-device spinlock.
 
-This patch set adds DT bindings to the Renesas CMT, MTU2 and TMU timers.
-Patches 02/19 to 13/19, 16/19 and 17/19 have already been posted in the
-previous version of this series. Patches 14/19, 15/19, 18/19 and 19/19 are
-new.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/clocksource/sh_cmt.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Compared to v2 I've rebased the patches on top of Simon's latest devel branch.
-
-Compared to v1 I've dropped the channel subnodes from the CMT DT bindings and
-just use a channels mask, as I don't need to specify per-channel properties.
-I'm slightly uncertain about this change though, as I can't easily predict
-whether per-channel properties would be needed later for new hardware. It
-won't be difficult to reintroduce channel subnodes then, so I'd rather not
-clutter the DT bindings with channel subnodes now. Please feel free to
-disagree.
-
-The first 11 patches should go through the timers tree while the last 8
-patches should go through the Renesas SoC tree. Patches 12/19 to 15/19 have
-no build time or run time dependency on the drivers changes. Patches 16/19 to
-19/19 may have a run time dependency on the drivers changes depending on the
-kernel configuration. Patches 16/19 and 17/19, for instance, require the
-driver changes only when architected timer support isn't enabled in the
-kernel.
-
-Laurent Pinchart (19):
-  clocksource: sh_tmu: Fix channel IRQ retrieval in legacy case
-  clocksource: sh_cmt: Drop support for legacy platform data
-  clocksource: sh_cmt: Replace global spinlock with a per-device
-    spinlock
-  clocksource: sh_tmu: Drop support for legacy platform data
-  clocksource: sh_tmu: Replace global spinlock with a per-device
-    spinlock
-  clocksource: sh_mtu2: Drop support for legacy platform data
-  clocksource: sh_mtu2: Replace global spinlock with a per-device
-    spinlock
-  clocksource: shmobile: Remove unused sh_timer_config members
-  clocksource: sh_cmt: Add DT support
-  clocksource: sh_tmu: Add DT support
-  clocksource: sh_mtu2: Add DT support
-  ARM: shmobile: r8a7790: Add CMT devices to DT
-  ARM: shmobile: r8a7791: Add CMT devices to DT
-  ARM: shmobile: r8a7779: Add TMU devices to DT
-  ARM: shmobile: r7s72100: Add MTU2 device to DT
-  ARM: shmobile: lager-reference: Enable CMT0 in device tree
-  ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
-  ARM: shmobile: marzen-reference: Enable TMU0 in device tree
-  ARM: shmobile: genmai-reference: Enable MTU2 in device tree
-
- .../devicetree/bindings/timer/renesas,cmt.txt      |  49 +++++
- .../devicetree/bindings/timer/renesas,mtu2.txt     |  40 ++++
- .../devicetree/bindings/timer/renesas,tmu.txt      |  40 ++++
- arch/arm/boot/dts/r7s72100-genmai.dts              |   4 +
- arch/arm/boot/dts/r7s72100.dtsi                    |  10 +
- arch/arm/boot/dts/r8a7779-marzen.dts               |   4 +
- arch/arm/boot/dts/r8a7779.dtsi                     |  42 ++++
- arch/arm/boot/dts/r8a7790-lager.dts                |   4 +
- arch/arm/boot/dts/r8a7790.dtsi                     |  34 +++
- arch/arm/boot/dts/r8a7791-koelsch.dts              |   4 +
- arch/arm/boot/dts/r8a7791.dtsi                     |  34 +++
- arch/arm/mach-shmobile/board-genmai-reference.c    |  16 --
- arch/arm/mach-shmobile/board-genmai.c              |  14 +-
- arch/arm/mach-shmobile/board-koelsch-reference.c   |   2 -
- arch/arm/mach-shmobile/board-lager-reference.c     |   2 -
- arch/arm/mach-shmobile/board-marzen-reference.c    |  10 -
- arch/arm/mach-shmobile/include/mach/r7s72100.h     |   1 -
- arch/arm/mach-shmobile/include/mach/r8a7779.h      |   1 -
- arch/arm/mach-shmobile/include/mach/r8a7790.h      |   1 -
- arch/arm/mach-shmobile/include/mach/r8a7791.h      |   1 -
- arch/arm/mach-shmobile/setup-r7s72100.c            |  21 --
- arch/arm/mach-shmobile/setup-r8a7779.c             |  17 +-
- arch/arm/mach-shmobile/setup-r8a7790.c             |   7 +-
- arch/arm/mach-shmobile/setup-r8a7791.c             |   7 +-
- drivers/clocksource/sh_cmt.c                       | 233 ++++++++-------------
- drivers/clocksource/sh_mtu2.c                      | 146 ++++---------
- drivers/clocksource/sh_tmu.c                       | 125 +++++------
- include/linux/sh_timer.h                           |   5 -
- 28 files changed, 467 insertions(+), 407 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
-
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index ff1a059..4d00e4b 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -118,6 +118,8 @@ struct sh_cmt_device {
+ 	void __iomem *mapbase;
+ 	struct clk *clk;
+ 
++	raw_spinlock_t lock; /* Protect the shared start/stop register */
++
+ 	struct sh_cmt_channel *channels;
+ 	unsigned int num_channels;
+ 
+@@ -299,14 +301,12 @@ static unsigned long sh_cmt_get_counter(struct sh_cmt_channel *ch,
+ 	return v2;
+ }
+ 
+-static DEFINE_RAW_SPINLOCK(sh_cmt_lock);
+-
+ static void sh_cmt_start_stop_ch(struct sh_cmt_channel *ch, int start)
+ {
+ 	unsigned long flags, value;
+ 
+ 	/* start stop register shared by multiple timer channels */
+-	raw_spin_lock_irqsave(&sh_cmt_lock, flags);
++	raw_spin_lock_irqsave(&ch->cmt->lock, flags);
+ 	value = sh_cmt_read_cmstr(ch);
+ 
+ 	if (start)
+@@ -315,7 +315,7 @@ static void sh_cmt_start_stop_ch(struct sh_cmt_channel *ch, int start)
+ 		value &= ~(1 << ch->timer_bit);
+ 
+ 	sh_cmt_write_cmstr(ch, value);
+-	raw_spin_unlock_irqrestore(&sh_cmt_lock, flags);
++	raw_spin_unlock_irqrestore(&ch->cmt->lock, flags);
+ }
+ 
+ static int sh_cmt_enable(struct sh_cmt_channel *ch, unsigned long *rate)
+@@ -934,6 +934,7 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ 
+ 	memset(cmt, 0, sizeof(*cmt));
+ 	cmt->pdev = pdev;
++	raw_spin_lock_init(&cmt->lock);
+ 
+ 	if (!cfg) {
+ 		dev_err(&cmt->pdev->dev, "missing platform data\n");
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.5.5
