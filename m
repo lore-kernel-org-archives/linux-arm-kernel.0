@@ -1,78 +1,51 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 14 Jun 2014 17:04:51 +0200
-Subject: [PATCH v4 11/14] ARM64: KVM: fix vgic_bitmap_get_reg function
- for BE 64bit case
-In-Reply-To: <1402590613-3341-12-git-send-email-victor.kamensky@linaro.org>
+Date: Sat, 14 Jun 2014 17:04:59 +0200
+Subject: [PATCH v4 12/14] ARM64: KVM: vgic_elrsr and vgic_eisr need to be
+ byteswapped in BE case
+In-Reply-To: <1402590613-3341-13-git-send-email-victor.kamensky@linaro.org>
 References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
- <1402590613-3341-12-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140614150451.GG14023@lvm>
+ <1402590613-3341-13-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140614150459.GH14023@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 09:30:10AM -0700, Victor Kamensky wrote:
-> Fix vgic_bitmap_get_reg function to return 'right' word address of
-> 'unsigned long' bitmap value in case of BE 64bit image.
+On Thu, Jun 12, 2014 at 09:30:11AM -0700, Victor Kamensky wrote:
+> On arm64 'u32 vgic_eisr[2];' and 'u32 vgic_elrsr[2]' are accessed as
+> one 'unsigned long *' bit fields, which has 64bit size. So we need to
+> swap least significant word with most significant word when code reads
+> those registers from h/w.
 > 
 > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 > ---
->  virt/kvm/arm/vgic.c | 24 ++++++++++++++++++++++--
->  1 file changed, 22 insertions(+), 2 deletions(-)
+>  arch/arm64/kvm/hyp.S | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 529c336..b4ffd82 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -101,14 +101,34 @@ static u32 vgic_nr_lr;
->  
->  static unsigned int vgic_maint_irq;
->  
-> +/*
-> + * struct vgic_bitmap contains unions that provide two views of
-> + * the same data. In one case it is an array of registers of
-> + * u32's, and in the other case it is a bitmap of unsigned
-> + * longs.
-> + *
-> + * This does not work on 64-bit BE systems, because the bitmap access
-> + * will store two consecutive 32-bit words with the higher-addressed
-> + * register's bits at the lower index and the lower-addressed register's
-> + * bits at the higher index.
-> + *
-> + * Therefore, swizzle the register index when accessing the 32-bit word
-> + * registers to access the right register's value.
-> + */
-> +#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 64
-> +#define REG_OFFSET_SWIZZLE	1
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 0620691..5035b41 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -415,10 +415,17 @@ CPU_BE(	rev	w11, w11 )
+>  	str	w4, [x3, #VGIC_CPU_HCR]
+>  	str	w5, [x3, #VGIC_CPU_VMCR]
+>  	str	w6, [x3, #VGIC_CPU_MISR]
+> +#ifndef CONFIG_CPU_BIG_ENDIAN
+>  	str	w7, [x3, #VGIC_CPU_EISR]
+>  	str	w8, [x3, #(VGIC_CPU_EISR + 4)]
+>  	str	w9, [x3, #VGIC_CPU_ELRSR]
+>  	str	w10, [x3, #(VGIC_CPU_ELRSR + 4)]
 > +#else
-> +#define REG_OFFSET_SWIZZLE	0
+> +	str	w7, [x3, #(VGIC_CPU_EISR + 4)]
+> +	str	w8, [x3, #VGIC_CPU_EISR]
+> +	str	w9, [x3, #(VGIC_CPU_ELRSR + 4)]
+> +	str	w10, [x3, #VGIC_CPU_ELRSR]
 > +#endif
-> +
->  static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
->  				int cpuid, u32 offset)
->  {
->  	offset >>= 2;
->  	if (!offset)
-> -		return x->percpu[cpuid].reg;
-> +		return x->percpu[cpuid].reg + (offset ^ REG_OFFSET_SWIZZLE);
->  	else
-> -		return x->shared.reg + offset - 1;
-> +		return x->shared.reg + ((offset - 1) ^ REG_OFFSET_SWIZZLE);
->  }
+>  	str	w11, [x3, #VGIC_CPU_APR]
 >  
->  static int vgic_bitmap_get_irq_val(struct vgic_bitmap *x,
+>  	/* Clear GICH_HCR */
 > -- 
 > 1.8.1.4
 > 
-
-I had wished there was a cleaner way to abstract this, but I can't think
-of a cleaner solution, and restructuring the whole thing would be very
-invasive.
-
-I'm curious to hear from Marc on this one, but you can add:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-because it looks correct.
-
-Thanks for picking up my suggestion on the commenting.
+I thought Marc had something here which allowed you to deal with the
+conversion in the accessor functions and avoid this patch?
 
 -Christoffer
