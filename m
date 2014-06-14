@@ -1,81 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 14 Jun 2014 22:51:06 +0200
-Subject: [RFC PATCH 5/6] arm/arm64: KVM: vgic: Fix SGI writes to
- GICD_I{CS}PENDR0
-In-Reply-To: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
-References: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1402779067-34478-6-git-send-email-christoffer.dall@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 14 Jun 2014 23:36:29 +0200
+Subject: [PATCH v2 2/3] mmc: Add APM X-Gene SoC SDHC controller support to
+ Arasan SDHCI driver
+In-Reply-To: <9432f705-fd6a-44a6-8e04-c0455f0a551c@BN1AFFO11FD054.protection.gbl>
+References: <1401829985-5212-1-git-send-email-lho@apm.com>
+ <1401829985-5212-3-git-send-email-lho@apm.com>
+ <9432f705-fd6a-44a6-8e04-c0455f0a551c@BN1AFFO11FD054.protection.gbl>
+Message-ID: <5219148.cLBgakF4fc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writes to GICD_ISPENDR0 and GICD_ICPENDR0 ignore all settings of the
-pending state for SGIs.  Make sure the implementation handles this
-correctly.
+On Wednesday 04 June 2014 08:09:12 Michal Simek wrote:
+> > +
+> > +static void sdhci_arasn_xgene_xlat_addr(struct sdhci_arasan_data *data,
+> > +                                    u64 dma_addr)
+> > +{
+> > +     #define AIM_AXI_HI_OFFSET       0x0000000c
+> > +     #define  AIM_AXI_ADDRESS_HI_N_WR(src) \
+> > +                                     (((u32) (src) << 20) & 0xfff00000)
+> 
+> ditto with indentation.
+> 20 should be shift
+> 0xfff00000 is mask.
+> 
+> Also you should take this opportunity and add function description
+> in kernel doc to be exactly clear what this function is doing.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+Actually this should just be configured in the dma-ranges property
+I think. It's not the driver's business to do the dma translation.
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 0b41875..1f91b3b 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -432,7 +432,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 					struct kvm_exit_mmio *mmio,
- 					phys_addr_t offset)
- {
--	u32 *reg;
-+	u32 *reg, orig;
- 	u32 level_mask;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 
-@@ -441,6 +441,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 
- 	/* Mark both level and edge triggered irqs as pending */
- 	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-+	orig = *reg;
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
- 
-@@ -452,6 +453,12 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 				ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
- 		*reg &= level_mask;
- 
-+		/* Ignore writes to SGIs */
-+		if (offset < 2) {
-+			*reg &= ~0xffff;
-+			*reg |= orig & 0xffff;
-+		}
-+
- 		vgic_update_state(vcpu->kvm);
- 		return true;
- 	}
-@@ -464,10 +471,11 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  phys_addr_t offset)
- {
- 	u32 *level_active;
--	u32 *reg;
-+	u32 *reg, orig;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 
- 	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-+	orig = *reg;
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
- 	if (mmio->is_write) {
-@@ -478,6 +486,12 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  vcpu->vcpu_id, offset);
- 		*reg |= *level_active;
- 
-+		/* Ignore writes to SGIs */
-+		if (offset < 2) {
-+			*reg &= ~0xffff;
-+			*reg |= orig & 0xffff;
-+		}
-+
- 		/* Clear soft-pending flags */
- 		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
- 					  vcpu->vcpu_id, offset);
--- 
-1.8.5.2
+	Arnd
