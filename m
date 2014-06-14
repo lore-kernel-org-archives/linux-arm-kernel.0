@@ -1,72 +1,73 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 14 Jun 2014 18:23:32 +0200
-Subject: [PATCH v3 10/19] clocksource: sh_tmu: Add DT support
+Date: Sat, 14 Jun 2014 18:23:33 +0200
+Subject: [PATCH v3 11/19] clocksource: sh_mtu2: Add DT support
 In-Reply-To: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1402763021-4067-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document DT bindings and parse them in the TMU driver.
+Document DT bindings and parse them in the MTU2 driver.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- .../devicetree/bindings/timer/renesas,tmu.txt      | 40 +++++++++++++++++++
- drivers/clocksource/sh_tmu.c                       | 45 ++++++++++++++++++----
- 2 files changed, 77 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
+ .../devicetree/bindings/timer/renesas,mtu2.txt     | 40 ++++++++++++++++++++++
+ drivers/clocksource/sh_mtu2.c                      |  8 +++++
+ 2 files changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
+diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
 new file mode 100644
-index 0000000..2392e89
+index 0000000..c5dd032
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
++++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
 @@ -0,0 +1,40 @@
-+* Renesas R-Car Timer Unit (TMU)
++* Renesas R-Car Multi-Function Timer Pulse Unit 2 (MTU2)
 +
-+The TMU is a 32-bit timer/counter with configurable clock inputs and
-+programmable compare match.
++The MTU2 is a multi-purpose, multi-channel timer/counter with configurable
++clock inputs and programmable compare match.
 +
 +Channels share hardware resources but their counter and compare match value
-+are independent. The TMU hardware supports up to three channels.
++are independent. The MTU2 hardware supports five channels indexed from 0 to 4.
 +
 +Required Properties:
 +
-+  - compatible: must contain "renesas,tmu"
++  - compatible: must contain "renesas,mtu2"
 +
 +  - reg: base address and length of the registers block for the timer module.
 +
-+  - interrupts: interrupt-specifier for the timer, one per channel.
++  - interrupt-parent, interrupts: interrupt specifiers for the timer, one for
++    each entry in interrupt-names.
++  - interrupt-names: must contain one entry named "tgi?a" for each enabled
++    channel, where "?" is the channel index expressed as one digit from "0" to
++    "4".
 +
 +  - clocks: a list of phandle + clock-specifier pairs, one for each entry
 +    in clock-names.
 +  - clock-names: must contain "fck" for the functional clock.
 +
-+Optional Properties:
 +
-+  - #renesas,channels: number of channels implemented by the timer, must be 2
-+    or 3 (if not specified the value defaults to 3).
++Example: R7S72100 (RZ/A1H) MTU2 node
 +
-+
-+Example: R8A7779 (R-Car H1) TMU0 node
-+
-+	tmu0: timer at ffd80000 {
-+		compatible = "renesas,tmu";
-+		reg = <0xffd80000 0x30>;
++	mtu2: timer at fcff0000 {
++		compatible = "renesas,mtu2";
++		reg = <0xfcff0000 0x400>;
 +		interrupt-parent = <&gic>;
-+		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
++		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 146 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 150 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 154 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 159 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tgi0a", "tgi1a", "tgi2a", "tgi3a", "tgi4a";
++		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
 +		clock-names = "fck";
-+
-+		#renesas,channels = <3>;
 +	};
-diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index ef8fb0b..2ece4ab 100644
---- a/drivers/clocksource/sh_tmu.c
-+++ b/drivers/clocksource/sh_tmu.c
-@@ -24,6 +24,7 @@
+diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+index ebdf9d1..79387af 100644
+--- a/drivers/clocksource/sh_mtu2.c
++++ b/drivers/clocksource/sh_mtu2.c
+@@ -23,6 +23,7 @@
  #include <linux/ioport.h>
  #include <linux/irq.h>
  #include <linux/module.h>
@@ -74,86 +75,24 @@ index ef8fb0b..2ece4ab 100644
  #include <linux/platform_device.h>
  #include <linux/pm_domain.h>
  #include <linux/pm_runtime.h>
-@@ -509,23 +510,46 @@ static int sh_tmu_map_memory(struct sh_tmu_device *tmu)
- 	return 0;
- }
- 
-+static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
-+{
-+	struct device_node *np = tmu->pdev->dev.of_node;
-+
-+	tmu->num_channels = 3;
-+	of_property_read_u32(np, "#renesas,channels", &tmu->num_channels);
-+
-+	if (tmu->num_channels != 2 && tmu->num_channels != 3) {
-+		dev_err(&tmu->pdev->dev, "invalid number of channels %u\n",
-+			tmu->num_channels);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- {
--	struct sh_timer_config *cfg = pdev->dev.platform_data;
- 	const struct platform_device_id *id = pdev->id_entry;
- 	unsigned int i;
- 	int ret;
- 
--	if (!cfg) {
--		dev_err(&tmu->pdev->dev, "missing platform data\n");
--		return -ENXIO;
--	}
--
- 	tmu->pdev = pdev;
- 	tmu->model = id->driver_data;
- 
- 	raw_spin_lock_init(&tmu->lock);
- 
-+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
-+		ret = sh_tmu_parse_dt(tmu);
-+		if (ret < 0)
-+			return ret;
-+	} else if (pdev->dev.platform_data) {
-+		struct sh_timer_config *cfg = pdev->dev.platform_data;
-+
-+		tmu->num_channels = hweight8(cfg->channels_mask);
-+	} else {
-+		dev_err(&tmu->pdev->dev, "missing platform data\n");
-+		return -ENXIO;
-+	}
-+
- 	/* Get hold of clock. */
- 	tmu->clk = clk_get(&tmu->pdev->dev, "fck");
- 	if (IS_ERR(tmu->clk)) {
-@@ -545,8 +569,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 	}
- 
- 	/* Allocate and setup the channels. */
--	tmu->num_channels = hweight8(cfg->channels_mask);
--
- 	tmu->channels = kzalloc(sizeof(*tmu->channels) * tmu->num_channels,
- 				GFP_KERNEL);
- 	if (tmu->channels == NULL) {
-@@ -630,11 +652,18 @@ static const struct platform_device_id sh_tmu_id_table[] = {
+@@ -502,11 +503,18 @@ static const struct platform_device_id sh_mtu2_id_table[] = {
  };
- MODULE_DEVICE_TABLE(platform, sh_tmu_id_table);
+ MODULE_DEVICE_TABLE(platform, sh_mtu2_id_table);
  
-+static const struct of_device_id sh_tmu_of_table[] = {
-+	{ .compatible = "renesas,tmu" },
++static const struct of_device_id sh_mtu2_of_table[] = {
++	{ .compatible = "renesas,mtu2" },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, sh_tmu_of_table);
++MODULE_DEVICE_TABLE(of, sh_mtu2_of_table);
 +
- static struct platform_driver sh_tmu_device_driver = {
- 	.probe		= sh_tmu_probe,
- 	.remove		= sh_tmu_remove,
+ static struct platform_driver sh_mtu2_device_driver = {
+ 	.probe		= sh_mtu2_probe,
+ 	.remove		= sh_mtu2_remove,
  	.driver		= {
- 		.name	= "sh_tmu",
-+		.of_match_table = sh_tmu_of_table,
+ 		.name	= "sh_mtu2",
++		.of_match_table = of_match_ptr(sh_mtu2_of_table),
  	},
- 	.id_table	= sh_tmu_id_table,
+ 	.id_table	= sh_mtu2_id_table,
  };
 -- 
 1.8.5.5
