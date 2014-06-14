@@ -1,64 +1,72 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 14 Jun 2014 18:23:34 +0200
-Subject: [PATCH v3 12/19] ARM: shmobile: r8a7790: Add CMT devices to DT
+Date: Sat, 14 Jun 2014 18:23:36 +0200
+Subject: [PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU devices to DT
 In-Reply-To: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1402763021-4067-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1402763021-4067-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the CMT0 and CMT1 counters to the r8a7790 device tree and make them
-disabled by default.
+Add the TMU0, TMU1 and TMU2 counters to the r8a7779 device tree and make
+them disabled by default.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/r8a7779.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 29907c9..cc32ac5 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -206,6 +206,40 @@
- 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 94e2fc8..bf716ce 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -266,6 +266,48 @@
+ 		reg = <0xffc48000 0x38>;
  	};
  
-+	cmt0: timer at ffca0000 {
-+		compatible = "renesas,cmt-48-gen2";
-+		reg = <0 0xffca0000 0 0x1004>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
++	tmu0: timer at ffd80000 {
++		compatible = "renesas,tmu";
++		reg = <0xffd80000 0x30>;
++		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
 +		clock-names = "fck";
 +
-+		renesas,channels-mask = <0x60>;
++		#renesas,channels = <3>;
 +
 +		status = "disabled";
 +	};
 +
-+	cmt1: timer at e6130000 {
-+		compatible = "renesas,cmt-48-gen2";
-+		reg = <0 0xe6130000 0 0x1004>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 121 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 122 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 123 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 124 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 125 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 126 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_CMT1>;
++	tmu1: timer at ffd81000 {
++		compatible = "renesas,tmu";
++		reg = <0xffd81000 0x30>;
++		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 45 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 46 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp0_clks R8A7779_CLK_TMU1>;
 +		clock-names = "fck";
 +
-+		renesas,channels-mask = <0xff>;
++		#renesas,channels = <3>;
 +
 +		status = "disabled";
 +	};
 +
- 	irqc0: interrupt-controller at e61c0000 {
- 		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
- 		#interrupt-cells = <2>;
++	tmu2: timer at ffd82000 {
++		compatible = "renesas,tmu";
++		reg = <0xffd82000 0x30>;
++		interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 49 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 50 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp0_clks R8A7779_CLK_TMU2>;
++		clock-names = "fck";
++
++		#renesas,channels = <3>;
++
++		status = "disabled";
++	};
++
+ 	sata: sata at fc600000 {
+ 		compatible = "renesas,rcar-sata";
+ 		reg = <0xfc600000 0x2000>;
 -- 
 1.8.5.5
