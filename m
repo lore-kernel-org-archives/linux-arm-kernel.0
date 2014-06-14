@@ -1,36 +1,37 @@
-From: linux@baker-net.org.uk (Adam Baker)
-Date: Sat, 14 Jun 2014 23:06:23 +0100
-Subject: [PATCH] Frees gate after if statement in clk-sunxi.c
-In-Reply-To: <1402769508-3821-1-git-send-email-xerofoify@gmail.com>
-References: <1402769508-3821-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <539CC75F.2080105@baker-net.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 15 Jun 2014 00:21:22 +0200
+Subject: [PATCH V2 2/2] power: twl4030_charger: attempt to power off in
+ case of critical events
+In-Reply-To: <1401313610-14252-3-git-send-email-nm@ti.com>
+References: <1401313610-14252-1-git-send-email-nm@ti.com>
+ <1401313610-14252-3-git-send-email-nm@ti.com>
+Message-ID: <20140614222122.GA1389@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/06/14 19:11, Nick wrote:
-> Signed-off-by: Nick <xerofoify@gmail.com>
-> ---
->   drivers/clk/sunxi/clk-sunxi.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 4264834..6f4fc51 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -42,6 +42,7 @@ static void __init sun4i_osc_clk_setup(struct device_node *node)
->   	u32 rate;
->
->   	if (of_property_read_u32(node, "clock-frequency", &rate))
-> +		kree(gate);
->   		return;
+Hi!
 
-There are no braces around this so the function of this code as written 
-is an unconditional return and the return shouldn't be indented. I 
-suspect, without reading the rest of the file, that that isn't what you 
-intended.
+> +	if (irqs2 & TWL4030_ACCHGOV) {
+>  		dev_crit(bci->dev, "Ac charger overvoltage\n");
+> +		power_off = true;
+> +	}
+> +
+> +	/* Try to shutdown the system */
+> +	if (power_off)
+> +		orderly_poweroff(true);
+>  
+>  	return IRQ_HANDLED;
+>  }
 
->
->   	/* allocate fixed-rate and gate clock structs */
->
+Userland can make orderly_poweroff take long time, or even forever. (Think disconnected
+network with nfsroot).
 
-Adam
+Should we do something more forceful here? Userland has to handle sudden poweroffs, anyway...
+
+(You could invent new function "give userland 5 seconds to shut system down" if you
+really wanted...)
+
+										Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
