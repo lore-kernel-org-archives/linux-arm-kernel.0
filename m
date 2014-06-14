@@ -1,26 +1,29 @@
-From: xerofoify@gmail.com (Nick)
-Date: Sat, 14 Jun 2014 14:11:48 -0400
-Subject: [PATCH] Frees gate after if statement in clk-sunxi.c
-Message-ID: <1402769508-3821-1-git-send-email-xerofoify@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 14 Jun 2014 21:01:59 +0200
+Subject: device tree: compilation of device tree sources
+In-Reply-To: <539AE266.70306@cdac.in>
+References: <539AE266.70306@cdac.in>
+Message-ID: <20140614190159.GF15686@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nick <xerofoify@gmail.com>
----
- drivers/clk/sunxi/clk-sunxi.c | 1 +
- 1 file changed, 1 insertion(+)
+On Fri, Jun 13, 2014 at 05:07:10PM +0530, Varka Bhadram wrote:
+> Hi,
+> 
+> I cloned the device tree git from: https://kernel.googlesource.com/pub/scm/linux/kernel/git/devicetree/devicetree-rebasing
+> 
+> When i try to compile the Makefile is throwing errors like this:
+> 
+> DTC     src/arc/abilis_tb100_dvk.dtb
+> 
+> dtc: invalid option -- 'i'
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 4264834..6f4fc51 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -42,6 +42,7 @@ static void __init sun4i_osc_clk_setup(struct device_node *node)
- 	u32 rate;
- 
- 	if (of_property_read_u32(node, "clock-frequency", &rate))
-+		kree(gate);
- 		return;
- 
- 	/* allocate fixed-rate and gate clock structs */
+Your dtc version is too old. Please upgrade.
+
+Sascha
+
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
