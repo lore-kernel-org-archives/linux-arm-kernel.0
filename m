@@ -1,90 +1,177 @@
-From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
-Date: Sat, 14 Jun 2014 15:46:44 +0530
-Subject: [PATCH v2 06/10] CMA: generalize CMA reserved area management
- functionality
-In-Reply-To: <1402543307-29800-7-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-7-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <87a99fg5ir.fsf@linux.vnet.ibm.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Sat, 14 Jun 2014 09:59:02 -0300
+Subject: [PATCH for v3.15] usb: musb: Fix panic upon musb_am335x module
+ removal
+In-Reply-To: <20140520165510.GA28859@arch.cereza>
+References: <1400371473-2053-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <20140520165510.GA28859@arch.cereza>
+Message-ID: <20140614125902.GA1202@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
+Hi Felipe,
 
-> Currently, there are two users on CMA functionality, one is the DMA
-> subsystem and the other is the kvm on powerpc. They have their own code
-> to manage CMA reserved area even if they looks really similar.
-> From my guess, it is caused by some needs on bitmap management. Kvm side
-> wants to maintain bitmap not for 1 page, but for more size. Eventually it
-> use bitmap where one bit represents 64 pages.
->
-> When I implement CMA related patches, I should change those two places
-> to apply my change and it seem to be painful to me. I want to change
-> this situation and reduce future code management overhead through
-> this patch.
->
-> This change could also help developer who want to use CMA in their
-> new feature development, since they can use CMA easily without
-> copying & pasting this reserved area management code.
->
-> In previous patches, we have prepared some features to generalize
-> CMA reserved area management and now it's time to do it. This patch
-> moves core functions to mm/cma.c and change DMA APIs to use
-> these functions.
->
-> There is no functional change in DMA APIs.
->
-> v2: There is no big change from v1 in mm/cma.c. Mostly renaming.
->
-> Acked-by: Michal Nazarewicz <mina86@mina86.com>
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->
+On 20 May 01:55 PM, Ezequiel Garcia wrote:
+> On 17 May 09:04 PM, Ezequiel Garcia wrote:
+> > At probe time, the musb_am335x driver register its childs by
+> > calling of_platform_populate(), which registers all childs in
+> > the devicetree hierarchy recursively.
+> > 
+> > On the other side, the driver's remove() function uses of_device_unregister()
+> > to remove each child of musb_am335x's.
+> > 
+> > However, when musb_dsps is loaded, its devices are attached to the musb_am335x
+> > device as musb_am335x childs. Hence, musb_am335x remove() will attempt to
+> > unregister the devices registered by musb_dsps, which produces a kernel panic.
+> > 
+> > In other words, the childs in the "struct device" hierarchy are not the same
+> > as the childs in the "devicetree" hierarchy.
+> > 
+> > Ideally, we should enforce the removal of the devices registered by
+> > musb_am335x *only*, instead of all its child devices. However, because of the
+> > recursive nature of of_platform_populate, this doesn't seem possible.
+> > 
+> > Therefore, as the only solution at hand, this commit disables musb_am335x
+> > driver removal capability, preventing it from being ever removed. This was
+> > originally suggested by Sebastian Siewior:
+> > 
+> > https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104946.html
+> > 
+> > And for reference, here's the panic upon module removal:
+> > 
+> > musb-hdrc musb-hdrc.0.auto: remove, state 4
+> > usb usb1: USB disconnect, device number 1
+> > musb-hdrc musb-hdrc.0.auto: USB bus 1 deregistered
+> > Unable to handle kernel NULL pointer dereference at virtual address 0000008c
+> > pgd = de11c000
+> > [0000008c] *pgd=9e174831, *pte=00000000, *ppte=00000000
+> > Internal error: Oops: 17 [#1] ARM
+> > Modules linked in: musb_am335x(-) musb_dsps musb_hdrc usbcore usb_common
+> > CPU: 0 PID: 623 Comm: modprobe Not tainted 3.15.0-rc4-00001-g24efd13 #69
+> > task: de1b7500 ti: de122000 task.ti: de122000
+> > PC is at am335x_shutdown+0x10/0x28
+> > LR is at am335x_shutdown+0xc/0x28
+> > pc : [<c0327798>]    lr : [<c0327794>]    psr: a0000013
+> > sp : de123df8  ip : 00000004  fp : 00028f00
+> > r10: 00000000  r9 : de122000  r8 : c000e6c4
+> > r7 : de0e3c10  r6 : de0e3800  r5 : de624010  r4 : de1ec750
+> > r3 : de0e3810  r2 : 00000000  r1 : 00000001  r0 : 00000000
+> > Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> > Control: 10c5387d  Table: 9e11c019  DAC: 00000015
+> > Process modprobe (pid: 623, stack limit = 0xde122240)
+> > Stack: (0xde123df8 to 0xde124000)
+> > 3de0:                                                       de0e3810 bf054488
+> > 3e00: bf05444c de624010 60000013 bf043650 000012fc de624010 de0e3810 bf043a20
+> > 3e20: de0e3810 bf04b240 c0635b88 c02ca37c c02ca364 c02c8db0 de1b7500 de0e3844
+> > 3e40: de0e3810 c02c8e28 c0635b88 de02824c de0e3810 c02c884c de0e3800 de0e3810
+> > 3e60: de0e3818 c02c5b20 bf05417c de0e3800 de0e3800 c0635b88 de0f2410 c02ca838
+> > 3e80: bf05417c de0e3800 bf055438 c02ca8cc de0e3c10 bf054194 de0e3c10 c02ca37c
+> > 3ea0: c02ca364 c02c8db0 de1b7500 de0e3c44 de0e3c10 c02c8e28 c0635b88 de02824c
+> > 3ec0: de0e3c10 c02c884c de0e3c10 de0e3c10 de0e3c18 c02c5b20 de0e3c10 de0e3c10
+> > 3ee0: 00000000 bf059000 a0000013 c02c5bc0 00000000 bf05900c de0e3c10 c02c5c48
+> > 3f00: de0dd0c0 de1ec970 de0f2410 bf05929c de0f2444 bf05902c de0f2410 c02ca37c
+> > 3f20: c02ca364 c02c8db0 bf05929c de0f2410 bf05929c c02c94c8 bf05929c 00000000
+> > 3f40: 00000800 c02c8ab4 bf0592e0 c007fc40 c00dd820 6273756d 336d615f 00783533
+> > 3f60: c064a0ac de1b7500 de122000 de1b7500 c000e590 00000001 c000e6c4 c0060160
+> > 3f80: 00028e70 00028e70 00028ea4 00000081 60000010 00028e70 00028e70 00028ea4
+> > 3fa0: 00000081 c000e500 00028e70 00028e70 00028ea4 00000800 becb59f8 00027608
+> > 3fc0: 00028e70 00028e70 00028ea4 00000081 00000001 00000001 00000000 00028f00
+> > 3fe0: b6e6b6f0 becb59d4 000160e8 b6e6b6fc 60000010 00028ea4 00000000 00000000
+> > [<c0327798>] (am335x_shutdown) from [<bf054488>] (dsps_musb_exit+0x3c/0x4c [musb_dsps])
+> > [<bf054488>] (dsps_musb_exit [musb_dsps]) from [<bf043650>] (musb_shutdown+0x80/0x90 [musb_hdrc])
+> > [<bf043650>] (musb_shutdown [musb_hdrc]) from [<bf043a20>] (musb_remove+0x24/0x68 [musb_hdrc])
+> > [<bf043a20>] (musb_remove [musb_hdrc]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
+> > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
+> > [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
+> > [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
+> > [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
+> > [<c02c5b20>] (device_del) from [<c02ca838>] (platform_device_del+0x14/0x9c)
+> > [<c02ca838>] (platform_device_del) from [<c02ca8cc>] (platform_device_unregister+0xc/0x20)
+> > [<c02ca8cc>] (platform_device_unregister) from [<bf054194>] (dsps_remove+0x18/0x38 [musb_dsps])
+> > [<bf054194>] (dsps_remove [musb_dsps]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
+> > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
+> > [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
+> > [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
+> > [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
+> > [<c02c5b20>] (device_del) from [<c02c5bc0>] (device_unregister+0xc/0x20)
+> > [<c02c5bc0>] (device_unregister) from [<bf05900c>] (of_remove_populated_child+0xc/0x14 [musb_am335x])
+> > [<bf05900c>] (of_remove_populated_child [musb_am335x]) from [<c02c5c48>] (device_for_each_child+0x44/0x70)
+> > [<c02c5c48>] (device_for_each_child) from [<bf05902c>] (am335x_child_remove+0x18/0x30 [musb_am335x])
+> > [<bf05902c>] (am335x_child_remove [musb_am335x]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
+> > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
+> > [<c02c8db0>] (__device_release_driver) from [<c02c94c8>] (driver_detach+0xb4/0xb8)
+> > [<c02c94c8>] (driver_detach) from [<c02c8ab4>] (bus_remove_driver+0x4c/0xa0)
+> > [<c02c8ab4>] (bus_remove_driver) from [<c007fc40>] (SyS_delete_module+0x128/0x1cc)
+> > [<c007fc40>] (SyS_delete_module) from [<c000e500>] (ret_fast_syscall+0x0/0x48)
+> > 
+> > Fixes: 97238b35d5bb ("usb: musb: dsps: use proper child nodes")
+> > Cc: <stable@vger.kernel.org> # v3.12+
+> > Acked-by: George Cherian <george.cherian@ti.com>
+> > Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> > ---
+> >  drivers/usb/musb/musb_am335x.c | 23 ++++++-----------------
+> >  1 file changed, 6 insertions(+), 17 deletions(-)
+> > 
+> > diff --git a/drivers/usb/musb/musb_am335x.c b/drivers/usb/musb/musb_am335x.c
+> > index d235378..1e58ed2 100644
+> > --- a/drivers/usb/musb/musb_am335x.c
+> > +++ b/drivers/usb/musb/musb_am335x.c
+> > @@ -19,21 +19,6 @@ err:
+> >  	return ret;
+> >  }
+> >  
+> > -static int of_remove_populated_child(struct device *dev, void *d)
+> > -{
+> > -	struct platform_device *pdev = to_platform_device(dev);
+> > -
+> > -	of_device_unregister(pdev);
+> > -	return 0;
+> > -}
+> > -
+> > -static int am335x_child_remove(struct platform_device *pdev)
+> > -{
+> > -	device_for_each_child(&pdev->dev, NULL, of_remove_populated_child);
+> > -	pm_runtime_disable(&pdev->dev);
+> > -	return 0;
+> > -}
+> > -
+> >  static const struct of_device_id am335x_child_of_match[] = {
+> >  	{ .compatible = "ti,am33xx-usb" },
+> >  	{  },
+> > @@ -42,13 +27,17 @@ MODULE_DEVICE_TABLE(of, am335x_child_of_match);
+> >  
+> >  static struct platform_driver am335x_child_driver = {
+> >  	.probe		= am335x_child_probe,
+> > -	.remove         = am335x_child_remove,
+> >  	.driver         = {
+> >  		.name   = "am335x-usb-childs",
+> >  		.of_match_table	= am335x_child_of_match,
+> >  	},
+> >  };
+> >  
+> > -module_platform_driver(am335x_child_driver);
+> > +static int __init am335x_child_init(void)
+> > +{
+> > +	return platform_driver_register(&am335x_child_driver);
+> > +}
+> > +module_init(am335x_child_init);
+> > +
+> >  MODULE_DESCRIPTION("AM33xx child devices");
+> >  MODULE_LICENSE("GPL v2");
+> > -- 
+> > 1.9.1
+> > 
+> 
+> Felipe,
+> 
+> Any comments on this?
+> 
 
-.....
+Any comments on this? I don't like to remove a feature, but as
+explained above, I don't see any other way to solve this.
 
-> +
-> +	mask = cma_bitmap_aligned_mask(cma, align);
-> +	bitmap_maxno = cma_bitmap_maxno(cma);
-> +	nr_bits = cma_bitmap_pages_to_bits(cma, count);
-> +
-> +	for (;;) {
-> +		mutex_lock(&cma->lock);
-> +		bitmapno = bitmap_find_next_zero_area(cma->bitmap,
-> +					bitmap_maxno, start, nr_bits, mask);
-> +		if (bitmapno >= bitmap_maxno) {
-> +			mutex_unlock(&cma->lock);
-> +			break;
-> +		}
-> +		bitmap_set(cma->bitmap, bitmapno, nr_bits);
-> +		/*
-> +		 * It's safe to drop the lock here. We've marked this region for
-> +		 * our exclusive use. If the migration fails we will take the
-> +		 * lock again and unmark it.
-> +		 */
-> +		mutex_unlock(&cma->lock);
-> +
-> +		pfn = cma->base_pfn + (bitmapno << cma->order_per_bit);
-> +		mutex_lock(&cma_mutex);
-> +		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
-> +		mutex_unlock(&cma_mutex);
-> +		if (ret == 0) {
-> +			page = pfn_to_page(pfn);
-> +			break;
-> +		} else if (ret != -EBUSY) {
-> +			clear_cma_bitmap(cma, pfn, count);
-> +			break;
-> +		}
-> +		
-
-
-For setting bit map we do
-		bitmap_set(cma->bitmap, bitmapno, nr_bits);
-                alloc_contig()..
-                if (error)
-                        clear_cma_bitmap(cma, pfn, count);
-
-Why ?
-
-why not bitmap_clear() ?
-
--aneesh
+The driver is currently broken. I tried using of_platform_depopulate()
+but failed.
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
