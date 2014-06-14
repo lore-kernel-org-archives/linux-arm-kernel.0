@@ -1,35 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 13 Jun 2014 16:36:31 -0700
-Subject: [PATCH] clkdev: Don't print errors on probe defer
-Message-ID: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
+From: xerofoify@gmail.com (Nick)
+Date: Fri, 13 Jun 2014 21:47:53 -0400
+Subject: [PATCH] Fixes two memory leaks in drivers/clk/sunxi/clk-sunxi.c
+Message-ID: <1402710473-3295-1-git-send-email-nickkrause@sympatico.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This error message can spam the logs if you have lots of probe
-deferals due to missing clocks. Just silence the error in this
-case because the driver should try again later.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clkdev.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index f890b901c6bc..da4bda8b7fc7 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -101,8 +101,9 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
- 		if (!IS_ERR(clk))
- 			break;
- 		else if (name && index >= 0) {
--			pr_err("ERROR: could not get clock %s:%s(%i)\n",
--				np->full_name, name ? name : "", index);
-+			if (PTR_ERR(clk) != -EPROBE_DEFER)
-+				pr_err("ERROR: could not get clock %s:%s(%i)\n",
-+					np->full_name, name ? name : "", index);
- 			return clk;
- 		}
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 4264834..07b45d1 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -41,9 +41,11 @@ static void __init sun4i_osc_clk_setup(struct device_node *node)
+ 	const char *clk_name = node->name;
+ 	u32 rate;
  
+-	if (of_property_read_u32(node, "clock-frequency", &rate))
++	if (of_property_read_u32(node, "clock-frequency", &rate)) {
++		kfree(fixed);
++		kfree(gate);
+ 		return;
+-
++	}
+ 	/* allocate fixed-rate and gate clock structs */
+ 	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
+ 	if (!fixed)
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
