@@ -1,76 +1,52 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 15 Jun 2014 23:18:06 +0200
-Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
-In-Reply-To: <1401903034-20074-1-git-send-email-dianders@chromium.org>
-References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
-Message-ID: <539E0D8E.9080706@linaro.org>
+Date: Sun, 15 Jun 2014 23:34:37 +0200
+Subject: [PATCH v8 2/7] clocksource: Add support for the Mediatek SoCs
+In-Reply-To: <alpine.DEB.2.10.1406112012460.5170@nanos>
+References: <1402490055-15197-1-git-send-email-matthias.bgg@gmail.com>
+ <1402490055-15197-3-git-send-email-matthias.bgg@gmail.com>
+ <alpine.DEB.2.10.1406112012460.5170@nanos>
+Message-ID: <539E116D.6030002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 07:30 PM, Doug Anderson wrote:
-> In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
-> supported using the MCT as a scheduler clock.  We properly marked
-> exynos4_read_sched_clock() as notrace.  However, we then went and
-> called another function that _wasn't_ notrace.  That means if you do:
+On 06/11/2014 08:14 PM, Thomas Gleixner wrote:
+> On Wed, 11 Jun 2014, Matthias Brugger wrote:
+>> +static void mtk_clkevt_mode(enum clock_event_mode mode,
+>> +				struct clock_event_device *clk)
+>> +{
+>> +	struct mtk_clock_event_device *evt = to_mtk_clk(clk);
+>> +
+>> +	mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
+>> +
+>> +	switch (mode) {
+>> +	case CLOCK_EVT_MODE_PERIODIC:
+>> +		mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
+>> +		mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
+>> +		break;
+>> +	case CLOCK_EVT_MODE_ONESHOT:
+>> +		mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
 >
->    cd /sys/kernel/debug/tracing/
->    echo function_graph > current_tracer
+> Why start the timer here? The code will call set next event right away.
 >
-> You'll get a crash.
+>> +		break;
+>> +	case CLOCK_EVT_MODE_UNUSED:
+>> +	case CLOCK_EVT_MODE_SHUTDOWN:
+>> +	default:
+>> +		/* No more interrupts will occur as source is disabled */
+>> +		break;
+>> +	}
+>> +}
 >
-> Fix this (but still let other readers of the MCT be trace-enabled) by
-> adding an extra function.  It's important to keep other users of MCT
-> traceable because the MCT is actually quite slow.
+> Looks good otherwise.
 
+Hi Thomas,
 
-Hi Doug,
-
-could you elaborate ? I don't get the 'because the MCT ... slow'
+Can I consider the 8.1 patch (the one taking into account your comment) 
+as acked-by ?
 
 Thanks
 
    -- Daniel
-
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->   drivers/clocksource/exynos_mct.c | 9 +++++++--
->   1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 8d64200..ba3a683 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -165,7 +165,7 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
->   	exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
->   }
->
-> -static cycle_t exynos4_frc_read(struct clocksource *cs)
-> +static inline cycle_t notrace _exynos4_frc_read(void)
->   {
->   	unsigned int lo, hi;
->   	u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
-> @@ -179,6 +179,11 @@ static cycle_t exynos4_frc_read(struct clocksource *cs)
->   	return ((cycle_t)hi << 32) | lo;
->   }
->
-> +static cycle_t exynos4_frc_read(struct clocksource *cs)
-> +{
-> +	return _exynos4_frc_read();
-> +}
-> +
->   static void exynos4_frc_resume(struct clocksource *cs)
->   {
->   	exynos4_mct_frc_start(0, 0);
-> @@ -195,7 +200,7 @@ struct clocksource mct_frc = {
->
->   static u64 notrace exynos4_read_sched_clock(void)
->   {
-> -	return exynos4_frc_read(&mct_frc);
-> +	return _exynos4_frc_read();
->   }
->
->   static void __init exynos4_clocksource_init(void)
->
 
 
 -- 
