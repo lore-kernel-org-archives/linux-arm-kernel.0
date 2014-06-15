@@ -1,325 +1,324 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 15 Jun 2014 00:27:40 -0700
-Subject: [PATCH v2 2/6] input: touchscreen: imx25 tcq driver
-In-Reply-To: <1402672899-6995-3-git-send-email-denis@eukrea.com>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
- <1402672899-6995-1-git-send-email-denis@eukrea.com>
- <1402672899-6995-3-git-send-email-denis@eukrea.com>
-Message-ID: <20140615072740.GA23950@core.coreip.homeip.net>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Sun, 15 Jun 2014 10:53:56 +0200
+Subject: [PATCH v2 1/7] mfd: add atmel-hlcdc driver
+In-Reply-To: <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <539D5F24.1020304@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
-
-On Fri, Jun 13, 2014 at 05:21:35PM +0200, Denis Carikli wrote:
+On 06/09/2014 06:04 PM, Boris BREZILLON wrote:
+> The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+> family or sama5d3 family) exposes 2 subdevices:
+> - a display controller (controlled by a DRM driver)
+> - a PWM chip
+> 
+> Add support for the MFD device which will just retrieve HLCDC clocks and
+> create a regmap so that subdevices can access the HLCDC register range
+> concurrently.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  41 ++++++++
+>  drivers/mfd/Kconfig                                |  11 ++
+>  drivers/mfd/Makefile                               |   1 +
+>  drivers/mfd/atmel-hlcdc.c                          | 116 +++++++++++++++++++++
+>  include/linux/mfd/atmel-hlcdc.h                    |  78 ++++++++++++++
+>  5 files changed, 247 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>  create mode 100644 drivers/mfd/atmel-hlcdc.c
+>  create mode 100644 include/linux/mfd/atmel-hlcdc.h
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+> new file mode 100644
+> index 0000000..f5b69cb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+> @@ -0,0 +1,41 @@
+> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) MFD driver
 > +
-> +	if (ret == 0 && samples != 0) {
-> +		/*
-> +		 * only if both touch measures are below a treshold,
-> +		 * the position is valid
-> +		 */
-> +		if (touch_pre < priv->pen_threshold &&
-> +					touch_post < priv->pen_threshold) {
-> +			/* valid samples, generate a report */
-> +			x_pos /= priv->sample_count;
-> +			y_pos /= priv->sample_count;
-> +			input_report_abs(priv->idev, ABS_X, x_pos);
-> +			input_report_abs(priv->idev, ABS_Y, y_pos);
-> +			input_report_key(priv->idev, BTN_TOUCH,
-> +					0xfff - ((touch_pre + touch_post) / 2));
-
-I still do not understand this calculation. input_report_key()
-converts the last argument to a boolean, so the only time it would
-report BTN_TOUCH UP here if (touch_pre + touch_post) / 2 is exactly
-0xfff. Given that default threshold is 500 this won't ever happen.
-
-Why isn't it simply:
-
-			input_report_key(priv->idev, BTN_TOUCH, 1);
-
-?
-
-...
-
+> +Required properties:
+> + - compatible: value should be one of the following:
+> +   "atmel,sama5d3-hlcdc"
+> + - reg: base address and size of the HLCDC device registers.
+> + - clock-names: the name of the 3 clocks requested by the HLCDC device.
+> +   Should contain "periph_clk", "sys_clk" and "slow_clk".
+> + - clocks: should contain the 3 clocks requested by the HLCDC device.
 > +
-> +static irqreturn_t mx25_tcq_irq_thread(int irq, void *dev_id)
-> +{
-> +	struct mx25_tcq_priv *priv = (struct mx25_tcq_priv *) dev_id;
-
-No need to cast.
-
-> +	u32 sample_buf[TSC_MAX_SAMPLES];
-> +	int samples = 0;
+> +The HLCDC IP exposes two subdevices:
+> + - a PWM chip: see Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> + - a Display Controller: see Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
 > +
-> +	/* read all samples */
-> +	while (1) {
-> +		u32 stats;
+> +Example:
 > +
-> +		regmap_read(priv->regs, MX25_ADCQ_SR, &stats);
-> +		if (stats & MX25_ADCQ_SR_EMPT)
-> +			break;
+> +	hlcdc: hlcdc at f0030000 {
+> +		compatible = "atmel,sama5d3-hlcdc";
+> +		reg = <0xf0030000 0x2000>;
+> +		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
+> +		clock-names = "periph_clk","sys_clk", "slow_clk";
+> +		status = "disabled";
 > +
-> +		if (samples < TSC_MAX_SAMPLES) {
-> +			regmap_read(priv->regs, MX25_ADCQ_FIFO,
-> +							&sample_buf[samples]);
-> +			++samples;
-> +		} else {
-> +			u32 discarded;
-> +			/* discard samples */
-> +			regmap_read(priv->regs, MX25_ADCQ_FIFO, &discarded);
-> +		}
-> +	}
+> +		hlcdc-display-controller {
+> +			compatible = "atmel,hlcdc-dc";
+> +			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
+> +			pinctrl-names = "default", "rgb-444", "rgb-565", "rgb-666", "rgb-888";
+> +			pinctrl-0 = <&pinctrl_lcd_base>;
+> +			pinctrl-1 = <&pinctrl_lcd_base &pinctrl_lcd_rgb444>;
+> +			pinctrl-2 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
+> +			pinctrl-3 = <&pinctrl_lcd_base &pinctrl_lcd_rgb666>;
+> +			pinctrl-4 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
+> +		};
 > +
-> +	mx25_tcq_create_event_for_4wire(priv, sample_buf, samples);
+> +		hlcdc_pwm: hlcdc-pwm {
+> +			compatible = "atmel,hlcdc-pwm";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_lcd_pwm>;
+> +			#pwm-cells = <3>;
+> +		};
+> +	};
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index ee8204c..82777f6 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -59,6 +59,17 @@ config MFD_AAT2870_CORE
+>  	  additional drivers must be enabled in order to use the
+>  	  functionality of the device.
+>  
+> +config MFD_ATMEL_HLCDC
+> +	tristate "Atmel HLCDC (High LCD Controller)"
+> +	select MFD_CORE
+> +	select REGMAP_MMIO
+> +	help
+> +	  Choose this option if you have an ATMEL SoC with an HLCDC (High
+> +	  LCD Controller) IP (i.e. at91sam9n12, at91sam9x5 family or sama5d3
+> +	  family).
+> +	  This MFD device exposes two subdevices: a PWM chip and a Display
+> +	  Controller.
 > +
-> +	return IRQ_HANDLED;
-> +}
+>  config MFD_BCM590XX
+>  	tristate "Broadcom BCM590xx PMUs"
+>  	select MFD_CORE
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 8afedba..5f25b0d 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -156,6 +156,7 @@ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
+>  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+>  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+>  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+> +obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
+>  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+>  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
+>  obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
+> diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
+> new file mode 100644
+> index 0000000..e4636e8
+> --- /dev/null
+> +++ b/drivers/mfd/atmel-hlcdc.c
+> @@ -0,0 +1,116 @@
+> +/*
+> + * Copyright (C) 2014 Free Electrons
+> + * Copyright (C) 2014 Atmel
+> + *
+> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
-> +static irqreturn_t mx25_tcq_irq(int irq, void *dev_id)
-> +{
-> +	struct mx25_tcq_priv *priv = (struct mx25_tcq_priv *)dev_id;
-
-Same here.
-
-> +	u32 stat;
-> +	int ret = IRQ_HANDLED;
+> +#include <linux/mfd/atmel-hlcdc.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
 > +
-> +	regmap_read(priv->regs, MX25_ADCQ_SR, &stat);
+> +static const struct mfd_cell atmel_hlcdc_cells[] = {
+> +	{
+> +		.name = "atmel-hlcdc-pwm",
+> +		.of_compatible = "atmel,hlcdc-pwm",
+> +	},
+> +	{
+> +		.name = "atmel-hlcdc-dc",
+> +		.of_compatible = "atmel,hlcdc-dc",
+> +	},
+> +};
 > +
-> +	if (stat & (MX25_ADCQ_SR_FRR | MX25_ADCQ_SR_FUR | MX25_ADCQ_SR_FOR))
-> +		mx25_tcq_fifo_reset(priv);
-> +
-> +	if (stat & MX25_ADCQ_SR_PD) {
-> +		mx25_tcq_disable_touch_irq(priv);
-> +		mx25_tcq_force_queue_start(priv);
-> +		mx25_tcq_enable_fifo_irq(priv);
-> +	}
-> +
-> +	if (stat & MX25_ADCQ_SR_FDRY) {
-> +		mx25_tcq_disable_fifo_irq(priv);
-> +		ret = IRQ_WAKE_THREAD;
-> +	}
-> +
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_SR, MX25_ADCQ_SR_FRR |
-> +			MX25_ADCQ_SR_FUR | MX25_ADCQ_SR_FOR | MX25_ADCQ_SR_PD |
-> +			MX25_ADCQ_SR_EOQ,
-> +			MX25_ADCQ_SR_FRR |
-> +			MX25_ADCQ_SR_FUR | MX25_ADCQ_SR_FOR | MX25_ADCQ_SR_PD |
-> +			MX25_ADCQ_SR_EOQ);
-> +
-> +	return ret;
-> +}
-> +
-> +/* configure the statemachine for a 4-wire touchscreen */
-> +static int mx25_tcq_init(struct mx25_tcq_priv *priv)
-> +{
-> +	u32 tgcr;
-> +	unsigned int ipg_div;
-> +	unsigned int adc_period;
-> +	unsigned int debounce_cnt;
-> +	unsigned int settling_time;
-> +	int itemct;
-> +	int ret;
-> +
-> +	regmap_read(priv->core_regs, MX25_TSC_TGCR, &tgcr);
-> +	ipg_div = max_t(unsigned int, 4, MX25_TGCR_GET_ADCCLK(tgcr));
-> +	adc_period = clk_get_rate(priv->clk) / (ipg_div * 2 + 2);
-> +	debounce_cnt = DIV_ROUND_UP(priv->pen_debounce, adc_period * 8) - 1;
-> +	settling_time = DIV_ROUND_UP(priv->settling_time, adc_period);
-> +
-> +
-> +	/* Reset */
-> +	regmap_write(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_QRST |
-> +			MX25_ADCQ_CR_FRST);
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_QRST |
-> +			MX25_ADCQ_CR_FRST, 0);
-> +
-> +	/* up to 128 * 8 ADC clocks are possible */
-> +	if (debounce_cnt > 127)
-> +		debounce_cnt = 127;
-> +
-> +	ret = imx25_setup_queue_4wire(priv, 0x0, &itemct);
-> +	if (ret)
-> +		return ret;
-> +
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_LITEMID_MASK |
-> +			MX25_ADCQ_CR_WMRK_MASK,
-> +			MX25_ADCQ_CR_LITEMID(itemct - 1) |
-> +			MX25_ADCQ_CR_WMRK(priv->expected_samples - 1));
-> +
-> +	/* setup debounce count */
-> +	regmap_update_bits(priv->core_regs, MX25_TSC_TGCR,
-> +			MX25_TGCR_PDBTIME_MASK,
-> +			MX25_TGCR_PDBTIME(debounce_cnt));
-> +
-> +	/* enable debounce */
-> +	regmap_update_bits(priv->core_regs, MX25_TSC_TGCR, MX25_TGCR_PDBEN,
-> +			MX25_TGCR_PDBEN);
-> +	regmap_update_bits(priv->core_regs, MX25_TSC_TGCR, MX25_TGCR_PDEN,
-> +			MX25_TGCR_PDEN);
-> +
-> +	/* enable the engine on demand */
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_QSM_FQS,
-> +			MX25_ADCQ_CR_QSM_FQS);
-> +
-> +	mx25_tcq_re_enable_touch_detection(priv);
-> +
-> +	return 0;
-> +}
-> +
-> +static int mx25_tcq_parse_dt(struct platform_device *pdev,
-> +		struct mx25_tcq_priv *priv)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	u32 wires;
-> +	int ret;
-> +
-> +	/* Setup defaults */
-> +	priv->pen_threshold = 500;
-> +	priv->sample_count = 3;
-> +	priv->pen_debounce = 1000000;
-> +	priv->settling_time = 250000;
-> +
-> +	ret = of_property_read_u32(np, "fsl,wires", &wires);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to find fsl,wires properties\n");
-> +		return ret;
-> +	}
-> +
-> +	if (wires == 4) {
-> +		priv->mode = MX25_TS_4WIRE;
-> +	} else {
-> +		dev_err(&pdev->dev, "%u-wire mode not supported\n", wires);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* These are optional, we don't care about the return values */
-> +	of_property_read_u32(np, "fsl,pen-threshold", &priv->pen_threshold);
-> +	of_property_read_u32(np, "fsl,settling-time", &priv->settling_time);
-> +	of_property_read_u32(np, "fsl,pen-debounce", &priv->pen_debounce);
-> +
-> +	return 0;
-> +}
-> +
-> +static int mx25_tcq_probe(struct platform_device *pdev)
+> +static int atmel_hlcdc_probe(struct platform_device *pdev)
 > +{
 > +	struct device *dev = &pdev->dev;
-> +	struct input_dev *idev;
-> +	struct mx25_tcq_priv *priv;
+> +	struct regmap_config config;
+> +	struct atmel_hlcdc *hlcdc;
 > +	struct resource *res;
-> +	void __iomem *mem;
-> +	int ret;
-> +	int irq;
+> +	void __iomem *regs;
 > +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
+> +	hlcdc = devm_kzalloc(dev, sizeof(*hlcdc), GFP_KERNEL);
+> +	if (!hlcdc)
 > +		return -ENOMEM;
 > +
 > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	mem = devm_ioremap_resource(dev, res);
-> +	if (!mem)
-> +		return -ENOMEM;
+> +	regs = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(regs))
+> +		return PTR_ERR(regs);
 > +
-> +	ret = mx25_tcq_parse_dt(pdev, priv);
-> +	if (ret)
-> +		return ret;
-> +
-> +	priv->regs = devm_regmap_init_mmio(dev, mem, &mx25_tcq_regconfig);
-> +	if (IS_ERR(priv->regs)) {
-> +		dev_err(dev, "Failed to initialize regmap\n");
-> +		return PTR_ERR(priv->regs);
+> +	hlcdc->periph_clk = devm_clk_get(dev, "periph_clk");
+> +	if (IS_ERR(hlcdc->periph_clk)) {
+> +		dev_err(dev, "failed to get functional clock\n");
+> +		return PTR_ERR(hlcdc->periph_clk);
 > +	}
 > +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq <= 0) {
-> +		dev_err(dev, "Failed to get IRQ\n");
-> +		return irq;
+> +	hlcdc->sys_clk = devm_clk_get(dev, "sys_clk");
+> +	if (IS_ERR(hlcdc->sys_clk)) {
+> +		dev_err(dev, "failed to get functional clock\n");
+> +		return PTR_ERR(hlcdc->sys_clk);
 > +	}
 > +
-> +	idev = devm_input_allocate_device(dev);
-> +	if (!idev) {
-> +		dev_err(dev, "Failed to allocate input device\n");
-> +		return -ENOMEM;
+> +	hlcdc->slow_clk = devm_clk_get(dev, "slow_clk");
+> +	if (IS_ERR(hlcdc->slow_clk)) {
+> +		dev_err(dev, "failed to get slow clock\n");
+> +		return PTR_ERR(hlcdc->slow_clk);
 > +	}
 > +
-> +	idev->name = mx25_tcq_name;
-> +	idev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-> +	idev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-> +	input_set_abs_params(idev, ABS_X, 0, 0xfff, 0, 0);
-> +	input_set_abs_params(idev, ABS_Y, 0, 0xfff, 0, 0);
+> +	memset(&config, 0, sizeof(config));
+> +	config.reg_bits = 32;
+> +	config.val_bits = 32;
+> +	config.reg_stride = 4;
+> +	config.max_register = (resource_size(res) / 4) - 1;
+> +	hlcdc->regmap = devm_regmap_init_mmio_clk(dev, "periph_clk", regs,
+> +						  &config);
+I don't think it's necessary to use "periph_clk" here. This clock will
+always be running because the HLCDC needs it to work (it's not just an
+interface clock). In the end it's just some extra work for each register
+access.
+> +	if (IS_ERR(hlcdc->regmap))
+> +		return PTR_ERR(hlcdc->regmap);
 > +
-> +	idev->id.bustype = BUS_HOST;
+> +	dev_set_drvdata(dev, hlcdc);
 > +
-> +	ret = input_register_device(idev);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to register input device\n");
-> +		return ret;
-> +	}
-> +
-> +	priv->idev = idev;
-> +
-> +	priv->core_regs = mx25_tsadc_get_regmap(pdev->dev.parent);
-> +	priv->clk = mx25_tsadc_get_ipg(pdev->dev.parent);
-> +
-> +	ret = clk_prepare_enable(priv->clk);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to enable ipg clock\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = devm_request_threaded_irq(dev, irq, mx25_tcq_irq,
-> +			mx25_tcq_irq_thread, IRQF_ONESHOT, pdev->name, priv);
-> +	if (ret) {
-> +		dev_err(dev, "Failed requesting IRQ\n");
-
-You are leaving clock enabled here.
-
-> +		return ret;
-> +	}
-> +
-> +	ret = mx25_tcq_init(priv);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to init tcq\n");
-> +		goto error_tcq_init;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	return 0;
-> +
-> +error_tcq_init:
-> +	clk_disable_unprepare(priv->clk);
-> +	return ret;
+> +	return mfd_add_devices(dev, -1, atmel_hlcdc_cells,
+> +			       ARRAY_SIZE(atmel_hlcdc_cells),
+> +			       NULL, 0, NULL);
 > +}
 > +
-> +static int mx25_tcq_remove(struct platform_device *pdev)
+> +static int atmel_hlcdc_remove(struct platform_device *pdev)
 > +{
-> +	struct mx25_tcq_priv *priv = platform_get_drvdata(pdev);
+> +	mfd_remove_devices(&pdev->dev);
 > +
-> +	clk_disable_unprepare(priv->clk);
+> +	dev_set_drvdata(&pdev->dev, NULL);
 > +
 > +	return 0;
 > +}
 > +
-> +static struct platform_driver mx25_tcq_driver = {
-> +	.driver		= {
-> +		.name	= "mx25-tcq",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = mx25_tcq_ids,
-> +	},
-> +	.probe		= mx25_tcq_probe,
-> +	.remove		= mx25_tcq_remove,
+> +static const struct of_device_id atmel_hlcdc_match[] = {
+> +	{ .compatible = "atmel,sama5d3-hlcdc" },
+> +	{ },
 > +};
-> +module_platform_driver(mx25_tcq_driver);
 > +
-> +MODULE_DESCRIPTION("TS input driver for Freescale mx25");
-> +MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 1.7.9.5
+> +static struct platform_driver atmel_hlcdc_driver = {
+> +	.probe = atmel_hlcdc_probe,
+> +	.remove = atmel_hlcdc_remove,
+> +	.driver = {
+> +		.name = "atmel-hlcdc",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = atmel_hlcdc_match,
+> +	},
+> +};
+> +module_platform_driver(atmel_hlcdc_driver);
+> +
+> +MODULE_ALIAS("platform:atmel-hlcdc");
+> +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
+> +MODULE_DESCRIPTION("Atmel HLCDC driver");
+> +MODULE_LICENSE("GPL");
+> diff --git a/include/linux/mfd/atmel-hlcdc.h b/include/linux/mfd/atmel-hlcdc.h
+> new file mode 100644
+> index 0000000..d7a5589
+> --- /dev/null
+> +++ b/include/linux/mfd/atmel-hlcdc.h
+> @@ -0,0 +1,78 @@
+> +/*
+> + * Copyright (C) 2014 Free Electrons
+> + * Copyright (C) 2014 Atmel
+> + *
+> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __LINUX_MFD_HLCDC_H
+> +#define __LINUX_MFD_HLCDC_H
+> +
+> +#include <linux/clk.h>
+> +#include <linux/regmap.h>
+> +
+> +#define ATMEL_HLCDC_CFG(i)		((i) * 0x4)
+> +#define ATMEL_HLCDC_SIG_CFG		LCDCFG(5)
+> +#define		ATMEL_HLCDC_HSPOL		BIT(0)
+> +#define		ATMEL_HLCDC_VSPOL		BIT(1)
+> +#define		ATMEL_HLCDC_VSPDLYS		BIT(2)
+> +#define		ATMEL_HLCDC_VSPDLYE		BIT(3)
+> +#define		ATMEL_HLCDC_DISPPOL		BIT(4)
+> +#define		ATMEL_HLCDC_DITHER		BIT(6)
+> +#define		ATMEL_HLCDC_DISPDLY		BIT(7)
+> +#define		ATMEL_HLCDC_MODE_MASK		0x300
+> +#define		ATMEL_HLCDC_PP			BIT(10)
+> +#define		ATMEL_HLCDC_VSPSU		BIT(12)
+> +#define		ATMEL_HLCDC_VSPHO		BIT(13)
+> +#define		ATMEL_HLCDC_GUARDTIME_MASK	0x1f0000
+> +
+> +#define ATMEL_HLCDC_EN			0x20
+> +#define ATMEL_HLCDC_DIS			0x24
+> +#define ATMEL_HLCDC_SR			0x28
+> +#define ATMEL_HLCDC_IER			0x2c
+> +#define ATMEL_HLCDC_IDR			0x30
+> +#define ATMEL_HLCDC_IMR			0x34
+> +#define ATMEL_HLCDC_ISR			0x38
+> +
+> +#define ATMEL_HLCDC_CLKPOL		BIT(0)
+> +#define ATMEL_HLCDC_CLKSEL		BIT(2)
+> +#define ATMEL_HLCDC_CLKPWMSEL		BIT(3)
+> +#define ATMEL_HLCDC_CGDIS(i)		BIT(8 + (i))
+> +#define ATMEL_HLCDC_CLKDIV_SHFT		16
+> +#define ATMEL_HLCDC_CLKDIV_MASK		(0xff << ATMEL_HLCDC_CLKDIV_SHFT)
+> +#define ATMEL_HLCDC_CLKDIV(div)		((div - 2) << ATMEL_HLCDC_CLKDIV_SHFT)
+> +
+> +#define ATMEL_HLCDC_PIXEL_CLK		BIT(0)
+> +#define ATMEL_HLCDC_SYNC		BIT(1)
+> +#define ATMEL_HLCDC_DISP		BIT(2)
+> +#define ATMEL_HLCDC_PWM			BIT(3)
+> +#define ATMEL_HLCDC_SIP			BIT(4)
+> +
+> +/**
+> + * Structure shared by the MFD device and its subdevices.
+> + *
+> + * @regmap: register map used to access HLCDC IP registers
+> + * @periph_clk: the hlcdc peripheral clock
+> + * @sys_clk: the hlcdc system clock
+> + * @slow_clk: the system slow clk
+> + */
+> +struct atmel_hlcdc {
+> +	struct regmap *regmap;
+> +	struct clk *periph_clk;
+> +	struct clk *sys_clk;
+> +	struct clk *slow_clk;
+> +};
+> +
+> +#endif /* __LINUX_MFD_HLCDC_H */
 > 
-
-Thanks.
-
--- 
-Dmitry
