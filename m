@@ -1,37 +1,41 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Sun, 15 Jun 2014 20:51:51 +0100
-Subject: [PATCH 2/2] ARM: dts: imx6qdl: use DT macro for clock ID
-In-Reply-To: <1402836147-29625-2-git-send-email-shawn.guo@freescale.com>
-References: <1402836147-29625-1-git-send-email-shawn.guo@freescale.com>
- <1402836147-29625-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <539DF957.5080603@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 15 Jun 2014 22:30:58 +0200
+Subject: [PATCH] Frees gate after if statement in clk-sunxi.c
+In-Reply-To: <1402769508-3821-1-git-send-email-xerofoify@gmail.com>
+References: <1402769508-3821-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20140615203058.GA22265@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/14 13:42, Shawn Guo wrote:
-> Switch to use DT macro for clock ID, so that device tree source is more
-> readable.
+On Sat, Jun 14, 2014 at 02:11:48PM -0400, Nick wrote:
+> Signed-off-by: Nick <xerofoify@gmail.com>
 
-[...]
->  		aips1: aips-bus at 02000000 {
-> @@ -87,7 +90,8 @@
->  				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
->  				reg = <0x021f8000 0x4000>;
->  				interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&clks 116>;
-> +				/* Same clock as i.MX6Q ECSPI5 */
-> +				clocks = <&clks IMX6QDL_CLK_ECSPI5>;
->  				status = "disabled";
->  			};
->  		};
+This should be your full real name here.
 
-Do you think it would it be worthwhile to define
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 4264834..6f4fc51 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -42,6 +42,7 @@ static void __init sun4i_osc_clk_setup(struct device_node *node)
+>  	u32 rate;
+>  
+>  	if (of_property_read_u32(node, "clock-frequency", &rate))
+> +		kree(gate);
 
-+#define IMX6Q_CLK_ECSPI5	116
-+#define IMX6DL_CLK_I2C4	116
+There's a typo in kfree. How does that even compile?
 
-in imx6qdl-clock.h from the first patch and use it here ?
-
-I'm not particularly bothered either way, I just remember thinking the 
-name in the enum could become a cause of confusion when I was looking 
-at the changes for i2c4.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140615/ff1118cc/attachment.sig>
