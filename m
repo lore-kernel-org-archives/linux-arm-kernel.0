@@ -1,64 +1,37 @@
-From: ml-arm@syscall.eu (=?UTF-8?B?UmFwaGHDq2wgUmlnbw==?=)
-Date: Sun, 15 Jun 2014 20:59:48 +0200
-Subject: [BUG] Armada 370 system clock drift (SSC related)
-Message-ID: <539DED24.6010802@syscall.eu>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sun, 15 Jun 2014 20:51:51 +0100
+Subject: [PATCH 2/2] ARM: dts: imx6qdl: use DT macro for clock ID
+In-Reply-To: <1402836147-29625-2-git-send-email-shawn.guo@freescale.com>
+References: <1402836147-29625-1-git-send-email-shawn.guo@freescale.com>
+ <1402836147-29625-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <539DF957.5080603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-I have a Netgear ReadyNAS 102 which exhibits a strong drift of its system clock.
-The drift is pretty stable, as this old log shows :
+On 15/06/14 13:42, Shawn Guo wrote:
+> Switch to use DT macro for clock ID, so that device tree source is more
+> readable.
 
-Dec 15 07:23:41  9.760884 sec
-Dec 15 08:23:58  9.737968 sec
-Dec 15 09:24:14  9.750450 sec
-Dec 15 10:24:31  9.762054 sec
-...
-Dec 16 19:33:37  9.750936 sec
-Dec 16 20:33:54  9.757914 sec
+[...]
+>  		aips1: aips-bus at 02000000 {
+> @@ -87,7 +90,8 @@
+>  				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
+>  				reg = <0x021f8000 0x4000>;
+>  				interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks = <&clks 116>;
+> +				/* Same clock as i.MX6Q ECSPI5 */
+> +				clocks = <&clks IMX6QDL_CLK_ECSPI5>;
+>  				status = "disabled";
+>  			};
+>  		};
 
-I took a look at Netgear GPL code in their kernel (3.0.93, based on Marvell 4.0
-LSP) and noticed the following in arch/arm/mach-armada370/time.c:
+Do you think it would it be worthwhile to define
 
-#include "boardEnv/mvBoardEnvSpec.h"
-void __init axp_time_init(unsigned int fabric_clk)
-{
-        u32 u;
++#define IMX6Q_CLK_ECSPI5	116
++#define IMX6DL_CLK_I2C4	116
 
-        printk("axp_time_init\n");
+in imx6qdl-clock.h from the first patch and use it here ?
 
-        ticks_per_jiffy = (fabric_clk + HZ/2) / HZ;
-        if (get_board_type() & (NETGEAR_BD_TYPE_RN102 | NETGEAR_BD_TYPE_RN104))
-        {
-                if (0 == (MV_REG_READ(MPP_SAMPLE_AT_RESET) & BIT10))
-                {
-                        // DDR SSC is enabled.
-
-
-                        fabric_clk = 598393125;
-                } else {
-                        // DDR SSC is disabled. fabric_clk is no need to change.
-
-
-                        ;
-                }
-        }
-
-I noticed that the above value is such that
-
-  3600*(1 - (598393125/600000000)) = 9.64125
-
-i.e. the hardcoded correction matches the drift observed above.
-
-
-Which is consistent with the information in the recently released Marvell
-documentation. In ARMADA370-FunctionalSpec-datasheet.pdf page 1140 there's the
-explanation of the SSCG (spread spectrum clock generator) Configuration Register
-which can be read to adjust the clock rate.
-
-It would be nice if this bug could be fixed. If nobody steps up, I may try
-patching it but since I have zero knowledge of creating kernel patches, it would
-take me a long time compared to someone familiar with the code base.
-
-Regards,
-Rapha?l Rigo
+I'm not particularly bothered either way, I just remember thinking the 
+name in the enum could become a cause of confusion when I was looking 
+at the changes for i2c4.
