@@ -1,60 +1,69 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Sun, 15 Jun 2014 17:00:45 +0200
-Subject: [PATCH v2 3/7] drm: add Atmel HLCDC Display Controller support
-In-Reply-To: <539D6839.1070703@traphandler.com>
-References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402329860-27520-4-git-send-email-boris.brezillon@free-electrons.com>
- <539D6839.1070703@traphandler.com>
-Message-ID: <539DB51D.5080204@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 Jun 2014 16:25:54 +0100
+Subject: [PATCH RFC 0/5] Dove PMU support
+In-Reply-To: <535F6DAF.1010400@gmail.com>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
+ <535F6DAF.1010400@gmail.com>
+Message-ID: <20140615152554.GA13870@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello JJ,
-
-On 15/06/2014 11:32, Jean-Jacques Hiblot wrote:
+On Tue, Apr 29, 2014 at 11:15:27AM +0200, Sebastian Hesselbarth wrote:
+> On 04/28/2014 10:31 AM, Andrew Lunn wrote:
+>>> Russell,
+>>>
+>>> thanks for dropping those patches. I know you are packed with a bunch
+>>> of other patch sets, so if you agree, I can pick up your Dove related
+>>> patches and finish them.
+>>>
+>>> One thing that comes into my mind is, that we moved Dove DT to
+>>> mach-mvebu starting with v3.15-rc1 so we need to find a better place
+>>> for the driver than mach-dove.
+>>
+>> Create drivers/pmu ?
 >
-> On 06/09/2014 06:04 PM, Boris BREZILLON wrote:
->> The Atmel HLCDC (High LCD Controller) IP available on some Atmel SoCs (i.e.
->> at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
->> controller device.
->>
->> This display controller support at least one primary plane and might
->> provide several overlays and an hardware cursor depending on the IP
->> version.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> ---
+> Hmm, I see no other folder it could sit in. Maybe, yes.
+>
+>> The cpufreq driver also needs access to registers within the pmu
+>> range. Should it be part of pmu.c, or should we export a regmap which
+>> cpufreq can use?
+>
+> Not only cpufreq but also pinctrl as the first 16 mpps can have PMU
+> related functions mapped to them. Syscon should do the trick.
 
-[...]
+The thing I don't like about regmap/syscon for this stuff is that it
+seems pretty easy to violate the statement in 8.6.2.4 when you lock
+individual register accesses.
 
->> +	    vm.vfront_porch > 0x40 || vm.vfront_porch < 0 ||
->> +	    vm.vback_porch > 0x40 || vm.vback_porch < 0 ||
->> +	    vm.hfront_porch > 0x200 || vm.hfront_porch < 0 ||
->> +	    vm.hback_porch > 0x200 || vm.hback_porch < 0 ||
->> +	    mode->hdisplay > 2048 || mode->hdisplay < 0 ||
->> +	    mode->vdisplay > 2048 || mode->vdisplay < 0)
->> +		return -EINVAL;
->> +
->> +	regmap_write(regmap, ATMEL_HLCDC_CFG(1),
->> +		     (vm.hsync_len - 1) | ((vm.vsync_len - 1) << 16));
->> +
->> +	regmap_write(regmap, ATMEL_HLCDC_CFG(2),
->> +		     (vm.vfront_porch - 1) | ((vm.vback_porch - 1) << 16));
-> Acording to the datasheet, it's vm.vback_porch instead of
-> (vm.vback_porch -1).
+This statement states that the power-up/power-down sequence for VMeta
+and the GPU must be completed one at a time.  In other words, you can't
+interleave the power control of these units (which is what could happen
+if you rely on the locking provided by regmap/syscon.)
 
-Oh, nice catch!
+I'd prefer to take that a little further to avoid any unintended
+consequences (as indeed I have done in this patch) and ensure that
+these sequences are complete before any other system is controlled.
 
-I'll check with Atmel that this is not a typo in their datasheet,
-because all other fields need the minus 1.
+As for DT, I should probably state that I'm far from happy with the DT
+situation on Dove.  When I've tried it, I've encountered problems with
+the HDMI output - the picture spends more time blanked than displaying.
+I've no idea what is causing that, I've been through the SI5351
+registers, the TDA998x registers, the LCD controller registers, and I
+can't find any reason for it.  Yet, boot the same kernel without DT
+and it works fine.  Boot back using DT, and it's unstable again.
 
-Thanks for your review.
+I can't detect any difference on the actual HDMI signals themselves
+either.  The HDMI clock seems stable and of the correct frequency.
 
-Best Regards,
+There is definitely some difference between booting with DT and booting
+with legacy stuff that seems to upset HDMI.
 
-Boris
+For me, the /only/ reliably working system is one where DT is not
+involved.  This means I remain opposed to any solutions which can't
+be used in a non-DT environment - at least until the HDMI issue can
+be resolved.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
