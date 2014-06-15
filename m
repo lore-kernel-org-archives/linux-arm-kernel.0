@@ -1,43 +1,50 @@
-From: anssi.hannula@iki.fi (Anssi Hannula)
-Date: Mon, 16 Jun 2014 02:39:44 +0300
-Subject: [PATCH 1/2] ARM: dts: imx6: remove wrong spdif rxtx2 clock
-Message-ID: <1402875585-29025-1-git-send-email-anssi.hannula@iki.fi>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 16 Jun 2014 09:59:28 +1000
+Subject: linux-next: manual merge of the imx-mxs tree with the  tree
+Message-ID: <20140616095928.1f21f8af@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rxtx2 clock of i.MX6 S/PDIF is currently set to "asrc" clock.
-However, according to SoC documentation, rxtx2 is connected to
-ASRC_EXT_CLK, a different external clock.
+Hi Shawn,
 
-Testing on Cubox-i system seems to confirm that: when fsl_spdif is
-forced to select rxtx2 as input clock, audio playback fails with an I/O
-error.
+Today's linux-next merge of the imx-mxs tree got a conflict in
+arch/arm/mach-imx/Kconfig between commit e49d9b375628 ("ARM: Remove
+ARCH_HAS_CPUFREQ config option") from the arm-soc tree and commit
+7de46855b1e7 ("ARM: imx5: move SOC_IMX5 and SOC_IMX51 into 'Device tree
+only'") from the imx-mxs tree.
 
-Set rxtx2 to the dummy clock by default to prevent fsl_spdif from
-selecting it.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Signed-off-by: Anssi Hannula <anssi.hannula@iki.fi>
-Cc: Nicolin Chen <Guangyu.Chen@freescale.com>
-Cc: Mark Brown <broonie@kernel.org>
----
-
-This one seems clear enough.
-
- arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ce0599134a69..3aef9a2f5fda 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -181,7 +181,7 @@
- 					       <&sdma 15 18 0>;
- 					dma-names = "rx", "tx";
- 					clocks = <&clks 197>, <&clks 3>,
--						 <&clks 197>, <&clks 107>,
-+						 <&clks 197>, <&clks 0>,
- 						 <&clks 0>,   <&clks 118>,
- 						 <&clks 0>,  <&clks 139>,
- 						 <&clks 0>;
 -- 
-1.8.4.5
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-imx/Kconfig
+index 28fa2fa49e5d,3b2a5c58cf91..000000000000
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@@ -700,9 -691,15 +688,14 @@@ if ARCH_MULTI_V
+  
+  comment "Device tree only"
+  
++ config SOC_IMX5
++ 	bool
+ -	select ARCH_HAS_CPUFREQ
++ 	select ARCH_HAS_OPP
++ 	select HAVE_IMX_SRC
++ 	select MXC_TZIC
++ 
+  config	SOC_IMX50
+  	bool "i.MX50 support"
+- 	select HAVE_IMX_SRC
+  	select PINCTRL_IMX50
+  	select SOC_IMX5
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140616/d8a413c9/attachment.sig>
