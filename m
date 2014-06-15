@@ -1,69 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 15 Jun 2014 16:25:54 +0100
-Subject: [PATCH RFC 0/5] Dove PMU support
-In-Reply-To: <535F6DAF.1010400@gmail.com>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
- <535F6DAF.1010400@gmail.com>
-Message-ID: <20140615152554.GA13870@n2100.arm.linux.org.uk>
+From: ml-arm@syscall.eu (=?UTF-8?B?UmFwaGHDq2wgUmlnbw==?=)
+Date: Sun, 15 Jun 2014 20:59:48 +0200
+Subject: [BUG] Armada 370 system clock drift (SSC related)
+Message-ID: <539DED24.6010802@syscall.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 11:15:27AM +0200, Sebastian Hesselbarth wrote:
-> On 04/28/2014 10:31 AM, Andrew Lunn wrote:
->>> Russell,
->>>
->>> thanks for dropping those patches. I know you are packed with a bunch
->>> of other patch sets, so if you agree, I can pick up your Dove related
->>> patches and finish them.
->>>
->>> One thing that comes into my mind is, that we moved Dove DT to
->>> mach-mvebu starting with v3.15-rc1 so we need to find a better place
->>> for the driver than mach-dove.
->>
->> Create drivers/pmu ?
->
-> Hmm, I see no other folder it could sit in. Maybe, yes.
->
->> The cpufreq driver also needs access to registers within the pmu
->> range. Should it be part of pmu.c, or should we export a regmap which
->> cpufreq can use?
->
-> Not only cpufreq but also pinctrl as the first 16 mpps can have PMU
-> related functions mapped to them. Syscon should do the trick.
+Hello,
+I have a Netgear ReadyNAS 102 which exhibits a strong drift of its system clock.
+The drift is pretty stable, as this old log shows :
 
-The thing I don't like about regmap/syscon for this stuff is that it
-seems pretty easy to violate the statement in 8.6.2.4 when you lock
-individual register accesses.
+Dec 15 07:23:41  9.760884 sec
+Dec 15 08:23:58  9.737968 sec
+Dec 15 09:24:14  9.750450 sec
+Dec 15 10:24:31  9.762054 sec
+...
+Dec 16 19:33:37  9.750936 sec
+Dec 16 20:33:54  9.757914 sec
 
-This statement states that the power-up/power-down sequence for VMeta
-and the GPU must be completed one at a time.  In other words, you can't
-interleave the power control of these units (which is what could happen
-if you rely on the locking provided by regmap/syscon.)
+I took a look at Netgear GPL code in their kernel (3.0.93, based on Marvell 4.0
+LSP) and noticed the following in arch/arm/mach-armada370/time.c:
 
-I'd prefer to take that a little further to avoid any unintended
-consequences (as indeed I have done in this patch) and ensure that
-these sequences are complete before any other system is controlled.
+#include "boardEnv/mvBoardEnvSpec.h"
+void __init axp_time_init(unsigned int fabric_clk)
+{
+        u32 u;
 
-As for DT, I should probably state that I'm far from happy with the DT
-situation on Dove.  When I've tried it, I've encountered problems with
-the HDMI output - the picture spends more time blanked than displaying.
-I've no idea what is causing that, I've been through the SI5351
-registers, the TDA998x registers, the LCD controller registers, and I
-can't find any reason for it.  Yet, boot the same kernel without DT
-and it works fine.  Boot back using DT, and it's unstable again.
+        printk("axp_time_init\n");
 
-I can't detect any difference on the actual HDMI signals themselves
-either.  The HDMI clock seems stable and of the correct frequency.
+        ticks_per_jiffy = (fabric_clk + HZ/2) / HZ;
+        if (get_board_type() & (NETGEAR_BD_TYPE_RN102 | NETGEAR_BD_TYPE_RN104))
+        {
+                if (0 == (MV_REG_READ(MPP_SAMPLE_AT_RESET) & BIT10))
+                {
+                        // DDR SSC is enabled.
 
-There is definitely some difference between booting with DT and booting
-with legacy stuff that seems to upset HDMI.
 
-For me, the /only/ reliably working system is one where DT is not
-involved.  This means I remain opposed to any solutions which can't
-be used in a non-DT environment - at least until the HDMI issue can
-be resolved.
+                        fabric_clk = 598393125;
+                } else {
+                        // DDR SSC is disabled. fabric_clk is no need to change.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+
+                        ;
+                }
+        }
+
+I noticed that the above value is such that
+
+  3600*(1 - (598393125/600000000)) = 9.64125
+
+i.e. the hardcoded correction matches the drift observed above.
+
+
+Which is consistent with the information in the recently released Marvell
+documentation. In ARMADA370-FunctionalSpec-datasheet.pdf page 1140 there's the
+explanation of the SSCG (spread spectrum clock generator) Configuration Register
+which can be read to adjust the clock rate.
+
+It would be nice if this bug could be fixed. If nobody steps up, I may try
+patching it but since I have zero knowledge of creating kernel patches, it would
+take me a long time compared to someone familiar with the code base.
+
+Regards,
+Rapha?l Rigo
