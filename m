@@ -1,47 +1,62 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 15 Jun 2014 21:50:45 +0800
-Subject: [PATCH v2 1/2] ARM: imx6qdl: switch to use macro for clock ID
-In-Reply-To: <20140615131237.GU23430@n2100.arm.linux.org.uk>
-References: <1402837204-30474-1-git-send-email-shawn.guo@freescale.com>
- <20140615131237.GU23430@n2100.arm.linux.org.uk>
-Message-ID: <20140615135044.GB8860@dragon>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Sun, 15 Jun 2014 16:48:58 +0200
+Subject: [PATCH v2 1/7] mfd: add atmel-hlcdc driver
+In-Reply-To: <539D5F24.1020304@traphandler.com>
+References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+ <539D5F24.1020304@traphandler.com>
+Message-ID: <539DB25A.4000201@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 15, 2014 at 02:12:37PM +0100, Russell King - ARM Linux wrote:
-> On Sun, Jun 15, 2014 at 09:00:03PM +0800, Shawn Guo wrote:
-> > Instead of using enum for clock ID, let's switch imx6qdl clock driver to
-> > use macro.  In this case, device tree can reuse these macros to improve
-> > readability.
-> 
-> Long overdue.  I recently needed to find out the clocks for the LDB, and
-> this is the process I followed:
-> 
-> 1. Look up the clock names in the imx6qdl.dtsi file.
-> 2. Convert them to clock index.
-> 3. Look in Documentation/devicetree/bindings/imx6q-clock.txt to translate
->    the clock index to another name.
-> 4. Look in arch/arm/mach-imx/clk-imx6q.c to find out what register(s) they
->    access.
-> 5. Look the registers up in the IMX6 reference manuals to convert the
->    register bits which are being manipulated to names that the manuals
->    use.
-> 6. Refer to the CCM clock tree diagram to find out where in the heirarchy
->    the clock actually sits.
+Hello JJ,
 
-Yes, I definitely understand the pain, and that's why I create the patch
-to make it less painful.
+On 15/06/2014 10:53, Jean-Jacques Hiblot wrote:
+> On 06/09/2014 06:04 PM, Boris BREZILLON wrote:
+>> The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+>> family or sama5d3 family) exposes 2 subdevices:
+>> - a display controller (controlled by a DRM driver)
+>> - a PWM chip
+>>
+>> Add support for the MFD device which will just retrieve HLCDC clocks and
+>> create a regmap so that subdevices can access the HLCDC register range
+>> concurrently.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>  .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  41 ++++++++
+>>  drivers/mfd/Kconfig                                |  11 ++
+>>  drivers/mfd/Makefile                               |   1 +
+[...]
+>> +	memset(&config, 0, sizeof(config));
+>> +	config.reg_bits = 32;
+>> +	config.val_bits = 32;
+>> +	config.reg_stride = 4;
+>> +	config.max_register = (resource_size(res) / 4) - 1;
+>> +	hlcdc->regmap = devm_regmap_init_mmio_clk(dev, "periph_clk", regs,
+>> +						  &config);
+> I don't think it's necessary to use "periph_clk" here. This clock will
+> always be running because the HLCDC needs it to work (it's not just an
+> interface clock). In the end it's just some extra work for each register
+> access.
 
-> 
-> This is incredibly time consuming and error-prone, and really, I wish that
-> the names used in clk-imx6q.c were as close as possible to those used in
-> the reference manual to cut down on the number of indirections required to
-> understand this stuff.
+Yes, I thought about removing this clk from regmap registration too (for
+the exact same reason: avoiding extra enable/disable work when accessing
+registers), but ATM I do not prepare/enable periph_clk in the hlcdc-pwm
+driver, this means the regmap won't work until the hlcdc-dc driver has
+probed the display controller device.
 
-When we create the imx6q clock driver, we did name the clocks by looking
-at Reference Manual.  But that's an early version document, and the
-clock name in the document changes over time.  I admit there are quite
-some clock names mismatch between code and document, but for most of
-them it shouldn't be so hard to map them.
+How about preparing/enabling the periph_clk in the MFD device, so that
+PWM and Display Controller subdevices won't have to bother about this
+clk, and the regmap will work as expected ?
+Or, should we just prepare/enable the periph clock in each subdevices ?
 
-Shawn
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
