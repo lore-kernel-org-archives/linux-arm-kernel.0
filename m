@@ -1,49 +1,114 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 Jun 2014 10:04:53 -0400
-Subject: [PATCH V3 00/16] irqchip: crossbar: driver fixes
-In-Reply-To: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <539EF985.3080705@ti.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Mon, 16 Jun 2014 17:08:43 +0300
+Subject: [RFC PATCH 4/4] cpufreq: tegra: Register a minimum EMC frequency
+ based on the CPU clock
+In-Reply-To: <1402925713-25426-5-git-send-email-tomeu.vizoso@collabora.com>
+References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1402925713-25426-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <539EFA6B.20501@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sricharan,
+The tegra-cpufreq driver is only for Tegra20, an upcoming driver for 
+Tegra124 will be separate, so this is not needed.
 
-On Monday 16 June 2014 07:23 AM, Sricharan R wrote:
-> This series does some cleanups, fixes for handling two interrupts
-> getting mapped twice to same crossbar and provides support for
-> hardwired IRQ and crossbar definitions.
-> 
-> On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10,
-> 131, 132, 133 are direct wired to hardware blocks bypassing
-> crossbar. This quirky implementation is *NOT* supposed to be the
-> expectation of crossbar hardware usage. This series adds support
-> to represent such hard-wired irqs through DT and avoid generic
-> allocation/programming of crossbar in the driver.
-> 
-> This way of supporting hard-wired irqs was a result of
-> the below discussions.
-> http://www.spinics.net/lists/arm-kernel/msg329946.html
-> 
-> Based on 3.15 mainline.
-> 
-> All the patches are available here
->  git at github.com:Sricharanti/sricharan.git crossbar_updates
-> 
-> The fixes series[1] earlier posted is merged in to this.
-> [1] http://www.spinics.net/lists/arm-kernel/msg328273.html
-> 
-> [V2] Merged the above series and rebased on 3.15 mainline
-> 
-> [V3] Modified patch#3 to get irqs-skip properties from DT,
->      merged path#8 for checkpatch warning to other relevant
->      patches and fixed comments for other patches.
+Thanks,
+- Mikko
+
+On 06/16/2014 04:35 PM, Tomeu Vizoso wrote:
+> Instead of setting a direct correlation to the CPU frequency. This allows
+> for other devices to influence the final effective EMC frequency.
 >
-I scanned entire series again including your updates on Jason's
-comments. All look good to my eyes.
-
-Hopefully after this series now, we can actually enable the crossbar
-support on those machines.
-
-FWIW,
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> In the future, this should be done instead by an ACTMON driver,
+> which would also take load stats into account when calculating the
+> floor EMC frequency.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
+>   drivers/cpufreq/tegra-cpufreq.c | 20 +++++---------------
+>   1 file changed, 5 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
+> index 8084c7f..64935f8 100644
+> --- a/drivers/cpufreq/tegra-cpufreq.c
+> +++ b/drivers/cpufreq/tegra-cpufreq.c
+> @@ -26,6 +26,7 @@
+>   #include <linux/err.h>
+>   #include <linux/clk.h>
+>   #include <linux/io.h>
+> +#include <linux/platform_data/tegra_emc.h>
+>
+>   static struct cpufreq_frequency_table freq_table[] = {
+>   	{ .frequency = 216000 },
+> @@ -44,7 +45,6 @@ static struct cpufreq_frequency_table freq_table[] = {
+>   static struct clk *cpu_clk;
+>   static struct clk *pll_x_clk;
+>   static struct clk *pll_p_clk;
+> -static struct clk *emc_clk;
+>   static bool pll_x_prepared;
+>
+>   static unsigned int tegra_get_intermediate(struct cpufreq_policy *policy,
+> @@ -96,15 +96,15 @@ static int tegra_target(struct cpufreq_policy *policy, unsigned int index)
+>   	int ret = 0;
+>
+>   	/*
+> -	 * Vote on memory bus frequency based on cpu frequency
+> +	 * Set minimum memory bus frequency based on cpu frequency
+>   	 * This sets the minimum frequency, display or avp may request higher
+>   	 */
+>   	if (rate >= 816000)
+> -		clk_set_rate(emc_clk, 600000000); /* cpu 816 MHz, emc max */
+> +		tegra124_emc_set_floor(600000000); /* cpu 816 MHz, emc max */
+>   	else if (rate >= 456000)
+> -		clk_set_rate(emc_clk, 300000000); /* cpu 456 MHz, emc 150Mhz */
+> +		tegra124_emc_set_floor(300000000); /* cpu 456 MHz, emc 150Mhz */
+>   	else
+> -		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
+> +		tegra124_emc_set_floor(100000000);  /* emc 50Mhz */
+>
+>   	/*
+>   	 * target freq == pll_p, don't need to take extra reference to pll_x_clk
+> @@ -141,14 +141,12 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+>   	if (policy->cpu >= NUM_CPUS)
+>   		return -EINVAL;
+>
+> -	clk_prepare_enable(emc_clk);
+>   	clk_prepare_enable(cpu_clk);
+>
+>   	/* FIXME: what's the actual transition time? */
+>   	ret = cpufreq_generic_init(policy, freq_table, 300 * 1000);
+>   	if (ret) {
+>   		clk_disable_unprepare(cpu_clk);
+> -		clk_disable_unprepare(emc_clk);
+>   		return ret;
+>   	}
+>
+> @@ -160,7 +158,6 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+>   static int tegra_cpu_exit(struct cpufreq_policy *policy)
+>   {
+>   	clk_disable_unprepare(cpu_clk);
+> -	clk_disable_unprepare(emc_clk);
+>   	return 0;
+>   }
+>
+> @@ -194,19 +191,12 @@ static int __init tegra_cpufreq_init(void)
+>   	if (IS_ERR(pll_p_clk))
+>   		return PTR_ERR(pll_p_clk);
+>
+> -	emc_clk = clk_get_sys("cpu", "emc");
+> -	if (IS_ERR(emc_clk)) {
+> -		clk_put(cpu_clk);
+> -		return PTR_ERR(emc_clk);
+> -	}
+> -
+>   	return cpufreq_register_driver(&tegra_cpufreq_driver);
+>   }
+>
+>   static void __exit tegra_cpufreq_exit(void)
+>   {
+>           cpufreq_unregister_driver(&tegra_cpufreq_driver);
+> -	clk_put(emc_clk);
+>   	clk_put(cpu_clk);
+>   }
+>
+>
