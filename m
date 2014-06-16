@@ -1,79 +1,211 @@
 From: elder@linaro.org (Alex Elder)
-Date: Mon, 16 Jun 2014 08:40:06 -0500
-Subject: [PATCH v6 6/7] clk: bcm281xx: define a bus clock
+Date: Mon, 16 Jun 2014 08:40:01 -0500
+Subject: [PATCH v6 1/7] clk: kona: move some code
 In-Reply-To: <1402926007-4436-1-git-send-email-elder@linaro.org>
 References: <1402926007-4436-1-git-send-email-elder@linaro.org>
-Message-ID: <1402926007-4436-7-git-send-email-elder@linaro.org>
+Message-ID: <1402926007-4436-2-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the bus clock "bsc3_apb".  This bus clock has to be managed
-using the CCU policy mechanism, so add the definitions required for
-that to the clock and its CCU.
+Move the definition of __peri_clk_init() up in "clk-kona.c", in
+preparation for the next patch (so it's defined before it's needed).
+Move kona_ccu_init() and __kona_clk_init() as well.
 
-This one bus clock in particular is defined because it is needed
-by peripheral clock "bsc3".  Our boot loader does not properly
-activate "bsc3_apb", and as a result, "bsc3" isn't able to function
-properly.  With "bsc3_apb" specified as a prerequisite clock for
-"bsc3", the latter works correctly.
-
-For now only this one bus clock is defined, because it allows
-correct operation of "bsc3".  Others can be added later as needed
-(and this patch serves to show how that's done).
+Done as a separate patch so doing so doesn't obscure other changes.
 
 Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- drivers/clk/bcm/clk-bcm281xx.c       | 13 ++++++++++++-
- include/dt-bindings/clock/bcm281xx.h |  3 ++-
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/clk/bcm/clk-kona.c | 174 ++++++++++++++++++++++-----------------------
+ 1 file changed, 87 insertions(+), 87 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-bcm281xx.c b/drivers/clk/bcm/clk-bcm281xx.c
-index 502a487..b937fc9 100644
---- a/drivers/clk/bcm/clk-bcm281xx.c
-+++ b/drivers/clk/bcm/clk-bcm281xx.c
-@@ -309,8 +309,17 @@ static struct peri_clk_data pwm_data = {
- 	.trig		= TRIGGER(0x0afc, 15),
- };
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index 95af2e6..b643d35 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -981,6 +981,93 @@ static int selector_write(struct ccu_data *ccu, struct bcm_clk_gate *gate,
+ 	return ret;
+ }
  
-+static struct bus_clk_data bsc3_apb_data = {
-+	.policy		= POLICY(0x0048, 4),
-+	.gate		= HW_SW_GATE(0x0484, 16, 0, 1),
-+};
++/* Put a peripheral clock into its initial state */
++static bool __peri_clk_init(struct kona_clk *bcm_clk)
++{
++	struct ccu_data *ccu = bcm_clk->ccu;
++	struct peri_clk_data *peri = bcm_clk->u.peri;
++	const char *name = bcm_clk->init_data.name;
++	struct bcm_clk_trig *trig;
 +
- static struct ccu_data slave_ccu_data = {
- 	BCM281XX_CCU_COMMON(slave, SLAVE),
-+	.policy		= {
-+		.enable		= CCU_LVM_EN(0x0034, 0),
-+		.control	= CCU_POLICY_CTL(0x000c, 0, 1, 2),
-+	},
- 	.kona_clks	= {
- 		[BCM281XX_SLAVE_CCU_UARTB] =
- 			KONA_CLK(slave, uartb, peri),
-@@ -329,9 +338,11 @@ static struct ccu_data slave_ccu_data = {
- 		[BCM281XX_SLAVE_CCU_BSC2] =
- 			KONA_CLK(slave, bsc2, peri),
- 		[BCM281XX_SLAVE_CCU_BSC3] =
--			KONA_CLK(slave, bsc3, peri),
-+			KONA_CLK_PREREQ(slave, bsc3, peri, bsc3_apb),
- 		[BCM281XX_SLAVE_CCU_PWM] =
- 			KONA_CLK(slave, pwm, peri),
-+		[BCM281XX_SLAVE_CCU_BSC3_APB] =
-+			KONA_CLK(slave, bsc3_apb, bus),
- 		[BCM281XX_SLAVE_CCU_CLOCK_COUNT] = LAST_KONA_CLK,
- 	},
- };
-diff --git a/include/dt-bindings/clock/bcm281xx.h b/include/dt-bindings/clock/bcm281xx.h
-index a763460..99f4aad 100644
---- a/include/dt-bindings/clock/bcm281xx.h
-+++ b/include/dt-bindings/clock/bcm281xx.h
-@@ -72,6 +72,7 @@
- #define BCM281XX_SLAVE_CCU_BSC2			7
- #define BCM281XX_SLAVE_CCU_BSC3			8
- #define BCM281XX_SLAVE_CCU_PWM			9
--#define BCM281XX_SLAVE_CCU_CLOCK_COUNT		10
-+#define BCM281XX_SLAVE_CCU_BSC3_APB		10
-+#define BCM281XX_SLAVE_CCU_CLOCK_COUNT		11
++	BUG_ON(bcm_clk->type != bcm_clk_peri);
++
++	if (!policy_init(ccu, &peri->policy)) {
++		pr_err("%s: error initializing policy for %s\n",
++			__func__, name);
++		return false;
++	}
++	if (!gate_init(ccu, &peri->gate)) {
++		pr_err("%s: error initializing gate for %s\n", __func__, name);
++		return false;
++	}
++	if (!hyst_init(ccu, &peri->hyst)) {
++		pr_err("%s: error initializing hyst for %s\n", __func__, name);
++		return false;
++	}
++	if (!div_init(ccu, &peri->gate, &peri->div, &peri->trig)) {
++		pr_err("%s: error initializing divider for %s\n", __func__,
++			name);
++		return false;
++	}
++
++	/*
++	 * For the pre-divider and selector, the pre-trigger is used
++	 * if it's present, otherwise we just use the regular trigger.
++	 */
++	trig = trigger_exists(&peri->pre_trig) ? &peri->pre_trig
++					       : &peri->trig;
++
++	if (!div_init(ccu, &peri->gate, &peri->pre_div, trig)) {
++		pr_err("%s: error initializing pre-divider for %s\n", __func__,
++			name);
++		return false;
++	}
++
++	if (!sel_init(ccu, &peri->gate, &peri->sel, trig)) {
++		pr_err("%s: error initializing selector for %s\n", __func__,
++			name);
++		return false;
++	}
++
++	return true;
++}
++
++static bool __kona_clk_init(struct kona_clk *bcm_clk)
++{
++	switch (bcm_clk->type) {
++	case bcm_clk_peri:
++		return __peri_clk_init(bcm_clk);
++	default:
++		BUG();
++	}
++	return -EINVAL;
++}
++
++/* Set a CCU and all its clocks into their desired initial state */
++bool __init kona_ccu_init(struct ccu_data *ccu)
++{
++	unsigned long flags;
++	unsigned int which;
++	struct clk **clks = ccu->clk_data.clks;
++	bool success = true;
++
++	flags = ccu_lock(ccu);
++	__ccu_write_enable(ccu);
++
++	for (which = 0; which < ccu->clk_data.clk_num; which++) {
++		struct kona_clk *bcm_clk;
++
++		if (!clks[which])
++			continue;
++		bcm_clk = to_kona_clk(__clk_get_hw(clks[which]));
++		success &= __kona_clk_init(bcm_clk);
++	}
++
++	__ccu_write_disable(ccu);
++	ccu_unlock(ccu, flags);
++	return success;
++}
++
+ /* Clock operations */
  
- #endif /* _CLOCK_BCM281XX_H */
+ static int kona_peri_clk_enable(struct clk_hw *hw)
+@@ -1192,90 +1279,3 @@ struct clk_ops kona_peri_clk_ops = {
+ 	.get_parent = kona_peri_clk_get_parent,
+ 	.set_rate = kona_peri_clk_set_rate,
+ };
+-
+-/* Put a peripheral clock into its initial state */
+-static bool __peri_clk_init(struct kona_clk *bcm_clk)
+-{
+-	struct ccu_data *ccu = bcm_clk->ccu;
+-	struct peri_clk_data *peri = bcm_clk->u.peri;
+-	const char *name = bcm_clk->init_data.name;
+-	struct bcm_clk_trig *trig;
+-
+-	BUG_ON(bcm_clk->type != bcm_clk_peri);
+-
+-	if (!policy_init(ccu, &peri->policy)) {
+-		pr_err("%s: error initializing policy for %s\n",
+-			__func__, name);
+-		return false;
+-	}
+-	if (!gate_init(ccu, &peri->gate)) {
+-		pr_err("%s: error initializing gate for %s\n", __func__, name);
+-		return false;
+-	}
+-	if (!hyst_init(ccu, &peri->hyst)) {
+-		pr_err("%s: error initializing hyst for %s\n", __func__, name);
+-		return false;
+-	}
+-	if (!div_init(ccu, &peri->gate, &peri->div, &peri->trig)) {
+-		pr_err("%s: error initializing divider for %s\n", __func__,
+-			name);
+-		return false;
+-	}
+-
+-	/*
+-	 * For the pre-divider and selector, the pre-trigger is used
+-	 * if it's present, otherwise we just use the regular trigger.
+-	 */
+-	trig = trigger_exists(&peri->pre_trig) ? &peri->pre_trig
+-					       : &peri->trig;
+-
+-	if (!div_init(ccu, &peri->gate, &peri->pre_div, trig)) {
+-		pr_err("%s: error initializing pre-divider for %s\n", __func__,
+-			name);
+-		return false;
+-	}
+-
+-	if (!sel_init(ccu, &peri->gate, &peri->sel, trig)) {
+-		pr_err("%s: error initializing selector for %s\n", __func__,
+-			name);
+-		return false;
+-	}
+-
+-	return true;
+-}
+-
+-static bool __kona_clk_init(struct kona_clk *bcm_clk)
+-{
+-	switch (bcm_clk->type) {
+-	case bcm_clk_peri:
+-		return __peri_clk_init(bcm_clk);
+-	default:
+-		BUG();
+-	}
+-	return -EINVAL;
+-}
+-
+-/* Set a CCU and all its clocks into their desired initial state */
+-bool __init kona_ccu_init(struct ccu_data *ccu)
+-{
+-	unsigned long flags;
+-	unsigned int which;
+-	struct clk **clks = ccu->clk_data.clks;
+-	bool success = true;
+-
+-	flags = ccu_lock(ccu);
+-	__ccu_write_enable(ccu);
+-
+-	for (which = 0; which < ccu->clk_data.clk_num; which++) {
+-		struct kona_clk *bcm_clk;
+-
+-		if (!clks[which])
+-			continue;
+-		bcm_clk = to_kona_clk(__clk_get_hw(clks[which]));
+-		success &= __kona_clk_init(bcm_clk);
+-	}
+-
+-	__ccu_write_disable(ccu);
+-	ccu_unlock(ccu, flags);
+-	return success;
+-}
 -- 
 1.9.1
