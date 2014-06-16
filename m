@@ -1,72 +1,74 @@
-From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
-Date: Mon, 16 Jun 2014 17:19:32 +0000
-Subject: [PATCHv2 00/24] ILP32 Support in ARM64
-In-Reply-To: <20140616170808.GA5362@arm.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>,
- <20140616170808.GA5362@arm.com>
-Message-ID: <6ABA4097-FE5B-4F52-A4A0-C289836919F6@caviumnetworks.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Jun 2014 19:25:35 +0200
+Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
+ Hisilicon System MMU binding
+In-Reply-To: <20140616164517.GY16758@arm.com>
+References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
+ <5537408.I9tiuCA96J@wuerfel> <20140616164517.GY16758@arm.com>
+Message-ID: <8028011.DbLMpGku5b@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On Jun 16, 2014, at 10:08 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
+On Monday 16 June 2014 17:45:17 Will Deacon wrote:
+> On Mon, Jun 16, 2014 at 05:42:10PM +0100, Arnd Bergmann wrote:
+> > On Monday 16 June 2014 17:26:53 Will Deacon wrote:
+> > > On Fri, Jun 06, 2014 at 12:07:11PM +0100, Dave Martin wrote:
+> > > > On Fri, Jun 06, 2014 at 08:48:26AM +0200, Arnd Bergmann wrote:
+> > > > > On Thursday 05 June 2014 21:37:09 Zhen Lei wrote:
+> > > > > 
+> > > > > > +- smmu-masters  : A list of phandles to device nodes representing bus
+> > > > > > +                  masters for which the SMMU can provide a translation
+> > > > > > +                  and their corresponding StreamIDs (see example below).
+> > > > > > 
+> > > > > 
+> > > > > We're currently in the process of defining a generic binding for IOMMUs.
+> > > > > 
+> > > > > While the smmu-masters property was copied from an existing binding,
+> > > > > I think we will end up migrating away from that towards a common way
+> > > > > to express those things, and we shouldn't add another one doing this
+> > > > > in a nonstandard way. Please have a look at the latest discussion
+> > > > > about the iommu binding using #iommu-cells and a reference from the
+> > > > > master to the iommu and see if you can migrate your code to use that.
+> > > > 
+> > > > Thanks for making this point -- I was going to do so yesterday but then
+> > > > hesitated due to uncertainty about whether this should really be a new
+> > > > driver.
+> > > > 
+> > > > Either way, it would be very valuable at least to attempt to describe
+> > > > the Hisilicon SMMU implemenation using the new proposals, since that is
+> > > > a good test of how reusable the proposed generic binding actually is.
+> > > 
+> > > If this ends up being an addition to the existing ARM SMMU driver, I'm
+> > > really not keen on using the new DT bindings. We're already stuck with
+> > > the old bindings for that driver -- supporting both old and new in the
+> > > same code only buys us maintenance headaches and pointless divergence
+> > > within the driver.
+> > 
+> > We have to migrate the driver to the new binding anyway, it may be
+> > a bit painful, but there are not really any users yet so there
+> > is a chance we can remove the nonstandard code at some point,
+> > perhaps in a few years.
 > 
-> Andrew,
+> The only way I see this working is if we kill the existing binding and move
+> exclusively to the new one. I'm actually ok with that (we have no in-tree
+> users), but it needs to happen ASAP in my opinion, otherwise we increase the
+> window where the old binding can be adopted.
+
+I agree. I was hoping to get the generic binding ready for 3.16, but that
+didn't happen. Maybe we can add a small patch to the binding to explain
+that it will change in the future.
+
+> Note that the next version of the ARM SMMU (v3) is considerably different to
+> the current architecture, so a new driver (using the new bindings) will be
+> required.
 > 
->> On Sat, May 24, 2014 at 12:01:55AM -0700, Andrew Pinski wrote:
->> New version of the patches with documentation, signal changes are
->> simplified, using less compat syscalls and splitting up the patches so
->> it is easier to review.  I have tested LTP on both LP64 and ILP32.
->> There is a few LTP failures but they are due to LTP being incorrect
->> (sigaction structure in glibc is not the one which is used by the
->> kernel)
-> 
-> Do you have more details about what's wrong here and where the fix
-> should go? LTP? glibc? Kernel?
+> This actually opens a wider question: if we don't have an in-tree user for a
+> device-tree binding, do we consider that binding to be unused?
 
-LTP assumes some sigaction structure is the same between userland and kernel.
-Glibc has the correct idea of what the kernel structure will be when passing to the kernel already. The fix should be done in LTP. There is already code in LTP for x86 for a similar issue which we should be able to advantage of. 
+Not in general, but often. We don't require dts files to be in the kernel,
+so we have to apply a bit of common sense. If anyone knows of out-of-tree
+users of the binding that are actually working with upstream kernels,
+we need a migration path. Anything that also requires out-of-tree kernel
+patches however is something we don't have to worry about.
 
-> 
-> I'll give you more specific comments on the code in the next couple of
-> days. But for cosmetics, please wrap the lines around 72 (or whatever)
-> characters both in emails, commit logs and Documentation/* files (and
-> you can drop the "Thanks" part in every commit log ;)).
-
-Will do this with the rest of the review. 
-
-> 
->> Andrew Pinski (24):
->>  ARM64: Force LP64 to compile the kernel.
->>  ARM64: Rename COMPAT to AARCH32_EL0 in Kconfig.
->>  ARM64: Change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
->>    instead.
->>  ARM64:ILP32: Set kernel_long to long long so we can reuse most of the
->>    same syscalls as LP64.
->>  ARM64:UAPI: Set the correct __BITS_PER_LONG for ILP32.
->>  Allow for some signal structures to be the same between a 32bit ABI
->>    and the 64bit ABI.
->>  ARM64:ILP32: Use the same size and layout of the signal structures
->>    for ILP32 as for LP64.
->>  Allow a 32bit ABI to use the naming of the 64bit ABI syscalls to
->>    avoid confusion of not splitting the registers.
->>  ARM64:ILP32: Use the same syscall names as LP64.
->>  ARM64: Introduce is_a32_task and is_a32_thread. Use them in the
->>    correct locations.
->>  ARM64: Add ARM64_ILP32 to Kconfig.
-> 
-> Does this patch need to be in the middle of the series? It should come
-> after the ILP32 support is complete.
-
-
-Ok, I will move it. I had added in the middle to test the newly added code. 
-
-Thanks,
-Andrew
-
-> 
-> Thanks.
-> 
-> -- 
-> Catalin
+	Arnd
