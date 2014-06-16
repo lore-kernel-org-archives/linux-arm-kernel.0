@@ -1,27 +1,40 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Jun 2014 16:04:26 -0600
-Subject: [PATCH 7/9] ahci: Increase AHCI_MAX_CLKS to 4
-In-Reply-To: <1401881559-18469-8-git-send-email-mperttunen@nvidia.com>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-8-git-send-email-mperttunen@nvidia.com>
-Message-ID: <539F69EA.6000200@wwwdotorg.org>
+Date: Mon, 16 Jun 2014 16:16:39 -0600
+Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
+In-Reply-To: <20140616215512.GC23430@n2100.arm.linux.org.uk>
+References: <1402941376-29594-1-git-send-email-mporter@linaro.org>
+ <20140616215512.GC23430@n2100.arm.linux.org.uk>
+Message-ID: <539F6CC7.4010002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
-> The Tegra AHCI device requires four clocks, so increase the maximum
-> amount of handled clocks from three to four.
+On 06/16/2014 03:55 PM, Russell King - ARM Linux wrote:
+> On Mon, Jun 16, 2014 at 01:56:16PM -0400, Matt Porter wrote:
+>> Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
+>> MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
+>> driver which is enabled in this defconfig. This results in the
+>> SDHCI driver not being built and a boot failure. Explictly
+>> enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
+>> driver is built.
+> 
+> I really don't understand why MMC_SDHCI_PLTFM isn't selected by the
+> sub-drivers.  sdhci-pltfm.c is a library module, which is only
+> useful with one of the sub-drivers enabled.
+> 
+> So, rather than providing a multitude of dependent options, why not
+> present people with:
+> 
+>  + sdhci drivers
+>    + sdhci pci
+>    + sdhci acpi
+>    + Arasan
+>    + Freescale eSDHC
+>    + Nintendo Wii
+>    + Dove
+> 
+> and leave MMC_SDHCI_PLTFM as a hidden option whose purpose is to
+> enable building of sdhci-pltfm.c.
 
-Tejun,
-
-The SATA driver in patch 8/9 in this series would usually be applied in
-your ATA tree. However, it has a lot of compile-time dependencies on
-things outside the ATA tree that I expect you don't want to deal with.
-
-If you're OK with patches 7 and 8, could you ack them so that I can
-apply them to the Tegra tree?
-
-I assume the patches won't cause any significant conflicts, but if you
-need, I can certainly give you a signed tag back to allow you to merge
-the driver patch (plus the compile-time dependencies) into your tree
-later if needed.
+CC'ing Arnd, as author of 5d01b7684b7e "mmc: simplify SDHCI Kconfig
+dependencies". I also forgot to do that on the patch that fixed
+multi_v7_defconfig for this:-(
