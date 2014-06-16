@@ -1,52 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jun 2014 14:38:49 +0100
-Subject: [RESEND PATCH] ARM: kdump: Add vmcore_elf64_check_arch
-In-Reply-To: <5395B4D0.6040302@huawei.com>
-References: <1399124686-63299-1-git-send-email-sdu.liu@huawei.com>
- <20140506121558.GB30234@arm.com> <5395B4D0.6040302@huawei.com>
-Message-ID: <20140616133849.GG16758@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Jun 2014 14:32:34 +0100
+Subject: [PATCH 0/2] backlight: remove trivial get_brightness
+ implementations
+In-Reply-To: <000701cf895e$6a648f20$3f2dad60$%han@samsung.com>
+References: <1401444650-12267-1-git-send-email-a.hajda@samsung.com>
+ <000701cf895e$6a648f20$3f2dad60$%han@samsung.com>
+Message-ID: <20140616133234.GX14323@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 09, 2014 at 02:21:20PM +0100, Liu hua wrote:
-> ? 2014/5/6 20:15, Will Deacon ??:
-> > On Sat, May 03, 2014 at 02:44:46PM +0100, Liu Hua wrote:
-> Sorry to reply you so late. These days I am working on kdump feature for LPAE enabled
-> kernel. And now I think this patch is not good.
-> 
-> > This function looks identical to elf_check_arch. Why do we need to duplicate
-> > that code? You could use some pre-processor magic to make the core part of
-> > the functions agnostic to header type.
-> 
-> At the begging I think I should add elf_check_arch_64 just as elf_check_arch to
-> do complicated check.
-> 
-> But for ARM32, elf_check_arch_64 would not be used except for kdump. No programs
-> with elf64 header can be loaded into 32bit ARM kernel. So I think I can just check
-> the "e_machine", just as what other platform does. I think other checks is useless
-> for kdump.
-> 
-> > In fact, if elf_check_arch could handle both header types then the generic
-> > definition of vmcore_elf64_check_arch in include/linux/crash_dump.h would
-> > work out of the box.
-> 
-> As I mentioned, I afraid this will make the code hard to understand.( Sorry
-> for my former incorrect patch).
-> 
-> How about this patch?
-> 
-> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-> index f4b46d3..9424542 100644
-> --- a/arch/arm/include/asm/elf.h
-> +++ b/arch/arm/include/asm/elf.h
-> @@ -97,7 +97,7 @@ struct elf32_hdr;
->  extern int elf_check_arch(const struct elf32_hdr *);
->  #define elf_check_arch elf_check_arch
-> 
-> -#define vmcore_elf64_check_arch(x) (0)
-> +#define vmcore_elf64_check_arch(x) ((x)->e_machine == EM_ARM)
+On Mon, 16 Jun 2014, Jingoo Han wrote:
 
-Is there no way we can get away with using the generic version here? What
-goes wrong if you let vmcore_elf64_check_arch fallback to elf_check_arch?
+> On Friday, May 30, 2014 7:11 PM, Andrzej Hajda wrote:
+> > 
+> > This patchset makes get_brightness callback optional
+> > and removes trivial implementations.
+> > Driver changes are quite obvious so I have put them into single
+> > patch.
+> > 
+> > The patchset is based on the current linux-next branch.
+> > 
+> > Regards
+> > Andrzej
+> > 
+> > Andrzej Hajda (2):
+> >   backlight: show brightness even if get_brightness is not implemented
+> >   backlight: remove trivial get_brightness implementations
+> 
+> These patches look good!
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> 
+> Lee Jones,
+> Would you merge these patches into backlight git?
 
-Will
+Yep, done.
+
+NB: You don't have to ask.  I'll see that you've reviewed/acked the
+patches and just apply them automatically (provided I'm on the CC list
+of course).
+
+> >  drivers/macintosh/via-pmu-backlight.c      | 6 ------
+> >  drivers/platform/x86/samsung-q10.c         | 6 ------
+> >  drivers/video/backlight/aat2870_bl.c       | 6 ------
+> >  drivers/video/backlight/ams369fg06.c       | 6 ------
+> >  drivers/video/backlight/backlight.c        | 2 ++
+> >  drivers/video/backlight/bd6107.c           | 6 ------
+> >  drivers/video/backlight/gpio_backlight.c   | 6 ------
+> >  drivers/video/backlight/ld9040.c           | 6 ------
+> >  drivers/video/backlight/lp855x_bl.c        | 6 ------
+> >  drivers/video/backlight/lp8788_bl.c        | 6 ------
+> >  drivers/video/backlight/lv5207lp.c         | 6 ------
+> >  drivers/video/backlight/pandora_bl.c       | 6 ------
+> >  drivers/video/backlight/pwm_bl.c           | 6 ------
+> >  drivers/video/backlight/s6e63m0.c          | 6 ------
+> >  drivers/video/backlight/tps65217_bl.c      | 6 ------
+> >  drivers/video/fbdev/aty/aty128fb.c         | 6 ------
+> >  drivers/video/fbdev/aty/atyfb_base.c       | 6 ------
+> >  drivers/video/fbdev/aty/radeon_backlight.c | 6 ------
+> >  drivers/video/fbdev/exynos/s6e8ax0.c       | 6 ------
+> >  drivers/video/fbdev/nvidia/nv_backlight.c  | 6 ------
+> >  drivers/video/fbdev/riva/fbdev.c           | 6 ------
+> >  21 files changed, 2 insertions(+), 120 deletions(-)
+> > 
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
