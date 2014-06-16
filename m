@@ -1,43 +1,85 @@
 From: k.chander@samsung.com (Chander Kashyap)
-Date: Mon, 16 Jun 2014 15:56:22 +0530
-Subject: [Patch v7 5/6] exynos: cpuidle: do not allow cpuidle registration for
- Exynos5420
+Date: Mon, 16 Jun 2014 15:56:23 +0530
+Subject: [Patch v7 6/6] mcpm: exynos: populate suspend and powered_up callbacks
 In-Reply-To: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
 References: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
-Message-ID: <1402914383-20471-6-git-send-email-k.chander@samsung.com>
+Message-ID: <1402914383-20471-7-git-send-email-k.chander@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chander Kashyap <chander.kashyap@linaro.org>
 
-Exynos5420 is big.Little Soc. It uses cpuidle-big-litle generic cpuidle driver.
-Hence do not allow exynos cpuidle driver registration for Exynos5420.
+In order to support cpuidle through mcpm, suspend and powered-up
+callbacks are required in mcpm platform code.
+Hence populate the same callbacks.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
-Changes in v6:
-	1. Move cpuidle registration check to exynos.c from cpuidle.c and
-	   use "samsung,exynos5420" compatible string to avvoid registration
- arch/arm/mach-exynos/exynos.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Changes in v6: None
+Changes in v5:
+	1. Add comment to address cache access while c-bit is cleared in SCLTR
+	2. Make exynos_powered_up static
+Changes in v4: None
+Changes in v3:
+	1. Removed coherency enablement after suspend failure.
+	2. Use generic function to poweron cpu.
+changes in v2:
+	1. Fixed typo: enynos_pmu_cpunr to exynos_pmu_cpunr
+ arch/arm/mach-exynos/mcpm-exynos.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 90aab4d..f4c08d6 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -271,7 +271,9 @@ static void __init exynos_dt_machine_init(void)
- 		}
- 	}
+diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+index 0498d0b..fc47e68 100644
+--- a/arch/arm/mach-exynos/mcpm-exynos.c
++++ b/arch/arm/mach-exynos/mcpm-exynos.c
+@@ -258,10 +258,46 @@ static int exynos_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+ 	return -ETIMEDOUT; /* timeout */
+ }
  
--	exynos_cpuidle_init();
-+	if (!of_machine_is_compatible("samsung,exynos5420"))
-+		exynos_cpuidle_init();
++static void exynos_powered_up(void)
++{
++	unsigned int mpidr, cpu, cluster;
 +
- 	exynos_cpufreq_init();
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	arch_spin_lock(&exynos_mcpm_lock);
++	if (cpu_use_count[cpu][cluster] == 0)
++		cpu_use_count[cpu][cluster] = 1;
++	arch_spin_unlock(&exynos_mcpm_lock);
++}
++
++static void exynos_suspend(u64 residency)
++{
++	unsigned int mpidr, cpunr;
++
++	exynos_power_down();
++
++	/*
++	 * Execution reaches here only if cpu did not power down.
++	 * Hence roll back the changes done in exynos_power_down function.
++	 *
++	 * CAUTION: "This function requires the stack data to be visible through
++	 * power down and can only be executed on processors like A15 and A7
++	 * that hit the cache with the C bit clear in the SCTLR register."
++	*/
++	mpidr = read_cpuid_mpidr();
++	cpunr = exynos_pmu_cpunr(mpidr);
++
++	exynos_cpu_power_up(cpunr);
++}
++
+ static const struct mcpm_platform_ops exynos_power_ops = {
+ 	.power_up		= exynos_power_up,
+ 	.power_down		= exynos_power_down,
+ 	.wait_for_powerdown	= exynos_wait_for_powerdown,
++	.suspend		= exynos_suspend,
++	.powered_up		= exynos_powered_up,
+ };
  
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ static void __init exynos_mcpm_usage_count_init(void)
 -- 
 1.7.9.5
