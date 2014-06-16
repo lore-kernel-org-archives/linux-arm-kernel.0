@@ -1,16 +1,17 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jun 2014 11:14:45 +0100
-Subject: [PATCH v14 01/10] [media] v4l2: add new V4L2_PIX_FMT_RGB666
- pixel format.
-In-Reply-To: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+Date: Mon, 16 Jun 2014 11:15:05 +0100
+Subject: [PATCH v14 02/10] imx-drm: Add RGB666 support for parallel
+ display.
+In-Reply-To: <1402913484-25910-2-git-send-email-denis@eukrea.com>
 References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140616101445.GW23430@n2100.arm.linux.org.uk>
+ <1402913484-25910-2-git-send-email-denis@eukrea.com>
+Message-ID: <20140616101505.GX23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 12:11:15PM +0200, Denis Carikli wrote:
-> That new macro is needed by the imx_drm staging driver
->   for supporting the QVGA display of the eukrea-cpuimx51 board.
+On Mon, Jun 16, 2014 at 12:11:16PM +0200, Denis Carikli wrote:
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
 As I said probably around v10 time, I already have this patch queued,
 and I was going to send it to Greg before the previous merge window,
