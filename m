@@ -1,130 +1,55 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 16 Jun 2014 16:32:24 +0200
-Subject: [PATCH v3 10/19] clocksource: sh_tmu: Add DT support
-In-Reply-To: <20140616083423.GE11582@verge.net.au>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140616083423.GE11582@verge.net.au>
-Message-ID: <3012797.FyNqyP1CPJ@avalon>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 16 Jun 2014 15:32:37 +0100
+Subject: [PATCH V4 0/2] PTE fixes for ARM LPAE
+Message-ID: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+This series fixes a couple of problems that I encountered on ARM with
+LPAE.
+ 1) Some pte accessors can have their results cancelled out by a
+    downcast. This is addressed by the first patch.
 
-On Monday 16 June 2014 17:34:23 Simon Horman wrote:
-> On Sat, Jun 14, 2014 at 06:23:32PM +0200, Laurent Pinchart wrote:
-> > Document DT bindings and parse them in the TMU driver.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> 
-> [snip]
-> 
-> > diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-> > index ef8fb0b..2ece4ab 100644
-> > --- a/drivers/clocksource/sh_tmu.c
-> > +++ b/drivers/clocksource/sh_tmu.c
+ 2) It is impossible to distinguish between clean writable ptes and
+    read only ptes. This is addressed by the second patch.
 
-[snip]
+I was going to put V3 of this series into the patch system, but got
+distracted, and some recent activity has necessitated a revision of
+this series.
 
-> > @@ -509,23 +510,46 @@ static int sh_tmu_map_memory(struct sh_tmu_device
-> > *tmu)
-> >  	return 0;
-> >  }
-> > 
-> > +static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
-> > +{
-> > +	struct device_node *np = tmu->pdev->dev.of_node;
-> > +
-> > +	tmu->num_channels = 3;
-> > +	of_property_read_u32(np, "#renesas,channels", &tmu->num_channels);
-> > +
-> > +	if (tmu->num_channels != 2 && tmu->num_channels != 3) {
-> > +		dev_err(&tmu->pdev->dev, "invalid number of channels %u\n",
-> > +			tmu->num_channels);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device
-> >  *pdev) {
-> > -	struct sh_timer_config *cfg = pdev->dev.platform_data;
-> >  	const struct platform_device_id *id = pdev->id_entry;
-> >  	unsigned int i;
-> >  	int ret;
-> > 
-> > -	if (!cfg) {
-> > -		dev_err(&tmu->pdev->dev, "missing platform data\n");
-> > -		return -ENXIO;
-> > -	}
-> > -
-> >  	tmu->pdev = pdev;
-> >  	tmu->model = id->driver_data;
-> >  	
-> >  	raw_spin_lock_init(&tmu->lock);
-> > 
-> > +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
-> > +		ret = sh_tmu_parse_dt(tmu);
-> > +		if (ret < 0)
-> > +			return ret;
-> > +	} else if (pdev->dev.platform_data) {
-> > +		struct sh_timer_config *cfg = pdev->dev.platform_data;
-> > +
-> > +		tmu->num_channels = hweight8(cfg->channels_mask);
-> > +	} else {
-> > +		dev_err(&tmu->pdev->dev, "missing platform data\n");
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > 
-> >  	/* Get hold of clock. */
-> >  	tmu->clk = clk_get(&tmu->pdev->dev, "fck");
-> >  	if (IS_ERR(tmu->clk)) {
-> 
-> [snip]
-> 
-> I had a bit of trouble running this code and after some investigation
-> it seems to me that in the case of using DT id will be NULL and
-> thus things do not go well when id->driver_data is accessed.
+Notable changes in this series from V3->V4:
+ o) Rebased to take into account the BE LPAE fix in 3.16-rc1.
+ o) THP logic added as this was missing.
 
-Indeed. I wonder how I've missed that :-/ Anyway, I'll fix it and resubmit.
+I was tempted to put a third patch in the series to re-route THP through
+the pte setters, but decided to take baby steps instead.
 
-> The following incremental patch resolved the problem for me.
-> 
-> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-> index 2ece4ab..3f90927 100644
-> --- a/drivers/clocksource/sh_tmu.c
-> +++ b/drivers/clocksource/sh_tmu.c
-> @@ -523,6 +523,8 @@ static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
->  		return -EINVAL;
->  	}
-> 
-> +	tmu->model = SH_TMU;
-> +
->  	return 0;
->  }
-> 
-> @@ -533,7 +535,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu,
-> struct platform_device *pdev) int ret;
-> 
->  	tmu->pdev = pdev;
-> -	tmu->model = id->driver_data;
-> 
->  	raw_spin_lock_init(&tmu->lock);
-> 
-> @@ -545,6 +546,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu,
-> struct platform_device *pdev) struct sh_timer_config *cfg =
-> pdev->dev.platform_data;
-> 
->  		tmu->num_channels = hweight8(cfg->channels_mask);
-> +		tmu->model = id->driver_data;
->  	} else {
->  		dev_err(&tmu->pdev->dev, "missing platform data\n");
->  		return -ENXIO;
+This series has been tested with libhugetlbfs unit tests, ltp mm tests
+and a custom THP test to test what happens when PROT_NONE THPs are
+faulted. I have tested on an Arndale board with LPAE and classic MMU
+(with classic MMU, only ltp mm tests were run), and would appreciate
+any testers for anything not covered by proc-v7-[23]level.S.
+
+Also any comments/feedback would be appreciated.
+
+Cheers,
+--
+Steve
+
+Steve Capper (2):
+  arm: mm: Introduce {pte,pmd}_isset and {pte,pmd}_isclear
+  arm: mm: Switch back to L_PTE_WRITE
+
+ arch/arm/include/asm/pgtable-2level.h |  2 +-
+ arch/arm/include/asm/pgtable-3level.h | 24 ++++++++++++----
+ arch/arm/include/asm/pgtable.h        | 52 +++++++++++++++++++----------------
+ arch/arm/mm/dump.c                    |  8 +++---
+ arch/arm/mm/mmu.c                     | 25 +++++++++--------
+ arch/arm/mm/proc-macros.S             | 16 +++++------
+ arch/arm/mm/proc-v7-2level.S          |  6 ++--
+ arch/arm/mm/proc-v7-3level.S          |  4 ++-
+ arch/arm/mm/proc-xscale.S             |  4 +--
+ 9 files changed, 80 insertions(+), 61 deletions(-)
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.4
