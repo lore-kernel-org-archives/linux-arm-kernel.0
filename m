@@ -1,27 +1,41 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 16 Jun 2014 17:40:20 +0530
-Subject: [PATCH V3 0/2] arm: dts: dra7: add crossbar dt support
-Message-ID: <1402920622-7998-1-git-send-email-r.sricharan@ti.com>
+Date: Mon, 16 Jun 2014 17:40:21 +0530
+Subject: [PATCH V3 1/2] arm: dts: dra7: add routable-irqs property for gic node
+In-Reply-To: <1402920622-7998-1-git-send-email-r.sricharan@ti.com>
+References: <1402920622-7998-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402920622-7998-2-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces DT support for crossbar device and
-changes dra7 peripherals to use crossbar number instead of irq.
+From: R Sricharan <r.sricharan@ti.com>
 
-This depends on below driver fixes and cleanup series.
+There is a IRQ crossbar device in the soc, which maps the
+irq requests from the peripherals to the mpu interrupt
+controller's inputs. The gic provides the support for such
+IPs in the form of routable-irqs. So adding the property
+here to gic node.
 
-https://lkml.org/lkml/2014/6/16/218
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Cc: Benoit Cousson <bcousson@baylibre.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dra7.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-[V2] Rebased on 3.15 mainline.
-[V3] Added ti,irqs-skip property and ti,irqs-safe-map property to
-     crossbar dt node.
-
-R Sricharan (2):
-  arm: dts: dra7: add routable-irqs property for gic node
-  arm: dts: dra7: add crossbar device binding
-
- arch/arm/boot/dts/dra7.dtsi |  136 +++++++++++++++++++++++++------------------
- 1 file changed, 78 insertions(+), 58 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index c29945e..1cf4ee1 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -45,6 +45,7 @@
+ 		compatible = "arm,cortex-a15-gic";
+ 		interrupt-controller;
+ 		#interrupt-cells = <3>;
++		arm,routable-irqs = <192>;
+ 		reg = <0x48211000 0x1000>,
+ 		      <0x48212000 0x1000>,
+ 		      <0x48214000 0x2000>,
 -- 
 1.7.9.5
