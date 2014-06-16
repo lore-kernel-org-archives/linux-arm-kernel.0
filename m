@@ -1,113 +1,98 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 16 Jun 2014 12:11:16 +0200
-Subject: [PATCH v14 02/10] imx-drm: Add RGB666 support for parallel display.
+Date: Mon, 16 Jun 2014 12:11:18 +0200
+Subject: [PATCH v14 04/10] imx-drm: use defines for clock polarity settings
 In-Reply-To: <1402913484-25910-1-git-send-email-denis@eukrea.com>
 References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
-Message-ID: <1402913484-25910-2-git-send-email-denis@eukrea.com>
+Message-ID: <1402913484-25910-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
 ChangeLog v13->v14:
 - Rebased
-ChangeLog v9->v13:
-- Rebased
-ChangeLog v8->v9:
-- Rebased.
-- Added Philipp Zabel's ack.
-- Shortened the patch title.
+ChangeLog 12->v13:
+- No changes
+ChangeLog 11->v12:
+- Improved the define names to match the hardware:
+  ENABLE_POL is not a clock signal but instead an enable signal.
 
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
-- Rebased.
-
-ChangeLog v7->v8:
-- Shrinked even more the Cc list.
-
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
-
-ChangeLog v5->v6:
-- Remove people not concerned by this patch from the Cc list.
-
-ChangeLog v3->v5:
-- Use the correct RGB order.
-
-ChangeLog v2->v3:
-- Added some interested people in the Cc list.
-- Removed the commit message long desciption that was just a copy of the short
-  description.
-- Rebased the patch.
-- Fixed a copy-paste error in the ipu_dc_map_clear parameter.
+ChangeLog v9->v10:
+- New patch which was splitted out from:
+  "staging: imx-drm: Use de-active and pixelclk-active display-timings.".
+- Fixes many issues in "staging: imx-drm: Use de-active and pixelclk-active
+  display-timings.":
+  - More clear meaning of the polarity settings.
+  - The SET_CLK_POL and SET_DE_POL masks are not
+    needed anymore.
 ---
- .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    4 ++--
- drivers/gpu/ipu-v3/ipu-dc.c                        |    9 +++++++++
- drivers/staging/imx-drm/parallel-display.c         |    2 ++
- 3 files changed, 13 insertions(+), 2 deletions(-)
+ drivers/gpu/ipu-v3/ipu-di.c          |    4 ++--
+ drivers/staging/imx-drm/ipuv3-crtc.c |    4 ++--
+ include/video/imx-ipu-v3.h           |    8 +++++++-
+ 3 files changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-index e75f0e5..c0eb95a 100644
---- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-@@ -60,8 +60,8 @@ Required properties:
- - compatible: Should be "fsl,imx-parallel-display"
- Optional properties:
- - interface_pix_fmt: How this display is connected to the
--  display interface. Currently supported types: "rgb24", "rgb565", "bgr666"
--  and "lvds666".
-+  display interface. Currently supported types: "rgb24", "rgb565", "bgr666",
-+  "rgb666" and "lvds666".
- - edid: verbatim EDID data block describing attached display.
- - ddc: phandle describing the i2c bus handling the display data
-   channel
-diff --git a/drivers/gpu/ipu-v3/ipu-dc.c b/drivers/gpu/ipu-v3/ipu-dc.c
-index 2326c75..100d410 100644
---- a/drivers/gpu/ipu-v3/ipu-dc.c
-+++ b/drivers/gpu/ipu-v3/ipu-dc.c
-@@ -93,6 +93,7 @@ enum ipu_dc_map {
- 	IPU_DC_MAP_BGR666,
- 	IPU_DC_MAP_LVDS666,
- 	IPU_DC_MAP_BGR24,
-+	IPU_DC_MAP_RGB666,
- };
- 
- struct ipu_dc {
-@@ -161,6 +162,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
- 		return IPU_DC_MAP_LVDS666;
- 	case V4L2_PIX_FMT_BGR24:
- 		return IPU_DC_MAP_BGR24;
-+	case V4L2_PIX_FMT_RGB666:
-+		return IPU_DC_MAP_RGB666;
- 	default:
- 		return -EINVAL;
+diff --git a/drivers/gpu/ipu-v3/ipu-di.c b/drivers/gpu/ipu-v3/ipu-di.c
+index c490ba4..d00f357 100644
+--- a/drivers/gpu/ipu-v3/ipu-di.c
++++ b/drivers/gpu/ipu-v3/ipu-di.c
+@@ -595,7 +595,7 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		}
  	}
-@@ -452,6 +455,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
  
-+	/* rgb666 */
-+	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
+-	if (sig->clk_pol)
++	if (sig->clk_pol == CLK_POL_POSEDGE)
+ 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
+ 
+ 	ipu_di_write(di, di_gen, DI_GENERAL);
+@@ -606,7 +606,7 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 	reg = ipu_di_read(di, DI_POL);
+ 	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
+ 
+-	if (sig->enable_pol)
++	if (sig->enable_pol == ENABLE_POL_HIGH)
+ 		reg |= DI_POL_DRDY_POLARITY_15;
+ 	if (sig->data_pol)
+ 		reg |= DI_POL_DRDY_DATA_POLARITY;
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index 720868b..7fec438 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -165,8 +165,8 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		sig_cfg.Vsync_pol = 1;
+ 
+-	sig_cfg.enable_pol = 1;
+-	sig_cfg.clk_pol = 0;
++	sig_cfg.enable_pol = ENABLE_POL_HIGH;
++	sig_cfg.clk_pol = CLK_POL_NEGEDGE;
+ 	sig_cfg.width = mode->hdisplay;
+ 	sig_cfg.height = mode->vdisplay;
+ 	sig_cfg.pixel_fmt = out_pixel_fmt;
+diff --git a/include/video/imx-ipu-v3.h b/include/video/imx-ipu-v3.h
+index 3e43e22..8888305 100644
+--- a/include/video/imx-ipu-v3.h
++++ b/include/video/imx-ipu-v3.h
+@@ -27,6 +27,12 @@ enum ipuv3_type {
+ 
+ #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
+ 
++#define CLK_POL_NEGEDGE		0
++#define CLK_POL_POSEDGE		1
 +
- 	return 0;
- }
- 
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index b567832..64b34336 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -218,6 +218,8 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
- 		else if (!strcmp(fmt, "bgr666"))
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
-+		else if (!strcmp(fmt, "rgb666"))
-+			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
- 		else if (!strcmp(fmt, "lvds666"))
- 			imxpd->interface_pix_fmt = v4l2_fourcc('L', 'V', 'D', '6');
- 	}
++#define ENABLE_POL_LOW		0
++#define ENABLE_POL_HIGH		1
++
+ /*
+  * Bitfield of Display Interface signal polarities.
+  */
+@@ -37,7 +43,7 @@ struct ipu_di_signal_cfg {
+ 	unsigned clksel_en:1;
+ 	unsigned clkidle_en:1;
+ 	unsigned data_pol:1;	/* true = inverted */
+-	unsigned clk_pol:1;	/* true = rising edge */
++	unsigned clk_pol:1;
+ 	unsigned enable_pol:1;
+ 	unsigned Hsync_pol:1;	/* true = active high */
+ 	unsigned Vsync_pol:1;
 -- 
 1.7.9.5
