@@ -1,78 +1,68 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 16 Jun 2014 12:46:22 +0200
-Subject: [PATCH v6 0/7] ARM: berlin: add AHCI support
-In-Reply-To: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <539ECAFE.3000508@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Jun 2014 11:46:16 +0100
+Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling()
+ into a library function
+In-Reply-To: <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140616104615.GA10701@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2014 12:26 PM, Antoine T?nart wrote:
-> This series adds the support for Berlin SoC AHCI controller. The
-> controller allows to use the SATA host interface and, for example, the
-> eSATA port on the BG2Q.
->
-> The series adds a PHY driver to control the two SATA ports available,
-> and adds a generic compatible to use the existing ahci_platform driver.
+On Wed, Apr 23, 2014 at 08:08:07PM +0100, Russell King wrote:
+> @@ -1507,25 +1529,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+>  			host->ops->set_clock(host, host->clock);
+>  		}
+>  
+> -		if (host->ops->set_uhs_signaling)
+> -			host->ops->set_uhs_signaling(host, ios->timing);
+> -		else {
+> -			ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+> -			/* Select Bus Speed Mode for host */
+> -			ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+> -			if ((ios->timing == MMC_TIMING_MMC_HS200) ||
+> -			    (ios->timing == MMC_TIMING_UHS_SDR104))
+> -				ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
+> -			else if (ios->timing == MMC_TIMING_UHS_SDR12)
+> -				ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
+> -			else if (ios->timing == MMC_TIMING_UHS_SDR25)
+> -				ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
+> -			else if (ios->timing == MMC_TIMING_UHS_SDR50)
+> -				ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
+> -			else if (ios->timing == MMC_TIMING_UHS_DDR50)
+> -				ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
+> -			sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+> -		}
+> +		host->ops->set_uhs_signaling(host, ios->timing);
+>  
+>  		if (!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN) &&
+>  				((ios->timing == MMC_TIMING_UHS_SDR12) ||
 
-Besides the comment about adding SATA clock to SATA PHY node and driver,
+Whoever decided to poorly pick these patches up against my will has
+slightly messed this patch up - whereas my original patch left the
+code correctly formatted, when whoever applied this patch did so, they
+left an additional blank line in the above.
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+The other thing I'd ask is that the MMC people learn C precedence
+rules, and realise that it's not necessary (and actively harmful)
+to add additional parenthesis around simple if() conditions.  Testing
+for timing being one of two values does not need anything more than
+one set of parenthesis - it does not need if ((a == b) || (a == c)) -
+if (a == b || a == c) does just fine, and is less confusing when
+encountering more complex statements, such as:
 
-for patches 1-5.
+	if ((((a == b) || (a == c)) && ((d > a) || (d < c))) || (z == f))
 
-> Also enable the eSATA interface on the BG2Q DMP.
->
-> Changes sinve v5:
-> 	- rebased on top of v3.16-rc1
-> 	- added the clocks property in the sata node
->
-> Changes since v4:
->          - updated PHY driver as tristate
->          - handled the case were no SATA port is enabled
->          - updated the compatible to a generic one
->          - cosmetic fixups
->
-> Changes since v3:
->          - moved all PHY operations to the PHY driver
->          - removed PHY sub-nodes
->          - removed the custom Berlin AHCI driver and switched to
->            ahci_platform
->          - added multiple PHYs support to the libahci_platform
->
-> Changes since v2:
->          - modeled each PHY as a sub-node
->          - cosmetic fixups
->
-> Changes since v1:
->          - added a PHY driver, allowing to enable each port
->            individually and removed the 'force-port-map' property
->          - made the drivers a bit less magic :)
->          - wrote a function to select and configure registers in the
->            AHCI driver
->          - removed BG2 / BG2CD nodes
->
-> Antoine T?nart (7):
->    phy: add a driver for the Berlin SATA PHY
->    Documentation: bindings: add the Berlin SATA PHY
->    ata: libahci: allow to use multiple PHYs
->    ata: ahci_platform: add a generic AHCI compatible
->    Documentation: bindings: document the sub-nodes AHCI bindings
->    ARM: berlin: add the AHCI node for the BG2Q
->    ARM: berlin: enable the eSATA interface on the BG2Q DMP
->
->   .../devicetree/bindings/ata/ahci-platform.txt      |  37 ++++
->   .../devicetree/bindings/phy/berlin-sata-phy.txt    |  14 ++
->   arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   8 +
->   arch/arm/boot/dts/berlin2q.dtsi                    |  28 +++
->   drivers/ata/ahci.h                                 |   3 +-
->   drivers/ata/ahci_platform.c                        |   2 +
->   drivers/ata/libahci.c                              |   7 +
->   drivers/ata/libahci_platform.c                     | 170 +++++++++++----
->   drivers/phy/Kconfig                                |   7 +
->   drivers/phy/Makefile                               |   1 +
->   drivers/phy/phy-berlin-sata.c                      | 232 +++++++++++++++++++++
->   11 files changed, 473 insertions(+), 36 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
->   create mode 100644 drivers/phy/phy-berlin-sata.c
->
+compared with:
+
+	if (((a == b || a == c) && (d > a || d < c)) || z == f)
+
+With the former "style", I normally end up having to pull the file into
+the editor, and rewrite the damned statement to work out what the
+grouping is, because the excessive use of parenthesis is detrimental to
+readability.  Don't do it.  Learn the C precedence rules and keep code
+readable.
+
+-- 
+FTTC broadband for 0.8mile line: now@9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
