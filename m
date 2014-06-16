@@ -1,69 +1,39 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 16 Jun 2014 19:56:44 +0200
-Subject: [PATCH v2 1/4] dt: bindings: add bindings for Broadcom bcm43xx sdio
- devices
+Date: Mon, 16 Jun 2014 19:56:46 +0200
+Subject: [PATCH v2 3/4] brcmfmac: Fix some wrong register defines
 In-Reply-To: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
 References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1402941407-8210-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1402941407-8210-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arend van Spriel <arend@broadcom.com>
-
-The Broadcom bcm43xx sdio devices are fullmac devices that may be
-integrated in ARM platforms. Currently, the brcmfmac driver for
-these devices support use of platform data. This patch specifies
-the bindings that allow this platform data to be expressed in the
-devicetree.
-
-Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
-Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
-Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
-Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
-Signed-off-by: Arend van Spriel <arend@broadcom.com>
-[hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
- on how to handle this yet]
-[hdegoede at redhat.com: move from bindings/staging to bindings]
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+ drivers/net/wireless/brcm80211/brcmfmac/sdio_host.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
-new file mode 100644
-index 0000000..6a0aaf2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
-@@ -0,0 +1,29 @@
-+Broadcom BCM43xx Fullmac wireless SDIO devices
-+
-+This node provides properties for controlling the Broadcom wireless device. The
-+node is expected to be specified as a child node to the SDIO controller that
-+connects the device to the system.
-+
-+Required properties:
-+
-+ - compatible : Should be "brcm,bcm43xx-fmac".
-+
-+Optional properties:
-+ - brcm,drive-strength : drive strength used for SDIO pins on device.
-+	(default = 6mA).
-+ - interrupt-parent : the phandle for the interrupt controller to which the
-+	device interrupts are connected.
-+ - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
-+	When not specified the device will use in-band SDIO interrupts.
-+ - interrupt-names : name of the out-of-band interrupt, which must be set
-+	to "host-wake".
-+
-+Example:
-+
-+bcm4335 {
-+	compatible = "brcm,bcm43xx-fmac";
-+	brcm,drive-strength = <4>;
-+	interrupt-parent = <&gpx2>;
-+	interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "host-wake";
-+};
+diff --git a/drivers/net/wireless/brcm80211/brcmfmac/sdio_host.h b/drivers/net/wireless/brcm80211/brcmfmac/sdio_host.h
+index 3deab79..6e6a366 100644
+--- a/drivers/net/wireless/brcm80211/brcmfmac/sdio_host.h
++++ b/drivers/net/wireless/brcm80211/brcmfmac/sdio_host.h
+@@ -72,12 +72,12 @@
+ #define SBSDIO_SPROM_DATA_HIGH		0x10003
+ /* sprom indirect access addr byte 0 */
+ #define SBSDIO_SPROM_ADDR_LOW		0x10004
+-/* sprom indirect access addr byte 0 */
+-#define SBSDIO_SPROM_ADDR_HIGH		0x10005
+-/* xtal_pu (gpio) output */
+-#define SBSDIO_CHIP_CTRL_DATA		0x10006
+-/* xtal_pu (gpio) enable */
+-#define SBSDIO_CHIP_CTRL_EN		0x10007
++/* gpio select */
++#define SBSDIO_GPIO_SELECT		0x10005
++/* gpio output */
++#define SBSDIO_GPIO_OUT			0x10006
++/* gpio enable */
++#define SBSDIO_GPIO_EN			0x10007
+ /* rev < 7, watermark for sdio device */
+ #define SBSDIO_WATERMARK		0x10008
+ /* control busy signal generation */
 -- 
 2.0.0
