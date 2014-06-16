@@ -1,47 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 16 Jun 2014 04:43:05 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Change hardreset soc_ops for
- AM43XX
-In-Reply-To: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
-References: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <alpine.DEB.2.02.1406160441150.26773@utopia.booyaka.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 16 Jun 2014 14:18:31 +0900
+Subject: [PATCH v2 01/10] DMA, CMA: clean-up log message
+In-Reply-To: <xa1tegyujvxv.fsf@mina86.com>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-2-git-send-email-iamjoonsoo.kim@lge.com>
+ <87y4x2pwnk.fsf@linux.vnet.ibm.com>
+ <20140612055358.GA30128@js1304-P5Q-DELUXE>
+ <xa1toaxyjym3.fsf@mina86.com> <xa1tegyujvxv.fsf@mina86.com>
+Message-ID: <20140616051830.GA23210@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
-
-On Mon, 9 Jun 2014, Dave Gerlach wrote:
-
-> am43xx reset register layout is more similar to am33xx than omap4 so
-> use the am33xx functions for hwmod hardreset soc_ops rather than the
-> currently used omap4 functions. Without this, assert_hardreset and
-> deassert_hardreset will not work on am43xx.
+On Thu, Jun 12, 2014 at 11:53:16AM +0200, Michal Nazarewicz wrote:
+> On Thu, Jun 12 2014, Michal Nazarewicz <mina86@mina86.com> wrote:
+> > I used ?function(arg1, arg2, ?)? at the *beginning* of functions when
+> > the arguments passed to the function were included in the message.  In
+> > all other cases I left it at just ?function:? (or just no additional
+> > prefix).  IMO that's a reasonable strategy.
 > 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 66c60fe..1c0885b 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -4251,9 +4251,9 @@ void __init omap_hwmod_init(void)
->  		soc_ops.enable_module = _omap4_enable_module;
->  		soc_ops.disable_module = _omap4_disable_module;
->  		soc_ops.wait_target_ready = _omap4_wait_target_ready;
-> -		soc_ops.assert_hardreset = _omap4_assert_hardreset;
-> -		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
-> -		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
-> +		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
-> +		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
-> +		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
->  		soc_ops.init_clkdm = _init_clkdm;
->  	} else if (soc_is_am33xx()) {
->  		soc_ops.enable_module = _am33xx_enable_module;
+> At closer inspection, I realised drivers/base/dma-contiguous.c is
+> Marek's code, but the above I think is still reasonable thing to do, so
+> I'd rather standardise on having ?function(?)? only at the beginning of
+> a function.  Just my 0.02 CHF.
 
-Should AM43XX be using the _am33xx_{enable,disable}_module and 
-wait_target_ready functions?  
+Hello,
 
+Now, I realize that these changes aren't needed in this patchset, so I
+simplify this patch just to remove redundant 'CMA' prefix. Other things
+can be done after merging if we need.
 
-- Paul
+Thanks.
