@@ -1,58 +1,74 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 16 Jun 2014 12:31:23 +0530
-Subject: [PATCH RFC v2 4/7] ARM: dts: Add PPMU device tree support for
- Exynos5420
-In-Reply-To: <537E38F5.4020200@cogentembedded.com>
-References: <1400779322-4410-1-git-send-email-a.kesavan@samsung.com>
- <1400779322-4410-5-git-send-email-a.kesavan@samsung.com>
- <537E38F5.4020200@cogentembedded.com>
-Message-ID: <CAM4voamge5W=YRb2WDSQjgTae-oeAiaUqx9ykLsQ0w1E-4LqsQ@mail.gmail.com>
+From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
+Date: Mon, 16 Jun 2014 12:32:24 +0530
+Subject: [PATCH v2 07/10] PPC, KVM,
+ CMA: use general CMA reserved area management framework
+In-Reply-To: <20140616053408.GH23210@js1304-P5Q-DELUXE>
+References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <1402543307-29800-8-git-send-email-iamjoonsoo.kim@lge.com>
+ <87mwdfg9co.fsf@linux.vnet.ibm.com>
+ <20140616053408.GH23210@js1304-P5Q-DELUXE>
+Message-ID: <87wqchcp6n.fsf@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
 
-On Thu, May 22, 2014 at 11:20 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 05/22/2014 09:21 PM, Abhilash Kesavan wrote:
+> On Sat, Jun 14, 2014 at 02:23:59PM +0530, Aneesh Kumar K.V wrote:
+>> Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
+>> 
+>> > Now, we have general CMA reserved area management framework,
+>> > so use it for future maintainabilty. There is no functional change.
+>> >
+>> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
+>> > Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+>> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+>> 
+>> Need this. We may want to keep the VM_BUG_ON by moving
+>> KVM_CMA_CHUNK_ORDER around.
+>> 
+>> diff --git a/arch/powerpc/kvm/book3s_64_mmu_hv.c b/arch/powerpc/kvm/book3s_64_mmu_hv.c
+>> index 8056107..1932e0e 100644
+>> --- a/arch/powerpc/kvm/book3s_64_mmu_hv.c
+>> +++ b/arch/powerpc/kvm/book3s_64_mmu_hv.c
+>> @@ -37,8 +37,6 @@
+>>  #include <asm/ppc-opcode.h>
+>>  #include <asm/cputable.h>
+>>  
+>> -#include "book3s_hv_cma.h"
+>> -
+>>  /* POWER7 has 10-bit LPIDs, PPC970 has 6-bit LPIDs */
+>>  #define MAX_LPID_970   63
+>>  
+>> @@ -64,7 +62,6 @@ long kvmppc_alloc_hpt(struct kvm *kvm, u32 *htab_orderp)
+>>         }
+>>  
+>>         kvm->arch.hpt_cma_alloc = 0;
+>> -       VM_BUG_ON(order < KVM_CMA_CHUNK_ORDER);
+>>         page = kvm_alloc_hpt(1 << (order - PAGE_SHIFT));
+>>         if (page) {
+>>                 hpt = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+>> 
+>> 
+>> 
+>> -aneesh
 >
->> PPMU is required by the exynos5420 devfreq driver. Add a device
->> tree node for it.
+> Okay.
+> So do you also want this?
 >
+> @@ -131,16 +135,18 @@ struct page *kvm_alloc_hpt(unsigned long nr_pages)
+>  {
+>         unsigned long align_pages = HPT_ALIGN_PAGES;
 >
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos5420.dtsi |    7 +++++++
->>   1 file changed, 7 insertions(+)
->
->
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
->> b/arch/arm/boot/dts/exynos5420.dtsi
->> index 8e7e35c..6ab7b03 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -833,4 +833,11 @@
->>                 samsung,pmu-syscon = <&pmu_system_controller>;
->>                 #phy-cells = <1>;
->>         };
->> +
->> +       ppmu {
->
->
->    Shouldn't it have the unit-address part, like "ppmu at 10d00000"?
-Will fix.
+> +       VM_BUG_ON(get_order(nr_pages) < KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
+> +
+>         /* Old CPUs require HPT aligned on a multiple of its size */
+>         if (!cpu_has_feature(CPU_FTR_ARCH_206))
+>                 align_pages = nr_pages;
+> -       return kvm_alloc_cma(nr_pages, align_pages);
+> +       return cma_alloc(kvm_cma, nr_pages, get_order(align_pages));
+>  }
 
-Regards,
-Abhilash
->
->
->> +               compatible = "samsung,exynos5420-int-busfreq";
->> +               reg = <0x10D00000 0x2000        /* PPMU_DMC_0_0 */
->> +                      0x10D10000 0x2000        /* PPMU_DMC_0_1 */
->> +                      0x10D60000 0x2000>;      /* PPMU_DMC_1_0 */
->> +       };
->>   };
->
->
-> WBR, Sergei
->
+That would also work.
+
+Thanks
+-aneesh
