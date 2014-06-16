@@ -1,89 +1,124 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 16 Jun 2014 13:49:47 +0200
-Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
-In-Reply-To: <534CFB45.9070704@st.com>
-References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
- <534CFB45.9070704@st.com>
-Message-ID: <1402919387.30599.4.camel@x220>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 16 Jun 2014 13:53:08 +0200
+Subject: [RESEND][PATCH] mmc: wmt-sdmmc: Fix settting BM_EIGHTBIT_MODE bit
+ in wmt_mci_set_ios()
+In-Reply-To: <1398594171.6291.2.camel@phoenix>
+References: <1398594171.6291.2.camel@phoenix>
+Message-ID: <CAPDyKFq9DQ0ZQCv5TxQ3SOavqEM5SDv0vHjjOZE8ojpztSmiEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-15 at 14:56 +0530, Rajeev kumar wrote:
-> On 4/15/2014 1:56 PM, Paul Bolle wrote:
-> > The Kconfig symbol PLAT_SPEAR_SINGLE briefly appeared during the v3.10
-> > development cycle. It was removed in a merge commit before v3.10. A few
-> > references to it were left in the tree, probably because they didn't
-> > generate merge conflicts. Whatever it was, they're useless now and can
-> > safely be removed.
-> >
-> > Reported-by: Martin Walch <walch.martin@web.de>
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > ---
-> > 0) First version was broken: it left config ARCH_SPEAR_AUTO without its
-> > bool type. This version is done on top of v3.15-rc1.
-> >
-> > 1) Still untested.
-> >
-> >   arch/arm/mach-spear/Kconfig | 9 ++++-----
-> >   1 file changed, 4 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
-> > index 0786249b2832..bc8a11c53377 100644
-> > --- a/arch/arm/mach-spear/Kconfig
-> > +++ b/arch/arm/mach-spear/Kconfig
-> > @@ -4,7 +4,6 @@
-> >
-> >   menuconfig PLAT_SPEAR
-> >   	bool "ST SPEAr Family" if ARCH_MULTI_V7 || ARCH_MULTI_V5
-> > -	default PLAT_SPEAR_SINGLE
-> >   	select ARCH_REQUIRE_GPIOLIB
-> >   	select ARM_AMBA
-> >   	select CLKSRC_MMIO
-> > @@ -13,7 +12,7 @@ if PLAT_SPEAR
-> >
-> >   config ARCH_SPEAR13XX
-> >   	bool "ST SPEAr13xx"
-> > -	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
-> > +	depends on ARCH_MULTI_V7
-> >   	select ARCH_HAS_CPUFREQ
-> >   	select ARM_GIC
-> >   	select GPIO_SPEAR_SPICS
-> > @@ -41,7 +40,7 @@ endif #ARCH_SPEAR13XX
-> >
-> >   config ARCH_SPEAR3XX
-> >   	bool "ST SPEAr3xx"
-> > -	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
-> > +	depends on ARCH_MULTI_V5
-> >   	depends on !ARCH_SPEAR13XX
-> >   	select ARM_VIC
-> >   	select PINCTRL
-> > @@ -72,7 +71,7 @@ endif
-> >
-> >   config ARCH_SPEAR6XX
-> >   	bool "ST SPEAr6XX"
-> > -	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
-> > +	depends on ARCH_MULTI_V5
-> >   	depends on !ARCH_SPEAR13XX
-> >   	select ARM_VIC
-> >   	help
-> > @@ -85,7 +84,7 @@ config MACH_SPEAR600
-> >   	  Supports ST SPEAr600 boards configured via the device-tree
-> >
-> >   config ARCH_SPEAR_AUTO
-> > -	def_bool PLAT_SPEAR_SINGLE
-> > +	bool
-> >   	depends on !ARCH_SPEAR13XX && !ARCH_SPEAR6XX
-> >   	select ARCH_SPEAR3XX
-> >
-> >
-> 
-> 
-> Reviewed-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+On 27 April 2014 12:22, Axel Lin <axel.lin@ingics.com> wrote:
+> For MMC_BUS_WIDTH_8 case, current code missed setting BM_EIGHTBIT_MODE bit.
+> Also has a small refactor to make the code looks better in readability.
+>
+> So the bit settings witch below logic:
+>
+> SDMMC_BUSMODE register:
+> Set EIGHTBIT_MODE bit for 8 bit mode, Set FOURBIT_MODE bit for 4 bit mode.
+> Clear both EIGHTBIT_MODE and FOURBIT_MODE bits for 1 bit mode.
+>
+> SDMMC_EXTCTRL register:
+> Set EXT_EIGHTBIT bit for 8 bit mode, Clear EXT_EIGHTBIT bit for 1/4 bit mode.
+>
+> Add define for EXT_EIGHTBIT to avoid using magic number.
+> BM_ONEBIT_MASK is no longer used, thus remove it.
+>
+> This patch is untested due to lack of platform with 8-bit hardware.
+> However since the code is there, it's good to make the code match the document.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
-Thanks!
+Thanks! Applied for next.
 
-This can still be seen in v3.16-rc1 and in today's linux-next (ie,
-next-20140616). Is this trivial patch queued somewhere?
+Kind regards
+Uffe
 
-
-Paul Bolle
+> ---
+> This patch was sent on:
+> http://www.spinics.net/lists/linux-mmc/msg22926.html
+> The document (wm8505 sdmmc controller suppliment.pdf) is available at:
+> https://groups.google.com/group/vt8500-wm8505-linux-kernel/attach/ac3d5037e860a34/wm8505%20sdmmc%20controller%20suppliment.pdf?part=4&authuser=1
+>
+> Regards,
+> Axel
+>
+>  drivers/mmc/host/wmt-sdmmc.c | 31 +++++++++++++++----------------
+>  1 file changed, 15 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+> index 8a48a50..6ed18f8 100644
+> --- a/drivers/mmc/host/wmt-sdmmc.c
+> +++ b/drivers/mmc/host/wmt-sdmmc.c
+> @@ -72,7 +72,6 @@
+>  #define BM_SPI_CS                      0x20
+>  #define BM_SD_POWER                    0x40
+>  #define BM_SOFT_RESET                  0x80
+> -#define BM_ONEBIT_MASK                 0xFD
+>
+>  /* SDMMC_BLKLEN bit fields */
+>  #define BLKL_CRCERR_ABORT              0x0800
+> @@ -120,6 +119,8 @@
+>  #define STS2_DATARSP_BUSY              0x20
+>  #define STS2_DIS_FORCECLK              0x80
+>
+> +/* SDMMC_EXTCTRL bit fields */
+> +#define EXT_EIGHTBIT                   0x04
+>
+>  /* MMC/SD DMA Controller Registers */
+>  #define SDDMA_GCR                      0x100
+> @@ -672,7 +673,7 @@ static void wmt_mci_request(struct mmc_host *mmc, struct mmc_request *req)
+>  static void wmt_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  {
+>         struct wmt_mci_priv *priv;
+> -       u32 reg_tmp;
+> +       u32 busmode, extctrl;
+>
+>         priv = mmc_priv(mmc);
+>
+> @@ -687,28 +688,26 @@ static void wmt_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         if (ios->clock != 0)
+>                 clk_set_rate(priv->clk_sdmmc, ios->clock);
+>
+> +       busmode = readb(priv->sdmmc_base + SDMMC_BUSMODE);
+> +       extctrl = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
+> +
+> +       busmode &= ~(BM_EIGHTBIT_MODE | BM_FOURBIT_MODE);
+> +       extctrl &= ~EXT_EIGHTBIT;
+> +
+>         switch (ios->bus_width) {
+>         case MMC_BUS_WIDTH_8:
+> -               reg_tmp = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
+> -               writeb(reg_tmp | 0x04, priv->sdmmc_base + SDMMC_EXTCTRL);
+> +               busmode |= BM_EIGHTBIT_MODE;
+> +               extctrl |= EXT_EIGHTBIT;
+>                 break;
+>         case MMC_BUS_WIDTH_4:
+> -               reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
+> -               writeb(reg_tmp | BM_FOURBIT_MODE, priv->sdmmc_base +
+> -                      SDMMC_BUSMODE);
+> -
+> -               reg_tmp = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
+> -               writeb(reg_tmp & 0xFB, priv->sdmmc_base + SDMMC_EXTCTRL);
+> +               busmode |= BM_FOURBIT_MODE;
+>                 break;
+>         case MMC_BUS_WIDTH_1:
+> -               reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
+> -               writeb(reg_tmp & BM_ONEBIT_MASK, priv->sdmmc_base +
+> -                      SDMMC_BUSMODE);
+> -
+> -               reg_tmp = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
+> -               writeb(reg_tmp & 0xFB, priv->sdmmc_base + SDMMC_EXTCTRL);
+>                 break;
+>         }
+> +
+> +       writeb(busmode, priv->sdmmc_base + SDMMC_BUSMODE);
+> +       writeb(extctrl, priv->sdmmc_base + SDMMC_EXTCTRL);
+>  }
+>
+>  static int wmt_mci_get_ro(struct mmc_host *mmc)
+> --
+> 1.8.1.2
+>
+>
+>
