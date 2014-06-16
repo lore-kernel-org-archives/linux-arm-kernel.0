@@ -1,25 +1,66 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 16 Jun 2014 17:11:42 +0200
-Subject: [PATCH v2 02/10] iommu/ipmmu-vmsa: Cleanup failures of ARM
- mapping creation or attachment
-In-Reply-To: <9405311.lnqBdrCsyu@avalon>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1400150451-13469-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140526092310.GA11299@8bytes.org> <9405311.lnqBdrCsyu@avalon>
-Message-ID: <20140616151142.GE18986@8bytes.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jun 2014 16:13:29 +0100
+Subject: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability
+ IOMMU_CAP_INTR_REMAP
+In-Reply-To: <20140616145344.GD18986@8bytes.org>
+References: <1401987808-23596-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1401987808-23596-5-git-send-email-a.motakis@virtualopensystems.com>
+ <20140608103129.GC3279@lvm> <20140616145344.GD18986@8bytes.org>
+Message-ID: <20140616151329.GQ16758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Mon, May 26, 2014 at 12:08:37PM +0200, Laurent Pinchart wrote:
-> > Skipped this one because it didn't apply. The others are applied.
+On Mon, Jun 16, 2014 at 03:53:44PM +0100, Joerg Roedel wrote:
+> On Sun, Jun 08, 2014 at 12:31:29PM +0200, Christoffer Dall wrote:
+> > On Thu, Jun 05, 2014 at 07:03:12PM +0200, Antonios Motakis wrote:
+> > > With an ARM SMMU, interrupt remapping should always be safe from the
+> > > SMMU's point of view, as it is properly handled by the GIC.
+> > > 
+> > > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> > > ---
+> > >  drivers/iommu/arm-smmu.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > > index 15ab2af..ff29402 100644
+> > > --- a/drivers/iommu/arm-smmu.c
+> > > +++ b/drivers/iommu/arm-smmu.c
+> > > @@ -1544,7 +1544,7 @@ static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
+> > >  	if (smmu_domain->root_cfg.smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+> > >  		caps |= IOMMU_CAP_CACHE_COHERENCY;
+> > >  
+> > > -	caps |= IOMMU_CAP_NOEXEC;
+> > > +	caps |= IOMMU_CAP_NOEXEC | IOMMU_CAP_INTR_REMAP;
+> > >  
+> > >  	return !!(cap & caps);
+> > >  }
+> > > -- 
+> > > 1.8.3.2
+> > > 
+> > What does IOMMU_CAP_INTR_REMAP signify exactly?  Is there docs/examples
+> > somewhere I can look at?  (A quick scan of the Linux souce code doesn't
+> > reveal much, and I'm not sure if this is purely MSI related or what...)
 > 
-> Thank you. I'll rebase the patch on top of your tree as soon as you publish 
-> the related branch and resubmit.
+> The flag was introduced for x86 IOMMUs to detect whether an IOMMU in the
+> system has and enables interrupt remapping to allow safe device
+> assignment to KVM guests. Without interrupt remapping a malicious guest
+> could attack the host with MSIs from the attached device.
+> 
+> How are PCI MSIs implemented on ARM with SMMU and GIC enabled. MSIs are
+> only memory dma transactions in the end, is it guaranteed on ARM that a
+> device only sends MSI transactions it is allowed to?
 
-What happened to this patch? And how about the other iommu_domain
-changes requested. Will you submit them for 3.17?
+MSIs look just like memory accesses made by the device, so the SMMU will
+translate them to point at the GIC ITS (doorbell). The ITS then has tables
+to work out how to route the MSI.
 
+So, if IOMMU_CAP_INTR_REMAP is simply supposed to indicate that the SMMU can
+translate MSIs to point somewhere else, then the ARM SMMU can always do it.
+If it's supposed to indicate that the actual MSI payload can be
+filtered/routed, then that requires the GIC ITS.
 
-	Joerg
+The part I'm unsure of is how VFIO knows where to map the MSIs to. That
+requires knowledge of the physical and virtual doorbell pages -- is that
+discoverable in the API?
+
+Will
