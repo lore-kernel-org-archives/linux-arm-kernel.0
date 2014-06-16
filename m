@@ -1,73 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 Jun 2014 10:35:42 +0200
-Subject: BUG: Bad page state in process swapper pfn:00000
-In-Reply-To: <539915B3.9050904@codeaurora.org>
-References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>
- <539892BD.8020403@codeaurora.org>
- <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
- <539915B3.9050904@codeaurora.org>
-Message-ID: <CAMuHMdWzb3czgdNA+iUSRhtm=a2gQbgvaMUOC_MkZPepd8xKXQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Jun 2014 09:44:27 +0100
+Subject: [PATCH 3/5] clk: Add driver for Maxim 77802 PMIC clocks
+In-Reply-To: <1402306670-17041-4-git-send-email-javier.martinez@collabora.co.uk>
+References: <1402306670-17041-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402306670-17041-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140616084427.GG14323@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 4:51 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> Great! Russell are you okay with taking the above as a fix or would you prefer
-> I fixup drivers/of/fdt.c right now?
->
->
-> Thanks,
-> Laura
->
-> ----8<----
-> From 14bda557a108ad197e7c5f040f50ca024b45cc17 Mon Sep 17 00:00:00 2001
-> From: Laura Abbott <lauraa@codeaurora.org>
-> Date: Wed, 11 Jun 2014 19:39:29 -0700
-> Subject: [PATCH] arm: Bring back early_init_dt_add_memory_arch
->
-> Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) removed
-> early_init_dt_add_memory_arch in favor of using the common method.
-> The common method does not currently check for memory outside of
-> 32-bit bounds which may lead to memory being incorrectly added to
-> the system. Bring back early_init_dt_add_memory_arch for now until
-> the generic function can be fixed up.
-
-There's another issue with the generic version: if the start address of the
-memory block is not page-aligned, it will be rounded _down_ instead of up.
-
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-
-Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-
-Still needed in v3.16-rc1.
-
+> The MAX77802 PMIC has two 32.768kHz Buffered Clock Outputs with
+> Low Jitter Mode. This patch adds support for these two clocks.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
->  arch/arm/kernel/devtree.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index e94a157..ea9ce92 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -27,6 +27,10 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
->
-> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-> +{
-> +       arm_add_memory(base, size);
-> +}
->
->  #ifdef CONFIG_SMP
->  extern struct of_cpu_method __cpu_method_of_table[];
+>  .../devicetree/bindings/clock/maxim,max77802.txt   |  40 ++++
+>  drivers/clk/Kconfig                                |   6 +
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/clk-max77802.c                         | 253 +++++++++++++++++++++
+>  drivers/mfd/max77802.c                             |   3 +
+>  include/dt-bindings/clock/maxim,max77802.h         |  22 ++
+>  6 files changed, 325 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+>  create mode 100644 drivers/clk/clk-max77802.c
+>  create mode 100644 include/dt-bindings/clock/maxim,max77802.h
 
-Gr{oetje,eeting}s,
+[...]
 
-                        Geert
+> diff --git a/drivers/mfd/max77802.c b/drivers/mfd/max77802.c
+> index 59696dd..33e8023 100644
+> --- a/drivers/mfd/max77802.c
+> +++ b/drivers/mfd/max77802.c
+> @@ -35,6 +35,9 @@
+>  
+>  static const struct mfd_cell max77802_devs[] = {
+>  	{ .name = "max77802-pmic", },
+> +#if defined(CONFIG_COMMON_CLK_MAX77802)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+No, don't do that.  If COMMON_CLK_MAX77802 is not defined it just
+won't be matched, which is enough to ensure it won't be probed.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +	{ .name = "max77802-clk", },
+> +#endif
+>  };
+
+[...]
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
