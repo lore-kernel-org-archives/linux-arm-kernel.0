@@ -1,51 +1,30 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 16 Jun 2014 23:22:59 +0200
-Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
-In-Reply-To: <1402941376-29594-1-git-send-email-mporter@linaro.org>
-References: <1402941376-29594-1-git-send-email-mporter@linaro.org>
-Message-ID: <CAPDyKFqh1chuz_Yw74vXU+kTtCUyKT1eY9pKroMCFTaVrPX-bQ@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 16 Jun 2014 14:30:48 -0700
+Subject: [PATCH 1/2] touchscreen: sun4i-ts: A10 (sun4i) has double the
+ temperature precision
+In-Reply-To: <1402943069-19420-2-git-send-email-hdegoede@redhat.com>
+References: <1402943069-19420-1-git-send-email-hdegoede@redhat.com>
+ <1402943069-19420-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140616213048.GA422@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2014 19:56, Matt Porter <mporter@linaro.org> wrote:
-> Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
-> MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
-> driver which is enabled in this defconfig. This results in the
-> SDHCI driver not being built and a boot failure. Explictly
-> enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
-> driver is built.
->
-> Fixes: 5d01b7684b7e ("mmc: simplify SDHCI Kconfig dependencies")
-> Signed-off-by: Matt Porter <mporter@linaro.org>
+Hi Hans,
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Mon, Jun 16, 2014 at 08:24:28PM +0200, Hans de Goede wrote:
+> Testing has revealed that the temperature in the rtp controller of the A10
+> (sun4i) SoC has a resolution of 50 milli degrees / step, where as the
+> A13 (sun5i) and later models have 100 milli degrees / step.
+> 
+> Add a new sun5i-a13-ts compatible to differentiate the newer models and
+> set the resolution based on the compatible string.
+> 
+> This fixes the temperature reported on the A10 being twice as high as expected.
 
-I suppose this goes through arm-soc, but ping me if want me to send
-this as a fix for 3.16.
+Should we maybe add explicit temperature steps property so that we won;t
+need to patch again if they decided to change resolution again?
 
-Kind regards
-Uffe
+Thanks.
 
-> ---
->  arch/arm/configs/bcm_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-> index 9d13dae..dcfc559 100644
-> --- a/arch/arm/configs/bcm_defconfig
-> +++ b/arch/arm/configs/bcm_defconfig
-> @@ -98,6 +98,7 @@ CONFIG_MMC_UNSAFE_RESUME=y
->  CONFIG_MMC_BLOCK_MINORS=32
->  CONFIG_MMC_TEST=y
->  CONFIG_MMC_SDHCI=y
-> +CONFIG_MMC_SDHCI_PLTFM=y
->  CONFIG_MMC_SDHCI_BCM_KONA=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
-> --
-> 1.8.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Dmitry
