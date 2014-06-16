@@ -1,65 +1,92 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 16 Jun 2014 15:19:02 -0500
-Subject: [PATCH] ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
-In-Reply-To: <alpine.DEB.2.02.1406160441150.26773@utopia.booyaka.com>
-References: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
- <alpine.DEB.2.02.1406160441150.26773@utopia.booyaka.com>
-Message-ID: <539F5136.60605@ti.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 16 Jun 2014 13:27:12 -0700
+Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
+In-Reply-To: <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1402950432.3708.22.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+Hi Mark,
 
-On 06/15/2014 11:43 PM, Paul Walmsley wrote:
-> Dave,
->
-> On Mon, 9 Jun 2014, Dave Gerlach wrote:
->
->> am43xx reset register layout is more similar to am33xx than omap4 so
->> use the am33xx functions for hwmod hardreset soc_ops rather than the
->> currently used omap4 functions. Without this, assert_hardreset and
->> deassert_hardreset will not work on am43xx.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->>   arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->> index 66c60fe..1c0885b 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -4251,9 +4251,9 @@ void __init omap_hwmod_init(void)
->>   		soc_ops.enable_module = _omap4_enable_module;
->>   		soc_ops.disable_module = _omap4_disable_module;
->>   		soc_ops.wait_target_ready = _omap4_wait_target_ready;
->> -		soc_ops.assert_hardreset = _omap4_assert_hardreset;
->> -		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
->> -		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
->> +		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
->> +		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
->> +		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
->>   		soc_ops.init_clkdm = _init_clkdm;
->>   	} else if (soc_is_am33xx()) {
->>   		soc_ops.enable_module = _am33xx_enable_module;
->
-> Should AM43XX be using the _am33xx_{enable,disable}_module and
-> wait_target_ready functions?
+Sorry for such a delay in my reply.
 
-AM43xx has been using the _omap4_{enable,disable}_module functions 
-without issue. Nothing is currently using the hardreset ops for am43xx 
-which is why it went unnoticed but I saw the issue when I tried to use 
-them for the wkup_m3 hwmod and they failed during internal development.
+On Fri, 2014-05-16 at 10:50 +0100, Mark Rutland wrote:
+> Both the image load offset and the effective image size are forced to be
+> little-endian regardless of the native endianness of the kernel to
+> enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
+> which wish to make use of the load offset can inspect the effective
+> image size field for a non-zero value to determine if the offset is of a
+> known endianness.
 
-With that said, am43xx clockdomains have prcm_partition defined as part 
-of their data which is only used by the _omap4_{enable,disable}_module 
-functions and not the _am33xx functions so as the current configuration 
-stands the _omap4 variants are the right choice.
+Doing this conversion in the linker script seems complicated.  My
+thought was to just have an image header field that specifies the
+byte order, in the same way that the EI_DATA part of the ELF
+e_ident field does.
 
-Regards,
-Dave
+Another advantage of having the byte order in the header is that
+tools other than a boot loader that need to know the byte order
+can get that info from the header, otherwise they would need to
+guess the order with some kind of inspection.
 
->
->
-> - Paul
->
+A patch I had planned to post for this is below.
+
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -72,8 +72,8 @@ The decompressed kernel image contains a 64-byte header as follows:
+>  
+>    u32 code0;			/* Executable code */
+>    u32 code1;			/* Executable code */
+> -  u64 text_offset;		/* Image load offset */
+> -  u64 res0	= 0;		/* reserved */
+> +  u64 text_offset;		/* Image load offset, little endian */
+> +  u64 image_size;		/* Effective Image size, little endian */
+
+It seems __le64 would be a better type to use here, if the
+value is decided to be little endian.
+
+>    u64 res1	= 0;		/* reserved */
+>    u64 res2	= 0;		/* reserved */
+>    u64 res3	= 0;		/* reserved */
+> @@ -86,9 +86,27 @@ Header notes:
+
+
+>From a63dd2f24105c55734238efaacdac5048bbedf39 Mon Sep 17 00:00:00 2001
+From: Geoff Levand <geoff@infradead.org>
+Date: Thu, 12 Jun 2014 11:23:23 -0700
+Subject: [PATCH] arm64: Add byte order to image header
+
+When working with a raw arm64 image one needs to know the byte order of the
+image header to properly interpret the multi-byte values of the header.  Add
+a character value to the image header indicating the byte order the image was
+built with:
+
+  1=LSB (little endian), 2=MSB (big endian), 0=no support.
+
+A zero value will indicate a kernel that pre-dates this change.
+
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/kernel/head.S | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b96a732..70c3656 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -109,7 +109,11 @@
+ 	 * DO NOT MODIFY. Image header expected by Linux boot-loaders.
+ 	 */
+ 	b	stext				// branch to kernel start, magic
+-	.long	0				// reserved
++	CPU_LE(.byte	1)			// 1=LSB (little endian)
++	CPU_BE(.byte	2)			// 2=MSB (big endian)
++	.byte	0				// reserved
++	.byte	0				// reserved
++	.byte	0				// reserved
+ 	.quad	TEXT_OFFSET			// Image load offset from start of RAM
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+-- 
+1.9.1
