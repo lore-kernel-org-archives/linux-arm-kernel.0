@@ -1,69 +1,135 @@
 From: elder@linaro.org (Alex Elder)
-Date: Mon, 16 Jun 2014 08:40:00 -0500
-Subject: [PATCH v6 0/7] clk: bcm: prerequisite and bus clock support
-Message-ID: <1402926007-4436-1-git-send-email-elder@linaro.org>
+Date: Mon, 16 Jun 2014 08:40:02 -0500
+Subject: [PATCH v6 2/7] clk: kona: don't init clocks at startup time
+In-Reply-To: <1402926007-4436-1-git-send-email-elder@linaro.org>
+References: <1402926007-4436-1-git-send-email-elder@linaro.org>
+Message-ID: <1402926007-4436-3-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently only peripheral clocks are supported for Broadcom platforms
-that use Kona style CCUs for clocking.  This series adds support for
-bus clocks as well.
+The last thing done for CCU setup is a call to kona_ccu_init().
+This locks and enables write access on the CCU, then calls
+__kona_clk_init() for all of the clocks it provides.  The purpose of
+this was to get or set the initial state of all the registers
+related to each clock.
 
-One motivation for doing this is that there exist peripheral clocks
-that cannot be configured without having first enabled a related bus
-clock.  Adding bus clock support allows such peripheral clocks to be
-usable.
+There's no reason to do this though.  The common clock framework
+assumes nothing about the state of the hardware, and if a driver
+requires its clock to be in a particular state it can set that
+state up itself.
 
-This also imposes a new requirement, however--that the bus clock be
-enabled *before* operating on the clock that depends on it.  For
-this, we define the notion of a "prerequisite" clock.  If a clock
-has a prerequisite specified, that prequisite clock will be prepared
-and enabled at the beginning  of the dependent clock's ->prepare
-method.  The prerequisite clock is similarly disabled and unprepared
-at the end of the dependent clock's ->unprepare method.
+Instead of initializing clocks at startup time, define a prepare
+method that performs that step when a clock is first needed.
 
-These patches are based on Linux 3.16-rc1.
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/bcm/clk-kona-setup.c |  3 ---
+ drivers/clk/bcm/clk-kona.c       | 49 +++++++++++++++++++---------------------
+ drivers/clk/bcm/clk-kona.h       |  1 -
+ 3 files changed, 23 insertions(+), 30 deletions(-)
 
-They are available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/bcm-bus-clk-v6
-
-					-Alex
-
-Version history:
-v6  - No change; just rebased on v3.16-rc1.
-v5  - All clocks get initialized the first time they are prepared.
-    - A per-clock flag now avoids doing initialization more than once.
-    - Prerequisite clocks get prepared and enabled in a dependent
-      clock's prepare routine, *before* preparing the dependent.
-    - No longer require nestable CCU write enable requests.
-    - Dropped requirement that clock and prerequisite share CCU.
-v4  - Remove boot-time initialization of clocks, opting instead to
-      do this work when needed, via clock ->prepare method.
-    - Prerequisite clocks are now prepared and enabled in a
-      dependent clock's ->prepare method.
-    - Use __clk_lookup() to get the prerequisite clock pointer.
-    - ccu_write_enable() calls can now be nested
-v3: - Deleted clk_lookup field from struct kona_clk.
-    - Now use term "initialized" rather than "enabled".
-v2: - Added field "p" to the previously unnamed prereq union.
-
-Alex Elder (7):
-  clk: kona: move some code
-  clk: kona: don't init clocks at startup time
-  clk: bcm281xx: add an initialized flag
-  clk: bcm281xx: implement prerequisite clocks
-  clk: bcm281xx: add bus clock support
-  clk: bcm281xx: define a bus clock
-  ARM: dts: add bus clock bsc3_apb for bcm281xx
-
- arch/arm/boot/dts/bcm11351.dtsi      |   3 +-
- drivers/clk/bcm/clk-bcm281xx.c       |  13 +-
- drivers/clk/bcm/clk-kona-setup.c     |  99 ++++++++++-
- drivers/clk/bcm/clk-kona.c           | 310 +++++++++++++++++++++++++----------
- drivers/clk/bcm/clk-kona.h           |  36 +++-
- include/dt-bindings/clock/bcm281xx.h |   3 +-
- 6 files changed, 364 insertions(+), 100 deletions(-)
-
+diff --git a/drivers/clk/bcm/clk-kona-setup.c b/drivers/clk/bcm/clk-kona-setup.c
+index e5aeded..317f7dd 100644
+--- a/drivers/clk/bcm/clk-kona-setup.c
++++ b/drivers/clk/bcm/clk-kona-setup.c
+@@ -867,9 +867,6 @@ void __init kona_dt_ccu_setup(struct ccu_data *ccu,
+ 		goto out_err;
+ 	}
+ 
+-	if (!kona_ccu_init(ccu))
+-		pr_err("Broadcom %s initialization had errors\n", node->name);
+-
+ 	return;
+ out_err:
+ 	kona_ccu_teardown(ccu);
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index b643d35..cacbfd6 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -1032,43 +1032,38 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
+ 	return true;
+ }
+ 
+-static bool __kona_clk_init(struct kona_clk *bcm_clk)
++/* Clock operations */
++
++static int kona_clk_prepare(struct clk_hw *hw)
+ {
++	struct kona_clk *bcm_clk = to_kona_clk(hw);
++	struct ccu_data *ccu;
++	unsigned long flags;
++	int ret = 0;
++
++	ccu = bcm_clk->ccu;
++	flags = ccu_lock(ccu);
++	__ccu_write_enable(ccu);
++
+ 	switch (bcm_clk->type) {
+ 	case bcm_clk_peri:
+-		return __peri_clk_init(bcm_clk);
++		if (!__peri_clk_init(bcm_clk))
++			ret = -EINVAL;
++		break;
+ 	default:
+ 		BUG();
+ 	}
+-	return -EINVAL;
+-}
+-
+-/* Set a CCU and all its clocks into their desired initial state */
+-bool __init kona_ccu_init(struct ccu_data *ccu)
+-{
+-	unsigned long flags;
+-	unsigned int which;
+-	struct clk **clks = ccu->clk_data.clks;
+-	bool success = true;
+-
+-	flags = ccu_lock(ccu);
+-	__ccu_write_enable(ccu);
+-
+-	for (which = 0; which < ccu->clk_data.clk_num; which++) {
+-		struct kona_clk *bcm_clk;
+-
+-		if (!clks[which])
+-			continue;
+-		bcm_clk = to_kona_clk(__clk_get_hw(clks[which]));
+-		success &= __kona_clk_init(bcm_clk);
+-	}
+ 
+ 	__ccu_write_disable(ccu);
+ 	ccu_unlock(ccu, flags);
+-	return success;
++
++	return ret;
+ }
+ 
+-/* Clock operations */
++static void kona_clk_unprepare(struct clk_hw *hw)
++{
++	/* Nothing to do. */
++}
+ 
+ static int kona_peri_clk_enable(struct clk_hw *hw)
+ {
+@@ -1270,6 +1265,8 @@ static int kona_peri_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ }
+ 
+ struct clk_ops kona_peri_clk_ops = {
++	.prepare = kona_clk_prepare,
++	.unprepare = kona_clk_unprepare,
+ 	.enable = kona_peri_clk_enable,
+ 	.disable = kona_peri_clk_disable,
+ 	.is_enabled = kona_peri_clk_is_enabled,
+diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
+index 2537b30..4c7e796 100644
+--- a/drivers/clk/bcm/clk-kona.h
++++ b/drivers/clk/bcm/clk-kona.h
+@@ -511,6 +511,5 @@ extern u64 scaled_div_build(struct bcm_clk_div *div, u32 div_value,
+ extern struct clk *kona_clk_setup(struct kona_clk *bcm_clk);
+ extern void __init kona_dt_ccu_setup(struct ccu_data *ccu,
+ 				struct device_node *node);
+-extern bool __init kona_ccu_init(struct ccu_data *ccu);
+ 
+ #endif /* _CLK_KONA_H */
 -- 
 1.9.1
