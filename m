@@ -1,38 +1,48 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 16 Jun 2014 00:50:29 -0300
-Subject: [PATCH 04/10] ARM: sun7i: Add node to represent the DMA controller
+Date: Mon, 16 Jun 2014 00:50:27 -0300
+Subject: [PATCH 02/10] serial: 8250_dw: support DMA on the OF case
 In-Reply-To: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
 References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1402890635-12342-5-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1402890635-12342-3-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 SoC has a sun4i-compatible DMA controller. Let's add a node to
-represent it on the device tree.
+Currently, DMA properties on the DT are ignored when using the 8250_dw
+driver. With this patch, DMA will be used when available.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/tty/serial/8250/8250_dw.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 32efc10..c72fad4 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -409,6 +409,14 @@
- 			interrupts = <0 0 4>;
- 		};
+diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+index ed31135..f75c0bf 100644
+--- a/drivers/tty/serial/8250/8250_dw.c
++++ b/drivers/tty/serial/8250/8250_dw.c
+@@ -222,6 +222,8 @@ static int dw8250_probe_of(struct uart_port *p,
+ 			   struct dw8250_data *data)
+ {
+ 	struct device_node	*np = p->dev->of_node;
++	struct uart_8250_port	*up = container_of(p, struct uart_8250_port,
++						   port);
+ 	u32			val;
+ 	bool has_ucv = true;
  
-+	        dma: dma-controller at 01c02000 {
-+	                compatible = "allwinner,sun4i-a10-dma";
-+	                reg = <0x01c02000 0x1000>;
-+	                interrupts = <0 27 4>;
-+	                clocks = <&ahb_gates 6>;
-+			#dma-cells = <2>;
-+	        };
+@@ -254,11 +256,14 @@ static int dw8250_probe_of(struct uart_port *p,
+ 		}
+ 	}
+ 	if (has_ucv)
+-		dw8250_setup_port(container_of(p, struct uart_8250_port, port));
++		dw8250_setup_port(up);
+ 
+ 	if (!of_property_read_u32(np, "reg-shift", &val))
+ 		p->regshift = val;
+ 
++	if (of_get_property(np, "dmas", NULL))
++		up->dma = &data->dma;
 +
- 		spi0: spi at 01c05000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c05000 0x1000>;
+ 	/* clock got configured through clk api, all done */
+ 	if (p->uartclk)
+ 		return 0;
 -- 
 2.0.0
