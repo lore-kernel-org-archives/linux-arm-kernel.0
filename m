@@ -1,106 +1,56 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 16 Jun 2014 18:00:52 +0900
-Subject: [PATCH v3 00/19] Renesas CMT, MTU2 and TMU timers DT support
-In-Reply-To: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140616090052.GH11582@verge.net.au>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 16 Jun 2014 11:01:10 +0200
+Subject: [PATCH v2 04/11] sched: Allow all archs to set the power_orig
+In-Reply-To: <53903169.3030404@arm.com>
+References: <1400860385-14555-1-git-send-email-vincent.guittot@linaro.org>
+ <1400860385-14555-5-git-send-email-vincent.guittot@linaro.org>
+ <53888FF0.4020403@arm.com>
+ <CAKfTPtB+2dsHjZw=KkYgbP4EnPebLjfdNeVDAStXFJ2h8wbm+g@mail.gmail.com>
+ <538EE9E9.7090605@arm.com>
+ <CAKfTPtB9bh1_ZeQSFsC2eoBaytDBNcmn8ZZpY7Weqxui75Z2kA@mail.gmail.com>
+ <53903169.3030404@arm.com>
+Message-ID: <CAKfTPtDLkpYaiC0HFxc=1STt4VWujUYk16ZhcFLxsB1gb2yGKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 14, 2014 at 06:23:22PM +0200, Laurent Pinchart wrote:
-> Hello,
-> 
-> This patch set adds DT bindings to the Renesas CMT, MTU2 and TMU timers.
-> Patches 02/19 to 13/19, 16/19 and 17/19 have already been posted in the
-> previous version of this series. Patches 14/19, 15/19, 18/19 and 19/19 are
-> new.
-> 
-> Compared to v2 I've rebased the patches on top of Simon's latest devel branch.
-> 
-> Compared to v1 I've dropped the channel subnodes from the CMT DT bindings and
-> just use a channels mask, as I don't need to specify per-channel properties.
-> I'm slightly uncertain about this change though, as I can't easily predict
-> whether per-channel properties would be needed later for new hardware. It
-> won't be difficult to reintroduce channel subnodes then, so I'd rather not
-> clutter the DT bindings with channel subnodes now. Please feel free to
-> disagree.
-> 
-> The first 11 patches should go through the timers tree while the last 8
-> patches should go through the Renesas SoC tree. Patches 12/19 to 15/19 have
-> no build time or run time dependency on the drivers changes. Patches 16/19 to
-> 19/19 may have a run time dependency on the drivers changes depending on the
-> kernel configuration. Patches 16/19 and 17/19, for instance, require the
-> driver changes only when architected timer support isn't enabled in the
-> kernel.
-> 
-> Laurent Pinchart (19):
-> o clocksource: sh_tmu: Fix channel IRQ retrieval in legacy case
-> o clocksource: sh_cmt: Drop support for legacy platform data
-> o clocksource: sh_cmt: Replace global spinlock with a per-device
->     spinlock
-> o clocksource: sh_tmu: Drop support for legacy platform data
-> o clocksource: sh_tmu: Replace global spinlock with a per-device
->     spinlock
->   clocksource: sh_mtu2: Drop support for legacy platform data
->   clocksource: sh_mtu2: Replace global spinlock with a per-device
->     spinlock
-> o clocksource: shmobile: Remove unused sh_timer_config members
-> o clocksource: sh_cmt: Add DT support
->   clocksource: sh_tmu: Add DT support
->   clocksource: sh_mtu2: Add DT support
-> o ARM: shmobile: r8a7790: Add CMT devices to DT
-> o ARM: shmobile: r8a7791: Add CMT devices to DT
->   ARM: shmobile: r8a7779: Add TMU devices to DT
->   ARM: shmobile: r7s72100: Add MTU2 device to DT
-> o ARM: shmobile: lager-reference: Enable CMT0 in device tree
-> o ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
->   ARM: shmobile: marzen-reference: Enable TMU0 in device tree
->   ARM: shmobile: genmai-reference: Enable MTU2 in device tree
+On 5 June 2014 10:59, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> [...]
+>>> Firstly, we need to scale cpu power in update_cpu_power() regarding
+>>> uArch, frequency and rt/irq pressure.
+>>> Here the freq related value we get back from arch_scale_freq_power(...,
+>>> cpu) could be an instantaneous value (curr_freq(cpu)/max_freq(cpu)).
+>>>
+>>> Secondly, to be able to scale the runnable avg sum of a sched entity
+>>> (se->avg->runnable_avg_sum), we preferable have a coefficient
+>>> representing uArch diffs (cpu_power_orig(cpu)/cpu_power_orig(most
+>>> powerful cpu in the system) and another coefficient (avg freq over 'now
+>>
+>> AFAICT, the coefficient representing uArch diffs is already taken into
+>> account into power_freq thanks to scale_cpu, isn't it ?
+>
+> True, but I can't see how the current signature of
+> arch_scale_cpu_power() and arch_scale_freq_power() fit into this uArch
+> and freq invariant updating of se->avg->runnable_avg_sum business.
 
-For the patches marked with a 'o':
+My 1st assumption is that the update of rq->cpu_power (or
+rq->cpu_power_freq as we discussed earlier) is fast enough compare to
+frequency scaling so that it can be used to scale the load without
+major error. In this case, you can use the cpu_power_orig, cpu_power
+fields. The update period of cpu_power is equal balance_interval
+which is initialized with the weight of the sched_domain (less or
+equal to 4ms for most of ARM platform). Most of ARM platforms use a
+100 HZ jiffies so the update period will be aligned to 10ms (1 tick).
 
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+If this update is not fast enough, the second possibility could be to
+directly access to current frequency (or something that represent it).
+This might be possible once the cpufreq will have been consolidated
+into the scheduler similarly to what is going with cpuidle
 
->  .../devicetree/bindings/timer/renesas,cmt.txt      |  49 +++++
->  .../devicetree/bindings/timer/renesas,mtu2.txt     |  40 ++++
->  .../devicetree/bindings/timer/renesas,tmu.txt      |  40 ++++
->  arch/arm/boot/dts/r7s72100-genmai.dts              |   4 +
->  arch/arm/boot/dts/r7s72100.dtsi                    |  10 +
->  arch/arm/boot/dts/r8a7779-marzen.dts               |   4 +
->  arch/arm/boot/dts/r8a7779.dtsi                     |  42 ++++
->  arch/arm/boot/dts/r8a7790-lager.dts                |   4 +
->  arch/arm/boot/dts/r8a7790.dtsi                     |  34 +++
->  arch/arm/boot/dts/r8a7791-koelsch.dts              |   4 +
->  arch/arm/boot/dts/r8a7791.dtsi                     |  34 +++
->  arch/arm/mach-shmobile/board-genmai-reference.c    |  16 --
->  arch/arm/mach-shmobile/board-genmai.c              |  14 +-
->  arch/arm/mach-shmobile/board-koelsch-reference.c   |   2 -
->  arch/arm/mach-shmobile/board-lager-reference.c     |   2 -
->  arch/arm/mach-shmobile/board-marzen-reference.c    |  10 -
->  arch/arm/mach-shmobile/include/mach/r7s72100.h     |   1 -
->  arch/arm/mach-shmobile/include/mach/r8a7779.h      |   1 -
->  arch/arm/mach-shmobile/include/mach/r8a7790.h      |   1 -
->  arch/arm/mach-shmobile/include/mach/r8a7791.h      |   1 -
->  arch/arm/mach-shmobile/setup-r7s72100.c            |  21 --
->  arch/arm/mach-shmobile/setup-r8a7779.c             |  17 +-
->  arch/arm/mach-shmobile/setup-r8a7790.c             |   7 +-
->  arch/arm/mach-shmobile/setup-r8a7791.c             |   7 +-
->  drivers/clocksource/sh_cmt.c                       | 233 ++++++++-------------
->  drivers/clocksource/sh_mtu2.c                      | 146 ++++---------
->  drivers/clocksource/sh_tmu.c                       | 125 +++++------
->  include/linux/sh_timer.h                           |   5 -
->  28 files changed, 467 insertions(+), 407 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
->  create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
->  create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Vincent
+
+>
+>>> - sa->last_runnable_update'(cpu)/max_freq(cpu). This value would have to
+>>> be retrieved from the arch in __update_entity_runnable_avg().
+>>>
+> [...]
+>
