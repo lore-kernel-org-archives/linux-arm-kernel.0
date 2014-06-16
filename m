@@ -1,103 +1,68 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 16 Jun 2014 12:11:21 +0200
-Subject: [PATCH v14 07/10] imx-drm: Use drm_display_mode timings flags.
+Date: Mon, 16 Jun 2014 12:11:24 +0200
+Subject: [PATCH v14 10/10] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
 In-Reply-To: <1402913484-25910-1-git-send-email-denis@eukrea.com>
 References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
-Message-ID: <1402913484-25910-7-git-send-email-denis@eukrea.com>
+Message-ID: <1402913484-25910-10-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-The previous hardware behaviour was kept if the
-flags are not set.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v13->v14:
-- Rebased
+- None
 
-ChangeLog v12->v13:
-- This patch doesn't need the DRM_MODE_FLAG_POL_*_PRESERVE flags anymore.
-- code cleanup to improve readability:
-  - ENABLE_POL_PRESERVE is now gone
-  - Less modifications in ipu_di_init_sync_panel
-  - more readable modifications in int ipu_crtc_mode_set
-ChangeLog v11->v12:
-- Rebased: It now uses the following new flags defines names:
-  CLK_POL, ENABLE_POL
-- The inversions in ipuv3-crtc.c are now fixed.
-- ipuv3-crtc.c was still using mode->private_flags
-  from the previous versions of this patchset, that's now fixed.
+ChangeLog v11->v13:
+- No changes
+ChangeLog v9->v11:
+- Now uses the drm-panel instead of the display-timings.
 
-ChangeLog v10->v11:
-- This patch was splitted-out and adapted from:
-  "Prepare imx-drm for extra display-timings retrival."
-- The display-timings dt specific part was removed.
-- The flags names were changed to use the DRM ones from:
-  "drm: drm_display_mode: add signal polarity flags"
+ChangeLog v8->v9:
+- Removed the Cc. They are now set in git-send-email directly.
+- The backlight is now on at boot.
+
+ChangeLog v6->v7:
+- Shrinked even more the Cc list.
+
+ChangeLog v5->v6:
+- Reordered the Cc list.
+
+ChangeLog v3->v5:
+- Updated to the new GPIO defines.
+
+ChangeLog v2->v3:
+- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
+- This patch now only adds backlight support.
+- Added some interested people in the Cc list, and removed some people that
+  might be annoyed by the receiving of that patch which is unrelated to their
+  subsystem.
 ---
- drivers/gpu/ipu-v3/ipu-di.c          |    2 ++
- drivers/staging/imx-drm/ipuv3-crtc.c |   18 ++++++++++++++++--
- include/video/imx-ipu-v3.h           |    4 ++--
- 3 files changed, 20 insertions(+), 4 deletions(-)
+ .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/gpu/ipu-v3/ipu-di.c b/drivers/gpu/ipu-v3/ipu-di.c
-index d00f357..1a1e116 100644
---- a/drivers/gpu/ipu-v3/ipu-di.c
-+++ b/drivers/gpu/ipu-v3/ipu-di.c
-@@ -597,6 +597,8 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
+index d273d09..6e36dae 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
+@@ -17,9 +17,19 @@
+ 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
+ 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
  
- 	if (sig->clk_pol == CLK_POL_POSEDGE)
- 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
-+	else if (sig->clk_pol == CLK_POL_NEGEDGE)
-+		di_gen &= ~DI_GEN_POLARITY_DISP_CLK;
- 
- 	ipu_di_write(di, di_gen, DI_GENERAL);
- 
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index 7fec438..7fdf575 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -165,8 +165,22 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
- 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
- 		sig_cfg.Vsync_pol = 1;
- 
--	sig_cfg.enable_pol = ENABLE_POL_HIGH;
--	sig_cfg.clk_pol = CLK_POL_NEGEDGE;
-+	if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_POSEDGE)
-+		sig_cfg.clk_pol = CLK_POL_POSEDGE;
-+	else if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE)
-+		sig_cfg.clk_pol = CLK_POL_NEGEDGE;
-+	else
-+		/* If no PIXDATA flags were set, keep the old behaviour */
-+		sig_cfg.clk_pol = CLK_POL_NEGEDGE;
++	backlight: backlight {
++		compatible = "gpio-backlight";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_backlight_1>;
++		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		default-brightness-level = <1>;
++		default-on;
++	};
 +
-+	if (mode->pol_flags & DRM_MODE_FLAG_POL_DE_HIGH)
-+		sig_cfg.enable_pol = ENABLE_POL_HIGH;
-+	else if (mode->pol_flags & DRM_MODE_FLAG_POL_DE_LOW)
-+		sig_cfg.enable_pol = ENABLE_POL_LOW;
-+	else
-+		/* If no DE flags were set, keep the old behaviour */
-+		sig_cfg.enable_pol = ENABLE_POL_HIGH;
-+
- 	sig_cfg.width = mode->hdisplay;
- 	sig_cfg.height = mode->vdisplay;
- 	sig_cfg.pixel_fmt = out_pixel_fmt;
-diff --git a/include/video/imx-ipu-v3.h b/include/video/imx-ipu-v3.h
-index 8888305..e660522 100644
---- a/include/video/imx-ipu-v3.h
-+++ b/include/video/imx-ipu-v3.h
-@@ -43,10 +43,10 @@ struct ipu_di_signal_cfg {
- 	unsigned clksel_en:1;
- 	unsigned clkidle_en:1;
- 	unsigned data_pol:1;	/* true = inverted */
--	unsigned clk_pol:1;
--	unsigned enable_pol:1;
- 	unsigned Hsync_pol:1;	/* true = active high */
- 	unsigned Vsync_pol:1;
-+	u8 clk_pol;
-+	u8 enable_pol;
+ 	panel: panel {
+ 		compatible = "eukrea,mbimxsd51-cmo-qvga", "simple-panel";
+ 		power-supply = <&reg_lcd_3v3>;
++		backlight = <&backlight>;
+ 	};
  
- 	u16 width;
- 	u16 height;
+ 	reg_lcd_3v3: lcd-en {
 -- 
 1.7.9.5
