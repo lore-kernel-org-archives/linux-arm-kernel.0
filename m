@@ -1,53 +1,86 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 16 Jun 2014 18:08:08 +0100
-Subject: [PATCHv2 00/24] ILP32 Support in ARM64
-In-Reply-To: <1400914939-9708-1-git-send-email-apinski@cavium.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
-Message-ID: <20140616170808.GA5362@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 16 Jun 2014 19:09:14 +0200
+Subject: [PATCH v2 1/7] mfd: add atmel-hlcdc driver
+In-Reply-To: <20140616170301.GC14323@lee--X1>
+References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140616125030.GT14323@lee--X1> <539EEFD8.20703@free-electrons.com>
+ <20140616170301.GC14323@lee--X1>
+Message-ID: <539F24BA.3060808@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
 
-On Sat, May 24, 2014 at 12:01:55AM -0700, Andrew Pinski wrote:
-> New version of the patches with documentation, signal changes are
-> simplified, using less compat syscalls and splitting up the patches so
-> it is easier to review.  I have tested LTP on both LP64 and ILP32.
-> There is a few LTP failures but they are due to LTP being incorrect
-> (sigaction structure in glibc is not the one which is used by the
-> kernel)
+On 16/06/2014 19:03, Lee Jones wrote:
+> On Mon, 16 Jun 2014, Boris BREZILLON wrote:
+>> On 16/06/2014 14:50, Lee Jones wrote:
+>>>> The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+>>>> family or sama5d3 family) exposes 2 subdevices:
+>>>> - a display controller (controlled by a DRM driver)
+>>>> - a PWM chip
+>>>>
+>>>> Add support for the MFD device which will just retrieve HLCDC clocks and
+>>>> create a regmap so that subdevices can access the HLCDC register range
+>>>> concurrently.
+>>>>
+>>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>>> ---
+>>>>  .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  41 ++++++++
+>>>>  drivers/mfd/Kconfig                                |  11 ++
+>>>>  drivers/mfd/Makefile                               |   1 +
+>>>>  drivers/mfd/atmel-hlcdc.c                          | 116 +++++++++++++++++++++
+>>>>  include/linux/mfd/atmel-hlcdc.h                    |  78 ++++++++++++++
+>>>>  5 files changed, 247 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>>>>  create mode 100644 drivers/mfd/atmel-hlcdc.c
+>>>>  create mode 100644 include/linux/mfd/atmel-hlcdc.h
+>>>> diff --git a/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>>>> new file mode 100644
+>>>> index 0000000..f5b69cb
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+> [...]
+>
+>>>> +		hlcdc-display-controller {
+>>>> +			compatible = "atmel,hlcdc-dc";
+>>>> +			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
+>>> I assume you're using the 3rd parameter for flags.  If so, please use
+>>> the defines.
+>> No, the third parameter encodes the irq priority (from 0 to 7 IIRC).
+> Ah okay.  Can you point me to the documentation for this IRQ
+> controller please?  I'd like to have a quick peek.  It might be worth
+> defining the priority to prevent confusion, also you definitely should
+> document it in your binding.
 
-Do you have more details about what's wrong here and where the fix
-should go? LTP? glibc? Kernel?
+Here's Atmel's irq chip DT bindings documentation:
 
-I'll give you more specific comments on the code in the next couple of
-days. But for cosmetics, please wrap the lines around 72 (or whatever)
-characters both in emails, commit logs and Documentation/* files (and
-you can drop the "Thanks" part in every commit log ;)).
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/arm/atmel-aic.txt
 
-> Andrew Pinski (24):
->   ARM64: Force LP64 to compile the kernel.
->   ARM64: Rename COMPAT to AARCH32_EL0 in Kconfig.
->   ARM64: Change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
->     instead.
->   ARM64:ILP32: Set kernel_long to long long so we can reuse most of the
->     same syscalls as LP64.
->   ARM64:UAPI: Set the correct __BITS_PER_LONG for ILP32.
->   Allow for some signal structures to be the same between a 32bit ABI
->     and the 64bit ABI.
->   ARM64:ILP32: Use the same size and layout of the signal structures
->     for ILP32 as for LP64.
->   Allow a 32bit ABI to use the naming of the 64bit ABI syscalls to
->     avoid confusion of not splitting the registers.
->   ARM64:ILP32: Use the same syscall names as LP64.
->   ARM64: Introduce is_a32_task and is_a32_thread. Use them in the
->     correct locations.
->   ARM64: Add ARM64_ILP32 to Kconfig.
+I'll describe interrupt fields in the HLCDC DT bindings doc.
 
-Does this patch need to be in the middle of the series? It should come
-after the ILP32 support is complete.
 
-Thanks.
+
+>
+> [...]
+>
+>>>> +static struct platform_driver atmel_hlcdc_driver = {
+>>>> +	.probe = atmel_hlcdc_probe,
+>>>> +	.remove = atmel_hlcdc_remove,
+>>>> +	.driver = {
+>>>> +		.name = "atmel-hlcdc",
+>>>> +		.owner = THIS_MODULE,
+>>>> +		.of_match_table = atmel_hlcdc_match,
+>>> Is this driver DT only?
+>> Yes it is.
+> So it should depend on OF in the Kconfig entry.
+>
+Absolutely, I'll add the dependency.
+
+Thanks,
+
+Boris
 
 -- 
-Catalin
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
