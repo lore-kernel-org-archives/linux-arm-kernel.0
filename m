@@ -1,36 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Jun 2014 15:55:14 -0600
-Subject: [PATCH 1/9] of: Add NVIDIA Tegra SATA controller binding
-In-Reply-To: <1401881559-18469-2-git-send-email-mperttunen@nvidia.com>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-2-git-send-email-mperttunen@nvidia.com>
-Message-ID: <539F67C2.9080303@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Jun 2014 22:55:12 +0100
+Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
+In-Reply-To: <1402941376-29594-1-git-send-email-mporter@linaro.org>
+References: <1402941376-29594-1-git-send-email-mporter@linaro.org>
+Message-ID: <20140616215512.GC23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
-> This patch adds device tree binding documentation for the SATA
-> controller found on NVIDIA Tegra SoCs.
+On Mon, Jun 16, 2014 at 01:56:16PM -0400, Matt Porter wrote:
+> Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
+> MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
+> driver which is enabled in this defconfig. This results in the
+> SDHCI driver not being built and a boot failure. Explictly
+> enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
+> driver is built.
 
-Just one nit below:
+I really don't understand why MMC_SDHCI_PLTFM isn't selected by the
+sub-drivers.  sdhci-pltfm.c is a library module, which is only
+useful with one of the sub-drivers enabled.
 
-> diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+So, rather than providing a multitude of dependent options, why not
+present people with:
 
-> + - clocks : Defines the clocks listed in the clock-names property.
-> + - clock-names : The following clock names must be present:
-> +   - sata
-...
+ + sdhci drivers
+   + sdhci pci
+   + sdhci acpi
+   + Arasan
+   + Freescale eSDHC
+   + Nintendo Wii
+   + Dove
 
-It would be nice if the binding could use the exact same wording as all
-the other Tegra bindings, i.e.:
+and leave MMC_SDHCI_PLTFM as a hidden option whose purpose is to
+enable building of sdhci-pltfm.c.
 
-==========
-- clocks : Must contain an entry for each entry in clock-names.
-  See ../clocks/clock-bindings.txt for details.
-- clock-names : Must include the following entries:
-  - pll_a
-  - pll_a_out0
-  - mclk (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
-==========
-
-Same for the resets property.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
