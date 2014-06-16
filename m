@@ -1,106 +1,118 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 16 Jun 2014 09:44:16 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6qdl: use DT macro for clock ID
-In-Reply-To: <539DF957.5080603@gmail.com>
-References: <1402836147-29625-1-git-send-email-shawn.guo@freescale.com>
- <1402836147-29625-2-git-send-email-shawn.guo@freescale.com>
- <539DF957.5080603@gmail.com>
-Message-ID: <20140616014415.GC8860@dragon>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 16 Jun 2014 01:56:30 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: Change hardreset soc_ops for
+ AM43XX
+In-Reply-To: <alpine.DEB.2.02.1406131939180.340@utopia.booyaka.com>
+References: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
+ <alpine.DEB.2.02.1406131939180.340@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1406160150590.659@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 15, 2014 at 08:51:51PM +0100, Iain Paton wrote:
-> On 15/06/14 13:42, Shawn Guo wrote:
-> > Switch to use DT macro for clock ID, so that device tree source is more
-> > readable.
-> 
-> [...]
-> >  		aips1: aips-bus at 02000000 {
-> > @@ -87,7 +90,8 @@
-> >  				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
-> >  				reg = <0x021f8000 0x4000>;
-> >  				interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
-> > -				clocks = <&clks 116>;
-> > +				/* Same clock as i.MX6Q ECSPI5 */
-> > +				clocks = <&clks IMX6QDL_CLK_ECSPI5>;
-> >  				status = "disabled";
-> >  			};
-> >  		};
-> 
-> Do you think it would it be worthwhile to define
-> 
-> +#define IMX6Q_CLK_ECSPI5	116
-> +#define IMX6DL_CLK_I2C4	116
-> 
-> in imx6qdl-clock.h from the first patch and use it here ?
-> 
-> I'm not particularly bothered either way, I just remember thinking the 
-> name in the enum could become a cause of confusion when I was looking 
-> at the changes for i2c4.
+On Fri, 13 Jun 2014, Paul Walmsley wrote:
 
-Yeah, point taken.  Here is the change what I'm amending.
+> On Mon, 9 Jun 2014, Dave Gerlach wrote:
+> 
+> > am43xx reset register layout is more similar to am33xx than omap4 so
+> > use the am33xx functions for hwmod hardreset soc_ops rather than the
+> > currently used omap4 functions. Without this, assert_hardreset and
+> > deassert_hardreset will not work on am43xx.
+> > 
+> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> 
+> Makes sense to me; queued for v3.16-rc.
 
-Shawn
+The patch failed a build test for an AM43xx-only config:
 
---8<---------
+----
+arch/arm/mach-omap2/built-in.o: In function `_am33xx_is_hardreset_asserted':
+arch/arm/mach-omap2/omap_hwmod.c:3223: undefined reference to `am33xx_prm_is_hardreset_asserted'
+arch/arm/mach-omap2/built-in.o: In function `_am33xx_deassert_hardreset':
+arch/arm/mach-omap2/omap_hwmod.c:3201: undefined reference to `am33xx_prm_deassert_hardreset'
+arch/arm/mach-omap2/built-in.o: In function `_am33xx_assert_hardreset':
+arch/arm/mach-omap2/omap_hwmod.c:3181: 
+undefined reference to `am33xx_prm_assert_hardreset'
+make: *** [vmlinux] Error 1
+----
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 74e978841d77..b453e0e28aee 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -90,8 +90,7 @@
- 				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
- 				reg = <0x021f8000 0x4000>;
- 				interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
--				/* Same clock as i.MX6Q ECSPI5 */
--				clocks = <&clks IMX6QDL_CLK_ECSPI5>;
-+				clocks = <&clks IMX6DL_CLK_I2C4>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 4a6cbd086da9..e9f3646d1760 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -92,8 +92,8 @@
- 					compatible = "fsl,imx6q-ecspi", "fsl,imx51-ecspi";
- 					reg = <0x02018000 0x4000>;
- 					interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
--					clocks = <&clks IMX6QDL_CLK_ECSPI5>,
--						 <&clks IMX6QDL_CLK_ECSPI5>;
-+					clocks = <&clks IMX6Q_CLK_ECSPI5>,
-+						 <&clks IMX6Q_CLK_ECSPI5>;
- 					clock-names = "ipg", "per";
- 					status = "disabled";
- 				};
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 84101911f1e3..e3cc1c8a1b4c 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -321,10 +321,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_ECSPI3]       = imx_clk_gate2("ecspi3",        "ecspi_root",        base + 0x6c, 4);
- 	clk[IMX6QDL_CLK_ECSPI4]       = imx_clk_gate2("ecspi4",        "ecspi_root",        base + 0x6c, 6);
- 	if (cpu_is_imx6dl())
--		/* ecspi5 is replaced with i2c4 on imx6dl & imx6s */
--		clk[IMX6QDL_CLK_ECSPI5] = imx_clk_gate2("i2c4",        "ipg_per",           base + 0x6c, 8);
-+		clk[IMX6DL_CLK_I2C4]  = imx_clk_gate2("i2c4",          "ipg_per",           base + 0x6c, 8);
- 	else
--		clk[IMX6QDL_CLK_ECSPI5] = imx_clk_gate2("ecspi5",      "ecspi_root",        base + 0x6c, 8);
-+		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
- 	clk[IMX6QDL_CLK_ENET]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
- 	clk[IMX6QDL_CLK_ESAI]         = imx_clk_gate2_shared("esai",   "esai_podf",         base + 0x6c, 16, &share_count_esai);
- 	clk[IMX6QDL_CLK_ESAI_AHB]     = imx_clk_gate2_shared("esai_ahb", "ahb",             base + 0x6c, 16, &share_count_esai);
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index 94700a773fe3..654151e24288 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -125,7 +125,8 @@
- #define IMX6QDL_CLK_ECSPI2			113
- #define IMX6QDL_CLK_ECSPI3			114
- #define IMX6QDL_CLK_ECSPI4			115
--#define IMX6QDL_CLK_ECSPI5			116
-+#define IMX6Q_CLK_ECSPI5			116
-+#define IMX6DL_CLK_I2C4				116
- #define IMX6QDL_CLK_ENET			117
- #define IMX6QDL_CLK_ESAI			118
- #define IMX6QDL_CLK_GPT_IPG			119
+I went ahead and modified the patch to build (updated patch below), but it 
+would be helpful if you could also build-test your AM43xx-specific patches 
+with an AM43xx-specific .config (along with the usual 
+omap2plus_defconfig).
+
+
+- Paul
+
+From: Dave Gerlach <d-gerlach@ti.com>
+Date: Sun, 15 Jun 2014 16:02:17 -0600
+Subject: [PATCH 1/2] ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
+
+am43xx reset register layout is more similar to am33xx than omap4 so
+use the am33xx functions for hwmod hardreset soc_ops rather than the
+currently used omap4 functions. Without this, assert_hardreset and
+deassert_hardreset will not work on am43xx.
+
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+[paul at pwsan.com: fixed build errors for an AM43xx-only Kconfig]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/Makefile     | 6 ++++--
+ arch/arm/mach-omap2/cm33xx.h     | 2 +-
+ arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
+ 3 files changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 8421f38cf445..7a695362aee7 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -110,14 +110,16 @@ obj-y					+= prm_common.o cm_common.o
+ obj-$(CONFIG_ARCH_OMAP2)		+= prm2xxx_3xxx.o prm2xxx.o cm2xxx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= prm2xxx_3xxx.o prm3xxx.o cm3xxx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= vc3xxx_data.o vp3xxx_data.o
+-obj-$(CONFIG_SOC_AM33XX)		+= prm33xx.o cm33xx.o
+ omap-prcm-4-5-common			=  cminst44xx.o cm44xx.o prm44xx.o \
+ 					   prcm_mpu44xx.o prminst44xx.o \
+ 					   vc44xx_data.o vp44xx_data.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-prcm-4-5-common)
+ obj-$(CONFIG_SOC_OMAP5)			+= $(omap-prcm-4-5-common)
+ obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-prcm-4-5-common)
+-obj-$(CONFIG_SOC_AM43XX)		+= $(omap-prcm-4-5-common)
++am33xx-43xx-prcm-common			+= prm33xx.o
++obj-$(CONFIG_SOC_AM33XX)		+= $(am33xx-43xx-prcm-common) cm33xx.o
++obj-$(CONFIG_SOC_AM43XX)		+= $(omap-prcm-4-5-common) \
++					   $(am33xx-43xx-prcm-common)
+ 
+ # OMAP voltage domains
+ voltagedomain-common			:= voltage.o vc.o vp.o
+diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
+index 15a778ce7707..bd2441790779 100644
+--- a/arch/arm/mach-omap2/cm33xx.h
++++ b/arch/arm/mach-omap2/cm33xx.h
+@@ -380,7 +380,7 @@ void am33xx_cm_clkdm_disable_hwsup(u16 inst, u16 cdoffs);
+ void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
+ void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
+ 
+-#ifdef CONFIG_SOC_AM33XX
++#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+ extern int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
+ 					u16 clkctrl_offs);
+ extern void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index f7bb435bb543..6c074f37cdd2 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -4251,9 +4251,9 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.enable_module = _omap4_enable_module;
+ 		soc_ops.disable_module = _omap4_disable_module;
+ 		soc_ops.wait_target_ready = _omap4_wait_target_ready;
+-		soc_ops.assert_hardreset = _omap4_assert_hardreset;
+-		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
+-		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
++		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
++		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
++		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
+ 		soc_ops.init_clkdm = _init_clkdm;
+ 	} else if (soc_is_am33xx()) {
+ 		soc_ops.enable_module = _am33xx_enable_module;
+-- 
+2.0.0
