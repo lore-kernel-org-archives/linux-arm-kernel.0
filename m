@@ -1,46 +1,76 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 16 Jun 2014 16:53:06 +0530
-Subject: [PATCH V3 06/16] irqchip: crossbar: remove IS_ERR_VALUE check
+Date: Mon, 16 Jun 2014 16:53:07 +0530
+Subject: [PATCH V3 07/16] irqchip: crossbar: fix sparse and checkpatch warnings
 In-Reply-To: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
 References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402917796-31574-7-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402917796-31574-8-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-IS_ERR_VALUE makes sense only *if* there could be valid values in
-negative error range. But in the cases that we do use it, there is no
-such case. Just remove the same.
+There is absolutely no need for crossbar driver to expose functions and
+variables into global namespace. So make them all static
+
+Also fix a couple of checkpatch warnings.
+
+Fixes sparse warnings:
+drivers/irqchip/irq-crossbar.c:129:29: warning: symbol 'routable_irq_domain_ops' was not declared. Should it be static?
+drivers/irqchip/irq-crossbar.c:261:12: warning: symbol 'irqcrossbar_init' was not declared. Should it be static?
+
+Checkpatch warnings:
+WARNING: Prefer kcalloc over kzalloc with multiply
++	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
+
+WARNING: Prefer kcalloc over kzalloc with multiply
++	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+[V3] Added checkpatch fixes as well to this.
+
+ drivers/irqchip/irq-crossbar.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 9528cf2..42ea49d 100644
+index 42ea49d..2d7fbdb 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -102,15 +102,15 @@ static int crossbar_domain_xlate(struct irq_domain *d,
- 				 unsigned long *out_hwirq,
- 				 unsigned int *out_type)
- {
--	unsigned long ret;
-+	int ret;
+@@ -15,6 +15,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
+ #include <linux/irqchip/arm-gic.h>
++#include <linux/irqchip/irq-crossbar.h>
  
- 	ret = get_prev_map_irq(intspec[1]);
--	if (!IS_ERR_VALUE(ret))
-+	if (ret >= 0)
- 		goto found;
+ #define IRQ_FREE	-1
+ #define IRQ_RESERVED	-2
+@@ -118,7 +119,7 @@ found:
+ 	return 0;
+ }
  
- 	ret = allocate_free_irq(intspec[1]);
+-const struct irq_domain_ops routable_irq_domain_ops = {
++static const struct irq_domain_ops routable_irq_domain_ops = {
+ 	.map = crossbar_domain_map,
+ 	.unmap = crossbar_domain_unmap,
+ 	.xlate = crossbar_domain_xlate
+@@ -139,7 +140,7 @@ static int __init crossbar_of_init(struct device_node *node)
+ 		goto err1;
  
--	if (IS_ERR_VALUE(ret))
-+	if (ret < 0)
- 		return ret;
+ 	of_property_read_u32(node, "ti,max-irqs", &max);
+-	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
++	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
+ 	if (!cb->irq_map)
+ 		goto err2;
  
- found:
+@@ -184,7 +185,7 @@ static int __init crossbar_of_init(struct device_node *node)
+ 	}
+ 
+ 
+-	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
++	cb->register_offsets = kcalloc(max, sizeof(int), GFP_KERNEL);
+ 	if (!cb->register_offsets)
+ 		goto err3;
+ 
 -- 
 1.7.9.5
