@@ -1,31 +1,71 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 16 Jun 2014 11:30:23 -0700
-Subject: [PATCH 1/3] ARM: dts: Create a cros-ec-keyboard fragment
-In-Reply-To: <539F33FE.8040501@wwwdotorg.org>
-References: <1401920421-25729-1-git-send-email-dianders@chromium.org>
- <539F33FE.8040501@wwwdotorg.org>
-Message-ID: <CAD=FV=W=qvzM6i3GhOsHO_2tPEZOVjq+TEKUrfdCVk_4eRo-Pw@mail.gmail.com>
+Date: Mon, 16 Jun 2014 11:35:21 -0700
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <5398758F.4080306@samsung.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+ <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
+ <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+ <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
+ <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
+ <5398758F.4080306@samsung.com>
+Message-ID: <CAD=FV=U49dNrsNRe7d0PAyq_g_fUiaZYoqTAFoj+gJ=3K5c_2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kukjin,
 
-On Mon, Jun 16, 2014 at 11:14 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/04/2014 04:20 PM, Doug Anderson wrote:
->> All ChromeOS ARM devices that have the standard "CrOS EC" have the
->> same keyboard mapping.  It's silly to include this same definition
->> everywhere.  Let's create a "dtsi" fragment that we can include from
->> many different boards.
+On Wed, Jun 11, 2014 at 8:28 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 06/12/14 00:19, Doug Anderson wrote:
 >>
->> This fragment is based on what's currently in tegra124-venice2.dts
->
-> I've applied this series to Tegra's for-3.17/dt-cros-ec-kbd branch. I'll
-> send a pull request to arm-soc shortly.
+>> Chander,
+>>
+>> On Tue, Jun 10, 2014 at 9:52 PM, Chander Kashyap<k.chander@samsung.com>
+>> wrote:
+>>>
+>>> Hi Doug,
+>>>
+>>> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre<nicolas.pitre@linaro.org>
+>>> wrote:
+>>>>
+>>>> On Tue, 10 Jun 2014, Doug Anderson wrote:
+>>>>
+>>>>> My S-state knowledge is not strong, but I believe that Lorenzo's
+>>>>> questions matter if we're using S2 for CPUidle (where we actually turn
+>>>>> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
+>>>>> (where we just enter WFI/WFE).
+>>>>>
+>>>
+>>> No Its not plain WFI.
+>>>
+>>> All cores in Exynos5420 can be powered off independently.
+>>> This functionality has been tested.
+>>>
+>>> Below is the link for the posted patches.
+>>>
+>>> https://lkml.org/lkml/2014/6/10/194
+>>>
+>>> And as Nicolas wrote, these patches need MCPM for that.
+>>
+>>
+>> Most excellent!  I should have been more clear that I only knew about
+>> how CPUidle worked in our local production kernel.  There I'm pretty
+>> sure CPUidle is just WFI/WFE.  If you've got patches to do better then
+>> that's great!
+>>
+>> ...can you confirm that my patch doesn't interfere with your improved
+>> CPUidle?  It's been Acked by Nicolas (thanks!) so I'd imagine it will
+>> land shortly.  Kukjin: I assume you'll be taking this?
+>>
+> Sure, I will ;-)
 
-It seems like you might want to merge from Stephen's branch
-<https://git.kernel.org/cgit/linux/kernel/git/tegra/linux.git/log/?h=for-3.17/dt-cros-ec-kbd>
-into your tree to avoid any future conflicts to exynos5250-snow (and
-also to allow you to apply
-https://patchwork.kernel.org/patch/4351321/).
+I see that you put some branches up about 3 hours ago and I don't see
+this patch.  Are you planning on applying it?  It would be nice if it
+was in 3.16 (since it causes problems booting), but if there's some
+reason it needs to be for-next that's OK too.
 
 -Doug
