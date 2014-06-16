@@ -1,30 +1,32 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 16 Jun 2014 14:30:48 -0700
-Subject: [PATCH 1/2] touchscreen: sun4i-ts: A10 (sun4i) has double the
- temperature precision
-In-Reply-To: <1402943069-19420-2-git-send-email-hdegoede@redhat.com>
-References: <1402943069-19420-1-git-send-email-hdegoede@redhat.com>
- <1402943069-19420-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140616213048.GA422@core.coreip.homeip.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Jun 2014 15:35:20 -0600
+Subject: [PATCH v3 1/4] of: Add NVIDIA Tegra XUSB pad controller binding
+In-Reply-To: <1402930623-28886-1-git-send-email-thierry.reding@gmail.com>
+References: <1402930623-28886-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <539F6318.5010306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Mon, Jun 16, 2014 at 08:24:28PM +0200, Hans de Goede wrote:
-> Testing has revealed that the temperature in the rtp controller of the A10
-> (sun4i) SoC has a resolution of 50 milli degrees / step, where as the
-> A13 (sun5i) and later models have 100 milli degrees / step.
+On 06/16/2014 08:57 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Add a new sun5i-a13-ts compatible to differentiate the newer models and
-> set the resolution based on the compatible string.
-> 
-> This fixes the temperature reported on the A10 being twice as high as expected.
+> This patch adds the device tree binding documentation for the XUSB pad
+> controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
+> capabilities.
 
-Should we maybe add explicit temperature steps property so that we won;t
-need to patch again if they decided to change resolution again?
+This looks fine to me, with one issue below:
 
-Thanks.
+> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
 
--- 
-Dmitry
+> +Required properties:
+> +--------------------
+
+> +- #address-cells: Should be 0.
+> +- #size-cells: Should be 0.
+
+I don't think those properties are needed. If they are, a value of 0 for
+both doesn't seem useful. I assume those two lines should just be
+deleted, and also from the example below.
+
+Assuming I take this through the Tegra tree, If this is the only issue,
+I can delete those lines when applying.
