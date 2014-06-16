@@ -1,124 +1,250 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 16 Jun 2014 15:11:58 -0500
-Subject: [PATCH] ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
-In-Reply-To: <alpine.DEB.2.02.1406160150590.659@utopia.booyaka.com>
-References: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
- <alpine.DEB.2.02.1406131939180.340@utopia.booyaka.com>
- <alpine.DEB.2.02.1406160150590.659@utopia.booyaka.com>
-Message-ID: <539F4F8E.2020902@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 16 Jun 2014 14:51:42 -0500
+Subject: [PATCH 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
+In-Reply-To: <539EC12C.6080504@ti.com>
+References: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
+ <539EC12C.6080504@ti.com>
+Message-ID: <A8CE5BD1-097E-416B-8D7C-D1CA84236C3E@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2014 08:56 PM, Paul Walmsley wrote:
-> On Fri, 13 Jun 2014, Paul Walmsley wrote:
->
->> On Mon, 9 Jun 2014, Dave Gerlach wrote:
->>
->>> am43xx reset register layout is more similar to am33xx than omap4 so
->>> use the am33xx functions for hwmod hardreset soc_ops rather than the
->>> currently used omap4 functions. Without this, assert_hardreset and
->>> deassert_hardreset will not work on am43xx.
->>>
->>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>
->> Makes sense to me; queued for v3.16-rc.
->
-> The patch failed a build test for an AM43xx-only config:
->
-> ----
-> arch/arm/mach-omap2/built-in.o: In function `_am33xx_is_hardreset_asserted':
-> arch/arm/mach-omap2/omap_hwmod.c:3223: undefined reference to `am33xx_prm_is_hardreset_asserted'
-> arch/arm/mach-omap2/built-in.o: In function `_am33xx_deassert_hardreset':
-> arch/arm/mach-omap2/omap_hwmod.c:3201: undefined reference to `am33xx_prm_deassert_hardreset'
-> arch/arm/mach-omap2/built-in.o: In function `_am33xx_assert_hardreset':
-> arch/arm/mach-omap2/omap_hwmod.c:3181:
-> undefined reference to `am33xx_prm_assert_hardreset'
-> make: *** [vmlinux] Error 1
-> ----
->
-> I went ahead and modified the patch to build (updated patch below), but it
-> would be helpful if you could also build-test your AM43xx-specific patches
-> with an AM43xx-specific .config (along with the usual
-> omap2plus_defconfig).
->
 
-Sorry about that, I definitely should have tried that, thanks for the fixup!
+On Jun 16, 2014, at 5:04 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
 
-Regards,
-Dave
+> Hi,
+> 
+> On Friday 13 June 2014 12:48 AM, Kumar Gala wrote:
+>> Add a PHY driver for uses with AHCI based SATA controller driver on the
+>> IPQ806x family of SoCs.
+>> 
+>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>> ---
+>> drivers/phy/Kconfig                 |   6 ++
+>> drivers/phy/Makefile                |   1 +
+>> drivers/phy/phy-qcom-ipq806x-sata.c | 204 ++++++++++++++++++++++++++++++++++++
+>> 3 files changed, 211 insertions(+)
+>> create mode 100644 drivers/phy/phy-qcom-ipq806x-sata.c
+>> 
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index 16a2f06..52bfb93 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -178,4 +178,10 @@ config PHY_XGENE
+>> 	help
+>> 	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+>> 
+>> +config PHY_QCOM_IPQ806X_SATA
+>> +	tristate "Qualcomm IPQ806x SATA SerDes/PHY driver"
+>> +	depends on ARCH_QCOM
+>> +	depends on OF
+> depends on HAS_IOMEM?
 
->
-> - Paul
->
-> From: Dave Gerlach <d-gerlach@ti.com>
-> Date: Sun, 15 Jun 2014 16:02:17 -0600
-> Subject: [PATCH 1/2] ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
->
-> am43xx reset register layout is more similar to am33xx than omap4 so
-> use the am33xx functions for hwmod hardreset soc_ops rather than the
-> currently used omap4 functions. Without this, assert_hardreset and
-> deassert_hardreset will not work on am43xx.
->
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> [paul at pwsan.com: fixed build errors for an AM43xx-only Kconfig]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->   arch/arm/mach-omap2/Makefile     | 6 ++++--
->   arch/arm/mach-omap2/cm33xx.h     | 2 +-
->   arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
->   3 files changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 8421f38cf445..7a695362aee7 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -110,14 +110,16 @@ obj-y					+= prm_common.o cm_common.o
->   obj-$(CONFIG_ARCH_OMAP2)		+= prm2xxx_3xxx.o prm2xxx.o cm2xxx.o
->   obj-$(CONFIG_ARCH_OMAP3)		+= prm2xxx_3xxx.o prm3xxx.o cm3xxx.o
->   obj-$(CONFIG_ARCH_OMAP3)		+= vc3xxx_data.o vp3xxx_data.o
-> -obj-$(CONFIG_SOC_AM33XX)		+= prm33xx.o cm33xx.o
->   omap-prcm-4-5-common			=  cminst44xx.o cm44xx.o prm44xx.o \
->   					   prcm_mpu44xx.o prminst44xx.o \
->   					   vc44xx_data.o vp44xx_data.o
->   obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-prcm-4-5-common)
->   obj-$(CONFIG_SOC_OMAP5)			+= $(omap-prcm-4-5-common)
->   obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-prcm-4-5-common)
-> -obj-$(CONFIG_SOC_AM43XX)		+= $(omap-prcm-4-5-common)
-> +am33xx-43xx-prcm-common			+= prm33xx.o
-> +obj-$(CONFIG_SOC_AM33XX)		+= $(am33xx-43xx-prcm-common) cm33xx.o
-> +obj-$(CONFIG_SOC_AM43XX)		+= $(omap-prcm-4-5-common) \
-> +					   $(am33xx-43xx-prcm-common)
->
->   # OMAP voltage domains
->   voltagedomain-common			:= voltage.o vc.o vp.o
-> diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
-> index 15a778ce7707..bd2441790779 100644
-> --- a/arch/arm/mach-omap2/cm33xx.h
-> +++ b/arch/arm/mach-omap2/cm33xx.h
-> @@ -380,7 +380,7 @@ void am33xx_cm_clkdm_disable_hwsup(u16 inst, u16 cdoffs);
->   void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
->   void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
->
-> -#ifdef CONFIG_SOC_AM33XX
-> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
->   extern int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
->   					u16 clkctrl_offs);
->   extern void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index f7bb435bb543..6c074f37cdd2 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -4251,9 +4251,9 @@ void __init omap_hwmod_init(void)
->   		soc_ops.enable_module = _omap4_enable_module;
->   		soc_ops.disable_module = _omap4_disable_module;
->   		soc_ops.wait_target_ready = _omap4_wait_target_ready;
-> -		soc_ops.assert_hardreset = _omap4_assert_hardreset;
-> -		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
-> -		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
-> +		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
-> +		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
-> +		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
->   		soc_ops.init_clkdm = _init_clkdm;
->   	} else if (soc_is_am33xx()) {
->   		soc_ops.enable_module = _am33xx_enable_module;
->
+will add
+
+>> +	select GENERIC_PHY
+>> +
+>> endmenu
+>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>> index b4f1d57..d950317 100644
+>> --- a/drivers/phy/Makefile
+>> +++ b/drivers/phy/Makefile
+>> @@ -20,3 +20,4 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
+>> phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+>> obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>> obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+>> +obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+>> diff --git a/drivers/phy/phy-qcom-ipq806x-sata.c b/drivers/phy/phy-qcom-ipq806x-sata.c
+>> new file mode 100644
+>> index 0000000..fc57340
+>> --- /dev/null
+>> +++ b/drivers/phy/phy-qcom-ipq806x-sata.c
+>> @@ -0,0 +1,204 @@
+>> +/*
+>> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/time.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/phy/phy.h>
+>> +
+>> +struct qcom_ipq806x_sata_phy {
+>> +	struct device *dev;
+> 
+> dev is not used anywhere. remove it.
+
+already done in v2
+
+>> +	void __iomem *mmio;
+>> +	struct clk *cfg_clk;
+>> +};
+>> +
+>> +#define __set(v, a, b)	(((v) << (b)) & GENMASK(a, b))
+>> +
+>> +#define SATA_PHY_P0_PARAM0		0x200
+>> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3(x)	__set(x, 17, 12)
+>> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3_MASK	GENMASK(17, 12)
+>> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2(x)	__set(x, 11, 6)
+>> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2_MASK	GENMASK(11, 6)
+>> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1(x)	__set(x, 5, 0)
+>> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1_MASK	GENMASK(5, 0)
+>> +
+>> +#define SATA_PHY_P0_PARAM1		0x204
+>> +#define SATA_PHY_P0_PARAM1_RESERVED_BITS31_21(x)	__set(x, 31, 21)
+>> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3(x)	__set(x, 20, 14)
+>> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3_MASK	GENMASK(20, 14)
+>> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2(x)	__set(x, 13, 7)
+>> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2_MASK	GENMASK(13, 7)
+>> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1(x)	__set(x, 6, 0)
+>> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1_MASK	GENMASK(6, 0)
+>> +
+>> +#define SATA_PHY_P0_PARAM2		0x208
+>> +#define SATA_PHY_P0_PARAM2_RX_EQ(x)	__set(x, 20, 18)
+>> +#define SATA_PHY_P0_PARAM2_RX_EQ_MASK	GENMASK(20, 18)
+>> +
+>> +#define SATA_PHY_P0_PARAM3		0x20C
+>> +#define SATA_PHY_SSC_EN			0x8
+>> +#define SATA_PHY_P0_PARAM4		0x210
+>> +#define SATA_PHY_REF_SSP_EN		0x2
+>> +#define SATA_PHY_RESET			0x1
+>> +
+>> +static inline void qcom_ipq806x_sata_delay_us(unsigned int delay)
+>> +{
+>> +	/* sleep for max. 50us more to combine processor wakeups */
+>> +	usleep_range(delay, delay + 50);
+>> +}
+>> +
+>> +static int qcom_ipq806x_sata_phy_init(struct phy *generic_phy)
+>> +{
+>> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
+>> +	u32 reg = 0;
+>> +
+>> +	/* Setting SSC_EN to 1 */
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM3);
+> 
+> Why readl_relaxed?
+
+because there is no need for readl?s memory barriers here.
+
+>> +	reg = reg | SATA_PHY_SSC_EN;
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM3);
+>> +
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM0) &
+>> +			~(SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3_MASK |
+>> +			  SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2_MASK |
+>> +			  SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1_MASK);
+>> +	reg |= SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3(0xf);
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM0);
+>> +
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM1) &
+>> +			~(SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3_MASK |
+>> +			  SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2_MASK |
+>> +			  SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1_MASK);
+>> +	reg |= SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3(0x55) |
+>> +		SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2(0x55) |
+>> +		SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1(0x55);
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM1);
+>> +
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM2) &
+>> +		~SATA_PHY_P0_PARAM2_RX_EQ_MASK;
+>> +	reg |= SATA_PHY_P0_PARAM2_RX_EQ(0x3);
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM2);
+>> +
+>> +	/* Setting PHY_RESET to 1 */
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+>> +	reg = reg | SATA_PHY_RESET;
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+>> +
+>> +	/* Setting REF_SSP_EN to 1 */
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+>> +	reg = reg | SATA_PHY_REF_SSP_EN | SATA_PHY_RESET;
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+>> +	mb();
+>> +	qcom_ipq806x_sata_delay_us(20);
+>> +
+>> +	/* Clearing PHY_RESET to 0 */
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+>> +	reg = reg & ~SATA_PHY_RESET;
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int qcom_ipq806x_sata_phy_exit(struct phy *generic_phy)
+>> +{
+>> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
+>> +	u32 reg = 0;
+>> +
+>> +	/* Setting PHY_RESET to 1 */
+>> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+>> +	reg = reg | SATA_PHY_RESET;
+>> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct phy_ops qcom_ipq806x_sata_phy_ops = {
+>> +	.init		= qcom_ipq806x_sata_phy_init,
+>> +	.exit		= qcom_ipq806x_sata_phy_exit,
+>> +	.owner		= THIS_MODULE,
+>> +};
+>> +
+>> +static int qcom_ipq806x_sata_phy_probe(struct platform_device *pdev)
+>> +{
+>> +	struct qcom_ipq806x_sata_phy *phy;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct resource *res;
+>> +	struct phy_provider *phy_provider;
+>> +	struct phy *generic_phy;
+>> +	int ret;
+>> +
+>> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+>> +	if (!phy) {
+>> +		dev_err(dev, "%s: failed to allocate phy\n", __func__);
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	phy->mmio = devm_ioremap_resource(dev, res);
+>> +	if (IS_ERR(phy->mmio)) {
+>> +		dev_err(dev, "%s: phy mmio get resource failed\n", __func__);
+>> +		return PTR_ERR(phy->mmio);
+>> +	}
+>> +
+>> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+>> +	if (IS_ERR(phy_provider)) {
+>> +		dev_err(dev, "%s: failed to register phy\n", __func__);
+>> +		return PTR_ERR(phy_provider);
+>> +	}
+> 
+> phy_provider_register should be the last step. Move it after phy_set_drvdata().
+
+will fix
+
+> 
+> Thanks
+> Kishon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
