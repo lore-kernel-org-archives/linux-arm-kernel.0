@@ -1,49 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jun 2014 07:17:13 -0700
-Subject: [PATCH] ARM: omap: rework platform selection
-In-Reply-To: <20140616112610.GE17845@atomide.com>
-References: <5701099.0P1SIXsHc1@wuerfel> <20140616110042.GD17845@atomide.com>
- <7892694.KrnV5uCBX6@wuerfel> <20140616112610.GE17845@atomide.com>
-Message-ID: <20140616141712.GL17845@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jun 2014 15:17:17 +0100
+Subject: [PATCH] arm64: Add flush_cache_vmap call in __early_set_fixmap
+In-Reply-To: <20140609133859.GB18487@localhost>
+References: <1402050590-23877-1-git-send-email-leif.lindholm@linaro.org>
+ <1402065449.15402.2.camel@deneb.redhat.com>
+ <20140606145324.GE4179@bivouac.eciton.net>
+ <1402067373.15402.9.camel@deneb.redhat.com>
+ <20140609110356.GD25590@arm.com>
+ <20140609132429.GF4179@bivouac.eciton.net>
+ <20140609133859.GB18487@localhost>
+Message-ID: <20140616141717.GK16758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140616 04:31]:
-> * Arnd Bergmann <arnd@arndb.de> [140616 04:18]:
+On Mon, Jun 09, 2014 at 02:38:59PM +0100, Catalin Marinas wrote:
+> On Mon, Jun 09, 2014 at 02:24:29PM +0100, Leif Lindholm wrote:
+> > On Mon, Jun 09, 2014 at 12:03:56PM +0100, Catalin Marinas wrote:
+> > > A quick grep through the kernel shows that we have other set_pte() calls
+> > > without additional dsb() like create_mapping(), I think kvm_set_pte() as
+> > > well.
+> > > 
+> > > So I'm proposing an alternative patch (which needs some benchmarking as
+> > > well to see if anything is affected, maybe application startup time).
 > > 
-> > Let's see if others have similar opinions Rob's patch as a whole.
-> > I'd still like to keep all the parts aside from the OMAP change
-> > and just back out the change that caused the problems.
-> > 
-> > Does that seem reasonable to you?
+> > I'm happy for any fix which can be included in 3.16.
 > 
-> Yes makes sense to me if others don't have similar issues. I guess
-> it should be possible to verify that by diffing the generated
-> .config files compared to the old ones.
+> Steve Capper made a point about performance. He'll follow up.
+> 
+> > But is the dsb(ishst) sufficient? We need to also prevent reads from
+> > overtaking the set_pte(). i.e.:
+> > 
+> > ptr = early_ioremap(phys_addr, size);
+> > if (ptr && strcmp(ptr, "magic") == 0)
+> >    ...
+> > 
+> > Does it not require a dsb(ish)?
+> 
+> So doesn't early_ioremap() now include a dsb() after set_pte() with my
+> patch?
+> 
+> BTW, according to the ARM ARM (and confirmed with architects), we needs
+> DSB+ISB even if we have just a data access (rather than instruction
+> fetch). We have to revisit both 32 and 64-bit code for this.
 
-If you update Rob's patch and undo the omap2+ changes, you might
-want to fold in something like the following to hide the omap
-options behind a menu.
+The impact of this really depends on whether or not we need to sandwich
+DSB+ISB between every update to a set of page tables (possibly plumbing
+together different levels) or whether the ISB can just come at the end.
 
-So far I have not come up with no great ideas on fixing this
-properly short of requiring all omap .config files to add
-CONFIG_ARCH_OMAP=y manually. Anybody got good ideas for that?
+If the latter case is true, we just need to add something for kernel
+mappings, which should be pretty low overhead,
 
-Regards,
-
-Tony
-
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -1,3 +1,5 @@
-+menu "TI OMAP/AM/DM/DRA Family"
-+
- config ARCH_OMAP
- 	bool
- 
-@@ -342,3 +344,5 @@ config OMAP4_ERRATA_I688
- endmenu
- 
- endif
-+
-+endmenu
+Will
