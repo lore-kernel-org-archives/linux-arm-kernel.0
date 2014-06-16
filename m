@@ -1,69 +1,53 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 16 Jun 2014 16:50:20 +0200
-Subject: [PATCH v3 11/19] clocksource: sh_mtu2: Add DT support
-In-Reply-To: <1494698.bV3kBZBSPf@avalon>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <539C7FA4.9000306@cogentembedded.com> <1494698.bV3kBZBSPf@avalon>
-Message-ID: <1457541.byEE42ItbZ@avalon>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 16 Jun 2014 16:53:44 +0200
+Subject: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability
+ IOMMU_CAP_INTR_REMAP
+In-Reply-To: <20140608103129.GC3279@lvm>
+References: <1401987808-23596-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1401987808-23596-5-git-send-email-a.motakis@virtualopensystems.com>
+ <20140608103129.GC3279@lvm>
+Message-ID: <20140616145344.GD18986@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Monday 16 June 2014 16:40:55 Laurent Pinchart wrote:
-> On Saturday 14 June 2014 21:00:20 Sergei Shtylyov wrote:
-> > On 06/14/2014 08:23 PM, Laurent Pinchart wrote:
-> > > Document DT bindings and parse them in the MTU2 driver.
-> > > 
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > Tested-by: Wolfram Sang <wsa@sang-engineering.com>
-> > > ---
-> > > 
-> > >  .../devicetree/bindings/timer/renesas,mtu2.txt     | 40 +++++++++++++++
-> > >  drivers/clocksource/sh_mtu2.c                      |  8 +++++
-> > >  
-> > >   2 files changed, 48 insertions(+)
-> > >   create mode 100644
-> > >   Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-
-[snip]
-
-> > > diff --git a/drivers/clocksource/sh_mtu2.c
-> > > b/drivers/clocksource/sh_mtu2.c
-> > > index ebdf9d1..79387af 100644
-> > > --- a/drivers/clocksource/sh_mtu2.c
-> > > +++ b/drivers/clocksource/sh_mtu2.c
+On Sun, Jun 08, 2014 at 12:31:29PM +0200, Christoffer Dall wrote:
+> On Thu, Jun 05, 2014 at 07:03:12PM +0200, Antonios Motakis wrote:
+> > With an ARM SMMU, interrupt remapping should always be safe from the
+> > SMMU's point of view, as it is properly handled by the GIC.
 > > 
-> > [...]
+> > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > > 
-> > > @@ -502,11 +503,18 @@ static const struct platform_device_id
-> > > sh_mtu2_id_table[] = {
-> > >   };
-> > >   MODULE_DEVICE_TABLE(platform, sh_mtu2_id_table);
-> > > 
-> > > +static const struct of_device_id sh_mtu2_of_table[] = {
-> > > +	{ .compatible = "renesas,mtu2" },
-> > > +	{ }
-> > > +};
-> > > +MODULE_DEVICE_TABLE(of, sh_mtu2_of_table);
-> > > +
-> > >   static struct platform_driver sh_mtu2_device_driver = {
-> > >   	.probe		= sh_mtu2_probe,
-> > >   	.remove		= sh_mtu2_remove,
-> > >   	.driver		= {
-> > >   		.name	= "sh_mtu2",
-> > > +		.of_match_table = of_match_ptr(sh_mtu2_of_table),
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 15ab2af..ff29402 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -1544,7 +1544,7 @@ static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
+> >  	if (smmu_domain->root_cfg.smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+> >  		caps |= IOMMU_CAP_CACHE_COHERENCY;
+> >  
+> > -	caps |= IOMMU_CAP_NOEXEC;
+> > +	caps |= IOMMU_CAP_NOEXEC | IOMMU_CAP_INTR_REMAP;
+> >  
+> >  	return !!(cap & caps);
+> >  }
+> > -- 
+> > 1.8.3.2
 > > 
-> > No need for of_match_ptr() since the table us not protected by #ifdef
-> > CONFIG_OF...
-> 
-> I'll fix that.
+> What does IOMMU_CAP_INTR_REMAP signify exactly?  Is there docs/examples
+> somewhere I can look at?  (A quick scan of the Linux souce code doesn't
+> reveal much, and I'm not sure if this is purely MSI related or what...)
 
-I spoke too fast. On non-OF platforms memory shouldn't be wasted by the OF 
-match table. I'll mark the table as __maybe_unused and keep of_match_ptr().
+The flag was introduced for x86 IOMMUs to detect whether an IOMMU in the
+system has and enables interrupt remapping to allow safe device
+assignment to KVM guests. Without interrupt remapping a malicious guest
+could attack the host with MSIs from the attached device.
 
--- 
-Regards,
+How are PCI MSIs implemented on ARM with SMMU and GIC enabled. MSIs are
+only memory dma transactions in the end, is it guaranteed on ARM that a
+device only sends MSI transactions it is allowed to?
 
-Laurent Pinchart
+
+	Joerg
