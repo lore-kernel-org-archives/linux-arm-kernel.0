@@ -1,226 +1,109 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 16 Jun 2014 15:34:28 +0530
-Subject: [PATCH 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
-In-Reply-To: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
-References: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
-Message-ID: <539EC12C.6080504@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon, 16 Jun 2014 12:11:17 +0200
+Subject: =?UTF-8?q?=5BPATCH=20v14=2003/10=5D=20imx-drm=3A=20Correct=20BGR666=20and=20the=20board=27s=20dts=20that=20use=20them=2E?=
+In-Reply-To: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+Message-ID: <1402913484-25910-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The current BGR666 is not consistent with the other color mapings like BGR24.
+BGR666 should be in the same byte order than BGR24.
 
-On Friday 13 June 2014 12:48 AM, Kumar Gala wrote:
-> Add a PHY driver for uses with AHCI based SATA controller driver on the
-> IPQ806x family of SoCs.
-> 
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> ---
->  drivers/phy/Kconfig                 |   6 ++
->  drivers/phy/Makefile                |   1 +
->  drivers/phy/phy-qcom-ipq806x-sata.c | 204 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 211 insertions(+)
->  create mode 100644 drivers/phy/phy-qcom-ipq806x-sata.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 16a2f06..52bfb93 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -178,4 +178,10 @@ config PHY_XGENE
->  	help
->  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
->  
-> +config PHY_QCOM_IPQ806X_SATA
-> +	tristate "Qualcomm IPQ806x SATA SerDes/PHY driver"
-> +	depends on ARCH_QCOM
-> +	depends on OF
-depends on HAS_IOMEM?
-> +	select GENERIC_PHY
-> +
->  endmenu
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index b4f1d57..d950317 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -20,3 +20,4 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
->  phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
->  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
->  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-> +obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
-> diff --git a/drivers/phy/phy-qcom-ipq806x-sata.c b/drivers/phy/phy-qcom-ipq806x-sata.c
-> new file mode 100644
-> index 0000000..fc57340
-> --- /dev/null
-> +++ b/drivers/phy/phy-qcom-ipq806x-sata.c
-> @@ -0,0 +1,204 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/time.h>
-> +#include <linux/delay.h>
-> +#include <linux/clk.h>
-> +#include <linux/slab.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/phy/phy.h>
-> +
-> +struct qcom_ipq806x_sata_phy {
-> +	struct device *dev;
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ChangeLog v13->v14:
+- Rebased
+ChangeLog v10->v13:
+- Rebased
+ChangeLog v9->v10:
+- Rebased.
+- Added Philipp Zabel's Ack.
+- Included Lothar Wa?mann's suggestion about imx-ldb.c.
+- Shortened the patch title
 
-dev is not used anywhere. remove it.
-> +	void __iomem *mmio;
-> +	struct clk *cfg_clk;
-> +};
-> +
-> +#define __set(v, a, b)	(((v) << (b)) & GENMASK(a, b))
-> +
-> +#define SATA_PHY_P0_PARAM0		0x200
-> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3(x)	__set(x, 17, 12)
-> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3_MASK	GENMASK(17, 12)
-> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2(x)	__set(x, 11, 6)
-> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2_MASK	GENMASK(11, 6)
-> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1(x)	__set(x, 5, 0)
-> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1_MASK	GENMASK(5, 0)
-> +
-> +#define SATA_PHY_P0_PARAM1		0x204
-> +#define SATA_PHY_P0_PARAM1_RESERVED_BITS31_21(x)	__set(x, 31, 21)
-> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3(x)	__set(x, 20, 14)
-> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3_MASK	GENMASK(20, 14)
-> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2(x)	__set(x, 13, 7)
-> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2_MASK	GENMASK(13, 7)
-> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1(x)	__set(x, 6, 0)
-> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1_MASK	GENMASK(6, 0)
-> +
-> +#define SATA_PHY_P0_PARAM2		0x208
-> +#define SATA_PHY_P0_PARAM2_RX_EQ(x)	__set(x, 20, 18)
-> +#define SATA_PHY_P0_PARAM2_RX_EQ_MASK	GENMASK(20, 18)
-> +
-> +#define SATA_PHY_P0_PARAM3		0x20C
-> +#define SATA_PHY_SSC_EN			0x8
-> +#define SATA_PHY_P0_PARAM4		0x210
-> +#define SATA_PHY_REF_SSP_EN		0x2
-> +#define SATA_PHY_RESET			0x1
-> +
-> +static inline void qcom_ipq806x_sata_delay_us(unsigned int delay)
-> +{
-> +	/* sleep for max. 50us more to combine processor wakeups */
-> +	usleep_range(delay, delay + 50);
-> +}
-> +
-> +static int qcom_ipq806x_sata_phy_init(struct phy *generic_phy)
-> +{
-> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
-> +	u32 reg = 0;
-> +
-> +	/* Setting SSC_EN to 1 */
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM3);
+ChangeLog v8->v9:
+- Removed the Cc. They are now set in git-send-email directly.
 
-Why readl_relaxed?
-> +	reg = reg | SATA_PHY_SSC_EN;
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM3);
-> +
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM0) &
-> +			~(SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3_MASK |
-> +			  SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2_MASK |
-> +			  SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1_MASK);
-> +	reg |= SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3(0xf);
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM0);
-> +
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM1) &
-> +			~(SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3_MASK |
-> +			  SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2_MASK |
-> +			  SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1_MASK);
-> +	reg |= SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3(0x55) |
-> +		SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2(0x55) |
-> +		SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1(0x55);
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM1);
-> +
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM2) &
-> +		~SATA_PHY_P0_PARAM2_RX_EQ_MASK;
-> +	reg |= SATA_PHY_P0_PARAM2_RX_EQ(0x3);
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM2);
-> +
-> +	/* Setting PHY_RESET to 1 */
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
-> +	reg = reg | SATA_PHY_RESET;
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
-> +
-> +	/* Setting REF_SSP_EN to 1 */
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
-> +	reg = reg | SATA_PHY_REF_SSP_EN | SATA_PHY_RESET;
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
-> +	mb();
-> +	qcom_ipq806x_sata_delay_us(20);
-> +
-> +	/* Clearing PHY_RESET to 0 */
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
-> +	reg = reg & ~SATA_PHY_RESET;
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
-> +
-> +	return 0;
-> +}
-> +
-> +static int qcom_ipq806x_sata_phy_exit(struct phy *generic_phy)
-> +{
-> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
-> +	u32 reg = 0;
-> +
-> +	/* Setting PHY_RESET to 1 */
-> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
-> +	reg = reg | SATA_PHY_RESET;
-> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct phy_ops qcom_ipq806x_sata_phy_ops = {
-> +	.init		= qcom_ipq806x_sata_phy_init,
-> +	.exit		= qcom_ipq806x_sata_phy_exit,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-> +static int qcom_ipq806x_sata_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct qcom_ipq806x_sata_phy *phy;
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	struct phy_provider *phy_provider;
-> +	struct phy *generic_phy;
-> +	int ret;
-> +
-> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-> +	if (!phy) {
-> +		dev_err(dev, "%s: failed to allocate phy\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	phy->mmio = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(phy->mmio)) {
-> +		dev_err(dev, "%s: phy mmio get resource failed\n", __func__);
-> +		return PTR_ERR(phy->mmio);
-> +	}
-> +
-> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-> +	if (IS_ERR(phy_provider)) {
-> +		dev_err(dev, "%s: failed to register phy\n", __func__);
-> +		return PTR_ERR(phy_provider);
-> +	}
+ChangeLog v7->v8:
+- Shrinked even more the Cc list.
 
-phy_provider_register should be the last step. Move it after phy_set_drvdata().
+ChangeLog v6->v7:
+- Shrinked even more the Cc list.
 
-Thanks
-Kishon
+ChangeLog v5->v6:
+- Remove people not concerned by this patch from the Cc list.
+- Added a better explanation of the change.
+
+ChangeLog v5:
+- New patch.
+---
+ arch/arm/boot/dts/imx51-apf51dev.dts |    2 +-
+ arch/arm/boot/dts/imx53-m53evk.dts   |    2 +-
+ drivers/gpu/ipu-v3/ipu-dc.c          |    4 ++--
+ drivers/staging/imx-drm/imx-ldb.c    |    4 ++--
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index c5a9a24..7b3851d 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -18,7 +18,7 @@
+ 
+ 	display at di1 {
+ 		compatible = "fsl,imx-parallel-display";
+-		interface-pix-fmt = "bgr666";
++		interface-pix-fmt = "rgb666";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp1>;
+ 
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index d5d146a..4b036b4 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -24,7 +24,7 @@
+ 	soc {
+ 		display1: display at di1 {
+ 			compatible = "fsl,imx-parallel-display";
+-			interface-pix-fmt = "bgr666";
++			interface-pix-fmt = "rgb666";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_ipu_disp1>;
+ 
+diff --git a/drivers/gpu/ipu-v3/ipu-dc.c b/drivers/gpu/ipu-v3/ipu-dc.c
+index 100d410..9974d41 100644
+--- a/drivers/gpu/ipu-v3/ipu-dc.c
++++ b/drivers/gpu/ipu-v3/ipu-dc.c
+@@ -439,9 +439,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 
+ 	/* bgr666 */
+ 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
+-	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
+-	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
++	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
+ 
+ 	/* lvds666 */
+ 	ipu_dc_map_clear(priv, IPU_DC_MAP_LVDS666);
+diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+index 7e3f019..5d22e40 100644
+--- a/drivers/staging/imx-drm/imx-ldb.c
++++ b/drivers/staging/imx-drm/imx-ldb.c
+@@ -188,11 +188,11 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+ 	switch (imx_ldb_ch->chno) {
+ 	case 0:
+ 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
+-			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
+ 		break;
+ 	case 1:
+ 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
+-			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
+ 		break;
+ 	default:
+ 		dev_err(ldb->dev, "unable to config di%d panel format\n",
+-- 
+1.7.9.5
