@@ -1,9 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 16 Jun 2014 12:11:24 +0200
-Subject: [PATCH v14 10/10] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
+Date: Mon, 16 Jun 2014 12:11:22 +0200
+Subject: [PATCH v14 08/10] drm/panel: Add Eukrea mbimxsd51 displays.
 In-Reply-To: <1402913484-25910-1-git-send-email-denis@eukrea.com>
 References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
-Message-ID: <1402913484-25910-10-git-send-email-denis@eukrea.com>
+Message-ID: <1402913484-25910-8-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,57 +12,163 @@ Signed-off-by: Denis Carikli <denis@eukrea.com>
 ChangeLog v13->v14:
 - None
 
-ChangeLog v11->v13:
-- No changes
-ChangeLog v9->v11:
-- Now uses the drm-panel instead of the display-timings.
+ChangeLog v12->v13:
+- Added a note explaining why the size is zero in
+  the eukrea_mbimxsd51_dvi(s)vga structs.
+ChangeLog v11->v12:
+- Rebased: It now uses the new DRM_MODE_FLAG_POL_DE flags defines names
 
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
-- The backlight is now on at boot.
-
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
-
-ChangeLog v5->v6:
-- Reordered the Cc list.
-
-ChangeLog v3->v5:
-- Updated to the new GPIO defines.
-
-ChangeLog v2->v3:
-- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds backlight support.
-- Added some interested people in the Cc list, and removed some people that
-  might be annoyed by the receiving of that patch which is unrelated to their
-  subsystem.
+ChangeLog v10->v11:
+- New patch.
 ---
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt   |    7 ++
+ .../bindings/panel/eukrea,mbimxsd51-dvi-svga.txt   |    7 ++
+ .../bindings/panel/eukrea,mbimxsd51-dvi-vga.txt    |    7 ++
+ drivers/gpu/drm/panel/panel-simple.c               |   83 ++++++++++++++++++++
+ 4 files changed, 104 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
+ create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
+ create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-index d273d09..6e36dae 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -17,9 +17,19 @@
- 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
- 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
- 
-+	backlight: backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight_1>;
-+		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <1>;
-+		default-on;
-+	};
+diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
+new file mode 100644
+index 0000000..03679d0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
+@@ -0,0 +1,7 @@
++Eukrea CMO-QVGA (320x240 pixels) TFT LCD panel
 +
- 	panel: panel {
- 		compatible = "eukrea,mbimxsd51-cmo-qvga", "simple-panel";
- 		power-supply = <&reg_lcd_3v3>;
-+		backlight = <&backlight>;
- 	};
++Required properties:
++- compatible: should be "eukrea,mbimxsd51-cmo-qvga"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
+new file mode 100644
+index 0000000..f408c9a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
+@@ -0,0 +1,7 @@
++Eukrea DVI-SVGA (800x600 pixels) DVI output.
++
++Required properties:
++- compatible: should be "eukrea,mbimxsd51-dvi-svga"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
+new file mode 100644
+index 0000000..8ea90da
+--- /dev/null
++++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
+@@ -0,0 +1,7 @@
++Eukrea DVI-VGA (640x480 pixels) DVI output.
++
++Required properties:
++- compatible: should be "eukrea,mbimxsd51-dvi-vga"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index a251361..adc40a7 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -403,6 +403,80 @@ static const struct panel_desc edt_etm0700g0dh6 = {
+ 	},
+ };
  
- 	reg_lcd_3v3: lcd-en {
++static const struct drm_display_mode eukrea_mbimxsd51_cmoqvga_mode = {
++	.clock = 6500,
++	.hdisplay = 320,
++	.hsync_start = 320 + 38,
++	.hsync_end = 320 + 38 + 20,
++	.htotal = 320 + 38 + 20 + 30,
++	.vdisplay = 240,
++	.vsync_start = 240 + 15,
++	.vsync_end = 240 + 15 + 4,
++	.vtotal = 240 + 15 + 4 + 3,
++	.vrefresh = 60,
++	.pol_flags = DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE |
++		     DRM_MODE_FLAG_POL_DE_LOW,
++};
++
++static const struct panel_desc eukrea_mbimxsd51_cmoqvga = {
++	.modes = &eukrea_mbimxsd51_cmoqvga_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 73,
++		.height = 56,
++	},
++};
++
++static const struct drm_display_mode eukrea_mbimxsd51_dvisvga_mode = {
++	.clock = 44333,
++	.hdisplay = 800,
++	.hsync_start = 800 + 112,
++	.hsync_end = 800 + 112 + 32,
++	.htotal = 800 + 112 + 32 + 80,
++	.vdisplay = 600,
++	.vsync_start = 600 + 3,
++	.vsync_end = 600 + 3 + 17,
++	.vtotal = 600 + 3 + 17 + 4,
++	.vrefresh = 60,
++	.pol_flags = DRM_MODE_FLAG_POL_PIXDATA_POSEDGE |
++		     DRM_MODE_FLAG_POL_DE_HIGH,
++};
++
++static const struct panel_desc eukrea_mbimxsd51_dvisvga = {
++	.modes = &eukrea_mbimxsd51_dvisvga_mode,
++	.num_modes = 1,
++	/* This is a DVI adapter for external displays */
++	.size = {
++		.width = 0,
++		.height = 0,
++	},
++};
++
++static const struct drm_display_mode eukrea_mbimxsd51_dvivga_mode = {
++	.clock = 23750,
++	.hdisplay = 640,
++	.hsync_start = 640 + 80,
++	.hsync_end = 640 + 80 + 16,
++	.htotal = 640 + 80 + 16 + 64,
++	.vdisplay = 480,
++	.vsync_start = 480 + 3,
++	.vsync_end = 480 + 3 + 13,
++	.vtotal  = 480 + 3 + 13 + 4,
++	.vrefresh = 60,
++	.pol_flags = DRM_MODE_FLAG_POL_PIXDATA_POSEDGE |
++		     DRM_MODE_FLAG_POL_DE_HIGH,
++};
++
++static const struct panel_desc eukrea_mbimxsd51_dvivga = {
++	.modes = &eukrea_mbimxsd51_dvivga_mode,
++	.num_modes = 1,
++	/* This is a DVI adapter for external displays */
++	.size = {
++		.width = 0,
++		.height = 0,
++	},
++};
++
+ static const struct drm_display_mode lg_lp129qe_mode = {
+ 	.clock = 285250,
+ 	.hdisplay = 2560,
+@@ -458,6 +532,15 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "chunghwa,claa101wa01a",
+ 		.data = &chunghwa_claa101wa01a
+ 	}, {
++		.compatible = "eukrea,mbimxsd51-cmo-qvga",
++		.data = &eukrea_mbimxsd51_cmoqvga,
++	}, {
++		.compatible = "eukrea,mbimxsd51-dvi-svga",
++		.data = &eukrea_mbimxsd51_dvisvga,
++	}, {
++		.compatible = "eukrea,mbimxsd51-dvi-vga",
++		.data = &eukrea_mbimxsd51_dvivga,
++	}, {
+ 		.compatible = "chunghwa,claa101wb01",
+ 		.data = &chunghwa_claa101wb01
+ 	}, {
 -- 
 1.7.9.5
