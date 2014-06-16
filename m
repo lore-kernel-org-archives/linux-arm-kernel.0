@@ -1,41 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jun 2014 14:49:08 +0100
-Subject: [PATCH] ARM: Thumb-2: Fix out-of-range offset for Thumb-2 in,
- proc-macros.S
-In-Reply-To: <5396ACF1.1020107@huawei.com>
-References: <5396ACF1.1020107@huawei.com>
-Message-ID: <20140616134908.GI16758@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 16 Jun 2014 17:01:42 +0300
+Subject: [PATCH v2 4/4] ARM: DTS: dra7/dra7xx-clocks: ATL related changes
+In-Reply-To: <1399458048-28213-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1399458048-28213-1-git-send-email-peter.ujfalusi@ti.com>
+ <1399458048-28213-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <539EF8C6.1080207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 08:00:01AM +0100, Wang Weidong wrote:
-> The STR Instruction Encoding T4 points that the <imm> is in the
-> range 0-255.So split the instruction into two for Thumb-2. Just
-> like commit 874d5d3ccc("ARM: 6623/1: Thumb-2: Fix out-of-range
-> offset for Thumb-2 in proc-v7.S").
-> 
-> Signed-off-by: Wang Weidong <wangweidong1@huawei.com>
+On 05/07/2014 01:20 PM, Peter Ujfalusi wrote:
+> Modify the clock nodes for the ATL clocks to use the ATL clock driver to
+> handle them.
+>
+> Add the ATL device node at the same time for DRA7.
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+This patch missed the merge window due to long dependency chain, however 
+Tony promised to pull this with rc-fixes. So, for that purpose:
+
+Acked-by: Tero Kristo <t-kristo@ti.com>
+
 > ---
->  arch/arm/mm/proc-macros.S | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-> index ee1d805..63f710c 100644
-> --- a/arch/arm/mm/proc-macros.S
-> +++ b/arch/arm/mm/proc-macros.S
-> @@ -252,7 +252,9 @@
->  	tst	r3, #L_PTE_PRESENT | L_PTE_YOUNG	@ present and young?
->  	movne	r2, #0				@ no -> fault
->  
-> -	str	r2, [r0, #2048]!		@ hardware version
-> + ARM(	str	r2, [r0, #2048]! 		) @ hardware version
-> + THUMB( add	r0, r0, #2048 			)
-> + THUMB( str	r2, [r0] 			)
->  	mov	ip, #0
->  	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
->  	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
-
-AFAICT this is in xscale_set_pte_ext_epilogue which should only be built as
-ARM. Are you seeing a real issue here?
-
-Will
+>   arch/arm/boot/dts/dra7.dtsi          | 11 +++++++++++
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi | 16 ++++++++--------
+>   2 files changed, 19 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 149b55099935..84071423016e 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -789,6 +789,17 @@
+>   			dma-names = "tx0", "rx0";
+>   			status = "disabled";
+>   		};
+> +
+> +		atl: atl at 4843c000 {
+> +			compatible = "ti,dra7-atl";
+> +			reg = <0x4843c000 0x3ff>;
+> +			ti,hwmods = "atl";
+> +			ti,provided-clocks = <&atl_clkin0_ck>, <&atl_clkin1_ck>,
+> +					     <&atl_clkin2_ck>, <&atl_clkin3_ck>;
+> +			clocks = <&atl_gfclk_mux>;
+> +			clock-names = "fck";
+> +			status = "disabled";
+> +		};
+>   	};
+>   };
+>
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index 30160348934c..789e92cd5595 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -10,26 +10,26 @@
+>   &cm_core_aon_clocks {
+>   	atl_clkin0_ck: atl_clkin0_ck {
+>   		#clock-cells = <0>;
+> -		compatible = "fixed-clock";
+> -		clock-frequency = <0>;
+> +		compatible = "ti,dra7-atl-clock";
+> +		clocks = <&atl_gfclk_mux>;
+>   	};
+>
+>   	atl_clkin1_ck: atl_clkin1_ck {
+>   		#clock-cells = <0>;
+> -		compatible = "fixed-clock";
+> -		clock-frequency = <0>;
+> +		compatible = "ti,dra7-atl-clock";
+> +		clocks = <&atl_gfclk_mux>;
+>   	};
+>
+>   	atl_clkin2_ck: atl_clkin2_ck {
+>   		#clock-cells = <0>;
+> -		compatible = "fixed-clock";
+> -		clock-frequency = <0>;
+> +		compatible = "ti,dra7-atl-clock";
+> +		clocks = <&atl_gfclk_mux>;
+>   	};
+>
+>   	atl_clkin3_ck: atl_clkin3_ck {
+>   		#clock-cells = <0>;
+> -		compatible = "fixed-clock";
+> -		clock-frequency = <0>;
+> +		compatible = "ti,dra7-atl-clock";
+> +		clocks = <&atl_gfclk_mux>;
+>   	};
+>
+>   	hdmi_clkin_ck: hdmi_clkin_ck {
+>
