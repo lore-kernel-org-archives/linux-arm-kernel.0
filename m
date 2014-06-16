@@ -1,45 +1,63 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 16 Jun 2014 18:08:50 +0200
-Subject: Fwd: [URGENT] Perf report shared objects showing unknown on ARM
-In-Reply-To: <20140616130010.GF16758@arm.com>
-References: <BAY177-W3DC97EDA6D43CDDD56EE9E5360@phx.gbl>
- <CAFrcx1=M_fOEQKezMxSE39szLKSUsMwmm-k-bO4qXtFrCqpkJA@mail.gmail.com>
- <CAFrcx1kjndv=KDBr8i9BvZMseVfinHxEfS4QfFm=DMqLXj=kKg@mail.gmail.com>
- <loom.20140519T134943-896@post.gmane.org>
- <CAFrcx1kZK8PwOLfMbqiv7J1ngMv0jC3ZZSM6ohOSOMtNGtO3sw@mail.gmail.com>
- <loom.20140521T072305-629@post.gmane.org>
- <CAFrcx1=HRex0rYX2w+hR-_zgAOwm+h9JU6+5N7T-U2xZWu8Q4w@mail.gmail.com>
- <CAAumFvMYX6ncAGkA5GC0fm0kGgkWvRpm-NO3OGJkGPBM0PL4dw@mail.gmail.com>
- <CAAumFvNtwQa5Kijjb13wsYTtjJz__am0aX73h_9CkxW78X=BBw@mail.gmail.com>
- <20140616130010.GF16758@arm.com>
-Message-ID: <CAORVsuXwYxyZ0uThcOTtLQeot71W6FXGE+PJu=9Z4OV6Lsp4fQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 16 Jun 2014 18:10:55 +0200
+Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling() into
+ a library function
+In-Reply-To: <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
+ <20140616104615.GA10701@n2100.arm.linux.org.uk>
+ <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
+Message-ID: <CAPDyKFoeZLMCNpMMyLKKES+CUmTXt1g1rCPLB6HKXy9AMw1Zng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 3:00 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Jun 05, 2014 at 02:50:22PM +0100, Prankul Garg wrote:
->> Hi will,
+On 16 June 2014 14:17, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 16 June 2014 12:46, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> On Wed, Apr 23, 2014 at 08:08:07PM +0100, Russell King wrote:
+>>> @@ -1507,25 +1529,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+>>>                       host->ops->set_clock(host, host->clock);
+>>>               }
+>>>
+>>> -             if (host->ops->set_uhs_signaling)
+>>> -                     host->ops->set_uhs_signaling(host, ios->timing);
+>>> -             else {
+>>> -                     ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+>>> -                     /* Select Bus Speed Mode for host */
+>>> -                     ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+>>> -                     if ((ios->timing == MMC_TIMING_MMC_HS200) ||
+>>> -                         (ios->timing == MMC_TIMING_UHS_SDR104))
+>>> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
+>>> -                     else if (ios->timing == MMC_TIMING_UHS_SDR12)
+>>> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
+>>> -                     else if (ios->timing == MMC_TIMING_UHS_SDR25)
+>>> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
+>>> -                     else if (ios->timing == MMC_TIMING_UHS_SDR50)
+>>> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
+>>> -                     else if (ios->timing == MMC_TIMING_UHS_DDR50)
+>>> -                             ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
+>>> -                     sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+>>> -             }
+>>> +             host->ops->set_uhs_signaling(host, ios->timing);
+>>>
+>>>               if (!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN) &&
+>>>                               ((ios->timing == MMC_TIMING_UHS_SDR12) ||
 >>
->> please review the problem.
+>> Whoever decided to poorly pick these patches up against my will has
+>> slightly messed this patch up - whereas my original patch left the
+>> code correctly formatted, when whoever applied this patch did so, they
+>> left an additional blank line in the above.
 >
-> What would you like me to do? perf tools patches don't go via me, but if
-> Jean sends the latest version of the patches then I can have a look.
->
-> I reviewed something here:
->
->   https://lkml.org/lkml/2014/5/19/460
->
-> but Jean didn't seen to know the answers to my questions either.
-Sorry I got no time to work on the topic. Let me check again and come
-back to you.
-Note: the patch is an RFC one, any comment or suggestion is welcome.
 
-Jean
+[snip]
 
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Please, feel free to send a patch to fixup my misstake. I will happily apply it.
+
+I had a second look to fix it up myself, but I just can't find that
+your patch was different than the one I applied (beside the conflict I
+resolved).
+
+If you do find any other issue regarding the patches in this patchset
+- please let me know and I will try to help.
+
+Kind regards
+Uffe
