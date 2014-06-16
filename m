@@ -1,71 +1,45 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 16 Jun 2014 11:35:21 -0700
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+Date: Mon, 16 Jun 2014 11:37:28 -0700
+Subject: [PATCH v2] ARM: EXYNOS: mcpm: Don't rely on firmware's
  secondary_cpu_start
-In-Reply-To: <5398758F.4080306@samsung.com>
+In-Reply-To: <alpine.LFD.2.11.1406091649290.25775@knanqh.ubzr>
 References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
- <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
- <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
- <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
- <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
- <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
- <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
- <5398758F.4080306@samsung.com>
-Message-ID: <CAD=FV=U49dNrsNRe7d0PAyq_g_fUiaZYoqTAFoj+gJ=3K5c_2A@mail.gmail.com>
+ <1402096465-13218-1-git-send-email-dianders@chromium.org>
+ <7htx7uq7k1.fsf@paris.lan>
+ <CAL1qeaGv+hBCr8oqs-E2j_Qh0Z=ZTVEaM-gdyu286Snu4otbMA@mail.gmail.com>
+ <alpine.LFD.2.11.1406091617181.25775@knanqh.ubzr>
+ <CAGa+x87puSoPftG6ddGTVtxOOxoUg_dLmMmZUHm-j6pjFuhr=g@mail.gmail.com>
+ <alpine.LFD.2.11.1406091649290.25775@knanqh.ubzr>
+Message-ID: <CAD=FV=XYBSkx_3jzZ2G=WuEYweiejna7KionneqUkEVPx3_E-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin,
+Nicolas,
 
-On Wed, Jun 11, 2014 at 8:28 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 06/12/14 00:19, Doug Anderson wrote:
+On Mon, Jun 9, 2014 at 1:55 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Mon, 9 Jun 2014, Kevin Hilman wrote:
+>
+>> On Mon, Jun 9, 2014 at 1:22 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Mon, 9 Jun 2014, Andrew Bresticker wrote:
+>> >
+>> >> > [1] While waiting for the forth-coming patch from Andrew to enable the
+>> >> >     CCI port for the boot cluster), I do this from u-boot before starting
+>> >> >     the kernel (based on earlier email from Doug):
+>> >> >
+>> >> >     mw.l 10d25000 3  # Enable CCI from U-Boot
+>> >>
+>> >> From the other thread, it sounds like Nicolas wants enabling of the
+>> >> boot cluster's CCI port to be done unconditionally for all MCPM
+>> >> platforms.  Nicolas, are you preparing a patch for this or should I?
+>> >
+>> > I would like confirmation this indeed solves your problem first before I
+>> > go ahead with it.
 >>
->> Chander,
->>
->> On Tue, Jun 10, 2014 at 9:52 PM, Chander Kashyap<k.chander@samsung.com>
->> wrote:
->>>
->>> Hi Doug,
->>>
->>> On Tue, Jun 10, 2014 at 9:19 PM, Nicolas Pitre<nicolas.pitre@linaro.org>
->>> wrote:
->>>>
->>>> On Tue, 10 Jun 2014, Doug Anderson wrote:
->>>>
->>>>> My S-state knowledge is not strong, but I believe that Lorenzo's
->>>>> questions matter if we're using S2 for CPUidle (where we actually turn
->>>>> off power and hot unplug CPUs) but not when we're using S1 for CPUidle
->>>>> (where we just enter WFI/WFE).
->>>>>
->>>
->>> No Its not plain WFI.
->>>
->>> All cores in Exynos5420 can be powered off independently.
->>> This functionality has been tested.
->>>
->>> Below is the link for the posted patches.
->>>
->>> https://lkml.org/lkml/2014/6/10/194
->>>
->>> And as Nicolas wrote, these patches need MCPM for that.
->>
->>
->> Most excellent!  I should have been more clear that I only knew about
->> how CPUidle worked in our local production kernel.  There I'm pretty
->> sure CPUidle is just WFI/WFE.  If you've got patches to do better then
->> that's great!
->>
->> ...can you confirm that my patch doesn't interfere with your improved
->> CPUidle?  It's been Acked by Nicolas (thanks!) so I'd imagine it will
->> land shortly.  Kukjin: I assume you'll be taking this?
->>
-> Sure, I will ;-)
+>> FYI... I confirmed on the other thread.  It works on the Chromebook2.
+>
+> OK I'll clean it up for mainline.
 
-I see that you put some branches up about 3 hours ago and I don't see
-this patch.  Are you planning on applying it?  It would be nice if it
-was in 3.16 (since it causes problems booting), but if there's some
-reason it needs to be for-next that's OK too.
+I just wanted to double-check that this is still on your list of
+things to do.  If not then please let us know!  :)
 
 -Doug
