@@ -1,46 +1,50 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 16 Jun 2014 13:55:52 +0200
-Subject: [RESEND][PATCH] mmc: wmt-sdmmc: Remove deprecated IRQF_DISABLED
-In-Reply-To: <1398594331.6291.4.camel@phoenix>
-References: <1398594331.6291.4.camel@phoenix>
-Message-ID: <CAPDyKFrRT55ZMUPsyu+iubtVJPs+tH=A0UEtFYM==4_LH05+rQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Jun 2014 05:00:15 -0700
+Subject: [PATCH] ARM: dts: OMAP5: Update CPU OPP table as per final
+ production Manual
+In-Reply-To: <1402016986-12508-1-git-send-email-nm@ti.com>
+References: <1402016986-12508-1-git-send-email-nm@ti.com>
+Message-ID: <20140616120014.GH17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 April 2014 12:25, Axel Lin <axel.lin@ingics.com> wrote:
-> It's a NOOP since 2.6.35 and it will be removed one day.
-> This is not trivial because current code uses hard coded 32 instead of
-> IRQF_DISABLED in the request_irq call.
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+* Nishanth Menon <nm@ti.com> [140605 18:11]:
+> As per the Final production Data Manual for OMAP5432,
+> SWPS050F(APRIL 2014)
+> 
+> There are only two OPPs - 1GHz and 1.5GHz. the older OPP_LOW has been
+> completely descoped. The Nominal voltages are still correct though.
+> However, expectation for final production configuration is operation
+> with Adaptive Body Bias (ABB) and Adaptive Voltage Scaling Class 0
+> operation.
+> 
+> There are no IDcode or version change information encoded to
+> programmatically detect this and software is supposed to NOT use
+> OPP_LOW(500MHz) anymore for all devices (legacy and production
+> samples).
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-Thanks! Applied for next.
+Thanks applying into omap-for-v3.16/fixes.
 
-Kind regards
-Uffe
+Tony
 
 > ---
-> This patch was sent on:
-> http://www.spinics.net/lists/linux-mmc/msg22644.html
->
->  drivers/mmc/host/wmt-sdmmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-> index 5501c9f..8a48a50 100644
-> --- a/drivers/mmc/host/wmt-sdmmc.c
-> +++ b/drivers/mmc/host/wmt-sdmmc.c
-> @@ -829,7 +829,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
->                 goto fail3;
->         }
->
-> -       ret = request_irq(dma_irq, wmt_mci_dma_isr, 32, "sdmmc", priv);
-> +       ret = request_irq(dma_irq, wmt_mci_dma_isr, 0, "sdmmc", priv);
->         if (ret) {
->                 dev_err(&pdev->dev, "Register DMA IRQ fail\n");
->                 goto fail4;
-> --
-> 1.8.1.2
->
->
->
+>  arch/arm/boot/dts/omap5.dtsi |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 3bfda16..a4ed549 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -45,7 +45,6 @@
+>  
+>  			operating-points = <
+>  				/* kHz    uV */
+> -				500000  880000
+>  				1000000 1060000
+>  				1500000 1250000
+>  			>;
+> -- 
+> 1.7.9.5
+> 
