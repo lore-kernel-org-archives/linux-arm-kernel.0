@@ -1,51 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Jun 2014 11:17:43 +0100
-Subject: [GIT PULL] mfd: Immutable branch between MFD and OMAP, due for
- v3.16
-In-Reply-To: <20140612083357.GB14323@lee--X1>
-References: <1401214140-9828-1-git-send-email-tony@atomide.com>
- <20140528071313.GH4227@lee--X1> <20140528180607.GB4707@atomide.com>
- <20140602163841.GC11004@atomide.com>
- <20140603080632.GC3060@lee--X1>
- <20140612054348.GC17845@atomide.com>
- <20140612074705.GB11421@lee--X1>
- <20140612080030.GD17845@atomide.com>
- <20140612083357.GB14323@lee--X1>
-Message-ID: <20140616101743.GO14323@lee--X1>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Mon, 16 Jun 2014 12:26:29 +0200
+Subject: [PATCH v6 4/7] ata: ahci_platform: add a generic AHCI compatible
+In-Reply-To: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1402914392-6028-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > Still not seeing this branch being merged..
-> > > 
-> > > Oh crap, I see what's happened and it's completely my fault.
-> > > 
-> > > If you read the final merge commit carefully:
-> > > 
-> > > 28fee3f: ("Merge branches 'ib-from-asoc-3.16', 'ib-from-pm-3.16',
-> > > 'ib-from-regulator-3.16', 'ib-mfd-gpio-3.16' and
-> > > 'ib-mfd-mmc-memstick-3.16', tags 'ib-mfd-extcon-3.16',
-> > > 'ib-mfd-omap-3.16' and 'ib-mfd-regulator-3.16' into
-> > > ibs-for-mfd-merged")
-> > > 
-> > > I appear to have a _branch_ AND a _tag_ called ib-mfd-omap-3.16 and it
-> > > looks like Git has taken the tag as a preference. heads/ib-mfd-omap-3.16
-> > > is actually at tag/ib-mfd-omap-3.16-1 (notice the appended '-1'),
-> > > which contains your most recent patches.  Since I created the MFD-OMAP
-> > > shared branch I have changed the naming convention to avoid this sort
-> > > of ambiguity.  I'll send a second MFD pull-request to Linus today.
-> > 
-> > Heh OK yeah I've hit that also at some point :)
-> >  
-> > > Sorry Tony.
-> > 
-> > No problem, good to hear you got it figured out.
-> 
-> Pull-request sent.  Hopefully it's sorted now.
+The ahci_platform driver is a generic driver using the libahci_platform
+functions. Add a generic compatible to avoid having an endless list of
+compatibles with no differences for the same driver.
 
-bae14e7a2dcb726476b5020396923a24ccc4c40b
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ drivers/ata/ahci_platform.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index ebe505c17763..a30cecd68609 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -78,6 +78,8 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
+ 			 ahci_platform_resume);
+ 
+ static const struct of_device_id ahci_of_match[] = {
++	{ .compatible = "generic-ahci", },
++	/* Keep the following compatibles for device tree compatibility */
+ 	{ .compatible = "snps,spear-ahci", },
+ 	{ .compatible = "snps,exynos5440-ahci", },
+ 	{ .compatible = "ibm,476gtr-ahci", },
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
