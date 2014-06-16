@@ -1,87 +1,94 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 16 Jun 2014 22:31:17 +0200
-Subject: [PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU devices to DT
-In-Reply-To: <CAMuHMdXeyKy4vR0jNS3RC9E7+0_=xPXRUDokXe0kP+V8uVEiyQ@mail.gmail.com>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1462083.WMstm6aRc1@avalon>
- <CAMuHMdXeyKy4vR0jNS3RC9E7+0_=xPXRUDokXe0kP+V8uVEiyQ@mail.gmail.com>
-Message-ID: <5236750.dtz35JItTk@avalon>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 16 Jun 2014 13:53:56 -0700
+Subject: [PATCH v2 1/4] dt: bindings: add bindings for Broadcom bcm43xx
+ sdio devices
+In-Reply-To: <1402941407-8210-2-git-send-email-hdegoede@redhat.com>
+References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
+ <1402941407-8210-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGVrzcZBzDTfnd6o0ib1FBvBK2VPNitS=rpb4jDkjF=T7Fy=DQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+2014-06-16 10:56 GMT-07:00 Hans de Goede <hdegoede@redhat.com>:
+> From: Arend van Spriel <arend@broadcom.com>
+>
+> The Broadcom bcm43xx sdio devices are fullmac devices that may be
+> integrated in ARM platforms. Currently, the brcmfmac driver for
+> these devices support use of platform data. This patch specifies
+> the bindings that allow this platform data to be expressed in the
+> devicetree.
+>
+> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
+> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
+> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
+> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
+> Signed-off-by: Arend van Spriel <arend@broadcom.com>
+> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
+>  on how to handle this yet]
+> [hdegoede at redhat.com: move from bindings/staging to bindings]
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>
+> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+> new file mode 100644
+> index 0000000..6a0aaf2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+> @@ -0,0 +1,29 @@
+> +Broadcom BCM43xx Fullmac wireless SDIO devices
+> +
+> +This node provides properties for controlling the Broadcom wireless device. The
+> +node is expected to be specified as a child node to the SDIO controller that
+> +connects the device to the system.
+> +
+> +Required properties:
+> +
+> + - compatible : Should be "brcm,bcm43xx-fmac".
 
-On Monday 16 June 2014 18:19:02 Geert Uytterhoeven wrote:
-> On Mon, Jun 16, 2014 at 4:22 PM, Laurent Pinchart wrote:
-> >> diff --git a/arch/arm/boot/dts/r8a7779.dtsi
-> >> b/arch/arm/boot/dts/r8a7779.dtsi index bf716ce..81714ce 100644
-> >> --- a/arch/arm/boot/dts/r8a7779.dtsi
-> >> +++ b/arch/arm/boot/dts/r8a7779.dtsi
-> >> @@ -269,9 +269,10 @@
-> >>       tmu0: timer at ffd80000 {
-> >>               compatible = "renesas,tmu";
-> >>               reg = <0xffd80000 0x30>;
-> >> -             interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
-> >> -                          <0 41 IRQ_TYPE_LEVEL_HIGH>,
-> >> -                          <0 42 IRQ_TYPE_LEVEL_HIGH>;
-> >> +             interrupt-parent = <&gic>;
-> >> +             interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
-> >> +                          <0 33 IRQ_TYPE_LEVEL_HIGH>,
-> >> +                          <0 34 IRQ_TYPE_LEVEL_HIGH>;
-> >> 
-> >>               clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
-> >>               clock-names = "fck";
-> >> 
-> >> @@ -283,9 +284,10 @@
-> >>       tmu1: timer at ffd81000 {
-> >>               compatible = "renesas,tmu";
-> >>               reg = <0xffd81000 0x30>;
-> >> -             interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>,
-> >> -                          <0 45 IRQ_TYPE_LEVEL_HIGH>,
-> >> -                          <0 46 IRQ_TYPE_LEVEL_HIGH>;
-> >> +             interrupt-parent = <&gic>;
-> >> +             interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>,
-> >> +                          <0 36 IRQ_TYPE_LEVEL_HIGH>,
-> >> +                          <0 37 IRQ_TYPE_LEVEL_HIGH>;
-> > 
-> > If I'm not mistaken the interrupts should be 36, 37 and 38.
-> 
-> (diving into the documentation)
-> 
-> Yes, probably 36, 37, and 38. I say "probably", as I find it non-trivial
-> to convert from docs to DT.
-> 
-> What happens with 35, which is "TMU21 (input capture)"?
-> As DT describes the hardware, shouldn't it be mentioned here?
+In general, the use of a wildcard compatible string is discouraged
+over the use of a more descriptive compatible string. So you should
+find out what is the first chip that is compatible, and use that
+compatible string as long as that compatibility remains.
 
-Input capture isn't supported by the TMU driver yet. I haven't checked how the 
-feature is implemented in the hardware, which is why I've left it out from the 
-DT bindings for now.
+> +
+> +Optional properties:
+> + - brcm,drive-strength : drive strength used for SDIO pins on device.
+> +       (default = 6mA).
 
-> >>               clocks = <&mstp0_clks R8A7779_CLK_TMU1>;
-> >>               clock-names = "fck";
-> >> 
-> >> @@ -296,10 +298,11 @@
-> >> 
-> >>       tmu2: timer at ffd82000 {
-> >>               compatible = "renesas,tmu";
-> >> +             interrupt-parent = <&gic>;
-> >>               reg = <0xffd82000 0x30>;
-> >> -             interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>,
-> >> -                          <0 49 IRQ_TYPE_LEVEL_HIGH>,
-> >> -                          <0 50 IRQ_TYPE_LEVEL_HIGH>;
-> >> +             interrupts = <0 38 IRQ_TYPE_LEVEL_HIGH>,
-> >> +                          <0 39 IRQ_TYPE_LEVEL_HIGH>,
-> >> +                          <0 40 IRQ_TYPE_LEVEL_HIGH>;
-> > 
-> > And 40, 41 and 42 here.
-> 
-> Likewise for "TMU51 (input capture)"?
-> 
-> >>               clocks = <&mstp0_clks R8A7779_CLK_TMU2>;
-> >>               clock-names = "fck";
+It would not hurt if you did specify the unit of the
+"brcm,drive-strength" property here. Also, if the default is 6, maybe
+the example below should be fixed to reflect that so people do not
+think that writing 4 to a register = 6 mA.
+
+> + - interrupt-parent : the phandle for the interrupt controller to which the
+> +       device interrupts are connected.
+> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
+> +       When not specified the device will use in-band SDIO interrupts.
+> + - interrupt-names : name of the out-of-band interrupt, which must be set
+> +       to "host-wake".
+> +
+> +Example:
+> +
+> +bcm4335 {
+> +       compatible = "brcm,bcm43xx-fmac";
+> +       brcm,drive-strength = <4>;
+> +       interrupt-parent = <&gpx2>;
+> +       interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
+> +       interrupt-names = "host-wake";
+> +};
+> --
+> 2.0.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
 
 -- 
-Regards,
-
-Laurent Pinchart
+Florian
