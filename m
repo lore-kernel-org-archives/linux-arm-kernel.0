@@ -1,57 +1,37 @@
-From: dianders@google.com (Doug Anderson)
-Date: Mon, 16 Jun 2014 09:49:26 -0700
-Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
-In-Reply-To: <539ED2C0.8030405@gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
- <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
- <539ED2C0.8030405@gmail.com>
-Message-ID: <CAD=FV=UaaRQVq3TmXMTv9OkER+zORC89YfPNjwZwfCQKmuavrw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Jun 2014 10:50:42 -0600
+Subject: [PATCH] ARM: multi_v7_defconfig: re-enable SDHCI drivers
+Message-ID: <1402937442-7623-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Mon, Jun 16, 2014 at 4:19 AM, Tushar Behera <trblinux@gmail.com> wrote:
-> On 06/13/2014 10:33 PM, Doug Anderson wrote:
->> Tushar,
->>
->> On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
->>> Peach-pi board has MAX98090 audio codec connected on HSI2C-7 bus.
->>
->> If you want to be a stickler about it, peach-pi actually has a
->> max98091.  That requires code changes to the i2c driver, though.
->> ...and unfortunately listing two compatible strings for i2c devices is
->> broken.  :(
->>
-> Hi Doug,
->
-> You are right. I checked the boot logs, the detected codec type is
-> MAX98091. Since both these CODECs are supported through a single driver
-> and the detection of chip is done during runtime, I would suggest we go
-> ahead with "max98090" compatible string. I will update the commit
-> message accordingly.
->
-> Does that sound okay to you?
+Following 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
+SDHCI drivers that use MMC_SDHCI_PLTFM no longer select it, but
+instead depend on it. This means that multi_v7_defconfig no longer
+selects it, and hence many SDHCI drivers are no longer enabled.
+Explicitly enable MMC_SDHCI_PLTFM to solve this.
 
-As per my understanding you shouldn't do this.  You should have two patches:
+Fixes: 5d01b7684b7e ("mmc: simplify SDHCI Kconfig dependencies")
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This is a fix for 3.16, and based directly on v3.16-rc1.
 
-1. Add "max98091".  You could simply post Wonjoon's patch from
-<https://chromium-review.googlesource.com/184091>
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-2. Change the device tree to refer to "max98091"
-
-The argument that the "current kernel driver has a single driver" is
-an argument that you're not supposed to make for device tree.  The
-same device tree is supposed to work for U-Boot, BSD, or any other
-platform.  On those platforms it might not be a shared driver.
-
-
-> If you so desire, I will submit a patch to sort peach-pi device-tree
-> nodes (w.r.t. peach-pit dts file).
-
-Yes please.  I think there's supposed to be some official ordering of
-things.  If anyone reading this has a pointer to the official sort
-order of things in the device tree I'd love to see it!  ;)
-
--Doug
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e2d62048e198..17d9462b9fb9 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -300,6 +300,7 @@ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_OF_ARASAN=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_SDHCI_DOVE=y
+-- 
+1.8.1.5
