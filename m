@@ -1,58 +1,49 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 16 Jun 2014 13:10:58 +0530
-Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
- secondary_cpu_start
-In-Reply-To: <CAD=FV=XkTSfHwt9Ekcy6TPGWJTJ49zMCOA9eaJVaq=q4u4Ri3Q@mail.gmail.com>
-References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
- <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
- <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
- <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
- <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
- <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
- <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
- <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
- <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
- <5398758F.4080306@samsung.com>
- <CADWw7Oh=A_cg_hqu8DZ1t_iacOGgWediLp3K3viFYHMNAPkqRw@mail.gmail.com>
- <CAD=FV=XkTSfHwt9Ekcy6TPGWJTJ49zMCOA9eaJVaq=q4u4Ri3Q@mail.gmail.com>
-Message-ID: <CANuQgHHf_NtL+-=1S14meyT8auBsh0kn6Zn+p6r==qAEgVG1UA@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 16 Jun 2014 09:43:47 +0200 (CEST)
+Subject: [PATCH v8 2/7] clocksource: Add support for the Mediatek SoCs
+In-Reply-To: <539E116D.6030002@linaro.org>
+References: <1402490055-15197-1-git-send-email-matthias.bgg@gmail.com>
+ <1402490055-15197-3-git-send-email-matthias.bgg@gmail.com>
+ <alpine.DEB.2.10.1406112012460.5170@nanos> <539E116D.6030002@linaro.org>
+Message-ID: <alpine.DEB.2.10.1406160943370.5170@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+On Sun, 15 Jun 2014, Daniel Lezcano wrote:
 
-On 13 June 2014 20:40, Doug Anderson <dianders@chromium.org> wrote:
-> Chander,
->
-> On Fri, Jun 13, 2014 at 4:54 AM, Chander Kashyap <k.chander@samsung.com> wrote:
->> This patch is effectively changing the mcpm_entry_point address from
->> nsbase + 0x1c to nsbase + 0x8
->>
->> Hence while integrating with mainline u-boot we need to take care for
->> new mcpm_entry_point address.
->>
->> With Chromebook it works straightforward.
->
-> Can you explain more and point to the code that is using the nsbase +
-> 0x1c?  Specifically the only code I see that uses the nsbase + 0x1c is
-> the code that is located at nsbase, which is the code we're
-> overwriting here.  I'd imagine you're using U-Boot code that looks
-> something like the bits that start at code_base here:
->
-> https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/ce358daf5069f1dc145b0f9d403cfbb028271807/arch/arm/cpu/armv7/exynos/lowlevel.S
->
-> With my kernel change you can completely eliminate U-Boot's
-> installation of this code (or keep it, it makes no difference).
+> On 06/11/2014 08:14 PM, Thomas Gleixner wrote:
+> > On Wed, 11 Jun 2014, Matthias Brugger wrote:
+> > > +static void mtk_clkevt_mode(enum clock_event_mode mode,
+> > > +				struct clock_event_device *clk)
+> > > +{
+> > > +	struct mtk_clock_event_device *evt = to_mtk_clk(clk);
+> > > +
+> > > +	mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
+> > > +
+> > > +	switch (mode) {
+> > > +	case CLOCK_EVT_MODE_PERIODIC:
+> > > +		mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
+> > > +		mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
+> > > +		break;
+> > > +	case CLOCK_EVT_MODE_ONESHOT:
+> > > +		mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
+> > 
+> > Why start the timer here? The code will call set next event right away.
+> > 
+> > > +		break;
+> > > +	case CLOCK_EVT_MODE_UNUSED:
+> > > +	case CLOCK_EVT_MODE_SHUTDOWN:
+> > > +	default:
+> > > +		/* No more interrupts will occur as source is disabled */
+> > > +		break;
+> > > +	}
+> > > +}
+> > 
+> > Looks good otherwise.
+> 
+> Hi Thomas,
+> 
+> Can I consider the 8.1 patch (the one taking into account your comment) as
+> acked-by ?
 
-Yes i agree with your point.
-What i am saying is when there is full support for Exynos5420 in
-mainline u-boot we need to take care for the mcpm_entry_point address.
-
->
-> -Doug
-
-
-
--- 
-with warm regards,
-Chander Kashyap
+Yes
