@@ -1,74 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Jun 2014 19:25:35 +0200
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <20140616164517.GY16758@arm.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <5537408.I9tiuCA96J@wuerfel> <20140616164517.GY16758@arm.com>
-Message-ID: <8028011.DbLMpGku5b@wuerfel>
+Date: Mon, 16 Jun 2014 19:30:19 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140616170416.GA16758@arm.com>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <8b0492b4697943a0b1f276ef42cc8223@DM2PR03MB352.namprd03.prod.outlook.com>
+ <20140616170416.GA16758@arm.com>
+Message-ID: <5115654.pRN5gLfQMp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 June 2014 17:45:17 Will Deacon wrote:
-> On Mon, Jun 16, 2014 at 05:42:10PM +0100, Arnd Bergmann wrote:
-> > On Monday 16 June 2014 17:26:53 Will Deacon wrote:
-> > > On Fri, Jun 06, 2014 at 12:07:11PM +0100, Dave Martin wrote:
-> > > > On Fri, Jun 06, 2014 at 08:48:26AM +0200, Arnd Bergmann wrote:
-> > > > > On Thursday 05 June 2014 21:37:09 Zhen Lei wrote:
-> > > > > 
-> > > > > > +- smmu-masters  : A list of phandles to device nodes representing bus
-> > > > > > +                  masters for which the SMMU can provide a translation
-> > > > > > +                  and their corresponding StreamIDs (see example below).
-> > > > > > 
-> > > > > 
-> > > > > We're currently in the process of defining a generic binding for IOMMUs.
-> > > > > 
-> > > > > While the smmu-masters property was copied from an existing binding,
-> > > > > I think we will end up migrating away from that towards a common way
-> > > > > to express those things, and we shouldn't add another one doing this
-> > > > > in a nonstandard way. Please have a look at the latest discussion
-> > > > > about the iommu binding using #iommu-cells and a reference from the
-> > > > > master to the iommu and see if you can migrate your code to use that.
-> > > > 
-> > > > Thanks for making this point -- I was going to do so yesterday but then
-> > > > hesitated due to uncertainty about whether this should really be a new
-> > > > driver.
-> > > > 
-> > > > Either way, it would be very valuable at least to attempt to describe
-> > > > the Hisilicon SMMU implemenation using the new proposals, since that is
-> > > > a good test of how reusable the proposed generic binding actually is.
-> > > 
-> > > If this ends up being an addition to the existing ARM SMMU driver, I'm
-> > > really not keen on using the new DT bindings. We're already stuck with
-> > > the old bindings for that driver -- supporting both old and new in the
-> > > same code only buys us maintenance headaches and pointless divergence
-> > > within the driver.
+On Monday 16 June 2014 18:04:16 Will Deacon wrote:
+> 
+> On Mon, Jun 16, 2014 at 05:56:32PM +0100, Stuart Yoder wrote:
+> > > Do you have use-cases where you really need to change these mappings
+> > > dynamically?
 > > 
-> > We have to migrate the driver to the new binding anyway, it may be
-> > a bit painful, but there are not really any users yet so there
-> > is a chance we can remove the nonstandard code at some point,
-> > perhaps in a few years.
+> > Yes.  In the case of a PCI bus-- you may not know in advance how many
+> > PCI devices there are until you probe the bus.   We have another FSL
+> > proprietary bus we call the "fsl-mc" bus that is similar.
 > 
-> The only way I see this working is if we kill the existing binding and move
-> exclusively to the new one. I'm actually ok with that (we have no in-tree
-> users), but it needs to happen ASAP in my opinion, otherwise we increase the
-> window where the old binding can be adopted.
+> For that case, though, you could still describe an algorithmic
+> transformation from RequesterID to StreamID which corresponds to a fixed
+> mapping.
 
-I agree. I was hoping to get the generic binding ready for 3.16, but that
-didn't happen. Maybe we can add a small patch to the binding to explain
-that it will change in the future.
+It sounds to me like the best option here would be to have only the
+RequesterID passed in the "iommus" property and have the StreamID
+dynamically assigned. This would mean we treat the StreamID as
+the context.
 
-> Note that the next version of the ARM SMMU (v3) is considerably different to
-> the current architecture, so a new driver (using the new bindings) will be
-> required.
+> > Another thing to consider-- starting with SMMUv2, as you know, there
+> > is a new distributed architecture with multiple TBUs and a centralized
+> > TCU that walks the SMMU page tables.  So instead of sprinkling multiple
+> > SMMUs all over an SoC you now have the option a 1 central TCU and sprinkling
+> > multiple TBUs around.   However, this means that the stream ID namespace
+> > is now global and can be pretty limited.  In the SMMU implementation we 
+> > have there are only 64 stream ID total for our Soc.  But we have many more
+> > masters than that.
+> > 
+> > So we look at stream IDs as really corresponding to an 'isolation context'
+> > and not to a bus master.  An isolation context is the domain you are
+> > trying to isolate with the SMMU.  Devices that all belong to the same
+> > 'isolation context' can share the same stream ID, since they share
+> > the same domain and page tables.
 > 
-> This actually opens a wider question: if we don't have an in-tree user for a
-> device-tree binding, do we consider that binding to be unused?
+> Ok, this is more compelling.
 
-Not in general, but often. We don't require dts files to be in the kernel,
-so we have to apply a bit of common sense. If anyone knows of out-of-tree
-users of the binding that are actually working with upstream kernels,
-we need a migration path. Anything that also requires out-of-tree kernel
-patches however is something we don't have to worry about.
+This also makes sense from the kernel's perspective: The shared Stream ID
+is the one that is used by the dma-mapping API here, while all other
+Stream IDs would only be used if you have things like PCI device assignment
+or GPU contexts that map into IOMMU contexts using the Linux IOMMU
+abstraction, which is a lower-level interface than the dma-mapping
+abstraction.
 
 	Arnd
