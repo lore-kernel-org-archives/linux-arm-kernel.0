@@ -1,80 +1,64 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 16 Jun 2014 16:53:03 +0530
-Subject: [PATCH V3 03/16] irqchip: crossbar: introduce ti,irqs-skip to skip
+Date: Mon, 16 Jun 2014 16:53:02 +0530
+Subject: [PATCH V3 02/16] irqchip: crossbar: check for premapped crossbar
+ before allocating
 In-Reply-To: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
 References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402917796-31574-4-git-send-email-r.sricharan@ti.com>
+Message-ID: <1402917796-31574-3-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-When, in the system due to varied reasons, interrupts might be unusable
-due to hardware behavior, but register maps do exist, then those interrupts
-should be skipped while mapping irq to crossbars.
+If irq_of_parse_and_map is executed twice, the same crossbar is mapped to two
+different GIC interrupts. This is completely undesirable. Instead, check
+if the requested crossbar event is pre-allocated and provide that GIC
+mapping back to caller if already allocated.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
-[V3] introduced ti,irqs-skip dt property to list the
-     irqs to be skipped.
+ drivers/irqchip/irq-crossbar.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
- .../devicetree/bindings/arm/omap/crossbar.txt      |    4 ++++
- drivers/irqchip/irq-crossbar.c                     |   20 ++++++++++++++++++++
- 2 files changed, 24 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index fb88585..cfcbd52 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -17,6 +17,10 @@ Required properties:
- 		 so crossbar bar driver should not consider them as free
- 		 lines.
- 
-+Optional properties:
-+- ti,irqs-skip: This is similar to "ti,irqs-reserved", but are irq mappings
-+  which are not supposed to be used for errata or other reasons(virtualization).
-+
- Examples:
- 		crossbar_mpu: @4a020000 {
- 			compatible = "ti,irq-crossbar";
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 51d4b87..27049de 100644
+index 20105bc..51d4b87 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -18,6 +18,7 @@
+@@ -51,6 +51,17 @@ static inline void crossbar_writeb(int irq_no, int cb_no)
+ 	writeb(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
+ }
  
- #define IRQ_FREE	-1
- #define IRQ_RESERVED	-2
-+#define IRQ_SKIP	-3
- #define GIC_IRQ_START	32
++static inline int get_prev_map_irq(int cb_no)
++{
++	int i;
++
++	for (i = 0; i < cb->int_max; i++)
++		if (cb->irq_map[i] == cb_no)
++			return i;
++
++	return -ENODEV;
++}
++
+ static inline int allocate_free_irq(int cb_no)
+ {
+ 	int i;
+@@ -88,11 +99,16 @@ static int crossbar_domain_xlate(struct irq_domain *d,
+ {
+ 	unsigned long ret;
  
- /*
-@@ -160,6 +161,25 @@ static int __init crossbar_of_init(struct device_node *node)
- 		}
- 	}
++	ret = get_prev_map_irq(intspec[1]);
++	if (!IS_ERR_VALUE(ret))
++		goto found;
++
+ 	ret = allocate_free_irq(intspec[1]);
  
-+	/* Skip the ones marked as skip */
-+	irqsr = of_get_property(node, "ti,irqs-skip", &size);
-+	if (irqsr) {
-+		size /= sizeof(__be32);
-+
-+		for (i = 0; i < size; i++) {
-+			of_property_read_u32_index(node,
-+						   "ti,irqs-skip",
-+						   i, &entry);
-+			if (entry > max) {
-+				pr_err("Invalid skip entry\n");
-+				ret = -EINVAL;
-+				goto err3;
-+			}
-+			cb->irq_map[entry] = IRQ_SKIP;
-+		}
-+	}
-+
-+
- 	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
- 	if (!cb->register_offsets)
- 		goto err3;
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
+ 
++found:
+ 	*out_hwirq = ret + GIC_IRQ_START;
+ 	return 0;
+ }
 -- 
 1.7.9.5
