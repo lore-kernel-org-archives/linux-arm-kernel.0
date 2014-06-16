@@ -1,115 +1,351 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 16 Jun 2014 15:28:52 +0300
-Subject: [PATCH 1/3] clk: ti: add 'ti,round-rate' flag
-In-Reply-To: <alpine.DEB.2.02.1406131924571.340@utopia.booyaka.com>
-References: <1399540009-6953-1-git-send-email-tomi.valkeinen@ti.com>
- <5370B839.3050108@ti.com> <5370BAFF.9070501@ti.com>
- <20140515060834.3084.5199@quantum> <5374B241.9010201@ti.com>
- <20140531000207.10062.55946@quantum>
- <alpine.DEB.2.02.1406031907210.14238@utopia.booyaka.com>
- <538EBBF1.7040804@ti.com>
- <alpine.DEB.2.02.1406131924571.340@utopia.booyaka.com>
-Message-ID: <539EE304.3070900@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Jun 2014 13:50:30 +0100
+Subject: [PATCH v2 1/7] mfd: add atmel-hlcdc driver
+In-Reply-To: <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140616125030.GT14323@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/14 22:53, Paul Walmsley wrote:
-
-> Whatever we do to the (common, not DSS-specific) clock code to fix this 
-> issue, it has to make sense independently of your specific DSS needs. 
-
-I agree. I think the fix (v1) makes sense for all users of the pll.
-Correct me if I'm wrong, but the current state is:
-
-- The pll's round_rate does not round, but instead returns an error if
-it cannot produce the exact rate that was requested.
-
-- All OMAP PLL's have dividers after them, handled with clk-divider driver.
-
-- clk-divider driver does not handle errors from round_rate, but instead
-goes on and the resulting clock rate is more or less garbage.
-
-- If a driver requests a clock rate that cannot be produced exactly,
-it'll instead get a garbage clock rate, leading to undefined behavior.
-
-So surely fixing the round_rate so that the clock code behaves sanely,
-if not optimally, is much better than the current undefined behavior?
-
-And again, currently a driver needs to request an exact clock rate, as
-otherwise it'll get a garbage clock rate, and I'm quite sure it won't
-work correctly. So all the current drivers request an exact clock rate,
-and they are not affected by the fix, or the drivers are totally broken
-already.
-
-> This is why I asked you for a DSS-specific change, since it would 
-> effectively avoid this basic principle.
-
-Yes, a DSS specific change would be marginally safer, but I think the
-DSS specific options get rather hacky or complex. One option was the DT
-flag, which was not accepted. Another would be adding a list of accepted
-clock rates to DSS driver, and the DSS driver would "round" internally.
-Quite hacky, I wouldn't like to go there.
-
-And as I don't see the generic fix causing any problems, I don't see why
-we would want to make big hacks somewhere else, just to avoid the
-generic fix.
-
-I'm open to ideas how to make a relatively clean DSS specific fix for
-this, which can be merged for the next -rc.
-
-> Right now, in my view, it does not make sense to have a PLL clk_set_rate() 
-> function that unconditionally rounds to the "closest" rate for all users.  
-> As I've written before, callers could end up with a clock rate that is 
-> different than what's needed for a synchronous I/O user that expects an 
-> exact rate.  I am concerned about both rounding to a lower rate and 
-> rounding to a higher rate in this case, although the higher rate is 
-> marginally more of a concern to me since the resulting rate may be higher 
-> than the device is characterized for at a given voltage.
+> The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+> family or sama5d3 family) exposes 2 subdevices:
+> - a display controller (controlled by a DRM driver)
+> - a PWM chip
 > 
-> Furthermore, as a general interface principle, allowing clk_set_rate() to 
-> silently round rates could lead to unexpected behavior, since the set of 
-> rates that clk_set_rate() can round to may change between the call to 
-> clk_round_rate() and the call to clk_set_rate().
-
-Maybe, but, correct me if I'm wrong, that's how the clock set_rate has
-worked (always?). The exact behavior for set_rate and round_rate isn't
-defined anywhere I've seen, which to me means the behavior is
-implementation specific.
-
-However, I think it's clear that round_rate _should_ round, which it
-currently does not. With this fix, both set_rate and round_rate work
-inside the "spec".
-
-> So again I think that the right way to deal with this is to:
+> Add support for the MFD device which will just retrieve HLCDC clocks and
+> create a regmap so that subdevices can access the HLCDC register range
+> concurrently.
 > 
-> 1. avoid silently rounding rates in clk_set_rate() and to return an error 
-> if calling clk_set_rate() would result in a rate other than the one 
-> desired; and to
-> 
-> 2. modify clk_round_rate() such that it returns the closest 
-> lowest-or-equal rate match to the target rate requested.
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  41 ++++++++
+>  drivers/mfd/Kconfig                                |  11 ++
+>  drivers/mfd/Makefile                               |   1 +
+>  drivers/mfd/atmel-hlcdc.c                          | 116 +++++++++++++++++++++
+>  include/linux/mfd/atmel-hlcdc.h                    |  78 ++++++++++++++
+>  5 files changed, 247 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>  create mode 100644 drivers/mfd/atmel-hlcdc.c
+>  create mode 100644 include/linux/mfd/atmel-hlcdc.h
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+> new file mode 100644
+> index 0000000..f5b69cb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+> @@ -0,0 +1,41 @@
+> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) MFD driver
+> +
+> +Required properties:
+> + - compatible: value should be one of the following:
+> +   "atmel,sama5d3-hlcdc"
+> + - reg: base address and size of the HLCDC device registers.
+> + - clock-names: the name of the 3 clocks requested by the HLCDC device.
+> +   Should contain "periph_clk", "sys_clk" and "slow_clk".
+> + - clocks: should contain the 3 clocks requested by the HLCDC device.
+> +
+> +The HLCDC IP exposes two subdevices:
+> + - a PWM chip: see Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> + - a Display Controller: see Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+> +
+> +Example:
+> +
+> +	hlcdc: hlcdc at f0030000 {
+> +		compatible = "atmel,sama5d3-hlcdc";
+> +		reg = <0xf0030000 0x2000>;
+> +		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
+> +		clock-names = "periph_clk","sys_clk", "slow_clk";
+> +		status = "disabled";
 
-I see that as a separate thing. What you're talking about is improving
-the clock API. What I'm talking about is fixing a major (at least to the
-owners of AM3xxx boards) bug in the mainline kernel, with as minimal
-changes as possible.
+Not sure you really want to disable the the node in the example.
 
-The fix doesn't need to solve all the possible issues around clock rate.
-It just needs to fix the bug we have, without causing any new bugs.
-Afaik, the fix does not introduce any new problems. The behavior of
-set_rate and round_rate can be improved later.
+> +		hlcdc-display-controller {
+> +			compatible = "atmel,hlcdc-dc";
+> +			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
 
-If the fix would be merged asap, we would get as long testing time as
-possible before the 3.16 is released. If we find any drivers broken by
-this fix, we can fix the drivers or in the worst case revert the fix.
+I assume you're using the 3rd parameter for flags.  If so, please use
+the defines.
 
- Tomi
+> +			pinctrl-names = "default", "rgb-444", "rgb-565", "rgb-666", "rgb-888";
+> +			pinctrl-0 = <&pinctrl_lcd_base>;
+> +			pinctrl-1 = <&pinctrl_lcd_base &pinctrl_lcd_rgb444>;
+> +			pinctrl-2 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
+> +			pinctrl-3 = <&pinctrl_lcd_base &pinctrl_lcd_rgb666>;
+> +			pinctrl-4 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
+> +		};
+> +
+> +		hlcdc_pwm: hlcdc-pwm {
+> +			compatible = "atmel,hlcdc-pwm";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_lcd_pwm>;
+> +			#pwm-cells = <3>;
+> +		};
+> +	};
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index ee8204c..82777f6 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -59,6 +59,17 @@ config MFD_AAT2870_CORE
+>  	  additional drivers must be enabled in order to use the
+>  	  functionality of the device.
+>  
+> +config MFD_ATMEL_HLCDC
+> +	tristate "Atmel HLCDC (High LCD Controller)"
 
+What's the difference between a high and a low controller?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140616/3e80eca0/attachment-0001.sig>
+> +	select MFD_CORE
+> +	select REGMAP_MMIO
+> +	help
+> +	  Choose this option if you have an ATMEL SoC with an HLCDC (High
+> +	  LCD Controller) IP (i.e. at91sam9n12, at91sam9x5 family or sama5d3
+> +	  family).
+> +	  This MFD device exposes two subdevices: a PWM chip and a Display
+> +	  Controller.
+> +
+>  config MFD_BCM590XX
+>  	tristate "Broadcom BCM590xx PMUs"
+>  	select MFD_CORE
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 8afedba..5f25b0d 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -156,6 +156,7 @@ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
+>  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+>  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+>  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+> +obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
+>  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+>  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
+>  obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
+> diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
+> new file mode 100644
+> index 0000000..e4636e8
+> --- /dev/null
+> +++ b/drivers/mfd/atmel-hlcdc.c
+> @@ -0,0 +1,116 @@
+> +/*
+> + * Copyright (C) 2014 Free Electrons
+> + * Copyright (C) 2014 Atmel
+> + *
+> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/mfd/atmel-hlcdc.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+
+Looks like you're inheriting the clk and regmap header files - don't
+do that.  Each source file which uses the interfaces should include
+them independently.
+
+> +static const struct mfd_cell atmel_hlcdc_cells[] = {
+> +	{
+> +		.name = "atmel-hlcdc-pwm",
+> +		.of_compatible = "atmel,hlcdc-pwm",
+> +	},
+> +	{
+> +		.name = "atmel-hlcdc-dc",
+> +		.of_compatible = "atmel,hlcdc-dc",
+> +	},
+> +};
+> +
+> +static int atmel_hlcdc_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct regmap_config config;
+> +	struct atmel_hlcdc *hlcdc;
+> +	struct resource *res;
+> +	void __iomem *regs;
+> +
+> +	hlcdc = devm_kzalloc(dev, sizeof(*hlcdc), GFP_KERNEL);
+> +	if (!hlcdc)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	regs = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(regs))
+> +		return PTR_ERR(regs);
+> +
+> +	hlcdc->periph_clk = devm_clk_get(dev, "periph_clk");
+> +	if (IS_ERR(hlcdc->periph_clk)) {
+> +		dev_err(dev, "failed to get functional clock\n");
+> +		return PTR_ERR(hlcdc->periph_clk);
+> +	}
+> +
+> +	hlcdc->sys_clk = devm_clk_get(dev, "sys_clk");
+> +	if (IS_ERR(hlcdc->sys_clk)) {
+> +		dev_err(dev, "failed to get functional clock\n");
+
+Can you be more descriptive?  This error message is the same as the
+one above.  How will a user know which one has failed?
+
+> +		return PTR_ERR(hlcdc->sys_clk);
+> +	}
+> +
+> +	hlcdc->slow_clk = devm_clk_get(dev, "slow_clk");
+> +	if (IS_ERR(hlcdc->slow_clk)) {
+> +		dev_err(dev, "failed to get slow clock\n");
+> +		return PTR_ERR(hlcdc->slow_clk);
+> +	}
+> +
+> +	memset(&config, 0, sizeof(config));
+> +	config.reg_bits = 32;
+> +	config.val_bits = 32;
+> +	config.reg_stride = 4;
+> +	config.max_register = (resource_size(res) / 4) - 1;
+
+I'd prefer you did this as a separate struct, like everyone else
+does.
+
+> +	hlcdc->regmap = devm_regmap_init_mmio_clk(dev, "periph_clk", regs,
+> +						  &config);
+> +	if (IS_ERR(hlcdc->regmap))
+> +		return PTR_ERR(hlcdc->regmap);
+> +
+> +	dev_set_drvdata(dev, hlcdc);
+> +
+> +	return mfd_add_devices(dev, -1, atmel_hlcdc_cells,
+> +			       ARRAY_SIZE(atmel_hlcdc_cells),
+> +			       NULL, 0, NULL);
+> +}
+> +
+> +static int atmel_hlcdc_remove(struct platform_device *pdev)
+> +{
+> +	mfd_remove_devices(&pdev->dev);
+> +
+> +	dev_set_drvdata(&pdev->dev, NULL);
+
+This is done automatically for you - you can remove it.
+
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id atmel_hlcdc_match[] = {
+> +	{ .compatible = "atmel,sama5d3-hlcdc" },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver atmel_hlcdc_driver = {
+> +	.probe = atmel_hlcdc_probe,
+> +	.remove = atmel_hlcdc_remove,
+> +	.driver = {
+> +		.name = "atmel-hlcdc",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = atmel_hlcdc_match,
+
+Is this driver DT only?
+
+> +	},
+> +};
+> +module_platform_driver(atmel_hlcdc_driver);
+> +
+> +MODULE_ALIAS("platform:atmel-hlcdc");
+> +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
+> +MODULE_DESCRIPTION("Atmel HLCDC driver");
+> +MODULE_LICENSE("GPL");
+> diff --git a/include/linux/mfd/atmel-hlcdc.h b/include/linux/mfd/atmel-hlcdc.h
+> new file mode 100644
+> index 0000000..d7a5589
+> --- /dev/null
+> +++ b/include/linux/mfd/atmel-hlcdc.h
+> @@ -0,0 +1,78 @@
+> +/*
+> + * Copyright (C) 2014 Free Electrons
+> + * Copyright (C) 2014 Atmel
+> + *
+> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __LINUX_MFD_HLCDC_H
+> +#define __LINUX_MFD_HLCDC_H
+> +
+> +#include <linux/clk.h>
+> +#include <linux/regmap.h>
+> +
+> +#define ATMEL_HLCDC_CFG(i)		((i) * 0x4)
+> +#define ATMEL_HLCDC_SIG_CFG		LCDCFG(5)
+> +#define		ATMEL_HLCDC_HSPOL		BIT(0)
+> +#define		ATMEL_HLCDC_VSPOL		BIT(1)
+> +#define		ATMEL_HLCDC_VSPDLYS		BIT(2)
+> +#define		ATMEL_HLCDC_VSPDLYE		BIT(3)
+> +#define		ATMEL_HLCDC_DISPPOL		BIT(4)
+> +#define		ATMEL_HLCDC_DITHER		BIT(6)
+> +#define		ATMEL_HLCDC_DISPDLY		BIT(7)
+> +#define		ATMEL_HLCDC_MODE_MASK		0x300
+> +#define		ATMEL_HLCDC_PP			BIT(10)
+> +#define		ATMEL_HLCDC_VSPSU		BIT(12)
+> +#define		ATMEL_HLCDC_VSPHO		BIT(13)
+> +#define		ATMEL_HLCDC_GUARDTIME_MASK	0x1f0000
+
+There should only be one space after '#define'.
+
+> +#define ATMEL_HLCDC_EN			0x20
+> +#define ATMEL_HLCDC_DIS			0x24
+> +#define ATMEL_HLCDC_SR			0x28
+> +#define ATMEL_HLCDC_IER			0x2c
+> +#define ATMEL_HLCDC_IDR			0x30
+> +#define ATMEL_HLCDC_IMR			0x34
+> +#define ATMEL_HLCDC_ISR			0x38
+> +
+> +#define ATMEL_HLCDC_CLKPOL		BIT(0)
+> +#define ATMEL_HLCDC_CLKSEL		BIT(2)
+> +#define ATMEL_HLCDC_CLKPWMSEL		BIT(3)
+> +#define ATMEL_HLCDC_CGDIS(i)		BIT(8 + (i))
+> +#define ATMEL_HLCDC_CLKDIV_SHFT		16
+> +#define ATMEL_HLCDC_CLKDIV_MASK		(0xff << ATMEL_HLCDC_CLKDIV_SHFT)
+> +#define ATMEL_HLCDC_CLKDIV(div)		((div - 2) << ATMEL_HLCDC_CLKDIV_SHFT)
+> +
+> +#define ATMEL_HLCDC_PIXEL_CLK		BIT(0)
+> +#define ATMEL_HLCDC_SYNC		BIT(1)
+> +#define ATMEL_HLCDC_DISP		BIT(2)
+> +#define ATMEL_HLCDC_PWM			BIT(3)
+> +#define ATMEL_HLCDC_SIP			BIT(4)
+> +
+> +/**
+> + * Structure shared by the MFD device and its subdevices.
+> + *
+> + * @regmap: register map used to access HLCDC IP registers
+> + * @periph_clk: the hlcdc peripheral clock
+> + * @sys_clk: the hlcdc system clock
+> + * @slow_clk: the system slow clk
+> + */
+> +struct atmel_hlcdc {
+> +	struct regmap *regmap;
+> +	struct clk *periph_clk;
+> +	struct clk *sys_clk;
+> +	struct clk *slow_clk;
+> +};
+> +
+> +#endif /* __LINUX_MFD_HLCDC_H */
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
