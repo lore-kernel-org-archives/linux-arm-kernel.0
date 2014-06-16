@@ -1,38 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jun 2014 22:55:12 +0100
-Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
-In-Reply-To: <1402941376-29594-1-git-send-email-mporter@linaro.org>
-References: <1402941376-29594-1-git-send-email-mporter@linaro.org>
-Message-ID: <20140616215512.GC23430@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Jun 2014 15:58:47 -0600
+Subject: [PATCH 3/9] ARM: tegra: Add SATA and SATA power to Jetson TK1
+ device tree
+In-Reply-To: <1401881559-18469-4-git-send-email-mperttunen@nvidia.com>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <1401881559-18469-4-git-send-email-mperttunen@nvidia.com>
+Message-ID: <539F6897.7080306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 01:56:16PM -0400, Matt Porter wrote:
-> Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
-> MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
-> driver which is enabled in this defconfig. This results in the
-> SDHCI driver not being built and a boot failure. Explictly
-> enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
-> driver is built.
+On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+> This enables the integrated SATA controller on the Tegra124 system-on-chip
+> on the Jetson TK1 board and adds regulators for the onboard Molex connector
+> commonly used to power SATA devices. The regulators are marked always-on
+> since they can be used for other purposes than powering SATA devices.
 
-I really don't understand why MMC_SDHCI_PLTFM isn't selected by the
-sub-drivers.  sdhci-pltfm.c is a library module, which is only
-useful with one of the sub-drivers enabled.
+> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
 
-So, rather than providing a multitude of dependent options, why not
-present people with:
+> +	sata at 0,70020000 {
 
- + sdhci drivers
-   + sdhci pci
-   + sdhci acpi
-   + Arasan
-   + Freescale eSDHC
-   + Nintendo Wii
-   + Dove
+> +		target-supply = <&vdd_5v0_sata>;
 
-and leave MMC_SDHCI_PLTFM as a hidden option whose purpose is to
-enable building of sdhci-pltfm.c.
+   	regulators {
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> +		/* Molex power connector */
+> +		vdd_5v0_sata: regulator at 13 {
+> +			compatible = "regulator-fixed";
+> +			reg = <13>;
+> +			regulator-name = "+5V_SATA";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio TEGRA_GPIO(EE, 2) GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
+> +			vin-supply = <&vdd_5v0_sys>;
+> +			regulator-always-on;
+> +		};
+
+Why is this always-on, considering that the SATA node references this,
+and presumably the driver explicitly enables this regulator?
+
+> +
+> +		vdd_12v0_sata: regulator at 14 {
+> +			compatible = "regulator-fixed";
+> +			reg = <14>;
+> +			regulator-name = "+12V_SATA";
+> +			regulator-min-microvolt = <12000000>;
+> +			regulator-max-microvolt = <12000000>;
+> +			gpio = <&gpio TEGRA_GPIO(EE, 2) GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
+> +			vin-supply = <&vdd_mux>;
+> +			regulator-always-on;
+> +		};
+>  	};
+
+If there are two regulators required for the SATA devices, shouldn't the
+SATA node's target-supply property reference them both? Well, I suppose
+there'd need to be target-5v-supply and target-12v-supply properties,
+since each regulator property can only reference a single supply, IIRC.
+I think the DT binding needs to be updated for this.
