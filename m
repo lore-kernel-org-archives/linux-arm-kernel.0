@@ -1,124 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 16 Jun 2014 17:34:23 +0900
-Subject: [PATCH v3 10/19] clocksource: sh_tmu: Add DT support
-In-Reply-To: <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140616083423.GE11582@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 16 Jun 2014 10:35:42 +0200
+Subject: BUG: Bad page state in process swapper pfn:00000
+In-Reply-To: <539915B3.9050904@codeaurora.org>
+References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>
+ <539892BD.8020403@codeaurora.org>
+ <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
+ <539915B3.9050904@codeaurora.org>
+Message-ID: <CAMuHMdWzb3czgdNA+iUSRhtm=a2gQbgvaMUOC_MkZPepd8xKXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Thu, Jun 12, 2014 at 4:51 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> Great! Russell are you okay with taking the above as a fix or would you prefer
+> I fixup drivers/of/fdt.c right now?
+>
+>
+> Thanks,
+> Laura
+>
+> ----8<----
+> From 14bda557a108ad197e7c5f040f50ca024b45cc17 Mon Sep 17 00:00:00 2001
+> From: Laura Abbott <lauraa@codeaurora.org>
+> Date: Wed, 11 Jun 2014 19:39:29 -0700
+> Subject: [PATCH] arm: Bring back early_init_dt_add_memory_arch
+>
+> Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) removed
+> early_init_dt_add_memory_arch in favor of using the common method.
+> The common method does not currently check for memory outside of
+> 32-bit bounds which may lead to memory being incorrectly added to
+> the system. Bring back early_init_dt_add_memory_arch for now until
+> the generic function can be fixed up.
 
-thanks for your patch.
+There's another issue with the generic version: if the start address of the
+memory block is not page-aligned, it will be rounded _down_ instead of up.
 
-On Sat, Jun 14, 2014 at 06:23:32PM +0200, Laurent Pinchart wrote:
-> Document DT bindings and parse them in the TMU driver.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-[snip]
+Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-> index ef8fb0b..2ece4ab 100644
-> --- a/drivers/clocksource/sh_tmu.c
-> +++ b/drivers/clocksource/sh_tmu.c
-> @@ -24,6 +24,7 @@
->  #include <linux/ioport.h>
->  #include <linux/irq.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_domain.h>
->  #include <linux/pm_runtime.h>
-> @@ -509,23 +510,46 @@ static int sh_tmu_map_memory(struct sh_tmu_device *tmu)
->  	return 0;
->  }
->  
-> +static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
+Still needed in v3.16-rc1.
+
+> ---
+>  arch/arm/kernel/devtree.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index e94a157..ea9ce92 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -27,6 +27,10 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>
+> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 > +{
-> +	struct device_node *np = tmu->pdev->dev.of_node;
-> +
-> +	tmu->num_channels = 3;
-> +	of_property_read_u32(np, "#renesas,channels", &tmu->num_channels);
-> +
-> +	if (tmu->num_channels != 2 && tmu->num_channels != 3) {
-> +		dev_err(&tmu->pdev->dev, "invalid number of channels %u\n",
-> +			tmu->num_channels);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
+> +       arm_add_memory(base, size);
 > +}
-> +
->  static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
->  {
-> -	struct sh_timer_config *cfg = pdev->dev.platform_data;
->  	const struct platform_device_id *id = pdev->id_entry;
->  	unsigned int i;
->  	int ret;
->  
-> -	if (!cfg) {
-> -		dev_err(&tmu->pdev->dev, "missing platform data\n");
-> -		return -ENXIO;
-> -	}
-> -
->  	tmu->pdev = pdev;
->  	tmu->model = id->driver_data;
->  
->  	raw_spin_lock_init(&tmu->lock);
->  
-> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
-> +		ret = sh_tmu_parse_dt(tmu);
-> +		if (ret < 0)
-> +			return ret;
-> +	} else if (pdev->dev.platform_data) {
-> +		struct sh_timer_config *cfg = pdev->dev.platform_data;
-> +
-> +		tmu->num_channels = hweight8(cfg->channels_mask);
-> +	} else {
-> +		dev_err(&tmu->pdev->dev, "missing platform data\n");
-> +		return -ENXIO;
-> +	}
-> +
->  	/* Get hold of clock. */
->  	tmu->clk = clk_get(&tmu->pdev->dev, "fck");
->  	if (IS_ERR(tmu->clk)) {
+>
+>  #ifdef CONFIG_SMP
+>  extern struct of_cpu_method __cpu_method_of_table[];
 
-[snip]
+Gr{oetje,eeting}s,
 
-I had a bit of trouble running this code and after some investigation
-it seems to me that in the case of using DT id will be NULL and
-thus things do not go well when id->driver_data is accessed.
+                        Geert
 
-The following incremental patch resolved the problem for me.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index 2ece4ab..3f90927 100644
---- a/drivers/clocksource/sh_tmu.c
-+++ b/drivers/clocksource/sh_tmu.c
-@@ -523,6 +523,8 @@ static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
- 		return -EINVAL;
- 	}
- 
-+	tmu->model = SH_TMU;
-+
- 	return 0;
- }
- 
-@@ -533,7 +535,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 	int ret;
- 
- 	tmu->pdev = pdev;
--	tmu->model = id->driver_data;
- 
- 	raw_spin_lock_init(&tmu->lock);
- 
-@@ -545,6 +546,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 		struct sh_timer_config *cfg = pdev->dev.platform_data;
- 
- 		tmu->num_channels = hweight8(cfg->channels_mask);
-+		tmu->model = id->driver_data;
- 	} else {
- 		dev_err(&tmu->pdev->dev, "missing platform data\n");
- 		return -ENXIO;
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
