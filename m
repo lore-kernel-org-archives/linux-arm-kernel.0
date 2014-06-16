@@ -1,52 +1,88 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 16 Jun 2014 18:11:52 +0200
-Subject: Fwd: [URGENT] Perf report shared objects showing unknown on ARM
-In-Reply-To: <CAORVsuXwYxyZ0uThcOTtLQeot71W6FXGE+PJu=9Z4OV6Lsp4fQ@mail.gmail.com>
-References: <BAY177-W3DC97EDA6D43CDDD56EE9E5360@phx.gbl>
- <CAFrcx1=M_fOEQKezMxSE39szLKSUsMwmm-k-bO4qXtFrCqpkJA@mail.gmail.com>
- <CAFrcx1kjndv=KDBr8i9BvZMseVfinHxEfS4QfFm=DMqLXj=kKg@mail.gmail.com>
- <loom.20140519T134943-896@post.gmane.org>
- <CAFrcx1kZK8PwOLfMbqiv7J1ngMv0jC3ZZSM6ohOSOMtNGtO3sw@mail.gmail.com>
- <loom.20140521T072305-629@post.gmane.org>
- <CAFrcx1=HRex0rYX2w+hR-_zgAOwm+h9JU6+5N7T-U2xZWu8Q4w@mail.gmail.com>
- <CAAumFvMYX6ncAGkA5GC0fm0kGgkWvRpm-NO3OGJkGPBM0PL4dw@mail.gmail.com>
- <CAAumFvNtwQa5Kijjb13wsYTtjJz__am0aX73h_9CkxW78X=BBw@mail.gmail.com>
- <20140616130010.GF16758@arm.com>
- <CAORVsuXwYxyZ0uThcOTtLQeot71W6FXGE+PJu=9Z4OV6Lsp4fQ@mail.gmail.com>
-Message-ID: <CAORVsuVur+CuTTTYdY1kgVydvKg8hdenkZDNDc=8ax4BdLrG6w@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 16 Jun 2014 18:19:02 +0200
+Subject: [PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU devices to DT
+In-Reply-To: <1462083.WMstm6aRc1@avalon>
+References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1402763021-4067-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140616084707.GF11582@verge.net.au> <1462083.WMstm6aRc1@avalon>
+Message-ID: <CAMuHMdXeyKy4vR0jNS3RC9E7+0_=xPXRUDokXe0kP+V8uVEiyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 6:08 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> On Mon, Jun 16, 2014 at 3:00 PM, Will Deacon <will.deacon@arm.com> wrote:
->> On Thu, Jun 05, 2014 at 02:50:22PM +0100, Prankul Garg wrote:
->>> Hi will,
->>>
->>> please review the problem.
->>
->> What would you like me to do? perf tools patches don't go via me, but if
->> Jean sends the latest version of the patches then I can have a look.
->>
->> I reviewed something here:
->>
->>   https://lkml.org/lkml/2014/5/19/460
->>
->> but Jean didn't seen to know the answers to my questions either.
-Can you please check my reply (https://lkml.org/lkml/2014/5/19/669)?
+Hi Laurent,
 
-Thx,
-Jean
+On Mon, Jun 16, 2014 at 4:22 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+>> index bf716ce..81714ce 100644
+>> --- a/arch/arm/boot/dts/r8a7779.dtsi
+>> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+>> @@ -269,9 +269,10 @@
+>>       tmu0: timer at ffd80000 {
+>>               compatible = "renesas,tmu";
+>>               reg = <0xffd80000 0x30>;
+>> -             interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
+>> -                          <0 41 IRQ_TYPE_LEVEL_HIGH>,
+>> -                          <0 42 IRQ_TYPE_LEVEL_HIGH>;
+>> +             interrupt-parent = <&gic>;
+>> +             interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
+>> +                          <0 33 IRQ_TYPE_LEVEL_HIGH>,
+>> +                          <0 34 IRQ_TYPE_LEVEL_HIGH>;
+>>               clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
+>>               clock-names = "fck";
+>>
+>> @@ -283,9 +284,10 @@
+>>       tmu1: timer at ffd81000 {
+>>               compatible = "renesas,tmu";
+>>               reg = <0xffd81000 0x30>;
+>> -             interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>,
+>> -                          <0 45 IRQ_TYPE_LEVEL_HIGH>,
+>> -                          <0 46 IRQ_TYPE_LEVEL_HIGH>;
+>> +             interrupt-parent = <&gic>;
+>> +             interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>,
+>> +                          <0 36 IRQ_TYPE_LEVEL_HIGH>,
+>> +                          <0 37 IRQ_TYPE_LEVEL_HIGH>;
+>
+> If I'm not mistaken the interrupts should be 36, 37 and 38.
 
-> Sorry I got no time to work on the topic. Let me check again and come
-> back to you.
-> Note: the patch is an RFC one, any comment or suggestion is welcome.
->
-> Jean
->
+(diving into the documentation)
+
+Yes, probably 36, 37, and 38. I say "probably", as I find it non-trivial
+to convert from docs to DT.
+
+What happens with 35, which is "TMU21 (input capture)"?
+As DT describes the hardware, shouldn't it be mentioned here?
+
+>>               clocks = <&mstp0_clks R8A7779_CLK_TMU1>;
+>>               clock-names = "fck";
 >>
->> Will
+>> @@ -296,10 +298,11 @@
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>       tmu2: timer at ffd82000 {
+>>               compatible = "renesas,tmu";
+>> +             interrupt-parent = <&gic>;
+>>               reg = <0xffd82000 0x30>;
+>> -             interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>,
+>> -                          <0 49 IRQ_TYPE_LEVEL_HIGH>,
+>> -                          <0 50 IRQ_TYPE_LEVEL_HIGH>;
+>> +             interrupts = <0 38 IRQ_TYPE_LEVEL_HIGH>,
+>> +                          <0 39 IRQ_TYPE_LEVEL_HIGH>,
+>> +                          <0 40 IRQ_TYPE_LEVEL_HIGH>;
+>
+> And 40, 41 and 42 here.
+
+Likewise for "TMU51 (input capture)"?
+
+>>               clocks = <&mstp0_clks R8A7779_CLK_TMU2>;
+>>               clock-names = "fck";
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
