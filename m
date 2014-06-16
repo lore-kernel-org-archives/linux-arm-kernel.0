@@ -1,59 +1,95 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 16 Jun 2014 00:50:32 -0300
-Subject: [PATCH 07/10] ARM: sun4i: enable DMA on SPI
+Date: Mon, 16 Jun 2014 00:50:33 -0300
+Subject: [PATCH 08/10] ARM: sun7i: add DMA properties to UARTs
 In-Reply-To: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
 References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1402890635-12342-8-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1402890635-12342-9-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All of our SPI controllers support DMA transfers, so let's add the
-properties here so they can be used when it's best to do so.
+Our UARTs also support DMA transfers, let's enable them for the sake of
+testing.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 6e61518..c66c39e 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -353,6 +353,8 @@
- 			interrupts = <10>;
- 			clocks = <&ahb_gates 20>, <&spi0_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 27>, <&dma 1 26>;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index c054ad3..3a33e62 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -712,6 +712,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 16>;
++			dmas = <&dma 0 8>, <&dma 0 8>;
 +			dma-names = "rx", "tx";
  			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -364,6 +366,8 @@
- 			interrupts = <11>;
- 			clocks = <&ahb_gates 21>, <&spi1_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 9>, <&dma 1 8>;
+ 		};
+ 
+@@ -722,6 +724,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 17>;
++			dmas = <&dma 0 9>, <&dma 0 9>;
 +			dma-names = "rx", "tx";
  			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -423,6 +427,8 @@
- 			interrupts = <12>;
- 			clocks = <&ahb_gates 22>, <&spi2_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 29>, <&dma 1 28>;
+ 		};
+ 
+@@ -732,6 +736,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 18>;
++			dmas = <&dma 0 10>, <&dma 0 10>;
 +			dma-names = "rx", "tx";
  			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -462,6 +468,8 @@
- 			interrupts = <50>;
- 			clocks = <&ahb_gates 23>, <&spi3_clk>;
- 			clock-names = "ahb", "mod";
-+			dmas = <&dma 1 31>, <&dma 1 30>;
+ 		};
+ 
+@@ -742,6 +748,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 19>;
++			dmas = <&dma 0 11>, <&dma 0 11>;
 +			dma-names = "rx", "tx";
  			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+ 		};
+ 
+@@ -752,6 +760,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 20>;
++			dmas = <&dma 0 12>, <&dma 0 12>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 		};
+ 
+@@ -762,6 +772,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 21>;
++			dmas = <&dma 0 13>, <&dma 0 13>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 		};
+ 
+@@ -772,6 +784,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 22>;
++			dmas = <&dma 0 14>, <&dma 0 14>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 		};
+ 
+@@ -782,6 +796,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 23>;
++			dmas = <&dma 0 15>, <&dma 0 15>;
++			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 		};
+ 
 -- 
 2.0.0
