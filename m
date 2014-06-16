@@ -1,45 +1,69 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 16 Jun 2014 10:48:30 -0400 (EDT)
-Subject: [PATCH v4 1/6] Documentation: arm: define DT idle states bindings
-In-Reply-To: <20140616142259.GA6650@e102568-lin.cambridge.arm.com>
-References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1402503520-8611-2-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.11.1406111240010.25775@knanqh.ubzr>
- <20140613164954.GA16745@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1406131306160.25775@knanqh.ubzr>
- <20140616142259.GA6650@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1406161044180.31631@knanqh.ubzr>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 16 Jun 2014 16:50:20 +0200
+Subject: [PATCH v3 11/19] clocksource: sh_mtu2: Add DT support
+In-Reply-To: <1494698.bV3kBZBSPf@avalon>
+References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <539C7FA4.9000306@cogentembedded.com> <1494698.bV3kBZBSPf@avalon>
+Message-ID: <1457541.byEE42ItbZ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Jun 2014, Lorenzo Pieralisi wrote:
+Hi Sergei,
 
-> On Fri, Jun 13, 2014 at 06:33:35PM +0100, Nicolas Pitre wrote:
-> > >    idle_state.exit_latency = worst-wakeup-latency
-> > >    idle_state.target_residency = min-residency-us
+On Monday 16 June 2014 16:40:55 Laurent Pinchart wrote:
+> On Saturday 14 June 2014 21:00:20 Sergei Shtylyov wrote:
+> > On 06/14/2014 08:23 PM, Laurent Pinchart wrote:
+> > > Document DT bindings and parse them in the MTU2 driver.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > Tested-by: Wolfram Sang <wsa@sang-engineering.com>
+> > > ---
+> > > 
+> > >  .../devicetree/bindings/timer/renesas,mtu2.txt     | 40 +++++++++++++++
+> > >  drivers/clocksource/sh_mtu2.c                      |  8 +++++
+> > >  
+> > >   2 files changed, 48 insertions(+)
+> > >   create mode 100644
+> > >   Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+
+[snip]
+
+> > > diff --git a/drivers/clocksource/sh_mtu2.c
+> > > b/drivers/clocksource/sh_mtu2.c
+> > > index ebdf9d1..79387af 100644
+> > > --- a/drivers/clocksource/sh_mtu2.c
+> > > +++ b/drivers/clocksource/sh_mtu2.c
 > > 
-> > But exit_latency is not necessarily equal to worst-wakeup-latency.  
-> > We'll need any of those 4 values depending on the context.  So I'd add 
-> > entry_latency and worst_wakeup_latency to struct cpuidle_state.  If a 
-> > driver doesn't initialize entry_latency then it can be left to 0, and if 
-> > worst_wakeup_latency is 0 then it should be set to entry_latency + 
-> > exit_latency by the core code.
+> > [...]
+> > 
+> > > @@ -502,11 +503,18 @@ static const struct platform_device_id
+> > > sh_mtu2_id_table[] = {
+> > >   };
+> > >   MODULE_DEVICE_TABLE(platform, sh_mtu2_id_table);
+> > > 
+> > > +static const struct of_device_id sh_mtu2_of_table[] = {
+> > > +	{ .compatible = "renesas,mtu2" },
+> > > +	{ }
+> > > +};
+> > > +MODULE_DEVICE_TABLE(of, sh_mtu2_of_table);
+> > > +
+> > >   static struct platform_driver sh_mtu2_device_driver = {
+> > >   	.probe		= sh_mtu2_probe,
+> > >   	.remove		= sh_mtu2_remove,
+> > >   	.driver		= {
+> > >   		.name	= "sh_mtu2",
+> > > +		.of_match_table = of_match_ptr(sh_mtu2_of_table),
+> > 
+> > No need for of_match_ptr() since the table us not protected by #ifdef
+> > CONFIG_OF...
 > 
-> Well, that's why I mentioned idle_state.exit_latency, because in CPUidle
-> today, the struct cpuidle_state.exit_latency field corresponds to our
-> worst-wakeup-latency property, not to the exit_latency property; I know
-> it is confusing but at least by defining proper bindings the kernel
-> structures can be updated with clear semantics (I would not rename them
-> for the time being though).
+> I'll fix that.
 
-Why not?  Adding more confusion or even simply keeping the existing one, 
-even if it is temporary, doesn't benefit anyone.
+I spoke too fast. On non-OF platforms memory shouldn't be wasted by the OF 
+match table. I'll mark the table as __maybe_unused and keep of_match_ptr().
 
-> Fields required by the scheduler (ie entry_latency) can be added in 
-> the patches that rely on them, when we agreed on the bindings, adding 
-> the variables is no big deal.
+-- 
+Regards,
 
-Sure.
-
-
-Nicolas
+Laurent Pinchart
