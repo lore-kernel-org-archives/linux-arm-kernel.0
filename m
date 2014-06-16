@@ -1,174 +1,110 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 16 Jun 2014 12:11:22 +0200
-Subject: [PATCH v14 08/10] drm/panel: Add Eukrea mbimxsd51 displays.
+Date: Mon, 16 Jun 2014 12:11:20 +0200
+Subject: [PATCH v14 06/10] drm: drm_display_mode: add signal polarity flags
 In-Reply-To: <1402913484-25910-1-git-send-email-denis@eukrea.com>
 References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
-Message-ID: <1402913484-25910-8-git-send-email-denis@eukrea.com>
+Message-ID: <1402913484-25910-6-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+We need a way to pass signal polarity informations
+  between DRM panels, and the display drivers.
+
+To do that, a pol_flags field was added to drm_display_mode.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v13->v14:
-- None
-
+- Fixed DRM_MODE_FLAG_POL_DE_HIGH's description.
 ChangeLog v12->v13:
-- Added a note explaining why the size is zero in
-  the eukrea_mbimxsd51_dvi(s)vga structs.
+- Added Docbook documentation for pol_flags the struct field.
+- Removed the _PRESERVE	defines: it was used by patches
+  against the imx_drm driver. Now theses patches have been
+  adapted not to require that defines.
 ChangeLog v11->v12:
+- Rebased: This patch now applies against drm_modes.h
 - Rebased: It now uses the new DRM_MODE_FLAG_POL_DE flags defines names
 
 ChangeLog v10->v11:
-- New patch.
----
- .../bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt   |    7 ++
- .../bindings/panel/eukrea,mbimxsd51-dvi-svga.txt   |    7 ++
- .../bindings/panel/eukrea,mbimxsd51-dvi-vga.txt    |    7 ++
- drivers/gpu/drm/panel/panel-simple.c               |   83 ++++++++++++++++++++
- 4 files changed, 104 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
- create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
- create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
+- Since the imx-drm won't be able to retrive its regulators
+  from the device tree when using display-timings nodes,
+  and that I was told that the drm simple-panel driver 
+  already supported that, I then, instead, added what was
+  lacking to make the eukrea displays work with the
+  drm-simple-panel driver.
 
-diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
-new file mode 100644
-index 0000000..03679d0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
-@@ -0,0 +1,7 @@
-+Eukrea CMO-QVGA (320x240 pixels) TFT LCD panel
+  That required a way to get back the display polarity
+  informations from the imx-drm driver without affecting
+  userspace.
+---
+ Documentation/DocBook/drm.tmpl |   30 ++++++++++++++++++++++++++++++
+ include/drm/drm_modes.h        |    6 ++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/Documentation/DocBook/drm.tmpl b/Documentation/DocBook/drm.tmpl
+index 7df3134..22d435f 100644
+--- a/Documentation/DocBook/drm.tmpl
++++ b/Documentation/DocBook/drm.tmpl
+@@ -2292,6 +2292,36 @@ void intel_crt_init(struct drm_device *dev)
+             and <structfield>height_mm</structfield> fields are only used internally
+             during EDID parsing and should not be set when creating modes manually.
+           </para>
++          <para>
++            The <structfield>pol_flags</structfield> value represents the display
++            signal polarity flags, it can be a combination of
++            <variablelist>
++              <varlistentry>
++                <term>DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE</term>
++                 <listitem><para>
++                     drive pixel data on falling edge, sample data on rising edge.
++                 </para></listitem>
++              </varlistentry>
++              <varlistentry>
++                <term>DRM_MODE_FLAG_POL_PIXDATA_POSEDGE</term>
++                <listitem><para>
++                  Drive pixel data on rising edge, sample data on falling edge.
++                </para></listitem>
++              </varlistentry>
++              <varlistentry>
++                <term>DRM_MODE_FLAG_POL_DE_LOW</term>
++                <listitem><para>
++                  data-enable pulse is active low
++                </para></listitem>
++              </varlistentry>
++              <varlistentry>
++                <term>DRM_MODE_FLAG_POL_DE_HIGH</term>
++                <listitem><para>
++                  data-enable pulse is active high
++                </para></listitem>
++              </varlistentry>
++            </variablelist>
++          </para>
+         </listitem>
+         <listitem>
+           <synopsis>int (*mode_valid)(struct drm_connector *connector,
+diff --git a/include/drm/drm_modes.h b/include/drm/drm_modes.h
+index 91d0582..c5cbe31 100644
+--- a/include/drm/drm_modes.h
++++ b/include/drm/drm_modes.h
+@@ -93,6 +93,11 @@ enum drm_mode_status {
+ 
+ #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
+ 
++#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
++#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
++#define DRM_MODE_FLAG_POL_DE_LOW		BIT(3)
++#define DRM_MODE_FLAG_POL_DE_HIGH		BIT(4)
 +
-+Required properties:
-+- compatible: should be "eukrea,mbimxsd51-cmo-qvga"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
-new file mode 100644
-index 0000000..f408c9a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
-@@ -0,0 +1,7 @@
-+Eukrea DVI-SVGA (800x600 pixels) DVI output.
-+
-+Required properties:
-+- compatible: should be "eukrea,mbimxsd51-dvi-svga"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
-new file mode 100644
-index 0000000..8ea90da
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
-@@ -0,0 +1,7 @@
-+Eukrea DVI-VGA (640x480 pixels) DVI output.
-+
-+Required properties:
-+- compatible: should be "eukrea,mbimxsd51-dvi-vga"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index a251361..adc40a7 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -403,6 +403,80 @@ static const struct panel_desc edt_etm0700g0dh6 = {
- 	},
+ struct drm_display_mode {
+ 	/* Header */
+ 	struct list_head head;
+@@ -144,6 +149,7 @@ struct drm_display_mode {
+ 	int vrefresh;		/* in Hz */
+ 	int hsync;		/* in kHz */
+ 	enum hdmi_picture_aspect picture_aspect_ratio;
++	unsigned int pol_flags;
  };
  
-+static const struct drm_display_mode eukrea_mbimxsd51_cmoqvga_mode = {
-+	.clock = 6500,
-+	.hdisplay = 320,
-+	.hsync_start = 320 + 38,
-+	.hsync_end = 320 + 38 + 20,
-+	.htotal = 320 + 38 + 20 + 30,
-+	.vdisplay = 240,
-+	.vsync_start = 240 + 15,
-+	.vsync_end = 240 + 15 + 4,
-+	.vtotal = 240 + 15 + 4 + 3,
-+	.vrefresh = 60,
-+	.pol_flags = DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE |
-+		     DRM_MODE_FLAG_POL_DE_LOW,
-+};
-+
-+static const struct panel_desc eukrea_mbimxsd51_cmoqvga = {
-+	.modes = &eukrea_mbimxsd51_cmoqvga_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 73,
-+		.height = 56,
-+	},
-+};
-+
-+static const struct drm_display_mode eukrea_mbimxsd51_dvisvga_mode = {
-+	.clock = 44333,
-+	.hdisplay = 800,
-+	.hsync_start = 800 + 112,
-+	.hsync_end = 800 + 112 + 32,
-+	.htotal = 800 + 112 + 32 + 80,
-+	.vdisplay = 600,
-+	.vsync_start = 600 + 3,
-+	.vsync_end = 600 + 3 + 17,
-+	.vtotal = 600 + 3 + 17 + 4,
-+	.vrefresh = 60,
-+	.pol_flags = DRM_MODE_FLAG_POL_PIXDATA_POSEDGE |
-+		     DRM_MODE_FLAG_POL_DE_HIGH,
-+};
-+
-+static const struct panel_desc eukrea_mbimxsd51_dvisvga = {
-+	.modes = &eukrea_mbimxsd51_dvisvga_mode,
-+	.num_modes = 1,
-+	/* This is a DVI adapter for external displays */
-+	.size = {
-+		.width = 0,
-+		.height = 0,
-+	},
-+};
-+
-+static const struct drm_display_mode eukrea_mbimxsd51_dvivga_mode = {
-+	.clock = 23750,
-+	.hdisplay = 640,
-+	.hsync_start = 640 + 80,
-+	.hsync_end = 640 + 80 + 16,
-+	.htotal = 640 + 80 + 16 + 64,
-+	.vdisplay = 480,
-+	.vsync_start = 480 + 3,
-+	.vsync_end = 480 + 3 + 13,
-+	.vtotal  = 480 + 3 + 13 + 4,
-+	.vrefresh = 60,
-+	.pol_flags = DRM_MODE_FLAG_POL_PIXDATA_POSEDGE |
-+		     DRM_MODE_FLAG_POL_DE_HIGH,
-+};
-+
-+static const struct panel_desc eukrea_mbimxsd51_dvivga = {
-+	.modes = &eukrea_mbimxsd51_dvivga_mode,
-+	.num_modes = 1,
-+	/* This is a DVI adapter for external displays */
-+	.size = {
-+		.width = 0,
-+		.height = 0,
-+	},
-+};
-+
- static const struct drm_display_mode lg_lp129qe_mode = {
- 	.clock = 285250,
- 	.hdisplay = 2560,
-@@ -458,6 +532,15 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "chunghwa,claa101wa01a",
- 		.data = &chunghwa_claa101wa01a
- 	}, {
-+		.compatible = "eukrea,mbimxsd51-cmo-qvga",
-+		.data = &eukrea_mbimxsd51_cmoqvga,
-+	}, {
-+		.compatible = "eukrea,mbimxsd51-dvi-svga",
-+		.data = &eukrea_mbimxsd51_dvisvga,
-+	}, {
-+		.compatible = "eukrea,mbimxsd51-dvi-vga",
-+		.data = &eukrea_mbimxsd51_dvivga,
-+	}, {
- 		.compatible = "chunghwa,claa101wb01",
- 		.data = &chunghwa_claa101wb01
- 	}, {
+ /* mode specified on the command line */
 -- 
 1.7.9.5
