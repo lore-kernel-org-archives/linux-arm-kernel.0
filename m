@@ -1,88 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 Jun 2014 18:19:02 +0200
-Subject: [PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU devices to DT
-In-Reply-To: <1462083.WMstm6aRc1@avalon>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1402763021-4067-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140616084707.GF11582@verge.net.au> <1462083.WMstm6aRc1@avalon>
-Message-ID: <CAMuHMdXeyKy4vR0jNS3RC9E7+0_=xPXRUDokXe0kP+V8uVEiyQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jun 2014 17:26:53 +0100
+Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
+ Hisilicon System MMU binding
+In-Reply-To: <20140606110652.GB4116@e103592.cambridge.arm.com>
+References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
+ <1401975430-2648-2-git-send-email-thunder.leizhen@huawei.com>
+ <8620067.9Lo76DOS52@wuerfel>
+ <20140606110652.GB4116@e103592.cambridge.arm.com>
+Message-ID: <20140616162653.GV16758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Fri, Jun 06, 2014 at 12:07:11PM +0100, Dave Martin wrote:
+> On Fri, Jun 06, 2014 at 08:48:26AM +0200, Arnd Bergmann wrote:
+> > On Thursday 05 June 2014 21:37:09 Zhen Lei wrote:
+> > 
+> > > +- smmu-masters  : A list of phandles to device nodes representing bus
+> > > +                  masters for which the SMMU can provide a translation
+> > > +                  and their corresponding StreamIDs (see example below).
+> > > 
+> > 
+> > We're currently in the process of defining a generic binding for IOMMUs.
+> > 
+> > While the smmu-masters property was copied from an existing binding,
+> > I think we will end up migrating away from that towards a common way
+> > to express those things, and we shouldn't add another one doing this
+> > in a nonstandard way. Please have a look at the latest discussion
+> > about the iommu binding using #iommu-cells and a reference from the
+> > master to the iommu and see if you can migrate your code to use that.
+> 
+> Thanks for making this point -- I was going to do so yesterday but then
+> hesitated due to uncertainty about whether this should really be a new
+> driver.
+> 
+> Either way, it would be very valuable at least to attempt to describe
+> the Hisilicon SMMU implemenation using the new proposals, since that is
+> a good test of how reusable the proposed generic binding actually is.
 
-On Mon, Jun 16, 2014 at 4:22 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
->> index bf716ce..81714ce 100644
->> --- a/arch/arm/boot/dts/r8a7779.dtsi
->> +++ b/arch/arm/boot/dts/r8a7779.dtsi
->> @@ -269,9 +269,10 @@
->>       tmu0: timer at ffd80000 {
->>               compatible = "renesas,tmu";
->>               reg = <0xffd80000 0x30>;
->> -             interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
->> -                          <0 41 IRQ_TYPE_LEVEL_HIGH>,
->> -                          <0 42 IRQ_TYPE_LEVEL_HIGH>;
->> +             interrupt-parent = <&gic>;
->> +             interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 33 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 34 IRQ_TYPE_LEVEL_HIGH>;
->>               clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
->>               clock-names = "fck";
->>
->> @@ -283,9 +284,10 @@
->>       tmu1: timer at ffd81000 {
->>               compatible = "renesas,tmu";
->>               reg = <0xffd81000 0x30>;
->> -             interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>,
->> -                          <0 45 IRQ_TYPE_LEVEL_HIGH>,
->> -                          <0 46 IRQ_TYPE_LEVEL_HIGH>;
->> +             interrupt-parent = <&gic>;
->> +             interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 36 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 37 IRQ_TYPE_LEVEL_HIGH>;
->
-> If I'm not mistaken the interrupts should be 36, 37 and 38.
+If this ends up being an addition to the existing ARM SMMU driver, I'm
+really not keen on using the new DT bindings. We're already stuck with
+the old bindings for that driver -- supporting both old and new in the
+same code only buys us maintenance headaches and pointless divergence
+within the driver.
 
-(diving into the documentation)
-
-Yes, probably 36, 37, and 38. I say "probably", as I find it non-trivial
-to convert from docs to DT.
-
-What happens with 35, which is "TMU21 (input capture)"?
-As DT describes the hardware, shouldn't it be mentioned here?
-
->>               clocks = <&mstp0_clks R8A7779_CLK_TMU1>;
->>               clock-names = "fck";
->>
->> @@ -296,10 +298,11 @@
->>
->>       tmu2: timer at ffd82000 {
->>               compatible = "renesas,tmu";
->> +             interrupt-parent = <&gic>;
->>               reg = <0xffd82000 0x30>;
->> -             interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>,
->> -                          <0 49 IRQ_TYPE_LEVEL_HIGH>,
->> -                          <0 50 IRQ_TYPE_LEVEL_HIGH>;
->> +             interrupts = <0 38 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 39 IRQ_TYPE_LEVEL_HIGH>,
->> +                          <0 40 IRQ_TYPE_LEVEL_HIGH>;
->
-> And 40, 41 and 42 here.
-
-Likewise for "TMU51 (input capture)"?
-
->>               clocks = <&mstp0_clks R8A7779_CLK_TMU2>;
->>               clock-names = "fck";
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
