@@ -1,60 +1,47 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 15 Jun 2014 21:40:39 -0700
-Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
-In-Reply-To: <539E0D8E.9080706@linaro.org>
-References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
- <539E0D8E.9080706@linaro.org>
-Message-ID: <CAD=FV=XA09XawT-fxAm2tTMw4kZ=7RHceXuww2y6q+zMV71pew@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 16 Jun 2014 04:43:05 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: Change hardreset soc_ops for
+ AM43XX
+In-Reply-To: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
+References: <1402347553-26029-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <alpine.DEB.2.02.1406160441150.26773@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+Dave,
 
-On Sun, Jun 15, 2014 at 2:18 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 06/04/2014 07:30 PM, Doug Anderson wrote:
->>
->> In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
->> supported using the MCT as a scheduler clock.  We properly marked
->> exynos4_read_sched_clock() as notrace.  However, we then went and
->> called another function that _wasn't_ notrace.  That means if you do:
->>
->>    cd /sys/kernel/debug/tracing/
->>    echo function_graph > current_tracer
->>
->> You'll get a crash.
->>
->> Fix this (but still let other readers of the MCT be trace-enabled) by
->> adding an extra function.  It's important to keep other users of MCT
->> traceable because the MCT is actually quite slow.
->
->
->
-> Hi Doug,
->
-> could you elaborate ? I don't get the 'because the MCT ... slow'
+On Mon, 9 Jun 2014, Dave Gerlach wrote:
 
-Sorry, I was trying to avoid duplication in the series and it's more
-obvious when you look at parts 2 and 3 of the series.  ;)
+> am43xx reset register layout is more similar to am33xx than omap4 so
+> use the am33xx functions for hwmod hardreset soc_ops rather than the
+> currently used omap4 functions. Without this, assert_hardreset and
+> deassert_hardreset will not work on am43xx.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 66c60fe..1c0885b 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -4251,9 +4251,9 @@ void __init omap_hwmod_init(void)
+>  		soc_ops.enable_module = _omap4_enable_module;
+>  		soc_ops.disable_module = _omap4_disable_module;
+>  		soc_ops.wait_target_ready = _omap4_wait_target_ready;
+> -		soc_ops.assert_hardreset = _omap4_assert_hardreset;
+> -		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
+> -		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
+> +		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
+> +		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
+> +		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
+>  		soc_ops.init_clkdm = _init_clkdm;
+>  	} else if (soc_is_am33xx()) {
+>  		soc_ops.enable_module = _am33xx_enable_module;
 
-Doing the math (please correct any miscalculations) using the numbers
-from the other patches: You can see that the existing code takes
-1323852 us for 1000000 gettimeofday in userspace.  The fastest
-implementation (just shaving to a 32-bit timer) gets us as fast as
-~1000000 us for 1000000 gettimeofday in userspace.
+Should AM43XX be using the _am33xx_{enable,disable}_module and 
+wait_target_ready functions?  
 
->From profiling, I believe that gettimeofday from userspace is about
-50% overhead (system call, multiplication, copies, etc) and about 50%
-MCT read.  That means that the fastest you can possibly do an MCT read
-is in .5us or 500ns.
 
-I believe an A15 has something like 1 or 2 cycles per instruction.  If
-it were 2 cycles per instruction, it can execute a normal instruction
-on a 2GHz machine in .5ns.  That means we can execute 1000 normal
-instructions in the time it takes to do a since MCT access.
-
-...so I guess that's what I'd call slow.  ;)  What do you think?  I
-know that the MCT read shows up in whole system profiles of
-gettimeofday.
-
--Doug
+- Paul
