@@ -1,99 +1,55 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 16 Jun 2014 16:53:16 +0530
-Subject: [PATCH V3 16/16] irqchip: crossbar: allow for quirky hardware with
- direct hardwiring of GIC
-In-Reply-To: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402917796-31574-17-git-send-email-r.sricharan@ti.com>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Mon, 16 Jun 2014 16:56:42 +0530
+Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
+ Exynos5420
+In-Reply-To: <CABxcv=kX07pNCd-YPYp6J8S5hHzG1rsoer1YRfdPE0g-xFqZnQ@mail.gmail.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>	<1402464739-19044-3-git-send-email-tushar.b@samsung.com>
+ <CABxcv=kX07pNCd-YPYp6J8S5hHzG1rsoer1YRfdPE0g-xFqZnQ@mail.gmail.com>
+Message-ID: <539ED472.5020102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+On 06/11/2014 09:28 PM, Javier Martinez Canillas wrote:
+> On Wed, Jun 11, 2014 at 7:32 AM, Tushar Behera <tushar.b@samsung.com> wrote:
+>> Currently CLK_FOUT_EPLL was set as one of the parents of AUDSS mux.
+>> As per the user manual, it should be CLK_MAU_EPLL.
+>>
+>> The problem surfaced when the bootloader in Peach-pit board set
+>> the EPLL clock as the parent of AUDSS mux. While booting the kernel,
+>> we used to get a system hang during late boot if CLK_MAU_EPLL was
+>> disabled.
+>>
+>> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>> Reported-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/exynos5420.dtsi |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+>> index e385322..79e9119 100644
+>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>> @@ -167,7 +167,7 @@
+>>                 compatible = "samsung,exynos5420-audss-clock";
+>>                 reg = <0x03810000 0x0C>;
+>>                 #clock-cells = <1>;
+>> -               clocks = <&clock CLK_FIN_PLL>, <&clock CLK_FOUT_EPLL>,
+>> +               clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MAU_EPLL>,
+>>                          <&clock CLK_SCLK_MAUDIO0>, <&clock CLK_SCLK_MAUPCM0>;
+>>                 clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
+>>         };
+>> --
+>> 1.7.9.5
+>>
+>> --
+> 
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
 
-On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10, 131,
-132, 133 are direct wired to hardware blocks bypassing crossbar.
-This quirky implementation is *NOT* supposed to be the expectation
-of crossbar hardware usage. However, these are already marked in our
-description of the hardware with SKIP and RESERVED where appropriate.
+Kukjin,
 
-Unfortunately, we need to be able to refer to these hardwired IRQs.
-So, to request these, crossbar driver can use the existing information
-from it's table that these SKIP/RESERVED maps are direct wired sources
-and generic allocation/programming of crossbar should be avoided.
+Would you please take this patch as a fix for 3.16?
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- .../devicetree/bindings/arm/omap/crossbar.txt      |   12 ++++++++++--
- drivers/irqchip/irq-crossbar.c                     |   20 ++++++++++++++++++--
- 2 files changed, 28 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 8210ea4..438ccab 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -42,8 +42,10 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
- 
- An interrupt consumer on an SoC using crossbar will use:
- 	interrupts = <GIC_SPI request_number interrupt_level>
--request number shall be between 0 to that described by
--"ti,max-crossbar-sources"
-+When the request number is between 0 to that described by
-+"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
-+request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
-+quirky hardware mapping direct to GIC.
- 
- Example:
- 	device_x at 0x4a023000 {
-@@ -51,3 +53,9 @@ Example:
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		...
- 	};
-+
-+	device_y at 0x4a033000 {
-+		/* Direct mapped GIC SPI 1 used */
-+		interrupts = <GIC_SPI 401 IRQ_TYPE_LEVEL_HIGH>;
-+		...
-+	};
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index ef613c4..fff6218 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -86,8 +86,13 @@ static inline int allocate_free_irq(int cb_no)
- 
- static inline bool needs_crossbar_write(irq_hw_number_t hw)
- {
--	if (hw > GIC_IRQ_START)
--		return true;
-+	int cb_no;
-+
-+	if (hw > GIC_IRQ_START) {
-+		cb_no = cb->irq_map[hw - GIC_IRQ_START];
-+		if (cb_no != IRQ_RESERVED && cb_no != IRQ_SKIP)
-+			return true;
-+	}
- 
- 	return false;
- }
-@@ -130,8 +135,19 @@ static int crossbar_domain_xlate(struct irq_domain *d,
- {
- 	int ret;
- 	int req_num = intspec[1];
-+	int direct_map_num;
- 
- 	if (req_num >= cb->max_crossbar_sources) {
-+		direct_map_num = req_num - cb->max_crossbar_sources;
-+		if (direct_map_num < cb->int_max) {
-+			ret = cb->irq_map[direct_map_num];
-+			if (ret == IRQ_RESERVED || ret == IRQ_SKIP) {
-+				/* We use the interrupt num as h/w irq num */
-+				ret = direct_map_num;
-+				goto found;
-+			}
-+		}
-+
- 		pr_err("%s: requested crossbar number %d > max %d\n",
- 		       __func__, req_num, cb->max_crossbar_sources);
- 		return -EINVAL;
 -- 
-1.7.9.5
+Tushar Behera
