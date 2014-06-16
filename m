@@ -1,138 +1,322 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 16 Jun 2014 15:25:17 +0200
-Subject: [PATCH] serial: 8250_dw: add ability to handle the peripheral clock
-Message-ID: <3755576.qE86Ikox0a@diego>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 16 Jun 2014 15:24:13 +0200
+Subject: [PATCH v3 5/6] regulator: add support for regulator set
+ registration
+In-Reply-To: <20140616080828.GF14323@lee--X1>
+References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1401183535-31003-6-git-send-email-boris.brezillon@free-electrons.com>
+ <53970ABD.4030402@free-electrons.com> <20140616080828.GF14323@lee--X1>
+Message-ID: <539EEFFD.3010300@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First try to find the named clock variants then fall back to the already
-existing handling of a nameless declared baudclk.
 
-This also adds the missing documentation for this already existing variant.
+On 16/06/2014 10:08, Lee Jones wrote:
+>> Hello Mark,
+>>
+>> Did you have time to take a look at this patch ?
+>>
+>> I'd like to post a new version of this series addressing Lee's comments,
+>> but it would be great to have your feedback on this patch before posting
+>> a new version.
+> I wouldn't do that, as you're likely to upset him.
+>
+> Just fix what you know and resend.
+>
+> Mark will subsequently review I'm sure.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- .../bindings/serial/snps-dw-apb-uart.txt           | 31 ++++++++++++++++++++++
- drivers/tty/serial/8250/8250_dw.c                  | 31 +++++++++++++++++++---
- 2 files changed, 59 insertions(+), 3 deletions(-)
+Okay, I'll send a new version soon.
 
-diff --git a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-index f13f1c5..3601399 100644
---- a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-@@ -4,7 +4,15 @@ Required properties:
- - compatible : "snps,dw-apb-uart"
- - reg : offset and length of the register set for the device.
- - interrupts : should contain uart interrupt.
-+
-+Clock handling:
-+The clock rate of the input clock needs to be supplied by one of
- - clock-frequency : the input clock frequency for the UART.
-+- clocks : phandle to the input clock
-+
-+The supplying peripheral clock can also be handled, needing a second property
-+- clock-names: tuple listing input clock names.
-+	Required elements: "baudclk", "apb_pclk"
- 
- Optional properties:
- - reg-shift : quantity to shift the register offsets by.  If this property is
-@@ -23,3 +31,26 @@ Example:
- 		reg-shift = <2>;
- 		reg-io-width = <4>;
- 	};
-+
-+Example with one clock:
-+
-+	uart at 80230000 {
-+		compatible = "snps,dw-apb-uart";
-+		reg = <0x80230000 0x100>;
-+		clocks = <&baudclk>;
-+		interrupts = <10>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+	};
-+
-+Example with two clocks:
-+
-+	uart at 80230000 {
-+		compatible = "snps,dw-apb-uart";
-+		reg = <0x80230000 0x100>;
-+		clocks = <&baudclk>, <&apb_pclk>;
-+		clock-names = "baudclk", "apb_pclk";
-+		interrupts = <10>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+	};
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index 51b307a..024cd58 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -59,6 +59,7 @@ struct dw8250_data {
- 	int			last_mcr;
- 	int			line;
- 	struct clk		*clk;
-+	struct clk		*pclk;
- 	struct uart_8250_dma	dma;
- };
- 
-@@ -402,10 +403,25 @@ static int dw8250_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	data->usr_reg = DW_UART_USR;
--	data->clk = devm_clk_get(&pdev->dev, NULL);
-+	data->clk = devm_clk_get(&pdev->dev, "baudclk");
-+	if (IS_ERR(data->clk))
-+		data->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (!IS_ERR(data->clk)) {
--		clk_prepare_enable(data->clk);
--		uart.port.uartclk = clk_get_rate(data->clk);
-+		err = clk_prepare_enable(data->clk);
-+		if (err)
-+			dev_warn(&pdev->dev, "could not enable optional baudclk: %d\n",
-+				 err);
-+		else
-+			uart.port.uartclk = clk_get_rate(data->clk);
-+	}
-+
-+	data->pclk = devm_clk_get(&pdev->dev, "apb_pclk");
-+	if (!IS_ERR(data->pclk)) {
-+		err = clk_prepare_enable(data->pclk);
-+		if (err) {
-+			dev_err(&pdev->dev, "could not enable apb_pclk\n");
-+			return err;
-+		}
- 	}
- 
- 	data->dma.rx_chan_id = -1;
-@@ -451,6 +467,9 @@ static int dw8250_remove(struct platform_device *pdev)
- 
- 	serial8250_unregister_port(data->line);
- 
-+	if (!IS_ERR(data->pclk))
-+		clk_disable_unprepare(data->pclk);
-+
- 	if (!IS_ERR(data->clk))
- 		clk_disable_unprepare(data->clk);
- 
-@@ -488,6 +507,9 @@ static int dw8250_runtime_suspend(struct device *dev)
- 	if (!IS_ERR(data->clk))
- 		clk_disable_unprepare(data->clk);
- 
-+	if (!IS_ERR(data->pclk))
-+		clk_disable_unprepare(data->pclk);
-+
- 	return 0;
- }
- 
-@@ -495,6 +517,9 @@ static int dw8250_runtime_resume(struct device *dev)
- {
- 	struct dw8250_data *data = dev_get_drvdata(dev);
- 
-+	if (!IS_ERR(data->pclk))
-+		clk_prepare_enable(data->pclk);
-+
- 	if (!IS_ERR(data->clk))
- 		clk_prepare_enable(data->clk);
- 
+>
+>> Best Regards,
+>>
+>> Boris
+>>
+>> On 27/05/2014 11:38, Boris BREZILLON wrote:
+>>> PMIC devices often provide several regulators, and these regulators are
+>>> all using the same regmap and are all attached to the same device (the
+>>> PMIC device).
+>>>
+>>> Add helper functions (both simple and resource managed versions) to
+>>> register and unregister such kind of regulator set.
+>>>
+>>> This implementation handles self dependency issues where one regulator
+>>> provided the PMIC depends on another one provided by the same PMIC.
+>>>
+>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>> ---
+>>>  drivers/regulator/core.c         | 106 +++++++++++++++++++++++++++++++++++++++
+>>>  drivers/regulator/devres.c       |  68 +++++++++++++++++++++++++
+>>>  include/linux/regulator/driver.h |  51 +++++++++++++++++++
+>>>  3 files changed, 225 insertions(+)
+>>>
+>>> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+>>> index 9a09f3c..7703853 100644
+>>> --- a/drivers/regulator/core.c
+>>> +++ b/drivers/regulator/core.c
+>>> @@ -3595,6 +3595,112 @@ void regulator_unregister(struct regulator_dev *rdev)
+>>>  EXPORT_SYMBOL_GPL(regulator_unregister);
+>>>  
+>>>  /**
+>>> + * regulator_set_register - register a set of regulators
+>>> + * @config: runtime configuration for regulator set
+>>> + *
+>>> + * Called by regulator drivers to register a set of regulators.
+>>> + * Returns a valid pointer to struct regulator_set on success
+>>> + * or an ERR_PTR() on error.
+>>> + */
+>>> +struct regulator_set *
+>>> +regulator_set_register(const struct regulator_set_config *config)
+>>> +{
+>>> +	struct regulator_set *rset;
+>>> +	int prev_nregistered = -1;
+>>> +	int nregistered = 0;
+>>> +	int ret;
+>>> +	int i;
+>>> +
+>>> +	if (!config->descs || !config->nregulators)
+>>> +		return ERR_PTR(-EINVAL);
+>>> +
+>>> +	rset = kzalloc(sizeof(*rset) +
+>>> +		       (config->nregulators * sizeof(struct regulator_dev *)),
+>>> +		       GFP_KERNEL);
+>>> +	if (!rset)
+>>> +		return ERR_PTR(-ENOMEM);
+>>> +
+>>> +	rset->nregulators = config->nregulators;
+>>> +
+>>> +	while (nregistered < config->nregulators &&
+>>> +	       prev_nregistered < nregistered) {
+>>> +
+>>> +		prev_nregistered = nregistered;
+>>> +
+>>> +		for (i = 0; i < config->nregulators; i++) {
+>>> +			struct regulator_config conf;
+>>> +			struct regulator_dev *regulator;
+>>> +
+>>> +			if (rset->regulators[i])
+>>> +				continue;
+>>> +
+>>> +			memset(&conf, 0, sizeof(conf));
+>>> +
+>>> +			conf.dev = config->dev;
+>>> +			conf.regmap = config->regmap;
+>>> +			conf.driver_data = config->driver_data;
+>>> +			if (config->matches && config->matches[i].init_data)
+>>> +				conf.init_data = config->matches[i].init_data;
+>>> +			else if (config->init_data)
+>>> +				conf.init_data = config->init_data[i];
+>>> +
+>>> +			if (config->matches)
+>>> +				conf.of_node = config->matches[i].of_node;
+>>> +
+>>> +			regulator = regulator_register(&config->descs[i],
+>>> +						       &conf);
+>>> +			if (IS_ERR(regulator)) {
+>>> +				ret = PTR_ERR(regulator);
+>>> +				if (ret == -EPROBE_DEFER)
+>>> +					continue;
+>>> +
+>>> +				goto err;
+>>> +			}
+>>> +
+>>> +			rset->regulators[i] = regulator;
+>>> +			nregistered++;
+>>> +		}
+>>> +	}
+>>> +
+>>> +	if (nregistered < config->nregulators) {
+>>> +		ret = -EPROBE_DEFER;
+>>> +		goto err;
+>>> +	}
+>>> +
+>>> +	return rset;
+>>> +
+>>> +err:
+>>> +	for (i = 0; i < config->nregulators; i++) {
+>>> +		if (rset->regulators[i])
+>>> +			regulator_unregister(rset->regulators[i]);
+>>> +	}
+>>> +
+>>> +	kfree(rset);
+>>> +
+>>> +	return ERR_PTR(ret);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(regulator_set_register);
+>>> +
+>>> +/**
+>>> + * regulator_set_unregister - unregister regulator set
+>>> + * @rset: regulator set to unregister
+>>> + *
+>>> + * Called by regulator drivers to unregister a regulator set.
+>>> + */
+>>> +void regulator_set_unregister(struct regulator_set *rset)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	for (i = 0; i < rset->nregulators; i++) {
+>>> +		if (rset->regulators[i])
+>>> +			regulator_unregister(rset->regulators[i]);
+>>> +	}
+>>> +
+>>> +	kfree(rset);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(regulator_set_unregister);
+>>> +
+>>> +/**
+>>>   * regulator_suspend_prepare - prepare regulators for system wide suspend
+>>>   * @state: system suspend state
+>>>   *
+>>> diff --git a/drivers/regulator/devres.c b/drivers/regulator/devres.c
+>>> index f44818b..a34f34c 100644
+>>> --- a/drivers/regulator/devres.c
+>>> +++ b/drivers/regulator/devres.c
+>>> @@ -251,6 +251,74 @@ void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev)
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(devm_regulator_unregister);
+>>>  
+>>> +static void devm_rset_release(struct device *dev, void *res)
+>>> +{
+>>> +	regulator_set_unregister(*(struct regulator_set **)res);
+>>> +}
+>>> +
+>>> +/**
+>>> + * devm_regulator_set_register - Resource managed regulator_set_register()
+>>> + * @dev: device registering the regulator set
+>>> + * @config: runtime configuration for regulator set
+>>> + *
+>>> + * Called by regulator drivers to register a set of regulators.  Returns a
+>>> + * valid pointer to struct regulator_set on success or an ERR_PTR() on
+>>> + * error.  The regulator will automatically be released when the device
+>>> + * is unbound.
+>>> + */
+>>> +struct regulator_set *
+>>> +devm_regulator_set_register(struct device *dev,
+>>> +			    const struct regulator_set_config *config)
+>>> +{
+>>> +	struct regulator_set **ptr, *rset;
+>>> +
+>>> +	ptr = devres_alloc(devm_rset_release, sizeof(*ptr),
+>>> +			   GFP_KERNEL);
+>>> +	if (!ptr)
+>>> +		return ERR_PTR(-ENOMEM);
+>>> +
+>>> +	rset = regulator_set_register(config);
+>>> +	if (!IS_ERR(rset)) {
+>>> +		*ptr = rset;
+>>> +		devres_add(dev, ptr);
+>>> +	} else {
+>>> +		devres_free(ptr);
+>>> +	}
+>>> +
+>>> +	return rset;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(devm_regulator_set_register);
+>>> +
+>>> +static int devm_rset_match(struct device *dev, void *res, void *data)
+>>> +{
+>>> +	struct regulator_set **r = res;
+>>> +	if (!r || !*r) {
+>>> +		WARN_ON(!r || !*r);
+>>> +		return 0;
+>>> +	}
+>>> +	return *r == data;
+>>> +}
+>>> +
+>>> +/**
+>>> + * devm_regulator_set_unregister - Resource managed regulator_set_unregister()
+>>> + * @dev: device unregistering the regulator set
+>>> + * @rset: regulator set to release
+>>> + *
+>>> + * Unregister a regulator set registered with devm_regulator_set_register().
+>>> + * Normally this function will not need to be called and the resource
+>>> + * management code will ensure that the resource is freed.
+>>> + */
+>>> +void devm_regulator_set_unregister(struct device *dev,
+>>> +				   struct regulator_set *rset)
+>>> +{
+>>> +	int rc;
+>>> +
+>>> +	rc = devres_release(dev, devm_rdev_release, devm_rset_match, rset);
+>>> +	if (rc != 0)
+>>> +		WARN_ON(rc);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(devm_regulator_unregister);
+>>> +
+>>>  struct regulator_supply_alias_match {
+>>>  	struct device *dev;
+>>>  	const char *id;
+>>> diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+>>> index bbe03a1..b683f68 100644
+>>> --- a/include/linux/regulator/driver.h
+>>> +++ b/include/linux/regulator/driver.h
+>>> @@ -350,6 +350,48 @@ struct regulator_dev {
+>>>  	unsigned int ena_gpio_state:1;
+>>>  };
+>>>  
+>>> +/**
+>>> + * struct regulator_set_config - Dynamic regulator set descriptor
+>>> + *
+>>> + * This structure describe a regulator and each regulator in this set
+>>> + * will be registered using informations passed through regulator_desc
+>>> + * and of_regulator_match tables.
+>>> + *
+>>> + * @dev: struct device providing the regulator set.
+>>> + * @driver_data: private driver data for this regulator set.
+>>> + * @regmap: regmap to use for core regmap helpers if dev_get_regulator() is
+>>> + *          insufficient.
+>>> + * @descs: table of regulator descriptors.
+>>> + * @matches: table of DT regulator descriptors. This table should have
+>>> + *           been filled by the of_regulator_match function.
+>>> + * @init_data: a table of init_data in case matches is NULL or the init_data
+>>> + *             of the match entry is NULL.
+>>> + * @nregulators: number of regulators in the regulator set.
+>>> + */
+>>> +struct regulator_set_config {
+>>> +	struct device *dev;
+>>> +	void *driver_data;
+>>> +	struct regmap *regmap;
+>>> +	const struct regulator_desc *descs;
+>>> +	const struct of_regulator_match *matches;
+>>> +	const struct regulator_init_data **init_data;
+>>> +	int nregulators;
+>>> +};
+>>> +
+>>> +/*
+>>> + * struct regulator_set - Regulator set
+>>> + *
+>>> + * This structure stores a set of regulator devices provided by a single
+>>> + * device (e.g. a PMIC device).
+>>> + *
+>>> + * @nregulators: number of regulators in the set
+>>> + * @regulators: regulators table
+>>> + */
+>>> +struct regulator_set {
+>>> +	int nregulators;
+>>> +	struct regulator_dev *regulators[0];
+>>> +};
+>>> +
+>>>  struct regulator_dev *
+>>>  regulator_register(const struct regulator_desc *regulator_desc,
+>>>  		   const struct regulator_config *config);
+>>> @@ -360,6 +402,15 @@ devm_regulator_register(struct device *dev,
+>>>  void regulator_unregister(struct regulator_dev *rdev);
+>>>  void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev);
+>>>  
+>>> +struct regulator_set *
+>>> +regulator_set_register(const struct regulator_set_config *config);
+>>> +struct regulator_set *
+>>> +devm_regulator_set_register(struct device *dev,
+>>> +			    const struct regulator_set_config *config);
+>>> +void regulator_set_unregister(struct regulator_set *rset);
+>>> +void devm_regulator_set_unregister(struct device *dev,
+>>> +				   struct regulator_set *rset);
+>>> +
+>>>  int regulator_notifier_call_chain(struct regulator_dev *rdev,
+>>>  				  unsigned long event, void *data);
+>>>  
+
 -- 
-1.9.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
