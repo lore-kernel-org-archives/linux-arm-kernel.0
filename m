@@ -1,110 +1,103 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 16 Jun 2014 16:53:10 +0530
-Subject: [PATCH V3 10/16] irqchip: crossbar: change the goto naming
-In-Reply-To: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1402917796-31574-11-git-send-email-r.sricharan@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Jun 2014 04:26:10 -0700
+Subject: [PATCH] ARM: omap: rework platform selection
+In-Reply-To: <7892694.KrnV5uCBX6@wuerfel>
+References: <5701099.0P1SIXsHc1@wuerfel> <20140616110042.GD17845@atomide.com>
+ <7892694.KrnV5uCBX6@wuerfel>
+Message-ID: <20140616112610.GE17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+* Arnd Bergmann <arnd@arndb.de> [140616 04:18]:
+> On Monday 16 June 2014 04:00:42 Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [140616 03:06]:
+> > > Commit 9851b662f659 ("ARM: use menuconfig for sub-arch menus") did more
+> > > than expected, which led to two OMAP specific bugs:
+> > 
+> > It seems the commit above is not -rc cycle material at least not without
+> > proper testing. There's a good chance of breaking a lot of the existing
+> > .config files which can create a big mess as we've seen before. 
+> 
+> Well, Kconfig is a big mess without it at the moment. The OMAP change
+> was definitely wrong there, but for all other platforms I don't see any
+> risk in applying it, because there is no semantic change, only cosmetic.
+> 
+> > > * Turning CONFIG_ARCH_OMAP into a user-selectable option makes it possible
+> > >   to have a configuration with ARCH_OMAP enabled but none of the specific
+> > >   OMAP SoCs enabled, which triggers a couple of link errors due to the
+> > >   layout of the Makefile
+> > 
+> > And so we have a regression to this old problem again :(
+> 
+> Yes, I didn't actually see this happen but from looking at the patch, I
+> concluded that it would likely be the case.
+> 
+> > > * The plat-omap menu still appears mixed into the normal menuconfig list,
+> > >   which is confusing and inconsistent.
+> > 
+> > That we should be able to remove completely soon but that's a
+> > separate patch..
+> 
+> Ok.
+> 
+> > > To make matters worse, the change did not enable CONFIG_ARCH_OMAP in the
+> > > defconfig files, which through some ripple effects disabled options that
+> > > were implicitly enabled from OMAP2, and that caused all machines to
+> > > fail booting with the unchanged config files.
+> > > 
+> > > This reorders the OMAP Kconfig files some more, to be consistent with
+> > > the others, and also changes the defconfig files.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > > Tony, can you have a look at this please? I'd like to send out the
+> > > fixes for 3.16, but this is needed on top of Rob's Kconfig changes.
+> > 
+> > Hmm why is this patch already in linux next before getting posted
+> > to the mailing lists?
+> 
+> I had applied Rob's patch to the fixes series but that broke all
+> multi_v7_defconfig runs on the boot test machines. I didn't want to
+> spend too much work on it over the weekend, but applied it so at least
+> today's linux-next wouldn't regress over last week's.
 
-Using err1,2,3,4 etc makes it hard to ensure a new exit path in the
-middle will not result in spurious changes, so rename the error paths
-as per the function it does.
+Ah OK I see. Some quality time with duct tape in the basement
+with the leaking pipes :)
+ 
+> > > --- a/arch/arm/plat-omap/Kconfig
+> > > +++ b/arch/arm/plat-omap/Kconfig
+> > > @@ -1,6 +1,11 @@
+> > > -if ARCH_OMAP
+> > > +menuconfig ARCH_OMAP_ENABLE
+> > > +	bool "TI OMAP platforms" if ARCH_MULTI_V6 || ARCH_MULTI_V7
+> > > +	default ARCH_OMAP1
+> > >  
+> > > -menu "TI OMAP Common Features"
+> > > +if ARCH_OMAP_ENABLE
+> > > +
+> > > +source "arch/arm/mach-omap1/Kconfig"
+> > > +source "arch/arm/mach-omap2/Kconfig"
+> > 
+> > It seems to me this kind of change is going to break all the
+> > existing .config files unless they are manually updated. This
+> > includes all the distros and automated build systems. I'll look
+> > more at it, but my initial take is that we should be able to do
+> > this all with CONFIG_ARCH_OMAP + the selected OMAP SoC and should
+> > not introduce any new Kconfig options.
+> > 
+> > For now I'd just leave out Rob's changed and this patch from fixes
+> > until they have been properly tested.
+> 
+> Let's see if others have similar opinions Rob's patch as a whole.
+> I'd still like to keep all the parts aside from the OMAP change
+> and just back out the change that caused the problems.
+> 
+> Does that seem reasonable to you?
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- drivers/irqchip/irq-crossbar.c |   23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
+Yes makes sense to me if others don't have similar issues. I guess
+it should be possible to verify that by diffing the generated
+.config files compared to the old ones.
 
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 5bcedc0..5bd7f3d 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -140,17 +140,17 @@ static int __init crossbar_of_init(struct device_node *node)
- 
- 	cb->crossbar_base = of_iomap(node, 0);
- 	if (!cb->crossbar_base)
--		goto err1;
-+		goto err_cb;
- 
- 	of_property_read_u32(node, "ti,max-irqs", &max);
- 	if (!max) {
- 		pr_err("missing 'ti,max-irqs' property\n");
- 		ret = -EINVAL;
--		goto err2;
-+		goto err_base;
- 	}
- 	cb->irq_map = kcalloc(max, sizeof(int), GFP_KERNEL);
- 	if (!cb->irq_map)
--		goto err2;
-+		goto err_base;
- 
- 	cb->int_max = max;
- 
-@@ -169,7 +169,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 			if (entry > max) {
- 				pr_err("Invalid reserved entry\n");
- 				ret = -EINVAL;
--				goto err3;
-+				goto err_irq_map;
- 			}
- 			cb->irq_map[entry] = IRQ_RESERVED;
- 		}
-@@ -187,7 +187,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 			if (entry > max) {
- 				pr_err("Invalid skip entry\n");
- 				ret = -EINVAL;
--				goto err3;
-+				goto err_irq_map;
- 			}
- 			cb->irq_map[entry] = IRQ_SKIP;
- 		}
-@@ -196,7 +196,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 
- 	cb->register_offsets = kcalloc(max, sizeof(int), GFP_KERNEL);
- 	if (!cb->register_offsets)
--		goto err3;
-+		goto err_irq_map;
- 
- 	of_property_read_u32(node, "ti,reg-size", &size);
- 
-@@ -213,7 +213,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 	default:
- 		pr_err("Invalid reg-size property\n");
- 		ret = -EINVAL;
--		goto err4;
-+		goto err_reg_offset;
- 		break;
- 	}
- 
-@@ -230,7 +230,6 @@ static int __init crossbar_of_init(struct device_node *node)
- 	}
- 
- 	of_property_read_u32(node, "ti,irqs-safe-map", &cb->safe_map);
--
- 	/* Initialize the crossbar with safe map to start with */
- 	for (i = 0; i < max; i++) {
- 		if (cb->irq_map[i] == IRQ_RESERVED ||
-@@ -243,13 +242,13 @@ static int __init crossbar_of_init(struct device_node *node)
- 	register_routable_domain_ops(&routable_irq_domain_ops);
- 	return 0;
- 
--err4:
-+err_reg_offset:
- 	kfree(cb->register_offsets);
--err3:
-+err_irq_map:
- 	kfree(cb->irq_map);
--err2:
-+err_base:
- 	iounmap(cb->crossbar_base);
--err1:
-+err_cb:
- 	kfree(cb);
- 	return ret;
- }
--- 
-1.7.9.5
+Regards,
+
+Tony
