@@ -1,71 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 16 Jun 2014 17:48:32 +0900
-Subject: [PATCH v3 10/19] clocksource: sh_tmu: Add DT support
-In-Reply-To: <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140616084832.GG11582@verge.net.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 16 Jun 2014 10:52:12 +0200
+Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
+In-Reply-To: <CAD=FV=XA09XawT-fxAm2tTMw4kZ=7RHceXuww2y6q+zMV71pew@mail.gmail.com>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>	<539E0D8E.9080706@linaro.org>
+ <CAD=FV=XA09XawT-fxAm2tTMw4kZ=7RHceXuww2y6q+zMV71pew@mail.gmail.com>
+Message-ID: <539EB03C.5080100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 14, 2014 at 06:23:32PM +0200, Laurent Pinchart wrote:
-> Document DT bindings and parse them in the TMU driver.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  .../devicetree/bindings/timer/renesas,tmu.txt      | 40 +++++++++++++++++++
->  drivers/clocksource/sh_tmu.c                       | 45 ++++++++++++++++++----
->  2 files changed, 77 insertions(+), 8 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> new file mode 100644
-> index 0000000..2392e89
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> @@ -0,0 +1,40 @@
-> +* Renesas R-Car Timer Unit (TMU)
-> +
-> +The TMU is a 32-bit timer/counter with configurable clock inputs and
-> +programmable compare match.
-> +
-> +Channels share hardware resources but their counter and compare match value
-> +are independent. The TMU hardware supports up to three channels.
-> +
-> +Required Properties:
-> +
-> +  - compatible: must contain "renesas,tmu"
-> +
-> +  - reg: base address and length of the registers block for the timer module.
-> +
-> +  - interrupts: interrupt-specifier for the timer, one per channel.
-> +
-> +  - clocks: a list of phandle + clock-specifier pairs, one for each entry
-> +    in clock-names.
-> +  - clock-names: must contain "fck" for the functional clock.
-> +
-> +Optional Properties:
-> +
-> +  - #renesas,channels: number of channels implemented by the timer, must be 2
-> +    or 3 (if not specified the value defaults to 3).
-> +
-> +
-> +Example: R8A7779 (R-Car H1) TMU0 node
-> +
-> +	tmu0: timer at ffd80000 {
-> +		compatible = "renesas,tmu";
-> +		reg = <0xffd80000 0x30>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
-> +		clock-names = "fck";
-> +
-> +		#renesas,channels = <3>;
-> +	};
+On 06/16/2014 06:40 AM, Doug Anderson wrote:
+> Daniel,
+>
+> On Sun, Jun 15, 2014 at 2:18 PM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On 06/04/2014 07:30 PM, Doug Anderson wrote:
+>>>
+>>> In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
+>>> supported using the MCT as a scheduler clock.  We properly marked
+>>> exynos4_read_sched_clock() as notrace.  However, we then went and
+>>> called another function that _wasn't_ notrace.  That means if you do:
+>>>
+>>>     cd /sys/kernel/debug/tracing/
+>>>     echo function_graph > current_tracer
+>>>
+>>> You'll get a crash.
+>>>
+>>> Fix this (but still let other readers of the MCT be trace-enabled) by
+>>> adding an extra function.  It's important to keep other users of MCT
+>>> traceable because the MCT is actually quite slow.
+>>
+>>
+>>
+>> Hi Doug,
+>>
+>> could you elaborate ? I don't get the 'because the MCT ... slow'
+>
+> Sorry, I was trying to avoid duplication in the series and it's more
+> obvious when you look at parts 2 and 3 of the series.  ;)
+>
+> Doing the math (please correct any miscalculations) using the numbers
+> from the other patches: You can see that the existing code takes
+> 1323852 us for 1000000 gettimeofday in userspace.  The fastest
+> implementation (just shaving to a 32-bit timer) gets us as fast as
+> ~1000000 us for 1000000 gettimeofday in userspace.
+>
+>  From profiling, I believe that gettimeofday from userspace is about
+> 50% overhead (system call, multiplication, copies, etc) and about 50%
+> MCT read.  That means that the fastest you can possibly do an MCT read
+> is in .5us or 500ns.
+>
+> I believe an A15 has something like 1 or 2 cycles per instruction.  If
+> it were 2 cycles per instruction, it can execute a normal instruction
+> on a 2GHz machine in .5ns.  That means we can execute 1000 normal
+> instructions in the time it takes to do a since MCT access.
+>
+> ...so I guess that's what I'd call slow.  ;)  What do you think?  I
+> know that the MCT read shows up in whole system profiles of
+> gettimeofday.
 
-As per my feedback for "[PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU
-devices to DT" I believe the IRQ values should be 32, 33 and 34, not 40,
-41, 42. I realise this is just an example but I feel that I should mention
-it.
+Hi Dough,
+
+thanks for the explanation. I still don't get why it is important to 
+keep others users of mct traceable because it is quite slow ? May be it 
+is what you explained here, but I miss the connection between 'the other 
+users' <-> 'traceable' <-> 'because slow'.
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
