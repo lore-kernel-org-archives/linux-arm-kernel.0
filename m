@@ -1,58 +1,43 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 16 Jun 2014 12:26:31 +0200
-Subject: [PATCH v6 6/7] ARM: berlin: add the AHCI node for the BG2Q
-In-Reply-To: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1402914392-6028-7-git-send-email-antoine.tenart@free-electrons.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Mon, 16 Jun 2014 15:56:22 +0530
+Subject: [Patch v7 5/6] exynos: cpuidle: do not allow cpuidle registration for
+ Exynos5420
+In-Reply-To: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
+References: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
+Message-ID: <1402914383-20471-6-git-send-email-k.chander@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q has an AHCI SATA controller. Add the corresponding nodes
-(AHCI, PHY) into its device tree.
+From: Chander Kashyap <chander.kashyap@linaro.org>
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+Exynos5420 is big.Little Soc. It uses cpuidle-big-litle generic cpuidle driver.
+Hence do not allow exynos cpuidle driver registration for Exynos5420.
+
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Changes in v6:
+	1. Move cpuidle registration check to exynos.c from cpuidle.c and
+	   use "samsung,exynos5420" compatible string to avvoid registration
+ arch/arm/mach-exynos/exynos.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 635a16a64cb4..3fb0d3935aec 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -303,6 +303,34 @@
- 			clock-names = "refclk";
- 		};
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 90aab4d..f4c08d6 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -271,7 +271,9 @@ static void __init exynos_dt_machine_init(void)
+ 		}
+ 	}
  
-+		ahci: sata at e90000 {
-+			compatible = "generic-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
+-	exynos_cpuidle_init();
++	if (!of_machine_is_compatible("samsung,exynos5420"))
++		exynos_cpuidle_init();
 +
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy 0>;
-+				status = "disabled";
-+			};
-+
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy 1>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin-sata-phy";
-+			reg = <0xe900a0 0x200>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
+ 	exynos_cpufreq_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 -- 
-1.9.1
+1.7.9.5
