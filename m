@@ -1,57 +1,47 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 16 Jun 2014 20:27:24 +0900
-Subject: [PATCH] ARM: shmobile: rcar-gen2: correct return value of
- shmobile_smp_apmu_suspend_init
-Message-ID: <1402918044-29961-1-git-send-email-horms+renesas@verge.net.au>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 16 Jun 2014 13:28:05 +0200
+Subject: [PATCH V2] ARM: STi: DT: Properly define sti-ethclk & stmmaceth
+ for stih415/6
+In-Reply-To: <20140616092339.GB27978@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1402345355-5682-1-git-send-email-peter.griffin@linaro.org>
+ <20140616092339.GB27978@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <539ED4C5.4070906@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dummy shmobile_smp_apmu_suspend_init() function provided when
-CPU_IDLE is not set should not return a value as per the signature
-of the function.
+Hi Peter,
 
-This problem appears to have been introduced by
-867ba81f728f1daa ("ARM: shmobile: APMU: Add Core-Standby-state for Suspend
-to RAM").
+On 06/16/2014 11:23 AM, Peter Griffin wrote:
+> This patch fixes two problems: -
+>
+> 1) The device tree isn't currently providing sti-ethclk which is
+> required by the dwmac glue code to correctly configure the ethernet
+> PHY clock speed.
+>
+> This means depending on what the bootloader/jtag has
+> configured this clock to, and what switch/hub the board is plugged
+> into you most likely will NOT successfully negotiate a ethernet link.
+>
+> 2) The stmmaceth clock was associated with the wrong clock. It was
+> referencing the PHY clock rather than the interconnect clock which
+> clocks the IP.
+>
+> This patch also brings us closer to not having to boot the upstream
+> kernel with the clk_ignore_unused parameter.
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>   arch/arm/boot/dts/stih415.dtsi           | 8 ++++----
+>   arch/arm/boot/dts/stih416.dtsi           | 8 ++++----
+>   include/dt-bindings/clock/stih415-clks.h | 1 +
+>   include/dt-bindings/clock/stih416-clks.h | 1 +
+>   4 files changed, 10 insertions(+), 8 deletions(-)
+>
 
-Cc: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+...
 
----
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-This patch resolves the following build warnings:
-In file included from arch/arm/mach-shmobile/clock.c:53:0:
-arch/arm/mach-shmobile/include/mach/common.h: In function 'shmobile_smp_apmu_suspend_init':
-arch/arm/mach-shmobile/include/mach/common.h:41:130: warning: 'return' with a value, in function returning void [enabled by default]
-In file included from arch/arm/mach-shmobile/console.c:22:0:
-arch/arm/mach-shmobile/include/mach/common.h: In function 'shmobile_smp_apmu_suspend_init':
-arch/arm/mach-shmobile/include/mach/common.h:41:130: warning: 'return' with a value, in function returning void [enabled by default]
-  CC      arch/arm/mach-shmobile/board-bockw-reference.o
-In file included from arch/arm/mach-shmobile/clock-r8a7778.c:43:0:
-arch/arm/mach-shmobile/include/mach/common.h: In function 'shmobile_smp_apmu_suspend_init':
-arch/arm/mach-shmobile/include/mach/common.h:41:130: warning: 'return' with a value, in function returning void [enabled by default]
-In file included from arch/arm/mach-shmobile/board-bockw-reference.c:22:0:
-arch/arm/mach-shmobile/include/mach/common.h: In function 'shmobile_smp_apmu_suspend_init':
-arch/arm/mach-shmobile/include/mach/common.h:41:130: warning: 'return' with a value, in function returning void [enabled by default]
-In file included from arch/arm/mach-shmobile/setup-r8a7778.c:42:0:
-arch/arm/mach-shmobile/include/mach/common.h: In function 'shmobile_smp_apmu_suspend_init':
-arch/arm/mach-shmobile/include/mach/common.h:41:130: warning: 'return' with a value, in function returning void [enabled by default]
----
- arch/arm/mach-shmobile/include/mach/common.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks for the fix!
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 8f0cd57..46766fc 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -38,7 +38,7 @@ int shmobile_suspend_init(void);
- void shmobile_smp_apmu_suspend_init(void);
- #else
- static inline int shmobile_suspend_init(void) { return 0; }
--static inline void shmobile_smp_apmu_suspend_init(void) { return 0; }
-+static inline void shmobile_smp_apmu_suspend_init(void) { return; }
- #endif
- 
- #ifdef CONFIG_CPU_IDLE
--- 
-2.0.0.rc2
+Maxime
