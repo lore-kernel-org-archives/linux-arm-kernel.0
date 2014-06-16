@@ -1,145 +1,226 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Jun 2014 12:04:58 +0200
-Subject: [PATCH] ARM: omap: rework platform selection
-Message-ID: <5701099.0P1SIXsHc1@wuerfel>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 16 Jun 2014 15:34:28 +0530
+Subject: [PATCH 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
+In-Reply-To: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
+References: <1402600724-20651-1-git-send-email-galak@codeaurora.org>
+Message-ID: <539EC12C.6080504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9851b662f659 ("ARM: use menuconfig for sub-arch menus") did more
-than expected, which led to two OMAP specific bugs:
+Hi,
 
-* Turning CONFIG_ARCH_OMAP into a user-selectable option makes it possible
-  to have a configuration with ARCH_OMAP enabled but none of the specific
-  OMAP SoCs enabled, which triggers a couple of link errors due to the
-  layout of the Makefile
+On Friday 13 June 2014 12:48 AM, Kumar Gala wrote:
+> Add a PHY driver for uses with AHCI based SATA controller driver on the
+> IPQ806x family of SoCs.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+>  drivers/phy/Kconfig                 |   6 ++
+>  drivers/phy/Makefile                |   1 +
+>  drivers/phy/phy-qcom-ipq806x-sata.c | 204 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 211 insertions(+)
+>  create mode 100644 drivers/phy/phy-qcom-ipq806x-sata.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 16a2f06..52bfb93 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -178,4 +178,10 @@ config PHY_XGENE
+>  	help
+>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+>  
+> +config PHY_QCOM_IPQ806X_SATA
+> +	tristate "Qualcomm IPQ806x SATA SerDes/PHY driver"
+> +	depends on ARCH_QCOM
+> +	depends on OF
+depends on HAS_IOMEM?
+> +	select GENERIC_PHY
+> +
+>  endmenu
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index b4f1d57..d950317 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -20,3 +20,4 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
+>  phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+> +obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+> diff --git a/drivers/phy/phy-qcom-ipq806x-sata.c b/drivers/phy/phy-qcom-ipq806x-sata.c
+> new file mode 100644
+> index 0000000..fc57340
+> --- /dev/null
+> +++ b/drivers/phy/phy-qcom-ipq806x-sata.c
+> @@ -0,0 +1,204 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/time.h>
+> +#include <linux/delay.h>
+> +#include <linux/clk.h>
+> +#include <linux/slab.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/phy/phy.h>
+> +
+> +struct qcom_ipq806x_sata_phy {
+> +	struct device *dev;
 
-* The plat-omap menu still appears mixed into the normal menuconfig list,
-  which is confusing and inconsistent.
+dev is not used anywhere. remove it.
+> +	void __iomem *mmio;
+> +	struct clk *cfg_clk;
+> +};
+> +
+> +#define __set(v, a, b)	(((v) << (b)) & GENMASK(a, b))
+> +
+> +#define SATA_PHY_P0_PARAM0		0x200
+> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3(x)	__set(x, 17, 12)
+> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3_MASK	GENMASK(17, 12)
+> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2(x)	__set(x, 11, 6)
+> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2_MASK	GENMASK(11, 6)
+> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1(x)	__set(x, 5, 0)
+> +#define SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1_MASK	GENMASK(5, 0)
+> +
+> +#define SATA_PHY_P0_PARAM1		0x204
+> +#define SATA_PHY_P0_PARAM1_RESERVED_BITS31_21(x)	__set(x, 31, 21)
+> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3(x)	__set(x, 20, 14)
+> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3_MASK	GENMASK(20, 14)
+> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2(x)	__set(x, 13, 7)
+> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2_MASK	GENMASK(13, 7)
+> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1(x)	__set(x, 6, 0)
+> +#define SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1_MASK	GENMASK(6, 0)
+> +
+> +#define SATA_PHY_P0_PARAM2		0x208
+> +#define SATA_PHY_P0_PARAM2_RX_EQ(x)	__set(x, 20, 18)
+> +#define SATA_PHY_P0_PARAM2_RX_EQ_MASK	GENMASK(20, 18)
+> +
+> +#define SATA_PHY_P0_PARAM3		0x20C
+> +#define SATA_PHY_SSC_EN			0x8
+> +#define SATA_PHY_P0_PARAM4		0x210
+> +#define SATA_PHY_REF_SSP_EN		0x2
+> +#define SATA_PHY_RESET			0x1
+> +
+> +static inline void qcom_ipq806x_sata_delay_us(unsigned int delay)
+> +{
+> +	/* sleep for max. 50us more to combine processor wakeups */
+> +	usleep_range(delay, delay + 50);
+> +}
+> +
+> +static int qcom_ipq806x_sata_phy_init(struct phy *generic_phy)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
+> +	u32 reg = 0;
+> +
+> +	/* Setting SSC_EN to 1 */
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM3);
 
-To make matters worse, the change did not enable CONFIG_ARCH_OMAP in the
-defconfig files, which through some ripple effects disabled options that
-were implicitly enabled from OMAP2, and that caused all machines to
-fail booting with the unchanged config files.
+Why readl_relaxed?
+> +	reg = reg | SATA_PHY_SSC_EN;
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM3);
+> +
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM0) &
+> +			~(SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3_MASK |
+> +			  SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN2_MASK |
+> +			  SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN1_MASK);
+> +	reg |= SATA_PHY_P0_PARAM0_P0_TX_PREEMPH_GEN3(0xf);
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM0);
+> +
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM1) &
+> +			~(SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3_MASK |
+> +			  SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2_MASK |
+> +			  SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1_MASK);
+> +	reg |= SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN3(0x55) |
+> +		SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN2(0x55) |
+> +		SATA_PHY_P0_PARAM1_P0_TX_AMPLITUDE_GEN1(0x55);
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM1);
+> +
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM2) &
+> +		~SATA_PHY_P0_PARAM2_RX_EQ_MASK;
+> +	reg |= SATA_PHY_P0_PARAM2_RX_EQ(0x3);
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM2);
+> +
+> +	/* Setting PHY_RESET to 1 */
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+> +	reg = reg | SATA_PHY_RESET;
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+> +
+> +	/* Setting REF_SSP_EN to 1 */
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+> +	reg = reg | SATA_PHY_REF_SSP_EN | SATA_PHY_RESET;
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+> +	mb();
+> +	qcom_ipq806x_sata_delay_us(20);
+> +
+> +	/* Clearing PHY_RESET to 0 */
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+> +	reg = reg & ~SATA_PHY_RESET;
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+> +
+> +	return 0;
+> +}
+> +
+> +static int qcom_ipq806x_sata_phy_exit(struct phy *generic_phy)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy = phy_get_drvdata(generic_phy);
+> +	u32 reg = 0;
+> +
+> +	/* Setting PHY_RESET to 1 */
+> +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
+> +	reg = reg | SATA_PHY_RESET;
+> +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct phy_ops qcom_ipq806x_sata_phy_ops = {
+> +	.init		= qcom_ipq806x_sata_phy_init,
+> +	.exit		= qcom_ipq806x_sata_phy_exit,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static int qcom_ipq806x_sata_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct qcom_ipq806x_sata_phy *phy;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	struct phy_provider *phy_provider;
+> +	struct phy *generic_phy;
+> +	int ret;
+> +
+> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+> +	if (!phy) {
+> +		dev_err(dev, "%s: failed to allocate phy\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	phy->mmio = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(phy->mmio)) {
+> +		dev_err(dev, "%s: phy mmio get resource failed\n", __func__);
+> +		return PTR_ERR(phy->mmio);
+> +	}
+> +
+> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +	if (IS_ERR(phy_provider)) {
+> +		dev_err(dev, "%s: failed to register phy\n", __func__);
+> +		return PTR_ERR(phy_provider);
+> +	}
 
-This reorders the OMAP Kconfig files some more, to be consistent with
-the others, and also changes the defconfig files.
+phy_provider_register should be the last step. Move it after phy_set_drvdata().
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Tony, can you have a look at this please? I'd like to send out the
-fixes for 3.16, but this is needed on top of Rob's Kconfig changes.
-
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 245058b..fcf6ddf 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -973,10 +973,6 @@ source "arch/arm/mach-nspire/Kconfig"
- 
- source "arch/arm/plat-omap/Kconfig"
- 
--source "arch/arm/mach-omap1/Kconfig"
--
--source "arch/arm/mach-omap2/Kconfig"
--
- source "arch/arm/mach-orion5x/Kconfig"
- 
- source "arch/arm/mach-picoxcell/Kconfig"
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e2d6204..d77bb9e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -23,6 +23,7 @@ CONFIG_ARCH_BERLIN=y
- CONFIG_MACH_BERLIN_BG2=y
- CONFIG_MACH_BERLIN_BG2CD=y
- CONFIG_MACH_BERLIN_BG2Q=y
-+CONFIG_ARCH_OMAP_ENABLE=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_HI3xxx=y
- CONFIG_ARCH_KEYSTONE=y
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 536a137..85de0a1 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -25,6 +25,7 @@ CONFIG_POWER_AVS_OMAP=y
- CONFIG_POWER_AVS_OMAP_CLASS3=y
- CONFIG_OMAP_RESET_CLOCKS=y
- CONFIG_OMAP_MUX_DEBUG=y
-+CONFIG_ARCH_OMAP_ENABLE=y
- CONFIG_ARCH_OMAP2=y
- CONFIG_ARCH_OMAP3=y
- CONFIG_ARCH_OMAP4=y
-diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
-index cdd05f2..53a802c 100644
---- a/arch/arm/mach-omap1/Kconfig
-+++ b/arch/arm/mach-omap1/Kconfig
-@@ -1,8 +1,6 @@
- if ARCH_OMAP1
- 
--menu "TI OMAP1 specific features"
--
--comment "OMAP Core Type"
-+comment "OMAP1 Core Type"
- 	depends on ARCH_OMAP1
- 
- config ARCH_OMAP730
-@@ -164,6 +162,4 @@ config MACH_OMAP_GENERIC
-           custom OMAP boards. Say Y here if you have a custom
-           board.
- 
--endmenu
--
- endif
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 4e81860..0006012 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -1,7 +1,5 @@
--menuconfig ARCH_OMAP
--	bool "TI OMAP/AM/DRA Based" if (ARCH_MULTI_V6 || ARCH_MULTI_V7)
--
--if ARCH_OMAP
-+config ARCH_OMAP
-+	bool
- 
- config ARCH_OMAP2
- 	bool "TI OMAP2"
-@@ -82,6 +80,7 @@ config ARCH_OMAP2PLUS
- 	bool
- 	select ARCH_HAS_BANDGAP
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-+	select ARCH_OMAP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKSRC_MMIO
- 	select GENERIC_IRQ_CHIP
-@@ -342,5 +341,3 @@ config OMAP4_ERRATA_I688
- endmenu
- 
- endif
--
--endif
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 02fc10d..8aa2dd2 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -1,6 +1,11 @@
--if ARCH_OMAP
-+menuconfig ARCH_OMAP_ENABLE
-+	bool "TI OMAP platforms" if ARCH_MULTI_V6 || ARCH_MULTI_V7
-+	default ARCH_OMAP1
- 
--menu "TI OMAP Common Features"
-+if ARCH_OMAP_ENABLE
-+
-+source "arch/arm/mach-omap1/Kconfig"
-+source "arch/arm/mach-omap2/Kconfig"
- 
- config ARCH_OMAP_OTG
- 	bool
-@@ -153,6 +158,4 @@ config OMAP_PM_NOOP
- 
- endchoice
- 
--endmenu
--
- endif
+Thanks
+Kishon
