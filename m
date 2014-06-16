@@ -1,66 +1,54 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 16 Jun 2014 19:56:47 +0200
-Subject: [PATCH v2 4/4] brcmfmac: Fix OOB interrupt not working for BCM43362
-In-Reply-To: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
-References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1402941407-8210-5-git-send-email-hdegoede@redhat.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 16 Jun 2014 20:02:28 +0200
+Subject: [PATCH v2 00/10] Add Maxim 77802 PMIC support
+Message-ID: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has taken me a long long time to get the OOB interrupt working on the
-AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
-end I found these magic register pokes in the cubietruck kernel tree:
-https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
+MAX77802 is a PMIC that contains 10 high efficiency Buck regulators,
+32 Low-dropout (LDO) regulators, two 32kHz buffered clock outputs,
+a Real-Time-Clock (RTC) and a I2C interface to program the individual
+regulators, clocks and the RTC.
 
-I'm not entirely sure if this specific to the AP6210 module, or if this
-should be done for all BCM43362 sdio devices.
+This second version of the patch-set addresses several issues pointed
+out by Krzysztof Kozlowski, Mark Brown and Lee Jones. The individual
+changes are added on each patch change log.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+The series are based on drivers added by Simon Glass to the Chrome OS
+kernel and adds support for the Maxim 77802 Power Management IC, their
+regulators, clocks, RTC and I2C interface. It's composed of patches:
 
-diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-index 0fc707c..58e86a5 100644
---- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-+++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-@@ -39,7 +39,9 @@
- #include <brcm_hw_ids.h>
- #include <brcmu_utils.h>
- #include <brcmu_wifi.h>
-+#include <chipcommon.h>
- #include <soc.h>
-+#include "chip.h"
- #include "dhd_bus.h"
- #include "dhd_dbg.h"
- #include "sdio_host.h"
-@@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
- {
- 	int ret = 0;
- 	u8 data;
-+	u32 addr, gpiocontrol;
- 	unsigned long flags;
- 
- 	if ((sdiodev->pdata) && (sdiodev->pdata->oob_irq_supported)) {
-@@ -148,6 +151,19 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
- 
- 		sdio_claim_host(sdiodev->func[1]);
- 
-+		if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
-+			/* assign GPIO to SDIO core */
-+			addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
-+			gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr, &ret);
-+			gpiocontrol |= 0x2;
-+			brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol, &ret);
-+
-+			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_SELECT, 0xf,
-+					  &ret);
-+			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_OUT, 0, &ret);
-+			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_EN, 0x2, &ret);
-+		}
-+
- 		/* must configure SDIO_CCCR_IENx to enable irq */
- 		data = brcmf_sdiod_regrb(sdiodev, SDIO_CCCR_IENx, &ret);
- 		data |= 1 << SDIO_FUNC_1 | 1 << SDIO_FUNC_2 | 1;
--- 
-2.0.0
+[PATCH v2 1/10] mfd: max77686: Convert to use regmap_irq
+[PATCH v2 2/10] clk: max77686: add DT include for MAX77686 PMIC clock
+[PATCH v2 3/10] Documentation: dt: improve Maxim 77686 PMIC clocks binding
+[PATCH v2 4/10] clk: Add generic driver for Maxim PMIC clocks
+[PATCH v2 5/10] clk: max77686: convert to the generic max clock driver
+[PATCH v2 6/10] mfd: Add driver for Maxim 77802 Power Management IC
+[PATCH v2 7/10] regulator: Add driver for Maxim 77802 PMIC regulators
+[PATCH v2 8/10] clk: Add driver for Maxim 77802 PMIC clocks
+[PATCH v2 9/10] rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
+[PATCH v2 10/10] ARM: dts: Add max77802 device node for exynos5420-peach-pit
+
+Patches 1-3 are improvements to the max77686 driver, Patch 4 adds a generic
+clock driver that can be shared by both max77686 and max77802 clock drivers
+and Patch 5 converts the former.
+
+Patches 6-9 add support for the different 77802 devices and Patch 10 enables
+the MAX77802 PMIC on the Exynos5420 based Peach pit board.
+
+The patch-set has been tested on both Daisy/Snow (max77686) and Peach pit
+(max77802) Chromebooks.
+
+NOTE: Since this series convert the max77686 driver to use regmap_irq API
+(getting rid of drivers/mfd/max77686-irq.c) and refactor the clock driver,
+the amount of duplicated code between 77686 and 77802 drivers were reduced
+significantly since v1. Still there is room for more code consolidation if
+the max77686 core mfd driver is extended to support max77802 instead.
+
+drivers/mfd/max14577.c is an example of such a combined driver that support
+two different Maxim PMIC (14577 and 77836) but I'm not convinced that having
+a single driver to support both 77686 and 77802 lead to a cleaner and more
+maintainable code than having two separate (and now smaller) mfd core drivers.
+
+Thanks a lot and best regards,
+Javier
