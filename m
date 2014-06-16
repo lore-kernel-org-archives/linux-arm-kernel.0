@@ -1,25 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jun 2014 05:07:13 -0700
-Subject: [PATCH] ARM: OMAP2+: drop unused function
-In-Reply-To: <1402435596-5486-1-git-send-email-computersforpeace@gmail.com>
-References: <1402435596-5486-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <20140616120712.GJ17845@atomide.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 16 Jun 2014 17:40:20 +0530
+Subject: [PATCH V3 0/2] arm: dts: dra7: add crossbar dt support
+Message-ID: <1402920622-7998-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Brian Norris <computersforpeace@gmail.com> [140610 14:31]:
-> gic_init_irq() is no longer used as of:
-> 
->     commit b42b918194c4791510ac049e3d507169a7de8544
->     Author: Tony Lindgren <tony@atomide.com>
->     Date:   Thu May 30 12:53:05 2013 -0700
-> 
->         ARM: OMAP2+: Remove board-omap4panda.c
-> 
-> Drop it.
-> 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+This series introduces DT support for crossbar device and
+changes dra7 peripherals to use crossbar number instead of irq.
 
-Applying into omap-for-v3.16/fixes thanks.
+This depends on below driver fixes and cleanup series.
 
-Tony
+https://lkml.org/lkml/2014/6/16/218
+
+[V2] Rebased on 3.15 mainline.
+[V3] Added ti,irqs-skip property and ti,irqs-safe-map property to
+     crossbar dt node.
+
+R Sricharan (2):
+  arm: dts: dra7: add routable-irqs property for gic node
+  arm: dts: dra7: add crossbar device binding
+
+ arch/arm/boot/dts/dra7.dtsi |  136 +++++++++++++++++++++++++------------------
+ 1 file changed, 78 insertions(+), 58 deletions(-)
+
+-- 
+1.7.9.5
