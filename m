@@ -1,107 +1,52 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 16 Jun 2014 15:35:13 +0200
-Subject: [RFC PATCH 4/4] cpufreq: tegra: Register a minimum EMC frequency
- based on the CPU clock
-In-Reply-To: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1402925713-25426-5-git-send-email-tomeu.vizoso@collabora.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jun 2014 14:38:49 +0100
+Subject: [RESEND PATCH] ARM: kdump: Add vmcore_elf64_check_arch
+In-Reply-To: <5395B4D0.6040302@huawei.com>
+References: <1399124686-63299-1-git-send-email-sdu.liu@huawei.com>
+ <20140506121558.GB30234@arm.com> <5395B4D0.6040302@huawei.com>
+Message-ID: <20140616133849.GG16758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of setting a direct correlation to the CPU frequency. This allows
-for other devices to influence the final effective EMC frequency.
+On Mon, Jun 09, 2014 at 02:21:20PM +0100, Liu hua wrote:
+> ? 2014/5/6 20:15, Will Deacon ??:
+> > On Sat, May 03, 2014 at 02:44:46PM +0100, Liu Hua wrote:
+> Sorry to reply you so late. These days I am working on kdump feature for LPAE enabled
+> kernel. And now I think this patch is not good.
+> 
+> > This function looks identical to elf_check_arch. Why do we need to duplicate
+> > that code? You could use some pre-processor magic to make the core part of
+> > the functions agnostic to header type.
+> 
+> At the begging I think I should add elf_check_arch_64 just as elf_check_arch to
+> do complicated check.
+> 
+> But for ARM32, elf_check_arch_64 would not be used except for kdump. No programs
+> with elf64 header can be loaded into 32bit ARM kernel. So I think I can just check
+> the "e_machine", just as what other platform does. I think other checks is useless
+> for kdump.
+> 
+> > In fact, if elf_check_arch could handle both header types then the generic
+> > definition of vmcore_elf64_check_arch in include/linux/crash_dump.h would
+> > work out of the box.
+> 
+> As I mentioned, I afraid this will make the code hard to understand.( Sorry
+> for my former incorrect patch).
+> 
+> How about this patch?
+> 
+> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+> index f4b46d3..9424542 100644
+> --- a/arch/arm/include/asm/elf.h
+> +++ b/arch/arm/include/asm/elf.h
+> @@ -97,7 +97,7 @@ struct elf32_hdr;
+>  extern int elf_check_arch(const struct elf32_hdr *);
+>  #define elf_check_arch elf_check_arch
+> 
+> -#define vmcore_elf64_check_arch(x) (0)
+> +#define vmcore_elf64_check_arch(x) ((x)->e_machine == EM_ARM)
 
-In the future, this should be done instead by an ACTMON driver,
-which would also take load stats into account when calculating the
-floor EMC frequency.
+Is there no way we can get away with using the generic version here? What
+goes wrong if you let vmcore_elf64_check_arch fallback to elf_check_arch?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/cpufreq/tegra-cpufreq.c | 20 +++++---------------
- 1 file changed, 5 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
-index 8084c7f..64935f8 100644
---- a/drivers/cpufreq/tegra-cpufreq.c
-+++ b/drivers/cpufreq/tegra-cpufreq.c
-@@ -26,6 +26,7 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/platform_data/tegra_emc.h>
- 
- static struct cpufreq_frequency_table freq_table[] = {
- 	{ .frequency = 216000 },
-@@ -44,7 +45,6 @@ static struct cpufreq_frequency_table freq_table[] = {
- static struct clk *cpu_clk;
- static struct clk *pll_x_clk;
- static struct clk *pll_p_clk;
--static struct clk *emc_clk;
- static bool pll_x_prepared;
- 
- static unsigned int tegra_get_intermediate(struct cpufreq_policy *policy,
-@@ -96,15 +96,15 @@ static int tegra_target(struct cpufreq_policy *policy, unsigned int index)
- 	int ret = 0;
- 
- 	/*
--	 * Vote on memory bus frequency based on cpu frequency
-+	 * Set minimum memory bus frequency based on cpu frequency
- 	 * This sets the minimum frequency, display or avp may request higher
- 	 */
- 	if (rate >= 816000)
--		clk_set_rate(emc_clk, 600000000); /* cpu 816 MHz, emc max */
-+		tegra124_emc_set_floor(600000000); /* cpu 816 MHz, emc max */
- 	else if (rate >= 456000)
--		clk_set_rate(emc_clk, 300000000); /* cpu 456 MHz, emc 150Mhz */
-+		tegra124_emc_set_floor(300000000); /* cpu 456 MHz, emc 150Mhz */
- 	else
--		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
-+		tegra124_emc_set_floor(100000000);  /* emc 50Mhz */
- 
- 	/*
- 	 * target freq == pll_p, don't need to take extra reference to pll_x_clk
-@@ -141,14 +141,12 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- 	if (policy->cpu >= NUM_CPUS)
- 		return -EINVAL;
- 
--	clk_prepare_enable(emc_clk);
- 	clk_prepare_enable(cpu_clk);
- 
- 	/* FIXME: what's the actual transition time? */
- 	ret = cpufreq_generic_init(policy, freq_table, 300 * 1000);
- 	if (ret) {
- 		clk_disable_unprepare(cpu_clk);
--		clk_disable_unprepare(emc_clk);
- 		return ret;
- 	}
- 
-@@ -160,7 +158,6 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- static int tegra_cpu_exit(struct cpufreq_policy *policy)
- {
- 	clk_disable_unprepare(cpu_clk);
--	clk_disable_unprepare(emc_clk);
- 	return 0;
- }
- 
-@@ -194,19 +191,12 @@ static int __init tegra_cpufreq_init(void)
- 	if (IS_ERR(pll_p_clk))
- 		return PTR_ERR(pll_p_clk);
- 
--	emc_clk = clk_get_sys("cpu", "emc");
--	if (IS_ERR(emc_clk)) {
--		clk_put(cpu_clk);
--		return PTR_ERR(emc_clk);
--	}
--
- 	return cpufreq_register_driver(&tegra_cpufreq_driver);
- }
- 
- static void __exit tegra_cpufreq_exit(void)
- {
-         cpufreq_unregister_driver(&tegra_cpufreq_driver);
--	clk_put(emc_clk);
- 	clk_put(cpu_clk);
- }
- 
--- 
-1.9.3
+Will
