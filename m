@@ -1,61 +1,56 @@
 From: elder@linaro.org (Alex Elder)
-Date: Mon, 16 Jun 2014 14:39:42 -0500
-Subject: [PATCH v5 0/5] ARM: SMP: support Broadcom mobile SoCs
-Message-ID: <1402947587-13898-1-git-send-email-elder@linaro.org>
+Date: Mon, 16 Jun 2014 14:39:43 -0500
+Subject: [PATCH v5 1/5] devicetree: bindings: document Broadcom CPU enable
+ method
+In-Reply-To: <1402947587-13898-1-git-send-email-elder@linaro.org>
+References: <1402947587-13898-1-git-send-email-elder@linaro.org>
+Message-ID: <1402947587-13898-2-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds SMP support for two Broadcom mobile SoC families.
-It uses CPU_METHOD_OF_DECLARE() so that SMP operations are assigned
-using device tree rather than adding it to a machine definition in a
-board file.
+Broadcom mobile SoCs use a ROM-implemented holding pen for
+controlled boot of secondary cores.  A special register is
+used to communicate to the ROM that a secondary core should
+start executing kernel code.  This enable method is currently
+used for members of the bcm281xx and bcm21664 SoC families.
 
-The enable method starts a secondary core by writing to a register
-monitored by CPUs spinning in a ROM-based holding pen loop.  The
-address of this register is recorded as a property in the "cpus"
-node of the device tree.
+The use of an enable method also allows the SMP operation vector to
+be assigned as a result of device tree content for these SoCs.
 
-					-Alex
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Notes:
-    - I would prefer to document the binding in a separate file in
-      the way suggested here:
-        https://lkml.org/lkml/2014/5/20/559
-      But for now I'm keeping this independent of that.
-    - This series is based on v3.16-rc1, plus two recently-posted patches:
-	http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264012.html
-	http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264024.html
-    - This series is available here:
-	http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-	Branch review/bcm-smp-v5
-
-History
-v5: - No real change; rebased onto v3.16-rc1.
-v4: - Renamed "platsmp.c" to be "kona_smp.c".
-    - Rebased onto v3.15-rc5
-v3: - Dropped definition and use of CPU_METHOD_OF_DECLARE_SETUP()
-    - Added documentation for "enable-method"
-    - Rebased onto v3.15-rc4
-v2: - Fixed a Makefile error (:= should have been +=)
-    - No longer set CONFIG_NR_CPUS in bcm_defconfig
-    - Rebased onto v3.15-rc1
-
-Alex Elder (5):
-  devicetree: bindings: document Broadcom CPU enable method
-  ARM: add SMP support for Broadcom mobile SoCs
-  ARM: configs: enable SMP in bcm_defconfig
-  ARM: dts: enable SMP support for bcm28155
-  ARM: dts: enable SMP support for bcm21664
-
- Documentation/devicetree/bindings/arm/cpus.txt |  12 ++
- arch/arm/boot/dts/bcm11351.dtsi                |  19 +++
- arch/arm/boot/dts/bcm21664.dtsi                |  19 +++
- arch/arm/configs/bcm_defconfig                 |   1 +
- arch/arm/mach-bcm/Kconfig                      |  18 ++-
- arch/arm/mach-bcm/Makefile                     |   3 +
- arch/arm/mach-bcm/kona_smp.c                   | 202 +++++++++++++++++++++++++
- 7 files changed, 271 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-bcm/kona_smp.c
-
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 1fe72a0..cdca080 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -184,6 +184,7 @@ nodes to be present and contain the properties described below.
+ 			  can be one of:
+ 			    "allwinner,sun6i-a31"
+ 			    "arm,psci"
++			    "brcm,bcm11351-cpu-method"
+ 			    "marvell,armada-375-smp"
+ 			    "marvell,armada-380-smp"
+ 			    "marvell,armada-xp-smp"
+@@ -215,6 +216,17 @@ nodes to be present and contain the properties described below.
+ 		Value type: <phandle>
+ 		Definition: Specifies the ACC[2] node associated with this CPU.
+ 
++	- secondary-boot-reg
++		Usage:
++			Required for systems that have an "enable-method"
++			property value of "brcm,bcm11351-cpu-method".
++		Value type: <u32>
++		Definition:
++			Specifies the physical address of the register used to
++			request the ROM holding pen code release a secondary
++			CPU.  The value written to the register is formed by
++			encoding the target CPU id into the low bits of the
++			physical start address it should jump to.
+ 
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+ 
 -- 
 1.9.1
