@@ -1,55 +1,97 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 16 Jun 2014 15:32:37 +0100
-Subject: [PATCH V4 0/2] PTE fixes for ARM LPAE
-Message-ID: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
+Date: Mon, 16 Jun 2014 15:32:38 +0100
+Subject: [PATCH V4 1/2] arm: mm: Introduce {pte, pmd}_isset and {pte,
+ pmd}_isclear
+In-Reply-To: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
+References: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1402929159-11028-2-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes a couple of problems that I encountered on ARM with
-LPAE.
- 1) Some pte accessors can have their results cancelled out by a
-    downcast. This is addressed by the first patch.
+Long descriptors on ARM are 64 bits, and some pte functions such as
+pte_dirty return a bitwise-and of a flag with the pte value. If the
+flag to be tested resides in the upper 32 bits of the pte, then we run
+into the danger of the result being dropped if downcast.
 
- 2) It is impossible to distinguish between clean writable ptes and
-    read only ptes. This is addressed by the second patch.
+For example:
+	gather_stats(page, md, pte_dirty(*pte), 1);
+where pte_dirty(*pte) is downcast to an int.
 
-I was going to put V3 of this series into the patch system, but got
-distracted, and some recent activity has necessitated a revision of
-this series.
+This patch introduces a new macro pte_isset which performs the bitwise
+and, then performs a double logical invert (where needed) to ensure
+predictable downcasting. The logical inverse pte_isclear is also
+introduced.
 
-Notable changes in this series from V3->V4:
- o) Rebased to take into account the BE LPAE fix in 3.16-rc1.
- o) THP logic added as this was missing.
+Equivalent pmd functions for Transparent HugePages have also been
+added.
 
-I was tempted to put a third patch in the series to re-route THP through
-the pte setters, but decided to take baby steps instead.
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/include/asm/pgtable-3level.h | 10 +++++++---
+ arch/arm/include/asm/pgtable.h        | 18 +++++++++++-------
+ 2 files changed, 18 insertions(+), 10 deletions(-)
 
-This series has been tested with libhugetlbfs unit tests, ltp mm tests
-and a custom THP test to test what happens when PROT_NONE THPs are
-faulted. I have tested on an Arndale board with LPAE and classic MMU
-(with classic MMU, only ltp mm tests were run), and would appreciate
-any testers for anything not covered by proc-v7-[23]level.S.
-
-Also any comments/feedback would be appreciated.
-
-Cheers,
---
-Steve
-
-Steve Capper (2):
-  arm: mm: Introduce {pte,pmd}_isset and {pte,pmd}_isclear
-  arm: mm: Switch back to L_PTE_WRITE
-
- arch/arm/include/asm/pgtable-2level.h |  2 +-
- arch/arm/include/asm/pgtable-3level.h | 24 ++++++++++++----
- arch/arm/include/asm/pgtable.h        | 52 +++++++++++++++++++----------------
- arch/arm/mm/dump.c                    |  8 +++---
- arch/arm/mm/mmu.c                     | 25 +++++++++--------
- arch/arm/mm/proc-macros.S             | 16 +++++------
- arch/arm/mm/proc-v7-2level.S          |  6 ++--
- arch/arm/mm/proc-v7-3level.S          |  4 ++-
- arch/arm/mm/proc-xscale.S             |  4 +--
- 9 files changed, 80 insertions(+), 61 deletions(-)
-
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 85c60ad..bde49f9 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -207,16 +207,20 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ #define pte_huge(pte)		(pte_val(pte) && !(pte_val(pte) & PTE_TABLE_BIT))
+ #define pte_mkhuge(pte)		(__pte(pte_val(pte) & ~PTE_TABLE_BIT))
+ 
+-#define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
++#define pmd_isset(pmd, val)	((u32)(val) == (val) ? pmd_val(pmd) & (val) \
++						: !!(pmd_val(pmd) & (val)))
++#define pmd_isclear(pmd, val)	(!(pmd_val(pmd) & (val)))
++
++#define pmd_young(pmd)		(pmd_isset((pmd), PMD_SECT_AF))
+ 
+ #define __HAVE_ARCH_PMD_WRITE
+-#define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
++#define pmd_write(pmd)		(pmd_isclear((pmd), PMD_SECT_RDONLY))
+ 
+ #define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
+ #define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+-#define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
++#define pmd_trans_huge(pmd)	(pmd_val(pmd) && pmd_isclear((pmd), PMD_TABLE_BIT))
+ #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+ #endif
+ 
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 5478e5d..01baef0 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -214,18 +214,22 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 
+ #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
+ 
++#define pte_isset(pte, val)	((u32)(val) == (val) ? pte_val(pte) & (val) \
++						: !!(pte_val(pte) & (val)))
++#define pte_isclear(pte, val)	(!(pte_val(pte) & (val)))
++
+ #define pte_none(pte)		(!pte_val(pte))
+-#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
+-#define pte_valid(pte)		(pte_val(pte) & L_PTE_VALID)
++#define pte_present(pte)	(pte_isset((pte), L_PTE_PRESENT))
++#define pte_valid(pte)		(pte_isset((pte), L_PTE_VALID))
+ #define pte_accessible(mm, pte)	(mm_tlb_flush_pending(mm) ? pte_present(pte) : pte_valid(pte))
+-#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
+-#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+-#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
+-#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
++#define pte_write(pte)		(pte_isclear((pte), L_PTE_RDONLY))
++#define pte_dirty(pte)		(pte_isset((pte), L_PTE_DIRTY))
++#define pte_young(pte)		(pte_isset((pte), L_PTE_YOUNG))
++#define pte_exec(pte)		(pte_isclear((pte), L_PTE_XN))
+ #define pte_special(pte)	(0)
+ 
+ #define pte_valid_user(pte)	\
+-	(pte_valid(pte) && (pte_val(pte) & L_PTE_USER) && pte_young(pte))
++	(pte_valid(pte) && pte_isset((pte), L_PTE_USER) && pte_young(pte))
+ 
+ #if __LINUX_ARM_ARCH__ < 6
+ static inline void __sync_icache_dcache(pte_t pteval)
 -- 
 1.8.1.4
