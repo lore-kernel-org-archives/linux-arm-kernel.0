@@ -1,49 +1,74 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 16 Jun 2014 09:43:47 +0200 (CEST)
-Subject: [PATCH v8 2/7] clocksource: Add support for the Mediatek SoCs
-In-Reply-To: <539E116D.6030002@linaro.org>
-References: <1402490055-15197-1-git-send-email-matthias.bgg@gmail.com>
- <1402490055-15197-3-git-send-email-matthias.bgg@gmail.com>
- <alpine.DEB.2.10.1406112012460.5170@nanos> <539E116D.6030002@linaro.org>
-Message-ID: <alpine.DEB.2.10.1406160943370.5170@nanos>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Mon, 16 Jun 2014 09:46:52 +0200
+Subject: [PATCH v2 1/7] mfd: add atmel-hlcdc driver
+In-Reply-To: <539DB25A.4000201@free-electrons.com>
+References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+ <539D5F24.1020304@traphandler.com>
+ <539DB25A.4000201@free-electrons.com>
+Message-ID: <CACh+v5MJ92=jNVkpx=FS3bNYcr+Xw2MUpLDfqwpYsj1zNZOu9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 Jun 2014, Daniel Lezcano wrote:
+2014-06-15 16:48 GMT+02:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+>
+>
+> Hello JJ,
+>
+> On 15/06/2014 10:53, Jean-Jacques Hiblot wrote:
+> > On 06/09/2014 06:04 PM, Boris BREZILLON wrote:
+> >> The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+> >> family or sama5d3 family) exposes 2 subdevices:
+> >> - a display controller (controlled by a DRM driver)
+> >> - a PWM chip
+> >>
+> >> Add support for the MFD device which will just retrieve HLCDC clocks and
+> >> create a regmap so that subdevices can access the HLCDC register range
+> >> concurrently.
+> >>
+> >> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >> ---
+> >>  .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  41 ++++++++
+> >>  drivers/mfd/Kconfig                                |  11 ++
+> >>  drivers/mfd/Makefile                               |   1 +
+> [...]
+> >> +    memset(&config, 0, sizeof(config));
+> >> +    config.reg_bits = 32;
+> >> +    config.val_bits = 32;
+> >> +    config.reg_stride = 4;
+> >> +    config.max_register = (resource_size(res) / 4) - 1;
+> >> +    hlcdc->regmap = devm_regmap_init_mmio_clk(dev, "periph_clk", regs,
+> >> +                                              &config);
+> > I don't think it's necessary to use "periph_clk" here. This clock will
+> > always be running because the HLCDC needs it to work (it's not just an
+> > interface clock). In the end it's just some extra work for each register
+> > access.
+>
+> Yes, I thought about removing this clk from regmap registration too (for
+> the exact same reason: avoiding extra enable/disable work when accessing
+> registers), but ATM I do not prepare/enable periph_clk in the hlcdc-pwm
+> driver, this means the regmap won't work until the hlcdc-dc driver has
+> probed the display controller device.
+>
+> How about preparing/enabling the periph_clk in the MFD device, so that
+> PWM and Display Controller subdevices won't have to bother about this
+> clk, and the regmap will work as expected ?
+> Or, should we just prepare/enable the periph clock in each subdevices ?
 
-> On 06/11/2014 08:14 PM, Thomas Gleixner wrote:
-> > On Wed, 11 Jun 2014, Matthias Brugger wrote:
-> > > +static void mtk_clkevt_mode(enum clock_event_mode mode,
-> > > +				struct clock_event_device *clk)
-> > > +{
-> > > +	struct mtk_clock_event_device *evt = to_mtk_clk(clk);
-> > > +
-> > > +	mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
-> > > +
-> > > +	switch (mode) {
-> > > +	case CLOCK_EVT_MODE_PERIODIC:
-> > > +		mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
-> > > +		mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
-> > > +		break;
-> > > +	case CLOCK_EVT_MODE_ONESHOT:
-> > > +		mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
-> > 
-> > Why start the timer here? The code will call set next event right away.
-> > 
-> > > +		break;
-> > > +	case CLOCK_EVT_MODE_UNUSED:
-> > > +	case CLOCK_EVT_MODE_SHUTDOWN:
-> > > +	default:
-> > > +		/* No more interrupts will occur as source is disabled */
-> > > +		break;
-> > > +	}
-> > > +}
-> > 
-> > Looks good otherwise.
-> 
-> Hi Thomas,
-> 
-> Can I consider the 8.1 patch (the one taking into account your comment) as
-> acked-by ?
+I think the latest is the best approach. This way the PWM and the DRM
+driver can handle their clock gating independently. BTW it's quite
+probable that the PWM don't really needs this clock except for
+register access.
 
-Yes
+>
+>
+>
+> Best Regards,
+>
+> Boris
+>
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
