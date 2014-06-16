@@ -1,43 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 16 Jun 2014 21:25:48 +0900
-Subject: [PATCH] ARM: shmobile: rcar-gen2: correct return value of
- shmobile_smp_apmu_suspend_init
-In-Reply-To: <539EDF72.7080305@cogentembedded.com>
-References: <1402918044-29961-1-git-send-email-horms+renesas@verge.net.au>
- <539EDF72.7080305@cogentembedded.com>
-Message-ID: <20140616122548.GA30357@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 16 Jun 2014 21:28:02 +0900
+Subject: [PATCH 0/2] backlight: remove trivial get_brightness
+ implementations
+In-Reply-To: <1401444650-12267-1-git-send-email-a.hajda@samsung.com>
+References: <1401444650-12267-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <000701cf895e$6a648f20$3f2dad60$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 04:13:38PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Friday, May 30, 2014 7:11 PM, Andrzej Hajda wrote:
 > 
-> On 06/16/2014 03:27 PM, Simon Horman wrote:
+> This patchset makes get_brightness callback optional
+> and removes trivial implementations.
+> Driver changes are quite obvious so I have put them into single
+> patch.
 > 
-> >The dummy shmobile_smp_apmu_suspend_init() function provided when
-> >CPU_IDLE is not set should not return a value as per the signature
-> >of the function.
+> The patchset is based on the current linux-next branch.
 > 
-> >This problem appears to have been introduced by
-> >867ba81f728f1daa ("ARM: shmobile: APMU: Add Core-Standby-state for Suspend
-> >to RAM").
+> Regards
+> Andrzej
 > 
-> >Cc: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> [...]
-> 
-> >diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-> >index 8f0cd57..46766fc 100644
-> >--- a/arch/arm/mach-shmobile/include/mach/common.h
-> >+++ b/arch/arm/mach-shmobile/include/mach/common.h
-> >@@ -38,7 +38,7 @@ int shmobile_suspend_init(void);
-> >  void shmobile_smp_apmu_suspend_init(void);
-> >  #else
-> >  static inline int shmobile_suspend_init(void) { return 0; }
-> >-static inline void shmobile_smp_apmu_suspend_init(void) { return 0; }
-> >+static inline void shmobile_smp_apmu_suspend_init(void) { return; }
-> 
->    I wonder why you kept *return* at all?
+> Andrzej Hajda (2):
+>   backlight: show brightness even if get_brightness is not implemented
+>   backlight: remove trivial get_brightness implementations
 
-Thanks, I will remove it.
+These patches look good!
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+Lee Jones,
+Would you merge these patches into backlight git?
+
+Best regards,
+Jingoo Han
+
+> 
+>  drivers/macintosh/via-pmu-backlight.c      | 6 ------
+>  drivers/platform/x86/samsung-q10.c         | 6 ------
+>  drivers/video/backlight/aat2870_bl.c       | 6 ------
+>  drivers/video/backlight/ams369fg06.c       | 6 ------
+>  drivers/video/backlight/backlight.c        | 2 ++
+>  drivers/video/backlight/bd6107.c           | 6 ------
+>  drivers/video/backlight/gpio_backlight.c   | 6 ------
+>  drivers/video/backlight/ld9040.c           | 6 ------
+>  drivers/video/backlight/lp855x_bl.c        | 6 ------
+>  drivers/video/backlight/lp8788_bl.c        | 6 ------
+>  drivers/video/backlight/lv5207lp.c         | 6 ------
+>  drivers/video/backlight/pandora_bl.c       | 6 ------
+>  drivers/video/backlight/pwm_bl.c           | 6 ------
+>  drivers/video/backlight/s6e63m0.c          | 6 ------
+>  drivers/video/backlight/tps65217_bl.c      | 6 ------
+>  drivers/video/fbdev/aty/aty128fb.c         | 6 ------
+>  drivers/video/fbdev/aty/atyfb_base.c       | 6 ------
+>  drivers/video/fbdev/aty/radeon_backlight.c | 6 ------
+>  drivers/video/fbdev/exynos/s6e8ax0.c       | 6 ------
+>  drivers/video/fbdev/nvidia/nv_backlight.c  | 6 ------
+>  drivers/video/fbdev/riva/fbdev.c           | 6 ------
+>  21 files changed, 2 insertions(+), 120 deletions(-)
+> 
+> --
+> 1.9.1
