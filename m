@@ -1,257 +1,384 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 16 Jun 2014 20:02:36 +0200
-Subject: [PATCH v2 08/10] clk: Add driver for Maxim 77802 PMIC clocks
+Date: Mon, 16 Jun 2014 20:02:38 +0200
+Subject: [PATCH v2 10/10] ARM: dts: Add max77802 device node for
+ exynos5420-peach-pit
 In-Reply-To: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1402941758-11216-9-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1402941758-11216-11-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MAX77802 PMIC has two 32.768kHz Buffered Clock Outputs with
-Low Jitter Mode. This patch adds support for these two clocks.
+Peach pit board uses a Maxim 77802 power management IC to
+drive regulators and its Real Time Clock. This patch adds
+support for this chip.
+
+These are the device nodes and pinctrl configuration that
+is present on the Peach pit DeviceTree source file in the
+the Chrome OS kernel 3.8 tree.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
 
 Changes since v1:
- - Use module_platform_driver() instead of having init/exit functions.
-   Suggested by Mark Brown.
- - Use the generic maxim clock driver to reduce code duplication with
-   clk-max77686.c driver.
+ - Use "regulators" for child node instead of "voltage-regulators" to be
+   consistent with other PMIC. Suggested by Mark Brown.
+ - Use regulators node names instead of the deprecated "regulator-compatible"
+   property. Suggested by Mark Brown.
 
- .../devicetree/bindings/clock/maxim,max77802.txt   | 42 +++++++++
- drivers/clk/Kconfig                                |  7 ++
- drivers/clk/Makefile                               |  1 +
- drivers/clk/clk-max77802.c                         | 99 ++++++++++++++++++++++
- drivers/mfd/max77802.c                             |  1 +
- include/dt-bindings/clock/maxim,max77802.h         | 22 +++++
- 6 files changed, 172 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
- create mode 100644 drivers/clk/clk-max77802.c
- create mode 100644 include/dt-bindings/clock/maxim,max77802.h
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 320 +++++++++++++++++++++++++++++
+ 1 file changed, 320 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/maxim,max77802.txt b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
-new file mode 100644
-index 0000000..b2c2129
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
-@@ -0,0 +1,42 @@
-+Binding for Maxim MAX77802 32k clock generator block
-+
-+This is a part of device tree bindings of MAX77802 multi-function device.
-+More information can be found in bindings/mfd/max77802.txt file.
-+
-+The MAX77802 contains two 32.768khz clock outputs that can be controlled
-+(gated/ungated) over I2C.
-+
-+Following properties should be presend in main device node of the MFD chip.
-+
-+Required properties:
-+
-+- #clock-cells: from common clock binding; shall be set to 1.
-+
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume. Following indices are allowed:
-+     - 0: 32khz_ap clock,
-+     - 1: 32khz_cp clock.
-+
-+Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77802.h
-+header and can be used in device tree sources.
-+
-+Example: Node of the MFD chip
-+
-+	max77802: max77802 at 09 {
-+		compatible = "maxim,max77802";
-+		interrupt-parent = <&wakeup_eint>;
-+		interrupts = <26 0>;
-+		reg = <0x09>;
-+		#clock-cells = <1>;
-+
-+		/* ... */
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 1c5b8f9..e6dc972 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -111,6 +111,13 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	max77802_irq: max77802-irq {
++		samsung,pins = "gpx3-1";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
 +	};
 +
-+Example: Clock consumer node
+ 	hdmi_hpd_irq: hdmi-hpd-irq {
+ 		samsung,pins = "gpx3-7";
+ 		samsung,pin-function = <0>;
+@@ -124,6 +131,29 @@
+ 		samsung,pin-pud = <3>;
+ 		samsung,pin-drv = <0>;
+ 	};
 +
-+	foo at 0 {
-+		compatible = "bar,foo";
-+		/* ... */
-+		clock-names = "32khz_ap";
-+		clocks = <&max77802 MAX77802_CLK_32K_AP>;
++	pmic_dvs_1: pmic-dvs-1 {
++		samsung,pins = "gpy7-6";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
 +	};
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 3fd4270..221260b 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -42,6 +42,13 @@ config COMMON_CLK_MAX77686
- 	---help---
- 	  This driver supports Maxim 77686 crystal oscillator clock. 
- 
-+config COMMON_CLK_MAX77802
-+	tristate "Clock driver for Maxim 77802 MFD"
-+	depends on MFD_MAX77802
-+	select COMMON_CLK_MAX_GEN
-+	---help---
-+	  This driver supports Maxim 77802 crystal oscillator clock.
-+
- config COMMON_CLK_SI5351
- 	tristate "Clock driver for SiLabs 5351A/B/C"
- 	depends on I2C
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 6c1aff6..520ff76 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
- obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
- obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
- obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
-+obj-$(CONFIG_COMMON_CLK_MAX77802)	+= clk-max77802.o
- obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
- obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
-diff --git a/drivers/clk/clk-max77802.c b/drivers/clk/clk-max77802.c
-new file mode 100644
-index 0000000..4253b44
---- /dev/null
-+++ b/drivers/clk/clk-max77802.c
-@@ -0,0 +1,99 @@
-+/*
-+ * clk-max77802.c - Clock driver for Maxim 77802
-+ *
-+ * Copyright (C) 2014 Google, Inc
-+ *
-+ * Copyright (C) 2012 Samsung Electornics
-+ * Jonghwa Lee <jonghwa3.lee@samsung.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * This driver is based on clk-max77686.c
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/mfd/max77802.h>
-+#include <linux/mfd/max77802-private.h>
-+#include <linux/clk-provider.h>
-+#include <linux/mutex.h>
-+#include <linux/clkdev.h>
-+
-+#include <dt-bindings/clock/maxim,max77802.h>
-+#include "clk-max-gen.h"
-+
-+#define MAX77802_CLOCK_OPMODE_MASK	0x1
-+#define MAX77802_CLOCK_LOW_JITTER_SHIFT 0x3
-+
-+static struct clk_init_data max77802_clks_init[MAX77802_CLKS_NUM] = {
-+	[MAX77802_CLK_32K_AP] = {
-+		.name = "32khz_ap",
-+		.ops = &max_gen_clk_ops,
-+		.flags = CLK_IS_ROOT,
-+	},
-+	[MAX77802_CLK_32K_CP] = {
-+		.name = "32khz_cp",
-+		.ops = &max_gen_clk_ops,
-+		.flags = CLK_IS_ROOT,
-+	},
 +};
 +
-+static int max77802_clk_probe(struct platform_device *pdev)
-+{
-+	struct max77802_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-+	int ret;
++&pinctrl_2 {
++	pmic_dvs_2: pmic-dvs-2 {
++		samsung,pins = "gpj4-2";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
 +
-+	ret = max_gen_clk_probe(pdev, iodev->regmap, MAX77802_REG_32KHZ,
-+				max77802_clks_init, MAX77802_CLKS_NUM);
-+
-+	if (ret) {
-+		dev_err(&pdev->dev, "generic probe failed %d\n", ret);
-+		return ret;
-+	}
-+
-+	/* Enable low-jitter mode on the 32khz clocks. */
-+	ret = regmap_update_bits(iodev->regmap, MAX77802_REG_32KHZ,
-+				 1 << MAX77802_CLOCK_LOW_JITTER_SHIFT,
-+				 1 << MAX77802_CLOCK_LOW_JITTER_SHIFT);
-+	if (ret < 0)
-+		dev_err(&pdev->dev, "failed to enable low-jitter mode\n");
-+
-+	return ret;
-+}
-+
-+static int max77802_clk_remove(struct platform_device *pdev)
-+{
-+	return max_gen_clk_remove(pdev, MAX77802_CLKS_NUM);
-+}
-+
-+static const struct platform_device_id max77802_clk_id[] = {
-+	{ "max77802-clk", 0},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(platform, max77802_clk_id);
-+
-+static struct platform_driver max77802_clk_driver = {
-+	.driver = {
-+		.name  = "max77802-clk",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = max77802_clk_probe,
-+	.remove = max77802_clk_remove,
-+	.id_table = max77802_clk_id,
-+};
-+
-+module_platform_driver(max77802_clk_driver);
-+
-+MODULE_DESCRIPTION("MAXIM 77802 Clock Driver");
-+MODULE_AUTHOR("Javier Martinez Canillas <javier.martinez@collabora.co.uk>");
-+MODULE_LICENSE("GPL");
-diff --git a/drivers/mfd/max77802.c b/drivers/mfd/max77802.c
-index c9dcbab..ae73bb4 100644
---- a/drivers/mfd/max77802.c
-+++ b/drivers/mfd/max77802.c
-@@ -38,6 +38,7 @@
- 
- static const struct mfd_cell max77802_devs[] = {
- 	{ .name = "max77802-pmic", },
-+	{ .name = "max77802-clk", },
++	pmic_dvs_3: pmic-dvs-3 {
++		samsung,pins = "gpj4-3";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
  };
  
- static bool max77802_pmic_is_accessible_reg(struct device *dev,
-diff --git a/include/dt-bindings/clock/maxim,max77802.h b/include/dt-bindings/clock/maxim,max77802.h
-new file mode 100644
-index 0000000..997312e
---- /dev/null
-+++ b/include/dt-bindings/clock/maxim,max77802.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2014 Google, Inc
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants clocks for the Maxim 77802 PMIC.
-+ */
+ &pinctrl_3 {
+@@ -140,6 +170,14 @@
+ 		samsung,pin-pud = <0>;
+ 		samsung,pin-drv = <0>;
+ 	};
 +
-+#ifndef _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H
-+#define _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H
++	pmic_selb: pmic-selb {
++		samsung,pins = "gph0-2", "gph0-3", "gph0-4", "gph0-5",
++			       "gph0-6";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
+ };
+ 
+ &rtc {
+@@ -189,6 +227,288 @@
+ 	};
+ };
+ 
++&hsi2c_4 {
++	status = "okay";
++	clock-frequency = <400000>;
 +
-+/* Fixed rate clocks. */
++	max77802-pmic at 9 {
++		compatible = "maxim,max77802";
++		interrupt-parent = <&gpx3>;
++		interrupts = <1 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&max77802_irq>, <&pmic_selb>,
++			    <&pmic_dvs_1>, <&pmic_dvs_2>, <&pmic_dvs_3>;
++		wakeup-source;
++		reg = <0x9>;
++		#clock-cells = <1>;
 +
-+#define MAX77802_CLK_32K_AP		0
-+#define MAX77802_CLK_32K_CP		1
++		/* Using idx 1 means warm reset will get good voltage */
++		max77802,pmic-buck-default-dvs-idx = <1>;
++		max77802,pmic-buck-dvs-gpios = <&gpy7 6 0>,
++					       <&gpj4 2 0>,
++					       <&gpj4 3 0>;
++		max77802,pmic-buck-selb-gpios = <&gph0 2 0>,
++						<&gph0 3 0>,
++						<&gph0 4 0>,
++						<&gph0 5 0>,
++						<&gph0 6 0>;
 +
-+/* Total number of clocks. */
-+#define MAX77802_CLKS_NUM		(MAX77802_CLK_32K_CP + 1)
++		regulators {
++			ldo1_reg: LDO1 {
++				regulator-name = "vdd_1v0";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++			ldo2_reg: LDO2 {
++				regulator-name = "vdd_1v2_2";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++			};
++			ldo3_reg: LDO3 {
++				regulator-name = "vdd_1v8_3";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			vqmmc_sdcard: ldo4_reg: LDO4 {
++				regulator-name = "vdd_sd";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++			};
++			ldo5_reg: LDO5 {
++				regulator-name = "vdd_1v8_5";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo6_reg: LDO6 {
++				regulator-name = "vdd_1v8_6";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo7_reg: LDO7 {
++				regulator-name = "vdd_1v8_7";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++			};
++			ldo8_reg: LDO8 {
++				regulator-name = "vdd_ldo8";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++			ldo9_reg: LDO9 {
++				regulator-name = "vdd_ldo9";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo10_reg: LDO10 {
++				regulator-name = "vdd_ldo10";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo11_reg: LDO11 {
++				regulator-name = "vdd_ldo11";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo12_reg: LDO12 {
++				regulator-name = "vdd_ldo12";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++			};
++			ldo13_reg: LDO13 {
++				regulator-name = "vdd_ldo13";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo14_reg: LDO14 {
++				regulator-name = "vdd_ldo14";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo15_reg: LDO15 {
++				regulator-name = "vdd_ldo15";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++			ldo17_reg: LDO17 {
++				regulator-name = "vdd_g3ds";
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-always-on;
++			};
++			ldo18_reg: LDO18 {
++				regulator-name = "ldo_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++			};
++			ldo19_reg: LDO19 {
++				regulator-name = "ldo_19";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++			};
++			ldo20_reg: LDO20 {
++				regulator-name = "ldo_20";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++			ldo21_reg: LDO21 {
++				regulator-name = "ldo_21";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++			};
++			ldo23_reg: LDO23 {
++				regulator-name = "ld0_23";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++			ldo24_reg: LDO24 {
++				regulator-name = "ldo_24";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++			};
++			ldo25_reg: LDO25 {
++				regulator-name = "ldo_25";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++			ldo26_reg: LDO26 {
++				regulator-name = "ldo_26";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++			};
++			ldo27_reg: LDO27 {
++				regulator-name = "ldo_27";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++			};
++			ldo28_reg: LDO28 {
++				regulator-name = "ldo_28";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++			};
++			ldo29_reg: LDO29 {
++				regulator-name = "ldo_29";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++			};
++			ldo30_reg: LDO30 {
++				regulator-name = "vdd_mifs";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++			ldo32_reg: LDO32 {
++				regulator-name = "ldo_32";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++			};
++			ldo33_reg: LDO33 {
++				regulator-name = "ldo_33";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++			};
++			ldo34_reg: LDO34 {
++				regulator-name = "ldo_34";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++			};
++			ldo35_reg: LDO35 {
++				regulator-name = "ldo_35";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++			};
++			buck1_reg: BUCK1 {
++				regulator-name = "vdd_mif";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++			};
++			buck2_reg: BUCK2 {
++				regulator-name = "vdd_arm_real";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++			};
++			buck3_reg: BUCK3 {
++				regulator-name = "vdd_int_real";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++			};
++			buck4_reg: BUCK4 {
++				regulator-name = "vdd_g3d";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++			};
++			buck5_reg: BUCK5 {
++				regulator-name = "vdd_1v2";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			buck6_reg: BUCK6 {
++				regulator-name = "vdd_kfc";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++			};
++			buck7_reg: BUCK7 {
++				regulator-name = "vdd_1v35";
++				regulator-min-microvolt = <1350000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			buck8_reg: BUCK8 {
++				regulator-name = "vdd_emmc";
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <2850000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			buck9_reg: BUCK9 {
++				regulator-name = "vdd_2v";
++				regulator-min-microvolt = <2000000>;
++				regulator-max-microvolt = <2000000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			buck10_reg: BUCK10 {
++				regulator-name = "vdd_1v8";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++		};
++	};
++};
 +
-+#endif /* _DT_BINDINGS_CLOCK_MAXIM_MAX77802_CLOCK_H */
+ &hsi2c_7 {
+ 	status = "okay";
+ 
 -- 
 2.0.0.rc2
