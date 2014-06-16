@@ -1,424 +1,429 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 16 Jun 2014 15:32:39 +0100
-Subject: [PATCH V4 2/2] arm: mm: Switch back to L_PTE_WRITE
-In-Reply-To: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
-References: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1402929159-11028-3-git-send-email-steve.capper@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 16 Jun 2014 09:36:44 -0500
+Subject: [RESEND PATCH 1/2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <alpine.DEB.2.02.1406150257380.659@utopia.booyaka.com>
+References: <1402676147-3711-1-git-send-email-balbi@ti.com>
+ <1402676147-3711-2-git-send-email-balbi@ti.com>
+ <20140613162323.GH8319@saruman.home>
+ <alpine.DEB.2.02.1406131910060.340@utopia.booyaka.com>
+ <20140613231019.GA24121@saruman.home>
+ <alpine.DEB.2.02.1406140127020.20370@utopia.booyaka.com>
+ <20140614045603.GA28775@saruman.home>
+ <alpine.DEB.2.02.1406150257380.659@utopia.booyaka.com>
+Message-ID: <20140616143644.GA16850@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For LPAE, we have the following means for encoding writable or dirty
-ptes:
-                              L_PTE_DIRTY       L_PTE_RDONLY
-    !pte_dirty && !pte_write        0               1
-    !pte_dirty && pte_write         0               1
-    pte_dirty && !pte_write         1               1
-    pte_dirty && pte_write          1               0
+Hi,
 
-So we can't distinguish between writable clean ptes and read only
-ptes. This can cause problems with ptes being incorrectly flagged as
-read only when they are writable but not dirty.
+On Sun, Jun 15, 2014 at 03:29:40AM +0000, Paul Walmsley wrote:
+> Hi,
+> 
+> On Fri, 13 Jun 2014, Felipe Balbi wrote:
+> 
+> > On Sat, Jun 14, 2014 at 02:57:32AM +0000, Paul Walmsley wrote:
+> > > > > > > From: Sathya Prakash M R <sathyap@ti.com>
+> > > > > > > 
+> > > > > > > Add DSS hwmod data for AM43xx.
+> > > > > > > 
+> > > > > > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > > > > > Acked-by: Rajendra Nayak <rnayak@ti.com>
+> > > > > > > Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> > > > > > > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > > > > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > > > > ---
+> > > > > > > 
+> > > > > > > Note that this patch was originally send on May 9th [1], changes were requested
+> > > > > > > and a new version was sent on May 19th [2], then on May 27th [3] Tomi pinged
+> > > > > > > maintainer again and go no response.
+> > > > > > > 
+> > > > > > > Without this patch, we cannot get display working on any AM437x devices.
+> > > > > > > 
+> > > > > > > [1] http://marc.info/?l=linux-arm-kernel&m=139963677925227&w=2
+> > > > > > > [2] http://marc.info/?l=linux-arm-kernel&m=140049799425512&w=2
+> > > > > > > [3] http://marc.info/?l=linux-arm-kernel&m=140117232826754&w=2
+> > > > > > > 
+> > > > > > >  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
+> > > > > > >  arch/arm/mach-omap2/prcm43xx.h             |  1 +
+> > > > > > >  2 files changed, 99 insertions(+)
+> > > > > 
+> > > > > Sorry for the delay on this.  Have been corresponding with TI management 
+> > > > > to figure out what to do about patches for AM43xx.  I don't have boards or 
+> > > > > public documentation for these devices, so it's impossible for me to 
+> > > > > meaningfully review the patches.  Looks like boards and/or public docs 
+> > > > > won't be coming any time soon.
+> > > > > 
+> > > > > So for my part, here's what I'll need to merge any hwmod or PRCM patches 
+> > > > > that involve AM437x:
+> > > > > 
+> > > > > 1. A Reviewed-by: from one of the following folks (which should come from
+> > > > > a different person than who is submitting the patches):
+> > > > > 
+> > > > > Roger Quadros
+> > > > > Nishanth Menon
+> > > > > Rajendra Nayak
+> > > > > Kevin Hilman
+> > > > > Tony Lindgren
+> > > > > 
+> > > > > 2. A Tested-by: from one of the following folks (who can be the same as 
+> > > > > the person who is the same as the person who is submitting the patches):
+> > > > > 
+> > > > > Nishanth Menon
+> > > > > Rajendra Nayak
+> > > > > Kevin Hilman 
+> > > > > Tony Lindgren
+> > > > 
+> > > > What you're saying here is that it's pointless for anybody else in TI to
+> > > > review and/or test patches because you will only accept such tags from
+> > > > this list of 4 ~ 5 people.
+> > > 
+> > > That might be how you interpreted the E-mail.  But that's not what was 
+> > > written.
+> > 
+> > of course it was. Read what you wrote:
+> > 
+> > "here's what I'll need to *merge* any hwmod or PRCM patches that involve
+> > AM437x".
+> > 
+> > That basically puts down the requirements to getting any patches
+> > accepted and those requirements are the blessings of a handful.
+> > 
+> > > For the record, I'm pleased to accept Reviewed-by:s and Tested-by:s from 
+> > > anyone.  But, like most maintainers, there are some folks who I think do a 
+> > > better job of reviewing and testing hwmod and PRCM patches than others.
+> > > 
+> > > The people listed above are a first cut at that list.  I'm certainly
+> > > happy to consider adding others, but the reviewers need:
+> > > 
+> > > 1. to have experience with those parts of the kernel;
+> > > 
+> > > 2. to have access to the canonical documentation for AM43xx to review
+> > > against; and
+> > 
+> > anybody in ti.com have access to those.
+> > 
+> > > 3. to have some kind of track record doing in-depth reviews of patches
+> > > for that subsystem, or writing clean code for that subsystem.
+> > > 
+> > > 
+> > > Similarly, for testers, the folks listed above are people who:
+> > > 
+> > > 1. could actually have AM43xx boards; and
+> > 
+> > well, quite a few have rather easy access to multiple (3, to be exact)
+> > different am437x platforms.
+> > 
+> > > 2. who have a history of testing patches against mainline kernels in 
+> > > public forums, rather than testing against vendor kernels; and
+> > 
+> > $subject and patch two have both been tested on top of linux next from
+> > june 10th. Is that bleeding edge enough for you ? Moreover, *only* these
+> > two patches were applied on top of Stephen's linux-next.
+> > 
+> > > 3. who I think would be mortally embarrassed if a patch was broken 
+> > > that they had a Tested-by: for.
+> > 
+> > right, and when those guys try to get bugs fixed, we spend half a year
+> > discussing pointless might-happen-when-the-sun-dies problems with other
+> > drivers even when... aaaah what the heck, you'll just say I'm mixing
+> > threads again...
+> > 
+> > The point is that it has been this back and forth for quite a while now,
+> > in countless occasions we have missed merge windows because this or that
+> > maintainer just stops responding and *nobody* else has balls to pick the
+> > patch up.
+> > 
+> > Weeks later social network posts start to arise blaming TI for not
+> > sending patches upstream.
+> > 
+> > > (N.B. In the case of anything involving DSS, such as this patch, I'd be 
+> > > happy to accept Tested-by:s from Archit or Tomi.)
+> > > 
+> > > If you have other people that you think I'm missing from the above two 
+> > > lists, who meet those requirements, please suggest some names!
+> > 
+> > the point is about not having a list. Sure, you need to know some folks
+> > who you can trust, but sometimes, when it's clear that the patch doesn't
+> > break anything, follows standard code practices, have passed through
+> > more than one hand and soaked in the mailing list for months, it's time
+> > to give up and just let the patch sit in linux-next for a while. You can
+> > always revert if someone else starts to scream.
+> > 
+> > I'm *not* saying that you should blindly accept anything, but not
+> > accepting patches without a reason isn't fair.
+> > 
+> > > > Quite frankly, it's very upsetting to see an affirmation that all the
+> > > > work that I (personally) and many others do is seen as "pointless" from
+> > > > your side *unless* it gets the blessing from the few folks listed above.
+> > > 
+> > > I'd be curious to know how many of the people listed in the Signed-off-by: 
+> > > for these patches have double-checked the data against the TRM (or 
+> > 
+> > I know I've done it. Have latest am437x Datasheed, TRM and board
+> > schematics open for quite a while now as I've been hacking this am437x
+> > StarterKit.
+> > 
+> > Also, the thing is functional. Xorg + i3 runs just fine without any
+> > glitches or bogus colors, or any sort of warnings, errors, anything at
+> > all.
+> > 
+> > > whatever documentation is canonical for this chip).  And have thought 
+> > > through whether the data actually makes sense with regards to the SoC 
+> > > integration.  I consider those to be the prerequisites for reviewing hwmod 
+> > 
+> > how else would we get the freaking thing to enable clocks ? Or are you
+> > forgetting that long ago the entire OMAP architecture was made tightly
+> > coupled with runtime PM and HWMOD; and are you also forgetting that no
+> > driver is now allowed to call clk_get() directly without hurting
+> > somebody's feelings ?
+> > 
+> > With these details in mind, there's no SoC who depends on mach-omap2
+> > that can have any chance of *working* without hwmod data.
+> > 
+> > > device data patches.  That's what I generally do myself, and that's what I 
+> > > expect from trusted reviewers.
+> > 
+> > alright, so do you see any problems with the patch ? Do you think the
+> > data isn't necessary ? Instead of just being silent for months, why
+> > don't you just drop a line ? Reply to the f-ing thread ? How can we make
+> > any progress if you don't ? Is this what we have to go now ? Send a
+> > patch and hopefully, some day, it will make its way to mainline ?
+> > 
+> > > > This just makes it ever more difficult for anything, which is clearly
+> > > > *BROKEN* to be fixed upstream and will just contribute to people
+> > > > vanishing from mainline development.
+> > > 
+> > > Sounds like you might be mixing mailing list threads.  
+> > > 
+> > > The description for these patches states:
+> > > 
+> > > "Add DSS hwmod data for AM43xx"
+> > > 
+> > > Unless I'm missing something, these patches add a feature.  They are not 
+> > > fixing something that is broken.
+> > 
+> > without DSS hwmod data, how can display work ? So it _is_ broken indeed.
+> > The same DSS code is functional in many other SoCs, but it's *broken* in
+> > am437x because $subject has been pending without *any* reply since
+> > May 19th.
+> > 
+> > > > The very fact that you will only accept patches blessed by the gang-of-4
+> > > > goes against the very foundations of open source development. Just
+> > > > because you don't have access to documentation - and granted, that
+> > > > _does_ make things a lot more difficult - does not mean you have to
+> > > > consider an entire company as a non-trust worthy organization. Specially
+> > > > when there are so many here who have been doing mainline development for
+> > > > quite some time.
+> > > 
+> > > As stated, I'm happy to consider adding more folks to the list, but they 
+> > > need to have a track record of doing good work in that area, or doing 
+> > > in-depth reviews.  If they don't have one yet, well, there's no better 
+> > > time to start than the present.
+> > > 
+> > > I'm also happy to do the reviews and a basic test myself, if I have 
+> > > documentation and a board.
+> > > 
+> > > > It doesn't take a brain surgeon to note how this won't scale and, if you 
+> > > > continue to ignore patches during the entire development cycle and only 
+> > > > reply after it's too late for $this merge window, it won't help much.
+> > > 
+> > > ...
+> > > 
+> > > > Anyway, whatever... I just hope that if we go through *another* merge
+> > > > window without $subject being merged
+> > > 
+> > > What is this business about "*another* merge window" and "continue to 
+> > > ignore"?  Using the dates from your own E-mail message above, the original 
+> > > patches were sent May 9th.  This was the same day that v3.15-rc5 was 
+> > > released. According to your message, the revised patches were sent May 
+> > > 19th - three days before v3.15-rc6.
+> > 
+> > right, right.. I'm talking in general. This *could* have made it into
+> > v3.16. There are also other patches which were missed. One of them since
+> > january.
+> > 
+> > > So by the time these patches were ready to go, we'd already reached the 
+> > > cutoff point for getting anything merged into v3.16.
+> > 
+> > not really. We had 3 more tags (3 more weeks) until v3.15 final was
+> > tagged. Add to that the fact that the merge window is 2 weeks long, 4
+> > weeks (leaving the last week as padding) seems like enough time.
+> > 
+> > > I was rather hoping that I'd be able to review it against the AM43xx 
+> > > documentation in time, but that turned out not to be available.
+> > > 
+> > > If all this has nothing to do with the $SUBJECT patches, and is about the 
+> > > DSS clocking issue, and not these patches, that's fine; but please direct 
+> > > your flames to that thread instead.
+> > > 
+> > > > ps: $subject in particular, has been tested by 3 different people.
+> > > > Actually 4, if you consider Darren Etheridge who used $subject to help
+> > > > me get display working on AM437x SK.
+> > > 
+> > > There are no Tested-by:s on this patch.  It seems likely to me that Tomi 
+> > > has tested it against something close to mainline, just based on general 
+> > > experience with his level of patch quality in the past, but in general, I 
+> > > have no way of knowing this.
+> > 
+> > SoB usually means the patch was tested by that person. Or are you
+> > implying that neither me nor Sathya (patch author!!) ever tested the
+> > patch ? I can post a video on youtube if that makes you happy, but boy
+> > do I want to avoid doing that...
+> > 
+> > > So if folks actually tested it against mainline, please do send 
+> > > Tested-by:s, and note the mainline commit that it was tested on, along 
+> > > with other patches were needed for this patch to apply and/or work.  It's 
+> > > also helpful to include a serial console boot log to a Tested-by: message.  
+> > > That adds confidence that the patches don't add extra warnings and that 
+> > > the commit ID is what's expected.
+> > 
+> > sure thing, but don't expect everybody to just figure out what's going
+> > on inside your head. Silent gets us nowhere.
+> > 
+> > > For the specific case of this patch, since it's already been reviewed by 
+> > > Rajendra, once there are good Tested-by:s sent to the list, I'd say it's 
+> > > ready to merge.
+> > 
+> > good Tested-by:s ?
+> > 
+> > nice
+> 
+> Felipe, here's what I need:
+> 
+> For boards that I don't have access to, that I don't have 
+> documentation for, such as the AM43xx and DRA7xx), for me to merge or ack 
+> SoC infrastructure or PM-related patches, I want to have:
+> 
+> 1. a Reviewed-by: from people who:
+> 
+> a. I think know something about SoC integration or PM in general, and 
+> about OMAP-style integration specifically; and
+> 
+> b. who have a track record of doing strong and detailed reviews of that 
+> code, or who have contributed significantly to that code in the past.
+> 
+> My initial list of those reviewers is listed above, and I am happy to 
+> consider extending it or modifying that list.
+> 
+> 
+> 2. confidence that the patch or series has been tested against a mainline 
+> commit and isn't obviously breaking other things, like PM, and confidence 
+> that it's not adding new runtime warnings.
+> 
+> I've listed an initial set of people above who I feel have proven track 
+> records in testing who I'm happy to accept Tested-by:s without further 
+> explanation.  I'm sure I've missed some folks and if anyone who should be 
+> on that list is offended that I didn't mention them, please accept my 
+> apologies.  For other folks, like yourself, who aren't on that list (yet), 
+> please just specifically state:
+> 
+> a. what mainline commit they've tested the patch against,
 
-This patch re-introduces the L_PTE_WRITE bit for both short descriptors
-and long descriptors, by reverting
-  36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
+As I said, linux-next from June 10th.
 
-For short descriptors the L_PTE_RDONLY bit is renamed to L_PTE_WRITE
-and the pertinent logic changed. For long descriptors, L_PTE_WRITE is
-implemented as a new software bit.
+commit 27a4e439fe5cd92b70137ae237c7aa6888c07b5a
+Author: Stephen Rothwell <sfr@canb.auug.org.au>
+Date:   Tue Jun 10 16:37:52 2014 +1000
 
-HugeTLB pages will use the L_PTE_WRITE semantics automatically.
+    Add linux-next specific files for 20140610
+    
+    Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
 
-We need to add some logic to Transparent HugePages to ensure that they
-correctly interpret the revised pgprot permissions.
+> b. what other prerequisite patches were needed for the patch to apply,
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
- arch/arm/include/asm/pgtable-2level.h |  2 +-
- arch/arm/include/asm/pgtable-3level.h | 16 ++++++++++++----
- arch/arm/include/asm/pgtable.h        | 36 +++++++++++++++++------------------
- arch/arm/mm/dump.c                    |  8 ++++----
- arch/arm/mm/mmu.c                     | 25 ++++++++++++------------
- arch/arm/mm/proc-macros.S             | 16 ++++++++--------
- arch/arm/mm/proc-v7-2level.S          |  6 +++---
- arch/arm/mm/proc-v7-3level.S          |  4 +++-
- arch/arm/mm/proc-xscale.S             |  4 ++--
- 9 files changed, 64 insertions(+), 53 deletions(-)
+only these two patches I sent here.
 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 219ac88..e2eec86 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -120,7 +120,7 @@
- #define L_PTE_YOUNG		(_AT(pteval_t, 1) << 1)
- #define L_PTE_FILE		(_AT(pteval_t, 1) << 2)	/* only when !PRESENT */
- #define L_PTE_DIRTY		(_AT(pteval_t, 1) << 6)
--#define L_PTE_RDONLY		(_AT(pteval_t, 1) << 7)
-+#define L_PTE_WRITE		(_AT(pteval_t, 1) << 7)
- #define L_PTE_USER		(_AT(pteval_t, 1) << 8)
- #define L_PTE_XN		(_AT(pteval_t, 1) << 9)
- #define L_PTE_SHARED		(_AT(pteval_t, 1) << 10)	/* shared(v6), coherent(xsc3) */
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index bde49f9..9a6c8ec 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -86,11 +86,13 @@
- #define L_PTE_DIRTY		(_AT(pteval_t, 1) << 55)	/* unused */
- #define L_PTE_SPECIAL		(_AT(pteval_t, 1) << 56)	/* unused */
- #define L_PTE_NONE		(_AT(pteval_t, 1) << 57)	/* PROT_NONE */
-+#define L_PTE_WRITE		(_AT(pteval_t, 1) << 58)
+> c. and a cut-and-paste of the serial console boot log from the boot 
+> portion of the test.
+
+attached minicom.cap. The "dirty" part is just another set of minor
+changes (see below) I'm testing to, hopefully, include in the final DTS
+too; and the WARNING you see, was caused by RMK's L2 rework but IIRC
+Sekhar already had a fix for it, not sure if it has already reached
+next.
+
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 49fa596..e3830d4 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -270,7 +270,7 @@
+ 			ti,hwmods = "counter_32k";
+ 		};
  
- #define PMD_SECT_VALID		(_AT(pmdval_t, 1) << 0)
- #define PMD_SECT_DIRTY		(_AT(pmdval_t, 1) << 55)
- #define PMD_SECT_SPLITTING	(_AT(pmdval_t, 1) << 56)
- #define PMD_SECT_NONE		(_AT(pmdval_t, 1) << 57)
-+#define PMD_SECT_WRITE		(_AT(pmdval_t, 1) << 58)
+-		rtc at 44e3e000 {
++		rtc: rtc at 44e3e000 {
+ 			compatible = "ti,am4372-rtc","ti,da830-rtc";
+ 			reg = <0x44e3e000 0x1000>;
+ 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH
+@@ -279,7 +279,7 @@
+ 			status = "disabled";
+ 		};
  
- /*
-  * To be used in assembly code with the upper page attributes.
-@@ -212,9 +214,10 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define pmd_isclear(pmd, val)	(!(pmd_val(pmd) & (val)))
- 
- #define pmd_young(pmd)		(pmd_isset((pmd), PMD_SECT_AF))
-+#define pmd_dirty(pmd)		(pmd_isset((pmd), PMD_SECT_DIRTY))
- 
- #define __HAVE_ARCH_PMD_WRITE
--#define pmd_write(pmd)		(pmd_isclear((pmd), PMD_SECT_RDONLY))
-+#define pmd_write(pmd)		(pmd_isset((pmd), PMD_SECT_WRITE))
- 
- #define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
- #define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
-@@ -227,10 +230,10 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define PMD_BIT_FUNC(fn,op) \
- static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
- 
--PMD_BIT_FUNC(wrprotect,	|= PMD_SECT_RDONLY);
-+PMD_BIT_FUNC(wrprotect,	&= ~PMD_SECT_WRITE);
- PMD_BIT_FUNC(mkold,	&= ~PMD_SECT_AF);
- PMD_BIT_FUNC(mksplitting, |= PMD_SECT_SPLITTING);
--PMD_BIT_FUNC(mkwrite,   &= ~PMD_SECT_RDONLY);
-+PMD_BIT_FUNC(mkwrite,   |= PMD_SECT_WRITE);
- PMD_BIT_FUNC(mkdirty,   |= PMD_SECT_DIRTY);
- PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
- 
-@@ -245,7 +248,7 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
- 
- static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
- {
--	const pmdval_t mask = PMD_SECT_USER | PMD_SECT_XN | PMD_SECT_RDONLY |
-+	const pmdval_t mask = PMD_SECT_USER | PMD_SECT_XN | PMD_SECT_WRITE |
- 				PMD_SECT_VALID | PMD_SECT_NONE;
- 	pmd_val(pmd) = (pmd_val(pmd) & ~mask) | (pgprot_val(newprot) & mask);
- 	return pmd;
-@@ -260,6 +263,11 @@ static inline void set_pmd_at(struct mm_struct *mm, unsigned long addr,
- 	if (pmd_val(pmd) & PMD_SECT_NONE)
- 		pmd_val(pmd) &= ~PMD_SECT_VALID;
- 
-+	if (pmd_write(pmd) && pmd_dirty(pmd))
-+		pmd_val(pmd) &= ~PMD_SECT_RDONLY;
-+	else
-+		pmd_val(pmd) |= PMD_SECT_RDONLY;
+-		wdt at 44e35000 {
++		wdt: wdt@44e35000 {
+ 			compatible = "ti,am4372-wdt","ti,omap3-wdt";
+ 			reg = <0x44e35000 0x1000>;
+ 			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+index 51ffab1..59b620b 100644
+--- a/arch/arm/boot/dts/am437x-sk-evm.dts
++++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+@@ -374,6 +374,16 @@
+ 		DRVDD-supply = <&v33_fixed>;
+ 		DVDD-supply = <&v18_fixed>;
+ 	};
 +
- 	*pmdp = __pmd(pmd_val(pmd) | PMD_SECT_nG);
- 	flush_pmd_entry(pmdp);
- }
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 01baef0..8c4a941 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -88,13 +88,13 @@ extern pgprot_t		pgprot_s2_device;
++	lis331dlh at 18 {
++		compatible = "st,lis331dlh";
++		reg = <0x18>;
++		status = "okay";
++
++		Vdd-supply = <&v33_fixed>;
++		Vdd_IO-supply = <&v33_fixed>;
++		interrupts-extended = <&gpio1 6 0>, <&gpio2 1 0>;
++	};
+ };
  
- #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
- 
--#define PAGE_NONE		_MOD_PROT(pgprot_user, L_PTE_XN | L_PTE_RDONLY | L_PTE_NONE)
--#define PAGE_SHARED		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_XN)
--#define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER)
--#define PAGE_COPY		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY | L_PTE_XN)
--#define PAGE_COPY_EXEC		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
--#define PAGE_READONLY		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY | L_PTE_XN)
--#define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
-+#define PAGE_NONE		_MOD_PROT(pgprot_user, L_PTE_XN | L_PTE_NONE)
-+#define PAGE_SHARED		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_WRITE | L_PTE_XN)
-+#define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_WRITE)
-+#define PAGE_COPY		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_XN)
-+#define PAGE_COPY_EXEC		_MOD_PROT(pgprot_user, L_PTE_USER)
-+#define PAGE_READONLY		_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_XN)
-+#define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER)
- #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
- #define PAGE_KERNEL_EXEC	pgprot_kernel
- #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
-@@ -102,13 +102,13 @@ extern pgprot_t		pgprot_s2_device;
- #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
- #define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDWR)
- 
--#define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN | L_PTE_NONE)
--#define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
--#define __PAGE_SHARED_EXEC	__pgprot(_L_PTE_DEFAULT | L_PTE_USER)
--#define __PAGE_COPY		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_RDONLY | L_PTE_XN)
--#define __PAGE_COPY_EXEC	__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_RDONLY)
--#define __PAGE_READONLY		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_RDONLY | L_PTE_XN)
--#define __PAGE_READONLY_EXEC	__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_RDONLY)
-+#define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_XN | L_PTE_NONE)
-+#define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_WRITE | L_PTE_XN)
-+#define __PAGE_SHARED_EXEC	__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_WRITE)
-+#define __PAGE_COPY		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
-+#define __PAGE_COPY_EXEC	__pgprot(_L_PTE_DEFAULT | L_PTE_USER)
-+#define __PAGE_READONLY		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
-+#define __PAGE_READONLY_EXEC	__pgprot(_L_PTE_DEFAULT | L_PTE_USER)
- 
- #define __pgprot_modify(prot,mask,bits)		\
- 	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
-@@ -222,7 +222,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- #define pte_present(pte)	(pte_isset((pte), L_PTE_PRESENT))
- #define pte_valid(pte)		(pte_isset((pte), L_PTE_VALID))
- #define pte_accessible(mm, pte)	(mm_tlb_flush_pending(mm) ? pte_present(pte) : pte_valid(pte))
--#define pte_write(pte)		(pte_isclear((pte), L_PTE_RDONLY))
-+#define pte_write(pte)		(pte_isset((pte), L_PTE_WRITE))
- #define pte_dirty(pte)		(pte_isset((pte), L_PTE_DIRTY))
- #define pte_young(pte)		(pte_isset((pte), L_PTE_YOUNG))
- #define pte_exec(pte)		(pte_isclear((pte), L_PTE_XN))
-@@ -255,8 +255,8 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- #define PTE_BIT_FUNC(fn,op) \
- static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
- 
--PTE_BIT_FUNC(wrprotect, |= L_PTE_RDONLY);
--PTE_BIT_FUNC(mkwrite,   &= ~L_PTE_RDONLY);
-+PTE_BIT_FUNC(wrprotect, &= ~L_PTE_WRITE);
-+PTE_BIT_FUNC(mkwrite,   |= L_PTE_WRITE);
- PTE_BIT_FUNC(mkclean,   &= ~L_PTE_DIRTY);
- PTE_BIT_FUNC(mkdirty,   |= L_PTE_DIRTY);
- PTE_BIT_FUNC(mkold,     &= ~L_PTE_YOUNG);
-@@ -268,7 +268,7 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
- 
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
- {
--	const pteval_t mask = L_PTE_XN | L_PTE_RDONLY | L_PTE_USER |
-+	const pteval_t mask = L_PTE_XN | L_PTE_WRITE | L_PTE_USER |
- 		L_PTE_NONE | L_PTE_VALID;
- 	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
- 	return pte;
-diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index c508f41..4d79c02 100644
---- a/arch/arm/mm/dump.c
-+++ b/arch/arm/mm/dump.c
-@@ -58,10 +58,10 @@ static const struct prot_bits pte_bits[] = {
- 		.set	= "USR",
- 		.clear	= "   ",
- 	}, {
--		.mask	= L_PTE_RDONLY,
--		.val	= L_PTE_RDONLY,
--		.set	= "ro",
--		.clear	= "RW",
-+		.mask	= L_PTE_WRITE,
-+		.val	= L_PTE_WRITE,
-+		.set	= "RW",
-+		.clear	= "ro",
- 	}, {
- 		.mask	= L_PTE_XN,
- 		.val	= L_PTE_XN,
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index ab14b79..4952ca68 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -235,7 +235,7 @@ __setup("noalign", noalign_setup);
- 
- #endif /* ifdef CONFIG_CPU_CP15 / else */
- 
--#define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
-+#define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_WRITE|L_PTE_XN
- #define PROT_PTE_S2_DEVICE	PROT_PTE_DEVICE
- #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
- 
-@@ -285,26 +285,26 @@ static struct mem_type mem_types[] = {
- 	},
- #endif
- 	[MT_LOW_VECTORS] = {
--		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--				L_PTE_RDONLY,
-+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.domain    = DOMAIN_USER,
- 	},
- 	[MT_HIGH_VECTORS] = {
- 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--				L_PTE_USER | L_PTE_RDONLY,
-+				L_PTE_USER,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.domain    = DOMAIN_USER,
- 	},
- 	[MT_MEMORY_RWX] = {
--		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
-+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-+				L_PTE_WRITE,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
- 		.domain    = DOMAIN_KERNEL,
- 	},
- 	[MT_MEMORY_RW] = {
- 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--			     L_PTE_XN,
-+				L_PTE_WRITE | L_PTE_XN,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
- 		.domain    = DOMAIN_KERNEL,
-@@ -315,26 +315,27 @@ static struct mem_type mem_types[] = {
- 	},
- 	[MT_MEMORY_RWX_NONCACHED] = {
- 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--				L_PTE_MT_BUFFERABLE,
-+				L_PTE_WRITE | L_PTE_MT_BUFFERABLE,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
- 		.domain    = DOMAIN_KERNEL,
- 	},
- 	[MT_MEMORY_RW_DTCM] = {
- 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--				L_PTE_XN,
-+				L_PTE_WRITE | L_PTE_XN,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN,
- 		.domain    = DOMAIN_KERNEL,
- 	},
- 	[MT_MEMORY_RWX_ITCM] = {
--		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
-+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-+				L_PTE_WRITE,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.domain    = DOMAIN_KERNEL,
- 	},
- 	[MT_MEMORY_RW_SO] = {
- 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--				L_PTE_MT_UNCACHED | L_PTE_XN,
-+				L_PTE_MT_UNCACHED | L_PTE_WRITE | L_PTE_XN,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
- 				PMD_SECT_UNCACHED | PMD_SECT_XN,
-@@ -342,7 +343,7 @@ static struct mem_type mem_types[] = {
- 	},
- 	[MT_MEMORY_DMA_READY] = {
- 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
--				L_PTE_XN,
-+				L_PTE_WRITE | L_PTE_XN,
- 		.prot_l1   = PMD_TYPE_TABLE,
- 		.domain    = DOMAIN_KERNEL,
- 	},
-@@ -617,7 +618,7 @@ static void __init build_mem_type_table(void)
- 
- 	pgprot_user   = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | user_pgprot);
- 	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
--				 L_PTE_DIRTY | kern_pgprot);
-+				 L_PTE_DIRTY | L_PTE_WRITE | kern_pgprot);
- 	pgprot_s2  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | s2_pgprot);
- 	pgprot_s2_device  = __pgprot(s2_device_pgprot);
- 	pgprot_hyp_device  = __pgprot(hyp_device_pgprot);
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index ee1d805..2da9a62 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -97,7 +97,7 @@
- #error PTE shared bit mismatch
- #endif
- #if !defined (CONFIG_ARM_LPAE) && \
--	(L_PTE_XN+L_PTE_USER+L_PTE_RDONLY+L_PTE_DIRTY+L_PTE_YOUNG+\
-+	(L_PTE_XN+L_PTE_USER+L_PTE_WRITE+L_PTE_DIRTY+L_PTE_YOUNG+\
- 	 L_PTE_FILE+L_PTE_PRESENT) > L_PTE_SHARED
- #error Invalid Linux PTE bit settings
- #endif
-@@ -148,9 +148,9 @@
- 	and	r2, r1, #L_PTE_MT_MASK
- 	ldr	r2, [ip, r2]
- 
--	eor	r1, r1, #L_PTE_DIRTY
--	tst	r1, #L_PTE_DIRTY|L_PTE_RDONLY
--	orrne	r3, r3, #PTE_EXT_APX
-+	tst	r1, #L_PTE_WRITE
-+	tstne	r1, #L_PTE_DIRTY
-+	orreq	r3, r3, #PTE_EXT_APX
- 
- 	tst	r1, #L_PTE_USER
- 	orrne	r3, r3, #PTE_EXT_AP1
-@@ -192,7 +192,7 @@
- 	.macro	armv3_set_pte_ext wc_disable=1
- 	str	r1, [r0], #2048			@ linux version
- 
--	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY
-+	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
- 
- 	bic	r2, r1, #PTE_SMALL_AP_MASK	@ keep C, B bits
- 	bic	r2, r2, #PTE_TYPE_MASK
-@@ -201,7 +201,7 @@
- 	tst	r3, #L_PTE_USER			@ user?
- 	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
- 
--	tst	r3, #L_PTE_RDONLY | L_PTE_DIRTY	@ write and dirty?
-+	tst	r3, #L_PTE_WRITE | L_PTE_DIRTY	@ write and dirty?
- 	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
- 
- 	tst	r3, #L_PTE_PRESENT | L_PTE_YOUNG	@ present and young?
-@@ -235,7 +235,7 @@
- 	.macro	xscale_set_pte_ext_prologue
- 	str	r1, [r0]			@ linux version
- 
--	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY
-+	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
- 
- 	bic	r2, r1, #PTE_SMALL_AP_MASK	@ keep C, B bits
- 	orr	r2, r2, #PTE_TYPE_EXT		@ extended page
-@@ -243,7 +243,7 @@
- 	tst	r3, #L_PTE_USER			@ user?
- 	orrne	r2, r2, #PTE_EXT_AP_URO_SRW	@ yes -> user r/o, system r/w
- 
--	tst	r3, #L_PTE_RDONLY | L_PTE_DIRTY	@ write and dirty?
-+	tst	r3, #L_PTE_WRITE | L_PTE_DIRTY	@ write and dirty?
- 	orreq	r2, r2, #PTE_EXT_AP_UNO_SRW	@ yes -> user n/a, system r/w
- 						@ combined with user -> user r/w
- 	.endm
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index 1f52915..a9dad38 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -84,9 +84,9 @@ ENTRY(cpu_v7_set_pte_ext)
- 	tst	r1, #1 << 4
- 	orrne	r3, r3, #PTE_EXT_TEX(1)
- 
--	eor	r1, r1, #L_PTE_DIRTY
--	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
--	orrne	r3, r3, #PTE_EXT_APX
-+	tst	r1, #L_PTE_WRITE
-+	tstne	r1, #L_PTE_DIRTY
-+	orreq	r3, r3, #PTE_EXT_APX
- 
- 	tst	r1, #L_PTE_USER
- 	orrne	r3, r3, #PTE_EXT_AP1
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 22e3ad6..a459f62 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -86,7 +86,9 @@ ENTRY(cpu_v7_set_pte_ext)
- 	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
- 	bicne	rl, #L_PTE_VALID
- 	bne	1f
--	tst	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
-+	bic	rl, #L_PTE_RDONLY
-+	tst	rh, #1 << (58 - 32)		@ L_PTE_WRITE
-+	tstne	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
- 	orreq	rl, #L_PTE_RDONLY
- 1:	strd	r2, r3, [r0]
- 	ALT_SMP(W(nop))
-diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-index d19b1cf..d5b23e8 100644
---- a/arch/arm/mm/proc-xscale.S
-+++ b/arch/arm/mm/proc-xscale.S
-@@ -510,8 +510,8 @@ ENTRY(cpu_xscale_set_pte_ext)
- 	@
- 	@ Erratum 40: must set memory to write-through for user read-only pages
- 	@
--	and	ip, r1, #(L_PTE_MT_MASK | L_PTE_USER | L_PTE_RDONLY) & ~(4 << 2)
--	teq	ip, #L_PTE_MT_WRITEBACK | L_PTE_USER | L_PTE_RDONLY
-+	and	ip, r1, #(L_PTE_MT_MASK | L_PTE_USER | L_PTE_WRITE) & ~(4 << 2)
-+	teq	ip, #L_PTE_MT_WRITEBACK | L_PTE_USER
- 
- 	moveq	r1, #L_PTE_MT_WRITETHROUGH
- 	and	r1, r1, #L_PTE_MT_MASK
+ &epwmss0 {
+@@ -537,3 +547,23 @@
+ 		};
+ 	};
+ };
++
++&sham {
++	status = "okay";
++};
++
++&aes {
++	status = "okay";
++};
++
++&des {
++	status = "okay";
++};
++
++&rtc {
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
+
+
 -- 
-1.8.1.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: minicom.cap
+Type: application/vnd.tcpdump.pcap
+Size: 32347 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140616/7a32c053/attachment-0001.cap>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140616/7a32c053/attachment-0001.sig>
