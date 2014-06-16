@@ -1,17 +1,27 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Jun 2014 16:01:02 -0600
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
+Date: Mon, 16 Jun 2014 16:04:26 -0600
+Subject: [PATCH 7/9] ahci: Increase AHCI_MAX_CLKS to 4
+In-Reply-To: <1401881559-18469-8-git-send-email-mperttunen@nvidia.com>
 References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
-Message-ID: <539F691E.5030204@wwwdotorg.org>
+ <1401881559-18469-8-git-send-email-mperttunen@nvidia.com>
+Message-ID: <539F69EA.6000200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
-> This symbol needs to be exported to power on rails without using
-> tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
-> cannot be used in situations where the driver wants to handle clocking
-> by itself.
+> The Tegra AHCI device requires four clocks, so increase the maximum
+> amount of handled clocks from three to four.
 
-Thierry, are you OK with this change?
+Tejun,
+
+The SATA driver in patch 8/9 in this series would usually be applied in
+your ATA tree. However, it has a lot of compile-time dependencies on
+things outside the ATA tree that I expect you don't want to deal with.
+
+If you're OK with patches 7 and 8, could you ack them so that I can
+apply them to the Tegra tree?
+
+I assume the patches won't cause any significant conflicts, but if you
+need, I can certainly give you a signed tag back to allow you to merge
+the driver patch (plus the compile-time dependencies) into your tree
+later if needed.
