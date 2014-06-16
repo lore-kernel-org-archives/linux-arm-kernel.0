@@ -1,87 +1,128 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 16 Jun 2014 16:24:23 +0200
+Date: Mon, 16 Jun 2014 16:32:24 +0200
 Subject: [PATCH v3 10/19] clocksource: sh_tmu: Add DT support
-In-Reply-To: <20140616084832.GG11582@verge.net.au>
+In-Reply-To: <20140616083423.GE11582@verge.net.au>
 References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
  <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140616084832.GG11582@verge.net.au>
-Message-ID: <1555850.ye4YtlhbQA@avalon>
+ <20140616083423.GE11582@verge.net.au>
+Message-ID: <3012797.FyNqyP1CPJ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Simon,
 
-On Monday 16 June 2014 17:48:32 Simon Horman wrote:
+On Monday 16 June 2014 17:34:23 Simon Horman wrote:
 > On Sat, Jun 14, 2014 at 06:23:32PM +0200, Laurent Pinchart wrote:
 > > Document DT bindings and parse them in the TMU driver.
 > > 
 > > Signed-off-by: Laurent Pinchart
 > > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >  .../devicetree/bindings/timer/renesas,tmu.txt      | 40 +++++++++++++++++
-> >  drivers/clocksource/sh_tmu.c                       | 45 +++++++++++++----
-> >  2 files changed, 77 insertions(+), 8 deletions(-)
-> >  create mode 100644
-> >  Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> > b/Documentation/devicetree/bindings/timer/renesas,tmu.txt new file mode
-> > 100644
-> > index 0000000..2392e89
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> > @@ -0,0 +1,40 @@
-> > +* Renesas R-Car Timer Unit (TMU)
-> > +
-> > +The TMU is a 32-bit timer/counter with configurable clock inputs and
-> > +programmable compare match.
-> > +
-> > +Channels share hardware resources but their counter and compare match
-> > value
-> > +are independent. The TMU hardware supports up to three channels.
-> > +
-> > +Required Properties:
-> > +
-> > +  - compatible: must contain "renesas,tmu"
-> > +
-> > +  - reg: base address and length of the registers block for the timer
-> > module.
-> > +
-> > +  - interrupts: interrupt-specifier for the timer, one per channel.
-> > +
-> > +  - clocks: a list of phandle + clock-specifier pairs, one for each entry
-> > +    in clock-names.
-> > +  - clock-names: must contain "fck" for the functional clock.
-> > +
-> > +Optional Properties:
-> > +
-> > +  - #renesas,channels: number of channels implemented by the timer, must
-> > be 2
-> > +    or 3 (if not specified the value defaults to 3).
-> > +
-> > +
-> > +Example: R8A7779 (R-Car H1) TMU0 node
-> > +
-> > +	tmu0: timer at ffd80000 {
-> > +		compatible = "renesas,tmu";
-> > +		reg = <0xffd80000 0x30>;
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
-> > +		clock-names = "fck";
-> > +
-> > +		#renesas,channels = <3>;
-> > +	};
 > 
-> As per my feedback for "[PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU
-> devices to DT" I believe the IRQ values should be 32, 33 and 34, not 40,
-> 41, 42. I realise this is just an example but I feel that I should mention
-> it.
+> [snip]
+> 
+> > diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+> > index ef8fb0b..2ece4ab 100644
+> > --- a/drivers/clocksource/sh_tmu.c
+> > +++ b/drivers/clocksource/sh_tmu.c
 
-Sure, I'll fix that, and remove the interrupt-parent property.
+[snip]
+
+> > @@ -509,23 +510,46 @@ static int sh_tmu_map_memory(struct sh_tmu_device
+> > *tmu)
+> >  	return 0;
+> >  }
+> > 
+> > +static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
+> > +{
+> > +	struct device_node *np = tmu->pdev->dev.of_node;
+> > +
+> > +	tmu->num_channels = 3;
+> > +	of_property_read_u32(np, "#renesas,channels", &tmu->num_channels);
+> > +
+> > +	if (tmu->num_channels != 2 && tmu->num_channels != 3) {
+> > +		dev_err(&tmu->pdev->dev, "invalid number of channels %u\n",
+> > +			tmu->num_channels);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device
+> >  *pdev) {
+> > -	struct sh_timer_config *cfg = pdev->dev.platform_data;
+> >  	const struct platform_device_id *id = pdev->id_entry;
+> >  	unsigned int i;
+> >  	int ret;
+> > 
+> > -	if (!cfg) {
+> > -		dev_err(&tmu->pdev->dev, "missing platform data\n");
+> > -		return -ENXIO;
+> > -	}
+> > -
+> >  	tmu->pdev = pdev;
+> >  	tmu->model = id->driver_data;
+> >  	
+> >  	raw_spin_lock_init(&tmu->lock);
+> > 
+> > +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
+> > +		ret = sh_tmu_parse_dt(tmu);
+> > +		if (ret < 0)
+> > +			return ret;
+> > +	} else if (pdev->dev.platform_data) {
+> > +		struct sh_timer_config *cfg = pdev->dev.platform_data;
+> > +
+> > +		tmu->num_channels = hweight8(cfg->channels_mask);
+> > +	} else {
+> > +		dev_err(&tmu->pdev->dev, "missing platform data\n");
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > 
+> >  	/* Get hold of clock. */
+> >  	tmu->clk = clk_get(&tmu->pdev->dev, "fck");
+> >  	if (IS_ERR(tmu->clk)) {
+> 
+> [snip]
+> 
+> I had a bit of trouble running this code and after some investigation
+> it seems to me that in the case of using DT id will be NULL and
+> thus things do not go well when id->driver_data is accessed.
+
+Indeed. I wonder how I've missed that :-/ Anyway, I'll fix it and resubmit.
+
+> The following incremental patch resolved the problem for me.
+> 
+> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+> index 2ece4ab..3f90927 100644
+> --- a/drivers/clocksource/sh_tmu.c
+> +++ b/drivers/clocksource/sh_tmu.c
+> @@ -523,6 +523,8 @@ static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
+>  		return -EINVAL;
+>  	}
+> 
+> +	tmu->model = SH_TMU;
+> +
+>  	return 0;
+>  }
+> 
+> @@ -533,7 +535,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu,
+> struct platform_device *pdev) int ret;
+> 
+>  	tmu->pdev = pdev;
+> -	tmu->model = id->driver_data;
+> 
+>  	raw_spin_lock_init(&tmu->lock);
+> 
+> @@ -545,6 +546,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu,
+> struct platform_device *pdev) struct sh_timer_config *cfg =
+> pdev->dev.platform_data;
+> 
+>  		tmu->num_channels = hweight8(cfg->channels_mask);
+> +		tmu->model = id->driver_data;
+>  	} else {
+>  		dev_err(&tmu->pdev->dev, "missing platform data\n");
+>  		return -ENXIO;
 
 -- 
 Regards,
