@@ -1,41 +1,29 @@
-From: elder@ieee.org (Alex Elder)
-Date: Mon, 16 Jun 2014 14:12:36 -0500
-Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
-In-Reply-To: <1402941376-29594-1-git-send-email-mporter@linaro.org>
-References: <1402941376-29594-1-git-send-email-mporter@linaro.org>
-Message-ID: <539F41A4.1090606@ieee.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Jun 2014 13:14:30 -0600
+Subject: [PATCH v2 3/3] arm: tegra: initial support for apalis t30
+In-Reply-To: <95c131deb3e410e8defc9fe125dc662bdb276310.1402353627.git.marcel@ziswiler.com>
+References: <dadd07f9ed693d6bcf541764b62a2caf4cc38630.1402353627.git.marcel@ziswiler.com>
+ <95c131deb3e410e8defc9fe125dc662bdb276310.1402353627.git.marcel@ziswiler.com>
+Message-ID: <539F4216.70102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2014 12:56 PM, Matt Porter wrote:
-> Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
-> MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
-> driver which is enabled in this defconfig. This results in the
-> SDHCI driver not being built and a boot failure. Explictly
-> enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
-> driver is built.
+On 06/09/2014 04:52 PM, Marcel Ziswiler wrote:
+> This patch adds the device tree to support Toradex Apalis T30, a
+> computer on module which can be used on different carrier boards.
 > 
-> Fixes: 5d01b7684b7e ("mmc: simplify SDHCI Kconfig dependencies")
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-
-Works for me.
-
-Tested-by: Alex Elder <elder@linaro.org>
-
-> ---
->  arch/arm/configs/bcm_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> The module consists of a Tegra 3 SoC, two PMICs, 1 or 2 GB of DDR3L
+> RAM, eMMC, an LM95245 temperature sensor chip, an i210 resp. i211
+> gigabit Ethernet controller, an STMPE811 ADC/touch controller as well
+> as two MCP2515 CAN controllers. Furthermore, there is an SGTL5000 audio
+> codec which is not yet supported. Anything that is not self contained
+> on the module is disabled by default.
 > 
-> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-> index 9d13dae..dcfc559 100644
-> --- a/arch/arm/configs/bcm_defconfig
-> +++ b/arch/arm/configs/bcm_defconfig
-> @@ -98,6 +98,7 @@ CONFIG_MMC_UNSAFE_RESUME=y
->  CONFIG_MMC_BLOCK_MINORS=32
->  CONFIG_MMC_TEST=y
->  CONFIG_MMC_SDHCI=y
-> +CONFIG_MMC_SDHCI_PLTFM=y
->  CONFIG_MMC_SDHCI_BCM_KONA=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
+> The device tree for the Evaluation Board includes the modules device
+> tree and enables the supported peripherals of the carrier board (the
+> Evaluation Board supports almost all of them).
 > 
+> While at it also add the device tree binding documentation for Apalis
+> T30.
+
+Applied to Tegra's for-3.17/dt branch.
