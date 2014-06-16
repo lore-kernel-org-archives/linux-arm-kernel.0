@@ -1,23 +1,23 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Jun 2014 22:05:23 +0200
-Subject: PXA2xx and pinctrl
-Message-ID: <87oaxsd3i4.fsf@free.fr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 16 Jun 2014 14:06:43 -0600
+Subject: [RFC PATCH 3/4] drm/tegra: Request memory bandwidth for the
+ display controller
+In-Reply-To: <1402925713-25426-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1402925713-25426-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <539F4E53.6080205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian, Eric,
+On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
+> Request it based solely on the current mode's refresh rate. More
+> accurate requirements can be requested in future patches.
 
-In my current work of porting things here and there to device-tree for PXA27x,
-I'm considering mfp-pxa2xx for pinctrl integration.
+> diff --git a/drivers/gpu/drm/tegra/dc.c b/drivers/gpu/drm/tegra/dc.c
 
-I'm wondering if you see before hand any blocking point that can't be addressed
-and which prevents pxa2xx to be converted to pinctrl inftrastructure.
+> +	bandwidth = mode->clock * window.bits_per_pixel / 8;
+> +	err = tegra124_emc_reserve_bandwidth(TEGRA_EMC_CONSUMER_DISP1, bandwidth);
 
-And if no blocking point arises, how easy would it be according to your
-knowledge to still offer legacy mfp_* APIs, and replace the functions by
-pinctrl_*() calls ?
-
-Cheers.
-
--- 
-Robert
+DISP1 shouldn't be hard-coded here; the code should use DISP1 or DISP2
+based on head or DC identity. We certainly have some boards capable of
+dual-head operation.
