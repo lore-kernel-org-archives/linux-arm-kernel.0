@@ -1,56 +1,43 @@
 From: k.chander@samsung.com (Chander Kashyap)
-Date: Mon, 16 Jun 2014 15:56:18 +0530
-Subject: [Patch v7 1/6] driver: cpuidle-big-little: add of_device_id structure
+Date: Mon, 16 Jun 2014 15:56:19 +0530
+Subject: [Patch v7 2/6] arm: exynos: add generic function to calculate cpu
+ number
 In-Reply-To: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
 References: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
-Message-ID: <1402914383-20471-2-git-send-email-k.chander@samsung.com>
+Message-ID: <1402914383-20471-3-git-send-email-k.chander@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chander Kashyap <chander.kashyap@linaro.org>
 
-This driver will be used by many big.Little Soc's. As of now it does
-string matching of hardcoded compatible string to init the driver. This
-comparison list will keep on growing with addition of new SoC's.
-Hence add of_device_id structure to collect the compatible strings of
-SoC's using this driver.
+The address of cpu power registers in pmu is based on cpu number
+offsets. This function calculate the same. This is essentially
+required in case of multi-cluster SoC's e.g Exynos5420.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/cpuidle/cpuidle-big_little.c |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-exynos/regs-pmu.h |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index b45fc62..4cd02bd 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -163,14 +163,23 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
- 	return 0;
- }
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 1d13b08..aff23bd 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -323,4 +323,13 @@
  
-+static const struct of_device_id compatible_machine_match[] = {
-+	{ .compatible = "arm,vexpress,v2p-ca15_a7" },
-+	{},
-+};
-+
- static int __init bl_idle_init(void)
- {
- 	int ret;
-+	struct device_node *root = of_find_node_by_path("/");
-+
-+	if (!root)
-+		return -ENODEV;
+ #define EXYNOS5420_SWRESET_KFC_SEL				0x3
  
- 	/*
- 	 * Initialize the driver just for a compliant set of machines
- 	 */
--	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7"))
-+	if (!of_match_node(compatible_machine_match, root))
- 		return -ENODEV;
- 	/*
- 	 * For now the differentiation between little and big cores
++#include <asm/cputype.h>
++#define MAX_CPUS_IN_CLUSTER	4
++
++static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
++{
++	return ((MPIDR_AFFINITY_LEVEL(mpidr, 1) * MAX_CPUS_IN_CLUSTER)
++		 + MPIDR_AFFINITY_LEVEL(mpidr, 0));
++}
++
+ #endif /* __ASM_ARCH_REGS_PMU_H */
 -- 
 1.7.9.5
