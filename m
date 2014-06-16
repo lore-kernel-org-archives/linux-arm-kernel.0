@@ -1,132 +1,347 @@
-From: jkridner@gmail.com (Jason Kridner)
-Date: Mon, 16 Jun 2014 09:22:50 -0400
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
-Message-ID: <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 16 Jun 2014 15:23:36 +0200
+Subject: [PATCH v2 1/7] mfd: add atmel-hlcdc driver
+In-Reply-To: <20140616125030.GT14323@lee--X1>
+References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402329860-27520-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140616125030.GT14323@lee--X1>
+Message-ID: <539EEFD8.20703@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding devicetree and linux-arm-kernel lists based on feedback on IRC...
+Hello Lee,
 
-On Tue, Jun 10, 2014 at 12:46 PM, Jason Kridner <jkridner@gmail.com> wrote:
-> I'd like to discuss moving our current library of cape devicetree
-> overlay sources into a single tree, including the boot .dtb files for
-> BeagleBoard.org boards and moving towards enabling as much of the cape
-> support into a single boot-time .dtb file with an approach similar to
-> the cape-universal overlay
-> (https://github.com/cdsteinkuehler/beaglebone-universal-io), but not
-> in an overlay.
+On 16/06/2014 14:50, Lee Jones wrote:
+>> The HLCDC IP available on some Atmel SoCs (i.e. at91sam9n12, at91sam9x5
+>> family or sama5d3 family) exposes 2 subdevices:
+>> - a display controller (controlled by a DRM driver)
+>> - a PWM chip
+>>
+>> Add support for the MFD device which will just retrieve HLCDC clocks and
+>> create a regmap so that subdevices can access the HLCDC register range
+>> concurrently.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>  .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  41 ++++++++
+>>  drivers/mfd/Kconfig                                |  11 ++
+>>  drivers/mfd/Makefile                               |   1 +
+>>  drivers/mfd/atmel-hlcdc.c                          | 116 +++++++++++++++++++++
+>>  include/linux/mfd/atmel-hlcdc.h                    |  78 ++++++++++++++
+>>  5 files changed, 247 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>>  create mode 100644 drivers/mfd/atmel-hlcdc.c
+>>  create mode 100644 include/linux/mfd/atmel-hlcdc.h
+>> diff --git a/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>> new file mode 100644
+>> index 0000000..f5b69cb
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
+>> @@ -0,0 +1,41 @@
+>> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) MFD driver
+>> +
+>> +Required properties:
+>> + - compatible: value should be one of the following:
+>> +   "atmel,sama5d3-hlcdc"
+>> + - reg: base address and size of the HLCDC device registers.
+>> + - clock-names: the name of the 3 clocks requested by the HLCDC device.
+>> +   Should contain "periph_clk", "sys_clk" and "slow_clk".
+>> + - clocks: should contain the 3 clocks requested by the HLCDC device.
+>> +
+>> +The HLCDC IP exposes two subdevices:
+>> + - a PWM chip: see Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+>> + - a Display Controller: see Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
+>> +
+>> +Example:
+>> +
+>> +	hlcdc: hlcdc at f0030000 {
+>> +		compatible = "atmel,sama5d3-hlcdc";
+>> +		reg = <0xf0030000 0x2000>;
+>> +		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
+>> +		clock-names = "periph_clk","sys_clk", "slow_clk";
+>> +		status = "disabled";
+> Not sure you really want to disable the the node in the example.
+
+Nope, I'll remove this line.
+
+>> +		hlcdc-display-controller {
+>> +			compatible = "atmel,hlcdc-dc";
+>> +			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
+> I assume you're using the 3rd parameter for flags.  If so, please use
+> the defines.
+
+No, the third parameter encodes the irq priority (from 0 to 7 IIRC).
+
+>> +			pinctrl-names = "default", "rgb-444", "rgb-565", "rgb-666", "rgb-888";
+>> +			pinctrl-0 = <&pinctrl_lcd_base>;
+>> +			pinctrl-1 = <&pinctrl_lcd_base &pinctrl_lcd_rgb444>;
+>> +			pinctrl-2 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
+>> +			pinctrl-3 = <&pinctrl_lcd_base &pinctrl_lcd_rgb666>;
+>> +			pinctrl-4 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
+>> +		};
+>> +
+>> +		hlcdc_pwm: hlcdc-pwm {
+>> +			compatible = "atmel,hlcdc-pwm";
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&pinctrl_lcd_pwm>;
+>> +			#pwm-cells = <3>;
+>> +		};
+>> +	};
+>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+>> index ee8204c..82777f6 100644
+>> --- a/drivers/mfd/Kconfig
+>> +++ b/drivers/mfd/Kconfig
+>> @@ -59,6 +59,17 @@ config MFD_AAT2870_CORE
+>>  	  additional drivers must be enabled in order to use the
+>>  	  functionality of the device.
+>>  
+>> +config MFD_ATMEL_HLCDC
+>> +	tristate "Atmel HLCDC (High LCD Controller)"
+> What's the difference between a high and a low controller?
+
+I don't know exactly.
+I guess the name changed when the LCD Controller design changed.
+Maybe "High-end LCD Controller" would be better...
+
+Nicolas, can you help me on this one ?
+
 >
-> First of all, I want to note this doesn't change my view on the
-> importance of mainline support for devicetree overlays. They are still
-> absolutely critical and highly useful, solving problems that cannot be
-> solved through boot-time devicetrees. I'm simply looking for an
-> approach that will complement the availability of overlays and provide
-> the best user experience.
+>> +	select MFD_CORE
+>> +	select REGMAP_MMIO
+>> +	help
+>> +	  Choose this option if you have an ATMEL SoC with an HLCDC (High
+>> +	  LCD Controller) IP (i.e. at91sam9n12, at91sam9x5 family or sama5d3
+>> +	  family).
+>> +	  This MFD device exposes two subdevices: a PWM chip and a Display
+>> +	  Controller.
+>> +
+>>  config MFD_BCM590XX
+>>  	tristate "Broadcom BCM590xx PMUs"
+>>  	select MFD_CORE
+>> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+>> index 8afedba..5f25b0d 100644
+>> --- a/drivers/mfd/Makefile
+>> +++ b/drivers/mfd/Makefile
+>> @@ -156,6 +156,7 @@ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
+>>  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+>>  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+>>  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+>> +obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
+>>  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+>>  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
+>>  obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
+>> diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
+>> new file mode 100644
+>> index 0000000..e4636e8
+>> --- /dev/null
+>> +++ b/drivers/mfd/atmel-hlcdc.c
+>> @@ -0,0 +1,116 @@
+>> +/*
+>> + * Copyright (C) 2014 Free Electrons
+>> + * Copyright (C) 2014 Atmel
+>> + *
+>> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms of the GNU General Public License version 2 as published by
+>> + * the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/mfd/atmel-hlcdc.h>
+>> +#include <linux/mfd/core.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+> Looks like you're inheriting the clk and regmap header files - don't
+> do that.  Each source file which uses the interfaces should include
+> them independently.
+
+Okay, I'll explicitly include clk and regmap headers.
+
 >
-> Robert has been talking about the actions required to clean-up Debian
-> Jessie support in another thread
-> (https://groups.google.com/d/msg/beagleboard/2b8rArtfABY/A8d1JzmJa4IJ)
-> and I suggested we should add a bit of a detour by cleaning up the
-> cape support for the mainline kernel and switching away our primary
-> process of supporting capes from using overlays to using a single
-> devicetree file provided at boot. I promised a pull-request and hadn't
-> gotten around to sending it until now (below). No architecture changes
-> have been made in my pull-request, just bringing in the kernel
-> devicetree source history. This suggestion is based on several
-> assumptions, any number of which might be wrong.
+>> +static const struct mfd_cell atmel_hlcdc_cells[] = {
+>> +	{
+>> +		.name = "atmel-hlcdc-pwm",
+>> +		.of_compatible = "atmel,hlcdc-pwm",
+>> +	},
+>> +	{
+>> +		.name = "atmel-hlcdc-dc",
+>> +		.of_compatible = "atmel,hlcdc-dc",
+>> +	},
+>> +};
+>> +
+>> +static int atmel_hlcdc_probe(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct regmap_config config;
+>> +	struct atmel_hlcdc *hlcdc;
+>> +	struct resource *res;
+>> +	void __iomem *regs;
+>> +
+>> +	hlcdc = devm_kzalloc(dev, sizeof(*hlcdc), GFP_KERNEL);
+>> +	if (!hlcdc)
+>> +		return -ENOMEM;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	regs = devm_ioremap_resource(dev, res);
+>> +	if (IS_ERR(regs))
+>> +		return PTR_ERR(regs);
+>> +
+>> +	hlcdc->periph_clk = devm_clk_get(dev, "periph_clk");
+>> +	if (IS_ERR(hlcdc->periph_clk)) {
+>> +		dev_err(dev, "failed to get functional clock\n");
+>> +		return PTR_ERR(hlcdc->periph_clk);
+>> +	}
+>> +
+>> +	hlcdc->sys_clk = devm_clk_get(dev, "sys_clk");
+>> +	if (IS_ERR(hlcdc->sys_clk)) {
+>> +		dev_err(dev, "failed to get functional clock\n");
+> Can you be more descriptive?  This error message is the same as the
+> one above.  How will a user know which one has failed?
+
+This is a copy/paste error. I'll fix that.
+
 >
-> The assumptions (for which I'm looking for feedback/corrections):
-> * The overlays pretty much all need to be compiled into the kernel if
-> they are going to be loaded using kernel command-line arguments or
-> /etc/capemgr for the majority of distros. While many cape devicetree
-> use cases are perfectly happy with loading at run-time rather than
-> boot-time, it seems there should be a mechanism for pushing cape
-> support into the category of being available at boot-time across
-> distributions.
-> * The devicetree sources, including the primary boot .dts files, will
-> eventually be removed from the kernel source tree. I'm not too sure if
-> and when it'll really happen, but starting up a project to maintain
-> the definitive beagleboard.org board devicetree files outside the
-> kernel seems to make sense. Given the interdependency of the boot .dtb
-> and the overlay .dtbo files, combining them into a single repository
-> where every distribution can pick them up seems like a natural and
-> obvious choice. There are of course some dependencies on kernel
-> versions, but I believe most of those have settled out by now and we
-> should be OK moving forward.
-> * There seems to be little or no interest in my previous proposal to
-> use cape EEPROMs to store the overlay fragments. Given some churn in
-> the devicetree node definitions, it is likely this would have failed
-> in bad ways anyway. It seems mostly reasonable to expect users to
-> update their kernel and firmware to gain support for new add-on
-> hardware and we mostly try to avoid regressions (with the seemingly
-> ever-living exception of 3D graphics support), so I think I'm better
-> aligned with the community to drop my older suggestion. Some people,
-> including CircuitCo, are building capes without configuration EEPROMs
-> now, so a different recommended mechanism seems like a requirement.
-> * With the patches in our vendor 3.8 kernels and with all recent
-> mainline kernels, performing userspace muxing operations has become
-> easy again. It seems to be possible to turn on drivers not currently
-> in use without an unacceptable level of bloat or conflict. This has
-> been partially proven out using Charles' universal cape
-> (https://github.com/cdsteinkuehler/beaglebone-universal-io), though I
-> still have some concerns about conflicts. The result might be that
-> there is still some number of overlays, but the approach of minimizing
-> the overlays and instead relying on the existing loading/unloading
-> mechanisms of the mainline drivers as much as possible feels right to
-> me.
-> * It will still be some time before devicetree overlay support is
-> adopted in the mainline kernel. While I still see a strong need to
-> have devicetree overlay support and CapeMgr in the mainline, the
-> desire here is to optimize the user experience in the shortest term
-> possible. Users get really confused by the errors that get generated
-> by loading incorrect devicetree overlays and it is always nice when
-> you can avoid confusing users.
+>> +		return PTR_ERR(hlcdc->sys_clk);
+>> +	}
+>> +
+>> +	hlcdc->slow_clk = devm_clk_get(dev, "slow_clk");
+>> +	if (IS_ERR(hlcdc->slow_clk)) {
+>> +		dev_err(dev, "failed to get slow clock\n");
+>> +		return PTR_ERR(hlcdc->slow_clk);
+>> +	}
+>> +
+>> +	memset(&config, 0, sizeof(config));
+>> +	config.reg_bits = 32;
+>> +	config.val_bits = 32;
+>> +	config.reg_stride = 4;
+>> +	config.max_register = (resource_size(res) / 4) - 1;
+> I'd prefer you did this as a separate struct, like everyone else
+> does.
+
+I tend to avoid static structures when they're used to initialize
+configurable things (here max_register depends on the resource size).
+This prevent getting the structure filled with dirty values from
+previous probe calls.
+Moreover, AFAIK, all the fields set in config are copied to the regmap
+struct during registration, and config pointer is never used after the
+registration has completed.
+
+Anyway, I can define a static struct and dynamically modify max_register.
+
+>> +	hlcdc->regmap = devm_regmap_init_mmio_clk(dev, "periph_clk", regs,
+>> +						  &config);
+>> +	if (IS_ERR(hlcdc->regmap))
+>> +		return PTR_ERR(hlcdc->regmap);
+>> +
+>> +	dev_set_drvdata(dev, hlcdc);
+>> +
+>> +	return mfd_add_devices(dev, -1, atmel_hlcdc_cells,
+>> +			       ARRAY_SIZE(atmel_hlcdc_cells),
+>> +			       NULL, 0, NULL);
+>> +}
+>> +
+>> +static int atmel_hlcdc_remove(struct platform_device *pdev)
+>> +{
+>> +	mfd_remove_devices(&pdev->dev);
+>> +
+>> +	dev_set_drvdata(&pdev->dev, NULL);
+> This is done automatically for you - you can remove it.
+
+Okay.
+
 >
-> My suggestion is:
-> * Maintain the source for .dtb and .dtbo files for all BeagleBoard.org
-> boards at http://github.com/beagleboard/devicetree-source, overriding
-> the sources in the mainline kernel when performing kernel builds. We
-> can host pre-built .dtb and .dtbo files at a normailzed location
-> outside the source repository for those that don't want to perform the
-> builds, since I don't believe the binary format is changing any time
-> soon other than the overlay support we utilize. Any patches accepted
-> into mainline as long as these files still exist there as well should
-> be merged to try to keep these in-line as long as possible,
-> anticipating eventual removal from mainline.
-> * Have cape makers submit pull requests to have their cape enabled in
-> the single boot-time devicetree overlay for each board they support.
-> The base drivers should be enabled at the earliest point where they
-> don't cause a conflict, minimizing what gets put into their overlays.
-> The final mux configuration and other points of conflict should be
-> kept in a board-specific overlay to make that configuration available
-> at boot. If the cape is disabled on the kernel command-line, the
-> kernel doesn't include CapeMgr support, or the board doesn't include a
-> configuration EEPROM, users would still have the ability to perform
-> run-time userspace mux configuration without CapeMgr unless
-> conflicting drivers need to be loaded.
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id atmel_hlcdc_match[] = {
+>> +	{ .compatible = "atmel,sama5d3-hlcdc" },
+>> +	{ },
+>> +};
+>> +
+>> +static struct platform_driver atmel_hlcdc_driver = {
+>> +	.probe = atmel_hlcdc_probe,
+>> +	.remove = atmel_hlcdc_remove,
+>> +	.driver = {
+>> +		.name = "atmel-hlcdc",
+>> +		.owner = THIS_MODULE,
+>> +		.of_match_table = atmel_hlcdc_match,
+> Is this driver DT only?
+
+Yes it is.
+
 >
-> Alternatively, if we don't think this is where things belong, perhaps
-> we could try to move all of this into the u-boot sources, though
-> people using other bootloaders might not find this the most useful
-> approach.
->
-> The pull request for http://github.com/beagleboard/devicetree-source:
->
-> The following changes since commit a524bf5d5e173795ce4cb214280f304588b1d78d:
->
->   capes: add BB-VIEW-LCD4-01-00A0 & BB-VIEW-LCD7-01-00A0 (2014-05-29
-> 15:59:31 -0500)
->
-> are available in the git repository at:
->
->   git at github.com:jadonk/cape-firmware master
->
-> for you to fetch changes up to 9de20db80056b72d6e1f61b68447ba8f2d12cf9c:
->
->   Beagle DTS: remove deleted files from Makefile (2014-06-02 12:35:28 -0400)
->
-> ----------------------------------------------------------------
->
-> [...] Too many changes to list bringing in kernel history.
+>> +	},
+>> +};
+>> +module_platform_driver(atmel_hlcdc_driver);
+>> +
+>> +MODULE_ALIAS("platform:atmel-hlcdc");
+>> +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
+>> +MODULE_DESCRIPTION("Atmel HLCDC driver");
+>> +MODULE_LICENSE("GPL");
+>> diff --git a/include/linux/mfd/atmel-hlcdc.h b/include/linux/mfd/atmel-hlcdc.h
+>> new file mode 100644
+>> index 0000000..d7a5589
+>> --- /dev/null
+>> +++ b/include/linux/mfd/atmel-hlcdc.h
+>> @@ -0,0 +1,78 @@
+>> +/*
+>> + * Copyright (C) 2014 Free Electrons
+>> + * Copyright (C) 2014 Atmel
+>> + *
+>> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms of the GNU General Public License version 2 as published by
+>> + * the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#ifndef __LINUX_MFD_HLCDC_H
+>> +#define __LINUX_MFD_HLCDC_H
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/regmap.h>
+>> +
+>> +#define ATMEL_HLCDC_CFG(i)		((i) * 0x4)
+>> +#define ATMEL_HLCDC_SIG_CFG		LCDCFG(5)
+>> +#define		ATMEL_HLCDC_HSPOL		BIT(0)
+>> +#define		ATMEL_HLCDC_VSPOL		BIT(1)
+>> +#define		ATMEL_HLCDC_VSPDLYS		BIT(2)
+>> +#define		ATMEL_HLCDC_VSPDLYE		BIT(3)
+>> +#define		ATMEL_HLCDC_DISPPOL		BIT(4)
+>> +#define		ATMEL_HLCDC_DITHER		BIT(6)
+>> +#define		ATMEL_HLCDC_DISPDLY		BIT(7)
+>> +#define		ATMEL_HLCDC_MODE_MASK		0x300
+>> +#define		ATMEL_HLCDC_PP			BIT(10)
+>> +#define		ATMEL_HLCDC_VSPSU		BIT(12)
+>> +#define		ATMEL_HLCDC_VSPHO		BIT(13)
+>> +#define		ATMEL_HLCDC_GUARDTIME_MASK	0x1f0000
+> There should only be one space after '#define'.
+
+I'll fix that.
+
+Thanks for your review.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
