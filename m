@@ -1,29 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 16 Jun 2014 10:26:31 +0100
-Subject: [PATCH] [linux-next] arm64: ftrace: Fix comment typo
- 'CONFIG_FUNCTION_GRAPH_FP_TEST'
-In-Reply-To: <1402479861.3798.63.camel@x220>
-References: <1402479861.3798.63.camel@x220>
-Message-ID: <20140616092630.GA3971@arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon, 16 Jun 2014 11:28:51 +0200
+Subject: [PATCH v3 4/6] ARM: dts: imx25: Add TSC and ADC support
+In-Reply-To: <1402910933-20534-1-git-send-email-denis@eukrea.com>
+References: <1402910933-20534-1-git-send-email-denis@eukrea.com>
+Message-ID: <1402910933-20534-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 10:44:21AM +0100, Paul Bolle wrote:
-> diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-> index b051871f2965..aa5f9fcbf9ee 100644
-> --- a/arch/arm64/kernel/entry-ftrace.S
-> +++ b/arch/arm64/kernel/entry-ftrace.S
-> @@ -205,7 +205,7 @@ ENDPROC(ftrace_graph_caller)
->   *
->   * Run ftrace_return_to_handler() before going back to parent.
->   * @fp is checked against the value passed by ftrace_graph_caller()
-> - * only when CONFIG_FUNCTION_GRAPH_FP_TEST is enabled.
-> + * only when CONFIG_HAVE_FUNCTION_GRAPH_FP_TEST is enabled.
->   */
->  ENTRY(return_to_handler)
->  	str	x0, [sp, #-16]!
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+Changelog v2->v3:
+- Added ADC controller support: making a separate patch
+  for it would have been overkill.
+- Moved the common TSC and ADC sub-nodes inside this patch
+  instead of having a copy in each dts using it.
+---
+ arch/arm/boot/dts/imx25.dtsi |   30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
 
-Thanks. Applied.
-
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 98783f5..3187342 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -264,13 +264,37 @@
+ 				status = "disabled";
+ 			};
+ 
+-			tsc: tsc at 50030000 {
+-				compatible = "fsl,imx25-adc", "fsl,imx21-tsc";
+-				reg = <0x50030000 0x4000>;
++			tscadc: tscadc at 50030000 {
++				compatible = "fsl,imx25-tsadc";
++				reg = <0x50030000 0xc>;
+ 				interrupts = <46>;
+ 				clocks = <&clks 119>;
+ 				clock-names = "ipg";
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
+ 				status = "disabled";
++
++				adc: adc at 50030800 {
++					compatible = "fsl,imx25-gcq";
++					reg = <0x50030800 0x60>;
++					interrupt-parent = <&tscadc>;
++					interrupts = <1>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					status = "disabled";
++				};
++
++				tsc: tcq at 50030400 {
++					compatible = "fsl,imx25-tcq";
++					reg = <0x50030400 0x60>;
++					interrupt-parent = <&tscadc>;
++					interrupts = <0>;
++					fsl,wires = <4>;
++					status = "disabled";
++				};
+ 			};
+ 
+ 			ssi1: ssi at 50034000 {
 -- 
-Catalin
+1.7.9.5
