@@ -1,92 +1,87 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 16 Jun 2014 13:27:12 -0700
-Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
-In-Reply-To: <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
-References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <1402950432.3708.22.camel@smoke>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 16 Jun 2014 22:31:17 +0200
+Subject: [PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU devices to DT
+In-Reply-To: <CAMuHMdXeyKy4vR0jNS3RC9E7+0_=xPXRUDokXe0kP+V8uVEiyQ@mail.gmail.com>
+References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1462083.WMstm6aRc1@avalon>
+ <CAMuHMdXeyKy4vR0jNS3RC9E7+0_=xPXRUDokXe0kP+V8uVEiyQ@mail.gmail.com>
+Message-ID: <5236750.dtz35JItTk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Geert,
 
-Sorry for such a delay in my reply.
+On Monday 16 June 2014 18:19:02 Geert Uytterhoeven wrote:
+> On Mon, Jun 16, 2014 at 4:22 PM, Laurent Pinchart wrote:
+> >> diff --git a/arch/arm/boot/dts/r8a7779.dtsi
+> >> b/arch/arm/boot/dts/r8a7779.dtsi index bf716ce..81714ce 100644
+> >> --- a/arch/arm/boot/dts/r8a7779.dtsi
+> >> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> >> @@ -269,9 +269,10 @@
+> >>       tmu0: timer at ffd80000 {
+> >>               compatible = "renesas,tmu";
+> >>               reg = <0xffd80000 0x30>;
+> >> -             interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
+> >> -                          <0 41 IRQ_TYPE_LEVEL_HIGH>,
+> >> -                          <0 42 IRQ_TYPE_LEVEL_HIGH>;
+> >> +             interrupt-parent = <&gic>;
+> >> +             interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
+> >> +                          <0 33 IRQ_TYPE_LEVEL_HIGH>,
+> >> +                          <0 34 IRQ_TYPE_LEVEL_HIGH>;
+> >> 
+> >>               clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
+> >>               clock-names = "fck";
+> >> 
+> >> @@ -283,9 +284,10 @@
+> >>       tmu1: timer at ffd81000 {
+> >>               compatible = "renesas,tmu";
+> >>               reg = <0xffd81000 0x30>;
+> >> -             interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>,
+> >> -                          <0 45 IRQ_TYPE_LEVEL_HIGH>,
+> >> -                          <0 46 IRQ_TYPE_LEVEL_HIGH>;
+> >> +             interrupt-parent = <&gic>;
+> >> +             interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>,
+> >> +                          <0 36 IRQ_TYPE_LEVEL_HIGH>,
+> >> +                          <0 37 IRQ_TYPE_LEVEL_HIGH>;
+> > 
+> > If I'm not mistaken the interrupts should be 36, 37 and 38.
+> 
+> (diving into the documentation)
+> 
+> Yes, probably 36, 37, and 38. I say "probably", as I find it non-trivial
+> to convert from docs to DT.
+> 
+> What happens with 35, which is "TMU21 (input capture)"?
+> As DT describes the hardware, shouldn't it be mentioned here?
 
-On Fri, 2014-05-16 at 10:50 +0100, Mark Rutland wrote:
-> Both the image load offset and the effective image size are forced to be
-> little-endian regardless of the native endianness of the kernel to
-> enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
-> which wish to make use of the load offset can inspect the effective
-> image size field for a non-zero value to determine if the offset is of a
-> known endianness.
+Input capture isn't supported by the TMU driver yet. I haven't checked how the 
+feature is implemented in the hardware, which is why I've left it out from the 
+DT bindings for now.
 
-Doing this conversion in the linker script seems complicated.  My
-thought was to just have an image header field that specifies the
-byte order, in the same way that the EI_DATA part of the ELF
-e_ident field does.
+> >>               clocks = <&mstp0_clks R8A7779_CLK_TMU1>;
+> >>               clock-names = "fck";
+> >> 
+> >> @@ -296,10 +298,11 @@
+> >> 
+> >>       tmu2: timer at ffd82000 {
+> >>               compatible = "renesas,tmu";
+> >> +             interrupt-parent = <&gic>;
+> >>               reg = <0xffd82000 0x30>;
+> >> -             interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>,
+> >> -                          <0 49 IRQ_TYPE_LEVEL_HIGH>,
+> >> -                          <0 50 IRQ_TYPE_LEVEL_HIGH>;
+> >> +             interrupts = <0 38 IRQ_TYPE_LEVEL_HIGH>,
+> >> +                          <0 39 IRQ_TYPE_LEVEL_HIGH>,
+> >> +                          <0 40 IRQ_TYPE_LEVEL_HIGH>;
+> > 
+> > And 40, 41 and 42 here.
+> 
+> Likewise for "TMU51 (input capture)"?
+> 
+> >>               clocks = <&mstp0_clks R8A7779_CLK_TMU2>;
+> >>               clock-names = "fck";
 
-Another advantage of having the byte order in the header is that
-tools other than a boot loader that need to know the byte order
-can get that info from the header, otherwise they would need to
-guess the order with some kind of inspection.
-
-A patch I had planned to post for this is below.
-
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -72,8 +72,8 @@ The decompressed kernel image contains a 64-byte header as follows:
->  
->    u32 code0;			/* Executable code */
->    u32 code1;			/* Executable code */
-> -  u64 text_offset;		/* Image load offset */
-> -  u64 res0	= 0;		/* reserved */
-> +  u64 text_offset;		/* Image load offset, little endian */
-> +  u64 image_size;		/* Effective Image size, little endian */
-
-It seems __le64 would be a better type to use here, if the
-value is decided to be little endian.
-
->    u64 res1	= 0;		/* reserved */
->    u64 res2	= 0;		/* reserved */
->    u64 res3	= 0;		/* reserved */
-> @@ -86,9 +86,27 @@ Header notes:
-
-
->From a63dd2f24105c55734238efaacdac5048bbedf39 Mon Sep 17 00:00:00 2001
-From: Geoff Levand <geoff@infradead.org>
-Date: Thu, 12 Jun 2014 11:23:23 -0700
-Subject: [PATCH] arm64: Add byte order to image header
-
-When working with a raw arm64 image one needs to know the byte order of the
-image header to properly interpret the multi-byte values of the header.  Add
-a character value to the image header indicating the byte order the image was
-built with:
-
-  1=LSB (little endian), 2=MSB (big endian), 0=no support.
-
-A zero value will indicate a kernel that pre-dates this change.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/kernel/head.S | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b96a732..70c3656 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -109,7 +109,11 @@
- 	 * DO NOT MODIFY. Image header expected by Linux boot-loaders.
- 	 */
- 	b	stext				// branch to kernel start, magic
--	.long	0				// reserved
-+	CPU_LE(.byte	1)			// 1=LSB (little endian)
-+	CPU_BE(.byte	2)			// 2=MSB (big endian)
-+	.byte	0				// reserved
-+	.byte	0				// reserved
-+	.byte	0				// reserved
- 	.quad	TEXT_OFFSET			// Image load offset from start of RAM
- 	.quad	0				// reserved
- 	.quad	0				// reserved
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
