@@ -1,34 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jun 2014 16:04:51 +0100
-Subject: [RFC PATCH v6 03/20] iommu/arm-smmu: add IOMMU_CAP_NOEXEC to the
- ARM SMMU driver
-In-Reply-To: <1401987808-23596-4-git-send-email-a.motakis@virtualopensystems.com>
-References: <1401987808-23596-1-git-send-email-a.motakis@virtualopensystems.com>
- <1401987808-23596-4-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <20140616150451.GP16758@arm.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 16 Jun 2014 17:07:13 +0200
+Subject: [PATCH v4 01/19] clocksource: sh_tmu: Fix channel IRQ retrieval in
+ legacy case
+In-Reply-To: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1402931251-22581-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1402931251-22581-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 06:03:11PM +0100, Antonios Motakis wrote:
-> The ARM SMMU supports the IOMMU_NOEXEC protection flag. Add the
-> corresponding IOMMU capability.
-> 
-> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-> ---
->  drivers/iommu/arm-smmu.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index d5a2200..15ab2af 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1544,6 +1544,8 @@ static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
->  	if (smmu_domain->root_cfg.smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
->  		caps |= IOMMU_CAP_CACHE_COHERENCY;
->  
-> +	caps |= IOMMU_CAP_NOEXEC;
-> +
+In the legacy platform data case each TMU platform device handles a
+single channel with a single IRQ for the platform device. Retrieve the
+IRQ using the logical channel number instead of the hardware channel
+number.
 
-Just initialise caps to IOMMU_CAP_NOEXEC.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/clocksource/sh_tmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Will
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index 4ba2c0f..ec34095 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -498,7 +498,7 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch, unsigned int index,
+ 			ch->base = tmu->mapbase + 8 + ch->index * 12;
+ 	}
+ 
+-	ch->irq = platform_get_irq(tmu->pdev, ch->index);
++	ch->irq = platform_get_irq(tmu->pdev, index);
+ 	if (ch->irq < 0) {
+ 		dev_err(&tmu->pdev->dev, "ch%u: failed to get irq\n",
+ 			ch->index);
+-- 
+1.8.5.5
