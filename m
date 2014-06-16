@@ -1,67 +1,320 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 16 Jun 2014 09:58:03 +0200
-Subject: [PATCH 3/3] mmc: mmci: Reverse IRQ handling for the arm_variant
-In-Reply-To: <1402905483-22567-1-git-send-email-ulf.hansson@linaro.org>
-References: <1402905483-22567-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1402905483-22567-4-git-send-email-ulf.hansson@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Jun 2014 09:08:28 +0100
+Subject: [PATCH v3 5/6] regulator: add support for regulator set
+ registration
+In-Reply-To: <53970ABD.4030402@free-electrons.com>
+References: <1401183535-31003-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1401183535-31003-6-git-send-email-boris.brezillon@free-electrons.com>
+ <53970ABD.4030402@free-electrons.com>
+Message-ID: <20140616080828.GF14323@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit "mmc: mmci: Handle CMD irq before DATA irq", caused an issue
-when using the ARM model of the PL181 and running QEMU.
+> Hello Mark,
+> 
+> Did you have time to take a look at this patch ?
+> 
+> I'd like to post a new version of this series addressing Lee's comments,
+> but it would be great to have your feedback on this patch before posting
+> a new version.
 
-The bug was reported for the following QEMU version:
-$ qemu-system-arm -version
-QEMU emulator version 2.0.0 (Debian 2.0.0+dfsg-2ubuntu1.1), Copyright
-(c) 2003-2008 Fabrice Bellard
+I wouldn't do that, as you're likely to upset him.
 
-To resolve the problem, let's restore the old behavior were the DATA
-irq is handled prior the CMD irq, but only for the arm_variant, which
-the problem was reported for.
+Just fix what you know and resend.
 
-Reported-by: John Stultz <john.stultz@linaro.org>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |   11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+Mark will subsequently review I'm sure.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5d20bfba..c7e1d42 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -74,6 +74,7 @@ static unsigned int fmax = 515633;
-  * @pwrreg_nopower: bits in MMCIPOWER don't controls ext. power supply
-  * @explicit_mclk_control: enable explicit mclk control in driver.
-  * @qcom_fifo: enables qcom specific fifo pio read logic.
-+ * @reversed_irq_handling: handle data irq before cmd irq.
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -97,6 +98,7 @@ struct variant_data {
- 	bool			pwrreg_nopower;
- 	bool			explicit_mclk_control;
- 	bool			qcom_fifo;
-+	bool			reversed_irq_handling;
- };
- 
- static struct variant_data variant_arm = {
-@@ -1236,8 +1238,13 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
- 
- 		dev_dbg(mmc_dev(host->mmc), "irq0 (data+cmd) %08x\n", status);
- 
--		mmci_cmd_irq(host, host->cmd, status);
--		mmci_data_irq(host, host->data, status);
-+		if (host->variant->reversed_irq_handling) {
-+			mmci_data_irq(host, host->data, status);
-+			mmci_cmd_irq(host, host->cmd, status);
-+		} else {
-+			mmci_cmd_irq(host, host->cmd, status);
-+			mmci_data_irq(host, host->data, status);
-+		}
- 
- 		/* Don't poll for busy completion in irq context. */
- 		if (host->busy_status)
+> Best Regards,
+> 
+> Boris
+> 
+> On 27/05/2014 11:38, Boris BREZILLON wrote:
+> > PMIC devices often provide several regulators, and these regulators are
+> > all using the same regmap and are all attached to the same device (the
+> > PMIC device).
+> >
+> > Add helper functions (both simple and resource managed versions) to
+> > register and unregister such kind of regulator set.
+> >
+> > This implementation handles self dependency issues where one regulator
+> > provided the PMIC depends on another one provided by the same PMIC.
+> >
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/regulator/core.c         | 106 +++++++++++++++++++++++++++++++++++++++
+> >  drivers/regulator/devres.c       |  68 +++++++++++++++++++++++++
+> >  include/linux/regulator/driver.h |  51 +++++++++++++++++++
+> >  3 files changed, 225 insertions(+)
+> >
+> > diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+> > index 9a09f3c..7703853 100644
+> > --- a/drivers/regulator/core.c
+> > +++ b/drivers/regulator/core.c
+> > @@ -3595,6 +3595,112 @@ void regulator_unregister(struct regulator_dev *rdev)
+> >  EXPORT_SYMBOL_GPL(regulator_unregister);
+> >  
+> >  /**
+> > + * regulator_set_register - register a set of regulators
+> > + * @config: runtime configuration for regulator set
+> > + *
+> > + * Called by regulator drivers to register a set of regulators.
+> > + * Returns a valid pointer to struct regulator_set on success
+> > + * or an ERR_PTR() on error.
+> > + */
+> > +struct regulator_set *
+> > +regulator_set_register(const struct regulator_set_config *config)
+> > +{
+> > +	struct regulator_set *rset;
+> > +	int prev_nregistered = -1;
+> > +	int nregistered = 0;
+> > +	int ret;
+> > +	int i;
+> > +
+> > +	if (!config->descs || !config->nregulators)
+> > +		return ERR_PTR(-EINVAL);
+> > +
+> > +	rset = kzalloc(sizeof(*rset) +
+> > +		       (config->nregulators * sizeof(struct regulator_dev *)),
+> > +		       GFP_KERNEL);
+> > +	if (!rset)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	rset->nregulators = config->nregulators;
+> > +
+> > +	while (nregistered < config->nregulators &&
+> > +	       prev_nregistered < nregistered) {
+> > +
+> > +		prev_nregistered = nregistered;
+> > +
+> > +		for (i = 0; i < config->nregulators; i++) {
+> > +			struct regulator_config conf;
+> > +			struct regulator_dev *regulator;
+> > +
+> > +			if (rset->regulators[i])
+> > +				continue;
+> > +
+> > +			memset(&conf, 0, sizeof(conf));
+> > +
+> > +			conf.dev = config->dev;
+> > +			conf.regmap = config->regmap;
+> > +			conf.driver_data = config->driver_data;
+> > +			if (config->matches && config->matches[i].init_data)
+> > +				conf.init_data = config->matches[i].init_data;
+> > +			else if (config->init_data)
+> > +				conf.init_data = config->init_data[i];
+> > +
+> > +			if (config->matches)
+> > +				conf.of_node = config->matches[i].of_node;
+> > +
+> > +			regulator = regulator_register(&config->descs[i],
+> > +						       &conf);
+> > +			if (IS_ERR(regulator)) {
+> > +				ret = PTR_ERR(regulator);
+> > +				if (ret == -EPROBE_DEFER)
+> > +					continue;
+> > +
+> > +				goto err;
+> > +			}
+> > +
+> > +			rset->regulators[i] = regulator;
+> > +			nregistered++;
+> > +		}
+> > +	}
+> > +
+> > +	if (nregistered < config->nregulators) {
+> > +		ret = -EPROBE_DEFER;
+> > +		goto err;
+> > +	}
+> > +
+> > +	return rset;
+> > +
+> > +err:
+> > +	for (i = 0; i < config->nregulators; i++) {
+> > +		if (rset->regulators[i])
+> > +			regulator_unregister(rset->regulators[i]);
+> > +	}
+> > +
+> > +	kfree(rset);
+> > +
+> > +	return ERR_PTR(ret);
+> > +}
+> > +EXPORT_SYMBOL_GPL(regulator_set_register);
+> > +
+> > +/**
+> > + * regulator_set_unregister - unregister regulator set
+> > + * @rset: regulator set to unregister
+> > + *
+> > + * Called by regulator drivers to unregister a regulator set.
+> > + */
+> > +void regulator_set_unregister(struct regulator_set *rset)
+> > +{
+> > +	int i;
+> > +
+> > +	for (i = 0; i < rset->nregulators; i++) {
+> > +		if (rset->regulators[i])
+> > +			regulator_unregister(rset->regulators[i]);
+> > +	}
+> > +
+> > +	kfree(rset);
+> > +}
+> > +EXPORT_SYMBOL_GPL(regulator_set_unregister);
+> > +
+> > +/**
+> >   * regulator_suspend_prepare - prepare regulators for system wide suspend
+> >   * @state: system suspend state
+> >   *
+> > diff --git a/drivers/regulator/devres.c b/drivers/regulator/devres.c
+> > index f44818b..a34f34c 100644
+> > --- a/drivers/regulator/devres.c
+> > +++ b/drivers/regulator/devres.c
+> > @@ -251,6 +251,74 @@ void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev)
+> >  }
+> >  EXPORT_SYMBOL_GPL(devm_regulator_unregister);
+> >  
+> > +static void devm_rset_release(struct device *dev, void *res)
+> > +{
+> > +	regulator_set_unregister(*(struct regulator_set **)res);
+> > +}
+> > +
+> > +/**
+> > + * devm_regulator_set_register - Resource managed regulator_set_register()
+> > + * @dev: device registering the regulator set
+> > + * @config: runtime configuration for regulator set
+> > + *
+> > + * Called by regulator drivers to register a set of regulators.  Returns a
+> > + * valid pointer to struct regulator_set on success or an ERR_PTR() on
+> > + * error.  The regulator will automatically be released when the device
+> > + * is unbound.
+> > + */
+> > +struct regulator_set *
+> > +devm_regulator_set_register(struct device *dev,
+> > +			    const struct regulator_set_config *config)
+> > +{
+> > +	struct regulator_set **ptr, *rset;
+> > +
+> > +	ptr = devres_alloc(devm_rset_release, sizeof(*ptr),
+> > +			   GFP_KERNEL);
+> > +	if (!ptr)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	rset = regulator_set_register(config);
+> > +	if (!IS_ERR(rset)) {
+> > +		*ptr = rset;
+> > +		devres_add(dev, ptr);
+> > +	} else {
+> > +		devres_free(ptr);
+> > +	}
+> > +
+> > +	return rset;
+> > +}
+> > +EXPORT_SYMBOL_GPL(devm_regulator_set_register);
+> > +
+> > +static int devm_rset_match(struct device *dev, void *res, void *data)
+> > +{
+> > +	struct regulator_set **r = res;
+> > +	if (!r || !*r) {
+> > +		WARN_ON(!r || !*r);
+> > +		return 0;
+> > +	}
+> > +	return *r == data;
+> > +}
+> > +
+> > +/**
+> > + * devm_regulator_set_unregister - Resource managed regulator_set_unregister()
+> > + * @dev: device unregistering the regulator set
+> > + * @rset: regulator set to release
+> > + *
+> > + * Unregister a regulator set registered with devm_regulator_set_register().
+> > + * Normally this function will not need to be called and the resource
+> > + * management code will ensure that the resource is freed.
+> > + */
+> > +void devm_regulator_set_unregister(struct device *dev,
+> > +				   struct regulator_set *rset)
+> > +{
+> > +	int rc;
+> > +
+> > +	rc = devres_release(dev, devm_rdev_release, devm_rset_match, rset);
+> > +	if (rc != 0)
+> > +		WARN_ON(rc);
+> > +}
+> > +EXPORT_SYMBOL_GPL(devm_regulator_unregister);
+> > +
+> >  struct regulator_supply_alias_match {
+> >  	struct device *dev;
+> >  	const char *id;
+> > diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+> > index bbe03a1..b683f68 100644
+> > --- a/include/linux/regulator/driver.h
+> > +++ b/include/linux/regulator/driver.h
+> > @@ -350,6 +350,48 @@ struct regulator_dev {
+> >  	unsigned int ena_gpio_state:1;
+> >  };
+> >  
+> > +/**
+> > + * struct regulator_set_config - Dynamic regulator set descriptor
+> > + *
+> > + * This structure describe a regulator and each regulator in this set
+> > + * will be registered using informations passed through regulator_desc
+> > + * and of_regulator_match tables.
+> > + *
+> > + * @dev: struct device providing the regulator set.
+> > + * @driver_data: private driver data for this regulator set.
+> > + * @regmap: regmap to use for core regmap helpers if dev_get_regulator() is
+> > + *          insufficient.
+> > + * @descs: table of regulator descriptors.
+> > + * @matches: table of DT regulator descriptors. This table should have
+> > + *           been filled by the of_regulator_match function.
+> > + * @init_data: a table of init_data in case matches is NULL or the init_data
+> > + *             of the match entry is NULL.
+> > + * @nregulators: number of regulators in the regulator set.
+> > + */
+> > +struct regulator_set_config {
+> > +	struct device *dev;
+> > +	void *driver_data;
+> > +	struct regmap *regmap;
+> > +	const struct regulator_desc *descs;
+> > +	const struct of_regulator_match *matches;
+> > +	const struct regulator_init_data **init_data;
+> > +	int nregulators;
+> > +};
+> > +
+> > +/*
+> > + * struct regulator_set - Regulator set
+> > + *
+> > + * This structure stores a set of regulator devices provided by a single
+> > + * device (e.g. a PMIC device).
+> > + *
+> > + * @nregulators: number of regulators in the set
+> > + * @regulators: regulators table
+> > + */
+> > +struct regulator_set {
+> > +	int nregulators;
+> > +	struct regulator_dev *regulators[0];
+> > +};
+> > +
+> >  struct regulator_dev *
+> >  regulator_register(const struct regulator_desc *regulator_desc,
+> >  		   const struct regulator_config *config);
+> > @@ -360,6 +402,15 @@ devm_regulator_register(struct device *dev,
+> >  void regulator_unregister(struct regulator_dev *rdev);
+> >  void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev);
+> >  
+> > +struct regulator_set *
+> > +regulator_set_register(const struct regulator_set_config *config);
+> > +struct regulator_set *
+> > +devm_regulator_set_register(struct device *dev,
+> > +			    const struct regulator_set_config *config);
+> > +void regulator_set_unregister(struct regulator_set *rset);
+> > +void devm_regulator_set_unregister(struct device *dev,
+> > +				   struct regulator_set *rset);
+> > +
+> >  int regulator_notifier_call_chain(struct regulator_dev *rdev,
+> >  				  unsigned long event, void *data);
+> >  
+> 
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
