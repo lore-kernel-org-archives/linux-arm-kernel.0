@@ -1,92 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Jun 2014 13:16:57 +0200
-Subject: [PATCH] ARM: omap: rework platform selection
-In-Reply-To: <20140616110042.GD17845@atomide.com>
-References: <5701099.0P1SIXsHc1@wuerfel> <20140616110042.GD17845@atomide.com>
-Message-ID: <7892694.KrnV5uCBX6@wuerfel>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Mon, 16 Jun 2014 16:49:28 +0530
+Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
+In-Reply-To: <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>	<1402464739-19044-4-git-send-email-tushar.b@samsung.com>
+ <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
+Message-ID: <539ED2C0.8030405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 June 2014 04:00:42 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [140616 03:06]:
-> > Commit 9851b662f659 ("ARM: use menuconfig for sub-arch menus") did more
-> > than expected, which led to two OMAP specific bugs:
+On 06/13/2014 10:33 PM, Doug Anderson wrote:
+> Tushar,
 > 
-> It seems the commit above is not -rc cycle material at least not without
-> proper testing. There's a good chance of breaking a lot of the existing
-> .config files which can create a big mess as we've seen before. 
-
-Well, Kconfig is a big mess without it at the moment. The OMAP change
-was definitely wrong there, but for all other platforms I don't see any
-risk in applying it, because there is no semantic change, only cosmetic.
-
-> > * Turning CONFIG_ARCH_OMAP into a user-selectable option makes it possible
-> >   to have a configuration with ARCH_OMAP enabled but none of the specific
-> >   OMAP SoCs enabled, which triggers a couple of link errors due to the
-> >   layout of the Makefile
+> On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
+>> Peach-pi board has MAX98090 audio codec connected on HSI2C-7 bus.
 > 
-> And so we have a regression to this old problem again :(
-
-Yes, I didn't actually see this happen but from looking at the patch, I
-concluded that it would likely be the case.
-
-> > * The plat-omap menu still appears mixed into the normal menuconfig list,
-> >   which is confusing and inconsistent.
+> If you want to be a stickler about it, peach-pi actually has a
+> max98091.  That requires code changes to the i2c driver, though.
+> ...and unfortunately listing two compatible strings for i2c devices is
+> broken.  :(
 > 
-> That we should be able to remove completely soon but that's a
-> separate patch..
+Hi Doug,
 
-Ok.
+You are right. I checked the boot logs, the detected codec type is
+MAX98091. Since both these CODECs are supported through a single driver
+and the detection of chip is done during runtime, I would suggest we go
+ahead with "max98090" compatible string. I will update the commit
+message accordingly.
 
-> > To make matters worse, the change did not enable CONFIG_ARCH_OMAP in the
-> > defconfig files, which through some ripple effects disabled options that
-> > were implicitly enabled from OMAP2, and that caused all machines to
-> > fail booting with the unchanged config files.
-> > 
-> > This reorders the OMAP Kconfig files some more, to be consistent with
-> > the others, and also changes the defconfig files.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > Tony, can you have a look at this please? I'd like to send out the
-> > fixes for 3.16, but this is needed on top of Rob's Kconfig changes.
+Does that sound okay to you?
+
 > 
-> Hmm why is this patch already in linux next before getting posted
-> to the mailing lists?
-
-I had applied Rob's patch to the fixes series but that broke all
-multi_v7_defconfig runs on the boot test machines. I didn't want to
-spend too much work on it over the weekend, but applied it so at least
-today's linux-next wouldn't regress over last week's.
-
-> > --- a/arch/arm/plat-omap/Kconfig
-> > +++ b/arch/arm/plat-omap/Kconfig
-> > @@ -1,6 +1,11 @@
-> > -if ARCH_OMAP
-> > +menuconfig ARCH_OMAP_ENABLE
-> > +	bool "TI OMAP platforms" if ARCH_MULTI_V6 || ARCH_MULTI_V7
-> > +	default ARCH_OMAP1
-> >  
-> > -menu "TI OMAP Common Features"
-> > +if ARCH_OMAP_ENABLE
-> > +
-> > +source "arch/arm/mach-omap1/Kconfig"
-> > +source "arch/arm/mach-omap2/Kconfig"
+>> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5800-peach-pi.dts |   31 +++++++++++++++++++++++++++++
+>>  1 file changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> index f3af207..76f5966 100644
+>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> @@ -78,9 +78,27 @@
+>>                 pinctrl-0 = <&usb301_vbus_en>;
+>>                 enable-active-high;
+>>         };
+>> +
+>> +       sound {
+>> +               compatible = "google,snow-audio-max98090";
+>> +
+>> +               samsung,i2s-controller = <&i2s0>;
+>> +               samsung,audio-codec = <&max98090>;
+>> +       };
+>> +};
+>> +
+>> +&i2s0 {
+>> +       status = "okay";
 > 
-> It seems to me this kind of change is going to break all the
-> existing .config files unless they are manually updated. This
-> includes all the distros and automated build systems. I'll look
-> more at it, but my initial take is that we should be able to do
-> this all with CONFIG_ARCH_OMAP + the selected OMAP SoC and should
-> not introduce any new Kconfig options.
+> It would be awfully nice to keep diffs between exynos5420-peach-pit
+> and exynos5800-peach-pi clean.  They're 99% the same.  I know this has
+> already gotten messed up with DP/HDMI were added, but there's no need
+> to make it worse.
 > 
-> For now I'd just leave out Rob's changed and this patch from fixes
-> until they have been properly tested.
 
-Let's see if others have similar opinions Rob's patch as a whole.
-I'd still like to keep all the parts aside from the OMAP change
-and just back out the change that caused the problems.
+If you so desire, I will submit a patch to sort peach-pi device-tree
+nodes (w.r.t. peach-pit dts file).
 
-Does that seem reasonable to you?
+> Could you add these nodes in the same place within the dts they were
+> added in exynos5420-peach-pit?
+> 
 
-	Arnd
+Okay, I will add it after watchdog node.
+
+-- 
+Tushar Behera
