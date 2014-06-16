@@ -1,22 +1,20 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Jun 2014 15:39:00 -0600
-Subject: [PATCH v3 4/4] ARM: tegra: jetson-tk1: Add XUSB pad controller
-In-Reply-To: <1402930623-28886-4-git-send-email-thierry.reding@gmail.com>
-References: <1402930623-28886-1-git-send-email-thierry.reding@gmail.com>
- <1402930623-28886-4-git-send-email-thierry.reding@gmail.com>
-Message-ID: <539F63F4.8030800@wwwdotorg.org>
+Date: Mon, 16 Jun 2014 15:49:18 -0600
+Subject: [PATCH 4/9] clk: tegra: Enable hardware control of SATA PLL
+In-Reply-To: <1401881559-18469-5-git-send-email-mperttunen@nvidia.com>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <1401881559-18469-5-git-send-email-mperttunen@nvidia.com>
+Message-ID: <539F665E.3060007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2014 08:57 AM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> Assign lanes to the XUSB pads as used on the Jetson TK1.
+On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+> This makes the SATA PLL be controlled by hardware instead of software.
+> This is required for working SATA support.
 
-This series looks OK to me.
+Peter, could you please take patches 4 and 5 through the clock tree. As
+far as I can tell, there's no compile-time dependency in the clock
+patches, so they can go through a different tree to the rest of the
+series without issue. These 2 patches look fine to me, so consider them:
 
-Linus, are you OK with my taking it through the Tegra tree? If so, an
-ack on patch 2/4 would be great. I expect there will be other series
-(PCIe, SATA, XUSB drivers) that depend on this, so whichever tree it
-goes through, we'll need to put it into a standalone topic branch for
-various other trees to merge, or for other series to be applied on top of.
+Acked-by: Stephen Warren <swarren@nvidia.com>
