@@ -1,31 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 16 Jun 2014 10:31:19 +0100
-Subject: [PATCH] arm64/crypto: fix and improve GHASH secure hash
- implementation
-In-Reply-To: <1402584187-17114-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1402584187-17114-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140616093119.GB3971@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Jun 2014 02:41:56 -0700
+Subject: [PATCH 02/14] ARM: omap2: fix am43xx dependency on l2x0 cache
+In-Reply-To: <1402675276-538682-3-git-send-email-arnd@arndb.de>
+References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
+ <1402675276-538682-3-git-send-email-arnd@arndb.de>
+Message-ID: <20140616094156.GA17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 03:43:07PM +0100, Ard Biesheuvel wrote:
-> This fixes a bug in the arm64 GHASH implementation, and switches to a faster,
-> polynomial multiplication based reduction instead of one that uses
-> shifts and rotates.
+* Arnd Bergmann <arnd@arndb.de> [140613 09:02]:
+> Commit d941f86fad41b ("ARM: l2c: AM43x: add L2 cache support") enabled
+> the L2 cache support for the am43xx SoC, but caused a build regression
+> when the driver for that cache controller is disabled:
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
+> arch/arm/mach-omap2/built-in.o: In function `am43xx_init_early':
+> :(.init.text+0xb20): undefined reference to `omap_l2_cache_init'
 > 
-> This is a bug fix and a performance optimization in a single patch. As the code
-> has never worked correctly and was merged just a couple of days ago, I am
-> assuming this is OK but if anyone would prefer the bug fix separately, I'm happy
-> to split them as well.
+> This did not happen for OMAP4, which has the same call, but enables
+> the l2x0 driver unconditionally. We could do the same thing for
+> am43xx, but it seems better to allow turning it off and make the
+> code work in either case.
+> 
+> This adds an inline wrapper for omap_l2_cache_init for the disabled
+> case, and removes the 'select' from OMAP4 so it becomes a user
+> visible option.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-omap at vger.kernel.org
 
-I can push a performance optimisation patch as well but I would prefer
-to separate the bug-fixing part. Could you please also describe what the
-bug was for future reference?
-
-Thanks.
-
--- 
-Catalin
+Acked-by: Tony Lindgren <tony@atomide.com>
