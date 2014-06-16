@@ -1,38 +1,60 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 16 Jun 2014 00:50:35 -0300
-Subject: [PATCH 10/10] ARM: sun7i: cubietruck: add an SPIdev device for testing
-In-Reply-To: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
-References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1402890635-12342-11-git-send-email-emilio@elopez.com.ar>
+From: dianders@chromium.org (Doug Anderson)
+Date: Sun, 15 Jun 2014 21:40:39 -0700
+Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
+In-Reply-To: <539E0D8E.9080706@linaro.org>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+ <539E0D8E.9080706@linaro.org>
+Message-ID: <CAD=FV=XA09XawT-fxAm2tTMw4kZ=7RHceXuww2y6q+zMV71pew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Daniel,
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index cb25d3c..2c852aa 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -47,6 +47,18 @@
- 			status = "okay";
- 		};
- 
-+		spi2: spi at 01c17000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi2_pins_a>;
-+			status = "okay";
-+
-+			dac0: dh2228 at 2 {
-+				compatible = "rohm,dh2228fv";
-+				reg = <2>;
-+				spi-max-frequency = <100000>;
-+			};
-+		};
-+
- 		pinctrl at 01c20800 {
- 			ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 {
- 				allwinner,pins = "PH12";
--- 
-2.0.0
+On Sun, Jun 15, 2014 at 2:18 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 06/04/2014 07:30 PM, Doug Anderson wrote:
+>>
+>> In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
+>> supported using the MCT as a scheduler clock.  We properly marked
+>> exynos4_read_sched_clock() as notrace.  However, we then went and
+>> called another function that _wasn't_ notrace.  That means if you do:
+>>
+>>    cd /sys/kernel/debug/tracing/
+>>    echo function_graph > current_tracer
+>>
+>> You'll get a crash.
+>>
+>> Fix this (but still let other readers of the MCT be trace-enabled) by
+>> adding an extra function.  It's important to keep other users of MCT
+>> traceable because the MCT is actually quite slow.
+>
+>
+>
+> Hi Doug,
+>
+> could you elaborate ? I don't get the 'because the MCT ... slow'
+
+Sorry, I was trying to avoid duplication in the series and it's more
+obvious when you look at parts 2 and 3 of the series.  ;)
+
+Doing the math (please correct any miscalculations) using the numbers
+from the other patches: You can see that the existing code takes
+1323852 us for 1000000 gettimeofday in userspace.  The fastest
+implementation (just shaving to a 32-bit timer) gets us as fast as
+~1000000 us for 1000000 gettimeofday in userspace.
+
+>From profiling, I believe that gettimeofday from userspace is about
+50% overhead (system call, multiplication, copies, etc) and about 50%
+MCT read.  That means that the fastest you can possibly do an MCT read
+is in .5us or 500ns.
+
+I believe an A15 has something like 1 or 2 cycles per instruction.  If
+it were 2 cycles per instruction, it can execute a normal instruction
+on a 2GHz machine in .5ns.  That means we can execute 1000 normal
+instructions in the time it takes to do a since MCT access.
+
+...so I guess that's what I'd call slow.  ;)  What do you think?  I
+know that the MCT read shows up in whole system profiles of
+gettimeofday.
+
+-Doug
