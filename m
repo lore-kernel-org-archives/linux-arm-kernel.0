@@ -1,58 +1,124 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jun 2014 01:29:48 -0700
-Subject: [GIT PULL] ARM: OMAP2+: hwmod code and data changes for early
- v3.16-rc
-In-Reply-To: <alpine.DEB.2.02.1406160317120.659@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1406160317120.659@utopia.booyaka.com>
-Message-ID: <20140616082948.GY17845@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 16 Jun 2014 17:34:23 +0900
+Subject: [PATCH v3 10/19] clocksource: sh_tmu: Add DT support
+In-Reply-To: <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1402763021-4067-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140616083423.GE11582@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [140615 20:19]:
-> Hi Tony,
-> 
-> The following changes since commit abf04af74a9f27a65172a43b43ccabcbc2bbdc39:
-> 
->   Merge tag 'scsi-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi (2014-06-14 19:49:48 -0500)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.16-rc/omap-fixes-a
-> 
-> for you to fetch changes up to bf32c4ad9924e2d60a23de4a3c074f806bf2ef05:
-> 
->   ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods (2014-06-15 20:12:52 -0600)
-> 
-> ----------------------------------------------------------------
-> Two OMAP hwmod patches for early v3.16-rc kernels.
-> 
-> There's one OMAP SoC integration fix for the AM43xx SoC, without
-> which, IP blocks can't be placed into hard-reset.
-> 
-> There is also one OMAP5 SoC data addition patch that should have gone
-> in for v3.16. Normally I wouldn't send this as part of an -rc series,
-> since it's not technically a fix. But I'd like to make an exception in
-> this case because:
-> 
-> - it's intended to go in very early in the v3.16-rc series (or even
-> pre-rc1);
-> 
-> - it's a fairly small change;
-> 
-> - the impact is limited to a single SoC and a single device;
-> 
-> - the only reason that it didn't go in earlier is because it "slipped
-> through the cracks," rather than for any technical reason.
-> 
-> Basic build, boot, and PM test logs are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/hwmod-a-v3.16-rc/20140615201307/
+Hi Laurent,
 
-Thanks, pulling into omap-for-v3.16/fixes. BTW, starting with -rc2
-your off-idle tests should finally start working for some DT based
-boards.
+thanks for your patch.
 
-Regards,
+On Sat, Jun 14, 2014 at 06:23:32PM +0200, Laurent Pinchart wrote:
+> Document DT bindings and parse them in the TMU driver.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Tony
+[snip]
+
+> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+> index ef8fb0b..2ece4ab 100644
+> --- a/drivers/clocksource/sh_tmu.c
+> +++ b/drivers/clocksource/sh_tmu.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/irq.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/pm_runtime.h>
+> @@ -509,23 +510,46 @@ static int sh_tmu_map_memory(struct sh_tmu_device *tmu)
+>  	return 0;
+>  }
+>  
+> +static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
+> +{
+> +	struct device_node *np = tmu->pdev->dev.of_node;
+> +
+> +	tmu->num_channels = 3;
+> +	of_property_read_u32(np, "#renesas,channels", &tmu->num_channels);
+> +
+> +	if (tmu->num_channels != 2 && tmu->num_channels != 3) {
+> +		dev_err(&tmu->pdev->dev, "invalid number of channels %u\n",
+> +			tmu->num_channels);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+>  {
+> -	struct sh_timer_config *cfg = pdev->dev.platform_data;
+>  	const struct platform_device_id *id = pdev->id_entry;
+>  	unsigned int i;
+>  	int ret;
+>  
+> -	if (!cfg) {
+> -		dev_err(&tmu->pdev->dev, "missing platform data\n");
+> -		return -ENXIO;
+> -	}
+> -
+>  	tmu->pdev = pdev;
+>  	tmu->model = id->driver_data;
+>  
+>  	raw_spin_lock_init(&tmu->lock);
+>  
+> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
+> +		ret = sh_tmu_parse_dt(tmu);
+> +		if (ret < 0)
+> +			return ret;
+> +	} else if (pdev->dev.platform_data) {
+> +		struct sh_timer_config *cfg = pdev->dev.platform_data;
+> +
+> +		tmu->num_channels = hweight8(cfg->channels_mask);
+> +	} else {
+> +		dev_err(&tmu->pdev->dev, "missing platform data\n");
+> +		return -ENXIO;
+> +	}
+> +
+>  	/* Get hold of clock. */
+>  	tmu->clk = clk_get(&tmu->pdev->dev, "fck");
+>  	if (IS_ERR(tmu->clk)) {
+
+[snip]
+
+I had a bit of trouble running this code and after some investigation
+it seems to me that in the case of using DT id will be NULL and
+thus things do not go well when id->driver_data is accessed.
+
+The following incremental patch resolved the problem for me.
+
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index 2ece4ab..3f90927 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -523,6 +523,8 @@ static int sh_tmu_parse_dt(struct sh_tmu_device *tmu)
+ 		return -EINVAL;
+ 	}
+ 
++	tmu->model = SH_TMU;
++
+ 	return 0;
+ }
+ 
+@@ -533,7 +535,6 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 	int ret;
+ 
+ 	tmu->pdev = pdev;
+-	tmu->model = id->driver_data;
+ 
+ 	raw_spin_lock_init(&tmu->lock);
+ 
+@@ -545,6 +546,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 		struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 
+ 		tmu->num_channels = hweight8(cfg->channels_mask);
++		tmu->model = id->driver_data;
+ 	} else {
+ 		dev_err(&tmu->pdev->dev, "missing platform data\n");
+ 		return -ENXIO;
