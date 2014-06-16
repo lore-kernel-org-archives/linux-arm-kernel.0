@@ -1,113 +1,29 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 16 Jun 2014 10:23:39 +0100
-Subject: [PATCH V2] ARM: STi: DT: Properly define sti-ethclk & stmmaceth for
- stih415/6
-In-Reply-To: <1402345355-5682-1-git-send-email-peter.griffin@linaro.org>
-References: <1402345355-5682-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20140616092339.GB27978@griffinp-ThinkPad-X1-Carbon-2nd>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Jun 2014 10:26:31 +0100
+Subject: [PATCH] [linux-next] arm64: ftrace: Fix comment typo
+ 'CONFIG_FUNCTION_GRAPH_FP_TEST'
+In-Reply-To: <1402479861.3798.63.camel@x220>
+References: <1402479861.3798.63.camel@x220>
+Message-ID: <20140616092630.GA3971@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes two problems: -
+On Wed, Jun 11, 2014 at 10:44:21AM +0100, Paul Bolle wrote:
+> diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+> index b051871f2965..aa5f9fcbf9ee 100644
+> --- a/arch/arm64/kernel/entry-ftrace.S
+> +++ b/arch/arm64/kernel/entry-ftrace.S
+> @@ -205,7 +205,7 @@ ENDPROC(ftrace_graph_caller)
+>   *
+>   * Run ftrace_return_to_handler() before going back to parent.
+>   * @fp is checked against the value passed by ftrace_graph_caller()
+> - * only when CONFIG_FUNCTION_GRAPH_FP_TEST is enabled.
+> + * only when CONFIG_HAVE_FUNCTION_GRAPH_FP_TEST is enabled.
+>   */
+>  ENTRY(return_to_handler)
+>  	str	x0, [sp, #-16]!
 
-1) The device tree isn't currently providing sti-ethclk which is
-required by the dwmac glue code to correctly configure the ethernet
-PHY clock speed.
+Thanks. Applied.
 
-This means depending on what the bootloader/jtag has
-configured this clock to, and what switch/hub the board is plugged
-into you most likely will NOT successfully negotiate a ethernet link.
-
-2) The stmmaceth clock was associated with the wrong clock. It was
-referencing the PHY clock rather than the interconnect clock which
-clocks the IP.
-
-This patch also brings us closer to not having to boot the upstream
-kernel with the clk_ignore_unused parameter.
-
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih415.dtsi           | 8 ++++----
- arch/arm/boot/dts/stih416.dtsi           | 8 ++++----
- include/dt-bindings/clock/stih415-clks.h | 1 +
- include/dt-bindings/clock/stih416-clks.h | 1 +
- 4 files changed, 10 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
-index d6f254f..a0f6f75 100644
---- a/arch/arm/boot/dts/stih415.dtsi
-+++ b/arch/arm/boot/dts/stih415.dtsi
-@@ -169,8 +169,8 @@
- 
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii0>;
--			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a1_ls CLK_GMAC0_PHY>;
-+			clock-names	= "stmmaceth", "sti-ethclk";
-+			clocks		= <&clk_s_a1_ls CLK_ICN_IF_2>, <&clk_s_a1_ls CLK_GMAC0_PHY>;
- 		};
- 
- 		ethernet1: dwmac at fef08000 {
-@@ -192,8 +192,8 @@
- 			reset-names		= "stmmaceth";
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii1>;
--			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a0_ls CLK_ETH1_PHY>;
-+			clock-names	= "stmmaceth", "sti-ethclk";
-+			clocks		= <&clk_s_a0_ls CLK_ICN_REG>, <&clk_s_a0_ls CLK_ETH1_PHY>;
- 		};
- 
- 		rc: rc at fe518000 {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 06473c5..84758d7 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -175,8 +175,8 @@
- 			reset-names		= "stmmaceth";
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii0>;
--			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a1_ls CLK_GMAC0_PHY>;
-+			clock-names	= "stmmaceth", "sti-ethclk";
-+			clocks		= <&clk_s_a1_ls CLK_ICN_IF_2>, <&clk_s_a1_ls CLK_GMAC0_PHY>;
- 		};
- 
- 		ethernet1: dwmac at fef08000 {
-@@ -197,8 +197,8 @@
- 			reset-names	= "stmmaceth";
- 			pinctrl-names 	= "default";
- 			pinctrl-0	= <&pinctrl_mii1>;
--			clock-names	= "stmmaceth";
--			clocks		= <&clk_s_a0_ls CLK_ETH1_PHY>;
-+			clock-names	= "stmmaceth", "sti-ethclk";
-+			clocks		= <&clk_s_a0_ls CLK_ICN_REG>, <&clk_s_a0_ls CLK_ETH1_PHY>;
- 		};
- 
- 		rc: rc at fe518000 {
-diff --git a/include/dt-bindings/clock/stih415-clks.h b/include/dt-bindings/clock/stih415-clks.h
-index 0d2c739..d80caa6 100644
---- a/include/dt-bindings/clock/stih415-clks.h
-+++ b/include/dt-bindings/clock/stih415-clks.h
-@@ -10,6 +10,7 @@
- #define CLK_ETH1_PHY		4
- 
- /* CLOCKGEN A1 */
-+#define CLK_ICN_IF_2		0
- #define CLK_GMAC0_PHY		3
- 
- #endif
-diff --git a/include/dt-bindings/clock/stih416-clks.h b/include/dt-bindings/clock/stih416-clks.h
-index 552c779..f9bdbd1 100644
---- a/include/dt-bindings/clock/stih416-clks.h
-+++ b/include/dt-bindings/clock/stih416-clks.h
-@@ -10,6 +10,7 @@
- #define CLK_ETH1_PHY		4
- 
- /* CLOCKGEN A1 */
-+#define CLK_ICN_IF_2		0
- #define CLK_GMAC0_PHY		3
- 
- #endif
 -- 
-1.9.1
+Catalin
