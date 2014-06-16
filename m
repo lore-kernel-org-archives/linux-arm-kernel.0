@@ -1,90 +1,165 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 16 Jun 2014 16:29:33 -0700
-Subject: [PATCH V2 3/3] mmc: mmci: Reverse IRQ handling for the arm_variant
-In-Reply-To: <CALAqxLXQeYA8jt_hLrJSuWtt7j3t2iZSZjEVAX7ScODAgrmVbA@mail.gmail.com>
-References: <1402906147-26596-1-git-send-email-ulf.hansson@linaro.org>
- <CALAqxLWs5HLhLo+BspcgyJe0O++PB1HU2G1GpsoQ=cVP34=v=A@mail.gmail.com>
- <CAPDyKFqK5G0j7ZKAYJqD+ZqBFCjuLTw=NtjBcAsfM=Xzd4cghA@mail.gmail.com>
- <CALAqxLXQeYA8jt_hLrJSuWtt7j3t2iZSZjEVAX7ScODAgrmVbA@mail.gmail.com>
-Message-ID: <CALAqxLX8TcFNDLvA1XozEZ_kf58jX0_SeDETfK9UcXVYajVVRQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 17 Jun 2014 08:34:34 +0900
+Subject: [PATCH v3 14/19] ARM: shmobile: r8a7779: Add TMU devices to DT
+In-Reply-To: <1462083.WMstm6aRc1@avalon>
+References: <1402763021-4067-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1402763021-4067-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140616084707.GF11582@verge.net.au> <1462083.WMstm6aRc1@avalon>
+Message-ID: <20140616233433.GC24011@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 3:41 PM, John Stultz <john.stultz@linaro.org> wrote:
-> On Mon, Jun 16, 2014 at 2:20 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> This patch based upon my latest mmc tree and the next branch. I tried
->> to apply it for 3.15, and I think you will be able resolve the
->> conflict - I should be quite trivial.
->
-> No worries. I just didn't want to waste time resolving it if it was
-> logically dependent on some other change.
->
-> I'll give it a shot and get back to you.
+On Mon, Jun 16, 2014 at 04:22:11PM +0200, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Monday 16 June 2014 17:47:07 Simon Horman wrote:
+> > On Sat, Jun 14, 2014 at 06:23:36PM +0200, Laurent Pinchart wrote:
+> > > Add the TMU0, TMU1 and TMU2 counters to the r8a7779 device tree and make
+> > > them disabled by default.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/r8a7779.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 42 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/r8a7779.dtsi
+> > > b/arch/arm/boot/dts/r8a7779.dtsi index 94e2fc8..bf716ce 100644
+> > > --- a/arch/arm/boot/dts/r8a7779.dtsi
+> > > +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> > > @@ -266,6 +266,48 @@
+> > >  		reg = <0xffc48000 0x38>;
+> > >  	};
+> > > 
+> > > +	tmu0: timer at ffd80000 {
+> > > +		compatible = "renesas,tmu";
+> > > +		reg = <0xffd80000 0x30>;
+> > > +		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
+> > > +			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
+> > > +			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
+> > > +		clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
+> > > +		clock-names = "fck";
+> > > +
+> > > +		#renesas,channels = <3>;
+> > > +
+> > > +		status = "disabled";
+> > > +	};
+> > > +
+> > > +	tmu1: timer at ffd81000 {
+> > > +		compatible = "renesas,tmu";
+> > > +		reg = <0xffd81000 0x30>;
+> > > +		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>,
+> > > +			     <0 45 IRQ_TYPE_LEVEL_HIGH>,
+> > > +			     <0 46 IRQ_TYPE_LEVEL_HIGH>;
+> > > +		clocks = <&mstp0_clks R8A7779_CLK_TMU1>;
+> > > +		clock-names = "fck";
+> > > +
+> > > +		#renesas,channels = <3>;
+> > > +
+> > > +		status = "disabled";
+> > > +	};
+> > > +
+> > > +	tmu2: timer at ffd82000 {
+> > > +		compatible = "renesas,tmu";
+> > > +		reg = <0xffd82000 0x30>;
+> > > +		interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>,
+> > > +			     <0 49 IRQ_TYPE_LEVEL_HIGH>,
+> > > +			     <0 50 IRQ_TYPE_LEVEL_HIGH>;
+> > > +		clocks = <&mstp0_clks R8A7779_CLK_TMU2>;
+> > > +		clock-names = "fck";
+> > > +
+> > > +		#renesas,channels = <3>;
+> > > +
+> > > +		status = "disabled";
+> > > +	};
+> > > +
+> > >  	sata: sata at fc600000 {
+> > >  		compatible = "renesas,rcar-sata";
+> > >  		reg = <0xfc600000 0x2000>;
+> > 
+> > There are no interrupt-parents in in the nodes above nodes
+> > although the documentation of the binding has one in the example.
+> > Is it just an oversight in this patch?
+> 
+> Not really.
+> 
+> The interrupt-parent property is required but can be inherited. Furthermore, 
+> the interrupts-extended property can be used to replace the interrupts and 
+> interrupt-parent properties. This should all be documented in the DT bindings, 
+> but not by duplicating the full explanation in dozens of different flavours in 
+> all bindings. We need standard wordings for common properties such as 
+> interrupts, clocks or reg.
 
-So unfortunately I'm still seeing trouble..
+Thanks for the clarification, I'm fine with that.
 
-[   94.202843] EXT4-fs error (device mmcblk0p5):
-ext4_mb_generate_buddy:756: group 1, 2303 clusters in bitmap, 2272 in
-gd; block bitmap corrupt.
-[   94.203873] Aborting journal on device mmcblk0p5-8.
-[   94.206553] Kernel panic - not syncing: EXT4-fs (device mmcblk0p5):
-panic forced after error
-[   94.206553]
-[   94.207420] CPU: 0 PID: 1 Comm: init Not tainted
-3.15.0-00002-g044f37a-dirty #589
-[   94.208330] [<c0011725>] (unwind_backtrace) from [<c000f3f1>]
-(show_stack+0x11/0x14)
-[   94.208835] [<c000f3f1>] (show_stack) from [<c042d599>]
-(dump_stack+0x59/0x7c)
-[   94.209288] [<c042d599>] (dump_stack) from [<c042a57f>] (panic+0x67/0x178)
-[   94.209724] [<c042a57f>] (panic) from [<c0135055>]
-(ext4_handle_error+0x69/0x74)
-[   94.210184] [<c0135055>] (ext4_handle_error) from [<c01358db>]
-(__ext4_grp_locked_error+0x6b/0x160)
-[   94.210747] [<c01358db>] (__ext4_grp_locked_error) from
-[<c0143691>] (ext4_mb_generate_buddy+0x1b1/0x29c)
-[   94.211392] [<c0143691>] (ext4_mb_generate_buddy) from [<c0144dfd>]
-(ext4_mb_init_cache+0x219/0x4e0)
-[   94.211959] [<c0144dfd>] (ext4_mb_init_cache) from [<c014517f>]
-(ext4_mb_init_group+0xbb/0x13c)
-[   94.213973] [<c014517f>] (ext4_mb_init_group) from [<c01452f3>]
-(ext4_mb_good_group+0xf3/0xfc)
-[   94.214873] [<c01452f3>] (ext4_mb_good_group) from [<c01462ab>]
-(ext4_mb_regular_allocator+0x153/0x2c4)
-[   94.215953] [<c01462ab>] (ext4_mb_regular_allocator) from
-[<c01486b1>] (ext4_mb_new_blocks+0x2fd/0x4e4)
-[   94.216939] [<c01486b1>] (ext4_mb_new_blocks) from [<c013fe41>]
-(ext4_ext_map_blocks+0x965/0x10f0)
-[   94.217694] [<c013fe41>] (ext4_ext_map_blocks) from [<c01230ff>]
-(ext4_map_blocks+0xff/0x374)
-[   94.219200] [<c0126839>] (mpage_map_and_submit_extent) from
-[<c0127049>] (ext4_writepages+0x2b9/0x4e8)
-[   94.219972] [<c0127049>] (ext4_writepages) from [<c0094e69>]
-(do_writepages+0x19/0x28)
-[   94.220648] [<c0094e69>] (do_writepages) from [<c008cbcd>]
-(__filemap_fdatawrite_range+0x3d/0x44)
-[   94.221391] [<c008cbcd>] (__filemap_fdatawrite_range) from
-[<c008cc3f>] (filemap_flush+0x23/0x28)
-[   94.222135] [<c008cc3f>] (filemap_flush) from [<c012c419>]
-(ext4_rename+0x2f9/0x3e4)
-[   94.222806] [<c012c419>] (ext4_rename) from [<c00c3707>]
-(vfs_rename+0x183/0x45c)
-[   94.223496] [<c00c3707>] (vfs_rename) from [<c00c3c0b>]
-(SyS_renameat2+0x22b/0x26c)
-[   94.224154] [<c00c3c0b>] (SyS_renameat2) from [<c00c3c83>]
-(SyS_rename+0x1f/0x24)
-[   94.224801] [<c00c3c83>] (SyS_rename) from [<c000cd41>]
-(ret_fast_syscall+0x1/0x5c)
+> > I believe that the IRQ numbers are not correct.
+> > 
+> > In setup-r8a7779.c I see gic_iid(0x40). But above I see 40.
+> > I think the correct value is 0x40 - 32 = 32. Likewise
+> > for the other IRQs of tmu0. And looking at the documentaiton
+> > this seems true for tmu1 and tmu2 too.
+> >
+> > I have successfully booted a marzen board with the following incremental
+> > patch to the DT nodes.
+> 
+> You're right, sorry about that. I'll fix the interrupt numbers and resubmit. 
+> The interrupt-parent is specified at the top level so there's no need to add 
+> it to the TMU nodes.
+> 
+> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> > index bf716ce..81714ce 100644
+> > --- a/arch/arm/boot/dts/r8a7779.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> > @@ -269,9 +269,10 @@
+> >  	tmu0: timer at ffd80000 {
+> >  		compatible = "renesas,tmu";
+> >  		reg = <0xffd80000 0x30>;
+> > -		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
+> > -			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
+> > -			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupt-parent = <&gic>;
+> > +		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 34 IRQ_TYPE_LEVEL_HIGH>;
+> >  		clocks = <&mstp0_clks R8A7779_CLK_TMU0>;
+> >  		clock-names = "fck";
+> > 
+> > @@ -283,9 +284,10 @@
+> >  	tmu1: timer at ffd81000 {
+> >  		compatible = "renesas,tmu";
+> >  		reg = <0xffd81000 0x30>;
+> > -		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>,
+> > -			     <0 45 IRQ_TYPE_LEVEL_HIGH>,
+> > -			     <0 46 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupt-parent = <&gic>;
+> > +		interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 36 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 37 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> If I'm not mistaken the interrupts should be 36, 37 and 38.
 
+Yes, sorry about that.
 
-That said, this mirrors the behavior when I was reverting your change
-by hand on-top of 3.15. While git bisect pointed to your patch and
-reverting it from the commit seems to resolve the issue at that point,
-there seems to be some other commit in the 3.14->3.15-rc1 interval
-that is causing problems as well.
+> >  		clocks = <&mstp0_clks R8A7779_CLK_TMU1>;
+> >  		clock-names = "fck";
+> > 
+> > @@ -296,10 +298,11 @@
+> > 
+> >  	tmu2: timer at ffd82000 {
+> >  		compatible = "renesas,tmu";
+> > +		interrupt-parent = <&gic>;
+> >  		reg = <0xffd82000 0x30>;
+> > -		interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>,
+> > -			     <0 49 IRQ_TYPE_LEVEL_HIGH>,
+> > -			     <0 50 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupts = <0 38 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 39 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 40 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> And 40, 41 and 42 here.
 
-Are there any sort of debugging options for mmc that I can use to try
-to better narrow down whats going wrong?
+Yes. I wonder how I managed to mess these up.
 
-thanks
--john
+> >  		clocks = <&mstp0_clks R8A7779_CLK_TMU2>;
+> >  		clock-names = "fck";
