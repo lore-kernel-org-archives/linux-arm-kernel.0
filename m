@@ -1,49 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Jun 2014 15:11:55 -0600
-Subject: [PATCH] misc: fuse: fix dummy functions
-Message-ID: <1402953115-32489-1-git-send-email-swarren@wwwdotorg.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 16 Jun 2014 23:16:01 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: re-enable SDHCI drivers
+In-Reply-To: <1402937442-7623-1-git-send-email-swarren@wwwdotorg.org>
+References: <1402937442-7623-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAPDyKFr98GfBZuUbod+JnvbEEyDC+Unninetw=-=6o8muQw_NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 16 June 2014 18:50, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> Following 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
+> SDHCI drivers that use MMC_SDHCI_PLTFM no longer select it, but
+> instead depend on it. This means that multi_v7_defconfig no longer
+> selects it, and hence many SDHCI drivers are no longer enabled.
+> Explicitly enable MMC_SDHCI_PLTFM to solve this.
+>
+> Fixes: 5d01b7684b7e ("mmc: simplify SDHCI Kconfig dependencies")
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-The Tegra fuse header's dummy functions for the case where Tegra20 is
-disabled are inconsistent with the correct prototypes, and have some
-syntax errors. Fix these. While at it, fix the indentation level of
-the dummy function bodies.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Fixes: 40969e30ad7c ("misc: fuse: Add efuse driver for Tegra")
-Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I intend to immediately apply this to Tegra's for-3.17/fuse-move branch.
----
- drivers/misc/fuse/tegra/fuse.h | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I suppose this goes through arm-soc, otherwise ping me if you want me
+to handle it as a fix for 3.16.
 
-diff --git a/drivers/misc/fuse/tegra/fuse.h b/drivers/misc/fuse/tegra/fuse.h
-index b3442770df09..3a398bf3572c 100644
---- a/drivers/misc/fuse/tegra/fuse.h
-+++ b/drivers/misc/fuse/tegra/fuse.h
-@@ -38,14 +38,14 @@ void tegra20_init_fuse_early(void);
- u32 tegra20_fuse_early(const unsigned int offset);
- #else
- static inline void tegra20_init_speedo_data(struct tegra_sku_info *sku_info) {}
--static inline bool tegra20_spare_fuse_early(int spare_bit, void *fuse_base)
-+static inline bool tegra20_spare_fuse_early(int spare_bit)
- {
--			return false;
-+	return false;
- }
--static inline void tegra20_init_fuse_early(void);
--static inline tegra20_fuse_early(const unsigned int offset);
-+static inline void tegra20_init_fuse_early(void) {}
-+static inline u32 tegra20_fuse_early(const unsigned int offset)
- {
--			return 0;
-+	return 0;
- }
- #endif
- 
--- 
-1.8.1.5
+Kind regards
+Uffe
+
+> ---
+> This is a fix for 3.16, and based directly on v3.16-rc1.
+>
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index e2d62048e198..17d9462b9fb9 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -300,6 +300,7 @@ CONFIG_MMC=y
+>  CONFIG_MMC_BLOCK_MINORS=16
+>  CONFIG_MMC_ARMMMCI=y
+>  CONFIG_MMC_SDHCI=y
+> +CONFIG_MMC_SDHCI_PLTFM=y
+>  CONFIG_MMC_SDHCI_OF_ARASAN=y
+>  CONFIG_MMC_SDHCI_ESDHC_IMX=y
+>  CONFIG_MMC_SDHCI_DOVE=y
+> --
+> 1.8.1.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
