@@ -1,76 +1,19 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 16 Jun 2014 12:04:25 -0600
-Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
-Message-ID: <1402941865-18249-1-git-send-email-swarren@wwwdotorg.org>
+Date: Mon, 16 Jun 2014 12:14:22 -0600
+Subject: [PATCH 1/3] ARM: dts: Create a cros-ec-keyboard fragment
+In-Reply-To: <1401920421-25729-1-git-send-email-dianders@chromium.org>
+References: <1401920421-25729-1-git-send-email-dianders@chromium.org>
+Message-ID: <539F33FE.8040501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 06/04/2014 04:20 PM, Doug Anderson wrote:
+> All ChromeOS ARM devices that have the standard "CrOS EC" have the
+> same keyboard mapping.  It's silly to include this same definition
+> everywhere.  Let's create a "dtsi" fragment that we can include from
+> many different boards.
+> 
+> This fragment is based on what's currently in tegra124-venice2.dts
 
-Run "make tegra_defconfig; make savedefconf" on v3.16-rc1. This allows
-other people to do the same thing to adjust the defconfig file without
-their patch bringing in a bunch of irrelevant diffs.
-
-All of the removed options either have been removed from Kconfig, or
-are now default y.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I intend to apply this immediately to Tegra's for-3.17/defconfig branch.
-
- arch/arm/configs/tegra_defconfig | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
-
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index fb25e2982f64..157a4f144479 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -23,14 +23,11 @@ CONFIG_MODULE_FORCE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
--CONFIG_GPIO_PCA953X=y
- CONFIG_ARCH_TEGRA=y
- CONFIG_ARCH_TEGRA_2x_SOC=y
- CONFIG_ARCH_TEGRA_3x_SOC=y
- CONFIG_ARCH_TEGRA_114_SOC=y
- CONFIG_ARCH_TEGRA_124_SOC=y
--CONFIG_TEGRA_EMC_SCALING_ENABLE=y
--CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_TEGRA=y
-@@ -74,9 +71,6 @@ CONFIG_IPV6_MIP6=y
- CONFIG_IPV6_TUNNEL=y
- CONFIG_IPV6_MULTIPLE_TABLES=y
- CONFIG_CAN=y
--CONFIG_CAN_RAW=y
--CONFIG_CAN_BCM=y
--CONFIG_CAN_DEV=y
- CONFIG_CAN_MCP251X=y
- CONFIG_BT=y
- CONFIG_BT_RFCOMM=y
-@@ -96,7 +90,6 @@ CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_MTD=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_SPI_NOR=y
--CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
-@@ -144,6 +137,7 @@ CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
- CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
-+CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_PALMAS=y
- CONFIG_GPIO_TPS6586X=y
-@@ -291,5 +285,4 @@ CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_CRYPTO_TWOFISH=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
--CONFIG_CRYPTO_DEV_TEGRA_AES=y
- CONFIG_CRC_CCITT=y
--- 
-1.8.1.5
+I've applied this series to Tegra's for-3.17/dt-cros-ec-kbd branch. I'll
+send a pull request to arm-soc shortly.
