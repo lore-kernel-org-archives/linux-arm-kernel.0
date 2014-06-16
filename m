@@ -1,80 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jun 2014 00:27:21 -0700
-Subject: [PATCH 2/2] arm: dts: add support for AM437x StarterKit
-In-Reply-To: <20140613163118.GJ8319@saruman.home>
-References: <1402676147-3711-1-git-send-email-balbi@ti.com>
- <1402676147-3711-3-git-send-email-balbi@ti.com>
- <20140613162334.GI8319@saruman.home>
- <20140613163118.GJ8319@saruman.home>
-Message-ID: <20140616072720.GX17845@atomide.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Mon, 16 Jun 2014 13:10:58 +0530
+Subject: [PATCH] ARM: EXYNOS: mcpm: Don't rely on firmware's
+ secondary_cpu_start
+In-Reply-To: <CAD=FV=XkTSfHwt9Ekcy6TPGWJTJ49zMCOA9eaJVaq=q4u4Ri3Q@mail.gmail.com>
+References: <1402090985-8061-1-git-send-email-dianders@chromium.org>
+ <20140607181221.GB25068@e102568-lin.cambridge.arm.com>
+ <CAD=FV=X17PeJ6JPE9Qyc1QT07AvA2PTE69Q87gz9a6MdUHgi4A@mail.gmail.com>
+ <20140609223831.GB16889@e102568-lin.cambridge.arm.com>
+ <CANuQgHHxAhTNYX-JAEdRkO=PMYT4A5GwXcuQfiqwE0CEkQyR+w@mail.gmail.com>
+ <CAD=FV=V5_RRNkgA7Rk7XbQw9m1qh6-RJA8arW7ZRU=QbWAPa+w@mail.gmail.com>
+ <alpine.LFD.2.11.1406101146140.25775@knanqh.ubzr>
+ <CADWw7OjqK3MAuqCHuv-WS3Bb2+2Q-FXth+7hqtwFoyAP6pyYhA@mail.gmail.com>
+ <CAD=FV=ULFx0GPp_mnEfouZF+m4h_RYE6WQu48N0WbFWrFv8-BA@mail.gmail.com>
+ <5398758F.4080306@samsung.com>
+ <CADWw7Oh=A_cg_hqu8DZ1t_iacOGgWediLp3K3viFYHMNAPkqRw@mail.gmail.com>
+ <CAD=FV=XkTSfHwt9Ekcy6TPGWJTJ49zMCOA9eaJVaq=q4u4Ri3Q@mail.gmail.com>
+Message-ID: <CANuQgHHf_NtL+-=1S14meyT8auBsh0kn6Zn+p6r==qAEgVG1UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140613 09:33]:
-> On Fri, Jun 13, 2014 at 11:23:34AM -0500, Felipe Balbi wrote:
-> > On Fri, Jun 13, 2014 at 11:15:47AM -0500, Felipe Balbi wrote:
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-> > > @@ -0,0 +1,539 @@
-> > > +/*
-> > > + * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > + */
-> > > +
-> > > +/* AM437x SK EVM */
-> > > +
-> > > +/dts-v1/;
-> > > +
-> > > +#include "am4372.dtsi"
-> > > +#include <dt-bindings/pinctrl/am43xx.h>
-> > > +#include <dt-bindings/pwm/pwm.h>
-> > > +#include <dt-bindings/gpio/gpio.h>
-> > > +#include <dt-bindings/input/input.h>
-> > > +
-> > > +/ {
-> > > +	model = "TI AM437x SK EVM";
-> > > +	compatible = "ti,am437x-sk-evm","ti,am4372","ti,am43";
-> > > +
-> > > +	aliases {
-> > > +		display0 = &lcd0;
-> > > +	};
-> > > +
-> > > +	vmmcsd_fixed: fixedregulator-sd {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "vmmcsd_fixed";
-> > > +		regulator-min-microvolt = <3300000>;
-> > > +		regulator-max-microvolt = <3300000>;
-> > > +		enable-active-high;
-> > > +	};
-> > > +
-> > > +	v33_fixed: fixedregulator-v33 {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "v33_fixed";
-> > > +		regulator-min-microvolt = <3300000>;
-> > > +		regulator-max-microvolt = <3300000>;
-> > > +		enable-active-high;
-> > > +	};
-> > > +
-> > > +	v18_fixed: fixedregulator-v18 {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "v18_fixed";
-> > > +		regulator-min-microvolt = <1800000>;
-> > > +		regulator-max-microvolt = <1800000>;
-> > > +		enable-active-high;
-> > > +	};
+Hi Doug,
 
-Chances are these are not fixed regulators.. Typically the these
-come from external regulators controlled by GPIO pins. Sounds
-like you have the schematics so it would be best to verify it.
-If they come from something not yet supported, let's at least
-document it with comments.
+On 13 June 2014 20:40, Doug Anderson <dianders@chromium.org> wrote:
+> Chander,
+>
+> On Fri, Jun 13, 2014 at 4:54 AM, Chander Kashyap <k.chander@samsung.com> wrote:
+>> This patch is effectively changing the mcpm_entry_point address from
+>> nsbase + 0x1c to nsbase + 0x8
+>>
+>> Hence while integrating with mainline u-boot we need to take care for
+>> new mcpm_entry_point address.
+>>
+>> With Chromebook it works straightforward.
+>
+> Can you explain more and point to the code that is using the nsbase +
+> 0x1c?  Specifically the only code I see that uses the nsbase + 0x1c is
+> the code that is located at nsbase, which is the code we're
+> overwriting here.  I'd imagine you're using U-Boot code that looks
+> something like the bits that start at code_base here:
+>
+> https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/ce358daf5069f1dc145b0f9d403cfbb028271807/arch/arm/cpu/armv7/exynos/lowlevel.S
+>
+> With my kernel change you can completely eliminate U-Boot's
+> installation of this code (or keep it, it makes no difference).
 
-Also looks like all the am43xx boards are using vmmcsd_fixed,
-might be worth checking those as well while at it.
+Yes i agree with your point.
+What i am saying is when there is full support for Exynos5420 in
+mainline u-boot we need to take care for the mcpm_entry_point address.
 
-Regards,
+>
+> -Doug
 
-Tony
+
+
+-- 
+with warm regards,
+Chander Kashyap
