@@ -1,68 +1,57 @@
 From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 16 Jun 2014 14:34:08 +0900
-Subject: [PATCH v2 07/10] PPC, KVM, CMA: use general CMA reserved area
- management framework
-In-Reply-To: <87mwdfg9co.fsf@linux.vnet.ibm.com>
-References: <1402543307-29800-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1402543307-29800-8-git-send-email-iamjoonsoo.kim@lge.com>
- <87mwdfg9co.fsf@linux.vnet.ibm.com>
-Message-ID: <20140616053408.GH23210@js1304-P5Q-DELUXE>
+Date: Mon, 16 Jun 2014 14:40:43 +0900
+Subject: [PATCH v3 -next 1/9] DMA, CMA: fix possible memory leak
+In-Reply-To: <1402897251-23639-1-git-send-email-iamjoonsoo.kim@lge.com>
+References: <1402897251-23639-1-git-send-email-iamjoonsoo.kim@lge.com>
+Message-ID: <1402897251-23639-2-git-send-email-iamjoonsoo.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 14, 2014 at 02:23:59PM +0530, Aneesh Kumar K.V wrote:
-> Joonsoo Kim <iamjoonsoo.kim@lge.com> writes:
-> 
-> > Now, we have general CMA reserved area management framework,
-> > so use it for future maintainabilty. There is no functional change.
-> >
-> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
-> > Acked-by: Paolo Bonzini <pbonzini@redhat.com>
-> > Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> 
-> Need this. We may want to keep the VM_BUG_ON by moving
-> KVM_CMA_CHUNK_ORDER around.
-> 
-> diff --git a/arch/powerpc/kvm/book3s_64_mmu_hv.c b/arch/powerpc/kvm/book3s_64_mmu_hv.c
-> index 8056107..1932e0e 100644
-> --- a/arch/powerpc/kvm/book3s_64_mmu_hv.c
-> +++ b/arch/powerpc/kvm/book3s_64_mmu_hv.c
-> @@ -37,8 +37,6 @@
->  #include <asm/ppc-opcode.h>
->  #include <asm/cputable.h>
->  
-> -#include "book3s_hv_cma.h"
-> -
->  /* POWER7 has 10-bit LPIDs, PPC970 has 6-bit LPIDs */
->  #define MAX_LPID_970   63
->  
-> @@ -64,7 +62,6 @@ long kvmppc_alloc_hpt(struct kvm *kvm, u32 *htab_orderp)
->         }
->  
->         kvm->arch.hpt_cma_alloc = 0;
-> -       VM_BUG_ON(order < KVM_CMA_CHUNK_ORDER);
->         page = kvm_alloc_hpt(1 << (order - PAGE_SHIFT));
->         if (page) {
->                 hpt = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
-> 
-> 
-> 
-> -aneesh
+We should free memory for bitmap when we find zone mis-match,
+otherwise this memory will leak.
 
-Okay.
-So do you also want this?
+Additionally, I copy code comment from PPC KVM's CMA code to inform
+why we need to check zone mis-match.
 
-@@ -131,16 +135,18 @@ struct page *kvm_alloc_hpt(unsigned long nr_pages)
- {
-        unsigned long align_pages = HPT_ALIGN_PAGES;
+* Note
+Minchan suggested to add a tag for the stable, but, I don't do it,
+because I found this possibility during code-review and, IMO,
+this patch isn't suitable for stable tree.
+
+Acked-by: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
+Reviewed-by: Michal Nazarewicz <mina86@mina86.com>
+Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 83969f8..6467c91 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -176,14 +176,24 @@ static int __init cma_activate_area(struct cma *cma)
+ 		base_pfn = pfn;
+ 		for (j = pageblock_nr_pages; j; --j, pfn++) {
+ 			WARN_ON_ONCE(!pfn_valid(pfn));
++			/*
++			 * alloc_contig_range requires the pfn range
++			 * specified to be in the same zone. Make this
++			 * simple by forcing the entire CMA resv range
++			 * to be in the same zone.
++			 */
+ 			if (page_zone(pfn_to_page(pfn)) != zone)
+-				return -EINVAL;
++				goto err;
+ 		}
+ 		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
+ 	} while (--i);
  
-+       VM_BUG_ON(get_order(nr_pages) < KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
+ 	mutex_init(&cma->lock);
+ 	return 0;
 +
-        /* Old CPUs require HPT aligned on a multiple of its size */
-        if (!cpu_has_feature(CPU_FTR_ARCH_206))
-                align_pages = nr_pages;
--       return kvm_alloc_cma(nr_pages, align_pages);
-+       return cma_alloc(kvm_cma, nr_pages, get_order(align_pages));
++err:
++	kfree(cma->bitmap);
++	return -EINVAL;
  }
-
-Thanks.
+ 
+ static struct cma cma_areas[MAX_CMA_AREAS];
+-- 
+1.7.9.5
