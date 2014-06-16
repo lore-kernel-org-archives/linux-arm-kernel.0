@@ -1,30 +1,34 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Mon, 16 Jun 2014 13:51:56 -0400
-Subject: [PATCH] ARM: multi_v7_defconfig: re-enable SDHCI drivers
-In-Reply-To: <1402937442-7623-1-git-send-email-swarren@wwwdotorg.org>
-References: <1402937442-7623-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140616175156.GF4173@beef>
+Date: Mon, 16 Jun 2014 13:56:16 -0400
+Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
+Message-ID: <1402941376-29594-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 10:50:42AM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Following 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
-> SDHCI drivers that use MMC_SDHCI_PLTFM no longer select it, but
-> instead depend on it. This means that multi_v7_defconfig no longer
-> selects it, and hence many SDHCI drivers are no longer enabled.
-> Explicitly enable MMC_SDHCI_PLTFM to solve this.
-> 
-> Fixes: 5d01b7684b7e ("mmc: simplify SDHCI Kconfig dependencies")
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This is a fix for 3.16, and based directly on v3.16-rc1.
-> 
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
+MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
+driver which is enabled in this defconfig. This results in the
+SDHCI driver not being built and a boot failure. Explictly
+enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
+driver is built.
 
-Thanks, fixes the boot failure on my BCM mobile boards. I'm posting the
-equivalent for our own defconfig.
+Fixes: 5d01b7684b7e ("mmc: simplify SDHCI Kconfig dependencies")
+Signed-off-by: Matt Porter <mporter@linaro.org>
+---
+ arch/arm/configs/bcm_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Tested-by: Matt Porter <mporter@linaro.org>
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index 9d13dae..dcfc559 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -98,6 +98,7 @@ CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_TEST=y
+ CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+-- 
+1.8.4
