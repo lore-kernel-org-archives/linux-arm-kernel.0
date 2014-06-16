@@ -1,73 +1,36 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 16 Jun 2014 10:09:07 +0200
-Subject: [PATCH V2 3/3] mmc: mmci: Reverse IRQ handling for the arm_variant
-Message-ID: <1402906147-26596-1-git-send-email-ulf.hansson@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Jun 2014 09:15:39 +0100
+Subject: [PATCH] Frees gate after if statement in clk-sunxi.c
+In-Reply-To: <CAPDOMVimRry7XejNt9gdqLX4C64T7qsOwEBGvpYLDvxa2H5xuA@mail.gmail.com>
+References: <1402769508-3821-1-git-send-email-xerofoify@gmail.com>
+ <20140615203058.GA22265@lukather>
+ <CAPDOMVj0JSp-ZfvAXkeTqHscKkhmp0ZttN5NVM+BYE_X+jWCcQ@mail.gmail.com>
+ <CAPDOMVimRry7XejNt9gdqLX4C64T7qsOwEBGvpYLDvxa2H5xuA@mail.gmail.com>
+Message-ID: <20140616081538.GV23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit "mmc: mmci: Handle CMD irq before DATA irq", caused an issue
-when using the ARM model of the PL181 and running QEMU.
+On Sun, Jun 15, 2014 at 11:31:41PM -0400, Nick Krause wrote:
+> Seems the bug is fixed , don't worry about resent patch.
+> Thanks Nick
+> 
+> On Sun, Jun 15, 2014 at 11:21 PM, Nick Krause <xerofoify@gmail.com> wrote:
+> > @@ -42,6 +42,7 @@ static void __init sun4i_osc_clk_setup(struct
+> > device_node *node)
+> >         u32 rate;
+> >
+> >         if (of_property_read_u32(node, "clock-frequency", &rate))
+> > +               kfree(gate);
+> >                 return;
 
-The bug was reported for the following QEMU version:
-$ qemu-system-arm -version
-QEMU emulator version 2.0.0 (Debian 2.0.0+dfsg-2ubuntu1.1), Copyright
-(c) 2003-2008 Fabrice Bellard
+In any case, the kernel is not coded in Python.
 
-To resolve the problem, let's restore the old behavior were the DATA
-irq is handled prior the CMD irq, but only for the arm_variant, which
-the problem was reported for.
+C uses braces { } to enclose blocks of code, and does not care about
+indentation - indentation is meaningless to C.  Python purely identifies
+blocks of code by indentation alone.
 
-Reported-by: John Stultz <john.stultz@linaro.org>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |   12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Please take account of the programming language when creating patches.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5d20bfba..e4d4707 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -74,6 +74,7 @@ static unsigned int fmax = 515633;
-  * @pwrreg_nopower: bits in MMCIPOWER don't controls ext. power supply
-  * @explicit_mclk_control: enable explicit mclk control in driver.
-  * @qcom_fifo: enables qcom specific fifo pio read logic.
-+ * @reversed_irq_handling: handle data irq before cmd irq.
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -97,6 +98,7 @@ struct variant_data {
- 	bool			pwrreg_nopower;
- 	bool			explicit_mclk_control;
- 	bool			qcom_fifo;
-+	bool			reversed_irq_handling;
- };
- 
- static struct variant_data variant_arm = {
-@@ -105,6 +107,7 @@ static struct variant_data variant_arm = {
- 	.datalength_bits	= 16,
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
-+	.reversed_irq_handling	= true,
- };
- 
- static struct variant_data variant_arm_extended_fifo = {
-@@ -1236,8 +1239,13 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
- 
- 		dev_dbg(mmc_dev(host->mmc), "irq0 (data+cmd) %08x\n", status);
- 
--		mmci_cmd_irq(host, host->cmd, status);
--		mmci_data_irq(host, host->data, status);
-+		if (host->variant->reversed_irq_handling) {
-+			mmci_data_irq(host, host->data, status);
-+			mmci_cmd_irq(host, host->cmd, status);
-+		} else {
-+			mmci_cmd_irq(host, host->cmd, status);
-+			mmci_data_irq(host, host->data, status);
-+		}
- 
- 		/* Don't poll for busy completion in irq context. */
- 		if (host->busy_status)
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
