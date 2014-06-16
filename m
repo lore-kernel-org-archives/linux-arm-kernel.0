@@ -1,112 +1,103 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 16 Jun 2014 12:11:15 +0200
-Subject: [PATCH v14 01/10] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel
- format.
-Message-ID: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+Date: Mon, 16 Jun 2014 12:11:21 +0200
+Subject: [PATCH v14 07/10] imx-drm: Use drm_display_mode timings flags.
+In-Reply-To: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+Message-ID: <1402913484-25910-7-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That new macro is needed by the imx_drm staging driver
-  for supporting the QVGA display of the eukrea-cpuimx51 board.
+The previous hardware behaviour was kept if the
+flags are not set.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
 ChangeLog v13->v14:
-- None
-ChangeLog v10->v13:
-- No changes
-ChangeLog v9->v10:
-- Rebased on top of:
-  "211e7f2 [media] DocBook media: drop the old incorrect packed RGB table"
-- Added Philipp Zabel's Ack.
+- Rebased
 
-ChangeLog v8->v9:
-- Removed the Cc. They are now set in git-send-email directly.
+ChangeLog v12->v13:
+- This patch doesn't need the DRM_MODE_FLAG_POL_*_PRESERVE flags anymore.
+- code cleanup to improve readability:
+  - ENABLE_POL_PRESERVE is now gone
+  - Less modifications in ipu_di_init_sync_panel
+  - more readable modifications in int ipu_crtc_mode_set
+ChangeLog v11->v12:
+- Rebased: It now uses the following new flags defines names:
+  CLK_POL, ENABLE_POL
+- The inversions in ipuv3-crtc.c are now fixed.
+- ipuv3-crtc.c was still using mode->private_flags
+  from the previous versions of this patchset, that's now fixed.
 
-ChangeLog v7->v8:
-- Added Mauro Carvalho Chehab back to the list of Cc
-
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
-ChangeLog v5->v6:
-- Remove people not concerned by this patch from the Cc list.
-
-ChangeLog v3->v4:
-- Added Laurent Pinchart's Ack.
-
-ChangeLog v2->v3:
-- Added some interested people in the Cc list.
-- Added Mauro Carvalho Chehab's Ack.
-- Added documentation.
+ChangeLog v10->v11:
+- This patch was splitted-out and adapted from:
+  "Prepare imx-drm for extra display-timings retrival."
+- The display-timings dt specific part was removed.
+- The flags names were changed to use the DRM ones from:
+  "drm: drm_display_mode: add signal polarity flags"
 ---
- .../DocBook/media/v4l/pixfmt-packed-rgb.xml        |   39 ++++++++++++++++++++
- include/uapi/linux/videodev2.h                     |    1 +
- 2 files changed, 40 insertions(+)
+ drivers/gpu/ipu-v3/ipu-di.c          |    2 ++
+ drivers/staging/imx-drm/ipuv3-crtc.c |   18 ++++++++++++++++--
+ include/video/imx-ipu-v3.h           |    4 ++--
+ 3 files changed, 20 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-index e1c4f8b..88a7fe1 100644
---- a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-+++ b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-@@ -279,6 +279,45 @@ colorspace <constant>V4L2_COLORSPACE_SRGB</constant>.</para>
- 	    <entry></entry>
- 	    <entry></entry>
- 	  </row>
-+	  <row id="V4L2-PIX-FMT-RGB666">
-+	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
-+	    <entry>'RGBH'</entry>
-+	    <entry></entry>
-+	    <entry>r<subscript>5</subscript></entry>
-+	    <entry>r<subscript>4</subscript></entry>
-+	    <entry>r<subscript>3</subscript></entry>
-+	    <entry>r<subscript>2</subscript></entry>
-+	    <entry>r<subscript>1</subscript></entry>
-+	    <entry>r<subscript>0</subscript></entry>
-+	    <entry>g<subscript>5</subscript></entry>
-+	    <entry>g<subscript>4</subscript></entry>
-+	    <entry></entry>
-+	    <entry>g<subscript>3</subscript></entry>
-+	    <entry>g<subscript>2</subscript></entry>
-+	    <entry>g<subscript>1</subscript></entry>
-+	    <entry>g<subscript>0</subscript></entry>
-+	    <entry>b<subscript>5</subscript></entry>
-+	    <entry>b<subscript>4</subscript></entry>
-+	    <entry>b<subscript>3</subscript></entry>
-+	    <entry>b<subscript>2</subscript></entry>
-+	    <entry></entry>
-+	    <entry>b<subscript>1</subscript></entry>
-+	    <entry>b<subscript>0</subscript></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	  </row>
- 	  <row id="V4L2-PIX-FMT-BGR24">
- 	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
- 	    <entry>'BGR3'</entry>
-diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-index 168ff50..08cac01 100644
---- a/include/uapi/linux/videodev2.h
-+++ b/include/uapi/linux/videodev2.h
-@@ -299,6 +299,7 @@ struct v4l2_pix_format {
- #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16  RGB-5-5-5 BE  */
- #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B', 'R') /* 16  RGB-5-6-5 BE  */
- #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B', 'G', 'R', 'H') /* 18  BGR-6-6-6	  */
-+#define V4L2_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */
- #define V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8     */
- #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24  RGB-8-8-8     */
- #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R', '4') /* 32  BGR-8-8-8-8   */
+diff --git a/drivers/gpu/ipu-v3/ipu-di.c b/drivers/gpu/ipu-v3/ipu-di.c
+index d00f357..1a1e116 100644
+--- a/drivers/gpu/ipu-v3/ipu-di.c
++++ b/drivers/gpu/ipu-v3/ipu-di.c
+@@ -597,6 +597,8 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 
+ 	if (sig->clk_pol == CLK_POL_POSEDGE)
+ 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
++	else if (sig->clk_pol == CLK_POL_NEGEDGE)
++		di_gen &= ~DI_GEN_POLARITY_DISP_CLK;
+ 
+ 	ipu_di_write(di, di_gen, DI_GENERAL);
+ 
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index 7fec438..7fdf575 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -165,8 +165,22 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		sig_cfg.Vsync_pol = 1;
+ 
+-	sig_cfg.enable_pol = ENABLE_POL_HIGH;
+-	sig_cfg.clk_pol = CLK_POL_NEGEDGE;
++	if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_POSEDGE)
++		sig_cfg.clk_pol = CLK_POL_POSEDGE;
++	else if (mode->pol_flags & DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE)
++		sig_cfg.clk_pol = CLK_POL_NEGEDGE;
++	else
++		/* If no PIXDATA flags were set, keep the old behaviour */
++		sig_cfg.clk_pol = CLK_POL_NEGEDGE;
++
++	if (mode->pol_flags & DRM_MODE_FLAG_POL_DE_HIGH)
++		sig_cfg.enable_pol = ENABLE_POL_HIGH;
++	else if (mode->pol_flags & DRM_MODE_FLAG_POL_DE_LOW)
++		sig_cfg.enable_pol = ENABLE_POL_LOW;
++	else
++		/* If no DE flags were set, keep the old behaviour */
++		sig_cfg.enable_pol = ENABLE_POL_HIGH;
++
+ 	sig_cfg.width = mode->hdisplay;
+ 	sig_cfg.height = mode->vdisplay;
+ 	sig_cfg.pixel_fmt = out_pixel_fmt;
+diff --git a/include/video/imx-ipu-v3.h b/include/video/imx-ipu-v3.h
+index 8888305..e660522 100644
+--- a/include/video/imx-ipu-v3.h
++++ b/include/video/imx-ipu-v3.h
+@@ -43,10 +43,10 @@ struct ipu_di_signal_cfg {
+ 	unsigned clksel_en:1;
+ 	unsigned clkidle_en:1;
+ 	unsigned data_pol:1;	/* true = inverted */
+-	unsigned clk_pol:1;
+-	unsigned enable_pol:1;
+ 	unsigned Hsync_pol:1;	/* true = active high */
+ 	unsigned Vsync_pol:1;
++	u8 clk_pol;
++	u8 enable_pol;
+ 
+ 	u16 width;
+ 	u16 height;
 -- 
 1.7.9.5
