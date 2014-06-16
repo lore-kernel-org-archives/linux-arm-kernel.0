@@ -1,44 +1,45 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 16 Jun 2014 13:23:17 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: enable i2c0 and i2c2
-In-Reply-To: <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1401780790-17830-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401780790-17830-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <539ED3A5.5050300@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Jun 2014 12:24:32 +0100
+Subject: [REGRESSION 3.16-rc1] freescale/fec_main.c: IPv6 TCP fails
+Message-ID: <20140616112432.GZ23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2014 09:33 AM, Antoine T?nart wrote:
-> Enable the I2C0 and I2C2 for the Marvell Berlin BG2G DMP. I2C1 and I2C3
-> are also working on this board, but no devices seemed to be there.
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+Starting with patch:
 
-Applied to berlin/dt with Andrew's Reviewed-by.
+	96c50caa5148 (net: fec: Enable IP header hardware checksum)
 
-Thanks!
+IPv6 TCP no longer works - connections are not established, and because
+of the behaviour, there is no fallback to IPv4.  Here is an example:
 
-> ---
->   arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 8 ++++++++
->   1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> index 995150f93795..a357ce02a64e 100644
-> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> @@ -34,6 +34,14 @@
->   	status = "okay";
->   };
->
-> +&i2c0 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	status = "okay";
-> +};
-> +
->   &uart0 {
->   	status = "okay";
->   };
->
+12:05:18.814143 IP6 (hlim 64, next-header TCP (6) payload length: 40) e0022681537dd.dyn.arm.linux.org.uk.58705 > fd8f:7570:feb6:1:d263:ff:fe00:0.ssh: Flags [S], cksum 0x5617 (incorrect -> 0x3d22), seq 1282590073, win 28800, options [mss 1440,sackOK,TS val 381695605 ecr 0,nop,wscale 7], length 0
+        0x0000:  6000 0000 0028 0640 fd8f 7570 feb6 0001  `....(. at ..up....
+        0x0010:  0222 68ff fe15 37dd fd8f 7570 feb6 0001  ."h...7...up....
+        0x0020:  d263 00ff fe00 0000 e551 0016 4c72 c579  .c.......Q..Lr.y
+        0x0030:  0000 0000 a002 7080 5617 0000 0204 05a0  ......p.V.......
+        0x0040:  0402 080a 16c0 3675 0000 0000 0103 0307  ......6u........
+12:05:18.814483 IP6 (hlim 64, next-header TCP (6) payload length: 40) fd8f:0:feb6:1:d263:ff:fe00:0.ssh > e0022681537dd.dyn.arm.linux.org.uk.58705: Flags [S.], cksum 0xe2c7 (correct), seq 622926173, ack 1282590074, win 28560, options [mss 1440,sackOK,TS val 102954 ecr 381695605,nop,wscale 7], length 0
+        0x0000:  6000 0000 0028 0640 fd8f 0000 feb6 0001  `....(. at ........
+                                          ^^^^
+        0x0010:  d263 00ff fe00 0000 fd8f 7570 feb6 0001  .c........up....
+        0x0020:  0222 68ff fe15 37dd 0016 e551 2521 195d  ."h...7....Q%!.]
+        0x0030:  4c72 c57a a012 6f90 e2c7 0000 0204 05a0  Lr.z..o.........
+        0x0040:  0402 080a 0001 922a 16c0 3675 0103 0307  .......*..6u....
+
+The problem is that the driver/hardware is treating all packets as IPv4,
+and overwriting the point in the packet which would be the IPv4 checksum.
+With IPv6 packets, this results in the source address being corrupted,
+and thus the initiator of the connection sees a reply from a different
+IP address:
+
+12:05:18.814510 IP6 (hlim 64, next-header TCP (6) payload length: 20) e0022681537dd.dyn.arm.linux.org.uk.58705 > fd8f:0:feb6:1:d263:ff:fe00:0.ssh: Flags [R], cksum 0xe092 (incorrect -> 0xd813), seq 1282590074, win 0, length 0
+        0x0000:  6000 0000 0014 0640 fd8f 7570 feb6 0001  `...... at ..up....
+        0x0010:  0222 68ff fe15 37dd fd8f 0000 feb6 0001  ."h...7.........
+        0x0020:  d263 00ff fe00 0000 e551 0016 4c72 c57a  .c.......Q..Lr.z
+        0x0030:  0000 0000 5004 0000 e092 0000            ....P.......
+
+and sends a TCPv6 reset packet.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
