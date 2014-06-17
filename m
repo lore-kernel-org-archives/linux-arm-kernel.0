@@ -1,55 +1,53 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Jun 2014 22:52:41 +0800
-Subject: [PATCH v2 04/20] clk: sunxi: Fix gate indexing for
- sun6i-a31-apb0-gates
+Date: Tue, 17 Jun 2014 22:52:42 +0800
+Subject: [PATCH v2 05/20] clk: sunxi: Support factor clocks with N multiplier
+ factor starting from 1
 In-Reply-To: <1403016777-15121-1-git-send-email-wens@csie.org>
 References: <1403016777-15121-1-git-send-email-wens@csie.org>
-Message-ID: <1403016777-15121-5-git-send-email-wens@csie.org>
+Message-ID: <1403016777-15121-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun6i-a31-apb0-gates supports using clock-indices for holes between
-individual gates. However, the driver passes the number of gates
-registered in clk_data->clk_num, which of_clk_src_onecell_get uses
-to recognize the range of valid indices a consumer can use.
+The PLLs on newer Allwinner SoC's, such as the A31 and A23, have a
+N multiplier factor that starts from 1, not 0.
 
-This patch makes the driver pass the maximum gate index + 1, so
-of_clk_src_onecell_get does not complain about indices greater
-than gates registered.
-
-This was tested on the A23 SoC, which has a similar APB0 clock,
-but has holes for gates to removed IP blocks.
+This patch adds an option to the clock driver's config data structures
+to define the difference.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/clk/sunxi/clk-factors.c | 5 ++++-
+ drivers/clk/sunxi/clk-factors.h | 1 +
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-index 44cd27c..b342f2a 100644
---- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-+++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
-@@ -25,6 +25,7 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
- 	void __iomem *reg;
- 	int gate_id;
- 	int ngates;
-+	int gate_max = 0;
- 	int i;
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 3806d97..399cf4d 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -62,7 +62,10 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+ 		p = FACTOR_GET(config->pshift, config->pwidth, reg);
  
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -72,9 +73,12 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
- 							    reg, gate_id,
- 							    0, NULL);
- 		WARN_ON(IS_ERR(clk_data->clks[gate_id]));
-+
-+		if (gate_id > gate_max)
-+			gate_max = gate_id;
- 	}
+ 	/* Calculate the rate */
+-	rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
++	if (config->n_from_one)
++		rate = (parent_rate * (n + 1) * (k + 1) >> p) / (m + 1);
++	else
++		rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
  
--	clk_data->clk_num = ngates;
-+	clk_data->clk_num = gate_max + 1;
- 
- 	return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+ 	return rate;
  }
+diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+index 02e1a43..0484a48 100644
+--- a/drivers/clk/sunxi/clk-factors.h
++++ b/drivers/clk/sunxi/clk-factors.h
+@@ -15,6 +15,7 @@ struct clk_factors_config {
+ 	u8 mwidth;
+ 	u8 pshift;
+ 	u8 pwidth;
++	u8 n_from_one;
+ };
+ 
+ struct clk_factors {
 -- 
 2.0.0
