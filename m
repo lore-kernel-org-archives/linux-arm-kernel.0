@@ -1,74 +1,38 @@
-From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Tue, 17 Jun 2014 19:59:21 +0300
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617160119.GE3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk> <20140617125831.GI4173@beef>
- <20140617131522.GD3705@n2100.arm.linux.org.uk>
- <C3DA6AFC-2784-4A41-BC72-EF25B2B03B41@antoniou-consulting.com>
- <20140617160119.GE3705@n2100.arm.linux.org.uk>
-Message-ID: <317D412E-B455-4B9D-95B3-F010C68744A3@antoniou-consulting.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Tue, 17 Jun 2014 19:59:35 +0300
+Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
+In-Reply-To: <53A069B6.6070902@wwwdotorg.org>
+References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
+ <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
+ <53A069B6.6070902@wwwdotorg.org>
+Message-ID: <53A073F7.20700@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 06/17/2014 07:15 PM, Stephen Warren wrote:
+> On 06/17/2014 06:16 AM, Tomeu Vizoso wrote:
+>> On 06/16/2014 10:02 PM, Stephen Warren wrote:
+>>> On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
+>
+>>> This binding looks quite anaemic vs.
+>>> Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-emc.txt; I
+>>> would expect that this binding needs all the EMC register data from the
+>>> tegra20-emc binding too. Can the two bindings be identical?
+>>
+>> There's even less stuff needed right now, as all what ultimately the EMC
+>> driver does is call clk_set_rate on the EMC clock. As the T124 EMC
+>> driver gains more features, they should get more similar.
+>
+> IIRC, even changing the EMC clock rate requires modifying the memory
+> controller's programming (e.g. delays/taps/tuning etc.). That's exactly
+> what the more complex stuff in the nvidia,tegra20-emc.txt is all about.
+> I not convinced that a driver that just modifies the clock rate without
+> adjusting the EMC programming will work reliably.
 
-On Jun 17, 2014, at 7:01 PM, Russell King - ARM Linux wrote:
-
-> On Tue, Jun 17, 2014 at 04:32:11PM +0300, Pantelis Antoniou wrote:
->> The complexity is absolutely required, and it has nothing to do with
->> beaglebone capes.
->> 
->> The fact of the matter is that reconfigurable hardware is here, on
->> shipping system, and we, as the linux kernel community have to make
->> sure it works, and that it works in a sane way.
-> 
-> Right, so looking back in the git history, this project has been going
-> on for... at least four years?  Probably longer than the length of time
-> that we've been converting ARM to DT.  At no point during that has anyone
-> brought up the issue of DT being dynamic, so none of the drivers which
-> we have been converting caters for this.
-> 
-
-The timeline does not go that far back. The first (non-DT overlay based)
-capebus patchset was posted on October 2012 and after feedback (i.e. it
-was deemed to suck) it was pointed that a DT based generic method should
-be used; hence DT overlays.
-
-The dynamic DT part has always been part of PPC DT support for pSeries.
-
-> Isn't this a bit of a missed opportunity, if this is a direction that
-> OF wishes to head towards?
-> 
-
-I am going to let Grant answer that, but personally I believe a lot of
-the troubles we've been having with DT and dynamic device graph changes
-can be handled elegantly using something DT overlays (and the follow up
-work which is transaction DT support).
- 
-> Wouldn't it have been relevant to the discussion at kernel summit too,
-> concerning DRM/v4l2/componentised systems?  What if someone comes along
-> tomorrow with part of their multimedia based system inside a FPGA
-> which they program up at runtime?
-> 
-
-That case might already work on FPGA people's trees. I know Altera for sure
-uses overlays, and some xilinx guys popped up on past discussions.
-Their vendor trees probably use an older revision of the patches.
-
-BTW, there is nothing special about DRM/v4l2 that can't be handled by a generic
-DT mechanism. What makes this such a big problem?
-
-Regards
-
--- Pantelis
-
-
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Indeed, changing the EMC clock rate is a somewhat complicated sequence 
+of ~10 steps. The kernel even won't let one the rate be change directly, 
+as the change would be propagated to PLL_M which cannot have its rate 
+changed while it is enabled. I suppose the sequence should be hidden in 
+the EMC clk's set_rate implementation, which I guess would leave just 
+the rate policy to this driver.
