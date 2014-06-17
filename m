@@ -1,293 +1,124 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 17 Jun 2014 09:38:41 +0200
-Subject: [PATCH v4 5/7] regulator: add support for regulator set registration
-In-Reply-To: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1402990723-28138-6-git-send-email-boris.brezillon@free-electrons.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 17 Jun 2014 16:46:58 +0900
+Subject: [PATCH v2 00/08] ARM: shmobile: Rework include path V2
+Message-ID: <20140617074658.30008.53021.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PMIC devices often provide several regulators, and these regulators are
-all using the same regmap and are all attached to the same device (the
-PMIC device).
+ARM: shmobile: Rework include path V2
 
-Add helper functions (both simple and resource managed versions) to
-register and unregister such kind of regulator set.
+[PATCH v2 01/08] ARM: shmobile: Move intc.h, cleanup sh_intc.h usage
+[PATCH v2 02/08] ARM: shmobile: Move dma-register.h
+[PATCH v2 03/08] ARM: shmobile: Move clock.h
+[PATCH v2 04/08] ARM: shmobile: Move most of irqs.h, keep some for pinctl
+[PATCH v2 05/08] ARM: shmobile: Move common.h
+[PATCH v2 06/08] ARM: shmobile: Move pm-rmobile.h, cleanup sh73xx.h
+[PATCH v2 07/08] ARM: shmobile: Move pm-rcar.h, cleanup r8a7779 case
+[PATCH v2 08/08] ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case
 
-This implementation handles self dependency issues where one regulator
-provided the PMIC depends on another one provided by the same PMIC.
+Olof, here my latest take on the header move that you requested earlier.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+This particular series hopefully follows your proposed way and moves the
+most common shared header files for mach-shmobile from <mach/foobar.h>
+to "foobar.h" without any workaround. Left are still per-SoC header files
+that will be moved once I know you are comformatble with this format.
+
+Please note that these are only lightly compile tested with a handful
+of defconfigs, but any potential issue should be trivial to fix.
+
+Also, there are certain bits of arch/arm/mach-shmobile/include/mach/
+get included from places like arch/arm/boot/compressed/ (booting
+legacy kernel directly from reset vector) and also from SoC specific
+legacy code under drivers/pinctrl. My proposal is to keep those users
+as-is until we phase out legacy board support (2-3 kernels?), let me
+know if you would like to get rid of "include/mach" sooner!
+
+Simon, can you please this pick up and include in your rebase to v3.16-rc1?
+
+Changes since V1:
+- rebased to v3.16-rc1
+
+Thanks to Geert and Arnd for review support!
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/regulator/core.c         | 106 +++++++++++++++++++++++++++++++++++++++
- drivers/regulator/devres.c       |  68 +++++++++++++++++++++++++
- include/linux/regulator/driver.h |  51 +++++++++++++++++++
- 3 files changed, 225 insertions(+)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 4c1f999..f37a604 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -3607,6 +3607,112 @@ void regulator_unregister(struct regulator_dev *rdev)
- EXPORT_SYMBOL_GPL(regulator_unregister);
- 
- /**
-+ * regulator_set_register - register a set of regulators
-+ * @config: runtime configuration for regulator set
-+ *
-+ * Called by regulator drivers to register a set of regulators.
-+ * Returns a valid pointer to struct regulator_set on success
-+ * or an ERR_PTR() on error.
-+ */
-+struct regulator_set *
-+regulator_set_register(const struct regulator_set_config *config)
-+{
-+	struct regulator_set *rset;
-+	int prev_nregistered = -1;
-+	int nregistered = 0;
-+	int ret;
-+	int i;
-+
-+	if (!config->descs || !config->nregulators)
-+		return ERR_PTR(-EINVAL);
-+
-+	rset = kzalloc(sizeof(*rset) +
-+		       (config->nregulators * sizeof(struct regulator_dev *)),
-+		       GFP_KERNEL);
-+	if (!rset)
-+		return ERR_PTR(-ENOMEM);
-+
-+	rset->nregulators = config->nregulators;
-+
-+	while (nregistered < config->nregulators &&
-+	       prev_nregistered < nregistered) {
-+
-+		prev_nregistered = nregistered;
-+
-+		for (i = 0; i < config->nregulators; i++) {
-+			struct regulator_config conf;
-+			struct regulator_dev *regulator;
-+
-+			if (rset->regulators[i])
-+				continue;
-+
-+			memset(&conf, 0, sizeof(conf));
-+
-+			conf.dev = config->dev;
-+			conf.regmap = config->regmap;
-+			conf.driver_data = config->driver_data;
-+			if (config->matches && config->matches[i].init_data)
-+				conf.init_data = config->matches[i].init_data;
-+			else if (config->init_data)
-+				conf.init_data = config->init_data[i];
-+
-+			if (config->matches)
-+				conf.of_node = config->matches[i].of_node;
-+
-+			regulator = regulator_register(&config->descs[i],
-+						       &conf);
-+			if (IS_ERR(regulator)) {
-+				ret = PTR_ERR(regulator);
-+				if (ret == -EPROBE_DEFER)
-+					continue;
-+
-+				goto err;
-+			}
-+
-+			rset->regulators[i] = regulator;
-+			nregistered++;
-+		}
-+	}
-+
-+	if (nregistered < config->nregulators) {
-+		ret = -EPROBE_DEFER;
-+		goto err;
-+	}
-+
-+	return rset;
-+
-+err:
-+	for (i = 0; i < config->nregulators; i++) {
-+		if (rset->regulators[i])
-+			regulator_unregister(rset->regulators[i]);
-+	}
-+
-+	kfree(rset);
-+
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(regulator_set_register);
-+
-+/**
-+ * regulator_set_unregister - unregister regulator set
-+ * @rset: regulator set to unregister
-+ *
-+ * Called by regulator drivers to unregister a regulator set.
-+ */
-+void regulator_set_unregister(struct regulator_set *rset)
-+{
-+	int i;
-+
-+	for (i = 0; i < rset->nregulators; i++) {
-+		if (rset->regulators[i])
-+			regulator_unregister(rset->regulators[i]);
-+	}
-+
-+	kfree(rset);
-+}
-+EXPORT_SYMBOL_GPL(regulator_set_unregister);
-+
-+/**
-  * regulator_suspend_prepare - prepare regulators for system wide suspend
-  * @state: system suspend state
-  *
-diff --git a/drivers/regulator/devres.c b/drivers/regulator/devres.c
-index 8f785bc..36ac40a 100644
---- a/drivers/regulator/devres.c
-+++ b/drivers/regulator/devres.c
-@@ -251,6 +251,74 @@ void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev)
- }
- EXPORT_SYMBOL_GPL(devm_regulator_unregister);
- 
-+static void devm_rset_release(struct device *dev, void *res)
-+{
-+	regulator_set_unregister(*(struct regulator_set **)res);
-+}
-+
-+/**
-+ * devm_regulator_set_register - Resource managed regulator_set_register()
-+ * @dev: device registering the regulator set
-+ * @config: runtime configuration for regulator set
-+ *
-+ * Called by regulator drivers to register a set of regulators.  Returns a
-+ * valid pointer to struct regulator_set on success or an ERR_PTR() on
-+ * error.  The regulator will automatically be released when the device
-+ * is unbound.
-+ */
-+struct regulator_set *
-+devm_regulator_set_register(struct device *dev,
-+			    const struct regulator_set_config *config)
-+{
-+	struct regulator_set **ptr, *rset;
-+
-+	ptr = devres_alloc(devm_rset_release, sizeof(*ptr),
-+			   GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	rset = regulator_set_register(config);
-+	if (!IS_ERR(rset)) {
-+		*ptr = rset;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return rset;
-+}
-+EXPORT_SYMBOL_GPL(devm_regulator_set_register);
-+
-+static int devm_rset_match(struct device *dev, void *res, void *data)
-+{
-+	struct regulator_set **r = res;
-+	if (!r || !*r) {
-+		WARN_ON(!r || !*r);
-+		return 0;
-+	}
-+	return *r == data;
-+}
-+
-+/**
-+ * devm_regulator_set_unregister - Resource managed regulator_set_unregister()
-+ * @dev: device unregistering the regulator set
-+ * @rset: regulator set to release
-+ *
-+ * Unregister a regulator set registered with devm_regulator_set_register().
-+ * Normally this function will not need to be called and the resource
-+ * management code will ensure that the resource is freed.
-+ */
-+void devm_regulator_set_unregister(struct device *dev,
-+				   struct regulator_set *rset)
-+{
-+	int rc;
-+
-+	rc = devres_release(dev, devm_rdev_release, devm_rset_match, rset);
-+	if (rc != 0)
-+		WARN_ON(rc);
-+}
-+EXPORT_SYMBOL_GPL(devm_regulator_unregister);
-+
- struct regulator_supply_alias_match {
- 	struct device *dev;
- 	const char *id;
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index bbe03a1..b683f68 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -350,6 +350,48 @@ struct regulator_dev {
- 	unsigned int ena_gpio_state:1;
- };
- 
-+/**
-+ * struct regulator_set_config - Dynamic regulator set descriptor
-+ *
-+ * This structure describe a regulator and each regulator in this set
-+ * will be registered using informations passed through regulator_desc
-+ * and of_regulator_match tables.
-+ *
-+ * @dev: struct device providing the regulator set.
-+ * @driver_data: private driver data for this regulator set.
-+ * @regmap: regmap to use for core regmap helpers if dev_get_regulator() is
-+ *          insufficient.
-+ * @descs: table of regulator descriptors.
-+ * @matches: table of DT regulator descriptors. This table should have
-+ *           been filled by the of_regulator_match function.
-+ * @init_data: a table of init_data in case matches is NULL or the init_data
-+ *             of the match entry is NULL.
-+ * @nregulators: number of regulators in the regulator set.
-+ */
-+struct regulator_set_config {
-+	struct device *dev;
-+	void *driver_data;
-+	struct regmap *regmap;
-+	const struct regulator_desc *descs;
-+	const struct of_regulator_match *matches;
-+	const struct regulator_init_data **init_data;
-+	int nregulators;
-+};
-+
-+/*
-+ * struct regulator_set - Regulator set
-+ *
-+ * This structure stores a set of regulator devices provided by a single
-+ * device (e.g. a PMIC device).
-+ *
-+ * @nregulators: number of regulators in the set
-+ * @regulators: regulators table
-+ */
-+struct regulator_set {
-+	int nregulators;
-+	struct regulator_dev *regulators[0];
-+};
-+
- struct regulator_dev *
- regulator_register(const struct regulator_desc *regulator_desc,
- 		   const struct regulator_config *config);
-@@ -360,6 +402,15 @@ devm_regulator_register(struct device *dev,
- void regulator_unregister(struct regulator_dev *rdev);
- void devm_regulator_unregister(struct device *dev, struct regulator_dev *rdev);
- 
-+struct regulator_set *
-+regulator_set_register(const struct regulator_set_config *config);
-+struct regulator_set *
-+devm_regulator_set_register(struct device *dev,
-+			    const struct regulator_set_config *config);
-+void regulator_set_unregister(struct regulator_set *rset);
-+void devm_regulator_set_unregister(struct device *dev,
-+				   struct regulator_set *rset);
-+
- int regulator_notifier_call_chain(struct regulator_dev *rdev,
- 				  unsigned long event, void *data);
- 
--- 
-1.8.3.2
+ arch/arm/mach-shmobile/board-ape6evm-reference.c         |    2 
+ arch/arm/mach-shmobile/board-ape6evm.c                   |    4 
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c |    2 
+ arch/arm/mach-shmobile/board-armadillo800eva.c           |    6 
+ arch/arm/mach-shmobile/board-bockw-reference.c           |    2 
+ arch/arm/mach-shmobile/board-bockw.c                     |    4 
+ arch/arm/mach-shmobile/board-genmai-reference.c          |    4 
+ arch/arm/mach-shmobile/board-genmai.c                    |    4 
+ arch/arm/mach-shmobile/board-koelsch-reference.c         |    8 
+ arch/arm/mach-shmobile/board-koelsch.c                   |    6 
+ arch/arm/mach-shmobile/board-kzm9g-reference.c           |    2 
+ arch/arm/mach-shmobile/board-kzm9g.c                     |    4 
+ arch/arm/mach-shmobile/board-lager-reference.c           |    8 
+ arch/arm/mach-shmobile/board-lager.c                     |    5 
+ arch/arm/mach-shmobile/board-mackerel.c                  |   10 
+ arch/arm/mach-shmobile/board-marzen-reference.c          |    4 
+ arch/arm/mach-shmobile/board-marzen.c                    |    4 
+ arch/arm/mach-shmobile/clock-r7s72100.c                  |    2 
+ arch/arm/mach-shmobile/clock-r8a73a4.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7740.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7778.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7779.c                   |    4 
+ arch/arm/mach-shmobile/clock-r8a7790.c                   |    5 
+ arch/arm/mach-shmobile/clock-r8a7791.c                   |    6 
+ arch/arm/mach-shmobile/clock-sh7372.c                    |    4 
+ arch/arm/mach-shmobile/clock-sh73a0.c                    |    4 
+ arch/arm/mach-shmobile/clock.c                           |    6 
+ arch/arm/mach-shmobile/clock.h                           |   56 ++
+ arch/arm/mach-shmobile/common.h                          |   56 ++
+ arch/arm/mach-shmobile/console.c                         |    2 
+ arch/arm/mach-shmobile/dma-register.h                    |   84 ++++
+ arch/arm/mach-shmobile/include/mach/clock.h              |   56 --
+ arch/arm/mach-shmobile/include/mach/common.h             |   56 --
+ arch/arm/mach-shmobile/include/mach/dma-register.h       |   84 ----
+ arch/arm/mach-shmobile/include/mach/intc.h               |  290 --------------
+ arch/arm/mach-shmobile/include/mach/irqs.h               |   17 
+ arch/arm/mach-shmobile/include/mach/pm-rcar.h            |   15 
+ arch/arm/mach-shmobile/include/mach/pm-rmobile.h         |   63 ---
+ arch/arm/mach-shmobile/include/mach/r8a7740.h            |    2 
+ arch/arm/mach-shmobile/include/mach/r8a7779.h            |   12 
+ arch/arm/mach-shmobile/include/mach/r8a7790.h            |    2 
+ arch/arm/mach-shmobile/include/mach/rcar-gen2.h          |    8 
+ arch/arm/mach-shmobile/include/mach/sh7372.h             |    4 
+ arch/arm/mach-shmobile/intc-sh7372.c                     |    5 
+ arch/arm/mach-shmobile/intc-sh73a0.c                     |    5 
+ arch/arm/mach-shmobile/intc.h                            |  290 ++++++++++++++
+ arch/arm/mach-shmobile/irqs.h                            |   21 +
+ arch/arm/mach-shmobile/platsmp-apmu.c                    |    2 
+ arch/arm/mach-shmobile/platsmp-scu.c                     |    2 
+ arch/arm/mach-shmobile/platsmp.c                         |    2 
+ arch/arm/mach-shmobile/pm-r8a7740.c                      |    4 
+ arch/arm/mach-shmobile/pm-r8a7779.c                      |   15 
+ arch/arm/mach-shmobile/pm-r8a7790.c                      |    2 
+ arch/arm/mach-shmobile/pm-rcar.c                         |    2 
+ arch/arm/mach-shmobile/pm-rcar.h                         |   15 
+ arch/arm/mach-shmobile/pm-rmobile.c                      |    2 
+ arch/arm/mach-shmobile/pm-rmobile.h                      |   63 +++
+ arch/arm/mach-shmobile/pm-sh7372.c                       |    4 
+ arch/arm/mach-shmobile/pm-sh73a0.c                       |    2 
+ arch/arm/mach-shmobile/rcar-gen2.h                       |    8 
+ arch/arm/mach-shmobile/setup-emev2.c                     |    2 
+ arch/arm/mach-shmobile/setup-r7s72100.c                  |    4 
+ arch/arm/mach-shmobile/setup-r8a73a4.c                   |    6 
+ arch/arm/mach-shmobile/setup-r8a7740.c                   |    8 
+ arch/arm/mach-shmobile/setup-r8a7778.c                   |    4 
+ arch/arm/mach-shmobile/setup-r8a7779.c                   |    4 
+ arch/arm/mach-shmobile/setup-r8a7790.c                   |    7 
+ arch/arm/mach-shmobile/setup-r8a7791.c                   |    6 
+ arch/arm/mach-shmobile/setup-rcar-gen2.c                 |    4 
+ arch/arm/mach-shmobile/setup-sh7372.c                    |    8 
+ arch/arm/mach-shmobile/setup-sh73a0.c                    |    7 
+ arch/arm/mach-shmobile/smp-emev2.c                       |    2 
+ arch/arm/mach-shmobile/smp-r8a7779.c                     |    4 
+ arch/arm/mach-shmobile/smp-r8a7790.c                     |    4 
+ arch/arm/mach-shmobile/smp-r8a7791.c                     |    4 
+ arch/arm/mach-shmobile/smp-sh73a0.c                      |    2 
+ 76 files changed, 723 insertions(+), 726 deletions(-)
