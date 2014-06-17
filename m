@@ -1,49 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jun 2014 17:22:15 +0100
-Subject: [PATCH 08/24] Allow a 32bit ABI to use the naming of the 64bit
- ABI syscalls to avoid confusion of not splitting the registers.
-In-Reply-To: <1400914939-9708-9-git-send-email-apinski@cavium.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <1400914939-9708-9-git-send-email-apinski@cavium.com>
-Message-ID: <20140617162215.GF21752@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Jun 2014 10:23:01 -0600
+Subject: [PATCH 8/9] ata: Add support for the Tegra124 SATA controller
+In-Reply-To: <20140617161447.GH31819@htj.dyndns.org>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <1401881559-18469-9-git-send-email-mperttunen@nvidia.com>
+ <1470404.13mIFv0Hnj@amdc1032> <53A0686F.4000303@wwwdotorg.org>
+ <20140617161320.GG31819@htj.dyndns.org>
+ <20140617161447.GH31819@htj.dyndns.org>
+Message-ID: <53A06B65.7030407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 12:02:03AM -0700, Andrew Pinski wrote:
-> In the ARM64 ILP32 case, we want to say the syscalls that normally
-> would pass 64bit as two arguments are now passing as one so want to
-> use the 64bit naming scheme.
+On 06/17/2014 10:14 AM, Tejun Heo wrote:
+> On Tue, Jun 17, 2014 at 12:13:20PM -0400, Tejun Heo wrote:
+>> On Tue, Jun 17, 2014 at 10:10:23AM -0600, Stephen Warren wrote:
+>>>> sata_writel() and sata_read() static inlines don't seem to add any value.
+>>>>
+>>>> Can they be removed?
+>>>
+>>> Such functions are quite idiomatic in drivers, and serve to simplify all
+>>> the call-sites by removing the need to write out the addition of the
+>>> base address everywhere.
+>>
+>> I think it obfuscates more than helps.  If you absoluately have to
+>> keep it, please at least name it so that it's clear that it's
+>> something specific to this driver.
 > 
-> Signed-off-by: Andrew Pinski <apinski@cavium.com>
-> ---
->  include/uapi/asm-generic/unistd.h |    5 ++++-
->  1 files changed, 4 insertions(+), 1 deletions(-)
-> 
-> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-> index 3336406..0648659 100644
-> --- a/include/uapi/asm-generic/unistd.h
-> +++ b/include/uapi/asm-generic/unistd.h
-> @@ -875,8 +875,11 @@ __SYSCALL(__NR_fork, sys_ni_syscall)
->   * they take different names.
->   * Here we map the numbers so that both versions
->   * use the same syscall table layout.
-> + * For 32bit abis where 64bit can be passed via one
-> + * register, use the same naming as the 64bit ones
-> + * as they will only have a 64 bit off_t.
->   */
-> -#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
-> +#if (__BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)) || defined(__SYSCALL_NONCOMPAT)
->  #define __NR_fcntl __NR3264_fcntl
->  #define __NR_statfs __NR3264_statfs
->  #define __NR_fstatfs __NR3264_fstatfs
+> Please also drop inline.  It isn't a difficult optimization to perform
+> for the compiler.
 
-I can see why you are defining this. For compat, we don't expose
-__SYSCALL_COMPAT to user. But this to work with ILP32 UAPI headers we
-would have to define __SYSCALL_NONCOMPAT in the arm64 uapi unistd.h if
-!__LP64__. I think we should use some naming closer to what we expose
-via UAPI already (on other architectures) like
-__ARCH_WANT_64BIT_SYSCALLS (or maybe we could reuse
-__ARCH_WANT_SYSCALL_OFF_T).
-
--- 
-Catalin
+There are probably hundreds of drivers marking those functions inline.
+If they aren't marked inline, it'll just stick out as unusual when
+people read them all, and then they'll send patches to fix it.
