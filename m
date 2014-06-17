@@ -1,58 +1,120 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Tue, 17 Jun 2014 13:07:42 -0700
-Subject: [PATCH v6 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
- support.
-In-Reply-To: <CAGVrzcYWecdwSmHux6yz1M5Nz849BV-sBe8DmnJWV+T8PetTvw@mail.gmail.com>
-References: <1402964326-11147-1-git-send-email-isubramanian@apm.com>
- <1402964326-11147-5-git-send-email-isubramanian@apm.com>
- <20140616.214247.1154200670003936158.davem@davemloft.net>
- <CAKh23F=2undAW=nWibOreAM8DJiQKpLx=OboCX=fNZE+OU=AbA@mail.gmail.com>
- <CAGVrzcYWecdwSmHux6yz1M5Nz849BV-sBe8DmnJWV+T8PetTvw@mail.gmail.com>
-Message-ID: <CAKh23F=AexThFD8Oqt-UxyBU1Ai9AfZfP4KpPTzQLXa0WE8Vwg@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 17 Jun 2014 22:13:47 +0200
+Subject: [PATCH] regmap: Add Kconfig option for debugfs register writes
+In-Reply-To: <alpine.DEB.2.02.1406171254540.18156@chino.kir.corp.google.com>
+References: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
+ <alpine.DEB.2.02.1406171254540.18156@chino.kir.corp.google.com>
+Message-ID: <20140617201347.GA32450@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 12:24 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 2014-06-17 12:21 GMT-07:00 Iyappan Subramanian <isubramanian@apm.com>:
->> On Mon, Jun 16, 2014 at 9:42 PM, David Miller <davem@davemloft.net> wrote:
->>> From: Iyappan Subramanian <isubramanian@apm.com>
->>> Date: Mon, 16 Jun 2014 17:18:46 -0700
->>>
->>>> +static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
->>>> +                                      struct net_device *ndev)
->>>> +{
->>>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
->>>> +     struct xgene_enet_desc_ring *tx_ring = pdata->tx_ring;
->>>> +     struct xgene_enet_desc_ring *cp_ring = tx_ring->cp_ring;
->>>> +     u32 tx_level, cq_level;
->>>> +
->>>> +     tx_level = xgene_enet_ring_len(tx_ring);
->>>> +     cq_level = xgene_enet_ring_len(cp_ring);
->>>> +     if (unlikely(tx_level > pdata->tx_qcnt_hi ||
->>>> +                  cq_level > pdata->cp_qcnt_hi)) {
->>>> +             netif_stop_queue(ndev);
->>>> +             return NETDEV_TX_BUSY;
->>>> +     }
->>>> +
->>>> +     if (xgene_enet_setup_tx_desc(tx_ring, skb))
->>>> +             return NETDEV_TX_OK;
->>>
->>> If you return NETDEV_TX_OK, it is your responsibility to deal with the
->>> SKB, because you own it.
->>>
->>> In particular, you have to free the packet.
->>
->> skb freeing happens in xgene_enet_tx_completion().
->
-> I have not looked at what xgenet_enet_setup_tx_desc() does, but
-> David's point is that, if this function fails and has not yet been
-> able to queue the SKB for transmission at the HW, you should make sure
-> that you free the SKB. Is xgene_enet_tx_completion() called if the
-> driver failed to prepare a descriptor for a SKB?
+Hi,
 
-Thanks for the explanation.  I will free up skb when
-xgene_enet_setup_tx_desc() fails
-and submit the next patch shortly.
+On Tue, Jun 17, 2014 at 12:56:54PM -0700, David Rientjes wrote:
+> On Tue, 17 Jun 2014, Markus Pargmann wrote:
+> 
+> > To enable writing of registers through the regmap debugfs interface, it
+> > was necessary to alter the regmap-debugfs.c source code. This is not
+> > really practical.
+> > 
+> > As this is a powerful tool for debugging, this patch creates an expert
+> > kconfig option for this function. This makes it easier to enable
+> > register writing in the kernel.
+> > 
+> > This patch also fixes the file mode when the regmap debugfs write code is
+> > compiled.
+> > 
+> 
+> Forcing users to enable CONFIG_EXPERT for this doesn't seem appropriate, 
+> it enables things by default and has really become a separate config of 
+> its own.  You might want to consider removing this dependency unless you 
+> have a strong reason for keeping it.
 
-> --
-> Florian
+I only created the dependency on CONFIG_EXPERT to make it clear that
+this option is only for people who know what they are doing. I can
+remove that dependency if that is OK for everyone?
+
+Thanks,
+
+Markus
+
+> 
+> > Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  drivers/base/regmap/Kconfig          | 14 ++++++++++++++
+> >  drivers/base/regmap/regmap-debugfs.c | 16 ++++++++++------
+> >  2 files changed, 24 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/base/regmap/Kconfig b/drivers/base/regmap/Kconfig
+> > index 4251570610c9..ce86600dbe75 100644
+> > --- a/drivers/base/regmap/Kconfig
+> > +++ b/drivers/base/regmap/Kconfig
+> > @@ -23,3 +23,17 @@ config REGMAP_MMIO
+> >  
+> >  config REGMAP_IRQ
+> >  	bool
+> > +
+> > +config REGMAP_ALLOW_WRITE_DEBUGFS
+> > +	default n
+> > +	depends on DEBUG_FS
+> > +	depends on EXPERT
+> > +	depends on REGMAP
+> > +	bool "Regmap, allow direct register writes through debugfs"
+> > +	help
+> > +	  This option enables regmap debugfs write support. If this is enabled,
+> > +	  you can directly write registers using the registers file in the
+> > +	  regmap debugfs.
+> > +
+> > +	  This is potentially dangerous. Do not enable this option unless you
+> > +	  know what you are doing.
+> > diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+> > index 45d812c0ea77..12906f2bdf00 100644
+> > --- a/drivers/base/regmap/regmap-debugfs.c
+> > +++ b/drivers/base/regmap/regmap-debugfs.c
+> > @@ -261,13 +261,10 @@ static ssize_t regmap_map_read_file(struct file *file, char __user *user_buf,
+> >  				   count, ppos);
+> >  }
+> >  
+> > -#undef REGMAP_ALLOW_WRITE_DEBUGFS
+> > -#ifdef REGMAP_ALLOW_WRITE_DEBUGFS
+> > +#if IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS)
+> >  /*
+> >   * This can be dangerous especially when we have clients such as
+> > - * PMICs, therefore don't provide any real compile time configuration option
+> > - * for this feature, people who want to use this will need to modify
+> > - * the source code directly.
+> > + * PMICs, therefore this function can only be selected in expert kconfig mode.
+> >   */
+> >  static ssize_t regmap_map_write_file(struct file *file,
+> >  				     const char __user *user_buf,
+> > @@ -512,7 +509,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+> >  			    map, &regmap_reg_ranges_fops);
+> >  
+> >  	if (map->max_register || regmap_readable(map, 0)) {
+> > -		debugfs_create_file("registers", 0400, map->debugfs,
+> > +		unsigned int registers_mode;
+> > +
+> > +		if (IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS))
+> > +			registers_mode = 0600;
+> > +		else
+> > +			registers_mode = 0400;
+> > +
+> > +		debugfs_create_file("registers", registers_mode, map->debugfs,
+> >  				    map, &regmap_map_fops);
+> >  		debugfs_create_file("access", 0400, map->debugfs,
+> >  				    map, &regmap_access_fops);
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/6811b4a4/attachment.sig>
