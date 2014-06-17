@@ -1,61 +1,38 @@
-From: Wei.Yang@windriver.com (Wei.Yang at windriver.com)
-Date: Tue, 17 Jun 2014 14:06:16 +0800
-Subject: [PATCH v1] kexec:fs2dt: Refine kdump device_tree sort
-Message-ID: <1402985176-10556-1-git-send-email-Wei.Yang@windriver.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 17 Jun 2014 08:31:27 +0200
+Subject: [PATCH 1/2] touchscreen: sun4i-ts: A10 (sun4i) has double the
+ temperature precision
+In-Reply-To: <20140616213048.GA422@core.coreip.homeip.net>
+References: <1402943069-19420-1-git-send-email-hdegoede@redhat.com>
+ <1402943069-19420-2-git-send-email-hdegoede@redhat.com>
+ <20140616213048.GA422@core.coreip.homeip.net>
+Message-ID: <539FE0BF.7030708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yang Wei <Wei.Yang@windriver.com>
+Hi,
 
-The commit b02d735bf was to rearrange the device-tree entries, and
-assumed that these entries are sorted in the ascending order. but
-acctually when I was validating kexec and kdump, the order of
-serial node still is changed. We should not only compare the length
-of directory name, but also compare the directory name, it would
-ensure that the order of device node is really in ascending order.
+On 06/16/2014 11:30 PM, Dmitry Torokhov wrote:
+> Hi Hans,
+> 
+> On Mon, Jun 16, 2014 at 08:24:28PM +0200, Hans de Goede wrote:
+>> Testing has revealed that the temperature in the rtp controller of the A10
+>> (sun4i) SoC has a resolution of 50 milli degrees / step, where as the
+>> A13 (sun5i) and later models have 100 milli degrees / step.
+>>
+>> Add a new sun5i-a13-ts compatible to differentiate the newer models and
+>> set the resolution based on the compatible string.
+>>
+>> This fixes the temperature reported on the A10 being twice as high as expected.
+> 
+> Should we maybe add explicit temperature steps property so that we won;t
+> need to patch again if they decided to change resolution again?
 
-Signed-off-by: Yang Wei <Wei.Yang@windriver.com>
----
- 
-Hi Simon,
+I can understand where your coming from, but in general the rule for
+devicetree bindings is to not add properties for things which are purely
+dependent on the SoC generation. Those must be deferred from the compatible
+string.
 
-   Please help me take a look at this patch. I validated it on freescale t4240qds.
+Regards,
 
-   Thanks
-   Wei
- kexec/fs2dt.c |   13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
-
-diff --git a/kexec/fs2dt.c b/kexec/fs2dt.c
-index 1e5f074..0bffaf5 100644
---- a/kexec/fs2dt.c
-+++ b/kexec/fs2dt.c
-@@ -479,6 +479,9 @@ static int comparefunc(const struct dirent **dentry1,
- {
- 	char *str1 = (*(struct dirent **)dentry1)->d_name;
- 	char *str2 = (*(struct dirent **)dentry2)->d_name;
-+	char* ptr1 = strchr(str1, '@');
-+	char* ptr2 = strchr(str2, '@');
-+	int len1, len2;
- 
- 	/*
- 	 * strcmp scans from left to right and fails to idetify for some
-@@ -486,9 +489,13 @@ static int comparefunc(const struct dirent **dentry1,
- 	 * Therefore, we get the wrong sorted order like memory at 10000000 and
- 	 * memory at f000000.
- 	 */
--	if (strchr(str1, '@') && strchr(str2, '@') &&
--		(strlen(str1) > strlen(str2)))
--		return 1;
-+	if (ptr1 && ptr2) {
-+		len1 = ptr1 - str1;
-+		len2 = ptr2 - str2;
-+		if (!strncmp(str1, str2, len1 >len2 ? len1: len2) &&
-+					(strlen(str1) > strlen(str2)))
-+				return 1;
-+	}
- 
- 	return strcmp(str1, str2);
- }
--- 
-1.7.9.5
+Hans
