@@ -1,134 +1,244 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Jun 2014 18:04:33 +0100
-Subject: [PATCHv2 3/4] arm64: cachetype: report weakest cache policy
+Date: Tue, 17 Jun 2014 18:04:32 +0100
+Subject: [PATCHv2 2/4] arm64: cpuinfo: print info for all CPUs
 In-Reply-To: <1403024674-25108-1-git-send-email-mark.rutland@arm.com>
 References: <1403024674-25108-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1403024674-25108-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403024674-25108-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In big.LITTLE systems, the I-cache policy may differ across CPUs, and
-thus we must always meet the most stringent maintenance requirements of
-any I-cache in the system when performing maintenance to ensure
-correctness. Unfortunately this requirement is not met as we always look
-at the current CPU's cache type register to determine the maintenance
-requirements.
+Currently reading /proc/cpuinfo will result in information being read
+out of the MIDR_EL1 of the current CPU, and the information is not
+associated with any particular logical CPU number.
 
-This patch causes the I-cache policy of all CPUs to be taken into
-account for icache_is_aliasing and icache_is_aivivt. If any I-cache in
-the system is aliasing or AIVIVT, the respective function will return
-true. At boot each CPU may set flags to identify that at least one
-I-cache in the system is aliasing and/or AIVIVT.
+This is problematic for systems with heterogeneous CPUs (i.e.
+big.LITTLE) where fields will vary across CPUs, and the output will
+differ depending on the executing CPU. Additionally the output is
+different in format to the 32-bit ARM Linux port, where information is
+printed out for each CPU.
 
-The now unused and potentially misleading icache_policy function is
-removed.
+This patch adds the necessary infrastructure to log the relevant
+registers (currently just MIDR_EL1) and print out the logged
+information.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/include/asm/cachetype.h | 16 ++++++++++------
- arch/arm64/include/asm/cpu.h       |  1 +
- arch/arm64/kernel/cpuinfo.c        | 28 +++++++++++++++++++++++++++-
- 3 files changed, 38 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/cpu.h | 30 +++++++++++++++++++++++++++++
+ arch/arm64/kernel/Makefile   |  3 ++-
+ arch/arm64/kernel/cpuinfo.c  | 31 +++++++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c    | 46 +++++++++++++++++++++++---------------------
+ arch/arm64/kernel/smp.c      |  6 ++++++
+ 5 files changed, 93 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm64/include/asm/cpu.h
+ create mode 100644 arch/arm64/kernel/cpuinfo.c
 
-diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index 4b23e75..7a2e076 100644
---- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -30,10 +30,14 @@
- 
- #ifndef __ASSEMBLY__
- 
--static inline u32 icache_policy(void)
--{
--	return (read_cpuid_cachetype() >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK;
--}
-+#include <linux/bitops.h>
-+
-+#define CTR_L1IP(ctr)	(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
-+
-+#define ICACHEF_ALIASING	BIT(0)
-+#define ICACHEF_AIVIVT		BIT(1)
-+
-+extern unsigned long __icache_flags;
- 
- /*
-  * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
-@@ -41,12 +45,12 @@ static inline u32 icache_policy(void)
-  */
- static inline int icache_is_aliasing(void)
- {
--	return icache_policy() != ICACHE_POLICY_PIPT;
-+	return test_bit(ICACHEF_ALIASING, &__icache_flags);
- }
- 
- static inline int icache_is_aivivt(void)
- {
--	return icache_policy() == ICACHE_POLICY_AIVIVT;
-+	return test_bit(ICACHEF_AIVIVT, &__icache_flags);
- }
- 
- static inline u32 cache_type_cwg(void)
 diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-index 74bf9bb..daca48d 100644
---- a/arch/arm64/include/asm/cpu.h
+new file mode 100644
+index 0000000..74bf9bb
+--- /dev/null
 +++ b/arch/arm64/include/asm/cpu.h
-@@ -20,6 +20,7 @@
-  */
- struct cpuinfo_arm64 {
- 	struct cpu	cpu;
-+	u32		reg_ctr;
- 	u32		reg_midr;
- };
- 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 340621d..b146148 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -14,18 +14,44 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#include <asm/cachetype.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
- 
-+#include <linux/bitops.h>
-+#include <linux/printk.h>
- #include <linux/smp.h>
- 
- DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
- 
-+static char *icache_policy_str[] = {
-+	[ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
-+	[ICACHE_POLICY_AIVIVT] = "AIVIVT",
-+	[ICACHE_POLICY_VIPT] = "VIPT",
-+	[ICACHE_POLICY_PIPT] = "PIPT",
+@@ -0,0 +1,30 @@
++/*
++ *  arch/arm/include/asm/cpu.h
++ *
++ *  Copyright (C) 2004-2014 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __ASM_ARM64_CPU_H
++#define __ASM_ARM64_CPU_H
++
++#include <linux/percpu.h>
++#include <linux/cpu.h>
++
++/*
++ * Records attributes of an individual CPU.
++ *
++ * This is used to cache data for /proc/cpuinfo.
++ */
++struct cpuinfo_arm64 {
++	struct cpu	cpu;
++	u32		reg_midr;
 +};
 +
-+unsigned long __icache_flags;
++DECLARE_PER_CPU(struct cpuinfo_arm64, cpu_data);
 +
-+static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info, int cpu)
++void cpuinfo_store_cpu(void);
++
++#endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index cdaedad..27c72ef 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -15,7 +15,8 @@ CFLAGS_REMOVE_return_address.o = -pg
+ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+-			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o
++			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o	\
++			   cpuinfo.o
+ 
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+new file mode 100644
+index 0000000..340621d
+--- /dev/null
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -0,0 +1,31 @@
++/*
++ * Record CPU attributes for later retrieval
++ *
++ * Copyright (C) 2014 ARM Ltd.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <asm/cpu.h>
++#include <asm/cputype.h>
++
++#include <linux/smp.h>
++
++DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
++
++void cpuinfo_store_cpu(void)
 +{
-+	u32 l1ip = CTR_L1IP(info->reg_ctr);
++	int cpu = smp_processor_id();
++	struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, cpu);
 +
-+	if (l1ip != ICACHE_POLICY_PIPT)
-+		set_bit(ICACHEF_ALIASING, &__icache_flags);
-+	if (l1ip == ICACHE_POLICY_AIVIVT);
-+		set_bit(ICACHEF_AIVIVT, &__icache_flags);
-+
-+	pr_info("Detected %s I-cache on CPU%d", icache_policy_str[l1ip], cpu);
++	cpuinfo->reg_midr = read_cpuid_id();
 +}
 +
- void cpuinfo_store_cpu(void)
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 46d1125..ba2b15f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -45,6 +45,7 @@
+ #include <linux/efi.h>
+ 
+ #include <asm/fixmap.h>
++#include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
+ #include <asm/cputable.h>
+@@ -396,6 +397,7 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+ 	cpu_read_bootcpu_ops();
++	cpuinfo_store_cpu();
+ #ifdef CONFIG_SMP
+ 	smp_init_cpus();
+ 	smp_build_mpidr_hash();
+@@ -417,14 +419,12 @@ static int __init arm64_device_init(void)
+ }
+ arch_initcall_sync(arm64_device_init);
+ 
+-static DEFINE_PER_CPU(struct cpu, cpu_data);
+-
+ static int __init topology_init(void)
  {
- 	int cpu = smp_processor_id();
- 	struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, cpu);
+ 	int i;
  
-+	cpuinfo->reg_ctr = read_cpuid_cachetype();
- 	cpuinfo->reg_midr = read_cpuid_id();
--}
+ 	for_each_possible_cpu(i) {
+-		struct cpu *cpu = &per_cpu(cpu_data, i);
++		struct cpu *cpu = &per_cpu(cpu_data.cpu, i);
+ 		cpu->hotpluggable = 1;
+ 		register_cpu(cpu, i);
+ 	}
+@@ -447,38 +447,40 @@ static const char *hwcap_str[] = {
  
-+	cpuinfo_detect_icache_policy(cpuinfo, cpu);
-+}
+ static int c_show(struct seq_file *m, void *v)
+ {
+-	int i;
++	int c;
+ 
+-	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+-		   cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
++	for_each_online_cpu(c) {
++		int i;
++		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, c);
++		u32 midr = cpuinfo->reg_midr;
+ 
+-	for_each_online_cpu(i) {
+ 		/*
+ 		 * glibc reads /proc/cpuinfo to determine the number of
+ 		 * online processors, looking for lines beginning with
+ 		 * "processor".  Give glibc what it expects.
+ 		 */
+ #ifdef CONFIG_SMP
+-		seq_printf(m, "processor\t: %d\n", i);
++		seq_printf(m, "processor\t: %d\n", c);
+ #endif
+-	}
++		seq_printf(m, "Type\t\t: %s rev %d (%s)\n",
++			   cpu_name, MIDR_REVISION(midr), ELF_PLATFORM);
+ 
+-	/* dump out the processor features */
+-	seq_puts(m, "Features\t: ");
++		/* dump out the processor features */
++		seq_puts(m, "Features\t: ");
+ 
+-	for (i = 0; hwcap_str[i]; i++)
+-		if (elf_hwcap & (1 << i))
+-			seq_printf(m, "%s ", hwcap_str[i]);
++		for (i = 0; hwcap_str[i]; i++)
++			if (elf_hwcap & (1 << i))
++				seq_printf(m, "%s ", hwcap_str[i]);
+ 
+-	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
+-	seq_printf(m, "CPU architecture: AArch64\n");
+-	seq_printf(m, "CPU variant\t: 0x%x\n", (read_cpuid_id() >> 20) & 15);
+-	seq_printf(m, "CPU part\t: 0x%03x\n", (read_cpuid_id() >> 4) & 0xfff);
+-	seq_printf(m, "CPU revision\t: %d\n", read_cpuid_id() & 15);
++		seq_printf(m, "\nCPU implementer\t: 0x%02x\n",
++			   MIDR_IMPLEMENTOR(midr));
++		seq_printf(m, "CPU architecture: AArch64\n");
++		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
++		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
++		seq_printf(m, "CPU revision\t: %d\n", MIDR_REVISION(midr));
+ 
+-	seq_puts(m, "\n");
+-
+-	seq_printf(m, "Hardware\t: %s\n", machine_name);
++		seq_puts(m, "\n");
++	}
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 40f38f4..7c730a6 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -39,6 +39,7 @@
+ 
+ #include <asm/atomic.h>
+ #include <asm/cacheflush.h>
++#include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/cpu_ops.h>
+ #include <asm/mmu_context.h>
+@@ -162,6 +163,11 @@ asmlinkage void secondary_start_kernel(void)
+ 	smp_store_cpu_info(cpu);
+ 
+ 	/*
++	 * Log the CPU info before it is marked online and might get read.
++	 */
++	cpuinfo_store_cpu();
++
++	/*
+ 	 * OK, now it's safe to let the boot CPU continue.  Wait for
+ 	 * the CPU migration code to notice that the CPU is online
+ 	 * before we continue.
 -- 
 1.9.1
