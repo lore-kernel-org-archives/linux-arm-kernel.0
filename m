@@ -1,52 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Jun 2014 12:23:53 +0100
-Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <5396E561.4020805@ti.com>
-References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
- <1400766819-22286-2-git-send-email-lee.jones@linaro.org>
- <5396E561.4020805@ti.com>
-Message-ID: <20140617112353.GB4139@lee--X1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Jun 2014 12:26:24 +0100
+Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
+In-Reply-To: <20140617104854.7393c14c@free-electrons.com>
+References: <20140527121806.GF3693@n2100.arm.linux.org.uk>
+ <20140527143745.386c77d9@free-electrons.com>
+ <20140528112450.GH3693@n2100.arm.linux.org.uk>
+ <20140530100819.1208149f@free-electrons.com>
+ <20140530092044.GO3693@n2100.arm.linux.org.uk>
+ <20140613121121.7e7dc8e6@free-electrons.com>
+ <20140613102019.GQ23430@n2100.arm.linux.org.uk>
+ <20140613133437.1a85f287@free-electrons.com>
+ <20140613155139.05e2393c@free-electrons.com>
+ <20140617104854.7393c14c@free-electrons.com>
+Message-ID: <20140617112624.GI23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> > devices. It has 2 ports which it can use for either; both SATA, both
-> > PCIe or one of each in any configuration.
+On Tue, Jun 17, 2014 at 10:48:54AM +0200, Thomas Petazzoni wrote:
+> Russell,
 > 
-> I've asked others who wrote multi-phy PHY providers to model each individual
-> PHY as sub-node of the PHY provider. So It's only fair I ask you the same to
-> do. So in this case the dt node should look something like:
-> 
-> 	miphy365x_phy: miphy365x at fe382000 {
-> 		compatible = "st,miphy365x-phy";
-> 		#phy-cells = <2>;
-> 		st,syscfg = <&syscfg_rear>;
-> 		channel at 0 {
-> 			reg =	<0xfe382000 0x100>, <0xfe394000 0x100>;
-> 			reg-names = "sata", "pcie";
-> 		}
-> 
-> 		channel at 1{
-> 			reg =	<0xfe38a000 0x100>, <0xfe804000 0x100>;
-> 			reg-names = "sata", "pcie";
-> 		}
-> 
-> 	};
+> Do you have some input/feedback about the below proposals/questions?
 
-I'm interested to know why you've taken this approach, as it makes the
-code much more complex.  The DT framework goes to the trouble of
-converting all addresses to to resources so drivers can easily pull
-them out using platform_get_resource() and friends.  Pushing the reg
-properties down into a child node means that we have to now iterate
-over the sub-nodes and pull them out manually.  This will lead to a
-pretty messy implementation IMHO.
+Not at the moment, I'm busy sorting through the 150-odd months-old
+patches which remain in my tree post-merge window, working through
+regressions, and trying to sort them out so I can (re-)post them and
+hopefully get rid of them.
 
-Can you point me in the direction of previous implementations where you
-have stipulated the same set of constraints please?
+Of course, if it didn't take many months to get patches into mainline,
+then I wouldn't be doing this right now, and I could spend more time
+thinking more about these sorts of issues, rather than (eg) thinking
+about how to generate DT binding documentation for drivers which have
+been merged without that required documentation, which I then need to
+modify, and then promptly get asked to write that required documentation
+for.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
