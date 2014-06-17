@@ -1,110 +1,207 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Jun 2014 22:52:49 +0800
-Subject: [PATCH v2 12/20] clk: sunxi: Add A23 APB0 support to
- sun6i-a31-apb0-clk
+Date: Tue, 17 Jun 2014 22:52:52 +0800
+Subject: [PATCH v2 15/20] pinctrl: sunxi: Add A23 R_PIO controller support
 In-Reply-To: <1403016777-15121-1-git-send-email-wens@csie.org>
 References: <1403016777-15121-1-git-send-email-wens@csie.org>
-Message-ID: <1403016777-15121-13-git-send-email-wens@csie.org>
+Message-ID: <1403016777-15121-16-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A23 has an almost identical PRCM clock tree. The difference in
-the APB0 clock is the smallest divisor is 1, instead of 2.
-
-This patch extends the sun6i-a31-apb0-clk driver to take divider
-tables associated to compatibles, and adds a compatible for the A23
-variant.
+The A23 has a R_PIO pin controller, similar to the one found on the A31 SoC.
+Add support for the pins controlled by the R_PIO controller.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-sun6i-apb0.c                | 28 ++++++++++++++++++-----
- 2 files changed, 23 insertions(+), 6 deletions(-)
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ drivers/pinctrl/sunxi/Kconfig                      |   5 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c        | 142 +++++++++++++++++++++
+ 4 files changed, 149 insertions(+)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index af9e47d..e3a47ec 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -28,6 +28,7 @@ Required properties:
- 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
- 	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
- 	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
-+	"allwinner,sun8i-a23-apb0-clk" - for the APB0 clock on A23
- 	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
- 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
- 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
-diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
-index 11f17c3..2197ac7 100644
---- a/drivers/clk/sunxi/clk-sun6i-apb0.c
-+++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
-@@ -11,6 +11,7 @@
- #include <linux/clk-provider.h>
- #include <linux/module.h>
- #include <linux/of.h>
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+index 44a78c1..93ce12e 100644
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+@@ -14,6 +14,7 @@ Required properties:
+   "allwinner,sun6i-a31-r-pinctrl"
+   "allwinner,sun7i-a20-pinctrl"
+   "allwinner,sun8i-a23-pinctrl"
++  "allwinner,sun8i-a23-r-pinctrl"
+ - reg: Should contain the register physical address and length for the
+   pin controller.
+ 
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 7c72ed8..da49524 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -37,4 +37,9 @@ config PINCTRL_SUN8I_A23
+ 	def_bool MACH_SUN8I
+ 	select PINCTRL_SUNXI_COMMON
+ 
++config PINCTRL_SUN8I_A23_R
++	def_bool MACH_SUN8I
++	depends on RESET_CONTROLLER
++	select PINCTRL_SUNXI_COMMON
++
+ endif
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index 850cd50..e797efb 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -9,3 +9,4 @@ obj-$(CONFIG_PINCTRL_SUN6I_A31)		+= pinctrl-sun6i-a31.o
+ obj-$(CONFIG_PINCTRL_SUN6I_A31_R)	+= pinctrl-sun6i-a31-r.o
+ obj-$(CONFIG_PINCTRL_SUN7I_A20)		+= pinctrl-sun7i-a20.o
+ obj-$(CONFIG_PINCTRL_SUN8I_A23)		+= pinctrl-sun8i-a23.o
++obj-$(CONFIG_PINCTRL_SUN8I_A23_R)	+= pinctrl-sun8i-a23-r.o
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
+new file mode 100644
+index 0000000..90f3b3a
+--- /dev/null
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
+@@ -0,0 +1,142 @@
++/*
++ * Allwinner A23 SoCs special pins pinctrl driver.
++ *
++ * Copyright (C) 2014 Chen-Yu Tsai
++ * Chen-Yu Tsai <wens@csie.org>
++ *
++ * Copyright (C) 2014 Boris Brezillon
++ * Boris Brezillon <boris.brezillon@free-electrons.com>
++ *
++ * Copyright (C) 2014 Maxime Ripard
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
 +#include <linux/of_device.h>
- #include <linux/platform_device.h>
- 
- /*
-@@ -28,6 +29,21 @@ static const struct clk_div_table sun6i_a31_apb0_divs[] = {
- 	{ /* sentinel */ },
- };
- 
-+/* The A23 APB0 clock has a standard power of 2 divisor */
-+static const struct clk_div_table sun8i_a23_apb0_divs[] = {
-+	{ .val = 0, .div = 1, },
-+	{ .val = 1, .div = 2, },
-+	{ .val = 2, .div = 4, },
-+	{ .val = 3, .div = 8, },
-+	{ /* sentinel */ },
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/reset.h>
++
++#include "pinctrl-sunxi.h"
++
++static const struct sunxi_desc_pin sun8i_a23_r_pins[] = {
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SCK */
++		  SUNXI_FUNCTION(0x3, "s_twi"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 0)),	/* PL_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SDA */
++		  SUNXI_FUNCTION(0x3, "s_twi"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 1)),	/* PL_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_uart"),	/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 2)),	/* PL_EINT2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_uart"),	/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 3)),	/* PL_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* MS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 4)),	/* PL_EINT4 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* CK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 5)),	/* PL_EINT5 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* DO */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 6)),	/* PL_EINT6 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_jtag"),	/* DI */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 7)),	/* PL_EINT7 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 8)),	/* PL_EINT8 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 9)),	/* PL_EINT9 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_pwm"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 10)),	/* PL_EINT10 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 11)),	/* PL_EINT11 */
 +};
 +
-+const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
-+	{ .compatible = "allwinner,sun6i-a31-apb0-clk", .data = &sun6i_a31_apb0_divs },
-+	{ .compatible = "allwinner,sun8i-a23-apb0-clk", .data = &sun8i_a23_apb0_divs },
-+	{ /* sentinel */ }
++static const struct sunxi_pinctrl_desc sun8i_a23_r_pinctrl_data = {
++	.pins = sun8i_a23_r_pins,
++	.npins = ARRAY_SIZE(sun8i_a23_r_pins),
++	.pin_base = PL_BASE,
++	.irq_banks = 1,
 +};
 +
- static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -36,12 +52,17 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	void __iomem *reg;
- 	struct clk *clk;
-+	const struct of_device_id *device;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	reg = devm_ioremap_resource(&pdev->dev, r);
- 	if (IS_ERR(reg))
- 		return PTR_ERR(reg);
- 
-+	device = of_match_device(sun6i_a31_apb0_clk_dt_ids, &pdev->dev);
-+	if (!device)
-+		return -EINVAL;
++static int sun8i_a23_r_pinctrl_probe(struct platform_device *pdev)
++{
++	struct reset_control *rstc;
++	int ret;
 +
- 	clk_parent = of_clk_get_parent_name(np, 0);
- 	if (!clk_parent)
- 		return -EINVAL;
-@@ -49,7 +70,7 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
- 	of_property_read_string(np, "clock-output-names", &clk_name);
- 
- 	clk = clk_register_divider_table(&pdev->dev, clk_name, clk_parent,
--					 0, reg, 0, 2, 0, sun6i_a31_apb0_divs,
-+					 0, reg, 0, 2, 0, device->data,
- 					 NULL);
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
-@@ -57,11 +78,6 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
- 	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
- }
- 
--const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
--	{ .compatible = "allwinner,sun6i-a31-apb0-clk" },
--	{ /* sentinel */ }
--};
--
- static struct platform_driver sun6i_a31_apb0_clk_driver = {
- 	.driver = {
- 		.name = "sun6i-a31-apb0-clk",
++	rstc = devm_reset_control_get(&pdev->dev, NULL);
++	if (IS_ERR(rstc)) {
++		dev_err(&pdev->dev, "Reset controller missing\n");
++		return PTR_ERR(rstc);
++	}
++
++	ret = reset_control_deassert(rstc);
++	if (ret)
++		return ret;
++
++	ret = sunxi_pinctrl_init(pdev,
++				 &sun8i_a23_r_pinctrl_data);
++
++	if (ret)
++		reset_control_assert(rstc);
++
++	return ret;
++}
++
++static struct of_device_id sun8i_a23_r_pinctrl_match[] = {
++	{ .compatible = "allwinner,sun8i-a23-r-pinctrl", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, sun8i_a23_r_pinctrl_match);
++
++static struct platform_driver sun8i_a23_r_pinctrl_driver = {
++	.probe	= sun8i_a23_r_pinctrl_probe,
++	.driver	= {
++		.name		= "sun8i-a23-r-pinctrl",
++		.owner		= THIS_MODULE,
++		.of_match_table	= sun8i_a23_r_pinctrl_match,
++	},
++};
++module_platform_driver(sun8i_a23_r_pinctrl_driver);
++
++MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
++MODULE_AUTHOR("Boris Brezillon <boris.brezillon at free-electrons.com");
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
++MODULE_DESCRIPTION("Allwinner A23 R_PIO pinctrl driver");
++MODULE_LICENSE("GPL");
 -- 
 2.0.0
