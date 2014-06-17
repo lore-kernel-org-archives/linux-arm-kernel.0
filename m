@@ -1,135 +1,89 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 17 Jun 2014 09:24:52 +0200
-Subject: [PATCH v6 3/7] mfd: AXP20x: Add bindings documentation
-In-Reply-To: <1400528868-5971-4-git-send-email-carlo@caione.org>
-References: <1400528868-5971-1-git-send-email-carlo@caione.org>
- <1400528868-5971-4-git-send-email-carlo@caione.org>
-Message-ID: <539FED44.1050904@free-electrons.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue, 17 Jun 2014 09:27:43 +0200
+Subject: [PATCH 1/1] clk-imx35: Add clko clock support
+Message-ID: <1402990063-26908-1-git-send-email-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This adds a new clk which is programmable using different sources and
+dividers.
 
-On 19/05/2014 21:47, Carlo Caione wrote:
-> Bindings documentation for the AXP20x driver. In this file also
-> sub-nodes are documented.
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+---
+I know some (most) of the new lines are larger than 80 characters, but I kept
+the same layout as the other lines.
+Also lots of the clock sources are not used in linux, so I have given them
+a descriptive name though.
 
-I think this patch has been forgotten (I didn't find it in linus' tree
-or linux-next tree).
+ arch/arm/mach-imx/clk-imx35.c | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-Best Regards,
-
-Boris
-
->
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 93 ++++++++++++++++++++++++
->  1 file changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
->
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> new file mode 100644
-> index 0000000..cc9e01b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -0,0 +1,93 @@
-> +AXP202/AXP209 device tree bindings
-> +
-> +The axp20x family current members :-
-> +axp202 (X-Powers)
-> +axp209 (X-Powers)
-> +
-> +Required properties:
-> +- compatible: "x-powers,axp202" or "x-powers,axp209"
-> +- reg: The I2C slave address for the AXP chip
-> +- interrupt-parent: The parent interrupt controller
-> +- interrupts: Interrupt specifiers for interrupt sources
-> +- interrupt-controller: axp20x has its own internal IRQs
-> +- #interrupt-cells: Should be set to 1
-> +- acin-supply: The input supply for LDO1
-> +- vin2-supply: The input supply for DCDC2
-> +- vin3-supply: The input supply for DCDC3
-> +- ldo24in-supply: The input supply for LDO2, LDO4
-> +- ldo3in-supply: The input supply for LDO3
-> +- ldo5in-supply: The input supply for LDO5
-> +
-> +- regulators: A node that houses a sub-node for each regulator. The regulators are
-> +	      bound using their name as listed here: dcdc2, dcdc3, ldo1, ldo2,
-> +	      ldo3, ldo4, ldo5.  The bindings details of individual regulator
-> +	      device can be found in:
-> +	      Documentation/devicetree/bindings/regulator/regulator.txt with
-> +	      the exception of x-powers,dcdc-freq
-> +- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
-> +		      (range: 750-1875). Default: 1.5MHz
-> +
-> +Optional properties for DCDCs:
-> +- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
-> +			  Default: AUTO mode
-> +
-> +Example:
-> +
-> +axp209: pmic at 34 {
-> +	compatible = "x-powers,axp209";
-> +	reg = <0x34>;
-> +	interrupt-parent = <&nmi_intc>;
-> +	interrupts = <0 8>;
-> +
-> +	interrupt-controller;
-> +	#interrupt-cells = <1>;
-> +
-> +	acin-supply = <&axp_ipsout_reg>;
-> +	vin2-supply = <&axp_ipsout_reg>;
-> +	vin3-supply = <&axp_ipsout_reg>;
-> +	ldo24in-supply = <&axp_ipsout_reg>;
-> +	ldo3in-supply = <&axp_ipsout_reg>;
-> +	ldo5in-supply = <&axp_ipsout_reg>;
-> +
-> +	regulators {
-> +		x-powers,dcdc-freq = <1500>;
-> +
-> +		axp_vcore_reg: dcdc2 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <2275000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_ddr_reg: dcdc3 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <3500000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_rtc_reg: ldo1 {
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_analog_reg: ldo2 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		axp_pll_reg: ldo3 {
-> +			regulator-min-microvolt = <700000>;
-> +			regulator-max-microvolt = <3500000>;
-> +		};
-> +
-> +		axp_hdmi_reg: ldo4 {
-> +			regulator-min-microvolt = <1250000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +
-> +		axp_mic_reg: ldo5 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +	};
-> +};
-> +
-
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index 71c86a2..acf821c 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -49,6 +49,13 @@ static struct clk_onecell_data clk_data;
+ 
+ static const char *std_sel[] = {"ppll", "arm"};
+ static const char *ipg_per_sel[] = {"ahb_per_div", "arm_per_div"};
++static const char *clko_select[] = {"ckil", "osc", "osc_audio", "dummy",
++				 "mpll_075", "mpll", "ppll", "arm",
++				 "ahb", "ipg", "ipg_per", "usbdiv",
++				 "esdhc1_div", "ssi1_div_post", "mlb_gate",
++				 "mshc_gate", "mpll_lock", "csi_div",
++				 "spdif_div_post", "uart1_gate", "asrc",
++				 "dptc", "arm_ungated", "nfc_div", "hsp"};
+ 
+ enum mx35_clks {
+ 	ckih, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
+@@ -64,7 +71,7 @@ enum mx35_clks {
+ 	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
+ 	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
+ 	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
+-	gpu2d_gate, clk_max
++	gpu2d_gate, clko_sel, clko_div1, clko_div, clko_gate, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -146,6 +153,10 @@ int __init mx35_clocks_init(void)
+ 	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
+ 	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
+ 
++	clk[clko_sel] = imx_clk_mux("clko_sel", base + MX35_CCM_COSR, 0, 5, clko_select, ARRAY_SIZE(clko_select));
++	clk[clko_div1] = imx_clk_divider("clko_div1", "clko_sel", base + MX35_CCM_COSR, 6, 1);
++	clk[clko_div] = imx_clk_divider("clko_div", "clko_div1", base + MX35_CCM_COSR, 10, 6);
++
+ 	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
+ 	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
+ 	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
+@@ -200,6 +211,8 @@ int __init mx35_clocks_init(void)
+ 	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
+ 	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
+ 
++	clk[clko_gate] = imx_clk_gate("clko_gate", "clko_div", base + MX35_CCM_COSR,  5);
++
+ 	for (i = 0; i < ARRAY_SIZE(clk); i++)
+ 		if (IS_ERR(clk[i]))
+ 			pr_err("i.MX35 clk %d: register failed with %ld\n",
+@@ -260,6 +273,7 @@ int __init mx35_clocks_init(void)
+ 	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
+ 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
+ 	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
++	clk_register_clkdev(clk[clko_gate], NULL, "clko.0");
+ 
+ 	clk_prepare_enable(clk[spba_gate]);
+ 	clk_prepare_enable(clk[gpio1_gate]);
+@@ -286,6 +300,11 @@ int __init mx35_clocks_init(void)
+ 	mxc_timer_init(MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
+ #endif
+ 
++	/*
++	 * Let's initially set up CLKO parent as arm.
++	 */
++	clk_set_parent(clk[clko_sel], clk[arm]);
++
+ 	return 0;
+ }
+ 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.5.5
