@@ -1,71 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 17 Jun 2014 11:40:44 -0500
-Subject: [PATCH] ARM: omap: rework platform selection
-In-Reply-To: <20140617152542.GU17845@atomide.com>
-References: <5701099.0P1SIXsHc1@wuerfel> <20140616141712.GL17845@atomide.com>
- <CABGGisxdKznLzR+0b0oYrN+aiWM0gNFbzYwfPtAZF=AiapU=eQ@mail.gmail.com>
- <201406171557.15819.arnd@arndb.de>
- <CAL_Jsq+MK+HMqE3k8p06bzzohzS0qu84N12C=VgF9_dMcSGGOQ@mail.gmail.com>
- <20140617152542.GU17845@atomide.com>
-Message-ID: <CAL_JsqJ_Q8x03wu5w0i6qNa5KrmSF0id0TOp-nSw9jSorC6atw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 17 Jun 2014 18:41:43 +0200
+Subject: [PATCH 1/6] ARM: at91/dt: define sam9261ek slow crystal frequency
+In-Reply-To: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1403023308-20533-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 10:25 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Rob Herring <robherring2@gmail.com> [140617 08:05]:
->> On Tue, Jun 17, 2014 at 8:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 16 June 2014, Rob Herring wrote:
->> >> > So far I have not come up with no great ideas on fixing this
->> >> > properly short of requiring all omap .config files to add
->> >> > CONFIG_ARCH_OMAP=y manually. Anybody got good ideas for that?
->> >>
->> >> I've failed to come up with anything...
->> >>
->> >
->> > I have two ideas, but neither is great:
->> >
->> > a) we leave the individual per-soc options in the top-level menu
->> >    and move the sub-options under those. This is a bit or a problem
->> >    for options concerning all of OMAP, but I'm not sure how many of
->> >    those are actually required.
->> >
->> > b) We go back to Rob's version and make CONFIG_ARCH_OMAP the
->> >    user-selectable option, and then find another solution for
->> >    building a kernel with ARCH_OMAP set but none of individual
->> >    options. This will work for anybody who has a full .config
->> >    file, but still break the 'make savedefconfig' generated ones.
->>
->> After playing with this more yesterday, I think ARCH_OMAP2PLUS instead
->> of ARCH_OMAP is actually a better choice to make the menuconfig item.
->> It still has the same defconfig issues, but doesn't affect OMAP1.
->
-> Well eventually we'll have the same problem for both ARCH_OMAP1
-> and ARCH_OMAP2PLUS so from that point of view it might make sense
-> to use ARCH_OMAP to start with.
+Define at91sam9261ek's slow crystal frequencies.
 
-But OMAP1 and OMAP2PLUS are mutually exclusive being v5 and v6+. So
-there would not be any user visible difference having 2 visible
-options. Do you expect any of these kconfig symbols to become
-obsolete?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9261ek.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
->> Doing your trick of a default selection with "select ARCH_OMAP2 if
->> !(ARCH_OMAP3 || ARCH_OMAP4 || ...)" in the menuconfig option can fix
->> the build issues. We'd actually need 2 selects for v6 and v7 only
->> builds.
->
-> Yes that or the options in mach-omap2/Makefile can be fixed up
-> further for building things only when a SoC is selected.
->
-> So really the issue is how to deal with make oldconfig for
-> existing .config files. I don't know if there's any solution to
-> that short of doing make CONFIG_ARCH_OMAP=y oldconfig.
-
-.config files are the full config, so wouldn't they be okay? It is
-only the reduced savedefconfig that would break.
-
-Rob
-
->
-> Regards,
->
-> Tony
+diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+index c6683ea8b743..aa35a7aec9a8 100644
+--- a/arch/arm/boot/dts/at91sam9261ek.dts
++++ b/arch/arm/boot/dts/at91sam9261ek.dts
+@@ -20,6 +20,10 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
++	slow_xtal {
++		clock-frequency = <32768>;
++	};
++
+ 	main_xtal {
+ 		clock-frequency = <18432000>;
+ 	};
+-- 
+1.9.1
