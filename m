@@ -1,24 +1,51 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jun 2014 22:34:30 +0200
-Subject: [PATCH v2 2/4] pinctrl: sunxi: Move setting of mux to irq type
- from unmask to request_resources
-In-Reply-To: <1402691764-17562-3-git-send-email-hdegoede@redhat.com>
-References: <1402691764-17562-1-git-send-email-hdegoede@redhat.com>
- <1402691764-17562-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140617203430.GC19730@lukather>
+Date: Tue, 17 Jun 2014 22:44:49 +0200
+Subject: [PATCH v4 4/7] regulator: axp20x: reset probe data before each
+ probe
+In-Reply-To: <1402990723-28138-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402990723-28138-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140617204449.GD19730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 10:36:02PM +0200, Hans de Goede wrote:
-> With level triggered interrupt mask / unmask will get called for each
-> interrupt, doing the somewhat expensive mux setting on each unmask thus is
-> not a good idea. Instead add a request_resources callback and do it there.
+On Tue, Jun 17, 2014 at 09:38:40AM +0200, Boris BREZILLON wrote:
+> The init_data and of_node fields of the axp2xx_matches tables are filled
+> at each device probe by the axp20x_regulator_parse_dt function (which then
+> calls the of_regulator_match function).
+> This means we can probe a new device and consider data initialized during
+> the probe of another device as valid.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Reset init_data and of_node field to NULL before each probe in order to
+> avoid this kind of issue.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/regulator/axp20x-regulator.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+> index 7a30f49..d42bf6d 100644
+> --- a/drivers/regulator/axp20x-regulator.c
+> +++ b/drivers/regulator/axp20x-regulator.c
+> @@ -324,6 +324,15 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>  		nregulators = AXP20X_REG_ID_MAX;
+>  	}
+>  
+> +	/*
+> +	 * Reset matches table (this table might have been modified by a
+> +	 * previous AXP2xx device probe).
+> +	 */
+> +	for (i = 0; i < nmatches; i++) {
+> +		matches[i].init_data = NULL;
+> +		matches[i].of_node = NULL;
+> +	}
+> +
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+That looks rather hackish, especially since we've never been in such a
+case yet, since we have a single PMIC in our system.
 
-Thanks!
+Can't you just use memzero here?
 
 Maxime
 
@@ -32,4 +59,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/3d3df746/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/1e74a964/attachment.sig>
