@@ -1,57 +1,158 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Tue, 17 Jun 2014 15:57:28 +0800
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <5537408.I9tiuCA96J@wuerfel>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <20140606110652.GB4116@e103592.cambridge.arm.com>
- <20140616162653.GV16758@arm.com> <5537408.I9tiuCA96J@wuerfel>
-Message-ID: <539FF4E8.7010202@huawei.com>
+From: sachin.kamat@samsung.com (Sachin Kamat)
+Date: Tue, 17 Jun 2014 13:39:54 +0530
+Subject: Boot warnings on exynos5420 based boards
+Message-ID: <CAK5sBcEJOJDtt_7ow=q=hiN8-JRHzOUg6t=T3hTNOwzKq5dodw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/6/17 0:42, Arnd Bergmann wrote:
-> On Monday 16 June 2014 17:26:53 Will Deacon wrote:
->> On Fri, Jun 06, 2014 at 12:07:11PM +0100, Dave Martin wrote:
->>> On Fri, Jun 06, 2014 at 08:48:26AM +0200, Arnd Bergmann wrote:
->>>> On Thursday 05 June 2014 21:37:09 Zhen Lei wrote:
->>>>
->>>>> +- smmu-masters  : A list of phandles to device nodes representing bus
->>>>> +                  masters for which the SMMU can provide a translation
->>>>> +                  and their corresponding StreamIDs (see example below).
->>>>>
->>>>
->>>> We're currently in the process of defining a generic binding for IOMMUs.
->>>>
->>>> While the smmu-masters property was copied from an existing binding,
->>>> I think we will end up migrating away from that towards a common way
->>>> to express those things, and we shouldn't add another one doing this
->>>> in a nonstandard way. Please have a look at the latest discussion
->>>> about the iommu binding using #iommu-cells and a reference from the
->>>> master to the iommu and see if you can migrate your code to use that.
->>>
->>> Thanks for making this point -- I was going to do so yesterday but then
->>> hesitated due to uncertainty about whether this should really be a new
->>> driver.
->>>
->>> Either way, it would be very valuable at least to attempt to describe
->>> the Hisilicon SMMU implemenation using the new proposals, since that is
->>> a good test of how reusable the proposed generic binding actually is.
->>
->> If this ends up being an addition to the existing ARM SMMU driver, I'm
->> really not keen on using the new DT bindings. We're already stuck with
->> the old bindings for that driver -- supporting both old and new in the
->> same code only buys us maintenance headaches and pointless divergence
->> within the driver.
-> 
-> We have to migrate the driver to the new binding anyway, it may be
-> a bit painful, but there are not really any users yet so there
-> is a chance we can remove the nonstandard code at some point,
-> perhaps in a few years.
-> 
-> 	Arnd
-> 
-> .
-> 
-My driver will base on arm-smmu, and I saw Will Deacon had agreed to you.
-So me too.
+Hi,
+
+I observe the below warnings while trying to boot Exynos5420 based boards
+since yesterday's linux-next (next-20140616) using multi_v7_defconfig. Looks
+like it is triggered by the commit 56e6921829 ("CPU hotplug, smp:
+flush any pending IPI callbacks before CPU offline"). Any ideas?
+
+
+*************************************************************
+[    0.046521] Exynos MCPM support installed
+[    0.048939] CPU1: Booted secondary processor
+[    0.065005] CPU1: update cpu_capacity 1535
+[    0.065011] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.065660] CPU2: Booted secondary processor
+[    0.085005] CPU2: update cpu_capacity 1535
+[    0.085012] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
+[    0.085662] CPU3: Booted secondary processor
+[    0.105005] CPU3: update cpu_capacity 1535
+[    0.105011] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
+[    1.105031] CPU4: failed to come online
+[    1.105081] ------------[ cut here ]------------
+[    1.105104] WARNING: CPU: 0 PID: 1 at kernel/smp.c:228
+flush_smp_call_function_queue+0xc0/0x178()
+[    1.105112] Modules linked in:
+[    1.105129] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
+3.15.0-next-20140616-00002-g38f9385a061b #2035
+[    1.105157] [<c02160f0>] (unwind_backtrace) from [<c0211c8c>]
+(show_stack+0x10/0x14)
+[    1.105179] [<c0211c8c>] (show_stack) from [<c0853794>]
+(dump_stack+0x8c/0x9c)
+[    1.105198] [<c0853794>] (dump_stack) from [<c024bdf4>]
+(warn_slowpath_common+0x70/0x8c)
+[    1.105216] [<c024bdf4>] (warn_slowpath_common) from [<c024beac>]
+(warn_slowpath_null+0x1c/0x24)
+[    1.105235] [<c024beac>] (warn_slowpath_null) from [<c02a3944>]
+(flush_smp_call_function_queue+0xc0/0x178)
+[    1.105253] [<c02a3944>] (flush_smp_call_function_queue) from
+[<c02a3a94>] (hotplug_cfd+0x98/0xd8)
+[    1.105269] [<c02a3a94>] (hotplug_cfd) from [<c026b064>]
+(notifier_call_chain+0x44/0x84)
+[    1.105285] [<c026b064>] (notifier_call_chain) from [<c024c1a4>]
+(_cpu_up+0x120/0x170)
+[    1.105302] [<c024c1a4>] (_cpu_up) from [<c024c264>] (cpu_up+0x70/0x94)
+[    1.105319] [<c024c264>] (cpu_up) from [<c0b5839c>] (smp_init+0xac/0xb0)
+[    1.105337] [<c0b5839c>] (smp_init) from [<c0b2fc54>]
+(kernel_init_freeable+0x90/0x1dc)
+[    1.105353] [<c0b2fc54>] (kernel_init_freeable) from [<c0851248>]
+(kernel_init+0xc/0xe8)
+[    1.105368] [<c0851248>] (kernel_init) from [<c020e7f8>]
+(ret_from_fork+0x14/0x3c)
+[    1.105389] ---[ end trace bc66942e4ab63168 ]---
+[    2.105047] CPU5: failed to come online
+[    2.105073] ------------[ cut here ]------------
+[    2.105091] WARNING: CPU: 0 PID: 1 at kernel/smp.c:228
+flush_smp_call_function_queue+0xc0/0x178()
+[    2.105099] Modules linked in:
+[    2.105114] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W
+3.15.0-next-20140616-00002-g38f9385a061b #2035
+[    2.105135] [<c02160f0>] (unwind_backtrace) from [<c0211c8c>]
+(show_stack+0x10/0x14)
+[    2.105153] [<c0211c8c>] (show_stack) from [<c0853794>]
+(dump_stack+0x8c/0x9c)
+[    2.105170] [<c0853794>] (dump_stack) from [<c024bdf4>]
+(warn_slowpath_common+0x70/0x8c)
+[    2.105187] [<c024bdf4>] (warn_slowpath_common) from [<c024beac>]
+(warn_slowpath_null+0x1c/0x24)
+[    2.105205] [<c024beac>] (warn_slowpath_null) from [<c02a3944>]
+(flush_smp_call_function_queue+0xc0/0x178)
+[    2.105222] [<c02a3944>] (flush_smp_call_function_queue) from
+[<c02a3a94>] (hotplug_cfd+0x98/0xd8)
+[    2.105237] [<c02a3a94>] (hotplug_cfd) from [<c026b064>]
+(notifier_call_chain+0x44/0x84)
+[    2.105252] [<c026b064>] (notifier_call_chain) from [<c024c1a4>]
+(_cpu_up+0x120/0x170)
+[    2.105268] [<c024c1a4>] (_cpu_up) from [<c024c264>] (cpu_up+0x70/0x94)
+[    2.105285] [<c024c264>] (cpu_up) from [<c0b5839c>] (smp_init+0xac/0xb0)
+[    2.105301] [<c0b5839c>] (smp_init) from [<c0b2fc54>]
+(kernel_init_freeable+0x90/0x1dc)
+[    2.105316] [<c0b2fc54>] (kernel_init_freeable) from [<c0851248>]
+(kernel_init+0xc/0xe8)
+[    2.105330] [<c0851248>] (kernel_init) from [<c020e7f8>]
+(ret_from_fork+0x14/0x3c)
+[    2.105339] ---[ end trace bc66942e4ab63169 ]---
+[    3.105064] CPU6: failed to come online
+[    3.105089] ------------[ cut here ]------------
+[    3.105107] WARNING: CPU: 0 PID: 1 at kernel/smp.c:228
+flush_smp_call_function_queue+0xc0/0x178()
+[    3.105115] Modules linked in:
+[    3.105131] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W
+3.15.0-next-20140616-00002-g38f9385a061b #2035
+[    3.105150] [<c02160f0>] (unwind_backtrace) from [<c0211c8c>]
+(show_stack+0x10/0x14)
+[    3.105168] [<c0211c8c>] (show_stack) from [<c0853794>]
+(dump_stack+0x8c/0x9c)
+[    3.105185] [<c0853794>] (dump_stack) from [<c024bdf4>]
+(warn_slowpath_common+0x70/0x8c)
+[    3.105202] [<c024bdf4>] (warn_slowpath_common) from [<c024beac>]
+(warn_slowpath_null+0x1c/0x24)
+[    3.105220] [<c024beac>] (warn_slowpath_null) from [<c02a3944>]
+(flush_smp_call_function_queue+0xc0/0x178)
+[    3.105237] [<c02a3944>] (flush_smp_call_function_queue) from
+[<c02a3a94>] (hotplug_cfd+0x98/0xd8)
+[    3.105252] [<c02a3a94>] (hotplug_cfd) from [<c026b064>]
+(notifier_call_chain+0x44/0x84)
+[    3.105267] [<c026b064>] (notifier_call_chain) from [<c024c1a4>]
+(_cpu_up+0x120/0x170)
+[    3.105283] [<c024c1a4>] (_cpu_up) from [<c024c264>] (cpu_up+0x70/0x94)
+[    3.105299] [<c024c264>] (cpu_up) from [<c0b5839c>] (smp_init+0xac/0xb0)
+[    3.105315] [<c0b5839c>] (smp_init) from [<c0b2fc54>]
+(kernel_init_freeable+0x90/0x1dc)
+[    3.105330] [<c0b2fc54>] (kernel_init_freeable) from [<c0851248>]
+(kernel_init+0xc/0xe8)
+[    3.105344] [<c0851248>] (kernel_init) from [<c020e7f8>]
+(ret_from_fork+0x14/0x3c)
+[    3.105353] ---[ end trace bc66942e4ab6316a ]---
+[    4.105081] CPU7: failed to come online
+[    4.105106] ------------[ cut here ]------------
+[    4.105124] WARNING: CPU: 0 PID: 1 at kernel/smp.c:228
+flush_smp_call_function_queue+0xc0/0x178()
+[    4.105132] Modules linked in:
+[    4.105147] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W
+3.15.0-next-20140616-00002-g38f9385a061b #2035
+[    4.105167] [<c02160f0>] (unwind_backtrace) from [<c0211c8c>]
+(show_stack+0x10/0x14)
+[    4.105184] [<c0211c8c>] (show_stack) from [<c0853794>]
+(dump_stack+0x8c/0x9c)
+[    4.105201] [<c0853794>] (dump_stack) from [<c024bdf4>]
+(warn_slowpath_common+0x70/0x8c)
+[    4.105218] [<c024bdf4>] (warn_slowpath_common) from [<c024beac>]
+(warn_slowpath_null+0x1c/0x24)
+[    4.105236] [<c024beac>] (warn_slowpath_null) from [<c02a3944>]
+(flush_smp_call_function_queue+0xc0/0x178)
+[    4.105253] [<c02a3944>] (flush_smp_call_function_queue) from
+[<c02a3a94>] (hotplug_cfd+0x98/0xd8)
+[    4.105268] [<c02a3a94>] (hotplug_cfd) from [<c026b064>]
+(notifier_call_chain+0x44/0x84)
+[    4.105283] [<c026b064>] (notifier_call_chain) from [<c024c1a4>]
+(_cpu_up+0x120/0x170)
+[    4.105299] [<c024c1a4>] (_cpu_up) from [<c024c264>] (cpu_up+0x70/0x94)
+[    4.105315] [<c024c264>] (cpu_up) from [<c0b5839c>] (smp_init+0xac/0xb0)
+[    4.105331] [<c0b5839c>] (smp_init) from [<c0b2fc54>]
+(kernel_init_freeable+0x90/0x1dc)
+[    4.105346] [<c0b2fc54>] (kernel_init_freeable) from [<c0851248>]
+(kernel_init+0xc/0xe8)
+[    4.105360] [<c0851248>] (kernel_init) from [<c020e7f8>]
+(ret_from_fork+0x14/0x3c)
+[    4.105370] ---[ end trace bc66942e4ab6316b ]---
+[    4.105380] Brought up 4 CPUs
+
+Regards,
+Sachin
