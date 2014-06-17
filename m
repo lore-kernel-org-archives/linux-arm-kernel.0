@@ -1,117 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Jun 2014 00:35:52 -0700
-Subject: [RESEND PATCH 1/2] ARM: AM43xx: hwmod: add DSS hwmod data
-In-Reply-To: <539FE9A1.7040409@ti.com>
-References: <1402676147-3711-1-git-send-email-balbi@ti.com>
- <1402676147-3711-2-git-send-email-balbi@ti.com>
- <20140616092219.GZ17845@atomide.com> <539FE9A1.7040409@ti.com>
-Message-ID: <20140617073552.GM17845@atomide.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 17 Jun 2014 09:38:36 +0200
+Subject: [PATCH v4 0/7] mfd: axp20x: add AXP221 PMIC support
+Message-ID: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140617 00:10]:
-> On 16/06/14 12:22, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [140613 09:17]:
-> >> From: Sathya Prakash M R <sathyap@ti.com>
-> >>
-> >> Add DSS hwmod data for AM43xx.
-> >>
-> >> Cc: Andrew Morton <akpm@linux-foundation.org>
-> >> Acked-by: Rajendra Nayak <rnayak@ti.com>
-> >> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
-> >> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> >> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >> ---
-> >>
-> >> Note that this patch was originally send on May 9th [1], changes were requested
-> >> and a new version was sent on May 19th [2], then on May 27th [3] Tomi pinged
-> >> maintainer again and go no response.
-> >>
-> >> Without this patch, we cannot get display working on any AM437x devices.
-> >>
-> >> [1] http://marc.info/?l=linux-arm-kernel&m=139963677925227&w=2
-> >> [2] http://marc.info/?l=linux-arm-kernel&m=140049799425512&w=2
-> >> [3] http://marc.info/?l=linux-arm-kernel&m=140117232826754&w=2
-> >>
-> >>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 98 ++++++++++++++++++++++++++++++
-> >>  arch/arm/mach-omap2/prcm43xx.h             |  1 +
-> >>  2 files changed, 99 insertions(+)
-> >>
-> >> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> >> index 5c2cc80..d2a7b6d 100644
-> >> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> >> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-> >> @@ -19,6 +19,8 @@
-> >>  #include "omap_hwmod.h"
-> >>  #include "omap_hwmod_33xx_43xx_common_data.h"
-> >>  #include "prcm43xx.h"
-> >> +#include "omap_hwmod_common_data.h"
-> >> +
-> >>  
-> >>  /* IP blocks */
-> >>  static struct omap_hwmod am43xx_l4_hs_hwmod = {
-> >> @@ -415,6 +417,70 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
-> >>  	},
-> >>  };
-> >>  
-> >> +/* Display sub system - DSS */
-> >> +
-> >> +struct omap_dss_dispc_dev_attr am43xx_dss_dispc_dev_attr = {
-> >> +	.manager_count		= 1,
-> >> +	.has_framedonetv_irq	= 0
-> >> +};
-> >> +
-> >> +
-> >> +static struct omap_hwmod_class_sysconfig am43xx_dispc_sysc = {
-> >> +	.rev_offs	= 0x0000,
-> >> +	.sysc_offs	= 0x0010,
-> >> +	.syss_offs	= 0x0014,
-> >> +	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE),
-> >> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-> >> +	.sysc_fields	= &omap_hwmod_sysc_type1,
-> >> +};
-> > 
-> > Looking at the TRM, "Table 13-43. DISPC_SYSCFG Register Field
-> > Descriptions" seems to list the folowing bits available:
-> > 
-> > 13-12	MIDLEMODE 
-> > 9-8	CLOCK_ACTIVITY 
-> > 4-3	SIDLEMODE 
-> > 2	ENWAKEUP 
-> > 1	SOFTRESET 
-> > 0	AUTOIDLE 
-> > 
-> > Have I missed something or how come we don't define them all
-> > as available?
-> 
-> Yes, you're right. I don't see why they shouldn't be there.
-> 
-> > The .idlemodes available values and .sysc_fields seems to match
-> > the TRM.
-> 
-> Shouldn't idlemodes also have:
-> 
-> 	MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART
+Hello,
 
-Oops yes indeed looking at the MIDDLEDMOE values in addition to
-to SIDLEMODE.
- 
-> I changed the dispc flags to:
-> 
-> 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SOFTRESET |
-> 		SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
-> 		SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_MIDLEMODE),
-> 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> 		MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-> 
-> and DSS seems to work fine for me. Then again, I don't think there's any
-> proper PM going on (or at least things like debugfs/pm_debug/count shows
-> no sensible values), so it could well be that those flags are not even
-> used at the moment.
+This patch series adds basic support for X-Powers' AXP221 PMIC.
 
-Right. Having these set correctly for devices is pretty much a
-requirement for PM to have any chance of working :)
+At the moment the MFD device only exposes AXP221 regulators but other
+subdevices might be added later.
 
-Regards,
+Best Regards,
 
-Tony
+Boris
+
+Changes since v3:
+ - rework mfd probe to avoid multiple AXP variant tests
+ - add new compatible string to the DT bindings doc
+
+Changes since v2:
+ - add helper functions for regulator set registration
+ - fix a copy/paste error in the axp20x mfd driver
+
+Changes since v1:
+ - merge code with the axp20x driver
+
+Boris BREZILLON (7):
+  mfd: axp20x: add AXP221 PMIC support
+  regulator: axp20x: prepare support for multiple AXP chip families
+  regulator: axp20x: add support for AXP221 regulators
+  regulator: axp20x: reset probe data before each probe
+  regulator: add support for regulator set registration
+  regulator: axp20x: make use of devm_regulator_set_register
+  mfd: AXP20x: add "x-powers,axp221" compatible string to DT bindings
+    doc
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt |   2 +-
+ drivers/mfd/axp20x.c                             |  64 ++++++-
+ drivers/regulator/axp20x-regulator.c             | 202 ++++++++++++++++-------
+ drivers/regulator/core.c                         | 106 ++++++++++++
+ drivers/regulator/devres.c                       |  68 ++++++++
+ include/linux/mfd/axp20x.h                       |  56 +++++++
+ include/linux/regulator/driver.h                 |  51 ++++++
+ 7 files changed, 483 insertions(+), 66 deletions(-)
+
+-- 
+1.8.3.2
