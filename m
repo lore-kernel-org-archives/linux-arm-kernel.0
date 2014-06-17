@@ -1,27 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jun 2014 23:48:06 +0100
-Subject: [PATCH] clkdev: Don't print errors on probe defer
-In-Reply-To: <20140617223305.32686.15540@quantum>
-References: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
- <20140617223305.32686.15540@quantum>
-Message-ID: <20140617224805.GN23430@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 17 Jun 2014 20:08:56 -0300
+Subject: [PATCH] ARM: mvebu: enable Dove SoC in mvebu_v7_defconfig
+Message-ID: <1403046536-18563-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 03:33:05PM -0700, Mike Turquette wrote:
-> Quoting Stephen Boyd (2014-06-13 16:36:31)
-> > This error message can spam the logs if you have lots of probe
-> > deferals due to missing clocks. Just silence the error in this
-> > case because the driver should try again later.
-> > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Looks OK to me. Russell?
+Since commit:
 
-Looks fine to me too.  Should I assume you're looking to take it?
+commit d93003e8e4e1fbbc8a06ec561a63f5aa105a4c45
+Author: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date:   Thu Apr 24 22:58:30 2014 +0100
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+    ARM: 8042/1: iwmmxt: allow to build iWMMXt on Marvell PJ4B
 
+fixed the error that prevented Dove SoC from being built with
+the rest of the mvebu SoCs, we can now add it to the defconfig.
+
+In addition, this commit enables SERIAL_OF_PLATFORM, which is required
+to have UART on some of the boards.
+
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/configs/mvebu_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index e11170e..b0bfefa 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -14,6 +14,7 @@ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_375=y
+ CONFIG_MACH_ARMADA_38X=y
+ CONFIG_MACH_ARMADA_XP=y
++CONFIG_MACH_DOVE=y
+ CONFIG_NEON=y
+ # CONFIG_CACHE_L2X0 is not set
+ # CONFIG_SWP_EMULATE is not set
+@@ -52,6 +53,7 @@ CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_GPIO=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_I2C=y
+ CONFIG_SPI=y
+ CONFIG_SPI_ORION=y
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.1
