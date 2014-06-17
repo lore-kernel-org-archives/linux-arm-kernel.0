@@ -1,80 +1,30 @@
-From: abhimany@codeaurora.org (Abhimanyu Kapur)
-Date: Mon, 16 Jun 2014 15:29:38 -0700
-Subject: [PATCH] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-Message-ID: <1402957778-13830-1-git-send-email-abhimany@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 16 Jun 2014 21:15:52 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_SOC_IMX6SX
+Message-ID: <1402964152-11140-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for debug communications channel based
-hvc console for arm64 cpus.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+Let mx6sx be built by default.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm64/include/asm/dcc.h | 41 +++++++++++++++++++++++++++++++++++++++++
- drivers/tty/hvc/Kconfig      |  2 +-
- 2 files changed, 42 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/dcc.h
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/dcc.h b/arch/arm64/include/asm/dcc.h
-new file mode 100644
-index 0000000..ef74324
---- /dev/null
-+++ b/arch/arm64/include/asm/dcc.h
-@@ -0,0 +1,41 @@
-+/* Copyright (c) 2014 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <asm/barrier.h>
-+
-+static inline u32 __dcc_getstatus(void)
-+{
-+	u32 __ret;
-+
-+	asm volatile("mrs %0, mdccsr_el0" : "=r" (__ret)
-+			: : "cc");
-+
-+	return __ret;
-+}
-+
-+static inline char __dcc_getchar(void)
-+{
-+	char __c;
-+
-+	asm volatile("mrs %0, dbgdtrrx_el0" : "=r" (__c));
-+	isb();
-+
-+	return __c;
-+}
-+
-+static inline void __dcc_putchar(char c)
-+{
-+	asm volatile("msr dbgdtrtx_el0, %0"
-+			: /* No output register */
-+			: "r" (c));
-+	isb();
-+}
-diff --git a/drivers/tty/hvc/Kconfig b/drivers/tty/hvc/Kconfig
-index 8902f9b..02051a1 100644
---- a/drivers/tty/hvc/Kconfig
-+++ b/drivers/tty/hvc/Kconfig
-@@ -88,7 +88,7 @@ config HVC_UDBG
- 
- config HVC_DCC
-        bool "ARM JTAG DCC console"
--       depends on ARM
-+       depends on ARM || ARM64
-        select HVC_DRIVER
-        help
-          This console uses the JTAG DCC on ARM to create a console under the HVC
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index a6f182e..e9f481e 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -37,6 +37,7 @@ CONFIG_SOC_IMX50=y
+ CONFIG_SOC_IMX53=y
+ CONFIG_SOC_IMX6Q=y
+ CONFIG_SOC_IMX6SL=y
++CONFIG_SOC_IMX6SX=y
+ CONFIG_SOC_VF610=y
+ CONFIG_PCI=y
+ CONFIG_PCI_IMX6=y
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.3.2
