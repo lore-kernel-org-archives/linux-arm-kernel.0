@@ -1,79 +1,41 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 17 Jun 2014 12:45:14 -0400
-Subject: [PATCH] arm64: support reboot and power off via EFI runtime
-Message-ID: <1403023514-1352-1-git-send-email-msalter@redhat.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 17 Jun 2014 18:50:01 +0200
+Subject: [PATCH v2 2/3] ata: Add Qualcomm ARM SoC AHCI SATA host controller
+ driver
+In-Reply-To: <419989CC-5106-4AF7-8911-617B51FD7395@codeaurora.org>
+References: <1402676163-31574-1-git-send-email-galak@codeaurora.org>
+ <14174621.WL9ndpHQ2Q@amdc1032>
+ <419989CC-5106-4AF7-8911-617B51FD7395@codeaurora.org>
+Message-ID: <3066194.ZkIxk6z9u6@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add handlers for arm_pm_resestart and pm_power_off which use EFI
-runtime services ResetSystem call to perform the functions. These
-handlers are only installed if no handler currently exists. This
-allows PSCI to take priority over EFI for these functions.
+On Tuesday, June 17, 2014 10:42:36 AM Kumar Gala wrote:
+> 
+> On Jun 17, 2014, at 7:25 AM, Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> wrote:
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+[...]
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 14db1f6..e8c0476 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -19,11 +19,14 @@
- #include <linux/of_fdt.h>
- #include <linux/sched.h>
- #include <linux/slab.h>
-+#include <linux/reboot.h>
-+#include <linux/pm.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/efi.h>
- #include <asm/tlbflush.h>
- #include <asm/mmu_context.h>
-+#include <asm/system_misc.h>
- 
- struct efi_memory_map memmap;
- 
-@@ -467,3 +470,40 @@ static int __init arm64_enter_virtual_mode(void)
- 	return 0;
- }
- early_initcall(arm64_enter_virtual_mode);
-+
-+static void efi_restart(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+	int efi_mode;
-+
-+	switch (reboot_mode) {
-+	case REBOOT_WARM:
-+	case REBOOT_SOFT:
-+		efi_mode = EFI_RESET_WARM;
-+		break;
-+	default:
-+		efi_mode = EFI_RESET_COLD;
-+		break;
-+	}
-+	efi.reset_system(efi_mode, 0, 0, NULL);
-+}
-+
-+static void efi_power_off(void)
-+{
-+	efi.reset_system(EFI_RESET_SHUTDOWN, 0, 0, NULL);
-+}
-+
-+static int __init setup_efi_reset(void)
-+{
-+	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-+		/*
-+		 * If something (psci, etc) hasn't already registered
-+		 * a handler, use EFI.
-+		 */
-+		if (arm_pm_restart == NULL)
-+			arm_pm_restart = efi_restart;
-+		if (pm_power_off == NULL)
-+			pm_power_off = efi_power_off;
-+	}
-+	return 0;
-+}
-+pure_initcall(setup_efi_reset);
--- 
-1.9.0
+> >> +static struct platform_driver qcom_ahci_driver = {
+> >> +	.probe = qcom_ahci_probe,
+> >> +	.remove = ata_platform_remove_one,
+> >> +	.driver = {
+> >> +		.name = "qcom_ahci_qcom",
+> >> +		.owner = THIS_MODULE,
+> >> +		.of_match_table = qcom_ahci_of_match,
+> >> +	},
+> > 
+> > This driver lacks PM suspend/resume support.  I assume that
+> > the IPQ806x platform also doesn't support suspend/resume yet
+> > (if so a comment in the driver code about this would be useful),
+> > otherwise the driver should be fixed.
+> 
+> Correct, do you want the comment in the commit message or the driver itself?
+
+I would prefer the comment in the driver itself.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
