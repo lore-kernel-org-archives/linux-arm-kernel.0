@@ -1,138 +1,96 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jun 2014 22:46:57 +0200
-Subject: [PATCH v4 6/7] regulator: axp20x: make use of
- devm_regulator_set_register
-In-Reply-To: <1402990723-28138-7-git-send-email-boris.brezillon@free-electrons.com>
-References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402990723-28138-7-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140617204657.GE19730@lukather>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 17 Jun 2014 13:57:33 -0700
+Subject: [PATCH v2 01/10] mfd: max77686: Convert to use regmap_irq
+In-Reply-To: <1402941758-11216-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402941758-11216-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=VUPwr6GbR7O-t0q-GaCttZ5vGzLeFqHckzkk-dZYfCFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 09:38:42AM +0200, Boris BREZILLON wrote:
-> Make use of the devm_regulator_set_register instead of registering each
-> regulator provided by the PMIC.
-> 
-> This also solves a self dependency issue where one regulator of the PMIC
-> is used as a supply for anoher regulator provided by the same PMIC.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/regulator/axp20x-regulator.c | 59 ++++++++++++++----------------------
->  1 file changed, 23 insertions(+), 36 deletions(-)
-> 
-> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> index d42bf6d..e8f0df7 100644
-> --- a/drivers/regulator/axp20x-regulator.c
-> +++ b/drivers/regulator/axp20x-regulator.c
-> @@ -301,66 +301,53 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
->  
->  static int axp20x_regulator_probe(struct platform_device *pdev)
->  {
-> -	struct regulator_dev *rdev;
-> +	struct regulator_set *rset;
->  	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-> -	struct regulator_config config = { };
-> -	struct regulator_init_data *init_data;
-> +	struct regulator_set_config config;
->  	struct of_regulator_match *matches;
-> -	int nmatches;
-> -	const struct regulator_desc *regulators;
-> -	int nregulators;
->  	int ret, i;
->  	u32 workmode;
->  
-> +	memset(&config, 0, sizeof(config));
-> +	config.dev = &pdev->dev;
-> +	config.regmap = axp20x->regmap;
->  	if (axp20x->variant == AXP221_ID) {
->  		matches = axp22x_matches;
-> -		nmatches = ARRAY_SIZE(axp22x_matches);
-> -		regulators = axp22x_regulators;
-> -		nregulators = AXP22X_REG_ID_MAX;
-> +		config.descs = axp22x_regulators;
-> +		config.nregulators = AXP22X_REG_ID_MAX;
->  	} else {
->  		matches = axp20x_matches;
-> -		nmatches = ARRAY_SIZE(axp20x_matches);
-> -		regulators = axp20x_regulators;
-> -		nregulators = AXP20X_REG_ID_MAX;
-> +		config.descs = axp20x_regulators;
-> +		config.nregulators = AXP20X_REG_ID_MAX;
->  	}
-> +	config.matches = matches;
->  
->  	/*
->  	 * Reset matches table (this table might have been modified by a
->  	 * previous AXP2xx device probe).
->  	 */
-> -	for (i = 0; i < nmatches; i++) {
-> +	for (i = 0; i < config.nregulators; i++) {
->  		matches[i].init_data = NULL;
->  		matches[i].of_node = NULL;
->  	}
->  
-> -	ret = axp20x_regulator_parse_dt(pdev, matches, nmatches);
-> +	ret = axp20x_regulator_parse_dt(pdev, matches,
-> +					config.nregulators);
->  	if (ret)
->  		return ret;
->  
-> -	for (i = 0; i < AXP20X_REG_ID_MAX; i++) {
-> -		init_data = matches[i].init_data;
-> +	rset = devm_regulator_set_register(&pdev->dev, &config);
-> +	if (IS_ERR(rset))
-> +		return PTR_ERR(rset);
->  
-> -		config.dev = &pdev->dev;
-> -		config.init_data = init_data;
-> -		config.regmap = axp20x->regmap;
-> -		config.of_node = matches[i].of_node;
-> -
-> -		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
-> -					       &config);
-> -		if (IS_ERR(rdev)) {
-> -			dev_err(&pdev->dev, "Failed to register %s\n",
-> -				regulators[i].name);
-> -
-> -			return PTR_ERR(rdev);
-> -		}
-> -
-> -		ret = of_property_read_u32(matches[i].of_node, "x-powers,dcdc-workmode",
-> +	for (i = 0; i < rset->nregulators; i++) {
-> +		ret = of_property_read_u32(config.matches[i].of_node,
-> +					   "x-powers,dcdc-workmode",
->  					   &workmode);
-> -		if (!ret) {
-> -			if (axp20x_set_dcdc_workmode(rdev, i, workmode))
-> -				dev_err(&pdev->dev, "Failed to set workmode on %s\n",
-> -					regulators[i].name);
-> -		}
-> +		if (!ret &&
-> +		    axp20x_set_dcdc_workmode(rset->regulators[i], i, workmode))
-> +			dev_err(&pdev->dev, "Failed to set workmode on %s\n",
-> +				config.descs[i].name);
->  	}
->  
->  	return 0;
-> -- 
-> 1.8.3.2
-> 
+Javier,
 
-It looks like you're modifying code you just introduced. You should
-probably move this patch earlier on, so that you don't have to patch
-your patch.
+On Mon, Jun 16, 2014 at 11:02 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> @@ -127,15 +175,48 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>         }
+>         i2c_set_clientdata(max77686->rtc, max77686);
+>
+> -       max77686_irq_init(max77686);
+> +       max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
+> +                                                   &max77686_rtc_regmap_config);
+> +       if (IS_ERR(max77686->rtc_regmap)) {
+> +               ret = PTR_ERR(max77686->rtc_regmap);
+> +               dev_err(max77686->dev, "failed to allocate RTC regmap: %d\n",
+> +                       ret);
+> +               goto err_unregister_i2c;
+> +       }
+> +
+> +       ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
+> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
+> +                                 IRQF_SHARED, 0, &max77686_irq_chip,
+> +                                 &max77686->irq_data);
+> +       if (ret != 0) {
+> +               dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
+> +               goto err_unregister_i2c;
+> +       }
+> +       ret = regmap_add_irq_chip(max77686->rtc_regmap, max77686->irq,
+> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
+> +                                 IRQF_SHARED, 0, &max77686_rtc_irq_chip,
+> +                                 &max77686->rtc_irq_data);
+> +       if (ret != 0) {
+> +               dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
+> +               goto err_del_irqc;
+> +       }
+>
+>         ret = mfd_add_devices(max77686->dev, -1, max77686_devs,
+>                               ARRAY_SIZE(max77686_devs), NULL, 0, NULL);
+>         if (ret < 0) {
+> -               mfd_remove_devices(max77686->dev);
+> -               i2c_unregister_device(max77686->rtc);
+> +               dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
+> +               goto err_del_rtc_irqc;
+>         }
+>
+> +       return 0;
+> +
+> +err_del_rtc_irqc:
+> +       regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+> +err_del_irqc:
+> +       regmap_del_irq_chip(max77686->irq, max77686->irq_data);
 
-Maxime
+I would imagine you either don't need these regmap_del_irq_chip() here
+or that you _do_ need them in max77686_i2c_remove().
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/10fcac8f/attachment.sig>
+...from looking at other drivers I think the answer is to add them to
+max77686_i2c_remove().
+
+
+> diff --git a/include/linux/mfd/max77686-private.h b/include/linux/mfd/max77686-private.h
+> index 8c75a9c..3a810b1 100644
+> --- a/include/linux/mfd/max77686-private.h
+> +++ b/include/linux/mfd/max77686-private.h
+> @@ -205,7 +205,7 @@ enum max77686_irq {
+>         MAX77686_PMICIRQ_140C,
+>         MAX77686_PMICIRQ_120C,
+>
+> -       MAX77686_RTCIRQ_RTC60S,
+> +       MAX77686_RTCIRQ_RTC60S = 0,
+>         MAX77686_RTCIRQ_RTCA1,
+>         MAX77686_RTCIRQ_RTCA2,
+>         MAX77686_RTCIRQ_SMPL,
+> @@ -215,6 +215,25 @@ enum max77686_irq {
+>         MAX77686_IRQ_NR,
+
+Maybe remove MAX77686_IRQ_NR which no longer makes any sense now that
+you start over at 0 partway through.
+
+
+Overall this looks good to me, so once nits above are fixed feel to
+add my Reviewed-by.  I've also built and booted this patch on
+exynos5250-snow and tested that the RTC wakealarm fires and can even
+wake the system up (with some additional work that I'll email you
+about).
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
