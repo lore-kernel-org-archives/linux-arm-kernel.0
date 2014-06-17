@@ -1,35 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Jun 2014 02:57:15 -0700
-Subject: [PATCH v2] ARM: AM43xx: hwmod: add DSS hwmod data
-In-Reply-To: <53A00970.3090902@ti.com>
-References: <1402994233-22599-1-git-send-email-tomi.valkeinen@ti.com>
- <20140617085846.GO17845@atomide.com> <53A00970.3090902@ti.com>
-Message-ID: <20140617095715.GS17845@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Jun 2014 10:57:29 +0100
+Subject: ARM diagnostic register across suspend/resume
+In-Reply-To: <20140617083117.GD8860@dragon>
+References: <20140617083117.GD8860@dragon>
+Message-ID: <20140617095729.GF13020@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140617 02:26]:
-> On 17/06/14 11:58, Tony Lindgren wrote:
+On Tue, Jun 17, 2014 at 09:31:18AM +0100, Shawn Guo wrote:
+> Hi Will, Catalin,
 > 
-> >> +/* rfbi */
-> > 
-> > I think we're still missing am43x_rfbi_sysc entry though?
-> > 
-> >> +static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
-> >> +	.name		= "dss_rfbi",
-> >> +	.class		= &omap2_rfbi_hwmod_class,
-> >> +	.clkdm_name	= "dss_clkdm",
-> >> +	.main_clk	= "disp_clk",
-> >> +	.prcm = {
-> >> +		.omap4 = {
-> >> +			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
-> >> +		},
-> >> +	},
-> >> +};
-> 
-> That should come from omap2/3 hwmod data, as the above references
-> omap2_rfbi_hwmod_class. The bits there looked correct for AM43xx to me.
+> The CP15 diagnostic register holds some bits for ARM errata workaround.
+> Since core gets power gated across suspend/resume cycle, these bits will
+> get lost along the way.  Is it okay for errata workaround to continue
+> working after suspend, or do we have to save/restore diagnostic register
+> to keep workaround effective?
 
-OK looks good to me then:
+I'm not sure that saving/restoring the diagnostic register on A9 actually
+works at all (I seem to remember some bits always read as zero?).
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Anyway, I'd expect the state could be lost, so you'd need to reprogram
+the diagnostic register rather than save/restore its value.
+
+Will
