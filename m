@@ -1,8 +1,10 @@
 From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Tue, 17 Jun 2014 20:55:26 +0530
+Date: Tue, 17 Jun 2014 20:55:27 +0530
 Subject: [PATCH v6 0/6] cpufreq: use generic cpufreq drivers for exynos
  platforms
-Message-ID: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
+In-Reply-To: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
+References: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1403018733-4187-2-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
