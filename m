@@ -1,49 +1,85 @@
-From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Tue, 17 Jun 2014 20:55:32 +0530
-Subject: [PATCH v6 5/6] ARM: Exynos: switch to using generic cpufreq driver
- for exynos4210/5250
-In-Reply-To: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
-References: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1403018733-4187-7-git-send-email-thomas.ab@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 17 Jun 2014 17:26:37 +0200
+Subject: [PATCH v4 06/11] ARM: EXYNOS: Add support for mapping PMU base
+ address via DT
+In-Reply-To: <000401cf89f7$7db93190$792b94b0$@samsung.com>
+References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399704998-13321-7-git-send-email-pankaj.dubey@samsung.com>
+ <53973C0B.2000903@samsung.com> <000401cf89f7$7db93190$792b94b0$@samsung.com>
+Message-ID: <53A05E2D.6020702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+Hi Pankaj,
 
-Remove the platform device instantiation for Exynos4210/5250 cpufreq
-driver and add the platform device for generic cpufreq drivers.
+On 17.06.2014 08:43, Pankaj Dubey wrote:
+> Hi Tomasz,
+> 
+>> Hi,
+>>
+>> On 10.05.2014 08:56, Pankaj Dubey wrote:
+>>> From: Young-Gun Jang <yg1004.jang@samsung.com>
+>>>
+>>> Add support for mapping Samsung Power Management Unit (PMU) base
+>>> address from device tree. This patch also adds helper function as
+>>> "get_exynos_pmuregmap". This function can be used by other machine
+>>> files such as "pm.c", "hotplug.c" for accessing PMU regmap handle.
+>>>
+>>
+>> I don't think there is a need to use regmap to provide access to PMU to
+> such low
+>> level code such as pm.c or hotplug.c. Moreover, I believe that it might be
+> undesirable
+>> in some cases, e.g. very low level code running at early resume or late
+> suspend.
+>>
+>> IMHO, based on what we now have for SYSRAM, you could simply map PMU from
+>> device tree one time, before SMP init, and keep the address in some
+> globally
+>> accessible variable, like those for SYSRAM we have right now
+> (sysram_base_addr,
+>> sysram_ns_base_addr -> pmu_base_addr).
+>>
+> 
+> Thanks for review. 
+> 
+> Well I adopted same approach in V1 of this patch series. 
+> 
+> V1: https://lkml.org/lkml/2014/4/2/48
+> 
+> So, if we do not have issues with that approach, I think we can map PMU
+> address
+> one time and use it for all machine files including pmu.c. 
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
----
- arch/arm/mach-exynos/exynos.c |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+The approach itself is fine, but I believe there is no reason to use fdt
+there. My recommendation is to follow the method used to map SYSRAMs in
+patch "b3205dea8f ARM: EXYNOS: Map SYSRAM through generic DT bindings"
+and taking into account patch "b87abf7deb ARM: exynos: move sysram info
+to exynos.c", which moves things around source files.
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index f38cf7c..cfcfe02 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -181,7 +181,20 @@ void __init exynos_cpuidle_init(void)
- 
- void __init exynos_cpufreq_init(void)
- {
--	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-+	char *dev_name;
-+
-+	if (of_machine_is_compatible("samsung,exynos5440"))
-+		return;
-+	if (of_machine_is_compatible("samsung,exynos5420"))
-+		dev_name = "arm-bL-cpufreq-dt";
-+	else
-+		if (of_machine_is_compatible("samsung,exynos4412") ||
-+			of_machine_is_compatible("samsung,exynos4212"))
-+			dev_name = "exynos-cpufreq";
-+		else
-+			dev_name = "cpufreq-cpu0";
-+
-+	platform_device_register_simple(dev_name, -1, NULL, 0);
- }
- 
- void __iomem *sysram_base_addr;
--- 
-1.7.9.5
+> Also I can see that early_syscon patch [1] is not progressing anymore,
+> so in next version of this series better I remove dependency of early syscon
+> and usage
+> of regmap.
+
+I have another proposal, basically something I already proposed in
+review of one of previous versions of this series. I will send a patch
+as a reply to this message.
+
+> 
+> 1: https://lkml.org/lkml/2014/4/8/239
+> 
+> Tomasz, It will be good if you can review remaining patches under this
+> series, specially patch [2].
+> So that, I can update this series after addressing all comments.
+> 
+> 2: https://lkml.org/lkml/2014/5/10/26
+> 
+
+Most of the patches have already received my reviewed-by tag. I'm
+generally hesitating to review remaining ones, because the general
+architecture will be quite different after changing things mentioned
+above. However let me see and try to point issues I can find.
+
+Best regards,
+Tomasz
