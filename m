@@ -1,122 +1,49 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Tue, 17 Jun 2014 09:09:45 +0530
-Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
-In-Reply-To: <CAD=FV=VaK3PR4exCsYbaYwEK=_cuK+=PK9QqK_uD-cT_Y7m7UQ@mail.gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
- <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
- <539ED2C0.8030405@gmail.com>
- <CAD=FV=UaaRQVq3TmXMTv9OkER+zORC89YfPNjwZwfCQKmuavrw@mail.gmail.com>
- <20140616165123.GA21661@sirena.org.uk>
- <CAD=FV=VaK3PR4exCsYbaYwEK=_cuK+=PK9QqK_uD-cT_Y7m7UQ@mail.gmail.com>
-Message-ID: <CAC5m3BzJ0308OuLUxhf16sk5YDCWcV73HGekzFcxZQjwnNk0zA@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 17 Jun 2014 09:18:25 +0530
+Subject: [PATCH v4 02/11] ARM: EXYNOS: Move cpufreq and cpuidle device
+ registration to init_machine
+In-Reply-To: <5396EFFB.3040704@samsung.com>
+References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399704998-13321-3-git-send-email-pankaj.dubey@samsung.com>
+ <5396EFFB.3040704@samsung.com>
+Message-ID: <000101cf89de$ffbb1730$ff314590$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 10:32 PM, Doug Anderson <dianders@google.com> wrote:
-> Mark,
->
-> On Mon, Jun 16, 2014 at 9:51 AM, Mark Brown <broonie@kernel.org> wrote:
->> On Mon, Jun 16, 2014 at 09:49:26AM -0700, Doug Anderson wrote:
->>
->>> Yes please.  I think there's supposed to be some official ordering of
->>> things.  If anyone reading this has a pointer to the official sort
->>> order of things in the device tree I'd love to see it!  ;)
->>
->> Most exact first I believe?
->
-> More specifically I'm looking for the ordering between nodes and
-> between properties in a node.  For instance:
->
-> 1. It appears to be convention to sort children of the "pinctrl" nodes
-> by the first pin number in that group.  That is:
->
-> ec_spi_cs: ec-spi-cs {
->   samsung,pins = "gpb1-2";
->   ...
-> };
->
-> ...comes before:
-> usb300_vbus_en: usb300-vbus-en {
->   samsung,pins = "gph0-0";
->   ...
-> };
->
-> ...that's one really good and well-defined ordering.
->
->
-> 2. I have no idea how general properties should be sorted.  I tend to
-> see "compatible" first but that's above the only rule I've seen.
-> Sometimes I've seen "status" first, sometimes last, sometimes
-> alphabetically sorted, and sometimes in a random place.  Examples:
->
-> usb301_vbus_reg: regulator-usb301 {
->   compatible = "regulator-fixed";
->   regulator-name = "P5.0V_USB3CON1";
->   regulator-min-microvolt = <5000000>;
->   regulator-max-microvolt = <5000000>;
->   gpio = <&gph0 1 0>;
->   pinctrl-names = "default";
->   pinctrl-0 = <&usb301_vbus_en>;
->   enable-active-high;
-> };
->
-> &hdmi {
->   status = "okay";
->   hpd-gpio = <&gpx3 7 GPIO_ACTIVE_HIGH>;
->   pinctrl-names = "default";
->   pinctrl-0 = <&hdmi_hpd_irq>;
->   ddc = <&i2c_2>;
-> };
->
->
-> 3. I have no idea how to sort nodes.  In theory you could say that
-> they should be sorted by base address:
->
-> i2s0: i2s at 03830000 {
->   ...
-> };
->
-> hsi2c_7: i2c at 12CD0000 {
->   ...
-> };
->
-> i2s1: i2s at 12D60000 {
->   ...
-> };
->
-> ...that works until someone argues that all of the "i2s" nodes should
-> be together.  It also doesn't work so well with the board convention
-> of using aliases to refer to things in the SoC, like:
->
-> &i2s0 {
->   status = "okay";
-> };
->
-> &hsi2c_7 {
->   status = "okay";
-> };
->
-> ...it's not at all obvious in the board file what the base address in
-> the SoC was.
->
+Hi Tomasz,
 
-In case where we are using only aliases in board file, sorting them
-alphabetically would be reasonable. This rule would be easy to
-reinforce.
+> -----Original Message-----
+> 
+> Hi Pankaj,
+> 
+> On 10.05.2014 08:56, Pankaj Dubey wrote:
+> > As exynos_cpuidle_init and exynos_cpufreq_init function have just one
+> > lines of code for registering platform devices. We can move these
+> > lines to exynos_dt_machine_init and delete exynos_cpuidle_init and
+> > exynos_cpufreq_init function. This will help in reducing lines of code
+> > in exynos.c, making it more cleaner.
+> >
+> > Suggested-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/exynos.c |   19 ++++---------------
+> >  1 file changed, 4 insertions(+), 15 deletions(-)
+> >
+> 
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> 
 
-> ---
->
-> Anyway, none of this is earth shattering and it doesn't matter all
-> that much.  It's just nice to have an official order to make diffing
-> easier and also to avoid merge conflicts (unlikely someone changing
-> different properties will both add them in the same place in the
-> ordering).
->
->
-> -Doug
+Thanks for review.
 
+> Btw. This and other simple clean-up patches from this series could be
+applied
+> separately, without re-spinning them every time with this series.
+> 
 
+OK, I will separate cleanup patches.
 
--- 
-Tushar Behera
+> Best regards,
+> Tomasz
+
+Thanks,
+Pankaj Dubey
