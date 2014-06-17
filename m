@@ -1,46 +1,51 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 17 Jun 2014 09:18:25 +0530
-Subject: [PATCH v4 02/11] ARM: EXYNOS: Move cpufreq and cpuidle device
- registration to init_machine
-In-Reply-To: <5396EFFB.3040704@samsung.com>
-References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
- <1399704998-13321-3-git-send-email-pankaj.dubey@samsung.com>
- <5396EFFB.3040704@samsung.com>
-Message-ID: <000101cf89de$ffbb1730$ff314590$@samsung.com>
+Date: Tue, 17 Jun 2014 09:22:20 +0530
+Subject: [PATCH v3 4/6] ARM: EXYNOS: Remove unused header inclusion from
+ hotplug.c
+In-Reply-To: <53970E8E.5030408@samsung.com>
+References: <1399706287-13919-1-git-send-email-y@samsung.com>
+ <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399706419-13976-5-git-send-email-pankaj.dubey@samsung.com>
+ <53970E8E.5030408@samsung.com>
+Message-ID: <000201cf89df$8dbd9d00$a938d700$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Tomasz,
 
+
 > -----Original Message-----
 > 
 > Hi Pankaj,
 > 
-> On 10.05.2014 08:56, Pankaj Dubey wrote:
-> > As exynos_cpuidle_init and exynos_cpufreq_init function have just one
-> > lines of code for registering platform devices. We can move these
-> > lines to exynos_dt_machine_init and delete exynos_cpuidle_init and
-> > exynos_cpufreq_init function. This will help in reducing lines of code
-> > in exynos.c, making it more cleaner.
+> On 10.05.2014 09:20, Pankaj Dubey wrote:
+> > This patch removed "plat/cpu.h" inclusion from hotplug.c as it is not
+> > required.
 > >
-> > Suggested-by: Tomasz Figa <t.figa@samsung.com>
 > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > > ---
-> >  arch/arm/mach-exynos/exynos.c |   19 ++++---------------
-> >  1 file changed, 4 insertions(+), 15 deletions(-)
+> >  arch/arm/mach-exynos/hotplug.c |    2 --
+> >  1 file changed, 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/hotplug.c
+> > b/arch/arm/mach-exynos/hotplug.c index 0243ef3..5e19601 100644
+> > --- a/arch/arm/mach-exynos/hotplug.c
+> > +++ b/arch/arm/mach-exynos/hotplug.c
+> > @@ -19,8 +19,6 @@
+> >  #include <asm/cp15.h>
+> >  #include <asm/smp_plat.h>
+> >
+> > -#include <plat/cpu.h>
+> > -
+> >  #include "common.h"
+> >  #include "regs-pmu.h"
+> >
 > >
 > 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> I don't see this header being included in current linux-next.
 > 
 
-Thanks for review.
-
-> Btw. This and other simple clean-up patches from this series could be
-applied
-> separately, without re-spinning them every time with this series.
-> 
-
-OK, I will separate cleanup patches.
+OK, if it's already taken care, I will drop this change in next version.
 
 > Best regards,
 > Tomasz
