@@ -1,96 +1,65 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 17 Jun 2014 13:57:33 -0700
-Subject: [PATCH v2 01/10] mfd: max77686: Convert to use regmap_irq
-In-Reply-To: <1402941758-11216-2-git-send-email-javier.martinez@collabora.co.uk>
-References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402941758-11216-2-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAD=FV=VUPwr6GbR7O-t0q-GaCttZ5vGzLeFqHckzkk-dZYfCFw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 17 Jun 2014 16:13:26 -0500
+Subject: [PATCH RESEND 1/2] ARM: topology: Use a clock if possible to get
+ the CPU frequency
+In-Reply-To: <1403034980-19112-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1403034980-19112-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1403034980-19112-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAL_Jsq+D2dprBfg8G_zYeZ9sk0pwWhVRd-1Uo513E0Jgg2igRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
-
-On Mon, Jun 16, 2014 at 11:02 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> @@ -127,15 +175,48 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->         }
->         i2c_set_clientdata(max77686->rtc, max77686);
+On Tue, Jun 17, 2014 at 2:56 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
+> topology code.
 >
-> -       max77686_irq_init(max77686);
-> +       max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
-> +                                                   &max77686_rtc_regmap_config);
-> +       if (IS_ERR(max77686->rtc_regmap)) {
-> +               ret = PTR_ERR(max77686->rtc_regmap);
-> +               dev_err(max77686->dev, "failed to allocate RTC regmap: %d\n",
-> +                       ret);
-> +               goto err_unregister_i2c;
-> +       }
-> +
-> +       ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
-> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
-> +                                 IRQF_SHARED, 0, &max77686_irq_chip,
-> +                                 &max77686->irq_data);
-> +       if (ret != 0) {
-> +               dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
-> +               goto err_unregister_i2c;
-> +       }
-> +       ret = regmap_add_irq_chip(max77686->rtc_regmap, max77686->irq,
-> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
-> +                                 IRQF_SHARED, 0, &max77686_rtc_irq_chip,
-> +                                 &max77686->rtc_irq_data);
-> +       if (ret != 0) {
-> +               dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
-> +               goto err_del_irqc;
-> +       }
+> Allow to use a clock to provide the same information.
 >
->         ret = mfd_add_devices(max77686->dev, -1, max77686_devs,
->                               ARRAY_SIZE(max77686_devs), NULL, 0, NULL);
->         if (ret < 0) {
-> -               mfd_remove_devices(max77686->dev);
-> -               i2c_unregister_device(max77686->rtc);
-> +               dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
-> +               goto err_del_rtc_irqc;
->         }
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/kernel/topology.c | 24 +++++++++++++++++-------
+>  1 file changed, 17 insertions(+), 7 deletions(-)
 >
-> +       return 0;
-> +
-> +err_del_rtc_irqc:
-> +       regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
-> +err_del_irqc:
-> +       regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-
-I would imagine you either don't need these regmap_del_irq_chip() here
-or that you _do_ need them in max77686_i2c_remove().
-
-...from looking at other drivers I think the answer is to add them to
-max77686_i2c_remove().
-
-
-> diff --git a/include/linux/mfd/max77686-private.h b/include/linux/mfd/max77686-private.h
-> index 8c75a9c..3a810b1 100644
-> --- a/include/linux/mfd/max77686-private.h
-> +++ b/include/linux/mfd/max77686-private.h
-> @@ -205,7 +205,7 @@ enum max77686_irq {
->         MAX77686_PMICIRQ_140C,
->         MAX77686_PMICIRQ_120C,
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index 9d853189028b..0bd044cbbcb2 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -11,6 +11,7 @@
+>   * for more details.
+>   */
 >
-> -       MAX77686_RTCIRQ_RTC60S,
-> +       MAX77686_RTCIRQ_RTC60S = 0,
->         MAX77686_RTCIRQ_RTCA1,
->         MAX77686_RTCIRQ_RTCA2,
->         MAX77686_RTCIRQ_SMPL,
-> @@ -215,6 +215,25 @@ enum max77686_irq {
->         MAX77686_IRQ_NR,
+> +#include <linux/clk.h>
+>  #include <linux/cpu.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/export.h>
+> @@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
+>                                  GFP_NOWAIT);
+>
+>         for_each_possible_cpu(cpu) {
+> -               const u32 *rate;
+> -               int len;
+> +               struct clk *clk;
+> +               u32 rate = 0;
+>
+>                 /* too early to use cpu->of_node */
+>                 cn = of_get_cpu_node(cpu, NULL);
+> @@ -117,14 +118,23 @@ static void __init parse_dt_topology(void)
+>                 if (cpu_eff->compatible == NULL)
+>                         continue;
+>
+> -               rate = of_get_property(cn, "clock-frequency", &len);
+> -               if (!rate || len != 4) {
+> -                       pr_err("%s missing clock-frequency property\n",
+> -                               cn->full_name);
+> +               clk = of_clk_get(cn, 0);
+> +               if (!IS_ERR(clk)) {
+> +                       rate = clk_get_rate(clk);
+> +               } else {
+> +                       if (of_property_read_u32(cn, "clock-frequency", &rate)) {
+> +                               pr_err("%s missing clocks or clock-frequency properties\n",
+> +                                      cn->full_name);
 
-Maybe remove MAX77686_IRQ_NR which no longer makes any sense now that
-you start over at 0 partway through.
-
-
-Overall this looks good to me, so once nits above are fixed feel to
-add my Reviewed-by.  I've also built and booted this patch on
-exynos5250-snow and tested that the RTC wakealarm fires and can even
-wake the system up (with some additional work that I'll email you
-about).
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+This error check and message is redundant with the next error message.
+You can remove this one and just call of_property_read_u32. rate will
+remain untouched on error.
