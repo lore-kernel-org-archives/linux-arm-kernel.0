@@ -1,108 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jun 2014 10:48:54 +0200
-Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
-In-Reply-To: <20140613155139.05e2393c@free-electrons.com>
-References: <20140526162643.GB3693@n2100.arm.linux.org.uk>
- <20140527111542.6a49833f@free-electrons.com>
- <20140527094749.GE3693@n2100.arm.linux.org.uk>
- <20140527135216.7eaf3b3f@free-electrons.com>
- <20140527121806.GF3693@n2100.arm.linux.org.uk>
- <20140527143745.386c77d9@free-electrons.com>
- <20140528112450.GH3693@n2100.arm.linux.org.uk>
- <20140530100819.1208149f@free-electrons.com>
- <20140530092044.GO3693@n2100.arm.linux.org.uk>
- <20140613121121.7e7dc8e6@free-electrons.com>
- <20140613102019.GQ23430@n2100.arm.linux.org.uk>
- <20140613133437.1a85f287@free-electrons.com>
- <20140613155139.05e2393c@free-electrons.com>
-Message-ID: <20140617104854.7393c14c@free-electrons.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Tue, 17 Jun 2014 14:24:21 +0530
+Subject: [PATCH V3 00/16] irqchip: crossbar: driver fixes
+In-Reply-To: <539EF985.3080705@ti.com>
+References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
+ <539EF985.3080705@ti.com>
+Message-ID: <53A0023D.9010407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Monday 16 June 2014 07:34 PM, Santosh Shilimkar wrote:
+> Sricharan,
+>
+> On Monday 16 June 2014 07:23 AM, Sricharan R wrote:
+>> This series does some cleanups, fixes for handling two interrupts
+>> getting mapped twice to same crossbar and provides support for
+>> hardwired IRQ and crossbar definitions.
+>>
+>> On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10,
+>> 131, 132, 133 are direct wired to hardware blocks bypassing
+>> crossbar. This quirky implementation is *NOT* supposed to be the
+>> expectation of crossbar hardware usage. This series adds support
+>> to represent such hard-wired irqs through DT and avoid generic
+>> allocation/programming of crossbar in the driver.
+>>
+>> This way of supporting hard-wired irqs was a result of
+>> the below discussions.
+>> http://www.spinics.net/lists/arm-kernel/msg329946.html
+>>
+>> Based on 3.15 mainline.
+>>
+>> All the patches are available here
+>>  git at github.com:Sricharanti/sricharan.git crossbar_updates
+>>
+>> The fixes series[1] earlier posted is merged in to this.
+>> [1] http://www.spinics.net/lists/arm-kernel/msg328273.html
+>>
+>> [V2] Merged the above series and rebased on 3.15 mainline
+>>
+>> [V3] Modified patch#3 to get irqs-skip properties from DT,
+>>      merged path#8 for checkpatch warning to other relevant
+>>      patches and fixed comments for other patches.
+>>
+> I scanned entire series again including your updates on Jason's
+> comments. All look good to my eyes.
+>
+> Hopefully after this series now, we can actually enable the crossbar
+> support on those machines.
+>
+> FWIW,
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Thanks Santosh.
 
-Do you have some input/feedback about the below proposals/questions?
-
-Thanks a lot!
-
-Thomas
-
-On Fri, 13 Jun 2014 15:51:39 +0200, Thomas Petazzoni wrote:
-> Hello Russell,
-> 
-> On Fri, 13 Jun 2014 13:34:37 +0200, Thomas Petazzoni wrote:
-> 
-> > > The patches I sent during this thread are now merged into mainline.  The
-> > > setting of the shared bit, and the memory cache policy are now both
-> > > derived from the proc_info structures, specifically the __cpu_mm_mmu_flags
-> > > member.
-> > 
-> > Right. So for Armada 370/XP, I'll update the proc_info structure. We
-> > still have to find the right solution/compromise for the Armada 375/38x
-> > though.
-> 
-> So, I had a look at that, and there are still I believe a few issues to
-> solve:
-> 
->  * Your change that takes the PMD flags set by the assembly code as the
->    reference can easily be used by specifying mm_mmuflags =
->    PMD_SECT_WBWA for Armada 370 and PMD_SECT_WBWA|PMD_SECT_S for Armada
->    XP to get write-allocate on Armada 370 and write-allocate +
->    shareable on Armada XP.
-> 
->    However, this adjusts only the PMD flags, and does not adjust
->    the TTB flags: they are still governed only by the ALT_UP/ALT_SMP
->    logic:
-> 
-> #define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_RGN_OC_WB
-> #define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
-> [...]
-> 	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
-> 	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
-> 
->    Do you have a suggestion on how to handle this?
-> 
->  * Regarding setting the SMP bit and TLB broadcast bit for Cortex-A9,
->    I've moved the __v7_ca9mp_setup code outside of the common Cortex-A
->    code so that it does set both bits as soon as it's a SMP-capable
->    Cortex-A9. Something like (untested):
-> 
-> /*
->  * Cortex-A9 is handled as a special case, as we want the SMP bit to
->  * be set regardless of whether CONFIG_SMP is enabled or not: as soon
->  * as the processor is SMP capable, we want to enable the SMP bit so
->  * that Cortex-A9 processors that support hardware I/O coherency will
->  * operate properly.
->  */
-> __v7_ca9mp_setup:
-> 	mcr	p15, 0, r0, c0, c0, 5		@ read MPIDR
-> 	and	r0, r0, #0xc0000000		@ multiprocessing extensions and
-> 	teq	r0, #0x80000000			@ not part of a uniprocessor system?
-> 	bne	__v7_setup
-> 
-> 	mrc	p15, 0, r0, c1, c0, 1
-> 	tst	r0, #(1 << 6)
-> 	orreq	r0, r0, #((1 << 6) | (1 << 10))
-> 	mcreq	p15, 0, r0, c1, c0, 1
-> 	b	__v7_setup
-> 
->    Would this be acceptable?
-> 
->  * Regarding setting the write allocate and shareable attribute in the
->    PMD bits for SMP-capable Cortex-A9, I was hoping to be able to do
->    that from the __v7_ca9mp_setup function above, but in fact this
->    per-processor 'initfunc' is called *after* the page tables are
->    created. So I'm not sure where to put the logic that detects we have
->    an SMP-capable Cortex-A9 and tweak the PMD flags accordingly. Any
->    suggestion?
-> 
-> Thanks!
-> 
-> Thomas
-
-
-
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+ Sricharan
