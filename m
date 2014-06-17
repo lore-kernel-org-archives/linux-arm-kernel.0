@@ -1,65 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 17 Jun 2014 16:13:26 -0500
-Subject: [PATCH RESEND 1/2] ARM: topology: Use a clock if possible to get
- the CPU frequency
-In-Reply-To: <1403034980-19112-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1403034980-19112-1-git-send-email-maxime.ripard@free-electrons.com>
- <1403034980-19112-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAL_Jsq+D2dprBfg8G_zYeZ9sk0pwWhVRd-1Uo513E0Jgg2igRg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Jun 2014 22:17:47 +0100
+Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
+ regulators
+In-Reply-To: <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140617211747.GY29841@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 2:56 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
-> topology code.
->
-> Allow to use a clock to provide the same information.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> The MAX77802 PMIC has 10 high-efficiency Buck and 32 Low-dropout
+> (LDO) regulators. This patch adds support for all these regulators
+> found on the MAX77802 PMIC and is based on a driver added by Simon
+> Glass to the Chrome OS kernel 3.8 tree.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
->  arch/arm/kernel/topology.c | 24 +++++++++++++++++-------
->  1 file changed, 17 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 9d853189028b..0bd044cbbcb2 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -11,6 +11,7 @@
->   * for more details.
->   */
->
-> +#include <linux/clk.h>
->  #include <linux/cpu.h>
->  #include <linux/cpumask.h>
->  #include <linux/export.h>
-> @@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
->                                  GFP_NOWAIT);
->
->         for_each_possible_cpu(cpu) {
-> -               const u32 *rate;
-> -               int len;
-> +               struct clk *clk;
-> +               u32 rate = 0;
->
->                 /* too early to use cpu->of_node */
->                 cn = of_get_cpu_node(cpu, NULL);
-> @@ -117,14 +118,23 @@ static void __init parse_dt_topology(void)
->                 if (cpu_eff->compatible == NULL)
->                         continue;
->
-> -               rate = of_get_property(cn, "clock-frequency", &len);
-> -               if (!rate || len != 4) {
-> -                       pr_err("%s missing clock-frequency property\n",
-> -                               cn->full_name);
-> +               clk = of_clk_get(cn, 0);
-> +               if (!IS_ERR(clk)) {
-> +                       rate = clk_get_rate(clk);
-> +               } else {
-> +                       if (of_property_read_u32(cn, "clock-frequency", &rate)) {
-> +                               pr_err("%s missing clocks or clock-frequency properties\n",
-> +                                      cn->full_name);
+> 
+> Changes since v1:
+>  - Remove unneeded check if num_regulators != MAX77802_MAX_REGULATORS.
+>  - Fix .set_suspend_mode handler comment and split regulators ops for
+>    regulators that behave differently. Suggested by Mark Brown.
+>  - Use module_platform_driver() instead of having init/exit functions.
+>    Suggested by Mark Brown.
+>  - Use the new descriptor-based GPIO interface instead of the deprecated
+>    integer based GPIO one. Suggested by Mark Brown.
+>  - Look for "regulators" child node instead of "voltage-regulators" to be
+>    consistent with other PMIC drivers. Suggested by Mark Brown.
+> 
+>  drivers/mfd/max77802.c       |   1 +
 
-This error check and message is redundant with the next error message.
-You can remove this one and just call of_property_read_u32. rate will
-remain untouched on error.
+Can you remove all of the MFD changes from patches 7, 8 and 9 and
+create new one.  That way there's no requirement for any cross
+subsystem messiness.
+
+>  drivers/regulator/Kconfig    |   9 +
+>  drivers/regulator/Makefile   |   1 +
+>  drivers/regulator/max77802.c | 701 +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 712 insertions(+)
+>  create mode 100644 drivers/regulator/max77802.c
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
