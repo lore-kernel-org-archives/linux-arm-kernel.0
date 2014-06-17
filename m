@@ -1,54 +1,65 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 17 Jun 2014 09:22:20 +0530
-Subject: [PATCH v3 4/6] ARM: EXYNOS: Remove unused header inclusion from
- hotplug.c
-In-Reply-To: <53970E8E.5030408@samsung.com>
-References: <1399706287-13919-1-git-send-email-y@samsung.com>
- <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
- <1399706419-13976-5-git-send-email-pankaj.dubey@samsung.com>
- <53970E8E.5030408@samsung.com>
-Message-ID: <000201cf89df$8dbd9d00$a938d700$@samsung.com>
+From: dianders@google.com (Doug Anderson)
+Date: Mon, 16 Jun 2014 21:07:44 -0700
+Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
+In-Reply-To: <CAC5m3Byeu5zdM=PeK5MkgsEOFRjrPd1Vrk1a3FaM7VPTOFyYOg@mail.gmail.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
+ <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
+ <539ED2C0.8030405@gmail.com>
+ <CAD=FV=UaaRQVq3TmXMTv9OkER+zORC89YfPNjwZwfCQKmuavrw@mail.gmail.com>
+ <CAC5m3Byeu5zdM=PeK5MkgsEOFRjrPd1Vrk1a3FaM7VPTOFyYOg@mail.gmail.com>
+Message-ID: <CAD=FV=U51f+sL_hSGdzusthC3OEgv3kbQ9t1G28JRgXueFYQEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Tushar,
 
+On Mon, Jun 16, 2014 at 8:36 PM, Tushar Behera <trblinux@gmail.com> wrote:
+> On Mon, Jun 16, 2014 at 10:19 PM, Doug Anderson <dianders@google.com> wrote:
+>> Tushar,
+>>
+>> On Mon, Jun 16, 2014 at 4:19 AM, Tushar Behera <trblinux@gmail.com> wrote:
+>>> On 06/13/2014 10:33 PM, Doug Anderson wrote:
+>>>> Tushar,
+>>>>
+>>>> On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
+>>>>> Peach-pi board has MAX98090 audio codec connected on HSI2C-7 bus.
+>>>>
+>>>> If you want to be a stickler about it, peach-pi actually has a
+>>>> max98091.  That requires code changes to the i2c driver, though.
+>>>> ...and unfortunately listing two compatible strings for i2c devices is
+>>>> broken.  :(
+>>>>
+>>> Hi Doug,
+>>>
+>>> You are right. I checked the boot logs, the detected codec type is
+>>> MAX98091. Since both these CODECs are supported through a single driver
+>>> and the detection of chip is done during runtime, I would suggest we go
+>>> ahead with "max98090" compatible string. I will update the commit
+>>> message accordingly.
+>>>
+>>> Does that sound okay to you?
+>>
+>> As per my understanding you shouldn't do this.  You should have two patches:
+>>
+>> 1. Add "max98091".  You could simply post Wonjoon's patch from
+>> <https://chromium-review.googlesource.com/184091>
+>>
+>> 2. Change the device tree to refer to "max98091"
+>>
+>> The argument that the "current kernel driver has a single driver" is
+>> an argument that you're not supposed to make for device tree.  The
+>> same device tree is supposed to work for U-Boot, BSD, or any other
+>> platform.  On those platforms it might not be a shared driver.
+>>
+>
+> My argument is that the device type is getting detected during
+> runtime, hence there is no need to differentiate between these two.
+>
+> But if you prefer that way, I will repost.
 
-> -----Original Message-----
-> 
-> Hi Pankaj,
-> 
-> On 10.05.2014 09:20, Pankaj Dubey wrote:
-> > This patch removed "plat/cpu.h" inclusion from hotplug.c as it is not
-> > required.
-> >
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/hotplug.c |    2 --
-> >  1 file changed, 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/hotplug.c
-> > b/arch/arm/mach-exynos/hotplug.c index 0243ef3..5e19601 100644
-> > --- a/arch/arm/mach-exynos/hotplug.c
-> > +++ b/arch/arm/mach-exynos/hotplug.c
-> > @@ -19,8 +19,6 @@
-> >  #include <asm/cp15.h>
-> >  #include <asm/smp_plat.h>
-> >
-> > -#include <plat/cpu.h>
-> > -
-> >  #include "common.h"
-> >  #include "regs-pmu.h"
-> >
-> >
-> 
-> I don't see this header being included in current linux-next.
-> 
+Yes please.
 
-OK, if it's already taken care, I will drop this change in next version.
-
-> Best regards,
-> Tomasz
-
-Thanks,
-Pankaj Dubey
+True that it is possible to detect 98090 vs. 98091.  ...but it's also
+possible to detect exynos5250 vs. exynos5420 vs. exynos5800.  ...yet
+they have different compatible strings.
