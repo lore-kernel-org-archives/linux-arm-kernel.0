@@ -1,93 +1,74 @@
-From: rientjes@google.com (David Rientjes)
-Date: Tue, 17 Jun 2014 12:56:54 -0700 (PDT)
-Subject: [PATCH] regmap: Add Kconfig option for debugfs register writes
-In-Reply-To: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
-References: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1406171254540.18156@chino.kir.corp.google.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jun 2014 21:56:19 +0200
+Subject: [PATCH RESEND 1/2] ARM: topology: Use a clock if possible to get the
+ CPU frequency
+In-Reply-To: <1403034980-19112-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1403034980-19112-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1403034980-19112-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jun 2014, Markus Pargmann wrote:
+The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
+topology code.
 
-> To enable writing of registers through the regmap debugfs interface, it
-> was necessary to alter the regmap-debugfs.c source code. This is not
-> really practical.
-> 
-> As this is a powerful tool for debugging, this patch creates an expert
-> kconfig option for this function. This makes it easier to enable
-> register writing in the kernel.
-> 
-> This patch also fixes the file mode when the regmap debugfs write code is
-> compiled.
-> 
+Allow to use a clock to provide the same information.
 
-Forcing users to enable CONFIG_EXPERT for this doesn't seem appropriate, 
-it enables things by default and has really become a separate config of 
-its own.  You might want to consider removing this dependency unless you 
-have a strong reason for keeping it.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/kernel/topology.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
-> Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/base/regmap/Kconfig          | 14 ++++++++++++++
->  drivers/base/regmap/regmap-debugfs.c | 16 ++++++++++------
->  2 files changed, 24 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/base/regmap/Kconfig b/drivers/base/regmap/Kconfig
-> index 4251570610c9..ce86600dbe75 100644
-> --- a/drivers/base/regmap/Kconfig
-> +++ b/drivers/base/regmap/Kconfig
-> @@ -23,3 +23,17 @@ config REGMAP_MMIO
->  
->  config REGMAP_IRQ
->  	bool
-> +
-> +config REGMAP_ALLOW_WRITE_DEBUGFS
-> +	default n
-> +	depends on DEBUG_FS
-> +	depends on EXPERT
-> +	depends on REGMAP
-> +	bool "Regmap, allow direct register writes through debugfs"
-> +	help
-> +	  This option enables regmap debugfs write support. If this is enabled,
-> +	  you can directly write registers using the registers file in the
-> +	  regmap debugfs.
-> +
-> +	  This is potentially dangerous. Do not enable this option unless you
-> +	  know what you are doing.
-> diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
-> index 45d812c0ea77..12906f2bdf00 100644
-> --- a/drivers/base/regmap/regmap-debugfs.c
-> +++ b/drivers/base/regmap/regmap-debugfs.c
-> @@ -261,13 +261,10 @@ static ssize_t regmap_map_read_file(struct file *file, char __user *user_buf,
->  				   count, ppos);
->  }
->  
-> -#undef REGMAP_ALLOW_WRITE_DEBUGFS
-> -#ifdef REGMAP_ALLOW_WRITE_DEBUGFS
-> +#if IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS)
->  /*
->   * This can be dangerous especially when we have clients such as
-> - * PMICs, therefore don't provide any real compile time configuration option
-> - * for this feature, people who want to use this will need to modify
-> - * the source code directly.
-> + * PMICs, therefore this function can only be selected in expert kconfig mode.
->   */
->  static ssize_t regmap_map_write_file(struct file *file,
->  				     const char __user *user_buf,
-> @@ -512,7 +509,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
->  			    map, &regmap_reg_ranges_fops);
->  
->  	if (map->max_register || regmap_readable(map, 0)) {
-> -		debugfs_create_file("registers", 0400, map->debugfs,
-> +		unsigned int registers_mode;
-> +
-> +		if (IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS))
-> +			registers_mode = 0600;
-> +		else
-> +			registers_mode = 0400;
-> +
-> +		debugfs_create_file("registers", registers_mode, map->debugfs,
->  				    map, &regmap_map_fops);
->  		debugfs_create_file("access", 0400, map->debugfs,
->  				    map, &regmap_access_fops);
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 9d853189028b..0bd044cbbcb2 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -11,6 +11,7 @@
+  * for more details.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/cpu.h>
+ #include <linux/cpumask.h>
+ #include <linux/export.h>
+@@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
+ 				 GFP_NOWAIT);
+ 
+ 	for_each_possible_cpu(cpu) {
+-		const u32 *rate;
+-		int len;
++		struct clk *clk;
++		u32 rate = 0;
+ 
+ 		/* too early to use cpu->of_node */
+ 		cn = of_get_cpu_node(cpu, NULL);
+@@ -117,14 +118,23 @@ static void __init parse_dt_topology(void)
+ 		if (cpu_eff->compatible == NULL)
+ 			continue;
+ 
+-		rate = of_get_property(cn, "clock-frequency", &len);
+-		if (!rate || len != 4) {
+-			pr_err("%s missing clock-frequency property\n",
+-				cn->full_name);
++		clk = of_clk_get(cn, 0);
++		if (!IS_ERR(clk)) {
++			rate = clk_get_rate(clk);
++		} else {
++			if (of_property_read_u32(cn, "clock-frequency", &rate)) {
++				pr_err("%s missing clocks or clock-frequency properties\n",
++				       cn->full_name);
++				continue;
++			}
++		}
++
++		if (!rate) {
++			pr_err("%s invalid CPU frequency", cn->full_name);
+ 			continue;
+ 		}
+ 
+-		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
++		capacity = ((rate) >> 20) * cpu_eff->efficiency;
+ 
+ 		/* Save min capacity of the system */
+ 		if (capacity < min_capacity)
+-- 
+2.0.0
