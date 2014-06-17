@@ -1,62 +1,56 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Jun 2014 22:52:40 +0800
-Subject: [PATCH v2 03/20] clk: sunxi: move "ahb_sdram" to protected clock list
+Date: Tue, 17 Jun 2014 22:52:55 +0800
+Subject: [PATCH v2 18/20] ARM: sunxi: Add earlyprintk support using R_UART
+ (sun6i/sun8i)
 In-Reply-To: <1403016777-15121-1-git-send-email-wens@csie.org>
 References: <1403016777-15121-1-git-send-email-wens@csie.org>
-Message-ID: <1403016777-15121-4-git-send-email-wens@csie.org>
+Message-ID: <1403016777-15121-19-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With sunxi_gates clocks registered with clkdev, we can use the
-protected clocks list to enable the "ahb_sdram" clock, instead
-of looking for it and adding CLK_IGNORE_UNUSED inline in the
-clock setup code.
+sun6i/sun8i have a UART in the RTC block group, which can be used
+as an early console. This is most useful on sun8i as UART0 is muxed
+with MMC0, which is not available if we boot from MMC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index e43ed6a..a38c799 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -870,7 +870,6 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 	int qty;
- 	int i = 0;
- 	int j = 0;
--	int ignore;
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8f90595..3548612 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -715,6 +715,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Allwinner A1X based platforms on the UART1.
  
- 	reg = of_iomap(node, 0);
- 
-@@ -891,11 +890,8 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 		of_property_read_string_index(node, "clock-output-names",
- 					      j, &clk_name);
- 
--		/* No driver claims this clock, but it should remain gated */
--		ignore = !strcmp("ahb_sdram", clk_name) ? CLK_IGNORE_UNUSED : 0;
--
- 		clk_data->clks[i] = clk_register_gate(NULL, clk_name,
--						      clk_parent, ignore,
-+						      clk_parent, 0,
- 						      reg + 4 * (i/32), i % 32,
- 						      0, &clk_lock);
- 		WARN_ON(IS_ERR(clk_data->clks[i]));
-@@ -1203,6 +1199,7 @@ static void __init sunxi_init_clocks(const char *clocks[], int nclocks)
- 
- static const char *sun4i_a10_critical_clocks[] __initdata = {
- 	"pll5_ddr",
-+	"ahb_sdram",
- };
- 
- static void __init sun4i_a10_init_clocks(struct device_node *node)
-@@ -1215,6 +1212,7 @@ CLK_OF_DECLARE(sun4i_a10_clk_init, "allwinner,sun4i-a10", sun4i_a10_init_clocks)
- static const char *sun5i_critical_clocks[] __initdata = {
- 	"mbus",
- 	"pll5_ddr",
-+	"ahb_sdram",
- };
- 
- static void __init sun5i_init_clocks(struct device_node *node)
++	config DEBUG_SUNXI_R_UART
++		bool "Kernel low-level debugging messages via sunXi R_UART"
++		depends on MACH_SUN6I || MACH_SUN8I
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Allwinner A31/A23 based platforms on the R_UART.
++
+ 	config TEGRA_DEBUG_UART_AUTO_ODMDATA
+ 		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
+ 		depends on ARCH_TEGRA
+@@ -1043,6 +1051,7 @@ config DEBUG_UART_PHYS
+ 	default 0x01c28400 if DEBUG_SUNXI_UART1
+ 	default 0x01d0c000 if DEBUG_DAVINCI_DA8XX_UART1
+ 	default 0x01d0d000 if DEBUG_DAVINCI_DA8XX_UART2
++	default 0x01f02800 if DEBUG_SUNXI_R_UART
+ 	default 0x02530c00 if DEBUG_KEYSTONE_UART0
+ 	default 0x02531000 if DEBUG_KEYSTONE_UART1
+ 	default 0x03010fe0 if ARCH_RPC
+@@ -1118,6 +1127,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf1600000 if ARCH_INTEGRATOR
+ 	default 0xf1c28000 if DEBUG_SUNXI_UART0
+ 	default 0xf1c28400 if DEBUG_SUNXI_UART1
++	default 0xf1f02800 if DEBUG_SUNXI_R_UART
+ 	default 0xf2100000 if DEBUG_PXA_UART1
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
 -- 
 2.0.0
