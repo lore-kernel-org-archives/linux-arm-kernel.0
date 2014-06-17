@@ -1,53 +1,23 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Jun 2014 22:52:42 +0800
-Subject: [PATCH v2 05/20] clk: sunxi: Support factor clocks with N multiplier
- factor starting from 1
-In-Reply-To: <1403016777-15121-1-git-send-email-wens@csie.org>
-References: <1403016777-15121-1-git-send-email-wens@csie.org>
-Message-ID: <1403016777-15121-6-git-send-email-wens@csie.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 17 Jun 2014 22:54:49 +0800
+Subject: ARM diagnostic register across suspend/resume
+In-Reply-To: <20140617143415.GH13808@arm.com>
+References: <20140617083117.GD8860@dragon> <20140617095729.GF13020@arm.com>
+ <20140617101606.GE23430@n2100.arm.linux.org.uk>
+ <20140617102123.GA13808@arm.com>
+ <20140617102344.GG23430@n2100.arm.linux.org.uk>
+ <20140617102519.GC13808@arm.com> <20140617130333.GE8860@dragon>
+ <20140617143415.GH13808@arm.com>
+Message-ID: <20140617145448.GH8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLLs on newer Allwinner SoC's, such as the A31 and A23, have a
-N multiplier factor that starts from 1, not 0.
+On Tue, Jun 17, 2014 at 03:34:15PM +0100, Will Deacon wrote:
+> The hardware guys got back to me, and I was mistaken (in fact, confused by
+> another register). So the diagnostic register on A9 *does* read back with
+> the value written to it. You still need to save/restore it across suspend,
+> but read-modify-write is the right thing to do everywhere else.
 
-This patch adds an option to the clock driver's config data structures
-to define the difference.
+Thanks for the confirmation, Will.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi/clk-factors.c | 5 ++++-
- drivers/clk/sunxi/clk-factors.h | 1 +
- 2 files changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-index 3806d97..399cf4d 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -62,7 +62,10 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
- 		p = FACTOR_GET(config->pshift, config->pwidth, reg);
- 
- 	/* Calculate the rate */
--	rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
-+	if (config->n_from_one)
-+		rate = (parent_rate * (n + 1) * (k + 1) >> p) / (m + 1);
-+	else
-+		rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
- 
- 	return rate;
- }
-diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-index 02e1a43..0484a48 100644
---- a/drivers/clk/sunxi/clk-factors.h
-+++ b/drivers/clk/sunxi/clk-factors.h
-@@ -15,6 +15,7 @@ struct clk_factors_config {
- 	u8 mwidth;
- 	u8 pshift;
- 	u8 pwidth;
-+	u8 n_from_one;
- };
- 
- struct clk_factors {
--- 
-2.0.0
+Shawn
