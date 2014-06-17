@@ -1,115 +1,55 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Tue, 17 Jun 2014 14:50:25 +0000
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <32165315f0b84be9948f489fd87bf6a9@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <5288123.eXagyPAxNq@wuerfel>
- <20140602104104.GD3855@e103592.cambridge.arm.com>
- <20140604143509.GF28484@ulmo> <20140604164132.GF6644@arm.com>
- <07321368d15d4ad9928ebb83af87e401@DM2PR03MB479.namprd03.prod.outlook.com>
- <20140616152739.GS16758@arm.com>
- <8b0492b4697943a0b1f276ef42cc8223@DM2PR03MB352.namprd03.prod.outlook.com>
- <20140616170416.GA16758@arm.com>
- <419e67f783524d208ab3be16bcd94bd9@DM2PR03MB352.namprd03.prod.outlook.com>
- <0587e1f4894546398be0798d2bc2c84f@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140617104304.GD13808@arm.com>
- <32165315f0b84be9948f489fd87bf6a9@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <7c03c5cffa174b20962bff3b09de0eb8@DM2PR03MB352.namprd03.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Jun 2014 22:52:54 +0800
+Subject: [PATCH v2 17/20] ARM: sunxi: Introduce Allwinner A23 support
+In-Reply-To: <1403016777-15121-1-git-send-email-wens@csie.org>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+Message-ID: <1403016777-15121-18-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Allwinner A23 is a dual-core Cortex-A7-based SoC. It re-uses most of
+the IPs found in previous SoCs, notably the A31.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/mach-sunxi/Kconfig |  8 ++++++++
+ arch/arm/mach-sunxi/sunxi.c | 10 ++++++++++
+ 2 files changed, 18 insertions(+)
 
-> -----Original Message-----
-> From: Sethi Varun-B16395
-> Sent: Tuesday, June 17, 2014 6:22 AM
-> To: Will Deacon
-> Cc: Mark Rutland; devicetree at vger.kernel.org; linux-samsung-
-> soc at vger.kernel.org; Arnd Bergmann; Pawel Moll; Ian Campbell; Grant
-> Grundler; Stephen Warren; Yoder Stuart-B08248; Rob Herring; linux-
-> kernel at vger.kernel.org; Marc Zyngier; Linux IOMMU; Thierry Reding; Kumar
-> Gala; linux-tegra at vger.kernel.org; Cho KyongHo; Dave P Martin; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH v2] devicetree: Add generic IOMMU device tree
-> bindings
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> > bounces at lists.linux-foundation.org] On Behalf Of Will Deacon
-> > Sent: Tuesday, June 17, 2014 4:13 PM
-> > To: Sethi Varun-B16395
-> > Cc: Mark Rutland; devicetree at vger.kernel.org; linux-samsung-
-> > soc at vger.kernel.org; Arnd Bergmann; Pawel Moll; Ian Campbell; Grant
-> > Grundler; Stephen Warren; Yoder Stuart-B08248; Rob Herring; linux-
-> > kernel at vger.kernel.org; Marc Zyngier; Linux IOMMU; Thierry Reding;
-> Kumar
-> > Gala; linux-tegra at vger.kernel.org; Cho KyongHo; Dave P Martin; linux-
-> arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH v2] devicetree: Add generic IOMMU device tree
-> > bindings
-> >
-> > On Tue, Jun 17, 2014 at 11:26:48AM +0100, Varun Sethi wrote:
-> > > > The way we generally thought it would work was something like
-> > > > this:
-> > > >    -u-boot/bootloader makes any static streamID allocation if
-> needed,
-> > > >     sets a default streamID  (e.g. 0x0) in device and expresses
-> > > >     that in the device tree
-> > > >    -device tree would express relationship between devices
-> > > >     (including bus controllers) and the SMMU through mmu-masters
-> > > >     property
-> > > >    -u-boot would express the range of unused (or used) streamIDs
-> via
-> > > > a new
-> > > >     device tree property so the kernel SMMU driver knows what
-> > > > streamIDs are
-> > > >     free
-> > > >    -in the SMMU driver a different vendor specific 'add_device'
-> > callback
-> > > >     could be used to handle our special cases where we need to
-> > set/change
-> > > >     the stream ID for devices added to a domain
-> > >
-> > > Another possibility, could be to program the stream Id in the device
-> > > registers (reference for the stream ID register can be obtained from
-> > > the device tree) during device attach. This could be relevant in case
-> > > of VFIO, when we are assigning multiple devices to a single VM. All
-> > > the devices can share the same stream ID.
-> >
-> > I think for simple masters (i.e. those that have all their StreamIDs
-> > under control of one driver), then setting something during attach (or
-> > add?) based on the DT could work pretty well. The other case is when we
-> > have masters behind a bridge (such as a PCI RC). In this case, it might
-> > actually be better to ask the bridge for the IDs and let it sort out
-> the
-> > allocation itself. That would also move the RequesterID -> StreamID
-> > mapping out of the SMMU code.
-> >
-> > What do you think?
-> The PCI bus iommu group creation code would be part of the SMMU driver
-> (it is handled by other IOMMU drivers as well). My understanding is that
-> there would be one is to one correspondence between the requestor ID and
-> the iommu group. May be, we can have an API provided by the PCI bridge
-> (architecture specific) for setting the stream ID.
-
-I think Will is suggesting something along those lines-- I think it's a
-question of where the streamID allocation happens.  You could
-either do something like the following in the SMMU driver when attaching
-a PCI device:
-
-    id = alloc_stream_id(...);
-    pci_set_streamid(pci-dev, id);
-
-    or
-
-    id = pci_get_streamid(pci-dev);
-
-...i.e the PCI RC could allocate (from some TBD
-allocator) and set the stream ID itself.
-
-Not sure how big a deal it is to extend PCI RC interfaces for 
-something like that.
-
-Stuart
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 0fbd4f1..6434e3b 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -35,4 +35,12 @@ config MACH_SUN7I
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select SUN5I_HSTIMER
+ 
++config MACH_SUN8I
++	bool "Allwinner A23 (sun8i) SoCs support"
++	default ARCH_SUNXI
++	select ARCH_HAS_RESET_CONTROLLER
++	select ARM_GIC
++	select MFD_SUN6I_PRCM
++	select RESET_CONTROLLER
++
+ endif
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 3f9587b..962ff30 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -53,3 +53,13 @@ static const char * const sun7i_board_dt_compat[] = {
+ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+ 	.dt_compat	= sun7i_board_dt_compat,
+ MACHINE_END
++
++static const char * const sun8i_board_dt_compat[] = {
++	"allwinner,sun8i-a23",
++	NULL,
++};
++
++DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
++	.init_time	= sun6i_timer_init,
++	.dt_compat	= sun8i_board_dt_compat,
++MACHINE_END
+-- 
+2.0.0
