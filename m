@@ -1,28 +1,30 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 17 Jun 2014 12:59:13 +0300
-Subject: [PATCH 4/9] clk: tegra: Enable hardware control of SATA PLL
-In-Reply-To: <539F665E.3060007@wwwdotorg.org>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-5-git-send-email-mperttunen@nvidia.com>
- <539F665E.3060007@wwwdotorg.org>
-Message-ID: <20140617095913.GE3407@tbergstrom-lnx.Nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Jun 2014 11:16:06 +0100
+Subject: ARM diagnostic register across suspend/resume
+In-Reply-To: <20140617095729.GF13020@arm.com>
+References: <20140617083117.GD8860@dragon> <20140617095729.GF13020@arm.com>
+Message-ID: <20140617101606.GE23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 11:49:18PM +0200, Stephen Warren wrote:
-> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
-> > This makes the SATA PLL be controlled by hardware instead of software.
-> > This is required for working SATA support.
+On Tue, Jun 17, 2014 at 10:57:29AM +0100, Will Deacon wrote:
+> On Tue, Jun 17, 2014 at 09:31:18AM +0100, Shawn Guo wrote:
+> > Hi Will, Catalin,
+> > 
+> > The CP15 diagnostic register holds some bits for ARM errata workaround.
+> > Since core gets power gated across suspend/resume cycle, these bits will
+> > get lost along the way.  Is it okay for errata workaround to continue
+> > working after suspend, or do we have to save/restore diagnostic register
+> > to keep workaround effective?
 > 
-> Peter, could you please take patches 4 and 5 through the clock tree. As
-> far as I can tell, there's no compile-time dependency in the clock
-> patches, so they can go through a different tree to the rest of the
-> series without issue. These 2 patches look fine to me, so consider them:
-> 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+> I'm not sure that saving/restoring the diagnostic register on A9 actually
+> works at all (I seem to remember some bits always read as zero?).
 
-Ok. Will do.
+If that's true, then we have a problem.  We always read-modify-write
+this register when enabling work-arounds.  If it always reads as
+zero, then enabling a subsequent work-around will disable the
+previous work-around.
 
-Cheers,
-
-Peter.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
