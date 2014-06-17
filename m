@@ -1,89 +1,109 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Tue, 17 Jun 2014 09:27:43 +0200
-Subject: [PATCH 1/1] clk-imx35: Add clko clock support
-Message-ID: <1402990063-26908-1-git-send-email-alexander.stein@systec-electronic.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 17 Jun 2014 09:33:02 +0200
+Subject: [PATCH V2 3/3] mmc: mmci: Reverse IRQ handling for the arm_variant
+In-Reply-To: <CALAqxLX8TcFNDLvA1XozEZ_kf58jX0_SeDETfK9UcXVYajVVRQ@mail.gmail.com>
+References: <1402906147-26596-1-git-send-email-ulf.hansson@linaro.org>
+ <CALAqxLWs5HLhLo+BspcgyJe0O++PB1HU2G1GpsoQ=cVP34=v=A@mail.gmail.com>
+ <CAPDyKFqK5G0j7ZKAYJqD+ZqBFCjuLTw=NtjBcAsfM=Xzd4cghA@mail.gmail.com>
+ <CALAqxLXQeYA8jt_hLrJSuWtt7j3t2iZSZjEVAX7ScODAgrmVbA@mail.gmail.com>
+ <CALAqxLX8TcFNDLvA1XozEZ_kf58jX0_SeDETfK9UcXVYajVVRQ@mail.gmail.com>
+Message-ID: <CAPDyKFry7_=-3kmydz7ikfDW5vMi512gC3Bj35PmuWT2z70GvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new clk which is programmable using different sources and
-dividers.
+On 17 June 2014 01:29, John Stultz <john.stultz@linaro.org> wrote:
+> On Mon, Jun 16, 2014 at 3:41 PM, John Stultz <john.stultz@linaro.org> wrote:
+>> On Mon, Jun 16, 2014 at 2:20 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> This patch based upon my latest mmc tree and the next branch. I tried
+>>> to apply it for 3.15, and I think you will be able resolve the
+>>> conflict - I should be quite trivial.
+>>
+>> No worries. I just didn't want to waste time resolving it if it was
+>> logically dependent on some other change.
+>>
+>> I'll give it a shot and get back to you.
+>
+> So unfortunately I'm still seeing trouble..
+>
+> [   94.202843] EXT4-fs error (device mmcblk0p5):
+> ext4_mb_generate_buddy:756: group 1, 2303 clusters in bitmap, 2272 in
+> gd; block bitmap corrupt.
+> [   94.203873] Aborting journal on device mmcblk0p5-8.
+> [   94.206553] Kernel panic - not syncing: EXT4-fs (device mmcblk0p5):
+> panic forced after error
+> [   94.206553]
+> [   94.207420] CPU: 0 PID: 1 Comm: init Not tainted
+> 3.15.0-00002-g044f37a-dirty #589
+> [   94.208330] [<c0011725>] (unwind_backtrace) from [<c000f3f1>]
+> (show_stack+0x11/0x14)
+> [   94.208835] [<c000f3f1>] (show_stack) from [<c042d599>]
+> (dump_stack+0x59/0x7c)
+> [   94.209288] [<c042d599>] (dump_stack) from [<c042a57f>] (panic+0x67/0x178)
+> [   94.209724] [<c042a57f>] (panic) from [<c0135055>]
+> (ext4_handle_error+0x69/0x74)
+> [   94.210184] [<c0135055>] (ext4_handle_error) from [<c01358db>]
+> (__ext4_grp_locked_error+0x6b/0x160)
+> [   94.210747] [<c01358db>] (__ext4_grp_locked_error) from
+> [<c0143691>] (ext4_mb_generate_buddy+0x1b1/0x29c)
+> [   94.211392] [<c0143691>] (ext4_mb_generate_buddy) from [<c0144dfd>]
+> (ext4_mb_init_cache+0x219/0x4e0)
+> [   94.211959] [<c0144dfd>] (ext4_mb_init_cache) from [<c014517f>]
+> (ext4_mb_init_group+0xbb/0x13c)
+> [   94.213973] [<c014517f>] (ext4_mb_init_group) from [<c01452f3>]
+> (ext4_mb_good_group+0xf3/0xfc)
+> [   94.214873] [<c01452f3>] (ext4_mb_good_group) from [<c01462ab>]
+> (ext4_mb_regular_allocator+0x153/0x2c4)
+> [   94.215953] [<c01462ab>] (ext4_mb_regular_allocator) from
+> [<c01486b1>] (ext4_mb_new_blocks+0x2fd/0x4e4)
+> [   94.216939] [<c01486b1>] (ext4_mb_new_blocks) from [<c013fe41>]
+> (ext4_ext_map_blocks+0x965/0x10f0)
+> [   94.217694] [<c013fe41>] (ext4_ext_map_blocks) from [<c01230ff>]
+> (ext4_map_blocks+0xff/0x374)
+> [   94.219200] [<c0126839>] (mpage_map_and_submit_extent) from
+> [<c0127049>] (ext4_writepages+0x2b9/0x4e8)
+> [   94.219972] [<c0127049>] (ext4_writepages) from [<c0094e69>]
+> (do_writepages+0x19/0x28)
+> [   94.220648] [<c0094e69>] (do_writepages) from [<c008cbcd>]
+> (__filemap_fdatawrite_range+0x3d/0x44)
+> [   94.221391] [<c008cbcd>] (__filemap_fdatawrite_range) from
+> [<c008cc3f>] (filemap_flush+0x23/0x28)
+> [   94.222135] [<c008cc3f>] (filemap_flush) from [<c012c419>]
+> (ext4_rename+0x2f9/0x3e4)
+> [   94.222806] [<c012c419>] (ext4_rename) from [<c00c3707>]
+> (vfs_rename+0x183/0x45c)
+> [   94.223496] [<c00c3707>] (vfs_rename) from [<c00c3c0b>]
+> (SyS_renameat2+0x22b/0x26c)
+> [   94.224154] [<c00c3c0b>] (SyS_renameat2) from [<c00c3c83>]
+> (SyS_rename+0x1f/0x24)
+> [   94.224801] [<c00c3c83>] (SyS_rename) from [<c000cd41>]
+> (ret_fast_syscall+0x1/0x5c)
+>
+>
+> That said, this mirrors the behavior when I was reverting your change
+> by hand on-top of 3.15. While git bisect pointed to your patch and
+> reverting it from the commit seems to resolve the issue at that point,
+> there seems to be some other commit in the 3.14->3.15-rc1 interval
+> that is causing problems as well.
+>
+> Are there any sort of debugging options for mmc that I can use to try
+> to better narrow down whats going wrong?
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
----
-I know some (most) of the new lines are larger than 80 characters, but I kept
-the same layout as the other lines.
-Also lots of the clock sources are not used in linux, so I have given them
-a descriptive name though.
+It seems like you want to debug the mmci host driver and unfortunate
+the debug utilities available are only dev_dbg prints. I wouldn't be
+surprised if the problem goes away when you enable them. :-)
 
- arch/arm/mach-imx/clk-imx35.c | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+I have some other locally stored debug patches for mmci, but those are
+not re-based and I am not sure you want to deal with them as is.
 
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index 71c86a2..acf821c 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -49,6 +49,13 @@ static struct clk_onecell_data clk_data;
- 
- static const char *std_sel[] = {"ppll", "arm"};
- static const char *ipg_per_sel[] = {"ahb_per_div", "arm_per_div"};
-+static const char *clko_select[] = {"ckil", "osc", "osc_audio", "dummy",
-+				 "mpll_075", "mpll", "ppll", "arm",
-+				 "ahb", "ipg", "ipg_per", "usbdiv",
-+				 "esdhc1_div", "ssi1_div_post", "mlb_gate",
-+				 "mshc_gate", "mpll_lock", "csi_div",
-+				 "spdif_div_post", "uart1_gate", "asrc",
-+				 "dptc", "arm_ungated", "nfc_div", "hsp"};
- 
- enum mx35_clks {
- 	ckih, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
-@@ -64,7 +71,7 @@ enum mx35_clks {
- 	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
- 	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
- 	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
--	gpu2d_gate, clk_max
-+	gpu2d_gate, clko_sel, clko_div1, clko_div, clko_gate, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -146,6 +153,10 @@ int __init mx35_clocks_init(void)
- 	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
- 	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
- 
-+	clk[clko_sel] = imx_clk_mux("clko_sel", base + MX35_CCM_COSR, 0, 5, clko_select, ARRAY_SIZE(clko_select));
-+	clk[clko_div1] = imx_clk_divider("clko_div1", "clko_sel", base + MX35_CCM_COSR, 6, 1);
-+	clk[clko_div] = imx_clk_divider("clko_div", "clko_div1", base + MX35_CCM_COSR, 10, 6);
-+
- 	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
- 	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
- 	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
-@@ -200,6 +211,8 @@ int __init mx35_clocks_init(void)
- 	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
- 	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
- 
-+	clk[clko_gate] = imx_clk_gate("clko_gate", "clko_div", base + MX35_CCM_COSR,  5);
-+
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
- 		if (IS_ERR(clk[i]))
- 			pr_err("i.MX35 clk %d: register failed with %ld\n",
-@@ -260,6 +273,7 @@ int __init mx35_clocks_init(void)
- 	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
-+	clk_register_clkdev(clk[clko_gate], NULL, "clko.0");
- 
- 	clk_prepare_enable(clk[spba_gate]);
- 	clk_prepare_enable(clk[gpio1_gate]);
-@@ -286,6 +300,11 @@ int __init mx35_clocks_init(void)
- 	mxc_timer_init(MX35_IO_ADDRESS(MX35_GPT1_BASE_ADDR), MX35_INT_GPT);
- #endif
- 
-+	/*
-+	 * Let's initially set up CLKO parent as arm.
-+	 */
-+	clk_set_parent(clk[clko_sel], clk[arm]);
-+
- 	return 0;
- }
- 
--- 
-1.8.5.5
+I guess I need to set up the QEMU environment and run the tests
+myself, unless we go for the revert path.
+How do you perform the tests, is just a simple mounting/un-mounting
+that triggers the problem?
+Any specific things that I need to think of when running QEMU?
+
+Kind regards
+Uffe
+
+>
+> thanks
+> -john
