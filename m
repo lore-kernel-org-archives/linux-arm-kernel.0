@@ -1,34 +1,18 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 17 Jun 2014 10:23:01 -0600
-Subject: [PATCH 8/9] ata: Add support for the Tegra124 SATA controller
-In-Reply-To: <20140617161447.GH31819@htj.dyndns.org>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-9-git-send-email-mperttunen@nvidia.com>
- <1470404.13mIFv0Hnj@amdc1032> <53A0686F.4000303@wwwdotorg.org>
- <20140617161320.GG31819@htj.dyndns.org>
- <20140617161447.GH31819@htj.dyndns.org>
-Message-ID: <53A06B65.7030407@wwwdotorg.org>
+Date: Tue, 17 Jun 2014 10:24:54 -0600
+Subject: [PATCH v4 1/4] of: Add NVIDIA Tegra XUSB pad controller binding
+In-Reply-To: <1403006877-19850-1-git-send-email-thierry.reding@gmail.com>
+References: <1403006877-19850-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53A06BD6.40608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 10:14 AM, Tejun Heo wrote:
-> On Tue, Jun 17, 2014 at 12:13:20PM -0400, Tejun Heo wrote:
->> On Tue, Jun 17, 2014 at 10:10:23AM -0600, Stephen Warren wrote:
->>>> sata_writel() and sata_read() static inlines don't seem to add any value.
->>>>
->>>> Can they be removed?
->>>
->>> Such functions are quite idiomatic in drivers, and serve to simplify all
->>> the call-sites by removing the need to write out the addition of the
->>> base address everywhere.
->>
->> I think it obfuscates more than helps.  If you absoluately have to
->> keep it, please at least name it so that it's clear that it's
->> something specific to this driver.
+On 06/17/2014 06:07 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Please also drop inline.  It isn't a difficult optimization to perform
-> for the compiler.
+> This patch adds the device tree binding documentation for the XUSB pad
+> controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
+> capabilities.
 
-There are probably hundreds of drivers marking those functions inline.
-If they aren't marked inline, it'll just stick out as unusual when
-people read them all, and then they'll send patches to fix it.
+Thanks. I'll wait for a Tested-by from Mikko and an Acked-by from Linus
+before taking this series.
