@@ -1,31 +1,53 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Tue, 17 Jun 2014 12:45:51 +0100
-Subject: [PATCH 0/5] Handle non-secure L2C initialization on Exynos4
-In-Reply-To: <539B11EB.6010304@samsung.com>
-References: <CAD8Lp46MbKZrCAMp+9T9LbWTB4uHRDdivhtjoQbkTyBbK48EgQ@mail.gmail.com>
- <539B11EB.6010304@samsung.com>
-Message-ID: <CAD8Lp47AHrwSx52Oi98HN51_L2pwT2xco9WB0FFP1rUdEucfZw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jun 2014 13:46:50 +0200
+Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
+In-Reply-To: <539F6CC7.4010002@wwwdotorg.org>
+References: <1402941376-29594-1-git-send-email-mporter@linaro.org>
+ <20140616215512.GC23430@n2100.arm.linux.org.uk>
+ <539F6CC7.4010002@wwwdotorg.org>
+Message-ID: <201406171346.51153.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 17 June 2014, Stephen Warren wrote:
+> On 06/16/2014 03:55 PM, Russell King - ARM Linux wrote:
+> > On Mon, Jun 16, 2014 at 01:56:16PM -0400, Matt Porter wrote:
+> >> Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
+> >> MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
+> >> driver which is enabled in this defconfig. This results in the
+> >> SDHCI driver not being built and a boot failure. Explictly
+> >> enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
+> >> driver is built.
+> > 
+> > I really don't understand why MMC_SDHCI_PLTFM isn't selected by the
+> > sub-drivers.  sdhci-pltfm.c is a library module, which is only
+> > useful with one of the sub-drivers enabled.
+> > 
+> > So, rather than providing a multitude of dependent options, why not
+> > present people with:
+> > 
+> >  + sdhci drivers
+> >    + sdhci pci
+> >    + sdhci acpi
+> >    + Arasan
+> >    + Freescale eSDHC
+> >    + Nintendo Wii
+> >    + Dove
+> >
+> > and leave MMC_SDHCI_PLTFM as a hidden option whose purpose is to
+> > enable building of sdhci-pltfm.c.
+> 
+> CC'ing Arnd, as author of 5d01b7684b7e "mmc: simplify SDHCI Kconfig
+> dependencies". I also forgot to do that on the patch that fixed
+> multi_v7_defconfig for this:-(
 
-On Fri, Jun 13, 2014 at 3:59 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> I have attached, three patches which make the kernel boot fine with L2
-> cache enabled on ODROID-U3. Could you test them on your setup to verify
-> that they indeed fix the issue?
+I think doing it the other way round as Russell suggested is a good
+idea, and we can definitely do that. We have a similar situation in
+other subsystems, sometimes we do it one way and sometimes the other.
 
-Nice work, now my ODROID-U2 boots fine.
+The problem I was addressing in my patch was that the SDHCI driver
+in particular was mixing the two approaches, which is much worse
+as that can cause Kconfig dependency loops and is rather confusing.
+I picked the approach that seemed simpler at the time.
 
-L2C: platform modifies aux control register: 0x02070000 -> 0x3e470001
-L2C: platform provided aux values permit register corruption.
-L2C: DT/platform modifies aux control register: 0x02070000 -> 0x3e470001
-L2C-310 enabling early BRESP for Cortex-A9
-L2C-310: enabling full line of zeros but not enabled in Cortex-A9
-L2C-310 ID prefetch enabled, offset 8 lines
-L2C-310 dynamic clock gating enabled, standby mode enabled
-L2C-310 cache controller enabled, 16 ways, 1024 kB
-L2C-310: CACHE_ID 0x4100c4c8, AUX_CTRL 0x7e470001
-
-Thanks!
-Daniel
+	Arnd
