@@ -1,37 +1,24 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 17 Jun 2014 15:28:29 +0300
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <20140617121313.GE18816@ulmo>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
- <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
-Message-ID: <53A0346D.8010005@nvidia.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 17 Jun 2014 14:28:59 +0200
+Subject: [PATCH v2] i2c: sun6-p2wi: fix call to snprintf
+In-Reply-To: <1402655028-6214-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1402655028-6214-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140617122859.GB2683@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'll try removing use of all libahci_platform stuff except 
-ahci_platform_init_host for v2.
+On Fri, Jun 13, 2014 at 12:23:48PM +0200, Boris BREZILLON wrote:
+> Fixes possible issue in case pdev name contains formatting characters.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Reported-by: Kees Cook <keescook@google.com>
 
-On 17/06/14 15:13, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
->> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
->>> This symbol needs to be exported to power on rails without using
->>> tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
->>> cannot be used in situations where the driver wants to handle clocking
->>> by itself.
->>
->> Thierry, are you OK with this change?
->
-> I would've preferred tegra_powergate_sequence_power_up() to be used
-> consistently in all drivers. I'm still not convinced that using the
-> platform AHCI driver this way is really the best option, since we're
-> bending over backwards to fit into what this driver dictates. There
-> shouldn't be a need for that.
->
-> Thierry
->
-> * Unknown Key
-> * 0x7F3EB3A1
->
+Applied to for-next, thanks!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/5188624a/attachment.sig>
