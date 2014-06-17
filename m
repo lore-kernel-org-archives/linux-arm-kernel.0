@@ -1,49 +1,41 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 17 Jun 2014 16:32:08 +0200
-Subject: [PATCH v2 4/4] brcmfmac: Fix OOB interrupt not working for
- BCM43362
-In-Reply-To: <53A02B5A.3070409@broadcom.com>
-References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
- <1402941407-8210-5-git-send-email-hdegoede@redhat.com>
- <53A02B5A.3070409@broadcom.com>
-Message-ID: <53A05168.9010604@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Jun 2014 15:34:15 +0100
+Subject: ARM diagnostic register across suspend/resume
+In-Reply-To: <20140617130333.GE8860@dragon>
+References: <20140617083117.GD8860@dragon> <20140617095729.GF13020@arm.com>
+ <20140617101606.GE23430@n2100.arm.linux.org.uk>
+ <20140617102123.GA13808@arm.com>
+ <20140617102344.GG23430@n2100.arm.linux.org.uk>
+ <20140617102519.GC13808@arm.com> <20140617130333.GE8860@dragon>
+Message-ID: <20140617143415.GH13808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06/17/2014 01:49 PM, Arend van Spriel wrote:
-> On 16-06-14 19:56, Hans de Goede wrote:
->> It has taken me a long long time to get the OOB interrupt working on the
->> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
->> end I found these magic register pokes in the cubietruck kernel tree:
->> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
->>
->> I'm not entirely sure if this specific to the AP6210 module, or if this
->> should be done for all BCM43362 sdio devices.
+On Tue, Jun 17, 2014 at 02:03:35PM +0100, Shawn Guo wrote:
+> On Tue, Jun 17, 2014 at 11:25:20AM +0100, Will Deacon wrote:
+> > On Tue, Jun 17, 2014 at 11:23:44AM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Jun 17, 2014 at 11:21:23AM +0100, Will Deacon wrote:
+> > > > I think that actually works ok, because writing zeroes doesn't actually
+> > > > do anything as far as I understand. The problem with suspend/resume is
+> > > > that the suspend/resume cycle could well clear the internal state and
+> > > > writing zeroes won't re-enable the workaround bits.
+> > > > 
+> > > > I'll double-check this with the hardware guys, since this register really
+> > > > is undocumented.
+> > > 
+> > > Are you saying that it is write one to set, and writing zero is ignored?
+> > > If that's true, we should simplify the work-around code to get rid of the
+> > > read-modify-write.
+> > 
+> > That's my understanding for the diagnostic register, but I've asked for
+> > clarification internally.
 > 
-> Hi Hans,
-> 
-> I was still not sure about this one so I asked around. Apart from the nvram settings I emailed earlier one more is needed:
-> 
-> sd_gpout=1
-> sd_oobonly=1
-> sd_gpval=1
-> *muxenab=0x11*
-> 
-> Could you give that a try?
+> Hmm, I'm not sure that's the case.  On imx6q, I can read out diagnostic
+> register as 0x00200850 which matches the errata we enable.
 
-I seriously doubt that is going to do anything at all, all 4 these keywords do not
-show up when running strings on brcmfmac43362-sdio.bin, where as all the
-keywords used in the brcmfmac43362-sdio.txt shipped with the android on ap6210
-equipped boards do show up, confirming that the keywords are encoded in plain text
-in the firmware file.
+The hardware guys got back to me, and I was mistaken (in fact, confused by
+another register). So the diagnostic register on A9 *does* read back with
+the value written to it. You still need to save/restore it across suspend,
+but read-modify-write is the right thing to do everywhere else.
 
-Let me know if want me to give it a try anyways and I'll do so.
-
-Perhaps these keywords need a newer firmware version then the one in the
-linux-firmware repository ?
-
-Regards,
-
-Hans
+Will
