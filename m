@@ -1,278 +1,489 @@
 From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Tue, 17 Jun 2014 20:55:31 +0530
-Subject: [PATCH v6 4/6] ARM: dts: Exynos: add cpu nodes,
- opp and cpu clock configuration data
+Date: Tue, 17 Jun 2014 20:55:33 +0530
+Subject: [PATCH v6 6/6] cpufreq: exynos: remove exynos4210/5250 specific
+ cpufreq driver support
 In-Reply-To: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
 References: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1403018733-4187-6-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1403018733-4187-8-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-For Exynos 4210/5250/5420 based platforms, add CPU nodes, operating points and
-cpu clock data for migrating from Exynos specific cpufreq driver to using
-generic cpufreq drivers.
+Exynos4210 and Exynos5250 based platforms have switched over to use generic
+cpufreq drivers for cpufreq functionality. So the Exynos specific cpufreq
+drivers for these platforms can be removed.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 ---
- arch/arm/boot/dts/exynos4210-origen.dts         |    6 +++++
- arch/arm/boot/dts/exynos4210-trats.dts          |    6 +++++
- arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 +++++
- arch/arm/boot/dts/exynos4210.dtsi               |   27 +++++++++++++++++++
- arch/arm/boot/dts/exynos5250-arndale.dts        |    6 +++++
- arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 +++++
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 +++++
- arch/arm/boot/dts/exynos5250.dtsi               |   23 ++++++++++++++++
- arch/arm/boot/dts/exynos5420-smdk5420.dts       |    6 +++++
- arch/arm/boot/dts/exynos5420.dtsi               |   32 +++++++++++++++++++++++
- 10 files changed, 124 insertions(+)
+ drivers/cpufreq/Kconfig.arm          |   22 ----
+ drivers/cpufreq/Makefile             |    2 -
+ drivers/cpufreq/exynos4210-cpufreq.c |  184 -----------------------------
+ drivers/cpufreq/exynos5250-cpufreq.c |  210 ----------------------------------
+ 4 files changed, 418 deletions(-)
+ delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index f767c42..49a97fc 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -33,6 +33,12 @@
- 		bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
- 	};
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index ebac671..7a2f289 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -28,17 +28,6 @@ config ARM_VEXPRESS_SPC_CPUFREQ
+ config ARM_EXYNOS_CPUFREQ
+ 	bool
  
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&buck1_reg>;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index f516da9..fe32b6a 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -30,6 +30,12 @@
- 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rootwait earlyprintk panic=5";
- 	};
+-config ARM_EXYNOS4210_CPUFREQ
+-	bool "SAMSUNG EXYNOS4210"
+-	depends on CPU_EXYNOS4210
+-	default y
+-	select ARM_EXYNOS_CPUFREQ
+-	help
+-	  This adds the CPUFreq driver for Samsung EXYNOS4210
+-	  SoC (S5PV310 or S5PC210).
+-
+-	  If in doubt, say N.
+-
+ config ARM_EXYNOS4X12_CPUFREQ
+ 	bool "SAMSUNG EXYNOS4x12"
+ 	depends on SOC_EXYNOS4212 || SOC_EXYNOS4412
+@@ -50,17 +39,6 @@ config ARM_EXYNOS4X12_CPUFREQ
  
-+	cpus {
-+		cpu: cpu at 0 {
-+			cpu0-supply = <&varm_breg>;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
+ 	  If in doubt, say N.
  
-diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-index d50eb3a..8ab12d6 100644
---- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-+++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-@@ -28,6 +28,12 @@
- 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1";
- 	};
- 
-+	cpus {
-+		cpu: cpu at 0 {
-+			cpu0-supply = <&vdd_arm_reg>;
-+		};
-+	};
-+
- 	sysram at 02020000 {
- 		smp-sysram at 0 {
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index ee3001f..c3a73bf 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -31,6 +31,33 @@
- 		pinctrl2 = &pinctrl_2;
- 	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu";
-+
-+			operating-points = <
-+				1200000 1250000
-+				1000000 1150000
-+				800000	1075000
-+				500000	975000
-+				400000	975000
-+				200000	950000
-+			>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
- 	sysram at 02020000 {
- 		compatible = "mmio-sram";
- 		reg = <0x02020000 0x20000>;
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index d0de1f5..d9b803b 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -26,6 +26,12 @@
- 		bootargs = "console=ttySAC2,115200";
- 	};
- 
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&buck2_reg>;
-+		};
-+	};
-+
- 	rtc at 101E0000 {
- 		status = "okay";
- 	};
-diff --git a/arch/arm/boot/dts/exynos5250-cros-common.dtsi b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-index 89ac90f..34bb31c 100644
---- a/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5250-cros-common.dtsi
-@@ -19,6 +19,12 @@
- 	chosen {
- 	};
- 
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&buck2_reg>;
-+		};
-+	};
-+
- 	pinctrl at 11400000 {
- 		/*
- 		 * Disabled pullups since external part has its own pullups and
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index a794a70..3632f7a 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -27,6 +27,12 @@
- 		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
- 	};
- 
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&buck2_reg>;
-+		};
-+	};
-+
- 	rtc at 101E0000 {
- 		status = "okay";
- 	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 834fb5a..66b0f98 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -63,6 +63,29 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1700000000>;
-+
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu";
-+
-+			operating-points = <
-+				1700000 1300000
-+				1600000 1250000
-+				1500000 1225000
-+				1400000 1200000
-+				1300000 1150000
-+				1200000 1125000
-+				1100000 1100000
-+				1000000 1075000
-+				 900000 1050000
-+				 800000 1025000
-+				 700000 1012500
-+				 600000 1000000
-+				 500000  975000
-+				 400000  950000
-+				 300000  937500
-+				 200000  925000
-+			>;
-+			clock-latency = <200000>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 6052aa9..084e587 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -24,6 +24,12 @@
- 		bootargs = "console=ttySAC2,115200 init=/linuxrc";
- 	};
- 
-+	cpus {
-+		cpu at 4 {
-+			cpu0-supply = <&buck6_reg>;
-+		};
-+	};
-+
- 	fixed-rate-clocks {
- 		oscclk {
- 			compatible = "samsung,exynos5420-oscclk";
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index e385322..3baee7f 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -59,8 +59,26 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0x0>;
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu-cluster.0";
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			clock-latency = <200000>;
-+
-+			operating-points = <
-+				1800000 1250000
-+				1700000 1212500
-+				1600000 1175000
-+				1500000 1137500
-+				1400000 1112500
-+				1300000 1062500
-+				1200000 1037500
-+				1100000 1012500
-+				1000000 987500
-+				 900000 962500
-+				 800000 937500
-+				 700000 912500
-+			>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -91,8 +109,22 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
-+			clocks = <&clock CLK_KFC_CLK>;
-+			clock-names = "cpu-cluster.1";
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			clock-latency = <200000>;
-+
-+			operating-points = <
-+				1300000 1275000
-+				1200000 1212500
-+				1100000 1162500
-+				1000000 1112500
-+				 900000 1062500
-+				 800000 1025000
-+				 700000 975000
-+				 600000 937500
-+			>;
- 		};
- 
- 		cpu5: cpu at 101 {
+-config ARM_EXYNOS5250_CPUFREQ
+-	bool "SAMSUNG EXYNOS5250"
+-	depends on SOC_EXYNOS5250
+-	default y
+-	select ARM_EXYNOS_CPUFREQ
+-	help
+-	  This adds the CPUFreq driver for Samsung EXYNOS5250
+-	  SoC.
+-
+-	  If in doubt, say N.
+-
+ config ARM_EXYNOS5440_CPUFREQ
+ 	bool "SAMSUNG EXYNOS5440"
+ 	depends on SOC_EXYNOS5440
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 738c8b7..ca5fb2d 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -52,9 +52,7 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= davinci-cpufreq.o
+ obj-$(CONFIG_UX500_SOC_DB8500)		+= dbx500-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
+-obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
+-obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
+ obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
+ obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
+deleted file mode 100644
+index 61a5431..0000000
+--- a/drivers/cpufreq/exynos4210-cpufreq.c
++++ /dev/null
+@@ -1,184 +0,0 @@
+-/*
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * EXYNOS4210 - CPU frequency scaling support
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/err.h>
+-#include <linux/clk.h>
+-#include <linux/io.h>
+-#include <linux/slab.h>
+-#include <linux/cpufreq.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-
+-#include "exynos-cpufreq.h"
+-
+-static struct clk *cpu_clk;
+-static struct clk *moutcore;
+-static struct clk *mout_mpll;
+-static struct clk *mout_apll;
+-static struct exynos_dvfs_info *cpufreq;
+-
+-static unsigned int exynos4210_volt_table[] = {
+-	1250000, 1150000, 1050000, 975000, 950000,
+-};
+-
+-static struct cpufreq_frequency_table exynos4210_freq_table[] = {
+-	{0, L0, 1200 * 1000},
+-	{0, L1, 1000 * 1000},
+-	{0, L2,  800 * 1000},
+-	{0, L3,  500 * 1000},
+-	{0, L4,  200 * 1000},
+-	{0, 0, CPUFREQ_TABLE_END},
+-};
+-
+-static struct apll_freq apll_freq_4210[] = {
+-	/*
+-	 * values:
+-	 * freq
+-	 * clock divider for CORE, COREM0, COREM1, PERIPH, ATB, PCLK_DBG, APLL, RESERVED
+-	 * clock divider for COPY, HPM, RESERVED
+-	 * PLL M, P, S
+-	 */
+-	APLL_FREQ(1200, 0, 3, 7, 3, 4, 1, 7, 0, 5, 0, 0, 150, 3, 1),
+-	APLL_FREQ(1000, 0, 3, 7, 3, 4, 1, 7, 0, 4, 0, 0, 250, 6, 1),
+-	APLL_FREQ(800,  0, 3, 7, 3, 3, 1, 7, 0, 3, 0, 0, 200, 6, 1),
+-	APLL_FREQ(500,  0, 3, 7, 3, 3, 1, 7, 0, 3, 0, 0, 250, 6, 2),
+-	APLL_FREQ(200,  0, 1, 3, 1, 3, 1, 0, 0, 3, 0, 0, 200, 6, 3),
+-};
+-
+-static void exynos4210_set_clkdiv(unsigned int div_index)
+-{
+-	unsigned int tmp;
+-
+-	/* Change Divider - CPU0 */
+-
+-	tmp = apll_freq_4210[div_index].clk_div_cpu0;
+-
+-	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU);
+-
+-	do {
+-		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU);
+-	} while (tmp & 0x1111111);
+-
+-	/* Change Divider - CPU1 */
+-
+-	tmp = apll_freq_4210[div_index].clk_div_cpu1;
+-
+-	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS4_CLKDIV_CPU1);
+-
+-	do {
+-		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKDIV_STATCPU1);
+-	} while (tmp & 0x11);
+-}
+-
+-static void exynos4210_set_apll(unsigned int index)
+-{
+-	unsigned int tmp, freq = apll_freq_4210[index].freq;
+-
+-	/* MUX_CORE_SEL = MPLL, ARMCLK uses MPLL for lock time */
+-	clk_set_parent(moutcore, mout_mpll);
+-
+-	do {
+-		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU)
+-			>> EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT);
+-		tmp &= 0x7;
+-	} while (tmp != 0x2);
+-
+-	clk_set_rate(mout_apll, freq * 1000);
+-
+-	/* MUX_CORE_SEL = APLL */
+-	clk_set_parent(moutcore, mout_apll);
+-
+-	do {
+-		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS4_CLKMUX_STATCPU);
+-		tmp &= EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK;
+-	} while (tmp != (0x1 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT));
+-}
+-
+-static void exynos4210_set_frequency(unsigned int old_index,
+-				     unsigned int new_index)
+-{
+-	if (old_index > new_index) {
+-		exynos4210_set_clkdiv(new_index);
+-		exynos4210_set_apll(new_index);
+-	} else if (old_index < new_index) {
+-		exynos4210_set_apll(new_index);
+-		exynos4210_set_clkdiv(new_index);
+-	}
+-}
+-
+-int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
+-{
+-	struct device_node *np;
+-	unsigned long rate;
+-
+-	/*
+-	 * HACK: This is a temporary workaround to get access to clock
+-	 * controller registers directly and remove static mappings and
+-	 * dependencies on platform headers. It is necessary to enable
+-	 * Exynos multi-platform support and will be removed together with
+-	 * this whole driver as soon as Exynos gets migrated to use
+-	 * cpufreq-cpu0 driver.
+-	 */
+-	np = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-clock");
+-	if (!np) {
+-		pr_err("%s: failed to find clock controller DT node\n",
+-			__func__);
+-		return -ENODEV;
+-	}
+-
+-	info->cmu_regs = of_iomap(np, 0);
+-	if (!info->cmu_regs) {
+-		pr_err("%s: failed to map CMU registers\n", __func__);
+-		return -EFAULT;
+-	}
+-
+-	cpu_clk = clk_get(NULL, "armclk");
+-	if (IS_ERR(cpu_clk))
+-		return PTR_ERR(cpu_clk);
+-
+-	moutcore = clk_get(NULL, "moutcore");
+-	if (IS_ERR(moutcore))
+-		goto err_moutcore;
+-
+-	mout_mpll = clk_get(NULL, "mout_mpll");
+-	if (IS_ERR(mout_mpll))
+-		goto err_mout_mpll;
+-
+-	rate = clk_get_rate(mout_mpll) / 1000;
+-
+-	mout_apll = clk_get(NULL, "mout_apll");
+-	if (IS_ERR(mout_apll))
+-		goto err_mout_apll;
+-
+-	info->mpll_freq_khz = rate;
+-	/* 800Mhz */
+-	info->pll_safe_idx = L2;
+-	info->cpu_clk = cpu_clk;
+-	info->volt_table = exynos4210_volt_table;
+-	info->freq_table = exynos4210_freq_table;
+-	info->set_freq = exynos4210_set_frequency;
+-
+-	cpufreq = info;
+-
+-	return 0;
+-
+-err_mout_apll:
+-	clk_put(mout_mpll);
+-err_mout_mpll:
+-	clk_put(moutcore);
+-err_moutcore:
+-	clk_put(cpu_clk);
+-
+-	pr_debug("%s: failed initialization\n", __func__);
+-	return -EINVAL;
+-}
+diff --git a/drivers/cpufreq/exynos5250-cpufreq.c b/drivers/cpufreq/exynos5250-cpufreq.c
+deleted file mode 100644
+index c91ce69..0000000
+--- a/drivers/cpufreq/exynos5250-cpufreq.c
++++ /dev/null
+@@ -1,210 +0,0 @@
+-/*
+- * Copyright (c) 2010-20122Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * EXYNOS5250 - CPU frequency scaling support
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/err.h>
+-#include <linux/clk.h>
+-#include <linux/io.h>
+-#include <linux/slab.h>
+-#include <linux/cpufreq.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-
+-#include "exynos-cpufreq.h"
+-
+-static struct clk *cpu_clk;
+-static struct clk *moutcore;
+-static struct clk *mout_mpll;
+-static struct clk *mout_apll;
+-static struct exynos_dvfs_info *cpufreq;
+-
+-static unsigned int exynos5250_volt_table[] = {
+-	1300000, 1250000, 1225000, 1200000, 1150000,
+-	1125000, 1100000, 1075000, 1050000, 1025000,
+-	1012500, 1000000,  975000,  950000,  937500,
+-	925000
+-};
+-
+-static struct cpufreq_frequency_table exynos5250_freq_table[] = {
+-	{0, L0, 1700 * 1000},
+-	{0, L1, 1600 * 1000},
+-	{0, L2, 1500 * 1000},
+-	{0, L3, 1400 * 1000},
+-	{0, L4, 1300 * 1000},
+-	{0, L5, 1200 * 1000},
+-	{0, L6, 1100 * 1000},
+-	{0, L7, 1000 * 1000},
+-	{0, L8,  900 * 1000},
+-	{0, L9,  800 * 1000},
+-	{0, L10, 700 * 1000},
+-	{0, L11, 600 * 1000},
+-	{0, L12, 500 * 1000},
+-	{0, L13, 400 * 1000},
+-	{0, L14, 300 * 1000},
+-	{0, L15, 200 * 1000},
+-	{0, 0, CPUFREQ_TABLE_END},
+-};
+-
+-static struct apll_freq apll_freq_5250[] = {
+-	/*
+-	 * values:
+-	 * freq
+-	 * clock divider for ARM, CPUD, ACP, PERIPH, ATB, PCLK_DBG, APLL, ARM2
+-	 * clock divider for COPY, HPM, RESERVED
+-	 * PLL M, P, S
+-	 */
+-	APLL_FREQ(1700, 0, 3, 7, 7, 7, 3, 5, 0, 0, 2, 0, 425, 6, 0),
+-	APLL_FREQ(1600, 0, 3, 7, 7, 7, 1, 4, 0, 0, 2, 0, 200, 3, 0),
+-	APLL_FREQ(1500, 0, 2, 7, 7, 7, 1, 4, 0, 0, 2, 0, 250, 4, 0),
+-	APLL_FREQ(1400, 0, 2, 7, 7, 6, 1, 4, 0, 0, 2, 0, 175, 3, 0),
+-	APLL_FREQ(1300, 0, 2, 7, 7, 6, 1, 3, 0, 0, 2, 0, 325, 6, 0),
+-	APLL_FREQ(1200, 0, 2, 7, 7, 5, 1, 3, 0, 0, 2, 0, 200, 4, 0),
+-	APLL_FREQ(1100, 0, 3, 7, 7, 5, 1, 3, 0, 0, 2, 0, 275, 6, 0),
+-	APLL_FREQ(1000, 0, 1, 7, 7, 4, 1, 2, 0, 0, 2, 0, 125, 3, 0),
+-	APLL_FREQ(900,  0, 1, 7, 7, 4, 1, 2, 0, 0, 2, 0, 150, 4, 0),
+-	APLL_FREQ(800,  0, 1, 7, 7, 4, 1, 2, 0, 0, 2, 0, 100, 3, 0),
+-	APLL_FREQ(700,  0, 1, 7, 7, 3, 1, 1, 0, 0, 2, 0, 175, 3, 1),
+-	APLL_FREQ(600,  0, 1, 7, 7, 3, 1, 1, 0, 0, 2, 0, 200, 4, 1),
+-	APLL_FREQ(500,  0, 1, 7, 7, 2, 1, 1, 0, 0, 2, 0, 125, 3, 1),
+-	APLL_FREQ(400,  0, 1, 7, 7, 2, 1, 1, 0, 0, 2, 0, 100, 3, 1),
+-	APLL_FREQ(300,  0, 1, 7, 7, 1, 1, 1, 0, 0, 2, 0, 200, 4, 2),
+-	APLL_FREQ(200,  0, 1, 7, 7, 1, 1, 1, 0, 0, 2, 0, 100, 3, 2),
+-};
+-
+-static void set_clkdiv(unsigned int div_index)
+-{
+-	unsigned int tmp;
+-
+-	/* Change Divider - CPU0 */
+-
+-	tmp = apll_freq_5250[div_index].clk_div_cpu0;
+-
+-	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS5_CLKDIV_CPU0);
+-
+-	while (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKDIV_STATCPU0)
+-	       & 0x11111111)
+-		cpu_relax();
+-
+-	/* Change Divider - CPU1 */
+-	tmp = apll_freq_5250[div_index].clk_div_cpu1;
+-
+-	__raw_writel(tmp, cpufreq->cmu_regs + EXYNOS5_CLKDIV_CPU1);
+-
+-	while (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKDIV_STATCPU1) & 0x11)
+-		cpu_relax();
+-}
+-
+-static void set_apll(unsigned int index)
+-{
+-	unsigned int tmp;
+-	unsigned int freq = apll_freq_5250[index].freq;
+-
+-	/* MUX_CORE_SEL = MPLL, ARMCLK uses MPLL for lock time */
+-	clk_set_parent(moutcore, mout_mpll);
+-
+-	do {
+-		cpu_relax();
+-		tmp = (__raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKMUX_STATCPU)
+-			>> 16);
+-		tmp &= 0x7;
+-	} while (tmp != 0x2);
+-
+-	clk_set_rate(mout_apll, freq * 1000);
+-
+-	/* MUX_CORE_SEL = APLL */
+-	clk_set_parent(moutcore, mout_apll);
+-
+-	do {
+-		cpu_relax();
+-		tmp = __raw_readl(cpufreq->cmu_regs + EXYNOS5_CLKMUX_STATCPU);
+-		tmp &= (0x7 << 16);
+-	} while (tmp != (0x1 << 16));
+-}
+-
+-static void exynos5250_set_frequency(unsigned int old_index,
+-				  unsigned int new_index)
+-{
+-	if (old_index > new_index) {
+-		set_clkdiv(new_index);
+-		set_apll(new_index);
+-	} else if (old_index < new_index) {
+-		set_apll(new_index);
+-		set_clkdiv(new_index);
+-	}
+-}
+-
+-int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
+-{
+-	struct device_node *np;
+-	unsigned long rate;
+-
+-	/*
+-	 * HACK: This is a temporary workaround to get access to clock
+-	 * controller registers directly and remove static mappings and
+-	 * dependencies on platform headers. It is necessary to enable
+-	 * Exynos multi-platform support and will be removed together with
+-	 * this whole driver as soon as Exynos gets migrated to use
+-	 * cpufreq-cpu0 driver.
+-	 */
+-	np = of_find_compatible_node(NULL, NULL, "samsung,exynos5250-clock");
+-	if (!np) {
+-		pr_err("%s: failed to find clock controller DT node\n",
+-			__func__);
+-		return -ENODEV;
+-	}
+-
+-	info->cmu_regs = of_iomap(np, 0);
+-	if (!info->cmu_regs) {
+-		pr_err("%s: failed to map CMU registers\n", __func__);
+-		return -EFAULT;
+-	}
+-
+-	cpu_clk = clk_get(NULL, "armclk");
+-	if (IS_ERR(cpu_clk))
+-		return PTR_ERR(cpu_clk);
+-
+-	moutcore = clk_get(NULL, "mout_cpu");
+-	if (IS_ERR(moutcore))
+-		goto err_moutcore;
+-
+-	mout_mpll = clk_get(NULL, "mout_mpll");
+-	if (IS_ERR(mout_mpll))
+-		goto err_mout_mpll;
+-
+-	rate = clk_get_rate(mout_mpll) / 1000;
+-
+-	mout_apll = clk_get(NULL, "mout_apll");
+-	if (IS_ERR(mout_apll))
+-		goto err_mout_apll;
+-
+-	info->mpll_freq_khz = rate;
+-	/* 800Mhz */
+-	info->pll_safe_idx = L9;
+-	info->cpu_clk = cpu_clk;
+-	info->volt_table = exynos5250_volt_table;
+-	info->freq_table = exynos5250_freq_table;
+-	info->set_freq = exynos5250_set_frequency;
+-
+-	cpufreq = info;
+-
+-	return 0;
+-
+-err_mout_apll:
+-	clk_put(mout_mpll);
+-err_mout_mpll:
+-	clk_put(moutcore);
+-err_moutcore:
+-	clk_put(cpu_clk);
+-
+-	pr_err("%s: failed initialization\n", __func__);
+-	return -EINVAL;
+-}
 -- 
 1.7.9.5
