@@ -1,45 +1,33 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 17 Jun 2014 09:38:40 +0200
-Subject: [PATCH v4 4/7] regulator: axp20x: reset probe data before each probe
+Date: Tue, 17 Jun 2014 09:38:43 +0200
+Subject: [PATCH v4 7/7] mfd: AXP20x: add "x-powers,
+ axp221" compatible string to DT bindings doc
 In-Reply-To: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1402990723-28138-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1402990723-28138-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The init_data and of_node fields of the axp2xx_matches tables are filled
-at each device probe by the axp20x_regulator_parse_dt function (which then
-calls the of_regulator_match function).
-This means we can probe a new device and consider data initialized during
-the probe of another device as valid.
-
-Reset init_data and of_node field to NULL before each probe in order to
-avoid this kind of issue.
+Add "x-powers,axp221" compatible string to the AXP20x DT bindings
+documentation.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/regulator/axp20x-regulator.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 7a30f49..d42bf6d 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -324,6 +324,15 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 		nregulators = AXP20X_REG_ID_MAX;
- 	}
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index cc9e01b..f22a169 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -5,7 +5,7 @@ axp202 (X-Powers)
+ axp209 (X-Powers)
  
-+	/*
-+	 * Reset matches table (this table might have been modified by a
-+	 * previous AXP2xx device probe).
-+	 */
-+	for (i = 0; i < nmatches; i++) {
-+		matches[i].init_data = NULL;
-+		matches[i].of_node = NULL;
-+	}
-+
- 	ret = axp20x_regulator_parse_dt(pdev, matches, nmatches);
- 	if (ret)
- 		return ret;
+ Required properties:
+-- compatible: "x-powers,axp202" or "x-powers,axp209"
++- compatible: "x-powers,axp202", "x-powers,axp209" or "x-powers,axp221"
+ - reg: The I2C slave address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: Interrupt specifiers for interrupt sources
 -- 
 1.8.3.2
