@@ -1,75 +1,55 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Jun 2014 22:52:38 +0800
-Subject: [PATCH v2 01/20] serial: 8250_dw: Add optional reset control support
+Date: Tue, 17 Jun 2014 22:52:41 +0800
+Subject: [PATCH v2 04/20] clk: sunxi: Fix gate indexing for
+ sun6i-a31-apb0-gates
 In-Reply-To: <1403016777-15121-1-git-send-email-wens@csie.org>
 References: <1403016777-15121-1-git-send-email-wens@csie.org>
-Message-ID: <1403016777-15121-2-git-send-email-wens@csie.org>
+Message-ID: <1403016777-15121-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31 and A23 SoCs have a reset controller
-maintaining the UART in reset by default.
+sun6i-a31-apb0-gates supports using clock-indices for holes between
+individual gates. However, the driver passes the number of gates
+registered in clk_data->clk_num, which of_clk_src_onecell_get uses
+to recognize the range of valid indices a consumer can use.
 
-This patch adds optional reset support to the driver.
+This patch makes the driver pass the maximum gate index + 1, so
+of_clk_src_onecell_get does not complain about indices greater
+than gates registered.
+
+This was tested on the A23 SoC, which has a similar APB0 clock,
+but has holes for gates to removed IP blocks.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt | 1 +
- drivers/tty/serial/8250/8250_dw.c                             | 9 +++++++++
- 2 files changed, 10 insertions(+)
+ drivers/clk/sunxi/clk-sun6i-apb0-gates.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-index f13f1c5..cb9af84 100644
---- a/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/snps-dw-apb-uart.txt
-@@ -7,6 +7,7 @@ Required properties:
- - clock-frequency : the input clock frequency for the UART.
+diff --git a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+index 44cd27c..b342f2a 100644
+--- a/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
++++ b/drivers/clk/sunxi/clk-sun6i-apb0-gates.c
+@@ -25,6 +25,7 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
+ 	void __iomem *reg;
+ 	int gate_id;
+ 	int ngates;
++	int gate_max = 0;
+ 	int i;
  
- Optional properties:
-+- resets : phandle to the parent reset controller.
- - reg-shift : quantity to shift the register offsets by.  If this property is
-   not present then the register offsets are not shifted.
- - reg-io-width : the size (in bytes) of the IO accesses that should be
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index 51b307a..cb1b3dc 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -26,6 +26,7 @@
- #include <linux/slab.h>
- #include <linux/acpi.h>
- #include <linux/clk.h>
-+#include <linux/reset.h>
- #include <linux/pm_runtime.h>
- 
- #include <asm/byteorder.h>
-@@ -59,6 +60,7 @@ struct dw8250_data {
- 	int			last_mcr;
- 	int			line;
- 	struct clk		*clk;
-+	struct reset_control	*rst;
- 	struct uart_8250_dma	dma;
- };
- 
-@@ -408,6 +410,10 @@ static int dw8250_probe(struct platform_device *pdev)
- 		uart.port.uartclk = clk_get_rate(data->clk);
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -72,9 +73,12 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
+ 							    reg, gate_id,
+ 							    0, NULL);
+ 		WARN_ON(IS_ERR(clk_data->clks[gate_id]));
++
++		if (gate_id > gate_max)
++			gate_max = gate_id;
  	}
  
-+	data->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
-+	if (!IS_ERR(data->rst))
-+		reset_control_deassert(data->rst);
-+
- 	data->dma.rx_chan_id = -1;
- 	data->dma.tx_chan_id = -1;
- 	data->dma.rx_param = data;
-@@ -451,6 +457,9 @@ static int dw8250_remove(struct platform_device *pdev)
+-	clk_data->clk_num = ngates;
++	clk_data->clk_num = gate_max + 1;
  
- 	serial8250_unregister_port(data->line);
- 
-+	if (!IS_ERR(data->rst))
-+		reset_control_assert(data->rst);
-+
- 	if (!IS_ERR(data->clk))
- 		clk_disable_unprepare(data->clk);
- 
+ 	return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+ }
 -- 
 2.0.0
