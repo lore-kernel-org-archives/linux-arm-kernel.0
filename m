@@ -1,110 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jun 2014 16:15:28 +0100
-Subject: [PATCH 03/24] ARM64: Change some CONFIG_COMPAT over to use
- CONFIG_AARCH32_EL0 instead.
-In-Reply-To: <1400914939-9708-4-git-send-email-apinski@cavium.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <1400914939-9708-4-git-send-email-apinski@cavium.com>
-Message-ID: <20140617151528.GB21752@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Jun 2014 17:17:00 +0200
+Subject: [PATCH 01/14] ARM: mvebu: fix randconfig builds for pmsu driver
+In-Reply-To: <4575903.g78pJlsGh9@wuerfel>
+References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
+ <1402675276-538682-2-git-send-email-arnd@arndb.de>
+ <20140617160011.03b1ea15@free-electrons.com>
+ <4575903.g78pJlsGh9@wuerfel>
+Message-ID: <20140617171700.27908c03@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 12:01:58AM -0700, Andrew Pinski wrote:
-> This patch changes CONFIG_COMPAT checks inside the arm64 which are AARCH32 specific.
+Dear Arnd Bergmann,
 
-Please state what it is changed to. I guess CONFIG_AARCH32_EL0. Longer
-commit log is always better.
+On Tue, 17 Jun 2014 17:03:28 +0200, Arnd Bergmann wrote:
 
-> --- a/arch/arm64/include/asm/signal32.h
-> +++ b/arch/arm64/include/asm/signal32.h
-> @@ -20,6 +20,7 @@
->  #ifdef CONFIG_COMPAT
->  #include <linux/compat.h>
->  
-> +#ifdef CONFIG_AARCH32_EL0
->  #define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
+> > So noMMU builds are supported in a single image with MMU builds?
+> 
+> It's not supported yet, but I have a patch to do that, which I used for
+> testing this code. I try to have the platform code ready before submitting
+> the main patch.
 
-Do we still need the top CONFIG_COMPAT for signal32.h? We don't use the
-signal32 infrastructure for ILP32.
+Ok.
 
-> diff --git a/arch/arm64/include/asm/stat.h b/arch/arm64/include/asm/stat.h
-> index 15e3559..af04276 100644
-> --- a/arch/arm64/include/asm/stat.h
-> +++ b/arch/arm64/include/asm/stat.h
-> @@ -22,6 +22,7 @@
->  
->  #include <asm/compat.h>
->  
-> +#ifdef CONFIG_AARCH32_EL0
+> > This unfortunately isn't really correct, and the patch I sent in
+> > "[PATCH] ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7
+> > platforms" on June, 11th already fixes the cpu_suspend()/cpu_resume()
+> > problem.
+> 
+> ok.
+> 
+> > The issue with your solution is that it assumes this function is only
+> > used for cpuidle. That is indeed the case in v3.16, but will be wrong
+> > as soon as we add CPU hotplug support, which I have posted on May, 30th
+> > in "[PATCH 0/5] CPU hotplug for Marvell Armada XP", and which I hope to
+> > see included in v3.17.
+> 
+> Right. I'll drop this patch from the submission then. You came just in
+> time, as I had originally planned to send it out this morning.
+> 
+> I'll also follow up with a separate patch to address the isb() issue.
 
-Same here, we have another #ifdef CONFIG_COMPAT above the #include.
+Ok, thanks a lot!
 
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
+So, should my patch adding the "select ARM_CPU_SUSPEND" be taken by
+Jason and then pushed to you, or will you apply it directly?
 
-[...]
+Thanks!
 
-> @@ -1041,11 +1041,28 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
->  
->  	return ret;
->  }
-> -#endif /* CONFIG_COMPAT */
-> +#else /* !CONFIG_AARCH32_EL0 */
-> +long compat_a32_arch_ptrace(struct task_struct *child, compat_long_t request,
-> +			    compat_ulong_t caddr, compat_ulong_t cdata)
-> +{
-> +	return -1;
-> +}
-> +#endif /* !CONFIG_AARCH32_EL0 */
-
-Can you return an appropriate error code here?
-
-> +
-> +#ifdef CONFIG_COMPAT
-> +long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-> +			compat_ulong_t caddr, compat_ulong_t cdata)
-> +{
-> +	if (is_compat_task())
-> +		return compat_a32_arch_ptrace(child, request, caddr, cdata);
-> +	return compat_ptrace_request(child, request, caddr, cdata);
-> +}
-> +#endif
-
-So for ILP32, will we route ptrace calls via compat_arch_ptrace? Some
-explanation for this code would help as it doesn't look like a simple
-CONFIG_COMPAT conversion.
-
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -417,3 +417,16 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
->  		tracehook_notify_resume(regs);
->  	}
->  }
-> +
-> +/* Some functions are needed for compat ptrace but we don't define
-> +   them if we don't have AARCH32 support compiled in */
-
-As per the kernel coding style, the multi-line comment should be:
-
-/*
- * Some functions are needed for compat ptrace but we don't define
- * them if we don't have AARCH32 support compiled in.
- */
-
-> +#if defined CONFIG_COMPAT && !defined CONFIG_AARCH32_EL0
-> +int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
-> +{
-> +	return -EFAULT;
-> +}
-> +int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
-> +{
-> +	return -EFAULT;
-> +}
-> +#endif
-
-Maybe it gets clearer in subsequent patches on how this interacts with
-ptrace. But at this stage in the series, COMPAT cannot be defined
-without CONFIG_AARCH32_EL0, so the above could be removed.
-
+Thomas
 -- 
-Catalin
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
