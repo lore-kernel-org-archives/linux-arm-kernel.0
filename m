@@ -1,45 +1,48 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 Jun 2014 23:51:20 +0200
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
- <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
- <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140617215119.GC24743@mithrandir>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Tue, 17 Jun 2014 14:43:48 -0700
+Subject: [PATCH 3.13 134/212] arm: dts: Fix missing device_type="memory" for
+ ste-ccu8540
+In-Reply-To: <1403041506-13646-1-git-send-email-kamal@canonical.com>
+References: <1403041506-13646-1-git-send-email-kamal@canonical.com>
+Message-ID: <1403041506-13646-135-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 05:01:46PM +0300, Peter De Schrijver wrote:
-> On Tue, Jun 17, 2014 at 02:13:15PM +0200, Thierry Reding wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
-> > > On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
-> > > > This symbol needs to be exported to power on rails without using
-> > > > tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
-> > > > cannot be used in situations where the driver wants to handle clocking
-> > > > by itself.
-> > > 
-> > > Thierry, are you OK with this change?
-> > 
-> > I would've preferred tegra_powergate_sequence_power_up() to be used
-> 
-> I don't think the current tegra_powergate_sequence_power_up() API is very well
-> defined though. I don't think the clocks and resets required by the sequence
-> should be provided by the driver. For one, there can be several clocks and
-> resets that need to be controlled for a single domain.
+3.13.11.4 -stable review patch.  If anyone has any objections, please let me know.
 
-Do you have any suggestions for what the API should look like? Even if
-we plan to move to some different API, I think there's some advantage in
-using it consistently if for no other reason than to make it easier to
-replace occurrences later on.
+------------------
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/80ed063c/attachment.sig>
+From: Leif Lindholm <leif.lindholm@linaro.org>
+
+commit bfaed5abad998bfc88a66e6e71c7b08dcf82f04e upstream.
+
+The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
+its memory node, relying on an old ppc quirk in order to discover its
+memory. Fix the data so that all parsing code can handle it correctly.
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ arch/arm/boot/dts/ste-ccu8540.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/ste-ccu8540.dts b/arch/arm/boot/dts/ste-ccu8540.dts
+index 7f3baf5..32dd55e 100644
+--- a/arch/arm/boot/dts/ste-ccu8540.dts
++++ b/arch/arm/boot/dts/ste-ccu8540.dts
+@@ -18,6 +18,7 @@
+ 	compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
+ 
+ 	memory at 0 {
++		device_type = "memory";
+ 		reg = <0x20000000 0x1f000000>, <0xc0000000 0x3f000000>;
+ 	};
+ 
+-- 
+1.9.1
