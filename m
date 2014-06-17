@@ -1,76 +1,37 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 17 Jun 2014 11:06:31 +0200
-Subject: [PATCH 3/7] ARM: dts: imx5*, remove fsl,ssi-dma-events
+Date: Tue, 17 Jun 2014 11:06:33 +0200
+Subject: [PATCH 5/7] ARM: dts: imx2*, remove ssi fsl,mode for sgtl5000 cards
 In-Reply-To: <1402995995-15098-1-git-send-email-mpa@pengutronix.de>
 References: <1402995995-15098-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1402995995-15098-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1402995995-15098-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All imx5*.dtsi files define the generic dma bindings. Drop the old
-non-generic fsl,ssi-dma-events.
+The DAI mode is and should be configured by the sound card driver as
+codec and ssi have to be in the right modes to communicate with each
+other. It is possible to operate the ssi unit or the codec in master mode,
+sometimes even on the same board in different configurations.
+
+With the latest changes in the fsl-ssi driver, the 'fsl,mode' property
+is only handled as a fallback property. If the sound card sets the DAI
+mode correctly, this fallback configuration is dropped.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi | 3 ---
- arch/arm/boot/dts/imx53.dtsi | 3 ---
- 2 files changed, 6 deletions(-)
+ arch/arm/boot/dts/imx25-pdk.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index bebbf3ba0d5e..17c05a6fa776 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -218,7 +218,6 @@
- 					       <&sdma 25 1 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
--					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
- 					status = "disabled";
- 				};
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index c608942b8a3b..8f9a424a80d6 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -233,7 +233,6 @@
  
-@@ -508,7 +507,6 @@
- 				       <&sdma 29 0 0>;
- 				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
- 
-@@ -564,7 +562,6 @@
- 				       <&sdma 47 0 0>;
- 				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <47 46 37 35>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 6456a0084388..d8d3f979f599 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -231,7 +231,6 @@
- 					       <&sdma 25 1 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
--					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
- 					status = "disabled";
- 				};
- 
-@@ -661,7 +660,6 @@
- 				       <&sdma 29 0 0>;
- 				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <29 28 27 26>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
- 
-@@ -689,7 +687,6 @@
- 				       <&sdma 47 0 0>;
- 				dma-names = "rx", "tx";
- 				fsl,fifo-depth = <15>;
--				fsl,ssi-dma-events = <47 46 45 44>; /* TX0 RX0 TX1 RX1 */
- 				status = "disabled";
- 			};
+ &ssi1 {
+ 	codec-handle = <&codec>;
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
  
 -- 
 2.0.0
