@@ -1,62 +1,35 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Tue, 17 Jun 2014 08:58:31 -0400
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617090931.GB3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk>
-Message-ID: <20140617125831.GI4173@beef>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 17 Jun 2014 21:03:35 +0800
+Subject: ARM diagnostic register across suspend/resume
+In-Reply-To: <20140617102519.GC13808@arm.com>
+References: <20140617083117.GD8860@dragon> <20140617095729.GF13020@arm.com>
+ <20140617101606.GE23430@n2100.arm.linux.org.uk>
+ <20140617102123.GA13808@arm.com>
+ <20140617102344.GG23430@n2100.arm.linux.org.uk>
+ <20140617102519.GC13808@arm.com>
+Message-ID: <20140617130333.GE8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 10:09:31AM +0100, Russell King wrote:
-> On Mon, Jun 16, 2014 at 09:22:50AM -0400, Jason Kridner wrote:
-> > Adding devicetree and linux-arm-kernel lists based on feedback on IRC...
+On Tue, Jun 17, 2014 at 11:25:20AM +0100, Will Deacon wrote:
+> On Tue, Jun 17, 2014 at 11:23:44AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Jun 17, 2014 at 11:21:23AM +0100, Will Deacon wrote:
+> > > I think that actually works ok, because writing zeroes doesn't actually
+> > > do anything as far as I understand. The problem with suspend/resume is
+> > > that the suspend/resume cycle could well clear the internal state and
+> > > writing zeroes won't re-enable the workaround bits.
+> > > 
+> > > I'll double-check this with the hardware guys, since this register really
+> > > is undocumented.
 > > 
-> > On Tue, Jun 10, 2014 at 12:46 PM, Jason Kridner <jkridner@gmail.com> wrote:
-> > > I'd like to discuss moving our current library of cape devicetree
-> > > overlay sources into a single tree, including the boot .dtb files for
-> > > BeagleBoard.org boards and moving towards enabling as much of the cape
-> > > support into a single boot-time .dtb file with an approach similar to
-> > > the cape-universal overlay
-> > > (https://github.com/cdsteinkuehler/beaglebone-universal-io), but not
-> > > in an overlay.
-> > >
-> > > First of all, I want to note this doesn't change my view on the
-> > > importance of mainline support for devicetree overlays. They are still
-> > > absolutely critical and highly useful, solving problems that cannot be
-> > > solved through boot-time devicetrees. I'm simply looking for an
-> > > approach that will complement the availability of overlays and provide
-> > > the best user experience.
+> > Are you saying that it is write one to set, and writing zero is ignored?
+> > If that's true, we should simplify the work-around code to get rid of the
+> > read-modify-write.
 > 
-> Here's the most obvious question in the world on this topic.  Are capes
-> hot-pluggable?
-> 
-> Looking at the posts on google+ from David Anders, they're using pin
-> headers for connectivity, with no additional protection against hot-
-> plugging, and no sequencing of pin connection.  In other words, they are
-> not hot-pluggable.
-> 
-> So, why do we need to add a load of infrastructure to the kernel to allow
-> the device tree to be modified at run time?  At present, the way the
-> entire DT infrastructure works is that it assumes the DT remains static
-> and never changes - this applies not only to the core DT code, but also
-> to all the drivers which have been converted.
-> 
-> So, you're asking for a feature which is impossible to really make use
-> of on the hardware which you want to use it.
-> 
-> Why should kernel developers go to the extent of adding support for DT
-> modification at runtime when the platform you want this for doesn't even
-> support hotplugging of these capes?
+> That's my understanding for the diagnostic register, but I've asked for
+> clarification internally.
 
-It's important to note that Jason's use case is not the real one driving
-runtime DT modification. You'll have to go back to threads like
-https://lkml.org/lkml/2013/2/22/255 over a year ago where this was all
-hashed out. The clearest use cases are the FPGA folks that are loading
-their bitstream from userspace and due to DT-everywhere also need to
-initiate runtime modification of the live DT tree from userspace.
-There's a lot of discussion over many threads where this has been
-debated.
+Hmm, I'm not sure that's the case.  On imx6q, I can read out diagnostic
+register as 0x00200850 which matches the errata we enable.
 
--Matt
+Shawn
