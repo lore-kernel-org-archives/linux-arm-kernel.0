@@ -1,117 +1,83 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Tue, 17 Jun 2014 09:49:14 +0200
-Subject: [PATCH v2 1/4] dt: bindings: add bindings for Broadcom bcm43xx
- sdio devices
-In-Reply-To: <539FE0EC.5090003@redhat.com>
-References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
- <1402941407-8210-2-git-send-email-hdegoede@redhat.com>
- <CAGVrzcZBzDTfnd6o0ib1FBvBK2VPNitS=rpb4jDkjF=T7Fy=DQ@mail.gmail.com>
- <539FE0EC.5090003@redhat.com>
-Message-ID: <539FF2FA.8050304@broadcom.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Tue, 17 Jun 2014 15:50:20 +0800
+Subject: [PATCH RFC v2 3/3] documentation/iommu: Add description of
+ Hisilicon SMMU private binding
+In-Reply-To: <20140616163930.GX16758@arm.com>
+References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
+ <1402549692-5224-4-git-send-email-thunder.leizhen@huawei.com>
+ <20140616163930.GX16758@arm.com>
+Message-ID: <539FF33C.7020007@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-06-14 08:32, Hans de Goede wrote:
-> Hi,
->
-> On 06/16/2014 10:53 PM, Florian Fainelli wrote:
->> 2014-06-16 10:56 GMT-07:00 Hans de Goede <hdegoede@redhat.com>:
->>> From: Arend van Spriel <arend@broadcom.com>
->>>
->>> The Broadcom bcm43xx sdio devices are fullmac devices that may be
->>> integrated in ARM platforms. Currently, the brcmfmac driver for
->>> these devices support use of platform data. This patch specifies
->>> the bindings that allow this platform data to be expressed in the
->>> devicetree.
->>>
->>> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
->>> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
->>> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
->>> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
->>> Signed-off-by: Arend van Spriel <arend@broadcom.com>
->>> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
->>>   on how to handle this yet]
->>> [hdegoede at redhat.com: move from bindings/staging to bindings]
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> ---
->>>   .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 29 ++++++++++++++++++++++
->>>   1 file changed, 29 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->>> new file mode 100644
->>> index 0000000..6a0aaf2
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->>> @@ -0,0 +1,29 @@
->>> +Broadcom BCM43xx Fullmac wireless SDIO devices
->>> +
->>> +This node provides properties for controlling the Broadcom wireless device. The
->>> +node is expected to be specified as a child node to the SDIO controller that
->>> +connects the device to the system.
->>> +
->>> +Required properties:
->>> +
->>> + - compatible : Should be "brcm,bcm43xx-fmac".
+On 2014/6/17 0:39, Will Deacon wrote:
+> On Thu, Jun 12, 2014 at 06:08:12AM +0100, Zhen Lei wrote:
+>> This patch adds a description of private properties for the Hisilicon
+>> System MMU architecture.
 >>
->> In general, the use of a wildcard compatible string is discouraged
->> over the use of a more descriptive compatible string. So you should
->> find out what is the first chip that is compatible, and use that
->> compatible string as long as that compatibility remains.
->
-> Right, Arend, what should we use then ?
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index f284b99..75b1351 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -15,6 +15,7 @@ conditions.
+>>                          "arm,smmu-v2"
+>>                          "arm,mmu-400"
+>>                          "arm,mmu-500"
+>> +                        "hisilicon,smmu-v1"
+>>
+>>                    depending on the particular implementation and/or the
+>>                    version of the architecture implemented.
+>> @@ -54,6 +55,21 @@ conditions.
+>>                    aliases of secure registers have to be used during
+>>                    SMMU configuration.
+>>
+>> +** Hisilicon SMMU private properties:
+>> +
+>> +- smmu-force-memtype : A list of StreamIDs which not translate address but
+>> +                  translate attributes. The StreamIDs list here can not be
+>> +                  used for map(translation) mode again.
+>> +                  StreamID first, then the type list below:
+>> +                  1, cahceable, WBRAWA, Normal outer and inner write-back
+>> +                  2, non-cacheable, Normal outer and inner non-cacheable
+>> +                  3, device, nGnRE
+>> +                  others, bypass
+>> +
+>> +- smmu-bypass-vmid   : Specify which context bank is used for bypass mode.
+>> +                  If omit, vmid=255 is default. If bypass and map mode can
+>> +                  share a same S2CR, config vmid=0.
+> 
+> These don't feel like they belong in the device-tree to me. Is the list of
+> StreamIDs described in smmu-force-memtype a property of the hardware
+> configuration, or a software policy to allow you to generate cacheable
+> traffic for particular masters?
+> 
+> Will
+> 
+> .
+> 
+OK, I will put these description into a sperate file, hisilicon,smmu.txt
+and mark a reference to arm,smmu.txt
 
-In earlier discussions, we ended up with this compatible string. The 
-properties are generic enough to be covered by this 'wildcard' string. 
-However, I am not religious about it so if you feel strongly for an 
-explicit string it could be brcm,bcm4329-fmac, but it does not have my 
-preference.
+The latter case. Some masters driver want use cacheable(WB) attribute to access
+memory, but the masters can not bring cacheable attribute. So, can not use
+bypass(or transaction) mode. In fact, the master driver can use iommu_map to
+create map and specify IOMMU_CACHE. But maybe the driver does not want to
+map, if the memory access is very dynamically, frequently map and unmap will
+decrease performance.
 
->>> +
->>> +Optional properties:
->>> + - brcm,drive-strength : drive strength used for SDIO pins on device.
->>> +       (default = 6mA).
->>
->> It would not hurt if you did specify the unit of the
->> "brcm,drive-strength" property here. Also, if the default is 6, maybe
->> the example below should be fixed to reflect that so people do not
->> think that writing 4 to a register = 6 mA.
->
-> Ok will fix in the next version.
->
+Actually, I think smmu-force-memtype maybe suitable for arm-smmu too. But now,
+if nobody declear need it, I will just implement it in hisi-smmu.c
 
-I agree that explicitly specifying the unit of the property is a good 
-addition. If that is done I don't think it is necessary to change the 
-value used in the example.
-
-Regards,
-Arend
-
->>
->>> + - interrupt-parent : the phandle for the interrupt controller to which the
->>> +       device interrupts are connected.
->>> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
->>> +       When not specified the device will use in-band SDIO interrupts.
->>> + - interrupt-names : name of the out-of-band interrupt, which must be set
->>> +       to "host-wake".
->>> +
->>> +Example:
->>> +
->>> +bcm4335 {
->>> +       compatible = "brcm,bcm43xx-fmac";
->>> +       brcm,drive-strength = <4>;
->>> +       interrupt-parent = <&gpx2>;
->>> +       interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
->>> +       interrupt-names = "host-wake";
->>> +};
->>> --
->>> 2.0.0
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->>
+A big issue should be discussed now. When a master use bypass mode to access
+memory, this means it can access all non-secure memory. So, if a master can
+be operated in user mode, that means a user process can access any kernel
+memory. In ARM smmu-v2 specification, SMMU_S2CRn.PRIVCFG is used for determine
+output priviledge attribute. But if use bypass mode and output attribute is
+Unprivileged, specification have no mention about where to decide memory access
+is permitted or not. Do you think is a spec design bug or Implemention
+defined, or find some description anywhere.
