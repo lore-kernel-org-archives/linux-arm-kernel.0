@@ -1,32 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jun 2014 15:57:15 +0200
-Subject: [PATCH] ARM: omap: rework platform selection
-In-Reply-To: <CABGGisxdKznLzR+0b0oYrN+aiWM0gNFbzYwfPtAZF=AiapU=eQ@mail.gmail.com>
-References: <5701099.0P1SIXsHc1@wuerfel> <20140616141712.GL17845@atomide.com>
- <CABGGisxdKznLzR+0b0oYrN+aiWM0gNFbzYwfPtAZF=AiapU=eQ@mail.gmail.com>
-Message-ID: <201406171557.15819.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 17 Jun 2014 21:59:20 +0800
+Subject: [PATCH 0/2] DT updates for Cubox-i
+In-Reply-To: <20140617134016.GK23430@n2100.arm.linux.org.uk>
+References: <20140617134016.GK23430@n2100.arm.linux.org.uk>
+Message-ID: <20140617135919.GG8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 June 2014, Rob Herring wrote:
-> > So far I have not come up with no great ideas on fixing this
-> > properly short of requiring all omap .config files to add
-> > CONFIG_ARCH_OMAP=y manually. Anybody got good ideas for that?
+On Tue, Jun 17, 2014 at 02:40:16PM +0100, Russell King - ARM Linux wrote:
+> Shawn,
 > 
-> I've failed to come up with anything...
+> These are two updates to the Cubox-i which I'd prefer to get into -rc.
+> They were omitted from the merge window because their dependent changes
+> were not merged, but have now been merged.
 > 
+> The only real functional change for the Cubox-i in this set is that it
+> is now possible to control the front panel LED.  The other patch is
+> solely about moving some DT configuration to where it belongs.
+> 
+> Can we please get these in?
 
-I have two ideas, but neither is great:
+Okay, I will send them together with the fixes I queued for -rc.
 
-a) we leave the individual per-soc options in the top-level menu
-   and move the sub-options under those. This is a bit or a problem
-   for options concerning all of OMAP, but I'm not sure how many of
-   those are actually required.
-
-b) We go back to Rob's version and make CONFIG_ARCH_OMAP the
-   user-selectable option, and then find another solution for
-   building a kernel with ARCH_OMAP set but none of individual
-   options. This will work for anybody who has a full .config
-   file, but still break the 'make savedefconfig' generated ones.
-
-	Arnd
+Shawn
