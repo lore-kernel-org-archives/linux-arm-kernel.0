@@ -1,265 +1,35 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Tue, 17 Jun 2014 15:24:01 +0530
-Subject: Boot warnings on exynos5420 based boards
-In-Reply-To: <CAK5sBcECq5sN9CnUhWLPoYnFnPz64JM_6CVRBwjz8Q2=X5_t=A@mail.gmail.com>
-References: <CAK5sBcEJOJDtt_7ow=q=hiN8-JRHzOUg6t=T3hTNOwzKq5dodw@mail.gmail.com>
- <53A007F7.6020103@linux.vnet.ibm.com>
- <CAK5sBcECq5sN9CnUhWLPoYnFnPz64JM_6CVRBwjz8Q2=X5_t=A@mail.gmail.com>
-Message-ID: <53A01039.2020302@linux.vnet.ibm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Jun 2014 02:57:15 -0700
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <53A00970.3090902@ti.com>
+References: <1402994233-22599-1-git-send-email-tomi.valkeinen@ti.com>
+ <20140617085846.GO17845@atomide.com> <53A00970.3090902@ti.com>
+Message-ID: <20140617095715.GS17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 03:03 PM, Sachin Kamat wrote:
-
->> Below is an updated patch, please let me know how it goes. (You'll have to
->> revert c47a9d7cca first, and then 56e692182, before trying this patch).
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140617 02:26]:
+> On 17/06/14 11:58, Tony Lindgren wrote:
 > 
-> I am unable to apply your below patch on top of the above 2 reverts.
-> Applying: CPU hotplug, smp: Execute any pending IPI callbacks before CPU offline
-> fatal: corrupt patch at line 106
-> Patch failed at 0001 CPU hotplug, smp: Execute any pending IPI
-> callbacks before CPU offline
+> >> +/* rfbi */
+> > 
+> > I think we're still missing am43x_rfbi_sysc entry though?
+> > 
+> >> +static struct omap_hwmod am43xx_dss_rfbi_hwmod = {
+> >> +	.name		= "dss_rfbi",
+> >> +	.class		= &omap2_rfbi_hwmod_class,
+> >> +	.clkdm_name	= "dss_clkdm",
+> >> +	.main_clk	= "disp_clk",
+> >> +	.prcm = {
+> >> +		.omap4 = {
+> >> +			.clkctrl_offs = AM43XX_CM_PER_DSS_CLKCTRL_OFFSET,
+> >> +		},
+> >> +	},
+> >> +};
 > 
-> Even with 'patch' I get the below failures:
-> patching file kernel/smp.c
-> Hunk #2 FAILED at 53.
-> Hunk #3 FAILED at 179.
-> 2 out of 3 hunks FAILED -- saving rejects to file kernel/smp.c.rej
-> 
+> That should come from omap2/3 hwmod data, as the above references
+> omap2_rfbi_hwmod_class. The bits there looked correct for AM43xx to me.
 
-Hmm, weird. My mailer must have screwed it up.
+OK looks good to me then:
 
-Let's try again:
-
-[In case this also doesn't work for you, please use this git tree in which
- I have reverted the 2 old commits and added this updated patch.
-
- git://github.com/srivatsabhat/linux.git ipi-offline-fix-v3
-]
-
-----------------------------------------------------------------------------
-From: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-
-[PATCH] CPU hotplug, smp: Execute any pending IPI callbacks before CPU offline
-
-There is a race between the CPU offline code (within stop-machine) and the
-smp-call-function code, which can lead to getting IPIs on the outgoing CPU,
-*after* it has gone offline.
-
-Specifically, this can happen when using smp_call_function_single_async() to
-send the IPI, since this API allows sending asynchronous IPIs from IRQ
-disabled contexts. The exact race condition is described below.
-
-During CPU offline, in stop-machine, we don't enforce any rule in the
-_DISABLE_IRQ stage, regarding the order in which the outgoing CPU and the
-other CPUs disable their local interrupts. Due to this, we can encounter a
-situation in which an IPI is sent by one of the other CPUs to the outgoing CPU
-(while it is *still* online), but the outgoing CPU ends up noticing it only
-*after* it has gone offline.
-
-              CPU 1                                         CPU 2
-          (Online CPU)                               (CPU going offline)
-
-       Enter _PREPARE stage                          Enter _PREPARE stage
-
-                                                     Enter _DISABLE_IRQ stage
-
-                                                   =
-       Got a device interrupt, and                 | Didn't notice the IPI
-       the interrupt handler sent an               | since interrupts were
-       IPI to CPU 2 using                          | disabled on this CPU.
-       smp_call_function_single_async()            |
-                                                   =
-
-       Enter _DISABLE_IRQ stage
-
-       Enter _RUN stage                              Enter _RUN stage
-
-                                  =
-       Busy loop with interrupts  |                  Invoke take_cpu_down()
-       disabled.                  |                  and take CPU 2 offline
-                                  =
-
-       Enter _EXIT stage                             Enter _EXIT stage
-
-       Re-enable interrupts                          Re-enable interrupts
-
-                                                     The pending IPI is noted
-                                                     immediately, but alas,
-                                                     the CPU is offline at
-                                                     this point.
-
-This of course, makes the smp-call-function IPI handler code running on CPU 2
-unhappy and it complains about "receiving an IPI on an offline CPU".
-One real example of the scenario on CPU 1 is the block layer's
-complete-request call-path:
-	__blk_complete_request() [interrupt-handler]
-	    raise_blk_irq()
-	        smp_call_function_single_async()
-
-
-However, if we look closely, the block layer does check that the target CPU is
-online before firing the IPI. So in this case, it is actually the unfortunate
-ordering/timing of events in the stop-machine phase that leads to receiving
-IPIs after the target CPU has gone offline.
-
-In reality, getting a late IPI on an offline CPU is not too bad by itself
-(this can happen even due to hardware latencies in IPI send-receive). It is
-a bug only if the target CPU really went offline without executing all the
-callbacks queued on its list. (Note that a CPU is free to execute its pending
-smp-call-function callbacks in a batch, without waiting for the corresponding
-IPIs to arrive for each one of those callbacks).
-
-So, fixing this issue can be broken up into two parts:
-1. Ensure that a CPU goes offline only after executing all the callbacks
-   queued on it.
-2. Modify the warning condition in the smp-call-function IPI handler code
-   such that it warns only if an offline CPU got an IPI *and* that CPU had
-   gone offline with callbacks still pending in its queue.
-
-Achieving part 1 is straight-forward - just flush (execute) all the queued
-callbacks on the outgoing CPU in the CPU_DYING stage[1], including those
-callbacks for which the source CPU's IPIs might not have been received on
-the outgoing CPU yet. Once we do this, an IPI that arrives late on the CPU
-going offline (either due to the race mentioned above, or due to hardware
-latencies) will be completely harmless, since the outgoing CPU would have
-executed all the queued callbacks before going offline.
-
-Overall, this fix (parts 1 and 2 put together) additionally guarantees that
-we will see a warning only when the *IPI-sender code* is buggy - that is, if
-it queues the callback _after_ the target CPU has gone offline.
-
-
-[1]. The CPU_DYING part needs a little more explanation: by the time we
-execute the CPU_DYING notifier callbacks, the CPU would have already been
-marked offline. But we want to flush out the pending callbacks at this stage,
-ignoring the fact that the CPU is offline. So restructure the IPI handler
-code so that we can by-pass the "is-cpu-offline?" check in this particular
-case. (Of course, the right solution here is to fix CPU hotplug to mark the
-CPU offline _after_ invoking the CPU_DYING notifiers, but this requires a
-lot of audit to ensure that this change doesn't break any existing code;
-hence lets go with the solution proposed above until that is done).
-
-[akpm at linux-foundation.org: coding-style fixes]
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-Suggested-by: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-Cc: Borislav Petkov <bp@suse.de>
-Cc: Christoph Hellwig <hch@infradead.org>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Gautham R Shenoy <ego@linux.vnet.ibm.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Mel Gorman <mgorman@suse.de>
-Cc: Mike Galbraith <mgalbraith@suse.de>
-Cc: Oleg Nesterov <oleg@redhat.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Rik van Riel <riel@redhat.com>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
-
- kernel/smp.c |   57 +++++++++++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 49 insertions(+), 8 deletions(-)
-
-
-diff --git a/kernel/smp.c b/kernel/smp.c
-index 306f818..80c33f8 100644
---- a/kernel/smp.c
-+++ b/kernel/smp.c
-@@ -29,6 +29,8 @@ static DEFINE_PER_CPU_SHARED_ALIGNED(struct call_function_data, cfd_data);
- 
- static DEFINE_PER_CPU_SHARED_ALIGNED(struct llist_head, call_single_queue);
- 
-+static void flush_smp_call_function_queue(bool warn_cpu_offline);
-+
- static int
- hotplug_cfd(struct notifier_block *nfb, unsigned long action, void *hcpu)
- {
-@@ -51,12 +53,27 @@ hotplug_cfd(struct notifier_block *nfb, unsigned long action, void *hcpu)
- #ifdef CONFIG_HOTPLUG_CPU
- 	case CPU_UP_CANCELED:
- 	case CPU_UP_CANCELED_FROZEN:
-+		/* Fall-through to the CPU_DEAD[_FROZEN] case. */
- 
- 	case CPU_DEAD:
- 	case CPU_DEAD_FROZEN:
- 		free_cpumask_var(cfd->cpumask);
- 		free_percpu(cfd->csd);
- 		break;
-+
-+	case CPU_DYING:
-+	case CPU_DYING_FROZEN:
-+		/*
-+		 * The IPIs for the smp-call-function callbacks queued by other
-+		 * CPUs might arrive late, either due to hardware latencies or
-+		 * because this CPU disabled interrupts (inside stop-machine)
-+		 * before the IPIs were sent. So flush out any pending callbacks
-+		 * explicitly (without waiting for the IPIs to arrive), to
-+		 * ensure that the outgoing CPU doesn't go offline with work
-+		 * still pending.
-+		 */
-+		flush_smp_call_function_queue(false);
-+		break;
- #endif
- 	};
- 
-@@ -177,23 +194,47 @@ static int generic_exec_single(int cpu, struct call_single_data *csd,
- 	return 0;
- }
- 
--/*
-- * Invoked by arch to handle an IPI for call function single. Must be
-- * called from the arch with interrupts disabled.
-+/**
-+ * generic_smp_call_function_single_interrupt - Execute SMP IPI callbacks
-+ *
-+ * Invoked by arch to handle an IPI for call function single.
-+ * Must be called with interrupts disabled.
-  */
- void generic_smp_call_function_single_interrupt(void)
- {
-+	flush_smp_call_function_queue(true);
-+}
-+
-+/**
-+ * flush_smp_call_function_queue - Flush pending smp-call-function callbacks
-+ *
-+ * @warn_cpu_offline: If set to 'true', warn if callbacks were queued on an
-+ *		      offline CPU. Skip this check if set to 'false'.
-+ *
-+ * Flush any pending smp-call-function callbacks queued on this CPU. This is
-+ * invoked by the generic IPI handler, as well as by a CPU about to go offline,
-+ * to ensure that all pending IPI callbacks are run before it goes completely
-+ * offline.
-+ *
-+ * Loop through the call_single_queue and run all the queued callbacks.
-+ * Must be called with interrupts disabled.
-+ */
-+static void flush_smp_call_function_queue(bool warn_cpu_offline)
-+{
-+	struct llist_head *head;
- 	struct llist_node *entry;
- 	struct call_single_data *csd, *csd_next;
- 	static bool warned;
- 
--	entry = llist_del_all(&__get_cpu_var(call_single_queue));
-+	WARN_ON(!irqs_disabled());
-+
-+	head = &__get_cpu_var(call_single_queue);
-+	entry = llist_del_all(head);
- 	entry = llist_reverse_order(entry);
- 
--	/*
--	 * Shouldn't receive this interrupt on a cpu that is not yet online.
--	 */
--	if (unlikely(!cpu_online(smp_processor_id()) && !warned)) {
-+	/* There shouldn't be any pending callbacks on an offline CPU. */
-+	if (unlikely(warn_cpu_offline && !cpu_online(smp_processor_id()) &&
-+		     !warned && !llist_empty(head))) {
- 		warned = true;
- 		WARN(1, "IPI on offline CPU %d\n", smp_processor_id());
- 
+Acked-by: Tony Lindgren <tony@atomide.com>
