@@ -1,40 +1,176 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jun 2014 17:20:22 +0200
-Subject: [PATCH 01/14] ARM: mvebu: fix randconfig builds for pmsu driver
-In-Reply-To: <20140617171700.27908c03@free-electrons.com>
-References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
- <4575903.g78pJlsGh9@wuerfel> <20140617171700.27908c03@free-electrons.com>
-Message-ID: <7711465.T7plxBX24Q@wuerfel>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 17 Jun 2014 16:21:34 +0100
+Subject: [PATCH v7 2/2] ARM: vexpress: Add CLCD Device Tree properties
+In-Reply-To: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
+References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1403018494-10264-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 June 2014 17:17:00 Thomas Petazzoni wrote:
-> 
-> > > This unfortunately isn't really correct, and the patch I sent in
-> > > "[PATCH] ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7
-> > > platforms" on June, 11th already fixes the cpu_suspend()/cpu_resume()
-> > > problem.
-> > 
-> > ok.
-> > 
-> > > The issue with your solution is that it assumes this function is only
-> > > used for cpuidle. That is indeed the case in v3.16, but will be wrong
-> > > as soon as we add CPU hotplug support, which I have posted on May, 30th
-> > > in "[PATCH 0/5] CPU hotplug for Marvell Armada XP", and which I hope to
-> > > see included in v3.17.
-> > 
-> > Right. I'll drop this patch from the submission then. You came just in
-> > time, as I had originally planned to send it out this morning.
-> > 
-> > I'll also follow up with a separate patch to address the isb() issue.
-> 
-> Ok, thanks a lot!
-> 
-> So, should my patch adding the "select ARM_CPU_SUSPEND" be taken by
-> Jason and then pushed to you, or will you apply it directly?
+... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
+dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
 
-I'll wait for Jason to pick it up. It was clearly a mistake for me
-to include my own patch directly and without an explicit Ack, I'll go
-back to the normal way of doing things ;-)
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 34 ++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 34 ++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 31 ++++++++++++++++++++++++++++++
+ 3 files changed, 97 insertions(+), 2 deletions(-)
 
-	ARnd
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index 756c986..0ac0623 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -246,9 +246,41 @@
+ 			clcd at 1f0000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f0000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++				arm,pl11x,framebuffer-base = <0x18000000 0x00800000>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++
++				port {
++					v2m_clcd_pads: endpoint {
++						remote-endpoint = <&v2m_clcd_panel>;
++						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++					};
++				};
++
++				panel {
++					compatible = "panel-dpi";
++
++					port {
++						v2m_clcd_panel: endpoint {
++							remote-endpoint = <&v2m_clcd_pads>;
++						};
++					};
++
++					panel-timing {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -350,7 +382,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index ba856d6..bbe1858 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -245,9 +245,41 @@
+ 			clcd at 1f000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++				arm,pl11x,framebuffer-base = <0x4c000000 0x00800000>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++
++				port {
++					v2m_clcd_pads: endpoint {
++						remote-endpoint = <&v2m_clcd_panel>;
++						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++					};
++				};
++
++				panel {
++					compatible = "panel-dpi";
++
++					port {
++						v2m_clcd_panel: endpoint {
++							remote-endpoint = <&v2m_clcd_pads>;
++						};
++					};
++
++					panel-timing {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -349,7 +381,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 62d9b22..31107cd 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -70,9 +70,40 @@
+ 	clcd at 10020000 {
+ 		compatible = "arm,pl111", "arm,primecell";
+ 		reg = <0x10020000 0x1000>;
++		interrupt-names = "combined";
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
++		max-memory-bandwidth = <94371840>; /* Bps, 1024x768 at 60 16bpp */
++
++		port {
++			clcd_pads: endpoint {
++				remote-endpoint = <&clcd_panel>;
++				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++			};
++		};
++
++		panel {
++			compatible = "panel-dpi";
++
++			port {
++				clcd_panel: endpoint {
++					remote-endpoint = <&clcd_pads>;
++				};
++			};
++
++			panel-timing {
++				clock-frequency = <63500127>;
++				hactive = <1024>;
++				hback-porch = <152>;
++				hfront-porch = <48>;
++				hsync-len = <104>;
++				vactive = <768>;
++				vback-porch = <23>;
++				vfront-porch = <3>;
++				vsync-len = <4>;
++			};
++		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+-- 
+1.9.1
