@@ -1,38 +1,41 @@
 From: guido@vanguardiasur.com.ar (=?UTF-8?q?Guido=20Mart=C3=ADnez?=)
-Date: Tue, 17 Jun 2014 11:17:07 -0300
-Subject: [PATCH/RESEND 5/9] drm/tilcdc: panel: fix leak when unloading the
- module
+Date: Tue, 17 Jun 2014 11:17:08 -0300
+Subject: [PATCH/RESEND 6/9] drm/tilcdc: fix release order on exit
 In-Reply-To: <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
 References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
  <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <1403014631-18072-6-git-send-email-guido@vanguardiasur.com.ar>
+Message-ID: <1403014631-18072-7-git-send-email-guido@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver did not unregister the allocated framebuffer, which caused
-memory leaks (and memory manager WARNs) when unloading. Also, the
-framebuffer device under /dev still existed after unloading.
+Unregister resources in the correct order on tilcdc_drm_fini, which is
+the reverse order they were registered during tilcdc_drm_init.
 
-Add a call to drm_fbdev_cma_fini when unloading the module to prevent
-both issues.
+This also means unregistering the driver before releasing its resources.
 
 Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
 Cc: <stable@vger.kernel.org> #v3.9+
 ---
- drivers/gpu/drm/tilcdc/tilcdc_drv.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-index b20b694..490aee7 100644
+index 490aee7..006a30e 100644
 --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
 +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-@@ -122,6 +122,7 @@ static int tilcdc_unload(struct drm_device *dev)
- 	struct tilcdc_drm_private *priv = dev->dev_private;
- 	struct tilcdc_module *mod, *cur;
+@@ -629,10 +629,10 @@ static int __init tilcdc_drm_init(void)
+ static void __exit tilcdc_drm_fini(void)
+ {
+ 	DBG("fini");
+-	tilcdc_tfp410_fini();
+-	tilcdc_slave_fini();
+-	tilcdc_panel_fini();
+ 	platform_driver_unregister(&tilcdc_platform_driver);
++	tilcdc_panel_fini();
++	tilcdc_slave_fini();
++	tilcdc_tfp410_fini();
+ }
  
-+	drm_fbdev_cma_fini(priv->fbdev);
- 	drm_kms_helper_poll_fini(dev);
- 	drm_mode_config_cleanup(dev);
- 	drm_vblank_cleanup(dev);
+ late_initcall(tilcdc_drm_init);
 -- 
 2.0.0
