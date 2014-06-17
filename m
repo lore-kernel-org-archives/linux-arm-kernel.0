@@ -1,71 +1,60 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 17 Jun 2014 18:05:29 +0200
-Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
- regulators
-In-Reply-To: <20140617141254.GP5099@sirena.org.uk>
-References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
- <20140616192500.GJ5099@sirena.org.uk> <53A01D54.10506@collabora.co.uk>
- <20140617141254.GP5099@sirena.org.uk>
-Message-ID: <53A06749.1010606@collabora.co.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 17 Jun 2014 12:07:38 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8
+ kernels
+In-Reply-To: <20140617142917.GA31861@n2100.arm.linux.org.uk>
+References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+ <20140617142917.GA31861@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1406171200220.16842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+On Tue, 17 Jun 2014, Russell King - ARM Linux wrote:
 
-On 06/17/2014 04:12 PM, Mark Brown wrote:
-> On Tue, Jun 17, 2014 at 12:49:56PM +0200, Javier Martinez Canillas wrote:
->> On 06/16/2014 09:25 PM, Mark Brown wrote:
+> Given that we're now passing the linker script through GCC for C
+> preprocessing, it seems to me that we don't need to do the sed trick
+> anymore - we can pass TEXTADDR and ZBSSADDR into GCC via definitions
+> instead, so I've committed this patch after this one.  No changes to
+> the vmlinux.lds.* file, it's just a pure rename.  Ack?
 > 
->> >> +	config.dev = &pdev->dev;
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Subject: [PATCH] ARM: Simplify generation of compressed vmlinux.lds file
 > 
->> > Are you sure this shouldn't be the MFD?
+> As we are now using the C preprocessor, we do not need to use sed to
+> edit constants in this file, and then pass the resulting file through
+> the C preprocessor.  Instead, rely solely on the C preprocessor to
+> rewrite TEXT_START and BSS_ADDR.
 > 
->> I just looked at regulator_register() and saw that it does rdev->dev.parent =
->> dev, so yes this has to be the MFD.
->
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/boot/compressed/.gitignore     |  1 -
+>  arch/arm/boot/compressed/Makefile       |  5 +-
+>  arch/arm/boot/compressed/vmlinux.lds.S  | 90 +++++++++++++++++++++++++++++++++
+>  arch/arm/boot/compressed/vmlinux.lds.in | 90 ---------------------------------
 
-I noticed that many drivers set config.dev = &pdev->dev. The original Chrome OS
-max77xxx driver and max77686 are two examples but others drivers do the same:
+Would be easier to review with git diff -M.
 
-$ git grep "config.dev = &pdev->dev" drivers/regulator/ | wc -l
-35
-$ git grep "config.dev = pdev->dev.parent" drivers/regulator/ | wc -l
-11
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> new file mode 100644
+> index 000000000000..60162231c7ea
+[...]
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
+> deleted file mode 100644
+> index 60162231c7ea..000000000000
 
-And also I see that mfd_add_device() calls
-devm_regulator_bulk_register_supply_alias(&pdev->dev,...) so I'm confused now
-about what the correct device should be...
+OK, the SHA1 is the same so both files are identical.
 
-> Do the regulators manage to get their supplies?
-> 
+> --- a/arch/arm/boot/compressed/vmlinux.lds.in
+> +++ /dev/null
+> @@ -1,90 +0,0 @@
+> -/*
+> - *  linux/arch/arm/boot/compressed/vmlinux.lds.in
 
-There are no current support in mainline for the devices that use the regulators
-in this PMIC so I can't tell you if consumers manage to get their supplies
-correctly (e.g: if regulator_dev_lookup succeeds).
+You might want to update this comment though.
 
-But I see in the kernel log that the regulators are registered and configured as
-expected [0] and also the driver in the Chrome OS 3.8 kernel is working for sure
-and sets config.dev to &pdev->dev instead of the MFD.
+Other than that...
 
->> So, for now I thought it made sense to set the operating mode to normal on
->> probe() but I'll change it to read from the hardware if that is better.
-> 
-> Yes, otherwise if the device is configured otherwise then when we change
-> the configuration we may break something.
-> 
->> I guess I should check in the datasheet if a sane default operating mode for
->> LDOs is expected when the chip is reseted or if this is left undefined and also
->> if the bootloader already set this.
-> 
-> You can't do anything based on the particular bootloader you're using in
-> your current system, this has to work in other systems.
-> 
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Yes, that's why I thought it was a good idea to set to a default operational
-mode but I'll change it to read from the hardware instead.
 
-Thanks a lot and best regards,
-Javier
-
-[0]: http://pastebin.com/raw.php?i=8yyMXcGD
+Nicolas
