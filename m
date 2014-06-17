@@ -1,67 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jun 2014 10:09:31 +0100
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
-Message-ID: <20140617090931.GB3705@n2100.arm.linux.org.uk>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 17 Jun 2014 09:11:08 +0000
+Subject: [PATCH RFC v2 3/3] documentation/iommu: Add description of
+ Hisilicon SMMU private binding
+In-Reply-To: <539FF33C.7020007@huawei.com>
+References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
+ <1402549692-5224-4-git-send-email-thunder.leizhen@huawei.com>
+ <20140616163930.GX16758@arm.com> <539FF33C.7020007@huawei.com>
+Message-ID: <926345f63ce542e0b1d39c3e08cd7c51@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 09:22:50AM -0400, Jason Kridner wrote:
-> Adding devicetree and linux-arm-kernel lists based on feedback on IRC...
+
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of leizhen
+> Sent: Tuesday, June 17, 2014 1:20 PM
+> To: Will Deacon
+> Cc: huxinwei at huawei.com; Catalin Marinas; Zefan Li; linux-arm-kernel
+> Subject: Re: [PATCH RFC v2 3/3] documentation/iommu: Add description of
+> Hisilicon SMMU private binding
 > 
-> On Tue, Jun 10, 2014 at 12:46 PM, Jason Kridner <jkridner@gmail.com> wrote:
-> > I'd like to discuss moving our current library of cape devicetree
-> > overlay sources into a single tree, including the boot .dtb files for
-> > BeagleBoard.org boards and moving towards enabling as much of the cape
-> > support into a single boot-time .dtb file with an approach similar to
-> > the cape-universal overlay
-> > (https://github.com/cdsteinkuehler/beaglebone-universal-io), but not
-> > in an overlay.
+> On 2014/6/17 0:39, Will Deacon wrote:
+> > On Thu, Jun 12, 2014 at 06:08:12AM +0100, Zhen Lei wrote:
+> >> This patch adds a description of private properties for the Hisilicon
+> >> System MMU architecture.
+> >>
+> >> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 16
+> >> ++++++++++++++++
+> >>  1 file changed, 16 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >> index f284b99..75b1351 100644
+> >> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >> @@ -15,6 +15,7 @@ conditions.
+> >>                          "arm,smmu-v2"
+> >>                          "arm,mmu-400"
+> >>                          "arm,mmu-500"
+> >> +                        "hisilicon,smmu-v1"
+> >>
+> >>                    depending on the particular implementation and/or
+> the
+> >>                    version of the architecture implemented.
+> >> @@ -54,6 +55,21 @@ conditions.
+> >>                    aliases of secure registers have to be used during
+> >>                    SMMU configuration.
+> >>
+> >> +** Hisilicon SMMU private properties:
+> >> +
+> >> +- smmu-force-memtype : A list of StreamIDs which not translate
+> address but
+> >> +                  translate attributes. The StreamIDs list here can
+> not be
+> >> +                  used for map(translation) mode again.
+> >> +                  StreamID first, then the type list below:
+> >> +                  1, cahceable, WBRAWA, Normal outer and inner write-
+> back
+> >> +                  2, non-cacheable, Normal outer and inner non-
+> cacheable
+> >> +                  3, device, nGnRE
+> >> +                  others, bypass
+> >> +
+> >> +- smmu-bypass-vmid   : Specify which context bank is used for bypass
+> mode.
+> >> +                  If omit, vmid=255 is default. If bypass and map
+> mode can
+> >> +                  share a same S2CR, config vmid=0.
 > >
-> > First of all, I want to note this doesn't change my view on the
-> > importance of mainline support for devicetree overlays. They are still
-> > absolutely critical and highly useful, solving problems that cannot be
-> > solved through boot-time devicetrees. I'm simply looking for an
-> > approach that will complement the availability of overlays and provide
-> > the best user experience.
+> > These don't feel like they belong in the device-tree to me. Is the
+> > list of StreamIDs described in smmu-force-memtype a property of the
+> > hardware configuration, or a software policy to allow you to generate
+> > cacheable traffic for particular masters?
+> >
+> > Will
+> >
+> > .
+> >
+> OK, I will put these description into a sperate file, hisilicon,smmu.txt
+> and mark a reference to arm,smmu.txt
+> 
+> The latter case. Some masters driver want use cacheable(WB) attribute to
+> access memory, but the masters can not bring cacheable attribute. So, can
+> not use bypass(or transaction) mode. In fact, the master driver can use
+> iommu_map to create map and specify IOMMU_CACHE. But maybe the driver
+> does not want to map, if the memory access is very dynamically,
+> frequently map and unmap will decrease performance.
+> 
+> Actually, I think smmu-force-memtype maybe suitable for arm-smmu too. But
+> now, if nobody declear need it, I will just implement it in hisi-smmu.c
+> 
+> A big issue should be discussed now. When a master use bypass mode to
+> access memory, this means it can access all non-secure memory. So, if a
+> master can be operated in user mode, that means a user process can access
+> any kernel memory. In ARM smmu-v2 specification, SMMU_S2CRn.PRIVCFG is
+> used for determine output priviledge attribute. But if use bypass mode
+> and output attribute is Unprivileged, specification have no mention about
+> where to decide memory access is permitted or not. Do you think is a spec
+> design bug or Implemention defined, or find some description anywhere.
+> 
+You should be using VFIO framework for user space I/O. VFIO uses the iommu_api to setup IOMMU for user space access. This allows you to restrict user space I/O access.
 
-Here's the most obvious question in the world on this topic.  Are capes
-hot-pluggable?
-
-Looking at the posts on google+ from David Anders, they're using pin
-headers for connectivity, with no additional protection against hot-
-plugging, and no sequencing of pin connection.  In other words, they are
-not hot-pluggable.
-
-So, why do we need to add a load of infrastructure to the kernel to allow
-the device tree to be modified at run time?  At present, the way the
-entire DT infrastructure works is that it assumes the DT remains static
-and never changes - this applies not only to the core DT code, but also
-to all the drivers which have been converted.
-
-So, you're asking for a feature which is impossible to really make use
-of on the hardware which you want to use it.
-
-Why should kernel developers go to the extent of adding support for DT
-modification at runtime when the platform you want this for doesn't even
-support hotplugging of these capes?
-
-The logical way to deal with this is to have the boot loader merge DT
-fragments together before it calls the kernel, so the kernel sees a single
-DT blob which describes the whole hardware.
-
-A good way that this could have been done is to put an I2C EEPROM on
-each cape, and have that store the DT fragment.  The boot loader could
-have then read that from each cape, and used that information to build
-up the final DT.  Why this hasn't been thought of, considering that the
-kernel has been moving towards DT for years, is quite unbelievable.
-
-I'm quite sure you're going to say that that introduces additional
-hardware expense.  Yes it does, but it also eliminates the problem you
-are now bringing up.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+-Varun
