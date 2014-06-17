@@ -1,194 +1,146 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 17 Jun 2014 10:42:36 -0500
-Subject: [PATCH v2 2/3] ata: Add Qualcomm ARM SoC AHCI SATA host
- controller driver
-In-Reply-To: <14174621.WL9ndpHQ2Q@amdc1032>
-References: <1402676163-31574-1-git-send-email-galak@codeaurora.org>
- <14174621.WL9ndpHQ2Q@amdc1032>
-Message-ID: <419989CC-5106-4AF7-8911-617B51FD7395@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Jun 2014 16:43:10 +0100
+Subject: [PATCH 06/24] Allow for some signal structures to be the same
+ between a 32bit ABI and the 64bit ABI.
+In-Reply-To: <1400914939-9708-7-git-send-email-apinski@cavium.com>
+References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+ <1400914939-9708-7-git-send-email-apinski@cavium.com>
+Message-ID: <20140617154310.GD21752@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, May 24, 2014 at 12:02:01AM -0700, Andrew Pinski wrote:
+> diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+> index ba5be7f..553aca9 100644
+> --- a/include/uapi/asm-generic/siginfo.h
+> +++ b/include/uapi/asm-generic/siginfo.h
+> @@ -4,9 +4,17 @@
+>  #include <linux/compiler.h>
+>  #include <linux/types.h>
+>  
+> +#ifndef __SIGINFO_VOIDPOINTER
+> +#define __SIGINFO_VOIDPOINTER(field) void __user *field
+> +#endif
 
-On Jun 17, 2014, at 7:25 AM, Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> wrote:
+Nitpick: maybe a shorter name like __SIGINFO_VOIDPTR (or VOID_PTR).
 
-> 
-> Hi,
-> 
-> On Friday, June 13, 2014 11:16:03 AM Kumar Gala wrote:
->> Add support for the Qualcomm AHCI SATA controller that exists on several
->> SoC and specifically the IPQ806x family of chips.  The IPQ806x SATA support
->> requires the associated IPQ806x SATA PHY Driver to be enabled as well.
->> 
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> ---
->> v2:
->> * Fixed MODULE_LICENSE to be GPL v2
->> 
->> drivers/ata/Kconfig     | 10 ++++++
->> drivers/ata/Makefile    |  1 +
->> drivers/ata/ahci_qcom.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++++
->> 3 files changed, 97 insertions(+)
->> create mode 100644 drivers/ata/ahci_qcom.c
->> 
->> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
->> index 7671dba..aa88648 100644
->> --- a/drivers/ata/Kconfig
->> +++ b/drivers/ata/Kconfig
->> @@ -132,6 +132,16 @@ config AHCI_MVEBU
->> 
->> 	  If unsure, say N.
->> 
->> +config AHCI_QCOM
->> +	tristate "Qualcomm AHCI SATA support"
->> +	depends on ARCH_QCOM
->> +	help
->> +	  This option enables support for AHCI SATA controller
->> +	  integrated into Qualcomm ARM SoC chipsets. For more
->> +	  information please refer to http://www.qualcomm.com/chipsets.
->> +
->> +	  If unsure, say N.
->> +
->> config AHCI_SUNXI
->> 	tristate "Allwinner sunxi AHCI SATA support"
->> 	depends on ARCH_SUNXI
->> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
->> index 5a02aee..15401e9 100644
->> --- a/drivers/ata/Makefile
->> +++ b/drivers/ata/Makefile
->> @@ -13,6 +13,7 @@ obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
->> obj-$(CONFIG_AHCI_DA850)	+= ahci_da850.o libahci.o libahci_platform.o
->> obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
->> obj-$(CONFIG_AHCI_MVEBU)	+= ahci_mvebu.o libahci.o libahci_platform.o
->> +obj-$(CONFIG_AHCI_QCOM)		+= ahci_qcom.o libahci.o libahci_platform.o
->> obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
->> obj-$(CONFIG_AHCI_ST)		+= ahci_st.o libahci.o libahci_platform.o
->> obj-$(CONFIG_AHCI_XGENE)	+= ahci_xgene.o libahci.o libahci_platform.o
->> diff --git a/drivers/ata/ahci_qcom.c b/drivers/ata/ahci_qcom.c
->> new file mode 100644
->> index 0000000..bfb7a77
->> --- /dev/null
->> +++ b/drivers/ata/ahci_qcom.c
->> @@ -0,0 +1,86 @@
->> +/*
->> + * Qualcomm ARM SoC AHCI SATA platform driver
->> + *
->> + * based on the AHCI SATA platform driver by Jeff Garzik and Anton Vorontsov
->> + *
->> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/pm.h>
->> +#include <linux/device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/libata.h>
->> +#include <linux/ahci_platform.h>
->> +#include "ahci.h"
->> +
->> +static const struct ata_port_info qcom_ahci_port_info = {
->> +	.flags		= AHCI_FLAG_COMMON,
->> +	.pio_mask	= ATA_PIO4,
->> +	.udma_mask	= ATA_UDMA6,
->> +	.port_ops	= &ahci_platform_ops,
->> +};
->> +
->> +static int qcom_ahci_probe(struct platform_device *pdev)
->> +{
->> +	struct ahci_host_priv *hpriv;
->> +	struct clk *rxoob_clk;
->> +	int rc;
->> +
->> +	hpriv = ahci_platform_get_resources(pdev);
->> +	if (IS_ERR(hpriv))
->> +		return PTR_ERR(hpriv);
->> +
->> +	/* Try and set the rxoob clk to 100Mhz */
->> +	rxoob_clk = of_clk_get_by_name(pdev->dev.of_node, "rxoob");
->> +	if (IS_ERR(rxoob_clk))
->> +		return PTR_ERR(rxoob_clk);
->> +
->> +	rc = clk_set_rate(rxoob_clk, 100000000);
-> 
-> Shouldn't the clk_prepare_enable() be called first?
+> +
+> +#ifndef __SIGINFO_BAND
+> +#define __SIGINFO_BAND(field) __ARCH_SI_BAND_T field
+> +#endif
+> +
+>  typedef union sigval {
+>  	int sival_int;
+> -	void __user *sival_ptr;
+> +	__SIGINFO_VOIDPOINTER(sival_ptr);
+>  } sigval_t;
 
-I don?t believe there is any requirement for clk_prepare_enable to be called first.
+I'll discuss this further in a subsequent patch. I assume here you'll
+enforce the alignment via the __SIGINFO_VOIDPOINTER definition. The
+alternative would be another macro for structure attributes.
 
-> 
->> +	if (rc)
->> +		return rc;
-> 
-> of_clk_get_by_name() gets an extra reference on the clock so clk_put()
-> should be called on failure.
+>  /*
+> @@ -86,7 +94,7 @@ typedef struct siginfo {
+>  
+>  		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
+>  		struct {
+> -			void __user *_addr; /* faulting insn/memory ref. */
+> +			__SIGINFO_VOIDPOINTER(_addr); /* faulting insn/memory ref. */
+>  #ifdef __ARCH_SI_TRAPNO
+>  			int _trapno;	/* TRAP # which caused the signal */
+>  #endif
+> @@ -95,13 +103,13 @@ typedef struct siginfo {
+>  
+>  		/* SIGPOLL */
+>  		struct {
+> -			__ARCH_SI_BAND_T _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+> +			__SIGINFO_BAND(_band);	/* POLL_IN, POLL_OUT, POLL_MSG */
+>  			int _fd;
+>  		} _sigpoll;
+>  
+>  		/* SIGSYS */
+>  		struct {
+> -			void __user *_call_addr; /* calling user insn */
+> +			__SIGINFO_VOIDPOINTER(_call_addr); /* calling user insn */
+>  			int _syscall;	/* triggering system call number */
+>  			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
+>  		} _sigsys;
+> @@ -283,6 +291,7 @@ typedef struct sigevent {
+>  		int _pad[SIGEV_PAD_SIZE];
+>  		 int _tid;
+>  
+> +		/* Note these two are handled only in userspace */
+>  		struct {
+>  			void (*_function)(sigval_t);
+>  			void *_attribute;	/* really pthread_attr_t */
 
-will fix.
+SIGEV_PAD_SIZE would be the same with ILP32 because sizeof(sigval_t)
+would not change. So I think that's fine.
 
-> 
->> +	rc = ahci_platform_enable_resources(hpriv);
->> +	if (rc)
->> +		return rc;
->> +
->> +	rc = ahci_platform_init_host(pdev, hpriv, &qcom_ahci_port_info, 0, 0);
->> +	if (rc)
->> +		goto disable_resources;
->> +
->> +	return 0;
->> +disable_resources:
->> +	ahci_platform_disable_resources(hpriv);
->> +	return rc;
->> +}
->> +
->> +static const struct of_device_id qcom_ahci_of_match[] = {
->> +	{ .compatible = "qcom,msm-ahci", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, qcom_ahci_of_match);
->> +
->> +static struct platform_driver qcom_ahci_driver = {
->> +	.probe = qcom_ahci_probe,
->> +	.remove = ata_platform_remove_one,
->> +	.driver = {
->> +		.name = "qcom_ahci_qcom",
->> +		.owner = THIS_MODULE,
->> +		.of_match_table = qcom_ahci_of_match,
->> +	},
-> 
-> This driver lacks PM suspend/resume support.  I assume that
-> the IPQ806x platform also doesn't support suspend/resume yet
-> (if so a comment in the driver code about this would be useful),
-> otherwise the driver should be fixed.
+> diff --git a/include/uapi/asm-generic/signal.h b/include/uapi/asm-generic/signal.h
+> index 9df61f1..c4ce238 100644
+> --- a/include/uapi/asm-generic/signal.h
+> +++ b/include/uapi/asm-generic/signal.h
+> @@ -4,7 +4,9 @@
+>  #include <linux/types.h>
+>  
+>  #define _NSIG		64
+> +#ifndef _NSIG_BPW
+>  #define _NSIG_BPW	__BITS_PER_LONG
+> +#endif
+>  #define _NSIG_WORDS	(_NSIG / _NSIG_BPW)
+>  
+>  #define SIGHUP		 1
+> @@ -83,9 +85,13 @@
+>  #define MINSIGSTKSZ	2048
+>  #define SIGSTKSZ	8192
+>  
+> +#ifndef __SIGSET_INNER_TYPE
+> +#define __SIGSET_INNER_TYPE unsigned long
+> +#endif
+> +
+>  #ifndef __ASSEMBLY__
+>  typedef struct {
+> -	unsigned long sig[_NSIG_WORDS];
+> +	__SIGSET_INNER_TYPE sig[_NSIG_WORDS];
+>  } sigset_t;
 
-Correct, do you want the comment in the commit message or the driver itself?
+Would the default not work? The sigset_t structure ends up with the same
+number of bits between LP64 and ILP32, whether you patch it or not.
 
-> 
->> +};
->> +module_platform_driver(qcom_ahci_driver);
->> +
->> +MODULE_DESCRIPTION("Qualcomm AHCI SATA platform driver");
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_ALIAS("ahci:qcom");
-> 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  
+>  /* not actually used, but required for linux/syscalls.h */
+> @@ -98,11 +104,24 @@ typedef unsigned long old_sigset_t;
+>  #endif
+>  
+>  #ifndef __KERNEL__
+> +
+> +#ifndef __SIGACTION_HANDLER
+> +#define __SIGACTION_HANDLER(field)	__sighandler_t field
+> +#endif
+> +
+> +#ifndef __SIGACTION_FLAGS
+> +#define __SIGACTION_FLAGS(field)	unsigned long field
+> +#endif
+> +
+> +#ifndef __SIGACTION_RESTORER
+> +#define __SIGACTION_RESTORER(field)	__sigrestore_t field
+> +#endif
+> +
+>  struct sigaction {
+> -	__sighandler_t sa_handler;
+> -	unsigned long sa_flags;
+> +	__SIGACTION_HANDLER(sa_handler);
+> +	__SIGACTION_FLAGS(sa_flags);
+>  #ifdef SA_RESTORER
+> -	__sigrestore_t sa_restorer;
+> +	__SIGACTION_RESTORER(sa_restorer);
+>  #endif
+>  	sigset_t sa_mask;		/* mask last for extensibility */
+>  };
+
+Same comment here about the need for attributes (to clarify in
+subsequent patch).
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Catalin
