@@ -1,57 +1,45 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 Jun 2014 14:07:57 +0200
-Subject: [PATCH v4 4/4] ARM: tegra: jetson-tk1: Add XUSB pad controller
-In-Reply-To: <1403006877-19850-1-git-send-email-thierry.reding@gmail.com>
-References: <1403006877-19850-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1403006877-19850-4-git-send-email-thierry.reding@gmail.com>
+Date: Tue, 17 Jun 2014 14:09:00 +0200
+Subject: [PATCH v3 2/4] pinctrl: Add NVIDIA Tegra XUSB pad controller
+ support
+In-Reply-To: <53A02479.8080405@nvidia.com>
+References: <1402930623-28886-1-git-send-email-thierry.reding@gmail.com>
+ <1402930623-28886-2-git-send-email-thierry.reding@gmail.com>
+ <53A02479.8080405@nvidia.com>
+Message-ID: <20140617120859.GC18816@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Tue, Jun 17, 2014 at 02:20:25PM +0300, Mikko Perttunen wrote:
+> This v3 breaks SATA; see below
+> 
+> On 16/06/14 17:57, Thierry Reding wrote:
+> ...
+> >+                       regval = padctl_readl(padctl, lane->offset);
+> >+
+> >+                       if (!value)
+> >+                               regval &= ~lane->iddq;
+> >+                       else
+> >+                               regval |= lane->iddq;
+> >+
+> >+                       padctl_writel(padctl, regval, lane->offset);
+> ...
+> 
+> The bits at at lane->iddq are actually IDDQ_DISABLE bits, so this is the
+> wrong way around: having iddq = <0> in device tree leads to the device
+> turning off. So either the DT property should be renamed or the branches of
+> the if here should be switched around.
 
-Assign lanes to the XUSB pads as used on the Jetson TK1.
+Indeed, s/!value/value/ in the above fixes this. I've sent a v4 with
+that fix and changes to address Stephen's comments regarding the
+#address-cells and #size-cells properties.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/boot/dts/tegra124-jetson-tk1.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-index e31fb61a81d3..38d30877057c 100644
---- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-+++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-@@ -1619,6 +1619,32 @@
- 		nvidia,sys-clock-req-active-high;
- 	};
- 
-+	padctl at 0,7009f000 {
-+		pinctrl-0 = <&padctl_default>;
-+		pinctrl-names = "default";
-+
-+		padctl_default: pinmux {
-+			usb3 {
-+				nvidia,lanes = "pcie-0", "pcie-1";
-+				nvidia,function = "usb3";
-+				nvidia,iddq = <0>;
-+			};
-+
-+			pcie {
-+				nvidia,lanes = "pcie-2", "pcie-3",
-+					       "pcie-4";
-+				nvidia,function = "pcie";
-+				nvidia,iddq = <0>;
-+			};
-+
-+			sata {
-+				nvidia,lanes = "sata-0";
-+				nvidia,function = "sata";
-+				nvidia,iddq = <0>;
-+			};
-+		};
-+	};
-+
- 	/* SD card */
- 	sdhci at 0,700b0400 {
- 		status = "okay";
--- 
-1.9.2
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/cdeff08e/attachment.sig>
