@@ -1,36 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jun 2014 16:22:50 +0100
-Subject: [PATCH 05/24] ARM64:UAPI: Set the correct __BITS_PER_LONG for
- ILP32.
-In-Reply-To: <1400914939-9708-6-git-send-email-apinski@cavium.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <1400914939-9708-6-git-send-email-apinski@cavium.com>
-Message-ID: <20140617152250.GC21752@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Jun 2014 08:25:42 -0700
+Subject: [PATCH] ARM: omap: rework platform selection
+In-Reply-To: <CAL_Jsq+MK+HMqE3k8p06bzzohzS0qu84N12C=VgF9_dMcSGGOQ@mail.gmail.com>
+References: <5701099.0P1SIXsHc1@wuerfel> <20140616141712.GL17845@atomide.com>
+ <CABGGisxdKznLzR+0b0oYrN+aiWM0gNFbzYwfPtAZF=AiapU=eQ@mail.gmail.com>
+ <201406171557.15819.arnd@arndb.de>
+ <CAL_Jsq+MK+HMqE3k8p06bzzohzS0qu84N12C=VgF9_dMcSGGOQ@mail.gmail.com>
+Message-ID: <20140617152542.GU17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 12:02:00AM -0700, Andrew Pinski wrote:
-> diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
-> index fce9c29..5e06c59 100644
-> --- a/arch/arm64/include/uapi/asm/bitsperlong.h
-> +++ b/arch/arm64/include/uapi/asm/bitsperlong.h
-> @@ -16,7 +16,12 @@
->  #ifndef __ASM_BITSPERLONG_H
->  #define __ASM_BITSPERLONG_H
->  
-> -#define __BITS_PER_LONG 64
-> +/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
-> +#ifdef __LP64__
-> +# define __BITS_PER_LONG 64
-> +#else
-> +# define __BITS_PER_LONG 32
-> +#endif
+* Rob Herring <robherring2@gmail.com> [140617 08:05]:
+> On Tue, Jun 17, 2014 at 8:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 16 June 2014, Rob Herring wrote:
+> >> > So far I have not come up with no great ideas on fixing this
+> >> > properly short of requiring all omap .config files to add
+> >> > CONFIG_ARCH_OMAP=y manually. Anybody got good ideas for that?
+> >>
+> >> I've failed to come up with anything...
+> >>
+> >
+> > I have two ideas, but neither is great:
+> >
+> > a) we leave the individual per-soc options in the top-level menu
+> >    and move the sub-options under those. This is a bit or a problem
+> >    for options concerning all of OMAP, but I'm not sure how many of
+> >    those are actually required.
+> >
+> > b) We go back to Rob's version and make CONFIG_ARCH_OMAP the
+> >    user-selectable option, and then find another solution for
+> >    building a kernel with ARCH_OMAP set but none of individual
+> >    options. This will work for anybody who has a full .config
+> >    file, but still break the 'make savedefconfig' generated ones.
+> 
+> After playing with this more yesterday, I think ARCH_OMAP2PLUS instead
+> of ARCH_OMAP is actually a better choice to make the menuconfig item.
+> It still has the same defconfig issues, but doesn't affect OMAP1.
 
-I think it's enough to just define it for the __LP64__ case.
+Well eventually we'll have the same problem for both ARCH_OMAP1
+and ARCH_OMAP2PLUS so from that point of view it might make sense
+to use ARCH_OMAP to start with.
 
->  #include <asm-generic/bitsperlong.h>
+> Doing your trick of a default selection with "select ARCH_OMAP2 if
+> !(ARCH_OMAP3 || ARCH_OMAP4 || ...)" in the menuconfig option can fix
+> the build issues. We'd actually need 2 selects for v6 and v7 only
+> builds.
 
-The asm-generic definition if 32 by default.
+Yes that or the options in mach-omap2/Makefile can be fixed up
+further for building things only when a SoC is selected.
 
--- 
-Catalin
+So really the issue is how to deal with make oldconfig for
+existing .config files. I don't know if there's any solution to
+that short of doing make CONFIG_ARCH_OMAP=y oldconfig.
+
+Regards,
+
+Tony
