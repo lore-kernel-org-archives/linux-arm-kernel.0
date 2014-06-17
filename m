@@ -1,62 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jun 2014 17:03:28 +0200
-Subject: [PATCH 01/14] ARM: mvebu: fix randconfig builds for pmsu driver
-In-Reply-To: <20140617160011.03b1ea15@free-electrons.com>
-References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
- <1402675276-538682-2-git-send-email-arnd@arndb.de>
- <20140617160011.03b1ea15@free-electrons.com>
-Message-ID: <4575903.g78pJlsGh9@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Jun 2014 16:08:05 +0100
+Subject: [PATCH] arm: allow all architectures to change max zone order
+In-Reply-To: <1372689229.4277.4.camel@weser.hi.pengutronix.de>
+References: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
+ <1372689229.4277.4.camel@weser.hi.pengutronix.de>
+Message-ID: <20140617150804.GA2819@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 June 2014 16:00:11 Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
+On Mon, Jul 01, 2013 at 04:33:49PM +0200, Lucas Stach wrote:
+> Am Freitag, den 31.05.2013, 19:02 +0200 schrieb Lucas Stach:
+> > Many multimedia applications on architectures without an
+> > IOMMU need large physically contiguous buffers and so need
+> > to adjust the max zone order of the page allocator.
+> > 
+> > There is zero reason to not allow this adjustment on arches
+> > other than SHMOBILE.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  arch/arm/Kconfig |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 49d993c..6ceace8 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1710,7 +1710,7 @@ config HW_PERF_EVENTS
+> >  source "mm/Kconfig"
+> >  
+> >  config FORCE_MAX_ZONEORDER
+> > -	int "Maximum zone order" if ARCH_SHMOBILE
+> > +	int "Maximum zone order"
+> >  	range 11 64 if ARCH_SHMOBILE
+> >  	default "12" if SOC_AM33XX
+> >  	default "9" if SA1111
 > 
-> On Fri, 13 Jun 2014 18:01:03 +0200, Arnd Bergmann wrote:
-> 
-> > @@ -200,7 +201,9 @@ static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
-> >       /* If we are here, wfi failed. As processors run out of
-> >        * coherency for some time, tlbs might be stale, so flush them
-> >        */
-> > +#ifdef CONFIG_MMU
-> >       local_flush_tlb_all();
-> > +#endif
-> 
-> So noMMU builds are supported in a single image with MMU builds?
+> Ping. This is really straight forward and low risk.
 
-It's not supported yet, but I have a patch to do that, which I used for
-testing this code. I try to have the platform code ready before submitting
-the main patch.
+According to my greps, this is the only copy of this mail that appeared
+on the mailing lists in 2013.  I've really not been happy with the
+blatent assertion in this commit message, so I've been ignoring the
+patch in the patch system because of that... until now.
 
-> Instead of having to #ifdef all around the place, wouldn't it be better
-> for the noMMU headers to provide an empty definition for this function?
+First, let's look at the default, which is 11.  That corresponds with
+2^10 pages, which gives a maximum allocation of 4MB.  While that's
+rather limiting when you want to allocate a 1080p framebuffer (which
+works out at slightly over 8MB), it seems that it's entirely possible
+to allocate such framebuffers without resorting to fiddling with this
+when CMA is being used.
 
-Yes, good point, it should probably be part of the main patch then.
+Indeed, on iMX6 with imx-drm, I have a 1080p frame buffer provided by
+the current CMA memory backed implementation there just fine with the
+default value of this.  So, large physically contiguous buffers can
+definitely be allocated today without problem - with CMA.
 
-> >  static int armada_370_xp_cpu_suspend(unsigned long deepidle)
-> >  {
-> > +     if (!IS_ENABLED(CONFIG_CPU_IDLE))
-> > +             return -ENODEV;
-> > +
-> >       return cpu_suspend(deepidle, do_armada_370_xp_cpu_suspend);
-> >  }
-> 
-> This unfortunately isn't really correct, and the patch I sent in
-> "[PATCH] ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7
-> platforms" on June, 11th already fixes the cpu_suspend()/cpu_resume()
-> problem.
+Not using CMA for large memory buffers would be a mistake.  Memory
+suffers from fragmentation, which makes large memory allocations
+suffer - I see even 16K allocations fail with 3.x kernels.  So what
+hope has a 4MB (or larger) allocation got?
 
-ok.
+CMA avoids that by setting aside a special region which is only used
+for data which can be moved into other memory areas when required,
+thereby reducing the effects of memory fragmentation in this area.
 
-> The issue with your solution is that it assumes this function is only
-> used for cpuidle. That is indeed the case in v3.16, but will be wrong
-> as soon as we add CPU hotplug support, which I have posted on May, 30th
-> in "[PATCH 0/5] CPU hotplug for Marvell Armada XP", and which I hope to
-> see included in v3.17.
+So, far from "zero reason", there's a very real reason: memory
+fragmentation leading to OOM situations.  Rather than fiddling with
+this seemingly easy-to-fiddle-with constant, please use an appropriately
+adjusted CMA for your multimedia applications instead of alloc_pages().
 
-Right. I'll drop this patch from the submission then. You came just in
-time, as I had originally planned to send it out this morning.
+Thanks.
 
-I'll also follow up with a separate patch to address the isb() issue.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
