@@ -1,30 +1,102 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 16 Jun 2014 21:15:52 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_SOC_IMX6SX
-Message-ID: <1402964152-11140-1-git-send-email-festevam@gmail.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Mon, 16 Jun 2014 17:18:42 -0700
+Subject: [PATCH v6 0/4] net: Add APM X-Gene SoC Ethernet driver support
+Message-ID: <1402964326-11147-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Adding APM X-Gene SoC Ethernet driver.
 
-Let mx6sx be built by default.
+v6: Address comments from v5 review
+* added basic ethtool support
+* added ndo_get_stats64 call back
+* deleted priting Rx error messages
+* renamed set_bits to xgene_set_bits to fix kbuild error (make ARCH=powerpc)
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+v5: Address comments from v4 review
+* Documentation: Added phy-handle, reg-names and changed mdio part
+* dtb: Added reg-names supplemental property
+* changed platform_get_resource to platform_get_resource_byname
+* added separate tx/rx set_desc/get_desc functions to do raw_write/raw_read
+* removed set_desc/get_desc table lookup logic
+* added error handling logic based on per packet descriptor bits
+* added software managed Rx packet and error counters
+* added busy wait for register read/writes
+* changed mdio_bus->id to avoid conflict
+* fixed mdio_bus leak in case of mdio_config error
+* changed phy reg hard coded value to MII_BMSR
+* changed phy addr hard coded value to phy_device->addr
+* added paranthesis around macro arguments
+* converted helper macros to inline functions
+* changed use of goto's only to common work such as cleanup
+
+v4: Address comments from v3 review
+* MAINTAINERS: changed status to supported
+* Kconfig: made default to no
+* changed to bool data type wherever applicable
+* cleaned up single bit set and masking code
+* removed statistics counters masking
+* removed unnecessary OOM message printing
+* fixed dma_map_single and dma_unmap_single size parameter
+* changed set bits macro body using new set_bits function
+
+v3: Address comments from v2 review
+* cleaned up set_desc and get_desc functions
+* added dtb mdio node and phy-handle subnode
+* renamed dtb phy-mode to phy-connection-type
+* added of_phy_connect call to connec to PHY
+* added empty line after last local variable declaration
+* removed type casting when not required
+* removed inline keyword from source files
+* removed CONFIG_CPU_BIG_ENDIAN ifdef
+
+v2
+* Completely redesigned ethernet driver
+* Added support to work with big endian kernel
+* Renamed dtb phyid entry to phy_addr
+* Changed dtb local-mac-address entry to byte string format
+* Renamed dtb eth8clk entry to menetclk
+
+v1
+* Initial version
+
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Ravi Patel <rapatel@apm.com>
+Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index a6f182e..e9f481e 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -37,6 +37,7 @@ CONFIG_SOC_IMX50=y
- CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
-+CONFIG_SOC_IMX6SX=y
- CONFIG_SOC_VF610=y
- CONFIG_PCI=y
- CONFIG_PCI_IMX6=y
+Iyappan Subramanian (4):
+  MAINTAINERS: Add entry for APM X-Gene SoC ethernet driver
+  Documentation: dts: Add bindings for APM X-Gene SoC ethernet driver
+  dts: Add bindings for APM X-Gene SoC ethernet driver
+  drivers: net: Add APM X-Gene SoC ethernet driver support.
+
+ .../devicetree/bindings/net/apm-xgene-enet.txt     |  72 ++
+ MAINTAINERS                                        |   8 +
+ arch/arm64/boot/dts/apm-mustang.dts                |   4 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  30 +-
+ drivers/net/ethernet/Kconfig                       |   1 +
+ drivers/net/ethernet/Makefile                      |   1 +
+ drivers/net/ethernet/apm/Kconfig                   |   1 +
+ drivers/net/ethernet/apm/Makefile                  |   5 +
+ drivers/net/ethernet/apm/xgene/Kconfig             |   9 +
+ drivers/net/ethernet/apm/xgene/Makefile            |   6 +
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    | 125 +++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     | 848 +++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     | 394 +++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   | 937 +++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   | 109 +++
+ 15 files changed, 2547 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+ create mode 100644 drivers/net/ethernet/apm/Kconfig
+ create mode 100644 drivers/net/ethernet/apm/Makefile
+ create mode 100644 drivers/net/ethernet/apm/xgene/Kconfig
+ create mode 100644 drivers/net/ethernet/apm/xgene/Makefile
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+
 -- 
-1.8.3.2
+1.9.1
