@@ -1,88 +1,79 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Jun 2014 18:41:47 +0200
-Subject: [PATCH 5/6] ARM: at91/dt: sam9x5 crystals under the clocks node
-In-Reply-To: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1403023308-20533-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 17 Jun 2014 12:45:14 -0400
+Subject: [PATCH] arm64: support reboot and power off via EFI runtime
+Message-ID: <1403023514-1352-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having clocks grouped in a subnode is common practice, so move the crystals and
-the ADC clock under a clocks node for the at91sam9x5 SoC and at91sam9x5 based
-boards.
+Add handlers for arm_pm_resestart and pm_power_off which use EFI
+runtime services ResetSystem call to perform the functions. These
+handlers are only installed if no handler currently exists. This
+allows PSCI to take priority over EFI for these functions.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Mark Salter <msalter@redhat.com>
 ---
- arch/arm/boot/dts/at91sam9x5.dtsi   | 30 ++++++++++++++++--------------
- arch/arm/boot/dts/at91sam9x5cm.dtsi | 12 +++++++-----
- 2 files changed, 23 insertions(+), 19 deletions(-)
+ arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index d6133f497207..ed9251324c90 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -52,22 +52,24 @@
- 		reg = <0x20000000 0x10000000>;
- 	};
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 14db1f6..e8c0476 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -19,11 +19,14 @@
+ #include <linux/of_fdt.h>
+ #include <linux/sched.h>
+ #include <linux/slab.h>
++#include <linux/reboot.h>
++#include <linux/pm.h>
  
--	slow_xtal: slow_xtal {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
-+	clocks {
-+		slow_xtal: slow_xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+		};
+ #include <asm/cacheflush.h>
+ #include <asm/efi.h>
+ #include <asm/tlbflush.h>
+ #include <asm/mmu_context.h>
++#include <asm/system_misc.h>
  
--	main_xtal: main_xtal {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
-+		main_xtal: main_xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+		};
+ struct efi_memory_map memmap;
  
--	adc_op_clk: adc_op_clk{
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <5000000>;
-+		adc_op_clk: adc_op_clk{
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <5000000>;
-+		};
- 	};
- 
- 	ahb {
-diff --git a/arch/arm/boot/dts/at91sam9x5cm.dtsi b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-index 8413e21192eb..229d6c24a9c4 100644
---- a/arch/arm/boot/dts/at91sam9x5cm.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-@@ -23,12 +23,14 @@
- 		};
- 	};
- 
--	slow_xtal {
--		clock-frequency = <32768>;
--	};
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
- 
--	main_xtal {
--		clock-frequency = <12000000>;
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
- 	};
- 
- 	ahb {
+@@ -467,3 +470,40 @@ static int __init arm64_enter_virtual_mode(void)
+ 	return 0;
+ }
+ early_initcall(arm64_enter_virtual_mode);
++
++static void efi_restart(enum reboot_mode reboot_mode, const char *cmd)
++{
++	int efi_mode;
++
++	switch (reboot_mode) {
++	case REBOOT_WARM:
++	case REBOOT_SOFT:
++		efi_mode = EFI_RESET_WARM;
++		break;
++	default:
++		efi_mode = EFI_RESET_COLD;
++		break;
++	}
++	efi.reset_system(efi_mode, 0, 0, NULL);
++}
++
++static void efi_power_off(void)
++{
++	efi.reset_system(EFI_RESET_SHUTDOWN, 0, 0, NULL);
++}
++
++static int __init setup_efi_reset(void)
++{
++	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
++		/*
++		 * If something (psci, etc) hasn't already registered
++		 * a handler, use EFI.
++		 */
++		if (arm_pm_restart == NULL)
++			arm_pm_restart = efi_restart;
++		if (pm_power_off == NULL)
++			pm_power_off = efi_power_off;
++	}
++	return 0;
++}
++pure_initcall(setup_efi_reset);
 -- 
-1.9.1
+1.9.0
