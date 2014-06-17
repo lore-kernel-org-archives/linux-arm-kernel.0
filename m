@@ -1,200 +1,117 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 17 Jun 2014 16:48:01 +0900
-Subject: [PATCH v2 08/08] ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case
-In-Reply-To: <20140617074658.30008.53021.sendpatchset@w520>
-References: <20140617074658.30008.53021.sendpatchset@w520>
-Message-ID: <20140617074801.30008.11376.sendpatchset@w520>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Tue, 17 Jun 2014 09:49:14 +0200
+Subject: [PATCH v2 1/4] dt: bindings: add bindings for Broadcom bcm43xx
+ sdio devices
+In-Reply-To: <539FE0EC.5090003@redhat.com>
+References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
+ <1402941407-8210-2-git-send-email-hdegoede@redhat.com>
+ <CAGVrzcZBzDTfnd6o0ib1FBvBK2VPNitS=rpb4jDkjF=T7Fy=DQ@mail.gmail.com>
+ <539FE0EC.5090003@redhat.com>
+Message-ID: <539FF2FA.8050304@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+On 17-06-14 08:32, Hans de Goede wrote:
+> Hi,
+>
+> On 06/16/2014 10:53 PM, Florian Fainelli wrote:
+>> 2014-06-16 10:56 GMT-07:00 Hans de Goede <hdegoede@redhat.com>:
+>>> From: Arend van Spriel <arend@broadcom.com>
+>>>
+>>> The Broadcom bcm43xx sdio devices are fullmac devices that may be
+>>> integrated in ARM platforms. Currently, the brcmfmac driver for
+>>> these devices support use of platform data. This patch specifies
+>>> the bindings that allow this platform data to be expressed in the
+>>> devicetree.
+>>>
+>>> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
+>>> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
+>>> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
+>>> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
+>>> Signed-off-by: Arend van Spriel <arend@broadcom.com>
+>>> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
+>>>   on how to handle this yet]
+>>> [hdegoede at redhat.com: move from bindings/staging to bindings]
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> ---
+>>>   .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 29 ++++++++++++++++++++++
+>>>   1 file changed, 29 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>>> new file mode 100644
+>>> index 0000000..6a0aaf2
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+>>> @@ -0,0 +1,29 @@
+>>> +Broadcom BCM43xx Fullmac wireless SDIO devices
+>>> +
+>>> +This node provides properties for controlling the Broadcom wireless device. The
+>>> +node is expected to be specified as a child node to the SDIO controller that
+>>> +connects the device to the system.
+>>> +
+>>> +Required properties:
+>>> +
+>>> + - compatible : Should be "brcm,bcm43xx-fmac".
+>>
+>> In general, the use of a wildcard compatible string is discouraged
+>> over the use of a more descriptive compatible string. So you should
+>> find out what is the first chip that is compatible, and use that
+>> compatible string as long as that compatibility remains.
+>
+> Right, Arend, what should we use then ?
 
-Change location of rcar-gen2.h so it can be used as #include "rcar-gen2.h"
-instead of the old style #include <mach/rcar-gen2.h>. Also clean up
-the r8a7790 case to follow the same style as r8a7791.
+In earlier discussions, we ended up with this compatible string. The 
+properties are generic enough to be covered by this 'wildcard' string. 
+However, I am not religious about it so if you feel strongly for an 
+explicit string it could be brcm,bcm4329-fmac, but it does not have my 
+preference.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
+>>> +
+>>> +Optional properties:
+>>> + - brcm,drive-strength : drive strength used for SDIO pins on device.
+>>> +       (default = 6mA).
+>>
+>> It would not hurt if you did specify the unit of the
+>> "brcm,drive-strength" property here. Also, if the default is 6, maybe
+>> the example below should be fixed to reflect that so people do not
+>> think that writing 4 to a register = 6 mA.
+>
+> Ok will fix in the next version.
+>
 
- Changes since V1:
- - rebased to v3.16-rc1
+I agree that explicitly specifying the unit of the property is a good 
+addition. If that is done I don't think it is necessary to change the 
+value used in the example.
 
- arch/arm/mach-shmobile/board-koelsch-reference.c |    2 +-
- arch/arm/mach-shmobile/board-koelsch.c           |    2 +-
- arch/arm/mach-shmobile/board-lager-reference.c   |    2 +-
- arch/arm/mach-shmobile/board-lager.c             |    1 +
- arch/arm/mach-shmobile/clock-r8a7790.c           |    1 +
- arch/arm/mach-shmobile/clock-r8a7791.c           |    2 +-
- arch/arm/mach-shmobile/include/mach/r8a7790.h    |    2 --
- arch/arm/mach-shmobile/include/mach/rcar-gen2.h  |    8 --------
- arch/arm/mach-shmobile/rcar-gen2.h               |    8 ++++++++
- arch/arm/mach-shmobile/setup-r8a7790.c           |    1 +
- arch/arm/mach-shmobile/setup-r8a7791.c           |    2 +-
- arch/arm/mach-shmobile/setup-rcar-gen2.c         |    2 +-
- arch/arm/mach-shmobile/smp-r8a7791.c             |    2 +-
- 13 files changed, 18 insertions(+), 17 deletions(-)
+Regards,
+Arend
 
---- 0006/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ work/arch/arm/mach-shmobile/board-koelsch-reference.c	2014-06-17 16:15:58.000000000 +0900
-@@ -23,12 +23,12 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/rcar-du.h>
--#include <mach/rcar-gen2.h>
- #include <mach/r8a7791.h>
- #include <asm/mach/arch.h>
- #include "clock.h"
- #include "common.h"
- #include "irqs.h"
-+#include "rcar-gen2.h"
- 
- /* DU */
- static struct rcar_du_encoder_data koelsch_du_encoders[] = {
---- 0006/arch/arm/mach-shmobile/board-koelsch.c
-+++ work/arch/arm/mach-shmobile/board-koelsch.c	2014-06-17 16:15:58.000000000 +0900
-@@ -46,11 +46,11 @@
- #include <linux/spi/rspi.h>
- #include <linux/spi/spi.h>
- #include <mach/r8a7791.h>
--#include <mach/rcar-gen2.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include "common.h"
- #include "irqs.h"
-+#include "rcar-gen2.h"
- 
- /* DU */
- static struct rcar_du_encoder_data koelsch_du_encoders[] = {
---- 0006/arch/arm/mach-shmobile/board-lager-reference.c
-+++ work/arch/arm/mach-shmobile/board-lager-reference.c	2014-06-17 16:15:58.000000000 +0900
-@@ -22,12 +22,12 @@
- #include <linux/init.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/rcar-du.h>
--#include <mach/rcar-gen2.h>
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
- #include "clock.h"
- #include "common.h"
- #include "irqs.h"
-+#include "rcar-gen2.h"
- 
- /* DU */
- static struct rcar_du_encoder_data lager_du_encoders[] = {
---- 0006/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2014-06-17 16:15:58.000000000 +0900
-@@ -58,6 +58,7 @@
- #include <sound/simple_card.h>
- #include "common.h"
- #include "irqs.h"
-+#include "rcar-gen2.h"
- 
- /*
-  * SSI-AK4643
---- 0006/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2014-06-17 16:15:58.000000000 +0900
-@@ -25,6 +25,7 @@
- #include <mach/r8a7790.h>
- #include "clock.h"
- #include "common.h"
-+#include "rcar-gen2.h"
- 
- /*
-  *   MD		EXTAL		PLL0	PLL1	PLL3
---- 0006/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7791.c	2014-06-17 16:15:58.000000000 +0900
-@@ -23,9 +23,9 @@
- #include <linux/kernel.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
--#include <mach/rcar-gen2.h>
- #include "clock.h"
- #include "common.h"
-+#include "rcar-gen2.h"
- 
- /*
-  *   MD		EXTAL		PLL0	PLL1	PLL3
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2014-06-17 16:15:58.000000000 +0900
-@@ -1,8 +1,6 @@
- #ifndef __ASM_R8A7790_H__
- #define __ASM_R8A7790_H__
- 
--#include <mach/rcar-gen2.h>
--
- /* DMA slave IDs */
- enum {
- 	RCAR_DMA_SLAVE_INVALID,
---- 0001/arch/arm/mach-shmobile/include/mach/rcar-gen2.h
-+++ /dev/null	2013-06-03 21:41:10.638032047 +0900
-@@ -1,8 +0,0 @@
--#ifndef __ASM_RCAR_GEN2_H__
--#define __ASM_RCAR_GEN2_H__
--
--void rcar_gen2_timer_init(void);
--#define MD(nr) BIT(nr)
--u32 rcar_gen2_read_mode_pins(void);
--
--#endif /* __ASM_RCAR_GEN2_H__ */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/rcar-gen2.h	2014-06-17 16:15:59.000000000 +0900
-@@ -0,0 +1,8 @@
-+#ifndef __ASM_RCAR_GEN2_H__
-+#define __ASM_RCAR_GEN2_H__
-+
-+void rcar_gen2_timer_init(void);
-+#define MD(nr) BIT(nr)
-+u32 rcar_gen2_read_mode_pins(void);
-+
-+#endif /* __ASM_RCAR_GEN2_H__ */
---- 0006/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2014-06-17 16:15:58.000000000 +0900
-@@ -31,6 +31,7 @@
- #include "common.h"
- #include "dma-register.h"
- #include "irqs.h"
-+#include "rcar-gen2.h"
- 
- /* Audio-DMAC */
- #define AUDIO_DMAC_SLAVE(_id, _addr, t, r)			\
---- 0006/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7791.c	2014-06-17 16:15:58.000000000 +0900
-@@ -27,10 +27,10 @@
- #include <linux/serial_sci.h>
- #include <linux/sh_timer.h>
- #include <mach/r8a7791.h>
--#include <mach/rcar-gen2.h>
- #include <asm/mach/arch.h>
- #include "common.h"
- #include "irqs.h"
-+#include "rcar-gen2.h"
- 
- static const struct resource pfc_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xe6060000, 0x250),
---- 0006/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ work/arch/arm/mach-shmobile/setup-rcar-gen2.c	2014-06-17 16:15:58.000000000 +0900
-@@ -22,9 +22,9 @@
- #include <linux/clocksource.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
--#include <mach/rcar-gen2.h>
- #include <asm/mach/arch.h>
- #include "common.h"
-+#include "rcar-gen2.h"
- 
- #define MODEMR 0xe6160060
- 
---- 0006/arch/arm/mach-shmobile/smp-r8a7791.c
-+++ work/arch/arm/mach-shmobile/smp-r8a7791.c	2014-06-17 16:15:58.000000000 +0900
-@@ -19,8 +19,8 @@
- #include <linux/io.h>
- #include <asm/smp_plat.h>
- #include <mach/r8a7791.h>
--#include <mach/rcar-gen2.h>
- #include "common.h"
-+#include "rcar-gen2.h"
- 
- #define RST		0xe6160000
- #define CA15BAR		0x0020
+>>
+>>> + - interrupt-parent : the phandle for the interrupt controller to which the
+>>> +       device interrupts are connected.
+>>> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
+>>> +       When not specified the device will use in-band SDIO interrupts.
+>>> + - interrupt-names : name of the out-of-band interrupt, which must be set
+>>> +       to "host-wake".
+>>> +
+>>> +Example:
+>>> +
+>>> +bcm4335 {
+>>> +       compatible = "brcm,bcm43xx-fmac";
+>>> +       brcm,drive-strength = <4>;
+>>> +       interrupt-parent = <&gpx2>;
+>>> +       interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
+>>> +       interrupt-names = "host-wake";
+>>> +};
+>>> --
+>>> 2.0.0
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+>>
