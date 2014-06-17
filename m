@@ -1,48 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 17 Jun 2014 20:08:56 -0300
-Subject: [PATCH] ARM: mvebu: enable Dove SoC in mvebu_v7_defconfig
-Message-ID: <1403046536-18563-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 18 Jun 2014 01:20:37 +0200
+Subject: [PATCH v2 02/10] iommu/ipmmu-vmsa: Cleanup failures of ARM
+ mapping creation or attachment
+In-Reply-To: <20140616151142.GE18986@8bytes.org>
+References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <9405311.lnqBdrCsyu@avalon> <20140616151142.GE18986@8bytes.org>
+Message-ID: <5430380.Ocpv7sA44O@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit:
+Hi Joerg,
 
-commit d93003e8e4e1fbbc8a06ec561a63f5aa105a4c45
-Author: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date:   Thu Apr 24 22:58:30 2014 +0100
+On Monday 16 June 2014 17:11:42 Joerg Roedel wrote:
+> On Mon, May 26, 2014 at 12:08:37PM +0200, Laurent Pinchart wrote:
+> > > Skipped this one because it didn't apply. The others are applied.
+> > 
+> > Thank you. I'll rebase the patch on top of your tree as soon as you
+> > publish the related branch and resubmit.
+> 
+> What happened to this patch?
 
-    ARM: 8042/1: iwmmxt: allow to build iWMMXt on Marvell PJ4B
+It looks like it slipped through the cracks :-/ Should I submit it as a fix 
+for v3.16 or wait until v3.17 ?
 
-fixed the error that prevented Dove SoC from being built with
-the rest of the mvebu SoCs, we can now add it to the defconfig.
+> And how about the other iommu_domain changes requested. Will you submit them
+> for 3.17?
 
-In addition, this commit enables SERIAL_OF_PLATFORM, which is required
-to have UART on some of the boards.
+I plan to work on that, but I'm not sure whether I'll be able to finish the 
+work for v3.17, as I need to concentrate on a DMA engine driver right now, and 
+will then need to finish the DT bindings for the IPMMU driver (which may 
+result in fixes for some of the iommu_domain-related problems).
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index e11170e..b0bfefa 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -14,6 +14,7 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_375=y
- CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
-+CONFIG_MACH_DOVE=y
- CONFIG_NEON=y
- # CONFIG_CACHE_L2X0 is not set
- # CONFIG_SWP_EMULATE is not set
-@@ -52,6 +53,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_I2C=y
- CONFIG_SPI=y
- CONFIG_SPI_ORION=y
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
