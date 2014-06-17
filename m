@@ -1,43 +1,44 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Tue, 17 Jun 2014 15:08:28 +0100
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617090931.GB3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk>
-Message-ID: <53A04BDC.1060403@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Jun 2014 15:12:54 +0100
+Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
+ regulators
+In-Reply-To: <53A01D54.10506@collabora.co.uk>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
+ <20140616192500.GJ5099@sirena.org.uk>
+ <53A01D54.10506@collabora.co.uk>
+Message-ID: <20140617141254.GP5099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/14 10:09, Russell King - ARM Linux wrote:
+On Tue, Jun 17, 2014 at 12:49:56PM +0200, Javier Martinez Canillas wrote:
+> On 06/16/2014 09:25 PM, Mark Brown wrote:
 
-> Why should kernel developers go to the extent of adding support for DT
-> modification at runtime when the platform you want this for doesn't even
-> support hotplugging of these capes?
+> >> +	config.dev = &pdev->dev;
 
-I'm not convinced you should, but Grant Likely seemed to be much more open 
-to the idea with the latest attempt https://lkml.org/lkml/2014/5/29/586
+> > Are you sure this shouldn't be the MFD?
 
-> A good way that this could have been done is to put an I2C EEPROM on
-> each cape, and have that store the DT fragment.  The boot loader could
-> have then read that from each cape, and used that information to build
-> up the final DT.  Why this hasn't been thought of, considering that the
-> kernel has been moving towards DT for years, is quite unbelievable.
+> I just looked at regulator_register() and saw that it does rdev->dev.parent =
+> dev, so yes this has to be the MFD.
 
-I believe that was Jasons original idea.
+Do the regulators manage to get their supplies?
 
->From a users perspective, a fixed DT fragment in EEPROM quickly ends up 
-being out of step with OS implementation and simply becomes another 
-pain point that needs worked around.
+> So, for now I thought it made sense to set the operating mode to normal on
+> probe() but I'll change it to read from the hardware if that is better.
 
-Anyway, there already exist capes in large scale production that don't 
-have the EEPROM. As well as ones that use the required I2C bus for other 
-purposes, thereby blocking all other capes connected at the same time 
-from using that mechanism even when they are capable of doing so.
-Not forgetting the number of capes that have shipped already without the
-DT fragment in their EEPROMS.
+Yes, otherwise if the device is configured otherwise then when we change
+the configuration we may break something.
 
-Too late to shut the barn door, question is where to go from here.
+> I guess I should check in the datasheet if a sane default operating mode for
+> LDOs is expected when the chip is reseted or if this is left undefined and also
+> if the bootloader already set this.
 
-Consolidation the dt knowledge in one tree is a good idea, regardless of 
-how it's eventually used.
+You can't do anything based on the particular bootloader you're using in
+your current system, this has to work in other systems.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/62f9e425/attachment-0001.sig>
