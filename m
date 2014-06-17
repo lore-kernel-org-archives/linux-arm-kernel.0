@@ -1,68 +1,63 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Tue, 17 Jun 2014 11:19:56 +0530
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-In-Reply-To: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
-References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
+From: Wei.Yang@windriver.com (Yang,Wei)
+Date: Tue, 17 Jun 2014 14:01:13 +0800
+Subject: [PATCH v1] fs2dt: Refine kdump device_tree sort
+In-Reply-To: <1402550168-7826-1-git-send-email-Wei.Yang@windriver.com>
+References: <1402550168-7826-1-git-send-email-Wei.Yang@windriver.com>
+Message-ID: <539FD9A9.1070307@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Simon,
 
-Please review this patch.
+How about this patch?
 
-Regards,
-Rahul Sharma
-
-On 9 June 2014 16:58, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> Display domain is removed due to instability issues. Explaining
-> the problem below:
+Thanks
+Wei
+On 06/12/2014 01:16 PM, Wei.Yang at windriver.com wrote:
+> From: Yang Wei <Wei.Yang@windriver.com>
 >
-> exynos_init_late triggers the pm_genpd_poweroff_unused which
-> powers off the unused power domains. This call hits before
-> the trigger to deferred probes.
+> The commit b02d735bf was to rearrange the device-tree entries, and
+> assumed that these entries are sorted in the ascending order. but
+> acctually when I was validating kexec and kdump, the order of
+> serial node still is changed. We should not only compare the length
+> of directory name, but also compare the directory name, it would
+> ensure that the order of device node is really in ascending order.
 >
-> DRM DP Panel defers the probe due to supply get failure. By the
-> time, deferred probe is scheduled again, Display Power Domain is
-> powered off by pm_genpd_poweroff_unused.
->
-> FIMD and DP drivers are accessing registers during Probe and Bind
-> callbacks. If display domain is enabled/disabled around register
-> accesses, display domain gets unstable and we are getting Power
-> Domain Disable fail notification. Increasing the Timeout also
-> didn't help.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Yang Wei <Wei.Yang@windriver.com>
 > ---
-> based on Kukjin's for-next branch.
+>   kexec/fs2dt.c |   13 ++++++++++---
+>   1 file changed, 10 insertions(+), 3 deletions(-)
 >
->  arch/arm/boot/dts/exynos5420.dtsi |    6 ------
->  1 file changed, 6 deletions(-)
+> 		It is validated on Freescale t4240qds.
 >
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index e385322..3d528cf 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -262,11 +262,6 @@
->                 reg = <0x10044060 0x20>;
->         };
->
-> -       disp_pd: power-domain at 100440C0 {
-> -               compatible = "samsung,exynos4210-pd";
-> -               reg = <0x100440C0 0x20>;
-> -       };
-> -
->         msc_pd: power-domain at 10044120 {
->                 compatible = "samsung,exynos4210-pd";
->                 reg = <0x10044120 0x20>;
-> @@ -518,7 +513,6 @@
->         };
->
->         fimd: fimd at 14400000 {
-> -               samsung,power-domain = <&disp_pd>;
->                 clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
->                 clock-names = "sclk_fimd", "fimd";
->         };
-> --
-> 1.7.9.5
->
+> diff --git a/kexec/fs2dt.c b/kexec/fs2dt.c
+> index 1e5f074..0bffaf5 100644
+> --- a/kexec/fs2dt.c
+> +++ b/kexec/fs2dt.c
+> @@ -479,6 +479,9 @@ static int comparefunc(const struct dirent **dentry1,
+>   {
+>   	char *str1 = (*(struct dirent **)dentry1)->d_name;
+>   	char *str2 = (*(struct dirent **)dentry2)->d_name;
+> +	char* ptr1 = strchr(str1, '@');
+> +	char* ptr2 = strchr(str2, '@');
+> +	int len1, len2;
+>   
+>   	/*
+>   	 * strcmp scans from left to right and fails to idetify for some
+> @@ -486,9 +489,13 @@ static int comparefunc(const struct dirent **dentry1,
+>   	 * Therefore, we get the wrong sorted order like memory at 10000000 and
+>   	 * memory at f000000.
+>   	 */
+> -	if (strchr(str1, '@') && strchr(str2, '@') &&
+> -		(strlen(str1) > strlen(str2)))
+> -		return 1;
+> +	if (ptr1 && ptr2) {
+> +		len1 = ptr1 - str1;
+> +		len2 = ptr2 - str2;
+> +		if (!strncmp(str1, str2, len1 >len2 ? len1: len2) &&
+> +					(strlen(str1) > strlen(str2)))
+> +				return 1;
+> +	}
+>   
+>   	return strcmp(str1, str2);
+>   }
