@@ -1,58 +1,67 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 17 Jun 2014 23:26:22 +0200
-Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
- devices
-In-Reply-To: <5027740.B7iVUcUX2T@wuerfel>
-References: <53A05E2D.6020702@samsung.com>
- <1403019164-12514-1-git-send-email-t.figa@samsung.com>
- <5027740.B7iVUcUX2T@wuerfel>
-Message-ID: <53A0B27E.5010708@gmail.com>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Tue, 17 Jun 2014 14:42:25 -0700
+Subject: [3.13.y.z extended stable] Patch "arm: dts: Fix missing
+ device_type="memory" for ste-ccu8540" has been added to staging queue
+Message-ID: <1403041345-10016-1-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This is a note to let you know that I have just added a patch titled
 
-On 17.06.2014 17:42, Arnd Bergmann wrote:
-> On Tuesday 17 June 2014 17:32:44 Tomasz Figa wrote:
->> Currently a syscon entity can be only registered directly through a
->> platform device that binds to a dedicated driver. However in certain use
->> cases it is desirable to make a device used with another driver a syscon
->> interface provider. For example, certain SoCs (e.g. Exynos) contain
->> system controller blocks which perform various functions such as power
->> domain control, CPU power management, low power mode control, but in
->> addition contain certain IP integration glue, such as various signal
->> masks, coprocessor power control, etc. In such case, there is a need to
->> have a dedicated driver for such system controller but also share
->> registers with other drivers. The latter is where the syscon interface
->> is helpful.
->>
->> This patch decouples syscon object from syscon driver, so that it can be
->> registered from any driver in addition to the original "syscon" platform
->> driver.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> 
-> Hi Tomasz,
-> 
-> This seems like a reasonable way of solving the problem, but I think
-> there is an even better one that we have about in the past: if we
-> promote syscon from a platform driver into a a drivers/base/ helper
-> that is independent of the platform device matching, we can use
-> call syscon_regmap_lookup_* for any device node, whether it's already
-> bound to a driver or not, which do what you need. It would also make
-> it easier to call the syscon code before the platform_device
-> infrastructure gets initialized, which is something a number of
-> people have asked for, e.g. for using regmap to do SMP bringup
-> or for clock registration.
+    arm: dts: Fix missing device_type="memory" for ste-ccu8540
 
-Basically, unless I'm missing your point, this is what my patch does,
-except that I don't move it to drivers/base/ and the registration
-function I added require a pointer to struct device. Indeed, decoupling
-it further from the driver model, by adding of_syscon_register() should
-be useful for early users.
+to the linux-3.13.y-queue branch of the 3.13.y.z extended stable tree 
+which can be found at:
 
-Should I move this to drivers/base/, even though from current location
-it can be used outside the platform driver anyway?
+ http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.13.y-queue
 
-Best regards,
-Tomasz
+This patch is scheduled to be released in version 3.13.11.4.
+
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
+
+For more information about the 3.13.y.z tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+
+Thanks.
+-Kamal
+
+------
+
+>From 9be0219d7a880ddfb91221f7f70a6aa5fdfae125 Mon Sep 17 00:00:00 2001
+From: Leif Lindholm <leif.lindholm@linaro.org>
+Date: Thu, 17 Apr 2014 18:41:59 +0100
+Subject: arm: dts: Fix missing device_type="memory" for ste-ccu8540
+
+commit bfaed5abad998bfc88a66e6e71c7b08dcf82f04e upstream.
+
+The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
+its memory node, relying on an old ppc quirk in order to discover its
+memory. Fix the data so that all parsing code can handle it correctly.
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ arch/arm/boot/dts/ste-ccu8540.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/ste-ccu8540.dts b/arch/arm/boot/dts/ste-ccu8540.dts
+index 7f3baf5..32dd55e 100644
+--- a/arch/arm/boot/dts/ste-ccu8540.dts
++++ b/arch/arm/boot/dts/ste-ccu8540.dts
+@@ -18,6 +18,7 @@
+ 	compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
+
+ 	memory at 0 {
++		device_type = "memory";
+ 		reg = <0x20000000 0x1f000000>, <0xc0000000 0x3f000000>;
+ 	};
+
+--
+1.9.1
