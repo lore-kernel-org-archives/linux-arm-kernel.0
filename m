@@ -1,54 +1,82 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 17 Jun 2014 14:28:44 +0100
-Subject: [PATCH v3] ARM: add get_user() support for 8 byte types
-In-Reply-To: <20140617110908.GH23430@n2100.arm.linux.org.uk>
-References: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
- <20140612155843.GK23430@n2100.arm.linux.org.uk> <53A015B3.2070809@linaro.org>
- <20140617110908.GH23430@n2100.arm.linux.org.uk>
-Message-ID: <53A0428C.10200@linaro.org>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 17 Jun 2014 09:30:43 -0400
+Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
+In-Reply-To: <20140617131522.GD3705@n2100.arm.linux.org.uk>
+References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
+ <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
+ <20140617090931.GB3705@n2100.arm.linux.org.uk>
+ <20140617125831.GI4173@beef>
+ <20140617131522.GD3705@n2100.arm.linux.org.uk>
+Message-ID: <20140617133043.GJ4173@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/14 12:09, Russell King - ARM Linux wrote:
-> On Tue, Jun 17, 2014 at 11:17:23AM +0100, Daniel Thompson wrote:
->> ... at this point there is a narrowing cast followed by an implicit
->> widening. This results in compiler either ignoring r3 altogether or, if
->> spilling to the stack, generating code to set r3 to zero before doing
->> the store.
+On Tue, Jun 17, 2014 at 02:15:22PM +0100, Russell King wrote:
+> On Tue, Jun 17, 2014 at 08:58:31AM -0400, Matt Porter wrote:
+> > On Tue, Jun 17, 2014 at 10:09:31AM +0100, Russell King wrote:
+> > > Why should kernel developers go to the extent of adding support for DT
+> > > modification at runtime when the platform you want this for doesn't even
+> > > support hotplugging of these capes?
+> > 
+> > It's important to note that Jason's use case is not the real one driving
+> > runtime DT modification. You'll have to go back to threads like
+> > https://lkml.org/lkml/2013/2/22/255 over a year ago where this was all
+> > hashed out. The clearest use cases are the FPGA folks that are loading
+> > their bitstream from userspace and due to DT-everywhere also need to
+> > initiate runtime modification of the live DT tree from userspace.
+> > There's a lot of discussion over many threads where this has been
+> > debated.
 > 
-> In actual fact, there's very little difference between the two
-> implementations in terms of generated code.
+> Okay, so it was debated, and the outcome of that debate has been... no
+> change.  That's probably because it is an incredible amount of work to
+> achieve it, and none of the overloaded DT maintainers (who don't have
+> enough time to review new bindings) have any intention of putting their
+> precious resources towards it.
+
+I don't believe this is completely true. Pantelis and Grant are working
+together on getting DT overlays upstream. It's pretty far along. It
+doesn't mean there aren't serious issues with the way the DT core code
+was implement assuming it would be static.
+ 
+> From my rudimentary understanding of the OF code, it seems to mean that
+> the way devices are created from the parsed OF tree structures (the
+> device_node structures) needs to change such that when an OF tree node
+> is removed, its corresponding device is also removed.  This probably
+> needs a struct device pointer in the device_node struct.
 > 
-> The difference between them is what happens on the 64-bit big endian
-> narrowing case, where we use __get_user_4 with your version.  This
-> adds one additional instruction.
-
-Good point.
-
-
-> and 64-bit narrowed to 32-bit:
+> Then there needs to be support to modify the parsed OF tree (not only
+> to add nodes but also to remove nodes) and do the right thing when a
+> node is added and/or removed.
 > 
->         str     lr, [sp, #-4]!
-> -       mov     ip, r0
-> +       mov     r3, r0
->         mov     r0, r1
->  #APP
->  @ 275 "t-getuser.c" 1
-> -       bl      __get_user_8
-> +       bl      __get_user_4
->  @ 0 "" 2
-> -       str     r2, [ip, #0]
-> +       str     r2, [r3, #0]
->         ldr     pc, [sp], #4
+> However, there's harder cases to solve.  There's several instances where
+> device nodes do not correspond with a struct device, and these nodes are
+> parsed by the driver.  Such things as the of_graph stuff, which describes
+> the inter-connectivity of a display subsystem or v4l2 subsystem.  The
+> nodes may be specified, but the target device for one of the links may
+> be disabled at original probe time, but later becomes enabled via
+> modification - this is one of the difficult cases since it needs the
+> driver to cooperate with the change, and there's no existing way to
+> notify it of that change.
+> 
+> As with any kernel change, it needs people to write code.  If no one writes
+> code, no change happens.  Endlessly discussing it on mailing lists does not
+> result in code being written.
 
-The later case avoids allocating r3 for the __get_user_x and should
-reduce register pressure and, potentially, saves a few instructions
-elsewhere (one of my rather large test functions does demonstrate this
-effect).
+Yes, I suppose you missed the active work on the DT overlay series. As I
+mentioned, there's active development on these things. There's also
+active discussion on some of the challenges.
 
-I don't know if we care about that. If we do I'm certainly happy to put
-a patch together than exploits this (whilst avoiding the add in the big
-endian case).
+> However, going back to the original stated platform - none of this
+> complexity is required there.  Once power is applied, the platform
+> hardware configuration is fixed (unless you want to yank a board off
+> and risk destroying the hardware in doing so.)  So, if Jason's interest
+> is in the capes, then the simplest and easiest approach is to have the
+> boot loader deal with it.  If it's about FPGAs and dynamically loading
+> bitstreams into them, then maybe a dynamic device tree is the answer -
+> but /someone/ then has to create patches to achieve that.  If no one is
+> willing to create those patches, then forget the idea of a dynamic
+> device tree, because it won't happen on its own.
 
+https://lkml.org/lkml/2014/5/28/280 
 
-Daniel.
+-Matt
