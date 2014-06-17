@@ -1,51 +1,85 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 17 Jun 2014 12:24:26 -0700
-Subject: [PATCH v6 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
- support.
-In-Reply-To: <CAKh23F=2undAW=nWibOreAM8DJiQKpLx=OboCX=fNZE+OU=AbA@mail.gmail.com>
-References: <1402964326-11147-1-git-send-email-isubramanian@apm.com>
- <1402964326-11147-5-git-send-email-isubramanian@apm.com>
- <20140616.214247.1154200670003936158.davem@davemloft.net>
- <CAKh23F=2undAW=nWibOreAM8DJiQKpLx=OboCX=fNZE+OU=AbA@mail.gmail.com>
-Message-ID: <CAGVrzcYWecdwSmHux6yz1M5Nz849BV-sBe8DmnJWV+T8PetTvw@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 17 Jun 2014 21:36:35 +0200
+Subject: [PATCH] regmap: Add Kconfig option for debugfs register writes
+Message-ID: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-06-17 12:21 GMT-07:00 Iyappan Subramanian <isubramanian@apm.com>:
-> On Mon, Jun 16, 2014 at 9:42 PM, David Miller <davem@davemloft.net> wrote:
->> From: Iyappan Subramanian <isubramanian@apm.com>
->> Date: Mon, 16 Jun 2014 17:18:46 -0700
->>
->>> +static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
->>> +                                      struct net_device *ndev)
->>> +{
->>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
->>> +     struct xgene_enet_desc_ring *tx_ring = pdata->tx_ring;
->>> +     struct xgene_enet_desc_ring *cp_ring = tx_ring->cp_ring;
->>> +     u32 tx_level, cq_level;
->>> +
->>> +     tx_level = xgene_enet_ring_len(tx_ring);
->>> +     cq_level = xgene_enet_ring_len(cp_ring);
->>> +     if (unlikely(tx_level > pdata->tx_qcnt_hi ||
->>> +                  cq_level > pdata->cp_qcnt_hi)) {
->>> +             netif_stop_queue(ndev);
->>> +             return NETDEV_TX_BUSY;
->>> +     }
->>> +
->>> +     if (xgene_enet_setup_tx_desc(tx_ring, skb))
->>> +             return NETDEV_TX_OK;
->>
->> If you return NETDEV_TX_OK, it is your responsibility to deal with the
->> SKB, because you own it.
->>
->> In particular, you have to free the packet.
->
-> skb freeing happens in xgene_enet_tx_completion().
+To enable writing of registers through the regmap debugfs interface, it
+was necessary to alter the regmap-debugfs.c source code. This is not
+really practical.
 
-I have not looked at what xgenet_enet_setup_tx_desc() does, but
-David's point is that, if this function fails and has not yet been
-able to queue the SKB for transmission at the HW, you should make sure
-that you free the SKB. Is xgene_enet_tx_completion() called if the
-driver failed to prepare a descriptor for a SKB?
+As this is a powerful tool for debugging, this patch creates an expert
+kconfig option for this function. This makes it easier to enable
+register writing in the kernel.
+
+This patch also fixes the file mode when the regmap debugfs write code is
+compiled.
+
+Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/base/regmap/Kconfig          | 14 ++++++++++++++
+ drivers/base/regmap/regmap-debugfs.c | 16 ++++++++++------
+ 2 files changed, 24 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/base/regmap/Kconfig b/drivers/base/regmap/Kconfig
+index 4251570610c9..ce86600dbe75 100644
+--- a/drivers/base/regmap/Kconfig
++++ b/drivers/base/regmap/Kconfig
+@@ -23,3 +23,17 @@ config REGMAP_MMIO
+ 
+ config REGMAP_IRQ
+ 	bool
++
++config REGMAP_ALLOW_WRITE_DEBUGFS
++	default n
++	depends on DEBUG_FS
++	depends on EXPERT
++	depends on REGMAP
++	bool "Regmap, allow direct register writes through debugfs"
++	help
++	  This option enables regmap debugfs write support. If this is enabled,
++	  you can directly write registers using the registers file in the
++	  regmap debugfs.
++
++	  This is potentially dangerous. Do not enable this option unless you
++	  know what you are doing.
+diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+index 45d812c0ea77..12906f2bdf00 100644
+--- a/drivers/base/regmap/regmap-debugfs.c
++++ b/drivers/base/regmap/regmap-debugfs.c
+@@ -261,13 +261,10 @@ static ssize_t regmap_map_read_file(struct file *file, char __user *user_buf,
+ 				   count, ppos);
+ }
+ 
+-#undef REGMAP_ALLOW_WRITE_DEBUGFS
+-#ifdef REGMAP_ALLOW_WRITE_DEBUGFS
++#if IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS)
+ /*
+  * This can be dangerous especially when we have clients such as
+- * PMICs, therefore don't provide any real compile time configuration option
+- * for this feature, people who want to use this will need to modify
+- * the source code directly.
++ * PMICs, therefore this function can only be selected in expert kconfig mode.
+  */
+ static ssize_t regmap_map_write_file(struct file *file,
+ 				     const char __user *user_buf,
+@@ -512,7 +509,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+ 			    map, &regmap_reg_ranges_fops);
+ 
+ 	if (map->max_register || regmap_readable(map, 0)) {
+-		debugfs_create_file("registers", 0400, map->debugfs,
++		unsigned int registers_mode;
++
++		if (IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS))
++			registers_mode = 0600;
++		else
++			registers_mode = 0400;
++
++		debugfs_create_file("registers", registers_mode, map->debugfs,
+ 				    map, &regmap_map_fops);
+ 		debugfs_create_file("access", 0400, map->debugfs,
+ 				    map, &regmap_access_fops);
 -- 
-Florian
+2.0.0
