@@ -1,43 +1,62 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 17 Jun 2014 10:03:07 -0500
-Subject: [PATCH] ARM: omap: rework platform selection
-In-Reply-To: <201406171557.15819.arnd@arndb.de>
-References: <5701099.0P1SIXsHc1@wuerfel> <20140616141712.GL17845@atomide.com>
- <CABGGisxdKznLzR+0b0oYrN+aiWM0gNFbzYwfPtAZF=AiapU=eQ@mail.gmail.com>
- <201406171557.15819.arnd@arndb.de>
-Message-ID: <CAL_Jsq+MK+HMqE3k8p06bzzohzS0qu84N12C=VgF9_dMcSGGOQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Jun 2014 17:03:28 +0200
+Subject: [PATCH 01/14] ARM: mvebu: fix randconfig builds for pmsu driver
+In-Reply-To: <20140617160011.03b1ea15@free-electrons.com>
+References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
+ <1402675276-538682-2-git-send-email-arnd@arndb.de>
+ <20140617160011.03b1ea15@free-electrons.com>
+Message-ID: <4575903.g78pJlsGh9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 8:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 16 June 2014, Rob Herring wrote:
->> > So far I have not come up with no great ideas on fixing this
->> > properly short of requiring all omap .config files to add
->> > CONFIG_ARCH_OMAP=y manually. Anybody got good ideas for that?
->>
->> I've failed to come up with anything...
->>
->
-> I have two ideas, but neither is great:
->
-> a) we leave the individual per-soc options in the top-level menu
->    and move the sub-options under those. This is a bit or a problem
->    for options concerning all of OMAP, but I'm not sure how many of
->    those are actually required.
->
-> b) We go back to Rob's version and make CONFIG_ARCH_OMAP the
->    user-selectable option, and then find another solution for
->    building a kernel with ARCH_OMAP set but none of individual
->    options. This will work for anybody who has a full .config
->    file, but still break the 'make savedefconfig' generated ones.
+On Tuesday 17 June 2014 16:00:11 Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
+> 
+> On Fri, 13 Jun 2014 18:01:03 +0200, Arnd Bergmann wrote:
+> 
+> > @@ -200,7 +201,9 @@ static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
+> >       /* If we are here, wfi failed. As processors run out of
+> >        * coherency for some time, tlbs might be stale, so flush them
+> >        */
+> > +#ifdef CONFIG_MMU
+> >       local_flush_tlb_all();
+> > +#endif
+> 
+> So noMMU builds are supported in a single image with MMU builds?
 
-After playing with this more yesterday, I think ARCH_OMAP2PLUS instead
-of ARCH_OMAP is actually a better choice to make the menuconfig item.
-It still has the same defconfig issues, but doesn't affect OMAP1.
+It's not supported yet, but I have a patch to do that, which I used for
+testing this code. I try to have the platform code ready before submitting
+the main patch.
 
-Doing your trick of a default selection with "select ARCH_OMAP2 if
-!(ARCH_OMAP3 || ARCH_OMAP4 || ...)" in the menuconfig option can fix
-the build issues. We'd actually need 2 selects for v6 and v7 only
-builds.
+> Instead of having to #ifdef all around the place, wouldn't it be better
+> for the noMMU headers to provide an empty definition for this function?
 
-Rob
+Yes, good point, it should probably be part of the main patch then.
+
+> >  static int armada_370_xp_cpu_suspend(unsigned long deepidle)
+> >  {
+> > +     if (!IS_ENABLED(CONFIG_CPU_IDLE))
+> > +             return -ENODEV;
+> > +
+> >       return cpu_suspend(deepidle, do_armada_370_xp_cpu_suspend);
+> >  }
+> 
+> This unfortunately isn't really correct, and the patch I sent in
+> "[PATCH] ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7
+> platforms" on June, 11th already fixes the cpu_suspend()/cpu_resume()
+> problem.
+
+ok.
+
+> The issue with your solution is that it assumes this function is only
+> used for cpuidle. That is indeed the case in v3.16, but will be wrong
+> as soon as we add CPU hotplug support, which I have posted on May, 30th
+> in "[PATCH 0/5] CPU hotplug for Marvell Armada XP", and which I hope to
+> see included in v3.17.
+
+Right. I'll drop this patch from the submission then. You came just in
+time, as I had originally planned to send it out this morning.
+
+I'll also follow up with a separate patch to address the isb() issue.
+
+	Arnd
