@@ -1,130 +1,82 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 17 Jun 2014 13:40:16 +0100
-Subject: BUG: Bad page state in process swapper pfn:00000
-In-Reply-To: <539915B3.9050904@codeaurora.org>
-References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>
- <539892BD.8020403@codeaurora.org>
- <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
- <539915B3.9050904@codeaurora.org>
-Message-ID: <CACxGe6vkcfeEf0TNE5gstFs0jCm+GUT7RuJt+D8Ngq2e9Lf_fg@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 17 Jun 2014 14:39:14 +0200
+Subject: [PATCH v3 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
+In-Reply-To: <1402948477-12347-1-git-send-email-galak@codeaurora.org>
+References: <1402948477-12347-1-git-send-email-galak@codeaurora.org>
+Message-ID: <25056551.7rd4nhvM6K@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 12, 2014 at 3:51 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> On 6/11/2014 12:19 PM, Geert Uytterhoeven wrote:
->> Hi Laura,
->>
->> On Wed, Jun 11, 2014 at 7:32 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
->>> On 6/11/2014 4:40 AM, Geert Uytterhoeven wrote:
->>>> With current mainline, I get an early crash on r8a7791/koelsch:
->>>>
->>>> BUG: Bad page state in process swapper  pfn:00000
->>>> page:ee20b000 count:0 mapcount:0 mapping:66756200 index:0x65726566
->>>> page flags: 0x74656b63(locked|error|lru|active|owner_priv_1|arch_1|private|writeback|head|swapcache
->>>> |reclaim|mlocked)
->>>> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
->>>> bad because of flags:
->>>> page flags: 0x212861(locked|lru|active|private|writeback|swapcache|mlocked)
->>>>
->>>> I bisected it to
->>>>
->>>> commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
->>>> Author: Laura Abbott <lauraa@codeaurora.org>
->>>> Date:   Sun Apr 13 22:54:58 2014 +0100
->>>>
->>>>     ARM: 8025/1: Get rid of meminfo
->>
->>>> -Truncating RAM at 40000000-bfffffff to -6f7fffff (vmalloc region overlap).
->>>> +Truncating RAM at 0x00000000-0xc0000000 to -0x6f800000
->>>
->>> I'm guessing this is the issue right there.
->>>
->>>         memory at 40000000 {
->>>                 device_type = "memory";
->>>                 reg = <0 0x40000000 0 0x40000000>;
->>>         };
->>>
->>>         memory at 200000000 {
->>>                 device_type = "memory";
->>>                 reg = <2 0x00000000 0 0x40000000>;
->>>         };
->>>
->>> Those are the memory nodes from r8a7791-koelsch.dts. It looks like the memory
->>> outside 32-bit address range is not being dropped. It was suggested to drop
->>> early_init_dt_add_memory_arch which called arm_add_memory and just use the
->>> generic of code directly but the problem is arm_add_memory does additional
->>> bounds checking. It looks like early_init_dt_add_memory_arch in
->>> drivers/of/fdt.c checks for overflow on u64 types but not for overflow
->>> on phys_addr_t (32 bits) which is what memblock_add actually uses.
->>>
->>> For a quick test, can you try bringing back early_init_dt_add_memory_arch
->>> and see if that fixes the problem:
->>>
->>> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
->>> index e94a157..ea9ce92 100644
->>> --- a/arch/arm/kernel/devtree.c
->>> +++ b/arch/arm/kernel/devtree.c
->>> @@ -27,6 +27,10 @@
->>>  #include <asm/mach/arch.h>
->>>  #include <asm/mach-types.h>
->>>
->>> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
->>> +{
->>> +       arm_add_memory(base, size);
->>> +}
->>>
->>>  #ifdef CONFIG_SMP
->>>  extern struct of_cpu_method __cpu_method_of_table[];
->>
->> Thanks, my board boots again after applying this quick hack.
->>
->
-> Great! Russell are you okay with taking the above as a fix or would you prefer
-> I fixup drivers/of/fdt.c right now?
 
-I would rather see the fix directly in fdt.c.
+Hi,
 
-g.
-
->
->
-> Thanks,
-> Laura
->
-> ----8<----
-> From 14bda557a108ad197e7c5f040f50ca024b45cc17 Mon Sep 17 00:00:00 2001
-> From: Laura Abbott <lauraa@codeaurora.org>
-> Date: Wed, 11 Jun 2014 19:39:29 -0700
-> Subject: [PATCH] arm: Bring back early_init_dt_add_memory_arch
->
-> Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) removed
-> early_init_dt_add_memory_arch in favor of using the common method.
-> The common method does not currently check for memory outside of
-> 32-bit bounds which may lead to memory being incorrectly added to
-> the system. Bring back early_init_dt_add_memory_arch for now until
-> the generic function can be fixed up.
->
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+On Monday, June 16, 2014 02:54:37 PM Kumar Gala wrote:
+> 
+> Add a PHY driver for uses with AHCI based SATA controller driver on the
+> IPQ806x family of SoCs.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 > ---
->  arch/arm/kernel/devtree.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index e94a157..ea9ce92 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -27,6 +27,10 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
->
-> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+> v3:
+> * Added Kconfig HAS_IOMEM dep
+> * re-ordered probe function so phy_provider_register is last
+>  
+> v2:
+> * dropped unused dev pointer in struct qcom_ipq806x_sata_phy
+> * remove unnecessary reg initializaiton
+> * Removed unneeded error message
+> * Added remove function to disable the clock
+> 
+>  drivers/phy/Kconfig                 |   7 ++
+>  drivers/phy/Makefile                |   1 +
+>  drivers/phy/phy-qcom-ipq806x-sata.c | 211 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 219 insertions(+)
+>  create mode 100644 drivers/phy/phy-qcom-ipq806x-sata.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 16a2f06..b7b6bce 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -178,4 +178,11 @@ config PHY_XGENE
+>  	help
+>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+>  
+> +config PHY_QCOM_IPQ806X_SATA
+> +	tristate "Qualcomm IPQ806x SATA SerDes/PHY driver"
+> +	depends on ARCH_QCOM
+> +	depends on HAS_IOMEM
+> +	depends on OF
+> +	select GENERIC_PHY
+> +
+>  endmenu
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index b4f1d57..d950317 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -20,3 +20,4 @@ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
+>  phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+> +obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+> diff --git a/drivers/phy/phy-qcom-ipq806x-sata.c b/drivers/phy/phy-qcom-ipq806x-sata.c
+> new file mode 100644
+> index 0000000..e931aee
+> --- /dev/null
+> +++ b/drivers/phy/phy-qcom-ipq806x-sata.c
+
+[...]
+
+> +static inline void qcom_ipq806x_sata_delay_us(unsigned int delay)
 > +{
-> +       arm_add_memory(base, size);
+> +	/* sleep for max. 50us more to combine processor wakeups */
+> +	usleep_range(delay, delay + 50);
 > +}
->
->  #ifdef CONFIG_SMP
->  extern struct of_cpu_method __cpu_method_of_table[];
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+
+This is used only once in the driver so there is no need to make it
+into static inline helper.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
