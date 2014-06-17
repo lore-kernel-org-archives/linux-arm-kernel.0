@@ -1,36 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 17 Jun 2014 19:15:39 +0200
-Subject: [PATCH 1/2] touchscreen: sun4i-ts: A10 (sun4i) has double the
- temperature precision
-In-Reply-To: <20140616213048.GA422@core.coreip.homeip.net>
-References: <1402943069-19420-1-git-send-email-hdegoede@redhat.com>
- <1402943069-19420-2-git-send-email-hdegoede@redhat.com>
- <20140616213048.GA422@core.coreip.homeip.net>
-Message-ID: <53A077BB.2090203@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Jun 2014 18:23:02 +0100
+Subject: [PATCH 2/2] phy: add hix5hd2-sata-phy driver
+In-Reply-To: <1402991881-27676-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1402991881-27676-1-git-send-email-zhangfei.gao@linaro.org>
+ <1402991881-27676-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140617172302.GI8930@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 17, 2014 at 08:58:01AM +0100, Zhangfei Gao wrote:
+> From: Jiancheng Xue <xuejiancheng@huawei.com>
+> 
+> Add hix5hd2-sata-phy driver on Hisilicon hix5hd2 soc.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>  drivers/phy/Kconfig            |    8 ++
+>  drivers/phy/Makefile           |    1 +
+>  drivers/phy/phy-hix5hd2-sata.c |  192 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 201 insertions(+)
+>  create mode 100644 drivers/phy/phy-hix5hd2-sata.c
+ 
+[...]
 
-On 06/16/2014 11:30 PM, Dmitry Torokhov wrote:
-> Hi Hans,
->
-> On Mon, Jun 16, 2014 at 08:24:28PM +0200, Hans de Goede wrote:
->> Testing has revealed that the temperature in the rtp controller of the A10
->> (sun4i) SoC has a resolution of 50 milli degrees / step, where as the
->> A13 (sun5i) and later models have 100 milli degrees / step.
->>
->> Add a new sun5i-a13-ts compatible to differentiate the newer models and
->> set the resolution based on the compatible string.
->>
->> This fixes the temperature reported on the A10 being twice as high as expected.
->
-> Should we maybe add explicit temperature steps property so that we won;t
-> need to patch again if they decided to change resolution again?
+> +	paddr = of_get_property(phy->dev.of_node, "hisilicon,reg-init", &lenp);
+> +	if (!paddr || lenp < 4 * sizeof(*paddr))
+> +		return 0;
+> +
+> +	lenp /= sizeof(*paddr);
+> +	for (i = 0; i < lenp - 3; i += 4) {
+> +		offset = be32_to_cpup(paddr + i);
+> +		shift = be32_to_cpup(paddr + i + 1);
+> +		width = be32_to_cpup(paddr + i + 2);
+> +		value = be32_to_cpup(paddr + i + 3);
+> +		hix5hd2_sata_phy_write(priv->base + offset,
+> +				       shift, width, value);
+> +	}
 
-Self NAK, further testing has revealed that it is likely not the resolution which is
-different on the A10, but that we need to apply a different offset.
+There is absolutely no reason to use of_get_property and be32 values
+here, we have of_property_count_u32_elems and
+of_property_read_u32_index.
 
-Regards,
+That said I would like to see a compelling reason for why we need to
+have this at all; I'm not a fan of DT becoming a shoddy bytecode format.
 
-Hans
+Cheers,
+Mark.
