@@ -1,61 +1,135 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jun 2014 09:14:41 +0200
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <20140616182645.GD16758@arm.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <8028011.DbLMpGku5b@wuerfel> <20140616182645.GD16758@arm.com>
-Message-ID: <6270066.3Z82jfEmEA@wuerfel>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 17 Jun 2014 09:24:52 +0200
+Subject: [PATCH v6 3/7] mfd: AXP20x: Add bindings documentation
+In-Reply-To: <1400528868-5971-4-git-send-email-carlo@caione.org>
+References: <1400528868-5971-1-git-send-email-carlo@caione.org>
+ <1400528868-5971-4-git-send-email-carlo@caione.org>
+Message-ID: <539FED44.1050904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 June 2014 19:26:45 Will Deacon wrote:
-> On Mon, Jun 16, 2014 at 06:25:35PM +0100, Arnd Bergmann wrote:
-> > On Monday 16 June 2014 17:45:17 Will Deacon wrote:
-> > > On Mon, Jun 16, 2014 at 05:42:10PM +0100, Arnd Bergmann wrote:
-> > > > We have to migrate the driver to the new binding anyway, it may be
-> > > > a bit painful, but there are not really any users yet so there
-> > > > is a chance we can remove the nonstandard code at some point,
-> > > > perhaps in a few years.
-> > > 
-> > > The only way I see this working is if we kill the existing binding and move
-> > > exclusively to the new one. I'm actually ok with that (we have no in-tree
-> > > users), but it needs to happen ASAP in my opinion, otherwise we increase the
-> > > window where the old binding can be adopted.
-> > 
-> > I agree. I was hoping to get the generic binding ready for 3.16, but that
-> > didn't happen. Maybe we can add a small patch to the binding to explain
-> > that it will change in the future.
-> 
-> Perhaps, but saying "don't use this" isn't much better than just ripping out
-> the support altogether. That said, I won't object to a patch adding a big
-> fat warning to the current binding docs if it dissuades people from using
-> what we currently have.
+Hello,
 
-Ok.
+On 19/05/2014 21:47, Carlo Caione wrote:
+> Bindings documentation for the AXP20x driver. In this file also
+> sub-nodes are documented.
 
-> > > Note that the next version of the ARM SMMU (v3) is considerably different to
-> > > the current architecture, so a new driver (using the new bindings) will be
-> > > required.
-> > > 
-> > > This actually opens a wider question: if we don't have an in-tree user for a
-> > > device-tree binding, do we consider that binding to be unused?
-> > 
-> > Not in general, but often. We don't require dts files to be in the kernel,
-> > so we have to apply a bit of common sense. If anyone knows of out-of-tree
-> > users of the binding that are actually working with upstream kernels,
-> > we need a migration path. Anything that also requires out-of-tree kernel
-> > patches however is something we don't have to worry about.
-> 
-> Ok. If Thierry's binding gets in for 3.17, then I'll try to convert the ARM
-> SMMU driver over to it for 3.18 providing we don't grow any in-tree users of
-> the existing binding in the meantime (or 3.17 depending on how early it gets
-> queued).
-> 
-> Sound fair?
+I think this patch has been forgotten (I didn't find it in linus' tree
+or linux-next tree).
 
-Sounds good. Let's make sure we get this done quickly now. I think there
-isn't much controversy left with the binding, though this particular one
-has been tough in the past.
+Best Regards,
 
-	Arnd
+Boris
+
+>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 93 ++++++++++++++++++++++++
+>  1 file changed, 93 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> new file mode 100644
+> index 0000000..cc9e01b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -0,0 +1,93 @@
+> +AXP202/AXP209 device tree bindings
+> +
+> +The axp20x family current members :-
+> +axp202 (X-Powers)
+> +axp209 (X-Powers)
+> +
+> +Required properties:
+> +- compatible: "x-powers,axp202" or "x-powers,axp209"
+> +- reg: The I2C slave address for the AXP chip
+> +- interrupt-parent: The parent interrupt controller
+> +- interrupts: Interrupt specifiers for interrupt sources
+> +- interrupt-controller: axp20x has its own internal IRQs
+> +- #interrupt-cells: Should be set to 1
+> +- acin-supply: The input supply for LDO1
+> +- vin2-supply: The input supply for DCDC2
+> +- vin3-supply: The input supply for DCDC3
+> +- ldo24in-supply: The input supply for LDO2, LDO4
+> +- ldo3in-supply: The input supply for LDO3
+> +- ldo5in-supply: The input supply for LDO5
+> +
+> +- regulators: A node that houses a sub-node for each regulator. The regulators are
+> +	      bound using their name as listed here: dcdc2, dcdc3, ldo1, ldo2,
+> +	      ldo3, ldo4, ldo5.  The bindings details of individual regulator
+> +	      device can be found in:
+> +	      Documentation/devicetree/bindings/regulator/regulator.txt with
+> +	      the exception of x-powers,dcdc-freq
+> +- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
+> +		      (range: 750-1875). Default: 1.5MHz
+> +
+> +Optional properties for DCDCs:
+> +- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
+> +			  Default: AUTO mode
+> +
+> +Example:
+> +
+> +axp209: pmic at 34 {
+> +	compatible = "x-powers,axp209";
+> +	reg = <0x34>;
+> +	interrupt-parent = <&nmi_intc>;
+> +	interrupts = <0 8>;
+> +
+> +	interrupt-controller;
+> +	#interrupt-cells = <1>;
+> +
+> +	acin-supply = <&axp_ipsout_reg>;
+> +	vin2-supply = <&axp_ipsout_reg>;
+> +	vin3-supply = <&axp_ipsout_reg>;
+> +	ldo24in-supply = <&axp_ipsout_reg>;
+> +	ldo3in-supply = <&axp_ipsout_reg>;
+> +	ldo5in-supply = <&axp_ipsout_reg>;
+> +
+> +	regulators {
+> +		x-powers,dcdc-freq = <1500>;
+> +
+> +		axp_vcore_reg: dcdc2 {
+> +			regulator-min-microvolt = <700000>;
+> +			regulator-max-microvolt = <2275000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		axp_ddr_reg: dcdc3 {
+> +			regulator-min-microvolt = <700000>;
+> +			regulator-max-microvolt = <3500000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		axp_rtc_reg: ldo1 {
+> +			regulator-always-on;
+> +		};
+> +
+> +		axp_analog_reg: ldo2 {
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		axp_pll_reg: ldo3 {
+> +			regulator-min-microvolt = <700000>;
+> +			regulator-max-microvolt = <3500000>;
+> +		};
+> +
+> +		axp_hdmi_reg: ldo4 {
+> +			regulator-min-microvolt = <1250000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+> +
+> +		axp_mic_reg: ldo5 {
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+> +	};
+> +};
+> +
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
