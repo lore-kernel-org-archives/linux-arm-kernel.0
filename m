@@ -1,103 +1,177 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 17 Jun 2014 20:17:02 +0200
-Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
- <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <53A0861E.90400@gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Tue, 17 Jun 2014 20:32:09 +0200
+Subject: [PATCH] arm64: fix MAX_ORDER for 64K pagesize
+In-Reply-To: <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
+References: <1402522435-13884-1-git-send-email-msalter@redhat.com>
+ <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
+Message-ID: <xa1t61jzwfo6.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2014 12:26 PM, Antoine T?nart wrote:
-> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
-> 
-> The mode selection can let us think this PHY can be configured to fit
-> other purposes. But there are reasons to think the SATA mode will be
-> the only one usable: the PHY registers are only accessible indirectly
-> through two registers in the SATA range, the PHY seems to be integrated
-> and no information tells us the contrary. For these reasons, make the
-> driver a SATA PHY driver.
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
-[...]
-> diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
-> new file mode 100644
-> index 000000000000..907897a02672
-> --- /dev/null
-> +++ b/drivers/phy/phy-berlin-sata.c
-> @@ -0,0 +1,232 @@
-> +/*
-> + * Marvell Berlin SATA PHY driver
-> + *
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/io.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define HOST_VSA_ADDR		0x0
-> +#define HOST_VSA_DATA		0x4
-> +#define PORT_VSR_ADDR		0x78
-> +#define PORT_VSR_DATA		0x7c
-> +#define PORT_SCR_CTL		0x2c
-> +
-> +#define CONTROL_REGISTER	0x0
-> +#define MBUS_SIZE_CONTROL	0x4
-> +
-> +#define POWER_DOWN_PHY0			BIT(6)
-> +#define POWER_DOWN_PHY1			BIT(14)
-> +#define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
-> +#define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
-> +
-> +#define PHY_BASE		0x200
+On Wed, Jun 11 2014, David Rientjes wrote:
+> On Wed, 11 Jun 2014, Mark Salter wrote:
+>
+>> With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE
+>> I get this at early boot:
+>> 
+>>   SMP: Total of 8 processors activated.
+>>   devtmpfs: initialized
+>>   Unable to handle kernel NULL pointer dereference at virtual address 00000008
+>>   pgd = fffffe0000050000
+>>   [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
+>>   Internal error: Oops: 96000006 [#1] SMP
+>>   Modules linked in:
+>>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
+>>   task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
+>>   PC is at __list_add+0x10/0xd4
+>>   LR is at free_one_page+0x270/0x638
+>>   ...
+>>   Call trace:
+>>   [<fffffe00003ee970>] __list_add+0x10/0xd4
+>>   [<fffffe000019c478>] free_one_page+0x26c/0x638
+>>   [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
+>>   [<fffffe000019d5e8>] __free_pages+0x74/0xbc
+>>   [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
+>>   [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
+>>   [<fffffe0000090418>] do_one_initcall+0xc4/0x154
+>>   [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
+>>   [<fffffe00007520a0>] kernel_init+0xc/0xd4
+>> 
+>> This happens in this configuration because __free_one_page() is called
+>> with an order greater than MAX_ORDER, accesses past zone->free_list[]
+>> and passes a bogus list_head to list_add().
+>> 
+>> arch/arm64/Kconfig has:
+>> 
+>>   config FORCE_MAX_ZONEORDER
+>> 	int
+>> 	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+>> 	default "11"
+>> 
+>> So with THP turned off MAX_ORDER == 11 but init_cma_reserved_pageblock()
+>> passes __free_pages() an order of pageblock_order which is based on
+>> (HPAGE_SHIFT - PAGE_SHIFT) which is 13 for 64K pages. I worked around
+>> this by removing the THP test so FORCE_MAX_ZONEORDER is always 14 for
+>> ARM64_64K_PAGES.
+>> 
+>> Signed-off-by: Mark Salter <msalter@redhat.com>
+>> ---
+>>  arch/arm64/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 7295419..42a334e 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -269,7 +269,7 @@ config XEN
+>>  
+>>  config FORCE_MAX_ZONEORDER
+>>  	int
+>> -	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+>> +	default "14" if ARM64_64K_PAGES
+>>  	default "11"
+>>  
+>>  endmenu
+>
+> Any reason to not switch this to
+>
+> 	ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE && CMA
+>
+> instead?  If pageblock_order > MAX_ORDER because of 
+> HPAGE_SHIFT > PAGE_SHIFT, then cma is always going to be passing a 
+> too-large-order to free_pages_prepare() via this path.
+>
+> Adding Michal and Marek to the cc.
 
-Antoine,
+The correct fix would be to change init_cma_reserved_pageblock such that
+it checks whether pageblock_order > MAX_ORDER and if so frees each max
+order page of the pageblock individually:
 
-I gave your Berlin AHCI patches a try on BG2. I finally got it working
-but BG2 has a different PHY_BASE and need some register fixups.
+--------- >8 ---------------------------------------------------------
+From: Michal Nazarewicz <mina86@mina86.com>
+Subject: [PATCH] mm: cma: fix cases where pageblock is bigger then MAX_ORDER
 
-Please update this patch and the DT bindings to reflect the difference
-of BG2Q with respect to BG2 as below.
+With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE,
+the following is triggered at early boot:
 
-[...]
-> +
-> +static const struct of_device_id phy_berlin_sata_of_match[] = {
-> +	{ .compatible = "marvell,berlin-sata-phy" },
+  SMP: Total of 8 processors activated.
+  devtmpfs: initialized
+  Unable to handle kernel NULL pointer dereference at virtual address 00000008
+  pgd = fffffe0000050000
+  [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
+  Internal error: Oops: 96000006 [#1] SMP
+  Modules linked in:
+  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
+  task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
+  PC is at __list_add+0x10/0xd4
+  LR is at free_one_page+0x270/0x638
+  ...
+  Call trace:
+  [<fffffe00003ee970>] __list_add+0x10/0xd4
+  [<fffffe000019c478>] free_one_page+0x26c/0x638
+  [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
+  [<fffffe000019d5e8>] __free_pages+0x74/0xbc
+  [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
+  [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
+  [<fffffe0000090418>] do_one_initcall+0xc4/0x154
+  [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
+  [<fffffe00007520a0>] kernel_init+0xc/0xd4
 
-s/marvell,berlin-sata-phy/marvell,berlin2-sata-phy/
+This happens in this configuration because __free_one_page() is called
+with an order greater than MAX_ORDER, accesses past zone->free_list[]
+and passes a bogus list_head to list_add().
 
-and add
+arch/arm64/Kconfig has:
 
-marvell,berlin2q-sata-phy
+  config FORCE_MAX_ZONEORDER
+	int
+	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
+	default "11"
 
-That way it can be applied now without proper support for BG2
-and I can send patches later.
+So with THP turned off MAX_ORDER == 11 but init_cma_reserved_pageblock()
+passes __free_pages() an order of pageblock_order which is based on
+(HPAGE_SHIFT - PAGE_SHIFT) which is 13 for 64K pages.
 
-Sebastian
+Fix the problem by changing init_cma_reserved_pageblock() such that it
+splits pageblock into individual MAX_ORDER pages if pageblock is
+bigger than a MAX_ORDER page.
 
-> +	{ },
-> +};
-> +
-> +static struct platform_driver phy_berlin_sata_driver = {
-> +	.probe	= phy_berlin_sata_probe,
-> +	.driver	= {
-> +		.name		= "phy-berlin-sata",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= phy_berlin_sata_of_match,
-> +	},
-> +};
-> +module_platform_driver(phy_berlin_sata_driver);
-> +
-> +MODULE_DESCRIPTION("Marvell Berlin SATA PHY driver");
-> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-> +MODULE_LICENSE("GPL v2");
-> 
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+Reported-by: Mark Salter <msalter@redhat.com>
+---
+ mm/page_alloc.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 5dba293..6e657ce 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -801,7 +801,15 @@ void __init init_cma_reserved_pageblock(struct page *page)
+ 
+ 	set_page_refcounted(page);
+ 	set_pageblock_migratetype(page, MIGRATE_CMA);
+-	__free_pages(page, pageblock_order);
++	if (pageblock_order > MAX_ORDER) {
++		struct page *subpage = p;
++		unsigned count = 1 << (pageblock_order - MAX_ORDER);
++		do {
++			__free_pages(subpage, pageblock_order);
++		} while (subpage += MAX_ORDER_NR_PAGES, --count);
++	} else {
++		__free_pages(page, pageblock_order);
++	}
+ 	adjust_managed_page_count(page, pageblock_nr_pages);
+ }
+ #endif
+--------- >8 ---------------------------------------------------------
+
+Thoughts?  This has not been tested and I think it may cause performance
+degradation in some cases since pageblock_order is not always
+a constant, so the comparison may end up not being stripped away even on
+systems where it's always false.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
