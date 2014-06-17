@@ -1,101 +1,58 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 17 Jun 2014 08:32:12 +0200
-Subject: [PATCH v2 1/4] dt: bindings: add bindings for Broadcom bcm43xx
- sdio devices
-In-Reply-To: <CAGVrzcZBzDTfnd6o0ib1FBvBK2VPNitS=rpb4jDkjF=T7Fy=DQ@mail.gmail.com>
-References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
- <1402941407-8210-2-git-send-email-hdegoede@redhat.com>
- <CAGVrzcZBzDTfnd6o0ib1FBvBK2VPNitS=rpb4jDkjF=T7Fy=DQ@mail.gmail.com>
-Message-ID: <539FE0EC.5090003@redhat.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Tue, 17 Jun 2014 14:32:47 +0800
+Subject: [PATCH RFC v2 0/3] Add support for Hisilicon SMMU architecture
+In-Reply-To: <20140616163742.GW16758@arm.com>
+References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
+ <20140616163742.GW16758@arm.com>
+Message-ID: <539FE10F.2040601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06/16/2014 10:53 PM, Florian Fainelli wrote:
-> 2014-06-16 10:56 GMT-07:00 Hans de Goede <hdegoede@redhat.com>:
->> From: Arend van Spriel <arend@broadcom.com>
+On 2014/6/17 0:37, Will Deacon wrote:
+> Hi there,
+> 
+> On Thu, Jun 12, 2014 at 06:08:09AM +0100, Zhen Lei wrote:
+>> Changes in v2:
 >>
->> The Broadcom bcm43xx sdio devices are fullmac devices that may be
->> integrated in ARM platforms. Currently, the brcmfmac driver for
->> these devices support use of platform data. This patch specifies
->> the bindings that allow this platform data to be expressed in the
->> devicetree.
+>> - Split Hisilicon smmu implementation in a separate file, hisi-smmu.c
+>> - Refactor arm-smmu.c. Some direct call hardware dependent functions replaced
+>>   with hooks. And move common struct and marco definition into arm-smmu.h
+>> - Merge the description of Hisilicon private properties into arm,smmu.txt
 >>
->> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
->> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
->> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
->> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
->> Signed-off-by: Arend van Spriel <arend@broadcom.com>
->> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
->>  on how to handle this yet]
->> [hdegoede at redhat.com: move from bindings/staging to bindings]
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 29 ++++++++++++++++++++++
->>  1 file changed, 29 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->> new file mode 100644
->> index 0000000..6a0aaf2
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->> @@ -0,0 +1,29 @@
->> +Broadcom BCM43xx Fullmac wireless SDIO devices
->> +
->> +This node provides properties for controlling the Broadcom wireless device. The
->> +node is expected to be specified as a child node to the SDIO controller that
->> +connects the device to the system.
->> +
->> +Required properties:
->> +
->> + - compatible : Should be "brcm,bcm43xx-fmac".
+>> Hisilicon smmu is similar to arm-smmu, some code can be direct reused. For
+>> example: map and unmap, device tree configuration, and the software framework.
+>> I found that, abstract about 11 hardware dependent functions in arm-smmu.c is
+>> enough . Abstract means use hooks to replace the direct call of functions. Now,
+>> if need to support Hisilicon SMMU or others arm smmu variants, just selective
+>> rewrite these hooks. And I add a dt_cfg_probe hook, to allow each variant parse
+>> their hardware special configuration. Finally, flush_pgtable is a special case,
+>> hardware independent but maybe referenced. So, total 13 hooks.
 > 
-> In general, the use of a wildcard compatible string is discouraged
-> over the use of a more descriptive compatible string. So you should
-> find out what is the first chip that is compatible, and use that
-> compatible string as long as that compatibility remains.
+> The fundamental question here is whether or not your SMMU implementation is
+> intended to follow the ARM SMMU architecture specification. Given the
+> changes you've highlighted, it clearly doesn't comply, so then it comes down
+> to how much code can actually be re-used between arm-smmu.c and hisi-smmu.c.
+> 
+> With your current split, I can still see plenty of duplication between the
+> two files (e.g. bits in the SCTLR register). I also recognise a fair number
+> of lines in hisi-smmu.c that I wrote originally.
+> 
+> So, is this supposed to be architecturally compliant with the ARM SMMU spec
+> or is it something completely independent?
+> 
+> Will
+> 
+> .
+> 
+Yeah, it doesn't comply, and finally will not comply too. So, I said before:
+"similar to" and "arm-smmu variant" maybe inappropriate. It looks like a new
+smmu hardware implementation.
 
-Right, Arend, what should we use then ?
+I also want to reuse your code as much as possible. But in order to keep your
+code flow clearly, I try to make as few changes as possible. I think make
+differentiate granule too small is not well. Because all of our codes maybe
+changed in future, and may any other smmu variants to reuse arm-smmu.c.
 
->> +
->> +Optional properties:
->> + - brcm,drive-strength : drive strength used for SDIO pins on device.
->> +       (default = 6mA).
-> 
-> It would not hurt if you did specify the unit of the
-> "brcm,drive-strength" property here. Also, if the default is 6, maybe
-> the example below should be fixed to reflect that so people do not
-> think that writing 4 to a register = 6 mA.
-
-Ok will fix in the next version.
-
-> 
->> + - interrupt-parent : the phandle for the interrupt controller to which the
->> +       device interrupts are connected.
->> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
->> +       When not specified the device will use in-band SDIO interrupts.
->> + - interrupt-names : name of the out-of-band interrupt, which must be set
->> +       to "host-wake".
->> +
->> +Example:
->> +
->> +bcm4335 {
->> +       compatible = "brcm,bcm43xx-fmac";
->> +       brcm,drive-strength = <4>;
->> +       interrupt-parent = <&gpx2>;
->> +       interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
->> +       interrupt-names = "host-wake";
->> +};
->> --
->> 2.0.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
+Especially, SCTLR register, the hardware dependent feature. I think not
+suitable for reuse. A bit field differentiation may need a marco to seperate,
+make the code ugly.
