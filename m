@@ -1,263 +1,51 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 16 Jun 2014 18:39:25 -0700
-Subject: [PATCHv3 5/5] arm64: Add atomic pool for non-coherent and CMA
- allocations.
-In-Reply-To: <1402969165-7526-1-git-send-email-lauraa@codeaurora.org>
-References: <1402969165-7526-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1402969165-7526-6-git-send-email-lauraa@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 17 Jun 2014 11:15:22 +0900
+Subject: [GIT PULL] ARM: create a cros-ec-keyboard DT fragment
+In-Reply-To: <1402949751-930-1-git-send-email-swarren@wwwdotorg.org>
+References: <1402949751-930-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <00d301cf89d2$00612e20$01238a60$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neither CMA nor noncoherent allocations support atomic allocations.
-Add a dedicated atomic pool to support this.
+Stephen Warren wrote:
+> 
+> This branch contains a series from Doug Anderson that creates a DT
+> include file to share some common DT content between Tegra and Exynos
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/Kconfig          |   1 +
- arch/arm64/mm/dma-mapping.c | 155 +++++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 139 insertions(+), 17 deletions(-)
+Looks good to me.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7295419..9de71a26 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -14,6 +14,7 @@ config ARM64
- 	select COMMON_CLK
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
- 	select DCACHE_WORD_ACCESS
-+	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_CPU_AUTOPROBE
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 4164c5a..8e8049b 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -27,6 +27,7 @@
- #include <linux/vmalloc.h>
- #include <linux/swiotlb.h>
- #include <linux/amba/bus.h>
-+#include <linux/genalloc.h>
- 
- #include <asm/cacheflush.h>
- 
-@@ -41,6 +42,55 @@ static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
- 	return prot;
- }
- 
-+static struct gen_pool *atomic_pool;
-+
-+#define DEFAULT_DMA_COHERENT_POOL_SIZE  SZ_256K
-+static size_t atomic_pool_size = DEFAULT_DMA_COHERENT_POOL_SIZE;
-+
-+static int __init early_coherent_pool(char *p)
-+{
-+	atomic_pool_size = memparse(p, &p);
-+	return 0;
-+}
-+early_param("coherent_pool", early_coherent_pool);
-+
-+static void *__alloc_from_pool(size_t size, struct page **ret_page)
-+{
-+	unsigned long val;
-+	void *ptr = NULL;
-+
-+	if (!atomic_pool) {
-+		WARN(1, "coherent pool not initialised!\n");
-+		return NULL;
-+	}
-+
-+	val = gen_pool_alloc(atomic_pool, size);
-+	if (val) {
-+		phys_addr_t phys = gen_pool_virt_to_phys(atomic_pool, val);
-+
-+		*ret_page = phys_to_page(phys);
-+		ptr = (void *)val;
-+	}
-+
-+	return ptr;
-+}
-+
-+static bool __in_atomic_pool(void *start, size_t size)
-+{
-+	return addr_in_gen_pool(atomic_pool, (unsigned long)start, size);
-+}
-+
-+static int __free_from_pool(void *start, size_t size)
-+{
-+	if (!__in_atomic_pool(start, size))
-+		return 0;
-+
-+	gen_pool_free(atomic_pool, (unsigned long)start, size);
-+
-+	return 1;
-+}
-+
-+
- static void *__dma_alloc_coherent(struct device *dev, size_t size,
- 				  dma_addr_t *dma_handle, gfp_t flags,
- 				  struct dma_attrs *attrs)
-@@ -53,7 +103,8 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
- 	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
- 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
- 		flags |= GFP_DMA;
--	if (IS_ENABLED(CONFIG_DMA_CMA)) {
-+
-+	if (!(flags & __GFP_WAIT) && IS_ENABLED(CONFIG_DMA_CMA)) {
- 		struct page *page;
- 
- 		size = PAGE_ALIGN(size);
-@@ -73,50 +124,56 @@ static void __dma_free_coherent(struct device *dev, size_t size,
- 				void *vaddr, dma_addr_t dma_handle,
- 				struct dma_attrs *attrs)
- {
-+	bool freed;
-+	phys_addr_t paddr = dma_to_phys(dev, dma_handle);
-+
- 	if (dev == NULL) {
- 		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
- 		return;
- 	}
- 
--	if (IS_ENABLED(CONFIG_DMA_CMA)) {
--		phys_addr_t paddr = dma_to_phys(dev, dma_handle);
- 
--		dma_release_from_contiguous(dev,
-+	freed = dma_release_from_contiguous(dev,
- 					phys_to_page(paddr),
- 					size >> PAGE_SHIFT);
--	} else {
-+	if (!freed)
- 		swiotlb_free_coherent(dev, size, vaddr, dma_handle);
--	}
- }
- 
- static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
- 				     dma_addr_t *dma_handle, gfp_t flags,
- 				     struct dma_attrs *attrs)
- {
--	struct page *page, **map;
-+	struct page *page;
- 	void *ptr, *coherent_ptr;
--	int order, i;
- 
- 	size = PAGE_ALIGN(size);
--	order = get_order(size);
-+
-+	if (!(flags & __GFP_WAIT)) {
-+		struct page *page = NULL;
-+		void *addr = __alloc_from_pool(size, &page);
-+
-+		if (addr)
-+			*dma_handle = phys_to_dma(dev, page_to_phys(page));
-+
-+		return addr;
-+
-+	}
- 
- 	ptr = __dma_alloc_coherent(dev, size, dma_handle, flags, attrs);
- 	if (!ptr)
- 		goto no_mem;
--	map = kmalloc(sizeof(struct page *) << order, flags & ~GFP_DMA);
--	if (!map)
--		goto no_map;
- 
- 	/* remove any dirty cache lines on the kernel alias */
- 	__dma_flush_range(ptr, ptr + size);
- 
-+
- 	/* create a coherent mapping */
- 	page = virt_to_page(ptr);
--	for (i = 0; i < (size >> PAGE_SHIFT); i++)
--		map[i] = page + i;
--	coherent_ptr = vmap(map, size >> PAGE_SHIFT, VM_MAP,
--			    __get_dma_pgprot(attrs, __pgprot(PROT_NORMAL_NC), false));
--	kfree(map);
-+	coherent_ptr = dma_common_contiguous_remap(page, size, VM_USERMAP,
-+				__get_dma_pgprot(attrs,
-+					__pgprot(PROT_NORMAL_NC), false),
-+					NULL);
- 	if (!coherent_ptr)
- 		goto no_map;
- 
-@@ -135,6 +192,8 @@ static void __dma_free_noncoherent(struct device *dev, size_t size,
- {
- 	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
- 
-+	if (__free_from_pool(vaddr, size))
-+		return;
- 	vunmap(vaddr);
- 	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
- }
-@@ -332,6 +391,68 @@ static struct notifier_block amba_bus_nb = {
- 
- extern int swiotlb_late_init_with_default_size(size_t default_size);
- 
-+static int __init atomic_pool_init(void)
-+{
-+	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
-+	unsigned long nr_pages = atomic_pool_size >> PAGE_SHIFT;
-+	struct page *page;
-+	void *addr;
-+
-+
-+	if (dev_get_cma_area(NULL))
-+		page = dma_alloc_from_contiguous(NULL, nr_pages,
-+					get_order(atomic_pool_size));
-+	else
-+		page = alloc_pages(GFP_KERNEL, get_order(atomic_pool_size));
-+
-+
-+	if (page) {
-+		int ret;
-+
-+		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
-+		if (!atomic_pool)
-+			goto free_page;
-+
-+		addr = dma_common_contiguous_remap(page, atomic_pool_size,
-+					VM_USERMAP, prot, atomic_pool_init);
-+
-+		if (!addr)
-+			goto destroy_genpool;
-+
-+		memset(addr, 0, atomic_pool_size);
-+		__dma_flush_range(addr, addr + atomic_pool_size);
-+
-+		ret = gen_pool_add_virt(atomic_pool, (unsigned long)addr,
-+					page_to_phys(page),
-+					atomic_pool_size, -1);
-+		if (ret)
-+			goto remove_mapping;
-+
-+		gen_pool_set_algo(atomic_pool,
-+				  gen_pool_first_fit_order_align,
-+				  (void *)PAGE_SHIFT);
-+
-+		pr_info("DMA: preallocated %zd KiB pool for atomic allocations\n",
-+			atomic_pool_size / 1024);
-+		return 0;
-+	}
-+	goto out;
-+
-+remove_mapping:
-+	dma_common_free_remap(addr, atomic_pool_size, VM_USERMAP);
-+destroy_genpool:
-+	gen_pool_destroy(atomic_pool);
-+	atomic_pool == NULL;
-+free_page:
-+	if (!dma_release_from_contiguous(NULL, page, nr_pages))
-+		__free_pages(page, get_order(atomic_pool_size));
-+out:
-+	pr_err("DMA: failed to allocate %zx KiB pool for atomic coherent allocation\n",
-+		atomic_pool_size / 1024);
-+	return -ENOMEM;
-+}
-+postcore_initcall(atomic_pool_init);
-+
- static int __init swiotlb_late_init(void)
- {
- 	size_t swiotlb_size = min(SZ_64M, MAX_ORDER_NR_PAGES << PAGE_SHIFT);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> boards that use cros-ec. I'll be pulling this into Tegra's for-3.17/dt
+> branch, and I assume the Samsung maintainers will do something similar.
+> 
+Yeah, I'll merge the branch into samsung tree as well.
+
+Thanks for your inform ;-)
+- Kukjin
+
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> 
+>   Linux 3.16-rc1
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.17-dt-cros-
+> ec-kbd
+> 
+> for you to fetch changes up to 1a395e3b4f2e9038964c9eec392ed5300a4b5b83:
+> 
+>   ARM: dts: Use the cros-ec-keyboard fragment in exynos5250-snow
+> 
+> ----------------------------------------------------------------
+> 
+> Doug Anderson (3):
+>       ARM: dts: Create a cros-ec-keyboard fragment
+>       ARM: tegra: Use the cros-ec-keyboard fragment in venice2
+>       ARM: dts: Use the cros-ec-keyboard fragment in exynos5250-snow
+> 
+>  arch/arm/boot/dts/cros-ec-keyboard.dtsi | 105 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250-snow.dts   |  93 +-----------------------
+>  arch/arm/boot/dts/tegra124-venice2.dts  |  96 +-----------------------
+>  3 files changed, 111 insertions(+), 183 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/cros-ec-keyboard.dtsi
