@@ -1,32 +1,175 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 17 Jun 2014 01:07:35 -0300
-Subject: [PATCH] ARM: dts: imx6sx: Use "vddarm" as the regulator name
-Message-ID: <1402978055-19625-1-git-send-email-festevam@gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 17 Jun 2014 09:51:39 +0530
+Subject: [PATCH v3 1/6] i2c: s3c2410: Handle i2c sys_cfg register in i2c
+ driver
+In-Reply-To: <53970994.8010400@samsung.com>
+References: <1399706287-13919-1-git-send-email-y@samsung.com>
+ <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399706419-13976-2-git-send-email-pankaj.dubey@samsung.com>
+ <53970994.8010400@samsung.com>
+Message-ID: <000301cf89e3$a43d3550$ecb79ff0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Tomasz,
 
-The other i.mx6 variants use "vddarm" as the name of the internal regulator
-that powers the core. Use the same convention here for consistency.
+> 
+> Hi Pankaj,
+> 
+> On 10.05.2014 09:20, Pankaj Dubey wrote:
+> > Let's handle i2c interrupt re-configuration in i2c driver. This will
+> > help us in removing some soc specific checks from machine files.
+> > Since only Exynos5250, and Exynos5420 need to do this, added syscon
+> > based phandle to i2c device nodes of respective SoC DT files.
+> > Also handle saving and restoring of SYS_I2C_CFG register during
+> > suspend and resume of i2c driver. This will help in removing soc
+> > specific check from mach-exynos/pm.c.
+> >
+> > CC: Rob Herring <robh+dt@kernel.org>
+> > CC: Randy Dunlap <rdunlap@infradead.org>
+> > CC: Wolfram Sang <wsa@the-dreams.de>
+> > CC: Russell King <linux@arm.linux.org.uk>
+> > CC: devicetree at vger.kernel.org
+> > CC: linux-doc at vger.kernel.org
+> > CC: linux-i2c at vger.kernel.org
+> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > ---
+> >  .../devicetree/bindings/arm/samsung/sysreg.txt     |    1 +
+> >  arch/arm/boot/dts/exynos5.dtsi                     |    5 +++
+> >  arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
+> >  arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
+> 
+> What about Exynos5410 and Exynos5800?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+OK, I will check user manuals of these two SoCs and if required will update.
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index ac3866c..78ccf61 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -581,7 +581,7 @@
- 
- 				reg_arm: regulator-vddcore at 140 {
- 					compatible = "fsl,anatop-regulator";
--					regulator-name = "cpu";
-+					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
- 					regulator-max-microvolt = <1450000>;
- 					regulator-always-on;
--- 
-1.8.3.2
+> 
+> >  drivers/i2c/busses/i2c-s3c2410.c                   |   32
+> ++++++++++++++++++++
+> >  5 files changed, 46 insertions(+)
+> 
+> [snip]
+> 
+> > diff --git a/drivers/i2c/busses/i2c-s3c2410.c
+> > b/drivers/i2c/busses/i2c-s3c2410.c
+> > index ae44910..e707062 100644
+> > --- a/drivers/i2c/busses/i2c-s3c2410.c
+> > +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> > @@ -39,6 +39,8 @@
+> >  #include <linux/of.h>
+> >  #include <linux/of_gpio.h>
+> >  #include <linux/pinctrl/consumer.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/regmap.h>
+> >
+> >  #include <asm/irq.h>
+> >
+> > @@ -91,6 +93,9 @@
+> >  /* Max time to wait for bus to become idle after a xfer (in us) */
+> >  #define S3C2410_IDLE_TIMEOUT	5000
+> >
+> > +/* Exynos5 Sysreg offset */
+> > +#define EXYNOS5_SYS_I2C_CFG	0x0234
+> > +
+> >  /* i2c controller state */
+> >  enum s3c24xx_i2c_state {
+> >  	STATE_IDLE,
+> > @@ -127,6 +132,8 @@ struct s3c24xx_i2c {  #if
+> > defined(CONFIG_ARM_S3C24XX_CPUFREQ)
+> >  	struct notifier_block	freq_transition;
+> >  #endif
+> > +	struct regmap		*sysreg;
+> > +	unsigned int		sys_i2s_cfg;
+> 
+> typo: s/i2s/i2c/
+
+Oops, sorry I will correct this. 
+
+> 
+> >  };
+> >
+> >  static struct platform_device_id s3c24xx_driver_ids[] = { @@ -1075,6
+> > +1082,8 @@ static void  s3c24xx_i2c_parse_dt(struct device_node *np,
+> > struct s3c24xx_i2c *i2c)  {
+> >  	struct s3c2410_platform_i2c *pdata = i2c->pdata;
+> > +	u32 val = 0;
+> > +	int id;
+> >
+> >  	if (!np)
+> >  		return;
+> > @@ -1084,6 +1093,23 @@ s3c24xx_i2c_parse_dt(struct device_node *np,
+struct
+> s3c24xx_i2c *i2c)
+> >  	of_property_read_u32(np, "samsung,i2c-slave-addr",
+&pdata->slave_addr);
+> >  	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+> >  				(u32 *)&pdata->frequency);
+> > +	/*
+> > +	 * Exynos5's legacy i2c controller and new high speed i2c
+> > +	 * controller have muxed interrupt sources. By default the
+> 
+> What do you mean by "by default"? Is it a setting from the bootloader or
+reset value?
+> 
+
+It's a reset value.
+
+> Probably to ensure that the mux is set correctly, same thing should be
+also added to
+> hsi2c driver.
+> 
+> > +	 * interrupts for 4-channel HS-I2C controller are enabled.
+> > +	 * If node for first four channels of legacy i2c controller
+> > +	 * are available then re-configure the interrupts via the
+> > +	 * system register.
+> > +	 */
+> > +	id = of_alias_get_id(np, "i2c");
+> > +	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
+> > +			"samsung,syscon-phandle");
+> > +	if (IS_ERR(i2c->sysreg)) {
+> > +		/* As this is not compulsory do not return error */
+> > +		pr_info("i2c-%d skipping re-configuration of interrutps\n",
+id);
+> > +		return;
+> > +	}
+> > +	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), val);
+> 
+> As Wolfram pointed, val can be replaced with immediate 0 here.
+
+OK, I will take care as per suggestion.
+
+> 
+> >  }
+> >  #else
+> >  static void
+> > @@ -1268,6 +1294,9 @@ static int s3c24xx_i2c_suspend_noirq(struct
+> > device *dev)
+> >
+> >  	i2c->suspended = 1;
+> >
+> > +	if (!IS_ERR(i2c->sysreg))
+> > +		regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c-
+> >sys_i2s_cfg);
+> > +
+> >  	return 0;
+> >  }
+> >
+> > @@ -1276,6 +1305,9 @@ static int s3c24xx_i2c_resume(struct device *dev)
+> >  	struct platform_device *pdev = to_platform_device(dev);
+> >  	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+> >
+> > +	if (!IS_ERR(i2c->sysreg))
+> > +		regmap_write(i2c->sysreg, i2c->sys_i2s_cfg,
+> EXYNOS5_SYS_I2C_CFG);
+> 
+> According to include/linux/regmap.h:
+> 
+> int regmap_write(struct regmap *map, unsigned int reg, unsigned int val);
+> 
+> So in your code reg is swapped with val.
+
+Yes. I will correct this.
+
+> 
+> Best regards,
+> Tomasz
