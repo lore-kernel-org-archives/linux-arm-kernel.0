@@ -1,76 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jun 2014 16:08:05 +0100
-Subject: [PATCH] arm: allow all architectures to change max zone order
-In-Reply-To: <1372689229.4277.4.camel@weser.hi.pengutronix.de>
-References: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
- <1372689229.4277.4.camel@weser.hi.pengutronix.de>
-Message-ID: <20140617150804.GA2819@n2100.arm.linux.org.uk>
+From: nikolay.borisov@arm.com (Nikolay Borisov)
+Date: Tue, 17 Jun 2014 16:12:04 +0100
+Subject: [PATCH RESEND 0/7] Fix backtrace support in THUMB2 mode
+In-Reply-To: <20140617144929.GA1929@n2100.arm.linux.org.uk>
+References: <1400837196-22339-1-git-send-email-Nikolay.Borisov@arm.com>
+ <20140617144929.GA1929@n2100.arm.linux.org.uk>
+Message-ID: <000001cf8a3e$7ff4aa60$7fddff20$@borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 01, 2013 at 04:33:49PM +0200, Lucas Stach wrote:
-> Am Freitag, den 31.05.2013, 19:02 +0200 schrieb Lucas Stach:
-> > Many multimedia applications on architectures without an
-> > IOMMU need large physically contiguous buffers and so need
-> > to adjust the max zone order of the page allocator.
-> > 
-> > There is zero reason to not allow this adjustment on arches
-> > other than SHMOBILE.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> >  arch/arm/Kconfig |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 49d993c..6ceace8 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1710,7 +1710,7 @@ config HW_PERF_EVENTS
-> >  source "mm/Kconfig"
-> >  
-> >  config FORCE_MAX_ZONEORDER
-> > -	int "Maximum zone order" if ARCH_SHMOBILE
-> > +	int "Maximum zone order"
-> >  	range 11 64 if ARCH_SHMOBILE
-> >  	default "12" if SOC_AM33XX
-> >  	default "9" if SA1111
+
+
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: 17 June 2014 15:49
+> To: Nikolay Borisov
+> Cc: linux-arm-kernel at lists.infradead.org; jld at mozilla.com;
+> rric at kernel.org; a.p.zijlstra at chello.nl; Will Deacon;
+> sboyd at codeaurora.org; dave.long at linaro.org; u.kleine-
+> koenig at pengutronix.de; Dave P Martin
+> Subject: Re: [PATCH RESEND 0/7] Fix backtrace support in THUMB2 mode
 > 
-> Ping. This is really straight forward and low risk.
+> On Fri, May 23, 2014 at 10:26:29AM +0100, Nikolay Borisov wrote:
+> > Currently all the code which deals with backtrace support assumes
+> that R11
+> > is the frame-pointer. While this is the case for ARM mode and is
+> explicitly
+> > documented in the AAPCS, this is not the case for THUMB2 mode.
+> >
+> > There is no official document requiring that R11 has to be the frame
+> pointer
+> > and GCC uses R7 as FP and given that R7's usage is so intertwined
+> within GCC's
+> > mechanics it is unlikely to change, so fixing backtrace in THUMB2
+> mode seems
+> > in order.
+> >
+> > This patch series rectifies the problem by first fixing the
+> > thread_save_fp macro to reference the correct register. Furthermore,
+> there
+> > a lot of repetetive sequences of code such as :
+> >
+> > stackframe.fp = pt_regs->ARM_fp
+> > stackframe.lr = pt_regs->ARM_lr
+> >
+> > so introducing a function arm_get_current_stack_frame which both
+> > hides this repetition and also utilizes teh frame_pointer(regs) macro
+> > to reference the correct register depending on the mode.
+> >
+> > Finally, change all the call sites so that they utilize the new
+> routine.
+> 
+> Can someone please explain to me what the point of this churn is?
+> 
 
-According to my greps, this is the only copy of this mail that appeared
-on the mailing lists in 2013.  I've really not been happy with the
-blatent assertion in this commit message, so I've been ignoring the
-patch in the patch system because of that... until now.
+During my testing with a THUMB2 kernel it turned out that no stacktrace
+information was being printed when either magic-sysrq was used
+or the 'ps -Al' command executed. The commit message of patch 8069/1 does
+list those uses cases as failures resulting from this bug. 
 
-First, let's look at the default, which is 11.  That corresponds with
-2^10 pages, which gives a maximum allocation of 4MB.  While that's
-rather limiting when you want to allocate a 1080p framebuffer (which
-works out at slightly over 8MB), it seems that it's entirely possible
-to allocate such framebuffers without resorting to fiddling with this
-when CMA is being used.
+Are you able to obtain backtrace support from a THUMB2 kernel using the 
+the correct magic sysrq to dump the current threads stacktrace?
 
-Indeed, on iMX6 with imx-drm, I have a 1080p frame buffer provided by
-the current CMA memory backed implementation there just fine with the
-default value of this.  So, large physically contiguous buffers can
-definitely be allocated today without problem - with CMA.
+This thread started by Jed David also sheds some light on the issue: 
+https://lkml.org/lkml/2013/7/12/469
 
-Not using CMA for large memory buffers would be a mistake.  Memory
-suffers from fragmentation, which makes large memory allocations
-suffer - I see even 16K allocations fail with 3.x kernels.  So what
-hope has a 4MB (or larger) allocation got?
 
-CMA avoids that by setting aside a special region which is only used
-for data which can be moved into other memory areas when required,
-thereby reducing the effects of memory fragmentation in this area.
-
-So, far from "zero reason", there's a very real reason: memory
-fragmentation leading to OOM situations.  Rather than fiddling with
-this seemingly easy-to-fiddle-with constant, please use an appropriately
-adjusted CMA for your multimedia applications instead of alloc_pages().
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> Let's start with a summary of Thumb2 kernel building.  When a Thumb2
+> kernel is built, we may build it with or without frame pointers.  In
+> either case, we always require the unwinder.
+> 
+> When the unwinder is in use, we don't use the APCS backtracing support.
+> The APCS backtracing support makes use of the frame pointer (and
+> requires
+> frame pointer support.)
+> 
+> The unwinder, although it is given what would be in the frame pointer
+> register, never reads from this value - the only registers that the
+> unwinder cares about is the stack pointer (so it can read values off
+> the stack), LR (in case PC is zero) and the PC value itself (so it can
+> work out where in the unwind information to start the unwinding
+> process.
+> 
+> The unwinder does write to the FP entry, but this is not really used
+> for anything (in much the same way that it writes to the other
+> registers.)  It also prints the FP value in its debugging, though what
+> use that is can be argued.
+> 
+> So, although the code /may/ look weird, and not really conform to what
+> is expected, don't see any bug with the code as it stands today (with
+> the exception of one c_backtrace() call in arm_syscall, which should
+> probably be fixed - but that's an entirely separate problem.)
+> 
+> While we may deem that introducing arm_get_current_stackframe() is
+> a useful cleanup, that's all it should be...
+> 
+> Am I missing something?
+> 
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up...
+> slowly
+> improving, and getting towards what was expected from it.
