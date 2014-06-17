@@ -1,52 +1,45 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 18 Jun 2014 00:11:40 +0200
-Subject: [patch] char: xilinx_hwicap: missing error code if ioremap() fails
-In-Reply-To: <20140617060324.GS5015@mwanda>
-References: <20140611060433.GB7569@mwanda>
- <000001cf8540$017e4f90$047aeeb0$%han@samsung.com>
- <add7f4d9-0279-4c49-b936-d70f34008ab4@BY2FFO11FD044.protection.gbl>
- <20140617060324.GS5015@mwanda>
-Message-ID: <087c9c34-0a21-4116-8179-174551750d4e@BY2FFO11FD026.protection.gbl>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 17 Jun 2014 15:33:05 -0700
+Subject: [PATCH] clkdev: Don't print errors on probe defer
+In-Reply-To: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
+References: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140617223305.32686.15540@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 08:03 AM, Dan Carpenter wrote:
-> On Tue, Jun 17, 2014 at 02:53:27AM +0200, Michal Simek wrote:
->> On 06/11/2014 08:40 AM, Jingoo Han wrote:
->>> On Wednesday, June 11, 2014 3:05 PM, Dan Carpenter wrote:
->>>>
->>>> Return -ENOMEM instead of success if ioremap() fails.
->>>>
->>>> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->>>
->>> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
->>>
->>> Best regards,
->>> Jingoo Han
->>>
->>>> ---
->>>> Static checker stuff, I can't compile this.
->>>>
->>>> diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
->>>> index f6345f9..9b1a5ac 100644
->>>> --- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
->>>> +++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
->>>> @@ -661,6 +661,7 @@ static int hwicap_setup(struct device *dev, int id,
->>>>  	drvdata->base_address = ioremap(drvdata->mem_start, drvdata->mem_size);
->>>>  	if (!drvdata->base_address) {
->>>>  		dev_err(dev, "ioremap() failed\n");
->>>> +		retval = -ENOMEM;
->>
->> Isn't it just better to do?
->>
->> if (IS_ERR(drvdata->base_address)) {
->> 	...
->> 	retval = PTR_ERR(drvdata->base_address);
->> }
+Quoting Stephen Boyd (2014-06-13 16:36:31)
+> This error message can spam the logs if you have lots of probe
+> deferals due to missing clocks. Just silence the error in this
+> case because the driver should try again later.
 > 
-> ioremap() returns NULL on error, not an ERR_PTR.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Ah ok. Fair enough.
+Looks OK to me. Russell?
 
-Thanks,
-Michal
+Regards,
+Mike
+
+> ---
+>  drivers/clk/clkdev.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index f890b901c6bc..da4bda8b7fc7 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -101,8 +101,9 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+>                 if (!IS_ERR(clk))
+>                         break;
+>                 else if (name && index >= 0) {
+> -                       pr_err("ERROR: could not get clock %s:%s(%i)\n",
+> -                               np->full_name, name ? name : "", index);
+> +                       if (PTR_ERR(clk) != -EPROBE_DEFER)
+> +                               pr_err("ERROR: could not get clock %s:%s(%i)\n",
+> +                                       np->full_name, name ? name : "", index);
+>                         return clk;
+>                 }
+>  
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
