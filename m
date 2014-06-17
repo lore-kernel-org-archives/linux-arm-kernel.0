@@ -1,53 +1,73 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 17 Jun 2014 14:50:35 +0100
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617090931.GB3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk>
-Message-ID: <20140617135035.F3FE0C40B3B@trevor.secretlab.ca>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 17 Jun 2014 14:54:16 +0100
+Subject: [PATCH v3] ARM: add get_user() support for 8 byte types
+In-Reply-To: <20140617133620.GJ23430@n2100.arm.linux.org.uk>
+References: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
+ <20140612155843.GK23430@n2100.arm.linux.org.uk> <53A015B3.2070809@linaro.org>
+ <20140617110908.GH23430@n2100.arm.linux.org.uk> <53A0428C.10200@linaro.org>
+ <20140617133620.GJ23430@n2100.arm.linux.org.uk>
+Message-ID: <53A04888.5010204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jun 2014 10:09:31 +0100, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 16, 2014 at 09:22:50AM -0400, Jason Kridner wrote:
-> > Adding devicetree and linux-arm-kernel lists based on feedback on IRC...
-> > 
-> > On Tue, Jun 10, 2014 at 12:46 PM, Jason Kridner <jkridner@gmail.com> wrote:
-> > > I'd like to discuss moving our current library of cape devicetree
-> > > overlay sources into a single tree, including the boot .dtb files for
-> > > BeagleBoard.org boards and moving towards enabling as much of the cape
-> > > support into a single boot-time .dtb file with an approach similar to
-> > > the cape-universal overlay
-> > > (https://github.com/cdsteinkuehler/beaglebone-universal-io), but not
-> > > in an overlay.
-> > >
-> > > First of all, I want to note this doesn't change my view on the
-> > > importance of mainline support for devicetree overlays. They are still
-> > > absolutely critical and highly useful, solving problems that cannot be
-> > > solved through boot-time devicetrees. I'm simply looking for an
-> > > approach that will complement the availability of overlays and provide
-> > > the best user experience.
+On 17/06/14 14:36, Russell King - ARM Linux wrote:
+> On Tue, Jun 17, 2014 at 02:28:44PM +0100, Daniel Thompson wrote:
+>> On 17/06/14 12:09, Russell King - ARM Linux wrote:
+>>> On Tue, Jun 17, 2014 at 11:17:23AM +0100, Daniel Thompson wrote:
+>>>> ... at this point there is a narrowing cast followed by an implicit
+>>>> widening. This results in compiler either ignoring r3 altogether or, if
+>>>> spilling to the stack, generating code to set r3 to zero before doing
+>>>> the store.
+>>>
+>>> In actual fact, there's very little difference between the two
+>>> implementations in terms of generated code.
+>>>
+>>> The difference between them is what happens on the 64-bit big endian
+>>> narrowing case, where we use __get_user_4 with your version.  This
+>>> adds one additional instruction.
+>>
+>> Good point.
+>>
+>>
+>>> and 64-bit narrowed to 32-bit:
+>>>
+>>>         str     lr, [sp, #-4]!
+>>> -       mov     ip, r0
+>>> +       mov     r3, r0
+>>>         mov     r0, r1
+>>>  #APP
+>>>  @ 275 "t-getuser.c" 1
+>>> -       bl      __get_user_8
+>>> +       bl      __get_user_4
+>>>  @ 0 "" 2
+>>> -       str     r2, [ip, #0]
+>>> +       str     r2, [r3, #0]
+>>>         ldr     pc, [sp], #4
+>>
+>> The later case avoids allocating r3 for the __get_user_x and should
+>> reduce register pressure and, potentially, saves a few instructions
+>> elsewhere (one of my rather large test functions does demonstrate this
+>> effect).
+>>
+>> I don't know if we care about that. If we do I'm certainly happy to put
+>> a patch together than exploits this (whilst avoiding the add in the big
+>> endian case).
 > 
-> Here's the most obvious question in the world on this topic.  Are capes
-> hot-pluggable?
-> 
-> Looking at the posts on google+ from David Anders, they're using pin
-> headers for connectivity, with no additional protection against hot-
-> plugging, and no sequencing of pin connection.  In other words, they are
-> not hot-pluggable.
-> 
-> So, why do we need to add a load of infrastructure to the kernel to allow
-> the device tree to be modified at run time?  At present, the way the
-> entire DT infrastructure works is that it assumes the DT remains static
-> and never changes - this applies not only to the core DT code, but also
-> to all the drivers which have been converted.
+> No need - the + case is your version, the - case is my version.  So your
+> version wins on this point. :)
 
-As others have pointed out, capes aren't the only use case. pseries
-already modifies the tree at runtime, and the FPGA users want the
-ability to add/remove additional DT blocks. I've also heard from
-hobbiest/maker developers that by deferring the load of additional data
-to userspace means they don't need to mess with the boot path once it is
-working. The feature is coming.
+:) Thanks, although credit really goes to Rob Clark...
 
-g.
+I think currently:
+
+1. Rob's patch is better for register pressure in the narrowing case
+   (above).
+
+2. Your patch is probably better for big endian due to the add in Rob's
+   version. I say probably because, without proof, I suspect the cost
+   of the add would in most cases outweigh the register pressure
+   benefit.
+
+3. Your patch has better implementation of __get_user_8 (it uses ldrd).
+
+Hence I'm suspect we need to combine elements from both patches.
