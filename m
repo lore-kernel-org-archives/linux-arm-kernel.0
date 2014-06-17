@@ -1,7 +1,7 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 17 Jun 2014 13:32:21 -0500
-Subject: [PATCH v4 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
-Message-ID: <1403029941-20207-1-git-send-email-galak@codeaurora.org>
+Date: Tue, 17 Jun 2014 13:33:28 -0500
+Subject: [PATCH v5 1/2] phy: qcom: Add driver for QCOM IPQ806x SATA PHY
+Message-ID: <1403030008-20675-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,6 +10,9 @@ IPQ806x family of SoCs.
 
 Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
+v5:
+* Fix copy/paste error when killing qcom_ipq806x_sata_delay_us
+
 v4:
 * removed qcom_ipq806x_sata_delay_us as it was only used one
 
@@ -56,7 +59,7 @@ index b4f1d57..d950317 100644
 +obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
 diff --git a/drivers/phy/phy-qcom-ipq806x-sata.c b/drivers/phy/phy-qcom-ipq806x-sata.c
 new file mode 100644
-index 0000000..f58ab6d
+index 0000000..0716aa2
 --- /dev/null
 +++ b/drivers/phy/phy-qcom-ipq806x-sata.c
 @@ -0,0 +1,206 @@
@@ -161,7 +164,7 @@ index 0000000..f58ab6d
 +	writel_relaxed(reg, phy->mmio + SATA_PHY_P0_PARAM4);
 +	mb();
 +	/* sleep for max. 50us more to combine processor wakeups */
-+	usleep_range(delay, delay + 50);
++	usleep_range(20, 20 + 50);
 +
 +	/* Clearing PHY_RESET to 0 */
 +	reg = readl_relaxed(phy->mmio + SATA_PHY_P0_PARAM4);
