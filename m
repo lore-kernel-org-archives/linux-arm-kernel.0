@@ -1,89 +1,105 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Jun 2014 22:52:53 +0800
-Subject: [PATCH v2 16/20] mfd: sun6i-prcm: Add support for Allwinner A23 PRCM
+Date: Tue, 17 Jun 2014 22:52:46 +0800
+Subject: [PATCH v2 09/20] clk: sunxi: Add sun6i MBUS clock support
 In-Reply-To: <1403016777-15121-1-git-send-email-wens@csie.org>
 References: <1403016777-15121-1-git-send-email-wens@csie.org>
-Message-ID: <1403016777-15121-17-git-send-email-wens@csie.org>
+Message-ID: <1403016777-15121-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
-The differences are the AR100 clock can no longer be modified,
-the APB0 clock has different divisors, and some clock gates are
-gone.
-
-This patch adds a compatible with a modified subdevice list for
-the A23.
-
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
- drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+ drivers/clk/sunxi/clk-sunxi.c                     | 44 +++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-index 1f5a31f..03c5a55 100644
---- a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-+++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
-@@ -4,7 +4,7 @@ PRCM is an MFD device exposing several Power Management related devices
- (like clks and reset controllers).
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index b9ec668..7b2ba41 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -40,6 +40,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
++	"allwinner,sun6i-a31-mbus-clk" - for the MBUS clocks on A31 / A23
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+ 	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+ 	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index eca3c6e..a086b5b 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -307,6 +307,37 @@ static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
  
- Required properties:
-- - compatible: "allwinner,sun6i-a31-prcm"
-+ - compatible: "allwinner,sun6i-a31-prcm" or "allwinner,sun8i-a23-prcm"
-  - reg: The PRCM registers range
  
- The prcm node may contain several subdevices definitions:
-diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-index 718fc4d..7a198d3 100644
---- a/drivers/mfd/sun6i-prcm.c
-+++ b/drivers/mfd/sun6i-prcm.c
-@@ -76,16 +76,46 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
- 	},
+ /**
++ * sun6i_a31_get_mbus_factors() - calculates m factor for MBUS clocks
++ * MBUS rate is calculated as follows
++ * rate = parent_rate / (m + 1);
++ */
++
++static void sun6i_a31_get_mbus_factors(u32 *freq, u32 parent_rate,
++				       u8 *n, u8 *k, u8 *m, u8 *p)
++{
++	u8 div;
++
++	/* These clocks can only divide, so we will never be able to achieve
++	 * frequencies higher than the parent frequency */
++	if (*freq > parent_rate)
++		*freq = parent_rate;
++
++	div = DIV_ROUND_UP(parent_rate, *freq);
++
++	if (div > 8)
++		div = 8;
++
++	*freq = parent_rate / div;
++
++	/* we were called to round the frequency, we can now return */
++	if (n == NULL)
++		return;
++
++	*m = div - 1;
++}
++
++
++/**
+  * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
+  * CLK_OUT rate is calculated as follows
+  * rate = (parent_rate >> p) / (m + 1);
+@@ -447,6 +478,11 @@ static struct clk_factors_config sun4i_mod0_config = {
+ 	.pwidth = 2,
  };
  
-+static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
-+	{
-+		.name = "sun6i-a31-apb0-clk",
-+		.of_compatible = "allwinner,sun8i-a23-apb0-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_clk_res),
-+		.resources = sun6i_a31_apb0_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-gates-clk",
-+		.of_compatible = "allwinner,sun8i-a23-apb0-gates-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
-+		.resources = sun6i_a31_apb0_gates_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-clock-reset",
-+		.of_compatible = "allwinner,sun6i-a31-clock-reset",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
-+		.resources = sun6i_a31_apb0_rstc_res,
-+	},
++static struct clk_factors_config sun6i_a31_mbus_config = {
++	.mshift = 0,
++	.mwidth = 3,
 +};
 +
- static const struct prcm_data sun6i_a31_prcm_data = {
- 	.nsubdevs = ARRAY_SIZE(sun6i_a31_prcm_subdevs),
- 	.subdevs = sun6i_a31_prcm_subdevs,
+ /* user manual says "n" but it's really "p" */
+ static struct clk_factors_config sun7i_a20_out_config = {
+ 	.mshift = 8,
+@@ -505,6 +541,13 @@ static const struct factors_data sun4i_mod0_data __initconst = {
+ 	.getter = sun4i_get_mod0_factors,
  };
  
-+static const struct prcm_data sun8i_a23_prcm_data = {
-+	.nsubdevs = ARRAY_SIZE(sun8i_a23_prcm_subdevs),
-+	.subdevs = sun8i_a23_prcm_subdevs,
++static const struct factors_data sun6i_a31_mbus_data __initconst = {
++	.enable = 31,
++	.mux = 24,
++	.table = &sun6i_a31_mbus_config,
++	.getter = sun6i_a31_get_mbus_factors,
 +};
 +
- static const struct of_device_id sun6i_prcm_dt_ids[] = {
- 	{
- 		.compatible = "allwinner,sun6i-a31-prcm",
- 		.data = &sun6i_a31_prcm_data,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-a23-prcm",
-+		.data = &sun8i_a23_prcm_data,
-+	},
- 	{ /* sentinel */ },
+ static const struct factors_data sun7i_a20_out_data __initconst = {
+ 	.enable = 31,
+ 	.mux = 24,
+@@ -1099,6 +1142,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
+ 	{.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
+ 	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
+ 	{.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
++	{.compatible = "allwinner,sun6i-a31-mbus-clk", .data = &sun6i_a31_mbus_data,},
+ 	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
+ 	{}
  };
- 
 -- 
 2.0.0
