@@ -1,71 +1,130 @@
-From: trini@ti.com (Tom Rini)
-Date: Tue, 17 Jun 2014 08:37:09 -0400
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617090931.GB3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk>
-Message-ID: <53A03675.1000908@ti.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 17 Jun 2014 13:40:16 +0100
+Subject: BUG: Bad page state in process swapper pfn:00000
+In-Reply-To: <539915B3.9050904@codeaurora.org>
+References: <CAMuHMdXm_fT251+ih2cJS+hRkrPuVQi3sMFgYe+k18xe-Wd21w@mail.gmail.com>
+ <539892BD.8020403@codeaurora.org>
+ <CAMuHMdWZutiNpGScEhCzgM70jJ+MZ1ErmKtNfMHVLDB+d5Lyzw@mail.gmail.com>
+ <539915B3.9050904@codeaurora.org>
+Message-ID: <CACxGe6vkcfeEf0TNE5gstFs0jCm+GUT7RuJt+D8Ngq2e9Lf_fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 05:09 AM, Russell King - ARM Linux wrote:
-> On Mon, Jun 16, 2014 at 09:22:50AM -0400, Jason Kridner wrote:
->> Adding devicetree and linux-arm-kernel lists based on feedback on IRC...
+On Thu, Jun 12, 2014 at 3:51 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> On 6/11/2014 12:19 PM, Geert Uytterhoeven wrote:
+>> Hi Laura,
 >>
->> On Tue, Jun 10, 2014 at 12:46 PM, Jason Kridner <jkridner@gmail.com> wrote:
->>> I'd like to discuss moving our current library of cape devicetree
->>> overlay sources into a single tree, including the boot .dtb files for
->>> BeagleBoard.org boards and moving towards enabling as much of the cape
->>> support into a single boot-time .dtb file with an approach similar to
->>> the cape-universal overlay
->>> (https://github.com/cdsteinkuehler/beaglebone-universal-io), but not
->>> in an overlay.
+>> On Wed, Jun 11, 2014 at 7:32 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>>> On 6/11/2014 4:40 AM, Geert Uytterhoeven wrote:
+>>>> With current mainline, I get an early crash on r8a7791/koelsch:
+>>>>
+>>>> BUG: Bad page state in process swapper  pfn:00000
+>>>> page:ee20b000 count:0 mapcount:0 mapping:66756200 index:0x65726566
+>>>> page flags: 0x74656b63(locked|error|lru|active|owner_priv_1|arch_1|private|writeback|head|swapcache
+>>>> |reclaim|mlocked)
+>>>> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
+>>>> bad because of flags:
+>>>> page flags: 0x212861(locked|lru|active|private|writeback|swapcache|mlocked)
+>>>>
+>>>> I bisected it to
+>>>>
+>>>> commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
+>>>> Author: Laura Abbott <lauraa@codeaurora.org>
+>>>> Date:   Sun Apr 13 22:54:58 2014 +0100
+>>>>
+>>>>     ARM: 8025/1: Get rid of meminfo
+>>
+>>>> -Truncating RAM at 40000000-bfffffff to -6f7fffff (vmalloc region overlap).
+>>>> +Truncating RAM at 0x00000000-0xc0000000 to -0x6f800000
 >>>
->>> First of all, I want to note this doesn't change my view on the
->>> importance of mainline support for devicetree overlays. They are still
->>> absolutely critical and highly useful, solving problems that cannot be
->>> solved through boot-time devicetrees. I'm simply looking for an
->>> approach that will complement the availability of overlays and provide
->>> the best user experience.
-> 
-> Here's the most obvious question in the world on this topic.  Are capes
-> hot-pluggable?
-> 
-> Looking at the posts on google+ from David Anders, they're using pin
-> headers for connectivity, with no additional protection against hot-
-> plugging, and no sequencing of pin connection.  In other words, they are
-> not hot-pluggable.
-> 
-> So, why do we need to add a load of infrastructure to the kernel to allow
-> the device tree to be modified at run time?  At present, the way the
-> entire DT infrastructure works is that it assumes the DT remains static
-> and never changes - this applies not only to the core DT code, but also
-> to all the drivers which have been converted.
-> 
-> So, you're asking for a feature which is impossible to really make use
-> of on the hardware which you want to use it.
-> 
-> Why should kernel developers go to the extent of adding support for DT
-> modification at runtime when the platform you want this for doesn't even
-> support hotplugging of these capes?
-> 
-> The logical way to deal with this is to have the boot loader merge DT
-> fragments together before it calls the kernel, so the kernel sees a single
-> DT blob which describes the whole hardware.
+>>> I'm guessing this is the issue right there.
+>>>
+>>>         memory at 40000000 {
+>>>                 device_type = "memory";
+>>>                 reg = <0 0x40000000 0 0x40000000>;
+>>>         };
+>>>
+>>>         memory at 200000000 {
+>>>                 device_type = "memory";
+>>>                 reg = <2 0x00000000 0 0x40000000>;
+>>>         };
+>>>
+>>> Those are the memory nodes from r8a7791-koelsch.dts. It looks like the memory
+>>> outside 32-bit address range is not being dropped. It was suggested to drop
+>>> early_init_dt_add_memory_arch which called arm_add_memory and just use the
+>>> generic of code directly but the problem is arm_add_memory does additional
+>>> bounds checking. It looks like early_init_dt_add_memory_arch in
+>>> drivers/of/fdt.c checks for overflow on u64 types but not for overflow
+>>> on phys_addr_t (32 bits) which is what memblock_add actually uses.
+>>>
+>>> For a quick test, can you try bringing back early_init_dt_add_memory_arch
+>>> and see if that fixes the problem:
+>>>
+>>> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+>>> index e94a157..ea9ce92 100644
+>>> --- a/arch/arm/kernel/devtree.c
+>>> +++ b/arch/arm/kernel/devtree.c
+>>> @@ -27,6 +27,10 @@
+>>>  #include <asm/mach/arch.h>
+>>>  #include <asm/mach-types.h>
+>>>
+>>> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+>>> +{
+>>> +       arm_add_memory(base, size);
+>>> +}
+>>>
+>>>  #ifdef CONFIG_SMP
+>>>  extern struct of_cpu_method __cpu_method_of_table[];
+>>
+>> Thanks, my board boots again after applying this quick hack.
+>>
+>
+> Great! Russell are you okay with taking the above as a fix or would you prefer
+> I fixup drivers/of/fdt.c right now?
 
-Frankly, if we're going to push device tree merging to be someone elses
-problem, I'd like to push it out to userspace.
+I would rather see the fix directly in fdt.c.
 
-> A good way that this could have been done is to put an I2C EEPROM on
-> each cape, and have that store the DT fragment.  The boot loader could
-> have then read that from each cape, and used that information to build
-> up the final DT.  Why this hasn't been thought of, considering that the
-> kernel has been moving towards DT for years, is quite unbelievable.
+g.
 
-I had actually talked about this a long while back (face to face) with
-people, but the problem was (and still kind of is) the bindings
-changing, etc.
-
--- 
-Tom
+>
+>
+> Thanks,
+> Laura
+>
+> ----8<----
+> From 14bda557a108ad197e7c5f040f50ca024b45cc17 Mon Sep 17 00:00:00 2001
+> From: Laura Abbott <lauraa@codeaurora.org>
+> Date: Wed, 11 Jun 2014 19:39:29 -0700
+> Subject: [PATCH] arm: Bring back early_init_dt_add_memory_arch
+>
+> Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) removed
+> early_init_dt_add_memory_arch in favor of using the common method.
+> The common method does not currently check for memory outside of
+> 32-bit bounds which may lead to memory being incorrectly added to
+> the system. Bring back early_init_dt_add_memory_arch for now until
+> the generic function can be fixed up.
+>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm/kernel/devtree.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index e94a157..ea9ce92 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -27,6 +27,10 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>
+> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+> +{
+> +       arm_add_memory(base, size);
+> +}
+>
+>  #ifdef CONFIG_SMP
+>  extern struct of_cpu_method __cpu_method_of_table[];
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
