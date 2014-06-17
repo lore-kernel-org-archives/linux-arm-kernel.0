@@ -1,25 +1,52 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 17 Jun 2014 21:59:20 +0800
-Subject: [PATCH 0/2] DT updates for Cubox-i
-In-Reply-To: <20140617134016.GK23430@n2100.arm.linux.org.uk>
-References: <20140617134016.GK23430@n2100.arm.linux.org.uk>
-Message-ID: <20140617135919.GG8860@dragon>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Jun 2014 16:00:11 +0200
+Subject: [PATCH 01/14] ARM: mvebu: fix randconfig builds for pmsu driver
+In-Reply-To: <1402675276-538682-2-git-send-email-arnd@arndb.de>
+References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
+ <1402675276-538682-2-git-send-email-arnd@arndb.de>
+Message-ID: <20140617160011.03b1ea15@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 02:40:16PM +0100, Russell King - ARM Linux wrote:
-> Shawn,
-> 
-> These are two updates to the Cubox-i which I'd prefer to get into -rc.
-> They were omitted from the merge window because their dependent changes
-> were not merged, but have now been merged.
-> 
-> The only real functional change for the Cubox-i in this set is that it
-> is now possible to control the front panel LED.  The other patch is
-> solely about moving some DT configuration to where it belongs.
-> 
-> Can we please get these in?
+Dear Arnd Bergmann,
 
-Okay, I will send them together with the fixes I queued for -rc.
+On Fri, 13 Jun 2014 18:01:03 +0200, Arnd Bergmann wrote:
 
-Shawn
+> @@ -200,7 +201,9 @@ static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
+>  	/* If we are here, wfi failed. As processors run out of
+>  	 * coherency for some time, tlbs might be stale, so flush them
+>  	 */
+> +#ifdef CONFIG_MMU
+>  	local_flush_tlb_all();
+> +#endif
+
+So noMMU builds are supported in a single image with MMU builds?
+Instead of having to #ifdef all around the place, wouldn't it be better
+for the noMMU headers to provide an empty definition for this function?
+
+>  static int armada_370_xp_cpu_suspend(unsigned long deepidle)
+>  {
+> +	if (!IS_ENABLED(CONFIG_CPU_IDLE))
+> +		return -ENODEV;
+> +
+>  	return cpu_suspend(deepidle, do_armada_370_xp_cpu_suspend);
+>  }
+
+This unfortunately isn't really correct, and the patch I sent in
+"[PATCH] ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7
+platforms" on June, 11th already fixes the cpu_suspend()/cpu_resume()
+problem.
+
+The issue with your solution is that it assumes this function is only
+used for cpuidle. That is indeed the case in v3.16, but will be wrong
+as soon as we add CPU hotplug support, which I have posted on May, 30th
+in "[PATCH 0/5] CPU hotplug for Marvell Armada XP", and which I hope to
+see included in v3.17.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
