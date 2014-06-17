@@ -1,100 +1,68 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 17 Jun 2014 11:50:22 +0900
-Subject: [PATCH] arm: exynos: Modify pm code to check for cortex A9 rather
- than the SoC
-In-Reply-To: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
-References: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <00ef01cf89d6$e248eb30$a6dac190$@samsung.com>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Tue, 17 Jun 2014 09:06:43 +0530
+Subject: [PATCH 3/3] ARM: dts: Enable audio support for Peach-pi board
+In-Reply-To: <CAD=FV=UaaRQVq3TmXMTv9OkER+zORC89YfPNjwZwfCQKmuavrw@mail.gmail.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-4-git-send-email-tushar.b@samsung.com>
+ <CAD=FV=XqqP7+xDOAKCixivzgaO0xvJX7L+CCN+unAEuf-6aUbQ@mail.gmail.com>
+ <539ED2C0.8030405@gmail.com>
+ <CAD=FV=UaaRQVq3TmXMTv9OkER+zORC89YfPNjwZwfCQKmuavrw@mail.gmail.com>
+Message-ID: <CAC5m3Byeu5zdM=PeK5MkgsEOFRjrPd1Vrk1a3FaM7VPTOFyYOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
-> 
-> We have an soc check to ensure that the scu and certain A9 specific
-> registers are not accessed on Exynos5250 (which is A15 based).
-> Rather than adding another soc specific check for 5420 let us test
-> for the Cortex A9 primary part number.
-> 
-> This resolves the below crash seen on exynos5420 during core switching
-> after the CPUIdle consolidation series was merged.
-> 
-> [  155.975589] [<c0013174>] (scu_enable) from [<c001b0dc>]
-> (exynos_cpu_pm_notifier+0x80/0xc4)
-> [  155.983833] [<c001b0dc>] (exynos_cpu_pm_notifier) from [<c003c1b0>]
-> (notifier_call_chain+0x44/0x84)
-> [  155.992851] [<c003c1b0>] (notifier_call_chain) from [<c007a49c>]
-> (cpu_pm_notify+0x20/0x3c)
-> [  156.001089] [<c007a49c>] (cpu_pm_notify) from [<c007a564>] (cpu_pm_exit+0x20/0x38)
-> [  156.008635] [<c007a564>] (cpu_pm_exit) from [<c0019e98>]
-> (bL_switcher_thread+0x298/0x40c)
-> [  156.016788] [<c0019e98>] (bL_switcher_thread) from [<c003842c>] (kthread+0xcc/0xe8)
-> [  156.024426] [<c003842c>] (kthread) from [<c000e438>] (ret_from_fork+0x14/0x3c)
-> [  156.031621] Code: ea017fec c0530a00 c052e3f8 c0012dcc (e5903000
-> 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c |   15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index d10c351..6dd4a11 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -300,7 +300,7 @@ static int exynos_pm_suspend(void)
->  	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
->  	__raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
-> 
-> -	if (!soc_is_exynos5250())
-> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->  		exynos_cpu_save_register();
-> 
->  	return 0;
-> @@ -334,7 +334,7 @@ static void exynos_pm_resume(void)
->  	if (exynos_pm_central_resume())
->  		goto early_wakeup;
-> 
-> -	if (!soc_is_exynos5250())
-> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->  		exynos_cpu_restore_register();
-> 
->  	/* For release retention */
-> @@ -353,7 +353,7 @@ static void exynos_pm_resume(void)
-> 
->  	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> 
-> -	if (!soc_is_exynos5250())
-> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->  		scu_enable(S5P_VA_SCU);
-> 
->  early_wakeup:
-> @@ -440,15 +440,18 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->  	case CPU_PM_ENTER:
->  		if (cpu == 0) {
->  			exynos_pm_central_suspend();
-> -			exynos_cpu_save_register();
-> +			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> +				exynos_cpu_save_register();
->  		}
->  		break;
-> 
->  	case CPU_PM_EXIT:
->  		if (cpu == 0) {
-> -			if (!soc_is_exynos5250())
-> +			if (read_cpuid_part_number() ==
-> +					ARM_CPU_PART_CORTEX_A9) {
->  				scu_enable(S5P_VA_SCU);
-> -			exynos_cpu_restore_register();
-> +				exynos_cpu_restore_register();
-> +			}
->  			exynos_pm_central_resume();
->  		}
->  		break;
-> --
-> 1.7.9.5
+On Mon, Jun 16, 2014 at 10:19 PM, Doug Anderson <dianders@google.com> wrote:
+> Tushar,
+>
+> On Mon, Jun 16, 2014 at 4:19 AM, Tushar Behera <trblinux@gmail.com> wrote:
+>> On 06/13/2014 10:33 PM, Doug Anderson wrote:
+>>> Tushar,
+>>>
+>>> On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
+>>>> Peach-pi board has MAX98090 audio codec connected on HSI2C-7 bus.
+>>>
+>>> If you want to be a stickler about it, peach-pi actually has a
+>>> max98091.  That requires code changes to the i2c driver, though.
+>>> ...and unfortunately listing two compatible strings for i2c devices is
+>>> broken.  :(
+>>>
+>> Hi Doug,
+>>
+>> You are right. I checked the boot logs, the detected codec type is
+>> MAX98091. Since both these CODECs are supported through a single driver
+>> and the detection of chip is done during runtime, I would suggest we go
+>> ahead with "max98090" compatible string. I will update the commit
+>> message accordingly.
+>>
+>> Does that sound okay to you?
+>
+> As per my understanding you shouldn't do this.  You should have two patches:
+>
+> 1. Add "max98091".  You could simply post Wonjoon's patch from
+> <https://chromium-review.googlesource.com/184091>
+>
+> 2. Change the device tree to refer to "max98091"
+>
+> The argument that the "current kernel driver has a single driver" is
+> an argument that you're not supposed to make for device tree.  The
+> same device tree is supposed to work for U-Boot, BSD, or any other
+> platform.  On those platforms it might not be a shared driver.
+>
 
-Yes, looks good to me.
+My argument is that the device type is getting detected during
+runtime, hence there is no need to differentiate between these two.
 
-I've applied this into fixes for 3.16.
+But if you prefer that way, I will repost.
 
-Thanks,
-Kukjin
+>
+>> If you so desire, I will submit a patch to sort peach-pi device-tree
+>> nodes (w.r.t. peach-pit dts file).
+>
+> Yes please.  I think there's supposed to be some official ordering of
+> things.  If anyone reading this has a pointer to the official sort
+> order of things in the device tree I'd love to see it!  ;)
+>
+> -Doug
+
+-- 
+Tushar Behera
