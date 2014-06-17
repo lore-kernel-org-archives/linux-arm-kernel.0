@@ -1,54 +1,93 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 17 Jun 2014 14:53:44 -0500
-Subject: [PATCH] tty: serial: msm: Fix section mismatch warning
-In-Reply-To: <CAOesGMjNVoKCDQ8=dB8TB+ghTxxCQ_xMW0A07k9s4imVTgoLbA@mail.gmail.com>
-References: <1401826402-1079-1-git-send-email-galak@codeaurora.org>
- <20140603203318.GB6582@kroah.com>
- <CAOesGMh5knixNp+dgWnQu5M00N4ZMm10PoBh3YVTquryfRh-cw@mail.gmail.com>
- <20140603211420.GA1192@kroah.com>
- <CAOesGMjNVoKCDQ8=dB8TB+ghTxxCQ_xMW0A07k9s4imVTgoLbA@mail.gmail.com>
-Message-ID: <D4093820-1DCF-4B10-8DEC-1378B5D64D3A@codeaurora.org>
+From: rientjes@google.com (David Rientjes)
+Date: Tue, 17 Jun 2014 12:56:54 -0700 (PDT)
+Subject: [PATCH] regmap: Add Kconfig option for debugfs register writes
+In-Reply-To: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
+References: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1406171254540.18156@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 17 Jun 2014, Markus Pargmann wrote:
 
-On Jun 3, 2014, at 4:17 PM, Olof Johansson <olof@lixom.net> wrote:
-
-> On Tue, Jun 3, 2014 at 2:14 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
->> On Tue, Jun 03, 2014 at 02:04:43PM -0700, Olof Johansson wrote:
->>> On Tue, Jun 3, 2014 at 1:33 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
->>>> On Tue, Jun 03, 2014 at 03:13:22PM -0500, Kumar Gala wrote:
->>>>> WARNING: drivers/tty/built-in.o(.data+0x3544): Section mismatch in
->>>>> reference from the variable msm_platform_driver to the function
->>>>> .init.text:msm_serial_probe()
->>>>> The variable msm_platform_driver references
->>>>> the function __init msm_serial_probe()
->>>>> If the reference is valid then annotate the
->>>>> variable with __init* or __refdata (see linux/init.h) or name the variable:
->>>>> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
->>>> 
->>>> Where is this mismatch showing up at?  3.15-rc8, 3.16-rc1?  Somewhere
->>>> older or else?
->>> 
->>> Linus' next branch, it was merged through arm-soc. I didn't notice it
->>> in time to fix it before we sent to Linus. :(
->> 
->> Ok, do you want to take this patch then?  I don't mind taking it through
->> my tree, but it will have to wait until after 3.16-rc1 is out.  It's up
->> to you.
+> To enable writing of registers through the regmap debugfs interface, it
+> was necessary to alter the regmap-debugfs.c source code. This is not
+> really practical.
 > 
-> I've got a handful of fixes we're queueing for the second batch of
-> merges, and I can add it to there.
+> As this is a powerful tool for debugging, this patch creates an expert
+> kconfig option for this function. This makes it easier to enable
+> register writing in the kernel.
 > 
+> This patch also fixes the file mode when the regmap debugfs write code is
+> compiled.
 > 
-> -Olof
 
-Olof,
+Forcing users to enable CONFIG_EXPERT for this doesn't seem appropriate, 
+it enables things by default and has really become a separate config of 
+its own.  You might want to consider removing this dependency unless you 
+have a strong reason for keeping it.
 
-Reminder to queue this up for fixes for 3.16
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/base/regmap/Kconfig          | 14 ++++++++++++++
+>  drivers/base/regmap/regmap-debugfs.c | 16 ++++++++++------
+>  2 files changed, 24 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/base/regmap/Kconfig b/drivers/base/regmap/Kconfig
+> index 4251570610c9..ce86600dbe75 100644
+> --- a/drivers/base/regmap/Kconfig
+> +++ b/drivers/base/regmap/Kconfig
+> @@ -23,3 +23,17 @@ config REGMAP_MMIO
+>  
+>  config REGMAP_IRQ
+>  	bool
+> +
+> +config REGMAP_ALLOW_WRITE_DEBUGFS
+> +	default n
+> +	depends on DEBUG_FS
+> +	depends on EXPERT
+> +	depends on REGMAP
+> +	bool "Regmap, allow direct register writes through debugfs"
+> +	help
+> +	  This option enables regmap debugfs write support. If this is enabled,
+> +	  you can directly write registers using the registers file in the
+> +	  regmap debugfs.
+> +
+> +	  This is potentially dangerous. Do not enable this option unless you
+> +	  know what you are doing.
+> diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+> index 45d812c0ea77..12906f2bdf00 100644
+> --- a/drivers/base/regmap/regmap-debugfs.c
+> +++ b/drivers/base/regmap/regmap-debugfs.c
+> @@ -261,13 +261,10 @@ static ssize_t regmap_map_read_file(struct file *file, char __user *user_buf,
+>  				   count, ppos);
+>  }
+>  
+> -#undef REGMAP_ALLOW_WRITE_DEBUGFS
+> -#ifdef REGMAP_ALLOW_WRITE_DEBUGFS
+> +#if IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS)
+>  /*
+>   * This can be dangerous especially when we have clients such as
+> - * PMICs, therefore don't provide any real compile time configuration option
+> - * for this feature, people who want to use this will need to modify
+> - * the source code directly.
+> + * PMICs, therefore this function can only be selected in expert kconfig mode.
+>   */
+>  static ssize_t regmap_map_write_file(struct file *file,
+>  				     const char __user *user_buf,
+> @@ -512,7 +509,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+>  			    map, &regmap_reg_ranges_fops);
+>  
+>  	if (map->max_register || regmap_readable(map, 0)) {
+> -		debugfs_create_file("registers", 0400, map->debugfs,
+> +		unsigned int registers_mode;
+> +
+> +		if (IS_ENABLED(CONFIG_REGMAP_ALLOW_WRITE_DEBUGFS))
+> +			registers_mode = 0600;
+> +		else
+> +			registers_mode = 0400;
+> +
+> +		debugfs_create_file("registers", registers_mode, map->debugfs,
+>  				    map, &regmap_map_fops);
+>  		debugfs_create_file("access", 0400, map->debugfs,
+>  				    map, &regmap_access_fops);
