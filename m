@@ -1,46 +1,172 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 17 Jun 2014 21:21:41 +0900
-Subject: [PATCH v2 00/08] ARM: shmobile: Rework include path V2
-In-Reply-To: <20140617074658.30008.53021.sendpatchset@w520>
-References: <20140617074658.30008.53021.sendpatchset@w520>
-Message-ID: <20140617122138.GA20368@verge.net.au>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 17 Jun 2014 14:25:21 +0200
+Subject: [PATCH v2 2/3] ata: Add Qualcomm ARM SoC AHCI SATA host controller
+ driver
+In-Reply-To: <1402676163-31574-1-git-send-email-galak@codeaurora.org>
+References: <1402676163-31574-1-git-send-email-galak@codeaurora.org>
+Message-ID: <14174621.WL9ndpHQ2Q@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 04:46:58PM +0900, Magnus Damm wrote:
-> ARM: shmobile: Rework include path V2
-> 
-> [PATCH v2 01/08] ARM: shmobile: Move intc.h, cleanup sh_intc.h usage
-> [PATCH v2 02/08] ARM: shmobile: Move dma-register.h
-> [PATCH v2 03/08] ARM: shmobile: Move clock.h
-> [PATCH v2 04/08] ARM: shmobile: Move most of irqs.h, keep some for pinctl
-> [PATCH v2 05/08] ARM: shmobile: Move common.h
-> [PATCH v2 06/08] ARM: shmobile: Move pm-rmobile.h, cleanup sh73xx.h
-> [PATCH v2 07/08] ARM: shmobile: Move pm-rcar.h, cleanup r8a7779 case
-> [PATCH v2 08/08] ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case
-> 
-> Olof, here my latest take on the header move that you requested earlier.
-> 
-> This particular series hopefully follows your proposed way and moves the
-> most common shared header files for mach-shmobile from <mach/foobar.h>
-> to "foobar.h" without any workaround. Left are still per-SoC header files
-> that will be moved once I know you are comformatble with this format.
-> 
-> Please note that these are only lightly compile tested with a handful
-> of defconfigs, but any potential issue should be trivial to fix.
-> 
-> Also, there are certain bits of arch/arm/mach-shmobile/include/mach/
-> get included from places like arch/arm/boot/compressed/ (booting
-> legacy kernel directly from reset vector) and also from SoC specific
-> legacy code under drivers/pinctrl. My proposal is to keep those users
-> as-is until we phase out legacy board support (2-3 kernels?), let me
-> know if you would like to get rid of "include/mach" sooner!
-> 
-> Simon, can you please this pick up and include in your rebase to v3.16-rc1?
-> 
-> Changes since V1:
-> - rebased to v3.16-rc1
-> 
-> Thanks to Geert and Arnd for review support!
 
-Thanks Magnus, I have queued this up.
+Hi,
+
+On Friday, June 13, 2014 11:16:03 AM Kumar Gala wrote:
+> Add support for the Qualcomm AHCI SATA controller that exists on several
+> SoC and specifically the IPQ806x family of chips.  The IPQ806x SATA support
+> requires the associated IPQ806x SATA PHY Driver to be enabled as well.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+> v2:
+> * Fixed MODULE_LICENSE to be GPL v2
+> 
+>  drivers/ata/Kconfig     | 10 ++++++
+>  drivers/ata/Makefile    |  1 +
+>  drivers/ata/ahci_qcom.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 97 insertions(+)
+>  create mode 100644 drivers/ata/ahci_qcom.c
+> 
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 7671dba..aa88648 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -132,6 +132,16 @@ config AHCI_MVEBU
+>  
+>  	  If unsure, say N.
+>  
+> +config AHCI_QCOM
+> +	tristate "Qualcomm AHCI SATA support"
+> +	depends on ARCH_QCOM
+> +	help
+> +	  This option enables support for AHCI SATA controller
+> +	  integrated into Qualcomm ARM SoC chipsets. For more
+> +	  information please refer to http://www.qualcomm.com/chipsets.
+> +
+> +	  If unsure, say N.
+> +
+>  config AHCI_SUNXI
+>  	tristate "Allwinner sunxi AHCI SATA support"
+>  	depends on ARCH_SUNXI
+> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+> index 5a02aee..15401e9 100644
+> --- a/drivers/ata/Makefile
+> +++ b/drivers/ata/Makefile
+> @@ -13,6 +13,7 @@ obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+>  obj-$(CONFIG_AHCI_DA850)	+= ahci_da850.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_MVEBU)	+= ahci_mvebu.o libahci.o libahci_platform.o
+> +obj-$(CONFIG_AHCI_QCOM)		+= ahci_qcom.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_ST)		+= ahci_st.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_XGENE)	+= ahci_xgene.o libahci.o libahci_platform.o
+> diff --git a/drivers/ata/ahci_qcom.c b/drivers/ata/ahci_qcom.c
+> new file mode 100644
+> index 0000000..bfb7a77
+> --- /dev/null
+> +++ b/drivers/ata/ahci_qcom.c
+> @@ -0,0 +1,86 @@
+> +/*
+> + * Qualcomm ARM SoC AHCI SATA platform driver
+> + *
+> + * based on the AHCI SATA platform driver by Jeff Garzik and Anton Vorontsov
+> + *
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/pm.h>
+> +#include <linux/device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/libata.h>
+> +#include <linux/ahci_platform.h>
+> +#include "ahci.h"
+> +
+> +static const struct ata_port_info qcom_ahci_port_info = {
+> +	.flags		= AHCI_FLAG_COMMON,
+> +	.pio_mask	= ATA_PIO4,
+> +	.udma_mask	= ATA_UDMA6,
+> +	.port_ops	= &ahci_platform_ops,
+> +};
+> +
+> +static int qcom_ahci_probe(struct platform_device *pdev)
+> +{
+> +	struct ahci_host_priv *hpriv;
+> +	struct clk *rxoob_clk;
+> +	int rc;
+> +
+> +	hpriv = ahci_platform_get_resources(pdev);
+> +	if (IS_ERR(hpriv))
+> +		return PTR_ERR(hpriv);
+> +
+> +	/* Try and set the rxoob clk to 100Mhz */
+> +	rxoob_clk = of_clk_get_by_name(pdev->dev.of_node, "rxoob");
+> +	if (IS_ERR(rxoob_clk))
+> +		return PTR_ERR(rxoob_clk);
+> +
+> +	rc = clk_set_rate(rxoob_clk, 100000000);
+
+Shouldn't the clk_prepare_enable() be called first?
+
+> +	if (rc)
+> +		return rc;
+
+of_clk_get_by_name() gets an extra reference on the clock so clk_put()
+should be called on failure.
+
+> +	rc = ahci_platform_enable_resources(hpriv);
+> +	if (rc)
+> +		return rc;
+> +
+> +	rc = ahci_platform_init_host(pdev, hpriv, &qcom_ahci_port_info, 0, 0);
+> +	if (rc)
+> +		goto disable_resources;
+> +
+> +	return 0;
+> +disable_resources:
+> +	ahci_platform_disable_resources(hpriv);
+> +	return rc;
+> +}
+> +
+> +static const struct of_device_id qcom_ahci_of_match[] = {
+> +	{ .compatible = "qcom,msm-ahci", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, qcom_ahci_of_match);
+> +
+> +static struct platform_driver qcom_ahci_driver = {
+> +	.probe = qcom_ahci_probe,
+> +	.remove = ata_platform_remove_one,
+> +	.driver = {
+> +		.name = "qcom_ahci_qcom",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = qcom_ahci_of_match,
+> +	},
+
+This driver lacks PM suspend/resume support.  I assume that
+the IPQ806x platform also doesn't support suspend/resume yet
+(if so a comment in the driver code about this would be useful),
+otherwise the driver should be fixed.
+
+> +};
+> +module_platform_driver(qcom_ahci_driver);
+> +
+> +MODULE_DESCRIPTION("Qualcomm AHCI SATA platform driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("ahci:qcom");
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
