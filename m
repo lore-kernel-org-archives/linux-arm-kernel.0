@@ -1,77 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jun 2014 21:56:20 +0200
-Subject: [PATCH RESEND 2/2] ARM: sunxi: Add clocks node to the CPU nodes
-In-Reply-To: <1403034980-19112-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1403034980-19112-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1403034980-19112-3-git-send-email-maxime.ripard@free-electrons.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue, 17 Jun 2014 13:07:42 -0700
+Subject: [PATCH v6 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <CAGVrzcYWecdwSmHux6yz1M5Nz849BV-sBe8DmnJWV+T8PetTvw@mail.gmail.com>
+References: <1402964326-11147-1-git-send-email-isubramanian@apm.com>
+ <1402964326-11147-5-git-send-email-isubramanian@apm.com>
+ <20140616.214247.1154200670003936158.davem@davemloft.net>
+ <CAKh23F=2undAW=nWibOreAM8DJiQKpLx=OboCX=fNZE+OU=AbA@mail.gmail.com>
+ <CAGVrzcYWecdwSmHux6yz1M5Nz849BV-sBe8DmnJWV+T8PetTvw@mail.gmail.com>
+Message-ID: <CAKh23F=AexThFD8Oqt-UxyBU1Ai9AfZfP4KpPTzQLXa0WE8Vwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the clock will make the topology code work, and will remove the
-following error at boot
+On Tue, Jun 17, 2014 at 12:24 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 2014-06-17 12:21 GMT-07:00 Iyappan Subramanian <isubramanian@apm.com>:
+>> On Mon, Jun 16, 2014 at 9:42 PM, David Miller <davem@davemloft.net> wrote:
+>>> From: Iyappan Subramanian <isubramanian@apm.com>
+>>> Date: Mon, 16 Jun 2014 17:18:46 -0700
+>>>
+>>>> +static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
+>>>> +                                      struct net_device *ndev)
+>>>> +{
+>>>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+>>>> +     struct xgene_enet_desc_ring *tx_ring = pdata->tx_ring;
+>>>> +     struct xgene_enet_desc_ring *cp_ring = tx_ring->cp_ring;
+>>>> +     u32 tx_level, cq_level;
+>>>> +
+>>>> +     tx_level = xgene_enet_ring_len(tx_ring);
+>>>> +     cq_level = xgene_enet_ring_len(cp_ring);
+>>>> +     if (unlikely(tx_level > pdata->tx_qcnt_hi ||
+>>>> +                  cq_level > pdata->cp_qcnt_hi)) {
+>>>> +             netif_stop_queue(ndev);
+>>>> +             return NETDEV_TX_BUSY;
+>>>> +     }
+>>>> +
+>>>> +     if (xgene_enet_setup_tx_desc(tx_ring, skb))
+>>>> +             return NETDEV_TX_OK;
+>>>
+>>> If you return NETDEV_TX_OK, it is your responsibility to deal with the
+>>> SKB, because you own it.
+>>>
+>>> In particular, you have to free the packet.
+>>
+>> skb freeing happens in xgene_enet_tx_completion().
+>
+> I have not looked at what xgenet_enet_setup_tx_desc() does, but
+> David's point is that, if this function fails and has not yet been
+> able to queue the SKB for transmission at the HW, you should make sure
+> that you free the SKB. Is xgene_enet_tx_completion() called if the
+> driver failed to prepare a descriptor for a SKB?
 
-[    0.097194] /cpus/cpu at 0 missing clock-frequency property
-[    0.103657] /cpus/cpu at 1 missing clock-frequency property
-[    0.110698] /cpus/cpu at 2 missing clock-frequency property
-[    0.117132] /cpus/cpu at 3 missing clock-frequency property
+Thanks for the explanation.  I will free up skb when
+xgene_enet_setup_tx_desc() fails
+and submit the next patch shortly.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 4 ++++
- arch/arm/boot/dts/sun7i-a20.dtsi | 2 ++
- 2 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index a9dfa12eb735..905b84add002 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -34,24 +34,28 @@
- 		cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <0>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <1>;
- 		};
- 
- 		cpu at 2 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <2>;
- 		};
- 
- 		cpu at 3 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <3>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 01e94664232a..12a4940be551 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -35,12 +35,14 @@
- 		cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <0>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <1>;
- 		};
- 	};
--- 
-2.0.0
+> --
+> Florian
