@@ -1,45 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 17 Jun 2014 15:33:05 -0700
-Subject: [PATCH] clkdev: Don't print errors on probe defer
-In-Reply-To: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
-References: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140617223305.32686.15540@quantum>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 18 Jun 2014 00:35:27 +0200
+Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
+In-Reply-To: <53A03186.3040703@collabora.com>
+References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
+ <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
+Message-ID: <20140617223518.GA25309@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-06-13 16:36:31)
-> This error message can spam the logs if you have lots of probe
-> deferals due to missing clocks. Just silence the error in this
-> case because the driver should try again later.
+On Tue, Jun 17, 2014 at 02:16:06PM +0200, Tomeu Vizoso wrote:
+> On 06/16/2014 10:02 PM, Stephen Warren wrote:
+> >On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
+> >>+
+> >>+Child device nodes describe the memory settings for different configurations and
+> >>+clock rates.
+> >
+> >How do the child nodes do that? The binding needs to specify the format
+> >of the child node.
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-
-Looks OK to me. Russell?
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/clkdev.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> Sorry, that file was sent before I had finished removing the bits from
+> downstream that aren't needed yet. There's no current need for any child
+> nodes.
 > 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index f890b901c6bc..da4bda8b7fc7 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -101,8 +101,9 @@ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
->                 if (!IS_ERR(clk))
->                         break;
->                 else if (name && index >= 0) {
-> -                       pr_err("ERROR: could not get clock %s:%s(%i)\n",
-> -                               np->full_name, name ? name : "", index);
-> +                       if (PTR_ERR(clk) != -EPROBE_DEFER)
-> +                               pr_err("ERROR: could not get clock %s:%s(%i)\n",
-> +                                       np->full_name, name ? name : "", index);
->                         return clk;
->                 }
->  
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> >This binding looks quite anaemic vs.
+> >Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-emc.txt; I
+> >would expect that this binding needs all the EMC register data from the
+> >tegra20-emc binding too. Can the two bindings be identical?
 > 
+> There's even less stuff needed right now, as all what ultimately the EMC
+> driver does is call clk_set_rate on the EMC clock. As the T124 EMC driver
+> gains more features, they should get more similar.
+> 
+> >Can you explain what the nvidia,mc and nvidia,pmc references are needed
+> >for? Hopefully, this driver isn't going to reach into those devices and
+> >touch their registers directly.
+> 
+> Not really needed, see above.
+
+I've been working on a prototype driver for the memory controller. Part
+of what I've added is programming of the latency allowance registers (it
+doesn't yet expose an API to do so yet, though). I think that needs to
+eventually take into account the EMC frequency (and needs to be notified
+of changes to the same).
+
+Without having thought this through very thoroughly, I suspect that
+rather than referencing the MC from the EMC it might be better to have
+the MC register with the EMC for notifications.
+
+But perhaps there are other services from MC that EMC needs to work?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/17d8567e/attachment.sig>
