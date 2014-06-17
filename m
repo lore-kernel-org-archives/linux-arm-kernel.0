@@ -1,50 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jun 2014 13:18:11 +0100
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140617115829.GB18816@ulmo>
-References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
- <538757B6.4010109@wwwdotorg.org> <20140530073006.GA24748@ulmo>
- <20140530112728.GB3949@e103592.cambridge.arm.com>
- <20140604211237.GC18710@mithrandir>
- <20140616125704.GE16758@arm.com> <20140617115829.GB18816@ulmo>
-Message-ID: <20140617121811.GG13808@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 17 Jun 2014 21:21:41 +0900
+Subject: [PATCH v2 00/08] ARM: shmobile: Rework include path V2
+In-Reply-To: <20140617074658.30008.53021.sendpatchset@w520>
+References: <20140617074658.30008.53021.sendpatchset@w520>
+Message-ID: <20140617122138.GA20368@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 12:58:30PM +0100, Thierry Reding wrote:
-> On Mon, Jun 16, 2014 at 01:57:04PM +0100, Will Deacon wrote:
-> > On Wed, Jun 04, 2014 at 10:12:38PM +0100, Thierry Reding wrote:
-> > > It can easily be argued that if the algorithm used to remap the ID
-> > > varies, the compatibility of the device changes. Therefore I would
-> > > expect any variant of the GICv3 that deviates from the "standard"
-> > > mapping (if there is such a thing) to have its own compatible string.
-> > 
-> > There is no standard mapping; it's a property defined at system integration
-> > time. I fully expect different SoCs to do different things here.
+On Tue, Jun 17, 2014 at 04:46:58PM +0900, Magnus Damm wrote:
+> ARM: shmobile: Rework include path V2
 > 
-> My point was that the mapping itself seems to be fundamental enough to
-> make devices with different mappings "incompatible". Therefore I think
-> this could probably be handled by using different compatible values,
-> something along the lines of this:
+> [PATCH v2 01/08] ARM: shmobile: Move intc.h, cleanup sh_intc.h usage
+> [PATCH v2 02/08] ARM: shmobile: Move dma-register.h
+> [PATCH v2 03/08] ARM: shmobile: Move clock.h
+> [PATCH v2 04/08] ARM: shmobile: Move most of irqs.h, keep some for pinctl
+> [PATCH v2 05/08] ARM: shmobile: Move common.h
+> [PATCH v2 06/08] ARM: shmobile: Move pm-rmobile.h, cleanup sh73xx.h
+> [PATCH v2 07/08] ARM: shmobile: Move pm-rcar.h, cleanup r8a7779 case
+> [PATCH v2 08/08] ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case
 > 
-> 	compatible = "vendor,soc-gicv3", "arm,gicv3";
+> Olof, here my latest take on the header move that you requested earlier.
 > 
-> Then the mapping can be described in code, which should be a whole lot
-> easier and more flexible than a more or less generic notation in device
-> tree.
+> This particular series hopefully follows your proposed way and moves the
+> most common shared header files for mach-shmobile from <mach/foobar.h>
+> to "foobar.h" without any workaround. Left are still per-SoC header files
+> that will be moved once I know you are comformatble with this format.
+> 
+> Please note that these are only lightly compile tested with a handful
+> of defconfigs, but any potential issue should be trivial to fix.
+> 
+> Also, there are certain bits of arch/arm/mach-shmobile/include/mach/
+> get included from places like arch/arm/boot/compressed/ (booting
+> legacy kernel directly from reset vector) and also from SoC specific
+> legacy code under drivers/pinctrl. My proposal is to keep those users
+> as-is until we phase out legacy board support (2-3 kernels?), let me
+> know if you would like to get rid of "include/mach" sooner!
+> 
+> Simon, can you please this pick up and include in your rebase to v3.16-rc1?
+> 
+> Changes since V1:
+> - rebased to v3.16-rc1
+> 
+> Thanks to Geert and Arnd for review support!
 
-I don't think that scales well beyond a handful of unique mappings, and I
-really anticipate everybody doing something different based on their
-integration constraints.
-
-You'd very quickly end up with sets of tables for each SoC, describing the
-topology and associated IDs in the kernel source, which feels like a giant
-step backwards from where we are today with device tree.
-
-If, for example, the GIC architecture prescribed a fixed set of Device IDs
-and an algorithm for converting from Stream IDs then your approach may have
-some merits, but that's not where we are today (and I also don't think it's
-practical to try and enforce such system-wide properties into an interrupt
-controller architecture).
-
-Will
+Thanks Magnus, I have queued this up.
