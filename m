@@ -1,47 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Jun 2014 22:17:47 +0100
-Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
- regulators
-In-Reply-To: <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
-References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140617211747.GY29841@lee--X1>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 17 Jun 2014 16:23:02 -0500
+Subject: [PATCH v2 05/20] clk: sunxi: Support factor clocks with N
+ multiplier factor starting from 1
+In-Reply-To: <1403016777-15121-6-git-send-email-wens@csie.org>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+ <1403016777-15121-6-git-send-email-wens@csie.org>
+Message-ID: <CAL_JsqLyXwQzd9Oxj9pb49fWqzMjV9=1Nx3i+9bN-rwfEMqwcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The MAX77802 PMIC has 10 high-efficiency Buck and 32 Low-dropout
-> (LDO) regulators. This patch adds support for all these regulators
-> found on the MAX77802 PMIC and is based on a driver added by Simon
-> Glass to the Chrome OS kernel 3.8 tree.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On Tue, Jun 17, 2014 at 9:52 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> The PLLs on newer Allwinner SoC's, such as the A31 and A23, have a
+> N multiplier factor that starts from 1, not 0.
+>
+> This patch adds an option to the clock driver's config data structures
+> to define the difference.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
-> 
-> Changes since v1:
->  - Remove unneeded check if num_regulators != MAX77802_MAX_REGULATORS.
->  - Fix .set_suspend_mode handler comment and split regulators ops for
->    regulators that behave differently. Suggested by Mark Brown.
->  - Use module_platform_driver() instead of having init/exit functions.
->    Suggested by Mark Brown.
->  - Use the new descriptor-based GPIO interface instead of the deprecated
->    integer based GPIO one. Suggested by Mark Brown.
->  - Look for "regulators" child node instead of "voltage-regulators" to be
->    consistent with other PMIC drivers. Suggested by Mark Brown.
-> 
->  drivers/mfd/max77802.c       |   1 +
+>  drivers/clk/sunxi/clk-factors.c | 5 ++++-
+>  drivers/clk/sunxi/clk-factors.h | 1 +
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+> index 3806d97..399cf4d 100644
+> --- a/drivers/clk/sunxi/clk-factors.c
+> +++ b/drivers/clk/sunxi/clk-factors.c
+> @@ -62,7 +62,10 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+>                 p = FACTOR_GET(config->pshift, config->pwidth, reg);
+>
+>         /* Calculate the rate */
+> -       rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
+> +       if (config->n_from_one)
+> +               rate = (parent_rate * (n + 1) * (k + 1) >> p) / (m + 1);
+> +       else
+> +               rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
 
-Can you remove all of the MFD changes from patches 7, 8 and 9 and
-create new one.  That way there's no requirement for any cross
-subsystem messiness.
+This can be simplified and support any base with:
 
->  drivers/regulator/Kconfig    |   9 +
->  drivers/regulator/Makefile   |   1 +
->  drivers/regulator/max77802.c | 701 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 712 insertions(+)
->  create mode 100644 drivers/regulator/max77802.c
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+rate = (parent_rate * (n + config->n_base) * (k + 1) >> p) / (m + 1);
