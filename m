@@ -1,37 +1,312 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 18 Jun 2014 01:20:37 +0200
-Subject: [PATCH v2 02/10] iommu/ipmmu-vmsa: Cleanup failures of ARM
- mapping creation or attachment
-In-Reply-To: <20140616151142.GE18986@8bytes.org>
-References: <1400150451-13469-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <9405311.lnqBdrCsyu@avalon> <20140616151142.GE18986@8bytes.org>
-Message-ID: <5430380.Ocpv7sA44O@avalon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 18 Jun 2014 01:26:06 +0200
+Subject: [PATCHv5 1/2] pwm: Add Allwinner SoC support
+In-Reply-To: <1400523003-27082-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1400523003-27082-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1400523003-27082-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140617232605.GB25525@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Mon, May 19, 2014 at 08:10:02PM +0200, Alexandre Belloni wrote:
+[...]
+> diff --git a/drivers/pwm/pwm-sunxi.c b/drivers/pwm/pwm-sunxi.c
+[...]
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pwm.h>
+> +#include <linux/module.h>
+> +#include <linux/mutex.h>
+> +#include <linux/slab.h>
 
-On Monday 16 June 2014 17:11:42 Joerg Roedel wrote:
-> On Mon, May 26, 2014 at 12:08:37PM +0200, Laurent Pinchart wrote:
-> > > Skipped this one because it didn't apply. The others are applied.
-> > 
-> > Thank you. I'll rebase the patch on top of your tree as soon as you
-> > publish the related branch and resubmit.
-> 
-> What happened to this patch?
+These should be ordered alphabetically.
 
-It looks like it slipped through the cracks :-/ Should I submit it as a fix 
-for v3.16 or wait until v3.17 ?
+> +#define PWM_CTRL_REG		0x0
+> +
+> +#define PWM_CH_PRD_BASE		0x4
+> +#define PWM_CH_PRD_OFF		0x4
 
-> And how about the other iommu_domain changes requested. Will you submit them
-> for 3.17?
+Is this supposed to be an offset? If so, then maybe it should be named
+PWM_CH_PRD_OFFSET?
 
-I plan to work on that, but I'm not sure whether I'll be able to finish the 
-work for v3.17, as I need to concentrate on a DMA engine driver right now, and 
-will then need to finish the DT bindings for the IPMMU driver (which may 
-result in fixes for some of the iommu_domain-related problems).
+> +#define PWM_CH_PRD(x)		(PWM_CH_PRD_BASE + PWM_CH_PRD_OFF * (x))
 
--- 
-Regards,
+x is the channel number? If so maybe call that parameter "ch"?
 
-Laurent Pinchart
+> +#define PWMCH_OFFSET		15
+> +#define PWM_PRESCAL_MASK	GENMASK(3, 0)
+> +#define PWM_PRESCAL_OFF		0
+> +#define PWM_EN			BIT(4)
+> +#define PWM_ACT_STATE		BIT(5)
+> +#define PWM_CLK_GATING		BIT(6)
+> +#define PWM_MODE		BIT(7)
+> +#define PWM_PULSE		BIT(8)
+> +#define PWM_BYPASS		BIT(9)
+> +
+> +#define PWM_RDY_BASE		28
+> +#define PWM_RDY_OFF		1
+> +#define PWM_RDY(x)		BIT(PWM_RDY_BASE + PWM_RDY_OFF * (x))
+
+Some comments as for PWM_CH_PRD above.
+
+> +#define PWM_PRD_ACT_MASK	GENMASK(7, 0)
+
+This seems to be unused.
+
+> +#define PWM_PRD(x)		((x - 1) << 16)
+
+x should be enclosed in ().
+
+> +#define PWM_PRD_MASK		GENMASK(7, 0)
+> +
+> +#define	BIT_CH(bit, chan)	(bit << (chan * PWMCH_OFFSET))
+
+There should be a space instead of a tab between "define" and
+"BIT_CH(...)".
+
+> +u32 prescal_table[] = { 120, 180, 240, 360, 480, 0, 0, 0,
+> +			12000, 24000, 36000, 48000, 72000,
+> +			0, 0, 1 };
+
+static const? Also this is oddly formatted. I'd prefer:
+
+	static const u32 prescal_table[] = {
+		...
+		...
+	};
+
+Also for readability I'd go for "prescaler_table" or "prescale_table".
+
+> +struct sunxi_pwm_data {
+> +	bool has_rdy;
+> +};
+> +
+> +struct sunxi_pwm_chip {
+> +	struct pwm_chip chip;
+> +	struct clk *clk;
+> +	void __iomem *base;
+> +	struct mutex ctrl_lock;
+> +	const struct sunxi_pwm_data *data;
+> +};
+> +
+> +#define to_sunxi_pwm_chip(chip) container_of(chip, struct sunxi_pwm_chip, chip)
+
+This should be a static inline function.
+
+> +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
+> +				  unsigned long offset)
+> +{
+> +	return readl(chip->base + offset);
+> +}
+> +
+> +static inline void sunxi_pwm_writel(struct sunxi_pwm_chip *chip,
+> +				    unsigned long offset, unsigned long val)
+
+Make val u32 for consistency with sunxi_pwm_readl()? Also I'd prefer if
+this function preserved the same parameter order as writel().
+
+> +static int sunxi_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			    int duty_ns, int period_ns)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
+> +	u32 clk_rate, prd, dty;
+> +	u64 div;
+> +	u32 val, clk_gate;
+
+These can both go onto the same line as the other u32s above.
+
+> +	int i, ret;
+
+I think i should be unsigned. And maybe rename ret to err since it's not
+used as a return value at all.
+
+> +
+> +	clk_rate = clk_get_rate(sunxi_pwm->clk);
+> +
+> +	/* First, test without any divider */
+> +	i = PWM_PRESCAL_MASK;
+
+I don't see where this value of I is used.
+
+> +	div = clk_rate * period_ns;
+> +	do_div(div, 1000000000);
+> +	if (div > PWM_PRD_MASK) {
+> +		/* Then go up from the first divider */
+> +		for (i = 0; i < PWM_PRESCAL_MASK; i++) {
+> +			if (!prescal_table[i])
+> +				continue;
+> +			div = clk_rate / prescal_table[i];
+> +			div = div * period_ns;
+> +			do_div(div, 1000000000);
+
+Maybe:
+
+	div = clk_rate / prescal_table[i];
+	do_div(div * period_ns, 1000000000);
+
+? Also 1000000000 == NSEC_PER_SEC, so maybe use that instead.
+
+> +			if (div <= PWM_PRD_MASK)
+> +				break;
+> +		}
+> +	}
+> +
+> +	if (div > PWM_PRD_MASK) {
+> +		dev_err(chip->dev, "prescaler exceeds the maximum value\n");
+
+Nit: the prescaler doesn't exceed anything. Rather the period exceeds
+the maximum.
+
+> +		return -EINVAL;
+> +	}
+> +
+> +	prd = div;
+> +	div *= duty_ns;
+> +	do_div(div, period_ns);
+> +	dty = div;
+> +
+> +	ret = clk_prepare_enable(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	mutex_lock(&sunxi_pwm->ctrl_lock);
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +
+> +	if (sunxi_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
+> +		mutex_unlock(&sunxi_pwm->ctrl_lock);
+> +		clk_disable_unprepare(sunxi_pwm->clk);
+> +		return -EBUSY;
+> +	}
+> +
+> +	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	if (clk_gate) {
+> +		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +		sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +	}
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
+> +	val |= i;
+
+Ah, this is where the initial value is used. Perhaps rename i to
+prescaler to make it more obvious what it is.
+
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CH_PRD(pwm->hwpwm), dty | PWM_PRD(prd));
+
+Maybe split this into two lines for readability:
+
+	val = dty | PWM_PRD(prd);
+	sunxi_pwm_writel(...);
+
+Also does dty need to be range-checked so it doesn't spill over into the
+PRD field?
+
+> +static int sunxi_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				  enum pwm_polarity polarity)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	mutex_lock(&sunxi_pwm->ctrl_lock);
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +
+> +	if (polarity != PWM_POLARITY_NORMAL)
+> +		val &= ~BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
+> +	else
+> +		val |= BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
+> +
+> +
+
+There's an extra blank line here.
+
+> +static int sunxi_pwm_probe(struct platform_device *pdev)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm;
+
+Perhaps just "pwm" or "sunxi"? sunxi_pwm is kind of redundant.
+
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	const struct of_device_id *match;
+
+There should be no blank line above this one.
+
+> +
+> +	match = of_match_device(sunxi_pwm_dt_ids, &pdev->dev);
+> +	if (!match || !match->data)
+
+None of this can ever happen. match would only be NULL if the table
+doesn't contain a matching entry for this device. But in that case the
+driver's .probe() wouldn't have been called anyway. And none of the
+entries have a NULL .data field, so no need to check for that either.
+
+> +		return -ENODEV;
+> +
+> +	sunxi_pwm = devm_kzalloc(&pdev->dev, sizeof(*sunxi_pwm), GFP_KERNEL);
+> +	if (!sunxi_pwm)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	sunxi_pwm->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(sunxi_pwm->base))
+> +		return PTR_ERR(sunxi_pwm->base);
+> +
+> +	sunxi_pwm->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(sunxi_pwm->clk))
+> +		return PTR_ERR(sunxi_pwm->clk);
+> +
+> +	sunxi_pwm->chip.dev = &pdev->dev;
+> +	sunxi_pwm->chip.ops = &sunxi_pwm_ops;
+> +
+> +	sunxi_pwm->chip.base = -1;
+
+Why the blank line between the above?
+
+> +	sunxi_pwm->chip.npwm = 2;
+> +	sunxi_pwm->chip.can_sleep = true;
+> +	sunxi_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+> +	sunxi_pwm->chip.of_pwm_n_cells = 3;
+> +	sunxi_pwm->data = match->data;
+> +
+> +	mutex_init(&sunxi_pwm->ctrl_lock);
+> +
+> +	ret = clk_prepare_enable(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable PWM clock\n");
+> +		goto error;
+> +	}
+> +
+> +	/* By default, the polarity is inversed, set it to normal */
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG,
+> +			 BIT_CH(PWM_ACT_STATE, 0) |
+> +			 BIT_CH(PWM_ACT_STATE, 1));
+> +	clk_disable_unprepare(sunxi_pwm->clk);
+
+Why do you need to do this here? Doesn't this potentially cause
+transients if a bootloader had this configured with inversed polarity?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/a48b96b4/attachment.sig>
