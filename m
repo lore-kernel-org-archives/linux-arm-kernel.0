@@ -1,39 +1,86 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Jun 2014 18:41:42 +0200
-Subject: [PATCH 0/6] ARM: at91: more clocks fixes for 3.16
-Message-ID: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Tue, 17 Jun 2014 18:41:44 +0200
+Subject: [PATCH 2/6] ARM: at91/dt: sam9261 crystals under the clocks node
+In-Reply-To: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1403023308-20533-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Having clocks grouped in a subnode is common practice, so move the crystals
+under a clocks node for the at91sam9261 SoC and at91sam9261 based boards.
 
-This patch set fixes more issues with the clocks on AT91:
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9261.dtsi  | 20 +++++++++++---------
+ arch/arm/boot/dts/at91sam9261ek.dts | 16 ++++++++--------
+ 2 files changed, 19 insertions(+), 17 deletions(-)
 
-The first patch define the slow crystal on the at91sam9261ek board
-
-The next patchs are moving all the clocks that were under the root under a
-"clocks" node to be consistent accross all architecture.
-
-Alexandre Belloni (6):
-  ARM: at91/dt: define sam9261ek slow crystal frequency
-  ARM: at91/dt: sam9261 crystals under the clocks node
-  ARM: at91/dt: sam9n12 crystals under the clocks node
-  ARM: at91/dt: sam9rl crystals under the clocks node
-  ARM: at91/dt: sam9x5 crystals under the clocks node
-  ARM: at91/dt: sama5d3 crystals under the clocks node
-
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 12 +++++++-----
- arch/arm/boot/dts/at91sam9261.dtsi          | 20 ++++++++++---------
- arch/arm/boot/dts/at91sam9261ek.dts         | 12 ++++++++----
- arch/arm/boot/dts/at91sam9n12.dtsi          | 20 ++++++++++---------
- arch/arm/boot/dts/at91sam9n12ek.dts         | 16 +++++++--------
- arch/arm/boot/dts/at91sam9rl.dtsi           | 22 ++++++++++-----------
- arch/arm/boot/dts/at91sam9rlek.dts          | 17 ++++++++--------
- arch/arm/boot/dts/at91sam9x5.dtsi           | 30 +++++++++++++++--------------
- arch/arm/boot/dts/at91sam9x5cm.dtsi         | 12 +++++++-----
- arch/arm/boot/dts/sama5d3.dtsi              | 22 ++++++++++-----------
- arch/arm/boot/dts/sama5d3xcm.dtsi           | 12 +++++++-----
- 11 files changed, 105 insertions(+), 90 deletions(-)
-
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index 9de312e9bb3e..c8e8b92df51b 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -46,16 +46,18 @@
+ 		reg = <0x20000000 0x08000000>;
+ 	};
+ 
+-	main_xtal: main_xtal {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
++	clocks {
++		main_xtal: main_xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++		};
+ 
+-	slow_xtal: slow_xtal {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
++		slow_xtal: slow_xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++		};
+ 	};
+ 
+ 	ahb {
+diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+index aa35a7aec9a8..f4a765729c7a 100644
+--- a/arch/arm/boot/dts/at91sam9261ek.dts
++++ b/arch/arm/boot/dts/at91sam9261ek.dts
+@@ -20,14 +20,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	slow_xtal {
+-		clock-frequency = <32768>;
+-	};
+-
+-	main_xtal {
+-		clock-frequency = <18432000>;
+-	};
+-
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -37,6 +29,14 @@
+ 			compatible = "atmel,osc", "fixed-clock";
+ 			clock-frequency = <18432000>;
+ 		};
++
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <18432000>;
++		};
+ 	};
+ 
+ 	ahb {
 -- 
 1.9.1
