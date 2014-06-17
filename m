@@ -1,58 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jun 2014 14:36:20 +0100
-Subject: [PATCH v3] ARM: add get_user() support for 8 byte types
-In-Reply-To: <53A0428C.10200@linaro.org>
-References: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
- <20140612155843.GK23430@n2100.arm.linux.org.uk> <53A015B3.2070809@linaro.org>
- <20140617110908.GH23430@n2100.arm.linux.org.uk> <53A0428C.10200@linaro.org>
-Message-ID: <20140617133620.GJ23430@n2100.arm.linux.org.uk>
+Date: Tue, 17 Jun 2014 14:40:16 +0100
+Subject: [PATCH 0/2] DT updates for Cubox-i
+Message-ID: <20140617134016.GK23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 02:28:44PM +0100, Daniel Thompson wrote:
-> On 17/06/14 12:09, Russell King - ARM Linux wrote:
-> > On Tue, Jun 17, 2014 at 11:17:23AM +0100, Daniel Thompson wrote:
-> >> ... at this point there is a narrowing cast followed by an implicit
-> >> widening. This results in compiler either ignoring r3 altogether or, if
-> >> spilling to the stack, generating code to set r3 to zero before doing
-> >> the store.
-> > 
-> > In actual fact, there's very little difference between the two
-> > implementations in terms of generated code.
-> > 
-> > The difference between them is what happens on the 64-bit big endian
-> > narrowing case, where we use __get_user_4 with your version.  This
-> > adds one additional instruction.
-> 
-> Good point.
-> 
-> 
-> > and 64-bit narrowed to 32-bit:
-> > 
-> >         str     lr, [sp, #-4]!
-> > -       mov     ip, r0
-> > +       mov     r3, r0
-> >         mov     r0, r1
-> >  #APP
-> >  @ 275 "t-getuser.c" 1
-> > -       bl      __get_user_8
-> > +       bl      __get_user_4
-> >  @ 0 "" 2
-> > -       str     r2, [ip, #0]
-> > +       str     r2, [r3, #0]
-> >         ldr     pc, [sp], #4
-> 
-> The later case avoids allocating r3 for the __get_user_x and should
-> reduce register pressure and, potentially, saves a few instructions
-> elsewhere (one of my rather large test functions does demonstrate this
-> effect).
-> 
-> I don't know if we care about that. If we do I'm certainly happy to put
-> a patch together than exploits this (whilst avoiding the add in the big
-> endian case).
+Shawn,
 
-No need - the + case is your version, the - case is my version.  So your
-version wins on this point. :)
+These are two updates to the Cubox-i which I'd prefer to get into -rc.
+They were omitted from the merge window because their dependent changes
+were not merged, but have now been merged.
+
+The only real functional change for the Cubox-i in this set is that it
+is now possible to control the front panel LED.  The other patch is
+solely about moving some DT configuration to where it belongs.
+
+Can we please get these in?
+
+Thanks.
+
+ arch/arm/boot/dts/imx6dl-hummingboard.dts | 10 ++++++++++
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi   | 13 -------------
+ 3 files changed, 37 insertions(+), 13 deletions(-)
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
