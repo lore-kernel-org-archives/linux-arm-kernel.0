@@ -1,115 +1,100 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 17 Jun 2014 08:08:29 +0530
-Subject: [PATCH v2 2/3] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <20140423161325.GB1243@e102568-lin.cambridge.arm.com>
-References: <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
- <1398147435-3122-1-git-send-email-a.kesavan@samsung.com>
- <535650AE.90501@linaro.org>
- <alpine.LFD.2.11.1404221129150.980@knanqh.ubzr>
- <5356C134.8070707@linaro.org>
- <alpine.LFD.2.11.1404221540540.980@knanqh.ubzr>
- <20140423161325.GB1243@e102568-lin.cambridge.arm.com>
-Message-ID: <CAM4voa=Lv3xpHfHVcua1jpajEY1XPrXKK=vS4-_3r+etmB4DDQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 17 Jun 2014 11:50:22 +0900
+Subject: [PATCH] arm: exynos: Modify pm code to check for cortex A9 rather
+ than the SoC
+In-Reply-To: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
+References: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <00ef01cf89d6$e248eb30$a6dac190$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Abhilash Kesavan wrote:
+> 
+> We have an soc check to ensure that the scu and certain A9 specific
+> registers are not accessed on Exynos5250 (which is A15 based).
+> Rather than adding another soc specific check for 5420 let us test
+> for the Cortex A9 primary part number.
+> 
+> This resolves the below crash seen on exynos5420 during core switching
+> after the CPUIdle consolidation series was merged.
+> 
+> [  155.975589] [<c0013174>] (scu_enable) from [<c001b0dc>]
+> (exynos_cpu_pm_notifier+0x80/0xc4)
+> [  155.983833] [<c001b0dc>] (exynos_cpu_pm_notifier) from [<c003c1b0>]
+> (notifier_call_chain+0x44/0x84)
+> [  155.992851] [<c003c1b0>] (notifier_call_chain) from [<c007a49c>]
+> (cpu_pm_notify+0x20/0x3c)
+> [  156.001089] [<c007a49c>] (cpu_pm_notify) from [<c007a564>] (cpu_pm_exit+0x20/0x38)
+> [  156.008635] [<c007a564>] (cpu_pm_exit) from [<c0019e98>]
+> (bL_switcher_thread+0x298/0x40c)
+> [  156.016788] [<c0019e98>] (bL_switcher_thread) from [<c003842c>] (kthread+0xcc/0xe8)
+> [  156.024426] [<c003842c>] (kthread) from [<c000e438>] (ret_from_fork+0x14/0x3c)
+> [  156.031621] Code: ea017fec c0530a00 c052e3f8 c0012dcc (e5903000
+> 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm.c |   15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index d10c351..6dd4a11 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -300,7 +300,7 @@ static int exynos_pm_suspend(void)
+>  	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
+>  	__raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
+> 
+> -	if (!soc_is_exynos5250())
+> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+>  		exynos_cpu_save_register();
+> 
+>  	return 0;
+> @@ -334,7 +334,7 @@ static void exynos_pm_resume(void)
+>  	if (exynos_pm_central_resume())
+>  		goto early_wakeup;
+> 
+> -	if (!soc_is_exynos5250())
+> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+>  		exynos_cpu_restore_register();
+> 
+>  	/* For release retention */
+> @@ -353,7 +353,7 @@ static void exynos_pm_resume(void)
+> 
+>  	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+> 
+> -	if (!soc_is_exynos5250())
+> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+>  		scu_enable(S5P_VA_SCU);
+> 
+>  early_wakeup:
+> @@ -440,15 +440,18 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+>  	case CPU_PM_ENTER:
+>  		if (cpu == 0) {
+>  			exynos_pm_central_suspend();
+> -			exynos_cpu_save_register();
+> +			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+> +				exynos_cpu_save_register();
+>  		}
+>  		break;
+> 
+>  	case CPU_PM_EXIT:
+>  		if (cpu == 0) {
+> -			if (!soc_is_exynos5250())
+> +			if (read_cpuid_part_number() ==
+> +					ARM_CPU_PART_CORTEX_A9) {
+>  				scu_enable(S5P_VA_SCU);
+> -			exynos_cpu_restore_register();
+> +				exynos_cpu_restore_register();
+> +			}
+>  			exynos_pm_central_resume();
+>  		}
+>  		break;
+> --
+> 1.7.9.5
 
-On Wed, Apr 23, 2014 at 9:43 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, Apr 22, 2014 at 08:56:23PM +0100, Nicolas Pitre wrote:
->>
->> [ Moved Lorenzo up in the addressee list to get his attention ]
->
-> Sorry for the delay in replying.
->
->> On Tue, 22 Apr 2014, Daniel Lezcano wrote:
->>
->> > On 04/22/2014 05:40 PM, Nicolas Pitre wrote:
->> > > On Tue, 22 Apr 2014, Daniel Lezcano wrote:
->> > >
->> > > > On 04/22/2014 08:17 AM, Abhilash Kesavan wrote:
->> > > > > +/*
->> > > > > + * The common v7_exit_coherency_flush API could not be used because of the
->> > > > > + * Erratum 799270 workaround. This macro is the same as the common one (in
->> > > > > + * arch/arm/include/asm/cacheflush.h) except for the erratum handling.
->> > > > > + */
->> > > > > +#define exynos_v7_exit_coherency_flush(level) \
->> > > > > +     asm volatile( \
->> > > > > +     "stmfd  sp!, {fp, ip}\n\t"\
->> > > > > +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
->> > > > > +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
->> > > > > +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
->> > > > > +     "isb\n\t"\
->> > > > > +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
->> > > > > +     "clrex\n\t"\
->> > > > > +     "mrc    p15, 0, r0, c1, c0, 1   @ get ACTLR\n\t" \
->> > > > > +     "bic    r0, r0, #(1 << 6)       @ disable local coherency\n\t" \
->> > > > > +     /* Dummy Load of a device register to avoid Erratum 799270 */ \
->> > > >
->> > > > Wouldn't make sense to add the erratum in the Kconfig and re-use it in the
->> > > > generic v7_exit_coherency_flush macro instead of redefining it ?
->> > >
->> > > The implementation of the erratum (the dummy device register load) is
->> > > platform specific I'm afraid.
->> > >
->> > > Is TC2 also concerned by this erratum, or is this Samsung specific?
->> >
->> > Sounds like it is ARM Cortex-A15MP specific:
->> >
->> > http://infocenter.arm.com/help/topic/com.arm.doc.epm028090/cortex_a15_mpcore_software_developers_errata_notice_r2_v12.pdf
->> >
->> > Page 31.
->>
->> The condition for hitting the erratum is: "The L2 cache block has been
->> idle for 256 or more cycles with no memory requests from any core, no
->> external snoops, and no ACP requests".
->>
->> Given that the operation that almost immediately precedes the
->> problematic mcr is a call to v7_flush_dcache_louis or
->> v7_flush_dcache_all, is this possible that the condition for the erratum
->> could ever be met?
->
-> Yes, if we execute out of the I-cache (no-data accesses) I think this might be
-> triggered.
->
-> On a side note, the errata affects also the setting of SMP bit
-> (__v7_ca15mp_setup and cpu_v7_do_resume) but we do nothing there (it
-> is a different situation though, MMU there is off and D-cache off...but
-> I-cache is allowed to be on, so I am actually checking if we should be doing
-> something there too).
->
->> If no then we should document that v7_exit_coherency_flush(() is safe
->> against erratum 799270 and use it here.
->
-> Eh, I wish we could use it safely, I am currently investigating and will get
-> back to you asap.
+Yes, looks good to me.
 
-Have you been able to come to a conclusion regarding the necessity of
-the erratum workaround ? We are currently carrying the workaround in
-the merged exynos back-end.
+I've applied this into fixes for 3.16.
 
-Regards,
-Abhilash
->
-> Lorenzo
->
->> > > > > +     "ldr    r4, [%0]\n\t" \
->> > > > > +     "and    r4, r4, #0\n\t" \
->> > > > > +     "orr    r0, r0, r4\n\t" \
->> > > > > +     "mcr    p15, 0, r0, c1, c0, 1   @ set ACTLR\n\t" \
->> > > > > +     "isb\n\t" \
->> > > > > +     "dsb\n\t" \
->> > > > > +     "ldmfd  sp!, {fp, ip}" \
->> > > > > +     : \
->> > > > > +     : "Ir" (S5P_INFORM0) \
->> > > > > +     : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", \
->> > > > > +       "r9", "r10", "lr", "memory")
->> > > >
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Kukjin
