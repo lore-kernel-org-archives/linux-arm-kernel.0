@@ -1,39 +1,61 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 17 Jun 2014 10:07:57 -0700
-Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- (Bjorn Andersson's message of "Mon, 16 Jun 2014 11:46:09 -0700")
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <7hvbrzbh1u.fsf@paris.lan>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Tue, 17 Jun 2014 20:10:46 +0300
+Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
+In-Reply-To: <20140617170531.GF3705@n2100.arm.linux.org.uk>
+References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
+ <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
+ <20140617090931.GB3705@n2100.arm.linux.org.uk> <20140617125831.GI4173@beef>
+ <20140617131522.GD3705@n2100.arm.linux.org.uk>
+ <C3DA6AFC-2784-4A41-BC72-EF25B2B03B41@antoniou-consulting.com>
+ <20140617160119.GE3705@n2100.arm.linux.org.uk>
+ <317D412E-B455-4B9D-95B3-F010C68744A3@antoniou-consulting.com>
+ <20140617170531.GF3705@n2100.arm.linux.org.uk>
+Message-ID: <FA75104C-9D36-4EB6-BE5C-862D71E1877B@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Paul Walmsley
+Hi Russell,
 
-Bjorn Andersson <bjorn.andersson@sonymobile.com> writes:
+On Jun 17, 2014, at 8:05 PM, Russell King - ARM Linux wrote:
 
-> This series adds a regulator driver for the Resource Power Manager found in
-> Qualcomm 8660, 8960 and 8064 based devices.
->
-> The RPM driver exposes resources to its child devices, that can be accessed to
-> implement drivers for the regulators, clocks and bus frequency control that's
-> owned by the RPM in these devices.
->
-> Changes since v2:
->   - Fix copy-paste error in dt binding
->   - Correct incomplete move from mfd to soc
->   - Correct const mistake in regulator driver
->
-> Changes since v1:
->   - Moved rpm driver to drivers/soc
+> On Tue, Jun 17, 2014 at 07:59:21PM +0300, Pantelis Antoniou wrote:
+>> That case might already work on FPGA people's trees. I know Altera for sure
+>> uses overlays, and some xilinx guys popped up on past discussions.
+>> Their vendor trees probably use an older revision of the patches.
+>> 
+>> BTW, there is nothing special about DRM/v4l2 that can't be handled by
+>> a generic DT mechanism. What makes this such a big problem?
+> 
+> Really?
+> 
+> DRM is not hotpluggable in any shape or form, and David Airlie has
+> indicated that he does strongly opposes moving it in that direction.
+> 
+> DRM follows the "card" model, where, at probe time, the hardware is
+> known and never changes until the "card" is torn down.  No new
+> connectors can be added once the "card" is initialised, and no
+> connectors can be removed.  Any changes must be done by tearing down
+> the entire card and reconstructing it (if reconstructing it with a
+> reduced set of hardware is appropriate.)
+> 
 
-I'm not sure I follow the motivation for having this under drivers/soc?
+That is a limitation of the current DRM implementation.
 
-In fact, my (possibly incorrect) understanding of this Resource Power
-Manager is that it's actually to manage communication/control of
-resources that are actually handled off the SoC by a microcontroller.
+I seems to be this is born out of some kind of misunderstanding about how
+DT can (and does) support dynamic changes.
 
-I added Paul W. to Cc so he can correct me, but I think this is a ways
-off from the goal of what drivers/soc was for.
+I admit that I haven't done much work on DRM (besides some tinkering with
+Rob Clark's ti_lcdc DRM driver), but knowing what DT does have a dynamic
+change notifier support, perhaps it can be made to work.
 
-Kevin
+As I said, the next thing coming is transactional DT support, perhaps you
+can share the DT fragment describing your use-case (before/after) and 
+I'll try to accommodate in the next patch series.
+
+Regards
+
+-- Pantelis
+
+> -- 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
