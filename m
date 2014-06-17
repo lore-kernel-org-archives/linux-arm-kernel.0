@@ -1,51 +1,68 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Tue, 17 Jun 2014 17:25:00 +0530
-Subject: Boot warnings on exynos5420 based boards
-In-Reply-To: <53A01039.2020302@linux.vnet.ibm.com>
-References: <CAK5sBcEJOJDtt_7ow=q=hiN8-JRHzOUg6t=T3hTNOwzKq5dodw@mail.gmail.com>
- <53A007F7.6020103@linux.vnet.ibm.com>
- <CAK5sBcECq5sN9CnUhWLPoYnFnPz64JM_6CVRBwjz8Q2=X5_t=A@mail.gmail.com>
- <53A01039.2020302@linux.vnet.ibm.com>
-Message-ID: <CAK5sBcH6Yw0rdfUgTPi2OhqZ5pNeD39_NUguT4NFR4hrK2uZgA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 17 Jun 2014 13:58:30 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140616125704.GE16758@arm.com>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <538757B6.4010109@wwwdotorg.org> <20140530073006.GA24748@ulmo>
+ <20140530112728.GB3949@e103592.cambridge.arm.com>
+ <20140604211237.GC18710@mithrandir>
+ <20140616125704.GE16758@arm.com>
+Message-ID: <20140617115829.GB18816@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srivatsa,
+On Mon, Jun 16, 2014 at 01:57:04PM +0100, Will Deacon wrote:
+> On Wed, Jun 04, 2014 at 10:12:38PM +0100, Thierry Reding wrote:
+> > On Fri, May 30, 2014 at 12:27:28PM +0100, Dave Martin wrote:
+> > > On Fri, May 30, 2014 at 08:30:08AM +0100, Thierry Reding wrote:
+> > [...]
+> > > > Arnd, can you take another look at this binding and see if there's
+> > > > anything else missing? If not I'll go through the document again and
+> > > > update all #address-cells/#size-cells references with #iommu-cells as
+> > > > appropriate and submit v3.
+> > > 
+> > > How do you envisage propagation of the master ID bits downstream of the
+> > > IOMMU would be described?
+> > > 
+> > > We will definitely need a way to describe this for GICv3.  How those
+> > > values are propagated is likely to vary between related SoCs and doesn't
+> > > feel like it should be baked into a driver, especially for the ARM SMMU
+> > > which may get reused in radically different SoC families from different
+> > > vendors.
+> > 
+> > Well, we've had cases like these in the past (power sequences come to
+> > mind). Some concepts are just too difficult or unwieldy to be put into
+> > device tree. I think that this is one of them.
+> > 
+> > > The most likely types of remapping are the adding of a base offset or
+> > > some extra bits to the ID -- because not all MSIs to the GIC will
+> > > necessarily pass through the IOMMU.  It's also possible that we might
+> > > see ID squashing or folding in some systems.
+> > 
+> > It can easily be argued that if the algorithm used to remap the ID
+> > varies, the compatibility of the device changes. Therefore I would
+> > expect any variant of the GICv3 that deviates from the "standard"
+> > mapping (if there is such a thing) to have its own compatible string.
+> 
+> There is no standard mapping; it's a property defined at system integration
+> time. I fully expect different SoCs to do different things here.
 
-On Tue, Jun 17, 2014 at 3:24 PM, Srivatsa S. Bhat
-<srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> On 06/17/2014 03:03 PM, Sachin Kamat wrote:
->
->>> Below is an updated patch, please let me know how it goes. (You'll have to
->>> revert c47a9d7cca first, and then 56e692182, before trying this patch).
->>
->> I am unable to apply your below patch on top of the above 2 reverts.
->> Applying: CPU hotplug, smp: Execute any pending IPI callbacks before CPU offline
->> fatal: corrupt patch at line 106
->> Patch failed at 0001 CPU hotplug, smp: Execute any pending IPI
->> callbacks before CPU offline
->>
->> Even with 'patch' I get the below failures:
->> patching file kernel/smp.c
->> Hunk #2 FAILED at 53.
->> Hunk #3 FAILED at 179.
->> 2 out of 3 hunks FAILED -- saving rejects to file kernel/smp.c.rej
->>
->
-> Hmm, weird. My mailer must have screwed it up.
->
-> Let's try again:
->
-> [In case this also doesn't work for you, please use this git tree in which
->  I have reverted the 2 old commits and added this updated patch.
->
->  git://github.com/srivatsabhat/linux.git ipi-offline-fix-v3
-> ]
+My point was that the mapping itself seems to be fundamental enough to
+make devices with different mappings "incompatible". Therefore I think
+this could probably be handled by using different compatible values,
+something along the lines of this:
 
-Unfortunately the attached patch did not apply either. Nevertheless, I
-applied the
-patch from your above mentioned tree. With that patch I do not see the warnings
-that I mentioned in my first mail. Thanks for fixing it.
+	compatible = "vendor,soc-gicv3", "arm,gicv3";
 
-Regards,
-Sachin.
+Then the mapping can be described in code, which should be a whole lot
+easier and more flexible than a more or less generic notation in device
+tree.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/957f757f/attachment.sig>
