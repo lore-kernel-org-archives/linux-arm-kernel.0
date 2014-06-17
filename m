@@ -1,61 +1,77 @@
-From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Tue, 17 Jun 2014 20:10:46 +0300
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617170531.GF3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk> <20140617125831.GI4173@beef>
- <20140617131522.GD3705@n2100.arm.linux.org.uk>
- <C3DA6AFC-2784-4A41-BC72-EF25B2B03B41@antoniou-consulting.com>
- <20140617160119.GE3705@n2100.arm.linux.org.uk>
- <317D412E-B455-4B9D-95B3-F010C68744A3@antoniou-consulting.com>
- <20140617170531.GF3705@n2100.arm.linux.org.uk>
-Message-ID: <FA75104C-9D36-4EB6-BE5C-862D71E1877B@antoniou-consulting.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Tue, 17 Jun 2014 19:11:05 +0200
+Subject: [PATCH] ARM: perf: allow tracing with kernel tracepoints events
+In-Reply-To: <CAFrcx1n-cPXm=w+84gQiUjZoFKi7gYnvJ0BQ+8yXKS=k3nEt3g@mail.gmail.com>
+References: <CAFrcx1n-cPXm=w+84gQiUjZoFKi7gYnvJ0BQ+8yXKS=k3nEt3g@mail.gmail.com>
+Message-ID: <1403025065-18001-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+When tracing with tracepoints events the IP and CPSR are set to 0,
+preventing the perf code to resolve the symbols:
 
-On Jun 17, 2014, at 8:05 PM, Russell King - ARM Linux wrote:
+./perf record -e kmem:kmalloc cal
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.007 MB perf.data (~321 samples) ]
 
-> On Tue, Jun 17, 2014 at 07:59:21PM +0300, Pantelis Antoniou wrote:
->> That case might already work on FPGA people's trees. I know Altera for sure
->> uses overlays, and some xilinx guys popped up on past discussions.
->> Their vendor trees probably use an older revision of the patches.
->> 
->> BTW, there is nothing special about DRM/v4l2 that can't be handled by
->> a generic DT mechanism. What makes this such a big problem?
-> 
-> Really?
-> 
-> DRM is not hotpluggable in any shape or form, and David Airlie has
-> indicated that he does strongly opposes moving it in that direction.
-> 
-> DRM follows the "card" model, where, at probe time, the hardware is
-> known and never changes until the "card" is torn down.  No new
-> connectors can be added once the "card" is initialised, and no
-> connectors can be removed.  Any changes must be done by tearing down
-> the entire card and reconstructing it (if reconstructing it with a
-> reduced set of hardware is appropriate.)
-> 
+./perf report
+Overhead Command Shared Object Symbol
+........ ....... ............. ...........
+40.78%   cal     [unknown]     [.]00000000
+31.6%    cal     [unknown]     [.]00000000
 
-That is a limitation of the current DRM implementation.
+The examination of the gathered samples (perf report -D) shows the IP
+is set to 0 and that the samples are considered as user space samples,
+while the IP should be set from the registers and the samples should be
+considered as kernel samples.
 
-I seems to be this is born out of some kind of misunderstanding about how
-DT can (and does) support dynamic changes.
+The fix is to implement perf_arch_fetch_caller_regs for ARM, which
+fills the necessary registers used for the callchain unwinding and
+to determine the user/kernel space property of the samples: ip, sp, fp
+and cpsr.
 
-I admit that I haven't done much work on DRM (besides some tinkering with
-Rob Clark's ti_lcdc DRM driver), but knowing what DT does have a dynamic
-change notifier support, perhaps it can be made to work.
+Tested with perf record and tracepoints filtering (-e <tracepoint>), with
+unwinding using fp (--call-graph fp) and dwarf info (--call-graph dwarf).
 
-As I said, the next thing coming is transactional DT support, perhaps you
-can share the DT fragment describing your use-case (before/after) and 
-I'll try to accommodate in the next patch series.
+Reported by Sneha Priya on linaro-dev, cf.
+http://lists.linaro.org/pipermail/linaro-dev/2014-May/017151.html
 
-Regards
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Reported-by: Sneha Priya <sneha.cse@hotmail.com>
+---
+ arch/arm/include/asm/perf_event.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
--- Pantelis
-
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+index 7558775..5e31d46 100644
+--- a/arch/arm/include/asm/perf_event.h
++++ b/arch/arm/include/asm/perf_event.h
+@@ -26,6 +26,25 @@ struct pt_regs;
+ extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
+ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs)	perf_misc_flags(regs)
++
++/*
++ * Take a snapshot of the regs.
++ * We only need a few of the regs:
++ * - ip for PERF_SAMPLE_IP
++ * - sp, fp for callchains
++ * - cpsr for user_mode() tests
++ */
++#define perf_arch_fetch_caller_regs(regs, __ip) {	\
++	instruction_pointer(regs)= (__ip);		\
++	__asm__ (					\
++		"mov	%[_ARM_sp], sp		\n\t"	\
++		"mov	%[_ARM_fp], fp		\n\t"	\
++		"mrs	%[_ARM_cpsr], cpsr	\n\t"	\
++		: [_ARM_sp]   "=r" (regs->ARM_sp),	\
++		  [_ARM_fp]   "=r" (regs->ARM_fp),	\
++		  [_ARM_cpsr] "=r" (regs->ARM_cpsr)	\
++	);						\
++}
+ #endif
+ 
+ #endif /* __ARM_PERF_EVENT_H__ */
+-- 
+1.8.1.2
