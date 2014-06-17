@@ -1,38 +1,72 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Tue, 17 Jun 2014 19:59:35 +0300
-Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
-In-Reply-To: <53A069B6.6070902@wwwdotorg.org>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
- <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
- <53A069B6.6070902@wwwdotorg.org>
-Message-ID: <53A073F7.20700@kapsi.fi>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Jun 2014 18:04:30 +0100
+Subject: [PATCHv2 0/4] arm64: handle heterogeneous system register values
+Message-ID: <1403024674-25108-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 07:15 PM, Stephen Warren wrote:
-> On 06/17/2014 06:16 AM, Tomeu Vizoso wrote:
->> On 06/16/2014 10:02 PM, Stephen Warren wrote:
->>> On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
->
->>> This binding looks quite anaemic vs.
->>> Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-emc.txt; I
->>> would expect that this binding needs all the EMC register data from the
->>> tegra20-emc binding too. Can the two bindings be identical?
->>
->> There's even less stuff needed right now, as all what ultimately the EMC
->> driver does is call clk_set_rate on the EMC clock. As the T124 EMC
->> driver gains more features, they should get more similar.
->
-> IIRC, even changing the EMC clock rate requires modifying the memory
-> controller's programming (e.g. delays/taps/tuning etc.). That's exactly
-> what the more complex stuff in the nvidia,tegra20-emc.txt is all about.
-> I not convinced that a driver that just modifies the clock rate without
-> adjusting the EMC programming will work reliably.
+Currently the arm64 kernel assumes CPUs are homogeneous, which is a source of
+several potential problems as this is not always true. This series is an
+attempt to ameliorate the situation. The first posting [1] was titled as
+"arm64: extend/fix /proc/cpuinfo + runtime sanity checks", but with the
+addition of the I-cache policy fix this title was either going to become
+unwieldy or misleading.
 
-Indeed, changing the EMC clock rate is a somewhat complicated sequence 
-of ~10 steps. The kernel even won't let one the rate be change directly, 
-as the change would be propagated to PLL_M which cannot have its rate 
-changed while it is enabled. I suppose the sequence should be hidden in 
-the EMC clk's set_rate implementation, which I guess would leave just 
-the rate policy to this driver.
+Since v1 [1]:
+* Add fix for differing I-cache policies
+* Make read_cpuid_part_number and read_cpu_implementor return extracted fields.
+
+This series adds infrastructure to record various system registers upon the
+booting of each CPU into a new per-CPU struct cpuinfo_arm64. This data can then
+be used to solve various problems:
+
+* On arm64 /proc/cpuinfo only contains information regarding the current CPU
+  (i.e. that which issued the read), due to use of read_cpuid_id() within
+  c_show. This isn't fantastic as it doesn't match arm and x86 (which print
+  information per-cpu), and on big.LITTLE AArch64 systems it will mean we don't
+  get accurate information regarding each CPU. Using the newly recorded
+  information, we can print correct information per-CPU in /proc/cpuinfo.
+
+* Level 1 instruction cache policy can differ across CPU micro-architectures in
+  big.LITTLE configurations, which can lead to a subset of cores reporting
+  aliasing I-caches in CTR_EL0.L1Ip. If any CPUs in the system have VIPT or
+  AIVIVT I-caches, the appropriate maintenance must be performed even from those
+  CPUs whose caches are non-aliasing. We can use the newly recorded information
+  to detect when this is the case.
+
+* Sometimes CPUs are erroneously configured differently by firmware such that a
+  feature is only enabled on a subset of CPUs. Even in the presence of
+  big.LITTLE systems we do not generally expect this, and such problems can be
+  difficult to detect. To enable early detection of mismatched capabilities in
+  SMP systems, we can use the newly recorded information to compare CPUs
+  feature-wise and identify potential issues.
+
+The series is based on v3.16-rc1, and can be found in my
+arm64/heterogeneous-sysreg branch [2,3].
+
+Cheers,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255389.html
+[2] http://linux-arm.org/git?p=linux-mr.git;a=shortlog;h=refs/heads/arm64/heterogeneous-sysreg
+[3] git://linux-arm.org/linux-mr.git arm64/heterogeneous-sysreg
+
+Mark Rutland (4):
+  arm64: add MIDR_EL1 field accessors
+  arm64: cpuinfo: print info for all CPUs
+  arm64: cachetype: report weakest cache policy
+  arm64: add runtime system sanity checks
+
+ arch/arm64/include/asm/cachetype.h |  16 ++--
+ arch/arm64/include/asm/cpu.h       |  48 ++++++++++++
+ arch/arm64/include/asm/cputype.h   |  33 ++++++--
+ arch/arm64/kernel/Makefile         |   3 +-
+ arch/arm64/kernel/cpuinfo.c        | 149 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c          |  46 ++++++------
+ arch/arm64/kernel/smp.c            |   6 ++
+ 7 files changed, 265 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm64/include/asm/cpu.h
+ create mode 100644 arch/arm64/kernel/cpuinfo.c
+
+-- 
+1.9.1
