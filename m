@@ -1,46 +1,81 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 Jun 2014 14:09:44 +0200
-Subject: [PATCH v3 1/4] of: Add NVIDIA Tegra XUSB pad controller binding
-In-Reply-To: <539F6318.5010306@wwwdotorg.org>
-References: <1402930623-28886-1-git-send-email-thierry.reding@gmail.com>
- <539F6318.5010306@wwwdotorg.org>
-Message-ID: <20140617120943.GD18816@ulmo>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 17 Jun 2014 14:13:15 +0200
+Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
+In-Reply-To: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+Message-ID: <53A030DB.3090009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 03:35:20PM -0600, Stephen Warren wrote:
-> On 06/16/2014 08:57 AM, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > This patch adds the device tree binding documentation for the XUSB pad
-> > controller found on NVIDIA Tegra SoCs. It exposes both pinmuxing and PHY
-> > capabilities.
-> 
-> This looks fine to me, with one issue below:
-> 
-> > diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
-> 
-> > +Required properties:
-> > +--------------------
-> 
-> > +- #address-cells: Should be 0.
-> > +- #size-cells: Should be 0.
-> 
-> I don't think those properties are needed. If they are, a value of 0 for
-> both doesn't seem useful. I assume those two lines should just be
-> deleted, and also from the example below.
-> 
-> Assuming I take this through the Tegra tree, If this is the only issue,
-> I can delete those lines when applying.
+On 06/04/2014 07:30 PM, Doug Anderson wrote:
+> In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
+> supported using the MCT as a scheduler clock.  We properly marked
+> exynos4_read_sched_clock() as notrace.  However, we then went and
+> called another function that _wasn't_ notrace.  That means if you do:
+>
+>    cd /sys/kernel/debug/tracing/
+>    echo function_graph > current_tracer
+>
+> You'll get a crash.
+>
+> Fix this (but still let other readers of the MCT be trace-enabled) by
+> adding an extra function.  It's important to keep other users of MCT
+> traceable because the MCT is actually quite slow.
 
-I've just sent a v4 including these changes along with a fix for the bug
-that Mikko pointed out.
+Thanks for the explanation in the other email.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/c46eb25f/attachment.sig>
+I think the last sentence is a bit confusing because you are implicitly 
+saying you need these traces to investigate why the timer is slow which 
+is referring to something not related to this fix.
+
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>   drivers/clocksource/exynos_mct.c | 9 +++++++--
+>   1 file changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 8d64200..ba3a683 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -165,7 +165,7 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
+>   	exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
+>   }
+>
+> -static cycle_t exynos4_frc_read(struct clocksource *cs)
+> +static inline cycle_t notrace _exynos4_frc_read(void)
+
+Why inline ?
+
+>   {
+>   	unsigned int lo, hi;
+>   	u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
+> @@ -179,6 +179,11 @@ static cycle_t exynos4_frc_read(struct clocksource *cs)
+>   	return ((cycle_t)hi << 32) | lo;
+>   }
+>
+> +static cycle_t exynos4_frc_read(struct clocksource *cs)
+> +{
+> +	return _exynos4_frc_read();
+> +}
+> +
+>   static void exynos4_frc_resume(struct clocksource *cs)
+>   {
+>   	exynos4_mct_frc_start(0, 0);
+> @@ -195,7 +200,7 @@ struct clocksource mct_frc = {
+>
+>   static u64 notrace exynos4_read_sched_clock(void)
+>   {
+> -	return exynos4_frc_read(&mct_frc);
+> +	return _exynos4_frc_read();
+>   }
+>
+>   static void __init exynos4_clocksource_init(void)
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
