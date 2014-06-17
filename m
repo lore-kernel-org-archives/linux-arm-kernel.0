@@ -1,52 +1,51 @@
-From: jkridner@gmail.com (Jason Kridner)
-Date: Tue, 17 Jun 2014 12:33:01 -0400
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617160119.GE3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk>
- <20140617125831.GI4173@beef>
- <20140617131522.GD3705@n2100.arm.linux.org.uk>
- <C3DA6AFC-2784-4A41-BC72-EF25B2B03B41@antoniou-consulting.com>
- <20140617160119.GE3705@n2100.arm.linux.org.uk>
-Message-ID: <CA+T6QP=wShk2pT+znmucF54qseF78MewYaY09UR0qsHv26eVWA@mail.gmail.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Tue, 17 Jun 2014 18:37:05 +0200
+Subject: [PATCH v2 4/4] brcmfmac: Fix OOB interrupt not working for
+ BCM43362
+In-Reply-To: <53A05168.9010604@redhat.com>
+References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
+ <1402941407-8210-5-git-send-email-hdegoede@redhat.com>
+ <53A02B5A.3070409@broadcom.com> <53A05168.9010604@redhat.com>
+Message-ID: <53A06EB1.4040805@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 12:01 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 17, 2014 at 04:32:11PM +0300, Pantelis Antoniou wrote:
->> The complexity is absolutely required, and it has nothing to do with
->> beaglebone capes.
+On 17-06-14 16:32, Hans de Goede wrote:
+> Hi,
+>
+> On 06/17/2014 01:49 PM, Arend van Spriel wrote:
+>> On 16-06-14 19:56, Hans de Goede wrote:
+>>> It has taken me a long long time to get the OOB interrupt working on the
+>>> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
+>>> end I found these magic register pokes in the cubietruck kernel tree:
+>>> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
+>>>
+>>> I'm not entirely sure if this specific to the AP6210 module, or if this
+>>> should be done for all BCM43362 sdio devices.
 >>
->> The fact of the matter is that reconfigurable hardware is here, on
->> shipping system, and we, as the linux kernel community have to make
->> sure it works, and that it works in a sane way.
+>> Hi Hans,
+>>
+>> I was still not sure about this one so I asked around. Apart from the nvram settings I emailed earlier one more is needed:
+>>
+>> sd_gpout=1
+>> sd_oobonly=1
+>> sd_gpval=1
+>> *muxenab=0x11*
+>>
+>> Could you give that a try?
 >
-> Right, so looking back in the git history, this project has been going
-> on for... at least four years?  Probably longer than the length of time
-> that we've been converting ARM to DT.  At no point during that has anyone
-> brought up the issue of DT being dynamic, so none of the drivers which
-> we have been converting caters for this.
+> I seriously doubt that is going to do anything at all, all 4 these keywords do not
+> show up when running strings on brcmfmac43362-sdio.bin, where as all the
+> keywords used in the brcmfmac43362-sdio.txt shipped with the android on ap6210
+> equipped boards do show up, confirming that the keywords are encoded in plain text
+> in the firmware file.
 >
-> Isn't this a bit of a missed opportunity, if this is a direction that
-> OF wishes to head towards?
+> Let me know if want me to give it a try anyways and I'll do so.
+>
+> Perhaps these keywords need a newer firmware version then the one in the
+> linux-firmware repository ?
 
-I believe it absolutely is a missed opportunity, but that doesn't mean
-it isn't still needed moving forward. We've been using overlays
-successfully in the BeagleBoard.org community on BeagleBone Black for
-over a year now. It is just a shame we're still shipping a 3.8 kernel.
-This universal overlay provides hope to support most add-ons, but it
-doesn't address the dynamic nature of some add-on hardware. It is
-certainly my hope that this effort doesn't derail the overlay
-development work.
+I will checkout the firmware release and see what is built there.
 
->
-> Wouldn't it have been relevant to the discussion at kernel summit too,
-> concerning DRM/v4l2/componentised systems?  What if someone comes along
-> tomorrow with part of their multimedia based system inside a FPGA
-> which they program up at runtime?
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+Thanks,
+Arend
