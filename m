@@ -1,90 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jun 2014 00:42:26 +0100
-Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling()
- into a library function
-In-Reply-To: <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
- <20140616104615.GA10701@n2100.arm.linux.org.uk>
- <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
-Message-ID: <20140617234226.GP23430@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 17 Jun 2014 16:59:13 -0700
+Subject: [PATCH v3 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <1402944372-31901-2-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1402944372-31901-2-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <53A0D651.20605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 02:17:30PM +0200, Ulf Hansson wrote:
-> On 16 June 2014 12:46, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Wed, Apr 23, 2014 at 08:08:07PM +0100, Russell King wrote:
-> >> @@ -1507,25 +1529,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
-> >>                       host->ops->set_clock(host, host->clock);
-> >>               }
-> >>
-> >> -             if (host->ops->set_uhs_signaling)
-> >> -                     host->ops->set_uhs_signaling(host, ios->timing);
-> >> -             else {
-> >> -                     ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-> >> -                     /* Select Bus Speed Mode for host */
-> >> -                     ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
-> >> -                     if ((ios->timing == MMC_TIMING_MMC_HS200) ||
-> >> -                         (ios->timing == MMC_TIMING_UHS_SDR104))
-> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
-> >> -                     else if (ios->timing == MMC_TIMING_UHS_SDR12)
-> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
-> >> -                     else if (ios->timing == MMC_TIMING_UHS_SDR25)
-> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
-> >> -                     else if (ios->timing == MMC_TIMING_UHS_SDR50)
-> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
-> >> -                     else if (ios->timing == MMC_TIMING_UHS_DDR50)
-> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
-> >> -                     sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
-> >> -             }
-> >> +             host->ops->set_uhs_signaling(host, ios->timing);
-> >>
-> >>               if (!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN) &&
-> >>                               ((ios->timing == MMC_TIMING_UHS_SDR12) ||
-> >
-> > Whoever decided to poorly pick these patches up against my will has
-> > slightly messed this patch up - whereas my original patch left the
-> > code correctly formatted, when whoever applied this patch did so, they
-> > left an additional blank line in the above.
-> 
-> Hi Russell,
-> 
-> We kindly pinged you several times asking for your state and for the
-> PR, but I suppose you were just too busy. Your PR were kind of
-> blocking patches for sdhci, if you remember.
+On 06/16/14 11:46, Bjorn Andersson wrote:
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
+> new file mode 100644
+> index 0000000..0366533
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
+> @@ -0,0 +1,260 @@
+> +Qualcomm Resource Power Manager (RPM)
+> +
+[...]
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: two entries specifying the RPM's message ram and ipc register
+> +
+> +- reg-names:
+> +	Usage: required
+> +	Value type: <string-array>
+> +	Definition: must contain the following, in order:
+> +		    "msg_ram"
+> +		    "ipc"
 
-I wasn't "too busy".  I had walked away from all kernel maintanence in
-disgust at the way many in the ARM community ignores questions, and
-ignores patches which need testing - I'm talking there about the L2C
-patch series which was extremely poorly tested, and still, to this day,
-has questions outstanding.  Yes, the code now produces warnings.  It
-produces warnings /because/ people were not willing to help.
+ipc is concerning....
 
-Those warnings serve as a reminder that there's still problems which
-need solving there, and they're not going to go away until those
-problems are solved.
+> +	rpm at 108000 {
+> +		compatible = "qcom,rpm-msm8960";
+> +		reg = <0x108000 0x1000 0x2011008 0x4>;
+> +
 
-While I don't like pushing unfinished code into mainline, in this case,
-others deemed the patch set too important _not_ to go into mainline
-even with these problems.
+(reg-names is missing from the example)
 
-Now, it's been /soo/ long since I worked on that patch set that my
-knowledge has now diminished... so it's now going to be _much_ harder
-to resolve those issues than it would have been three months ago.
+because ipc is actually a register inside the Krait complex's global
+clock control/distribution hardware block (it's located at 0x2011000).
+>From what I can tell, this is the only non-clock/power register inside
+there. I plan to send out a driver for this hardware block so that I can
+switch the L2 aux source mux over to PLL8 instead of PXO (done with a
+single register write to 0x2011028) and this mapping/use here is going
+to conflict with that unless I only map the single register like is done
+here.
 
-And I'm also holding a grudge, and I bear grudges for a long time, so
-expect me to be "difficult" towards Linux stuff for a while yet.
-
-> The mmc people were also very helping in sending patches to fixup
-> related regressions, immediately after we merged your patchset. Thus
-> together I think we managed to pull it off.
-
-The formatting problem I refer to above is line 1532/1533 in sdhci.c -
-there's an additional blank line which somehow got left behind, caused
-presumably by insufficient attention paid to cleaning up a conflict
-between my original patches and the state of the tree they were
-applied to.
+I wonder if we'd be better off making this region a separate node and
+having some phandle to it here in the RPM node? That way we have a
+driver that provides a clock and some IPC handle the RPM driver can get.
+The SMD driver also uses the same register to kick other processors so
+having some generic IPC handle may be useful there too.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
