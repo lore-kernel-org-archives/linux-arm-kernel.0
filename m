@@ -1,40 +1,27 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 18 Jun 2014 00:43:35 +0200
-Subject: [RFC PATCH 3/4] drm/tegra: Request memory bandwidth for the
- display controller
-In-Reply-To: <539F4E53.6080205@wwwdotorg.org>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1402925713-25426-4-git-send-email-tomeu.vizoso@collabora.com>
- <539F4E53.6080205@wwwdotorg.org>
-Message-ID: <20140617224334.GC25309@mithrandir>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Jun 2014 23:48:06 +0100
+Subject: [PATCH] clkdev: Don't print errors on probe defer
+In-Reply-To: <20140617223305.32686.15540@quantum>
+References: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
+ <20140617223305.32686.15540@quantum>
+Message-ID: <20140617224805.GN23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 02:06:43PM -0600, Stephen Warren wrote:
-> On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
-> > Request it based solely on the current mode's refresh rate. More
-> > accurate requirements can be requested in future patches.
+On Tue, Jun 17, 2014 at 03:33:05PM -0700, Mike Turquette wrote:
+> Quoting Stephen Boyd (2014-06-13 16:36:31)
+> > This error message can spam the logs if you have lots of probe
+> > deferals due to missing clocks. Just silence the error in this
+> > case because the driver should try again later.
+> > 
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> > diff --git a/drivers/gpu/drm/tegra/dc.c b/drivers/gpu/drm/tegra/dc.c
-> 
-> > +	bandwidth = mode->clock * window.bits_per_pixel / 8;
-> > +	err = tegra124_emc_reserve_bandwidth(TEGRA_EMC_CONSUMER_DISP1, bandwidth);
-> 
-> DISP1 shouldn't be hard-coded here; the code should use DISP1 or DISP2
-> based on head or DC identity. We certainly have some boards capable of
-> dual-head operation.
+> Looks OK to me. Russell?
 
-On a general note, I think perhaps a better way to represent this in an
-API, and perhaps this would help with making the API more generic, too,
-would be to make drivers request some sort of handle in .probe() and use
-that handle subsequently when making requests. That's somewhat analogous
-to the PM QoS' struct pm_qos_request.
+Looks fine to me too.  Should I assume you're looking to take it?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/38042c1e/attachment.sig>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
