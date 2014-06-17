@@ -1,112 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jun 2014 17:33:45 +0200
-Subject: ARM: SoC bug fixes
-Message-ID: <6661934.qBJd3kAAeu@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 17 Jun 2014 10:38:48 -0500
+Subject: [RFC PATCH 0/7] ARM: OMAP4+: PRM: minor cleanups and dt support
+ of interrupts
+In-Reply-To: <1402025761-16831-1-git-send-email-nm@ti.com>
+References: <1402025761-16831-1-git-send-email-nm@ti.com>
+Message-ID: <53A06108.9010108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2dc24b0d0636349d403ae803bbad0c84f6c2ea57:
+On 06/05/2014 10:35 PM, Nishanth Menon wrote:
+> 
+> Hi,
+> 
+> The following series is a minimal set of cleanups and generalization
+> in the direction of supporting daisychain wakeup on all OMAP4+
+> platforms. We cannot still add IO_WAKEUP ability for OMAP5/DRA7/AM437x
+> yet pending further pinctrl patches.
+> 
+> These do have a few cosmetic issues, but hope is to get a view about
+> the approach. Also note that documentation of bindings for ti,dra7-prm
+> etc are still pending.
+> 
+> Nishanth Menon (7):
+>   ARM: OMAP4+: prminst: provide function to find prm_dev instance
+>     offset
+>   ARM: OMAP4: prm use the generic prm_inst to allow logic to be
+>     abstracted
+>   ARM: OMAP4+: PRM: remove "wkup" event
+>   ARM: OMAP4+: PRM: register interrupt information from DT
+>   ARM: dts: OMAP4: Add PRM interrupt
+>   ARM: dts: OMAP5: add PRM interrupt
+>   ARM: dts: DRA7: add PRM interrupt
+> 
+>  arch/arm/boot/dts/dra7.dtsi       |    1 +
+>  arch/arm/boot/dts/omap4.dtsi      |    1 +
+>  arch/arm/boot/dts/omap5.dtsi      |    1 +
+>  arch/arm/mach-omap2/prm44xx.c     |   89 ++++++++++++++++++++++++++++++++-----
+>  arch/arm/mach-omap2/prminst44xx.c |   41 ++++++++++-------
+>  arch/arm/mach-omap2/prminst44xx.h |    3 ++
+>  6 files changed, 111 insertions(+), 25 deletions(-)
+> 
+Gentle ping on this series? are we ok with this approach?
 
-  Merge tag 'soc2-for-3.16' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2014-06-11 11:03:24 -0700)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 21278aeafbfacfd62b3e613525f0c694a029dac1:
-
-  ARM: use menuconfig for sub-arch menus (2014-06-17 17:09:48 +0200)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.16
-
-A first set of bug fixes that didn't make it for the merge window, and
-two Kconfig cleanups that still make sense at this point. Unfortunately,
-one of the two cleanups caused an unintended change in the original
-version, so we had to revert one part of it and do some more testing
-to ensure the rest is really fine. There was also a last-minute
-rebase of the patches to remove another bad commit.
-
-----------------------------------------------------------------
-Arnd Bergmann (5):
-      ARM: omap2: fix am43xx dependency on l2x0 cache
-      ARM: keystone requires ARM_PATCH_PHYS_VIRT
-      bus/arm-cci: add dependency on OF && CPU_V7
-      remoteproc: da8xx: don't select CMA on no-MMU
-      ARM: samsung: make SAMSUNG_DMADEV optional
-
-Dan Carpenter (1):
-      misc: vexpress: fix error handling vexpress_syscfg_regmap_init()
-
-Ezequiel Garcia (2):
-      ARM: dts: Specify the NAND ECC scheme explicitly on Armada 375 DB board
-      ARM: dts: Specify the NAND ECC scheme explicitly on Armada 385 DB board
-
-Jason Cooper (1):
-      ARM: mvebu: DT: fix OpenBlocks AX3-4 RAM size
-
-Linus Walleij (1):
-      ARM: integrator: fix section mismatch problem
-
-Olof Johansson (1):
-      ARM: exynos: move sysram info to exynos.c
-
-Rob Herring (2):
-      ARM: exynos: cleanup kconfig option display
-      ARM: use menuconfig for sub-arch menus
-
-Sachin Kamat (1):
-      ARM: EXYNOS: Fix compilation warning
-
-Stephen Boyd (1):
-      ARM: Remove ARCH_HAS_CPUFREQ config option
-
-Stephen Warren (1):
-      ARM: multi_v7_defconfig: re-enable SDHCI drivers
-
- arch/arm/Kconfig                                 | 20 +--------------
- arch/arm/boot/dts/armada-375-db.dts              |  2 ++
- arch/arm/boot/dts/armada-385-db.dts              |  2 ++
- arch/arm/boot/dts/armada-xp-openbl	ocks-ax3-4.dts |  2 +-
- arch/arm/configs/multi_v7_defconfig              |  1 +
- arch/arm/configs/omap2plus_defconfig             |  1 +
- arch/arm/mach-bcm/Kconfig                        |  7 +++---
- arch/arm/mach-berlin/Kconfig                     |  6 +----
- arch/arm/mach-cns3xxx/Kconfig                    |  7 +++---
- arch/arm/mach-davinci/Kconfig                    |  1 -
- arch/arm/mach-exynos/Kconfig                     |  7 +-----
- arch/arm/mach-exynos/common.h                    |  1 +
- arch/arm/mach-exynos/exynos.c                    | 31 +++++++++++++++++++++++-
- arch/arm/mach-exynos/platsmp.c                   | 26 ++------------------
- arch/arm/mach-highbank/Kconfig                   |  1 -
- arch/arm/mach-imx/Kconfig                        | 10 +++-----
- arch/arm/mach-integrator/Kconfig                 |  2 +-
- arch/arm/mach-integrator/impd1.c                 | 12 ++++++++-
- arch/arm/mach-keystone/Kconfig                   |  1 +
- arch/arm/mach-moxart/Kconfig                     |  2 +-
- arch/arm/mach-mvebu/Kconfig                      |  7 +-----
- arch/arm/mach-nomadik/Kconfig                    |  4 +--
- arch/arm/mach-omap2/Kconfig                      |  7 ++++--
- arch/arm/mach-omap2/common.h                     |  7 ++++++
- arch/arm/mach-prima2/Kconfig                     |  6 ++---
- arch/arm/mach-qcom/Kconfig                       |  6 +----
- arch/arm/mach-s3c24xx/Kconfig                    |  2 +-
- arch/arm/mach-s3c64xx/Kconfig                    |  4 +--
- arch/arm/mach-s5p64x0/Kconfig                    |  6 +++--
- arch/arm/mach-s5pc100/Kconfig                    |  3 ++-
- arch/arm/mach-s5pv210/Kconfig                    |  3 ++-
- arch/arm/mach-shmobile/Kconfig                   |  6 ++---
- arch/arm/mach-spear/Kconfig                      |  1 -
- arch/arm/mach-sti/Kconfig                        |  2 +-
- arch/arm/mach-tegra/Kconfig                      |  8 +++---
- arch/arm/mach-u300/Kconfig                       |  6 +----
- arch/arm/mach-ux500/Kconfig                      |  7 +-----
- arch/arm/mach-vexpress/Kconfig                   |  8 +++---
- arch/arm/mach-vt8500/Kconfig                     |  1 -
- arch/arm/mach-zynq/Kconfig                       |  1 -
- arch/arm/plat-samsung/Kconfig                    | 28 ++++++---------------
- drivers/bus/Kconfig                              |  2 +-
- drivers/misc/vexpress-syscfg.c                   | 12 ++++++---
- drivers/remoteproc/Kconfig                       |  2 +-
- 44 files changed, 123 insertions(+), 158 deletions(-)
+-- 
+Regards,
+Nishanth Menon
