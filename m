@@ -1,272 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jun 2014 18:41:28 +0100
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <FA75104C-9D36-4EB6-BE5C-862D71E1877B@antoniou-consulting.com>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk> <20140617125831.GI4173@beef>
- <20140617131522.GD3705@n2100.arm.linux.org.uk>
- <C3DA6AFC-2784-4A41-BC72-EF25B2B03B41@antoniou-consulting.com>
- <20140617160119.GE3705@n2100.arm.linux.org.uk>
- <317D412E-B455-4B9D-95B3-F010C68744A3@antoniou-consulting.com>
- <20140617170531.GF3705@n2100.arm.linux.org.uk>
- <FA75104C-9D36-4EB6-BE5C-862D71E1877B@antoniou-consulting.com>
-Message-ID: <20140617174128.GG3705@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 17 Jun 2014 20:17:02 +0200
+Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <53A0861E.90400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 08:10:46PM +0300, Pantelis Antoniou wrote:
-> Hi Russell,
+On 06/16/2014 12:26 PM, Antoine T?nart wrote:
+> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
 > 
-> On Jun 17, 2014, at 8:05 PM, Russell King - ARM Linux wrote:
-> > DRM is not hotpluggable in any shape or form, and David Airlie has
-> > indicated that he does strongly opposes moving it in that direction.
-> > 
-> > DRM follows the "card" model, where, at probe time, the hardware is
-> > known and never changes until the "card" is torn down.  No new
-> > connectors can be added once the "card" is initialised, and no
-> > connectors can be removed.  Any changes must be done by tearing down
-> > the entire card and reconstructing it (if reconstructing it with a
-> > reduced set of hardware is appropriate.)
-> > 
+> The mode selection can let us think this PHY can be configured to fit
+> other purposes. But there are reasons to think the SATA mode will be
+> the only one usable: the PHY registers are only accessible indirectly
+> through two registers in the SATA range, the PHY seems to be integrated
+> and no information tells us the contrary. For these reasons, make the
+> driver a SATA PHY driver.
 > 
-> That is a limitation of the current DRM implementation.
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> ---
+[...]
+> diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
+> new file mode 100644
+> index 000000000000..907897a02672
+> --- /dev/null
+> +++ b/drivers/phy/phy-berlin-sata.c
+> @@ -0,0 +1,232 @@
+> +/*
+> + * Marvell Berlin SATA PHY driver
+> + *
+> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+> + *
+> + * Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/io.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define HOST_VSA_ADDR		0x0
+> +#define HOST_VSA_DATA		0x4
+> +#define PORT_VSR_ADDR		0x78
+> +#define PORT_VSR_DATA		0x7c
+> +#define PORT_SCR_CTL		0x2c
+> +
+> +#define CONTROL_REGISTER	0x0
+> +#define MBUS_SIZE_CONTROL	0x4
+> +
+> +#define POWER_DOWN_PHY0			BIT(6)
+> +#define POWER_DOWN_PHY1			BIT(14)
+> +#define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
+> +#define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
+> +
+> +#define PHY_BASE		0x200
 
-... an implementation which isn't going to change any time soon... and
-certainly is not going to change because someone comes along with a
-dynamic DT infrastructure.
+Antoine,
 
-> I seems to be this is born out of some kind of misunderstanding about how
-> DT can (and does) support dynamic changes.
+I gave your Berlin AHCI patches a try on BG2. I finally got it working
+but BG2 has a different PHY_BASE and need some register fixups.
+
+Please update this patch and the DT bindings to reflect the difference
+of BG2Q with respect to BG2 as below.
+
+[...]
+> +
+> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+> +	{ .compatible = "marvell,berlin-sata-phy" },
+
+s/marvell,berlin-sata-phy/marvell,berlin2-sata-phy/
+
+and add
+
+marvell,berlin2q-sata-phy
+
+That way it can be applied now without proper support for BG2
+and I can send patches later.
+
+Sebastian
+
+> +	{ },
+> +};
+> +
+> +static struct platform_driver phy_berlin_sata_driver = {
+> +	.probe	= phy_berlin_sata_probe,
+> +	.driver	= {
+> +		.name		= "phy-berlin-sata",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= phy_berlin_sata_of_match,
+> +	},
+> +};
+> +module_platform_driver(phy_berlin_sata_driver);
+> +
+> +MODULE_DESCRIPTION("Marvell Berlin SATA PHY driver");
+> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
+> +MODULE_LICENSE("GPL v2");
 > 
-> I admit that I haven't done much work on DRM (besides some tinkering with
-> Rob Clark's ti_lcdc DRM driver), but knowing what DT does have a dynamic
-> change notifier support, perhaps it can be made to work.
-
-It can be made to work in the way that I described above - any change
-to the hardware which makes up a DRM card would need the entire DRM
-card torn down and re-created... as I said above.
-
-The reason I know this is because I've been involved closely in dealing
-with imx-drm, and Armada DRM, and the mess that people spew trying to
-get their DT representations of their hardware (as multiple, separate
-devices which can be probed asynchronously) to work with DT.
-
-If DRM supported hot-plugging of components, dealing with that would
-be much easier than it is, but - as I said above - this is not going
-to happen.  So, if it's not going to happen for the case which we
-commonly find on ARM hardware today, it's certainly not going to
-happen because DT wants to become dynamic.
-
-> As I said, the next thing coming is transactional DT support, perhaps you
-> can share the DT fragment describing your use-case (before/after) and 
-> I'll try to accommodate in the next patch series.
-
-I don't have any - I'm using it as an example where a device (such as
-the iMX6 SoC) which has quite a complex media infrastructure may be
-extended externally via an FPGA to provide additional interfaces which
-may then require dynamic changes to the DT description, thereby meaning
-that we have to reconstruct the DRM "card" in its entirety.
-
-If you want some DT to look at...
-
-                        ldb: ldb at 020e0008 {
-                                #address-cells = <1>;
-                                #size-cells = <0>;
-                                compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
-                                gpr = <&gpr>;
-                                status = "disabled";
-
-                                lvds-channel at 0 {
-                                        #address-cells = <1>;
-                                        #size-cells = <0>;
-                                        reg = <0>;
-                                        status = "disabled";
-
-                                        port at 0 {
-                                                reg = <0>;
-
-                                                lvds0_mux_0: endpoint {
-                                                        remote-endpoint = <&ipu1_di0_lvds0>;
-                                                };
-                                        };
-
-                                        port at 1 {
-                                                reg = <1>;
-
-                                                lvds0_mux_1: endpoint {
-                                                        remote-endpoint = <&ipu1_di1_lvds0>;
-                                                };
-                                        };
-                                };
-
-                                lvds-channel at 1 {
-                                        #address-cells = <1>;
-                                        #size-cells = <0>;
-                                        reg = <1>;
-                                        status = "disabled";
-
-                                        port at 0 {
-                                                reg = <0>;
-
-                                                lvds1_mux_0: endpoint {
-                                                        remote-endpoint = <&ipu1_di0_lvds1>;
-                                                };
-                                        };
-
-                                        port at 1 {
-                                                reg = <1>;
-
-                                                lvds1_mux_1: endpoint {
-                                                        remote-endpoint = <&ipu1_di1_lvds1>;
-                                                };
-                                        };
-                                };
-                        };
-
-                        hdmi: hdmi at 0120000 {
-                                #address-cells = <1>;
-                                #size-cells = <0>;
-                                reg = <0x00120000 0x9000>;
-                                interrupts = <0 115 0x04>;
-                                gpr = <&gpr>;
-                                clocks = <&clks 123>, <&clks 124>;
-                                clock-names = "iahb", "isfr";
-                                status = "disabled";
-
-                                port at 0 {
-                                        reg = <0>;
-
-                                        hdmi_mux_0: endpoint {
-                                                remote-endpoint = <&ipu1_di0_hdmi>;
-                                        };
-                                };
-
-                                port at 1 {
-                                        reg = <1>;
-
-                                        hdmi_mux_1: endpoint {
-                                                remote-endpoint = <&ipu1_di1_hdmi>;
-                                        };
-                                };
-                        };
-
-                        mipi_dsi: mipi at 021e0000 {
-                                #address-cells = <1>;
-                                #size-cells = <0>;
-                                reg = <0x021e0000 0x4000>;
-                                status = "disabled";
-
-                                port at 0 {
-                                        reg = <0>;
-
-                                        mipi_mux_0: endpoint {
-                                                remote-endpoint = <&ipu1_di0_mipi>;
-                                        };
-                                };
-
-                                port at 1 {
-                                        reg = <1>;
-
-                                        mipi_mux_1: endpoint {
-                                                remote-endpoint = <&ipu1_di1_mipi>;
-                                        };
-                                };
-                        };
-
-                ipu1: ipu at 02400000 {
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        compatible = "fsl,imx6q-ipu";
-                        reg = <0x02400000 0x400000>;
-                        interrupts = <0 6 IRQ_TYPE_LEVEL_HIGH>,
-                                     <0 5 IRQ_TYPE_LEVEL_HIGH>;
-                        clocks = <&clks 130>, <&clks 131>, <&clks 132>;
-                        clock-names = "bus", "di0", "di1";
-                        resets = <&src 2>;
-
-                        ipu1_di0: port at 2 {
-                                #address-cells = <1>;
-                                #size-cells = <0>;
-                                reg = <2>;
-
-                                ipu1_di0_disp0: endpoint at 0 {
-                                };
-
-                                ipu1_di0_hdmi: endpoint at 1 {
-                                        remote-endpoint = <&hdmi_mux_0>;
-                                };
-
-                                ipu1_di0_mipi: endpoint at 2 {
-                                        remote-endpoint = <&mipi_mux_0>;
-                                };
-
-                                ipu1_di0_lvds0: endpoint at 3 {
-                                        remote-endpoint = <&lvds0_mux_0>;
-                                };
-
-                                ipu1_di0_lvds1: endpoint at 4 {
-                                        remote-endpoint = <&lvds1_mux_0>;
-                                };
-                                };
-
-                                ipu1_di0_lvds1: endpoint at 4 {
-                                        remote-endpoint = <&lvds1_mux_0>;
-                                };
-                        };
-
-                        ipu1_di1: port at 3 {
-                                #address-cells = <1>;
-                                #size-cells = <0>;
-                                reg = <3>;
-
-                                ipu1_di0_disp1: endpoint at 0 {
-                                };
-
-                                ipu1_di1_hdmi: endpoint at 1 {
-                                        remote-endpoint = <&hdmi_mux_1>;
-                                };
-
-                                ipu1_di1_mipi: endpoint at 2 {
-                                        remote-endpoint = <&mipi_mux_1>;
-                                };
-
-                                ipu1_di1_lvds0: endpoint at 3 {
-                                        remote-endpoint = <&lvds0_mux_1>;
-                                };
-
-                                ipu1_di1_lvds1: endpoint at 4 {
-                                        remote-endpoint = <&lvds1_mux_1>;
-                                };
-                        };
-                };
-
-        display-subsystem {
-                compatible = "fsl,imx-display-subsystem";
-                ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
-        };
-
-
-ipu1, mipi_dsi, ldb and hdmi are each separate platform devices, which
-are combined to look like a single DRM device.  Each device can be
-enabled by the platform code.  All enabled devices must be present to
-cause the DRM device to "bind".  The above connectivity is parsed via
-the of_graph helpers, and enumerated by the driver(s).
-
-Let's say that we have ipu1 and hdmi enabled, but ldb disabled.  ldb is
-connected to an external FPGA.  Someone loads a bitstream after boot
-into the FPGA, and then updates the DT dynamically to enable the ldb
-device.
-
-Great, so a new platform device gets spawned for the new device.  What
-triggers the ipu or display subsystem level (which is what's really
-needed) to tell it something changed here?
-
-This is exactly my point - such stuff has not been thought about, because
-(I reckon) not many people are even aware of DT wanting to become dynamic.
-It's certainly not clear from the use model that we've been basing our
-driver conversions on that DT is anything but static...
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
