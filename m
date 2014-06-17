@@ -1,53 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Jun 2014 13:46:50 +0200
-Subject: [PATCH] ARM: bcm_defconfig: re-enable BCM Kona SDHCI driver
-In-Reply-To: <539F6CC7.4010002@wwwdotorg.org>
-References: <1402941376-29594-1-git-send-email-mporter@linaro.org>
- <20140616215512.GC23430@n2100.arm.linux.org.uk>
- <539F6CC7.4010002@wwwdotorg.org>
-Message-ID: <201406171346.51153.arnd@arndb.de>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Tue, 17 Jun 2014 13:49:46 +0200
+Subject: [PATCH v2 4/4] brcmfmac: Fix OOB interrupt not working for
+ BCM43362
+In-Reply-To: <1402941407-8210-5-git-send-email-hdegoede@redhat.com>
+References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
+ <1402941407-8210-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <53A02B5A.3070409@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 June 2014, Stephen Warren wrote:
-> On 06/16/2014 03:55 PM, Russell King - ARM Linux wrote:
-> > On Mon, Jun 16, 2014 at 01:56:16PM -0400, Matt Porter wrote:
-> >> Since 5d01b7684b7e "mmc: simplify SDHCI Kconfig dependencies",
-> >> MMC_SDHCI_PLTFM is no longer selected by the BCM Kona SDHCI
-> >> driver which is enabled in this defconfig. This results in the
-> >> SDHCI driver not being built and a boot failure. Explictly
-> >> enable MMC_SDHCI_PLTFM in bcm_defconfig so the BCM Kona SDHCI
-> >> driver is built.
-> > 
-> > I really don't understand why MMC_SDHCI_PLTFM isn't selected by the
-> > sub-drivers.  sdhci-pltfm.c is a library module, which is only
-> > useful with one of the sub-drivers enabled.
-> > 
-> > So, rather than providing a multitude of dependent options, why not
-> > present people with:
-> > 
-> >  + sdhci drivers
-> >    + sdhci pci
-> >    + sdhci acpi
-> >    + Arasan
-> >    + Freescale eSDHC
-> >    + Nintendo Wii
-> >    + Dove
-> >
-> > and leave MMC_SDHCI_PLTFM as a hidden option whose purpose is to
-> > enable building of sdhci-pltfm.c.
-> 
-> CC'ing Arnd, as author of 5d01b7684b7e "mmc: simplify SDHCI Kconfig
-> dependencies". I also forgot to do that on the patch that fixed
-> multi_v7_defconfig for this:-(
+On 16-06-14 19:56, Hans de Goede wrote:
+> It has taken me a long long time to get the OOB interrupt working on the
+> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
+> end I found these magic register pokes in the cubietruck kernel tree:
+> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
+>
+> I'm not entirely sure if this specific to the AP6210 module, or if this
+> should be done for all BCM43362 sdio devices.
 
-I think doing it the other way round as Russell suggested is a good
-idea, and we can definitely do that. We have a similar situation in
-other subsystems, sometimes we do it one way and sometimes the other.
+Hi Hans,
 
-The problem I was addressing in my patch was that the SDHCI driver
-in particular was mixing the two approaches, which is much worse
-as that can cause Kconfig dependency loops and is rather confusing.
-I picked the approach that seemed simpler at the time.
+I was still not sure about this one so I asked around. Apart from the 
+nvram settings I emailed earlier one more is needed:
 
-	Arnd
+sd_gpout=1
+sd_oobonly=1
+sd_gpval=1
+*muxenab=0x11*
+
+Could you give that a try?
+
+Regards,
+Arend
+
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 16 ++++++++++++++++
+>   1 file changed, 16 insertions(+)
+>
+> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> index 0fc707c..58e86a5 100644
+> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> @@ -39,7 +39,9 @@
+>   #include <brcm_hw_ids.h>
+>   #include <brcmu_utils.h>
+>   #include <brcmu_wifi.h>
+> +#include <chipcommon.h>
+>   #include <soc.h>
+> +#include "chip.h"
+>   #include "dhd_bus.h"
+>   #include "dhd_dbg.h"
+>   #include "sdio_host.h"
+> @@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+>   {
+>   	int ret = 0;
+>   	u8 data;
+> +	u32 addr, gpiocontrol;
+>   	unsigned long flags;
+>
+>   	if ((sdiodev->pdata) && (sdiodev->pdata->oob_irq_supported)) {
+> @@ -148,6 +151,19 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+>
+>   		sdio_claim_host(sdiodev->func[1]);
+>
+> +		if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
+> +			/* assign GPIO to SDIO core */
+> +			addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
+> +			gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr, &ret);
+> +			gpiocontrol |= 0x2;
+> +			brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol, &ret);
+> +
+> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_SELECT, 0xf,
+> +					  &ret);
+> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_OUT, 0, &ret);
+> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_EN, 0x2, &ret);
+> +		}
+> +
+>   		/* must configure SDIO_CCCR_IENx to enable irq */
+>   		data = brcmf_sdiod_regrb(sdiodev, SDIO_CCCR_IENx, &ret);
+>   		data |= 1 << SDIO_FUNC_1 | 1 << SDIO_FUNC_2 | 1;
+>
