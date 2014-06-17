@@ -1,54 +1,46 @@
 From: guido@vanguardiasur.com.ar (=?UTF-8?q?Guido=20Mart=C3=ADnez?=)
-Date: Tue, 17 Jun 2014 11:17:02 -0300
-Subject: [PATCH/RESEND 0/9] drm: tilcdc driver fixes
-In-Reply-To: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
+Date: Tue, 17 Jun 2014 11:17:03 -0300
+Subject: [PATCH/RESEND 1/9] drm/i2c: tda998x: move drm_i2c_encoder_destroy call
+In-Reply-To: <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
 References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
+ <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
+Message-ID: <1403014631-18072-2-git-send-email-guido@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tilcdc driver could be compiled as a module, but was severely broken
-and could not be used as such. This patchset attempts to fix the issues
-preventing a proper load/unload of the module.
+Currently tda998x_encoder_destroy() calls cec_write() and reg_clear(),
+as part of the release procedure. Such calls need to access the I2C bus
+and therefore, we need to call them before drm_i2c_encoder_destroy()
+which unregisters the I2C device.
 
-Issues included dangling sysfs nodes, dangling devices, memory leaks and
-a double kfree.
+This commit moves the latter so it's done afterwards.
 
-It now seems to be working ok. We have tested this by loading and
-unloading the driver repeteadly, with both panel and slave connectors
-and found no flaws.
+Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
+Signed-off-by: Ezequiel Garc?a <ezequiel@vanguardiasur.com.ar>
+Cc: <stable@vger.kernel.org> #v3.9+
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-There is still one warning left on tilcdc_crtc_destroy, caused by
-destroying the connector while still in an ON status. We don't know why
-this happens or why it's an issue, so we did not fix it.
-
-The first 7 patches are bug fixes which and should probably be applied
-in the stable trees. The last two are clean-ups.
-
-
-Resending this since I got no replies.
-
-
-Guido Mart?nez (9):
-  drm/i2c: tda998x: move drm_i2c_encoder_destroy call
-  drm/tilcdc: panel: fix dangling sysfs connector node
-  drm/tilcdc: slave: fix dangling sysfs connector node
-  drm/tilcdc: tfp410: fix dangling sysfs connector node
-  drm/tilcdc: panel: fix leak when unloading the module
-  drm/tilcdc: fix release order on exit
-  drm/tilcdc: fix double kfree
-  drm/tilcdc: remove submodule destroy calls
-  drm/tilcdc: replace late_initcall with module_init
-
- drivers/gpu/drm/i2c/tda998x_drv.c      |  2 +-
- drivers/gpu/drm/tilcdc/Module.symvers  |  0
- drivers/gpu/drm/tilcdc/tilcdc_drv.c    | 15 +++++--------
- drivers/gpu/drm/tilcdc/tilcdc_drv.h    |  1 -
- drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 39 +++++++++++++++++-----------------
- drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 27 +++++++++++++----------
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 35 +++++++++++++++---------------
- 7 files changed, 59 insertions(+), 60 deletions(-)
- create mode 100644 drivers/gpu/drm/tilcdc/Module.symvers
-
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 240c331..db9515f 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -1183,7 +1183,6 @@ static void
+ tda998x_encoder_destroy(struct drm_encoder *encoder)
+ {
+ 	struct tda998x_priv *priv = to_tda998x_priv(encoder);
+-	drm_i2c_encoder_destroy(encoder);
+ 
+ 	/* disable all IRQs and free the IRQ handler */
+ 	cec_write(priv, REG_CEC_RXSHPDINTENA, 0);
+@@ -1193,6 +1192,7 @@ tda998x_encoder_destroy(struct drm_encoder *encoder)
+ 
+ 	if (priv->cec)
+ 		i2c_unregister_device(priv->cec);
++	drm_i2c_encoder_destroy(encoder);
+ 	kfree(priv);
+ }
+ 
 -- 
 2.0.0
