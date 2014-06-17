@@ -1,31 +1,71 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 17 Jun 2014 18:04:08 +0200
-Subject: [PATCH v4 09/11] ARM: EXYNOS: Move "mach/map.h" inclusion from
- regs-pmu.h to platsmp.c
-In-Reply-To: <1399704998-13321-10-git-send-email-pankaj.dubey@samsung.com>
-References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
- <1399704998-13321-10-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53A066F8.9060702@samsung.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 17 Jun 2014 18:05:29 +0200
+Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
+ regulators
+In-Reply-To: <20140617141254.GP5099@sirena.org.uk>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
+ <20140616192500.GJ5099@sirena.org.uk> <53A01D54.10506@collabora.co.uk>
+ <20140617141254.GP5099@sirena.org.uk>
+Message-ID: <53A06749.1010606@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.05.2014 08:56, Pankaj Dubey wrote:
-> As we have removed static mappings from "regs-pmu.h" it does not
-> need map.h anymore. But "platsmp.c" needed this and till now it
-> got included indirectly. So lets move header inclusion of
-> "mach/map.h" from "regs-pmu.h" to "platsmp.c".
+Hello Mark,
+
+On 06/17/2014 04:12 PM, Mark Brown wrote:
+> On Tue, Jun 17, 2014 at 12:49:56PM +0200, Javier Martinez Canillas wrote:
+>> On 06/16/2014 09:25 PM, Mark Brown wrote:
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/platsmp.c  |    1 +
->  arch/arm/mach-exynos/regs-pmu.h |    2 --
->  2 files changed, 1 insertion(+), 2 deletions(-)
+>> >> +	config.dev = &pdev->dev;
+> 
+>> > Are you sure this shouldn't be the MFD?
+> 
+>> I just looked at regulator_register() and saw that it does rdev->dev.parent =
+>> dev, so yes this has to be the MFD.
+>
 
-This could be probably squashed with other one of previous patches, but
-anyway:
+I noticed that many drivers set config.dev = &pdev->dev. The original Chrome OS
+max77xxx driver and max77686 are two examples but others drivers do the same:
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+$ git grep "config.dev = &pdev->dev" drivers/regulator/ | wc -l
+35
+$ git grep "config.dev = pdev->dev.parent" drivers/regulator/ | wc -l
+11
 
---
-Best regards,
-Tomasz
+And also I see that mfd_add_device() calls
+devm_regulator_bulk_register_supply_alias(&pdev->dev,...) so I'm confused now
+about what the correct device should be...
+
+> Do the regulators manage to get their supplies?
+> 
+
+There are no current support in mainline for the devices that use the regulators
+in this PMIC so I can't tell you if consumers manage to get their supplies
+correctly (e.g: if regulator_dev_lookup succeeds).
+
+But I see in the kernel log that the regulators are registered and configured as
+expected [0] and also the driver in the Chrome OS 3.8 kernel is working for sure
+and sets config.dev to &pdev->dev instead of the MFD.
+
+>> So, for now I thought it made sense to set the operating mode to normal on
+>> probe() but I'll change it to read from the hardware if that is better.
+> 
+> Yes, otherwise if the device is configured otherwise then when we change
+> the configuration we may break something.
+> 
+>> I guess I should check in the datasheet if a sane default operating mode for
+>> LDOs is expected when the chip is reseted or if this is left undefined and also
+>> if the bootloader already set this.
+> 
+> You can't do anything based on the particular bootloader you're using in
+> your current system, this has to work in other systems.
+> 
+
+Yes, that's why I thought it was a good idea to set to a default operational
+mode but I'll change it to read from the hardware instead.
+
+Thanks a lot and best regards,
+Javier
+
+[0]: http://pastebin.com/raw.php?i=8yyMXcGD
