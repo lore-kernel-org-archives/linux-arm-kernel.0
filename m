@@ -1,104 +1,108 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 17 Jun 2014 10:42:41 +0200
-Subject: [GIT PULL] at91: fixes for 3.16 (drivers) #1
-In-Reply-To: <CAOesGMj1FuozbydRf=J7jWFt_8GZ8ZKZReg_1BmvPC706cZ7rQ@mail.gmail.com>
-References: <CAOesGMj1FuozbydRf=J7jWFt_8GZ8ZKZReg_1BmvPC706cZ7rQ@mail.gmail.com>
-Message-ID: <1402994561-29492-1-git-send-email-nicolas.ferre@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Jun 2014 10:48:54 +0200
+Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
+In-Reply-To: <20140613155139.05e2393c@free-electrons.com>
+References: <20140526162643.GB3693@n2100.arm.linux.org.uk>
+ <20140527111542.6a49833f@free-electrons.com>
+ <20140527094749.GE3693@n2100.arm.linux.org.uk>
+ <20140527135216.7eaf3b3f@free-electrons.com>
+ <20140527121806.GF3693@n2100.arm.linux.org.uk>
+ <20140527143745.386c77d9@free-electrons.com>
+ <20140528112450.GH3693@n2100.arm.linux.org.uk>
+ <20140530100819.1208149f@free-electrons.com>
+ <20140530092044.GO3693@n2100.arm.linux.org.uk>
+ <20140613121121.7e7dc8e6@free-electrons.com>
+ <20140613102019.GQ23430@n2100.arm.linux.org.uk>
+ <20140613133437.1a85f287@free-electrons.com>
+ <20140613155139.05e2393c@free-electrons.com>
+Message-ID: <20140617104854.7393c14c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Russell,
 
-As advised by Olof, here is the interesting updated on PWM drivers for AT91
-resent after 3.16-rc1 release. Delaying the inclusion of this material has
-solved all the issues with dependecies that previous pull-request had ([GIT
-PULL] at91: drivers for 3.16 #1).
+Do you have some input/feedback about the below proposals/questions?
 
-I remind you what it's about: Alexandre did a great job replacing the existing
-calls to the older, non-standard drivers by the use of the newer "pwm-atmel"
-which takes advantage of the PWM framework.
-In addition of removing three obsolete drivers, it also solves an issue with
-non existing Kconfig symbols introduced by (misc: atmel_pwm: only build for
-supported platforms) which was trying to avoid a build failure... so, all in 
-all, a pretty good thing!
-The diffstat is pretty nice as well ;-)
+Thanks a lot!
 
-Thanks, best regards,
+Thomas
 
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+On Fri, 13 Jun 2014 15:51:39 +0200, Thomas Petazzoni wrote:
+> Hello Russell,
+> 
+> On Fri, 13 Jun 2014 13:34:37 +0200, Thomas Petazzoni wrote:
+> 
+> > > The patches I sent during this thread are now merged into mainline.  The
+> > > setting of the shared bit, and the memory cache policy are now both
+> > > derived from the proc_info structures, specifically the __cpu_mm_mmu_flags
+> > > member.
+> > 
+> > Right. So for Armada 370/XP, I'll update the proc_info structure. We
+> > still have to find the right solution/compromise for the Armada 375/38x
+> > though.
+> 
+> So, I had a look at that, and there are still I believe a few issues to
+> solve:
+> 
+>  * Your change that takes the PMD flags set by the assembly code as the
+>    reference can easily be used by specifying mm_mmuflags =
+>    PMD_SECT_WBWA for Armada 370 and PMD_SECT_WBWA|PMD_SECT_S for Armada
+>    XP to get write-allocate on Armada 370 and write-allocate +
+>    shareable on Armada XP.
+> 
+>    However, this adjusts only the PMD flags, and does not adjust
+>    the TTB flags: they are still governed only by the ALT_UP/ALT_SMP
+>    logic:
+> 
+> #define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_RGN_OC_WB
+> #define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
+> [...]
+> 	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
+> 	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
+> 
+>    Do you have a suggestion on how to handle this?
+> 
+>  * Regarding setting the SMP bit and TLB broadcast bit for Cortex-A9,
+>    I've moved the __v7_ca9mp_setup code outside of the common Cortex-A
+>    code so that it does set both bits as soon as it's a SMP-capable
+>    Cortex-A9. Something like (untested):
+> 
+> /*
+>  * Cortex-A9 is handled as a special case, as we want the SMP bit to
+>  * be set regardless of whether CONFIG_SMP is enabled or not: as soon
+>  * as the processor is SMP capable, we want to enable the SMP bit so
+>  * that Cortex-A9 processors that support hardware I/O coherency will
+>  * operate properly.
+>  */
+> __v7_ca9mp_setup:
+> 	mcr	p15, 0, r0, c0, c0, 5		@ read MPIDR
+> 	and	r0, r0, #0xc0000000		@ multiprocessing extensions and
+> 	teq	r0, #0x80000000			@ not part of a uniprocessor system?
+> 	bne	__v7_setup
+> 
+> 	mrc	p15, 0, r0, c1, c0, 1
+> 	tst	r0, #(1 << 6)
+> 	orreq	r0, r0, #((1 << 6) | (1 << 10))
+> 	mcreq	p15, 0, r0, c1, c0, 1
+> 	b	__v7_setup
+> 
+>    Would this be acceptable?
+> 
+>  * Regarding setting the write allocate and shareable attribute in the
+>    PMD bits for SMP-capable Cortex-A9, I was hoping to be able to do
+>    that from the __v7_ca9mp_setup function above, but in fact this
+>    per-processor 'initfunc' is called *after* the page tables are
+>    created. So I'm not sure where to put the logic that detects we have
+>    an SMP-capable Cortex-A9 and tweak the PMD flags accordingly. Any
+>    suggestion?
+> 
+> Thanks!
+> 
+> Thomas
 
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to be6ef50d11bfeec5cce3cf6b463f9094fad1de14:
-
-  misc: atmel_pwm: remove obsolete driver (2014-06-17 10:24:08 +0200)
-
-----------------------------------------------------------------
-Atmel PWM driver update for 3.16
-- move to the new PWM driver which uses PWM framework
-- remove 3 obsolete drivers (atmel-pwm-bl.c, leds-atmel-pwm.c and atmel_pwm.c)
-
-----------------------------------------------------------------
-Alexandre Belloni (15):
-      ARM: at91: at91sam9g45: switch to generic PWM framework
-      ARM: at91: sam9m10g45ek: use generic leds_pwm driver
-      ARM: at91: at91sam9263: switch to generic PWM framework
-      ARM: at91: sam9263ek: use generic leds_pwm driver
-      ARM: at91: at91sam9rl: switch to generic PWM framework
-      ARM: at91: remove useless at91_pwm_leds()
-      PWM: atmel: allow building for AVR32
-      avr32/at32ap: switch to the generic PWM framework
-      avr32: MRMT: use generic leds_pwm driver
-      avr32: merisc: use generic leds_pwm driver
-      avr32: favr-32: use generic pwm_bl driver
-      avr32: update defconfig to use the generic PWM framework
-      backlight: atmel-pwm-bl: remove obsolete driver
-      leds: atmel-pwm: remove obsolete driver
-      misc: atmel_pwm: remove obsolete driver
-
- arch/arm/mach-at91/at91sam9263.c           |   1 +
- arch/arm/mach-at91/at91sam9263_devices.c   |  11 +-
- arch/arm/mach-at91/at91sam9g45.c           |   1 +
- arch/arm/mach-at91/at91sam9g45_devices.c   |  11 +-
- arch/arm/mach-at91/at91sam9rl.c            |   1 +
- arch/arm/mach-at91/at91sam9rl_devices.c    |  11 +-
- arch/arm/mach-at91/board-sam9263ek.c       |  55 +++-
- arch/arm/mach-at91/board-sam9m10g45ek.c    |  42 ++-
- arch/arm/mach-at91/board.h                 |   1 -
- arch/arm/mach-at91/leds.c                  |  37 ---
- arch/avr32/boards/atngw100/mrmt.c          |  34 ++-
- arch/avr32/boards/favr-32/setup.c          |  48 ++--
- arch/avr32/boards/merisc/setup.c           |  34 ++-
- arch/avr32/configs/atngw100_mrmt_defconfig |   5 +-
- arch/avr32/configs/atstk1002_defconfig     |   5 +-
- arch/avr32/configs/atstk1003_defconfig     |   5 +-
- arch/avr32/configs/atstk1004_defconfig     |   5 +-
- arch/avr32/configs/atstk1006_defconfig     |   5 +-
- arch/avr32/configs/favr-32_defconfig       |   6 +-
- arch/avr32/configs/merisc_defconfig        |   5 +-
- arch/avr32/mach-at32ap/at32ap700x.c        |   7 +-
- drivers/leds/Kconfig                       |   8 -
- drivers/leds/Makefile                      |   1 -
- drivers/leds/leds-atmel-pwm.c              | 149 -----------
- drivers/misc/Kconfig                       |  10 -
- drivers/misc/Makefile                      |   1 -
- drivers/misc/atmel_pwm.c                   | 402 -----------------------------
- drivers/pwm/Kconfig                        |   2 +-
- drivers/video/backlight/Kconfig            |  11 -
- drivers/video/backlight/Makefile           |   1 -
- drivers/video/backlight/atmel-pwm-bl.c     | 223 ----------------
- include/linux/atmel-pwm-bl.h               |  43 ---
- include/linux/atmel_pwm.h                  |  70 -----
- 33 files changed, 186 insertions(+), 1065 deletions(-)
- delete mode 100644 drivers/leds/leds-atmel-pwm.c
- delete mode 100644 drivers/misc/atmel_pwm.c
- delete mode 100644 drivers/video/backlight/atmel-pwm-bl.c
- delete mode 100644 include/linux/atmel-pwm-bl.h
- delete mode 100644 include/linux/atmel_pwm.h
 
 -- 
-Nicolas Ferre
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
