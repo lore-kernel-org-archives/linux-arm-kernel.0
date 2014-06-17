@@ -1,58 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Jun 2014 08:25:42 -0700
-Subject: [PATCH] ARM: omap: rework platform selection
-In-Reply-To: <CAL_Jsq+MK+HMqE3k8p06bzzohzS0qu84N12C=VgF9_dMcSGGOQ@mail.gmail.com>
-References: <5701099.0P1SIXsHc1@wuerfel> <20140616141712.GL17845@atomide.com>
- <CABGGisxdKznLzR+0b0oYrN+aiWM0gNFbzYwfPtAZF=AiapU=eQ@mail.gmail.com>
- <201406171557.15819.arnd@arndb.de>
- <CAL_Jsq+MK+HMqE3k8p06bzzohzS0qu84N12C=VgF9_dMcSGGOQ@mail.gmail.com>
-Message-ID: <20140617152542.GU17845@atomide.com>
+From: thomas.ab@samsung.com (Thomas Abraham)
+Date: Tue, 17 Jun 2014 20:55:26 +0530
+Subject: [PATCH v6 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+Message-ID: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [140617 08:05]:
-> On Tue, Jun 17, 2014 at 8:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 16 June 2014, Rob Herring wrote:
-> >> > So far I have not come up with no great ideas on fixing this
-> >> > properly short of requiring all omap .config files to add
-> >> > CONFIG_ARCH_OMAP=y manually. Anybody got good ideas for that?
-> >>
-> >> I've failed to come up with anything...
-> >>
-> >
-> > I have two ideas, but neither is great:
-> >
-> > a) we leave the individual per-soc options in the top-level menu
-> >    and move the sub-options under those. This is a bit or a problem
-> >    for options concerning all of OMAP, but I'm not sure how many of
-> >    those are actually required.
-> >
-> > b) We go back to Rob's version and make CONFIG_ARCH_OMAP the
-> >    user-selectable option, and then find another solution for
-> >    building a kernel with ARCH_OMAP set but none of individual
-> >    options. This will work for anybody who has a full .config
-> >    file, but still break the 'make savedefconfig' generated ones.
-> 
-> After playing with this more yesterday, I think ARCH_OMAP2PLUS instead
-> of ARCH_OMAP is actually a better choice to make the menuconfig item.
-> It still has the same defconfig issues, but doesn't affect OMAP1.
+Changes since v5:
+- Configuration data for cpu clock block is embedded with the code. The cpu clock
+  logic can later to extended to obtain this data from DT.
+- Excluded the support for Exynos4x12 SoC since the work on boost OPP bindings is
+  still incomplete.
+- Included cpufreq support for Exynos5420 SoC.
+- Many other minor changes (and so dropped Ack's for some of the patches in v5)
 
-Well eventually we'll have the same problem for both ARCH_OMAP1
-and ARCH_OMAP2PLUS so from that point of view it might make sense
-to use ARCH_OMAP to start with.
+This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
+series also enabled cpufreq support for Exynos5420 using arm_big_little cpufreq
+driver.
 
-> Doing your trick of a default selection with "select ARCH_OMAP2 if
-> !(ARCH_OMAP3 || ARCH_OMAP4 || ...)" in the menuconfig option can fix
-> the build issues. We'd actually need 2 selects for v6 and v7 only
-> builds.
+Thomas Abraham (6):
+  clk: samsung: add infrastructure to register cpu clocks
+  clk: samsung: register exynos5420 apll/kpll configuration data
+  clk: exynos: use cpu-clock provider type to represent arm clock
+  ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
+  ARM: Exynos: switch to using generic cpufreq driver for exynos4210/5250
+  cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
 
-Yes that or the options in mach-omap2/Makefile can be fixed up
-further for building things only when a SoC is selected.
+ arch/arm/boot/dts/exynos4210-origen.dts         |    6 +
+ arch/arm/boot/dts/exynos4210-trats.dts          |    6 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |    6 +
+ arch/arm/boot/dts/exynos4210.dtsi               |   27 ++
+ arch/arm/boot/dts/exynos5250-arndale.dts        |    6 +
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi   |    6 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |    6 +
+ arch/arm/boot/dts/exynos5250.dtsi               |   23 +
+ arch/arm/boot/dts/exynos5420-smdk5420.dts       |    6 +
+ arch/arm/boot/dts/exynos5420.dtsi               |   32 ++
+ arch/arm/mach-exynos/exynos.c                   |   15 +-
+ drivers/clk/samsung/Makefile                    |    2 +-
+ drivers/clk/samsung/clk-cpu.c                   |  577 +++++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos4.c               |   25 +-
+ drivers/clk/samsung/clk-exynos5250.c            |   16 +-
+ drivers/clk/samsung/clk-exynos5420.c            |   59 ++-
+ drivers/clk/samsung/clk.h                       |    5 +
+ drivers/cpufreq/Kconfig.arm                     |   22 -
+ drivers/cpufreq/Makefile                        |    2 -
+ drivers/cpufreq/exynos4210-cpufreq.c            |  184 --------
+ drivers/cpufreq/exynos5250-cpufreq.c            |  210 ---------
+ include/dt-bindings/clock/exynos5250.h          |    1 +
+ include/dt-bindings/clock/exynos5420.h          |    2 +
+ 23 files changed, 802 insertions(+), 442 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-cpu.c
+ delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
 
-So really the issue is how to deal with make oldconfig for
-existing .config files. I don't know if there's any solution to
-that short of doing make CONFIG_ARCH_OMAP=y oldconfig.
-
-Regards,
-
-Tony
+-- 
+1.7.9.5
