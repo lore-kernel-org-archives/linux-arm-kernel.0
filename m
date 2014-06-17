@@ -1,64 +1,54 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 17 Jun 2014 10:25:07 +0900
-Subject: [PATCH v3 -next 0/9] CMA: generalize CMA reserved area
- management code
-In-Reply-To: <539EB4C7.3080106@samsung.com>
-References: <1402897251-23639-1-git-send-email-iamjoonsoo.kim@lge.com>
- <539EB4C7.3080106@samsung.com>
-Message-ID: <20140617012507.GA6825@js1304-P5Q-DELUXE>
+From: wangweidong1@huawei.com (Wang Weidong)
+Date: Tue, 17 Jun 2014 09:23:56 +0800
+Subject: [PATCH] ARM: Thumb-2: Fix out-of-range offset for Thumb-2 in,
+ proc-macros.S
+In-Reply-To: <20140616134908.GI16758@arm.com>
+References: <5396ACF1.1020107@huawei.com> <20140616134908.GI16758@arm.com>
+Message-ID: <539F98AC.9050105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 11:11:35AM +0200, Marek Szyprowski wrote:
-> Hello,
+On 2014/6/16 21:49, Will Deacon wrote:
+> On Tue, Jun 10, 2014 at 08:00:01AM +0100, Wang Weidong wrote:
+>> The STR Instruction Encoding T4 points that the <imm> is in the
+>> range 0-255.So split the instruction into two for Thumb-2. Just
+>> like commit 874d5d3ccc("ARM: 6623/1: Thumb-2: Fix out-of-range
+>> offset for Thumb-2 in proc-v7.S").
+>>
+>> Signed-off-by: Wang Weidong <wangweidong1@huawei.com>
+>> ---
+>>  arch/arm/mm/proc-macros.S | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+>> index ee1d805..63f710c 100644
+>> --- a/arch/arm/mm/proc-macros.S
+>> +++ b/arch/arm/mm/proc-macros.S
+>> @@ -252,7 +252,9 @@
+>>  	tst	r3, #L_PTE_PRESENT | L_PTE_YOUNG	@ present and young?
+>>  	movne	r2, #0				@ no -> fault
+>>  
+>> -	str	r2, [r0, #2048]!		@ hardware version
+>> + ARM(	str	r2, [r0, #2048]! 		) @ hardware version
+>> + THUMB( add	r0, r0, #2048 			)
+>> + THUMB( str	r2, [r0] 			)
+>>  	mov	ip, #0
+>>  	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
+>>  	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
 > 
-> On 2014-06-16 07:40, Joonsoo Kim wrote:
-> >Currently, there are two users on CMA functionality, one is the DMA
-> >subsystem and the other is the KVM on powerpc. They have their own code
-> >to manage CMA reserved area even if they looks really similar.
-> >>From my guess, it is caused by some needs on bitmap management. Kvm side
-> >wants to maintain bitmap not for 1 page, but for more size. Eventually it
-> >use bitmap where one bit represents 64 pages.
-> >
-> >When I implement CMA related patches, I should change those two places
-> >to apply my change and it seem to be painful to me. I want to change
-> >this situation and reduce future code management overhead through
-> >this patch.
-> >
-> >This change could also help developer who want to use CMA in their
-> >new feature development, since they can use CMA easily without
-> >copying & pasting this reserved area management code.
-> >
-> >v3:
-> >   - Simplify old patch 1(log format fix) and move it to the end of patchset.
-> >   - Patch 2: Pass aligned base and size to dma_contiguous_early_fixup()
-> >   - Patch 5: Add some accessor functions to pass aligned base and size to
-> >   dma_contiguous_early_fixup() function
-> >   - Patch 5: Move MAX_CMA_AREAS definition to cma.h
-> >   - Patch 6: Add CMA region zeroing to PPC KVM's CMA alloc function
-> >   - Patch 8: put 'base' ahead of 'size' in cma_declare_contiguous()
-> >   - Remaining minor fixes are noted in commit description of each one
-> >
-> >v2:
-> >   - Although this patchset looks very different with v1, the end result,
-> >   that is, mm/cma.c is same with v1's one. So I carry Ack to patch 6-7.
-> >
-> >This patchset is based on linux-next 20140610.
+> AFAICT this is in xscale_set_pte_ext_epilogue which should only be built as
+> ARM. Are you seeing a real issue here?
 > 
-> Thanks for taking care of this. I will test it with my setup and if
-> everything goes well, I will take it to my -next tree. If any branch
-> is required for anyone to continue his works on top of those patches,
-> let me know, I will also prepare it.
+> Will
+> 
 
-Hello,
+Hi will,
 
-I'm glad to hear that. :)
-But, there is one concern. As you already know, I am preparing further
-patches (Aggressively allocate the pages on CMA reserved memory). It
-may be highly related to MM branch and also slightly depends on this CMA
-changes. In this case, what is the best strategy to merge this
-patchset? IMHO, Anrew's tree is more appropriate branch. If there is
-no issue in this case, I am willing to develope further patches based
-on your tree.
+I don't see any issue here. I just review the codes while I learn thumb-2.
+It does only build as ARM, so ignore it.
 
-Thanks.
+Regards
+Wang
+
+> .
+> 
