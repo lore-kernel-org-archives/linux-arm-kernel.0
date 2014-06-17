@@ -1,35 +1,30 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 17 Jun 2014 21:03:35 +0800
+Date: Tue, 17 Jun 2014 21:08:28 +0800
 Subject: ARM diagnostic register across suspend/resume
-In-Reply-To: <20140617102519.GC13808@arm.com>
+In-Reply-To: <20140617095729.GF13020@arm.com>
 References: <20140617083117.GD8860@dragon> <20140617095729.GF13020@arm.com>
- <20140617101606.GE23430@n2100.arm.linux.org.uk>
- <20140617102123.GA13808@arm.com>
- <20140617102344.GG23430@n2100.arm.linux.org.uk>
- <20140617102519.GC13808@arm.com>
-Message-ID: <20140617130333.GE8860@dragon>
+Message-ID: <20140617130827.GF8860@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 11:25:20AM +0100, Will Deacon wrote:
-> On Tue, Jun 17, 2014 at 11:23:44AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Jun 17, 2014 at 11:21:23AM +0100, Will Deacon wrote:
-> > > I think that actually works ok, because writing zeroes doesn't actually
-> > > do anything as far as I understand. The problem with suspend/resume is
-> > > that the suspend/resume cycle could well clear the internal state and
-> > > writing zeroes won't re-enable the workaround bits.
-> > > 
-> > > I'll double-check this with the hardware guys, since this register really
-> > > is undocumented.
+On Tue, Jun 17, 2014 at 10:57:29AM +0100, Will Deacon wrote:
+> On Tue, Jun 17, 2014 at 09:31:18AM +0100, Shawn Guo wrote:
+> > Hi Will, Catalin,
 > > 
-> > Are you saying that it is write one to set, and writing zero is ignored?
-> > If that's true, we should simplify the work-around code to get rid of the
-> > read-modify-write.
+> > The CP15 diagnostic register holds some bits for ARM errata workaround.
+> > Since core gets power gated across suspend/resume cycle, these bits will
+> > get lost along the way.  Is it okay for errata workaround to continue
+> > working after suspend, or do we have to save/restore diagnostic register
+> > to keep workaround effective?
 > 
-> That's my understanding for the diagnostic register, but I've asked for
-> clarification internally.
+> I'm not sure that saving/restoring the diagnostic register on A9 actually
+> works at all (I seem to remember some bits always read as zero?).
+> 
+> Anyway, I'd expect the state could be lost, so you'd need to reprogram
+> the diagnostic register rather than save/restore its value.
 
-Hmm, I'm not sure that's the case.  On imx6q, I can read out diagnostic
-register as 0x00200850 which matches the errata we enable.
+Yes, we observed that diagnostic state gets lost after suspend.  But
+per my testing I can see the effectiveness of errata workaround
+preserves.  Is this expected somehow or something wrong in my testing?
 
 Shawn
