@@ -1,35 +1,103 @@
-From: trini@ti.com (Tom Rini)
-Date: Tue, 17 Jun 2014 10:58:24 -0400
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140617125640.GC3705@n2100.arm.linux.org.uk>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QPmCk9GzHPHqCKG4vHDvUGirgGaizH-V9bsHT4V=8=gCaA@mail.gmail.com>
- <20140617090931.GB3705@n2100.arm.linux.org.uk> <53A03675.1000908@ti.com>
- <20140617125640.GC3705@n2100.arm.linux.org.uk>
-Message-ID: <53A05790.7090803@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Jun 2014 07:58:55 -0700
+Subject: [GIT PULL] omap fixes against v3.16-rc1
+Message-ID: <20140617145854.GT17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 08:56 AM, Russell King - ARM Linux wrote:
-> On Tue, Jun 17, 2014 at 08:37:09AM -0400, Tom Rini wrote:
->> On 06/17/2014 05:09 AM, Russell King - ARM Linux wrote:
->>> A good way that this could have been done is to put an I2C EEPROM on
->>> each cape, and have that store the DT fragment.  The boot loader could
->>> have then read that from each cape, and used that information to build
->>> up the final DT.  Why this hasn't been thought of, considering that the
->>> kernel has been moving towards DT for years, is quite unbelievable.
->>
->> I had actually talked about this a long while back (face to face) with
->> people, but the problem was (and still kind of is) the bindings
->> changing, etc.
-> 
-> And that's a strong argument for having stable bindings - or at the
-> very least, ensuring that new bindings which are compatible with older
-> versions.
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 
-Yes.  This was a few years back (a bit before the first beaglebone was
-public) so before we had really pushed up on some level of binding
-stability.
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 
--- 
-Tom
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-against-rc1
+
+for you to fetch changes up to edc56f871eefbc56baf1fd981eeff35ef447925c:
+
+  ARM: dts: dra7-evm: remove interrupt binding (2014-06-17 01:22:55 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps for issues discovered during the merge window and
+enabling of a few features that had to wait for the driver
+dependencies to clear.
+
+The fixes included are:
+
+- Fix am43xx hard reset flags
+
+- Fix SoC detection for DRA722
+
+- Fix CPU OPP table for omap5
+
+- Fix legacy mux parser bug if requested muxname is a prefix of
+  multiple mux entries
+
+- Fix qspi interrupt binding that relies on the irq crossbar
+  that has not yet been enabled
+
+- Add missing phy_sel for am43x-epos-evm
+
+- Drop unused gic_init_irq() that is no longer needed
+
+And the enabling of features that had driver dependencies are:
+
+- Change dra7 to use Audio Tracking Logic clock instead of a fixed
+  clock now that the clock driver for it has been merged
+
+- Enable off idle configuration for selected omaps as all the kernel
+  dependencies for device tree based booting are finally merged as
+  this is needed to get the automated PM tests working finally with
+  device tree based booting
+
+- Add hwmod entry for ocp2scp3 for omap5 to get sata working as
+  all the driver dependencies are now in the kernel and this patch
+  fell through the cracks during the merge window
+
+----------------------------------------------------------------
+Brian Norris (1):
+      ARM: OMAP2+: drop unused function
+
+Dave Gerlach (1):
+      ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
+
+David R. Piegdon (1):
+      ARM: OMAP2+: Fix parser-bug in platform muxing code
+
+George Cherian (1):
+      ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for am43x-epos-evm
+
+Keshava Munegowda (1):
+      ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
+
+Nishanth Menon (2):
+      ARM: DRA722: add detection of SoC information
+      ARM: dts: omap5: Update CPU OPP table as per final production Manual
+
+Peter Ujfalusi (1):
+      ARM: DTS: dra7/dra7xx-clocks: ATL related changes
+
+Sourav Poddar (1):
+      ARM: dts: dra7-evm: remove interrupt binding
+
+Tony Lindgren (2):
+      ARM: dts: Enable twl4030 off-idle configuration for selected omaps
+      Merge tag 'for-v3.16-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/fixes
+
+ arch/arm/boot/dts/am43x-epos-evm.dts       |  4 ++
+ arch/arm/boot/dts/dra7.dtsi                | 12 ++++-
+ arch/arm/boot/dts/dra7xx-clocks.dtsi       | 16 +++----
+ arch/arm/boot/dts/omap3-beagle-xm.dts      |  6 +++
+ arch/arm/boot/dts/omap3-evm-common.dtsi    |  7 +++
+ arch/arm/boot/dts/omap3-n900.dts           |  5 ++
+ arch/arm/boot/dts/omap5.dtsi               |  1 -
+ arch/arm/mach-omap2/Makefile               |  6 ++-
+ arch/arm/mach-omap2/cm33xx.h               |  2 +-
+ arch/arm/mach-omap2/common.h               |  1 -
+ arch/arm/mach-omap2/id.c                   | 12 +++++
+ arch/arm/mach-omap2/mux.c                  |  6 ++-
+ arch/arm/mach-omap2/omap4-common.c         | 20 --------
+ arch/arm/mach-omap2/omap_hwmod.c           |  6 +--
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 73 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/soc.h                  |  1 +
+ 16 files changed, 139 insertions(+), 39 deletions(-)
