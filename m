@@ -1,67 +1,90 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 18 Jun 2014 01:37:16 +0200
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140617121811.GG13808@arm.com>
-References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
- <538757B6.4010109@wwwdotorg.org> <20140530073006.GA24748@ulmo>
- <20140530112728.GB3949@e103592.cambridge.arm.com>
- <20140604211237.GC18710@mithrandir>
- <20140616125704.GE16758@arm.com> <20140617115829.GB18816@ulmo>
- <20140617121811.GG13808@arm.com>
-Message-ID: <20140617233714.GD25525@mithrandir>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jun 2014 00:42:26 +0100
+Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling()
+ into a library function
+In-Reply-To: <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
+ <20140616104615.GA10701@n2100.arm.linux.org.uk>
+ <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
+Message-ID: <20140617234226.GP23430@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 01:18:11PM +0100, Will Deacon wrote:
-> On Tue, Jun 17, 2014 at 12:58:30PM +0100, Thierry Reding wrote:
-> > On Mon, Jun 16, 2014 at 01:57:04PM +0100, Will Deacon wrote:
-> > > On Wed, Jun 04, 2014 at 10:12:38PM +0100, Thierry Reding wrote:
-> > > > It can easily be argued that if the algorithm used to remap the ID
-> > > > varies, the compatibility of the device changes. Therefore I would
-> > > > expect any variant of the GICv3 that deviates from the "standard"
-> > > > mapping (if there is such a thing) to have its own compatible string.
-> > > 
-> > > There is no standard mapping; it's a property defined at system integration
-> > > time. I fully expect different SoCs to do different things here.
-> > 
-> > My point was that the mapping itself seems to be fundamental enough to
-> > make devices with different mappings "incompatible". Therefore I think
-> > this could probably be handled by using different compatible values,
-> > something along the lines of this:
-> > 
-> > 	compatible = "vendor,soc-gicv3", "arm,gicv3";
-> > 
-> > Then the mapping can be described in code, which should be a whole lot
-> > easier and more flexible than a more or less generic notation in device
-> > tree.
+On Mon, Jun 16, 2014 at 02:17:30PM +0200, Ulf Hansson wrote:
+> On 16 June 2014 12:46, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Wed, Apr 23, 2014 at 08:08:07PM +0100, Russell King wrote:
+> >> @@ -1507,25 +1529,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+> >>                       host->ops->set_clock(host, host->clock);
+> >>               }
+> >>
+> >> -             if (host->ops->set_uhs_signaling)
+> >> -                     host->ops->set_uhs_signaling(host, ios->timing);
+> >> -             else {
+> >> -                     ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+> >> -                     /* Select Bus Speed Mode for host */
+> >> -                     ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+> >> -                     if ((ios->timing == MMC_TIMING_MMC_HS200) ||
+> >> -                         (ios->timing == MMC_TIMING_UHS_SDR104))
+> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
+> >> -                     else if (ios->timing == MMC_TIMING_UHS_SDR12)
+> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
+> >> -                     else if (ios->timing == MMC_TIMING_UHS_SDR25)
+> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
+> >> -                     else if (ios->timing == MMC_TIMING_UHS_SDR50)
+> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
+> >> -                     else if (ios->timing == MMC_TIMING_UHS_DDR50)
+> >> -                             ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
+> >> -                     sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+> >> -             }
+> >> +             host->ops->set_uhs_signaling(host, ios->timing);
+> >>
+> >>               if (!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN) &&
+> >>                               ((ios->timing == MMC_TIMING_UHS_SDR12) ||
+> >
+> > Whoever decided to poorly pick these patches up against my will has
+> > slightly messed this patch up - whereas my original patch left the
+> > code correctly formatted, when whoever applied this patch did so, they
+> > left an additional blank line in the above.
 > 
-> I don't think that scales well beyond a handful of unique mappings, and I
-> really anticipate everybody doing something different based on their
-> integration constraints.
+> Hi Russell,
 > 
-> You'd very quickly end up with sets of tables for each SoC, describing the
-> topology and associated IDs in the kernel source, which feels like a giant
-> step backwards from where we are today with device tree.
+> We kindly pinged you several times asking for your state and for the
+> PR, but I suppose you were just too busy. Your PR were kind of
+> blocking patches for sdhci, if you remember.
 
-Well, today we don't have a generic binding at all, so anything will
-really be a giant step forward in my opinion.
+I wasn't "too busy".  I had walked away from all kernel maintanence in
+disgust at the way many in the ARM community ignores questions, and
+ignores patches which need testing - I'm talking there about the L2C
+patch series which was extremely poorly tested, and still, to this day,
+has questions outstanding.  Yes, the code now produces warnings.  It
+produces warnings /because/ people were not willing to help.
 
-But seriously, from what you said earlier I got the impression that some
-of the mappings may not be easy or possible to represent in DT, which is
-why I proposed to encode it into the compatible property so that it can
-be handled in code instead.
+Those warnings serve as a reminder that there's still problems which
+need solving there, and they're not going to go away until those
+problems are solved.
 
-We've had similar discussions before (power sequences anyone?) where we
-tried to come up with a generic way to describe something in device tree
-that just didn't work out too well. Some things are better done in code,
-so I think we should at least consider that possibility rather than
-blindly try and force everything into device tree.
+While I don't like pushing unfinished code into mainline, in this case,
+others deemed the patch set too important _not_ to go into mainline
+even with these problems.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/1a18178b/attachment.sig>
+Now, it's been /soo/ long since I worked on that patch set that my
+knowledge has now diminished... so it's now going to be _much_ harder
+to resolve those issues than it would have been three months ago.
+
+And I'm also holding a grudge, and I bear grudges for a long time, so
+expect me to be "difficult" towards Linux stuff for a while yet.
+
+> The mmc people were also very helping in sending patches to fixup
+> related regressions, immediately after we merged your patchset. Thus
+> together I think we managed to pull it off.
+
+The formatting problem I refer to above is line 1532/1533 in sdhci.c -
+there's an additional blank line which somehow got left behind, caused
+presumably by insufficient attention paid to cleaning up a conflict
+between my original patches and the state of the tree they were
+applied to.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
