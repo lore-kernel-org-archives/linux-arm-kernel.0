@@ -1,36 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jun 2014 14:44:59 +0100
-Subject: [PATCH 1/2] ARM: dts: hummingboard: add support for BT/wifi
- where fitted
-In-Reply-To: <20140618133345.GL8860@dragon>
-References: <E1WufIK-0007yl-2k@rmk-PC.arm.linux.org.uk>
- <20140618133345.GL8860@dragon>
-Message-ID: <20140618134459.GD32514@n2100.arm.linux.org.uk>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Wed, 18 Jun 2014 19:14:59 +0530
+Subject: [PATCH] ARM: dts: add hdmi regulators for exynos5420 based peach-pit
+ board
+Message-ID: <1403099099-6599-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 09:33:46PM +0800, Shawn Guo wrote:
-> On Wed, Jun 11, 2014 at 10:58:12AM +0100, Russell King wrote:
-> > Some microsom modules have BT/Wifi fitted for the Hummingboard.  Enable
-> > support for this additional hardware; where it isn't present, the SDIO
-> > BT/Wifi will not be detected, and no harm will come from having these
-> > additional devices enabled.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Applied this one, thanks.
+Adding regulators for hdmi for peach-pit board.
 
-Probably not a good idea - which is why I didn't re-send it with my
-recent set.  As we /still/ don't have the story sorted six months down
-the line for handling the power and reset signals for the module, we
-still don't know what the final bindings are going to look like.
+Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+---
+Based on for-next branch in Kukjin's tree.
+Dependent on:
+1) PMIC DT patch at http://www.gossamer-threads.com/lists/linux/kernel/1945703
+2) tps65090 DT patch at https://lkml.org/lkml/2014/6/13/483
 
-I've more or less given up any hope of that situation being resolved;
-I'm intending to maintain Olof's patches locally, publishing them for
-Cubox-i users.  At this point, I really couldn't care less what the
-dysfunctional mainline kernel community does in respect of this very
-necessary feature.
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
+ 1 file changed, 5 insertions(+)
 
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 1c5b8f9..0a6a1cb 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -229,6 +229,11 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&hdmi_hpd_irq>;
+ 	ddc = <&i2c_2>;
++
++	hdmi-en-supply = <&tps65090_fet7>;
++	vdd-supply = <&ldo8_reg>;
++	vdd_osc-supply = <&ldo10_reg>;
++	vdd_pll-supply = <&ldo8_reg>;
+ };
+ 
+ &usbdrd_phy0 {
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
