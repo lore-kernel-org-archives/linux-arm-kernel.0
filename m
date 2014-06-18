@@ -1,41 +1,95 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 18 Jun 2014 22:23:03 +0200
-Subject: [PATCH] omap3-n900.dts: Rename model name to "Nokia RX-51 board"
-In-Reply-To: <20140618201241.GB558@drone.musicnaut.iki.fi>
-References: <1403110635-29696-1-git-send-email-pali.rohar@gmail.com>
- <20140618201241.GB558@drone.musicnaut.iki.fi>
-Message-ID: <201406182223.03420@pali>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 18 Jun 2014 13:27:48 -0700
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+Message-ID: <20140618202748.GA9022@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 22:12:41 Aaro Koskinen wrote:
-> On Wed, Jun 18, 2014 at 06:57:15PM +0200, Pali Roh?r wrote:
-> > Use same name as in legacy board code. There are lot of
-> > userspace applications which using machine/model name for
-> > determinating device type.
-> 
-> Can you clarify this? Nokia kernel or userspace never had DT,
-> so they cannot see e.g. /proc/device-tree/model. What other
-> APIs expose model?
-> 
-> A.
+An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
+(stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
+(stored to current_thread_info()->syscall). When this happens, the
+syscall can change across the call to secure_computing(), since it may
+block on tracer notification, and the tracer can then make changes
+to the process, before we return from secure_computing(). This
+means the code must respect the changed syscall after the
+secure_computing() call in syscall_trace_enter(). The same is true
+for tracehook_report_syscall_entry() which may also block and change
+the syscall.
 
-Hi Aaro,
+The x86 code handles this (it expects orig_ax to always be the
+desired syscall). In the ARM case, this means we should not be touching
+current_thread_info()->syscall after its initial assignment. All failures
+should result in a -1 syscall, though.
 
-look at email discussion about my previous patch with subject:
-[PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+Based on patch by Ricky Zhou.
 
-Basically that patch export model name in Hardware /proc/cpuinfo 
-instead generic DT name. And this patch change name to what 
-legacy board code reported.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+Cc: Ricky Zhou <rickyz@google.com>
+Cc: stable at vger.kernel.org
+---
+ arch/arm/kernel/ptrace.c |   20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 0dd3b79b15c3..97bd95f6aa01 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -911,6 +911,7 @@ enum ptrace_syscall_dir {
+ static int tracehook_report_syscall(struct pt_regs *regs,
+ 				    enum ptrace_syscall_dir dir)
+ {
++	int ret = 0;
+ 	unsigned long ip;
+ 
+ 	/*
+@@ -923,30 +924,35 @@ static int tracehook_report_syscall(struct pt_regs *regs,
+ 	if (dir == PTRACE_SYSCALL_EXIT)
+ 		tracehook_report_syscall_exit(regs, 0);
+ 	else if (tracehook_report_syscall_entry(regs))
+-		current_thread_info()->syscall = -1;
++		ret = -1;
+ 
+ 	regs->ARM_ip = ip;
+-	return current_thread_info()->syscall;
++	return ret;
+ }
+ 
+ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+ {
++	int ret = 0;
++
++	/* set up syscall, which may be changed in secure_computing */
+ 	current_thread_info()->syscall = scno;
+ 
+ 	/* Do the secure computing check first; failures should be fast. */
+ 	if (secure_computing(scno) == -1)
+ 		return -1;
+ 
+-	if (test_thread_flag(TIF_SYSCALL_TRACE))
+-		scno = tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
++	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
++	    tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER))
++		ret = -1;
+ 
+ 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+-		trace_sys_enter(regs, scno);
++		trace_sys_enter(regs, current_thread_info()->syscall);
+ 
+-	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
++	audit_syscall_entry(AUDIT_ARCH_ARM, current_thread_info()->syscall,
++			    regs->ARM_r0, regs->ARM_r1,
+ 			    regs->ARM_r2, regs->ARM_r3);
+ 
+-	return scno;
++	return ret ?: current_thread_info()->syscall;
+ }
+ 
+ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
+-- 
+1.7.9.5
+
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/2d166566/attachment.sig>
+Kees Cook
+Chrome OS Security
