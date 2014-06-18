@@ -1,38 +1,32 @@
 From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
-Date: Wed, 18 Jun 2014 18:54:24 +0200
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-Message-ID: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+Date: Wed, 18 Jun 2014 18:57:15 +0200
+Subject: [PATCH] omap3-n900.dts: Rename model name to "Nokia RX-51 board"
+Message-ID: <1403110635-29696-1-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Machine name from board description is some generic name on DT kernel.
-DT provides machine name property which is specific for board, so use
-it instead generic one when possible.
+Use same name as in legacy board code. There are lot of userspace applications
+which using machine/model name for determinating device type. And changing this
+name will break all of them. Due to small features support in DT code only non
+DT kernel was used for Nokia N900 until now.
 
 Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
 ---
- arch/arm/kernel/setup.c |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap3-n900.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 8a16ee5..fbc7b4f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -875,10 +875,13 @@ void __init setup_arch(char **cmdline_p)
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 6c6551a..e23ee96 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -13,7 +13,7 @@
+ #include <dt-bindings/input/input.h>
  
- 	setup_processor();
- 	mdesc = setup_machine_fdt(__atags_pointer);
--	if (!mdesc)
-+	if (mdesc)
-+		machine_name = of_flat_dt_get_machine_name();
-+	else
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
--	machine_name = mdesc->name;
-+	if (!machine_name)
-+		machine_name = mdesc->name;
+ / {
+-	model = "Nokia N900";
++	model = "Nokia RX-51 board";
+ 	compatible = "nokia,omap3-n900", "ti,omap3430", "ti,omap3";
  
- 	if (mdesc->reboot_mode != REBOOT_HARD)
- 		reboot_mode = mdesc->reboot_mode;
+ 	aliases {
 -- 
 1.7.9.5
