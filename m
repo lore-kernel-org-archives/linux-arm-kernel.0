@@ -1,93 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 16:17:17 +0100
-Subject: [PATCH 3/7] ARM: stih416: Add DT nodes for PWM
-In-Reply-To: <CAG374jChjAZksvYv0eQN+L1a2Zc4D2w+nU+OTuX_cCHP-aaPHA@mail.gmail.com>
-References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
- <1403103172-19856-3-git-send-email-lee.jones@linaro.org>
- <CAG374jChjAZksvYv0eQN+L1a2Zc4D2w+nU+OTuX_cCHP-aaPHA@mail.gmail.com>
-Message-ID: <20140618151717.GD15956@lee--X1>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 18 Jun 2014 10:17:48 -0500
+Subject: [PATCH 2/2] regulators: TPS65218: Correct the the config register for
+ LDO1
+In-Reply-To: <1403104668-32316-1-git-send-email-balbi@ti.com>
+References: <1403104668-32316-1-git-send-email-balbi@ti.com>
+Message-ID: <1403104668-32316-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jun 2014, Gabriel Fernandez wrote:
+From: Keerthy <j-keerthy@ti.com>
 
-> Hi Lee,
-> minor remark below..
-> 
-> On 18 June 2014 16:52, Lee Jones <lee.jones@linaro.org> wrote:
-> > Supply top level nodes for the STiH416 based development boards.
-> > The Pinctrl configuration has already been applied, so the only
-> > missing piece of the DT puzzle is for a board's DTB to enable
-> > the nodes.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/stih416.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 40 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> > index 06473c5..8af159e 100644
-> > --- a/arch/arm/boot/dts/stih416.dtsi
-> > +++ b/arch/arm/boot/dts/stih416.dtsi
-> > @@ -236,5 +236,45 @@
-> >                         resets  = <&powerdown STIH416_KEYSCAN_POWERDOWN>,
-> >                                   <&softreset STIH416_KEYSCAN_SOFTRESET>;
-> >                 };
-> > +
-> > +               /* SAS PWM Module */
-> > +               pwm0: pwm at fed10000 {
-> > +                       compatible      = "st,sti-pwm";
-> > +                       status          = "disabled";
-> > +                       #pwm-cells      = <2>;
-> > +                       reg             = <0xfed10000 0x68>;
-> > +
-> > +                       pinctrl-names   = "default";
-> > +                        pinctrl-0 =    <&pinctrl_pwm0_chan0_default
-> del space
+Correct the the config register for LDO1.
 
-Thanks.
+Cc: <stable@vger.kernel.org> # v3.15
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/regulator/tps65218-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> > +                                       &pinctrl_pwm0_chan1_default
-> > +                                       &pinctrl_pwm0_chan2_default
-> > +                                       &pinctrl_pwm0_chan3_default>;
-> > +
-> > +                       clock-names     = "pwm";
-> > +                       clocks          = <&clk_sysin>;
-> > +               };
-> > +
-> > +               /* SBC PWM Module */
-> > +               pwm1: pwm at fe510000 {
-> > +                       compatible      = "st,sti-pwm";
-> > +                       status          = "disabled";
-> > +                       #pwm-cells      = <2>;
-> > +                       reg             = <0xfe510000 0x68>;
-> > +
-> > +                       pinctrl-names   = "default";
-> > +                       pinctrl-0 =     <&pinctrl_pwm1_chan0_default
-> > +                                       /*
-> > +                                        * Shared with SBC_OBS_NOTRST.  Don't
-> > +                                        * enable unless you really know what
-> > +                                        * you're doing.
-> > +                                        *
-> > +                                        * &pinctrl_pwm1_chan1_default
-> > +                                        */
-> > +                                       &pinctrl_pwm1_chan2_default
-> > +                                       &pinctrl_pwm1_chan3_default>;
-> > +
-> > +                       clock-names     = "pwm";
-> > +                       clocks          = <&clk_sysin>;
-> > +               };
-> >         };
-> >  };
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+index edbc46e..9effe48 100644
+--- a/drivers/regulator/tps65218-regulator.c
++++ b/drivers/regulator/tps65218-regulator.c
+@@ -209,7 +209,7 @@ static const struct regulator_desc regulators[] = {
+ 			   1, -1, -1, TPS65218_REG_ENABLE1,
+ 			   TPS65218_ENABLE1_DC6_EN, NULL, NULL, 0, 0),
+ 	TPS65218_REGULATOR("LDO1", TPS65218_LDO_1, tps65218_ldo1_dcdc34_ops, 64,
+-			   TPS65218_REG_CONTROL_DCDC4,
++			   TPS65218_REG_CONTROL_LDO1,
+ 			   TPS65218_CONTROL_LDO1_MASK, TPS65218_REG_ENABLE2,
+ 			   TPS65218_ENABLE2_LDO1_EN, NULL, ldo1_dcdc3_ranges,
+ 			   2, 0),
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.0.0.rc1
