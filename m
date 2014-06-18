@@ -1,110 +1,59 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 18 Jun 2014 10:41:47 -0400
-Subject: [PATCH] arm64: support reboot and power off via EFI runtime
-In-Reply-To: <CAL_JsqJUMMRwUn+PUiFweDOywgLCbKiWfDTLDSfJqE9oTV5gYw@mail.gmail.com>
-References: <1403023514-1352-1-git-send-email-msalter@redhat.com>
- <CAL_JsqJUMMRwUn+PUiFweDOywgLCbKiWfDTLDSfJqE9oTV5gYw@mail.gmail.com>
-Message-ID: <1403102507.32688.42.camel@deneb.redhat.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 18 Jun 2014 16:47:44 +0200
+Subject: [RFC PATCH 6/6] arm/arm64: KVM: vgic: Clarify and correct vgic
+ documentation
+In-Reply-To: <1402779067-34478-7-git-send-email-christoffer.dall@linaro.org>
+References: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
+ <1402779067-34478-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <53A1A690.8030909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-06-18 at 09:09 -0500, Rob Herring wrote:
-> On Tue, Jun 17, 2014 at 11:45 AM, Mark Salter <msalter@redhat.com> wrote:
-> > Add handlers for arm_pm_resestart and pm_power_off which use EFI
+On 06/14/2014 10:51 PM, Christoffer Dall wrote:
+> The VGIC virtual distributor implementation documentation was written a
+> very long time ago, before the true nature of the beast had been
+> partially absorbed into my bloodstream.  I think this amalgamates the
+> two evil beings (myself and the code) a little more.
 > 
-> typo.
+> Plus, it fixes an actual bug.  ICFRn, pfff.
 > 
-> > runtime services ResetSystem call to perform the functions. These
-> > handlers are only installed if no handler currently exists. This
-> > allows PSCI to take priority over EFI for these functions.
-> >
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > ---
-> >  arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic.c | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
 > 
-> Where's the arm32 version? Surely this could be shared with all
-> arches. pm_power_off is at least architecturally independent. We
-> should do the same for restart/reboot. I'm not saying do that now, but
-> at least put it in the right place for that to happen.
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 1f91b3b..cc776af 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -36,21 +36,22 @@
+>   * How the whole thing works (courtesy of Christoffer Dall):
+>   *
+>   * - At any time, the dist->irq_pending_on_cpu is the oracle that knows if
+> - *   something is pending
+> - * - VGIC pending interrupts are stored on the vgic.irq_pending vgic
+> - *   bitmap (this bitmap is updated by both user land ioctls and guest
+> - *   mmio ops, and other in-kernel peripherals such as the
+> - *   arch. timers) and indicate the 'wire' state.
+> + *   something is pending on the CPU interface.
+> + * - Interrupts that are pending on the distributor are stored on the
+> + *   vgic.irq_pending vgic bitmap (this bitmap is updated by both user land
+> + *   ioctls and guest mmio ops, and other in-kernel peripherals such as the
+> + *   arch. timers).
+ok forget my previous comment related to wire state;-)
+>   * - Every time the bitmap changes, the irq_pending_on_cpu oracle is
+>   *   recalculated
+>   * - To calculate the oracle, we need info for each cpu from
+>   *   compute_pending_for_cpu, which considers:
+>   *   - PPI: dist->irq_pending & dist->irq_enable
+>   *   - SPI: dist->irq_pending & dist->irq_enable & dist->irq_spi_target
+> - *   - irq_spi_target is a 'formatted' version of the GICD_ICFGR
+> + *   - irq_spi_target is a 'formatted' version of the GICD_ITARGETSRn
+>   *     registers, stored on each vcpu. We only keep one bit of
+>   *     information per interrupt, making sure that only one vcpu can
+>   *     accept the interrupt.
+> + * - If any of the above state changes, we must recalculate the oracle.
+>   * - The same is true when injecting an interrupt, except that we only
+>   *   consider a single interrupt at a time. The irq_spi_cpu array
+>   *   contains the target CPU for each SPI.
 > 
-> Rob
-
-Good point. So the right place would be drivers/firmware/efi I think.
-Add a CONFIG_EFI_RESET with default off. I suppose we could also
-go ahead and s/arm_pm_restart/pm_restart/ kernel-wide or have an
-ifdef in the code (or depends on ARM64 || ARM in Kconfig) until we
-do so.
-
-[Matt Fleming CC'd]
-
-> 
-> >  1 file changed, 40 insertions(+)
-> >
-> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> > index 14db1f6..e8c0476 100644
-> > --- a/arch/arm64/kernel/efi.c
-> > +++ b/arch/arm64/kernel/efi.c
-> > @@ -19,11 +19,14 @@
-> >  #include <linux/of_fdt.h>
-> >  #include <linux/sched.h>
-> >  #include <linux/slab.h>
-> > +#include <linux/reboot.h>
-> > +#include <linux/pm.h>
-> >
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/efi.h>
-> >  #include <asm/tlbflush.h>
-> >  #include <asm/mmu_context.h>
-> > +#include <asm/system_misc.h>
-> >
-> >  struct efi_memory_map memmap;
-> >
-> > @@ -467,3 +470,40 @@ static int __init arm64_enter_virtual_mode(void)
-> >         return 0;
-> >  }
-> >  early_initcall(arm64_enter_virtual_mode);
-> > +
-> > +static void efi_restart(enum reboot_mode reboot_mode, const char *cmd)
-> > +{
-> > +       int efi_mode;
-> > +
-> > +       switch (reboot_mode) {
-> > +       case REBOOT_WARM:
-> > +       case REBOOT_SOFT:
-> > +               efi_mode = EFI_RESET_WARM;
-> > +               break;
-> > +       default:
-> > +               efi_mode = EFI_RESET_COLD;
-> > +               break;
-> > +       }
-> > +       efi.reset_system(efi_mode, 0, 0, NULL);
-> > +}
-> > +
-> > +static void efi_power_off(void)
-> > +{
-> > +       efi.reset_system(EFI_RESET_SHUTDOWN, 0, 0, NULL);
-> > +}
-> > +
-> > +static int __init setup_efi_reset(void)
-> > +{
-> > +       if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-> > +               /*
-> > +                * If something (psci, etc) hasn't already registered
-> > +                * a handler, use EFI.
-> > +                */
-> > +               if (arm_pm_restart == NULL)
-> > +                       arm_pm_restart = efi_restart;
-> > +               if (pm_power_off == NULL)
-> > +                       pm_power_off = efi_power_off;
-> > +       }
-> > +       return 0;
-> > +}
-> > +pure_initcall(setup_efi_reset);
-> > --
-> > 1.9.0
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
