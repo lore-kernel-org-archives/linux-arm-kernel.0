@@ -1,58 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Jun 2014 10:29:06 +0100
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <7c03c5cffa174b20962bff3b09de0eb8@DM2PR03MB352.namprd03.prod.outlook.com>
-References: <20140604164132.GF6644@arm.com>
- <07321368d15d4ad9928ebb83af87e401@DM2PR03MB479.namprd03.prod.outlook.com>
- <20140616152739.GS16758@arm.com>
- <8b0492b4697943a0b1f276ef42cc8223@DM2PR03MB352.namprd03.prod.outlook.com>
- <20140616170416.GA16758@arm.com>
- <419e67f783524d208ab3be16bcd94bd9@DM2PR03MB352.namprd03.prod.outlook.com>
- <0587e1f4894546398be0798d2bc2c84f@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140617104304.GD13808@arm.com>
- <32165315f0b84be9948f489fd87bf6a9@BL2PR03MB468.namprd03.prod.outlook.com>
- <7c03c5cffa174b20962bff3b09de0eb8@DM2PR03MB352.namprd03.prod.outlook.com>
-Message-ID: <20140618092906.GA32699@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 18 Jun 2014 11:31:09 +0200
+Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
+In-Reply-To: <1403083170.1984.70.camel@x220>
+References: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-17-git-send-email-arnd@arndb.de>
+ <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
+ <20140528155916.GA9793@piout.net> <1401293383.22486.18.camel@x220>
+ <20140528175439.GA18470@piout.net> <1401299948.22486.51.camel@x220>
+ <20140528184217.GB30031@kroah.com> <1403083170.1984.70.camel@x220>
+Message-ID: <20140618093109.GQ19375@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 03:50:25PM +0100, Stuart Yoder wrote:
-> > > I think for simple masters (i.e. those that have all their StreamIDs
-> > > under control of one driver), then setting something during attach (or
-> > > add?) based on the DT could work pretty well. The other case is when we
-> > > have masters behind a bridge (such as a PCI RC). In this case, it might
-> > > actually be better to ask the bridge for the IDs and let it sort out
-> > the
-> > > allocation itself. That would also move the RequesterID -> StreamID
-> > > mapping out of the SMMU code.
-> > >
-> > > What do you think?
-> > The PCI bus iommu group creation code would be part of the SMMU driver
-> > (it is handled by other IOMMU drivers as well). My understanding is that
-> > there would be one is to one correspondence between the requestor ID and
-> > the iommu group. May be, we can have an API provided by the PCI bridge
-> > (architecture specific) for setting the stream ID.
-> 
-> I think Will is suggesting something along those lines-- I think it's a
-> question of where the streamID allocation happens.  You could
-> either do something like the following in the SMMU driver when attaching
-> a PCI device:
-> 
->     id = alloc_stream_id(...);
->     pci_set_streamid(pci-dev, id);
-> 
->     or
-> 
->     id = pci_get_streamid(pci-dev);
-> 
-> ...i.e the PCI RC could allocate (from some TBD
-> allocator) and set the stream ID itself.
-> 
-> Not sure how big a deal it is to extend PCI RC interfaces for 
-> something like that.
+Hi,
 
-I think both interfaces have their place; the latter for hotpluggable buses
-and the former for static allocation (i.e. set once). The only way to see
-how well it works is to try implementing it, I guess.
+On 18/06/2014 at 11:19:30 +0200, Paul Bolle wrote :
+> This has landed unchanged in v3.16-rc1. Should I submit the trivial
+> patch to remove these pointless references to the unknown symbols
+> AT91SAM9263, AT91SAM9RL, and AT91SAM9G45?
+> 
 
-Will
+Because of dependencies, the pull request was delayed until after
+3.16-rc1. It has been resent and this should be solved for 3.16-rc2:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264181.html
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
