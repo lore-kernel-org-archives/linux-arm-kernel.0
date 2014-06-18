@@ -1,62 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 18 Jun 2014 09:37:54 -0600
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
- <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
- <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
- <20140617215119.GC24743@mithrandir>
- <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
-Message-ID: <53A1B252.1030204@wwwdotorg.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 18 Jun 2014 17:39:08 +0200
+Subject: Dove DT and HDMI on v3.16-rc1
+In-Reply-To: <20140618153028.GF32514@n2100.arm.linux.org.uk>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
+ <535F6DAF.1010400@gmail.com> <20140615152554.GA13870@n2100.arm.linux.org.uk>
+ <53A19DFA.7030207@gmail.com> <20140618143447.GA22890@arch.cereza>
+ <20140618150103.GE32514@n2100.arm.linux.org.uk> <53A1ABE8.8050401@gmail.com>
+ <20140618153028.GF32514@n2100.arm.linux.org.uk>
+Message-ID: <53A1B29C.6000604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2014 06:18 AM, Peter De Schrijver wrote:
-> On Tue, Jun 17, 2014 at 11:51:20PM +0200, Thierry Reding wrote:
->> * PGP Signed by an unknown key
->>
->> On Tue, Jun 17, 2014 at 05:01:46PM +0300, Peter De Schrijver wrote:
->>> On Tue, Jun 17, 2014 at 02:13:15PM +0200, Thierry Reding wrote:
->>>>> Old Signed by an unknown key
->>>>
->>>> On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
->>>>> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
->>>>>> This symbol needs to be exported to power on rails without using
->>>>>> tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
->>>>>> cannot be used in situations where the driver wants to handle clocking
->>>>>> by itself.
->>>>>
->>>>> Thierry, are you OK with this change?
->>>>
->>>> I would've preferred tegra_powergate_sequence_power_up() to be used
->>>
->>> I don't think the current tegra_powergate_sequence_power_up() API is very well
->>> defined though. I don't think the clocks and resets required by the sequence
->>> should be provided by the driver. For one, there can be several clocks and
->>> resets that need to be controlled for a single domain.
->>
->> Do you have any suggestions for what the API should look like? Even if
->> we plan to move to some different API, I think there's some advantage in
->> using it consistently if for no other reason than to make it easier to
->> replace occurrences later on.
->>
-> 
-> I think the API should only have the domain ID as input so:
-> 
-> int tegra_powerdomain_on(int id) 
-> 
-> /*
->  * Prerequisites: domain is off
->  * Result: domain is on, clocks of the modules in the domain are off, modules are in reset
->  */
-> 
-> int tegra_powerdomain_off(int id)
-> 
-> /*
->  * Prerequisites: all clocks of the modules in the domain are off
->  * result: domain is off
->  */
+On 06/18/2014 05:30 PM, Russell King - ARM Linux wrote:
+> On Wed, Jun 18, 2014 at 05:10:32PM +0200, Sebastian Hesselbarth wrote:
+>> xf86-video-armada needs some missing
+>> #include "picturestr.h"
+>> for raring, but whole process has been very straight forward.
+>
+> I'm only aware of this (sorry, copy'n'pasted) which I found when trying
+> to build against ubuntu 14.04.  If further patches are needed to make it
+> compatible with more Xorg versions, please ensure that they find their
+> way into my inbox...
 
-That doesn't make sense; the PMC doesn't have access to the clock and
-reset IDs - that's why the API requires them to be passed in.
+Your patch also makes the xorg driver build fine on raring.
+When I encountered the build error, I just tried the first hit on Google
+- I didn't investigate it at all.
+
+Sebastian
