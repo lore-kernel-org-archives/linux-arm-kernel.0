@@ -1,44 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Jun 2014 11:39:54 +0100
-Subject: [PATCH] arm64: export __cpu_{clear,copy}_user_page functions
-In-Reply-To: <1403025266-2326-1-git-send-email-msalter@redhat.com>
-References: <1403025266-2326-1-git-send-email-msalter@redhat.com>
-Message-ID: <20140618103954.GC14680@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Jun 2014 11:40:09 +0100
+Subject: [PATCH] ARM: save/restore diagnostic register on ARMv7
+ suspend/resume
+In-Reply-To: <1403081398-32116-1-git-send-email-shawn.guo@freescale.com>
+References: <1403081398-32116-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140618104009.GH32699@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 06:14:26PM +0100, Mark Salter wrote:
-> The __cpu_clear_user_page() and __cpu_copy_user_page() functions
-> are not currently exported. This prevents modules from using
-> clear_user_page() and opy_user_page().
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  arch/arm64/mm/copypage.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/copypage.c b/arch/arm64/mm/copypage.c
-> index 9aecbac..13bbc3be 100644
-> --- a/arch/arm64/mm/copypage.c
-> +++ b/arch/arm64/mm/copypage.c
-> @@ -27,8 +27,10 @@ void __cpu_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
->  	copy_page(kto, kfrom);
->  	__flush_dcache_area(kto, PAGE_SIZE);
->  }
-> +EXPORT_SYMBOL_GPL(__cpu_copy_user_page);
->  
->  void __cpu_clear_user_page(void *kaddr, unsigned long vaddr)
->  {
->  	clear_page(kaddr);
->  }
-> +EXPORT_SYMBOL_GPL(__cpu_clear_user_page);
+On Wed, Jun 18, 2014 at 09:49:58AM +0100, Shawn Guo wrote:
+> The CP15 diagnostic register holds ARM errata bits on ARMv7, so it
+> needs to be saved/restored on suspend/resume.  Otherwise, the
+> effectiveness of errata workaround gets lost together with diagnostic
+> register bit across suspend/resume cycle.
 
-I wonder why we still have these functions. I don't think we need any
-D-cache flushing for copy_user_page(), so we could simply remove this
-code and define copy_user_page() as copy_page() (similarly for
-clear_user_page). I'll post a patch separately removing the copy_page,
-copy_user_page etc. functions (now that we also have optimised memcpy
-and memset).
+This should be conditional on Cortex-A9, since this register is certainly
+not architected.
 
--- 
-Catalin
+Will
