@@ -1,107 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Jun 2014 18:47:10 +0100
-Subject: [PATCH 10/24] ARM64: Introduce is_a32_task and is_a32_thread.
- Use them in the correct locations.
-In-Reply-To: <1400914939-9708-11-git-send-email-apinski@cavium.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <1400914939-9708-11-git-send-email-apinski@cavium.com>
-Message-ID: <20140618174710.GB11977@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 18 Jun 2014 10:55:01 -0700
+Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8 kernels
+In-Reply-To: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 12:02:05AM -0700, Andrew Pinski wrote:
-> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-> index e71f81f..fad7612 100644
-> --- a/arch/arm64/include/asm/compat.h
-> +++ b/arch/arm64/include/asm/compat.h
-> @@ -293,28 +293,47 @@ struct compat_shmid64_ds {
->  	compat_ulong_t __unused5;
->  };
->  
-> -static inline int is_compat_task(void)
-> +#ifdef CONFIG_AARCH32_EL0
-> +static inline int is_a32_compat_task(void)
->  {
->  	return test_thread_flag(TIF_32BIT);
->  }
-> -
-> -static inline int is_compat_thread(struct thread_info *thread)
-> +static inline int is_a32_compat_thread(struct thread_info *thread)
->  {
->  	return test_ti_thread_flag(thread, TIF_32BIT);
->  }
-> +#else
-> +static inline int is_a32_compat_task(void)
-> +{
-> +	return 0;
-> +}
-> +static inline int is_a32_compat_thread(struct thread_info *thread)
-> +{
-> +	return 0;
-> +}
-> +#endif
->  
->  #else /* !CONFIG_COMPAT */
->  
-> -static inline int is_compat_task(void)
-> +static inline int is_a32_compat_task(void)
->  {
->  	return 0;
->  }
-> -
-> -static inline int is_compat_thread(struct thread_info *thread)
-> +static inline int is_a32_compat_thread(struct thread_info *thread)
->  {
->  	return 0;
->  }
+On Thu, Apr 10, 2014 at 9:27 AM, Taras Kondratiuk
+<taras.kondratiuk@linaro.org> wrote:
+> From: Nico Pitre <nico@fluxnic.net>
+>
+> All known BE8-capable systems have LE bootloaders, so we need to ensure
+> that the magic number and image start/end values are in little endian
+> format.
+>
+> [ben.dooks at codethink.co.uk: from nico's original email on this subject]
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> [taras.kondratiuk at linaro.org: removed lds.S->lds rule, added target to extra-y]
+> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
 
-Why do we have 2 dummy definitions for is_a32_compat_task()? Could we
-not squash them into one with different #ifdefs?
+This patch has now hit -next (as of next-20140618) and I noticed all
+my big-endian boot tests failed[1].  Turns out they failed because I'm
+deciding whether to pass a big-endian or little-endian initramfs based
+on the magic number of the zImage.  Since it's now always little
+endian, even the big-endian kernels were boot tested with a little
+endian initramfs.  And guess what.... they failed.
 
->  
->  #endif /* CONFIG_COMPAT */
-> +
-> +static inline int is_compat_task(void)
-> +{
-> +	return is_a32_compat_task();
-> +}
-> +
-> +static inline int is_compat_thread(struct thread_info *thread)
-> +{
-> +	return is_a32_compat_thread(thread);
-> +}
->  #endif /* __KERNEL__ */
->  #endif /* __ASM_COMPAT_H */
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 36c3603..8180511 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -150,7 +150,7 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
->  
->  /* 1GB of VA */
->  #ifdef CONFIG_COMPAT
-> -#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
-> +#define STACK_RND_MASK			(is_compat_task() ? \
->  						0x7ff >> (PAGE_SHIFT - 12) : \
->  						0x3ffff >> (PAGE_SHIFT - 12))
+I like this patch for several reasons, including the fact that
+u-boot's bootz support checks the magic number and failed before this
+patch.
 
-I think I tried something similar in the past and while it works most of
-the time, you can easily get into an #include mess since now elf.h needs
-compat.h. Similarly for other header files where you've changed this.
+All of that to say, with this patch applied, I need a new (and
+reliable) way to determine the endianness of a kernel just by looking
+at the zImage.  Recommendations welcome.
 
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index 720e70b..b2bf728 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -106,7 +106,7 @@ static inline struct thread_info *current_thread_info(void)
->  #define TIF_FREEZE		19
->  #define TIF_RESTORE_SIGMASK	20
->  #define TIF_SINGLESTEP		21
-> -#define TIF_32BIT		22	/* 32bit process */
-> +#define TIF_32BIT		22	/* AARCH32 process */
+Thanks,
 
-Can we not just keep TIF_32BIT for limiting the address space to 32-bit
-and use another bit for AArch32 applications?
+Kevin
 
--- 
-Catalin
+[1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-June/004059.html
