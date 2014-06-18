@@ -1,41 +1,60 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 18 Jun 2014 17:23:19 +0300
-Subject: [PATCH v2 0/7] Serial ATA support for NVIDIA Tegra124
-Message-ID: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
+Date: Wed, 18 Jun 2014 17:23:20 +0300
+Subject: [PATCH v2 1/7] of: Add NVIDIA Tegra SATA controller binding
+In-Reply-To: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
+References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1403101406-15439-2-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds device tree binding documentation for the SATA
+controller found on NVIDIA Tegra SoCs.
 
-This series adds support for the onboard AHCI-compliant Serial ATA
-controller found on Tegra124 systems-on-chip. The series depends on
-Thierry's XUSB pinctrl driver.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+v2:
+- added target-5v-supply and target-12v-supply
+- changed wording to be similar with other Tegra drivers
 
-A branch containing the series is located at 
-	git://github.com/cyndis/linux.git
-branch ahci-rel-v2.
-
-Mikko Perttunen (7):
-  of: Add NVIDIA Tegra SATA controller binding
-  ARM: tegra: Add SATA controller to Tegra124 device tree
-  ARM: tegra: Add SATA and SATA power to Jetson TK1 device tree
-  clk: tegra: Enable hardware control of SATA PLL
-  clk: tegra: Add SATA clocks to Tegra124 initialization table
-  ata: Add support for the Tegra124 SATA controller
-  ARM: tegra: Add options for Tegra AHCI support to tegra_defconfig
-
- .../devicetree/bindings/ata/tegra-sata.txt         |  30 ++
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  35 ++
- arch/arm/boot/dts/tegra124.dtsi                    |  25 ++
- arch/arm/configs/tegra_defconfig                   |   3 +
- drivers/ata/Kconfig                                |   9 +
- drivers/ata/Makefile                               |   1 +
- drivers/ata/ahci_tegra.c                           | 448 +++++++++++++++++++++
- drivers/clk/tegra/clk-pll.c                        |   8 +
- drivers/clk/tegra/clk-tegra124.c                   |   2 +
- 9 files changed, 561 insertions(+)
+ .../devicetree/bindings/ata/tegra-sata.txt         | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
- create mode 100644 drivers/ata/ahci_tegra.c
 
+diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+new file mode 100644
+index 0000000..946f207
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
+@@ -0,0 +1,30 @@
++Tegra124 SoC SATA AHCI controller
++
++Required properties :
++- compatible : "nvidia,tegra124-ahci".
++- reg : Should contain 2 entries:
++  - AHCI register set (SATA BAR5)
++  - SATA register set
++- interrupts : Defines the interrupt used by SATA
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries:
++  - sata
++  - sata-oob
++  - cml1
++  - pll_e
++- resets : Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names : Must include the following entries:
++  - sata
++  - sata-oob
++  - sata-cold
++- phys : Must contain an entry for each entry in phy-names.
++  See ../phy/phy-bindings.txt for details.
++- phy-names : Must include the following entries:
++  - sata-phy : XUSB PADCTL SATA PHY
++- hvdd-supply : Defines the SATA HVDD regulator
++- vddio-supply : Defines the SATA VDDIO regulator
++- avdd-supply : Defines the SATA AVDD regulator
++- target-5v-supply : Defines the SATA 5V power regulator
++- target-12v-supply : Defines the SATA 12V power regulator
 -- 
 1.8.1.5
