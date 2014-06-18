@@ -1,74 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Jun 2014 14:07:35 -0500
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 18 Jun 2014 21:09:58 +0200
 Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+In-Reply-To: <20140618190108.GI32514@n2100.arm.linux.org.uk>
 References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
+ <20140618190108.GI32514@n2100.arm.linux.org.uk>
+Message-ID: <201406182109.59059@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 11:54 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> Machine name from board description is some generic name on DT kernel.
-> DT provides machine name property which is specific for board, so use
-> it instead generic one when possible.
->
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  arch/arm/kernel/setup.c |    7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 8a16ee5..fbc7b4f 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -875,10 +875,13 @@ void __init setup_arch(char **cmdline_p)
->
->         setup_processor();
->         mdesc = setup_machine_fdt(__atags_pointer);
-> -       if (!mdesc)
-> +       if (mdesc)
-> +               machine_name = of_flat_dt_get_machine_name();
-> +       else
->                 mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
->         machine_desc = mdesc;
-> -       machine_name = mdesc->name;
-> +       if (!machine_name)
-> +               machine_name = mdesc->name;
->
->         if (mdesc->reboot_mode != REBOOT_HARD)
->                 reboot_mode = mdesc->reboot_mode;
+On Wednesday 18 June 2014 21:01:09 Russell King - ARM Linux 
+wrote:
+> On Wed, Jun 18, 2014 at 06:54:24PM +0200, Pali Roh?r wrote:
+> > Machine name from board description is some generic name on
+> > DT kernel. DT provides machine name property which is
+> > specific for board, so use it instead generic one when
+> > possible.
+> 
+> http://archive.arm.linux.org.uk/lurker/message/20130726.132850
+> .53d47576.en.html
+> 
+> "If userspace wants to get at the DT information about a
+> platform, we already have ways that can happen already - we
+> export the DT stuff so that kexec's tools can get at it."
 
-I did a similar patch previously[1]. Like my original patch, your
-patch unconditionally changes the name which could be considered part
-of the userspace ABI. It's arguably not good practice for userspace to
-depend on the name, but there are likely cases that do. So I think
-this needs to be optional and only use the DT name if the machine desc
-name is NULL.
+Userspace application does not know that kernel using DT. And 
+also it does not want to get DT information. Only board/machine 
+name. So existing applications stop working after migration to 
+DT. And because legacy board boot code (without DT) is going to 
+be removed for ARM in near future this will permanently break 
+existing applications.
 
-So something like the below and then change the machine descriptors
-you care about. The default generic DT machine desc should definitely
-be changed.
+And sometimes it is even not possible to fix userspace 
+application if is closed source - binary only.
 
-I had a follow-up discussion with Grant about his concerns in the
-thread about knowing which machine desc used to boot. He said he was
-okay if just the machine desc address is printed out.
-
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 50e198c..1479250 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -887,7 +887,7 @@ void __init setup_arch(char **cmdline_p)
-        if (!mdesc)
-                mdesc = setup_machine_tags(__atags_pointer,
-__machine_arch_type);
-        machine_desc = mdesc;
--       machine_name = mdesc->name;
-+       machine_name = mdesc->name ? mdesc->name :
-of_flat_dt_get_machine_name();
-
-        if (mdesc->reboot_mode != REBOOT_HARD)
-                reboot_mode = mdesc->reboot_mode;
-
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/208878.html
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/5d34ccda/attachment.sig>
