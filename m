@@ -1,324 +1,55 @@
-From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Wed, 18 Jun 2014 15:16:35 +0800
-Subject: [PATCH v2 4/8] PCI: designware: add msi controller functions
- for v3.65 hw
-In-Reply-To: <1402426287-31157-5-git-send-email-m-karicheri2@ti.com>
-References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
- <1402426287-31157-5-git-send-email-m-karicheri2@ti.com>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB6619C5F8168DB@EAPEX1MAIL1.st.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 18 Jun 2014 09:29:16 +0200
+Subject: [PATCH 0/6] ARM: at91: more clocks fixes for 3.16
+In-Reply-To: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <53A13FCC.6060906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Murali,
+Hello,
 
-> -----Original Message-----
-> From: Murali Karicheri [mailto:m-karicheri2 at ti.com]
-> Sent: Wednesday, June 11, 2014 12:21 AM
-> To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-
-> doc at vger.kernel.org
-> Cc: Murali Karicheri; Santosh Shilimkar; Russell King; Grant Likely; Rob Herring;
-> Mohit KUMAR DCG; Jingoo Han; Bjorn Helgaas; Pratyush ANAND; Richard
-> Zhu; Kishon Vijay Abraham I; Marek Vasut; Arnd Bergmann; Pawel Moll;
-> Mark Rutland; Ian Campbell; Kumar Gala; Randy Dunlap
-> Subject: [PATCH v2 4/8] PCI: designware: add msi controller functions for
-> v3.65 hw
-> 
-> Add dw msi controller functions for v3.65 hw. This adds dw_v3_65_msi_chip
-> and dw_v3_65_msi_domain_ops so that can be used on this version of the
-> hw.
-> This required since MSI irq registers reside in the application space for v3.65
-> hw. The functions are used by v3.65 dw pci core functions to support
-> implementation of PCI controllers based on this hw version.
-> 
-> While at it, move the ATU hw specific variable and msi irq to a separate struct
-> inside a union and add another struct inside the union to hold dw v3.65
-> specific variables.
-> 
-- Here also, pls look into Lucas work for MSI cleanup and then apply your changes:
-[PATCH 0/4] proper multi MSI handling for designware host
+On 17/06/2014 18:41, Alexandre Belloni wrote:
+> Hi,
+>
+> This patch set fixes more issues with the clocks on AT91:
+>
+> The first patch define the slow crystal on the at91sam9261ek board
+>
+> The next patchs are moving all the clocks that were under the root under a
+> "clocks" node to be consistent accross all architecture.
 
-Thanks
-Mohit
+I'm just nitpicking here, but you could swap patch 1 and 2 so that
+slow_xtal node appears directly under clocks node.
 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> 
-> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Grant Likely <grant.likely@linaro.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Mohit Kumar <mohit.kumar@st.com>
-> CC: Jingoo Han <jg1.han@samsung.com>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Pratyush Anand <pratyush.anand@st.com>
-> CC: Richard Zhu <r65037@freescale.com>
-> CC: Kishon Vijay Abraham I <kishon@ti.com>
-> CC: Marek Vasut <marex@denx.de>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Pawel Moll <pawel.moll@arm.com>
-> CC: Mark Rutland <mark.rutland@arm.com>
-> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> CC: Kumar Gala <galak@codeaurora.org>
-> CC: Randy Dunlap <rdunlap@infradead.org>
-> CC: Grant Likely <grant.likely@linaro.org>
-> 
-> ---
->  drivers/pci/host/Kconfig            |    5 ++
->  drivers/pci/host/Makefile           |    1 +
->  drivers/pci/host/pci-dw-v3_65-msi.c |  149
-> +++++++++++++++++++++++++++++++++++
->  drivers/pci/host/pci-dw-v3_65.h     |   20 +++++
->  drivers/pci/host/pcie-designware.h  |   21 +++--
->  5 files changed, 191 insertions(+), 5 deletions(-)  create mode 100644
-> drivers/pci/host/pci-dw-v3_65-msi.c
->  create mode 100644 drivers/pci/host/pci-dw-v3_65.h
-> 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig index
-> a6f67ec..2fcd9f9 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -9,6 +9,11 @@ config PCI_MVEBU
->  config PCIE_DW
->  	bool
-> 
-> +config PCI_DW_V3_65
-> +	bool "Designware PCIe h/w v3.65"
-> +	help
-> +	   Say Y here if the DW h/w version is 3.65
-> +
->  config PCI_EXYNOS
->  	bool "Samsung Exynos PCIe controller"
->  	depends on SOC_EXYNOS5440
-> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile index
-> 13fb333..28af710 100644
-> --- a/drivers/pci/host/Makefile
-> +++ b/drivers/pci/host/Makefile
-> @@ -4,3 +4,4 @@ obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
->  obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
->  obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
->  obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
-> +obj-$(CONFIG_PCI_DW_V3_65) += pci-dw-v3_65-msi.o
-> diff --git a/drivers/pci/host/pci-dw-v3_65-msi.c b/drivers/pci/host/pci-dw-
-> v3_65-msi.c
-> new file mode 100644
-> index 0000000..a26ffdd
-> --- /dev/null
-> +++ b/drivers/pci/host/pci-dw-v3_65-msi.c
-> @@ -0,0 +1,149 @@
-> +/*
-> + * Designware(dw) MSI controller version 3.65
-> + *
-> + * Copyright (C) 2013-2014 Texas Instruments., Ltd.
-> + *		http://www.ti.com
-> + *
-> + * Author: Murali Karicheri <m-karicheri2@ti.com>
-> + *
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/of_irq.h>
-> +#include <linux/kernel.h>
-> +#include <linux/msi.h>
-> +#include <linux/pci.h>
-> +
-> +#include "pcie-designware.h"
-> +
-> +#define MSI_IRQ				0x054
-> +#define MSI0_IRQ_STATUS			0x104
-> +#define MSI0_IRQ_ENABLE_SET		0x108
-> +#define MSI0_IRQ_ENABLE_CLR		0x10c
-> +#define IRQ_STATUS			0x184
-> +#define IRQ_EOI                         0x050
-> +#define MSI_IRQ_OFFSET			4
-> +
-> +static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys) {
-> +	return sys->private_data;
-> +}
-> +
-> +static inline void update_reg_offset_bit_pos(u32 offset, u32 *reg_offset,
-> +					u32 *bit_pos)
-> +{
-> +	*reg_offset = offset % 8;
-> +	*bit_pos = offset >> 3;
-> +}
-> +
-> +inline u32 dw_v3_65_get_msi_data(struct pcie_port *pp) {
-> +	return pp->app.start + MSI_IRQ;
-> +}
-> +
-> +void dw_v3_65_handle_msi_irq(struct pcie_port *pp, int offset) {
-> +	u32 pending, vector;
-> +	int src, virq;
-> +
-> +	pending = readl(pp->va_app_base + MSI0_IRQ_STATUS + (offset <<
-> 4));
-> +	/*
-> +	 * MSI0, Status bit 0-3 shows vectors 0, 8, 16, 24, MSI1 status bit
-> +	 * shows 1, 9, 17, 25 and so forth
-> +	 */
-> +	for (src = 0; src < 4; src++) {
-> +		if (BIT(src) & pending) {
-> +			vector = offset + (src << 3);
-> +			virq = irq_linear_revmap(pp->irq_domain, vector);
-> +			dev_dbg(pp->dev,
-> +				"irq: bit %d, vector %d, virq %d\n",
-> +				 src, vector, virq);
-> +			generic_handle_irq(virq);
-> +		}
-> +	}
-> +}
-> +
-> +static void dw_v3_65_msi_irq_ack(struct irq_data *d) {
-> +	u32 offset, reg_offset, bit_pos;
-> +	unsigned int irq = d->irq;
-> +	struct msi_desc *msi;
-> +	struct pcie_port *pp;
-> +
-> +	msi = irq_get_msi_desc(irq);
-> +	pp = sys_to_pcie(msi->dev->bus->sysdata);
-> +	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-> +	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-> +
-> +	writel(BIT(bit_pos),
-> +		pp->va_app_base + MSI0_IRQ_STATUS + (reg_offset << 4));
-> +	writel(reg_offset + MSI_IRQ_OFFSET, pp->va_app_base + IRQ_EOI);
-> }
-> +
-> +static void dw_v3_65_msi_irq_mask(struct irq_data *d) {
-> +	u32 offset, reg_offset, bit_pos;
-> +	unsigned int irq = d->irq;
-> +	struct msi_desc *msi;
-> +	struct pcie_port *pp;
-> +
-> +	msi = irq_get_msi_desc(irq);
-> +	pp = sys_to_pcie(msi->dev->bus->sysdata);
-> +	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-> +	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-> +
-> +	/* mask the end point if PVM implemented */
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		if (msi->msi_attrib.maskbit)
-> +			mask_msi_irq(d);
-> +	}
-> +
-> +	writel(BIT(bit_pos),
-> +		pp->va_app_base + MSI0_IRQ_ENABLE_CLR + (reg_offset <<
-> 4)); }
-> +
-> +static void dw_v3_65_msi_irq_unmask(struct irq_data *d) {
-> +	u32 offset, reg_offset, bit_pos;
-> +	unsigned int irq = d->irq;
-> +	struct msi_desc *msi;
-> +	struct pcie_port *pp;
-> +
-> +	msi = irq_get_msi_desc(irq);
-> +	pp = sys_to_pcie(msi->dev->bus->sysdata);
-> +	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-> +	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-> +
-> +	/* mask the end point if PVM implemented */
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		if (msi->msi_attrib.maskbit)
-> +			unmask_msi_irq(d);
-> +	}
-> +
-> +	writel(BIT(bit_pos),
-> +		pp->va_app_base + MSI0_IRQ_ENABLE_SET + (reg_offset <<
-> 4)); }
-> +
-> +static struct irq_chip dw_v3_65_msi_chip = {
-> +	.name = "PCI-DW-MSI-OLD",
-> +	.irq_ack = dw_v3_65_msi_irq_ack,
-> +	.irq_mask = dw_v3_65_msi_irq_mask,
-> +	.irq_unmask = dw_v3_65_msi_irq_unmask, };
-> +
-> +static int dw_v3_65_msi_map(struct irq_domain *domain, unsigned int irq,
-> +			irq_hw_number_t hwirq)
-> +{
-> +	irq_set_chip_and_handler(irq, &dw_v3_65_msi_chip,
-> handle_level_irq);
-> +	irq_set_chip_data(irq, domain->host_data);
-> +	set_irq_flags(irq, IRQF_VALID);
-> +
-> +	return 0;
-> +}
-> +
-> +const struct irq_domain_ops dw_v3_65_msi_domain_ops = {
-> +	.map = dw_v3_65_msi_map,
-> +};
-> diff --git a/drivers/pci/host/pci-dw-v3_65.h b/drivers/pci/host/pci-dw-
-> v3_65.h new file mode 100644 index 0000000..689256a
-> --- /dev/null
-> +++ b/drivers/pci/host/pci-dw-v3_65.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + * Designware(dw) v3.65 controller common includes
-> + *
-> + * Copyright (C) 2013-2014 Texas Instruments., Ltd.
-> + *		http://www.ti.com
-> + *
-> + * Author: Murali Karicheri <m-karicheri2@ti.com>
-> + *
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#define MAX_LEGACY_IRQS		4
-> +
-> +/* v3.65 specific MSI controller APIs/definitions */ extern const
-> +struct irq_domain_ops dw_v3_65_msi_domain_ops; void
-> +dw_v3_65_handle_msi_irq(struct pcie_port *pp, int offset);
-> +u32 dw_v3_65_get_msi_data(struct pcie_port *pp);
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-
-> designware.h
-> index 3a6a6eb..05bb590 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -35,16 +35,27 @@ struct pcie_port {
->  	struct device		*dev;
->  	u8			root_bus_nr;
->  	void __iomem		*dbi_base;
-> -	u64			cfg0_base;
-> -	void __iomem		*va_cfg0_base;
-> -	u64			cfg1_base;
-> -	void __iomem		*va_cfg1_base;
->  	/*
->  	 * v3.65 DW hw implements application register space for
->  	 * MSI and has no ATU view port
->  	 */
->  #define DW_V3_65		BIT(0)
->  	u32			version;
-> +	union {
-> +		/* New DW hw specific */
-> +		struct {
-> +			u64			cfg0_base;
-> +			void __iomem		*va_cfg0_base;
-> +			u64			cfg1_base;
-> +			void __iomem		*va_cfg1_base;
-> +			int			msi_irq;
-> +		};
-> +		/* v3.65 DW hw specific */
-> +		struct  {
-> +			void __iomem		*va_app_base;
-> +			struct resource		app;
-> +		};
-> +	};
->  	u64			io_base;
->  	u64			mem_base;
->  	spinlock_t		conf_lock;
-> @@ -55,7 +66,7 @@ struct pcie_port {
->  	int			irq;
->  	u32			lanes;
->  	struct pcie_host_ops	*ops;
-> -	int			msi_irq;
-> +	/* msi irq domain */
->  	struct irq_domain	*irq_domain;
->  	unsigned long		msi_data;
->  	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
-> --
-> 1.7.9.5
+Apart from that,
+
+Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+
+>
+> Alexandre Belloni (6):
+>   ARM: at91/dt: define sam9261ek slow crystal frequency
+>   ARM: at91/dt: sam9261 crystals under the clocks node
+>   ARM: at91/dt: sam9n12 crystals under the clocks node
+>   ARM: at91/dt: sam9rl crystals under the clocks node
+>   ARM: at91/dt: sam9x5 crystals under the clocks node
+>   ARM: at91/dt: sama5d3 crystals under the clocks node
+>
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 12 +++++++-----
+>  arch/arm/boot/dts/at91sam9261.dtsi          | 20 ++++++++++---------
+>  arch/arm/boot/dts/at91sam9261ek.dts         | 12 ++++++++----
+>  arch/arm/boot/dts/at91sam9n12.dtsi          | 20 ++++++++++---------
+>  arch/arm/boot/dts/at91sam9n12ek.dts         | 16 +++++++--------
+>  arch/arm/boot/dts/at91sam9rl.dtsi           | 22 ++++++++++-----------
+>  arch/arm/boot/dts/at91sam9rlek.dts          | 17 ++++++++--------
+>  arch/arm/boot/dts/at91sam9x5.dtsi           | 30 +++++++++++++++--------------
+>  arch/arm/boot/dts/at91sam9x5cm.dtsi         | 12 +++++++-----
+>  arch/arm/boot/dts/sama5d3.dtsi              | 22 ++++++++++-----------
+>  arch/arm/boot/dts/sama5d3xcm.dtsi           | 12 +++++++-----
+>  11 files changed, 105 insertions(+), 90 deletions(-)
+>
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
