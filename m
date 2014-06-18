@@ -1,29 +1,72 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 18 Jun 2014 13:21:24 +0530
-Subject: [PATCH v6 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
-References: <1403018733-4187-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CAKohpomt4M_V7rMAoh=+UFon3CxnZjVY_9DuVtQW9ddtTTj7Fg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 09:26:53 +0100
+Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
+ devices
+In-Reply-To: <53A0B27E.5010708@gmail.com>
+References: <53A05E2D.6020702@samsung.com>
+ <1403019164-12514-1-git-send-email-t.figa@samsung.com>
+ <5027740.B7iVUcUX2T@wuerfel> <53A0B27E.5010708@gmail.com>
+Message-ID: <20140618082653.GN21030@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2014 20:55, Thomas Abraham <thomas.ab@samsung.com> wrote:
-> Changes since v5:
-> - Configuration data for cpu clock block is embedded with the code. The cpu clock
->   logic can later to extended to obtain this data from DT.
-> - Excluded the support for Exynos4x12 SoC since the work on boost OPP bindings is
->   still incomplete.
-> - Included cpufreq support for Exynos5420 SoC.
-> - Many other minor changes (and so dropped Ack's for some of the patches in v5)
->
-> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
-> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
-> series also enabled cpufreq support for Exynos5420 using arm_big_little cpufreq
-> driver.
+On Tue, 17 Jun 2014, Tomasz Figa wrote:
+> On 17.06.2014 17:42, Arnd Bergmann wrote:
+> > On Tuesday 17 June 2014 17:32:44 Tomasz Figa wrote:
+> >> Currently a syscon entity can be only registered directly through a
+> >> platform device that binds to a dedicated driver. However in certain use
+> >> cases it is desirable to make a device used with another driver a syscon
+> >> interface provider. For example, certain SoCs (e.g. Exynos) contain
+> >> system controller blocks which perform various functions such as power
+> >> domain control, CPU power management, low power mode control, but in
+> >> addition contain certain IP integration glue, such as various signal
+> >> masks, coprocessor power control, etc. In such case, there is a need to
+> >> have a dedicated driver for such system controller but also share
+> >> registers with other drivers. The latter is where the syscon interface
+> >> is helpful.
+> >>
+> >> This patch decouples syscon object from syscon driver, so that it can be
+> >> registered from any driver in addition to the original "syscon" platform
+> >> driver.
 
-cpufreq at vger.kernel.org list is deprecated now: dec102a, use linux-pm instead.
++1 for this approach.
 
-For patch 5 and 6:
+Michal, Pankay,
+  Does it also suit your needs?
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > 
+> > Hi Tomasz,
+> > 
+> > This seems like a reasonable way of solving the problem, but I think
+> > there is an even better one that we have about in the past: if we
+> > promote syscon from a platform driver into a a drivers/base/ helper
+> > that is independent of the platform device matching, we can use
+> > call syscon_regmap_lookup_* for any device node, whether it's already
+> > bound to a driver or not, which do what you need. It would also make
+> > it easier to call the syscon code before the platform_device
+> > infrastructure gets initialized, which is something a number of
+> > people have asked for, e.g. for using regmap to do SMP bringup
+> > or for clock registration.
+> 
+> Basically, unless I'm missing your point, this is what my patch does,
+> except that I don't move it to drivers/base/ and the registration
+> function I added require a pointer to struct device. Indeed, decoupling
+> it further from the driver model, by adding of_syscon_register() should
+> be useful for early users.
+
+If agreed by Arnd, I think this work can be completed as a subsequent
+patch.
+
+> Should I move this to drivers/base/, even though from current location
+> it can be used outside the platform driver anyway?
+
+If I'm being honest with myself, I'd say that Syscon wasn't really an
+MFD driver.  I'm happy to keep it in there any continue maintaining
+it, but wouldn't block a move either.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
