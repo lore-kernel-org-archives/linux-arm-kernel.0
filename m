@@ -1,69 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 18 Jun 2014 17:35:08 -0400 (EDT)
-Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8
- kernels
-In-Reply-To: <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
-References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
- <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
- <53A1D701.8060404@codeaurora.org>
- <CAGa+x86DfDjQG8gN2-x7Kapt2ipsYt879R4OK6JWGoaT93VVig@mail.gmail.com>
- <53A1D8FE.6030404@codeaurora.org>
- <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1406181720130.16842@knanqh.ubzr>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 18 Jun 2014 16:43:28 -0500
+Subject: [PATCH v2 1/2] arm: dts: am4372: let boards enable RTC and
+ Watchdog
+In-Reply-To: <20140618192553.GB4570@saruman.home>
+References: <1403106200-777-1-git-send-email-balbi@ti.com>
+ <1403106200-777-2-git-send-email-balbi@ti.com> <53A1B677.9010909@ti.com>
+ <20140618192553.GB4570@saruman.home>
+Message-ID: <53A20800.3070301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jun 2014, Kevin Hilman wrote:
+On 06/18/2014 02:25 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Wed, Jun 18, 2014 at 10:55:35AM -0500, Nishanth Menon wrote:
+>> $subject - ARM: dts:
+>>
+>> On 06/18/2014 10:43 AM, Felipe Balbi wrote:
+>>> by providing phandles to rtc and wdt nodes, we can
+>>> let boards enable rtc and wdt as necessary.
+>>>
+>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>> ---
+>>>   arch/arm/boot/dts/am4372.dtsi | 4 ++--
+>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+>>> index 49fa596..e3830d4 100644
+>>> --- a/arch/arm/boot/dts/am4372.dtsi
+>>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>>> @@ -270,7 +270,7 @@
+>>>   			ti,hwmods = "counter_32k";
+>>>   		};
+>>>
+>>> -		rtc at 44e3e000 {
+>>> +		rtc: rtc at 44e3e000 {
+>>>   			compatible = "ti,am4372-rtc","ti,da830-rtc";
+>>>   			reg = <0x44e3e000 0x1000>;
+>>>   			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH
+>>> @@ -279,7 +279,7 @@
+>>>   			status = "disabled";
+>>>   		};
+>>>
+>>> -		wdt at 44e35000 {
+>>> +		wdt: wdt at 44e35000 {
+>>>   			compatible = "ti,am4372-wdt","ti,omap3-wdt";
+>>>   			reg = <0x44e35000 0x1000>;
+>>>   			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+>>>
+>> we might want to fix up any other similar nodes in dtsi as well, no?
+>>
+>> examples:
+>> cpu at 0
+>
+> and why would you want boards to mess with the cpu node ?
+>
+cpu-supply = <&regulator>;
 
-> On Wed, Jun 18, 2014 at 11:22 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 06/18/14 11:21, Kevin Hilman wrote:
-> >> On Wed, Jun 18, 2014 at 11:14 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >>> On 06/18/14 10:55, Kevin Hilman wrote:
-> >>>> All of that to say, with this patch applied, I need a new (and
-> >>>> reliable) way to determine the endianness of a kernel just by looking
-> >>>> at the zImage.  Recommendations welcome.
-> >>> Assuming that you have the .config configured to be built into the
-> >>> kernel you could use extract-ikconfig
-> >>>
-> >>> $ ./scripts/extract-ikconfig zImage | grep CONFIG_CPU_ENDIAN_BE8
-> >> Unfortunately, I can't rely on having that built in since I want the
-> >> boot tools to be as generic as possible.
-> >>
-> >>
-> >
-> > Yeah ok. Perhaps you can look for the 'setend be' instruction right
-> > after the magic values instead.
-> 
-> Yeah, that works, as long as I can always assume that instruction will
-> be at the same offset (currently at 0x30).
-
-Well... then you also have to test for the Thumb2 variant. And that 
-forces this instruction to always be there.
-
-If we're to "officialize" this, I'd much prefer we add another magic 
-value like this:
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index c95feab6ce..413fd94b53 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -128,6 +128,7 @@ start:
- 		.word	_magic_sig	@ Magic numbers to help the loader
- 		.word	_magic_start	@ absolute load/run zImage address
- 		.word	_magic_end	@ zImage end address
-+		.word	0x04030201	@ endianness flag
- 
-  THUMB(		.thumb			)
- 1:
-
-
-
-
-> 
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+for cpufreq.
