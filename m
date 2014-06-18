@@ -1,71 +1,70 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Wed, 18 Jun 2014 11:10:11 +0000
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <20140616182645.GD16758@arm.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <5537408.I9tiuCA96J@wuerfel> <20140616164517.GY16758@arm.com>
- <8028011.DbLMpGku5b@wuerfel> <20140616182645.GD16758@arm.com>
-Message-ID: <836ade98fe6141f58476bf981ac5a6bf@BL2PR03MB468.namprd03.prod.outlook.com>
+From: sachin.kamat@samsung.com (Sachin Kamat)
+Date: Wed, 18 Jun 2014 16:50:43 +0530
+Subject: Build error - vmlinux.lds [Re: linux-next: Tree for Jun 18]
+Message-ID: <CAK5sBcEpXboRVD-KzzjBJMi+LF-jhdt_HUYEz7wkJtFAv+BLcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Will Deacon
-> Sent: Monday, June 16, 2014 11:57 PM
-> To: Arnd Bergmann
-> Cc: Kefeng Wang; Catalin Marinas; Tianhong Ding; huxinwei at huawei.com;
-> Zefan Li; Zhen Lei; Dave P Martin; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH RFC v1 1/2] documentation/iommu: Add description of
-> Hisilicon System MMU binding
-> 
-> On Mon, Jun 16, 2014 at 06:25:35PM +0100, Arnd Bergmann wrote:
-> > On Monday 16 June 2014 17:45:17 Will Deacon wrote:
-> > > On Mon, Jun 16, 2014 at 05:42:10PM +0100, Arnd Bergmann wrote:
-> > > > We have to migrate the driver to the new binding anyway, it may be
-> > > > a bit painful, but there are not really any users yet so there is
-> > > > a chance we can remove the nonstandard code at some point, perhaps
-> > > > in a few years.
-> > >
-> > > The only way I see this working is if we kill the existing binding
-> > > and move exclusively to the new one. I'm actually ok with that (we
-> > > have no in-tree users), but it needs to happen ASAP in my opinion,
-> > > otherwise we increase the window where the old binding can be
-> adopted.
-> >
-> > I agree. I was hoping to get the generic binding ready for 3.16, but
-> > that didn't happen. Maybe we can add a small patch to the binding to
-> > explain that it will change in the future.
-> 
-> Perhaps, but saying "don't use this" isn't much better than just ripping
-> out the support altogether. That said, I won't object to a patch adding a
-> big fat warning to the current binding docs if it dissuades people from
-> using what we currently have.
-> 
-> > > Note that the next version of the ARM SMMU (v3) is considerably
-> > > different to the current architecture, so a new driver (using the
-> > > new bindings) will be required.
-> > >
-> > > This actually opens a wider question: if we don't have an in-tree
-> > > user for a device-tree binding, do we consider that binding to be
-> unused?
-> >
-> > Not in general, but often. We don't require dts files to be in the
-> > kernel, so we have to apply a bit of common sense. If anyone knows of
-> > out-of-tree users of the binding that are actually working with
-> > upstream kernels, we need a migration path. Anything that also
-> > requires out-of-tree kernel patches however is something we don't have
-> to worry about.
-> 
-> Ok. If Thierry's binding gets in for 3.17, then I'll try to convert the
-> ARM SMMU driver over to it for 3.18 providing we don't grow any in-tree
-> users of the existing binding in the meantime (or 3.17 depending on how
-> early it gets queued).
-> 
-> Sound fair?
-Would you be considering the handling of hot plug masters in the arm-smmu driver while incorporating the new binding?
+I observe the following build error while building uImage for ARM.
 
--Varun
+  Kernel: arch/arm/boot/Image is ready
+make[2]: *** No rule to make target
+`arch/arm/boot/compressed/vmlinux.lds', needed by
+`arch/arm/boot/compressed/vmlinux'.  Stop.
+make[1]: *** [arch/arm/boot/compressed/vmlinux] Error 2
+make: *** [uImage] Error 2
+
+Regards,
+Sachin.
+
+
+On Wed, Jun 18, 2014 at 9:33 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
+>
+> The powerpc allyesconfig is again broken more than usual.
+>
+> Changes since 20140617:
+>
+> Non-merge commits (relative to Linus' tree): 868
+>  1021 files changed, 24269 insertions(+), 14775 deletions(-)
+>
+> ----------------------------------------------------------------------------
+>
+> I have created today's linux-next tree at
+> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+> (patches at http://www.kernel.org/pub/linux/kernel/next/ ).  If you
+> are tracking the linux-next tree using git, you should not use "git pull"
+> to do so as that will try to merge the new linux-next release with the
+> old one.  You should use "git fetch" and checkout or reset to the new
+> master.
+>
+> You can see which trees have been included by looking in the Next/Trees
+> file in the source.  There are also quilt-import.log and merge.log files
+> in the Next directory.  Between each merge, the tree was built with
+> a ppc64_defconfig for powerpc and an allmodconfig for x86_64 and a
+> multi_v7_defconfig for arm. After the final fixups (if any), it is also
+> built with powerpc allnoconfig (32 and 64 bit), ppc44x_defconfig and
+> allyesconfig (this fails its final link) and i386, sparc, sparc64 and arm
+> defconfig.
+>
+> Below is a summary of the state of the merge.
+>
+> I am currently merging 219 trees (counting Linus' and 29 trees of patches
+> pending for Linus' tree).
+>
+> Stats about the size of the tree over time can be seen at
+> http://neuling.org/linux-next-size.html .
+>
+> Status of my local build tests will be at
+> http://kisskb.ellerman.id.au/linux-next .  If maintainers want to give
+> advice about cross compilers/configs that work, we are always open to add
+> more builds.
+>
+> Thanks to Randy Dunlap for doing many randconfig builds.  And to Paul
+> Gortmaker for triage and bug fixes.
+>
+> --
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
