@@ -1,60 +1,41 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 18 Jun 2014 16:43:28 -0500
-Subject: [PATCH v2 1/2] arm: dts: am4372: let boards enable RTC and
- Watchdog
-In-Reply-To: <20140618192553.GB4570@saruman.home>
-References: <1403106200-777-1-git-send-email-balbi@ti.com>
- <1403106200-777-2-git-send-email-balbi@ti.com> <53A1B677.9010909@ti.com>
- <20140618192553.GB4570@saruman.home>
-Message-ID: <53A20800.3070301@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jun 2014 22:47:52 +0100
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <CAL_JsqK5j8PvYfq+tct4RMr63TWDYGfi_TA28k5m4KyG=UuNbg@mail.gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
+ <201406182122.29623@pali>
+ <CAL_JsqK5j8PvYfq+tct4RMr63TWDYGfi_TA28k5m4KyG=UuNbg@mail.gmail.com>
+Message-ID: <20140618214752.GL32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2014 02:25 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Wed, Jun 18, 2014 at 10:55:35AM -0500, Nishanth Menon wrote:
->> $subject - ARM: dts:
->>
->> On 06/18/2014 10:43 AM, Felipe Balbi wrote:
->>> by providing phandles to rtc and wdt nodes, we can
->>> let boards enable rtc and wdt as necessary.
->>>
->>> Signed-off-by: Felipe Balbi <balbi@ti.com>
->>> ---
->>>   arch/arm/boot/dts/am4372.dtsi | 4 ++--
->>>   1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
->>> index 49fa596..e3830d4 100644
->>> --- a/arch/arm/boot/dts/am4372.dtsi
->>> +++ b/arch/arm/boot/dts/am4372.dtsi
->>> @@ -270,7 +270,7 @@
->>>   			ti,hwmods = "counter_32k";
->>>   		};
->>>
->>> -		rtc at 44e3e000 {
->>> +		rtc: rtc at 44e3e000 {
->>>   			compatible = "ti,am4372-rtc","ti,da830-rtc";
->>>   			reg = <0x44e3e000 0x1000>;
->>>   			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH
->>> @@ -279,7 +279,7 @@
->>>   			status = "disabled";
->>>   		};
->>>
->>> -		wdt at 44e35000 {
->>> +		wdt: wdt at 44e35000 {
->>>   			compatible = "ti,am4372-wdt","ti,omap3-wdt";
->>>   			reg = <0x44e35000 0x1000>;
->>>   			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
->>>
->> we might want to fix up any other similar nodes in dtsi as well, no?
->>
->> examples:
->> cpu at 0
->
-> and why would you want boards to mess with the cpu node ?
->
-cpu-supply = <&regulator>;
+On Wed, Jun 18, 2014 at 03:46:19PM -0500, Rob Herring wrote:
+> On Wed, Jun 18, 2014 at 2:22 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> > Also I still did not know why DT kernel does not report Revision
+> > number which is passed by bootloader via atags. Any idea?
+> 
+> Probably because no one cared until now and revision info for every
+> SOC is different. I would like to see revision info set in the DT in a
+> standard way and remove the various SOC specific kernel
+> implementations.
 
-for cpufreq.
+Except... that's not what it is.  What that revision field was originally
+invented for was the Netwinder to indicate the _platform_ revision.
+
+>From what I've seen, almost everyone else sets this to zero in their
+boot loaders - it is /very/ rarely used.  However, I think OMAP (ab)uses
+it by putting the SoC revision into it at kernel boot time.  That's
+not what it is supposed to be used for.
+
+Others have already solved the problem of exporting SoC specific
+information, such as SoC name, SoC revision, etc, if only people would
+use it - drivers/base/soc.c.  This gives machine, family, soc_id and
+SoC revision information in a standard place - it /might/ have been
+a good idea if the creation of that also contained documentation for
+what was expected in each of the fields, rather than leaving it
+open...
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
