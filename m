@@ -1,42 +1,61 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 18 Jun 2014 10:55:01 -0700
-Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8 kernels
-In-Reply-To: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
+From: vidyas@nvidia.com (Vidya Sagar)
+Date: Wed, 18 Jun 2014 23:37:48 +0530
+Subject: [PATCH v3] ARM: fix debug prints relevant to PCI devices
+Message-ID: <1403114868-17533-1-git-send-email-vidyas@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 9:27 AM, Taras Kondratiuk
-<taras.kondratiuk@linaro.org> wrote:
-> From: Nico Pitre <nico@fluxnic.net>
->
-> All known BE8-capable systems have LE bootloaders, so we need to ensure
-> that the magic number and image start/end values are in little endian
-> format.
->
-> [ben.dooks at codethink.co.uk: from nico's original email on this subject]
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> [taras.kondratiuk at linaro.org: removed lds.S->lds rule, added target to extra-y]
-> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+As per PCIe spec, fast back-to-back transactions feature
+is not applicable to PCIe devices. Hence, do not print
+that fast back-to-back trasactions are disabled when
+there is a PCIe device found on the bus
 
-This patch has now hit -next (as of next-20140618) and I noticed all
-my big-endian boot tests failed[1].  Turns out they failed because I'm
-deciding whether to pass a big-endian or little-endian initramfs based
-on the magic number of the zImage.  Since it's now always little
-endian, even the big-endian kernels were boot tested with a little
-endian initramfs.  And guess what.... they failed.
+Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
+---
+v3:
+* removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
 
-I like this patch for several reasons, including the fact that
-u-boot's bootz support checks the magic number and failed before this
-patch.
+v2:
+* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
+* replaced printk with pr_info
 
-All of that to say, with this patch applied, I need a new (and
-reliable) way to determine the endianness of a kernel just by looking
-at the zImage.  Recommendations welcome.
+ arch/arm/kernel/bios32.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-Thanks,
-
-Kevin
-
-[1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-June/004059.html
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..fcf2581 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
++	bool has_pcie_dev = 0;
+ 
+ 	/*
+ 	 * Walk the devices on this bus, working out what we can
+@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		u16 status;
+ 
++		if (!has_pcie_dev)
++			has_pcie_dev = pci_is_pcie(dev);
+ 		pci_read_config_word(dev, PCI_STATUS, &status);
+ 
+ 		/*
+@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 
+ 	/*
+ 	 * Report what we did for this bus
++	 * (only if the bus doesn't have even one PCIe device)
+ 	 */
+-	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+-		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
++	if (!has_pcie_dev)
++		pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
++			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-- 
+1.8.1.5
