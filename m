@@ -1,36 +1,74 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 18 Jun 2014 12:01:45 -0700
-Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8 kernels
-In-Reply-To: <53A1D8FE.6030404@codeaurora.org>
-References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
- <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
- <53A1D701.8060404@codeaurora.org>
- <CAGa+x86DfDjQG8gN2-x7Kapt2ipsYt879R4OK6JWGoaT93VVig@mail.gmail.com>
- <53A1D8FE.6030404@codeaurora.org>
-Message-ID: <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 18 Jun 2014 14:07:35 -0500
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 11:22 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/18/14 11:21, Kevin Hilman wrote:
->> On Wed, Jun 18, 2014 at 11:14 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> On 06/18/14 10:55, Kevin Hilman wrote:
->>>> All of that to say, with this patch applied, I need a new (and
->>>> reliable) way to determine the endianness of a kernel just by looking
->>>> at the zImage.  Recommendations welcome.
->>> Assuming that you have the .config configured to be built into the
->>> kernel you could use extract-ikconfig
->>>
->>> $ ./scripts/extract-ikconfig zImage | grep CONFIG_CPU_ENDIAN_BE8
->> Unfortunately, I can't rely on having that built in since I want the
->> boot tools to be as generic as possible.
->>
->>
+On Wed, Jun 18, 2014 at 11:54 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> Machine name from board description is some generic name on DT kernel.
+> DT provides machine name property which is specific for board, so use
+> it instead generic one when possible.
 >
-> Yeah ok. Perhaps you can look for the 'setend be' instruction right
-> after the magic values instead.
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> ---
+>  arch/arm/kernel/setup.c |    7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 8a16ee5..fbc7b4f 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -875,10 +875,13 @@ void __init setup_arch(char **cmdline_p)
+>
+>         setup_processor();
+>         mdesc = setup_machine_fdt(__atags_pointer);
+> -       if (!mdesc)
+> +       if (mdesc)
+> +               machine_name = of_flat_dt_get_machine_name();
+> +       else
+>                 mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+>         machine_desc = mdesc;
+> -       machine_name = mdesc->name;
+> +       if (!machine_name)
+> +               machine_name = mdesc->name;
+>
+>         if (mdesc->reboot_mode != REBOOT_HARD)
+>                 reboot_mode = mdesc->reboot_mode;
 
-Yeah, that works, as long as I can always assume that instruction will
-be at the same offset (currently at 0x30).
+I did a similar patch previously[1]. Like my original patch, your
+patch unconditionally changes the name which could be considered part
+of the userspace ABI. It's arguably not good practice for userspace to
+depend on the name, but there are likely cases that do. So I think
+this needs to be optional and only use the DT name if the machine desc
+name is NULL.
 
-Kevin
+So something like the below and then change the machine descriptors
+you care about. The default generic DT machine desc should definitely
+be changed.
+
+I had a follow-up discussion with Grant about his concerns in the
+thread about knowing which machine desc used to boot. He said he was
+okay if just the machine desc address is printed out.
+
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 50e198c..1479250 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -887,7 +887,7 @@ void __init setup_arch(char **cmdline_p)
+        if (!mdesc)
+                mdesc = setup_machine_tags(__atags_pointer,
+__machine_arch_type);
+        machine_desc = mdesc;
+-       machine_name = mdesc->name;
++       machine_name = mdesc->name ? mdesc->name :
+of_flat_dt_get_machine_name();
+
+        if (mdesc->reboot_mode != REBOOT_HARD)
+                reboot_mode = mdesc->reboot_mode;
+
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/208878.html
