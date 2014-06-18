@@ -1,56 +1,114 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 18 Jun 2014 11:19:30 +0200
-Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
-In-Reply-To: <20140528184217.GB30031@kroah.com>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-17-git-send-email-arnd@arndb.de>
- <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
- <20140528155916.GA9793@piout.net> <1401293383.22486.18.camel@x220>
- <20140528175439.GA18470@piout.net> <1401299948.22486.51.camel@x220>
- <20140528184217.GB30031@kroah.com>
-Message-ID: <1403083170.1984.70.camel@x220>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 18 Jun 2014 11:21:56 +0200
+Subject: [PATCH v2 01/10] mfd: max77686: Convert to use regmap_irq
+In-Reply-To: <CAD=FV=VUPwr6GbR7O-t0q-GaCttZ5vGzLeFqHckzkk-dZYfCFw@mail.gmail.com>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>	<1402941758-11216-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=VUPwr6GbR7O-t0q-GaCttZ5vGzLeFqHckzkk-dZYfCFw@mail.gmail.com>
+Message-ID: <53A15A34.10805@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Hello Doug,
 
-On Wed, 2014-05-28 at 11:42 -0700, Greg Kroah-Hartman wrote:
-> On Wed, May 28, 2014 at 07:59:08PM +0200, Paul Bolle wrote:
-> > On Wed, 2014-05-28 at 19:55 +0200, Alexandre Belloni wrote:
-> > > On 28/05/2014 at 18:09:43 +0200, Paul Bolle wrote :
-> > > > On Wed, 2014-05-28 at 17:59 +0200, Alexandre Belloni wrote:
-> > > > > On 28/05/2014 at 14:24:27 +0200, Paul Bolle wrote :
-> > > > > > > >  config ATMEL_PWM
-> > > > > > > >  	tristate "Atmel AT32/AT91 PWM support"
-> > > > > > > > -	depends on HAVE_CLK && (AVR32 || ARCH_AT91 || COMPILE_TEST)
-> > > > > > > > +	depends on HAVE_CLK
-> > > > > > > > +	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
-> > > > > > 
-> > > > > > Symbols AT91SAM9263, AT91SAM9RL, and AT91SAM9G45 do not seem to exist in
-> > > > > > next-20140528. Should these perhaps be SOC_AT91SAM9263, SOC_AT91SAM9RL,
-> > > > > > and SOC_AT91SAM9G45 and/or ARCH_AT91SAM9263, ARCH_AT91SAM9RL, and
-> > > > > > ARCH_AT91SAM9G45?
-> > > > > 
-> > > > > I wouldn't bother too much fixing that, this will definitely be remove
-> > > > > in 3.17. 
-> > > > 
-> > > > Are you talking about: 1) the problem this patch tried to fix; or 2) the
-> > > > problem it created?
-> > > > 
-> > > 
-> > > I'm removing the whole atmel_pwm driver so the CONFIG_ATMEL_PWM symbol
-> > > will be gone.
-> > 
-> > So the patch we're discussing here will never be included in a release?
+On 06/17/2014 10:57 PM, Doug Anderson wrote:
+> Javier,
 > 
-> So, should I just remove it right now?  I like deleting files :)
+> On Mon, Jun 16, 2014 at 11:02 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> @@ -127,15 +175,48 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+>>         }
+>>         i2c_set_clientdata(max77686->rtc, max77686);
+>>
+>> -       max77686_irq_init(max77686);
+>> +       max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
+>> +                                                   &max77686_rtc_regmap_config);
+>> +       if (IS_ERR(max77686->rtc_regmap)) {
+>> +               ret = PTR_ERR(max77686->rtc_regmap);
+>> +               dev_err(max77686->dev, "failed to allocate RTC regmap: %d\n",
+>> +                       ret);
+>> +               goto err_unregister_i2c;
+>> +       }
+>> +
+>> +       ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
+>> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
+>> +                                 IRQF_SHARED, 0, &max77686_irq_chip,
+>> +                                 &max77686->irq_data);
+>> +       if (ret != 0) {
+>> +               dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
+>> +               goto err_unregister_i2c;
+>> +       }
+>> +       ret = regmap_add_irq_chip(max77686->rtc_regmap, max77686->irq,
+>> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
+>> +                                 IRQF_SHARED, 0, &max77686_rtc_irq_chip,
+>> +                                 &max77686->rtc_irq_data);
+>> +       if (ret != 0) {
+>> +               dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
+>> +               goto err_del_irqc;
+>> +       }
+>>
+>>         ret = mfd_add_devices(max77686->dev, -1, max77686_devs,
+>>                               ARRAY_SIZE(max77686_devs), NULL, 0, NULL);
+>>         if (ret < 0) {
+>> -               mfd_remove_devices(max77686->dev);
+>> -               i2c_unregister_device(max77686->rtc);
+>> +               dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
+>> +               goto err_del_rtc_irqc;
+>>         }
+>>
+>> +       return 0;
+>> +
+>> +err_del_rtc_irqc:
+>> +       regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
+>> +err_del_irqc:
+>> +       regmap_del_irq_chip(max77686->irq, max77686->irq_data);
+> 
+> I would imagine you either don't need these regmap_del_irq_chip() here
+> or that you _do_ need them in max77686_i2c_remove().
+> 
+> ...from looking at other drivers I think the answer is to add them to
+> max77686_i2c_remove().
+> 
+>
 
-This has landed unchanged in v3.16-rc1. Should I submit the trivial
-patch to remove these pointless references to the unknown symbols
-AT91SAM9263, AT91SAM9RL, and AT91SAM9G45?
+Yes, I forgot to do the regmap irqchip cleanup in the driver .remove function.
+The same issue is in the max77802 driver btw so I'll fix both on v3.
 
-Thanks,
+Thanks a lot for pointing this out.
 
+>> diff --git a/include/linux/mfd/max77686-private.h b/include/linux/mfd/max77686-private.h
+>> index 8c75a9c..3a810b1 100644
+>> --- a/include/linux/mfd/max77686-private.h
+>> +++ b/include/linux/mfd/max77686-private.h
+>> @@ -205,7 +205,7 @@ enum max77686_irq {
+>>         MAX77686_PMICIRQ_140C,
+>>         MAX77686_PMICIRQ_120C,
+>>
+>> -       MAX77686_RTCIRQ_RTC60S,
+>> +       MAX77686_RTCIRQ_RTC60S = 0,
+>>         MAX77686_RTCIRQ_RTCA1,
+>>         MAX77686_RTCIRQ_RTCA2,
+>>         MAX77686_RTCIRQ_SMPL,
+>> @@ -215,6 +215,25 @@ enum max77686_irq {
+>>         MAX77686_IRQ_NR,
+> 
+> Maybe remove MAX77686_IRQ_NR which no longer makes any sense now that
+> you start over at 0 partway through.
+> 
+> 
 
-Paul Bolle
+Right, it is not needed anymore. I'll remove it when re-spin.
+
+> Overall this looks good to me, so once nits above are fixed feel to
+> add my Reviewed-by.  I've also built and booted this patch on
+> exynos5250-snow and tested that the RTC wakealarm fires and can even
+> wake the system up (with some additional work that I'll email you
+> about).
+>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> 
+
+Great! thanks a lot for testing.
+
+Best regards,
+Javier
