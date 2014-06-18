@@ -1,95 +1,81 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 18 Jun 2014 16:33:39 -0600
-Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
-In-Reply-To: <CACP_E+Jr5QyYm92Mc2=WVhKMbk=9Ty1fvJuH+fqOmDnYmdqFRg@mail.gmail.com>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
- <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
- <53A069B6.6070902@wwwdotorg.org> <53A1CB23.5090307@collabora.com>
- <20140618220008.GC26514@mithrandir>
- <CACP_E+Jr5QyYm92Mc2=WVhKMbk=9Ty1fvJuH+fqOmDnYmdqFRg@mail.gmail.com>
-Message-ID: <53A213C3.2020207@wwwdotorg.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 18 Jun 2014 16:03:42 -0700
+Subject: [PATCH] arm64: Add byte order to image header
+In-Reply-To: <20140618164927.GA9612@leverpostej>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+ <1402950432.3708.22.camel@smoke> <20140618164927.GA9612@leverpostej>
+Message-ID: <1403132622.17030.35.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2014 04:19 PM, St?phane Marchesin wrote:
-> On Wed, Jun 18, 2014 at 3:00 PM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
->> On Wed, Jun 18, 2014 at 07:23:47PM +0200, Tomeu Vizoso wrote:
->>> On 06/17/2014 06:15 PM, Stephen Warren wrote:
->>>> On 06/17/2014 06:16 AM, Tomeu Vizoso wrote:
->>>>> On 06/16/2014 10:02 PM, Stephen Warren wrote:
->>>>>> On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
->>>>>>> +#ifdef CONFIG_TEGRA124_EMC
->>>>>>> +int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
->>>>>>> long rate);
->>>>>>> +void tegra124_emc_set_floor(unsigned long freq);
->>>>>>> +void tegra124_emc_set_ceiling(unsigned long freq);
->>>>>>> +#else
->>>>>>> +int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
->>>>>>> long rate)
->>>>>>> +{ return -ENODEV; }
->>>>>>> +void tegra124_emc_set_floor(unsigned long freq)
->>>>>>> +{ return; }
->>>>>>> +void tegra124_emc_set_ceiling(unsigned long freq)
->>>>>>> +{ return; }
->>>>>>> +#endif
->>>>>>
->>>>>> I'll repeat what I said off-list so that we can have the whole
->>>>>> conversation on the list:
->>>>>>
->>>>>> That looks like a custom Tegra-specific API. I think it'd be much better
->>>>>> to integrate this into the common clock framework as a standard clock
->>>>>> constraints API. There are other use-cases for clock constraints besides
->>>>>> EMC scaling (e.g. some in audio on Tegra, and I'm sure many on other
->>>>>> SoCs too).
->>>>>
->>>>> Yes, I wrote a bit in the cover letter about our requirements and how
->>>>> they map to the CCF. Could you please comment on that?
->>>>
->>>> My comments remain the same. I believe this is something that belongs in
->>>> the clock driver, or at the least, some API that takes a struct clock as
->>>> its parameter, so that drivers can use the existing DT clock lookup
->>>> mechanism.
->>>
->>> Ok, let me put this strawman here to see if I have gotten close to what you
->>> have in mind:
->>>
->>> * add per-client accounting (Rabin's patches referenced before)
->>>
->>> * add clk_set_floor, to be used by cpufreq, load stats, etc.
->>>
->>> * add clk_set_ceiling, to be used by battery drivers, thermal, etc.
->>>
->>> * an EMC driver would collect bandwidth and latency requests from consumers
->>> and call clk_set_floor on the EMC clock.
->>>
->>> * the EMC driver would also register for rate change notifications in the
->>> EMC clock and would update the latency allowance registers at that point.
->>
->> Latency allowance registers are part of the MC rather than the EMC. So I
->> think we have two options: a) have a unified driver for MC and EMC or b)
->> provide two parts of the API in two drivers.
->>
->> Or perhaps c), create a generic framework that both MC and EMC can
->> register with (bandwidth for EMC, latency for MC).
-> 
-> Is there any motivation for keeping MC and EMC separate? In my mind,
-> the solution was always to handle those together.
+When working with a raw arm64 image one needs to know the byte order of the
+image header to properly interpret the multi-byte values of the header.  Add
+a character value to the image header indicating the byte order the image was
+built with:
 
-Well, they are documented as being separate HW modules in the TRM.
+  1=LSB (little endian), 2=MSB (big endian), 0=no support.
 
-I know there's an interlock in HW so that when the EMC clock is changed,
-the EMC registers can flip atomically to a new configuration.
+A zero value will indicate a kernel that pre-dates this change.
 
-I'm not aware of any similar HW interlock between MC and EMC registers.
-That would imply that very tight co-ordination shouldn't be required.
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+Hi,
 
-Do the MC latency allowance registers /really/ need to be *very tightly*
-managed whenever the EMC clock is changed, or is it just a matter of it
-being a good idea to update EMC clock and MC latency allowance registers
-at roughly the same time? Even if there's some co-ordination required,
-maybe it can be handled rather like cpufreq notifications; use clock
-pre-rate change notifications to set MC up in a way that'll work at both
-old/new EMC clocks, and then clock post-rate notifications to the final
-MC configuration?
+I noticed there was a change to the image header for COFF compatibility
+that conflicted with my old patch.  Here's an update that also changes
+booting.txt.
+
+I'll also post a patch that adds a new file asm/image.h to describe
+the header.
+
+-Geoff
+
+ Documentation/arm64/booting.txt | 10 ++++++----
+ arch/arm64/kernel/head.S        |  7 ++++++-
+ 2 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index beb754e..525e37c 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -73,13 +73,15 @@ The decompressed kernel image contains a 64-byte header as follows:
+   u32 code0;			/* Executable code */
+   u32 code1;			/* Executable code */
+   u64 text_offset;		/* Image load offset */
+-  u64 res0	= 0;		/* reserved */
+-  u64 res1	= 0;		/* reserved */
+-  u64 res2	= 0;		/* reserved */
++  u8  byte_order;		/* 1=LSB (little endian), 2=MSB (big endian) */
++  u8[3] res1;			/* reserved */
++  u32 res2	= 0;		/* reserved */
+   u64 res3	= 0;		/* reserved */
+   u64 res4	= 0;		/* reserved */
++  u64 res5	= 0;		/* reserved */
++  u64 res6	= 0;		/* reserved */
+   u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
+-  u32 res5 = 0;      		/* reserved */
++  u32 res7 = 0;      		/* reserved */
+ 
+ 
+ Header notes:
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b96a732..08cd054 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -111,7 +111,12 @@
+ 	b	stext				// branch to kernel start, magic
+ 	.long	0				// reserved
+ 	.quad	TEXT_OFFSET			// Image load offset from start of RAM
+-	.quad	0				// reserved
++	CPU_LE(.byte	1)			// 1=LSB (little endian)
++	CPU_BE(.byte	2)			// 2=MSB (big endian)
++	.byte	0				// reserved
++	.byte	0				// reserved
++	.byte	0				// reserved
++	.word	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+-- 
+1.9.1
