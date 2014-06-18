@@ -1,63 +1,135 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 18 Jun 2014 11:57:25 +0300
-Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
-In-Reply-To: <20140617223518.GA25309@mithrandir>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
- <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
- <20140617223518.GA25309@mithrandir>
-Message-ID: <20140618085725.GI3407@tbergstrom-lnx.Nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 10:06:16 +0100
+Subject: [PATCH v6 3/7] mfd: AXP20x: Add bindings documentation
+In-Reply-To: <539FED44.1050904@free-electrons.com>
+References: <1400528868-5971-1-git-send-email-carlo@caione.org>
+ <1400528868-5971-4-git-send-email-carlo@caione.org>
+ <539FED44.1050904@free-electrons.com>
+Message-ID: <20140618090616.GA23945@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 12:35:27AM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+> On 19/05/2014 21:47, Carlo Caione wrote:
+> > Bindings documentation for the AXP20x driver. In this file also
+> > sub-nodes are documented.
 > 
-> On Tue, Jun 17, 2014 at 02:16:06PM +0200, Tomeu Vizoso wrote:
-> > On 06/16/2014 10:02 PM, Stephen Warren wrote:
-> > >On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
-> > >>+
-> > >>+Child device nodes describe the memory settings for different configurations and
-> > >>+clock rates.
-> > >
-> > >How do the child nodes do that? The binding needs to specify the format
-> > >of the child node.
-> > 
-> > Sorry, that file was sent before I had finished removing the bits from
-> > downstream that aren't needed yet. There's no current need for any child
-> > nodes.
-> > 
-> > >This binding looks quite anaemic vs.
-> > >Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-emc.txt; I
-> > >would expect that this binding needs all the EMC register data from the
-> > >tegra20-emc binding too. Can the two bindings be identical?
-> > 
-> > There's even less stuff needed right now, as all what ultimately the EMC
-> > driver does is call clk_set_rate on the EMC clock. As the T124 EMC driver
-> > gains more features, they should get more similar.
-> > 
-> > >Can you explain what the nvidia,mc and nvidia,pmc references are needed
-> > >for? Hopefully, this driver isn't going to reach into those devices and
-> > >touch their registers directly.
-> > 
-> > Not really needed, see above.
-> 
-> I've been working on a prototype driver for the memory controller. Part
-> of what I've added is programming of the latency allowance registers (it
-> doesn't yet expose an API to do so yet, though). I think that needs to
-> eventually take into account the EMC frequency (and needs to be notified
-> of changes to the same).
-> 
-> Without having thought this through very thoroughly, I suspect that
-> rather than referencing the MC from the EMC it might be better to have
-> the MC register with the EMC for notifications.
-> 
-> But perhaps there are other services from MC that EMC needs to work?
+> I think this patch has been forgotten (I didn't find it in linus' tree
+> or linux-next tree).
+
+This patch-set became confusing.  Some of the patches were applied in
+v5 and were still submitted for v6.  I need Carlo to rebase on top of
+v3.16-rc1+ and re-submit with the Acks he's collected so far.
+
+> > Signed-off-by: Carlo Caione <carlo@caione.org>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/axp20x.txt | 93 ++++++++++++++++++++++++
+> >  1 file changed, 93 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > new file mode 100644
+> > index 0000000..cc9e01b
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > @@ -0,0 +1,93 @@
+> > +AXP202/AXP209 device tree bindings
+> > +
+> > +The axp20x family current members :-
+> > +axp202 (X-Powers)
+> > +axp209 (X-Powers)
+> > +
+> > +Required properties:
+> > +- compatible: "x-powers,axp202" or "x-powers,axp209"
+> > +- reg: The I2C slave address for the AXP chip
+> > +- interrupt-parent: The parent interrupt controller
+> > +- interrupts: Interrupt specifiers for interrupt sources
+> > +- interrupt-controller: axp20x has its own internal IRQs
+> > +- #interrupt-cells: Should be set to 1
+> > +- acin-supply: The input supply for LDO1
+> > +- vin2-supply: The input supply for DCDC2
+> > +- vin3-supply: The input supply for DCDC3
+> > +- ldo24in-supply: The input supply for LDO2, LDO4
+> > +- ldo3in-supply: The input supply for LDO3
+> > +- ldo5in-supply: The input supply for LDO5
+> > +
+> > +- regulators: A node that houses a sub-node for each regulator. The regulators are
+> > +	      bound using their name as listed here: dcdc2, dcdc3, ldo1, ldo2,
+> > +	      ldo3, ldo4, ldo5.  The bindings details of individual regulator
+> > +	      device can be found in:
+> > +	      Documentation/devicetree/bindings/regulator/regulator.txt with
+> > +	      the exception of x-powers,dcdc-freq
+> > +- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
+> > +		      (range: 750-1875). Default: 1.5MHz
+> > +
+> > +Optional properties for DCDCs:
+> > +- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
+> > +			  Default: AUTO mode
+> > +
+> > +Example:
+> > +
+> > +axp209: pmic at 34 {
+> > +	compatible = "x-powers,axp209";
+> > +	reg = <0x34>;
+> > +	interrupt-parent = <&nmi_intc>;
+> > +	interrupts = <0 8>;
+> > +
+> > +	interrupt-controller;
+> > +	#interrupt-cells = <1>;
+> > +
+> > +	acin-supply = <&axp_ipsout_reg>;
+> > +	vin2-supply = <&axp_ipsout_reg>;
+> > +	vin3-supply = <&axp_ipsout_reg>;
+> > +	ldo24in-supply = <&axp_ipsout_reg>;
+> > +	ldo3in-supply = <&axp_ipsout_reg>;
+> > +	ldo5in-supply = <&axp_ipsout_reg>;
+> > +
+> > +	regulators {
+> > +		x-powers,dcdc-freq = <1500>;
+> > +
+> > +		axp_vcore_reg: dcdc2 {
+> > +			regulator-min-microvolt = <700000>;
+> > +			regulator-max-microvolt = <2275000>;
+> > +			regulator-always-on;
+> > +		};
+> > +
+> > +		axp_ddr_reg: dcdc3 {
+> > +			regulator-min-microvolt = <700000>;
+> > +			regulator-max-microvolt = <3500000>;
+> > +			regulator-always-on;
+> > +		};
+> > +
+> > +		axp_rtc_reg: ldo1 {
+> > +			regulator-always-on;
+> > +		};
+> > +
+> > +		axp_analog_reg: ldo2 {
+> > +			regulator-min-microvolt = <1800000>;
+> > +			regulator-max-microvolt = <3300000>;
+> > +			regulator-always-on;
+> > +		};
+> > +
+> > +		axp_pll_reg: ldo3 {
+> > +			regulator-min-microvolt = <700000>;
+> > +			regulator-max-microvolt = <3500000>;
+> > +		};
+> > +
+> > +		axp_hdmi_reg: ldo4 {
+> > +			regulator-min-microvolt = <1250000>;
+> > +			regulator-max-microvolt = <3300000>;
+> > +		};
+> > +
+> > +		axp_mic_reg: ldo5 {
+> > +			regulator-min-microvolt = <1800000>;
+> > +			regulator-max-microvolt = <3300000>;
+> > +		};
+> > +	};
+> > +};
+> > +
 > 
 
-If the emc frequency change is modelled as a clock, you could use CCF
-notifications for this?
-
-Cheers,
-
-Peter.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
