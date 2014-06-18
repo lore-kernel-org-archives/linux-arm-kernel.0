@@ -1,34 +1,34 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 18 Jun 2014 11:14:32 -0500
-Subject: [PATCHv2] clk: socfpga: Add a second parent option for the
- dbg_base_clk
-In-Reply-To: <20140617221138.32686.1282@quantum>
-References: <1402714835-19861-1-git-send-email-dinguyen@altera.com>
- <20140617221138.32686.1282@quantum>
-Message-ID: <1403108072.15124.0.camel@linux-builds1>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 18 Jun 2014 18:22:29 +0200
+Subject: [PATCH V2 0/2] Sound support for Exynos4412 Odroid X2, U3 board
+Message-ID: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+This series adds basic sound support for the Odroid X2/U3 boards.
+It relies on specific Exynos Audio Subsystem clock parent and
+frequencies being pre-configured.
 
-On Tue, 2014-06-17 at 15:11 -0700, Mike Turquette wrote:
-> Quoting dinguyen at altera.com (2014-06-13 20:00:35)
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > The debug base clock can be bypassed from the main PLL to the OSC1 clock.
-> > The bypass register is the staysoc1(0x10) register that is in the clock
-> > manager.
-> > 
-> > This patch adds the option to get the correct parent for the debug base
-> > clock.
-> > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Looks good to me.
-> 
-> Regards,
-> Mike
+My full testing git branch has been pushed to:
+git://linuxtv.org/snawrocki/samsung.git v3.16-rc1-odroid-sound-clk
 
-Thanks for reviewing. Can you please apply it to your for-next?
+It can be browsed at:
+http://git.linuxtv.org/cgit.cgi/snawrocki/samsung.git/log/?h=v3.16-rc1-odroid-sound-clk
 
-Dinh
+I didn't use the simple-card since there is going to be added
+one more CPU interface using the secondary I2S and IDMA.
+
+Sylwester Nawrocki (2):
+  ASoC: samsung: Add machine driver for Odroid X2/U3
+  doc: dt bindings: Document Odroid X2/U3 audio subsystem bindings
+
+ .../bindings/sound/samsung,odroidx2-max98090.txt   |   35 ++++
+ sound/soc/samsung/Kconfig                          |    8 +
+ sound/soc/samsung/Makefile                         |    2 +
+ sound/soc/samsung/odroidx2_max98090.c              |  191 ++++++++++++++++++++
+ 4 files changed, 236 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/samsung,odroidx2-max98090.txt
+ create mode 100644 sound/soc/samsung/odroidx2_max98090.c
+
+--
+1.7.9.5
