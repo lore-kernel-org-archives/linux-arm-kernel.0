@@ -1,74 +1,74 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 18 Jun 2014 12:16:17 -0700
-Subject: [PATCH v3 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <53A14F00.9010904@linaro.org>
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1402944372-31901-2-git-send-email-bjorn.andersson@sonymobile.com>
- <53A0D651.20605@codeaurora.org> <53A14F00.9010904@linaro.org>
-Message-ID: <53A1E581.7010004@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 18 Jun 2014 14:25:53 -0500
+Subject: [PATCH v2 1/2] arm: dts: am4372: let boards enable RTC and
+ Watchdog
+In-Reply-To: <53A1B677.9010909@ti.com>
+References: <1403106200-777-1-git-send-email-balbi@ti.com>
+ <1403106200-777-2-git-send-email-balbi@ti.com>
+ <53A1B677.9010909@ti.com>
+Message-ID: <20140618192553.GB4570@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/14 01:34, Srinivas Kandagatla wrote:
->
->
-> On 18/06/14 00:59, Stephen Boyd wrote:
->> On 06/16/14 11:46, Bjorn Andersson wrote:
->>> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
->>> b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
->>> new file mode 100644
->>> index 0000000..0366533
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
->>> @@ -0,0 +1,260 @@
->>> +Qualcomm Resource Power Manager (RPM)
->>> +
->> [...]
->>> +
->>> +- reg:
->>> +    Usage: required
->>> +    Value type: <prop-encoded-array>
->>> +    Definition: two entries specifying the RPM's message ram and
->>> ipc register
->>> +
->>> +- reg-names:
->>> +    Usage: required
->>> +    Value type: <string-array>
->>> +    Definition: must contain the following, in order:
->>> +            "msg_ram"
->>> +            "ipc"
->>
->> ipc is concerning....
->>
->>> +    rpm at 108000 {
->>> +        compatible = "qcom,rpm-msm8960";
->>> +        reg = <0x108000 0x1000 0x2011008 0x4>;
->>> +
->>
->> (reg-names is missing from the example)
->>
->> because ipc is actually a register inside the Krait complex's global
->> clock control/distribution hardware block (it's located at 0x2011000).
->>  From what I can tell, this is the only non-clock/power register inside
->> there. I plan to send out a driver for this hardware block so that I can
->> switch the L2 aux source mux over to PLL8 instead of PXO (done with a
->> single register write to 0x2011028) and this mapping/use here is going
->> to conflict with that unless I only map the single register like is done
->> here.
->>
->> I wonder if we'd be better off making this region a separate node and
->> having some phandle to it here in the RPM node? That way we have a
->
-> Can't we use syscon based on regmap here?  syscon is a better way to
-> share a common register space across multiple drivers.
+Hi,
 
-How would the mux clock be registered? I'd like it to be registered by
-the driver associated with this device with something like
-devm_clk_register(). From what I can tell syscon wouldn't allow that
-unless we extend the syscon driver to handle more specific compatible
-strings.
+On Wed, Jun 18, 2014 at 10:55:35AM -0500, Nishanth Menon wrote:
+> $subject - ARM: dts:
+> 
+> On 06/18/2014 10:43 AM, Felipe Balbi wrote:
+> > by providing phandles to rtc and wdt nodes, we can
+> > let boards enable rtc and wdt as necessary.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/boot/dts/am4372.dtsi | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> > index 49fa596..e3830d4 100644
+> > --- a/arch/arm/boot/dts/am4372.dtsi
+> > +++ b/arch/arm/boot/dts/am4372.dtsi
+> > @@ -270,7 +270,7 @@
+> >  			ti,hwmods = "counter_32k";
+> >  		};
+> >  
+> > -		rtc at 44e3e000 {
+> > +		rtc: rtc at 44e3e000 {
+> >  			compatible = "ti,am4372-rtc","ti,da830-rtc";
+> >  			reg = <0x44e3e000 0x1000>;
+> >  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH
+> > @@ -279,7 +279,7 @@
+> >  			status = "disabled";
+> >  		};
+> >  
+> > -		wdt at 44e35000 {
+> > +		wdt: wdt at 44e35000 {
+> >  			compatible = "ti,am4372-wdt","ti,omap3-wdt";
+> >  			reg = <0x44e35000 0x1000>;
+> >  			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+> > 
+> we might want to fix up any other similar nodes in dtsi as well, no?
+>
+> examples:
+> cpu at 0
+
+and why would you want boards to mess with the cpu node ?
+
+> dispc at 4832a400
+
+perhaps
+
+> Might also be nice to have Fixes: to point out which commit was being
+> fixed, no?
+
+no other board enables those, so I wouldn't consider it a fix.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/97c15295/attachment-0001.sig>
