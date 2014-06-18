@@ -1,38 +1,28 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 18 Jun 2014 10:24:19 -0700
-Subject: [PATCH] clkdev: Don't print errors on probe defer
-In-Reply-To: <20140617224805.GN23430@n2100.arm.linux.org.uk>
-References: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
- <20140617223305.32686.15540@quantum>
- <20140617224805.GN23430@n2100.arm.linux.org.uk>
-Message-ID: <20140618172419.32686.58695@quantum>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 18 Jun 2014 21:25:50 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogaS5NWDogTWlncmF0ZSBGcmVlc2NhbGUg?=
+ =?UTF-8?B?aS5NWDI3IElQIENhbWVyYSBib2FyZCB0byBkZXZpY2V0cmVl?=
+In-Reply-To: <20140618143135.GO8860@dragon>
+References: <1402642578-2456-1-git-send-email-shc_work@mail.ru>
+ <1402672866.272590114@f160.i.mail.ru>
+ <20140618143135.GO8860@dragon>
+Message-ID: <1403112350.754983078@f438.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2014-06-17 15:48:06)
-> On Tue, Jun 17, 2014 at 03:33:05PM -0700, Mike Turquette wrote:
-> > Quoting Stephen Boyd (2014-06-13 16:36:31)
-> > > This error message can spam the logs if you have lots of probe
-> > > deferals due to missing clocks. Just silence the error in this
-> > > case because the driver should try again later.
+Wed, 18 Jun 2014 22:31:36 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
+> On Fri, Jun 13, 2014 at 07:21:06PM +0400, Alexander Shiyan wrote:
+> > Fri, 13 Jun 2014 12:15:21 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+> > > On Fri, Jun 13, 2014 at 3:56 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+...
+> > > Anyway, I am fine if you simply drop the board support file for the mx27 ipcam.
 > > > 
-> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > No need to add a dts for it, as I don't have access to this board anymore.
 > > 
-> > Looks OK to me. Russell?
+> > If so, I will send a removal patch for this, Shawn?
 > 
-> Looks fine to me too.  Should I assume you're looking to take it?
+> Yes, please.
 
-Yes, I'll take it.
+OK. What about mach-imx27lite (Part 2/2 of this patch)?
 
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-Thanks for the Ack.
-
-Regards,
-Mike
-
-> 
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+---
