@@ -1,94 +1,108 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 17 Jun 2014 20:30:05 -0500
-Subject: [PATCH 2/2] arm: dts: add support for AM437x StarterKit
-In-Reply-To: <20140616072720.GX17845@atomide.com>
-References: <1402676147-3711-1-git-send-email-balbi@ti.com>
- <1402676147-3711-3-git-send-email-balbi@ti.com>
- <20140613162334.GI8319@saruman.home>
- <20140613163118.GJ8319@saruman.home>
- <20140616072720.GX17845@atomide.com>
-Message-ID: <20140618013004.GA16868@saruman.home>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 17 Jun 2014 18:41:52 -0700
+Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
+ support
+In-Reply-To: <20140611070352.GC24286@lvm>
+References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
+ <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
+ <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
+ <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
+ <20140611070352.GC24286@lvm>
+Message-ID: <53A0EE60.6030508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/11/2014 12:03 AM, Christoffer Dall wrote:
 
-On Mon, Jun 16, 2014 at 12:27:21AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [140613 09:33]:
-> > On Fri, Jun 13, 2014 at 11:23:34AM -0500, Felipe Balbi wrote:
-> > > On Fri, Jun 13, 2014 at 11:15:47AM -0500, Felipe Balbi wrote:
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-> > > > @@ -0,0 +1,539 @@
-> > > > +/*
-> > > > + * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-> > > > + *
-> > > > + * This program is free software; you can redistribute it and/or modify
-> > > > + * it under the terms of the GNU General Public License version 2 as
-> > > > + * published by the Free Software Foundation.
-> > > > + */
-> > > > +
-> > > > +/* AM437x SK EVM */
-> > > > +
-> > > > +/dts-v1/;
-> > > > +
-> > > > +#include "am4372.dtsi"
-> > > > +#include <dt-bindings/pinctrl/am43xx.h>
-> > > > +#include <dt-bindings/pwm/pwm.h>
-> > > > +#include <dt-bindings/gpio/gpio.h>
-> > > > +#include <dt-bindings/input/input.h>
-> > > > +
-> > > > +/ {
-> > > > +	model = "TI AM437x SK EVM";
-> > > > +	compatible = "ti,am437x-sk-evm","ti,am4372","ti,am43";
-> > > > +
-> > > > +	aliases {
-> > > > +		display0 = &lcd0;
-> > > > +	};
-> > > > +
-> > > > +	vmmcsd_fixed: fixedregulator-sd {
-> > > > +		compatible = "regulator-fixed";
-> > > > +		regulator-name = "vmmcsd_fixed";
-> > > > +		regulator-min-microvolt = <3300000>;
-> > > > +		regulator-max-microvolt = <3300000>;
-> > > > +		enable-active-high;
-> > > > +	};
-> > > > +
-> > > > +	v33_fixed: fixedregulator-v33 {
-> > > > +		compatible = "regulator-fixed";
-> > > > +		regulator-name = "v33_fixed";
-> > > > +		regulator-min-microvolt = <3300000>;
-> > > > +		regulator-max-microvolt = <3300000>;
-> > > > +		enable-active-high;
-> > > > +	};
-> > > > +
-> > > > +	v18_fixed: fixedregulator-v18 {
-> > > > +		compatible = "regulator-fixed";
-> > > > +		regulator-name = "v18_fixed";
-> > > > +		regulator-min-microvolt = <1800000>;
-> > > > +		regulator-max-microvolt = <1800000>;
-> > > > +		enable-active-high;
-> > > > +	};
+>>
+>> There is also the issue of kvm_flush_remote_tlbs(), that's also weak,
+>> the generic one is using IPIs. Since it's only used in mmu.c maybe make 
+>> this one static.
+>>
+> So I don't see a lot of use of weak symbols in kvm_main.c (actually on
+> kvmarm/next I don't see any), but we do want to share code when more
+> than one architecture implements something in the exact same way, like
+> it seems x86 and ARM is doing here for this particular function.
 > 
-> Chances are these are not fixed regulators.. Typically the these
-> come from external regulators controlled by GPIO pins. Sounds
-> like you have the schematics so it would be best to verify it.
-> If they come from something not yet supported, let's at least
-> document it with comments.
+> I think the KVM scheme is usually to check for some define, like:
+> 
+> #ifdef KVM_ARCH_HAVE_GET_DIRTY_LOG
+> 	ret = kvm_arch_get_dirty_log(...);
+> #else
+> 	ret = kvm_get_dirty_log(...);
+> #endif
+> 
+> but Paolo may have a more informed oppinion of how to deal with these.
+> 
+> Thanks,
+> -Christoffer
+>
 
-sure, let me just make sure of it.
+ 
+One approach I'm trying looking at the code in kvm_main().
+This approach applies more to selecting features as opposed to
+selecting generic vs architecture specific functions.
 
-> Also looks like all the am43xx boards are using vmmcsd_fixed,
-> might be worth checking those as well while at it.
+1.-------------------------------------------------
+ - add to 'virt/kvm/Kconfig'
+config HAVE_KVM_ARCH_TLB_FLUSH_ALL
+       bool
 
-I'll need help testing, but sure thing.
+config HAVE_KVM_ARCH_DIRTY_LOG
+       bool
+2.--------------------------------------------------
+For ARM and later ARM64 add to 'arch/arm[64]/kvm/Kconfig'
+config KVM
+        bool "Kernel-based Virtual Machine (KVM) support"
+...
+select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+..
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140617/d716fc9f/attachment.sig>
+Not for HAVE_KVM_ARCH_DIRTY_LOG given it's shared with x86,
+but would need to do it for every other architecture that
+does not share it (except initially for arm64 since it
+will use the variant that returns -EINVAL until feature
+is supported)
+
+3------------------------------------------------------
+In kvm_main.c would have something like
+
+void kvm_flush_remote_tlbs(struct kvm *kvm)
+{
+#ifdef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
+        kvm_arch_flush_remote_tlbs(kvm);
+#else
+        long dirty_count = kvm->tlbs_dirty;
+
+        smp_mb();
+        if (make_all_cpus_request(kvm, KVM_REQ_TLB_FLUSH))
+                ++kvm->stat.remote_tlb_flush;
+        cmpxchg(&kvm->tlbs_dirty, dirty_count, 0);
+#endif
+}
+
+Then add void kvm_flush_remote_tlbs(struct kvm *kvm) definition
+to arm kvm_host.h. Define the function in this case mmu.c
+
+For the dirty log function
+int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
+                                                struct kvm_dirty_log *log)
+{
+#ifdef CONFIG_HAVE_KVM_ARCH_DIRTY_LOG
+        kvm_arch_vm_ioctl_get_dirty_log(kvm, log);
+#else
+        int r;
+        struct kvm_memory_slot *memslot;
+        unsigned long n, i;
+        unsigned long *dirty_bitmap;
+        unsigned long *dirty_bitmap_buffer;
+        bool is_dirty = false;
+	...
+
+But then you have to go into every architecture and define the
+kvm_arch_vm_...() variant.
+
+Is this the right way to go? Or is there a simpler way?
+
+Thanks,
+- Mario
