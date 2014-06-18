@@ -1,99 +1,47 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 18 Jun 2014 12:54:08 +0800
-Subject: [PATCH RFC 1/2] libahci_platform: add ahci_platform_get_of_property
-In-Reply-To: <1403067249-8021-1-git-send-email-zhangfei.gao@linaro.org>
-References: <xuwei5@hisilicon.com, kefeng.wang@linaro.org,>
- <1403067249-8021-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1403067249-8021-2-git-send-email-zhangfei.gao@linaro.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 17 Jun 2014 22:19:58 -0700
+Subject: [PATCH v3 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <53A0D651.20605@codeaurora.org>
+References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1402944372-31901-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <53A0D651.20605@codeaurora.org>
+Message-ID: <CAJAp7Oi6gqbrVOBnB8YvpR7YtQ_DDdWOAYeEU2j2Mt_=FboNoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of setting hflags in different files,
-ahci_platform_get_of_property set hpriv->flags when ahci_platform_init_host
-according to property in dts.
+On Tue, Jun 17, 2014 at 4:59 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+[...]
+>
+> because ipc is actually a register inside the Krait complex's global
+> clock control/distribution hardware block (it's located at 0x2011000).
+> From what I can tell, this is the only non-clock/power register inside
+> there. I plan to send out a driver for this hardware block so that I can
+> switch the L2 aux source mux over to PLL8 instead of PXO (done with a
+> single register write to 0x2011028) and this mapping/use here is going
+> to conflict with that unless I only map the single register like is done
+> here.
+>
+> I wonder if we'd be better off making this region a separate node and
+> having some phandle to it here in the RPM node? That way we have a
+> driver that provides a clock and some IPC handle the RPM driver can get.
+> The SMD driver also uses the same register to kick other processors so
+> having some generic IPC handle may be useful there too.
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- .../devicetree/bindings/ata/ahci-platform.txt      |    9 +++++
- drivers/ata/libahci_platform.c                     |   39 ++++++++++++++++++++
- 2 files changed, 48 insertions(+)
+Thanks Stephen,
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index c96d8dcf98fd..c0b9f6e76ba4 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -26,6 +26,15 @@ Optional properties:
- - clocks            : must contain the sata, sata_ref and ahb clocks
- - clock-names       : must contain "ahb" for the ahb clock
- 
-+- no-ncq: when present, controller can't do NCQ, turning off CAP_NCQ
-+- 32bit-only: when present, controller can't do 64bit DMA, forcing 32bit
-+- no-msi: when present, no PCI MSI
-+- no-pmp: when present, controller can't do PMP, turning off CAP_PMP
-+- yes-ncq: when present,controller can do NCQ, turning on CAP_NCQ
-+- no-suspend: when present, controller can't do suspend
-+- yes-fbs: when present, controller can do FBS, turning on CAP_FBS
-+- no-fbs: when present, controller can't do FBS, turning off CAP_FBS
-+
- Examples:
-         sata at ffe08000 {
- 		compatible = "snps,spear-ahci";
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index 3a5b4ed25a4f..880b9f360056 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -278,6 +278,44 @@ err_out:
- }
- EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
- 
-+#ifdef CONFIG_OF
-+static void ahci_platform_get_of_property(struct platform_device *pdev,
-+					  struct ahci_host_priv *hpriv)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (of_device_is_available(np)) {
-+		if (of_get_property(np, "no-ncq", NULL))
-+			hpriv->flags |= AHCI_HFLAG_NO_NCQ;
-+
-+		if (of_get_property(np, "32bit-only", NULL))
-+			hpriv->flags |= AHCI_HFLAG_32BIT_ONLY;
-+
-+		if (of_get_property(np, "no-msi", NULL))
-+			hpriv->flags |= AHCI_HFLAG_NO_MSI;
-+
-+		if (of_get_property(np, "no-pmp", NULL))
-+			hpriv->flags |= AHCI_HFLAG_NO_PMP;
-+
-+		if (of_get_property(np, "yes-ncq", NULL))
-+			hpriv->flags |= AHCI_HFLAG_YES_NCQ;
-+
-+		if (of_get_property(np, "no-suspend", NULL))
-+			hpriv->flags |= AHCI_HFLAG_NO_SUSPEND;
-+
-+		if (of_get_property(np, "yes-fbs", NULL))
-+			hpriv->flags |= AHCI_HFLAG_YES_FBS;
-+
-+		if (of_get_property(np, "no-fbs", NULL))
-+			hpriv->flags |= AHCI_HFLAG_NO_FBS;
-+	}
-+}
-+#else
-+static void ahci_platform_get_of_property(struct platform_device *pdev,
-+					  struct ahci_host_priv *hpriv)
-+{}
-+#endif /* CONFIG_OF */
-+
- /**
-  * ahci_platform_init_host - Bring up an ahci-platform host
-  * @pdev: platform device pointer for the host
-@@ -316,6 +354,7 @@ int ahci_platform_init_host(struct platform_device *pdev,
- 	/* prepare host */
- 	pi.private_data = (void *)host_flags;
- 	hpriv->flags |= host_flags;
-+	ahci_platform_get_of_property(pdev, hpriv);
- 
- 	ahci_save_initial_config(dev, hpriv, force_port_map, mask_port_map);
- 
--- 
-1.7.9.5
+I never connected the dots here but now that I found the right pieces of
+documentation I can only agree with you. This would better be some sort of
+reverse interrupt chip.
+
+Another such use case would be the smsm and smp2p, which in the codeaurora tree
+are modelled with a custom "state change" api and as gpios respectively. Both
+of these seems like they should better just be modelled as incoming virtual
+interrupts and then some sort of outgoing "interrupts" or "signals".
+
+Maybe I'm over optimistic regarding the reusability here, but I definitely
+agree with you that having a "ipc = <&apcs 0>;" does look like a better
+solution.
+
+Regards,
+Bjorn
