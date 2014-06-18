@@ -1,56 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 18 Jun 2014 17:24:47 -0600
-Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
-In-Reply-To: <20140618231410.GG26514@mithrandir>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
- <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
- <53A069B6.6070902@wwwdotorg.org> <53A1CB23.5090307@collabora.com>
- <53A1D089.8010605@wwwdotorg.org> <20140618220343.GD26514@mithrandir>
- <53A20E02.5050900@wwwdotorg.org> <20140618231410.GG26514@mithrandir>
-Message-ID: <53A21FBF.5090806@wwwdotorg.org>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 18 Jun 2014 16:30:50 -0700
+Subject: [PATCH v3 3/4] edac: Add APM X-Gene SoC EDAC driver
+In-Reply-To: <20140618223112.GM24024@pd.tnic>
+References: <1401761660-11515-1-git-send-email-lho@apm.com>
+ <1401761660-11515-2-git-send-email-lho@apm.com>
+ <1401761660-11515-3-git-send-email-lho@apm.com>
+ <1401761660-11515-4-git-send-email-lho@apm.com>
+ <20140618221046.GL24024@pd.tnic>
+ <CAPw-ZT=k=27NY5OgV2Tp4gsjf3wSTmgN3FM46qJq8HEQWHTYDw@mail.gmail.com>
+ <20140618223112.GM24024@pd.tnic>
+Message-ID: <CAPw-ZTmqEuXCZGPGXBJAe4+_L+4LZfrPUp=JFKHjnGXqADr0zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2014 05:14 PM, Thierry Reding wrote:
-> On Wed, Jun 18, 2014 at 04:09:06PM -0600, Stephen Warren wrote:
->> On 06/18/2014 04:03 PM, Thierry Reding wrote:
-...
->>> From what I remember, Mike was fairly strongly opposing the idea of
->>> virtual clocks, but what you're proposing here sounds like it would
->>> assume the existence of virtual clocks. clk_set_rate() per client
->>> doesn't work with the current API as I understand it.
->>>
->>> Or perhaps what you're proposing isn't about the individual clocks at
->>> all but rather about a mechanism to express constraints for a set of
->>> clocks?
->>
->> This doesn't have anything to do with virtual clocks. As you mention,
->> it's just about constraints.
->>
->> One user of clock "cpu" wants min rate 216MHz. Another wants max rate
->> 1GHz. cpufreq will request some rate between the 2, or be capped to
->> those limits. These set of imposed constraints would need to be stored
->> per client of the clock, not per HW clock, since many clients could set
->> different max rates (e.g. thermal throttle 1.5GHz due to temperature,
->> CPU policy 1GHz due to the user selecting low CPU power, etc.)
->>
->> Similarly for audio, of there are N clients of 1 clock/PLL, and they
->> each want the PLL to run at a different rate, something needs to detect
->> that and deny it.
-> 
-> I'm wondering how this should work with the current API. Could the clock
-> core be modified to return a per-client struct clk * that references the
-> hardware clock internally? Or do we need to add a new API?
+Hi Rob,
 
-I would assume the we can just change struct clk and hide the details
-from any driver. Hopefully only clock-core and clock-drivers would need
-any changes.
+>> One more thing, if you going to pull this in, please use version 4 as
+>> that fixes the PMD (CPU L1/L2) error report and clearing.
+>
+> Ah, I have a v4 too in my mbox. cool.
+>
+> Please ping me when the atomic scrub lands in some maintainers tree so
+> that we can track it/point to it.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/e86187fa/attachment.sig>
+Did the EDAC support for ARM64 made to any GIT tree yet?
+
+>> Should I ping a device tree maintainer? If so, who would that be?
+>
+> $ ./scripts/get_maintainer.pl -f Documentation/devicetree/
+> Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND...)
+> Pawel Moll <pawel.moll@arm.com> (maintainer:OPEN FIRMWARE AND...)
+> Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND...)
+> Ian Campbell <ijc+devicetree@hellion.org.uk> (maintainer:OPEN FIRMWARE AND...)
+> Kumar Gala <galak@codeaurora.org> (maintainer:OPEN FIRMWARE AND...)
+> Randy Dunlap <rdunlap@infradead.org> (maintainer:DOCUMENTATION)
+> devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND...)
+> linux-doc at vger.kernel.org (open list:DOCUMENTATION)
+> linux-kernel at vger.kernel.org (open list)
+
+Also, can you review the DT node of this EDAC driver as you seems to
+review the GPIO DT node as well? Please review version 4 of the
+posting.
+
+-Loc
