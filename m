@@ -1,45 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Jun 2014 14:57:47 +0200
-Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
- devices
-In-Reply-To: <53A0B27E.5010708@gmail.com>
-References: <53A05E2D.6020702@samsung.com> <5027740.B7iVUcUX2T@wuerfel>
- <53A0B27E.5010708@gmail.com>
-Message-ID: <5537724.LlmJ2hxcKn@wuerfel>
+Date: Wed, 18 Jun 2014 15:01:42 +0200
+Subject: [PATCH] tty: serial: msm: Fix section mismatch warning
+In-Reply-To: <D4093820-1DCF-4B10-8DEC-1378B5D64D3A@codeaurora.org>
+References: <1401826402-1079-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMjNVoKCDQ8=dB8TB+ghTxxCQ_xMW0A07k9s4imVTgoLbA@mail.gmail.com>
+ <D4093820-1DCF-4B10-8DEC-1378B5D64D3A@codeaurora.org>
+Message-ID: <4362858.JqVD2H8dBO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 June 2014 23:26:22 Tomasz Figa wrote:
-> On 17.06.2014 17:42, Arnd Bergmann wrote:
-> > This seems like a reasonable way of solving the problem, but I think
-> > there is an even better one that we have about in the past: if we
-> > promote syscon from a platform driver into a a drivers/base/ helper
-> > that is independent of the platform device matching, we can use
-> > call syscon_regmap_lookup_* for any device node, whether it's already
-> > bound to a driver or not, which do what you need. It would also make
-> > it easier to call the syscon code before the platform_device
-> > infrastructure gets initialized, which is something a number of
-> > people have asked for, e.g. for using regmap to do SMP bringup
-> > or for clock registration.
+On Tuesday 17 June 2014 14:53:44 Kumar Gala wrote:
 > 
-> Basically, unless I'm missing your point, this is what my patch does,
-> except that I don't move it to drivers/base/ and the registration
-> function I added require a pointer to struct device. Indeed, decoupling
-> it further from the driver model, by adding of_syscon_register() should
-> be useful for early users.
+> On Jun 3, 2014, at 4:17 PM, Olof Johansson <olof@lixom.net> wrote:
+> 
+> > On Tue, Jun 3, 2014 at 2:14 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> >> On Tue, Jun 03, 2014 at 02:04:43PM -0700, Olof Johansson wrote:
+> >>> On Tue, Jun 3, 2014 at 1:33 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> >>>> On Tue, Jun 03, 2014 at 03:13:22PM -0500, Kumar Gala wrote:
+> >>>>> WARNING: drivers/tty/built-in.o(.data+0x3544): Section mismatch in
+> >>>>> reference from the variable msm_platform_driver to the function
+> >>>>> .init.text:msm_serial_probe()
+> >>>>> The variable msm_platform_driver references
+> >>>>> the function __init msm_serial_probe()
+> >>>>> If the reference is valid then annotate the
+> >>>>> variable with __init* or __refdata (see linux/init.h) or name the variable:
+> >>>>> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+> >>>> 
+> >>>> Where is this mismatch showing up at?  3.15-rc8, 3.16-rc1?  Somewhere
+> >>>> older or else?
+> >>> 
+> >>> Linus' next branch, it was merged through arm-soc. I didn't notice it
+> >>> in time to fix it before we sent to Linus. :(
+> >> 
+> >> Ok, do you want to take this patch then?  I don't mind taking it through
+> >> my tree, but it will have to wait until after 3.16-rc1 is out.  It's up
+> >> to you.
+> > 
+> > I've got a handful of fixes we're queueing for the second batch of
+> > merges, and I can add it to there.
+> > 
+> Reminder to queue this up for fixes for 3.16
 
-I believe the part you are missing is that with the approach I suggested,
-there would be no registration function at all. You can easily do the
-lookup from the client drivers using the DT data structures, with no
-need for the device at all. The only exception today is the clps711x
-platform using syscon_regmap_lookup_by_pdevname(), but that should be
-solved in 3.17 when clps711x becomes DT-only.
+I've applied it on top of the fixes branch now. I think I missed it when
+I picked up the other fixes as I was only looking for patches sent to
+arm at kernel.org.
 
-> Should I move this to drivers/base/, even though from current location
-> it can be used outside the platform driver anyway?
-
-Thinking about it some more, drivers/of might be better than drivers/base.
-It depends a bit where we are heading with this, in particular if we
-expect to see non-DT users in the future.
+Thanks for the reminder!
 
 	Arnd
