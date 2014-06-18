@@ -1,114 +1,32 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 18 Jun 2014 11:21:56 +0200
-Subject: [PATCH v2 01/10] mfd: max77686: Convert to use regmap_irq
-In-Reply-To: <CAD=FV=VUPwr6GbR7O-t0q-GaCttZ5vGzLeFqHckzkk-dZYfCFw@mail.gmail.com>
-References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>	<1402941758-11216-2-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=VUPwr6GbR7O-t0q-GaCttZ5vGzLeFqHckzkk-dZYfCFw@mail.gmail.com>
-Message-ID: <53A15A34.10805@collabora.co.uk>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 18 Jun 2014 10:25:02 +0100
+Subject: [PATCH] efi/arm64: efistub: remove local copy of linux_banner
+In-Reply-To: <CAKv+Gu8auFu=rxtDpZy4tkfPiZK7ERUeRDvymzQYi9AhVUxW+Q@mail.gmail.com>
+References: <1402657911-7779-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140618085059.GB24049@console-pimps.org>
+ <CAKv+Gu8auFu=rxtDpZy4tkfPiZK7ERUeRDvymzQYi9AhVUxW+Q@mail.gmail.com>
+Message-ID: <20140618092502.GD24049@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
-
-On 06/17/2014 10:57 PM, Doug Anderson wrote:
-> Javier,
+On Wed, 18 Jun, at 11:12:28AM, Ard Biesheuvel wrote:
 > 
-> On Mon, Jun 16, 2014 at 11:02 AM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> @@ -127,15 +175,48 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
->>         }
->>         i2c_set_clientdata(max77686->rtc, max77686);
->>
->> -       max77686_irq_init(max77686);
->> +       max77686->rtc_regmap = devm_regmap_init_i2c(max77686->rtc,
->> +                                                   &max77686_rtc_regmap_config);
->> +       if (IS_ERR(max77686->rtc_regmap)) {
->> +               ret = PTR_ERR(max77686->rtc_regmap);
->> +               dev_err(max77686->dev, "failed to allocate RTC regmap: %d\n",
->> +                       ret);
->> +               goto err_unregister_i2c;
->> +       }
->> +
->> +       ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
->> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
->> +                                 IRQF_SHARED, 0, &max77686_irq_chip,
->> +                                 &max77686->irq_data);
->> +       if (ret != 0) {
->> +               dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
->> +               goto err_unregister_i2c;
->> +       }
->> +       ret = regmap_add_irq_chip(max77686->rtc_regmap, max77686->irq,
->> +                                 IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
->> +                                 IRQF_SHARED, 0, &max77686_rtc_irq_chip,
->> +                                 &max77686->rtc_irq_data);
->> +       if (ret != 0) {
->> +               dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
->> +               goto err_del_irqc;
->> +       }
->>
->>         ret = mfd_add_devices(max77686->dev, -1, max77686_devs,
->>                               ARRAY_SIZE(max77686_devs), NULL, 0, NULL);
->>         if (ret < 0) {
->> -               mfd_remove_devices(max77686->dev);
->> -               i2c_unregister_device(max77686->rtc);
->> +               dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
->> +               goto err_del_rtc_irqc;
->>         }
->>
->> +       return 0;
->> +
->> +err_del_rtc_irqc:
->> +       regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
->> +err_del_irqc:
->> +       regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-> 
-> I would imagine you either don't need these regmap_del_irq_chip() here
-> or that you _do_ need them in max77686_i2c_remove().
-> 
-> ...from looking at other drivers I think the answer is to add them to
-> max77686_i2c_remove().
-> 
->
+> This just removes the duplicate definition of linux_banner, *not* the
+> reference to it a couple of lines down. IOW, the DT bindings and
+> everything behind it are not affected at all by this patch.
+> The reason it works fine for arm64 is that its stub is part of the
+> kernel proper, so the reference will bind to the global definition
+> instead.
+ 
+Aha, thanks.
 
-Yes, I forgot to do the regmap irqchip cleanup in the driver .remove function.
-The same issue is in the max77802 driver btw so I'll fix both on v3.
+> What will be affected is 32-bit ARM, as its stub is not part of the
+> kernel proper. In this case, we will propose an alternative [and
+> better] way of allowing the stub to reference linux_banner, i.e.,
+> without having to redefine it at the C level. We will take this into
+> account when we propose the next round of efistub patches for ARM.
 
-Thanks a lot for pointing this out.
+No complaints from me.
 
->> diff --git a/include/linux/mfd/max77686-private.h b/include/linux/mfd/max77686-private.h
->> index 8c75a9c..3a810b1 100644
->> --- a/include/linux/mfd/max77686-private.h
->> +++ b/include/linux/mfd/max77686-private.h
->> @@ -205,7 +205,7 @@ enum max77686_irq {
->>         MAX77686_PMICIRQ_140C,
->>         MAX77686_PMICIRQ_120C,
->>
->> -       MAX77686_RTCIRQ_RTC60S,
->> +       MAX77686_RTCIRQ_RTC60S = 0,
->>         MAX77686_RTCIRQ_RTCA1,
->>         MAX77686_RTCIRQ_RTCA2,
->>         MAX77686_RTCIRQ_SMPL,
->> @@ -215,6 +215,25 @@ enum max77686_irq {
->>         MAX77686_IRQ_NR,
-> 
-> Maybe remove MAX77686_IRQ_NR which no longer makes any sense now that
-> you start over at 0 partway through.
-> 
-> 
-
-Right, it is not needed anymore. I'll remove it when re-spin.
-
-> Overall this looks good to me, so once nits above are fixed feel to
-> add my Reviewed-by.  I've also built and booted this patch on
-> exynos5250-snow and tested that the RTC wakealarm fires and can even
-> wake the system up (with some additional work that I'll email you
-> about).
->
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> 
-
-Great! thanks a lot for testing.
-
-Best regards,
-Javier
+-- 
+Matt Fleming, Intel Open Source Technology Center
