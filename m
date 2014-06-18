@@ -1,45 +1,74 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 18 Jun 2014 21:09:58 +0200
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <20140618190108.GI32514@n2100.arm.linux.org.uk>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <20140618190108.GI32514@n2100.arm.linux.org.uk>
-Message-ID: <201406182109.59059@pali>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 18 Jun 2014 12:16:17 -0700
+Subject: [PATCH v3 1/3] soc: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <53A14F00.9010904@linaro.org>
+References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1402944372-31901-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <53A0D651.20605@codeaurora.org> <53A14F00.9010904@linaro.org>
+Message-ID: <53A1E581.7010004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 21:01:09 Russell King - ARM Linux 
-wrote:
-> On Wed, Jun 18, 2014 at 06:54:24PM +0200, Pali Roh?r wrote:
-> > Machine name from board description is some generic name on
-> > DT kernel. DT provides machine name property which is
-> > specific for board, so use it instead generic one when
-> > possible.
-> 
-> http://archive.arm.linux.org.uk/lurker/message/20130726.132850
-> .53d47576.en.html
-> 
-> "If userspace wants to get at the DT information about a
-> platform, we already have ways that can happen already - we
-> export the DT stuff so that kexec's tools can get at it."
+On 06/18/14 01:34, Srinivas Kandagatla wrote:
+>
+>
+> On 18/06/14 00:59, Stephen Boyd wrote:
+>> On 06/16/14 11:46, Bjorn Andersson wrote:
+>>> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
+>>> b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
+>>> new file mode 100644
+>>> index 0000000..0366533
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,rpm.txt
+>>> @@ -0,0 +1,260 @@
+>>> +Qualcomm Resource Power Manager (RPM)
+>>> +
+>> [...]
+>>> +
+>>> +- reg:
+>>> +    Usage: required
+>>> +    Value type: <prop-encoded-array>
+>>> +    Definition: two entries specifying the RPM's message ram and
+>>> ipc register
+>>> +
+>>> +- reg-names:
+>>> +    Usage: required
+>>> +    Value type: <string-array>
+>>> +    Definition: must contain the following, in order:
+>>> +            "msg_ram"
+>>> +            "ipc"
+>>
+>> ipc is concerning....
+>>
+>>> +    rpm at 108000 {
+>>> +        compatible = "qcom,rpm-msm8960";
+>>> +        reg = <0x108000 0x1000 0x2011008 0x4>;
+>>> +
+>>
+>> (reg-names is missing from the example)
+>>
+>> because ipc is actually a register inside the Krait complex's global
+>> clock control/distribution hardware block (it's located at 0x2011000).
+>>  From what I can tell, this is the only non-clock/power register inside
+>> there. I plan to send out a driver for this hardware block so that I can
+>> switch the L2 aux source mux over to PLL8 instead of PXO (done with a
+>> single register write to 0x2011028) and this mapping/use here is going
+>> to conflict with that unless I only map the single register like is done
+>> here.
+>>
+>> I wonder if we'd be better off making this region a separate node and
+>> having some phandle to it here in the RPM node? That way we have a
+>
+> Can't we use syscon based on regmap here?  syscon is a better way to
+> share a common register space across multiple drivers.
 
-Userspace application does not know that kernel using DT. And 
-also it does not want to get DT information. Only board/machine 
-name. So existing applications stop working after migration to 
-DT. And because legacy board boot code (without DT) is going to 
-be removed for ARM in near future this will permanently break 
-existing applications.
-
-And sometimes it is even not possible to fix userspace 
-application if is closed source - binary only.
+How would the mux clock be registered? I'd like it to be registered by
+the driver associated with this device with something like
+devm_clk_register(). From what I can tell syscon wouldn't allow that
+unless we extend the syscon driver to handle more specific compatible
+strings.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/5d34ccda/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
