@@ -1,99 +1,76 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 18 Jun 2014 09:09:35 -0500
-Subject: [PATCH] arm64: support reboot and power off via EFI runtime
-In-Reply-To: <1403023514-1352-1-git-send-email-msalter@redhat.com>
-References: <1403023514-1352-1-git-send-email-msalter@redhat.com>
-Message-ID: <CAL_JsqJUMMRwUn+PUiFweDOywgLCbKiWfDTLDSfJqE9oTV5gYw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 15:10:48 +0100
+Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
+ regulators
+In-Reply-To: <53A16047.7010409@collabora.co.uk>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
+ <20140617211747.GY29841@lee--X1> <53A16047.7010409@collabora.co.uk>
+Message-ID: <20140618141048.GA15956@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 11:45 AM, Mark Salter <msalter@redhat.com> wrote:
-> Add handlers for arm_pm_resestart and pm_power_off which use EFI
+On Wed, 18 Jun 2014, Javier Martinez Canillas wrote:
 
-typo.
+> Hello Lee,
+> 
+> Thanks a lot for your feedback.
+> 
+> On 06/17/2014 11:17 PM, Lee Jones wrote:
+> >> The MAX77802 PMIC has 10 high-efficiency Buck and 32 Low-dropout
+> >> (LDO) regulators. This patch adds support for all these regulators
+> >> found on the MAX77802 PMIC and is based on a driver added by Simon
+> >> Glass to the Chrome OS kernel 3.8 tree.
+> >> 
+> >> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >> ---
+> >> 
+> >> Changes since v1:
+> >>  - Remove unneeded check if num_regulators != MAX77802_MAX_REGULATORS.
+> >>  - Fix .set_suspend_mode handler comment and split regulators ops for
+> >>    regulators that behave differently. Suggested by Mark Brown.
+> >>  - Use module_platform_driver() instead of having init/exit functions.
+> >>    Suggested by Mark Brown.
+> >>  - Use the new descriptor-based GPIO interface instead of the deprecated
+> >>    integer based GPIO one. Suggested by Mark Brown.
+> >>  - Look for "regulators" child node instead of "voltage-regulators" to be
+> >>    consistent with other PMIC drivers. Suggested by Mark Brown.
+> >> 
+> >>  drivers/mfd/max77802.c       |   1 +
+> > 
+> > Can you remove all of the MFD changes from patches 7, 8 and 9 and
+> > create new one.  That way there's no requirement for any cross
+> > subsystem messiness.
+> > 
+> 
+> Sure, Mark already suggested the same and I'll do it on the next version.
+> 
+> But there still be some cross-subsystem dependency/messiness since the
+> regulator, clk and rtc drivers include the mfd max77802 headers that are added
+> in Patch 6.
 
-> runtime services ResetSystem call to perform the functions. These
-> handlers are only installed if no handler currently exists. This
-> allows PSCI to take priority over EFI for these functions.
->
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
+What I should have said was _avoidable_ or _unnecessary_ messiness.
 
-Where's the arm32 version? Surely this could be shared with all
-arches. pm_power_off is at least architecturally independent. We
-should do the same for restart/reboot. I'm not saying do that now, but
-at least put it in the right place for that to happen.
+> So I guess you should either a) take the whole patch-set through your mfd tree
+> or b) merge the mfd patches and create an immutable branch that can be pulled by
+> Mark, Mike and Alessandro.
+> 
+> I don't know what's the preferred workflow in these cases...
 
-Rob
+That's fine.  I'm happy to create shared branches when required.
 
->  1 file changed, 40 insertions(+)
->
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 14db1f6..e8c0476 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -19,11 +19,14 @@
->  #include <linux/of_fdt.h>
->  #include <linux/sched.h>
->  #include <linux/slab.h>
-> +#include <linux/reboot.h>
-> +#include <linux/pm.h>
->
->  #include <asm/cacheflush.h>
->  #include <asm/efi.h>
->  #include <asm/tlbflush.h>
->  #include <asm/mmu_context.h>
-> +#include <asm/system_misc.h>
->
->  struct efi_memory_map memmap;
->
-> @@ -467,3 +470,40 @@ static int __init arm64_enter_virtual_mode(void)
->         return 0;
->  }
->  early_initcall(arm64_enter_virtual_mode);
-> +
-> +static void efi_restart(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> +       int efi_mode;
-> +
-> +       switch (reboot_mode) {
-> +       case REBOOT_WARM:
-> +       case REBOOT_SOFT:
-> +               efi_mode = EFI_RESET_WARM;
-> +               break;
-> +       default:
-> +               efi_mode = EFI_RESET_COLD;
-> +               break;
-> +       }
-> +       efi.reset_system(efi_mode, 0, 0, NULL);
-> +}
-> +
-> +static void efi_power_off(void)
-> +{
-> +       efi.reset_system(EFI_RESET_SHUTDOWN, 0, 0, NULL);
-> +}
-> +
-> +static int __init setup_efi_reset(void)
-> +{
-> +       if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-> +               /*
-> +                * If something (psci, etc) hasn't already registered
-> +                * a handler, use EFI.
-> +                */
-> +               if (arm_pm_restart == NULL)
-> +                       arm_pm_restart = efi_restart;
-> +               if (pm_power_off == NULL)
-> +                       pm_power_off = efi_power_off;
-> +       }
-> +       return 0;
-> +}
-> +pure_initcall(setup_efi_reset);
-> --
-> 1.9.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>  drivers/regulator/Kconfig    |   9 +
+> >>  drivers/regulator/Makefile   |   1 +
+> >>  drivers/regulator/max77802.c | 701 +++++++++++++++++++++++++++++++++++++++++++
+> >>  4 files changed, 712 insertions(+)
+> >>  create mode 100644 drivers/regulator/max77802.c
+> > 
+> 
+> Best regards,
+> Javier
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
