@@ -1,56 +1,71 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Jun 2014 01:32:59 +0200
-Subject: [PATCH] cpuidle: mvebu: Fix the name of the states
-In-Reply-To: <1403095063-22843-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1403095063-22843-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <2630012.Dan7hg1t0j@vostro.rjw.lan>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 18 Jun 2014 16:17:01 -0700
+Subject: [PATCH] clocksource: exynos-mct: Register the timer for stable
+ udelay
+In-Reply-To: <1403091060-5054-1-git-send-email-amit.daniel@samsung.com>
+References: <1403091060-5054-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAD=FV=WHK7TDdqcAd6aVs2g8rcHJx834im_4nTKHJAkUisWq4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 18, 2014 02:37:43 PM Gregory CLEMENT wrote:
-> The length name of the states 2 was too long to fit in the allocated
-> string (limited to 16 bytes). This lead to improper string displayed
-> through sysfs.
-> 
-> This patch shorten the name by removing the reference to Marvell and
-> to the CPU as both are implicit. For coherency the same change have
-> been done for the states 1.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Amit,
+
+Thanks for posting!
+
+On Wed, Jun 18, 2014 at 4:31 AM, Amit Daniel Kachhap
+<amit.daniel@samsung.com> wrote:
+> This patch register the exynos mct clocksource as the current timer
+> as it has constant clock rate. This will generate correct udelay for the
+> exynos platform and avoid using unnecessary calibrated jiffies. This change
+> have been tested on exynos5420 based board.
+>
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 > ---
-> Hi,
-> 
-> This fix should be merged in 3.16.
+>
+> Patches from David Riley confirmed that udelay is broken in exynos5420.
+> Link to those patches are,
+> 1) https://patchwork.kernel.org/patch/4344911/
+> 2) https://patchwork.kernel.org/patch/4344881/
+>
+>  drivers/clocksource/exynos_mct.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 8d64200..57cb3dc 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -198,10 +198,21 @@ static u64 notrace exynos4_read_sched_clock(void)
+>         return exynos4_frc_read(&mct_frc);
+>  }
+>
+> +static struct delay_timer exynos4_delay_timer;
+> +
+> +static unsigned long exynos4_read_current_timer(void)
+> +{
+> +       return exynos4_frc_read(&mct_frc);
 
-Applied, thanks!
+This is terribly inefficient to read all 64-bits and then cast back to
+a 32-bit value.  Replace with:
 
->  drivers/cpuidle/cpuidle-armada-370-xp.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
-> index 28587d0f3947..a5fba0287bfb 100644
-> --- a/drivers/cpuidle/cpuidle-armada-370-xp.c
-> +++ b/drivers/cpuidle/cpuidle-armada-370-xp.c
-> @@ -55,7 +55,7 @@ static struct cpuidle_driver armada_370_xp_idle_driver = {
->  		.power_usage		= 50,
->  		.target_residency	= 100,
->  		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> -		.name			= "MV CPU IDLE",
-> +		.name			= "Idle",
->  		.desc			= "CPU power down",
->  	},
->  	.states[2]		= {
-> @@ -65,7 +65,7 @@ static struct cpuidle_driver armada_370_xp_idle_driver = {
->  		.target_residency	= 1000,
->  		.flags			= CPUIDLE_FLAG_TIME_VALID |
->  						ARMADA_370_XP_FLAG_DEEP_IDLE,
-> -		.name			= "MV CPU DEEP IDLE",
-> +		.name			= "Deep idle",
->  		.desc			= "CPU and L2 Fabric power down",
->  	},
->  	.state_count = ARMADA_370_XP_MAX_STATES,
-> 
+return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+
+> +}
+> +
+>  static void __init exynos4_clocksource_init(void)
+>  {
+>         exynos4_mct_frc_start(0, 0);
+
+Please rebase atop (1d80415 clocksource: exynos_mct: Don't reset the
+counter during boot and resume), which is in linuxnext among other
+places.
+
+>
+> +       exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+> +       exynos4_delay_timer.freq = clk_rate;
+> +       register_current_timer_delay(&exynos4_delay_timer);
+> +
+>         if (clocksource_register_hz(&mct_frc, clk_rate))
+>                 panic("%s: can't register clocksource\n", mct_frc.name);
+
+It does seem to work for me though.  :)
