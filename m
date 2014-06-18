@@ -1,59 +1,46 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 18 Jun 2014 17:23:21 +0300
-Subject: [PATCH v2 2/7] ARM: tegra: Add SATA controller to Tegra124 device tree
+Date: Wed, 18 Jun 2014 17:23:23 +0300
+Subject: [PATCH v2 4/7] clk: tegra: Enable hardware control of SATA PLL
 In-Reply-To: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
 References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1403101406-15439-3-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1403101406-15439-5-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the integrated AHCI-compliant Serial ATA controller present
-in Tegra124 systems-on-chip to the Tegra124 device tree.
+This makes the SATA PLL be controlled by hardware instead of software.
+This is required for working SATA support.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 ---
-v2:
-- added clock-names property
-- changed 0 -> GIC_SPI
+ drivers/clk/tegra/clk-pll.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
- arch/arm/boot/dts/tegra124.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 6fa06d2..63a2bfa 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -734,6 +734,31 @@
- 		status = "disabled";
- 	};
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 637b62c..f070c36 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -110,6 +110,9 @@
+ #define XUSBIO_PLL_CFG0_SEQ_ENABLE		BIT(24)
+ #define XUSBIO_PLL_CFG0_SEQ_START_STATE		BIT(25)
  
-+	sata at 0,70020000 {
-+		compatible = "nvidia,tegra124-ahci";
++#define SATA_PLL_CFG0		0x490
++#define SATA_PLL_CFG0_PADPLL_RESET_SWCTL	BIT(0)
 +
-+		reg = <0x0 0x70027000 0x0 0x2000>, /* AHCI */
-+			<0x0 0x70020000 0x0 0x7000>; /* SATA */
+ #define PLLE_MISC_PLLE_PTS	BIT(8)
+ #define PLLE_MISC_IDDQ_SW_VALUE	BIT(13)
+ #define PLLE_MISC_IDDQ_SW_CTRL	BIT(14)
+@@ -1361,6 +1364,11 @@ static int clk_plle_tegra114_enable(struct clk_hw *hw)
+ 	val |= XUSBIO_PLL_CFG0_SEQ_ENABLE;
+ 	pll_writel(val, XUSBIO_PLL_CFG0, pll);
+ 
++	/* Enable hw control of SATA pll */
++	val = pll_readl(SATA_PLL_CFG0, pll);
++	val &= ~SATA_PLL_CFG0_PADPLL_RESET_SWCTL;
++	pll_writel(val, SATA_PLL_CFG0, pll);
 +
-+		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		clocks = <&tegra_car TEGRA124_CLK_SATA>,
-+			<&tegra_car TEGRA124_CLK_SATA_OOB>,
-+			<&tegra_car TEGRA124_CLK_CML1>,
-+			<&tegra_car TEGRA124_CLK_PLL_E>;
-+		clock-names = "sata", "sata-oob", "cml1", "pll_e";
-+
-+		resets = <&tegra_car 124>,
-+			<&tegra_car 123>,
-+			<&tegra_car 129>;
-+		reset-names = "sata", "sata-oob", "sata-cold";
-+
-+		phys = <&padctl TEGRA_XUSB_PADCTL_SATA>;
-+		phy-names = "sata-phy";
-+
-+		status = "disabled";
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+ out:
+ 	if (pll->lock)
+ 		spin_unlock_irqrestore(pll->lock, flags);
 -- 
 1.8.1.5
