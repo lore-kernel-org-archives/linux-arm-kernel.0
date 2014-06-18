@@ -1,59 +1,56 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 18 Jun 2014 16:47:44 +0200
-Subject: [RFC PATCH 6/6] arm/arm64: KVM: vgic: Clarify and correct vgic
- documentation
-In-Reply-To: <1402779067-34478-7-git-send-email-christoffer.dall@linaro.org>
-References: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
- <1402779067-34478-7-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <53A1A690.8030909@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 15:52:46 +0100
+Subject: [PATCH 1/7] ARM: stih407: Add DT nodes for for PWM
+Message-ID: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2014 10:51 PM, Christoffer Dall wrote:
-> The VGIC virtual distributor implementation documentation was written a
-> very long time ago, before the true nature of the beast had been
-> partially absorbed into my bloodstream.  I think this amalgamates the
-> two evil beings (myself and the code) a little more.
-> 
-> Plus, it fixes an actual bug.  ICFRn, pfff.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 1f91b3b..cc776af 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -36,21 +36,22 @@
->   * How the whole thing works (courtesy of Christoffer Dall):
->   *
->   * - At any time, the dist->irq_pending_on_cpu is the oracle that knows if
-> - *   something is pending
-> - * - VGIC pending interrupts are stored on the vgic.irq_pending vgic
-> - *   bitmap (this bitmap is updated by both user land ioctls and guest
-> - *   mmio ops, and other in-kernel peripherals such as the
-> - *   arch. timers) and indicate the 'wire' state.
-> + *   something is pending on the CPU interface.
-> + * - Interrupts that are pending on the distributor are stored on the
-> + *   vgic.irq_pending vgic bitmap (this bitmap is updated by both user land
-> + *   ioctls and guest mmio ops, and other in-kernel peripherals such as the
-> + *   arch. timers).
-ok forget my previous comment related to wire state;-)
->   * - Every time the bitmap changes, the irq_pending_on_cpu oracle is
->   *   recalculated
->   * - To calculate the oracle, we need info for each cpu from
->   *   compute_pending_for_cpu, which considers:
->   *   - PPI: dist->irq_pending & dist->irq_enable
->   *   - SPI: dist->irq_pending & dist->irq_enable & dist->irq_spi_target
-> - *   - irq_spi_target is a 'formatted' version of the GICD_ICFGR
-> + *   - irq_spi_target is a 'formatted' version of the GICD_ITARGETSRn
->   *     registers, stored on each vcpu. We only keep one bit of
->   *     information per interrupt, making sure that only one vcpu can
->   *     accept the interrupt.
-> + * - If any of the above state changes, we must recalculate the oracle.
->   * - The same is true when injecting an interrupt, except that we only
->   *   consider a single interrupt at a time. The irq_spi_cpu array
->   *   contains the target CPU for each SPI.
-> 
+Supply top level nodes for the STiH407 based development boards.
+The Pinctrl configuration has already been applied, so the only
+missing piece of the DT puzzle is for a board's DTB to enable
+the nodes.
+
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih407.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index 4f9024f..6b43ba2 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -259,5 +259,32 @@
+ 
+ 			status = "disabled";
+ 		};
++
++		/* COMMS PWM Module */
++		pwm0: pwm at 9810000 {
++			compatible      = "st,sti-pwm";
++			status		= "disabled";
++			#pwm-cells	= <2>;
++			reg		= <0x9810000 0x68>;
++			pinctrl-names	= "default";
++                        pinctrl-0	= <&pinctrl_pwm0_chan0_default>;
++			clock-names	= "pwm";
++			clocks          = <&clk_sysin>;
++		};
++
++		/* SBC PWM Module */
++		pwm1: pwm at 9510000 {
++			compatible	= "st,sti-pwm";
++			status		= "disabled";
++			#pwm-cells	= <2>;
++			reg		= <0x9510000 0x68>;
++			pinctrl-names	= "default";
++		        pinctrl-0	= <&pinctrl_pwm1_chan0_default
++					&pinctrl_pwm1_chan1_default
++					&pinctrl_pwm1_chan2_default
++					&pinctrl_pwm1_chan3_default>;
++			clock-names	= "pwm";
++			clocks          = <&clk_sysin>;
++		};
+ 	};
+ };
+-- 
+1.8.3.2
