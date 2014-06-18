@@ -1,71 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 17:48:22 +0100
-Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- <7hvbrzbh1u.fsf@paris.lan>
- <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
- <7hzjha8b97.fsf@paris.lan>
- <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
-Message-ID: <20140618164822.GC25353@lee--X1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Jun 2014 17:49:27 +0100
+Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
+In-Reply-To: <1402950432.3708.22.camel@smoke>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+ <1402950432.3708.22.camel@smoke>
+Message-ID: <20140618164927.GA9612@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jun 2014, Kumar Gala wrote:
+On Mon, Jun 16, 2014 at 09:27:12PM +0100, Geoff Levand wrote:
+> Hi Mark,
 
+Hi Geoff,
+
+> Sorry for such a delay in my reply.
 > 
-> On Jun 18, 2014, at 10:53 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> On Fri, 2014-05-16 at 10:50 +0100, Mark Rutland wrote:
+> > Both the image load offset and the effective image size are forced to be
+> > little-endian regardless of the native endianness of the kernel to
+> > enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
+> > which wish to make use of the load offset can inspect the effective
+> > image size field for a non-zero value to determine if the offset is of a
+> > known endianness.
 > 
-> > Bjorn Andersson <bjorn@kryo.se> writes:
-> > 
-> >> On Tue, Jun 17, 2014 at 10:07 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> >>> +Paul Walmsley
-> >>> 
-> >>> Bjorn Andersson <bjorn.andersson@sonymobile.com> writes:
-> >>> 
-> >>>> This series adds a regulator driver for the Resource Power Manager found in
-> >>>> Qualcomm 8660, 8960 and 8064 based devices.
-> >>>> 
-> >>>> The RPM driver exposes resources to its child devices, that can be accessed to
-> >>>> implement drivers for the regulators, clocks and bus frequency control that's
-> >>>> owned by the RPM in these devices.
-> >>>> 
-> >>>> Changes since v2:
-> >>>>  - Fix copy-paste error in dt binding
-> >>>>  - Correct incomplete move from mfd to soc
-> >>>>  - Correct const mistake in regulator driver
-> >>>> 
-> >>>> Changes since v1:
-> >>>>  - Moved rpm driver to drivers/soc
-> >>> 
-> >>> I'm not sure I follow the motivation for having this under drivers/soc?
-> >>> 
-> >> Hi Kevin,
-> >> 
-> >> I've made the argument that to me this is conceptually a black box
-> >> handling regulators, clocks and other stuff; hence similar to a PMIC,
-> >> which would fit nicely into drivers/mfd.
-> >> 
-> >> I still think this is the case and now that I look back I didn't get
-> >> any pushback from Lee Jones so maybe the move was premature?
-> > 
-> > Yes, IMO, the move was premature, but hopefully the drivers/soc folks
-> > can chime in an clarify the criteria for inclusion there.
-> > 
-> > Kevin
-> 
-> I dont agree, I think having this in drivers/soc means that we can
-> clearly go through drivers/soc in the future and look for patterns
-> across SoCs that should be re-factored.
+> Doing this conversion in the linker script seems complicated.  My
+> thought was to just have an image header field that specifies the
+> byte order, in the same way that the EI_DATA part of the ELF
+> e_ident field does.
 
-> Where MFD seems like its become the new drivers misc.
+While the conversion in the linker script is a little ugly, it does
+work, and that complexity is hidden behind the macro I added.
 
-Do you have any grounds for that statement?  I only know of one driver
-which doesn't fit the bounds of a true MFD.  If you know of more, I'd
-like to hear about it.
+While I initially considered having a field to specify byte order, it's
+incredibly likely that bootloaders will not use it. Maintaining a fixed
+endianness everywhere makes it simpler for bootloaders to do the right
+thing, and matches what existing bootloaders are already doing. That's
+less pain for loaders and less pain for the kernel, as things are less
+likely to go wrong.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+To me it makes more sense to ensure these fields have a consistent
+endianness, rather than adding more room for possible mistakes.
+
+> Another advantage of having the byte order in the header is that
+> tools other than a boot loader that need to know the byte order
+> can get that info from the header, otherwise they would need to
+> guess the order with some kind of inspection.
+
+What kind of tools do you envision which would need to know the
+endianness of the kernel but would be looking at the Image rather than
+the vmlinux?
+
+Mark.
