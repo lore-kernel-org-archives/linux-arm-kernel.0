@@ -1,48 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Jun 2014 17:16:55 +0200
-Subject: [PATCH 03/14] ARM: keystone requires ARM_PATCH_PHYS_VIRT
-In-Reply-To: <CAL_JsqLNH-qL49EnaSbHQkhBpNvEWTJ1tExT6qtiyYzyAhcPLg@mail.gmail.com>
-References: <1402675276-538682-1-git-send-email-arnd@arndb.de>
- <1402675276-538682-4-git-send-email-arnd@arndb.de>
- <CAL_JsqLNH-qL49EnaSbHQkhBpNvEWTJ1tExT6qtiyYzyAhcPLg@mail.gmail.com>
-Message-ID: <21215705.gcNUAhls8f@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 16:17:17 +0100
+Subject: [PATCH 3/7] ARM: stih416: Add DT nodes for PWM
+In-Reply-To: <CAG374jChjAZksvYv0eQN+L1a2Zc4D2w+nU+OTuX_cCHP-aaPHA@mail.gmail.com>
+References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
+ <1403103172-19856-3-git-send-email-lee.jones@linaro.org>
+ <CAG374jChjAZksvYv0eQN+L1a2Zc4D2w+nU+OTuX_cCHP-aaPHA@mail.gmail.com>
+Message-ID: <20140618151717.GD15956@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 09:39:57 Rob Herring wrote:
-> On Fri, Jun 13, 2014 at 11:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The dynamic relocation that the keystone platform performs
-> > only works if we can pick the phys offset at boot time. It's
-> > possible that there is another solution for this, but this
-> > is the easiest workaround. Kernels with ARM_PATCH_PHYS_VIRT
-> > are not portable across platforms, and I see no reason why
-> > anyone would run a kernel without ARM_PATCH_PHYS_VIRT on
-> > keystone.
+On Wed, 18 Jun 2014, Gabriel Fernandez wrote:
+
+> Hi Lee,
+> minor remark below..
+> 
+> On 18 June 2014 16:52, Lee Jones <lee.jones@linaro.org> wrote:
+> > Supply top level nodes for the STiH416 based development boards.
+> > The Pinctrl configuration has already been applied, so the only
+> > missing piece of the DT puzzle is for a board's DTB to enable
+> > the nodes.
 > >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > > ---
-> >  arch/arm/mach-keystone/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
+> >  arch/arm/boot/dts/stih416.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 40 insertions(+)
 > >
-> > diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-> > index f50bc93..98a156a 100644
-> > --- a/arch/arm/mach-keystone/Kconfig
-> > +++ b/arch/arm/mach-keystone/Kconfig
-> > @@ -1,6 +1,7 @@
-> >  config ARCH_KEYSTONE
-> >         bool "Texas Instruments Keystone Devices"
-> >         depends on ARCH_MULTI_V7
-> > +       depends on ARM_PATCH_PHYS_VIRT
-> 
-> Why is this needed when multi-platform already selects this?
-> 
+> > diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+> > index 06473c5..8af159e 100644
+> > --- a/arch/arm/boot/dts/stih416.dtsi
+> > +++ b/arch/arm/boot/dts/stih416.dtsi
+> > @@ -236,5 +236,45 @@
+> >                         resets  = <&powerdown STIH416_KEYSCAN_POWERDOWN>,
+> >                                   <&softreset STIH416_KEYSCAN_SOFTRESET>;
+> >                 };
+> > +
+> > +               /* SAS PWM Module */
+> > +               pwm0: pwm at fed10000 {
+> > +                       compatible      = "st,sti-pwm";
+> > +                       status          = "disabled";
+> > +                       #pwm-cells      = <2>;
+> > +                       reg             = <0xfed10000 0x68>;
+> > +
+> > +                       pinctrl-names   = "default";
+> > +                        pinctrl-0 =    <&pinctrl_pwm0_chan0_default
+> del space
 
-I have a patch to make ARM_PATCH_PHYS_VIRT optional for multi-platform,
-which I plan to post at some point in the next weeks. This will let
-us enable NOMMU builds and other things in platforms that are
-converted to multiplatform (at the obvious expense of losing generality
-for that particular build). Most other platforms can work with or without
-ARM_PATCH_PHYS_VIRT, but keystone lost that ability.
+Thanks.
 
-	Arnd
+> > +                                       &pinctrl_pwm0_chan1_default
+> > +                                       &pinctrl_pwm0_chan2_default
+> > +                                       &pinctrl_pwm0_chan3_default>;
+> > +
+> > +                       clock-names     = "pwm";
+> > +                       clocks          = <&clk_sysin>;
+> > +               };
+> > +
+> > +               /* SBC PWM Module */
+> > +               pwm1: pwm at fe510000 {
+> > +                       compatible      = "st,sti-pwm";
+> > +                       status          = "disabled";
+> > +                       #pwm-cells      = <2>;
+> > +                       reg             = <0xfe510000 0x68>;
+> > +
+> > +                       pinctrl-names   = "default";
+> > +                       pinctrl-0 =     <&pinctrl_pwm1_chan0_default
+> > +                                       /*
+> > +                                        * Shared with SBC_OBS_NOTRST.  Don't
+> > +                                        * enable unless you really know what
+> > +                                        * you're doing.
+> > +                                        *
+> > +                                        * &pinctrl_pwm1_chan1_default
+> > +                                        */
+> > +                                       &pinctrl_pwm1_chan2_default
+> > +                                       &pinctrl_pwm1_chan3_default>;
+> > +
+> > +                       clock-names     = "pwm";
+> > +                       clocks          = <&clk_sysin>;
+> > +               };
+> >         };
+> >  };
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
