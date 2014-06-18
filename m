@@ -1,307 +1,150 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 18 Jun 2014 15:27:20 -0400
-Subject: [PATCH v4 1/6] Documentation: arm: define DT idle states bindings
-In-Reply-To: <20140618173648.GB31573@e102568-lin.cambridge.arm.com>
-References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1402503520-8611-2-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.11.1406111240010.25775@knanqh.ubzr>
- <20140613164954.GA16745@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1406131306160.25775@knanqh.ubzr>
- <20140618173648.GB31573@e102568-lin.cambridge.arm.com>
-Message-ID: <53A1E818.6030400@ti.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 18 Jun 2014 21:22:29 +0200
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
+Message-ID: <201406182122.29623@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 01:36 PM, Lorenzo Pieralisi wrote:
-> On Fri, Jun 13, 2014 at 06:33:35PM +0100, Nicolas Pitre wrote:
+On Wednesday 18 June 2014 21:07:35 Rob Herring wrote:
+> On Wed, Jun 18, 2014 at 11:54 AM, Pali Roh?r 
+<pali.rohar@gmail.com> wrote:
+> > Machine name from board description is some generic name on
+> > DT kernel. DT provides machine name property which is
+> > specific for board, so use it instead generic one when
+> > possible.
+> > 
+> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> > ---
+> > 
+> >  arch/arm/kernel/setup.c |    7 +++++--
+> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/setup.c
+> > b/arch/arm/kernel/setup.c index 8a16ee5..fbc7b4f 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -875,10 +875,13 @@ void __init setup_arch(char
+> > **cmdline_p)
+> > 
+> >         setup_processor();
+> >         mdesc = setup_machine_fdt(__atags_pointer);
+> > 
+> > -       if (!mdesc)
+> > +       if (mdesc)
+> > +               machine_name =
+> > of_flat_dt_get_machine_name(); +       else
+> > 
+> >                 mdesc = setup_machine_tags(__atags_pointer,
+> >                 __machine_arch_type);
+> >         
+> >         machine_desc = mdesc;
+> > 
+> > -       machine_name = mdesc->name;
+> > +       if (!machine_name)
+> > +               machine_name = mdesc->name;
+> > 
+> >         if (mdesc->reboot_mode != REBOOT_HARD)
+> >         
+> >                 reboot_mode = mdesc->reboot_mode;
+> 
+> I did a similar patch previously[1]. Like my original patch,
+> your patch unconditionally changes the name which could be
+> considered part of the userspace ABI. It's arguably not good
+> practice for userspace to depend on the name, but there are
+> likely cases that do. So I think this needs to be optional
+> and only use the DT name if the machine desc name is NULL.
+> 
+> So something like the below and then change the machine
+> descriptors you care about. The default generic DT machine
+> desc should definitely be changed.
+> 
+> I had a follow-up discussion with Grant about his concerns in
+> the thread about knowing which machine desc used to boot. He
+> said he was okay if just the machine desc address is printed
+> out.
+> 
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 50e198c..1479250 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -887,7 +887,7 @@ void __init setup_arch(char **cmdline_p)
+>         if (!mdesc)
+>                 mdesc = setup_machine_tags(__atags_pointer,
+> __machine_arch_type);
+>         machine_desc = mdesc;
+> -       machine_name = mdesc->name;
+> +       machine_name = mdesc->name ? mdesc->name :
+> of_flat_dt_get_machine_name();
+> 
+>         if (mdesc->reboot_mode != REBOOT_HARD)
+>                 reboot_mode = mdesc->reboot_mode;
+> 
+> 
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-No
+> vember/208878.html
 
-[..]
-> Ok, a minor tweak to the diagram above, min-residency should include
-> energy costs related to idle entry and exit, but not the exit-latency
-> itself, as long as the energy costs implied by exiting the state are
-> factored out in the min-residency-us property.
-> 
-> Hence, to sum it up, I attached below the updated bindings patch:
-> 
-> I think we are close to an agreement, if anyone disagrees please shout
-> as soon as possible so that we can still integrate changes.
-> 
+Hi,
 
-[..]
+now legacy board code for Nokia N900 (RX-51) is migrating to DT  
+kernel and there is problem with info which /proc/cpuinfo reports
 
-> 
-> -- >8 --
-> Subject: [PATCH] Documentation: arm: define DT idle states bindings
-> 
-> ARM based platforms implement a variety of power management schemes that
-> allow processors to enter idle states at run-time.
-> The parameters defining these idle states vary on a per-platform basis forcing
-> the OS to hardcode the state parameters in platform specific static tables
-> whose size grows as the number of platforms supported in the kernel increases
-> and hampers device drivers standardization.
-> 
-> Therefore, this patch aims at standardizing idle state device tree bindings for
-> ARM platforms. Bindings define idle state parameters inclusive of entry methods
-> and state latencies, to allow operating systems to retrieve the configuration
-> entries from the device tree and initialize the related power management
-> drivers, paving the way for common code in the kernel to deal with idle
-> states and removing the need for static data in current and previous kernel
-> versions.
-> 
-> Reviewed-by: Sebastian Capella <sebcape@gmail.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
-Nice work Lorenzo !!
-I have few comments/questions.
+New DT kernel (3.16-rc1) reports:
 
->  Documentation/devicetree/bindings/arm/cpus.txt     |   8 +
->  .../devicetree/bindings/arm/idle-states.txt        | 561 +++++++++++++++++++++
->  2 files changed, 569 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/idle-states.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 1fe72a0..a44d4fd 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -215,6 +215,12 @@ nodes to be present and contain the properties described below.
->  		Value type: <phandle>
->  		Definition: Specifies the ACC[2] node associated with this CPU.
->  
-> +	- cpu-idle-states
-> +		Usage: Optional
-> +		Value type: <prop-encoded-array>
-> +		Definition:
-> +			# List of phandles to idle state nodes supported
-> +			  by this cpu [3].
->  
->  Example 1 (dual-cluster big.LITTLE system 32-bit):
->  
-> @@ -411,3 +417,5 @@ cpus {
->  --
->  [1] arm/msm/qcom,saw2.txt
->  [2] arm/msm/qcom,kpss-acc.txt
-> +[3] ARM Linux kernel documentation - idle states bindings
-> +    Documentation/devicetree/bindings/arm/idle-states.txt
-> diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
-> new file mode 100644
-> index 0000000..c9e1ec6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/idle-states.txt
-> @@ -0,0 +1,561 @@
-> +==========================================
-> +ARM idle states binding description
-> +==========================================
-> +
-> +==========================================
-> +1 - Introduction
-> +==========================================
-> +
-> +ARM systems contain HW capable of managing power consumption dynamically,
-> +where cores can be put in different low-power states (ranging from simple
-> +wfi to power gating) according to OSPM policies. The CPU states representing
-s/OSPM/OS PM ?
-> +the range of dynamic idle states that a processor can enter at run-time, can be
-> +specified through device tree bindings representing the parameters required
-> +to enter/exit specific idle states on a given processor.
-> +
-> +According to the Server Base System Architecture document (SBSA, [3]), the
-> +power states an ARM CPU can be put into are identified by the following list:
-> +
-> +- Running
-> +- Idle_standby
-> +- Idle_retention
-> +- Sleep
-> +- Off
-> +
-> +The power states described in the SBSA document define the basic CPU states on
-> +top of which ARM platforms implement power management schemes that allow an OS
-> +PM implementation to put the processor in different idle states (which include
-> +states listed above; "off" state is not an idle state since it does not have
-> +wake-up capabilities, hence it is not considered in this document).
-> +
-> +Idle state parameters (eg entry latency) are platform specific and need to be
-> +characterized with bindings that provide the required information to OSPM
-Ditto
-> +code so that it can build the required tables and use them at runtime.
-> +
-> +The device tree binding definition for ARM idle states is the subject of this
-> +document.
-> +
-> +===========================================
-> +2 - idle-states node
-> +===========================================
-> +
-> +ARM processor idle states are defined within the idle-states node, which is
-> +a direct child of the cpus node [1] and provides a container where the
-> +processor idle states, defined as device tree nodes, are listed.
-> +
-> +- idle-states node
-> +
-> +	Usage: Optional - On ARM systems, is a container of processor idle
-s/is/it is ?
-> +			  states nodes. If the system does not provide CPU
-> +			  power management capabilities or the processor just
-> +			  supports idle_standby an idle-states node is not
-> +			  required.
-> +
-> +	Description: idle-states node is a container node, where its
-> +		     subnodes describe the CPU idle states.
-> +
-> +	Node name must be "idle-states".
-> +
-> +	The idle-states node's parent node must be the cpus node.
-> +
-> +	The idle-states node's child nodes can be:
-s/idle-states/idle-state
-> +
-> +	- one or more state nodes
-> +
-> +	Any other configuration is considered invalid.
-> +
-> +	An idle-states node defines the following properties:
-> +
-> +	- entry-method
-> +		Usage: Required
-> +		Value type: <stringlist>
-> +		Definition: Describes the method by which a CPU enters the
-> +			    idle states. This property is required and must be
-> +			    one of:
-> +
-> +			    - "arm,psci"
-> +			      ARM PSCI firmware interface [2].
-> +
-> +			    - "[vendor],[method]"
-> +			      An implementation dependent string with
-> +			      format "vendor,method", where vendor is a string
-> +			      denoting the name of the manufacturer and
-> +			      method is a string specifying the mechanism
-> +			      used to enter the idle state.
-> +
-> +The nodes describing the idle states (state) can only be defined within the
-> +idle-states node, any other configuration is considered invalid and therefore
-> +must be ignored.
-> +
-> +===========================================
-> +3 - state node
-> +===========================================
-> +
-> +A state node represents an idle state description and must be defined as
-> +follows:
-> +
-> +- state node
-> +
-> +	Description: must be child of the idle-states node
-> +
-> +	The state node name shall follow standard device tree naming
-> +	rules ([5], 2.2.1 "Node names"), in particular state nodes which
-> +	are siblings within a single common parent must be given a unique name.
-> +
-> +	The idle state entered by executing the wfi instruction (idle_standby
-> +	SBSA,[3][4]) is considered standard on all ARM platforms and therefore
-> +	must not be listed.
-> +
-> +	To correctly specify idle states timing and energy related properties,
-> +	the following definitions identify the different execution phases
-> +	a CPU goes through to enter and exit idle states and the implied
-> +	energy metrics:
-> +
-> +	..__[EXEC]__|__[PREP]__|__[ENTRY]__|__[IDLE]__|__[EXIT]__|__[EXEC]__..
-> +		    |          |           |          |          |
-> +
-> +		    |<------ entry ------->|
-> +		    |       latency        |
-> +						      |<- exit ->|
-> +						      |  latency |
-> +		    |<-------- min-residency -------->|
-> +			       |<-------  wakeup-latency ------->|
-> +
-I don't know the wakeup latency makes much sense and also correct.
-Hardware wakeup latency is actually exit latency. Is it for failed
-or abort-able ilde case ? We are adding this as a new parameter
-at least from idle states perspective. I think we should just
-avoid it.
+# busybox cat /proc/cpuinfo 
+processor       : 0
+model name      : ARMv7 Processor rev 3 (v7l)
+Features        : swp half thumb fastmult vfp edsp thumbee neon 
+vfpv3 tls vfpd32 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x2
+CPU part        : 0xc08
+CPU revision    : 3
 
-> +	EXEC:	Normal CPU execution.
-> +
-> +	PREP:	Preparation phase before committing the hardware to idle mode
-> +		like cache flushing. This is abortable on pending wake-up
-> +		event conditions. The abort latency is assumed to be negligible
-> +		(i.e. less than the ENTRY + EXIT duration). If aborted, CPU
-> +		goes back to EXEC. This phase is optional. If not abortable,
-> +		this should be included in the ENTRY phase instead.
-> +
-> +	ENTRY:	The hardware is committed to idle mode. This period must run
-> +		to completion up to IDLE before anything else can happen.
-> +
-> +	IDLE:	This is the actual energy-saving idle period. This may last
-> +		between 0 and infinite time, until a wake-up event occurs.
-> +
-> +	EXIT:	Period during which the CPU is brought back to operational
-> +		mode (EXEC).
-> +
-> +	With the definitions provided above, the following list represents
-> +	the valid properties for a state node:
-> +
-> +	- compatible
-> +		Usage: Required
-> +		Value type: <stringlist>
-> +		Definition: Must be "arm,idle-state".
-> +
-> +	- logic-state-retained
-> +		Usage: See definition
-> +		Value type: <none>
-> +		Definition: if present logic is retained on state entry,
-> +			    otherwise it is lost.
-> +
-> +	- cache-state-retained
-> +		Usage: See definition
-> +		Value type: <none>
-> +		Definition: if present cache memory is retained on state entry,
-> +			    otherwise it is lost.
-> +
-> +	- entry-method-param
-> +		Usage: See definition.
-> +		Value type: <u32>
-> +		Definition: Depends on the idle-states node entry-method
-> +			    property value. Refer to the entry-method bindings
-> +			    for this property value definition.
-> +
-> +	- entry-latency-us
-> +		Usage: Required
-> +		Value type: <prop-encoded-array>
-> +		Definition: u32 value representing worst case latency in
-> +			    microseconds required to enter the idle state.
-> +			    The exit-latency-us duration may be guaranteed
-> +			    only after entry-latency-us has passed.
-> +
-> +	- exit-latency-us
-> +		Usage: Required
-> +		Value type: <prop-encoded-array>
-> +		Definition: u32 value representing worst case latency
-> +			    in microseconds required to exit the idle state.
-> +
-> +	- min-residency-us
-> +		Usage: Required
-> +		Value type: <prop-encoded-array>
-> +		Definition: u32 value representing minimum residency duration
-> +			    in microseconds, inclusive of preparation and
-> +			    entry, for this idle state to be considered
-> +			    worthwhile energy wise.
-> +			    The residency time must take into account the
-> +			    energy consumed while entering and exiting the
-> +			    idle state and is therefore expected to be
-> +			    longer than entry-latency-us.
-> +
-> +	- wakeup-latency-us:
-> +		Usage: Optional
-> +		Value type: <prop-encoded-array>
-> +		Definition: u32 value representing maximum delay between the
-> +			    signaling of a wake-up event and the CPU being
-> +			    able to execute normal code again. If omitted,
-> +			    this is assumed to be equal to:
-> +				entry-latency-us + exit-latency-us
-> +
-Rest of the patch looks fine by to me.
+Hardware        : Generic OMAP3 (Flattened Device Tree)
+Revision        : 0000
+Serial          : 0000000000000000
 
-regards,
-Santosh
+But legacy board code kernel reports:
+
+# busybox cat /proc/cpuinfo 
+processor       : 0
+model name      : ARMv7 Processor rev 3 (v7l)
+Features        : swp half thumb fastmult vfp edsp thumbee neon 
+vfpv3 tls vfpd32 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x2
+CPU part        : 0xc08
+CPU revision    : 3
+
+Hardware        : Nokia RX-51 board
+Revision        : 0012
+Serial          : 0000000000000000
+
+Basically in DT kernel is missing Hardware, Revision and probably 
+also Serial key. (Now I used only qemu for testing which set 
+serial key to 0). All these informations is used by userspace 
+applications which determinate how to behave.
+
+So without this patch DT migration for Nokia N900 cannot be done 
+without breaking userspace - which is not acceptable...
+
+Also I still did not know why DT kernel does not report Revision 
+number which is passed by bootloader via atags. Any idea?
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/5a518bfe/attachment.sig>
