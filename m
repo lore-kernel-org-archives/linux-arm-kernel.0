@@ -1,42 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Jun 2014 01:11:27 +0100
-Subject: [PATCH] regmap: Add Kconfig option for debugfs register writes
-In-Reply-To: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
-References: <1403033795-9122-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140618001127.GC5099@sirena.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 17 Jun 2014 21:22:11 -0300
+Subject: [PATCH] ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7
+ platforms
+In-Reply-To: <1402488397-31381-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1402488397-31381-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140618002211.GA4094@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 09:36:35PM +0200, Markus Pargmann wrote:
+On 11 Jun 02:06 PM, Thomas Petazzoni wrote:
+> On Marvell Armada platforms, the PMSU (Power Management Service Unit)
+> controls a number of power management related activities, needed for
+> things like suspend/resume, CPU hotplug, cpuidle or even simply SMP.
+> 
+> Since cpuidle support was added for Armada XP, the pmsu.c file in
+> arch/arm/mach-mvebu/ calls the cpu_suspend() and cpu_resume() ARM
+> functions, which are only available when
+> CONFIG_ARM_CPU_SUSPEND=y. Therefore, configurations that have
+> CONFIG_ARM_CPU_SUSPEND disabled due to PM_SLEEP being disabled no
+> longer build properly, due to undefined references to cpu_suspend()
+> and cpu_resume().
+> 
+> To fix this, this patch simply ensures CONFIG_ARM_CPU_SUSPEND is
+> always enabled for Marvell EBU v7 platforms. Doing things in a more
+> fine-grained way would require a lot of #ifdef-ery in pmsu.c to
+> isolate the parts that use cpu_suspend()/cpu_resume(), and those parts
+> would anyway have been needed as soon as either one of suspend/resume,
+> CPU hotplug or cpuidle was enabled.
+> 
+> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Jason, this patch is against the mvebu/soc branch, and should be
+> pushed to 3.16, where the problem was introduced.
+> 
 
-> To enable writing of registers through the regmap debugfs interface, it
-> was necessary to alter the regmap-debugfs.c source code. This is not
-> really practical.
-
-> As this is a powerful tool for debugging, this patch creates an expert
-> kconfig option for this function. This makes it easier to enable
-> register writing in the kernel.
-
-This is deliberately hard to enable in order to make it clear that it
-should never, ever be used in production as a bodge around writing
-drivers and generally in order to reduce the risk to the rest of the
-system.  Enabling this will typically give userspace full access to
-components like PMICs which have the potential to cause physical damage
-to the system if misused.
-
-Anyone with a use for this is most likely building their own kernels
-anyway and if a user modifies the code to enable it is clear that it is
-their responsibility to deal with the fallout.
-
-> This patch also fixes the file mode when the regmap debugfs write code is
-> compiled.
-
-Seperate changes in separate patches, especially don't put bugfixes in
-the same patch as features.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/85db496e/attachment.sig>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
