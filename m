@@ -1,60 +1,30 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 18 Jun 2014 11:03:44 -0500
-Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <7hzjha8b97.fsf@paris.lan>
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- <7hvbrzbh1u.fsf@paris.lan>
- <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
- <7hzjha8b97.fsf@paris.lan>
-Message-ID: <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 18 Jun 2014 12:09:29 -0400 (EDT)
+Subject: Dove DT and HDMI on v3.16-rc1 (was: Re: [PATCH RFC 0/5] Dove PMU
+ support)
+In-Reply-To: <20140618150103.GE32514@n2100.arm.linux.org.uk>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
+ <535F6DAF.1010400@gmail.com> <20140615152554.GA13870@n2100.arm.linux.org.uk>
+ <53A19DFA.7030207@gmail.com> <20140618143447.GA22890@arch.cereza>
+ <20140618150103.GE32514@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1406181153130.16842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 18 Jun 2014, Russell King - ARM Linux wrote:
 
-On Jun 18, 2014, at 10:53 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Even though the kernel side is supposed to be GPL, I'm really not happy
+> distributing it or publishing changes as there are a number of files with
+> headers which seem to be GPL-incompatible (which I've eliminated from my
+> tree through updates) but the problem is wonderful git keeps them as
+> history... and in my tree it's a massive 93 patches, against an old
+> version of the code (0.8.0.1998) which I then sort-of updated to the
+> version OLPC were carrying towards the start of 2013.
 
-> Bjorn Andersson <bjorn@kryo.se> writes:
-> 
->> On Tue, Jun 17, 2014 at 10:07 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>> +Paul Walmsley
->>> 
->>> Bjorn Andersson <bjorn.andersson@sonymobile.com> writes:
->>> 
->>>> This series adds a regulator driver for the Resource Power Manager found in
->>>> Qualcomm 8660, 8960 and 8064 based devices.
->>>> 
->>>> The RPM driver exposes resources to its child devices, that can be accessed to
->>>> implement drivers for the regulators, clocks and bus frequency control that's
->>>> owned by the RPM in these devices.
->>>> 
->>>> Changes since v2:
->>>>  - Fix copy-paste error in dt binding
->>>>  - Correct incomplete move from mfd to soc
->>>>  - Correct const mistake in regulator driver
->>>> 
->>>> Changes since v1:
->>>>  - Moved rpm driver to drivers/soc
->>> 
->>> I'm not sure I follow the motivation for having this under drivers/soc?
->>> 
->> Hi Kevin,
->> 
->> I've made the argument that to me this is conceptually a black box
->> handling regulators, clocks and other stuff; hence similar to a PMIC,
->> which would fit nicely into drivers/mfd.
->> 
->> I still think this is the case and now that I look back I didn't get
->> any pushback from Lee Jones so maybe the move was premature?
-> 
-> Yes, IMO, the move was premature, but hopefully the drivers/soc folks
-> can chime in an clarify the criteria for inclusion there.
-> 
-> Kevin
+If you want to remove some files from git history, you may look at the 
+git-filter-branch man page.  The first provided examples are most likely 
+what you'd need.
 
-I dont agree, I think having this in drivers/soc means that we can clearly go through drivers/soc in the future and look for patterns across SoCs that should be re-factored.  Where MFD seems like its become the new drivers misc.
 
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Nicolas
