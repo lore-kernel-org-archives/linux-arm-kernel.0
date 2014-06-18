@@ -1,62 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 16:29:32 +0100
-Subject: [PATCH v2 7/7] pwm: st: Supply Device Tree binding documentation for
- ST's PWM IP
-In-Reply-To: <1403103172-19856-7-git-send-email-lee.jones@linaro.org>
-References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
- <1403103172-19856-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140618152932.GG15956@lee--X1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jun 2014 16:30:28 +0100
+Subject: Dove DT and HDMI on v3.16-rc1
+In-Reply-To: <53A1ABE8.8050401@gmail.com>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
+ <535F6DAF.1010400@gmail.com> <20140615152554.GA13870@n2100.arm.linux.org.uk>
+ <53A19DFA.7030207@gmail.com> <20140618143447.GA22890@arch.cereza>
+ <20140618150103.GE32514@n2100.arm.linux.org.uk> <53A1ABE8.8050401@gmail.com>
+Message-ID: <20140618153028.GF32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm: st: Supply Device Tree binding documentation for ST's PWM IP
-    
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Jun 18, 2014 at 05:10:32PM +0200, Sebastian Hesselbarth wrote:
+> xf86-video-armada needs some missing
+> #include "picturestr.h"
+> for raring, but whole process has been very straight forward.
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-st.txt b/Documentation/devicetree/bindings/pwm/pwm-st.txt
-new file mode 100644
-index 0000000..84d2fb8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-st.txt
-@@ -0,0 +1,41 @@
-+STMicroelectronics PWM driver bindings
-+--------------------------------------
-+
-+Required parameters:
-+- compatible :		"st,pwm"
-+- #pwm-cells : 		Number of cells used to specify a PWM. First cell
-+			specifies the per-chip index of the PWM to use and the
-+			second cell is the period in nanoseconds - fixed to 2
-+			for STiH41x.
-+- reg :			Physical base address and length of the controller's
-+			registers.
-+- pinctrl-names: 	Set to "default".
-+- pinctrl-0: 		List of phandles pointing to pin configuration nodes
-+			for PWM module.
-+			For Pinctrl properties, please refer to [1].
-+- clock-names: 		Set to "pwm".
-+- clocks: 		phandle of the clock used by the PWM module.
-+			For Clk properties, please refer to [2].
-+
-+Optional properties:
-+- st,pwm-num-chan:	Number of available channels. If not passed, the driver
-+			will consider single channel by default.
-+
-+[1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+[2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Example:
-+
-+pwm1: pwm at fe510000 {
-+	compatible = "st,pwm";
-+	reg = <0xfe510000 0x68>;
-+	#pwm-cells = <2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm1_chan0_default
-+		     &pinctrl_pwm1_chan1_default
-+		     &pinctrl_pwm1_chan2_default
-+		     &pinctrl_pwm1_chan3_default>;
-+	clocks = <&clk_sysin>;
-+	clock-names = "pwm";
-+	st,pwm-num-chan = <4>;
-+};
+I'm only aware of this (sorry, copy'n'pasted) which I found when trying
+to build against ubuntu 14.04.  If further patches are needed to make it
+compatible with more Xorg versions, please ensure that they find their
+way into my inbox...
+
+diff --git a/src/common_drm.h b/src/common_drm.h
+index b0c3cd4..3bc5dc6 100644
+--- a/src/common_drm.h
++++ b/src/common_drm.h
+@@ -1,8 +1,8 @@
+ #ifndef COMMON_DRM_H
+ #define COMMON_DRM_H
+ 
+-#include "compat-api.h"
+ #include "xf86Crtc.h"
++#include "compat-api.h"
+ 
+ struct common_crtc_info {
+ 	int drm_fd;
+diff --git a/src/vivante_unaccel_render.c b/src/vivante_unaccel_render.c
+index ad4d5cf..0496d7a 100644
+--- a/src/vivante_unaccel_render.c
++++ b/src/vivante_unaccel_render.c
+@@ -11,11 +11,11 @@
+ #include "config.h"
+ #endif
+ 
+-#include "compat-api.h"
+ #include "fb.h"
+ #include "fbpict.h"
+ #include "mipict.h"
+ 
++#include "compat-api.h"
+ #include "vivante_unaccel.h"
+ #include "vivante_utils.h"
+
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
