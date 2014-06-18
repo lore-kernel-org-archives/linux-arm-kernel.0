@@ -1,135 +1,192 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 10:06:16 +0100
-Subject: [PATCH v6 3/7] mfd: AXP20x: Add bindings documentation
-In-Reply-To: <539FED44.1050904@free-electrons.com>
-References: <1400528868-5971-1-git-send-email-carlo@caione.org>
- <1400528868-5971-4-git-send-email-carlo@caione.org>
- <539FED44.1050904@free-electrons.com>
-Message-ID: <20140618090616.GA23945@lee--X1>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 18 Jun 2014 14:38:43 +0530
+Subject: [PATCH v2 04/18] PCI: designware: use untranslated address while
+ programming ATU
+In-Reply-To: <1401345500-20188-5-git-send-email-kishon@ti.com>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-5-git-send-email-kishon@ti.com>
+Message-ID: <53A1571B.7080806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 19/05/2014 21:47, Carlo Caione wrote:
-> > Bindings documentation for the AXP20x driver. In this file also
-> > sub-nodes are documented.
+Hi Arnd,
+
+On Thursday 29 May 2014 12:08 PM, Kishon Vijay Abraham I wrote:
+> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
+> address. So whenever the cpu issues a read/write request, the 4 most
+> significant bits are used by L3 to determine the target controller.
+> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
+> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
+> the outbound translation window the *base* should be programmed as 0x000_0000.
+> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
+> we have programmed in the translation window with base as 0x000_0000.
 > 
-> I think this patch has been forgotten (I didn't find it in linus' tree
-> or linux-next tree).
-
-This patch-set became confusing.  Some of the patches were applied in
-v5 and were still submitted for v6.  I need Carlo to rebase on top of
-v3.16-rc1+ and re-submit with the Acks he's collected so far.
-
-> > Signed-off-by: Carlo Caione <carlo@caione.org>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/axp20x.txt | 93 ++++++++++++++++++++++++
-> >  1 file changed, 93 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> > new file mode 100644
-> > index 0000000..cc9e01b
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> > @@ -0,0 +1,93 @@
-> > +AXP202/AXP209 device tree bindings
-> > +
-> > +The axp20x family current members :-
-> > +axp202 (X-Powers)
-> > +axp209 (X-Powers)
-> > +
-> > +Required properties:
-> > +- compatible: "x-powers,axp202" or "x-powers,axp209"
-> > +- reg: The I2C slave address for the AXP chip
-> > +- interrupt-parent: The parent interrupt controller
-> > +- interrupts: Interrupt specifiers for interrupt sources
-> > +- interrupt-controller: axp20x has its own internal IRQs
-> > +- #interrupt-cells: Should be set to 1
-> > +- acin-supply: The input supply for LDO1
-> > +- vin2-supply: The input supply for DCDC2
-> > +- vin3-supply: The input supply for DCDC3
-> > +- ldo24in-supply: The input supply for LDO2, LDO4
-> > +- ldo3in-supply: The input supply for LDO3
-> > +- ldo5in-supply: The input supply for LDO5
-> > +
-> > +- regulators: A node that houses a sub-node for each regulator. The regulators are
-> > +	      bound using their name as listed here: dcdc2, dcdc3, ldo1, ldo2,
-> > +	      ldo3, ldo4, ldo5.  The bindings details of individual regulator
-> > +	      device can be found in:
-> > +	      Documentation/devicetree/bindings/regulator/regulator.txt with
-> > +	      the exception of x-powers,dcdc-freq
-> > +- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
-> > +		      (range: 750-1875). Default: 1.5MHz
-> > +
-> > +Optional properties for DCDCs:
-> > +- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
-> > +			  Default: AUTO mode
-> > +
-> > +Example:
-> > +
-> > +axp209: pmic at 34 {
-> > +	compatible = "x-powers,axp209";
-> > +	reg = <0x34>;
-> > +	interrupt-parent = <&nmi_intc>;
-> > +	interrupts = <0 8>;
-> > +
-> > +	interrupt-controller;
-> > +	#interrupt-cells = <1>;
-> > +
-> > +	acin-supply = <&axp_ipsout_reg>;
-> > +	vin2-supply = <&axp_ipsout_reg>;
-> > +	vin3-supply = <&axp_ipsout_reg>;
-> > +	ldo24in-supply = <&axp_ipsout_reg>;
-> > +	ldo3in-supply = <&axp_ipsout_reg>;
-> > +	ldo5in-supply = <&axp_ipsout_reg>;
-> > +
-> > +	regulators {
-> > +		x-powers,dcdc-freq = <1500>;
-> > +
-> > +		axp_vcore_reg: dcdc2 {
-> > +			regulator-min-microvolt = <700000>;
-> > +			regulator-max-microvolt = <2275000>;
-> > +			regulator-always-on;
-> > +		};
-> > +
-> > +		axp_ddr_reg: dcdc3 {
-> > +			regulator-min-microvolt = <700000>;
-> > +			regulator-max-microvolt = <3500000>;
-> > +			regulator-always-on;
-> > +		};
-> > +
-> > +		axp_rtc_reg: ldo1 {
-> > +			regulator-always-on;
-> > +		};
-> > +
-> > +		axp_analog_reg: ldo2 {
-> > +			regulator-min-microvolt = <1800000>;
-> > +			regulator-max-microvolt = <3300000>;
-> > +			regulator-always-on;
-> > +		};
-> > +
-> > +		axp_pll_reg: ldo3 {
-> > +			regulator-min-microvolt = <700000>;
-> > +			regulator-max-microvolt = <3500000>;
-> > +		};
-> > +
-> > +		axp_hdmi_reg: ldo4 {
-> > +			regulator-min-microvolt = <1250000>;
-> > +			regulator-max-microvolt = <3300000>;
-> > +		};
-> > +
-> > +		axp_mic_reg: ldo5 {
-> > +			regulator-min-microvolt = <1800000>;
-> > +			regulator-max-microvolt = <3300000>;
-> > +		};
-> > +	};
-> > +};
-> > +
+> This is needed when the dt node is modelled something like below
+> axi {
+> 	compatible = "simple-bus";
+> 	#size-cells = <1>;
+> 	#address-cells = <1>;
+> 	ranges = <0x0        0x20000000 0x10000000 // 28-bit bus
+> 		  0x51000000 0x51000000 0x3000>;
+> 	pcie at 51000000 {
+> 		reg = <0x1000 0x2000>, <0x51002000 0x14c>, <0x51000000 0x2000>;
+> 		reg-names = "config", "ti_conf", "rc_dbics";
+> 		#address-cells = <3>;
+> 		#size-cells = <2>;
+> 		ranges = <0x81000000 0 0          0x03000 0 0x00010000
+> 			  0x82000000 0 0x20013000 0x13000 0 0xffed000>;
+> 	};
+> };
 > 
+> Here the CPU address for configuration space is 0x20013000 and the controller
+> address for configuration space is 0x13000. The controller address should be
+> used while programming the ATU (in order for translation to happen properly in
+> DRA7xx).
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I've fixed this up with what you suggested in the v1 of the series. Do you
+think this is fine?
+
+Thanks
+Kishon
+> 
+> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Mohit Kumar <mohit.kumar@st.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Marek Vasut <marex@denx.de>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/host/pcie-designware.c |   49 ++++++++++++++++++++++++++++--------
+>  drivers/pci/host/pcie-designware.h |    4 +++
+>  2 files changed, 42 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 603b386..9dfd2d4 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -397,8 +397,15 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  	struct of_pci_range range;
+>  	struct of_pci_range_parser parser;
+>  	struct resource *cfg_res;
+> -	u32 val;
+> -	int i;
+> +	u32 val, na, ns;
+> +	const __be32 *addrp;
+> +	int i, index;
+> +
+> +	/* Find the address cell size and the number of cells in order to get
+> +	 * the untranslated address.
+> +	 */
+> +	of_property_read_u32(np, "#address-cells", &na);
+> +	ns = of_n_size_cells(np);
+>  
+>  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+>  	if (cfg_res) {
+> @@ -406,6 +413,12 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  		pp->config.cfg1_size = resource_size(cfg_res)/2;
+>  		pp->cfg0_base = cfg_res->start;
+>  		pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
+> +
+> +		/* Find the untranslated configuration space address */
+> +		index = of_property_match_string(np, "reg-names", "config");
+> +		addrp = of_get_address(np, index, false, false);
+> +		pp->cfg0_mod_addr = of_read_number(addrp, ns);
+> +		pp->cfg1_mod_addr = pp->cfg0_mod_addr + pp->config.cfg0_size;
+>  	} else {
+>  		dev_err(pp->dev, "missing *config* reg space\n");
+>  	}
+> @@ -431,12 +444,20 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  			pp->config.io_size = resource_size(&pp->io);
+>  			pp->config.io_bus_addr = range.pci_addr;
+>  			pp->io_base = range.cpu_addr;
+> +
+> +			/* Find the untranslated IO space address */
+> +			pp->io_mod_addr = of_read_number(parser.range -
+> +							 parser.np + na, ns);
+>  		}
+>  		if (restype == IORESOURCE_MEM) {
+>  			of_pci_range_to_resource(&range, np, &pp->mem);
+>  			pp->mem.name = "MEM";
+>  			pp->config.mem_size = resource_size(&pp->mem);
+>  			pp->config.mem_bus_addr = range.pci_addr;
+> +
+> +			/* Find the untranslated MEM space address */
+> +			pp->mem_mod_addr = of_read_number(parser.range -
+> +							  parser.np + na, ns);
+>  		}
+>  		if (restype == 0) {
+>  			of_pci_range_to_resource(&range, np, &pp->cfg);
+> @@ -444,6 +465,12 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  			pp->config.cfg1_size = resource_size(&pp->cfg)/2;
+>  			pp->cfg0_base = pp->cfg.start;
+>  			pp->cfg1_base = pp->cfg.start + pp->config.cfg0_size;
+> +
+> +			/* Find the untranslated configuration space address */
+> +			pp->cfg0_mod_addr = of_read_number(parser.range -
+> +							   parser.np + na, ns);
+> +			pp->cfg1_mod_addr = pp->cfg0_mod_addr +
+> +					    pp->config.cfg0_size;
+>  		}
+>  	}
+>  
+> @@ -518,9 +545,9 @@ static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+>  	/* Program viewport 0 : OUTBOUND : CFG0 */
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+>  			  PCIE_ATU_VIEWPORT);
+> -	dw_pcie_writel_rc(pp, pp->cfg0_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->cfg0_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->cfg0_base + pp->config.cfg0_size - 1,
+> +	dw_pcie_writel_rc(pp, pp->cfg0_mod_addr, PCIE_ATU_LOWER_BASE);
+> +	dw_pcie_writel_rc(pp, (pp->cfg0_mod_addr >> 32), PCIE_ATU_UPPER_BASE);
+> +	dw_pcie_writel_rc(pp, pp->cfg0_mod_addr + pp->config.cfg0_size - 1,
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
+> @@ -534,9 +561,9 @@ static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
+>  			  PCIE_ATU_VIEWPORT);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
+> -	dw_pcie_writel_rc(pp, pp->cfg1_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->cfg1_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->cfg1_base + pp->config.cfg1_size - 1,
+> +	dw_pcie_writel_rc(pp, pp->cfg1_mod_addr, PCIE_ATU_LOWER_BASE);
+> +	dw_pcie_writel_rc(pp, (pp->cfg1_mod_addr >> 32), PCIE_ATU_UPPER_BASE);
+> +	dw_pcie_writel_rc(pp, pp->cfg1_mod_addr + pp->config.cfg1_size - 1,
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
+> @@ -549,9 +576,9 @@ static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+>  			  PCIE_ATU_VIEWPORT);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
+> -	dw_pcie_writel_rc(pp, pp->mem_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->mem_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->mem_base + pp->config.mem_size - 1,
+> +	dw_pcie_writel_rc(pp, pp->mem_mod_addr, PCIE_ATU_LOWER_BASE);
+> +	dw_pcie_writel_rc(pp, (pp->mem_mod_addr >> 32), PCIE_ATU_UPPER_BASE);
+> +	dw_pcie_writel_rc(pp, pp->mem_mod_addr + pp->config.mem_size - 1,
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, pp->config.mem_bus_addr, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, upper_32_bits(pp->config.mem_bus_addr),
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index 3063b35..d1f7d5e 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -36,11 +36,15 @@ struct pcie_port {
+>  	u8			root_bus_nr;
+>  	void __iomem		*dbi_base;
+>  	u64			cfg0_base;
+> +	u64			cfg0_mod_addr;
+>  	void __iomem		*va_cfg0_base;
+>  	u64			cfg1_base;
+> +	u64			cfg1_mod_addr;
+>  	void __iomem		*va_cfg1_base;
+>  	u64			io_base;
+> +	u64			io_mod_addr;
+>  	u64			mem_base;
+> +	u64			mem_mod_addr;
+>  	spinlock_t		conf_lock;
+>  	struct resource		cfg;
+>  	struct resource		io;
+> 
