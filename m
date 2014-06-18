@@ -1,53 +1,61 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Wed, 18 Jun 2014 17:38:14 +0530
-Subject: Build error - vmlinux.lds [Re: linux-next: Tree for Jun 18]
-In-Reply-To: <20140618115602.GA32514@n2100.arm.linux.org.uk>
-References: <CAK5sBcEpXboRVD-KzzjBJMi+LF-jhdt_HUYEz7wkJtFAv+BLcg@mail.gmail.com>
- <20140618115602.GA32514@n2100.arm.linux.org.uk>
-Message-ID: <CAK5sBcEg1XYQmzshxdLDHFCYFiawV0d8rt7aeAkPoiPhNMX1CQ@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 18 Jun 2014 15:18:06 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <20140617215119.GC24743@mithrandir>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
+ <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
+ <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
+ <20140617215119.GC24743@mithrandir>
+Message-ID: <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 5:26 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jun 18, 2014 at 04:50:43PM +0530, Sachin Kamat wrote:
->> Hi,
->>
->> I observe the following build error while building uImage for ARM.
->>
->>   Kernel: arch/arm/boot/Image is ready
->> make[2]: *** No rule to make target
->> `arch/arm/boot/compressed/vmlinux.lds', needed by
->> `arch/arm/boot/compressed/vmlinux'.  Stop.
->> make[1]: *** [arch/arm/boot/compressed/vmlinux] Error 2
->> make: *** [uImage] Error 2
->
-> Works fine here against an empty object tree:
->
-> http://www.arm.linux.org.uk/developer/build/file.php?lid=9591
->
-> Are you building into an already-built object tree or rebuilding an
-> already built tree?
+On Tue, Jun 17, 2014 at 11:51:20PM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Tue, Jun 17, 2014 at 05:01:46PM +0300, Peter De Schrijver wrote:
+> > On Tue, Jun 17, 2014 at 02:13:15PM +0200, Thierry Reding wrote:
+> > > > Old Signed by an unknown key
+> > > 
+> > > On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
+> > > > On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+> > > > > This symbol needs to be exported to power on rails without using
+> > > > > tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
+> > > > > cannot be used in situations where the driver wants to handle clocking
+> > > > > by itself.
+> > > > 
+> > > > Thierry, are you OK with this change?
+> > > 
+> > > I would've preferred tegra_powergate_sequence_power_up() to be used
+> > 
+> > I don't think the current tegra_powergate_sequence_power_up() API is very well
+> > defined though. I don't think the clocks and resets required by the sequence
+> > should be provided by the driver. For one, there can be several clocks and
+> > resets that need to be controlled for a single domain.
+> 
+> Do you have any suggestions for what the API should look like? Even if
+> we plan to move to some different API, I think there's some advantage in
+> using it consistently if for no other reason than to make it easier to
+> replace occurrences later on.
+> 
 
-I did a clean build after updating the tree to next-20140618.
-git status show me the following after doing make clean
+I think the API should only have the domain ID as input so:
 
-# On branch master
-# Changes not staged for commit:
-#   (use "git add/rm <file>..." to update what will be committed)
-#   (use "git checkout -- <file>..." to discard changes in working directory)
-#
-#    deleted:    arch/arm/boot/compressed/vmlinux.lds.S
+int tegra_powerdomain_on(int id) 
 
+/*
+ * Prerequisites: domain is off
+ * Result: domain is on, clocks of the modules in the domain are off, modules are in reset
+ */
 
-My tip of kernel points to commit 4ca1fbc122fcb ("Add linux-next specific
-files for 20140618")
+int tegra_powerdomain_off(int id)
 
->
-> This is likely caused by make getting confused over the dependencies.
-> I suggest making clean to recover from this error.
+/*
+ * Prerequisites: all clocks of the modules in the domain are off
+ * result: domain is off
+ */
 
-I get this error when I do a clean build too.
+Cheers,
 
-Regards,
-Sachin.
+Peter/
