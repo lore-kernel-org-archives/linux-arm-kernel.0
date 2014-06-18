@@ -1,50 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Jun 2014 15:01:42 +0200
-Subject: [PATCH] tty: serial: msm: Fix section mismatch warning
-In-Reply-To: <D4093820-1DCF-4B10-8DEC-1378B5D64D3A@codeaurora.org>
-References: <1401826402-1079-1-git-send-email-galak@codeaurora.org>
- <CAOesGMjNVoKCDQ8=dB8TB+ghTxxCQ_xMW0A07k9s4imVTgoLbA@mail.gmail.com>
- <D4093820-1DCF-4B10-8DEC-1378B5D64D3A@codeaurora.org>
-Message-ID: <4362858.JqVD2H8dBO@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jun 2014 14:07:32 +0100
+Subject: [PATCH] ARM: save/restore diagnostic register on ARMv7
+ suspend/resume
+In-Reply-To: <20140618123906.GI8860@dragon>
+References: <1403081398-32116-1-git-send-email-shawn.guo@freescale.com>
+ <20140618104009.GH32699@arm.com> <20140618123906.GI8860@dragon>
+Message-ID: <20140618130731.GC32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 June 2014 14:53:44 Kumar Gala wrote:
-> 
-> On Jun 3, 2014, at 4:17 PM, Olof Johansson <olof@lixom.net> wrote:
-> 
-> > On Tue, Jun 3, 2014 at 2:14 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> >> On Tue, Jun 03, 2014 at 02:04:43PM -0700, Olof Johansson wrote:
-> >>> On Tue, Jun 3, 2014 at 1:33 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> >>>> On Tue, Jun 03, 2014 at 03:13:22PM -0500, Kumar Gala wrote:
-> >>>>> WARNING: drivers/tty/built-in.o(.data+0x3544): Section mismatch in
-> >>>>> reference from the variable msm_platform_driver to the function
-> >>>>> .init.text:msm_serial_probe()
-> >>>>> The variable msm_platform_driver references
-> >>>>> the function __init msm_serial_probe()
-> >>>>> If the reference is valid then annotate the
-> >>>>> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> >>>>> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
-> >>>> 
-> >>>> Where is this mismatch showing up at?  3.15-rc8, 3.16-rc1?  Somewhere
-> >>>> older or else?
-> >>> 
-> >>> Linus' next branch, it was merged through arm-soc. I didn't notice it
-> >>> in time to fix it before we sent to Linus. :(
-> >> 
-> >> Ok, do you want to take this patch then?  I don't mind taking it through
-> >> my tree, but it will have to wait until after 3.16-rc1 is out.  It's up
-> >> to you.
+On Wed, Jun 18, 2014 at 08:39:08PM +0800, Shawn Guo wrote:
+> On Wed, Jun 18, 2014 at 11:40:09AM +0100, Will Deacon wrote:
+> > On Wed, Jun 18, 2014 at 09:49:58AM +0100, Shawn Guo wrote:
+> > > The CP15 diagnostic register holds ARM errata bits on ARMv7, so it
+> > > needs to be saved/restored on suspend/resume.  Otherwise, the
+> > > effectiveness of errata workaround gets lost together with diagnostic
+> > > register bit across suspend/resume cycle.
 > > 
-> > I've got a handful of fixes we're queueing for the second batch of
-> > merges, and I can add it to there.
-> > 
-> Reminder to queue this up for fixes for 3.16
+> > This should be conditional on Cortex-A9, since this register is certainly
+> > not architected.
+> 
+> Ah, yes.  In that case, I should probably handle it at platform level to
+> avoid messing up generic ARMv7 suspend/resume routines.
 
-I've applied it on top of the fixes branch now. I think I missed it when
-I picked up the other fixes as I was only looking for patches sent to
-arm at kernel.org.
+We don't need more platform code repeating this kind of stuff...
 
-Thanks for the reminder!
+All Cortex-A9 which have these work-arounds enabled may need this and
+as the generic kernel already fiddles with this, it's something that
+should not be platform specific - indeed, some of these workarounds
+are supposed to be in place before the MMU is enabled.
 
-	Arnd
+So, it's being done at the preferred place in the kernel... just not
+in a way that results in only Cortex A9 being affected.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
