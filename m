@@ -1,46 +1,47 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 18 Jun 2014 17:40:02 +0900
-Subject: [PATCHv2 3/3] ARM: dts: Exynos: Add cpu clock table for Exynos3250
-In-Reply-To: <1403080802-2794-1-git-send-email-cw00.choi@samsung.com>
-References: <1403080802-2794-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1403080802-2794-4-git-send-email-cw00.choi@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 18 Jun 2014 10:46:58 +0200
+Subject: [PATCH v4 1/7] mfd: axp20x: add AXP221 PMIC support
+In-Reply-To: <20140618083605.GQ21030@lee--X1>
+References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402990723-28138-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140618083605.GQ21030@lee--X1>
+Message-ID: <53A15202.1070908@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add cpu clock table (CPU clock and voltage) to support generic
-cpufreq-cpu0 driver for Exynos3250.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+On 18/06/2014 10:36, Lee Jones wrote:
+> On Tue, 17 Jun 2014, Boris BREZILLON wrote:
+>
+>> Add support for the AXP221 PMIC device to the existing AXP20x driver.
+>>
+>> The AXP221 defines a new set of registers, power supplies and regulators,
+>> but most of the API is similar to the AXP20x ones.
+>> The AXP20x irq chip definition is reused, though some interrupts are not
+>> available in the AXP221.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>  drivers/mfd/axp20x.c       | 64 ++++++++++++++++++++++++++++++++++++++++++----
+>>  include/linux/mfd/axp20x.h | 56 ++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 115 insertions(+), 5 deletions(-)
+> Looks good to me now.
+>   Acked-by: Lee Jones <lee.jones@linaro.org>
+>
+> Can this go in independently to the other patches in the set?
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index d3777d2..3d3c45b 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -53,6 +53,21 @@
- 			compatible = "arm,cortex-a7";
- 			reg = <0>;
- 			clock-frequency = <1000000000>;
-+			clocks = <&cmu CLK_DIV_CORE2>;
-+			clock-names = "cpu";
-+
-+			operating-points = <
-+				1000000 1150000
-+				900000  1112500
-+				800000  1075000
-+				700000  1037500
-+				600000  1000000
-+				500000  962500
-+				400000  925000
-+				300000  887500
-+				200000  850000
-+				100000  850000
-+			>;
- 		};
- 
- 		cpu1: cpu at 1 {
+Yes, as long as no one define an axp221 node in his DT.
+In this case axp221 regulators would be considered as axp20x ones (which
+might be a bit problematic), because axp20x-regulator driver does not
+test the axp variant before probing its regulators (this test is
+introduced in patch 3).
+
+Best Regards,
+
+Boris
+
+
 -- 
-1.8.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
