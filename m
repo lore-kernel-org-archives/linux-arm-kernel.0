@@ -1,61 +1,25 @@
-From: vidyas@nvidia.com (Vidya Sagar)
-Date: Wed, 18 Jun 2014 23:37:48 +0530
-Subject: [PATCH v3] ARM: fix debug prints relevant to PCI devices
-Message-ID: <1403114868-17533-1-git-send-email-vidyas@nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 18 Jun 2014 11:14:25 -0700
+Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8 kernels
+In-Reply-To: <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
+References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+ <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
+Message-ID: <53A1D701.8060404@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per PCIe spec, fast back-to-back transactions feature
-is not applicable to PCIe devices. Hence, do not print
-that fast back-to-back trasactions are disabled when
-there is a PCIe device found on the bus
+On 06/18/14 10:55, Kevin Hilman wrote:
+>
+> All of that to say, with this patch applied, I need a new (and
+> reliable) way to determine the endianness of a kernel just by looking
+> at the zImage.  Recommendations welcome.
 
-Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
----
-v3:
-* removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
+Assuming that you have the .config configured to be built into the
+kernel you could use extract-ikconfig
 
-v2:
-* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
-* replaced printk with pr_info
+$ ./scripts/extract-ikconfig zImage | grep CONFIG_CPU_ENDIAN_BE8
 
- arch/arm/kernel/bios32.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 17a26c1..fcf2581 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- {
- 	struct pci_dev *dev;
- 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
-+	bool has_pcie_dev = 0;
- 
- 	/*
- 	 * Walk the devices on this bus, working out what we can
-@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- 	list_for_each_entry(dev, &bus->devices, bus_list) {
- 		u16 status;
- 
-+		if (!has_pcie_dev)
-+			has_pcie_dev = pci_is_pcie(dev);
- 		pci_read_config_word(dev, PCI_STATUS, &status);
- 
- 		/*
-@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- 
- 	/*
- 	 * Report what we did for this bus
-+	 * (only if the bus doesn't have even one PCIe device)
- 	 */
--	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
--		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-+	if (!has_pcie_dev)
-+		pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
-+			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
 -- 
-1.8.1.5
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
