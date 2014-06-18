@@ -1,35 +1,40 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 18 Jun 2014 09:50:59 +0100
-Subject: [PATCH] efi/arm64: efistub: remove local copy of linux_banner
-In-Reply-To: <1402657911-7779-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1402657911-7779-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140618085059.GB24049@console-pimps.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Jun 2014 09:51:24 +0100
+Subject: [PATCH 09/24] ARM64:ILP32: Use the same syscall names as LP64.
+In-Reply-To: <1400914939-9708-10-git-send-email-apinski@cavium.com>
+References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+ <1400914939-9708-10-git-send-email-apinski@cavium.com>
+Message-ID: <20140618085124.GA11977@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jun, at 01:11:51PM, Ard Biesheuvel wrote:
-> The shared efistub code for ARM and arm64 contains a local copy of linux_banner,
-> allowing it to be referenced from separate executables such as the ARM
-> decompressor. However, this introduces a dependency on generated header files,
-> causing unnecessary rebuilds of the stub itself and, in case of arm64, vmlinux
-> which contains it.
-> 
-> On arm64, the copy is not actually needed since we can reference the original
-> symbol directly, and as it turns out, there may be better ways to deal with this
-> for ARM as well, so let's remove it from the shared code. If it still needs to
-> be reintroduced for ARM later, it should live under arch/arm anyway and not in
-> shared code.
+On Sat, May 24, 2014 at 12:02:04AM -0700, Andrew Pinski wrote:
+> diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
+> index 1caadc2..067eab0 100644
+> --- a/arch/arm64/include/uapi/asm/unistd.h
+> +++ b/arch/arm64/include/uapi/asm/unistd.h
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright (C) 2012 ARM Ltd.
+> + * Copyright (C) 2014 Cavium Inc.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -13,4 +14,10 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> +
+> +/* For ILP32 AARCH64, we want to use the non compat names. */
+> +#if defined(__aarch64__) && defined(__ILP32__)
 
-I remember making some similar arguments when this patch was first
-introduced. From looking at my notes, the patch rationale was based on
-some DT binding discussion where people wanted an explicit way to
-identify the kernel they were booting and everyone agreed upon this
-string - I don't know which discussion, I don't have that data.
+Another inconsistency for !__LP64__ vs __ILP32__. BTW, do we still need
+__aarch64__ check? Do we expect these headers to be used with AArch32?
 
-I'm more than happy to delete this from the shared code, I never wanted
-it to go in in the first place. But could someone please give me some
-details as to why this change is safe and isn't going to break
-ARM/ARM64? How does this affect DT bindings?
+> +#define __SYSCALL_NONCOMPAT
+
+As I mentioned in a previous patch, I prefer something like
+__ARCH_WANT...
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Catalin
