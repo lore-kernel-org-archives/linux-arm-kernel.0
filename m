@@ -1,91 +1,79 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Wed, 18 Jun 2014 12:07:07 +0530
-Subject: [PATCH v2 1/8] PCI: designware: add rd[wr]_other_conf API
-In-Reply-To: <1402426287-31157-2-git-send-email-m-karicheri2@ti.com>
-References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
- <1402426287-31157-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20140618063706.GA6098@pratyush-vbox>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Jun 2014 23:53:09 -0700
+Subject: [PATCH] ARM: omap: rework platform selection
+In-Reply-To: <CAL_JsqJ_Q8x03wu5w0i6qNa5KrmSF0id0TOp-nSw9jSorC6atw@mail.gmail.com>
+References: <5701099.0P1SIXsHc1@wuerfel> <20140616141712.GL17845@atomide.com>
+ <CABGGisxdKznLzR+0b0oYrN+aiWM0gNFbzYwfPtAZF=AiapU=eQ@mail.gmail.com>
+ <201406171557.15819.arnd@arndb.de>
+ <CAL_Jsq+MK+HMqE3k8p06bzzohzS0qu84N12C=VgF9_dMcSGGOQ@mail.gmail.com>
+ <20140617152542.GU17845@atomide.com>
+ <CAL_JsqJ_Q8x03wu5w0i6qNa5KrmSF0id0TOp-nSw9jSorC6atw@mail.gmail.com>
+Message-ID: <20140618065309.GV17845@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 11, 2014 at 02:51:20AM +0800, Murali Karicheri wrote:
-> v3.65 version of the designware h/w, requires application space
-> registers to be configured to access the remote EP config space.
-> To support this, add rd[wr]_other_conf API in the pcie_host_opts
+* Rob Herring <robherring2@gmail.com> [140617 09:42]:
+> On Tue, Jun 17, 2014 at 10:25 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Rob Herring <robherring2@gmail.com> [140617 08:05]:
+> >> On Tue, Jun 17, 2014 at 8:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Monday 16 June 2014, Rob Herring wrote:
+> >> >> > So far I have not come up with no great ideas on fixing this
+> >> >> > properly short of requiring all omap .config files to add
+> >> >> > CONFIG_ARCH_OMAP=y manually. Anybody got good ideas for that?
+> >> >>
+> >> >> I've failed to come up with anything...
+> >> >>
+> >> >
+> >> > I have two ideas, but neither is great:
+> >> >
+> >> > a) we leave the individual per-soc options in the top-level menu
+> >> >    and move the sub-options under those. This is a bit or a problem
+> >> >    for options concerning all of OMAP, but I'm not sure how many of
+> >> >    those are actually required.
+> >> >
+> >> > b) We go back to Rob's version and make CONFIG_ARCH_OMAP the
+> >> >    user-selectable option, and then find another solution for
+> >> >    building a kernel with ARCH_OMAP set but none of individual
+> >> >    options. This will work for anybody who has a full .config
+> >> >    file, but still break the 'make savedefconfig' generated ones.
+> >>
+> >> After playing with this more yesterday, I think ARCH_OMAP2PLUS instead
+> >> of ARCH_OMAP is actually a better choice to make the menuconfig item.
+> >> It still has the same defconfig issues, but doesn't affect OMAP1.
+> >
+> > Well eventually we'll have the same problem for both ARCH_OMAP1
+> > and ARCH_OMAP2PLUS so from that point of view it might make sense
+> > to use ARCH_OMAP to start with.
 > 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> 
-> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Grant Likely <grant.likely@linaro.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Mohit Kumar <mohit.kumar@st.com>
-> CC: Jingoo Han <jg1.han@samsung.com>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Pratyush Anand <pratyush.anand@st.com>
-> CC: Richard Zhu <r65037@freescale.com>
-> CC: Kishon Vijay Abraham I <kishon@ti.com>
-> CC: Marek Vasut <marex@denx.de>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Pawel Moll <pawel.moll@arm.com>
-> CC: Mark Rutland <mark.rutland@arm.com>
-> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> CC: Kumar Gala <galak@codeaurora.org>
-> CC: Randy Dunlap <rdunlap@infradead.org>
-> CC: Grant Likely <grant.likely@linaro.org> 
-> 
-> ---
->  drivers/pci/host/pcie-designware.c |   12 ++++++++++--
->  drivers/pci/host/pcie-designware.h |    4 ++++
->  2 files changed, 14 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index c4e3732..e8f5d8d 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -654,7 +654,11 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
->  
->  	spin_lock_irqsave(&pp->conf_lock, flags);
->  	if (bus->number != pp->root_bus_nr)
-> -		ret = dw_pcie_rd_other_conf(pp, bus, devfn,
-> +		if (pp->ops->rd_other_conf)
-> +			ret = pp->ops->rd_other_conf(pp, bus, devfn,
-> +						where, size, val);
-> +		else
-> +			ret = dw_pcie_rd_other_conf(pp, bus, devfn,
->  						where, size, val);
->  	else
->  		ret = dw_pcie_rd_own_conf(pp, where, size, val);
-> @@ -680,7 +684,11 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
->  
->  	spin_lock_irqsave(&pp->conf_lock, flags);
->  	if (bus->number != pp->root_bus_nr)
-> -		ret = dw_pcie_wr_other_conf(pp, bus, devfn,
-> +		if (pp->ops->wr_other_conf)
-> +			ret = pp->ops->wr_other_conf(pp, bus, devfn,
-> +						where, size, val);
-> +		else
-> +			ret = dw_pcie_wr_other_conf(pp, bus, devfn,
->  						where, size, val);
->  	else
->  		ret = dw_pcie_wr_own_conf(pp, where, size, val);
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index 3063b35..2d6dd66 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -62,6 +62,10 @@ struct pcie_host_ops {
->  			u32 val, void __iomem *dbi_base);
->  	int (*rd_own_conf)(struct pcie_port *pp, int where, int size, u32 *val);
->  	int (*wr_own_conf)(struct pcie_port *pp, int where, int size, u32 val);
-> +	int (*rd_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
-> +			unsigned int devfn, int where, int size, u32 *val);
-> +	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
-> +			unsigned int devfn, int where, int size, u32 val);
->  	int (*link_up)(struct pcie_port *pp);
->  	void (*host_init)(struct pcie_port *pp);
->  };
+> But OMAP1 and OMAP2PLUS are mutually exclusive being v5 and v6+. So
+> there would not be any user visible difference having 2 visible
+> options. Do you expect any of these kconfig symbols to become
+> obsolete?
 
-Reviewed-by: Pratyush Anand <pratyush.anand@st.com> 
+Yes you're right. They would be mutually exclusive and will most
+likely stay that way because of different compiler flags needed.
+All three Kconfig options are needed. So if you prefer using
+OMAP2PLUS there I'm fine with that.
+ 
+> >> Doing your trick of a default selection with "select ARCH_OMAP2 if
+> >> !(ARCH_OMAP3 || ARCH_OMAP4 || ...)" in the menuconfig option can fix
+> >> the build issues. We'd actually need 2 selects for v6 and v7 only
+> >> builds.
+> >
+> > Yes that or the options in mach-omap2/Makefile can be fixed up
+> > further for building things only when a SoC is selected.
+> >
+> > So really the issue is how to deal with make oldconfig for
+> > existing .config files. I don't know if there's any solution to
+> > that short of doing make CONFIG_ARCH_OMAP=y oldconfig.
+> 
+> .config files are the full config, so wouldn't they be okay? It is
+> only the reduced savedefconfig that would break.
 
-> -- 
-> 1.7.9.5
+Right, so maybe that problem does not affect as many people as I
+thought originally. But certainly not something to do during the
+-rc cycle though :)
+
+Regards,
+
+Tony
