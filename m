@@ -1,639 +1,230 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 18 Jun 2014 10:43:20 -0500
-Subject: [PATCH v2 2/2] arm: dts: add support for AM437x StarterKit
-In-Reply-To: <1403106200-777-1-git-send-email-balbi@ti.com>
-References: <1403106200-777-1-git-send-email-balbi@ti.com>
-Message-ID: <1403106200-777-3-git-send-email-balbi@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 18 Jun 2014 17:46:52 +0200
+Subject: [PATCH] clk: samsung: Register clk provider only after registering its
+ all clocks
+Message-ID: <1403106412-24526-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for TI's AM437x StarterKit Evaluation
-Module.
+Ensure the clock provider is not registered until after all its related
+clocks were created and are ready to use. Currently there are races
+possible and any (of_)clk_get() call right after a clock provider's
+clk_init_cb callback call may fail.
 
-Cc: Josh Elliot <jelliott@ti.com>
-Cc: Darren Etheridge <detheridge@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- .../devicetree/bindings/arm/omap/omap.txt          |   3 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/am437x-sk-evm.dts                | 583 +++++++++++++++++++++
- 3 files changed, 587 insertions(+)
- create mode 100644 arch/arm/boot/dts/am437x-sk-evm.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index d22b216..0edc903 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -129,6 +129,9 @@ Boards:
- - AM437x GP EVM
-   compatible = "ti,am437x-gp-evm", "ti,am4372", "ti,am43"
- 
-+- AM437x SK EVM: AM437x StarterKit Evaluation Module
-+  compatible = "ti,am437x-sk-evm", "ti,am4372", "ti,am43"
-+
- - DRA742 EVM:  Software Development Board for DRA742
-   compatible = "ti,dra7-evm", "ti,dra742", "ti,dra74", "ti,dra7"
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 621c6c5..a85a4b8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -306,6 +306,7 @@ dtb-$(CONFIG_ARCH_OMAP4) += omap4-duovero-parlor.dtb \
- 	omap4-var-dvk-om44.dtb \
- 	omap4-var-stk-om44.dtb
- dtb-$(CONFIG_SOC_AM43XX) += am43x-epos-evm.dtb \
-+	am437x-sk-evm.dtb \
- 	am437x-gp-evm.dtb
- dtb-$(CONFIG_SOC_OMAP5) += omap5-cm-t54.dtb \
- 	omap5-sbc-t54.dtb \
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-new file mode 100644
-index 0000000..e7a2bbe
---- /dev/null
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -0,0 +1,583 @@
-+/*
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/* AM437x SK EVM */
-+
-+/dts-v1/;
-+
-+#include "am4372.dtsi"
-+#include <dt-bindings/pinctrl/am43xx.h>
-+#include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "TI AM437x SK EVM";
-+	compatible = "ti,am437x-sk-evm","ti,am4372","ti,am43";
-+
-+	aliases {
-+		display0 = &lcd0;
-+	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&ecap0 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 51 53 56 62 75 101 152 255>;
-+		default-brightness-level = <8>;
-+	};
-+
-+	sound {
-+		compatible = "ti,da830-evm-audio";
-+		ti,model = "AM437x-SK-EVM";
-+		ti,audio-codec = <&tlv320aic3106>;
-+		ti,mcasp-controller = <&mcasp1>;
-+		ti,codec-clock-rate = <24000000>;
-+		ti,audio-routing =
-+			"Headphone Jack",       "HPLOUT",
-+			"Headphone Jack",       "HPROUT";
-+	};
-+
-+	matrix_keypad: matrix_keypad at 0 {
-+		compatible = "gpio-matrix-keypad";
-+
-+		debounce-delay-ms = <5>;
-+		col-scan-delay-us = <1500>;
-+
-+		row-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH		/* Bank5, pin5 */
-+				&gpio5 6 GPIO_ACTIVE_HIGH>;	/* Bank5, pin6 */
-+
-+		col-gpios = <&gpio5 13 GPIO_ACTIVE_HIGH		/* Bank5, pin13 */
-+				&gpio5 4 GPIO_ACTIVE_HIGH>;	/* Bank5, pin4 */
-+
-+		linux,keymap = <
-+				MATRIX_KEY(0, 0, KEY_DOWN)
-+				MATRIX_KEY(0, 1, KEY_RIGHT)
-+				MATRIX_KEY(1, 0, KEY_LEFT)
-+				MATRIX_KEY(1, 1, KEY_UP)
-+			>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		led at 0 {
-+			label = "am437x-sk:red:heartbeat";
-+			gpios = <&gpio5 0 GPIO_ACTIVE_HIGH>;	/* Bank 5, pin 0 */
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+
-+		led at 1 {
-+			label = "am437x-sk:green:mmc1";
-+			gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;	/* Bank 5, pin 1 */
-+			linux,default-trigger = "mmc0";
-+			default-state = "off";
-+		};
-+
-+		led at 2 {
-+			label = "am437x-sk:blue:cpu0";
-+			gpios = <&gpio5 2 GPIO_ACTIVE_HIGH>;	/* Bank 5, pin 2 */
-+			linux,default-trigger = "cpu0";
-+			default-state = "off";
-+		};
-+
-+		led at 3 {
-+			label = "am437x-sk:blue:usr3";
-+			gpios = <&gpio5 3 GPIO_ACTIVE_HIGH>;	/* Bank 5, pin 3 */
-+			default-state = "off";
-+		};
-+	};
-+
-+	lcd0: display {
-+		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
-+		label = "lcd";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+
-+		enable-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+
-+		panel-timing {
-+			clock-frequency = <9000000>;
-+			hactive = <480>;
-+			vactive = <272>;
-+			hfront-porch = <8>;
-+			hback-porch = <43>;
-+			hsync-len = <4>;
-+			vback-porch = <12>;
-+			vfront-porch = <4>;
-+			vsync-len = <10>;
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			de-active = <1>;
-+			pixelclk-active = <1>;
-+		};
-+
-+		port {
-+			lcd_in: endpoint {
-+				remote-endpoint = <&dpi_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&am43xx_pinmux {
-+	i2c0_pins: i2c0_pins {
-+		pinctrl-single,pins = <
-+			0x188 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_sda.i2c0_sda */
-+			0x18c (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_scl.i2c0_scl */
-+		>;
-+	};
-+
-+	i2c1_pins: i2c1_pins {
-+		pinctrl-single,pins = <
-+			0x15c (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE2)  /* spi0_cs0.i2c1_scl */
-+			0x158 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE2)  /* spi0_d1.i2c1_sda  */
-+		>;
-+	};
-+
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			0x160 (PIN_INPUT | MUX_MODE7) /* spi0_cs1.gpio0_6 */
-+		>;
-+	};
-+
-+	ecap0_pins: backlight_pins {
-+		pinctrl-single,pins = <
-+			0x164 MUX_MODE0       /* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
-+		>;
-+	};
-+
-+	edt_ft5306_ts_pins: edt_ft5306_ts_pins {
-+		pinctrl-single,pins = <
-+			0x74 (PIN_INPUT | MUX_MODE7)	/* gpmc_wpn.gpio0_31 */
-+			0x78 (PIN_OUTPUT | MUX_MODE7)	/* gpmc_be1n.gpio1_28 */
-+		>;
-+	};
-+
-+	cpsw_default: cpsw_default {
-+		pinctrl-single,pins = <
-+			/* Slave 1 */
-+			0x12c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txclk.rmii1_tclk */
-+			0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txen.rgmii1_tctl */
-+			0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td0 */
-+			0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td1 */
-+			0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td2 */
-+			0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td3 */
-+			0x130 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxclk.rmii1_rclk */
-+			0x118 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxdv.rgmii1_rctl */
-+			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rd0 */
-+			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rd1 */
-+			0x138 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rd2 */
-+			0x134 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rd3 */
-+
-+			/* Slave 2 */
-+			0x58 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a6.rgmii2_tclk */
-+			0x40 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a0.rgmii2_tctl */
-+			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a5.rgmii2_td0 */
-+			0x50 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a4.rgmii2_td1 */
-+			0x4c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a3.rgmii2_td2 */
-+			0x48 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a2.rgmii2_td3 */
-+			0x5c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a7.rgmii2_rclk */
-+			0x44 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a1.rgmii2_rtcl */
-+			0x6c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a11.rgmii2_rd0 */
-+			0x68 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a10.rgmii2_rd1 */
-+			0x64 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a9.rgmii2_rd2 */
-+			0x60 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a8.rgmii2_rd3 */
-+		>;
-+	};
-+
-+	cpsw_sleep: cpsw_sleep {
-+		pinctrl-single,pins = <
-+			/* Slave 1 reset value */
-+			0x12c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x120 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x11c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x130 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x138 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x134 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+
-+			/* Slave 2 reset value */
-+			0x58 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x40 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x54 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x50 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x4c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x48 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x5c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x44 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x6c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x68 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x64 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x60 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	davinci_mdio_default: davinci_mdio_default {
-+		pinctrl-single,pins = <
-+			/* MDIO */
-+			0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-+			0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
-+		>;
-+	};
-+
-+	davinci_mdio_sleep: davinci_mdio_sleep {
-+		pinctrl-single,pins = <
-+			/* MDIO reset value */
-+			0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	dss_pins: dss_pins {
-+		pinctrl-single,pins = <
-+			0x020 (PIN_OUTPUT_PULLUP | MUX_MODE1)	/* gpmc ad 8 -> DSS DATA 23 */
-+			0x024 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x028 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x02c (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x030 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x034 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x038 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x03c (PIN_OUTPUT_PULLUP | MUX_MODE1)	/* gpmc ad 15 -> DSS DATA 16 */
-+			0x0a0 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* DSS DATA 0 */
-+			0x0a4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0a8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0ac (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0b0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0b4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0b8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0bc (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0c0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0c4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0c8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0cc (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0d0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0d4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0d8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0dc (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* DSS DATA 15 */
-+			0x0e0 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* DSS VSYNC */
-+			0x0e4 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* DSS HSYNC */
-+			0x0e8 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* DSS PCLK */
-+			0x0ec (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* DSS AC BIAS EN */
-+
-+		>;
-+	};
-+
-+	qspi_pins: qspi_pins {
-+		pinctrl-single,pins = <
-+			0x7c (PIN_OUTPUT_PULLUP | MUX_MODE3)	/* gpmc_csn0.qspi_csn */
-+			0x88 (PIN_OUTPUT | MUX_MODE2)		/* gpmc_csn3.qspi_clk */
-+			0x90 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_advn_ale.qspi_d0 */
-+			0x94 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_oen_ren.qspi_d1 */
-+			0x98 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_wen.qspi_d2 */
-+			0x9c (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_be0n_cle.qspi_d3 */
-+		>;
-+	};
-+
-+	mcasp1_pins: mcasp1_pins {
-+		pinctrl-single,pins = <
-+			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* mii1_crs.mcasp1_aclkx */
-+			0x110 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* mii1_rxerr.mcasp1_fsx */
-+			0x108 (PIN_OUTPUT_PULLDOWN | MUX_MODE4)	/* mii1_col.mcasp1_axr2 */
-+			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* rmii1_ref_clk.mcasp1_axr3 */
-+		>;
-+	};
-+
-+	lcd_pins: lcd_pins {
-+		pinctrl-single,pins = <
-+			/* GPIO 5_8 to select LCD / HDMI */
-+			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
-+		>;
-+	};
-+};
-+
-+&i2c0 {
-+        status = "okay";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&i2c0_pins>;
-+
-+	tps at 24 {
-+		compatible = "ti,tps65218";
-+		reg = <0x24>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+
-+		dcdc1: regulator-dcdc1 {
-+			compatible = "ti,tps65218-dcdc1";
-+			/* VDD_CORE limits min of OPP50 and max of OPP100 */
-+			regulator-name = "vdd_core";
-+			regulator-min-microvolt = <912000>;
-+			regulator-max-microvolt = <1144000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		dcdc2: regulator-dcdc2 {
-+			compatible = "ti,tps65218-dcdc2";
-+			/* VDD_MPU limits min of OPP50 and max of OPP_NITRO */
-+			regulator-name = "vdd_mpu";
-+			regulator-min-microvolt = <912000>;
-+			regulator-max-microvolt = <1378000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		dcdc3: regulator-dcdc3 {
-+			compatible = "ti,tps65218-dcdc3";
-+			regulator-name = "vdds_ddr";
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		dcdc4: regulator-dcdc4 {
-+			compatible = "ti,tps65218-dcdc4";
-+			regulator-name = "v3_3d";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		ldo1: regulator-ldo1 {
-+			compatible = "ti,tps65218-ldo1";
-+			regulator-name = "v1_8d";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+	};
-+
-+	at24 at 50 {
-+		compatible = "at24,24c256";
-+		pagesize = <64>;
-+		reg = <0x50>;
-+	};
-+};
-+
-+&i2c1 {
-+        status = "okay";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&i2c1_pins>;
-+
-+	edt-ft5306 at 38 {
-+		status = "okay";
-+		compatible = "edt,edt-ft5306", "edt,edt-ft5x06";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&edt_ft5306_ts_pins>;
-+		reg = <0x38>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <31 0>;
-+
-+		wake-gpios = <&gpio1 28 GPIO_ACTIVE_HIGH>;
-+
-+		touchscreen-size-x = <480>;
-+		touchscreen-size-y = <272>;
-+	};
-+
-+	tlv320aic3106: tlv320aic3106 at 1b {
-+		compatible = "ti,tlv320aic3106";
-+		reg = <0x1b>;
-+		status = "okay";
-+
-+		/* Regulators */
-+		AVDD-supply = <&dcdc4>;
-+		IOVDD-supply = <&dcdc4>;
-+		DRVDD-supply = <&dcdc4>;
-+		DVDD-supply = <&ldo1>;
-+	};
-+
-+	lis331dlh at 18 {
-+		compatible = "st,lis331dlh";
-+		reg = <0x18>;
-+		status = "okay";
-+
-+		Vdd-supply = <&dcdc4>;
-+		Vdd_IO-supply = <&dcdc4>;
-+		interrupts-extended = <&gpio1 6 0>, <&gpio2 1 0>;
-+	};
-+};
-+
-+&epwmss0 {
-+	status = "okay";
-+};
-+
-+&ecap0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ecap0_pins>;
-+};
-+
-+&gpio0 {
-+	status = "okay";
-+};
-+
-+&gpio1 {
-+	status = "okay";
-+};
-+
-+&gpio5 {
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	status = "okay";
-+	vmmc-supply = <&dcdc4>;
-+	bus-width = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&usb2_phy1 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&usb2_phy2 {
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&qspi {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&qspi_pins>;
-+
-+	spi-max-frequency = <48000000>;
-+	m25p80 at 0 {
-+		compatible = "mx66l51235l";
-+		spi-max-frequency = <48000000>;
-+		reg = <0>;
-+		spi-cpol;
-+		spi-cpha;
-+		spi-tx-bus-width = <1>;
-+		spi-rx-bus-width = <4>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		/* MTD partition table.
-+		 * The ROM checks the first 512KiB
-+		 * for a valid file to boot(XIP).
-+		 */
-+		partition at 0 {
-+			label = "QSPI.U_BOOT";
-+			reg = <0x00000000 0x000080000>;
-+		};
-+		partition at 1 {
-+			label = "QSPI.U_BOOT.backup";
-+			reg = <0x00080000 0x00080000>;
-+		};
-+		partition at 2 {
-+			label = "QSPI.U-BOOT-SPL_OS";
-+			reg = <0x00100000 0x00010000>;
-+		};
-+		partition at 3 {
-+			label = "QSPI.U_BOOT_ENV";
-+			reg = <0x00110000 0x00010000>;
-+		};
-+		partition at 4 {
-+			label = "QSPI.U-BOOT-ENV.backup";
-+			reg = <0x00120000 0x00010000>;
-+		};
-+		partition at 5 {
-+			label = "QSPI.KERNEL";
-+			reg = <0x00130000 0x0800000>;
-+		};
-+		partition at 6 {
-+			label = "QSPI.FILESYSTEM";
-+			reg = <0x00930000 0x36D0000>;
-+		};
-+	};
-+};
-+
-+&mac {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&cpsw_default>;
-+	pinctrl-1 = <&cpsw_sleep>;
-+	dual_emac = <1>;
-+	status = "okay";
-+};
-+
-+&davinci_mdio {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&davinci_mdio_default>;
-+	pinctrl-1 = <&davinci_mdio_sleep>;
-+	status = "okay";
-+};
-+
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <4>;
-+	phy-mode = "rgmii";
-+	dual_emac_res_vlan = <1>;
-+};
-+
-+&cpsw_emac1 {
-+	phy_id = <&davinci_mdio>, <5>;
-+	phy-mode = "rgmii";
-+	dual_emac_res_vlan = <2>;
-+};
-+
-+&elm {
-+	status = "okay";
-+};
-+
-+&mcasp1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcasp1_pins>;
-+
-+	status = "okay";
-+
-+	op-mode = <0>;
-+	tdm-slots = <2>;
-+	serial-dir = <
-+		0 0 1 2
-+	>;
-+
-+	tx-num-evt = <1>;
-+	rx-num-evt = <1>;
-+};
-+
-+&dss {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_pins>;
-+
-+	port {
-+		dpi_out: endpoint at 0 {
-+			remote-endpoint = <&lcd_in>;
-+			data-lines = <24>;
-+		};
-+	};
-+};
-+
-+&rtc {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
--- 
-2.0.0.rc1
+NOTE: Tested only on Exynos4412.
+
+ drivers/clk/samsung/clk-exynos3250.c |    2 ++
+ drivers/clk/samsung/clk-exynos4.c    |    2 ++
+ drivers/clk/samsung/clk-exynos5250.c |    2 ++
+ drivers/clk/samsung/clk-exynos5260.c |    2 ++
+ drivers/clk/samsung/clk-exynos5410.c |    2 ++
+ drivers/clk/samsung/clk-exynos5420.c |    2 ++
+ drivers/clk/samsung/clk-exynos5440.c |    2 ++
+ drivers/clk/samsung/clk-s3c2410.c    |    2 ++
+ drivers/clk/samsung/clk-s3c2412.c    |    2 ++
+ drivers/clk/samsung/clk-s3c2443.c    |    2 ++
+ drivers/clk/samsung/clk-s3c64xx.c    |    2 ++
+ drivers/clk/samsung/clk.c            |   19 ++++++++++---------
+ drivers/clk/samsung/clk.h            |    2 ++
+ 13 files changed, 34 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+index 7a17bd4..9a43cc3 100644
+--- a/drivers/clk/samsung/clk-exynos3250.c
++++ b/drivers/clk/samsung/clk-exynos3250.c
+@@ -776,5 +776,7 @@ static void __init exynos3250_cmu_init(struct device_node *np)
+ 	samsung_clk_register_gate(ctx, gate_clks, ARRAY_SIZE(gate_clks));
+
+ 	exynos3250_clk_sleep_init();
++
++	samsung_clk_of_add_provider(np, ctx);
+ }
+ CLK_OF_DECLARE(exynos3250_cmu, "samsung,exynos3250-cmu", exynos3250_cmu_init);
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 4f150c9..fc73bb4 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1260,6 +1260,8 @@ static void __init exynos4_clk_init(struct device_node *np,
+
+ 	exynos4_clk_sleep_init();
+
++	samsung_clk_of_add_provider(np, ctx);
++
+ 	pr_info("%s clocks: sclk_apll = %ld, sclk_mpll = %ld\n"
+ 		"\tsclk_epll = %ld, sclk_vpll = %ld, arm_clk = %ld\n",
+ 		exynos4_soc == EXYNOS4210 ? "Exynos4210" : "Exynos4x12",
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 1fad4c5..3a544a8 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -820,6 +820,8 @@ static void __init exynos5250_clk_init(struct device_node *np)
+
+ 	exynos5250_clk_sleep_init();
+
++	samsung_clk_of_add_provider(np, ctx);
++
+ 	pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+ 			_get_rate("div_arm2"));
+ }
+diff --git a/drivers/clk/samsung/clk-exynos5260.c b/drivers/clk/samsung/clk-exynos5260.c
+index 64596ba..ce3de97 100644
+--- a/drivers/clk/samsung/clk-exynos5260.c
++++ b/drivers/clk/samsung/clk-exynos5260.c
+@@ -206,6 +206,8 @@ void __init exynos5260_cmu_register_one(struct device_node *np,
+ 	if (cmu->clk_regs)
+ 		exynos5260_clk_sleep_init(reg_base, cmu->clk_regs,
+ 			cmu->nr_clk_regs);
++
++	samsung_clk_of_add_provider(np, ctx);
+ }
+
+
+diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
+index c9505ab..231475b 100644
+--- a/drivers/clk/samsung/clk-exynos5410.c
++++ b/drivers/clk/samsung/clk-exynos5410.c
+@@ -204,6 +204,8 @@ static void __init exynos5410_clk_init(struct device_node *np)
+ 	samsung_clk_register_gate(ctx, exynos5410_gate_clks,
+ 			ARRAY_SIZE(exynos5410_gate_clks));
+
++	samsung_clk_of_add_provider(np, ctx);
++
+ 	pr_debug("Exynos5410: clock setup completed.\n");
+ }
+ CLK_OF_DECLARE(exynos5410_clk, "samsung,exynos5410-clock", exynos5410_clk_init);
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 9d7d7ee..ef48f34 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -1226,6 +1226,8 @@ static void __init exynos5x_clk_init(struct device_node *np,
+ 	}
+
+ 	exynos5420_clk_sleep_init();
++
++	samsung_clk_of_add_provider(np, ctx);
+ }
+
+ static void __init exynos5420_clk_init(struct device_node *np)
+diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
+index 647f144..2f182f2 100644
+--- a/drivers/clk/samsung/clk-exynos5440.c
++++ b/drivers/clk/samsung/clk-exynos5440.c
+@@ -123,6 +123,8 @@ static void __init exynos5440_clk_init(struct device_node *np)
+ 	samsung_clk_register_gate(ctx, exynos5440_gate_clks,
+ 			ARRAY_SIZE(exynos5440_gate_clks));
+
++	samsung_clk_of_add_provider(np, ctx);
++
+ 	pr_info("Exynos5440: arm_clk = %ldHz\n", _get_rate("arm_clk"));
+ 	pr_info("exynos5440 clock initialization complete\n");
+ }
+diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
+index ba07168..2e688c3 100644
+--- a/drivers/clk/samsung/clk-s3c2410.c
++++ b/drivers/clk/samsung/clk-s3c2410.c
+@@ -461,6 +461,8 @@ void __init s3c2410_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 	}
+
+ 	s3c2410_clk_sleep_init();
++
++	samsung_clk_of_add_provider(np, ctx);
+ }
+
+ static void __init s3c2410_clk_init(struct device_node *np)
+diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
+index 23e4313..34af09f 100644
+--- a/drivers/clk/samsung/clk-s3c2412.c
++++ b/drivers/clk/samsung/clk-s3c2412.c
+@@ -265,6 +265,8 @@ void __init s3c2412_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 				   ARRAY_SIZE(s3c2412_aliases));
+
+ 	s3c2412_clk_sleep_init();
++
++	samsung_clk_of_add_provider(np, ctx);
+ }
+
+ static void __init s3c2412_clk_init(struct device_node *np)
+diff --git a/drivers/clk/samsung/clk-s3c2443.c b/drivers/clk/samsung/clk-s3c2443.c
+index c4bbdab..c92f853 100644
+--- a/drivers/clk/samsung/clk-s3c2443.c
++++ b/drivers/clk/samsung/clk-s3c2443.c
+@@ -445,6 +445,8 @@ void __init s3c2443_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 	}
+
+ 	s3c2443_clk_sleep_init();
++
++	samsung_clk_of_add_provider(np, ctx);
+ }
+
+ static void __init s3c2416_clk_init(struct device_node *np)
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index efa16ee..3fb997fe 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -516,6 +516,8 @@ void __init s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
+ 					ARRAY_SIZE(s3c64xx_clock_aliases));
+ 	s3c64xx_clk_sleep_init();
+
++	samsung_clk_of_add_provider(np, ctx);
++
+ 	pr_info("%s clocks: apll = %lu, mpll = %lu\n"
+ 		"\tepll = %lu, arm_clk = %lu\n",
+ 		is_s3c6400 ? "S3C6400" : "S3C6410",
+diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+index 49629c7..98fb31b 100644
+--- a/drivers/clk/samsung/clk.c
++++ b/drivers/clk/samsung/clk.c
+@@ -53,7 +53,6 @@ struct samsung_clk_provider *__init samsung_clk_init(struct device_node *np,
+ {
+ 	struct samsung_clk_provider *ctx;
+ 	struct clk **clk_table;
+-	int ret;
+ 	int i;
+
+ 	ctx = kzalloc(sizeof(struct samsung_clk_provider), GFP_KERNEL);
+@@ -72,17 +71,19 @@ struct samsung_clk_provider *__init samsung_clk_init(struct device_node *np,
+ 	ctx->clk_data.clk_num = nr_clks;
+ 	spin_lock_init(&ctx->lock);
+
+-	if (!np)
+-		return ctx;
+-
+-	ret = of_clk_add_provider(np, of_clk_src_onecell_get,
+-			&ctx->clk_data);
+-	if (ret)
+-		panic("could not register clock provide\n");
+-
+ 	return ctx;
+ }
+
++void __init samsung_clk_of_add_provider(struct device_node *np,
++				struct samsung_clk_provider *ctx)
++{
++	if (np) {
++		if (of_clk_add_provider(np, of_clk_src_onecell_get,
++					&ctx->clk_data))
++			panic("could not register clk provider\n");
++	}
++}
++
+ /* add a clock instance to the clock lookup table used for dt based lookup */
+ void samsung_clk_add_lookup(struct samsung_clk_provider *ctx, struct clk *clk,
+ 				unsigned int id)
+diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+index 9693b80..92131f9 100644
+--- a/drivers/clk/samsung/clk.h
++++ b/drivers/clk/samsung/clk.h
+@@ -327,6 +327,8 @@ struct samsung_pll_clock {
+ extern struct samsung_clk_provider *__init samsung_clk_init(
+ 			struct device_node *np, void __iomem *base,
+ 			unsigned long nr_clks);
++extern void __init samsung_clk_of_add_provider(struct device_node *np,
++			struct samsung_clk_provider *ctx);
+ extern void __init samsung_clk_of_register_fixed_ext(
+ 			struct samsung_clk_provider *ctx,
+ 			struct samsung_fixed_rate_clock *fixed_rate_clk,
+--
+1.7.9.5
