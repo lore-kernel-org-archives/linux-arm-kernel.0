@@ -1,33 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 09:29:53 +0100
-Subject: [PATCH v2 16/20] mfd: sun6i-prcm: Add support for Allwinner A23
- PRCM
-In-Reply-To: <1403016777-15121-17-git-send-email-wens@csie.org>
-References: <1403016777-15121-1-git-send-email-wens@csie.org>
- <1403016777-15121-17-git-send-email-wens@csie.org>
-Message-ID: <20140618082953.GO21030@lee--X1>
+Date: Wed, 18 Jun 2014 09:32:04 +0100
+Subject: [PATCH v2 06/10] mfd: Add driver for Maxim 77802 Power
+ Management IC
+In-Reply-To: <53A01F09.5070106@collabora.co.uk>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402941758-11216-7-git-send-email-javier.martinez@collabora.co.uk>
+ <20140616192720.GK5099@sirena.org.uk>
+ <53A01F09.5070106@collabora.co.uk>
+Message-ID: <20140618083204.GP21030@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
-> The differences are the AR100 clock can no longer be modified,
-> the APB0 clock has different divisors, and some clock gates are
-> gone.
+> >> +config MFD_MAX77802
+> >> +	tristate "Maxim Integrated MAX77802 PMIC Support"
+> >> +	depends on I2C=y
+> >> +	select MFD_CORE
+> >> +	select REGMAP_I2C
+> >> +	select REGMAP_IRQ
+> >> +	select IRQ_DOMAIN
+> >> +	help
+> >> +	  Say yes here to support for Maxim Integrated MAX77802.
+> >> +	  This is a Power Management IC with RTC on chip.
+> >> +	  This driver provides common support for accessing the device;
+> >> +	  additional drivers must be enabled in order to use the functionality
+> >> +	  of the device.
+> >> +
+> > 
+> > It is a bit unorthodox to put the build infrastructure in the same patch
+> > as the DT binding...
+> > 
 > 
-> This patch adds a compatible with a modified subdevice list for
-> the A23.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
->  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
->  2 files changed, 31 insertions(+), 1 deletion(-)
+> I thought it was the opposite. That a DT binding document has to be added along
+> with the first user of the binding but I'll separate the DT doc in another patch
+> then if that is the right thing to do.
 
-The patch looks fine to me, but I'm concerned about the size of the
-patch set and the amount of subsystems it touches.
+This was the 'old' method, but changed a little over a year ago.
 
-I am guessing that this patch can just be taken independently though.
-Please correct me if I'm wrong.
+> Thanks a lot for all your suggestions, I'll wait a little to see if there is
+> more feedback and repost a v3 addressing all the issues you pointed out.
+
+Just re-post it.  I'll review the next version.
 
 -- 
 Lee Jones
