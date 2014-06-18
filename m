@@ -1,36 +1,70 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 18 Jun 2014 23:04:29 +0800
-Subject: [PATCH] ARM: save/restore diagnostic register on ARMv7
- suspend/resume
-In-Reply-To: <alpine.LFD.2.11.1406181033510.16842@knanqh.ubzr>
-References: <1403081398-32116-1-git-send-email-shawn.guo@freescale.com>
- <20140618104009.GH32699@arm.com> <20140618123906.GI8860@dragon>
- <alpine.LFD.2.11.1406181033510.16842@knanqh.ubzr>
-Message-ID: <20140618150428.GQ8860@dragon>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Wed, 18 Jun 2014 17:07:35 +0200
+Subject: [PATCH 1/7] ARM: stih407: Add DT nodes for for PWM
+In-Reply-To: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
+References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAG374jCGhjACBr1a86_W6wQYWq8_CofwSFxZO+4j=3aHQC2nmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 10:37:15AM -0400, Nicolas Pitre wrote:
-> On Wed, 18 Jun 2014, Shawn Guo wrote:
-> 
-> > On Wed, Jun 18, 2014 at 11:40:09AM +0100, Will Deacon wrote:
-> > > On Wed, Jun 18, 2014 at 09:49:58AM +0100, Shawn Guo wrote:
-> > > > The CP15 diagnostic register holds ARM errata bits on ARMv7, so it
-> > > > needs to be saved/restored on suspend/resume.  Otherwise, the
-> > > > effectiveness of errata workaround gets lost together with diagnostic
-> > > > register bit across suspend/resume cycle.
-> > > 
-> > > This should be conditional on Cortex-A9, since this register is certainly
-> > > not architected.
-> > 
-> > Ah, yes.  In that case, I should probably handle it at platform level to
-> > avoid messing up generic ARMv7 suspend/resume routines.
-> 
-> Please don't do that.
-> 
-> You may look at commit 16c79a3776 and do something similar for 
-> Cortex-A9.
+Hi Lee,
+minor remark below..
 
-Okay.  Thanks for the hint, Nico.  Will work out a V2 patch soon.
+On 18 June 2014 16:52, Lee Jones <lee.jones@linaro.org> wrote:
+> Supply top level nodes for the STiH407 based development boards.
+> The Pinctrl configuration has already been applied, so the only
+> missing piece of the DT puzzle is for a board's DTB to enable
+> the nodes.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+> index 4f9024f..6b43ba2 100644
+> --- a/arch/arm/boot/dts/stih407.dtsi
+> +++ b/arch/arm/boot/dts/stih407.dtsi
+> @@ -259,5 +259,32 @@
+>
+>                         status = "disabled";
+>                 };
+> +
+> +               /* COMMS PWM Module */
+> +               pwm0: pwm at 9810000 {
+> +                       compatible      = "st,sti-pwm";
+> +                       status          = "disabled";
+> +                       #pwm-cells      = <2>;
+> +                       reg             = <0x9810000 0x68>;
+> +                       pinctrl-names   = "default";
+> +                        pinctrl-0      = <&pinctrl_pwm0_chan0_default>;
+del space
 
-Shawn
+> +                       clock-names     = "pwm";
+> +                       clocks          = <&clk_sysin>;
+> +               };
+> +
+> +               /* SBC PWM Module */
+> +               pwm1: pwm at 9510000 {
+> +                       compatible      = "st,sti-pwm";
+> +                       status          = "disabled";
+> +                       #pwm-cells      = <2>;
+> +                       reg             = <0x9510000 0x68>;
+> +                       pinctrl-names   = "default";
+> +                       pinctrl-0       = <&pinctrl_pwm1_chan0_default
+> +                                       &pinctrl_pwm1_chan1_default
+> +                                       &pinctrl_pwm1_chan2_default
+> +                                       &pinctrl_pwm1_chan3_default>;
+> +                       clock-names     = "pwm";
+> +                       clocks          = <&clk_sysin>;
+> +               };
+>         };
+>  };
+> --
+> 1.8.3.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
