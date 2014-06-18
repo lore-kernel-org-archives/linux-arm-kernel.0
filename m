@@ -1,82 +1,82 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 18 Jun 2014 08:16:03 +0200
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-In-Reply-To: <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
-References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
- <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
-Message-ID: <53A12EA3.5010007@samsung.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 17 Jun 2014 23:16:11 -0700
+Subject: [PATCH v1 0/9] Tegra XHCI support
+Message-ID: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 07:49 AM, Rahul Sharma wrote:
-> Hi All,
-> 
-> Please review this patch.
-> 
-> Regards,
-> Rahul Sharma
-> 
-> On 9 June 2014 16:58, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->> Display domain is removed due to instability issues. Explaining
->> the problem below:
->>
->> exynos_init_late triggers the pm_genpd_poweroff_unused which
->> powers off the unused power domains. This call hits before
->> the trigger to deferred probes.
->>
->> DRM DP Panel defers the probe due to supply get failure. By the
->> time, deferred probe is scheduled again, Display Power Domain is
->> powered off by pm_genpd_poweroff_unused.
->>
->> FIMD and DP drivers are accessing registers during Probe and Bind
->> callbacks. If display domain is enabled/disabled around register
->> accesses, display domain gets unstable and we are getting Power
->> Domain Disable fail notification. Increasing the Timeout also
->> didn't help.
+This series adds support for XHCI on NVIDIA Tegra SoCs.  This includes:
+ - extending the XUSB pad controller driver to support the USB PHY
+   types (UTMI, HSIC, and USB3),
+ - adding a driver for the mailbox used to communicate with the XHCI
+   controller's firmware, and
+ - adding a XHCI host-controller driver.
 
-As I understand the problem is that fimd and dp drivers access hw
-registers without enabling power domain. So the proper solution is to
-fix these drivers.
+Based on Stephen Warren's for-next branch plus Thierry Reding's XUSB
+pad controller driver [1].
 
-Btw. there are already patches removing hw access from probe/bind of
-fimd. I guess removing also hw access from dp probe/bind could be a good
-solution.
+Tested on Venice2 and Jetson TK1 with a variety of USB2.0 and USB3.0 memory
+sticks and ethernet dongles using controller firmware from the ChromiumOS
+tree [2].
 
-Regards
-Andrzej
+Notes:
+ - HSIC support is mostly untested and I think there are still some issues
+   to work out there.  I do have a Tegra124 board with a HSIC hub so I'll
+   try to sort those out later.
+ - The XUSB padctl driver doesn't play nice with the existing Tegra USB2.0
+   PHY driver, so all ports should be assigned to the XHCI controller.
 
->>
->> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->> ---
->> based on Kukjin's for-next branch.
->>
->>  arch/arm/boot/dts/exynos5420.dtsi |    6 ------
->>  1 file changed, 6 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
->> index e385322..3d528cf 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -262,11 +262,6 @@
->>                 reg = <0x10044060 0x20>;
->>         };
->>
->> -       disp_pd: power-domain at 100440C0 {
->> -               compatible = "samsung,exynos4210-pd";
->> -               reg = <0x100440C0 0x20>;
->> -       };
->> -
->>         msc_pd: power-domain at 10044120 {
->>                 compatible = "samsung,exynos4210-pd";
->>                 reg = <0x10044120 0x20>;
->> @@ -518,7 +513,6 @@
->>         };
->>
->>         fimd: fimd at 14400000 {
->> -               samsung,power-domain = <&disp_pd>;
->>                 clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
->>                 clock-names = "sclk_fimd", "fimd";
->>         };
->> --
->> 1.7.9.5
->>
+Based on work by:
+  a lot of people, but from what I can tell from the L4T tree [3], the
+  original authors of the Tegra XHCI driver are:
+    Ajay Gupta <ajayg@nvidia.com>
+    Bharath Yadav <byadav@nvidia.com>
+
+Changes from RFC:
+ - Dropped Tegra114 support.
+ - Split out mailbox into separate driver.
+ - Stopped using child xhci-plat device in XHCI host-controller driver.
+ - Added PHY support to Thierry's XUSB padctl driver instead of in a separate
+   USB PHY driver.
+ - Added Jetson TK1 support.
+ - Misc. cleanups.
+
+[1] http://patchwork.ozlabs.org/patch/360458/
+[2] http://commondatastorage.googleapis.com/chromeos-localmirror/distfiles/xhci-firmware-2014.05.09.00.00.tbz2
+[3] git://nv-tegra.nvidia.com/linux-3.10.git
+
+Andrew Bresticker (9):
+  of: Add NVIDIA Tegra XUSB mailbox binding
+  mailbox: Add NVIDIA Tegra XUSB mailbox driver
+  of: Update Tegra XUSB pad controller binding for USB
+  pinctrl: tegra-xusb: Add USB PHY support
+  of: Add NVIDIA Tegra XHCI controller binding
+  usb: xhci: Add NVIDIA Tegra XHCI host-controller driver
+  ARM: tegra: Add Tegra124 XUSB mailbox and XHCI controller
+  ARM: tegra: jetson-tk1: Add XHCI support
+  ARM: tegra: venice2: Add XHCI support
+
+ .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt |   25 +
+ .../pinctrl/nvidia,tegra124-xusb-padctl.txt        |   53 +-
+ .../bindings/usb/nvidia,tegra124-xhci.txt          |   76 ++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   43 +-
+ arch/arm/boot/dts/tegra124-venice2.dts             |   72 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   31 +
+ drivers/mailbox/Kconfig                            |    7 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/tegra-xusb-mbox.c                  |  308 ++++++
+ drivers/pinctrl/pinctrl-tegra-xusb.c               | 1106 +++++++++++++++++++-
+ drivers/usb/host/Kconfig                           |   12 +
+ drivers/usb/host/Makefile                          |    2 +
+ drivers/usb/host/xhci-tegra.c                      |  900 ++++++++++++++++
+ include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h   |    7 +
+ include/linux/tegra-xusb-mbox.h                    |   98 ++
+ 15 files changed, 2673 insertions(+), 69 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
+ create mode 100644 drivers/mailbox/tegra-xusb-mbox.c
+ create mode 100644 drivers/usb/host/xhci-tegra.c
+ create mode 100644 include/linux/tegra-xusb-mbox.h
+
+-- 
+2.0.0.526.g5318336
