@@ -1,44 +1,64 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 18 Jun 2014 18:49:09 +0400
-Subject: [PATCH] arm: get rid of hardcoded assumptions about kernel stack
- size
-In-Reply-To: <20140618143145.GH2186@arm.com>
-References: <1403099422-850-1-git-send-email-a.ryabinin@samsung.com>
- <20140618143145.GH2186@arm.com>
-Message-ID: <53A1A6E5.6070200@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 18 Jun 2014 23:55:52 +0900
+Subject: [PATCH v2 04/08] ARM: shmobile: Move most of irqs.h, keep some
+ for pinctl
+In-Reply-To: <20140617074729.30008.55742.sendpatchset@w520>
+References: <20140617074658.30008.53021.sendpatchset@w520>
+ <20140617074729.30008.55742.sendpatchset@w520>
+Message-ID: <20140618145549.GA16873@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/14 18:31, Will Deacon wrote:
-> On Wed, Jun 18, 2014 at 02:50:22PM +0100, Andrey Ryabinin wrote:
->> Changing kernel stack size on arm is not as simple as it should be:
->> 1) THRED_SIZE macro doen't respect PAGE_SIZE and THREAD_SIZE_ORDER
+On Tue, Jun 17, 2014 at 04:47:29PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
 > 
-> THREAD_SIZE
+> Move most of irqs.h so it can be used as #include "irqs.h"
+> instead of the old style #include <mach/irqs.h>.
 > 
-Yup, I just found some more typos in my commit message.
-I'll fix them in update.
-
->> 2) stack size is hardcoded in get_thread_info macro
->>
->> This patch fixes it by caculating THREAD_SIZE and thread_info address
->> taking into account PAGE_SIZE and THREAD_SIZE_ORDER.
->>
->> Now changing stack size becomes simply changing THREAD_SIZE_ORDER.
+> Legacy code in drivers/pinctrl needs more work to get rid
+> of the "mach" portion of the include path, so some part
+> is left in the original location.
 > 
-> Curious: is this just a cleanup, or are you actually running out of kernel
-> stack on an ARM platform?
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
 > 
+>  Changes since V1:
+>  - rebased to v3.16-rc1
 
-It's actually both.
-I'm working on address sanitizer for kernel [1]. Recently we started experiments with
-stack instrumentation. Compiler inserts redzones around every variable on stack, so
-we could detect accesses to such redzones and catch out-of-bound read/write bugs on stack variables.
-Obviously stack is bloated in such kernel.
-For mainline kernel it just a cleanup.
+[snip]
 
+> --- 0001/arch/arm/mach-shmobile/include/mach/irqs.h
+> +++ work/arch/arm/mach-shmobile/include/mach/irqs.h	2014-06-17 16:03:57.000000000 +0900
+> @@ -1,24 +1,11 @@
+>  #ifndef __ASM_MACH_IRQS_H
+>  #define __ASM_MACH_IRQS_H
+>  
+> -#include <linux/sh_intc.h>
+> -
+> -/* GIC */
+> -#define gic_spi(nr)		((nr) + 32)
+> -#define gic_iid(nr)		(nr) /* ICCIAR / interrupt ID */
+> -
+> -/* INTCS */
+> -#define INTCS_VECT_BASE		0x3400
+> -#define INTCS_VECT(n, vect)	INTC_VECT((n), INTCS_VECT_BASE + (vect))
+> -#define intcs_evt2irq(evt)	evt2irq(INTCS_VECT_BASE + (evt))
+> +/* Stuck here until drivers/pinctl/sh-pfc gets rid of legacy code */
+>  
+>  /* External IRQ pins */
+>  #define IRQPIN_BASE		2000
+>  #define irq_pin(nr)		((nr) + IRQPIN_BASE)
+>  
+> -/* GPIO IRQ */
+> -#define _GPIO_IRQ_BASE		2500
+> -#define GPIO_IRQ_BASE(x)	(_GPIO_IRQ_BASE + (32 * x))
+> -#define GPIO_IRQ(x, y)		(_GPIO_IRQ_BASE + (32 * x) + y)
+> -
+>  #endif /* __ASM_MACH_IRQS_H */
+> +
 
-[1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerForKernel
+I removed the trailing blank line this patch adds here.
 
-> Will
-> 
+[snip]
