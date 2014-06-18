@@ -1,42 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Jun 2014 14:24:38 +0200
-Subject: [PATCH v2 16/20] mfd: sun6i-prcm: Add support for Allwinner A23
- PRCM
-In-Reply-To: <20140618082953.GO21030@lee--X1>
+Date: Wed, 18 Jun 2014 14:29:03 +0200
+Subject: [PATCH v2 18/20] ARM: sunxi: Add earlyprintk support using
+ R_UART (sun6i/sun8i)
+In-Reply-To: <1403016777-15121-19-git-send-email-wens@csie.org>
 References: <1403016777-15121-1-git-send-email-wens@csie.org>
- <1403016777-15121-17-git-send-email-wens@csie.org>
- <20140618082953.GO21030@lee--X1>
-Message-ID: <20140618122438.GR19730@lukather>
+ <1403016777-15121-19-git-send-email-wens@csie.org>
+Message-ID: <20140618122903.GT19730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 09:29:53AM +0100, Lee Jones wrote:
-> > The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
-> > The differences are the AR100 clock can no longer be modified,
-> > the APB0 clock has different divisors, and some clock gates are
-> > gone.
-> > 
-> > This patch adds a compatible with a modified subdevice list for
-> > the A23.
-> > 
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> >  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
-> >  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
-> >  2 files changed, 31 insertions(+), 1 deletion(-)
+On Tue, Jun 17, 2014 at 10:52:55PM +0800, Chen-Yu Tsai wrote:
+> sun6i/sun8i have a UART in the RTC block group, which can be used
+> as an early console. This is most useful on sun8i as UART0 is muxed
+> with MMC0, which is not available if we boot from MMC.
 > 
-> The patch looks fine to me, but I'm concerned about the size of the
-> patch set and the amount of subsystems it touches.
-> 
-> I am guessing that this patch can just be taken independently though.
-> Please correct me if I'm wrong.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I have a bit of the same concern. We have several comments on the
-previous patches, so I'm not even sure this patch can go as is.
-
-It would be much easier if you (ChenYu) could introduce first a very
-basic with just the UART support, and then, as separate series,
-clocks, PRCM, MMC, and so on.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 Maxime
 
@@ -50,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/e3250f99/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/816d00cf/attachment.sig>
