@@ -1,29 +1,99 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 18 Jun 2014 22:08:03 +0800
-Subject: [PATCH 1/2] ARM: dts: hummingboard: add support for BT/wifi
- where fitted
-In-Reply-To: <20140618134459.GD32514@n2100.arm.linux.org.uk>
-References: <E1WufIK-0007yl-2k@rmk-PC.arm.linux.org.uk>
- <20140618133345.GL8860@dragon>
- <20140618134459.GD32514@n2100.arm.linux.org.uk>
-Message-ID: <20140618140802.GM8860@dragon>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 18 Jun 2014 09:09:35 -0500
+Subject: [PATCH] arm64: support reboot and power off via EFI runtime
+In-Reply-To: <1403023514-1352-1-git-send-email-msalter@redhat.com>
+References: <1403023514-1352-1-git-send-email-msalter@redhat.com>
+Message-ID: <CAL_JsqJUMMRwUn+PUiFweDOywgLCbKiWfDTLDSfJqE9oTV5gYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 02:44:59PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 18, 2014 at 09:33:46PM +0800, Shawn Guo wrote:
-> > On Wed, Jun 11, 2014 at 10:58:12AM +0100, Russell King wrote:
-> > > Some microsom modules have BT/Wifi fitted for the Hummingboard.  Enable
-> > > support for this additional hardware; where it isn't present, the SDIO
-> > > BT/Wifi will not be detected, and no harm will come from having these
-> > > additional devices enabled.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Applied this one, thanks.
-> 
-> Probably not a good idea - which is why I didn't re-send it with my
+On Tue, Jun 17, 2014 at 11:45 AM, Mark Salter <msalter@redhat.com> wrote:
+> Add handlers for arm_pm_resestart and pm_power_off which use EFI
 
-Okay, dropped.
+typo.
 
-Shawn
+> runtime services ResetSystem call to perform the functions. These
+> handlers are only installed if no handler currently exists. This
+> allows PSCI to take priority over EFI for these functions.
+>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
+
+Where's the arm32 version? Surely this could be shared with all
+arches. pm_power_off is at least architecturally independent. We
+should do the same for restart/reboot. I'm not saying do that now, but
+at least put it in the right place for that to happen.
+
+Rob
+
+>  1 file changed, 40 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 14db1f6..e8c0476 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -19,11 +19,14 @@
+>  #include <linux/of_fdt.h>
+>  #include <linux/sched.h>
+>  #include <linux/slab.h>
+> +#include <linux/reboot.h>
+> +#include <linux/pm.h>
+>
+>  #include <asm/cacheflush.h>
+>  #include <asm/efi.h>
+>  #include <asm/tlbflush.h>
+>  #include <asm/mmu_context.h>
+> +#include <asm/system_misc.h>
+>
+>  struct efi_memory_map memmap;
+>
+> @@ -467,3 +470,40 @@ static int __init arm64_enter_virtual_mode(void)
+>         return 0;
+>  }
+>  early_initcall(arm64_enter_virtual_mode);
+> +
+> +static void efi_restart(enum reboot_mode reboot_mode, const char *cmd)
+> +{
+> +       int efi_mode;
+> +
+> +       switch (reboot_mode) {
+> +       case REBOOT_WARM:
+> +       case REBOOT_SOFT:
+> +               efi_mode = EFI_RESET_WARM;
+> +               break;
+> +       default:
+> +               efi_mode = EFI_RESET_COLD;
+> +               break;
+> +       }
+> +       efi.reset_system(efi_mode, 0, 0, NULL);
+> +}
+> +
+> +static void efi_power_off(void)
+> +{
+> +       efi.reset_system(EFI_RESET_SHUTDOWN, 0, 0, NULL);
+> +}
+> +
+> +static int __init setup_efi_reset(void)
+> +{
+> +       if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+> +               /*
+> +                * If something (psci, etc) hasn't already registered
+> +                * a handler, use EFI.
+> +                */
+> +               if (arm_pm_restart == NULL)
+> +                       arm_pm_restart = efi_restart;
+> +               if (pm_power_off == NULL)
+> +                       pm_power_off = efi_power_off;
+> +       }
+> +       return 0;
+> +}
+> +pure_initcall(setup_efi_reset);
+> --
+> 1.9.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
