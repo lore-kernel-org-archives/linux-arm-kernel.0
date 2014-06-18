@@ -1,76 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 15:10:48 +0100
-Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
- regulators
-In-Reply-To: <53A16047.7010409@collabora.co.uk>
-References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
- <20140617211747.GY29841@lee--X1> <53A16047.7010409@collabora.co.uk>
-Message-ID: <20140618141048.GA15956@lee--X1>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 18 Jun 2014 16:11:06 +0200
+Subject: Dove DT and HDMI on v3.16-rc1 (was: Re: [PATCH RFC 0/5] Dove PMU
+ support)
+In-Reply-To: <20140615152554.GA13870@n2100.arm.linux.org.uk>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
+ <535F6DAF.1010400@gmail.com> <20140615152554.GA13870@n2100.arm.linux.org.uk>
+Message-ID: <53A19DFA.7030207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jun 2014, Javier Martinez Canillas wrote:
+On 06/15/2014 05:25 PM, Russell King - ARM Linux wrote:
+> As for DT, I should probably state that I'm far from happy with the DT
+> situation on Dove.  When I've tried it, I've encountered problems with
+> the HDMI output - the picture spends more time blanked than displaying.
+> I've no idea what is causing that, I've been through the SI5351
+> registers, the TDA998x registers, the LCD controller registers, and I
+> can't find any reason for it.  Yet, boot the same kernel without DT
+> and it works fine.  Boot back using DT, and it's unstable again.
+>
+> I can't detect any difference on the actual HDMI signals themselves
+> either.  The HDMI clock seems stable and of the correct frequency.
+>
+> There is definitely some difference between booting with DT and booting
+> with legacy stuff that seems to upset HDMI.
+>
+> For me, the /only/ reliably working system is one where DT is not
+> involved.  This means I remain opposed to any solutions which can't
+> be used in a non-DT environment - at least until the HDMI issue can
+> be resolved.
 
-> Hello Lee,
-> 
-> Thanks a lot for your feedback.
-> 
-> On 06/17/2014 11:17 PM, Lee Jones wrote:
-> >> The MAX77802 PMIC has 10 high-efficiency Buck and 32 Low-dropout
-> >> (LDO) regulators. This patch adds support for all these regulators
-> >> found on the MAX77802 PMIC and is based on a driver added by Simon
-> >> Glass to the Chrome OS kernel 3.8 tree.
-> >> 
-> >> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >> ---
-> >> 
-> >> Changes since v1:
-> >>  - Remove unneeded check if num_regulators != MAX77802_MAX_REGULATORS.
-> >>  - Fix .set_suspend_mode handler comment and split regulators ops for
-> >>    regulators that behave differently. Suggested by Mark Brown.
-> >>  - Use module_platform_driver() instead of having init/exit functions.
-> >>    Suggested by Mark Brown.
-> >>  - Use the new descriptor-based GPIO interface instead of the deprecated
-> >>    integer based GPIO one. Suggested by Mark Brown.
-> >>  - Look for "regulators" child node instead of "voltage-regulators" to be
-> >>    consistent with other PMIC drivers. Suggested by Mark Brown.
-> >> 
-> >>  drivers/mfd/max77802.c       |   1 +
-> > 
-> > Can you remove all of the MFD changes from patches 7, 8 and 9 and
-> > create new one.  That way there's no requirement for any cross
-> > subsystem messiness.
-> > 
-> 
-> Sure, Mark already suggested the same and I'll do it on the next version.
-> 
-> But there still be some cross-subsystem dependency/messiness since the
-> regulator, clk and rtc drivers include the mfd max77802 headers that are added
-> in Patch 6.
+Russell,
 
-What I should have said was _avoidable_ or _unnecessary_ messiness.
+as said on IRC, I really want this to be sorted out. I prepared a Dove
+DT HDMI quick-hack and pushed it to
 
-> So I guess you should either a) take the whole patch-set through your mfd tree
-> or b) merge the mfd patches and create an immutable branch that can be pulled by
-> Mark, Mike and Alessandro.
-> 
-> I don't know what's the preferred workflow in these cases...
+https://github.com/shesselba/linux-dove.git dove-drm-v3.16-rc1
 
-That's fine.  I'm happy to create shared branches when required.
+Using your libdrm-armada and xf86-video-armada on Ubuntu raring armhf,
+I can run Xfce4 on 1920x1080p60 on Dove Cubox without any blanking
+issues. Using xrandr -s <mode> will fail after 2-3 times but that
+shouldn't be related to the issues you see.
 
-> >>  drivers/regulator/Kconfig    |   9 +
-> >>  drivers/regulator/Makefile   |   1 +
-> >>  drivers/regulator/max77802.c | 701 +++++++++++++++++++++++++++++++++++++++++++
-> >>  4 files changed, 712 insertions(+)
-> >>  create mode 100644 drivers/regulator/max77802.c
-> > 
-> 
-> Best regards,
-> Javier
+Please test above branch with kernel config at
+https://dl.dropboxusercontent.com/u/59928252/config-dove-v3.16-rc1-hdmi
+and report back if issues are still there.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Anyone having a Dove CuBox ready, please also test. Russell has a git
+branch for the required video lib and drivers.
+
+Sebastian
