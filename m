@@ -1,99 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Jun 2014 11:06:41 +0200
-Subject: [PATCH RESEND 1/2] ARM: topology: Use a clock if possible to get
- the CPU frequency
-In-Reply-To: <CAL_Jsq+D2dprBfg8G_zYeZ9sk0pwWhVRd-1Uo513E0Jgg2igRg@mail.gmail.com>
-References: <1403034980-19112-1-git-send-email-maxime.ripard@free-electrons.com>
- <1403034980-19112-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAL_Jsq+D2dprBfg8G_zYeZ9sk0pwWhVRd-1Uo513E0Jgg2igRg@mail.gmail.com>
-Message-ID: <20140618090641.GG19730@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 Jun 2014 11:12:28 +0200
+Subject: [PATCH] efi/arm64: efistub: remove local copy of linux_banner
+In-Reply-To: <20140618085059.GB24049@console-pimps.org>
+References: <1402657911-7779-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140618085059.GB24049@console-pimps.org>
+Message-ID: <CAKv+Gu8auFu=rxtDpZy4tkfPiZK7ERUeRDvymzQYi9AhVUxW+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 18 June 2014 10:50, Matt Fleming <matt@console-pimps.org> wrote:
+> On Fri, 13 Jun, at 01:11:51PM, Ard Biesheuvel wrote:
+>> The shared efistub code for ARM and arm64 contains a local copy of linux_banner,
+>> allowing it to be referenced from separate executables such as the ARM
+>> decompressor. However, this introduces a dependency on generated header files,
+>> causing unnecessary rebuilds of the stub itself and, in case of arm64, vmlinux
+>> which contains it.
+>>
+>> On arm64, the copy is not actually needed since we can reference the original
+>> symbol directly, and as it turns out, there may be better ways to deal with this
+>> for ARM as well, so let's remove it from the shared code. If it still needs to
+>> be reintroduced for ARM later, it should live under arch/arm anyway and not in
+>> shared code.
+>
+> I remember making some similar arguments when this patch was first
+> introduced. From looking at my notes, the patch rationale was based on
+> some DT binding discussion where people wanted an explicit way to
+> identify the kernel they were booting and everyone agreed upon this
+> string - I don't know which discussion, I don't have that data.
+>
+> I'm more than happy to delete this from the shared code, I never wanted
+> it to go in in the first place. But could someone please give me some
+> details as to why this change is safe and isn't going to break
+> ARM/ARM64? How does this affect DT bindings?
+>
 
-On Tue, Jun 17, 2014 at 04:13:26PM -0500, Rob Herring wrote:
-> On Tue, Jun 17, 2014 at 2:56 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
-> > topology code.
-> >
-> > Allow to use a clock to provide the same information.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/kernel/topology.c | 24 +++++++++++++++++-------
-> >  1 file changed, 17 insertions(+), 7 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> > index 9d853189028b..0bd044cbbcb2 100644
-> > --- a/arch/arm/kernel/topology.c
-> > +++ b/arch/arm/kernel/topology.c
-> > @@ -11,6 +11,7 @@
-> >   * for more details.
-> >   */
-> >
-> > +#include <linux/clk.h>
-> >  #include <linux/cpu.h>
-> >  #include <linux/cpumask.h>
-> >  #include <linux/export.h>
-> > @@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
-> >                                  GFP_NOWAIT);
-> >
-> >         for_each_possible_cpu(cpu) {
-> > -               const u32 *rate;
-> > -               int len;
-> > +               struct clk *clk;
-> > +               u32 rate = 0;
-> >
-> >                 /* too early to use cpu->of_node */
-> >                 cn = of_get_cpu_node(cpu, NULL);
-> > @@ -117,14 +118,23 @@ static void __init parse_dt_topology(void)
-> >                 if (cpu_eff->compatible == NULL)
-> >                         continue;
-> >
-> > -               rate = of_get_property(cn, "clock-frequency", &len);
-> > -               if (!rate || len != 4) {
-> > -                       pr_err("%s missing clock-frequency property\n",
-> > -                               cn->full_name);
-> > +               clk = of_clk_get(cn, 0);
-> > +               if (!IS_ERR(clk)) {
-> > +                       rate = clk_get_rate(clk);
-> > +               } else {
-> > +                       if (of_property_read_u32(cn, "clock-frequency", &rate)) {
-> > +                               pr_err("%s missing clocks or clock-frequency properties\n",
-> > +                                      cn->full_name);
-> 
-> This error check and message is redundant with the next error message.
-> You can remove this one and just call of_property_read_u32. rate will
-> remain untouched on error.
+This just removes the duplicate definition of linux_banner, *not* the
+reference to it a couple of lines down. IOW, the DT bindings and
+everything behind it are not affected at all by this patch.
+The reason it works fine for arm64 is that its stub is part of the
+kernel proper, so the reference will bind to the global definition
+instead.
 
-I'm not sure what you mean here. There's no next error message in the
-code as far as I'm aware.
+What will be affected is 32-bit ARM, as its stub is not part of the
+kernel proper. In this case, we will propose an alternative [and
+better] way of allowing the stub to reference linux_banner, i.e.,
+without having to redefine it at the C level. We will take this into
+account when we propose the next round of efistub patches for ARM.
 
-If you mean that I'd rather have something like
-
-clk = of_clk_get(cn, 0);
-if (!IS_ERR(clk))
-	rate = clk_get_rate(clk);
-else
-	of_property_read_u32(cn, "clock-frequency", &rate));
-
-if (!rate)
-	pr_err()
-
-Then, yes, it makes sense. I'll resend a version
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/fdefee69/attachment.sig>
+Regards,
+Ard.
