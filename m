@@ -1,45 +1,54 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 18 Jun 2014 16:30:50 -0700
-Subject: [PATCH v3 3/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <20140618223112.GM24024@pd.tnic>
-References: <1401761660-11515-1-git-send-email-lho@apm.com>
- <1401761660-11515-2-git-send-email-lho@apm.com>
- <1401761660-11515-3-git-send-email-lho@apm.com>
- <1401761660-11515-4-git-send-email-lho@apm.com>
- <20140618221046.GL24024@pd.tnic>
- <CAPw-ZT=k=27NY5OgV2Tp4gsjf3wSTmgN3FM46qJq8HEQWHTYDw@mail.gmail.com>
- <20140618223112.GM24024@pd.tnic>
-Message-ID: <CAPw-ZTmqEuXCZGPGXBJAe4+_L+4LZfrPUp=JFKHjnGXqADr0zQ@mail.gmail.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 18 Jun 2014 16:46:11 -0700
+Subject: [PATCH v6 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <20140617.132024.1213369771856463527.davem@davemloft.net>
+References: <1402964326-11147-5-git-send-email-isubramanian@apm.com>
+ <20140616.214247.1154200670003936158.davem@davemloft.net>
+ <CAKh23F=2undAW=nWibOreAM8DJiQKpLx=OboCX=fNZE+OU=AbA@mail.gmail.com>
+ <20140617.132024.1213369771856463527.davem@davemloft.net>
+Message-ID: <CAKh23FmnZqZkDaGYPfnKRrvCYQ4_6W_RRKbqEbc4nbD6jqQaLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
->> One more thing, if you going to pull this in, please use version 4 as
->> that fixes the PMD (CPU L1/L2) error report and clearing.
+On Tue, Jun 17, 2014 at 1:20 PM, David Miller <davem@davemloft.net> wrote:
+> From: Iyappan Subramanian <isubramanian@apm.com>
+> Date: Tue, 17 Jun 2014 12:21:08 -0700
 >
-> Ah, I have a v4 too in my mbox. cool.
+>> On Mon, Jun 16, 2014 at 9:42 PM, David Miller <davem@davemloft.net> wrote:
+>>> From: Iyappan Subramanian <isubramanian@apm.com>
+>>> Date: Mon, 16 Jun 2014 17:18:46 -0700
+>>>
+>>>> +static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
+>>>> +                                      struct net_device *ndev)
+>>>> +{
+>>>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+>>>> +     struct xgene_enet_desc_ring *tx_ring = pdata->tx_ring;
+>>>> +     struct xgene_enet_desc_ring *cp_ring = tx_ring->cp_ring;
+>>>> +     u32 tx_level, cq_level;
+>>>> +
+>>>> +     tx_level = xgene_enet_ring_len(tx_ring);
+>>>> +     cq_level = xgene_enet_ring_len(cp_ring);
+>>>> +     if (unlikely(tx_level > pdata->tx_qcnt_hi ||
+>>>> +                  cq_level > pdata->cp_qcnt_hi)) {
+>>>> +             netif_stop_queue(ndev);
+>>>> +             return NETDEV_TX_BUSY;
+>>>> +     }
+>>>> +
+>>>> +     if (xgene_enet_setup_tx_desc(tx_ring, skb))
+>>>> +             return NETDEV_TX_OK;
+>>>
+>>> If you return NETDEV_TX_OK, it is your responsibility to deal with the
+>>> SKB, because you own it.
+>>>
+>>> In particular, you have to free the packet.
+>>
+>> skb freeing happens in xgene_enet_tx_completion().
 >
-> Please ping me when the atomic scrub lands in some maintainers tree so
-> that we can track it/point to it.
-
-Did the EDAC support for ARM64 made to any GIT tree yet?
-
->> Should I ping a device tree maintainer? If so, who would that be?
+> You're not queueing up the packet when DMA mapping the packet fails,
+> which is the only condition that causes xgene_enet_setup_tx_desc() to
+> return an error, so xgene_enet_tx_completion() will not be called.
 >
-> $ ./scripts/get_maintainer.pl -f Documentation/devicetree/
-> Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND...)
-> Pawel Moll <pawel.moll@arm.com> (maintainer:OPEN FIRMWARE AND...)
-> Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND...)
-> Ian Campbell <ijc+devicetree@hellion.org.uk> (maintainer:OPEN FIRMWARE AND...)
-> Kumar Gala <galak@codeaurora.org> (maintainer:OPEN FIRMWARE AND...)
-> Randy Dunlap <rdunlap@infradead.org> (maintainer:DOCUMENTATION)
-> devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND...)
-> linux-doc at vger.kernel.org (open list:DOCUMENTATION)
-> linux-kernel at vger.kernel.org (open list)
+> Can you really not see this?
 
-Also, can you review the DT node of this EDAC driver as you seems to
-review the GPIO DT node as well? Please review version 4 of the
-posting.
-
--Loc
+I am sorry I missed that.  I will fix this.
