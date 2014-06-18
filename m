@@ -1,49 +1,78 @@
-From: dann.frazier@canonical.com (Dann Frazier)
-Date: Wed, 18 Jun 2014 16:19:45 -0600
-Subject: [PATCH v3 3/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <20140618221046.GL24024@pd.tnic>
-References: <1401761660-11515-1-git-send-email-lho@apm.com>
- <1401761660-11515-2-git-send-email-lho@apm.com>
- <1401761660-11515-3-git-send-email-lho@apm.com>
- <1401761660-11515-4-git-send-email-lho@apm.com>
- <20140618221046.GL24024@pd.tnic>
-Message-ID: <CALdTtnte5M=G5qyChM2iegkivdgsRM=23ezcHNGVuPYN24LXhg@mail.gmail.com>
+From: stephane.marchesin@gmail.com (=?UTF-8?Q?St=C3=A9phane_Marchesin?=)
+Date: Wed, 18 Jun 2014 15:19:27 -0700
+Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
+In-Reply-To: <20140618220008.GC26514@mithrandir>
+References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
+ <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
+ <53A069B6.6070902@wwwdotorg.org> <53A1CB23.5090307@collabora.com>
+ <20140618220008.GC26514@mithrandir>
+Message-ID: <CACP_E+Jr5QyYm92Mc2=WVhKMbk=9Ty1fvJuH+fqOmDnYmdqFRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 4:10 PM, Borislav Petkov <bp@alien8.de> wrote:
-> On Mon, Jun 02, 2014 at 08:14:19PM -0600, Loc Ho wrote:
->> This patch adds support for the APM X-Gene SoC EDAC driver and
->> requires ARM64 EDAC support patch [1] to compile.
+On Wed, Jun 18, 2014 at 3:00 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Jun 18, 2014 at 07:23:47PM +0200, Tomeu Vizoso wrote:
+>> On 06/17/2014 06:15 PM, Stephen Warren wrote:
+>> >On 06/17/2014 06:16 AM, Tomeu Vizoso wrote:
+>> >>On 06/16/2014 10:02 PM, Stephen Warren wrote:
+>> >>>On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
+>> >>>>+#ifdef CONFIG_TEGRA124_EMC
+>> >>>>+int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
+>> >>>>long rate);
+>> >>>>+void tegra124_emc_set_floor(unsigned long freq);
+>> >>>>+void tegra124_emc_set_ceiling(unsigned long freq);
+>> >>>>+#else
+>> >>>>+int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
+>> >>>>long rate)
+>> >>>>+{ return -ENODEV; }
+>> >>>>+void tegra124_emc_set_floor(unsigned long freq)
+>> >>>>+{ return; }
+>> >>>>+void tegra124_emc_set_ceiling(unsigned long freq)
+>> >>>>+{ return; }
+>> >>>>+#endif
+>> >>>
+>> >>>I'll repeat what I said off-list so that we can have the whole
+>> >>>conversation on the list:
+>> >>>
+>> >>>That looks like a custom Tegra-specific API. I think it'd be much better
+>> >>>to integrate this into the common clock framework as a standard clock
+>> >>>constraints API. There are other use-cases for clock constraints besides
+>> >>>EMC scaling (e.g. some in audio on Tegra, and I'm sure many on other
+>> >>>SoCs too).
+>> >>
+>> >>Yes, I wrote a bit in the cover letter about our requirements and how
+>> >>they map to the CCF. Could you please comment on that?
+>> >
+>> >My comments remain the same. I believe this is something that belongs in
+>> >the clock driver, or at the least, some API that takes a struct clock as
+>> >its parameter, so that drivers can use the existing DT clock lookup
+>> >mechanism.
 >>
->> [1] http://www.spinics.net/lists/arm-kernel/msg324093.html
+>> Ok, let me put this strawman here to see if I have gotten close to what you
+>> have in mind:
 >>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
+>> * add per-client accounting (Rabin's patches referenced before)
+>>
+>> * add clk_set_floor, to be used by cpufreq, load stats, etc.
+>>
+>> * add clk_set_ceiling, to be used by battery drivers, thermal, etc.
+>>
+>> * an EMC driver would collect bandwidth and latency requests from consumers
+>> and call clk_set_floor on the EMC clock.
+>>
+>> * the EMC driver would also register for rate change notifications in the
+>> EMC clock and would update the latency allowance registers at that point.
 >
-> This is starting to look ok, I'd guess it needs to go after the atomic
-> scrub patch goes in, right?
+> Latency allowance registers are part of the MC rather than the EMC. So I
+> think we have two options: a) have a unified driver for MC and EMC or b)
+> provide two parts of the API in two drivers.
+>
+> Or perhaps c), create a generic framework that both MC and EMC can
+> register with (bandwidth for EMC, latency for MC).
 
-Yeah, he mentions that dependency in patch #3. fwiw, I tested this set
-together and it is working fine for me.
+Is there any motivation for keeping MC and EMC separate? In my mind,
+the solution was always to handle those together.
 
-Tested-by: dann frazier <dann.frazier@canonical.com>
-
- -dann
-
-> Also, I'd need the device tree pieces acked by device tree maintainers
-> before I pick them up together with this driver.
->
-> Thanks.
->
-> --
-> Regards/Gruss,
->     Boris.
->
-> Sent from a fat crate under my desk. Formatting is fine.
-> --
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+St?phane
