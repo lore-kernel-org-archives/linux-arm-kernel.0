@@ -1,93 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Jun 2014 14:26:23 +0100
-Subject: [PATCH] arm64: support reboot and power off via EFI runtime
-In-Reply-To: <1403023514-1352-1-git-send-email-msalter@redhat.com>
-References: <1403023514-1352-1-git-send-email-msalter@redhat.com>
-Message-ID: <20140618132623.GF26461@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Jun 2014 14:32:58 +0100
+Subject: [PATCH RFC v2 3/3] documentation/iommu: Add description of
+ Hisilicon SMMU private binding
+In-Reply-To: <53A0EB3E.2080202@huawei.com>
+References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
+ <1402549692-5224-4-git-send-email-thunder.leizhen@huawei.com>
+ <20140616163930.GX16758@arm.com> <539FF33C.7020007@huawei.com>
+ <20140617093326.GC13020@arm.com> <53A0EB3E.2080202@huawei.com>
+Message-ID: <20140618133258.GC2186@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Tue, Jun 17, 2014 at 05:45:14PM +0100, Mark Salter wrote:
-> Add handlers for arm_pm_resestart and pm_power_off which use EFI
-> runtime services ResetSystem call to perform the functions. These
-> handlers are only installed if no handler currently exists. This
-> allows PSCI to take priority over EFI for these functions.
+On Wed, Jun 18, 2014 at 02:28:30AM +0100, leizhen wrote:
+> On 2014/6/17 17:33, Will Deacon wrote:
+> > On Tue, Jun 17, 2014 at 08:50:20AM +0100, leizhen wrote:
+> >> The latter case. Some masters driver want use cacheable(WB) attribute to access
+> >> memory, but the masters can not bring cacheable attribute. So, can not use
+> >> bypass(or transaction) mode. In fact, the master driver can use iommu_map to
+> >> create map and specify IOMMU_CACHE. But maybe the driver does not want to
+> >> map, if the memory access is very dynamically, frequently map and unmap will
+> >> decrease performance.
+> > 
+> > You seem to be highlighting a perceived deficiency in the IOMMU API which
+> > you're attempting to work-around with new device-tree properties. Instead,
+> > why not propose an extension to the IOMMU API in Linux?
+> > 
 > 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
+> The private properties or new IOMMU APIs, just in order to optimize performance
+> or simplify master driver code, I will consider it later. I think it's good to
+> support base functions first.
 > 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 14db1f6..e8c0476 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -19,11 +19,14 @@
->  #include <linux/of_fdt.h>
->  #include <linux/sched.h>
->  #include <linux/slab.h>
-> +#include <linux/reboot.h>
-> +#include <linux/pm.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/efi.h>
->  #include <asm/tlbflush.h>
->  #include <asm/mmu_context.h>
-> +#include <asm/system_misc.h>
->  
->  struct efi_memory_map memmap;
->  
-> @@ -467,3 +470,40 @@ static int __init arm64_enter_virtual_mode(void)
->  	return 0;
->  }
->  early_initcall(arm64_enter_virtual_mode);
-> +
-> +static void efi_restart(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> +	int efi_mode;
-> +
-> +	switch (reboot_mode) {
-> +	case REBOOT_WARM:
-> +	case REBOOT_SOFT:
-> +		efi_mode = EFI_RESET_WARM;
-> +		break;
-> +	default:
-> +		efi_mode = EFI_RESET_COLD;
-> +		break;
-> +	}
-> +	efi.reset_system(efi_mode, 0, 0, NULL);
-> +}
-> +
-> +static void efi_power_off(void)
-> +{
-> +	efi.reset_system(EFI_RESET_SHUTDOWN, 0, 0, NULL);
-> +}
-> +
-> +static int __init setup_efi_reset(void)
-> +{
-> +	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-> +		/*
-> +		 * If something (psci, etc) hasn't already registered
-> +		 * a handler, use EFI.
-> +		 */
-> +		if (arm_pm_restart == NULL)
-> +			arm_pm_restart = efi_restart;
-> +		if (pm_power_off == NULL)
-> +			pm_power_off = efi_power_off;
-> +	}
-> +	return 0;
-> +}
-> +pure_initcall(setup_efi_reset);
+> Sorry, I just only known ARM SMMU and Hisilicon SMMU, not familiar with others.
+> Add a common API may meet more difficulty.
+> 
+> If I have time, I will try to do it.
 
-This doesn't seem to match the definition of a pure initcall, given that
-it depends on the state of EFI runtime services and
-arm_{pm_restart,power_off}.
+Ok, so we're agreeing to drop those properties for now?
 
-Is there any reason this needs to run so early? Can this not be
-called later, when we have more of a guarantee of other reboot /
-shutdown mechanisms having been registered?
+> >> Actually, I think smmu-force-memtype maybe suitable for arm-smmu too. But now,
+> >> if nobody declear need it, I will just implement it in hisi-smmu.c
+> > 
+> > I don't want to see hisi-smmu.c at all. You need to make your driver fit
+> > into the code we already have.
+> > 
+> > Do you have a specification available describing the hardware you have
+> > created?
+> > 
+> 
+> Although I have the Hisilicon SMMU specification, but it was written in Chinese.
+> I have told this to hardware engineers.
 
-Cheers,
-Mark.
+Having access to a specification I can understand would help to assess
+exactly what you've gone and built.
+
+> OK. I will try my best to merge two drivers into one file. Maybe need to use many
+> #if#else.
+
+The fact of the matter is that you've got a device that isn't
+architecturally compliant. That leaves me in a fairly undesirable position
+with a small set of options:
+
+  (1) We can duplicate lots of the code we already have and you end up with a
+      separate driver. This is obviously bad because of the code duplication,
+      associated maintenance headaches, driver divergence, etc. It also brings
+      into question the point of having a driver written to the architecture
+      when the hardware has gone off and done something different.
+
+  (2) We try to fit your SMMU into the existing driver. I'd like to see what
+      this looks like, but if it's as much #ifdeffery as you suggest, then
+      that's also bad for many of the same reasons as above.
+
+  (3) We don't support your device in the Linux kernel. We could just treat
+      your SMMU as a broken ARM SMMU implementation and not support it. If
+      this was a CPU instead of an SMMU this would unquestionably be the
+      correct approach.
+
+Unless you can come up with something compelling for point (2), I'm going to
+err on the side of (3). So, please, *please*, don't do a rushed job of
+merging the drivers. You need to convince me why I should bother supporting
+this device in my driver, which means using clean abstractions and extending
+the code we already have. If this isn't possible, then perhaps you'll
+consider following the architecture next time around.
+
+Will
