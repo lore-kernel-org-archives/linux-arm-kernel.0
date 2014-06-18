@@ -1,85 +1,135 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 18 Jun 2014 19:27:20 +0400
-Subject: [PATCH] arm: get rid of hardcoded assumptions about kernel stack
- size
-In-Reply-To: <alpine.LFD.2.11.1406181039310.16842@knanqh.ubzr>
-References: <1403099422-850-1-git-send-email-a.ryabinin@samsung.com>
- <alpine.LFD.2.11.1406181039310.16842@knanqh.ubzr>
-Message-ID: <53A1AFD8.1080808@samsung.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 18 Jun 2014 08:36:52 -0700
+Subject: [PATCH v2 1/2] gpio: Add driver for Zynq GPIO controller
+In-Reply-To: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
+References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
+Message-ID: <5cc8b89b-20ff-4fa9-92dd-bb2f6d3512d8@BY2FFO11FD030.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/14 18:40, Nicolas Pitre wrote:
-> On Wed, 18 Jun 2014, Andrey Ryabinin wrote:
-> 
->> Changing kernel stack size on arm is not as simple as it should be:
->> 1) THRED_SIZE macro doen't respect PAGE_SIZE and THREAD_SIZE_ORDER
->> 2) stack size is hardcoded in get_thread_info macro
->>
->> This patch fixes it by caculating THREAD_SIZE and thread_info address
->> taking into account PAGE_SIZE and THREAD_SIZE_ORDER.
->>
->> Now changing stack size becomes simply changing THREAD_SIZE_ORDER.
->>
->> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> 
+Hi Linus,
 
-Thanks. Patch with fixes in commit message pushed to Russel's patch tracking system, #8078/1.
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8078/1
+I did some of the changes for this v2 and a few things are not clear to
+me.
 
+The first is, how is userspace supposed to find the correct offset for a
+GPIO pin. E.g. let's say GPIO 10 of this SOC-internal GPIO controller is
+something I want to control. So, I'd export GPIO (chip-base + 10). But
+this chip-base seems pretty variable. v1 of this patch had it hardcoded
+to 0, which resulted in a predictable offset, but apparently was utterly
+wrong. Now I see an offset of 138 for this chip when using my config.
+And when I use multi_v7_defconfig the offset is somewhere in the 800s,
+IIRC. The best I found was the 'label' in the gpiochip's sysfs entry,
+but documentation says that is not necessarily unique, and parsing labes
+seems sub-optimal too.
 
->> ---
->>  arch/arm/include/asm/assembler.h   | 8 +++++---
->>  arch/arm/include/asm/thread_info.h | 3 ++-
->>  2 files changed, 7 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
->> index 57f0584..906703a 100644
->> --- a/arch/arm/include/asm/assembler.h
->> +++ b/arch/arm/include/asm/assembler.h
->> @@ -24,6 +24,8 @@
->>  #include <asm/domain.h>
->>  #include <asm/opcodes-virt.h>
->>  #include <asm/asm-offsets.h>
->> +#include <asm/page.h>
->> +#include <asm/thread_info.h>
->>  
->>  #define IOMEM(x)	(x)
->>  
->> @@ -179,10 +181,10 @@
->>   * Get current thread_info.
->>   */
->>  	.macro	get_thread_info, rd
->> - ARM(	mov	\rd, sp, lsr #13	)
->> + ARM(	mov	\rd, sp, lsr #THREAD_SIZE_ORDER + PAGE_SHIFT	)
->>   THUMB(	mov	\rd, sp			)
->> - THUMB(	lsr	\rd, \rd, #13		)
->> -	mov	\rd, \rd, lsl #13
->> + THUMB(	lsr	\rd, \rd, #THREAD_SIZE_ORDER + PAGE_SHIFT	)
->> +	mov	\rd, \rd, lsl #THREAD_SIZE_ORDER + PAGE_SHIFT
->>  	.endm
->>  
->>  /*
->> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
->> index f989d7c..f85d2b0 100644
->> --- a/arch/arm/include/asm/thread_info.h
->> +++ b/arch/arm/include/asm/thread_info.h
->> @@ -14,9 +14,10 @@
->>  
->>  #include <linux/compiler.h>
->>  #include <asm/fpstate.h>
->> +#include <asm/page.h>
->>  
->>  #define THREAD_SIZE_ORDER	1
->> -#define THREAD_SIZE		8192
->> +#define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
->>  #define THREAD_START_SP		(THREAD_SIZE - 8)
->>  
->>  #ifndef __ASSEMBLY__
->> -- 
->> 1.8.5.5
->>
-> 
+The second issue is a stack trace (below) I see when triggering
+interrupts (e.g. echo rising > edge; and then pushing the connected
+button). Looking at the stack trace, I don't see an obvious error (I
+think I pretty much copied the IRQ registration from the gpio-pl061.c
+driver you mentioned). Is this an issue in this driver or the core code?
+This happens on Linus' latest tip. Despite all this chatter the system
+still works and doesn't not seem to lock up.
+
+Here the stack trace:
+# echo rising > edge
+  BUG: sleeping function called from invalid context at kernel/locking/mutex.c:586
+  in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
+  no locks held by swapper/0/0.
+  irq event stamp: 55488
+  hardirqs last  enabled at (55485): [<c03bf10c>] cpuidle_enter_state+0x60/0xec
+  hardirqs last disabled at (55486): [<c0014374>] __irq_svc+0x34/0x78
+  softirqs last  enabled at (55488): [<c002fc40>] _local_bh_enable+0x58/0x64
+  softirqs last disabled at (55487): [<c0030534>] irq_enter+0x48/0x88
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-rc1-xilinx-00021-gf5ddad957172 #88
+  [<c0017840>] (unwind_backtrace) from [<c0013770>] (show_stack+0x20/0x24)
+  [<c0013770>] (show_stack) from [<c04d94a0>] (dump_stack+0x8c/0xd0)
+  [<c04d94a0>] (dump_stack) from [<c005d5e4>] (__might_sleep+0x1ac/0x1e4)
+  [<c005d5e4>] (__might_sleep) from [<c04dc19c>] (mutex_lock_nested+0x40/0x46c)
+  [<c04dc19c>] (mutex_lock_nested) from [<c019df34>] (kernfs_notify+0xac/0x148)
+  [<c019df34>] (kernfs_notify) from [<c02d89e0>] (gpio_sysfs_irq+0x1c/0x24)
+  [<c02d89e0>] (gpio_sysfs_irq) from [<c008588c>] (handle_irq_event_percpu+0xa8/0x3c0)
+  [<c008588c>] (handle_irq_event_percpu) from [<c0085bf0>] (handle_irq_event+0x4c/0x6c)
+  [<c0085bf0>] (handle_irq_event) from [<c0088a28>] (handle_simple_irq+0xac/0xbc)
+  [<c0088a28>] (handle_simple_irq) from [<c0084fec>] (generic_handle_irq+0x30/0x40)
+  [<c0084fec>] (generic_handle_irq) from [<c02de3fc>] (zynq_gpio_irqhandler+0xe8/0x130)
+  [<c02de3fc>] (zynq_gpio_irqhandler) from [<c0084fec>] (generic_handle_irq+0x30/0x40)
+  [<c0084fec>] (generic_handle_irq) from [<c000fd24>] (handle_IRQ+0x78/0xa0)
+  [<c000fd24>] (handle_IRQ) from [<c000868c>] (gic_handle_irq+0x4c/0x70)
+  [<c000868c>] (gic_handle_irq) from [<c0014384>] (__irq_svc+0x44/0x78)
+  Exception stack(0xc0755ec8 to 0xc0755f10)
+  5ec0:                   00000001 00000004 00000000 c075fb70 00000001 edfc9310
+  5ee0: 8ed05707 0000001d 9e7f7ffa 0000001d c0752308 c0755f44 c0755ee0 c0755f10
+  5f00: c0077340 c03bf110 200d0013 ffffffff
+  [<c0014384>] (__irq_svc) from [<c03bf110>] (cpuidle_enter_state+0x64/0xec)
+  [<c03bf110>] (cpuidle_enter_state) from [<c03bf2a0>] (cpuidle_enter+0x24/0x28)
+  [<c03bf2a0>] (cpuidle_enter) from [<c0071d94>] (cpu_idle_loop+0x2e0/0x6fc)
+  [<c0071d94>] (cpu_idle_loop) from [<c00721cc>] (cpupri_find+0x0/0x108)
+  
+  =================================
+  [ INFO: inconsistent lock state ]
+  3.16.0-rc1-xilinx-00021-gf5ddad957172 #88 Not tainted
+  ---------------------------------
+  inconsistent {HARDIRQ-ON-W} -> {IN-HARDIRQ-W} usage.
+  swapper/0/0 [HC1[1]:SC0[0]:HE0:SE1] takes:
+   (kernfs_mutex){?.+.+.}, at: [<c019df34>] kernfs_notify+0xac/0x148
+  {HARDIRQ-ON-W} state was registered at:
+    [<c0079a08>] lock_acquire+0xfc/0x21c
+    [<c04dc1e0>] mutex_lock_nested+0x84/0x46c
+    [<c019d668>] kernfs_activate+0x2c/0xf8
+    [<c019d9b8>] kernfs_create_root+0xbc/0xe0
+    [<c070edac>] sysfs_init+0x20/0x5c
+    [<c070cef4>] mnt_init+0x108/0x258
+    [<c070caa8>] vfs_caches_init+0x9c/0x110
+    [<c06f5c3c>] start_kernel+0x364/0x3fc
+    [<00008074>] 0x8074
+  irq event stamp: 55488
+  hardirqs last  enabled at (55485): [<c03bf10c>] cpuidle_enter_state+0x60/0xec
+  hardirqs last disabled at (55486): [<c0014374>] __irq_svc+0x34/0x78
+  softirqs last  enabled at (55488): [<c002fc40>] _local_bh_enable+0x58/0x64
+  softirqs last disabled at (55487): [<c0030534>] irq_enter+0x48/0x88
+  
+  other info that might help us debug this:
+   Possible unsafe locking scenario:
+  
+         CPU0
+         ----
+    lock(kernfs_mutex);
+    <Interrupt>
+      lock(kernfs_mutex);
+  
+   *** DEADLOCK ***
+  
+  no locks held by swapper/0/0.
+  
+  stack backtrace:
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-rc1-xilinx-00021-gf5ddad957172 #88
+  [<c0017840>] (unwind_backtrace) from [<c0013770>] (show_stack+0x20/0x24)
+  [<c0013770>] (show_stack) from [<c04d94a0>] (dump_stack+0x8c/0xd0)
+  [<c04d94a0>] (dump_stack) from [<c0076a50>] (print_usage_bug+0x254/0x2c4)
+  [<c0076a50>] (print_usage_bug) from [<c0076e6c>] (mark_lock+0x3ac/0x674)
+  [<c0076e6c>] (mark_lock) from [<c0078024>] (__lock_acquire+0x934/0x1b58)
+  [<c0078024>] (__lock_acquire) from [<c0079a08>] (lock_acquire+0xfc/0x21c)
+  [<c0079a08>] (lock_acquire) from [<c04dc1e0>] (mutex_lock_nested+0x84/0x46c)
+  [<c04dc1e0>] (mutex_lock_nested) from [<c019df34>] (kernfs_notify+0xac/0x148)
+  [<c019df34>] (kernfs_notify) from [<c02d89e0>] (gpio_sysfs_irq+0x1c/0x24)
+  [<c02d89e0>] (gpio_sysfs_irq) from [<c008588c>] (handle_irq_event_percpu+0xa8/0x3c0)
+  [<c008588c>] (handle_irq_event_percpu) from [<c0085bf0>] (handle_irq_event+0x4c/0x6c)
+  [<c0085bf0>] (handle_irq_event) from [<c0088a28>] (handle_simple_irq+0xac/0xbc)
+  [<c0088a28>] (handle_simple_irq) from [<c0084fec>] (generic_handle_irq+0x30/0x40)
+  [<c0084fec>] (generic_handle_irq) from [<c02de3fc>] (zynq_gpio_irqhandler+0xe8/0x130)
+  [<c02de3fc>] (zynq_gpio_irqhandler) from [<c0084fec>] (generic_handle_irq+0x30/0x40)
+  [<c0084fec>] (generic_handle_irq) from [<c000fd24>] (handle_IRQ+0x78/0xa0)
+  [<c000fd24>] (handle_IRQ) from [<c000868c>] (gic_handle_irq+0x4c/0x70)
+  [<c000868c>] (gic_handle_irq) from [<c0014384>] (__irq_svc+0x44/0x78)
+  Exception stack(0xc0755ec8 to 0xc0755f10)
+  5ec0:                   00000001 00000004 00000000 c075fb70 00000001 edfc9310
+  5ee0: 8ed05707 0000001d 9e7f7ffa 0000001d c0752308 c0755f44 c0755ee0 c0755f10
+  5f00: c0077340 c03bf110 200d0013 ffffffff
+  [<c0014384>] (__irq_svc) from [<c03bf110>] (cpuidle_enter_state+0x64/0xec)
+  [<c03bf110>] (cpuidle_enter_state) from [<c03bf2a0>] (cpuidle_enter+0x24/0x28)
+  [<c03bf2a0>] (cpuidle_enter) from [<c0071d94>] (cpu_idle_loop+0x2e0/0x6fc)
+  [<c0071d94>] (cpu_idle_loop) from [<c00721cc>] (cpupri_find+0x0/0x108)
+
+	Thanks,
+	S?ren
