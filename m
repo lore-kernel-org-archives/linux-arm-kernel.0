@@ -1,69 +1,38 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 18 Jun 2014 19:23:47 +0200
-Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
-In-Reply-To: <53A069B6.6070902@wwwdotorg.org>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
- <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
- <53A069B6.6070902@wwwdotorg.org>
-Message-ID: <53A1CB23.5090307@collabora.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 18 Jun 2014 10:24:19 -0700
+Subject: [PATCH] clkdev: Don't print errors on probe defer
+In-Reply-To: <20140617224805.GN23430@n2100.arm.linux.org.uk>
+References: <1402702591-21087-1-git-send-email-sboyd@codeaurora.org>
+ <20140617223305.32686.15540@quantum>
+ <20140617224805.GN23430@n2100.arm.linux.org.uk>
+Message-ID: <20140618172419.32686.58695@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2014 06:15 PM, Stephen Warren wrote:
-> On 06/17/2014 06:16 AM, Tomeu Vizoso wrote:
->> On 06/16/2014 10:02 PM, Stephen Warren wrote:
->>> On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
->>>> +#ifdef CONFIG_TEGRA124_EMC
->>>> +int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
->>>> long rate);
->>>> +void tegra124_emc_set_floor(unsigned long freq);
->>>> +void tegra124_emc_set_ceiling(unsigned long freq);
->>>> +#else
->>>> +int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
->>>> long rate)
->>>> +{ return -ENODEV; }
->>>> +void tegra124_emc_set_floor(unsigned long freq)
->>>> +{ return; }
->>>> +void tegra124_emc_set_ceiling(unsigned long freq)
->>>> +{ return; }
->>>> +#endif
->>>
->>> I'll repeat what I said off-list so that we can have the whole
->>> conversation on the list:
->>>
->>> That looks like a custom Tegra-specific API. I think it'd be much better
->>> to integrate this into the common clock framework as a standard clock
->>> constraints API. There are other use-cases for clock constraints besides
->>> EMC scaling (e.g. some in audio on Tegra, and I'm sure many on other
->>> SoCs too).
->>
->> Yes, I wrote a bit in the cover letter about our requirements and how
->> they map to the CCF. Could you please comment on that?
->
-> My comments remain the same. I believe this is something that belongs in
-> the clock driver, or at the least, some API that takes a struct clock as
-> its parameter, so that drivers can use the existing DT clock lookup
-> mechanism.
+Quoting Russell King - ARM Linux (2014-06-17 15:48:06)
+> On Tue, Jun 17, 2014 at 03:33:05PM -0700, Mike Turquette wrote:
+> > Quoting Stephen Boyd (2014-06-13 16:36:31)
+> > > This error message can spam the logs if you have lots of probe
+> > > deferals due to missing clocks. Just silence the error in this
+> > > case because the driver should try again later.
+> > > 
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > Looks OK to me. Russell?
+> 
+> Looks fine to me too.  Should I assume you're looking to take it?
 
-Ok, let me put this strawman here to see if I have gotten close to what 
-you have in mind:
+Yes, I'll take it.
 
-* add per-client accounting (Rabin's patches referenced before)
+> 
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-* add clk_set_floor, to be used by cpufreq, load stats, etc.
-
-* add clk_set_ceiling, to be used by battery drivers, thermal, etc.
-
-* an EMC driver would collect bandwidth and latency requests from 
-consumers and call clk_set_floor on the EMC clock.
-
-* the EMC driver would also register for rate change notifications in 
-the EMC clock and would update the latency allowance registers at that 
-point.
-
-How does it sound?
+Thanks for the Ack.
 
 Regards,
+Mike
 
-Tomeu
+> 
+> -- 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
