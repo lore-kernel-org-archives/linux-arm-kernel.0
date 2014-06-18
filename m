@@ -1,50 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 10:28:06 +0100
-Subject: [PATCH v4 1/7] mfd: axp20x: add AXP221 PMIC support
-In-Reply-To: <53A15202.1070908@free-electrons.com>
-References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402990723-28138-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140618083605.GQ21030@lee--X1>
- <53A15202.1070908@free-electrons.com>
-Message-ID: <20140618092806.GI23945@lee--X1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Jun 2014 10:29:06 +0100
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <7c03c5cffa174b20962bff3b09de0eb8@DM2PR03MB352.namprd03.prod.outlook.com>
+References: <20140604164132.GF6644@arm.com>
+ <07321368d15d4ad9928ebb83af87e401@DM2PR03MB479.namprd03.prod.outlook.com>
+ <20140616152739.GS16758@arm.com>
+ <8b0492b4697943a0b1f276ef42cc8223@DM2PR03MB352.namprd03.prod.outlook.com>
+ <20140616170416.GA16758@arm.com>
+ <419e67f783524d208ab3be16bcd94bd9@DM2PR03MB352.namprd03.prod.outlook.com>
+ <0587e1f4894546398be0798d2bc2c84f@BL2PR03MB468.namprd03.prod.outlook.com>
+ <20140617104304.GD13808@arm.com>
+ <32165315f0b84be9948f489fd87bf6a9@BL2PR03MB468.namprd03.prod.outlook.com>
+ <7c03c5cffa174b20962bff3b09de0eb8@DM2PR03MB352.namprd03.prod.outlook.com>
+Message-ID: <20140618092906.GA32699@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jun 2014, Boris BREZILLON wrote:
-> On 18/06/2014 10:36, Lee Jones wrote:
-> > On Tue, 17 Jun 2014, Boris BREZILLON wrote:
-> >
-> >> Add support for the AXP221 PMIC device to the existing AXP20x driver.
-> >>
-> >> The AXP221 defines a new set of registers, power supplies and regulators,
-> >> but most of the API is similar to the AXP20x ones.
-> >> The AXP20x irq chip definition is reused, though some interrupts are not
-> >> available in the AXP221.
-> >>
-> >> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> >> ---
-> >>  drivers/mfd/axp20x.c       | 64 ++++++++++++++++++++++++++++++++++++++++++----
-> >>  include/linux/mfd/axp20x.h | 56 ++++++++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 115 insertions(+), 5 deletions(-)
-> > Looks good to me now.
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> >
-> > Can this go in independently to the other patches in the set?
+On Tue, Jun 17, 2014 at 03:50:25PM +0100, Stuart Yoder wrote:
+> > > I think for simple masters (i.e. those that have all their StreamIDs
+> > > under control of one driver), then setting something during attach (or
+> > > add?) based on the DT could work pretty well. The other case is when we
+> > > have masters behind a bridge (such as a PCI RC). In this case, it might
+> > > actually be better to ask the bridge for the IDs and let it sort out
+> > the
+> > > allocation itself. That would also move the RequesterID -> StreamID
+> > > mapping out of the SMMU code.
+> > >
+> > > What do you think?
+> > The PCI bus iommu group creation code would be part of the SMMU driver
+> > (it is handled by other IOMMU drivers as well). My understanding is that
+> > there would be one is to one correspondence between the requestor ID and
+> > the iommu group. May be, we can have an API provided by the PCI bridge
+> > (architecture specific) for setting the stream ID.
 > 
-> Yes, as long as no one define an axp221 node in his DT.
-> In this case axp221 regulators would be considered as axp20x ones (which
-> might be a bit problematic), because axp20x-regulator driver does not
-> test the axp variant before probing its regulators (this test is
-> introduced in patch 3).
+> I think Will is suggesting something along those lines-- I think it's a
+> question of where the streamID allocation happens.  You could
+> either do something like the following in the SMMU driver when attaching
+> a PCI device:
+> 
+>     id = alloc_stream_id(...);
+>     pci_set_streamid(pci-dev, id);
+> 
+>     or
+> 
+>     id = pci_get_streamid(pci-dev);
+> 
+> ...i.e the PCI RC could allocate (from some TBD
+> allocator) and set the stream ID itself.
+> 
+> Not sure how big a deal it is to extend PCI RC interfaces for 
+> something like that.
 
-Then I'd prefer to wait and have the dependencies go in at the same
-time.
+I think both interfaces have their place; the latter for hotpluggable buses
+and the former for static allocation (i.e. set once). The only way to see
+how well it works is to try implementing it, I guess.
 
-Mark,
-  As normal, I'm happy to create a shared branch between us.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
