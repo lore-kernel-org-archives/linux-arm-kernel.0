@@ -1,135 +1,125 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 18 Jun 2014 09:31:31 +0900
-Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
-In-Reply-To: <CAErSpo6=vi0SR0A3u5BCLgiGxoH48N5R=e8VAnFDG=K61qLxnw@mail.gmail.com>
-References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo6=vi0SR0A3u5BCLgiGxoH48N5R=e8VAnFDG=K61qLxnw@mail.gmail.com>
-Message-ID: <003f01cf8a8c$a6f3be00$f4db3a00$%han@samsung.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Wed, 18 Jun 2014 09:28:30 +0800
+Subject: [PATCH RFC v2 3/3] documentation/iommu: Add description of
+ Hisilicon SMMU private binding
+In-Reply-To: <20140617093326.GC13020@arm.com>
+References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
+ <1402549692-5224-4-git-send-email-thunder.leizhen@huawei.com>
+ <20140616163930.GX16758@arm.com> <539FF33C.7020007@huawei.com>
+ <20140617093326.GC13020@arm.com>
+Message-ID: <53A0EB3E.2080202@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 18, 2014 9:09 AM, Bjorn Helgaas wrote:
+On 2014/6/17 17:33, Will Deacon wrote:
+> On Tue, Jun 17, 2014 at 08:50:20AM +0100, leizhen wrote:
+>> On 2014/6/17 0:39, Will Deacon wrote:
+>>> On Thu, Jun 12, 2014 at 06:08:12AM +0100, Zhen Lei wrote:
+>>>> This patch adds a description of private properties for the Hisilicon
+>>>> System MMU architecture.
+>>>>
+>>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 16 ++++++++++++++++
+>>>>  1 file changed, 16 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>>>> index f284b99..75b1351 100644
+>>>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>>>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>>>> @@ -15,6 +15,7 @@ conditions.
+>>>>                          "arm,smmu-v2"
+>>>>                          "arm,mmu-400"
+>>>>                          "arm,mmu-500"
+>>>> +                        "hisilicon,smmu-v1"
+>>>>
+>>>>                    depending on the particular implementation and/or the
+>>>>                    version of the architecture implemented.
+>>>> @@ -54,6 +55,21 @@ conditions.
+>>>>                    aliases of secure registers have to be used during
+>>>>                    SMMU configuration.
+>>>>
+>>>> +** Hisilicon SMMU private properties:
+>>>> +
+>>>> +- smmu-force-memtype : A list of StreamIDs which not translate address but
+>>>> +                  translate attributes. The StreamIDs list here can not be
+>>>> +                  used for map(translation) mode again.
+>>>> +                  StreamID first, then the type list below:
+>>>> +                  1, cahceable, WBRAWA, Normal outer and inner write-back
+>>>> +                  2, non-cacheable, Normal outer and inner non-cacheable
+>>>> +                  3, device, nGnRE
+>>>> +                  others, bypass
+>>>> +
+>>>> +- smmu-bypass-vmid   : Specify which context bank is used for bypass mode.
+>>>> +                  If omit, vmid=255 is default. If bypass and map mode can
+>>>> +                  share a same S2CR, config vmid=0.
+>>>
+>>> These don't feel like they belong in the device-tree to me. Is the list of
+>>> StreamIDs described in smmu-force-memtype a property of the hardware
+>>> configuration, or a software policy to allow you to generate cacheable
+>>> traffic for particular masters?
+>>>
+>>> Will
+>>>
+>>> .
+>>>
+>> OK, I will put these description into a sperate file, hisilicon,smmu.txt
+>> and mark a reference to arm,smmu.txt
 > 
-> On Tue, Jun 10, 2014 at 02:51:19PM -0400, Murali Karicheri wrote:
-> > This patch adds a PCIe controller driver for Keystone SoCs. This
-> > is based on v1 of the series posted to the mailing list.
-> >
-> > CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > CC: Russell King <linux@arm.linux.org.uk>
-> > CC: Grant Likely <grant.likely@linaro.org>
-> > CC: Rob Herring <robh+dt@kernel.org>
-> > CC: Mohit Kumar <mohit.kumar@st.com>
-> > CC: Jingoo Han <jg1.han@samsung.com>
-> > CC: Bjorn Helgaas <bhelgaas@google.com>
-> > CC: Pratyush Anand <pratyush.anand@st.com>
-> > CC: Richard Zhu <r65037@freescale.com>
-> > CC: Kishon Vijay Abraham I <kishon@ti.com>
-> > CC: Marek Vasut <marex@denx.de>
-> > CC: Arnd Bergmann <arnd@arndb.de>
-> > CC: Pawel Moll <pawel.moll@arm.com>
-> > CC: Mark Rutland <mark.rutland@arm.com>
-> > CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > CC: Kumar Gala <galak@codeaurora.org>
-> > CC: Randy Dunlap <rdunlap@infradead.org>
-> > CC: Grant Likely <grant.likely@linaro.org>
-> >
-> >
-> > Changelog:
-> >
-> > V2
-> >  - Split the designware pcie enhancement patch to multiple
-> >    patches based on functionality added
-> >  - Remove the quirk code and add a patch to fix mps/mrss
-> >    tuning for ARM. Use kernel command line parameter
-> >    pci=pcie_bus_perf to work with Keystone PCI Controller.
-> >    Following patch addressed this.
-> >      [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
-> >  - Add documentation for device tree bindings
-> >  - Add separate interrupt controller nodes for MSI and Legacy
-> >    IRQs and use irq map for legacy IRQ
-> >  - Use compatibility to identify v3.65 version of the DW hardware
-> >    and use it to customize the designware common code.
-> >  - Use reg property for configuration space instead of range
-> >  - Other minor updates based on code inspection.
-> >
-> > V1
-> >  - Add an interrupt controller node for Legacy irq chip and use
-> >    interrupt map/map-mask property to map legacy IRQs A/B/C/D
-> >  - Add a Phy driver to replace the original serdes driver
-> >  - Move common application register handling code to a separate
-> >    file to allow re-use across other platforms that use older
-> >    DW PCIe h/w
-> >  - PCI quirk for maximum read request size. Check and override only
-> >    if the maximum is higher than what controller can handle.
-> >  - Converted to a module platform driver.
-> >
-> >
-> > Murali Karicheri (8):
-> >   PCI: designware: add rd[wr]_other_conf API
-> >   PCI: designware: refactor host init code to re-use on v3.65 DW pci hw
-> >   PCI: designware: update pcie core driver to work with dw hw version
-> >     3.65
-> >   PCI: designware: add msi controller functions for v3.65 hw
-> >   PCI: designware: add PCI controller functions for v3.65 DW hw
-> >   phy: Add serdes phy driver for keystone
-> >   PCI: keystone: add pcie driver based on designware core driver
-> >   ARM: keystone: add pcie related options
-> >
-> >  .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
-> >  .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
-> >  .../bindings/phy/phy-keystone-serdes.txt           |   25 ++
-> >  arch/arm/mach-keystone/Kconfig                     |    1 +
-> >  drivers/pci/host/Kconfig                           |   12 +
-> >  drivers/pci/host/Makefile                          |    2 +
-> >  drivers/pci/host/pci-dw-v3_65-msi.c                |  149 +++++++
-> >  drivers/pci/host/pci-dw-v3_65.c                    |  390 ++++++++++++++++++
-> >  drivers/pci/host/pci-dw-v3_65.h                    |   34 ++
-> >  drivers/pci/host/pci-keystone.c                    |  418 ++++++++++++++++++++
-> >  drivers/pci/host/pcie-designware.c                 |  175 +++++---
-> >  drivers/pci/host/pcie-designware.h                 |   42 +-
-> >  drivers/phy/Kconfig                                |    6 +
-> >  drivers/phy/Makefile                               |    1 +
-> >  drivers/phy/phy-keystone-serdes.c                  |  230 +++++++++++
-> >  15 files changed, 1531 insertions(+), 52 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
-> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
-> >  create mode 100644 drivers/pci/host/pci-dw-v3_65-msi.c
-> >  create mode 100644 drivers/pci/host/pci-dw-v3_65.c
-> >  create mode 100644 drivers/pci/host/pci-dw-v3_65.h
-> >  create mode 100644 drivers/pci/host/pci-keystone.c
-> >  create mode 100644 drivers/phy/phy-keystone-serdes.c
+> No, don't do that. Delete the properties instead. I'm not a device-tree
+> expert, but these don't feel like things we should be describing there at
+> all.
 > 
-> I'm not willing to merge phy-keystone-serdes.c because I don't
-> maintain drivers/phy and because of the binary blob of register values
-> it contains, but maybe somebody else will.  I assume it could be
-> merged by itself before the rest of this.
-
-I think so, too.
-
-DT maintainers and arch maintainers should review the following
-dt bindings.
-  .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
-  .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
-
-Generic PHY maintainer (Kishon Vijay Abraham I) should review the
-following phy driver.
-  drivers/phy/phy-keystone-serdes.c
-
+>> The latter case. Some masters driver want use cacheable(WB) attribute to access
+>> memory, but the masters can not bring cacheable attribute. So, can not use
+>> bypass(or transaction) mode. In fact, the master driver can use iommu_map to
+>> create map and specify IOMMU_CACHE. But maybe the driver does not want to
+>> map, if the memory access is very dynamically, frequently map and unmap will
+>> decrease performance.
 > 
-> I'm looking for acks from Mohit and/or Jingoo for the pci/host
-> changes, and from Arnd for the devicetree/bindings changes.
+> You seem to be highlighting a perceived deficiency in the IOMMU API which
+> you're attempting to work-around with new device-tree properties. Instead,
+> why not propose an extension to the IOMMU API in Linux?
 > 
-> Adding these "-dw-3_64" files is sort of ugly.  If that code is only
-> used by keystone, maybe it could just be moved to pci-keystone.c?  But
-> I'll defer to Mohit and Jingoo on that and the way you modify
-> pcie-designware.c.
 
-I agree with Bjorn Helgaas's opinion. These three "-dw-3_64" files
-look terrible! I don't have a good way to handle this; however,
-moving this code to pci-keystone.c looks better.
+The private properties or new IOMMU APIs, just in order to optimize performance
+or simplify master driver code, I will consider it later. I think it's good to
+support base functions first.
 
-Best regards,
-Jingoo Han
+Sorry, I just only known ARM SMMU and Hisilicon SMMU, not familiar with others.
+Add a common API may meet more difficulty.
 
+If I have time, I will try to do it.
+
+>> Actually, I think smmu-force-memtype maybe suitable for arm-smmu too. But now,
+>> if nobody declear need it, I will just implement it in hisi-smmu.c
 > 
-> Bjorn
+> I don't want to see hisi-smmu.c at all. You need to make your driver fit
+> into the code we already have.
+> 
+> Do you have a specification available describing the hardware you have
+> created?
+> 
+
+Although I have the Hisilicon SMMU specification, but it was written in Chinese.
+I have told this to hardware engineers.
+
+OK. I will try my best to merge two drivers into one file. Maybe need to use many
+#if#else.
+
+>> A big issue should be discussed now. When a master use bypass mode to access
+>> memory, this means it can access all non-secure memory. So, if a master can
+>> be operated in user mode, that means a user process can access any kernel
+>> memory. In ARM smmu-v2 specification, SMMU_S2CRn.PRIVCFG is used for determine
+>> output priviledge attribute. But if use bypass mode and output attribute is
+>> Unprivileged, specification have no mention about where to decide memory access
+>> is permitted or not. Do you think is a spec design bug or Implemention
+>> defined, or find some description anywhere.
+> 
+> There are various overrides for the privilege controls but, as Varun said,
+> you should be using VFIO for userspace device access.
+> 
+> Will
+> 
+> .
+> 
