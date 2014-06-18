@@ -1,30 +1,63 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 18 Jun 2014 09:52:22 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: Add QCOM GSBI driver
-Message-ID: <1403081542-28291-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 18 Jun 2014 11:57:25 +0300
+Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
+In-Reply-To: <20140617223518.GA25309@mithrandir>
+References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
+ <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
+ <20140617223518.GA25309@mithrandir>
+Message-ID: <20140618085725.GI3407@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds QCOM GSBI config option to multi_v7_defconfig. Serial
-driver on QCOM APQ8064 depends on GSBI driver, so without this patch
-there is no serial console on IF6410 board using multi_v7_defconfig.
+On Wed, Jun 18, 2014 at 12:35:27AM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Tue, Jun 17, 2014 at 02:16:06PM +0200, Tomeu Vizoso wrote:
+> > On 06/16/2014 10:02 PM, Stephen Warren wrote:
+> > >On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
+> > >>+
+> > >>+Child device nodes describe the memory settings for different configurations and
+> > >>+clock rates.
+> > >
+> > >How do the child nodes do that? The binding needs to specify the format
+> > >of the child node.
+> > 
+> > Sorry, that file was sent before I had finished removing the bits from
+> > downstream that aren't needed yet. There's no current need for any child
+> > nodes.
+> > 
+> > >This binding looks quite anaemic vs.
+> > >Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-emc.txt; I
+> > >would expect that this binding needs all the EMC register data from the
+> > >tegra20-emc binding too. Can the two bindings be identical?
+> > 
+> > There's even less stuff needed right now, as all what ultimately the EMC
+> > driver does is call clk_set_rate on the EMC clock. As the T124 EMC driver
+> > gains more features, they should get more similar.
+> > 
+> > >Can you explain what the nvidia,mc and nvidia,pmc references are needed
+> > >for? Hopefully, this driver isn't going to reach into those devices and
+> > >touch their registers directly.
+> > 
+> > Not really needed, see above.
+> 
+> I've been working on a prototype driver for the memory controller. Part
+> of what I've added is programming of the latency allowance registers (it
+> doesn't yet expose an API to do so yet, though). I think that needs to
+> eventually take into account the EMC frequency (and needs to be notified
+> of changes to the same).
+> 
+> Without having thought this through very thoroughly, I suspect that
+> rather than referencing the MC from the EMC it might be better to have
+> the MC register with the EMC for notifications.
+> 
+> But perhaps there are other services from MC that EMC needs to work?
+> 
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+If the emc frequency change is modelled as a clock, you could use CCF
+notifications for this?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e2d6204..f71731f 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -352,6 +352,7 @@ CONFIG_MFD_NVEC=y
- CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
-+CONFIG_QCOM_GSBI=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
--- 
-1.9.1
+Cheers,
+
+Peter.
