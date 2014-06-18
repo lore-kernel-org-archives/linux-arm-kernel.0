@@ -1,119 +1,53 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Wed, 18 Jun 2014 12:03:46 +0000
-Subject: [PATCH RFC v2 3/3] documentation/iommu: Add description of
- Hisilicon SMMU private binding
-In-Reply-To: <53A0EB3E.2080202@huawei.com>
-References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
- <1402549692-5224-4-git-send-email-thunder.leizhen@huawei.com>
- <20140616163930.GX16758@arm.com> <539FF33C.7020007@huawei.com>
- <20140617093326.GC13020@arm.com> <53A0EB3E.2080202@huawei.com>
-Message-ID: <ec7da7c5e94a440b90ff7a0743742d74@BL2PR03MB468.namprd03.prod.outlook.com>
+From: sachin.kamat@samsung.com (Sachin Kamat)
+Date: Wed, 18 Jun 2014 17:38:14 +0530
+Subject: Build error - vmlinux.lds [Re: linux-next: Tree for Jun 18]
+In-Reply-To: <20140618115602.GA32514@n2100.arm.linux.org.uk>
+References: <CAK5sBcEpXboRVD-KzzjBJMi+LF-jhdt_HUYEz7wkJtFAv+BLcg@mail.gmail.com>
+ <20140618115602.GA32514@n2100.arm.linux.org.uk>
+Message-ID: <CAK5sBcEg1XYQmzshxdLDHFCYFiawV0d8rt7aeAkPoiPhNMX1CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will/Zhen,
+On Wed, Jun 18, 2014 at 5:26 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jun 18, 2014 at 04:50:43PM +0530, Sachin Kamat wrote:
+>> Hi,
+>>
+>> I observe the following build error while building uImage for ARM.
+>>
+>>   Kernel: arch/arm/boot/Image is ready
+>> make[2]: *** No rule to make target
+>> `arch/arm/boot/compressed/vmlinux.lds', needed by
+>> `arch/arm/boot/compressed/vmlinux'.  Stop.
+>> make[1]: *** [arch/arm/boot/compressed/vmlinux] Error 2
+>> make: *** [uImage] Error 2
+>
+> Works fine here against an empty object tree:
+>
+> http://www.arm.linux.org.uk/developer/build/file.php?lid=9591
+>
+> Are you building into an already-built object tree or rebuilding an
+> already built tree?
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of leizhen
-> Sent: Wednesday, June 18, 2014 6:59 AM
-> To: Will Deacon
-> Cc: huxinwei at huawei.com; Catalin Marinas; Zefan Li; linux-arm-kernel
-> Subject: Re: [PATCH RFC v2 3/3] documentation/iommu: Add description of
-> Hisilicon SMMU private binding
-> 
-> On 2014/6/17 17:33, Will Deacon wrote:
-> > On Tue, Jun 17, 2014 at 08:50:20AM +0100, leizhen wrote:
-> >> On 2014/6/17 0:39, Will Deacon wrote:
-> >>> On Thu, Jun 12, 2014 at 06:08:12AM +0100, Zhen Lei wrote:
-> >>>> This patch adds a description of private properties for the
-> >>>> Hisilicon System MMU architecture.
-> >>>>
-> >>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> >>>> ---
-> >>>>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 16
-> >>>> ++++++++++++++++
-> >>>>  1 file changed, 16 insertions(+)
-> >>>>
-> >>>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> >>>> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> >>>> index f284b99..75b1351 100644
-> >>>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> >>>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> >>>> @@ -15,6 +15,7 @@ conditions.
-> >>>>                          "arm,smmu-v2"
-> >>>>                          "arm,mmu-400"
-> >>>>                          "arm,mmu-500"
-> >>>> +                        "hisilicon,smmu-v1"
-> >>>>
-> >>>>                    depending on the particular implementation and/or
-> the
-> >>>>                    version of the architecture implemented.
-> >>>> @@ -54,6 +55,21 @@ conditions.
-> >>>>                    aliases of secure registers have to be used
-> during
-> >>>>                    SMMU configuration.
-> >>>>
-> >>>> +** Hisilicon SMMU private properties:
-> >>>> +
-> >>>> +- smmu-force-memtype : A list of StreamIDs which not translate
-> address but
-> >>>> +                  translate attributes. The StreamIDs list here can
-> not be
-> >>>> +                  used for map(translation) mode again.
-> >>>> +                  StreamID first, then the type list below:
-> >>>> +                  1, cahceable, WBRAWA, Normal outer and inner
-> write-back
-> >>>> +                  2, non-cacheable, Normal outer and inner non-
-> cacheable
-> >>>> +                  3, device, nGnRE
-> >>>> +                  others, bypass
-> >>>> +
-> >>>> +- smmu-bypass-vmid   : Specify which context bank is used for
-> bypass mode.
-> >>>> +                  If omit, vmid=255 is default. If bypass and map
-> mode can
-> >>>> +                  share a same S2CR, config vmid=0.
-> >>>
-> >>> These don't feel like they belong in the device-tree to me. Is the
-> >>> list of StreamIDs described in smmu-force-memtype a property of the
-> >>> hardware configuration, or a software policy to allow you to
-> >>> generate cacheable traffic for particular masters?
-> >>>
-> >>> Will
-> >>>
-> >>> .
-> >>>
-> >> OK, I will put these description into a sperate file,
-> >> hisilicon,smmu.txt and mark a reference to arm,smmu.txt
-> >
-> > No, don't do that. Delete the properties instead. I'm not a
-> > device-tree expert, but these don't feel like things we should be
-> > describing there at all.
-> >
-> >> The latter case. Some masters driver want use cacheable(WB) attribute
-> >> to access memory, but the masters can not bring cacheable attribute.
-> >> So, can not use bypass(or transaction) mode. In fact, the master
-> >> driver can use iommu_map to create map and specify IOMMU_CACHE. But
-> >> maybe the driver does not want to map, if the memory access is very
-> >> dynamically, frequently map and unmap will decrease performance.
-> >
-> > You seem to be highlighting a perceived deficiency in the IOMMU API
-> > which you're attempting to work-around with new device-tree
-> > properties. Instead, why not propose an extension to the IOMMU API in
-> Linux?
-> >
-> 
-> The private properties or new IOMMU APIs, just in order to optimize
-> performance or simplify master driver code, I will consider it later. I
-> think it's good to support base functions first.
-> 
-> Sorry, I just only known ARM SMMU and Hisilicon SMMU, not familiar with
-> others.
-> Add a common API may meet more difficulty.
-> 
-> If I have time, I will try to do it.
-> 
-[Sethi Varun-B16395] We can introduce SMMU specific attributes (to use with iommu set attribute API call) for setting memory cacheability attributes. These could be used for setting the MAIR per context bank. Actually, we would require this for out platform. However, I am not sure how memory attribute translation would work if S2CR is set for bypass?
+I did a clean build after updating the tree to next-20140618.
+git status show me the following after doing make clean
 
--Varun
+# On branch master
+# Changes not staged for commit:
+#   (use "git add/rm <file>..." to update what will be committed)
+#   (use "git checkout -- <file>..." to discard changes in working directory)
+#
+#    deleted:    arch/arm/boot/compressed/vmlinux.lds.S
+
+
+My tip of kernel points to commit 4ca1fbc122fcb ("Add linux-next specific
+files for 20140618")
+
+>
+> This is likely caused by make getting confused over the dependencies.
+> I suggest making clean to recover from this error.
+
+I get this error when I do a clean build too.
+
+Regards,
+Sachin.
