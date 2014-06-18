@@ -1,78 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 16:28:24 +0100
-Subject: [PATCH v2 3/7] ARM: stih416: Add DT nodes for PWM
-In-Reply-To: <1403103172-19856-3-git-send-email-lee.jones@linaro.org>
-References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
- <1403103172-19856-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140618152824.GF15956@lee--X1>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 18 Jun 2014 10:29:27 -0500
+Subject: [PATCH 2/2] regulators: TPS65218: Correct the the config register
+ for LDO1
+In-Reply-To: <1403104668-32316-2-git-send-email-balbi@ti.com>
+References: <1403104668-32316-1-git-send-email-balbi@ti.com>
+ <1403104668-32316-2-git-send-email-balbi@ti.com>
+Message-ID: <53A1B057.1030902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: stih416: Add DT nodes for PWM
+nit pick:
+s/regulators: TPS65218:/regulators: tps65218:/
 
-Supply top level nodes for the STiH416 based development boards.
-The Pinctrl configuration has already been applied, so the only
-missing piece of the DT puzzle is for a board's DTB to enable
-the nodes.
+On 06/18/2014 10:17 AM, Felipe Balbi wrote:
+> From: Keerthy <j-keerthy@ti.com>
+> 
+> Correct the the config register for LDO1.
+> 
+> Cc: <stable@vger.kernel.org> # v3.15
+Fixes: 90e7d5262796 (regulator: tps65218: Add Regulator driver for
+TPS65218 PMIC)
+?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/regulator/tps65218-regulator.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
+> index edbc46e..9effe48 100644
+> --- a/drivers/regulator/tps65218-regulator.c
+> +++ b/drivers/regulator/tps65218-regulator.c
+> @@ -209,7 +209,7 @@ static const struct regulator_desc regulators[] = {
+>  			   1, -1, -1, TPS65218_REG_ENABLE1,
+>  			   TPS65218_ENABLE1_DC6_EN, NULL, NULL, 0, 0),
+>  	TPS65218_REGULATOR("LDO1", TPS65218_LDO_1, tps65218_ldo1_dcdc34_ops, 64,
+> -			   TPS65218_REG_CONTROL_DCDC4,
+> +			   TPS65218_REG_CONTROL_LDO1,
+>  			   TPS65218_CONTROL_LDO1_MASK, TPS65218_REG_ENABLE2,
+>  			   TPS65218_ENABLE2_LDO1_EN, NULL, ldo1_dcdc3_ranges,
+>  			   2, 0),
+> 
+otherwise,
+Acked-by: Nishanth Menon <nm@ti.com>
 
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 06473c5..f95e469 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -102,7 +102,7 @@
- 			interrupts	= <0 210 0>;
- 			pinctrl-names 	= "default";
- 			pinctrl-0 	= <&pinctrl_sbc_serial1>;
--			clocks          = <&clk_sysin>;
-+			clocks		= <&clk_sysin>;
- 		};
- 
- 		i2c at fed40000 {
-@@ -236,5 +236,45 @@
- 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
- 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
- 		};
-+
-+		/* SAS PWM Module */
-+		pwm0: pwm at fed10000 {
-+			compatible	= "st,sti-pwm";
-+			status		= "disabled";
-+			#pwm-cells	= <2>;
-+			reg		= <0xfed10000 0x68>;
-+
-+			pinctrl-names	= "default";
-+			pinctrl-0 = 	<&pinctrl_pwm0_chan0_default
-+					&pinctrl_pwm0_chan1_default
-+					&pinctrl_pwm0_chan2_default
-+					&pinctrl_pwm0_chan3_default>;
-+
-+			clock-names	= "pwm";
-+			clocks		= <&clk_sysin>;
-+		};
-+
-+		/* SBC PWM Module */
-+		pwm1: pwm at fe510000 {
-+			compatible	= "st,sti-pwm";
-+			status		= "disabled";
-+			#pwm-cells	= <2>;
-+			reg		= <0xfe510000 0x68>;
-+
-+			pinctrl-names	= "default";
-+			pinctrl-0	= <&pinctrl_pwm1_chan0_default
-+					/*
-+					 * Shared with SBC_OBS_NOTRST.  Don't
-+					 * enable unless you really know what
-+					 * you're doing.
-+					 *
-+					 * &pinctrl_pwm1_chan1_default
-+					 */
-+					&pinctrl_pwm1_chan2_default
-+					&pinctrl_pwm1_chan3_default>;
-+
-+			clock-names	= "pwm";
-+			clocks		= <&clk_sysin>;
-+		};
- 	};
- };
+-- 
+Regards,
+Nishanth Menon
