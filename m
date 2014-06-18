@@ -1,74 +1,56 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 18 Jun 2014 18:23:27 -0500
-Subject: [PATCH v2 2/2] arm: dts: add support for AM437x StarterKit
-In-Reply-To: <20140618231923.GA9855@saruman.home>
-References: <1403106200-777-1-git-send-email-balbi@ti.com>
- <1403106200-777-3-git-send-email-balbi@ti.com>
- <53A1BADD.7050309@ti.com> <20140618193113.GC4570@saruman.home>
- <53A20A7D.3060508@ti.com> <20140618231923.GA9855@saruman.home>
-Message-ID: <20140618232327.GC9855@saruman.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 18 Jun 2014 17:24:47 -0600
+Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
+In-Reply-To: <20140618231410.GG26514@mithrandir>
+References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
+ <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
+ <53A069B6.6070902@wwwdotorg.org> <53A1CB23.5090307@collabora.com>
+ <53A1D089.8010605@wwwdotorg.org> <20140618220343.GD26514@mithrandir>
+ <53A20E02.5050900@wwwdotorg.org> <20140618231410.GG26514@mithrandir>
+Message-ID: <53A21FBF.5090806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-(side note)
-
-On Wed, Jun 18, 2014 at 06:19:23PM -0500, Felipe Balbi wrote:
-> > >>>+		interrupt-controller;
-> > >>>+		#interrupt-cells = <2>;
-> > >>>+
-> > >>>+		dcdc1: regulator-dcdc1 {
-> > >>>+			compatible = "ti,tps65218-dcdc1";
-> > >>>+			/* VDD_CORE limits min of OPP50 and max of OPP100 */
-> > >>>+			regulator-name = "vdd_core";
-> > >>>+			regulator-min-microvolt = <912000>;
-> > >>>+			regulator-max-microvolt = <1144000>;
-> > >>>+			regulator-boot-on;
-> > >>>+			regulator-always-on;
-> > >>>+		};
-> > >>>+
-> > >>>+		dcdc2: regulator-dcdc2 {
-> > >>>+			compatible = "ti,tps65218-dcdc2";
-> > >>>+			/* VDD_MPU limits min of OPP50 and max of OPP_NITRO */
-> > >>>+			regulator-name = "vdd_mpu";
-> > >>>+			regulator-min-microvolt = <912000>;
-> > >>>+			regulator-max-microvolt = <1378000>;
-> > >>>+			regulator-boot-on;
-> > >>>+			regulator-always-on;
-> > >>>+		};
-> > >>>+
-> > >>>+		dcdc3: regulator-dcdc3 {
-> > >>>+			compatible = "ti,tps65218-dcdc3";
-> > >>>+			regulator-name = "vdds_ddr";
-> > >>no voltage ?
-> > >
-> > >has no users in kernel. Also, it comes out with default, and correct,
-> > >voltage.
-> > 
-> > Device tree is description of hardware, not just who uses what in OS
-> > of interest.
+On 06/18/2014 05:14 PM, Thierry Reding wrote:
+> On Wed, Jun 18, 2014 at 04:09:06PM -0600, Stephen Warren wrote:
+>> On 06/18/2014 04:03 PM, Thierry Reding wrote:
+...
+>>> From what I remember, Mike was fairly strongly opposing the idea of
+>>> virtual clocks, but what you're proposing here sounds like it would
+>>> assume the existence of virtual clocks. clk_set_rate() per client
+>>> doesn't work with the current API as I understand it.
+>>>
+>>> Or perhaps what you're proposing isn't about the individual clocks at
+>>> all but rather about a mechanism to express constraints for a set of
+>>> clocks?
+>>
+>> This doesn't have anything to do with virtual clocks. As you mention,
+>> it's just about constraints.
+>>
+>> One user of clock "cpu" wants min rate 216MHz. Another wants max rate
+>> 1GHz. cpufreq will request some rate between the 2, or be capped to
+>> those limits. These set of imposed constraints would need to be stored
+>> per client of the clock, not per HW clock, since many clients could set
+>> different max rates (e.g. thermal throttle 1.5GHz due to temperature,
+>> CPU policy 1GHz due to the user selecting low CPU power, etc.)
+>>
+>> Similarly for audio, of there are N clients of 1 clock/PLL, and they
+>> each want the PLL to run at a different rate, something needs to detect
+>> that and deny it.
 > 
-> then we should start "fixing" every single DTS in the kernel because I'm
-> sure even LEDs and keypads are tied to some sort of supply, as is the
-> case with this board. No driver will use it though.
-> 
-> Also, I couldn't find anywhere which voltage is dcdc3 outputing and
-> there's no shunt anywhere (other than a 0 ohm resistor) to measure
-> voltage. So I kinda have my hands tied here.
-> 
-> (goes review schematics)
-> 
-> actually there's 0.05 ohm sense resistor. Hopefully it's easy to access.
+> I'm wondering how this should work with the current API. Could the clock
+> core be modified to return a per-client struct clk * that references the
+> hardware clock internally? Or do we need to add a new API?
 
-1.35v
+I would assume the we can just change struct clk and hide the details
+from any driver. Hopefully only clock-core and clock-drivers would need
+any changes.
 
--- 
-balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/de3bf90a/attachment.sig>
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/e86187fa/attachment.sig>
