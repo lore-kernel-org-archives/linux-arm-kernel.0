@@ -1,40 +1,28 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 15:52:49 +0100
-Subject: [PATCH 4/7] ARM: stih416-b2020e: Enable PWM on the B2020 Rev-E
+Date: Wed, 18 Jun 2014 15:52:50 +0100
+Subject: [PATCH 5/7] ARM: multi_v7_defconfig: Enable ST's PWM driver
 In-Reply-To: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
 References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1403103172-19856-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1403103172-19856-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the infrastructure is now in place for ST's PWM controller.  This
-patch takes the final step and enables the IP on the 2020 Rev-E
-development platform.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416-b2020e.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
-index ba0fa2c..07cbf5b 100644
---- a/arch/arm/boot/dts/stih416-b2020e.dts
-+++ b/arch/arm/boot/dts/stih416-b2020e.dts
-@@ -31,5 +31,15 @@
- 		ethernet1: dwmac at fef08000 {
- 			snps,reset-gpio = <&PIO0 7>;
- 		};
-+
-+		/* SAS PWM Module */
-+		pwm0: pwm at fed10000 {
-+			status		= "okay";
-+		};
-+
-+		/* SBC PWM Module */
-+		pwm1: pwm at fe510000 {
-+			status		= "okay";
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e2d6204..287b569 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -364,6 +364,7 @@ CONFIG_AK8975=y
+ CONFIG_PWM=y
+ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
++CONFIG_PWM_ST=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
 -- 
 1.8.3.2
