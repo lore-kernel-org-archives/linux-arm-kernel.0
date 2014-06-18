@@ -1,51 +1,69 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 18 Jun 2014 11:50:08 +0200
-Subject: [PATCH v2 06/10] mfd: Add driver for Maxim 77802 Power Management
- IC
-In-Reply-To: <20140618083204.GP21030@lee--X1>
-References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
- <1402941758-11216-7-git-send-email-javier.martinez@collabora.co.uk>
- <20140616192720.GK5099@sirena.org.uk> <53A01F09.5070106@collabora.co.uk>
- <20140618083204.GP21030@lee--X1>
-Message-ID: <53A160D0.6010306@collabora.co.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 18 Jun 2014 15:20:09 +0530
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <20140617112353.GB4139@lee--X1>
+References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
+ <1400766819-22286-2-git-send-email-lee.jones@linaro.org>
+ <5396E561.4020805@ti.com> <20140617112353.GB4139@lee--X1>
+Message-ID: <53A160D1.8000908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+Hi,
 
-On 06/18/2014 10:32 AM, Lee Jones wrote:
->> >> +config MFD_MAX77802
->> >> +	tristate "Maxim Integrated MAX77802 PMIC Support"
->> >> +	depends on I2C=y
->> >> +	select MFD_CORE
->> >> +	select REGMAP_I2C
->> >> +	select REGMAP_IRQ
->> >> +	select IRQ_DOMAIN
->> >> +	help
->> >> +	  Say yes here to support for Maxim Integrated MAX77802.
->> >> +	  This is a Power Management IC with RTC on chip.
->> >> +	  This driver provides common support for accessing the device;
->> >> +	  additional drivers must be enabled in order to use the functionality
->> >> +	  of the device.
->> >> +
->> > 
->> > It is a bit unorthodox to put the build infrastructure in the same patch
->> > as the DT binding...
->> > 
->> 
->> I thought it was the opposite. That a DT binding document has to be added along
->> with the first user of the binding but I'll separate the DT doc in another patch
->> then if that is the right thing to do.
+On Tuesday 17 June 2014 04:53 PM, Lee Jones wrote:
+>>> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+>>> devices. It has 2 ports which it can use for either; both SATA, both
+>>> PCIe or one of each in any configuration.
+>>
+>> I've asked others who wrote multi-phy PHY providers to model each individual
+>> PHY as sub-node of the PHY provider. So It's only fair I ask you the same to
+>> do. So in this case the dt node should look something like:
+>>
+>> 	miphy365x_phy: miphy365x at fe382000 {
+>> 		compatible = "st,miphy365x-phy";
+>> 		#phy-cells = <2>;
+>> 		st,syscfg = <&syscfg_rear>;
+>> 		channel at 0 {
+>> 			reg =	<0xfe382000 0x100>, <0xfe394000 0x100>;
+>> 			reg-names = "sata", "pcie";
+>> 		}
+>>
+>> 		channel at 1{
+>> 			reg =	<0xfe38a000 0x100>, <0xfe804000 0x100>;
+>> 			reg-names = "sata", "pcie";
+>> 		}
+>>
+>> 	};
 > 
-> This was the 'old' method, but changed a little over a year ago.
-> 
->> Thanks a lot for all your suggestions, I'll wait a little to see if there is
->> more feedback and repost a v3 addressing all the issues you pointed out.
-> 
-> Just re-post it.  I'll review the next version.
-> 
+> I'm interested to know why you've taken this approach, as it makes the
+> code much more complex.  The DT framework goes to the trouble of
 
-Ok, will do. I was waiting for Krzysztof's feedback but he can review v3 as well.
+It looks to be much closer representation of the hardware in dt. It also
+enables to have more control of each individual PHYs. For example, we can have
+something like status="disabled" for channels which is disabled.
 
-Thanks a lot and best regards,
-Javier
+> converting all addresses to to resources so drivers can easily pull
+> them out using platform_get_resource() and friends.  Pushing the reg
+
+right. Can't we use of_address_to_resource here?
+> properties down into a child node means that we have to now iterate
+> over the sub-nodes and pull them out manually.  This will lead to a
+
+You anyway iterate while creating PHYs based on some constant. Now you have to
+iterate over the sub-nodes.
+> pretty messy implementation IMHO.
+
+
+> 
+> Can you point me in the direction of previous implementations where you
+> have stipulated the same set of constraints please?
+
+ah.. there isn't any. The author of the other multi-phy driver [1] also feels
+this will just add to the complexity of the driver.
+
+Maybe we should ask the opinion of others?
+
+[1] -> http://www.spinics.net/lists/linux-sh/msg32087.html
+> 
