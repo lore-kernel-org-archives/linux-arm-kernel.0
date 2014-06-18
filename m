@@ -1,60 +1,79 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 18 Jun 2014 17:23:20 +0300
-Subject: [PATCH v2 1/7] of: Add NVIDIA Tegra SATA controller binding
+Date: Wed, 18 Jun 2014 17:23:22 +0300
+Subject: [PATCH v2 3/7] ARM: tegra: Add SATA and SATA power to Jetson TK1
+ device tree
 In-Reply-To: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
 References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1403101406-15439-2-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1403101406-15439-4-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree binding documentation for the SATA
-controller found on NVIDIA Tegra SoCs.
+This enables the integrated SATA controller on the Tegra124 system-on-chip
+on the Jetson TK1 board and adds regulators for the onboard Molex connector
+commonly used to power SATA devices. The regulators are marked always-on
+since they can be used for other purposes than powering SATA devices.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
 v2:
-- added target-5v-supply and target-12v-supply
-- changed wording to be similar with other Tegra drivers
+- added target-v5-supply and target-12v-supply
+- made sata power not always-on
 
- .../devicetree/bindings/ata/tegra-sata.txt         | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/tegra-sata.txt
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 35 +++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/tegra-sata.txt b/Documentation/devicetree/bindings/ata/tegra-sata.txt
-new file mode 100644
-index 0000000..946f207
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/tegra-sata.txt
-@@ -0,0 +1,30 @@
-+Tegra124 SoC SATA AHCI controller
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 11c1650..00ba373 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1687,6 +1687,18 @@
+ 		vbus-supply = <&vdd_usb3_vbus>;
+ 	};
+ 
++	/* Serial ATA */
++	sata at 0,70020000 {
++		status = "okay";
 +
-+Required properties :
-+- compatible : "nvidia,tegra124-ahci".
-+- reg : Should contain 2 entries:
-+  - AHCI register set (SATA BAR5)
-+  - SATA register set
-+- interrupts : Defines the interrupt used by SATA
-+- clocks : Must contain an entry for each entry in clock-names.
-+  See ../clocks/clock-bindings.txt for details.
-+- clock-names : Must include the following entries:
-+  - sata
-+  - sata-oob
-+  - cml1
-+  - pll_e
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - sata
-+  - sata-oob
-+  - sata-cold
-+- phys : Must contain an entry for each entry in phy-names.
-+  See ../phy/phy-bindings.txt for details.
-+- phy-names : Must include the following entries:
-+  - sata-phy : XUSB PADCTL SATA PHY
-+- hvdd-supply : Defines the SATA HVDD regulator
-+- vddio-supply : Defines the SATA VDDIO regulator
-+- avdd-supply : Defines the SATA AVDD regulator
-+- target-5v-supply : Defines the SATA 5V power regulator
-+- target-12v-supply : Defines the SATA 12V power regulator
++		hvdd-supply = <&vdd_3v3_lp0>;
++		vddio-supply = <&vdd_1v05_run>;
++		avdd-supply = <&vdd_1v05_run>;
++
++		target-5v-supply = <&vdd_5v0_sata>;
++		target-12v-supply = <&vdd_12v0_sata>;
++	};
++
+ 	clocks {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -1828,6 +1840,29 @@
+ 			enable-active-high;
+ 			vin-supply = <&vdd_5v0_sys>;
+ 		};
++
++		/* Molex power connector */
++		vdd_5v0_sata: regulator at 13 {
++			compatible = "regulator-fixed";
++			reg = <13>;
++			regulator-name = "+5V_SATA";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio TEGRA_GPIO(EE, 2) GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			vin-supply = <&vdd_5v0_sys>;
++		};
++
++		vdd_12v0_sata: regulator at 14 {
++			compatible = "regulator-fixed";
++			reg = <14>;
++			regulator-name = "+12V_SATA";
++			regulator-min-microvolt = <12000000>;
++			regulator-max-microvolt = <12000000>;
++			gpio = <&gpio TEGRA_GPIO(EE, 2) GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			vin-supply = <&vdd_mux>;
++		};
+ 	};
+ 
+ 	sound {
 -- 
 1.8.1.5
