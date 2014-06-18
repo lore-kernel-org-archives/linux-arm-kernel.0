@@ -1,81 +1,107 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 18 Jun 2014 11:46:49 -0600
-Subject: [RFC PATCH 1/4] memory: tegra124-emc: Add EMC driver
-In-Reply-To: <53A1CB23.5090307@collabora.com>
-References: <1402925713-25426-1-git-send-email-tomeu.vizoso@collabora.com>
- <1402925713-25426-2-git-send-email-tomeu.vizoso@collabora.com>
- <539F4D44.3070309@wwwdotorg.org> <53A03186.3040703@collabora.com>
- <53A069B6.6070902@wwwdotorg.org> <53A1CB23.5090307@collabora.com>
-Message-ID: <53A1D089.8010605@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Jun 2014 18:47:10 +0100
+Subject: [PATCH 10/24] ARM64: Introduce is_a32_task and is_a32_thread.
+ Use them in the correct locations.
+In-Reply-To: <1400914939-9708-11-git-send-email-apinski@cavium.com>
+References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+ <1400914939-9708-11-git-send-email-apinski@cavium.com>
+Message-ID: <20140618174710.GB11977@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2014 11:23 AM, Tomeu Vizoso wrote:
-> On 06/17/2014 06:15 PM, Stephen Warren wrote:
->> On 06/17/2014 06:16 AM, Tomeu Vizoso wrote:
->>> On 06/16/2014 10:02 PM, Stephen Warren wrote:
->>>> On 06/16/2014 07:35 AM, Tomeu Vizoso wrote:
->>>>> +#ifdef CONFIG_TEGRA124_EMC
->>>>> +int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
->>>>> long rate);
->>>>> +void tegra124_emc_set_floor(unsigned long freq);
->>>>> +void tegra124_emc_set_ceiling(unsigned long freq);
->>>>> +#else
->>>>> +int tegra124_emc_reserve_bandwidth(unsigned int consumer, unsigned
->>>>> long rate)
->>>>> +{ return -ENODEV; }
->>>>> +void tegra124_emc_set_floor(unsigned long freq)
->>>>> +{ return; }
->>>>> +void tegra124_emc_set_ceiling(unsigned long freq)
->>>>> +{ return; }
->>>>> +#endif
->>>>
->>>> I'll repeat what I said off-list so that we can have the whole
->>>> conversation on the list:
->>>>
->>>> That looks like a custom Tegra-specific API. I think it'd be much
->>>> better
->>>> to integrate this into the common clock framework as a standard clock
->>>> constraints API. There are other use-cases for clock constraints
->>>> besides
->>>> EMC scaling (e.g. some in audio on Tegra, and I'm sure many on other
->>>> SoCs too).
->>>
->>> Yes, I wrote a bit in the cover letter about our requirements and how
->>> they map to the CCF. Could you please comment on that?
->>
->> My comments remain the same. I believe this is something that belongs in
->> the clock driver, or at the least, some API that takes a struct clock as
->> its parameter, so that drivers can use the existing DT clock lookup
->> mechanism.
-> 
-> Ok, let me put this strawman here to see if I have gotten close to what
-> you have in mind:
-> 
-> * add per-client accounting (Rabin's patches referenced before)
-> 
-> * add clk_set_floor, to be used by cpufreq, load stats, etc.
-> 
-> * add clk_set_ceiling, to be used by battery drivers, thermal, etc.
+On Sat, May 24, 2014 at 12:02:05AM -0700, Andrew Pinski wrote:
+> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+> index e71f81f..fad7612 100644
+> --- a/arch/arm64/include/asm/compat.h
+> +++ b/arch/arm64/include/asm/compat.h
+> @@ -293,28 +293,47 @@ struct compat_shmid64_ds {
+>  	compat_ulong_t __unused5;
+>  };
+>  
+> -static inline int is_compat_task(void)
+> +#ifdef CONFIG_AARCH32_EL0
+> +static inline int is_a32_compat_task(void)
+>  {
+>  	return test_thread_flag(TIF_32BIT);
+>  }
+> -
+> -static inline int is_compat_thread(struct thread_info *thread)
+> +static inline int is_a32_compat_thread(struct thread_info *thread)
+>  {
+>  	return test_ti_thread_flag(thread, TIF_32BIT);
+>  }
+> +#else
+> +static inline int is_a32_compat_task(void)
+> +{
+> +	return 0;
+> +}
+> +static inline int is_a32_compat_thread(struct thread_info *thread)
+> +{
+> +	return 0;
+> +}
+> +#endif
+>  
+>  #else /* !CONFIG_COMPAT */
+>  
+> -static inline int is_compat_task(void)
+> +static inline int is_a32_compat_task(void)
+>  {
+>  	return 0;
+>  }
+> -
+> -static inline int is_compat_thread(struct thread_info *thread)
+> +static inline int is_a32_compat_thread(struct thread_info *thread)
+>  {
+>  	return 0;
+>  }
 
-Yes. I'd expect those to be maintained per-client, and so the clock core
-(or whatever higher level code implements clk_set_floor/ceiling)
-performs the logic that "blends" together all the different requests
-from different clients.
+Why do we have 2 dummy definitions for is_a32_compat_task()? Could we
+not squash them into one with different #ifdefs?
 
-As an aside, for audio usage, I would expect clk_set_rate to be a
-per-client (rather than per HW clock) operation too, and to error out if
-one client says it wants to set pll_a to the rate needed for
-44.1KHz-based audio and a different client wants the rate for
-48KHz-based audio.
+>  
+>  #endif /* CONFIG_COMPAT */
+> +
+> +static inline int is_compat_task(void)
+> +{
+> +	return is_a32_compat_task();
+> +}
+> +
+> +static inline int is_compat_thread(struct thread_info *thread)
+> +{
+> +	return is_a32_compat_thread(thread);
+> +}
+>  #endif /* __KERNEL__ */
+>  #endif /* __ASM_COMPAT_H */
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index 36c3603..8180511 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -150,7 +150,7 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+>  
+>  /* 1GB of VA */
+>  #ifdef CONFIG_COMPAT
+> -#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
+> +#define STACK_RND_MASK			(is_compat_task() ? \
+>  						0x7ff >> (PAGE_SHIFT - 12) : \
+>  						0x3ffff >> (PAGE_SHIFT - 12))
 
-> * an EMC driver would collect bandwidth and latency requests from
-> consumers and call clk_set_floor on the EMC clock.
-> 
-> * the EMC driver would also register for rate change notifications in
-> the EMC clock and would update the latency allowance registers at that
-> point.
-> 
-> How does it sound?
+I think I tried something similar in the past and while it works most of
+the time, you can easily get into an #include mess since now elf.h needs
+compat.h. Similarly for other header files where you've changed this.
 
-At a high level, yes this sounds about right to me.
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 720e70b..b2bf728 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -106,7 +106,7 @@ static inline struct thread_info *current_thread_info(void)
+>  #define TIF_FREEZE		19
+>  #define TIF_RESTORE_SIGMASK	20
+>  #define TIF_SINGLESTEP		21
+> -#define TIF_32BIT		22	/* 32bit process */
+> +#define TIF_32BIT		22	/* AARCH32 process */
+
+Can we not just keep TIF_32BIT for limiting the address space to 32-bit
+and use another bit for AArch32 applications?
+
+-- 
+Catalin
