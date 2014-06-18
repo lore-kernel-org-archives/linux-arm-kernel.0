@@ -1,24 +1,52 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 19 Jun 2014 00:10:39 +0300
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <201406182122.29623@pali>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <CAL_JsqKw-C6uZBU3hccGmdofXcCcUKTV6z7Af6KwYwnZiy3HoQ@mail.gmail.com>
- <201406182122.29623@pali>
-Message-ID: <20140618211038.GD558@drone.musicnaut.iki.fi>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 18 Jun 2014 23:19:33 +0200
+Subject: [PATCH v11 2/8] ASoC: core: Generic ac97 link reset functions
+In-Reply-To: <20140618184234.GA27312@sfrouter>
+References: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
+ <1376924761-4054-3-git-send-email-mpa@pengutronix.de>
+ <20140618184234.GA27312@sfrouter>
+Message-ID: <20140618211933.GD32450@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Silvio,
 
-On Wed, Jun 18, 2014 at 09:22:29PM +0200, Pali Roh?r wrote:
-> So without this patch DT migration for Nokia N900 cannot be done 
-> without breaking userspace - which is not acceptable...
+On Wed, Jun 18, 2014 at 08:42:34PM +0200, S. Fricke wrote:
+> 
+> Hi Markus,
+> 
+> I'm fighting with your ac97 pinctrl configuration per dts. 
+> 
+> > [...]
+> > +ssi {
+> > +	...
+> > +
+> > +	pinctrl-names = "default", "ac97-running", "ac97-reset", "ac97-warm-reset";
+> > +	pinctrl-0 = <&ac97link_running>;
+> > +	pinctrl-1 = <&ac97link_running>;
+> > +	pinctrl-2 = <&ac97link_reset>;
+> > +	pinctrl-3 = <&ac97link_warm_reset>;
+> > +	ac97-gpios = <&gpio3 20 0 &gpio3 22 0 &gpio3 28 0>;
+> 
+> I see here the gpios for sync, sdata and reset. On my board I have two sdata
+> lines (sdata-in and sdata-out) which line should I specify here for this setting?
 
-I guess the fact is that the Nokia N900 proprietary userspace has
-never worked properly with the mainline kernel without severe patching,
-so you cannot really talk about any regression. If you cannot fix
-those programs, you could still probably emulate the old Nokia kernel's
-/proc/cpuinfo by providing some text file and bind mounting it, no?
+Try to use sdata-out. This is the only data output line. sdata-in is the
+input to the SoC so we don't have to use this for an AC97 reset.
 
-A.
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/5abd42f4/attachment.sig>
