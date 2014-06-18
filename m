@@ -1,51 +1,120 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Jun 2014 11:12:28 +0200
-Subject: [PATCH] efi/arm64: efistub: remove local copy of linux_banner
-In-Reply-To: <20140618085059.GB24049@console-pimps.org>
-References: <1402657911-7779-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140618085059.GB24049@console-pimps.org>
-Message-ID: <CAKv+Gu8auFu=rxtDpZy4tkfPiZK7ERUeRDvymzQYi9AhVUxW+Q@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 18 Jun 2014 14:44:33 +0530
+Subject: [PATCH v2 03/18] PCI: designware: Configuration space should
+ be specified in 'reg'
+In-Reply-To: <3E54258959B69E4282D79E01AB1F32B70477D2A4@DFLE11.ent.ti.com>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-4-git-send-email-kishon@ti.com> <53876116.90504@ti.com>
+ <3E54258959B69E4282D79E01AB1F32B70477D2A4@DFLE11.ent.ti.com>
+Message-ID: <53A15879.7030302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 June 2014 10:50, Matt Fleming <matt@console-pimps.org> wrote:
-> On Fri, 13 Jun, at 01:11:51PM, Ard Biesheuvel wrote:
->> The shared efistub code for ARM and arm64 contains a local copy of linux_banner,
->> allowing it to be referenced from separate executables such as the ARM
->> decompressor. However, this introduces a dependency on generated header files,
->> causing unnecessary rebuilds of the stub itself and, in case of arm64, vmlinux
->> which contains it.
+Hi,
+
+On Friday 30 May 2014 07:45 PM, Karicheri, Muralidharan wrote:
+>> -----Original Message-----
+>> From: Murali Karicheri [mailto:m-karicheri2 at ti.com]
+>> Sent: Thursday, May 29, 2014 12:32 PM
+>> To: ABRAHAM, KISHON VIJAY
+>> Cc: devicetree at vger.kernel.org; linux-doc at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-pci at vger.kernel.org; linux-
+>> kernel at vger.kernel.org; arnd at arndb.de; tony at atomide.com; jg1.han at samsung.com;
+>> Jason Gunthorpe; Bjorn Helgaas; Mohit Kumar; Marek Vasut
+>> Subject: Re: [PATCH v2 03/18] PCI: designware: Configuration space should be specified
+>> in 'reg'
 >>
->> On arm64, the copy is not actually needed since we can reference the original
->> symbol directly, and as it turns out, there may be better ways to deal with this
->> for ARM as well, so let's remove it from the shared code. If it still needs to
->> be reintroduced for ARM later, it should live under arch/arm anyway and not in
->> shared code.
->
-> I remember making some similar arguments when this patch was first
-> introduced. From looking at my notes, the patch rationale was based on
-> some DT binding discussion where people wanted an explicit way to
-> identify the kernel they were booting and everyone agreed upon this
-> string - I don't know which discussion, I don't have that data.
->
-> I'm more than happy to delete this from the shared code, I never wanted
-> it to go in in the first place. But could someone please give me some
-> details as to why this change is safe and isn't going to break
-> ARM/ARM64? How does this affect DT bindings?
->
+>> On 5/29/2014 2:38 AM, ABRAHAM, KISHON VIJAY wrote:
+>>> The configuration address space has so far been specified in *ranges*,
+>>> however it should be specified in *reg* making it a platform MEM resource.
+>>> Hence used 'platform_get_resource_*' API to get configuration address
+>>> space in the designware driver.
+>>>
+>>> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>>> Cc: Mohit Kumar <mohit.kumar@st.com>
+>>> Cc: Jingoo Han <jg1.han@samsung.com>
+>>> Cc: Marek Vasut <marex@denx.de>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>   .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
+>>>   drivers/pci/host/pcie-designware.c                 |   17 +++++++++++++++--
+>>>   2 files changed, 16 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>> index d6fae13..8314360 100644
+>>> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>> @@ -6,6 +6,7 @@ Required properties:
+>>>   	as "samsung,exynos5440-pcie" or "fsl,imx6q-pcie".
+>>>   - reg: base addresses and lengths of the pcie controller,
+>>>   	the phy controller, additional register for the phy controller.
+>>> +	The configuration address space should also be specified here.
+>> Kishon,
+>>
+>> I am working on the Keystone PCI driver for which v1 is already posted.
+>> Want to clarify
+>> following.
+>> 1. Original text for reg states "base addresses and lengths of the pcie controller,
+>>         the phy controller, additional register for the phy controller"
+>> and you added
+>>         "The configuration address space should also be specified here"
+>>
+>>    and the code below added resource name "config"
+>>
+>> Does PCI designware follow some convention? Does it mean after applying this patch
+>> config name is mandatory or optional? Below code you are not returning error. Can you or
+>> author of PCI designware clarify what is expected to be present as mandatory and what is
+>> optional.
+>>
+>> Does config refers to RC's config space or EP's config space or both?
+>> The code below divide
+>> the size by 2. So it appears to be RC's + EP's config space. Please clarify.
+>>
+>>>   - interrupts: interrupt values for level interrupt,
+>>>   	pulse interrupt, special interrupt.
+>>>   - clocks: from common clock binding: handle to pci clock.
+>>> diff --git a/drivers/pci/host/pcie-designware.c
+>>> b/drivers/pci/host/pcie-designware.c
+>>> index c4e3732..603b386 100644
+>>> --- a/drivers/pci/host/pcie-designware.c
+>>> +++ b/drivers/pci/host/pcie-designware.c
+>>> @@ -20,6 +20,7 @@
+>>>   #include <linux/of_pci.h>
+>>>   #include <linux/pci.h>
+>>>   #include <linux/pci_regs.h>
+>>> +#include <linux/platform_device.h>
+>>>   #include <linux/types.h>
+>>>
+>>>   #include "pcie-designware.h"
+>>> @@ -392,11 +393,23 @@ static const struct irq_domain_ops msi_domain_ops = {
+>>>   int __init dw_pcie_host_init(struct pcie_port *pp)
+>>>   {
+>>>   	struct device_node *np = pp->dev->of_node;
+>>> +	struct platform_device *pdev = to_platform_device(pp->dev);
+>>>   	struct of_pci_range range;
+>>>   	struct of_pci_range_parser parser;
+>>> +	struct resource *cfg_res;
+>>>   	u32 val;
+>>>   	int i;
+>>>
+>>> +	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+>>> +	if (cfg_res) {
+>>> +		pp->config.cfg0_size = resource_size(cfg_res)/2;
+>>> +		pp->config.cfg1_size = resource_size(cfg_res)/2;
+>>> +		pp->cfg0_base = cfg_res->start;
+>>> +		pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
+>>> +	} else {
+>>> +		dev_err(pp->dev, "missing *config* reg space\n");
+>> This should return error -EINVAL.
 
-This just removes the duplicate definition of linux_banner, *not* the
-reference to it a couple of lines down. IOW, the DT bindings and
-everything behind it are not affected at all by this patch.
-The reason it works fine for arm64 is that its stub is part of the
-kernel proper, so the reference will bind to the global definition
-instead.
+Just read the other thread and Grant Likely suggested the host controller
+driver should be backward compatible [1]. So we can't return -EINVAL here.
+So I'd assume this patch is fine as is? Arnd? Jingoo?
 
-What will be affected is 32-bit ARM, as its stub is not part of the
-kernel proper. In this case, we will propose an alternative [and
-better] way of allowing the stub to reference linux_banner, i.e.,
-without having to redefine it at the C level. We will take this into
-account when we propose the next round of efistub patches for ARM.
+[1] -> https://lkml.org/lkml/2014/6/3/124
 
-Regards,
-Ard.
+Thanks
+Kishon
