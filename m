@@ -1,70 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 12:21:32 +0100
-Subject: [PATCH v2] ARM: stih41x: Rename stih416-b2020-revE.dts to
- stih416-b2020e.dts
-In-Reply-To: <53A1734D.7000606@st.com>
-References: <1403087508-6710-1-git-send-email-lee.jones@linaro.org>
- <20140618105438.GC8300@lee--X1> <53A1734D.7000606@st.com>
-Message-ID: <20140618112132.GE8300@lee--X1>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 18 Jun 2014 12:24:04 +0100
+Subject: [RFC v3 1/9] arm: fiq: arbitrary mappings from IRQ to FIQ virqs
+In-Reply-To: <CAL_JsqK-jCQjCCw4qfJOCfNKLVRDTAYSYsGpmYLDzoSVsBaHrA@mail.gmail.com>
+References: <1400853478-5824-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1401961994-18033-2-git-send-email-daniel.thompson@linaro.org>
+ <CAL_JsqK-jCQjCCw4qfJOCfNKLVRDTAYSYsGpmYLDzoSVsBaHrA@mail.gmail.com>
+Message-ID: <53A176D4.90002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jun 2014, Maxime Coquelin wrote:
-
-> Hi Lee,
+On 13/06/14 15:29, Rob Herring wrote:
+> On Thu, Jun 5, 2014 at 4:53 AM, Daniel Thompson
+> <daniel.thompson@linaro.org> wrote:
+>> Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
+>> virq into a FIQ virq. This is too inflexible for multi-platform kernels
+>> and makes runtime error checking impossible.
+>>
+>> We solve this by introducing a flexible mapping that allows interrupt
+>> controllers that support FIQ to register those mappings. This, in turn,
+>> makes it much possible for drivers in DT kernels to gain access to
+>> FIQ virqs.
 > 
-> On 06/18/2014 12:54 PM, Lee Jones wrote:
-> >Two reasons for this rename.  Firstly, it removes the camel case
-> >convention which isn't used by any other platform and secondly it
-> >matches the naming convention for the internal kernel, which can
-> >become annoying when flipping between the two.
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-> 
-> It will be part of the STi pull-request for 3.16 fixes.
+> I don't get why you need a separate linux irq numbers for FIQ. Isn't
+> enabling FIQ simply a property of an irq like edge vs. level trigger?
+> Also, given the constraints on FIQ, we can't really have more that 1
+> IRQ assigned to FIQ.
 
-Thanks for taking the patch. :)
+No particular reason. I mostly went that way because it mimics the
+effect of fiq_start on enable_fiq/disable_fiq whilst supporting
+multi-platform.
 
-Just a quick side note.  As a maintainer, if you're going to take the
-patch there's no requirement to publicly Ack it.  Just let the
-submitter know that you've applied it to your tree.
+I'm tempted to keep the radix tree in the FIQ infrastructure but rather
+than messing about with shadow virqs use it to lookup a fiq_chip
+structure. I think this would keep a clean separation between the ARM
+centric (and slightly weird) FIQ from the generic irq code.
 
-I use Acks for 2 things; when a patch touches code that I maintain,
-but is going in via a different tree, or as a marker if there is some
-reason I can't apply it to my tree right away (waiting on dependencies
-etc), but equally do not wish to review the same patch twice.
 
-> >---
-> >v1 -> v2: Appropriate change to the Makefile.
-> >---
-> >  arch/arm/boot/dts/Makefile                                       | 2 +-
-> >  arch/arm/boot/dts/{stih416-b2020-revE.dts => stih416-b2020e.dts} | 0
-> >  2 files changed, 1 insertion(+), 1 deletion(-)
-> >  rename arch/arm/boot/dts/{stih416-b2020-revE.dts => stih416-b2020e.dts} (100%)
-> >
-> >diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >index 5986ff6..adb5ed9 100644
-> >--- a/arch/arm/boot/dts/Makefile
-> >+++ b/arch/arm/boot/dts/Makefile
-> >@@ -357,7 +357,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
-> >         stih415-b2020.dtb \
-> >         stih416-b2000.dtb \
-> >         stih416-b2020.dtb \
-> >-       stih416-b2020-revE.dtb
-> >+       stih416-b2020e.dtb
-> >  dtb-$(CONFIG_MACH_SUN4I) += \
-> >         sun4i-a10-a1000.dtb \
-> >         sun4i-a10-cubieboard.dtb \
-> >diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020e.dts
-> >similarity index 100%
-> >rename from arch/arm/boot/dts/stih416-b2020-revE.dts
-> >rename to arch/arm/boot/dts/stih416-b2020e.dts
-> >
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Daniel.
