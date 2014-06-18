@@ -1,31 +1,41 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 18 Jun 2014 11:31:09 +0200
-Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
-In-Reply-To: <1403083170.1984.70.camel@x220>
-References: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-17-git-send-email-arnd@arndb.de>
- <536CA80A.60201@atmel.com> <1401279867.22486.6.camel@x220>
- <20140528155916.GA9793@piout.net> <1401293383.22486.18.camel@x220>
- <20140528175439.GA18470@piout.net> <1401299948.22486.51.camel@x220>
- <20140528184217.GB30031@kroah.com> <1403083170.1984.70.camel@x220>
-Message-ID: <20140618093109.GQ19375@piout.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Jun 2014 11:38:50 +0200
+Subject: [PATCH v2 04/20] clk: sunxi: Fix gate indexing for
+ sun6i-a31-apb0-gates
+In-Reply-To: <1403016777-15121-5-git-send-email-wens@csie.org>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+ <1403016777-15121-5-git-send-email-wens@csie.org>
+Message-ID: <20140618093850.GJ19730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 18/06/2014 at 11:19:30 +0200, Paul Bolle wrote :
-> This has landed unchanged in v3.16-rc1. Should I submit the trivial
-> patch to remove these pointless references to the unknown symbols
-> AT91SAM9263, AT91SAM9RL, and AT91SAM9G45?
+On Tue, Jun 17, 2014 at 10:52:41PM +0800, Chen-Yu Tsai wrote:
+> sun6i-a31-apb0-gates supports using clock-indices for holes between
+> individual gates. However, the driver passes the number of gates
+> registered in clk_data->clk_num, which of_clk_src_onecell_get uses
+> to recognize the range of valid indices a consumer can use.
 > 
+> This patch makes the driver pass the maximum gate index + 1, so
+> of_clk_src_onecell_get does not complain about indices greater
+> than gates registered.
+> 
+> This was tested on the A23 SoC, which has a similar APB0 clock,
+> but has holes for gates to removed IP blocks.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Because of dependencies, the pull request was delayed until after
-3.16-rc1. It has been resent and this should be solved for 3.16-rc2:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264181.html
+Maxime
 
 -- 
-Alexandre Belloni, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/75902010/attachment.sig>
