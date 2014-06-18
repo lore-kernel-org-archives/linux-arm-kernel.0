@@ -1,34 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jun 2014 16:59:22 +0100
-Subject: Dove DT and HDMI on v3.16-rc1
-In-Reply-To: <53A1B29C.6000604@gmail.com>
-References: <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
- <535F6DAF.1010400@gmail.com> <20140615152554.GA13870@n2100.arm.linux.org.uk>
- <53A19DFA.7030207@gmail.com> <20140618143447.GA22890@arch.cereza>
- <20140618150103.GE32514@n2100.arm.linux.org.uk> <53A1ABE8.8050401@gmail.com>
- <20140618153028.GF32514@n2100.arm.linux.org.uk> <53A1B29C.6000604@gmail.com>
-Message-ID: <20140618155922.GG32514@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 18 Jun 2014 11:03:44 -0500
+Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
+In-Reply-To: <7hzjha8b97.fsf@paris.lan>
+References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <7hvbrzbh1u.fsf@paris.lan>
+ <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
+ <7hzjha8b97.fsf@paris.lan>
+Message-ID: <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 05:39:08PM +0200, Sebastian Hesselbarth wrote:
-> On 06/18/2014 05:30 PM, Russell King - ARM Linux wrote:
->> On Wed, Jun 18, 2014 at 05:10:32PM +0200, Sebastian Hesselbarth wrote:
->>> xf86-video-armada needs some missing
->>> #include "picturestr.h"
->>> for raring, but whole process has been very straight forward.
->>
->> I'm only aware of this (sorry, copy'n'pasted) which I found when trying
->> to build against ubuntu 14.04.  If further patches are needed to make it
->> compatible with more Xorg versions, please ensure that they find their
->> way into my inbox...
->
-> Your patch also makes the xorg driver build fine on raring.
-> When I encountered the build error, I just tried the first hit on Google
-> - I didn't investigate it at all.
 
-Thanks, just pushed that change out.
+On Jun 18, 2014, at 10:53 AM, Kevin Hilman <khilman@linaro.org> wrote:
+
+> Bjorn Andersson <bjorn@kryo.se> writes:
+> 
+>> On Tue, Jun 17, 2014 at 10:07 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>>> +Paul Walmsley
+>>> 
+>>> Bjorn Andersson <bjorn.andersson@sonymobile.com> writes:
+>>> 
+>>>> This series adds a regulator driver for the Resource Power Manager found in
+>>>> Qualcomm 8660, 8960 and 8064 based devices.
+>>>> 
+>>>> The RPM driver exposes resources to its child devices, that can be accessed to
+>>>> implement drivers for the regulators, clocks and bus frequency control that's
+>>>> owned by the RPM in these devices.
+>>>> 
+>>>> Changes since v2:
+>>>>  - Fix copy-paste error in dt binding
+>>>>  - Correct incomplete move from mfd to soc
+>>>>  - Correct const mistake in regulator driver
+>>>> 
+>>>> Changes since v1:
+>>>>  - Moved rpm driver to drivers/soc
+>>> 
+>>> I'm not sure I follow the motivation for having this under drivers/soc?
+>>> 
+>> Hi Kevin,
+>> 
+>> I've made the argument that to me this is conceptually a black box
+>> handling regulators, clocks and other stuff; hence similar to a PMIC,
+>> which would fit nicely into drivers/mfd.
+>> 
+>> I still think this is the case and now that I look back I didn't get
+>> any pushback from Lee Jones so maybe the move was premature?
+> 
+> Yes, IMO, the move was premature, but hopefully the drivers/soc folks
+> can chime in an clarify the criteria for inclusion there.
+> 
+> Kevin
+
+I dont agree, I think having this in drivers/soc means that we can clearly go through drivers/soc in the future and look for patterns across SoCs that should be re-factored.  Where MFD seems like its become the new drivers misc.
+
+- k
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
