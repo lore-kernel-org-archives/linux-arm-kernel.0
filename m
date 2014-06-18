@@ -1,47 +1,64 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 18 Jun 2014 10:46:58 +0200
-Subject: [PATCH v4 1/7] mfd: axp20x: add AXP221 PMIC support
-In-Reply-To: <20140618083605.GQ21030@lee--X1>
-References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402990723-28138-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140618083605.GQ21030@lee--X1>
-Message-ID: <53A15202.1070908@free-electrons.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 18 Jun 2014 09:48:33 +0100
+Subject: [PATCH v1] ARM: debug: fix broken DEBUG_LL_INCLUDE for multi platform
+In-Reply-To: <1402394236-14778-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1402394236-14778-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1403081313-28234-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On multi_v7_defconfig using def_bool in Kconfig can override the selection
+made as part of DEBUG_LL. This is because def_bool will set the config to true
+if the expression evaluates to true, which is what was happening in
+multi_v7_defconfig. ARCH_SPEAR13XX selects DEBUG_UART_PL01X overriding any
+previous DEBUG_LL selections and resulting in DEBUG_LL_INCLUDE to
+always point to debug/pl01x.S.
 
-On 18/06/2014 10:36, Lee Jones wrote:
-> On Tue, 17 Jun 2014, Boris BREZILLON wrote:
->
->> Add support for the AXP221 PMIC device to the existing AXP20x driver.
->>
->> The AXP221 defines a new set of registers, power supplies and regulators,
->> but most of the API is similar to the AXP20x ones.
->> The AXP20x irq chip definition is reused, though some interrupts are not
->> available in the AXP221.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> ---
->>  drivers/mfd/axp20x.c       | 64 ++++++++++++++++++++++++++++++++++++++++++----
->>  include/linux/mfd/axp20x.h | 56 ++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 115 insertions(+), 5 deletions(-)
-> Looks good to me now.
->   Acked-by: Lee Jones <lee.jones@linaro.org>
->
-> Can this go in independently to the other patches in the set?
+Choice menu already provides options for selecting pl01x and 8250 via
+DEBUG_LL_UART_PL01X and DEBUG_LL_UART_8250 options. so I don't see point of
+having dependencies or def_bool options for PL01X and 8250.
+Other than getting them selected automatically and overriding
+DEBUG_LL selections.
 
-Yes, as long as no one define an axp221 node in his DT.
-In this case axp221 regulators would be considered as axp20x ones (which
-might be a bit problematic), because axp20x-regulator driver does not
-test the axp variant before probing its regulators (this test is
-introduced in patch 3).
+Without this patch its impossible to get earlyprintk working with multi_v7_defconfig
 
-Best Regards,
-
-Boris
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+Am resending this patch as I missed arm-soc people in the loop.
 
 
+ arch/arm/Kconfig.debug | 17 +++--------------
+ 1 file changed, 3 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8f90595..4ee4103 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1019,22 +1019,11 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
+ 	default "mach/debug-macro.S"
+ 
+-# Compatibility options for PL01x
+ config DEBUG_UART_PL01X
+-	def_bool ARCH_EP93XX || \
+-		ARCH_INTEGRATOR || \
+-		ARCH_SPEAR3XX || \
+-		ARCH_SPEAR6XX || \
+-		ARCH_SPEAR13XX || \
+-		ARCH_VERSATILE
+-
+-# Compatibility options for 8250
++	bool
++
+ config DEBUG_UART_8250
+-	def_bool ARCH_DOVE || ARCH_EBSA110 || \
+-		(FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
+-		ARCH_GEMINI || ARCH_IOP13XX || ARCH_IOP32X || \
+-		ARCH_IOP33X || ARCH_IXP4XX || ARCH_KIRKWOOD || \
+-		ARCH_LPC32XX || ARCH_MV78XX0 || ARCH_ORION5X || ARCH_RPC
++	bool
+ 
+ config DEBUG_UART_PHYS
+ 	hex "Physical base address of debug UART"
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
