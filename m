@@ -1,54 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Jun 2014 17:49:27 +0100
-Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
-In-Reply-To: <1402950432.3708.22.camel@smoke>
-References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
- <1402950432.3708.22.camel@smoke>
-Message-ID: <20140618164927.GA9612@leverpostej>
+From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
+Date: Wed, 18 Jun 2014 18:54:24 +0200
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+Message-ID: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 09:27:12PM +0100, Geoff Levand wrote:
-> Hi Mark,
+Machine name from board description is some generic name on DT kernel.
+DT provides machine name property which is specific for board, so use
+it instead generic one when possible.
 
-Hi Geoff,
+Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+---
+ arch/arm/kernel/setup.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-> Sorry for such a delay in my reply.
-> 
-> On Fri, 2014-05-16 at 10:50 +0100, Mark Rutland wrote:
-> > Both the image load offset and the effective image size are forced to be
-> > little-endian regardless of the native endianness of the kernel to
-> > enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
-> > which wish to make use of the load offset can inspect the effective
-> > image size field for a non-zero value to determine if the offset is of a
-> > known endianness.
-> 
-> Doing this conversion in the linker script seems complicated.  My
-> thought was to just have an image header field that specifies the
-> byte order, in the same way that the EI_DATA part of the ELF
-> e_ident field does.
-
-While the conversion in the linker script is a little ugly, it does
-work, and that complexity is hidden behind the macro I added.
-
-While I initially considered having a field to specify byte order, it's
-incredibly likely that bootloaders will not use it. Maintaining a fixed
-endianness everywhere makes it simpler for bootloaders to do the right
-thing, and matches what existing bootloaders are already doing. That's
-less pain for loaders and less pain for the kernel, as things are less
-likely to go wrong.
-
-To me it makes more sense to ensure these fields have a consistent
-endianness, rather than adding more room for possible mistakes.
-
-> Another advantage of having the byte order in the header is that
-> tools other than a boot loader that need to know the byte order
-> can get that info from the header, otherwise they would need to
-> guess the order with some kind of inspection.
-
-What kind of tools do you envision which would need to know the
-endianness of the kernel but would be looking at the Image rather than
-the vmlinux?
-
-Mark.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 8a16ee5..fbc7b4f 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -875,10 +875,13 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	setup_processor();
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+-	if (!mdesc)
++	if (mdesc)
++		machine_name = of_flat_dt_get_machine_name();
++	else
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+ 	machine_desc = mdesc;
+-	machine_name = mdesc->name;
++	if (!machine_name)
++		machine_name = mdesc->name;
+ 
+ 	if (mdesc->reboot_mode != REBOOT_HARD)
+ 		reboot_mode = mdesc->reboot_mode;
+-- 
+1.7.9.5
