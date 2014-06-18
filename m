@@ -1,95 +1,82 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 18 Jun 2014 13:27:48 -0700
-Subject: [PATCH] arm: ptrace: fix syscall modification under
- PTRACE_O_TRACESECCOMP
-Message-ID: <20140618202748.GA9022@www.outflux.net>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Wed, 18 Jun 2014 22:38:41 +0200
+Subject: [PATCH v2 4/4] brcmfmac: Fix OOB interrupt not working for
+ BCM43362
+In-Reply-To: <1402941407-8210-5-git-send-email-hdegoede@redhat.com>
+References: <1402941407-8210-1-git-send-email-hdegoede@redhat.com>
+ <1402941407-8210-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <53A1F8D1.1050204@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
-(stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
-(stored to current_thread_info()->syscall). When this happens, the
-syscall can change across the call to secure_computing(), since it may
-block on tracer notification, and the tracer can then make changes
-to the process, before we return from secure_computing(). This
-means the code must respect the changed syscall after the
-secure_computing() call in syscall_trace_enter(). The same is true
-for tracehook_report_syscall_entry() which may also block and change
-the syscall.
+On 16-06-14 19:56, Hans de Goede wrote:
+> It has taken me a long long time to get the OOB interrupt working on the
+> AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
+> end I found these magic register pokes in the cubietruck kernel tree:
+> https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
+>
+> I'm not entirely sure if this specific to the AP6210 module, or if this
+> should be done for all BCM43362 sdio devices.
 
-The x86 code handles this (it expects orig_ax to always be the
-desired syscall). In the ARM case, this means we should not be touching
-current_thread_info()->syscall after its initial assignment. All failures
-should result in a -1 syscall, though.
+Bit late response but it took some digging. It turns out this is done 
+for all bcm43362 in internal/proprietary driver.
 
-Based on patch by Ricky Zhou.
++Reviewed-by: Arend van Spriel <arend@broadcom.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 16 ++++++++++++++++
+>   1 file changed, 16 insertions(+)
+>
+> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> index 0fc707c..58e86a5 100644
+> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> @@ -39,7 +39,9 @@
+>   #include <brcm_hw_ids.h>
+>   #include <brcmu_utils.h>
+>   #include <brcmu_wifi.h>
+> +#include <chipcommon.h>
+>   #include <soc.h>
+> +#include "chip.h"
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Cc: Ricky Zhou <rickyz@google.com>
-Cc: stable at vger.kernel.org
----
- arch/arm/kernel/ptrace.c |   20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+Not sure why chip.h is needed here.
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 0dd3b79b15c3..97bd95f6aa01 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -911,6 +911,7 @@ enum ptrace_syscall_dir {
- static int tracehook_report_syscall(struct pt_regs *regs,
- 				    enum ptrace_syscall_dir dir)
- {
-+	int ret = 0;
- 	unsigned long ip;
- 
- 	/*
-@@ -923,30 +924,35 @@ static int tracehook_report_syscall(struct pt_regs *regs,
- 	if (dir == PTRACE_SYSCALL_EXIT)
- 		tracehook_report_syscall_exit(regs, 0);
- 	else if (tracehook_report_syscall_entry(regs))
--		current_thread_info()->syscall = -1;
-+		ret = -1;
- 
- 	regs->ARM_ip = ip;
--	return current_thread_info()->syscall;
-+	return ret;
- }
- 
- asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
- {
-+	int ret = 0;
-+
-+	/* set up syscall, which may be changed in secure_computing */
- 	current_thread_info()->syscall = scno;
- 
- 	/* Do the secure computing check first; failures should be fast. */
- 	if (secure_computing(scno) == -1)
- 		return -1;
- 
--	if (test_thread_flag(TIF_SYSCALL_TRACE))
--		scno = tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
-+	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
-+	    tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER))
-+		ret = -1;
- 
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
--		trace_sys_enter(regs, scno);
-+		trace_sys_enter(regs, current_thread_info()->syscall);
- 
--	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
-+	audit_syscall_entry(AUDIT_ARCH_ARM, current_thread_info()->syscall,
-+			    regs->ARM_r0, regs->ARM_r1,
- 			    regs->ARM_r2, regs->ARM_r3);
- 
--	return scno;
-+	return ret ?: current_thread_info()->syscall;
- }
- 
- asmlinkage void syscall_trace_exit(struct pt_regs *regs)
--- 
-1.7.9.5
+>   #include "dhd_bus.h"
+>   #include "dhd_dbg.h"
+>   #include "sdio_host.h"
+> @@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+>   {
+>   	int ret = 0;
+>   	u8 data;
+> +	u32 addr, gpiocontrol;
+>   	unsigned long flags;
+>
+>   	if ((sdiodev->pdata) && (sdiodev->pdata->oob_irq_supported)) {
+> @@ -148,6 +151,19 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+>
+>   		sdio_claim_host(sdiodev->func[1]);
+>
+> +		if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
+> +			/* assign GPIO to SDIO core */
+> +			addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
 
+I don't like the assumption that chipcommon core register space is 
+always at SI_ENUM_BASE although it is for BCM43362. Let's keep it for now.
 
--- 
-Kees Cook
-Chrome OS Security
+> +			gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr, &ret);
+> +			gpiocontrol |= 0x2;
+> +			brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol, &ret);
+> +
+> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_SELECT, 0xf,
+> +					  &ret);
+> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_OUT, 0, &ret);
+> +			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_EN, 0x2, &ret);
+> +		}
+> +
+>   		/* must configure SDIO_CCCR_IENx to enable irq */
+>   		data = brcmf_sdiod_regrb(sdiodev, SDIO_CCCR_IENx, &ret);
+>   		data |= 1 << SDIO_FUNC_1 | 1 << SDIO_FUNC_2 | 1;
+>
+
+Regards,
+Arend
