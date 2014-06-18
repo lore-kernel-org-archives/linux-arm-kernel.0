@@ -1,38 +1,100 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 18 Jun 2014 19:14:59 +0530
-Subject: [PATCH] ARM: dts: add hdmi regulators for exynos5420 based peach-pit
- board
-Message-ID: <1403099099-6599-1-git-send-email-rahul.sharma@samsung.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 18 Jun 2014 09:52:05 -0400
+Subject: [PATCH] arm64: support reboot and power off via EFI runtime
+In-Reply-To: <20140618132623.GF26461@leverpostej>
+References: <1403023514-1352-1-git-send-email-msalter@redhat.com>
+ <20140618132623.GF26461@leverpostej>
+Message-ID: <1403099525.32688.28.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding regulators for hdmi for peach-pit board.
+On Wed, 2014-06-18 at 14:26 +0100, Mark Rutland wrote:
+> Hi Mark,
+> 
+> On Tue, Jun 17, 2014 at 05:45:14PM +0100, Mark Salter wrote:
+> > Add handlers for arm_pm_resestart and pm_power_off which use EFI
+> > runtime services ResetSystem call to perform the functions. These
+> > handlers are only installed if no handler currently exists. This
+> > allows PSCI to take priority over EFI for these functions.
+> > 
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > ---
+> >  arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 40 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 14db1f6..e8c0476 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -19,11 +19,14 @@
+> >  #include <linux/of_fdt.h>
+> >  #include <linux/sched.h>
+> >  #include <linux/slab.h>
+> > +#include <linux/reboot.h>
+> > +#include <linux/pm.h>
+> >  
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/efi.h>
+> >  #include <asm/tlbflush.h>
+> >  #include <asm/mmu_context.h>
+> > +#include <asm/system_misc.h>
+> >  
+> >  struct efi_memory_map memmap;
+> >  
+> > @@ -467,3 +470,40 @@ static int __init arm64_enter_virtual_mode(void)
+> >  	return 0;
+> >  }
+> >  early_initcall(arm64_enter_virtual_mode);
+> > +
+> > +static void efi_restart(enum reboot_mode reboot_mode, const char *cmd)
+> > +{
+> > +	int efi_mode;
+> > +
+> > +	switch (reboot_mode) {
+> > +	case REBOOT_WARM:
+> > +	case REBOOT_SOFT:
+> > +		efi_mode = EFI_RESET_WARM;
+> > +		break;
+> > +	default:
+> > +		efi_mode = EFI_RESET_COLD;
+> > +		break;
+> > +	}
+> > +	efi.reset_system(efi_mode, 0, 0, NULL);
+> > +}
+> > +
+> > +static void efi_power_off(void)
+> > +{
+> > +	efi.reset_system(EFI_RESET_SHUTDOWN, 0, 0, NULL);
+> > +}
+> > +
+> > +static int __init setup_efi_reset(void)
+> > +{
+> > +	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+> > +		/*
+> > +		 * If something (psci, etc) hasn't already registered
+> > +		 * a handler, use EFI.
+> > +		 */
+> > +		if (arm_pm_restart == NULL)
+> > +			arm_pm_restart = efi_restart;
+> > +		if (pm_power_off == NULL)
+> > +			pm_power_off = efi_power_off;
+> > +	}
+> > +	return 0;
+> > +}
+> > +pure_initcall(setup_efi_reset);
+> 
+> This doesn't seem to match the definition of a pure initcall, given that
+> it depends on the state of EFI runtime services and
+> arm_{pm_restart,power_off}.
+> 
+> Is there any reason this needs to run so early? Can this not be
+> called later, when we have more of a guarantee of other reboot /
+> shutdown mechanisms having been registered?
+> 
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
----
-Based on for-next branch in Kukjin's tree.
-Dependent on:
-1) PMIC DT patch at http://www.gossamer-threads.com/lists/linux/kernel/1945703
-2) tps65090 DT patch at https://lkml.org/lkml/2014/6/13/483
-
- arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 1c5b8f9..0a6a1cb 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -229,6 +229,11 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&hdmi_hpd_irq>;
- 	ddc = <&i2c_2>;
-+
-+	hdmi-en-supply = <&tps65090_fet7>;
-+	vdd-supply = <&ldo8_reg>;
-+	vdd_osc-supply = <&ldo10_reg>;
-+	vdd_pll-supply = <&ldo8_reg>;
- };
- 
- &usbdrd_phy0 {
--- 
-1.7.9.5
+I used pure_initcall because that was the earliest EFI runtime services
+would be available (runtime services set up with early_initcall). I was
+thinking this was after psci would have a chance to set handlers and
+other hw specific drivers could come later and override. But now that
+you mention it, there is no reason this couldn't come much later in boot
+so that the EFI handlers are a last resort.
