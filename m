@@ -1,57 +1,25 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 17 Jun 2014 23:49:11 -0500
-Subject: [PATCH] pinctrl: qcom: Add BUS_HOLD pin bias
-Message-ID: <1403066951-31266-1-git-send-email-agross@codeaurora.org>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 18 Jun 2014 12:54:07 +0800
+Subject: [PATCH 0/2] add ahci_platform_get_of_property
+In-Reply-To: <xuwei5@hisilicon.com, kefeng.wang@linaro.org,>
+References: <xuwei5@hisilicon.com, kefeng.wang@linaro.org,>
+Message-ID: <1403067249-8021-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the BUS_HOLD (Keeper) bias option for pins.
+Instead of setting hflags in different files,  
+ahci_platform_get_of_property set hpriv->flags when ahci_platform_init_host
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/pinctrl/pinctrl-msm.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Any other property required?
 
-diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/pinctrl-msm.c
-index e43fbce..9aa2839 100644
---- a/drivers/pinctrl/pinctrl-msm.c
-+++ b/drivers/pinctrl/pinctrl-msm.c
-@@ -206,6 +206,7 @@ static int msm_config_reg(struct msm_pinctrl *pctrl,
- 	switch (param) {
- 	case PIN_CONFIG_BIAS_DISABLE:
- 	case PIN_CONFIG_BIAS_PULL_DOWN:
-+	case PIN_CONFIG_BIAS_BUS_HOLD:
- 	case PIN_CONFIG_BIAS_PULL_UP:
- 		*bit = g->pull_bit;
- 		*mask = 3;
-@@ -243,6 +244,7 @@ static int msm_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
- 
- #define MSM_NO_PULL	0
- #define MSM_PULL_DOWN	1
-+#define MSM_KEEPER	2
- #define MSM_PULL_UP	3
- 
- static unsigned msm_regval_to_drive(u32 val)
-@@ -280,6 +282,9 @@ static int msm_config_group_get(struct pinctrl_dev *pctldev,
- 	case PIN_CONFIG_BIAS_PULL_DOWN:
- 		arg = arg == MSM_PULL_DOWN;
- 		break;
-+	case PIN_CONFIG_BIAS_BUS_HOLD:
-+		arg = arg == MSM_KEEPER;
-+		break;
- 	case PIN_CONFIG_BIAS_PULL_UP:
- 		arg = arg == MSM_PULL_UP;
- 		break;
-@@ -339,6 +344,9 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
- 		case PIN_CONFIG_BIAS_PULL_DOWN:
- 			arg = MSM_PULL_DOWN;
- 			break;
-+		case PIN_CONFIG_BIAS_BUS_HOLD:
-+			arg = MSM_KEEPER;
-+			break;
- 		case PIN_CONFIG_BIAS_PULL_UP:
- 			arg = MSM_PULL_UP;
- 			break;
+Zhangfei Gao (2):
+  libahci_platform: add ahci_platform_get_of_property
+  ahci: remove AHCI_HFLAG_NO_FBS setting
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |    9 +++++
+ drivers/ata/ahci_platform.c                        |    3 --
+ drivers/ata/libahci_platform.c                     |   39 ++++++++++++++++++++
+ 3 files changed, 48 insertions(+), 3 deletions(-)
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
