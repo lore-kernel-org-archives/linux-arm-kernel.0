@@ -1,47 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Jun 2014 13:53:55 +0100
-Subject: [PATCH] ARM: perf: allow tracing with kernel tracepoints events
-In-Reply-To: <1403025065-18001-1-git-send-email-jean.pihet@linaro.org>
-References: <CAFrcx1n-cPXm=w+84gQiUjZoFKi7gYnvJ0BQ+8yXKS=k3nEt3g@mail.gmail.com>
- <1403025065-18001-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140618125355.GA2186@arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 18 Jun 2014 14:56:56 +0200
+Subject: [PATCH] ARM: dts: imx51-eukrea-mbimxsd51-baseboard: unbreak esdhc.
+Message-ID: <1403096216-21292-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+The following commit:
+89d7e5c mmc: sdhci-esdhc-imx: add runtime pm support
+has the effect of also disabling the hardware card detect
+in runtime pm.
 
-On Tue, Jun 17, 2014 at 06:11:05PM +0100, Jean Pihet wrote:
-> When tracing with tracepoints events the IP and CPSR are set to 0,
-> preventing the perf code to resolve the symbols:
-> 
-> ./perf record -e kmem:kmalloc cal
-> [ perf record: Woken up 1 times to write data ]
-> [ perf record: Captured and wrote 0.007 MB perf.data (~321 samples) ]
-> 
-> ./perf report
-> Overhead Command Shared Object Symbol
-> ........ ....... ............. ...........
-> 40.78%   cal     [unknown]     [.]00000000
-> 31.6%    cal     [unknown]     [.]00000000
-> 
-> The examination of the gathered samples (perf report -D) shows the IP
-> is set to 0 and that the samples are considered as user space samples,
-> while the IP should be set from the registers and the samples should be
-> considered as kernel samples.
-> 
-> The fix is to implement perf_arch_fetch_caller_regs for ARM, which
-> fills the necessary registers used for the callchain unwinding and
-> to determine the user/kernel space property of the samples: ip, sp, fp
-> and cpsr.
+We switch to GPIO based detection to avoid this issue.
 
-Surely its only the CPSR that identifies whether it's user or kernel?
+This patch is based on:
+ARM: dts: imx51-babbage: Fix esdhc setup
 
-> Tested with perf record and tracepoints filtering (-e <tracepoint>), with
-> unwinding using fp (--call-graph fp) and dwarf info (--call-graph dwarf).
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Whilst the old ACPS unwinding only needs PC, FP and SP, is this definitely
-true for exidx and DWARF-based unwinding? Given that libunwind ends up
-running a state machine for the latter, can we guarantee that we won't hit
-instructions that require access to other general purpose registers?
-
-Will
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+index 75e66c9..1d77381 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -108,6 +108,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1 &pinctrl_esdhc1_cd>;
+ 	fsl,cd-controller;
++	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
++
+ 	status = "okay";
+ };
+ 
+@@ -206,7 +208,7 @@
+ 
+ 		pinctrl_esdhc1_cd: esdhc1_cd {
+ 			fsl,pins = <
+-				MX51_PAD_GPIO1_0__SD1_CD 0x20d5
++				MX51_PAD_GPIO1_0__GPIO1_0 0xd5
+ 			>;
+ 		};
+ 
+-- 
+1.7.9.5
