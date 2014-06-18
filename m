@@ -1,53 +1,57 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 18 Jun 2014 16:53:56 +0100
-Subject: [PATCH] arm64: support reboot and power off via EFI runtime
-In-Reply-To: <1403102507.32688.42.camel@deneb.redhat.com>
-References: <1403023514-1352-1-git-send-email-msalter@redhat.com>
- <CAL_JsqJUMMRwUn+PUiFweDOywgLCbKiWfDTLDSfJqE9oTV5gYw@mail.gmail.com>
- <1403102507.32688.42.camel@deneb.redhat.com>
-Message-ID: <20140618155356.GR24049@console-pimps.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 18 Jun 2014 10:55:35 -0500
+Subject: [PATCH v2 1/2] arm: dts: am4372: let boards enable RTC and
+ Watchdog
+In-Reply-To: <1403106200-777-2-git-send-email-balbi@ti.com>
+References: <1403106200-777-1-git-send-email-balbi@ti.com>
+ <1403106200-777-2-git-send-email-balbi@ti.com>
+Message-ID: <53A1B677.9010909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jun, at 10:41:47AM, Mark Salter wrote:
-> On Wed, 2014-06-18 at 09:09 -0500, Rob Herring wrote:
-> > On Tue, Jun 17, 2014 at 11:45 AM, Mark Salter <msalter@redhat.com> wrote:
-> > > Add handlers for arm_pm_resestart and pm_power_off which use EFI
-> > 
-> > typo.
-> > 
-> > > runtime services ResetSystem call to perform the functions. These
-> > > handlers are only installed if no handler currently exists. This
-> > > allows PSCI to take priority over EFI for these functions.
-> > >
-> > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > ---
-> > >  arch/arm64/kernel/efi.c | 40 ++++++++++++++++++++++++++++++++++++++++
-> > 
-> > Where's the arm32 version? Surely this could be shared with all
-> > arches. pm_power_off is at least architecturally independent. We
-> > should do the same for restart/reboot. I'm not saying do that now, but
-> > at least put it in the right place for that to happen.
-> > 
-> > Rob
+$subject - ARM: dts:
+
+On 06/18/2014 10:43 AM, Felipe Balbi wrote:
+> by providing phandles to rtc and wdt nodes, we can
+> let boards enable rtc and wdt as necessary.
 > 
-> Good point. So the right place would be drivers/firmware/efi I think.
-> Add a CONFIG_EFI_RESET with default off. I suppose we could also
-> go ahead and s/arm_pm_restart/pm_restart/ kernel-wide or have an
-> ifdef in the code (or depends on ARM64 || ARM in Kconfig) until we
-> do so.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/boot/dts/am4372.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> [Matt Fleming CC'd]
- 
-Heh, this is timely. I wrote some patches last week to use
-EfiResetSystem() for ACPI Hardware Reduced platforms,
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index 49fa596..e3830d4 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -270,7 +270,7 @@
+>  			ti,hwmods = "counter_32k";
+>  		};
+>  
+> -		rtc at 44e3e000 {
+> +		rtc: rtc at 44e3e000 {
+>  			compatible = "ti,am4372-rtc","ti,da830-rtc";
+>  			reg = <0x44e3e000 0x1000>;
+>  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH
+> @@ -279,7 +279,7 @@
+>  			status = "disabled";
+>  		};
+>  
+> -		wdt at 44e35000 {
+> +		wdt: wdt at 44e35000 {
+>  			compatible = "ti,am4372-wdt","ti,omap3-wdt";
+>  			reg = <0x44e35000 0x1000>;
+>  			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+> 
+we might want to fix up any other similar nodes in dtsi as well, no?
 
-  http://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/log/?h=efi/reboot
+examples:
+cpu at 0
+dispc at 4832a400
 
-so it would definitely be good if we could try and solve both of our
-problems simultaneously.
-
-Let me post that patch series to kickoff the discussion.
+Might also be nice to have Fixes: to point out which commit was being
+fixed, no?
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Regards,
+Nishanth Menon
