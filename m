@@ -1,108 +1,57 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 17 Jun 2014 18:41:52 -0700
-Subject: [RESEND PATCH v7 3/4] arm: dirty log write protect management
- support
-In-Reply-To: <20140611070352.GC24286@lvm>
-References: <1401837567-5527-1-git-send-email-m.smarduch@samsung.com>
- <1402076021-9425-1-git-send-email-m.smarduch@samsung.com>
- <20140608120522.GG3279@lvm> <539663A0.9080507@samsung.com>
- <20140610092240.GF1388@lvm> <53974998.70001@samsung.com>
- <20140611070352.GC24286@lvm>
-Message-ID: <53A0EE60.6030508@samsung.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 17 Jun 2014 23:49:11 -0500
+Subject: [PATCH] pinctrl: qcom: Add BUS_HOLD pin bias
+Message-ID: <1403066951-31266-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2014 12:03 AM, Christoffer Dall wrote:
+This patch adds the BUS_HOLD (Keeper) bias option for pins.
 
->>
->> There is also the issue of kvm_flush_remote_tlbs(), that's also weak,
->> the generic one is using IPIs. Since it's only used in mmu.c maybe make 
->> this one static.
->>
-> So I don't see a lot of use of weak symbols in kvm_main.c (actually on
-> kvmarm/next I don't see any), but we do want to share code when more
-> than one architecture implements something in the exact same way, like
-> it seems x86 and ARM is doing here for this particular function.
-> 
-> I think the KVM scheme is usually to check for some define, like:
-> 
-> #ifdef KVM_ARCH_HAVE_GET_DIRTY_LOG
-> 	ret = kvm_arch_get_dirty_log(...);
-> #else
-> 	ret = kvm_get_dirty_log(...);
-> #endif
-> 
-> but Paolo may have a more informed oppinion of how to deal with these.
-> 
-> Thanks,
-> -Christoffer
->
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ drivers/pinctrl/pinctrl-msm.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
+diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/pinctrl-msm.c
+index e43fbce..9aa2839 100644
+--- a/drivers/pinctrl/pinctrl-msm.c
++++ b/drivers/pinctrl/pinctrl-msm.c
+@@ -206,6 +206,7 @@ static int msm_config_reg(struct msm_pinctrl *pctrl,
+ 	switch (param) {
+ 	case PIN_CONFIG_BIAS_DISABLE:
+ 	case PIN_CONFIG_BIAS_PULL_DOWN:
++	case PIN_CONFIG_BIAS_BUS_HOLD:
+ 	case PIN_CONFIG_BIAS_PULL_UP:
+ 		*bit = g->pull_bit;
+ 		*mask = 3;
+@@ -243,6 +244,7 @@ static int msm_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
  
-One approach I'm trying looking at the code in kvm_main().
-This approach applies more to selecting features as opposed to
-selecting generic vs architecture specific functions.
-
-1.-------------------------------------------------
- - add to 'virt/kvm/Kconfig'
-config HAVE_KVM_ARCH_TLB_FLUSH_ALL
-       bool
-
-config HAVE_KVM_ARCH_DIRTY_LOG
-       bool
-2.--------------------------------------------------
-For ARM and later ARM64 add to 'arch/arm[64]/kvm/Kconfig'
-config KVM
-        bool "Kernel-based Virtual Machine (KVM) support"
-...
-select HAVE_KVM_ARCH_TLB_FLUSH_ALL
-..
-
-Not for HAVE_KVM_ARCH_DIRTY_LOG given it's shared with x86,
-but would need to do it for every other architecture that
-does not share it (except initially for arm64 since it
-will use the variant that returns -EINVAL until feature
-is supported)
-
-3------------------------------------------------------
-In kvm_main.c would have something like
-
-void kvm_flush_remote_tlbs(struct kvm *kvm)
-{
-#ifdef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
-        kvm_arch_flush_remote_tlbs(kvm);
-#else
-        long dirty_count = kvm->tlbs_dirty;
-
-        smp_mb();
-        if (make_all_cpus_request(kvm, KVM_REQ_TLB_FLUSH))
-                ++kvm->stat.remote_tlb_flush;
-        cmpxchg(&kvm->tlbs_dirty, dirty_count, 0);
-#endif
-}
-
-Then add void kvm_flush_remote_tlbs(struct kvm *kvm) definition
-to arm kvm_host.h. Define the function in this case mmu.c
-
-For the dirty log function
-int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
-                                                struct kvm_dirty_log *log)
-{
-#ifdef CONFIG_HAVE_KVM_ARCH_DIRTY_LOG
-        kvm_arch_vm_ioctl_get_dirty_log(kvm, log);
-#else
-        int r;
-        struct kvm_memory_slot *memslot;
-        unsigned long n, i;
-        unsigned long *dirty_bitmap;
-        unsigned long *dirty_bitmap_buffer;
-        bool is_dirty = false;
-	...
-
-But then you have to go into every architecture and define the
-kvm_arch_vm_...() variant.
-
-Is this the right way to go? Or is there a simpler way?
-
-Thanks,
-- Mario
+ #define MSM_NO_PULL	0
+ #define MSM_PULL_DOWN	1
++#define MSM_KEEPER	2
+ #define MSM_PULL_UP	3
+ 
+ static unsigned msm_regval_to_drive(u32 val)
+@@ -280,6 +282,9 @@ static int msm_config_group_get(struct pinctrl_dev *pctldev,
+ 	case PIN_CONFIG_BIAS_PULL_DOWN:
+ 		arg = arg == MSM_PULL_DOWN;
+ 		break;
++	case PIN_CONFIG_BIAS_BUS_HOLD:
++		arg = arg == MSM_KEEPER;
++		break;
+ 	case PIN_CONFIG_BIAS_PULL_UP:
+ 		arg = arg == MSM_PULL_UP;
+ 		break;
+@@ -339,6 +344,9 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
+ 		case PIN_CONFIG_BIAS_PULL_DOWN:
+ 			arg = MSM_PULL_DOWN;
+ 			break;
++		case PIN_CONFIG_BIAS_BUS_HOLD:
++			arg = MSM_KEEPER;
++			break;
+ 		case PIN_CONFIG_BIAS_PULL_UP:
+ 			arg = MSM_PULL_UP;
+ 			break;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
