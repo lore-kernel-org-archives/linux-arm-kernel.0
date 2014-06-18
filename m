@@ -1,69 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jun 2014 09:26:53 +0100
-Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
- devices
-In-Reply-To: <53A0B27E.5010708@gmail.com>
-References: <53A05E2D.6020702@samsung.com>
- <1403019164-12514-1-git-send-email-t.figa@samsung.com>
- <5027740.B7iVUcUX2T@wuerfel> <53A0B27E.5010708@gmail.com>
-Message-ID: <20140618082653.GN21030@lee--X1>
+Date: Wed, 18 Jun 2014 09:29:53 +0100
+Subject: [PATCH v2 16/20] mfd: sun6i-prcm: Add support for Allwinner A23
+ PRCM
+In-Reply-To: <1403016777-15121-17-git-send-email-wens@csie.org>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+ <1403016777-15121-17-git-send-email-wens@csie.org>
+Message-ID: <20140618082953.GO21030@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jun 2014, Tomasz Figa wrote:
-> On 17.06.2014 17:42, Arnd Bergmann wrote:
-> > On Tuesday 17 June 2014 17:32:44 Tomasz Figa wrote:
-> >> Currently a syscon entity can be only registered directly through a
-> >> platform device that binds to a dedicated driver. However in certain use
-> >> cases it is desirable to make a device used with another driver a syscon
-> >> interface provider. For example, certain SoCs (e.g. Exynos) contain
-> >> system controller blocks which perform various functions such as power
-> >> domain control, CPU power management, low power mode control, but in
-> >> addition contain certain IP integration glue, such as various signal
-> >> masks, coprocessor power control, etc. In such case, there is a need to
-> >> have a dedicated driver for such system controller but also share
-> >> registers with other drivers. The latter is where the syscon interface
-> >> is helpful.
-> >>
-> >> This patch decouples syscon object from syscon driver, so that it can be
-> >> registered from any driver in addition to the original "syscon" platform
-> >> driver.
-
-+1 for this approach.
-
-Michal, Pankay,
-  Does it also suit your needs?
-
-> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > 
-> > Hi Tomasz,
-> > 
-> > This seems like a reasonable way of solving the problem, but I think
-> > there is an even better one that we have about in the past: if we
-> > promote syscon from a platform driver into a a drivers/base/ helper
-> > that is independent of the platform device matching, we can use
-> > call syscon_regmap_lookup_* for any device node, whether it's already
-> > bound to a driver or not, which do what you need. It would also make
-> > it easier to call the syscon code before the platform_device
-> > infrastructure gets initialized, which is something a number of
-> > people have asked for, e.g. for using regmap to do SMP bringup
-> > or for clock registration.
+> The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
+> The differences are the AR100 clock can no longer be modified,
+> the APB0 clock has different divisors, and some clock gates are
+> gone.
 > 
-> Basically, unless I'm missing your point, this is what my patch does,
-> except that I don't move it to drivers/base/ and the registration
-> function I added require a pointer to struct device. Indeed, decoupling
-> it further from the driver model, by adding of_syscon_register() should
-> be useful for early users.
+> This patch adds a compatible with a modified subdevice list for
+> the A23.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
+>  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
+>  2 files changed, 31 insertions(+), 1 deletion(-)
 
-If agreed by Arnd, I think this work can be completed as a subsequent
-patch.
+The patch looks fine to me, but I'm concerned about the size of the
+patch set and the amount of subsystems it touches.
 
-> Should I move this to drivers/base/, even though from current location
-> it can be used outside the platform driver anyway?
-
-If I'm being honest with myself, I'd say that Syscon wasn't really an
-MFD driver.  I'm happy to keep it in there any continue maintaining
-it, but wouldn't block a move either.
+I am guessing that this patch can just be taken independently though.
+Please correct me if I'm wrong.
 
 -- 
 Lee Jones
