@@ -1,23 +1,23 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 18 Jun 2014 11:56:38 -0700
-Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
-In-Reply-To: <20140618164927.GA9612@leverpostej>
-References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
- <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
- <1402950432.3708.22.camel@smoke>
- <20140618164927.GA9612@leverpostej>
-Message-ID: <CAGa+x85uCquTbimbpAbS5_72RPTWrX-pNp15R63iNat=v4Atjw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jun 2014 20:01:09 +0100
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20140618190108.GI32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 9:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+On Wed, Jun 18, 2014 at 06:54:24PM +0200, Pali Roh?r wrote:
+> Machine name from board description is some generic name on DT kernel.
+> DT provides machine name property which is specific for board, so use
+> it instead generic one when possible.
 
-> What kind of tools do you envision which would need to know the
-> endianness of the kernel but would be looking at the Image rather than
-> the vmlinux?
+http://archive.arm.linux.org.uk/lurker/message/20130726.132850.53d47576.en.html
 
-Automated boot infrastructure which has access to the [zu]Image but
-not the vmlinux and wants to know which endian rootfs to pass to the
-kernel.
+"If userspace wants to get at the DT information about a platform, we already
+have ways that can happen already - we export the DT stuff so that kexec's
+tools can get at it."
 
-Kevin
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
