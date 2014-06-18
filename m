@@ -1,67 +1,79 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 18 Jun 2014 17:50:22 +0400
-Subject: [PATCH] arm: get rid of hardcoded assumptions about kernel stack size
-Message-ID: <1403099422-850-1-git-send-email-a.ryabinin@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Jun 2014 15:03:52 +0100
+Subject: [PATCH RFC 1/2] libahci_platform: add
+ ahci_platform_get_of_property
+In-Reply-To: <1403067249-8021-2-git-send-email-zhangfei.gao@linaro.org>
+References: <xuwei5@hisilicon.com,kefeng.wang@linaro.org,>
+ <1403067249-8021-1-git-send-email-zhangfei.gao@linaro.org>
+ <1403067249-8021-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140618140352.GD11895@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing kernel stack size on arm is not as simple as it should be:
-1) THRED_SIZE macro doen't respect PAGE_SIZE and THREAD_SIZE_ORDER
-2) stack size is hardcoded in get_thread_info macro
+On Wed, Jun 18, 2014 at 05:54:08AM +0100, Zhangfei Gao wrote:
+> Instead of setting hflags in different files,
+> ahci_platform_get_of_property set hpriv->flags when ahci_platform_init_host
+> according to property in dts.
 
-This patch fixes it by caculating THREAD_SIZE and thread_info address
-taking into account PAGE_SIZE and THREAD_SIZE_ORDER.
+The AHCI_HFLAGS are a Linux implementation detail, so it would be nice
+to have a good justification for each of these being turned into DT
+properties.
 
-Now changing stack size becomes simply changing THREAD_SIZE_ORDER.
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>  .../devicetree/bindings/ata/ahci-platform.txt      |    9 +++++
+>  drivers/ata/libahci_platform.c                     |   39 ++++++++++++++++++++
+>  2 files changed, 48 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> index c96d8dcf98fd..c0b9f6e76ba4 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> @@ -26,6 +26,15 @@ Optional properties:
+>  - clocks            : must contain the sata, sata_ref and ahb clocks
+>  - clock-names       : must contain "ahb" for the ahb clock
+>  
+> +- no-ncq: when present, controller can't do NCQ, turning off CAP_NCQ
+> +- 32bit-only: when present, controller can't do 64bit DMA, forcing 32bit
+> +- no-msi: when present, no PCI MSI
+> +- no-pmp: when present, controller can't do PMP, turning off CAP_PMP
+> +- yes-ncq: when present,controller can do NCQ, turning on CAP_NCQ
+> +- no-suspend: when present, controller can't do suspend
+> +- yes-fbs: when present, controller can do FBS, turning on CAP_FBS
+> +- no-fbs: when present, controller can't do FBS, turning off CAP_FBS
 
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
----
- arch/arm/include/asm/assembler.h   | 8 +++++---
- arch/arm/include/asm/thread_info.h | 3 ++-
- 2 files changed, 7 insertions(+), 4 deletions(-)
+There is absolutely no reason to mention CAP_* here; the DT should
+describe the HW, not Linux internals.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 57f0584..906703a 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -24,6 +24,8 @@
- #include <asm/domain.h>
- #include <asm/opcodes-virt.h>
- #include <asm/asm-offsets.h>
-+#include <asm/page.h>
-+#include <asm/thread_info.h>
- 
- #define IOMEM(x)	(x)
- 
-@@ -179,10 +181,10 @@
-  * Get current thread_info.
-  */
- 	.macro	get_thread_info, rd
-- ARM(	mov	\rd, sp, lsr #13	)
-+ ARM(	mov	\rd, sp, lsr #THREAD_SIZE_ORDER + PAGE_SHIFT	)
-  THUMB(	mov	\rd, sp			)
-- THUMB(	lsr	\rd, \rd, #13		)
--	mov	\rd, \rd, lsl #13
-+ THUMB(	lsr	\rd, \rd, #THREAD_SIZE_ORDER + PAGE_SHIFT	)
-+	mov	\rd, \rd, lsl #THREAD_SIZE_ORDER + PAGE_SHIFT
- 	.endm
- 
- /*
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index f989d7c..f85d2b0 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -14,9 +14,10 @@
- 
- #include <linux/compiler.h>
- #include <asm/fpstate.h>
-+#include <asm/page.h>
- 
- #define THREAD_SIZE_ORDER	1
--#define THREAD_SIZE		8192
-+#define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
- #define THREAD_START_SP		(THREAD_SIZE - 8)
- 
- #ifndef __ASSEMBLY__
--- 
-1.8.5.5
+Do these all make sense to be placed in DT?
+
+I worry that for other quirks we may need more flags in future. For that
+reason I'd rather figure this out in the driver based on the compatible
+string.
+
+> +
+>  Examples:
+>          sata at ffe08000 {
+>  		compatible = "snps,spear-ahci";
+> diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
+> index 3a5b4ed25a4f..880b9f360056 100644
+> --- a/drivers/ata/libahci_platform.c
+> +++ b/drivers/ata/libahci_platform.c
+> @@ -278,6 +278,44 @@ err_out:
+>  }
+>  EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
+>  
+> +#ifdef CONFIG_OF
+> +static void ahci_platform_get_of_property(struct platform_device *pdev,
+> +					  struct ahci_host_priv *hpriv)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +
+> +	if (of_device_is_available(np)) {
+> +		if (of_get_property(np, "no-ncq", NULL))
+> +			hpriv->flags |= AHCI_HFLAG_NO_NCQ;
+
+For boolean flags please use of_property_read_bool.
+
+Mark.
