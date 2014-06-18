@@ -1,58 +1,34 @@
-From: harinik@xilinx.com (Harini Katakam)
-Date: Wed, 18 Jun 2014 17:09:37 +0530
-Subject: [PATCH v2 2/2] devicetree: Add Zynq GPIO devicetree bindings
- documentation
-In-Reply-To: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
-References: <1403091577-10232-1-git-send-email-harinik@xilinx.com>
-Message-ID: <1403091577-10232-2-git-send-email-harinik@xilinx.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jun 2014 12:56:02 +0100
+Subject: Build error - vmlinux.lds [Re: linux-next: Tree for Jun 18]
+In-Reply-To: <CAK5sBcEpXboRVD-KzzjBJMi+LF-jhdt_HUYEz7wkJtFAv+BLcg@mail.gmail.com>
+References: <CAK5sBcEpXboRVD-KzzjBJMi+LF-jhdt_HUYEz7wkJtFAv+BLcg@mail.gmail.com>
+Message-ID: <20140618115602.GA32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Harini Katakam <harini.katakam@xilinx.com>
+On Wed, Jun 18, 2014 at 04:50:43PM +0530, Sachin Kamat wrote:
+> Hi,
+> 
+> I observe the following build error while building uImage for ARM.
+> 
+>   Kernel: arch/arm/boot/Image is ready
+> make[2]: *** No rule to make target
+> `arch/arm/boot/compressed/vmlinux.lds', needed by
+> `arch/arm/boot/compressed/vmlinux'.  Stop.
+> make[1]: *** [arch/arm/boot/compressed/vmlinux] Error 2
+> make: *** [uImage] Error 2
 
-Add gpio-zynq bindings documentation.
+Works fine here against an empty object tree:
 
-Signed-off-by: Harini Katakam <harinik@xilinx.com>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
+http://www.arm.linux.org.uk/developer/build/file.php?lid=9591
 
-v2 changes:
-Improve description.
+Are you building into an already-built object tree or rebuilding an
+already built tree?
 
----
- .../devicetree/bindings/gpio/gpio-zynq.txt         |   24 ++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-zynq.txt
+This is likely caused by make getting confused over the dependencies.
+I suggest making clean to recover from this error.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-zynq.txt b/Documentation/devicetree/bindings/gpio/gpio-zynq.txt
-new file mode 100644
-index 0000000..b2c023a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-zynq.txt
-@@ -0,0 +1,24 @@
-+Xilinx Zynq GPIO controller Device Tree Bindings
-+-------------------------------------------
-+
-+Required properties:
-+- #gpio-cells 		: Should be two. First cell is used to mention
-+			  pin number.
-+- compatible		: Should be "xlnx,zynq-gpio-1.0"
-+- clocks		: Clock specifier (see clock bindings for details)
-+- gpio-controller	: Marks the device node as a GPIO controller.
-+- interrupts		: Interrupt specifier (see interrupt bindings for
-+			  details)
-+- interrupt-parent	: Must be core interrupt controller
-+- reg			: Address and length of the register set for the device
-+
-+Example:
-+	gpio at e000a000 {
-+		#gpio-cells = <2>;
-+		compatible = "xlnx,zynq-gpio-1.0";
-+		clocks = <&clkc 42>;
-+		gpio-controller;
-+		interrupt-parent = <&intc>;
-+		interrupts = <0 20 4>;
-+		reg = <0xe000a000 0x1000>;
-+	};
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
