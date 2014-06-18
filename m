@@ -1,61 +1,50 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 18 Jun 2014 18:27:05 +0900
-Subject: [PATCH v2 03/18] PCI: designware: Configuration space should be
- specified in 'reg'
-In-Reply-To: <53A15879.7030302@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-4-git-send-email-kishon@ti.com> <53876116.90504@ti.com>
- <3E54258959B69E4282D79E01AB1F32B70477D2A4@DFLE11.ent.ti.com>
- <53A15879.7030302@ti.com>
-Message-ID: <000001cf8ad7$784e1aa0$68ea4fe0$%han@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 10:28:06 +0100
+Subject: [PATCH v4 1/7] mfd: axp20x: add AXP221 PMIC support
+In-Reply-To: <53A15202.1070908@free-electrons.com>
+References: <1402990723-28138-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1402990723-28138-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140618083605.GQ21030@lee--X1>
+ <53A15202.1070908@free-electrons.com>
+Message-ID: <20140618092806.GI23945@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 18, 2014 6:15 PM, Kishon Vijay Abraham I wrote:
-> On Friday 30 May 2014 07:45 PM, Karicheri, Muralidharan wrote:
-> >> On 5/29/2014 2:38 AM, ABRAHAM, KISHON VIJAY wrote:
-> >>> The configuration address space has so far been specified in *ranges*,
-> >>> however it should be specified in *reg* making it a platform MEM resource.
-> >>> Hence used 'platform_get_resource_*' API to get configuration address
-> >>> space in the designware driver.
-> >>>
-> >>> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> >>> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >>> Cc: Mohit Kumar <mohit.kumar@st.com>
-> >>> Cc: Jingoo Han <jg1.han@samsung.com>
-> >>> Cc: Marek Vasut <marex@denx.de>
-> >>> Cc: Arnd Bergmann <arnd@arndb.de>
-> >>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >>> ---
-> >>>   .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
-> >>>   drivers/pci/host/pcie-designware.c                 |   17 +++++++++++++++--
-> >>>   2 files changed, 16 insertions(+), 2 deletions(-)
-
-[...]
-
-> >>> +	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-> >>> +	if (cfg_res) {
-> >>> +		pp->config.cfg0_size = resource_size(cfg_res)/2;
-> >>> +		pp->config.cfg1_size = resource_size(cfg_res)/2;
-> >>> +		pp->cfg0_base = cfg_res->start;
-> >>> +		pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
-> >>> +	} else {
-> >>> +		dev_err(pp->dev, "missing *config* reg space\n");
-> >> This should return error -EINVAL.
+On Wed, 18 Jun 2014, Boris BREZILLON wrote:
+> On 18/06/2014 10:36, Lee Jones wrote:
+> > On Tue, 17 Jun 2014, Boris BREZILLON wrote:
+> >
+> >> Add support for the AXP221 PMIC device to the existing AXP20x driver.
+> >>
+> >> The AXP221 defines a new set of registers, power supplies and regulators,
+> >> but most of the API is similar to the AXP20x ones.
+> >> The AXP20x irq chip definition is reused, though some interrupts are not
+> >> available in the AXP221.
+> >>
+> >> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >> ---
+> >>  drivers/mfd/axp20x.c       | 64 ++++++++++++++++++++++++++++++++++++++++++----
+> >>  include/linux/mfd/axp20x.h | 56 ++++++++++++++++++++++++++++++++++++++++
+> >>  2 files changed, 115 insertions(+), 5 deletions(-)
+> > Looks good to me now.
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > Can this go in independently to the other patches in the set?
 > 
-> Just read the other thread and Grant Likely suggested the host controller
-> driver should be backward compatible [1]. So we can't return -EINVAL here.
-> So I'd assume this patch is fine as is? Arnd? Jingoo?
+> Yes, as long as no one define an axp221 node in his DT.
+> In this case axp221 regulators would be considered as axp20x ones (which
+> might be a bit problematic), because axp20x-regulator driver does not
+> test the axp variant before probing its regulators (this test is
+> introduced in patch 3).
 
-Yes, you're right. The driver should keep backward compatibility for
-legacy DT binding. However, after enough time goes by, these legacy
-DT handling can be removed.
+Then I'd prefer to wait and have the dependencies go in at the same
+time.
 
-Best regards,
-Jingoo Han
+Mark,
+  As normal, I'm happy to create a shared branch between us.
 
-> 
-> [1] -> https://lkml.org/lkml/2014/6/3/124
-> 
-> Thanks
-> Kishon
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
