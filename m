@@ -1,50 +1,62 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 18 Jun 2014 10:29:27 -0500
-Subject: [PATCH 2/2] regulators: TPS65218: Correct the the config register
- for LDO1
-In-Reply-To: <1403104668-32316-2-git-send-email-balbi@ti.com>
-References: <1403104668-32316-1-git-send-email-balbi@ti.com>
- <1403104668-32316-2-git-send-email-balbi@ti.com>
-Message-ID: <53A1B057.1030902@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 16:29:32 +0100
+Subject: [PATCH v2 7/7] pwm: st: Supply Device Tree binding documentation for
+ ST's PWM IP
+In-Reply-To: <1403103172-19856-7-git-send-email-lee.jones@linaro.org>
+References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
+ <1403103172-19856-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140618152932.GG15956@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nit pick:
-s/regulators: TPS65218:/regulators: tps65218:/
+pwm: st: Supply Device Tree binding documentation for ST's PWM IP
+    
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-On 06/18/2014 10:17 AM, Felipe Balbi wrote:
-> From: Keerthy <j-keerthy@ti.com>
-> 
-> Correct the the config register for LDO1.
-> 
-> Cc: <stable@vger.kernel.org> # v3.15
-Fixes: 90e7d5262796 (regulator: tps65218: Add Regulator driver for
-TPS65218 PMIC)
-?
-
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/regulator/tps65218-regulator.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/regulator/tps65218-regulator.c b/drivers/regulator/tps65218-regulator.c
-> index edbc46e..9effe48 100644
-> --- a/drivers/regulator/tps65218-regulator.c
-> +++ b/drivers/regulator/tps65218-regulator.c
-> @@ -209,7 +209,7 @@ static const struct regulator_desc regulators[] = {
->  			   1, -1, -1, TPS65218_REG_ENABLE1,
->  			   TPS65218_ENABLE1_DC6_EN, NULL, NULL, 0, 0),
->  	TPS65218_REGULATOR("LDO1", TPS65218_LDO_1, tps65218_ldo1_dcdc34_ops, 64,
-> -			   TPS65218_REG_CONTROL_DCDC4,
-> +			   TPS65218_REG_CONTROL_LDO1,
->  			   TPS65218_CONTROL_LDO1_MASK, TPS65218_REG_ENABLE2,
->  			   TPS65218_ENABLE2_LDO1_EN, NULL, ldo1_dcdc3_ranges,
->  			   2, 0),
-> 
-otherwise,
-Acked-by: Nishanth Menon <nm@ti.com>
-
--- 
-Regards,
-Nishanth Menon
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-st.txt b/Documentation/devicetree/bindings/pwm/pwm-st.txt
+new file mode 100644
+index 0000000..84d2fb8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-st.txt
+@@ -0,0 +1,41 @@
++STMicroelectronics PWM driver bindings
++--------------------------------------
++
++Required parameters:
++- compatible :		"st,pwm"
++- #pwm-cells : 		Number of cells used to specify a PWM. First cell
++			specifies the per-chip index of the PWM to use and the
++			second cell is the period in nanoseconds - fixed to 2
++			for STiH41x.
++- reg :			Physical base address and length of the controller's
++			registers.
++- pinctrl-names: 	Set to "default".
++- pinctrl-0: 		List of phandles pointing to pin configuration nodes
++			for PWM module.
++			For Pinctrl properties, please refer to [1].
++- clock-names: 		Set to "pwm".
++- clocks: 		phandle of the clock used by the PWM module.
++			For Clk properties, please refer to [2].
++
++Optional properties:
++- st,pwm-num-chan:	Number of available channels. If not passed, the driver
++			will consider single channel by default.
++
++[1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++[2] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Example:
++
++pwm1: pwm at fe510000 {
++	compatible = "st,pwm";
++	reg = <0xfe510000 0x68>;
++	#pwm-cells = <2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1_chan0_default
++		     &pinctrl_pwm1_chan1_default
++		     &pinctrl_pwm1_chan2_default
++		     &pinctrl_pwm1_chan3_default>;
++	clocks = <&clk_sysin>;
++	clock-names = "pwm";
++	st,pwm-num-chan = <4>;
++};
