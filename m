@@ -1,54 +1,71 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 18 Jun 2014 13:09:01 +0200
-Subject: [PATCH v2] ARM: stih41x: Rename stih416-b2020-revE.dts to
- stih416-b2020e.dts
-In-Reply-To: <20140618105438.GC8300@lee--X1>
-References: <1403087508-6710-1-git-send-email-lee.jones@linaro.org>
- <20140618105438.GC8300@lee--X1>
-Message-ID: <53A1734D.7000606@st.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Wed, 18 Jun 2014 11:10:11 +0000
+Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
+ Hisilicon System MMU binding
+In-Reply-To: <20140616182645.GD16758@arm.com>
+References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
+ <5537408.I9tiuCA96J@wuerfel> <20140616164517.GY16758@arm.com>
+ <8028011.DbLMpGku5b@wuerfel> <20140616182645.GD16758@arm.com>
+Message-ID: <836ade98fe6141f58476bf981ac5a6bf@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Will,
 
-On 06/18/2014 12:54 PM, Lee Jones wrote:
-> Two reasons for this rename.  Firstly, it removes the camel case
-> convention which isn't used by any other platform and secondly it
-> matches the naming convention for the internal kernel, which can
-> become annoying when flipping between the two.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Will Deacon
+> Sent: Monday, June 16, 2014 11:57 PM
+> To: Arnd Bergmann
+> Cc: Kefeng Wang; Catalin Marinas; Tianhong Ding; huxinwei at huawei.com;
+> Zefan Li; Zhen Lei; Dave P Martin; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH RFC v1 1/2] documentation/iommu: Add description of
+> Hisilicon System MMU binding
+> 
+> On Mon, Jun 16, 2014 at 06:25:35PM +0100, Arnd Bergmann wrote:
+> > On Monday 16 June 2014 17:45:17 Will Deacon wrote:
+> > > On Mon, Jun 16, 2014 at 05:42:10PM +0100, Arnd Bergmann wrote:
+> > > > We have to migrate the driver to the new binding anyway, it may be
+> > > > a bit painful, but there are not really any users yet so there is
+> > > > a chance we can remove the nonstandard code at some point, perhaps
+> > > > in a few years.
+> > >
+> > > The only way I see this working is if we kill the existing binding
+> > > and move exclusively to the new one. I'm actually ok with that (we
+> > > have no in-tree users), but it needs to happen ASAP in my opinion,
+> > > otherwise we increase the window where the old binding can be
+> adopted.
+> >
+> > I agree. I was hoping to get the generic binding ready for 3.16, but
+> > that didn't happen. Maybe we can add a small patch to the binding to
+> > explain that it will change in the future.
+> 
+> Perhaps, but saying "don't use this" isn't much better than just ripping
+> out the support altogether. That said, I won't object to a patch adding a
+> big fat warning to the current binding docs if it dissuades people from
+> using what we currently have.
+> 
+> > > Note that the next version of the ARM SMMU (v3) is considerably
+> > > different to the current architecture, so a new driver (using the
+> > > new bindings) will be required.
+> > >
+> > > This actually opens a wider question: if we don't have an in-tree
+> > > user for a device-tree binding, do we consider that binding to be
+> unused?
+> >
+> > Not in general, but often. We don't require dts files to be in the
+> > kernel, so we have to apply a bit of common sense. If anyone knows of
+> > out-of-tree users of the binding that are actually working with
+> > upstream kernels, we need a migration path. Anything that also
+> > requires out-of-tree kernel patches however is something we don't have
+> to worry about.
+> 
+> Ok. If Thierry's binding gets in for 3.17, then I'll try to convert the
+> ARM SMMU driver over to it for 3.18 providing we don't grow any in-tree
+> users of the existing binding in the meantime (or 3.17 depending on how
+> early it gets queued).
+> 
+> Sound fair?
+Would you be considering the handling of hot plug masters in the arm-smmu driver while incorporating the new binding?
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-It will be part of the STi pull-request for 3.16 fixes.
-
-Thanks,
-Maxime
-
-> ---
-> v1 -> v2: Appropriate change to the Makefile.
-> ---
->   arch/arm/boot/dts/Makefile                                       | 2 +-
->   arch/arm/boot/dts/{stih416-b2020-revE.dts => stih416-b2020e.dts} | 0
->   2 files changed, 1 insertion(+), 1 deletion(-)
->   rename arch/arm/boot/dts/{stih416-b2020-revE.dts => stih416-b2020e.dts} (100%)
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 5986ff6..adb5ed9 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -357,7 +357,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
->          stih415-b2020.dtb \
->          stih416-b2000.dtb \
->          stih416-b2020.dtb \
-> -       stih416-b2020-revE.dtb
-> +       stih416-b2020e.dtb
->   dtb-$(CONFIG_MACH_SUN4I) += \
->          sun4i-a10-a1000.dtb \
->          sun4i-a10-cubieboard.dtb \
-> diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020e.dts
-> similarity index 100%
-> rename from arch/arm/boot/dts/stih416-b2020-revE.dts
-> rename to arch/arm/boot/dts/stih416-b2020e.dts
->
+-Varun
