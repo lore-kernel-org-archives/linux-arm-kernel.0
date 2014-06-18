@@ -1,59 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jun 2014 13:20:21 +0100
-Subject: Build error - vmlinux.lds [Re: linux-next: Tree for Jun 18]
-In-Reply-To: <CAK5sBcEg1XYQmzshxdLDHFCYFiawV0d8rt7aeAkPoiPhNMX1CQ@mail.gmail.com>
-References: <CAK5sBcEpXboRVD-KzzjBJMi+LF-jhdt_HUYEz7wkJtFAv+BLcg@mail.gmail.com>
- <20140618115602.GA32514@n2100.arm.linux.org.uk>
- <CAK5sBcEg1XYQmzshxdLDHFCYFiawV0d8rt7aeAkPoiPhNMX1CQ@mail.gmail.com>
-Message-ID: <20140618122020.GB32514@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Jun 2014 14:24:38 +0200
+Subject: [PATCH v2 16/20] mfd: sun6i-prcm: Add support for Allwinner A23
+ PRCM
+In-Reply-To: <20140618082953.GO21030@lee--X1>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+ <1403016777-15121-17-git-send-email-wens@csie.org>
+ <20140618082953.GO21030@lee--X1>
+Message-ID: <20140618122438.GR19730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 05:38:14PM +0530, Sachin Kamat wrote:
-> On Wed, Jun 18, 2014 at 5:26 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Jun 18, 2014 at 04:50:43PM +0530, Sachin Kamat wrote:
-> >> Hi,
-> >>
-> >> I observe the following build error while building uImage for ARM.
-> >>
-> >>   Kernel: arch/arm/boot/Image is ready
-> >> make[2]: *** No rule to make target
-> >> `arch/arm/boot/compressed/vmlinux.lds', needed by
-> >> `arch/arm/boot/compressed/vmlinux'.  Stop.
-> >> make[1]: *** [arch/arm/boot/compressed/vmlinux] Error 2
-> >> make: *** [uImage] Error 2
-> >
-> > Works fine here against an empty object tree:
-> >
-> > http://www.arm.linux.org.uk/developer/build/file.php?lid=9591
-> >
-> > Are you building into an already-built object tree or rebuilding an
-> > already built tree?
+On Wed, Jun 18, 2014 at 09:29:53AM +0100, Lee Jones wrote:
+> > The Allwinner A23 SoC has a PRCM unit like the previous A31 SoC.
+> > The differences are the AR100 clock can no longer be modified,
+> > the APB0 clock has different divisors, and some clock gates are
+> > gone.
+> > 
+> > This patch adds a compatible with a modified subdevice list for
+> > the A23.
+> > 
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+> >  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  2 +-
+> >  drivers/mfd/sun6i-prcm.c                           | 30 ++++++++++++++++++++++
+> >  2 files changed, 31 insertions(+), 1 deletion(-)
 > 
-> I did a clean build after updating the tree to next-20140618.
-> git status show me the following after doing make clean
+> The patch looks fine to me, but I'm concerned about the size of the
+> patch set and the amount of subsystems it touches.
 > 
-> # On branch master
-> # Changes not staged for commit:
-> #   (use "git add/rm <file>..." to update what will be committed)
-> #   (use "git checkout -- <file>..." to discard changes in working directory)
-> #
-> #    deleted:    arch/arm/boot/compressed/vmlinux.lds.S
-> 
-> 
-> My tip of kernel points to commit 4ca1fbc122fcb ("Add linux-next specific
-> files for 20140618")
-> 
-> >
-> > This is likely caused by make getting confused over the dependencies.
-> > I suggest making clean to recover from this error.
-> 
-> I get this error when I do a clean build too.
+> I am guessing that this patch can just be taken independently though.
+> Please correct me if I'm wrong.
 
-Hmm.  Please try removing vmlinux.lds.S from extra-y in
-arch/arm/boot/compressed/Makefile and restoring the deleted file.
+I have a bit of the same concern. We have several comments on the
+previous patches, so I'm not even sure this patch can go as is.
+
+It would be much easier if you (ChenYu) could introduce first a very
+basic with just the UART support, and then, as separate series,
+clocks, PRCM, MMC, and so on.
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/e3250f99/attachment-0001.sig>
