@@ -1,39 +1,30 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 18 Jun 2014 13:51:44 -0700
-Subject: [PATCH v3 -next 0/9] CMA: generalize CMA reserved area
- management code
-In-Reply-To: <20140617012507.GA6825@js1304-P5Q-DELUXE>
-References: <1402897251-23639-1-git-send-email-iamjoonsoo.kim@lge.com>
- <539EB4C7.3080106@samsung.com>
- <20140617012507.GA6825@js1304-P5Q-DELUXE>
-Message-ID: <20140618135144.297c785260f9e2aebead867c@linux-foundation.org>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 18 Jun 2014 13:51:39 -0700
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <20140618202748.GA9022@www.outflux.net>
+References: <20140618202748.GA9022@www.outflux.net>
+Message-ID: <CALCETrX+3fVvLncFJmZ+4Esgt1esqinGxwK89LopLAXo=3HR0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jun 2014 10:25:07 +0900 Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+On Wed, Jun 18, 2014 at 1:27 PM, Kees Cook <keescook@chromium.org> wrote:
+> An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
+> (stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
+> (stored to current_thread_info()->syscall). When this happens, the
+> syscall can change across the call to secure_computing(), since it may
+> block on tracer notification, and the tracer can then make changes
+> to the process, before we return from secure_computing(). This
+> means the code must respect the changed syscall after the
+> secure_computing() call in syscall_trace_enter(). The same is true
+> for tracehook_report_syscall_entry() which may also block and change
+> the syscall.
+>
+> The x86 code handles this (it expects orig_ax to always be the
+> desired syscall). In the ARM case, this means we should not be touching
+> current_thread_info()->syscall after its initial assignment. All failures
+> should result in a -1 syscall, though.
 
-> > >v2:
-> > >   - Although this patchset looks very different with v1, the end result,
-> > >   that is, mm/cma.c is same with v1's one. So I carry Ack to patch 6-7.
-> > >
-> > >This patchset is based on linux-next 20140610.
-> > 
-> > Thanks for taking care of this. I will test it with my setup and if
-> > everything goes well, I will take it to my -next tree. If any branch
-> > is required for anyone to continue his works on top of those patches,
-> > let me know, I will also prepare it.
-> 
-> Hello,
-> 
-> I'm glad to hear that. :)
-> But, there is one concern. As you already know, I am preparing further
-> patches (Aggressively allocate the pages on CMA reserved memory). It
-> may be highly related to MM branch and also slightly depends on this CMA
-> changes. In this case, what is the best strategy to merge this
-> patchset? IMHO, Anrew's tree is more appropriate branch. If there is
-> no issue in this case, I am willing to develope further patches based
-> on your tree.
+This looks sensible.
 
-That's probably easier.  Marek, I'll merge these into -mm (and hence
--next and git://git.kernel.org/pub/scm/linux/kernel/git/mhocko/mm.git)
-and shall hold them pending you review/ack/test/etc, OK?
+--Andy
