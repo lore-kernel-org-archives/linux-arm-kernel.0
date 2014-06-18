@@ -1,99 +1,91 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 18 Jun 2014 12:06:54 +0530
-Subject: [PATCH] ARM: dts: remove display power domain for exynos5420
-In-Reply-To: <53A12EA3.5010007@samsung.com>
-References: <1402313299-18885-1-git-send-email-rahul.sharma@samsung.com>
- <CAPdUM4OVjRSqVdQDUJZR7vGm1uUEYr31s-tx7Oxs8tM_xc2v7g@mail.gmail.com>
- <53A12EA3.5010007@samsung.com>
-Message-ID: <CAPdUM4OK+ATMMRM67dV5JeeTGMu=XA7Gvi7Uif+Hypf3iP+6jg@mail.gmail.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Wed, 18 Jun 2014 12:07:07 +0530
+Subject: [PATCH v2 1/8] PCI: designware: add rd[wr]_other_conf API
+In-Reply-To: <1402426287-31157-2-git-send-email-m-karicheri2@ti.com>
+References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
+ <1402426287-31157-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20140618063706.GA6098@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrej,
+On Wed, Jun 11, 2014 at 02:51:20AM +0800, Murali Karicheri wrote:
+> v3.65 version of the designware h/w, requires application space
+> registers to be configured to access the remote EP config space.
+> To support this, add rd[wr]_other_conf API in the pcie_host_opts
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Grant Likely <grant.likely@linaro.org>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Mohit Kumar <mohit.kumar@st.com>
+> CC: Jingoo Han <jg1.han@samsung.com>
+> CC: Bjorn Helgaas <bhelgaas@google.com>
+> CC: Pratyush Anand <pratyush.anand@st.com>
+> CC: Richard Zhu <r65037@freescale.com>
+> CC: Kishon Vijay Abraham I <kishon@ti.com>
+> CC: Marek Vasut <marex@denx.de>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Pawel Moll <pawel.moll@arm.com>
+> CC: Mark Rutland <mark.rutland@arm.com>
+> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> CC: Kumar Gala <galak@codeaurora.org>
+> CC: Randy Dunlap <rdunlap@infradead.org>
+> CC: Grant Likely <grant.likely@linaro.org> 
+> 
+> ---
+>  drivers/pci/host/pcie-designware.c |   12 ++++++++++--
+>  drivers/pci/host/pcie-designware.h |    4 ++++
+>  2 files changed, 14 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index c4e3732..e8f5d8d 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -654,7 +654,11 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+>  
+>  	spin_lock_irqsave(&pp->conf_lock, flags);
+>  	if (bus->number != pp->root_bus_nr)
+> -		ret = dw_pcie_rd_other_conf(pp, bus, devfn,
+> +		if (pp->ops->rd_other_conf)
+> +			ret = pp->ops->rd_other_conf(pp, bus, devfn,
+> +						where, size, val);
+> +		else
+> +			ret = dw_pcie_rd_other_conf(pp, bus, devfn,
+>  						where, size, val);
+>  	else
+>  		ret = dw_pcie_rd_own_conf(pp, where, size, val);
+> @@ -680,7 +684,11 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+>  
+>  	spin_lock_irqsave(&pp->conf_lock, flags);
+>  	if (bus->number != pp->root_bus_nr)
+> -		ret = dw_pcie_wr_other_conf(pp, bus, devfn,
+> +		if (pp->ops->wr_other_conf)
+> +			ret = pp->ops->wr_other_conf(pp, bus, devfn,
+> +						where, size, val);
+> +		else
+> +			ret = dw_pcie_wr_other_conf(pp, bus, devfn,
+>  						where, size, val);
+>  	else
+>  		ret = dw_pcie_wr_own_conf(pp, where, size, val);
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index 3063b35..2d6dd66 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -62,6 +62,10 @@ struct pcie_host_ops {
+>  			u32 val, void __iomem *dbi_base);
+>  	int (*rd_own_conf)(struct pcie_port *pp, int where, int size, u32 *val);
+>  	int (*wr_own_conf)(struct pcie_port *pp, int where, int size, u32 val);
+> +	int (*rd_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
+> +			unsigned int devfn, int where, int size, u32 *val);
+> +	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
+> +			unsigned int devfn, int where, int size, u32 val);
+>  	int (*link_up)(struct pcie_port *pp);
+>  	void (*host_init)(struct pcie_port *pp);
+>  };
 
-On 18 June 2014 11:46, Andrzej Hajda <a.hajda@samsung.com> wrote:
-> On 06/17/2014 07:49 AM, Rahul Sharma wrote:
->> Hi All,
->>
->> Please review this patch.
->>
->> Regards,
->> Rahul Sharma
->>
->> On 9 June 2014 16:58, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->>> Display domain is removed due to instability issues. Explaining
->>> the problem below:
->>>
->>> exynos_init_late triggers the pm_genpd_poweroff_unused which
->>> powers off the unused power domains. This call hits before
->>> the trigger to deferred probes.
->>>
->>> DRM DP Panel defers the probe due to supply get failure. By the
->>> time, deferred probe is scheduled again, Display Power Domain is
->>> powered off by pm_genpd_poweroff_unused.
->>>
->>> FIMD and DP drivers are accessing registers during Probe and Bind
->>> callbacks. If display domain is enabled/disabled around register
->>> accesses, display domain gets unstable and we are getting Power
->>> Domain Disable fail notification. Increasing the Timeout also
->>> didn't help.
->
-> As I understand the problem is that fimd and dp drivers access hw
-> registers without enabling power domain. So the proper solution is to
-> fix these drivers.
+Reviewed-by: Pratyush Anand <pratyush.anand@st.com> 
 
-That is also a problem but I fixed those accesses in my local kernel before
-hitting this issue. If we do register accesses in FIMD/DP probe/bind we
-observes "Prefetch abort" exception. But here the problem is that 'DP
-domain disable' starts failing if we enable/disable multiple times.
-
->
-> Btw. there are already patches removing hw access from probe/bind of
-> fimd. I guess removing also hw access from dp probe/bind could be a good
-> solution.
-
-Please let me know the links for posted patches. I will test with those patches.
-
-Regards,
-Rahul Sharma
-
->
-> Regards
-> Andrzej
->
->>>
->>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->>> ---
->>> based on Kukjin's for-next branch.
->>>
->>>  arch/arm/boot/dts/exynos5420.dtsi |    6 ------
->>>  1 file changed, 6 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
->>> index e385322..3d528cf 100644
->>> --- a/arch/arm/boot/dts/exynos5420.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->>> @@ -262,11 +262,6 @@
->>>                 reg = <0x10044060 0x20>;
->>>         };
->>>
->>> -       disp_pd: power-domain at 100440C0 {
->>> -               compatible = "samsung,exynos4210-pd";
->>> -               reg = <0x100440C0 0x20>;
->>> -       };
->>> -
->>>         msc_pd: power-domain at 10044120 {
->>>                 compatible = "samsung,exynos4210-pd";
->>>                 reg = <0x10044120 0x20>;
->>> @@ -518,7 +513,6 @@
->>>         };
->>>
->>>         fimd: fimd at 14400000 {
->>> -               samsung,power-domain = <&disp_pd>;
->>>                 clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
->>>                 clock-names = "sclk_fimd", "fimd";
->>>         };
->>> --
->>> 1.7.9.5
->>>
->
+> -- 
+> 1.7.9.5
