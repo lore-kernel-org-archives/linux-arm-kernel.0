@@ -1,35 +1,23 @@
-From: silvio.fricke@gmail.com (S. Fricke)
-Date: Wed, 18 Jun 2014 20:42:34 +0200
-Subject: [PATCH v11 2/8] ASoC: core: Generic ac97 link reset functions
-In-Reply-To: <1376924761-4054-3-git-send-email-mpa@pengutronix.de>
-References: <1376924761-4054-1-git-send-email-mpa@pengutronix.de>
- <1376924761-4054-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140618184234.GA27312@sfrouter>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 18 Jun 2014 11:56:38 -0700
+Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
+In-Reply-To: <20140618164927.GA9612@leverpostej>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+ <1402950432.3708.22.camel@smoke>
+ <20140618164927.GA9612@leverpostej>
+Message-ID: <CAGa+x85uCquTbimbpAbS5_72RPTWrX-pNp15R63iNat=v4Atjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 18, 2014 at 9:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
 
-Hi Markus,
+> What kind of tools do you envision which would need to know the
+> endianness of the kernel but would be looking at the Image rather than
+> the vmlinux?
 
-I'm fighting with your ac97 pinctrl configuration per dts. 
+Automated boot infrastructure which has access to the [zu]Image but
+not the vmlinux and wants to know which endian rootfs to pass to the
+kernel.
 
-> [...]
-> +ssi {
-> +	...
-> +
-> +	pinctrl-names = "default", "ac97-running", "ac97-reset", "ac97-warm-reset";
-> +	pinctrl-0 = <&ac97link_running>;
-> +	pinctrl-1 = <&ac97link_running>;
-> +	pinctrl-2 = <&ac97link_reset>;
-> +	pinctrl-3 = <&ac97link_warm_reset>;
-> +	ac97-gpios = <&gpio3 20 0 &gpio3 22 0 &gpio3 28 0>;
-
-I see here the gpios for sync, sdata and reset. On my board I have two sdata
-lines (sdata-in and sdata-out) which line should I specify here for this setting?
-
-Thanks for a short answer and
-Cheers, Silvio
-
-
--- 
--- S. Fricke ---------------------------------------- silvio at port1024.net --
+Kevin
