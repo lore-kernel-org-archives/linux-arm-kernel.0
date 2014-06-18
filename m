@@ -1,66 +1,91 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Jun 2014 11:57:59 +0200
-Subject: [PATCH v2 08/20] ARM: sun6i: DT: Rename PLL6 to PLL6x2 and add
- fixed-factor-clock for PLL6
-In-Reply-To: <1403016777-15121-9-git-send-email-wens@csie.org>
-References: <1403016777-15121-1-git-send-email-wens@csie.org>
- <1403016777-15121-9-git-send-email-wens@csie.org>
-Message-ID: <20140618095759.GL19730@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Jun 2014 11:04:11 +0100
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <53A160D1.8000908@ti.com>
+References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
+ <1400766819-22286-2-git-send-email-lee.jones@linaro.org>
+ <5396E561.4020805@ti.com> <20140617112353.GB4139@lee--X1>
+ <53A160D1.8000908@ti.com>
+Message-ID: <20140618100411.GL23945@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 10:52:45PM +0800, Chen-Yu Tsai wrote:
-> The PLL6 clock driver actually manages the PLL6x2 output of PLL6, so
-> rename the node accordingly, and add a halved fixed-factor-clock for
-> normal PLL6 output used by most modules.
+> On Tuesday 17 June 2014 04:53 PM, Lee Jones wrote:
+> >>> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> >>> devices. It has 2 ports which it can use for either; both SATA, both
+> >>> PCIe or one of each in any configuration.
+> >>
+> >> I've asked others who wrote multi-phy PHY providers to model each individual
+> >> PHY as sub-node of the PHY provider. So It's only fair I ask you the same to
+> >> do. So in this case the dt node should look something like:
+> >>
+> >> 	miphy365x_phy: miphy365x at fe382000 {
+> >> 		compatible = "st,miphy365x-phy";
+> >> 		#phy-cells = <2>;
+> >> 		st,syscfg = <&syscfg_rear>;
+> >> 		channel at 0 {
+> >> 			reg =	<0xfe382000 0x100>, <0xfe394000 0x100>;
+> >> 			reg-names = "sata", "pcie";
+> >> 		}
+> >>
+> >> 		channel at 1{
+> >> 			reg =	<0xfe38a000 0x100>, <0xfe804000 0x100>;
+> >> 			reg-names = "sata", "pcie";
+> >> 		}
+> >>
+> >> 	};
+> > 
+> > I'm interested to know why you've taken this approach, as it makes the
+> > code much more complex.  The DT framework goes to the trouble of
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun6i-a31.dtsi | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
+> It looks to be much closer representation of the hardware in dt. It also
+> enables to have more control of each individual PHYs. For example, we can have
+> something like status="disabled" for channels which is disabled.
+
+If you wanted to disable the channels in this way, you would either
+have to A) add your own code to parse that property or B) have each
+channel set itself up as platform device and would probe (or not if
+status = "disabled") individually.  If you choose the later option,
+the platform resource would also be populated.
+
+> > converting all addresses to to resources so drivers can easily pull
+> > them out using platform_get_resource() and friends.  Pushing the reg
 > 
-> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-> index a9dfa12..12d558b 100644
-> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> @@ -94,11 +94,20 @@
->  			clock-output-names = "pll1";
->  		};
->  
-> -		pll6: clk at 01c20028 {
-> +		pll6x2: clk at 01c20028 {
->  			#clock-cells = <0>;
->  			compatible = "allwinner,sun6i-a31-pll6-clk";
->  			reg = <0x01c20028 0x4>;
->  			clocks = <&osc24M>;
-> +			clock-output-names = "pll6x2";
-> +		};
-> +
-> +		pll6: pll6_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-factor-clock";
-> +			clock-div = <2>;
-> +			clock-mult = <1>;
-> +			clocks = <&pll6x2>;
->  			clock-output-names = "pll6";
->  		};
+> right. Can't we use of_address_to_resource here?
 
-Hmm, nope. The output of PLL6 is 24M * N * K / 2, and this is what we
-support in the driver.
+We could, but that would be an extra layer.  We'd be pulling the
+address, putting it into a resource, then pulling it from the resource
+for use.  If we're going to be pulling addresses out manually, we're
+probably better off using of_get_address().  But again, we're just
+carrying out functionality which is already provided by the
+framework.
 
-This change is backward, and should be the other way around. Have PLL6
-running at it's usual speed, and then have PLL62X be a fixed-factor.
+> > properties down into a child node means that we have to now iterate
+> > over the sub-nodes and pull them out manually.  This will lead to a
+> 
+> You anyway iterate while creating PHYs based on some constant. Now you have to
+> iterate over the sub-nodes.
+> > pretty messy implementation IMHO.
 
-Maxime
+This much is true.
+
+> > Can you point me in the direction of previous implementations where you
+> > have stipulated the same set of constraints please?
+> 
+> ah.. there isn't any. The author of the other multi-phy driver [1] also feels
+> this will just add to the complexity of the driver.
+
+=:)
+
+> Maybe we should ask the opinion of others?
+
+We could.  I'll CC Arnd as he likes this PHY stuff. :)
+
+> [1] -> http://www.spinics.net/lists/linux-sh/msg32087.html
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140618/0125a387/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
