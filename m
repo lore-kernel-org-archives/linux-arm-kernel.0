@@ -1,44 +1,42 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 19 Jun 2014 15:12:09 +0800
-Subject: [PATCH v2 7/7] ARM: at91/dt: enable the LCD panel on sama5d3xek
- boards
-In-Reply-To: <1402329860-27520-8-git-send-email-boris.brezillon@free-electrons.com>
-References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402329860-27520-8-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53A28D49.2040400@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 19 Jun 2014 09:31:17 +0200
+Subject: [PATCH] of: Check for phys_addr_t overflows in
+ early_init_dt_add_memory_arch
+In-Reply-To: <1403154257-14591-1-git-send-email-lauraa@codeaurora.org>
+References: <1403154257-14591-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAMuHMdW854ThGRUSVohvowJksTbVAzZ2cWmjBrsD804LqmBH8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi Laura,
 
-On 06/10/2014 12:04 AM, Boris BREZILLON wrote:
-> diff --git a/arch/arm/boot/dts/sama5d33ek.dts b/arch/arm/boot/dts/sama5d33ek.dts
-> index cbd6a3f..f2ab41d 100644
-> --- a/arch/arm/boot/dts/sama5d33ek.dts
-> +++ b/arch/arm/boot/dts/sama5d33ek.dts
-> @@ -36,9 +36,33 @@
->   			macb0: ethernet at f0028000 {
->   				status = "okay";
->   			};
-> +
-> +			hlcdc: hlcdc at f0030000 {
-> +				status = "okay";
-> +
-> +				hlcdc-display-controller {
-> +					atmel,panel = <&panel 3 0>;
-
-One question here, in the driver code, it will configuration the frame 
-buffer mode depends on this parameter.
-So, my question is if the framebuffer bits per pixel is different with 
-output bits per pixel, how to setting it?
-
-For example, frame buffer use 16 bits/pixel, while output 24 bits/pixel.
-
-> +				};
-> +			};
->   		};
->   	};
+On Thu, Jun 19, 2014 at 7:04 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> The common early_init_dt_add_memory_arch takes the base and size
+> of a memory region as u64 types. The function never checks if
+> the base and size can actually fit in a phys_addr_t which may
+> be smaller than 64-bits. This may result in incorrect memory
+> being passed to memblock_add if the memory falls outside the
+> range of phys_addr_t. Add range checks for the base and size if
+> phys_addr_t is smaller than u64.
 >
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-Best Regards,
-Bo Shen
+Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+
+> ---
+> Geert, can you drop my other patch and give this a test to see if it fixes
+> your bootup problem?
+
+Thanks, works fine!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
