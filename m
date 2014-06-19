@@ -1,107 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jun 2014 11:49:23 +0100
-Subject: [PATCHv3 4/4] arm64: Enable TEXT_OFFSET fuzzing
-In-Reply-To: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
-References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1403174963-10730-5-git-send-email-mark.rutland@arm.com>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Thu, 19 Jun 2014 18:54:56 +0800
+Subject: [PATCH] arm64: add the ability to hook the fault code
+Message-ID: <1403175296-25181-1-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 Image header contains a text_offset field which bootloaders
-are supposed to read to determine the offset (from a 2MB aligned "start
-of memory" per booting.txt) at which to load the kernel. The offset is
-not well respected by bootloaders at present, and due to the lack of
-variation there is little incentive to support it. This is unfortunate
-for the sake of future kernels where we may wish to vary the text offset
-(even zeroing it).
+Add the ability to hook the fault code for future use.
 
-This patch adds options to arm64 to enable fuzz-testing of text_offset.
-CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET forces the text offset to a random
-16-byte aligned value value in the range [0..2MB) upon a build of the
-kernel. It is recommended that distribution kernels enable randomization
-to test bootloaders such that any compliance issues can be fixed early.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Tom Rini <trini@ti.com>
+Signed-off-by: Neil Zhang <zhangwm@marvell.com>
 ---
- arch/arm64/Kconfig.debug        | 16 ++++++++++++++++
- arch/arm64/Makefile             |  4 ++++
- arch/arm64/kernel/head.S        |  8 ++++++--
- arch/arm64/kernel/vmlinux.lds.S |  5 +++++
- 4 files changed, 31 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/system_misc.h |    4 ++++
+ arch/arm64/mm/fault.c                |   12 ++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 1c1b756..566bf80 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -28,4 +28,20 @@ config PID_IN_CONTEXTIDR
- 	  instructions during context switch. Say Y here only if you are
- 	  planning to use hardware trace tools with this kernel.
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 7a18fab..a8c19dd 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -37,6 +37,10 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ 					     struct pt_regs *),
+ 			   int sig, int code, const char *name);
  
-+config ARM64_RANDOMIZE_TEXT_OFFSET
-+	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
-+	default N
-+	help
-+	  Say Y here if you want the image load offset (AKA TEXT_OFFSET)
-+	  of the kernel to be randomized at build-time. When selected,
-+	  this option will cause TEXT_OFFSET to be randomized upon any
-+	  build of the kernel, and the offset will be reflected in the
-+	  text_offset field of the resulting Image. This can be used to
-+	  fuzz-test bootloaders which respect text_offset.
++void hook_fault_code(int nr,
++		int (*fn)(unsigned long, unsigned int, struct pt_regs *),
++		int sig, int code, const char *name);
 +
-+	  This option is intended for bootloader and/or kernel testing
-+	  only. Bootloaders must make no assumptions regarding the value
-+	  of TEXT_OFFSET and platforms must not require a specific
-+	  value.
+ struct mm_struct;
+ extern void show_pte(struct mm_struct *mm, unsigned long addr);
+ extern void __show_regs(struct pt_regs *);
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index bcc965e..7902fb6 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -447,6 +447,18 @@ static const char *fault_name(unsigned int esr)
+ 	return inf->name;
+ }
+ 
++void __init hook_fault_code(int nr,
++		int (*fn)(unsigned long, unsigned int, struct pt_regs *),
++		int sig, int code, const char *name)
++{
++	BUG_ON(nr < 0 || nr >= ARRAY_SIZE(fault_info));
 +
- endmenu
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 8185a91..e8d025c 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -38,7 +38,11 @@ CHECKFLAGS	+= -D__aarch64__
- head-y		:= arch/arm64/kernel/head.o
- 
- # The byte offset of the kernel image in RAM from the start of RAM.
-+ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
-+TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
-+else
- TEXT_OFFSET := 0x00080000
-+endif
- 
- export	TEXT_OFFSET GZFLAGS
- 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 7b59c3d..8483504 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -37,8 +37,12 @@
- 
- #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
- 
--#if (KERNEL_RAM_VADDR & 0xfffff) != 0x80000
--#error KERNEL_RAM_VADDR must start at 0xXXX80000
-+#if (TEXT_OFFSET & 0xf) != 0
-+#error TEXT_OFFSET must be at least 16B aligned
-+#elif (PAGE_OFFSET & 0xfffff) != 0
-+#error PAGE_OFFSET must be at least 2MB aligned
-+#elif TEXT_OFFSET > 0xfffff
-+#error TEXT_OFFSET must be less than 2MB
- #endif
- 
- 	.macro	pgtbl, ttb0, ttb1, virt_to_phys
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 9cbf77a..d1270c3 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -124,3 +124,8 @@ SECTIONS
++	fault_info[nr].fn   = fn;
++	fault_info[nr].sig  = sig;
++	fault_info[nr].code = code;
++	fault_info[nr].name = name;
++}
++
+ /*
+  * Dispatch a data abort to the relevant handler.
   */
- ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) > __hyp_idmap_text_end),
-        "HYP init code too big")
-+
-+/*
-+ * If padding is applied before .head.text, virt<->phys conversions will fail.
-+ */
-+ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
 -- 
-1.9.1
+1.7.9.5
