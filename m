@@ -1,142 +1,86 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 19 Jun 2014 18:40:49 +0200
-Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
- udelay
-In-Reply-To: <CAD=FV=UjFJ9utR9i=Xu4DRQ7gdULCtXQXgsQ8gUYm6-V5U4GaQ@mail.gmail.com>
-References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>	<53A2B9C3.1050906@gmail.com>	<CAD=FV=VmC-p4_R1GV3U3bg1JojTzNYKyFTa8o8QMJ=3m=WuRYA@mail.gmail.com>	<53A30D08.6070107@gmail.com>
- <CAD=FV=UjFJ9utR9i=Xu4DRQ7gdULCtXQXgsQ8gUYm6-V5U4GaQ@mail.gmail.com>
-Message-ID: <53A31291.9000007@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 19 Jun 2014 10:02:16 -0700
+Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling() into
+ a library function
+In-Reply-To: <20140619122830.GP32514@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
+ <20140616104615.GA10701@n2100.arm.linux.org.uk>
+ <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
+ <20140619122830.GP32514@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMh_8JSMzZQXVncBGmiTN6B--udY11kX=xmD5_TWRsUiSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.06.2014 18:31, Doug Anderson wrote:
-> Tomasz,
-> 
-> On Thu, Jun 19, 2014 at 9:17 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On 19.06.2014 18:01, Doug Anderson wrote:
->>> Hi,
->>>
->>> On Thu, Jun 19, 2014 at 3:21 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>>>> +static struct delay_timer exynos4_delay_timer;
->>>>> +
->>>>> +static unsigned long exynos4_read_current_timer(void)
->>>
->>> Note: I think this should return a cycles_t, not an unsigned long.
->>> They're the same (right now), but probably shouldn't be (see below).
->>>
->>>
->>>>> +{
->>>>> +#ifdef ARM
->>>>> +     return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
->>>>> +#else /* ARM64, etc */
->>>>> +     return exynos4_frc_read(&mct_frc);
->>>>> +#endif
->>>>> +}
->>>>> +
->>>>
->>>> No need for anything like this. Even if running on ARM64, the delay
->>>> timer code should be able to cope with different timer widths. For
->>>> delays, 32 bits are enough, so just always read the lower part.
->>>
->>> I agree that the timer code should cope but it doesn't appear to.  I see:
->>>
->>>   cycles_t start = get_cycles();
->>>   while ((get_cycles() - start) < cycles)
->>>     cpu_relax();
->>>
->>> Right now cycles_t is defined as "unsigned long".  If that's 64-bits
->>> on ARM64 then this function will have problems with wraparound.
+On Thu, Jun 19, 2014 at 5:28 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 16, 2014 at 02:17:30PM +0200, Ulf Hansson wrote:
+>> Anyway, we did get some folks to test the patches and was thus fairly
+>> confident that we could merge them. Chris asked me to try to collect
+>> them in a PR for him, so I did. Sorry if I managed to screw some
+>> things up, there were several conflicts and actual regressions, which
+>> I tried to take care of.
 >>
->> Well, first of all, I'm not sure why we're discussing ARM64 here, if it
->> doesn't have support for register_current_timer_delay() at all.
->> Moreover, the only user if it is ARM32 and, if I remember correctly, the
->> assumption was that you need a >= 32 bit timer to use it for delays and
->> so with 32 bit unsigned long everything should work. Now if ARM64 also
->> wants to use this infrastructure, instead of hacking drivers now and
->> encouraging ARM64 people to continue using this kind of hackery, I
->> believe we should indicate that ARM64 delay timer code needs to be
->> implemented correctly and cope for different timer widths.
->>
->> Of course the best way would be to redesign this interface right now to
->> consider time width (it is not just about 32 or 64 bits, there are
->> various timers, possibly 48- or 52-bit) and change ARM32 implementation
->> of it as well, if there are any volunteers.
-> 
-> I was arguing that it was a lot of extra complexity to add to the code
-> to support different timer sizes for udelay when 32-bits is enough
-> (and it's trivial for timer implementations to truncate down to
-> 32-bits).
-> 
-> 
->> Changing the code to always
->> use 32-bit type regardless of arch is also an option.
-> 
-> Right, that's what I was arguing for.
-> 
-> 
->>> My personal vote would be to submit a patch to change "cycles_t" to
->>> always be 32-bits.  Given that 32-bits was fine for udelay() for ARM
->>> that seems sane and simple.  If someone later comes up with a super
->>> compelling reason why we need 64-bit timers for udelay (really??) then
->>> they can later add all the complexity needed.
->>
->> Yes, this could work. I'm not sure what else cycles_t is used for, though.
-> 
-> True, it is a bit questionable to change this since it's a type that's
-> not obviously just for udelay().  Perhaps a better option would be to
-> make a new typedef for the result of read_current_timer().  ...or just
-> change it to return a u32?
-> 
+>> The mmc people were also very helping in sending patches to fixup
+>> related regressions, immediately after we merged your patchset. Thus
+>> together I think we managed to pull it off.
+>
+> I tend to look through slightly less rose-tinted glasses.
+>
+> The fact is... there's loads of ARM platforms which now fail in Olof's
+> build/boot testing, and they all seem to have a very similar pattern:
+>
+> hummingboard:
+> [    1.149688] sdhci: Secure Digital Host Controller Interface driver
+> [    1.155901] sdhci: Copyright(c) Pierre Ossman
+> ...
+> [    1.253630] Waiting for root device /dev/mmcblk0p2...
+> [   60.325469] imx-sdma 20ec000.sdma: firmware not found
+> ~$off
+> # PYBOOT: Exception: timeout
+>
+> jetson:
+> [    2.261355] Waiting for root device /dev/mmcblk0p1...
+>
+> wandboard:
+> [    1.186870] sdhci: Secure Digital Host Controller Interface driver
+> [    1.193075] sdhci: Copyright(c) Pierre Ossman
+> ...
+> [    1.291064] Waiting for root device /dev/mmcblk0p2...
+>
+> Whether these are caused by the patch set or not is anyone's guess,
+> because we (a) don't know what's causing these failures, and (b)
+> my patch series was never tested on anything but iMX6.
+>
+> I'm pretty certain that the hummingboard failure is not related to
+> my series as that's one of the platforms I did test my series on.
+>
+> There's more failures which look like possibly something in core MMC is
+> rather screwed, as OMAP5 (which doesn't use SDHCI) is also failing at
+> a similar point.
+>
+> What these failures /do/ mean is that when I'm pushing my ARM for-next
+> branch out, Olof's builder picks it up and runs a build across it, and
+> the report returns a whole load of failures.  A whole load of failures
+> means that those platforms haven't tested my changes, which means the
+> quality of testing is much lower than it should be.
+>
+> With 26 passing and 15 failing, that's over 1/3 of platforms failing,
+> which means 1/3 aren't getting tested.
+>
+> This level of failure has been going on for quite a while now, and (afaik)
+> it remains uninvestigated and undiagnosed.  (This is one of the complaints
+> I have about Olof's build/boot test system, much of the information about
+> the build and boot is hidden away and unpublished, which makes it almost
+> impossible for third parties to diagnose any problem there.  I've given up
+> looking at most of Olof's build/boot mails because of this - it's just
+> not interesting to see the same abbreviated boot failure logs which give
+> no useful information time and time again.)
 
-Sounds good to me, but let's hear other opinions. I'm adding Will and
-Jonathan as they wrote the ARM delay timer code.
+Most of this is because I want to avoid sending huuuge emails out with
+the failures. I'll add a push of the full log to arm-soc.lixom.net and
+include a link to it in the emails, similar to how I do the build
+logs. I'll let you know when I've made that change.
 
-> 
->>> Amit: can you code up such a patch and add it to the series?  I know
->>> it changes code that touches all ARM devices but I still think it's
->>> the right thing to do and actually only really changes behavior on
->>> ARM64.
->>>
->>>
->>>> Also use of raw accessors in drivers is discouraged - please use
->>>> readl_relaxed().
->>>
->>> It doesn't seem like that should happen in the same patch.  Perhaps
->>> Amit can do a cleanup patch first that changes all instances of
->>> __raw_readl / __raw_writel in this file, then submit his patch atop
->>> that.
->>
->> Why not? The patch adding exynos4_read_current_timer() (and so the call
->> to __raw_readl() was Amit's patch. I'm not asking to fix this in the
->> whole driver, just to do things correctly in new code.
-> 
-> IMHO consistency within a file is more important.  Having a single
-> readl_relaxed() in a file that uses all __raw_readl() doesn't seem
-> beneficial to me.  ...but I certainly won't NAK the patch if that's
-> what others want.
-> 
 
-It depends whether you prefer consistency over correctness or the other
-way around. I should have marked this comment as a nitpick. :)
-
-> 
->>>> Btw. I don't even see support for this on ARM64 in mainline, where arch
->>>> timer is always used for delays and AFAIK this is a platform requirement.
->>>
->>> Yeah, I'd vote for not using MCT on ARM64, but it I suppose it doesn't
->>> hurt to keep it working.
->>
->> Right now there is no need for this, so let's just keep things simple.
-> 
-> It should at least have a comment saying that it's broken in subtle
-> ways (only on udelays that happen to span the 32-bit wraparound) on
-> anything where cycle_t is not 32-bits.  Perhaps at least a:
->   WARN_ON_ONCE(sizeof(cycles_t) != sizeof(u32));
-> 
-> The above should be optimized by the compiler.
-
-Sounds good as well. Or maybe even BUILD_BUG_ON_MSG() with proper error
-message?
-
-Best regards,
-Tomasz
+-Olof
