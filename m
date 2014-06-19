@@ -1,59 +1,150 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 19 Jun 2014 12:59:27 +0200
-Subject: [STLinux Kernel] [PATCH 4/7] ARM: stih416-b2020e: Enable PWM
- on the B2020 Rev-E
-In-Reply-To: <20140619101236.GA7390@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>	<1403103172-19856-4-git-send-email-lee.jones@linaro.org>	<20140619090546.GB2131@griffinp-ThinkPad-X1-Carbon-2nd>	<20140619092042.GB26560@lee--X1>
- <20140619101236.GA7390@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <53A2C28F.1080007@st.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Thu, 19 Jun 2014 16:30:19 +0530
+Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
+ udelay
+In-Reply-To: <53A2BBD0.3050106@linaro.org>
+References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
+ <53A2A936.3070109@linaro.org>
+ <CADGdYn6YObHdRq6A9-L7qbD+EYiPrwhrKkLwyA5Z=0tDoWUzvA@mail.gmail.com>
+ <53A2BBD0.3050106@linaro.org>
+Message-ID: <CADGdYn67L9StxiojQN0c5rwgDo6jLNOS9uWyj__B6ViGRm080A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 06/19/2014 12:12 PM, Peter Griffin wrote:
-> Hi Lee,
-> 
->>> Why are you only enabling this for rev-E board?
+On Thu, Jun 19, 2014 at 4:00 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 06/19/2014 12:21 PM, amit daniel kachhap wrote:
 >>
->> Purely for testing purposes, as it's the only board I have.  If
->> anyone has the other revisions and would be happy to test the driver
->> for me then great.
-> 
-> Ok that's what I suspected.
-> 
-> If you tell me how, I can test on a Rev C board. But as there are several other 
-> revisions I think checking the board schematics would be the quickest way forward.
-
-Only Rev C & E are in the wild now, so checking these two boards will
-be enough.
-
-Thanks,
-Maxime
-
-> 
->>> If you make the stih415 DT PWM nodes part of this series as well, then 
->>> assuming there is no good reason to the contary, the PWM could 
->>> be enabled for both stih415/6 in the common stih41x-b2020 DTS file which
->>> is also included by rev-E (assuming that PWM wiring is not some rev-E specific
->>> thing).
-> 
-> Can you add the stih415 bindings in V2 as well?
-> 
-> regards,
-> 
-> Peter
-> 
-> _______________________________________________
-> Kernel mailing list
-> Kernel at stlinux.com
-> http://www.stlinux.com/mailman/listinfo/kernel
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140619/4cb3411c/attachment.sig>
+>> On Thu, Jun 19, 2014 at 2:41 PM, Daniel Lezcano
+>> <daniel.lezcano@linaro.org> wrote:
+>>>
+>>> On 06/19/2014 10:39 AM, Amit Daniel Kachhap wrote:
+>>>>
+>>>>
+>>>> This patch register the exynos mct clocksource as the current timer
+>>>> as it has constant clock rate. This will generate correct udelay for the
+>>>> exynos platform and avoid using unnecessary calibrated jiffies. This
+>>>> change
+>>>> has been tested on exynos5420 based board and udelay is very close to
+>>>> expected.
+>>>>
+>>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>> ---
+>>>> Changes in V2:
+>>>> * Added #defines for ARM and ARM64 as pointed by Doug Anderson.
+>>>>
+>>>> Patches from David Riley confirmed that udelay is broken in exynos5420.
+>>>> Link to those patches are,
+>>>> 1) https://patchwork.kernel.org/patch/4344911/
+>>>> 2) https://patchwork.kernel.org/patch/4344881/
+>>>>
+>>>>    drivers/clocksource/exynos_mct.c | 15 +++++++++++++++
+>>>>    1 file changed, 15 insertions(+)
+>>>>
+>>>> diff --git a/drivers/clocksource/exynos_mct.c
+>>>> b/drivers/clocksource/exynos_mct.c
+>>>> index f71d55f..02927e2 100644
+>>>> --- a/drivers/clocksource/exynos_mct.c
+>>>> +++ b/drivers/clocksource/exynos_mct.c
+>>>> @@ -195,10 +195,25 @@ static u64 notrace exynos4_read_sched_clock(void)
+>>>>          return exynos4_frc_read(&mct_frc);
+>>>>    }
+>>>>
+>>>> +static struct delay_timer exynos4_delay_timer;
+>>>> +
+>>>> +static unsigned long exynos4_read_current_timer(void)
+>>>> +{
+>>>> +#ifdef ARM
+>>>> +       return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
+>>>> +#else /* ARM64, etc */
+>>>> +       return exynos4_frc_read(&mct_frc);
+>>>> +#endif
+>>>> +}
+>>>> +
+>>>
+>>>
+>>>
+>>> There isn't another solution than that ? macros definitions in C file are
+>>> avoided as much as possible.
+>>
+>> I also didn't want to use macros but used as a last option. you want
+>> me to put more comments here?
+>> Or something like below is also possible for checking the size of
+>> (unsigned long) in runtime.
+>>
+>> unsigned long x;
+>> unsigned int size = (char *)(&x + 1) - (char *)(&x);
+>> if (size == 4)
+>>             return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
+>> else
+>>             return exynos4_frc_read(&mct_frc);
+>>
+>> But this involves extra computation which should not be used for time
+>> critical functions.
+>> Any suggestion?
+>
+>
+> AFAIU, Doug may change the exynos4_frc_read to be 32 bits. So may not need
+> those macros as 'exynos4_frc_read' could be used instead.
+right, its better to wait till those patches are out.
+>
+> Doug may confirm this.
+>
+>
+>>>>    static void __init exynos4_clocksource_init(void)
+>>>>    {
+>>>>          exynos4_mct_frc_start();
+>>>>
+>>>> +       exynos4_delay_timer.read_current_timer =
+>>>> &exynos4_read_current_timer;
+>>>
+>>>
+>>>
+>>> &exynos4_read_current_timer ?
+>>
+>> Any issue in the naming?
+>
+>
+> No problem with the naming. As Tomasz pointed also, you are passing '&' for
+> the function pointer.
+yes my mistake.
+>
+>
+>>>> +       exynos4_delay_timer.freq = clk_rate;
+>>>> +       register_current_timer_delay(&exynos4_delay_timer);
+>>>> +
+>>>>          if (clocksource_register_hz(&mct_frc, clk_rate))
+>>>>                  panic("%s: can't register clocksource\n",
+>>>> mct_frc.name);
+>>>>
+>>>>
+>>>
+>>>
+>>> --
+>>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>>
+>>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>>> <http://twitter.com/#!/linaroorg> Twitter |
+>>> <http://www.linaro.org/linaro-blog/> Blog
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe
+>>> linux-samsung-soc"
+>>> in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
