@@ -1,59 +1,65 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 20 Jun 2014 01:31:21 +0530
-Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <CAJAp7OgfsVs9C0RNrDnQ5g7heba7JjaYFrj7wVUqT_m+wu-A3A@mail.gmail.com>
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- <7hvbrzbh1u.fsf@paris.lan>
- <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
- <7hzjha8b97.fsf@paris.lan>
- <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
- <7hegym6uca.fsf@paris.lan>
- <CAJe_ZhfmsgvnVu-VgN63LaZ-522HuAY_EVfB6ujQjdzBE+u=zA@mail.gmail.com>
- <CAJAp7OgfsVs9C0RNrDnQ5g7heba7JjaYFrj7wVUqT_m+wu-A3A@mail.gmail.com>
-Message-ID: <CAJe_ZhcSMrN6OeRjo7cG7CMobjEPMMB7o0eUD9HAFskravSQ3w@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 19 Jun 2014 16:32:12 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8
+ kernels
+In-Reply-To: <7hk38cycuh.fsf@paris.lan>
+References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+ <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
+ <53A1D701.8060404@codeaurora.org>
+ <CAGa+x86DfDjQG8gN2-x7Kapt2ipsYt879R4OK6JWGoaT93VVig@mail.gmail.com>
+ <53A1D8FE.6030404@codeaurora.org>
+ <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
+ <alpine.LFD.2.11.1406181720130.16842@knanqh.ubzr> <7hk38cycuh.fsf@paris.lan>
+Message-ID: <alpine.LFD.2.11.1406191630260.16842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2014 23:52, Bjorn Andersson <bjorn@kryo.se> wrote:
-> On Wed, Jun 18, 2014 at 8:55 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
->> On 18 June 2014 22:14, Kevin Hilman <khilman@linaro.org> wrote:
-> [...]
->>> Thinking more about what this RPM driver actually does, and since you
->>> mentioned patterns across SoCs, it seems to me the RPM driver bascially
->>> just doing the IPC.
->>>
->>> So, rather than MFD or drivers/soc, it seems to me that it should be
->>> implmented as a controller in the new common mailbox framwork[1] being
->>> worked on by Jassi Brar (added to Cc.)
->>>
->>> IIUC, RPM is actually only doing one-way IPC (it only exposes a write()
->>> interface to clients) so it seems like a rather simple implementation of
->>> a mailbox controller.
->>>
->> Yup, qcom_rpm.c is exactly what drivers/mailbox/ is meant for.
->>
->
-> The RPM provides a register file with 80ish registers of variable size, to
-> program the hardware you write to these registers. Then you write to a register
-> selector register and then signal an outgoing interrupt.
->
-For mailbox_request_channel(), you have dev_get_qcom_rpm()  and
-qcom_rpm_write() for mbox_send_message()
-Rest all is what you need to fire off a message to remote or register
-for interrupts. So nothing new to me.
+On Thu, 19 Jun 2014, Kevin Hilman wrote:
 
-> That is, the interface exposed to the kernel by the SoC is not an mailbox like
-> interface.
->
- I don't understand how having to program 80 registers makes it "not
-like mailbox"?
- I have used mailbox api to pass messages between CPUs (using PPI)
-under same instance of Linux and otoh I think it could also support
-IPC over gpio (if someone gets that desperate).
-Mailbox isn't about how you program the h/w. Do whatever is needed to
-send a message across.
+> I think this should probably be officialized since we've taken away the
+> ability for magic-number checking tools (like 'file') to distinguish
+> between big- and little-endian zImages.
+> 
+> For now, I've updated my tools to check for 'setend be' in ARM and
+> Thumb2 mode, but if this does get officialized, I'll gladly move over to
+> it.
 
-BTW I haven't looked closely, but probably you could push the data tables in DT?
+Would you ACK this patch?
 
-Cheers
--Jassi
+----- >8
+ARM: zImage: identify kernel endianness
+
+With patch #8067/1 applied, it is no longer possible to determine the
+endianness of a compiled kernel image.  This normally shouldn't matter
+to the boot environment, except for those cases where the selection of
+a ramdisk or root filesystem with a matching endianness has to be
+automated.
+
+Let's add a flag to the zImage header indicating the actual endianness.
+Four bytes from offset 0x30 can be interpreted as follows:
+
+	04 03 02 01	big endian kernel
+
+	01 02 03 04	little endian kernel
+
+Anything else should be interpreted as "unknown", in which case it is
+most likely that patch #8067/1 was not applied either and the zImage
+magic number at offset 0x24 could be used instead to determine
+endianness. No zImage before this patch ever produced 0x01020304 nor
+0x04030201 at offset 0x30 so there is no confusion possible.
+
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index c95feab6ce..413fd94b53 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -128,6 +128,7 @@ start:
+ 		.word	_magic_sig	@ Magic numbers to help the loader
+ 		.word	_magic_start	@ absolute load/run zImage address
+ 		.word	_magic_end	@ zImage end address
++		.word	0x04030201	@ endianness flag
+ 
+  THUMB(		.thumb			)
+ 1:
