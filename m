@@ -1,115 +1,91 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 18 Jun 2014 18:31:40 -0700
-Subject: [PATCH v8 4/4] arm: dirty page logging 2nd stage page fault handling
- support
-In-Reply-To: <1403141500-31010-1-git-send-email-m.smarduch@samsung.com>
-References: <1403141500-31010-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1403141500-31010-5-git-send-email-m.smarduch@samsung.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Thu, 19 Jun 2014 09:58:25 +0800
+Subject: [PATCH RFC v2 3/3] documentation/iommu: Add description of
+ Hisilicon SMMU private binding
+In-Reply-To: <20140618133258.GC2186@arm.com>
+References: <1402549692-5224-1-git-send-email-thunder.leizhen@huawei.com>
+ <1402549692-5224-4-git-send-email-thunder.leizhen@huawei.com>
+ <20140616163930.GX16758@arm.com> <539FF33C.7020007@huawei.com>
+ <20140617093326.GC13020@arm.com> <53A0EB3E.2080202@huawei.com>
+ <20140618133258.GC2186@arm.com>
+Message-ID: <53A243C1.9030700@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for handling 2nd stage page faults during migration,
-it disables faulting in huge pages, and dissolves huge pages to page tables.
-In case migration is canceled huge pages will be used again. For ARMv8
-logging is hardcoded to false.
-
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/mmu.c |   31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 1caf511..d49df28 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -641,7 +641,8 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- }
- 
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
--			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
-+			  phys_addr_t addr, const pte_t *new_pte, bool iomap,
-+			  bool logging_active)
- {
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
-@@ -656,6 +657,15 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 		return 0;
- 	}
- 
-+	/*
-+	 * While dirty memory logging, clear PMD entry for huge page and split
-+	 * into smaller pages, to track dirty memory at page granularity.
-+	 */
-+	if (logging_active && kvm_pmd_huge(*pmd)) {
-+		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
-+		clear_pmd_entry(kvm, pmd, ipa);
-+	}
-+
- 	/* Create stage-2 page mappings - Level 2 */
- 	if (pmd_none(*pmd)) {
- 		if (!cache)
-@@ -708,7 +718,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
--		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
-+		ret = stage2_set_pte(kvm, &cache, addr, &pte, true, false);
- 		spin_unlock(&kvm->mmu_lock);
- 		if (ret)
- 			goto out;
-@@ -925,6 +935,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
-+	/* Get logging status, if dirty_bitmap is not NULL then logging is on */
-+#ifdef CONFIG_ARM
-+	bool logging_active = !!memslot->dirty_bitmap;
-+#else
-+	bool logging_active = false;
-+#endif
- 
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -935,7 +951,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	/* Let's check if we will get back a huge page backed by hugetlbfs */
- 	down_read(&current->mm->mmap_sem);
- 	vma = find_vma_intersection(current->mm, hva, hva + 1);
--	if (is_vm_hugetlb_page(vma)) {
-+	if (is_vm_hugetlb_page(vma) && !logging_active) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
-@@ -978,7 +994,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
--	if (!hugetlb && !force_pte)
-+	if (!hugetlb && !force_pte && !logging_active)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
- 	if (hugetlb) {
-@@ -997,9 +1013,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
--		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
-+		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false,
-+					logging_active);
- 	}
- 
-+	if (write_fault)
-+		mark_page_dirty(kvm, gfn);
- 
- out_unlock:
- 	spin_unlock(&kvm->mmu_lock);
-@@ -1150,7 +1169,7 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
- {
- 	pte_t *pte = (pte_t *)data;
- 
--	stage2_set_pte(kvm, NULL, gpa, pte, false);
-+	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
- }
- 
- 
--- 
-1.7.9.5
+On 2014/6/18 21:32, Will Deacon wrote:
+> On Wed, Jun 18, 2014 at 02:28:30AM +0100, leizhen wrote:
+>> On 2014/6/17 17:33, Will Deacon wrote:
+>>> On Tue, Jun 17, 2014 at 08:50:20AM +0100, leizhen wrote:
+>>>> The latter case. Some masters driver want use cacheable(WB) attribute to access
+>>>> memory, but the masters can not bring cacheable attribute. So, can not use
+>>>> bypass(or transaction) mode. In fact, the master driver can use iommu_map to
+>>>> create map and specify IOMMU_CACHE. But maybe the driver does not want to
+>>>> map, if the memory access is very dynamically, frequently map and unmap will
+>>>> decrease performance.
+>>>
+>>> You seem to be highlighting a perceived deficiency in the IOMMU API which
+>>> you're attempting to work-around with new device-tree properties. Instead,
+>>> why not propose an extension to the IOMMU API in Linux?
+>>>
+>>
+>> The private properties or new IOMMU APIs, just in order to optimize performance
+>> or simplify master driver code, I will consider it later. I think it's good to
+>> support base functions first.
+>>
+>> Sorry, I just only known ARM SMMU and Hisilicon SMMU, not familiar with others.
+>> Add a common API may meet more difficulty.
+>>
+>> If I have time, I will try to do it.
+> 
+> Ok, so we're agreeing to drop those properties for now?
+> 
+>>>> Actually, I think smmu-force-memtype maybe suitable for arm-smmu too. But now,
+>>>> if nobody declear need it, I will just implement it in hisi-smmu.c
+>>>
+>>> I don't want to see hisi-smmu.c at all. You need to make your driver fit
+>>> into the code we already have.
+>>>
+>>> Do you have a specification available describing the hardware you have
+>>> created?
+>>>
+>>
+>> Although I have the Hisilicon SMMU specification, but it was written in Chinese.
+>> I have told this to hardware engineers.
+> 
+> Having access to a specification I can understand would help to assess
+> exactly what you've gone and built.
+> 
+>> OK. I will try my best to merge two drivers into one file. Maybe need to use many
+>> #if#else.
+> 
+> The fact of the matter is that you've got a device that isn't
+> architecturally compliant. That leaves me in a fairly undesirable position
+> with a small set of options:
+> 
+>   (1) We can duplicate lots of the code we already have and you end up with a
+>       separate driver. This is obviously bad because of the code duplication,
+>       associated maintenance headaches, driver divergence, etc. It also brings
+>       into question the point of having a driver written to the architecture
+>       when the hardware has gone off and done something different.
+> 
+>   (2) We try to fit your SMMU into the existing driver. I'd like to see what
+>       this looks like, but if it's as much #ifdeffery as you suggest, then
+>       that's also bad for many of the same reasons as above.
+> 
+>   (3) We don't support your device in the Linux kernel. We could just treat
+>       your SMMU as a broken ARM SMMU implementation and not support it. If
+>       this was a CPU instead of an SMMU this would unquestionably be the
+>       correct approach.
+> 
+> Unless you can come up with something compelling for point (2), I'm going to
+> err on the side of (3). So, please, *please*, don't do a rushed job of
+> merging the drivers. You need to convince me why I should bother supporting
+> this device in my driver, which means using clean abstractions and extending
+> the code we already have. If this isn't possible, then perhaps you'll
+> consider following the architecture next time around.
+> 
+> Will
+> 
+> .
+> 
+Yeah, I konw. I also a software engineer. A victim of this SMMU.
