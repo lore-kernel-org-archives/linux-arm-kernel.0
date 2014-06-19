@@ -1,95 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jun 2014 10:19:35 +0100
-Subject: [PATCH v5 12/20] KVM: ARM: vgic: introduce vgic_enable
+Date: Thu, 19 Jun 2014 10:19:33 +0100
+Subject: [PATCH v5 10/20] KVM: ARM: vgic: move underflow handling to vgic_ops
 In-Reply-To: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
 References: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403169583-13668-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403169583-13668-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the code dealing with enabling the VGIC on to vgic_ops.
+Move the code dealing with LR underflow handling to its own functions,
+and make them accessible through vgic_ops.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  1 +
- virt/kvm/arm/vgic.c    | 29 +++++++++++++++++++++--------
- 2 files changed, 22 insertions(+), 8 deletions(-)
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/vgic.c    | 28 +++++++++++++++++++++++++---
+ 2 files changed, 27 insertions(+), 3 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index f515800..2228973 100644
+index 4857508..cdfa5d9 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -99,6 +99,7 @@ struct vgic_ops {
- 	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
- 	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- 	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+	void	(*enable)(struct kvm_vcpu *vcpu);
+@@ -88,6 +88,8 @@ struct vgic_ops {
+ 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+ 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
+ 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
++	void	(*enable_underflow)(struct kvm_vcpu *vcpu);
++	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
  };
  
  struct vgic_dist {
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index b097a2c..383db29 100644
+index 9491c22..369016c 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1081,6 +1081,19 @@ static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
+@@ -1047,6 +1047,16 @@ static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
+ 	return ret;
  }
  
-+static void vgic_v2_enable(struct kvm_vcpu *vcpu)
++static void vgic_v2_enable_underflow(struct kvm_vcpu *vcpu)
 +{
-+	/*
-+	 * By forcing VMCR to zero, the GIC will restore the binary
-+	 * points to their reset values. Anything else resets to zero
-+	 * anyway.
-+	 */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr |= GICH_HCR_UIE;
++}
 +
-+	/* Get the show on the road... */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
++static void vgic_v2_disable_underflow(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
 +}
 +
  static const struct vgic_ops vgic_ops = {
  	.get_lr			= vgic_v2_get_lr,
  	.set_lr			= vgic_v2_set_lr,
-@@ -1092,6 +1105,7 @@ static const struct vgic_ops vgic_ops = {
- 	.disable_underflow	= vgic_v2_disable_underflow,
- 	.get_vmcr		= vgic_v2_get_vmcr,
- 	.set_vmcr		= vgic_v2_set_vmcr,
-+	.enable			= vgic_v2_enable,
+@@ -1054,6 +1064,8 @@ static const struct vgic_ops vgic_ops = {
+ 	.get_elrsr		= vgic_v2_get_elrsr,
+ 	.get_eisr		= vgic_v2_get_eisr,
+ 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
++	.enable_underflow	= vgic_v2_enable_underflow,
++	.disable_underflow	= vgic_v2_disable_underflow,
  };
  
  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1146,6 +1160,11 @@ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
- 	vgic_ops.set_vmcr(vcpu, vmcr);
+@@ -1088,6 +1100,16 @@ static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
+ 	return vgic_ops.get_interrupt_status(vcpu);
  }
  
-+static inline void vgic_enable(struct kvm_vcpu *vcpu)
++static inline void vgic_enable_underflow(struct kvm_vcpu *vcpu)
 +{
-+	vgic_ops.enable(vcpu);
++	vgic_ops.enable_underflow(vcpu);
++}
++
++static inline void vgic_disable_underflow(struct kvm_vcpu *vcpu)
++{
++	vgic_ops.disable_underflow(vcpu);
 +}
 +
  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1608,15 +1627,9 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 		vgic_cpu->vgic_irq_lr_map[i] = LR_EMPTY;
+@@ -1269,9 +1291,9 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 
+ epilog:
+ 	if (overflow) {
+-		vgic_cpu->vgic_v2.vgic_hcr |= GICH_HCR_UIE;
++		vgic_enable_underflow(vcpu);
+ 	} else {
+-		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++		vgic_disable_underflow(vcpu);
+ 		/*
+ 		 * We're about to run this VCPU, and we've consumed
+ 		 * everything the distributor had in store for
+@@ -1324,7 +1346,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
  	}
  
--	/*
--	 * By forcing VMCR to zero, the GIC will restore the binary
--	 * points to their reset values. Anything else resets to zero
--	 * anyway.
--	 */
--	vgic_cpu->vgic_v2.vgic_vmcr = 0;
--
- 	vgic_cpu->nr_lr = vgic_nr_lr;
--	vgic_cpu->vgic_v2.vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
-+
-+	vgic_enable(vcpu);
+ 	if (status & INT_STATUS_UNDERFLOW)
+-		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++		vgic_disable_underflow(vcpu);
  
- 	return 0;
+ 	return level_pending;
  }
 -- 
 1.8.3.4
