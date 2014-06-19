@@ -1,60 +1,90 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 19 Jun 2014 18:15:53 +0530
-Subject: [PATCH v2 06/18] ARM: dts: DRA7: Add divider table to
- optfclk_pciephy_div clock
-In-Reply-To: <53A2C52C.6020606@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-7-git-send-email-kishon@ti.com> <53A2C52C.6020606@ti.com>
-Message-ID: <53A2DB81.5070105@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 19 Jun 2014 13:49:14 +0100
+Subject: [PATCH 12/24] ARM64: Add is_ilp32_compat_task and
+ is_ilp32_compat_thread and TIF_32BIT_AARCH64.
+In-Reply-To: <1400914939-9708-13-git-send-email-apinski@cavium.com>
+References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+ <1400914939-9708-13-git-send-email-apinski@cavium.com>
+Message-ID: <20140619124914.GA8476@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+On Sat, May 24, 2014 at 12:02:07AM -0700, Andrew Pinski wrote:
+> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+> index fad7612..85f945c 100644
+> --- a/arch/arm64/include/asm/compat.h
+> +++ b/arch/arm64/include/asm/compat.h
+> @@ -313,6 +313,26 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_ARM64_ILP32
+> +static inline int is_ilp32_compat_task(void)
+> +{
+> +	return test_thread_flag(TIF_32BIT_AARCH64);
+> +}
+> +static inline int is_ilp32_compat_thread(struct thread_info *thread)
+> +{
+> +	return test_ti_thread_flag(thread, TIF_32BIT_AARCH64);
+> +}
+> +#else
+> +static inline int is_ilp32_compat_task(void)
+> +{
+> +	return 0;
+> +}
+> +static inline int is_ilp32_compat_thread(struct thread_info *thread)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  #else /* !CONFIG_COMPAT */
+>  
+>  static inline int is_a32_compat_task(void)
+> @@ -323,17 +343,25 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
+>  {
+>  	return 0;
+>  }
+> +static inline int is_ilp32_compat_task(void)
+> +{
+> +	return 0;
+> +}
+> +static inline int is_ilp32_compat_thread(struct thread_info *thread)
+> +{
+> +	return 0;
+> +}
 
-On Thursday 19 June 2014 04:40 PM, Tero Kristo wrote:
-> On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
->> From: Keerthy <j-keerthy@ti.com>
->>
->> Add divider table to optfclk_pciephy_div clock. The Documentation
->> for divider clock can be found at ../clock/ti/divider.txt
-> 
-> This patch requires a better changelog. Why is the change done, any TRM refs etc.?
+As for a previous patch, it looks like we have too many dummy
+definitions for is_ilp32_compat_*().
 
-The 8th bit of CM_CLKMODE_APLL_PCIE can be programmed to either 0x0 or 0x1
-based on if the divider value is 0x2 or 0x1.
+>  
+>  #endif /* CONFIG_COMPAT */
+>  
+>  static inline int is_compat_task(void)
+>  {
+> -	return is_a32_compat_task();
+> +	return is_a32_compat_task() || is_ilp32_compat_task();
+>  }
+>  
+>  static inline int is_compat_thread(struct thread_info *thread)
+>  {
+> -	return is_a32_compat_thread(thread);
+> +	return is_a32_compat_thread(thread) || is_ilp32_compat_thread(thread);
+>  }
+>  #endif /* __KERNEL__ */
+>  #endif /* __ASM_COMPAT_H */
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index b2bf728..98baf65 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -108,6 +108,7 @@ static inline struct thread_info *current_thread_info(void)
+>  #define TIF_SINGLESTEP		21
+>  #define TIF_32BIT		22	/* AARCH32 process */
+>  #define TIF_SWITCH_MM		23	/* deferred switch_mm */
+> +#define TIF_32BIT_AARCH64	24	/* 32 bit process on AArch64(ILP32) */
 
-Figure 26-21. PCIe PHY Clock Generator Overview in vE of DRA7xx ES1.0 shows the
-block diagram of Clock Generator Subsystem of PCIe PHY module. We have to do a
-bypass (divided by 1) in order to get the correct PCIE_PHY_DIV_GCLK
-frequency.
+The is_compat_task() code could be simplified if we keep the TIF_32BIT
+flag for both 32 and 64-bit applications (ILP32) and define TIF_AARCH32.
 
-Thanks
-Kishon
-> 
-> -Tero
-> 
->>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Cc: Tero Kristo <t-kristo@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   arch/arm/boot/dts/dra7xx-clocks.dtsi |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> index c767687..55e95c5 100644
->> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> @@ -1170,6 +1170,7 @@
->>           clocks = <&apll_pcie_ck>;
->>           #clock-cells = <0>;
->>           reg = <0x021c>;
->> +        ti,dividers = <2>, <1>;
->>           ti,bit-shift = <8>;
->>           ti,max-div = <2>;
->>       };
->>
-> 
+-- 
+Catalin
