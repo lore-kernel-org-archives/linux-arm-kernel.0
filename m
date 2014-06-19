@@ -1,61 +1,142 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 19 Jun 2014 18:40:43 +0200
-Subject: [PATCH v2] ARM: mvebu: Fix missing binding documentation for Armada
- 38x
-Message-ID: <1403196043-6317-1-git-send-email-gregory.clement@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 19 Jun 2014 18:40:49 +0200
+Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
+ udelay
+In-Reply-To: <CAD=FV=UjFJ9utR9i=Xu4DRQ7gdULCtXQXgsQ8gUYm6-V5U4GaQ@mail.gmail.com>
+References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>	<53A2B9C3.1050906@gmail.com>	<CAD=FV=VmC-p4_R1GV3U3bg1JojTzNYKyFTa8o8QMJ=3m=WuRYA@mail.gmail.com>	<53A30D08.6070107@gmail.com>
+ <CAD=FV=UjFJ9utR9i=Xu4DRQ7gdULCtXQXgsQ8gUYm6-V5U4GaQ@mail.gmail.com>
+Message-ID: <53A31291.9000007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the Armada 380 and Armada 385 SoCs, the common bindings for those
-2 SoCs, was forgotten. This patch add the documentation for the
-marvell,aramda38x property.
+On 19.06.2014 18:31, Doug Anderson wrote:
+> Tomasz,
+> 
+> On Thu, Jun 19, 2014 at 9:17 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 19.06.2014 18:01, Doug Anderson wrote:
+>>> Hi,
+>>>
+>>> On Thu, Jun 19, 2014 at 3:21 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>>>> +static struct delay_timer exynos4_delay_timer;
+>>>>> +
+>>>>> +static unsigned long exynos4_read_current_timer(void)
+>>>
+>>> Note: I think this should return a cycles_t, not an unsigned long.
+>>> They're the same (right now), but probably shouldn't be (see below).
+>>>
+>>>
+>>>>> +{
+>>>>> +#ifdef ARM
+>>>>> +     return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
+>>>>> +#else /* ARM64, etc */
+>>>>> +     return exynos4_frc_read(&mct_frc);
+>>>>> +#endif
+>>>>> +}
+>>>>> +
+>>>>
+>>>> No need for anything like this. Even if running on ARM64, the delay
+>>>> timer code should be able to cope with different timer widths. For
+>>>> delays, 32 bits are enough, so just always read the lower part.
+>>>
+>>> I agree that the timer code should cope but it doesn't appear to.  I see:
+>>>
+>>>   cycles_t start = get_cycles();
+>>>   while ((get_cycles() - start) < cycles)
+>>>     cpu_relax();
+>>>
+>>> Right now cycles_t is defined as "unsigned long".  If that's 64-bits
+>>> on ARM64 then this function will have problems with wraparound.
+>>
+>> Well, first of all, I'm not sure why we're discussing ARM64 here, if it
+>> doesn't have support for register_current_timer_delay() at all.
+>> Moreover, the only user if it is ARM32 and, if I remember correctly, the
+>> assumption was that you need a >= 32 bit timer to use it for delays and
+>> so with 32 bit unsigned long everything should work. Now if ARM64 also
+>> wants to use this infrastructure, instead of hacking drivers now and
+>> encouraging ARM64 people to continue using this kind of hackery, I
+>> believe we should indicate that ARM64 delay timer code needs to be
+>> implemented correctly and cope for different timer widths.
+>>
+>> Of course the best way would be to redesign this interface right now to
+>> consider time width (it is not just about 32 or 64 bits, there are
+>> various timers, possibly 48- or 52-bit) and change ARM32 implementation
+>> of it as well, if there are any volunteers.
+> 
+> I was arguing that it was a lot of extra complexity to add to the code
+> to support different timer sizes for udelay when 32-bits is enough
+> (and it's trivial for timer implementations to truncate down to
+> 32-bits).
+> 
+> 
+>> Changing the code to always
+>> use 32-bit type regardless of arch is also an option.
+> 
+> Right, that's what I was arguing for.
+> 
+> 
+>>> My personal vote would be to submit a patch to change "cycles_t" to
+>>> always be 32-bits.  Given that 32-bits was fine for udelay() for ARM
+>>> that seems sane and simple.  If someone later comes up with a super
+>>> compelling reason why we need 64-bit timers for udelay (really??) then
+>>> they can later add all the complexity needed.
+>>
+>> Yes, this could work. I'm not sure what else cycles_t is used for, though.
+> 
+> True, it is a bit questionable to change this since it's a type that's
+> not obviously just for udelay().  Perhaps a better option would be to
+> make a new typedef for the result of read_current_timer().  ...or just
+> change it to return a u32?
+> 
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
---
-Hi,
+Sounds good to me, but let's hear other opinions. I'm adding Will and
+Jonathan as they wrote the ARM delay timer code.
 
-This fix should be merged in 3.16. For 3.15 I am not sure as it is not
-a regression.
+> 
+>>> Amit: can you code up such a patch and add it to the series?  I know
+>>> it changes code that touches all ARM devices but I still think it's
+>>> the right thing to do and actually only really changes behavior on
+>>> ARM64.
+>>>
+>>>
+>>>> Also use of raw accessors in drivers is discouraged - please use
+>>>> readl_relaxed().
+>>>
+>>> It doesn't seem like that should happen in the same patch.  Perhaps
+>>> Amit can do a cleanup patch first that changes all instances of
+>>> __raw_readl / __raw_writel in this file, then submit his patch atop
+>>> that.
+>>
+>> Why not? The patch adding exynos4_read_current_timer() (and so the call
+>> to __raw_readl() was Amit's patch. I'm not asking to fix this in the
+>> whole driver, just to do things correctly in new code.
+> 
+> IMHO consistency within a file is more important.  Having a single
+> readl_relaxed() in a file that uses all __raw_readl() doesn't seem
+> beneficial to me.  ...but I certainly won't NAK the patch if that's
+> what others want.
+> 
 
-Changelog:
-v1->v2
+It depends whether you prefer consistency over correctness or the other
+way around. I should have marked this comment as a nitpick. :)
 
-- Reformulate to make clear that we will need marvell,armada38x _and_ a
-SoC specific string. For consistency I duplicated what we have done in
-armada-370-xp.txt
+> 
+>>>> Btw. I don't even see support for this on ARM64 in mainline, where arch
+>>>> timer is always used for delays and AFAIK this is a platform requirement.
+>>>
+>>> Yeah, I'd vote for not using MCT on ARM64, but it I suppose it doesn't
+>>> hurt to keep it working.
+>>
+>> Right now there is no need for this, so let's just keep things simple.
+> 
+> It should at least have a comment saying that it's broken in subtle
+> ways (only on udelays that happen to span the 32-bit wraparound) on
+> anything where cycle_t is not 32-bits.  Perhaps at least a:
+>   WARN_ON_ONCE(sizeof(cycles_t) != sizeof(u32));
+> 
+> The above should be optimized by the compiler.
 
+Sounds good as well. Or maybe even BUILD_BUG_ON_MSG() with proper error
+message?
 
-Thanks,
-Gregory
-
-
- Documentation/devicetree/bindings/arm/armada-38x.txt | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
-index 11f2330a6554..fa08760046df 100644
---- a/Documentation/devicetree/bindings/arm/armada-38x.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
-@@ -6,5 +6,18 @@ following property:
- 
- Required root node property:
- 
-- - compatible: must contain either "marvell,armada380" or
--   "marvell,armada385" depending on the variant of the SoC being used.
-+compatible: must contain "marvell,armada38x"
-+
-+In addition, boards using the Marvell Armada 380 SoC shall have the
-+following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armada380"
-+
-+In addition, boards using the Marvell Armada 385 SoC shall have the
-+following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armada385"
--- 
-1.8.1.2
+Best regards,
+Tomasz
