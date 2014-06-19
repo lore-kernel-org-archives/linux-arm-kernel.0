@@ -1,94 +1,71 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Thu, 19 Jun 2014 13:59:59 +0530
-Subject: [PATCH] clocksource: exynos-mct: Register the timer for stable
- udelay
-In-Reply-To: <CAD=FV=WHK7TDdqcAd6aVs2g8rcHJx834im_4nTKHJAkUisWq4A@mail.gmail.com>
-References: <1403091060-5054-1-git-send-email-amit.daniel@samsung.com>
- <CAD=FV=WHK7TDdqcAd6aVs2g8rcHJx834im_4nTKHJAkUisWq4A@mail.gmail.com>
-Message-ID: <CADGdYn6-SnwgTiOi5f8waXBStPaxndep6T6swfkuAcU4=KdcUQ@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 19 Jun 2014 11:36:12 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
+ <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
+ <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
+ <20140617215119.GC24743@mithrandir>
+ <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
+ <53A1B252.1030204@wwwdotorg.org>
+ <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140619083612.GL3407@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 4:47 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Amit,
->
-> Thanks for posting!
->
-> On Wed, Jun 18, 2014 at 4:31 AM, Amit Daniel Kachhap
-> <amit.daniel@samsung.com> wrote:
->> This patch register the exynos mct clocksource as the current timer
->> as it has constant clock rate. This will generate correct udelay for the
->> exynos platform and avoid using unnecessary calibrated jiffies. This change
->> have been tested on exynos5420 based board.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>
->> Patches from David Riley confirmed that udelay is broken in exynos5420.
->> Link to those patches are,
->> 1) https://patchwork.kernel.org/patch/4344911/
->> 2) https://patchwork.kernel.org/patch/4344881/
->>
->>  drivers/clocksource/exynos_mct.c | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->> index 8d64200..57cb3dc 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -198,10 +198,21 @@ static u64 notrace exynos4_read_sched_clock(void)
->>         return exynos4_frc_read(&mct_frc);
->>  }
->>
->> +static struct delay_timer exynos4_delay_timer;
->> +
->> +static unsigned long exynos4_read_current_timer(void)
->> +{
->> +       return exynos4_frc_read(&mct_frc);
->
-> This is terribly inefficient to read all 64-bits and then cast back to
-> a 32-bit value.  Replace with:
-Yes agree.
-This unsigned long strangely behaves as 32 bits for arm32 and 64 bits for arm64.
-So I think it better is to do something like this,
-+static unsigned long exynos4_read_current_timer(void)
-+{
-+#ifdef ARM
-+       return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
-+#else /* ARM64, etc */
-+       return exynos4_frc_read(&mct_frc);
-+#endif
-+}
-+
-I will post V2 version like above and see what the maintainer says.
+On Thu, Jun 19, 2014 at 10:02:35AM +0200, Peter De Schrijver wrote:
+> On Wed, Jun 18, 2014 at 05:37:54PM +0200, Stephen Warren wrote:
+> > On 06/18/2014 06:18 AM, Peter De Schrijver wrote:
+> > > On Tue, Jun 17, 2014 at 11:51:20PM +0200, Thierry Reding wrote:
+> > >> * PGP Signed by an unknown key
+> > >>
+> > >> On Tue, Jun 17, 2014 at 05:01:46PM +0300, Peter De Schrijver wrote:
+> > >>> On Tue, Jun 17, 2014 at 02:13:15PM +0200, Thierry Reding wrote:
+> > >>>>> Old Signed by an unknown key
+> > >>>>
+> > >>>> On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
+> > >>>>> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+> > >>>>>> This symbol needs to be exported to power on rails without using
+> > >>>>>> tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
+> > >>>>>> cannot be used in situations where the driver wants to handle clocking
+> > >>>>>> by itself.
+> > >>>>>
+> > >>>>> Thierry, are you OK with this change?
+> > >>>>
+> > >>>> I would've preferred tegra_powergate_sequence_power_up() to be used
+> > >>>
+> > >>> I don't think the current tegra_powergate_sequence_power_up() API is very well
+> > >>> defined though. I don't think the clocks and resets required by the sequence
+> > >>> should be provided by the driver. For one, there can be several clocks and
+> > >>> resets that need to be controlled for a single domain.
+> > >>
+> > >> Do you have any suggestions for what the API should look like? Even if
+> > >> we plan to move to some different API, I think there's some advantage in
+> > >> using it consistently if for no other reason than to make it easier to
+> > >> replace occurrences later on.
+> > >>
+> > > 
+> > > I think the API should only have the domain ID as input so:
+> > > 
+> > > int tegra_powerdomain_on(int id) 
+> > > 
+> > > /*
+> > >  * Prerequisites: domain is off
+> > >  * Result: domain is on, clocks of the modules in the domain are off, modules are in reset
+> > >  */
+> > > 
+> > > int tegra_powerdomain_off(int id)
+> > > 
+> > > /*
+> > >  * Prerequisites: all clocks of the modules in the domain are off
+> > >  * result: domain is off
+> > >  */
+> > 
+> > That doesn't make sense; the PMC doesn't have access to the clock and
+> > reset IDs - that's why the API requires them to be passed in.
+> > 
+> 
+> We should make driver look them up by name then. It doesn't make sense to
 
->
-> return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
->
->
->> +}
->> +
->>  static void __init exynos4_clocksource_init(void)
->>  {
->>         exynos4_mct_frc_start(0, 0);
->
-> Please rebase atop (1d80415 clocksource: exynos_mct: Don't reset the
-> counter during boot and resume), which is in linuxnext among other
-> places.
-OK will re base my patch on top of this.
->
->>
->> +       exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
->> +       exynos4_delay_timer.freq = clk_rate;
->> +       register_current_timer_delay(&exynos4_delay_timer);
->> +
->>         if (clocksource_register_hz(&mct_frc, clk_rate))
->>                 panic("%s: can't register clocksource\n", mct_frc.name);
->
-> It does seem to work for me though.  :)
-thanks,
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I mean the PMC driver here.
