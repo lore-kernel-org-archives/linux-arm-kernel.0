@@ -1,153 +1,99 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 19 Jun 2014 11:38:23 +0100
-Subject: [PATCH v4 13/13] serial: imx: Add support for KGDB's FIQ/NMI mode
-In-Reply-To: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
-References: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1403174303-25456-14-git-send-email-daniel.thompson@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Jun 2014 11:49:19 +0100
+Subject: [PATCHv3 0/4] arm64: simplify restrictions on bootloaders
+Message-ID: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to use the imx uart with KGDB's FIQ/NMI
-mode.
+Hi all,
 
-Main changes are:
+This is version 3 of the boot simplification series I posted previously [1,4].
+Many thanks to those who reviewed / tested the prior postings.
 
-.poll_init() will, if KGDB+FIQ are enabled, perform deeper hardware
-initialization to ensure the serial port is always active (required
-otherwise FIQ is not triggered by UART activity). This has an impact on
-power usage so it is conservatively enabled.
+Changes since v2 [4]
+* Rebased to v3.16-rc1 now that the EFI changes have been merged. Fixed
+  conflicts in arch/arm64/mm/init.c.
+* Added flags field to export kernel endianness.
+* Moved the linker script macros to image.h, to hide the magic behind a new
+  HEAD_SYMBOLS macro.
+* Fixed up the documentation, including some cleanups for the EFI changes. It
+  now refers to v3.17, but I can update if this is delayed further.
+* Renamed patch 3 as it has absorbed several Image header changes.
+Changes since v1 [1]:
+* Rebased to Matt Fleming's arm64-efi branch [2] to resolve conflict with the
+  EFI stub series in head.S.
+* Fixed random TEXT_OFFSET generation to be mawk compatible.
+* Removed option to set TEXT_OFFSET explicitly per Catalin's request.
+* Remove (invalid) recommendation of 1MB for dynamically initialised data.
 
-imx_put_poll_char() has been simplified to remove the code to disable
-interrupts. The present code can corrupt register state when re-entered
-from FIQ handler.
+For those who have not seen v1 or v2, a rationale and description of the series
+follows:
 
-Both imx_put_poll_char() and imx_get_poll_char() adopt _relaxed()
-MMIO functions (which are safe for polled I/O and needed to avoid taking
-spin locks).
+Currently bootloaders have an extremely difficult time protecting memory from
+the kernel, as the kernel may clobber memory below TEXT_OFFSET with pagetables,
+and above the end of the kernel binary with the BSS.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: linux-serial at vger.kernel.org
----
- drivers/tty/serial/imx.c | 71 +++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 52 insertions(+), 19 deletions(-)
+This series attempts to ameliorate matters by adding a mechanism for bootloaders
+to discover the minimum runtime footprint of the kernel image, including the BSS
+and any other dynamically initialised data, and moving the initial page tables
+into this region.
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 25ed1d2..a2baf7e 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -49,6 +49,7 @@
- #include <linux/of_device.h>
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
-+#include <linux/kgdb.h>
- 
- #include <asm/irq.h>
- #include <linux/platform_data/serial-imx.h>
-@@ -1502,44 +1503,73 @@ imx_verify_port(struct uart_port *port, struct serial_struct *ser)
- }
- 
- #if defined(CONFIG_CONSOLE_POLL)
-+
-+#if defined(CONFIG_KGDB_FIQ)
-+/*
-+ * Prepare the UART to be used from kgdb's NMI support.
-+ */
-+static int imx_poll_init(struct uart_port *port)
-+{
-+	struct imx_port *sport = (struct imx_port *)port;
-+	unsigned long flags;
-+	unsigned long temp;
-+	int retval;
-+
-+	retval = clk_prepare_enable(sport->clk_ipg);
-+	if (retval)
-+		return retval;
-+	retval = clk_prepare_enable(sport->clk_per);
-+	if (retval)
-+		clk_disable_unprepare(sport->clk_ipg);
-+
-+	imx_setup_ufcr(sport, 0);
-+
-+	spin_lock_irqsave(&sport->port.lock, flags);
-+
-+	temp = readl(sport->port.membase + UCR1);
-+	if (is_imx1_uart(sport))
-+		temp |= IMX1_UCR1_UARTCLKEN;
-+	temp |= UCR1_UARTEN | UCR1_RRDYEN;
-+	temp &= ~(UCR1_TXMPTYEN | UCR1_RTSDEN);
-+	writel(temp, sport->port.membase + UCR1);
-+
-+	temp = readl(sport->port.membase + UCR2);
-+	temp |= UCR2_RXEN;
-+	writel(temp, sport->port.membase + UCR2);
-+
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
-+
-+	/* register the FIQ with kgdb */
-+	kgdb_register_fiq(sport->port.irq);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_KGDB_FIQ */
-+
- static int imx_poll_get_char(struct uart_port *port)
- {
--	if (!(readl(port->membase + USR2) & USR2_RDR))
-+	if (!(readl_relaxed(port->membase + USR2) & USR2_RDR))
- 		return NO_POLL_CHAR;
- 
--	return readl(port->membase + URXD0) & URXD_RX_DATA;
-+	return readl_relaxed(port->membase + URXD0) & URXD_RX_DATA;
- }
- 
- static void imx_poll_put_char(struct uart_port *port, unsigned char c)
- {
--	struct imx_port_ucrs old_ucr;
- 	unsigned int status;
- 
--	/* save control registers */
--	imx_port_ucrs_save(port, &old_ucr);
--
--	/* disable interrupts */
--	writel(UCR1_UARTEN, port->membase + UCR1);
--	writel(old_ucr.ucr2 & ~(UCR2_ATEN | UCR2_RTSEN | UCR2_ESCI),
--	       port->membase + UCR2);
--	writel(old_ucr.ucr3 & ~(UCR3_DCD | UCR3_RI | UCR3_DTREN),
--	       port->membase + UCR3);
--
- 	/* drain */
- 	do {
--		status = readl(port->membase + USR1);
-+		status = readl_relaxed(port->membase + USR1);
- 	} while (~status & USR1_TRDY);
- 
- 	/* write */
--	writel(c, port->membase + URTX0);
-+	writel_relaxed(c, port->membase + URTX0);
- 
- 	/* flush */
- 	do {
--		status = readl(port->membase + USR2);
-+		status = readl_relaxed(port->membase + USR2);
- 	} while (~status & USR2_TXDC);
--
--	/* restore control registers */
--	imx_port_ucrs_restore(port, &old_ucr);
- }
- #endif
- 
-@@ -1560,6 +1590,9 @@ static struct uart_ops imx_pops = {
- 	.config_port	= imx_config_port,
- 	.verify_port	= imx_verify_port,
- #if defined(CONFIG_CONSOLE_POLL)
-+#if defined(CONFIG_KGDB_FIQ)
-+	.poll_init      = imx_poll_init,
-+#endif
- 	.poll_get_char  = imx_poll_get_char,
- 	.poll_put_char  = imx_poll_put_char,
- #endif
+The currently ill-described image load offset variable is coerced to always be
+little-endian. This means that bootloader can actually make use of the field for
+any kernel (wither LE or BE), and as the field does not yet seem to be used
+anywhere taking endianness into account I hope this is not problematic.
+Documentation is updated with recommendations on handling the field. To aid in
+encouraging bootloader authors to respect the field, an option is added to
+randomize the text_offset field at link time, which may be used in test and/or
+distribution kernels. So as to not break existing (but arguably broken) loaders
+immediately, this option is hidden under kernel hacking and disabled by default.
+
+The documentation is updated to cover how to use the new image_size field and
+what to do if it is zero, and how to use the image_size field to determine
+whether the text_offset field is guaranteed to be little-endian. In the absence
+of an image_size field, it's not possible to provide a reasonable sensible
+value due to configuration-dependent variation -- a recent defconfg kernel had
+a ~190KB BSS, while an allyesconfig build (with some features disabled due to
+build breakages) had a ~13MB BSS.
+
+A BE conditional 64-bit endianness swapping routine (DATA_LE64) is added to
+vmlinux.lds.S, as the linker is the only place we can endianness swap a value
+calculated from two symbols known only at link time. There are several existing
+headers that do almost the same thing but due to use of C prototypes and/or
+casts are not suitable for use in a linker script. A separate series may be able
+to unify that.
+
+I've given some light testing to text_offset fuzzing with an updated bootwrapper
+[3] which reads the text_offset field at build time to ensure the kernel gets
+loaded at the right address. Nothing else is yet moved however, so this may
+explode if this location happens to overlap the bootwrapper code, DTB, or
+spin-table mbox. I'll try to teach the bootwrapper how to deal with that
+shortly.
+
+Cheers,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257141.html
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git arm64-efi
+[3] http://linux-arm.org/git?p=boot-wrapper-aarch64.git;a=shortlog;h=refs/heads/unstable/text-offset
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/260076.html
+
+Mark Rutland (4):
+  arm64: head.S: remove unnecessary function alignment
+  arm64: place initial page tables above the kernel
+  arm64: Update the Image header
+  arm64: Enable TEXT_OFFSET fuzzing
+
+ Documentation/arm64/booting.txt | 43 ++++++++++++++++++++++------
+ arch/arm64/Kconfig.debug        | 16 +++++++++++
+ arch/arm64/Makefile             |  4 +++
+ arch/arm64/include/asm/image.h  | 62 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/page.h   |  9 ++++++
+ arch/arm64/kernel/head.S        | 49 +++++++++++++++-----------------
+ arch/arm64/kernel/vmlinux.lds.S | 15 ++++++++++
+ arch/arm64/mm/init.c            | 12 +++-----
+ 8 files changed, 168 insertions(+), 42 deletions(-)
+ create mode 100644 arch/arm64/include/asm/image.h
+
 -- 
-1.9.3
+1.9.1
