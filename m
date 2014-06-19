@@ -1,36 +1,59 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 19 Jun 2014 10:21:48 -0400
-Subject: [PATCH v3 2/2] ata: Fix the dma state machine lockup for the
- IDENTIFY DEVICE PIO mode command.
-In-Reply-To: <CAOHikRAX1NfeCRWVJtv_FTHHheYxU5uKVk_hytdEmb_j-5_wnA@mail.gmail.com>
-References: <1403160654-31612-1-git-send-email-stripathi@apm.com>
- <20140619141047.GA26904@htj.dyndns.org>
- <CAOHikRAX1NfeCRWVJtv_FTHHheYxU5uKVk_hytdEmb_j-5_wnA@mail.gmail.com>
-Message-ID: <20140619142148.GD26904@htj.dyndns.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 19 Jun 2014 16:23:26 +0200
+Subject: [RFC 1/2] pwrseq: Add subsystem to handle complex power sequences
+In-Reply-To: <53A2EDCA.8080000@redhat.com>
+References: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>
+ <1403183091-27876-2-git-send-email-ulf.hansson@linaro.org>
+ <53A2EDCA.8080000@redhat.com>
+Message-ID: <53A2F25E.80200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 07:44:28PM +0530, Suman Tripathi wrote:
-> Hi Tejun,
-> 
-> On Thu, Jun 19, 2014 at 12:20:54PM +0530, Suman Tripathi wrote:
-> > +     /*
-> > +      * Restart the dma engine if the last cmd issued
-> > +      * is IDENTIFY DEVICE command
-> > +      */
-> > +     if (unlikely(ctx->last_cmd[ap->port_no] == ATA_CMD_ID_ATA))
-> > +             ahci_restart_engine(ap);
-> 
-> Is it really only for IDENTIFY?  Are other PIO commands okay?
-> [Suman] : We root cause it , It is the IDENTIFY DEVICE command . Other are
-> ok
-> Theprevious version applied it to all PIO commands, right?
-> [suman] : The v2 contains only the IDENTIFY DEVICE. The v1 is contains for
-> all PIO commands and that didn't work because the ERRATA mentions that it
-> happens for the IDENTIFY DEVICE command.
+Hi,
 
-So, it's just ATA_CMD_ID_ATA and ATA_CMD_ID_ATAPI is okay?  That's
-kinda weird.
+On 06/19/2014 04:03 PM, Hans de Goede wrote:
+> Hi,
+> 
 
--- 
-tejun
+<snip>
+
+> Also I'm not sold on how you're making this a devm only thing, and
+> are using devres_alloc to not only allocate memory for resource tracking,
+> but also the actual backing struct, that is not how devres_alloc is
+> intended to be used AFAIK.
+> 
+> A problem with having this one always devm managed is that it makes it
+> hard to use in library functions without side effects.
+> 
+> e.g. if you look at how your using this in mmc_of_parse in the next
+> patch, this gives mmc_of_parse the side-effect of having allocated
+> and bound the power-seq method, even if mmc_of_parse later
+> fails on e.g. gpio binding. If then for some reason the mmc host
+> probe method decides to not propagate the mmc_of_parse method
+> error (leading to freeing of all devm managed resources), then this is
+> undesirable.
+> 
+> Where as with a non devm version, it would be clear that on error
+> mmc_of_parse would need to explicitly release the pwrseq again.
+> 
+> I realize that pwrseq implementations likely will want to use
+> devm functions too, and I'm a great fan of devm. But this is something
+> to keep in mind. At a minimum the description of of_mmc_parse needs
+> to get updated with info about it having potential side-effects even
+> when it fails, and that failure should always be treated as a fatal
+> error and cause the host probe method to fail.
+
+Thinking more about this, it may be a good idea to give the pwrseq
+its own struct device, turning it into a virtual device, this way the
+pwrseq-method can use devm managed resources bound to this device,
+we can set the of_node of this device to the actual powerseq
+childnode and it gets its own sysfs dir in which we could do useful things
+such as have an attribute to query the current power state.
+
+This would also mean introducing a non devm version of devm_pwrseq_get
++ an explicit release, which would be useful to avoid the side-effects
+mentioned above when used in library functions such as mmc_of_parse.
+
+Regards,
+
+Hans
