@@ -1,37 +1,62 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 19 Jun 2014 11:12:36 +0100
-Subject: [STLinux Kernel] [PATCH 4/7] ARM: stih416-b2020e: Enable PWM on
- the B2020 Rev-E
-In-Reply-To: <20140619092042.GB26560@lee--X1>
-References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
- <1403103172-19856-4-git-send-email-lee.jones@linaro.org>
- <20140619090546.GB2131@griffinp-ThinkPad-X1-Carbon-2nd>
- <20140619092042.GB26560@lee--X1>
-Message-ID: <20140619101236.GA7390@griffinp-ThinkPad-X1-Carbon-2nd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Jun 2014 12:17:35 +0200
+Subject: The problem of fixing the obvious problem...
+In-Reply-To: <20140619094319.GN32514@n2100.arm.linux.org.uk>
+References: <20140619094319.GN32514@n2100.arm.linux.org.uk>
+Message-ID: <4332175.W7nZ6A4hH1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-> > Why are you only enabling this for rev-E board?
+On Thursday 19 June 2014 10:43:19 Russell King - ARM Linux wrote:
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 0ba482638ebf..2085b3d42ed6 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -28,7 +28,6 @@ config ARCH_OMAP4
+>         select ARM_CPU_SUSPEND if PM
+>         select ARM_ERRATA_720789
+>         select ARM_GIC
+> -       select CACHE_L2X0
+>         select HAVE_ARM_SCU if SMP
+>         select HAVE_ARM_TWD if SMP
+>         select OMAP_INTERCONNECT
 > 
-> Purely for testing purposes, as it's the only board I have.  If
-> anyone has the other revisions and would be happy to test the driver
-> for me then great.
+> May look as if it's the right thing to do, but there's symbols lower down
+> (PL310_ERRATA_*) which are selected which depend on this symbol being
+> enabled.
+> 
+> What this means is that it's now possible for OMAP to be configured with
+> CACHE_L2X0 disabled _and_ for the PL310_ERRATA_* options to be forced on,
+> which results in:
+> 
+> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_588369 which has unmet direct dependencies (CACHE_L2X0)
+> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_727915 which has unmet direct dependencies (CACHE_L2X0)
+> 
+> So, let's clean up this sillyness by doing the job properly - ensuring
+> that /all/ PL310_ERRATA_* symbols are selected conditionally on
+> CACHE_L2X0 (whether or not CACHE_L2X0 is selected), so when people remove
+> that select statement, it doesn't cause these kinds of side effects.
+> 
+> The patch below will be in linux-next tomorrow.
+> 
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Subject: [PATCH] ARM: l2c: fix dependencies on PL310 errata symbols
+> 
+> A number of configurations spit out warnings similar to:
+> 
+> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_588369 which has unmet direct dependencies (CACHE_L2X0)
+> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_727915 which has unmet direct dependencies (CACHE_L2X0)
+> 
+> Clean up the dependencies here:
+> * PL310 symbols should only be selected when CACHE_L2X0 is enabled.
+> * Since the cache-l2x0 code detects PL310 presence at runtime, and we will
+>   eventually get rid of CACHE_PL310, surround these errata options with an
+>   if CACHE_L2X0 conditional rather than repeating the dependency against
+>   each.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
 
-Ok that's what I suspected.
+Thanks a lot!
 
-If you tell me how, I can test on a Rev C board. But as there are several other 
-revisions I think checking the board schematics would be the quickest way forward.
-
-> > If you make the stih415 DT PWM nodes part of this series as well, then 
-> > assuming there is no good reason to the contary, the PWM could 
-> > be enabled for both stih415/6 in the common stih41x-b2020 DTS file which
-> > is also included by rev-E (assuming that PWM wiring is not some rev-E specific
-> > thing).
-
-Can you add the stih415 bindings in V2 as well?
-
-regards,
-
-Peter
+Acked-by: Arnd Bergmann <arnd@arndb.de>
