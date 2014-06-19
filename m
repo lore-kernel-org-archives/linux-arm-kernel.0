@@ -1,86 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 19 Jun 2014 10:02:16 -0700
-Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling() into
- a library function
-In-Reply-To: <20140619122830.GP32514@n2100.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
- <20140616104615.GA10701@n2100.arm.linux.org.uk>
- <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
- <20140619122830.GP32514@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMh_8JSMzZQXVncBGmiTN6B--udY11kX=xmD5_TWRsUiSg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 19 Jun 2014 10:07:26 -0700
+Subject: [PATCH 1/3] clocksource: exynos_mct: Fix ftrace
+In-Reply-To: <53A030DB.3090009@linaro.org>
+References: <1401903034-20074-1-git-send-email-dianders@chromium.org>
+ <53A030DB.3090009@linaro.org>
+Message-ID: <CAD=FV=X+Wdkm60OU4Mh+0YWhAs6M2gLTNoTm=3pNp+Za7Haj8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 5:28 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 16, 2014 at 02:17:30PM +0200, Ulf Hansson wrote:
->> Anyway, we did get some folks to test the patches and was thus fairly
->> confident that we could merge them. Chris asked me to try to collect
->> them in a PR for him, so I did. Sorry if I managed to screw some
->> things up, there were several conflicts and actual regressions, which
->> I tried to take care of.
+Daniel,
+
+On Tue, Jun 17, 2014 at 5:13 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 06/04/2014 07:30 PM, Doug Anderson wrote:
 >>
->> The mmc people were also very helping in sending patches to fixup
->> related regressions, immediately after we merged your patchset. Thus
->> together I think we managed to pull it off.
+>> In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
+>> supported using the MCT as a scheduler clock.  We properly marked
+>> exynos4_read_sched_clock() as notrace.  However, we then went and
+>> called another function that _wasn't_ notrace.  That means if you do:
+>>
+>>    cd /sys/kernel/debug/tracing/
+>>    echo function_graph > current_tracer
+>>
+>> You'll get a crash.
+>>
+>> Fix this (but still let other readers of the MCT be trace-enabled) by
+>> adding an extra function.  It's important to keep other users of MCT
+>> traceable because the MCT is actually quite slow.
 >
-> I tend to look through slightly less rose-tinted glasses.
 >
-> The fact is... there's loads of ARM platforms which now fail in Olof's
-> build/boot testing, and they all seem to have a very similar pattern:
+> Thanks for the explanation in the other email.
 >
-> hummingboard:
-> [    1.149688] sdhci: Secure Digital Host Controller Interface driver
-> [    1.155901] sdhci: Copyright(c) Pierre Ossman
-> ...
-> [    1.253630] Waiting for root device /dev/mmcblk0p2...
-> [   60.325469] imx-sdma 20ec000.sdma: firmware not found
-> ~$off
-> # PYBOOT: Exception: timeout
->
-> jetson:
-> [    2.261355] Waiting for root device /dev/mmcblk0p1...
->
-> wandboard:
-> [    1.186870] sdhci: Secure Digital Host Controller Interface driver
-> [    1.193075] sdhci: Copyright(c) Pierre Ossman
-> ...
-> [    1.291064] Waiting for root device /dev/mmcblk0p2...
->
-> Whether these are caused by the patch set or not is anyone's guess,
-> because we (a) don't know what's causing these failures, and (b)
-> my patch series was never tested on anything but iMX6.
->
-> I'm pretty certain that the hummingboard failure is not related to
-> my series as that's one of the platforms I did test my series on.
->
-> There's more failures which look like possibly something in core MMC is
-> rather screwed, as OMAP5 (which doesn't use SDHCI) is also failing at
-> a similar point.
->
-> What these failures /do/ mean is that when I'm pushing my ARM for-next
-> branch out, Olof's builder picks it up and runs a build across it, and
-> the report returns a whole load of failures.  A whole load of failures
-> means that those platforms haven't tested my changes, which means the
-> quality of testing is much lower than it should be.
->
-> With 26 passing and 15 failing, that's over 1/3 of platforms failing,
-> which means 1/3 aren't getting tested.
->
-> This level of failure has been going on for quite a while now, and (afaik)
-> it remains uninvestigated and undiagnosed.  (This is one of the complaints
-> I have about Olof's build/boot test system, much of the information about
-> the build and boot is hidden away and unpublished, which makes it almost
-> impossible for third parties to diagnose any problem there.  I've given up
-> looking at most of Olof's build/boot mails because of this - it's just
-> not interesting to see the same abbreviated boot failure logs which give
-> no useful information time and time again.)
+> I think the last sentence is a bit confusing because you are implicitly
+> saying you need these traces to investigate why the timer is slow which is
+> referring to something not related to this fix.
 
-Most of this is because I want to avoid sending huuuge emails out with
-the failures. I'll add a push of the full log to arm-soc.lixom.net and
-include a link to it in the emails, similar to how I do the build
-logs. I'll let you know when I've made that change.
+Done
 
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>   drivers/clocksource/exynos_mct.c | 9 +++++++--
+>>   1 file changed, 7 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/exynos_mct.c
+>> b/drivers/clocksource/exynos_mct.c
+>> index 8d64200..ba3a683 100644
+>> --- a/drivers/clocksource/exynos_mct.c
+>> +++ b/drivers/clocksource/exynos_mct.c
+>> @@ -165,7 +165,7 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
+>>         exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
+>>   }
+>>
+>> -static cycle_t exynos4_frc_read(struct clocksource *cs)
+>> +static inline cycle_t notrace _exynos4_frc_read(void)
+>
+>
+> Why inline ?
 
--Olof
+Somehow I thought that without the "inline" that somehow
+exynos4_frc_read() would not be traceable.  ...but this makes no sense
+so I've removed.
