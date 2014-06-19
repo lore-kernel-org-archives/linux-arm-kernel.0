@@ -1,45 +1,129 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 19 Jun 2014 13:26:36 +0900
-Subject: [PATCHv2 0/3] cpufreq: Use cpufreq-cpu0 driver for Exynos3250
-In-Reply-To: <CAJuA9aiYGXYYORkbB66ZJs3rTjAu4a7HcPhMSOZs_qUJyy_o7g@mail.gmail.com>
-References: <1403080802-2794-1-git-send-email-cw00.choi@samsung.com>
- <CAJuA9aiYGXYYORkbB66ZJs3rTjAu4a7HcPhMSOZs_qUJyy_o7g@mail.gmail.com>
-Message-ID: <53A2667C.9060604@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 19 Jun 2014 12:33:41 +0800
+Subject: [PATCH v2 12/20] clk: sunxi: Add A23 APB0 support to
+ sun6i-a31-apb0-clk
+In-Reply-To: <20140618102623.GQ19730@lukather>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+ <1403016777-15121-13-git-send-email-wens@csie.org>
+ <20140618102623.GQ19730@lukather>
+Message-ID: <CAGb2v64D6qBtXGXzn25443s_oj_=Z-u_P6+-MX52Lz54+9bQyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 06/19/2014 01:21 PM, Thomas Abraham wrote:
-> On Wed, Jun 18, 2014 at 2:09 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patchset use cpufreq-cpu0 driver to support Exynos3250 cpufreq. So, this
->> patchset is based on following patchset[1] by Thomas Abraham.
->>  [1] http://www.spinics.net/lists/arm-kernel/msg339392.html
+On Wed, Jun 18, 2014 at 6:26 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jun 17, 2014 at 10:52:49PM +0800, Chen-Yu Tsai wrote:
+>> The A23 has an almost identical PRCM clock tree. The difference in
+>> the APB0 clock is the smallest divisor is 1, instead of 2.
 >>
->> Changes from v1:
->> - Rebased on new patchset[1] by Thomas Abraham
->> - Modify clk-cpu.c to support Exynos3250
->> - Drop documentation patch on previous patchset[2]
->>  [2] http://www.spinics.net/lists/cpufreq/msg10265.html
->> - Add only operating-points for Exynos3250 without armclk-divider-table
+>> This patch extends the sun6i-a31-apb0-clk driver to take divider
+>> tables associated to compatibles, and adds a compatible for the A23
+>> variant.
 >>
->> Chanwoo Choi (3):
->>   clk: samsung: cpu: Add support for cpu clocks of Exynos3250
->>   clk: samsung: exynos3250: Use cpu-clock provider type to support cpufreq
->>   ARM: dts: Exynos: Add cpu clock table for Exynos3250
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>>  drivers/clk/sunxi/clk-sun6i-apb0.c                | 28 ++++++++++++++++++-----
+>>  2 files changed, 23 insertions(+), 6 deletions(-)
 >>
->>  arch/arm/boot/dts/exynos3250.dtsi    | 15 +++++++++++++++
->>  drivers/clk/samsung/clk-cpu.c        | 31 +++++++++++++++++++++++++++++++
->>  drivers/clk/samsung/clk-exynos3250.c | 14 ++++++++++----
->>  3 files changed, 56 insertions(+), 4 deletions(-)
-> 
-> Hi Chanwoo,
-> 
-> I have reviewed this series and it looks fine. If the cpu clock type
-> is merged without any further changes, please add
-> Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index af9e47d..e3a47ec 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -28,6 +28,7 @@ Required properties:
+>>       "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+>>       "allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
+>>       "allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
+>> +     "allwinner,sun8i-a23-apb0-clk" - for the APB0 clock on A23
+>>       "allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
+>>       "allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+>>       "allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
+>> diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
+>> index 11f17c3..2197ac7 100644
+>> --- a/drivers/clk/sunxi/clk-sun6i-apb0.c
+>> +++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
+>> @@ -11,6 +11,7 @@
+>>  #include <linux/clk-provider.h>
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>> +#include <linux/of_device.h>
+>>  #include <linux/platform_device.h>
+>>
+>>  /*
+>> @@ -28,6 +29,21 @@ static const struct clk_div_table sun6i_a31_apb0_divs[] = {
 
-Thanks for your review.
+For reference:
 
-Best Regards,
-Chanwoo Choi
+static const struct clk_div_table sun6i_a31_apb0_divs[] = {
+        { .val = 0, .div = 2, },
+        { .val = 1, .div = 2, },
+        { .val = 2, .div = 4, },
+        { .val = 3, .div = 8, },
+        { /* sentinel */ },
+};
+
+
+>>       { /* sentinel */ },
+>>  };
+>>
+>> +/* The A23 APB0 clock has a standard power of 2 divisor */
+>
+> Why not just pass CLK_DIVIDER_POWER_OF_TWO then, instead of a table?
+
+The A31 APB0 clock uses a table for the odd /2 divisor for value 0.
+The standard table I'm using for the A23 is just to keep it simple
+and alike.
+
+>> +static const struct clk_div_table sun8i_a23_apb0_divs[] = {
+>> +     { .val = 0, .div = 1, },
+>> +     { .val = 1, .div = 2, },
+>> +     { .val = 2, .div = 4, },
+>> +     { .val = 3, .div = 8, },
+>> +     { /* sentinel */ },
+>> +};
+>> +
+>> +const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
+>> +     { .compatible = "allwinner,sun6i-a31-apb0-clk", .data = &sun6i_a31_apb0_divs },
+>> +     { .compatible = "allwinner,sun8i-a23-apb0-clk", .data = &sun8i_a23_apb0_divs },
+>> +     { /* sentinel */ }
+>> +};
+>> +
+>>  static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+>>  {
+>>       struct device_node *np = pdev->dev.of_node;
+>> @@ -36,12 +52,17 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+>>       struct resource *r;
+>>       void __iomem *reg;
+>>       struct clk *clk;
+>> +     const struct of_device_id *device;
+>>
+>>       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>       reg = devm_ioremap_resource(&pdev->dev, r);
+>>       if (IS_ERR(reg))
+>>               return PTR_ERR(reg);
+>>
+>> +     device = of_match_device(sun6i_a31_apb0_clk_dt_ids, &pdev->dev);
+>> +     if (!device)
+>> +             return -EINVAL;
+>> +
+>>       clk_parent = of_clk_get_parent_name(np, 0);
+>>       if (!clk_parent)
+>>               return -EINVAL;
+>> @@ -49,7 +70,7 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
+>>       of_property_read_string(np, "clock-output-names", &clk_name);
+>>
+>>       clk = clk_register_divider_table(&pdev->dev, clk_name, clk_parent,
+>> -                                      0, reg, 0, 2, 0, sun6i_a31_apb0_divs,
+>> +                                      0, reg, 0, 2, 0, device->data,
+>
+> I'm not sure that it will actually work for the A31, since it does
+> define some dividers anyway, and the divider table is !NULL, even
+> though there's actually no dividers defined.
+
+I'm not following. The A31 does have a table defined. It's just cut
+off in this patch. I asked Boris to add the table when he was working
+on the A31 PRCM clocks. See above.
+
+
+Cheers
+ChenYu
