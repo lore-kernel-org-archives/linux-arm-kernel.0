@@ -1,68 +1,81 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Thu, 19 Jun 2014 17:53:53 +0530
-Subject: [PATCH] arm: exynos: Support cluster power off on exynos5420/5800
-In-Reply-To: <alpine.LFD.2.11.1406181132110.16842@knanqh.ubzr>
-References: <1403104722-14848-1-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1406181132110.16842@knanqh.ubzr>
-Message-ID: <CAM4voameJ+zbMSr+OhSVbp=nAX9MzBJWrZaB-o3S6nuN=X09xQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jun 2014 13:28:31 +0100
+Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling()
+ into a library function
+In-Reply-To: <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
+ <20140616104615.GA10701@n2100.arm.linux.org.uk>
+ <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
+Message-ID: <20140619122830.GP32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Mon, Jun 16, 2014 at 02:17:30PM +0200, Ulf Hansson wrote:
+> Anyway, we did get some folks to test the patches and was thus fairly
+> confident that we could merge them. Chris asked me to try to collect
+> them in a PR for him, so I did. Sorry if I managed to screw some
+> things up, there were several conflicts and actual regressions, which
+> I tried to take care of.
+> 
+> The mmc people were also very helping in sending patches to fixup
+> related regressions, immediately after we merged your patchset. Thus
+> together I think we managed to pull it off.
 
-On Wed, Jun 18, 2014 at 9:10 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 18 Jun 2014, Abhilash Kesavan wrote:
->
->> Turning off a cluster when all 4 cores of the cluster are powered off
->> saves power significantly. Powering off the A15 L2 alone gives around
->> 100mW in savings. Add support for powering off the A15/A7 clusters on
->> exynos5420/5800.
->>
->> The patch enables specific register bits which ensure that:
->>    - cluster L2 will be turned on before the first man is powered up.
->>    - last man will be turned off before the cluster L2 is turned off.
->>    - core is powered down before powering it up.
->>
->> Remove the exynos_cluster_power_control function completely as we can
->> rely on the above mentioned bits rather than polling the cluster power
->> status register.
->>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->
-> Minor nit below:
->
->> @@ -342,6 +318,26 @@ static int __init exynos_mcpm_init(void)
->>       pr_info("Exynos MCPM support installed\n");
->>
->>       /*
->> +      * On Exynos5420/5800 for the A15 and A7 clusters:
->> +      *
->> +      * EXYNOS5420_ENABLE_AUTOMATIC_CORE_DOWN ensures that all the cores
->> +      * in a cluster are turned off before turning off the cluster L2.
->> +      *
->> +      * EXYNOS5420_USE_ARM_CORE_DOWN_STATE ensures that a cores is powered
->> +      * off before waking it up.
->> +      *
->> +      * EXYNOS5420_USE_L2_COMMON_UP_STATE ensures that cluster L2 will be
->> +      * turned on before the first man is powered up.
->> +      */
->> +     for (i = 0; i < EXYNOS5420_NR_CLUSTERS; i++) {
->> +             value = __raw_readl(EXYNOS_COMMON_CONFIGURATION(i) + 0x8);
->> +             value |= EXYNOS5420_ENABLE_AUTOMATIC_CORE_DOWN |
->> +                      EXYNOS5420_USE_ARM_CORE_DOWN_STATE    |
->> +                      EXYNOS5420_USE_L2_COMMON_UP_STATE;
->> +             __raw_writel(value, EXYNOS_COMMON_CONFIGURATION(i) + 0x8);
->
-> Surely you can add another define in mach-exynos/regs-pmu.h to better
-> identify this register instead of EXYNOS_COMMON_CONFIGURATION()+8 ?
->
-> After that, you may add:
->
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-Thanks. Will fix and post v2 with your ack.
+I tend to look through slightly less rose-tinted glasses.
 
-Regards,
-Abhilash
->
->
-> Nicolas
+The fact is... there's loads of ARM platforms which now fail in Olof's
+build/boot testing, and they all seem to have a very similar pattern:
+
+hummingboard:
+[    1.149688] sdhci: Secure Digital Host Controller Interface driver
+[    1.155901] sdhci: Copyright(c) Pierre Ossman
+...
+[    1.253630] Waiting for root device /dev/mmcblk0p2...
+[   60.325469] imx-sdma 20ec000.sdma: firmware not found
+~$off
+# PYBOOT: Exception: timeout
+
+jetson:
+[    2.261355] Waiting for root device /dev/mmcblk0p1...
+
+wandboard:
+[    1.186870] sdhci: Secure Digital Host Controller Interface driver
+[    1.193075] sdhci: Copyright(c) Pierre Ossman
+...
+[    1.291064] Waiting for root device /dev/mmcblk0p2...
+
+Whether these are caused by the patch set or not is anyone's guess,
+because we (a) don't know what's causing these failures, and (b)
+my patch series was never tested on anything but iMX6.
+
+I'm pretty certain that the hummingboard failure is not related to
+my series as that's one of the platforms I did test my series on.
+
+There's more failures which look like possibly something in core MMC is
+rather screwed, as OMAP5 (which doesn't use SDHCI) is also failing at
+a similar point.
+
+What these failures /do/ mean is that when I'm pushing my ARM for-next
+branch out, Olof's builder picks it up and runs a build across it, and
+the report returns a whole load of failures.  A whole load of failures
+means that those platforms haven't tested my changes, which means the
+quality of testing is much lower than it should be.
+
+With 26 passing and 15 failing, that's over 1/3 of platforms failing,
+which means 1/3 aren't getting tested.
+
+This level of failure has been going on for quite a while now, and (afaik)
+it remains uninvestigated and undiagnosed.  (This is one of the complaints
+I have about Olof's build/boot test system, much of the information about
+the build and boot is hidden away and unpublished, which makes it almost
+impossible for third parties to diagnose any problem there.  I've given up
+looking at most of Olof's build/boot mails because of this - it's just
+not interesting to see the same abbreviated boot failure logs which give
+no useful information time and time again.)
+
+We need to get on top of these failures and get them sorted.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
