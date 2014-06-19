@@ -1,63 +1,95 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 19 Jun 2014 20:20:30 +0200
-Subject: [PATCH v3 04/14] clk: max77686: Improve Maxim 77686 PMIC clocks
- binding
+Date: Thu, 19 Jun 2014 20:20:35 +0200
+Subject: [PATCH v3 09/14] regmap: Add regmap_reg_copy function
 In-Reply-To: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1403202040-12641-5-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403202040-12641-10-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like most clock drivers, the Maxim 77686 PMIC clock binding
-follows the convention that the "#clock-cells" property is
-used to specify the number of cells in a clock provider.
-
-But the binding document is not clear enough that it shall
-be set to 1 since the PMIC support multiple clocks outputs.
-
-Also, explain that the clocks identifiers are defined in a
-header file that can be included by Device Tree source with
-client nodes to avoid using magic numbers.
+Some device drivers using the register map API need to copy the
+value from one register to another. Even though it can be done
+with a combination of regmap_read() and regmap_write(), it is
+better to have a function to avoid code duplication, sanity check
+passed values and do it atomically by holding the regmap lock.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- .../devicetree/bindings/clock/maxim,max77686.txt          | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ drivers/base/regmap/regmap.c | 34 ++++++++++++++++++++++++++++++++++
+ include/linux/regmap.h       |  9 +++++++++
+ 2 files changed, 43 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/maxim,max77686.txt b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-index 96ce71b..8dea305 100644
---- a/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-+++ b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-@@ -9,13 +9,18 @@ The MAX77686 contains three 32.768khz clock outputs that can be controlled
- Following properties should be presend in main device node of the MFD chip.
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index 74d8c06..a2e0b04 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -2555,6 +2555,40 @@ int regmap_parse_val(struct regmap *map, const void *buf,
+ }
+ EXPORT_SYMBOL_GPL(regmap_parse_val);
  
- Required properties:
--- #clock-cells: simple one-cell clock specifier format is used, where the
--  only cell is used as an index of the clock inside the provider. Following
--  indices are allowed:
++/**
++ * regmap_reg_copy(): Copy a value from a single register to another one
++ *
++ * @map: Register map to operate on
++ * @dest: Register to copy the value to
++ * @src: Register to copy the value from
++ *
++ * A value of zero will be returned on success, a negative errno will
++ * be returned in error cases.
++ */
++int regmap_reg_copy(struct regmap *map, unsigned int dest, unsigned int src)
++{
++	int val;
++	int ret = 0;
 +
-+- #clock-cells: from common clock binding; shall be set to 1.
++	if (dest == src)
++		return ret;
 +
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume. Following indices are allowed:
-     - 0: 32khz_ap clock,
-     - 1: 32khz_cp clock,
-     - 2: 32khz_pmic clock.
++	if (dest % map->reg_stride ||
++	    src % map->reg_stride)
++		return -EINVAL;
++
++	map->lock(map->lock_arg);
++
++	ret = _regmap_read(map, src, &val);
++	if (!ret)
++		ret = _regmap_write(map, dest, val);
++
++	map->unlock(map->lock_arg);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(regmap_reg_copy);
++
+ static int __init regmap_initcall(void)
+ {
+ 	regmap_debugfs_initcall();
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 7b0e4b4..116c22b 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -445,6 +445,8 @@ int regmap_register_patch(struct regmap *map, const struct reg_default *regs,
+ int regmap_parse_val(struct regmap *map, const void *buf,
+ 				unsigned int *val);
  
-+Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77686.h
-+header and can be used in device tree sources.
++int regmap_reg_copy(struct regmap *map, unsigned int dest, unsigned int src);
 +
- Example: Node of the MFD chip
+ static inline bool regmap_reg_in_range(unsigned int reg,
+ 				       const struct regmap_range *range)
+ {
+@@ -723,6 +725,13 @@ static inline int regmap_parse_val(struct regmap *map, const void *buf,
+ 	return -EINVAL;
+ }
  
- 	max77686: max77686 at 09 {
-@@ -33,6 +38,6 @@ Example: Clock consumer node
- 	foo at 0 {
- 		compatible = "bar,foo";
- 		/* ... */
--		clock-names = "my-clock";
--		clocks = <&max77686 2>;
-+		clock-names = "32khz_pmic";
-+		clocks = <&max77686 MAX77686_CLK_PMIC>;
- 	};
++static inline int regmap_reg_copy(struct regmap *map, unsigned int dest,
++				  unsigned int src)
++{
++	WARN_ONCE(1, "regmap API is disabled");
++	return -EINVAL;
++}
++
+ static inline struct regmap *dev_get_regmap(struct device *dev,
+ 					    const char *name)
+ {
 -- 
 2.0.0.rc2
