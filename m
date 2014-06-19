@@ -1,55 +1,53 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 18 Jun 2014 22:04:17 -0700
-Subject: [PATCH] of: Check for phys_addr_t overflows in
- early_init_dt_add_memory_arch
-Message-ID: <1403154257-14591-1-git-send-email-lauraa@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 18 Jun 2014 22:21:13 -0700
+Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
+ suspend/resume
+Message-ID: <1403155273-1057-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common early_init_dt_add_memory_arch takes the base and size
-of a memory region as u64 types. The function never checks if
-the base and size can actually fit in a phys_addr_t which may
-be smaller than 64-bits. This may result in incorrect memory
-being passed to memblock_add if the memory falls outside the
-range of phys_addr_t. Add range checks for the base and size if
-phys_addr_t is smaller than u64.
+The original code for the exynos i2c controller registered for the
+"noirq" variants.  However during review feedback it was moved to
+SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
+longer actually "noirq" (despite functions named
+exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
 
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+i2c controllers that might have wakeup sources on them seem to need to
+resume at noirq time so that the individual drivers can actually read
+the i2c bus to handle their wakeup.
+
+NOTE: I took the original review feedback from Wolfram and added
+poweroff, thaw, freeze, restore.
+
+This patch has only been compile-tested since I don't have all the
+patches needed to make my machine using this i2c driver actually
+suspend/resume.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
-Geert, can you drop my other patch and give this a test to see if it fixes
-your bootup problem?
+ drivers/i2c/busses/i2c-exynos5.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
----
- drivers/of/fdt.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index c4cddf0..f72132c 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -880,6 +880,21 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
- 	const u64 phys_offset = __pa(PAGE_OFFSET);
- 	base &= PAGE_MASK;
- 	size &= PAGE_MASK;
-+
-+#ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
-+	if (base > ULONG_MAX) {
-+		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
-+				base, base + size);
-+		return;
-+	}
-+
-+	if (base + size > ULONG_MAX) {
-+		pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
-+				ULONG_MAX, base + size);
-+		size = ULONG_MAX - base;
-+	}
-+#endif
-+
- 	if (base + size < phys_offset) {
- 		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
- 			   base, base + size);
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index 63d2292..cba740c 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -789,8 +789,14 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+ }
+ #endif
+ 
+-static SIMPLE_DEV_PM_OPS(exynos5_i2c_dev_pm_ops, exynos5_i2c_suspend_noirq,
+-			 exynos5_i2c_resume_noirq);
++const struct dev_pm_ops exynos5_i2c_dev_pm_ops = {
++	.suspend_noirq = exynos5_i2c_suspend_noirq,
++	.resume_noirq = exynos5_i2c_resume_noirq,
++	.freeze_noirq = exynos5_i2c_suspend_noirq,
++	.thaw_noirq = exynos5_i2c_resume_noirq,
++	.poweroff_noirq = exynos5_i2c_suspend_noirq,
++	.restore_noirq = exynos5_i2c_resume_noirq,
++};
+ 
+ static struct platform_driver exynos5_i2c_driver = {
+ 	.probe		= exynos5_i2c_probe,
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+2.0.0.526.g5318336
