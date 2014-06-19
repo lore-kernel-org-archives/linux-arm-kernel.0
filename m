@@ -1,68 +1,69 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 19 Jun 2014 14:12:01 +0100
-Subject: [PATCH v4 11/13] serial: asc: Adopt readl_/writel_relaxed()
-In-Reply-To: <53A2D135.4020700@linaro.org>
-References: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
- <1403174303-25456-12-git-send-email-daniel.thompson@linaro.org>
- <53A2C9A3.9090507@linaro.org> <53A2CD8D.1050106@linaro.org>
- <53A2D135.4020700@linaro.org>
-Message-ID: <53A2E1A1.3010705@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 19 Jun 2014 18:53:30 +0530
+Subject: [PATCH v2 10/18] ARM: dts: dra7xx-clocks: Add missing 32khz clocks
+ used for PHY
+In-Reply-To: <53A2C690.1060106@ti.com>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-11-git-send-email-kishon@ti.com> <53A2C690.1060106@ti.com>
+Message-ID: <53A2E452.5020109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/14 13:01, Srinivas Kandagatla wrote:
->>> Why are we concern about x86 for this driver?
->>> As per my understanding this IP is only seen on ARM and SH based CPUs so
->>> why cant we just use relaxed versions, why ifdefs?
->>> I think, this would involve fixing the kconfig and make it depend on SH
->>> and ARM based platforms only.
->>
->> You mean just drop the COMPILE_TEST?
->>
->> In generally I like as much code as possible to compile on x86. Its
->> worthwhile protection against the excessive/accidental ARMisms which
->> could easily impact less common architectures (such as SH).
+Hi Tero,
+
+On Thursday 19 June 2014 04:46 PM, Tero Kristo wrote:
+> On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
+>> Added missing 32khz clock used by PCIe PHY.
+>> The documention for this node can be found @ ../bindings/clock/ti/gate.txt.
 > 
-> That's fair. Does this mean that we are going do similar changes to
-> other ST drivers too?
+> You can drop the node documentation ref, and rather add a TRM reference about
+> hardware details. Other than that, looks good to me.
 
-I didn't give any thought at all to other ST drivers. I don't see why a
-*general* preference (of mine or anyone else) would override what is
-right for any particular driver.
+You mean something like why 32KHz clock is used (**PRCM.PCIE_32K_GFCLK (based
+on PRM.SYS_32K) for debounce and wakeup logic inside the PCIe1_PHY_RX**)? Or
+something like **Figure 26-19. PCIe PHY Subsystem Integration of DRA TRM vE
+shows how 32KHz clock is being used** ?
 
-I don't think "both manage ST peripherals" means drivers have much in
-common.
+Thanks
+Kishon
 
-
->>> On the other hand, This patch looks more generic and applicable to most
->>> of the drivers. Am not sure which way is the right one.
->>
->> I'm particularly keen on doing the right thing where readl_relaxed() is
->> concerned because this function has a compiler barrier on ARM but not on
->> x86.
->>
-> My only concern is code duplication all across ST drivers.
-
-I really struggle to understand this. Why would anyone copy code out of
-the asc driver into the network driver (or any other ST driver)?
-
-
->> Since having asc_in/asc_out made it easy to portably make these changes
->> I decided is was better to be redundantly exemplary than conceal secret
->> portability issues.
-> Your change would fit in nicely with as asc_in/out are wrappers and fix
-> st-asc but this would be just for asc driver.
-> What about other drivers which fall in same category?
 > 
-> So I think we should just drop COMPILE_TEST and possibly make it
-> specific to ARM and SH or ARM only.
-
-I'm slightly uneasy about this primarily because all the rationale above
-describes a concern about drivers other than the one I seek to change.
-They ought to be outside the scope of this change.
-
-Nevertheless, since I said I don't feel that strongly about it, as you
-wish...
-
-I'll change this in v5.
+> -Tero
+> 
+>>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   arch/arm/boot/dts/dra7xx-clocks.dtsi |    8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> index 44993ec..e1bd052 100644
+>> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> @@ -1165,6 +1165,14 @@
+>>           reg = <0x021c>, <0x0220>;
+>>       };
+>>
+>> +    optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
+>> +        compatible = "ti,gate-clock";
+>> +        clocks = <&sys_32k_ck>;
+>> +        #clock-cells = <0>;
+>> +        reg = <0x13b0>;
+>> +        ti,bit-shift = <8>;
+>> +    };
+>> +
+>>       optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
+>>           compatible = "ti,divider-clock";
+>>           clocks = <&apll_pcie_ck>;
+>>
+> 
