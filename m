@@ -1,67 +1,52 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Jun 2014 16:27:32 +0300
-Subject: [PATCH v2 06/18] ARM: dts: DRA7: Add divider table to
- optfclk_pciephy_div clock
-In-Reply-To: <53A2DB81.5070105@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-7-git-send-email-kishon@ti.com> <53A2C52C.6020606@ti.com>
- <53A2DB81.5070105@ti.com>
-Message-ID: <53A2E544.1020605@ti.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 19 Jun 2014 14:29:59 +0100
+Subject: [STLinux Kernel] [PATCH 4/7] ARM: stih416-b2020e: Enable PWM on
+ the B2020 Rev-E
+In-Reply-To: <20140619112239.GC26560@lee--X1>
+References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
+ <1403103172-19856-4-git-send-email-lee.jones@linaro.org>
+ <20140619090546.GB2131@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20140619092042.GB26560@lee--X1>
+ <20140619101236.GA7390@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20140619112239.GC26560@lee--X1>
+Message-ID: <20140619132959.GA22592@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2014 03:45 PM, Kishon Vijay Abraham I wrote:
-> Hi Tero,
->
-> On Thursday 19 June 2014 04:40 PM, Tero Kristo wrote:
->> On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
->>> From: Keerthy <j-keerthy@ti.com>
->>>
->>> Add divider table to optfclk_pciephy_div clock. The Documentation
->>> for divider clock can be found at ../clock/ti/divider.txt
->>
->> This patch requires a better changelog. Why is the change done, any TRM refs etc.?
->
-> The 8th bit of CM_CLKMODE_APLL_PCIE can be programmed to either 0x0 or 0x1
-> based on if the divider value is 0x2 or 0x1.
->
-> Figure 26-21. PCIe PHY Clock Generator Overview in vE of DRA7xx ES1.0 shows the
-> block diagram of Clock Generator Subsystem of PCIe PHY module. We have to do a
-> bypass (divided by 1) in order to get the correct PCIE_PHY_DIV_GCLK
+Hi Lee,
 
-Yes, something like this on the changelog would be good.
+> > > Purely for testing purposes, as it's the only board I have.  If
+> > > anyone has the other revisions and would be happy to test the driver
+> > > for me then great.
+> > 
+> > Ok that's what I suspected.
+> > 
+> > If you tell me how, I can test on a Rev C board. But as there are several other 
+> > revisions I think checking the board schematics would be the quickest way forward.
+> 
+> Great.  Do you have a oscilloscope/logic analyser?
 
--Tero
+I have an old scope, and I've been wanting to buy a decent logic analyser ;-)
+Also can you email me the rev E schematic? I currently only have rev C.
 
-> frequency.
->
-> Thanks
-> Kishon
->>
->> -Tero
->>
->>>
->>> Cc: Rajendra Nayak <rnayak@ti.com>
->>> Cc: Tero Kristo <t-kristo@ti.com>
->>> Cc: Paul Walmsley <paul@pwsan.com>
->>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>    arch/arm/boot/dts/dra7xx-clocks.dtsi |    1 +
->>>    1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->>> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->>> index c767687..55e95c5 100644
->>> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->>> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->>> @@ -1170,6 +1170,7 @@
->>>            clocks = <&apll_pcie_ck>;
->>>            #clock-cells = <0>;
->>>            reg = <0x021c>;
->>> +        ti,dividers = <2>, <1>;
->>>            ti,bit-shift = <8>;
->>>            ti,max-div = <2>;
->>>        };
->>>
->>
+> > > > If you make the stih415 DT PWM nodes part of this series as well, then 
+> > > > assuming there is no good reason to the contary, the PWM could 
+> > > > be enabled for both stih415/6 in the common stih41x-b2020 DTS file which
+> > > > is also included by rev-E (assuming that PWM wiring is not some rev-E specific
+> > > > thing).
+> > 
+> > Can you add the stih415 bindings in V2 as well?
+> 
+> Who's using Orly1?
+
+I'll let ST answer that.
+
+AFAIK drivers upstreamed so far for Orly based hardware have generally been enabled for both
+SoCs, hence querying why the stih415 bindings are missing from this series.
+
+Being pinout compatible, a b2020 board can be populated with a stih415, so it seems strange 
+for it to then be missing PWM support given that the SoC, board and pwm driver all support it.
+
+regards,
+
+Peter.
