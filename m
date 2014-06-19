@@ -1,121 +1,95 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jun 2014 10:19:30 +0100
-Subject: [PATCH v5 07/20] KVM: ARM: vgic: abstract access to the ELRSR bitmap
+Date: Thu, 19 Jun 2014 10:19:35 +0100
+Subject: [PATCH v5 12/20] KVM: ARM: vgic: introduce vgic_enable
 In-Reply-To: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
 References: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403169583-13668-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403169583-13668-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the GICH_ELRSR access to its own functions, and add them to
-the vgic_ops structure.
+Move the code dealing with enabling the VGIC on to vgic_ops.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  2 ++
- virt/kvm/arm/vgic.c    | 38 +++++++++++++++++++++++++++++++++-----
- 2 files changed, 35 insertions(+), 5 deletions(-)
+ include/kvm/arm_vgic.h |  1 +
+ virt/kvm/arm/vgic.c    | 29 +++++++++++++++++++++--------
+ 2 files changed, 22 insertions(+), 8 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 17bbe51..38864f5 100644
+index f515800..2228973 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -84,6 +84,8 @@ struct vgic_lr {
- struct vgic_ops {
- 	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
- 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
-+	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
-+	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+@@ -99,6 +99,7 @@ struct vgic_ops {
+ 	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
+ 	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ 	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++	void	(*enable)(struct kvm_vcpu *vcpu);
  };
  
  struct vgic_dist {
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 11408fe..8b73cd6 100644
+index b097a2c..383db29 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1015,9 +1015,24 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
+@@ -1081,6 +1081,19 @@ static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
  }
  
-+static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
-+				  struct vgic_lr lr_desc)
++static void vgic_v2_enable(struct kvm_vcpu *vcpu)
 +{
-+	if (!(lr_desc.state & LR_STATE_MASK))
-+		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
-+}
++	/*
++	 * By forcing VMCR to zero, the GIC will restore the binary
++	 * points to their reset values. Anything else resets to zero
++	 * anyway.
++	 */
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
 +
-+static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
-+{
-+	const u32 *elrsr = vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
-+	return *(u64 *)elrsr;
++	/* Get the show on the road... */
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
 +}
 +
  static const struct vgic_ops vgic_ops = {
  	.get_lr			= vgic_v2_get_lr,
  	.set_lr			= vgic_v2_set_lr,
-+	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
-+	.get_elrsr		= vgic_v2_get_elrsr,
+@@ -1092,6 +1105,7 @@ static const struct vgic_ops vgic_ops = {
+ 	.disable_underflow	= vgic_v2_disable_underflow,
+ 	.get_vmcr		= vgic_v2_get_vmcr,
+ 	.set_vmcr		= vgic_v2_set_vmcr,
++	.enable			= vgic_v2_enable,
  };
  
  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1031,6 +1046,17 @@ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	vgic_ops.set_lr(vcpu, lr, vlr);
+@@ -1146,6 +1160,11 @@ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+ 	vgic_ops.set_vmcr(vcpu, vmcr);
  }
  
-+static void vgic_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
-+			       struct vgic_lr vlr)
++static inline void vgic_enable(struct kvm_vcpu *vcpu)
 +{
-+	vgic_ops.sync_lr_elrsr(vcpu, lr, vlr);
-+}
-+
-+static inline u64 vgic_get_elrsr(struct kvm_vcpu *vcpu)
-+{
-+	return vgic_ops.get_elrsr(vcpu);
++	vgic_ops.enable(vcpu);
 +}
 +
  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1260,7 +1286,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 			 * Despite being EOIed, the LR may not have
- 			 * been marked as empty.
- 			 */
--			set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr);
-+			vgic_sync_lr_elrsr(vcpu, lr, vlr);
- 		}
+@@ -1608,15 +1627,9 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 		vgic_cpu->vgic_irq_lr_map[i] = LR_EMPTY;
  	}
  
-@@ -1278,14 +1304,17 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	u64 elrsr;
-+	unsigned long *elrsr_ptr;
- 	int lr, pending;
- 	bool level_pending;
+-	/*
+-	 * By forcing VMCR to zero, the GIC will restore the binary
+-	 * points to their reset values. Anything else resets to zero
+-	 * anyway.
+-	 */
+-	vgic_cpu->vgic_v2.vgic_vmcr = 0;
+-
+ 	vgic_cpu->nr_lr = vgic_nr_lr;
+-	vgic_cpu->vgic_v2.vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
++
++	vgic_enable(vcpu);
  
- 	level_pending = vgic_process_maintenance(vcpu);
-+	elrsr = vgic_get_elrsr(vcpu);
-+	elrsr_ptr = (unsigned long *)&elrsr;
- 
- 	/* Clear mappings for empty LRs */
--	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr,
--			 vgic_cpu->nr_lr) {
-+	for_each_set_bit(lr, elrsr_ptr, vgic_cpu->nr_lr) {
- 		struct vgic_lr vlr;
- 
- 		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-@@ -1298,8 +1327,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	}
- 
- 	/* Check if we still have something up our sleeve... */
--	pending = find_first_zero_bit((unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr,
--				      vgic_cpu->nr_lr);
-+	pending = find_first_zero_bit(elrsr_ptr, vgic_cpu->nr_lr);
- 	if (level_pending || pending < vgic_cpu->nr_lr)
- 		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+ 	return 0;
  }
 -- 
 1.8.3.4
