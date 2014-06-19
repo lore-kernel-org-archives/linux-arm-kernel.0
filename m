@@ -1,43 +1,49 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 19 Jun 2014 13:52:23 +0100
-Subject: [PATCH 14/24] ARM64:ILP32: COMPAT_USE_64BIT_TIME is true for
- ILP32 tasks.
-In-Reply-To: <1400914939-9708-15-git-send-email-apinski@cavium.com>
+Date: Thu, 19 Jun 2014 13:54:08 +0100
+Subject: [PATCH 15/24] ARM64:ILP32: Use the non compat HWCAP for ILP32.
+In-Reply-To: <1400914939-9708-16-git-send-email-apinski@cavium.com>
 References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <1400914939-9708-15-git-send-email-apinski@cavium.com>
-Message-ID: <20140619125223.GC8476@arm.com>
+ <1400914939-9708-16-git-send-email-apinski@cavium.com>
+Message-ID: <20140619125408.GD8476@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 24, 2014 at 12:02:09AM -0700, Andrew Pinski wrote:
-> Since __kernel_long_t (time_t) is long long, we need to tell the rest
-> of kernel that we use 64bit time_t for compat when the task is not an
-> AARCH32 task.  The reason why we check AARCH32 rather than ILP32 here
-> is because if we don't have AARCH32 compiled in (which is going to be
-> the common case due to AARCH32 requiring 4k pages).
-> 
-> Thanks,
-> Andrew Pinski
-> 
+On Sat, May 24, 2014 at 12:02:10AM -0700, Andrew Pinski wrote:
 > Signed-off-by: Andrew Pinski <apinski@cavium.com>
+
+Please add some commit log, even if minimal.
+
 > ---
->  arch/arm64/include/asm/compat.h |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+>  arch/arm64/include/asm/hwcap.h |   12 ++++++++++--
+>  1 files changed, 10 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-> index 85f945c..c77fc0f 100644
-> --- a/arch/arm64/include/asm/compat.h
-> +++ b/arch/arm64/include/asm/compat.h
-> @@ -76,6 +76,9 @@ struct compat_timeval {
->  	s32		tv_usec;
->  };
+> diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+> index 024c461..cb87f91 100644
+> --- a/arch/arm64/include/asm/hwcap.h
+> +++ b/arch/arm64/include/asm/hwcap.h
+> @@ -46,9 +46,17 @@
+>  #define ELF_HWCAP		(elf_hwcap)
 >  
-> +/* ILP32 uses 64bit time_t and not the above compat structures */
-> +#define COMPAT_USE_64BIT_TIME !is_a32_compat_task()
+>  #ifdef CONFIG_COMPAT
+> -#define COMPAT_ELF_HWCAP	(compat_elf_hwcap)
+> -#define COMPAT_ELF_HWCAP2	(compat_elf_hwcap2)
+>  extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
+> +#define COMPAT_ELF_HWCAP	\
+> +	(is_a32_compat_task()	\
+> +	  ? compat_elf_hwcap	\
+> +	  : elf_hwcap)
+> +
+> +#define COMPAT_ELF_HWCAP2	\
+> +	(is_a32_compat_task()	\
+> +	  ? compat_elf_hwcap2	\
+> +	  : 0)
+> +
+>  #endif
+>  
+>  extern unsigned long elf_hwcap;
 
-Brackets.
-
-BTW, you could write is_ilp32_compat_task().
+Do any extra headers need to be included? It looks like we rely on the
+code including hwcap.h to have the correct headers.
 
 -- 
 Catalin
