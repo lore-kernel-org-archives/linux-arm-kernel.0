@@ -1,150 +1,45 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Thu, 19 Jun 2014 16:30:19 +0530
-Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
- udelay
-In-Reply-To: <53A2BBD0.3050106@linaro.org>
-References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
- <53A2A936.3070109@linaro.org>
- <CADGdYn6YObHdRq6A9-L7qbD+EYiPrwhrKkLwyA5Z=0tDoWUzvA@mail.gmail.com>
- <53A2BBD0.3050106@linaro.org>
-Message-ID: <CADGdYn67L9StxiojQN0c5rwgDo6jLNOS9uWyj__B6ViGRm080A@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 19 Jun 2014 14:10:36 +0300
+Subject: [PATCH v2 06/18] ARM: dts: DRA7: Add divider table to
+ optfclk_pciephy_div clock
+In-Reply-To: <1401345500-20188-7-git-send-email-kishon@ti.com>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-7-git-send-email-kishon@ti.com>
+Message-ID: <53A2C52C.6020606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 4:00 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 06/19/2014 12:21 PM, amit daniel kachhap wrote:
->>
->> On Thu, Jun 19, 2014 at 2:41 PM, Daniel Lezcano
->> <daniel.lezcano@linaro.org> wrote:
->>>
->>> On 06/19/2014 10:39 AM, Amit Daniel Kachhap wrote:
->>>>
->>>>
->>>> This patch register the exynos mct clocksource as the current timer
->>>> as it has constant clock rate. This will generate correct udelay for the
->>>> exynos platform and avoid using unnecessary calibrated jiffies. This
->>>> change
->>>> has been tested on exynos5420 based board and udelay is very close to
->>>> expected.
->>>>
->>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>> ---
->>>> Changes in V2:
->>>> * Added #defines for ARM and ARM64 as pointed by Doug Anderson.
->>>>
->>>> Patches from David Riley confirmed that udelay is broken in exynos5420.
->>>> Link to those patches are,
->>>> 1) https://patchwork.kernel.org/patch/4344911/
->>>> 2) https://patchwork.kernel.org/patch/4344881/
->>>>
->>>>    drivers/clocksource/exynos_mct.c | 15 +++++++++++++++
->>>>    1 file changed, 15 insertions(+)
->>>>
->>>> diff --git a/drivers/clocksource/exynos_mct.c
->>>> b/drivers/clocksource/exynos_mct.c
->>>> index f71d55f..02927e2 100644
->>>> --- a/drivers/clocksource/exynos_mct.c
->>>> +++ b/drivers/clocksource/exynos_mct.c
->>>> @@ -195,10 +195,25 @@ static u64 notrace exynos4_read_sched_clock(void)
->>>>          return exynos4_frc_read(&mct_frc);
->>>>    }
->>>>
->>>> +static struct delay_timer exynos4_delay_timer;
->>>> +
->>>> +static unsigned long exynos4_read_current_timer(void)
->>>> +{
->>>> +#ifdef ARM
->>>> +       return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
->>>> +#else /* ARM64, etc */
->>>> +       return exynos4_frc_read(&mct_frc);
->>>> +#endif
->>>> +}
->>>> +
->>>
->>>
->>>
->>> There isn't another solution than that ? macros definitions in C file are
->>> avoided as much as possible.
->>
->> I also didn't want to use macros but used as a last option. you want
->> me to put more comments here?
->> Or something like below is also possible for checking the size of
->> (unsigned long) in runtime.
->>
->> unsigned long x;
->> unsigned int size = (char *)(&x + 1) - (char *)(&x);
->> if (size == 4)
->>             return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
->> else
->>             return exynos4_frc_read(&mct_frc);
->>
->> But this involves extra computation which should not be used for time
->> critical functions.
->> Any suggestion?
+On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
+> From: Keerthy <j-keerthy@ti.com>
 >
+> Add divider table to optfclk_pciephy_div clock. The Documentation
+> for divider clock can be found at ../clock/ti/divider.txt
+
+This patch requires a better changelog. Why is the change done, any TRM 
+refs etc.?
+
+-Tero
+
 >
-> AFAIU, Doug may change the exynos4_frc_read to be 32 bits. So may not need
-> those macros as 'exynos4_frc_read' could be used instead.
-right, its better to wait till those patches are out.
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi |    1 +
+>   1 file changed, 1 insertion(+)
 >
-> Doug may confirm this.
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index c767687..55e95c5 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -1170,6 +1170,7 @@
+>   		clocks = <&apll_pcie_ck>;
+>   		#clock-cells = <0>;
+>   		reg = <0x021c>;
+> +		ti,dividers = <2>, <1>;
+>   		ti,bit-shift = <8>;
+>   		ti,max-div = <2>;
+>   	};
 >
->
->>>>    static void __init exynos4_clocksource_init(void)
->>>>    {
->>>>          exynos4_mct_frc_start();
->>>>
->>>> +       exynos4_delay_timer.read_current_timer =
->>>> &exynos4_read_current_timer;
->>>
->>>
->>>
->>> &exynos4_read_current_timer ?
->>
->> Any issue in the naming?
->
->
-> No problem with the naming. As Tomasz pointed also, you are passing '&' for
-> the function pointer.
-yes my mistake.
->
->
->>>> +       exynos4_delay_timer.freq = clk_rate;
->>>> +       register_current_timer_delay(&exynos4_delay_timer);
->>>> +
->>>>          if (clocksource_register_hz(&mct_frc, clk_rate))
->>>>                  panic("%s: can't register clocksource\n",
->>>> mct_frc.name);
->>>>
->>>>
->>>
->>>
->>> --
->>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>>
->>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->>> <http://twitter.com/#!/linaroorg> Twitter |
->>> <http://www.linaro.org/linaro-blog/> Blog
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe
->>> linux-samsung-soc"
->>> in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
