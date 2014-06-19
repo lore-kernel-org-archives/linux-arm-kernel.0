@@ -1,26 +1,72 @@
-From: guido@vanguardiasur.com.ar (Guido =?iso-8859-1?Q?Mart=EDnez?=)
-Date: Thu, 19 Jun 2014 13:25:39 -0300
-Subject: [PATCH/RESEND 0/9] drm: tilcdc driver fixes
-In-Reply-To: <53A2E897.1030206@ti.com>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
- <53A2E897.1030206@ti.com>
-Message-ID: <20140619162538.GA29661@fox>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 19 Jun 2014 18:24:58 +0200
+Subject: [PATCH] ARM: mvebu: Fix missing binding documentation for Armada
+ 38x
+In-Reply-To: <CAL_Jsq+JyngWXvk6ZzV8LPfGqVMDPyouJsADaokAGzgHv=gphQ@mail.gmail.com>
+References: <1403186871-28204-1-git-send-email-gregory.clement@free-electrons.com>
+ <CAL_Jsq+JyngWXvk6ZzV8LPfGqVMDPyouJsADaokAGzgHv=gphQ@mail.gmail.com>
+Message-ID: <53A30EDA.7050407@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Darren,
+Hi Rob,
 
-On Thu, Jun 19, 2014 at 08:41:43AM -0500, Darren Etheridge wrote:
-> Guido,
+On 19/06/2014 16:54, Rob Herring wrote:
+> On Thu, Jun 19, 2014 at 9:07 AM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>> For the Armada 380 and Armada 385 SoCs, the common bindings for those
+>> 2 SoCs, was forgotten. This patch add the documentation for the
+>> marvell,aramda38x property.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>> Hi,
+>>
+>> This fix should be merged in 3.16. For 3.15 I am not sure as it is not
+>> a regression.
+>>
+>> Thanks,
+>> Gregory
+>>
+>>  Documentation/devicetree/bindings/arm/armada-38x.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
+>> index 11f2330a6554..b68bcb80d2de 100644
+>> --- a/Documentation/devicetree/bindings/arm/armada-38x.txt
+>> +++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
+>> @@ -6,5 +6,9 @@ following property:
+>>
+>>  Required root node property:
+>>
+>> +compatible: must contain "marvell,armada38x"
+>> +
+>> +Required root node property:
+>> +
+>>   - compatible: must contain either "marvell,armada380" or
+>>     "marvell,armada385" depending on the variant of the SoC being used.
 > 
-> Thanks and sorry I missed this the first time around.  I'll give it a try on
-> a few of my AM335x based boards when I have access to them again on Monday.
-Thanks! And no worries :)
+> This looks a bit strange. How about something like this:
+> 
+>    - compatible: must contain either "marvell,armada380" or
+>      "marvell,armada385" depending on the variant of the SoC being
+> used and contain "marvell,armada38x".
+
+Indeed it will be more clear written in this way.
+
+
+Thanks,
+
+Gregory
+
 
 > 
-> Darren
+> Rob
 > 
+
+
 -- 
-Guido Mart?nez, VanguardiaSur
-www.vanguardiasur.com.ar
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
