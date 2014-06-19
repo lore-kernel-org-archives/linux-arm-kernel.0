@@ -1,95 +1,128 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 19 Jun 2014 20:20:35 +0200
-Subject: [PATCH v3 09/14] regmap: Add regmap_reg_copy function
+Date: Thu, 19 Jun 2014 20:20:34 +0200
+Subject: [PATCH v3 08/14] mfd: max77802: Add DT binding documentation
 In-Reply-To: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1403202040-12641-10-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403202040-12641-9-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some device drivers using the register map API need to copy the
-value from one register to another. Even though it can be done
-with a combination of regmap_read() and regmap_write(), it is
-better to have a function to avoid code duplication, sanity check
-passed values and do it atomically by holding the regmap lock.
+Add Device Tree binding documentation for Maxim 77802 PMIC.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- drivers/base/regmap/regmap.c | 34 ++++++++++++++++++++++++++++++++++
- include/linux/regmap.h       |  9 +++++++++
- 2 files changed, 43 insertions(+)
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 74d8c06..a2e0b04 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -2555,6 +2555,40 @@ int regmap_parse_val(struct regmap *map, const void *buf,
- }
- EXPORT_SYMBOL_GPL(regmap_parse_val);
- 
-+/**
-+ * regmap_reg_copy(): Copy a value from a single register to another one
-+ *
-+ * @map: Register map to operate on
-+ * @dest: Register to copy the value to
-+ * @src: Register to copy the value from
-+ *
-+ * A value of zero will be returned on success, a negative errno will
-+ * be returned in error cases.
-+ */
-+int regmap_reg_copy(struct regmap *map, unsigned int dest, unsigned int src)
-+{
-+	int val;
-+	int ret = 0;
+Changes since v2:
+ - Explain better the Dynamic Voltage Scaling (DVS) support in some Buck
+   regulators and the max77802,pmic-buck-{dvs,selb}-gpios properties.
+   Suggested by Mark Brown.
+
+ Documentation/devicetree/bindings/mfd/max77802.txt | 97 ++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+
+diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
+new file mode 100644
+index 0000000..f3b67c5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/max77802.txt
+@@ -0,0 +1,97 @@
++Maxim MAX77802 multi-function device
 +
-+	if (dest == src)
-+		return ret;
++MAX77802 is a Mulitifunction device with PMIC, RTC and Charger on chip. It is
++interfaced to host controller using i2c interface. PMIC, Charger and RTC
++submodules are addressed using same i2c slave address.
 +
-+	if (dest % map->reg_stride ||
-+	    src % map->reg_stride)
-+		return -EINVAL;
++Buck regulators 1, 2, 3, 4 and 6 include Dynamic Voltage Scaling (DVS) that
++allows each output voltage to change dynamically. Each Buck output voltage
++is selected using a set of external inputs: DVS1-3 and SELB1, 2, 3 and 6.
 +
-+	map->lock(map->lock_arg);
++There are 8 DVS registers that can be used to configure the output voltage
++for each Buck regulator and which one is active is controled by DVSx lines.
 +
-+	ret = _regmap_read(map, src, &val);
-+	if (!ret)
-+		ret = _regmap_write(map, dest, val);
++SELBx lines are used to control if individual Buck lines are ON or OFF.
 +
-+	map->unlock(map->lock_arg);
++This document describes the binding for mfd device and PMIC submodule.
 +
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(regmap_reg_copy);
++Binding for the built-in 32k clock generator block is defined separately
++in bindings/clk/maxim,max77802.txt file.
 +
- static int __init regmap_initcall(void)
- {
- 	regmap_debugfs_initcall();
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index 7b0e4b4..116c22b 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -445,6 +445,8 @@ int regmap_register_patch(struct regmap *map, const struct reg_default *regs,
- int regmap_parse_val(struct regmap *map, const void *buf,
- 				unsigned int *val);
- 
-+int regmap_reg_copy(struct regmap *map, unsigned int dest, unsigned int src);
++Required properties:
++- compatible : Must be "maxim,max77802";
++- reg : Specifies the i2c slave address of PMIC block.
++- interrupts : This i2c device has an IRQ line connected to the main SoC.
++- interrupt-parent : The parent interrupt controller.
 +
- static inline bool regmap_reg_in_range(unsigned int reg,
- 				       const struct regmap_range *range)
- {
-@@ -723,6 +725,13 @@ static inline int regmap_parse_val(struct regmap *map, const void *buf,
- 	return -EINVAL;
- }
- 
-+static inline int regmap_reg_copy(struct regmap *map, unsigned int dest,
-+				  unsigned int src)
-+{
-+	WARN_ONCE(1, "regmap API is disabled");
-+	return -EINVAL;
-+}
++Optional properties:
++- max77802,pmic-buck-default-dvs-idx: We'll always write this DVS index in the
++  PMIC for Bucks with DVS.
++  NOTE: at the moment these bindings don't include enough details for actual
++  GPIO-DVS--this just lets you choose which single slot to use.
 +
- static inline struct regmap *dev_get_regmap(struct device *dev,
- 					    const char *name)
- {
++- max77802,pmic-buck-dvs-gpios: A GPIO array where each GPIO is connected to a
++  DVS line. We'll try to set these GPIOs to match pmic-buck-default-dvs-idx at
++  probe time if they are defined. If some or all of these GPIOs are not defined
++  it's assumed that the board has any missing GPIOs hardwired to match
++  pmic-buck-default-dvs-idx.
++
++- max77802,pmic-buck-selb-gpios: A GPIO array where each GPIO is connected to a
++  SELBx line. Should be five values: 1, 2, 3, 4, 6. It is strongly suggested to
++  include these GPIOs if there's any chance that changing DVS GPIOs one line at
++  a time might glitch your DVS values.
++
++Optional node:
++- regulators : The regulators of max77802 have to be instantiated
++  under subnode named "regulators" using the following format.
++
++	regulator_name {
++		standard regulator constraints....
++	};
++	refer Documentation/devicetree/bindings/regulator/regulator.txt
++
++  The regulator node name should be initialized with a string
++to get matched with their hardware counterparts as follow:
++
++	-LDOn 	:	for LDOs, where n can lie in range 1 to 35.
++			example: LDO1, LDO2, LDO35.
++	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 10.
++			example: BUCK1, BUCK5, BUCK10.
++Example:
++
++	max77802 at 09 {
++		compatible = "maxim,max77802";
++		interrupt-parent = <&wakeup_eint>;
++		interrupts = <26 0>;
++		reg = <0x09>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		max77802,pmic-buck-default-dvs-idx = <1>;
++		max77802,pmic-buck-dvs-gpios = <&gpy7 6 0>,
++					       <&gpj4 2 0>,
++					       <&gpj4 3 0>;
++		max77802,pmic-buck-selb-gpios = <&gph0 2 0>,
++						<&gph0 3 0>,
++						<&gph0 4 0>,
++						<&gph0 5 0>,
++						<&gph0 6 0>;
++
++		regulators {
++			ldo11_reg: LDO11 {
++				regulator-compatible = "LDO11";
++				regulator-name = "vdd_ldo11";
++				regulator-min-microvolt = <1900000>;
++				regulator-max-microvolt = <1900000>;
++				regulator-always-on;
++			};
++
++			buck1_reg {
++				regulator-compatible = "BUCK1";
++				regulator-name = "vdd_mif";
++				regulator-min-microvolt = <950000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++	};
 -- 
 2.0.0.rc2
