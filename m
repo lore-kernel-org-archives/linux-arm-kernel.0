@@ -1,55 +1,59 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Thu, 19 Jun 2014 18:54:56 +0800
-Subject: [PATCH] arm64: add the ability to hook the fault code
-Message-ID: <1403175296-25181-1-git-send-email-zhangwm@marvell.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Jun 2014 11:56:58 +0100
+Subject: [PATCHv2 2/4] arm64: cpuinfo: print info for all CPUs
+In-Reply-To: <20140618171519.GF17851@arm.com>
+References: <1403024674-25108-1-git-send-email-mark.rutland@arm.com>
+ <1403024674-25108-3-git-send-email-mark.rutland@arm.com>
+ <20140618171519.GF17851@arm.com>
+Message-ID: <20140619105658.GB22217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ability to hook the fault code for future use.
+On Wed, Jun 18, 2014 at 06:15:20PM +0100, Will Deacon wrote:
+> On Tue, Jun 17, 2014 at 06:04:32PM +0100, Mark Rutland wrote:
+> > Currently reading /proc/cpuinfo will result in information being read
+> > out of the MIDR_EL1 of the current CPU, and the information is not
+> > associated with any particular logical CPU number.
+> > 
+> > This is problematic for systems with heterogeneous CPUs (i.e.
+> > big.LITTLE) where fields will vary across CPUs, and the output will
+> > differ depending on the executing CPU. Additionally the output is
+> > different in format to the 32-bit ARM Linux port, where information is
+> > printed out for each CPU.
+> > 
+> > This patch adds the necessary infrastructure to log the relevant
+> > registers (currently just MIDR_EL1) and print out the logged
+> > information.
+> 
+> [...]
+> 
+> > diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+> > new file mode 100644
+> > index 0000000..74bf9bb
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/cpu.h
+> > @@ -0,0 +1,30 @@
+> > +/*
+> > + *  arch/arm/include/asm/cpu.h
+> > + *
+> > + *  Copyright (C) 2004-2014 ARM Ltd.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +#ifndef __ASM_ARM64_CPU_H
+> > +#define __ASM_ARM64_CPU_H
+> 
+> We're trying to have a consistent style for these guards, so please use
+> __ASM_CPU_H here instead.
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
----
- arch/arm64/include/asm/system_misc.h |    4 ++++
- arch/arm64/mm/fault.c                |   12 ++++++++++++
- 2 files changed, 16 insertions(+)
+Done (also added /* __ASM_CPU_H */ to the #endif for consistency).
 
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 7a18fab..a8c19dd 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -37,6 +37,10 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
- 					     struct pt_regs *),
- 			   int sig, int code, const char *name);
- 
-+void hook_fault_code(int nr,
-+		int (*fn)(unsigned long, unsigned int, struct pt_regs *),
-+		int sig, int code, const char *name);
-+
- struct mm_struct;
- extern void show_pte(struct mm_struct *mm, unsigned long addr);
- extern void __show_regs(struct pt_regs *);
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index bcc965e..7902fb6 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -447,6 +447,18 @@ static const char *fault_name(unsigned int esr)
- 	return inf->name;
- }
- 
-+void __init hook_fault_code(int nr,
-+		int (*fn)(unsigned long, unsigned int, struct pt_regs *),
-+		int sig, int code, const char *name)
-+{
-+	BUG_ON(nr < 0 || nr >= ARRAY_SIZE(fault_info));
-+
-+	fault_info[nr].fn   = fn;
-+	fault_info[nr].sig  = sig;
-+	fault_info[nr].code = code;
-+	fault_info[nr].name = name;
-+}
-+
- /*
-  * Dispatch a data abort to the relevant handler.
-  */
--- 
-1.7.9.5
+> That said, does this actually need to be in a header file? If you move
+> cpuinfo_store_cpu into setup.c, this structure can be private to that
+> file, no?
+
+Per your comments on patch 3 I'll ignore this :)
+
+Mark.
