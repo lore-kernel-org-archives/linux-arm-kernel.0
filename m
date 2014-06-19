@@ -1,81 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jun 2014 13:28:31 +0100
-Subject: [PATCH 23/38] mmc: sdhci: convert sdhci_set_uhs_signaling()
- into a library function
-In-Reply-To: <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2Wd-0003vp-S2@rmk-PC.arm.linux.org.uk>
- <20140616104615.GA10701@n2100.arm.linux.org.uk>
- <CAPDyKFrp8JokqBbo3rg2i6WYykU1C9CuPF0FL7AOHh=Gcp5=hg@mail.gmail.com>
-Message-ID: <20140619122830.GP32514@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Jun 2014 13:33:19 +0100
+Subject: [PATCHv2 4/4] arm64: add runtime system sanity checks
+In-Reply-To: <20140618172036.GH17851@arm.com>
+References: <1403024674-25108-1-git-send-email-mark.rutland@arm.com>
+ <1403024674-25108-5-git-send-email-mark.rutland@arm.com>
+ <20140618172036.GH17851@arm.com>
+Message-ID: <20140619123319.GD22217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 02:17:30PM +0200, Ulf Hansson wrote:
-> Anyway, we did get some folks to test the patches and was thus fairly
-> confident that we could merge them. Chris asked me to try to collect
-> them in a PR for him, so I did. Sorry if I managed to screw some
-> things up, there were several conflicts and actual regressions, which
-> I tried to take care of.
+On Wed, Jun 18, 2014 at 06:20:36PM +0100, Will Deacon wrote:
+> On Tue, Jun 17, 2014 at 06:04:34PM +0100, Mark Rutland wrote:
+> > Unexpected variation in certain system register values across CPUs is an
+> > indicator of potential problems with a system. The kernel expects CPUs
+> > to be mostly identical in terms of supported features, even in systems
+> > with heterogeneous CPUs, with uniform instruction set support being
+> > critical for the correct operation of userspace.
+> > 
+> > To help detect issues early where hardware violates the expectations of
+> > the kernel, this patch adds simple runtime sanity checks on important ID
+> > registers in the bring up path of each CPU.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > 
-> The mmc people were also very helping in sending patches to fixup
-> related regressions, immediately after we merged your patchset. Thus
-> together I think we managed to pull it off.
+> [...]
+> 
+> > +/*
+> > + * Verify that CPUs don't have unexpected differences that will cause problems.
+> > + */
+> > +void cpuinfo_sanity_check(struct cpuinfo_arm64 *cur)
+> > +{
+> > +	struct cpuinfo_arm64 *boot = &per_cpu(cpu_data, 0);
+> > +	int cpu = smp_processor_id();
+> 
+> You could just as easily pass in the cpu number here, like you do for
+> cpuinfo_detect_icache_policy.
 
-I tend to look through slightly less rose-tinted glasses.
+Sure; done.
 
-The fact is... there's loads of ARM platforms which now fail in Olof's
-build/boot testing, and they all seem to have a very similar pattern:
-
-hummingboard:
-[    1.149688] sdhci: Secure Digital Host Controller Interface driver
-[    1.155901] sdhci: Copyright(c) Pierre Ossman
-...
-[    1.253630] Waiting for root device /dev/mmcblk0p2...
-[   60.325469] imx-sdma 20ec000.sdma: firmware not found
-~$off
-# PYBOOT: Exception: timeout
-
-jetson:
-[    2.261355] Waiting for root device /dev/mmcblk0p1...
-
-wandboard:
-[    1.186870] sdhci: Secure Digital Host Controller Interface driver
-[    1.193075] sdhci: Copyright(c) Pierre Ossman
-...
-[    1.291064] Waiting for root device /dev/mmcblk0p2...
-
-Whether these are caused by the patch set or not is anyone's guess,
-because we (a) don't know what's causing these failures, and (b)
-my patch series was never tested on anything but iMX6.
-
-I'm pretty certain that the hummingboard failure is not related to
-my series as that's one of the platforms I did test my series on.
-
-There's more failures which look like possibly something in core MMC is
-rather screwed, as OMAP5 (which doesn't use SDHCI) is also failing at
-a similar point.
-
-What these failures /do/ mean is that when I'm pushing my ARM for-next
-branch out, Olof's builder picks it up and runs a build across it, and
-the report returns a whole load of failures.  A whole load of failures
-means that those platforms haven't tested my changes, which means the
-quality of testing is much lower than it should be.
-
-With 26 passing and 15 failing, that's over 1/3 of platforms failing,
-which means 1/3 aren't getting tested.
-
-This level of failure has been going on for quite a while now, and (afaik)
-it remains uninvestigated and undiagnosed.  (This is one of the complaints
-I have about Olof's build/boot test system, much of the information about
-the build and boot is hidden away and unpublished, which makes it almost
-impossible for third parties to diagnose any problem there.  I've given up
-looking at most of Olof's build/boot mails because of this - it's just
-not interesting to see the same abbreviated boot failure logs which give
-no useful information time and time again.)
-
-We need to get on top of these failures and get them sorted.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Mark.
