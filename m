@@ -1,85 +1,86 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jun 2014 10:21:28 +0100
-Subject: [PATCH v2 4/9] arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
+Date: Thu, 19 Jun 2014 10:21:27 +0100
+Subject: [PATCH v2 3/9] arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
 In-Reply-To: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
 References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403169693-13982-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403169693-13982-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have the information about the number of CPU interfaces in
-the distributor itself. Let's get rid of VGIC_MAX_CPUS, and just
-rely on KVM_MAX_VCPUS where we don't have the choice. Yet.
+Having a dynamic number of supported interrupts means that we
+cannot relly on VGIC_NR_SHARED_IRQS being fixed anymore.
+
+Instead, make it take the distributor structure as a parameter,
+so it can return the right value.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/arm.c     | 2 +-
- include/kvm/arm_vgic.h | 3 +--
- virt/kvm/arm/vgic.c    | 6 +++---
- 3 files changed, 5 insertions(+), 6 deletions(-)
+ include/kvm/arm_vgic.h |  1 -
+ virt/kvm/arm/vgic.c    | 16 +++++++++++-----
+ 2 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9548bc9..14ba035 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -811,7 +811,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	switch (ioctl) {
- 	case KVM_CREATE_IRQCHIP: {
- 		if (vgic_present)
--			return kvm_vgic_create(kvm, VGIC_MAX_CPUS, VGIC_NR_IRQS);
-+			return kvm_vgic_create(kvm, KVM_MAX_VCPUS, VGIC_NR_IRQS);
- 		else
- 			return -ENXIO;
- 	}
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b5072b7..5853a67 100644
+index c57ffd0..b5072b7 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -29,13 +29,12 @@
+@@ -29,7 +29,6 @@
  #define VGIC_NR_SGIS		16
  #define VGIC_NR_PPIS		16
  #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
--#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
+-#define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
+ #define VGIC_MAX_CPUS		KVM_MAX_VCPUS
  
  #define VGIC_V2_MAX_LRS		(1 << 6)
- #define VGIC_V3_MAX_LRS		16
- 
- /* Sanity checks... */
--#if (VGIC_MAX_CPUS > 8)
-+#if (KVM_MAX_VCPUS > 8)
- #error	Invalid number of CPU interfaces
- #endif
- 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 4b1f0a6..07b6450 100644
+index 220b215..4b1f0a6 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1184,7 +1184,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
- 
- 	sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
- 
--	for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
-+	for_each_set_bit(c, &sources, dist->nr_cpus) {
- 		if (vgic_queue_irq(vcpu, c, irq))
- 			clear_bit(c, &sources);
+@@ -973,11 +973,17 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
  	}
-@@ -1564,7 +1564,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 	if (ret)
- 		return ret;
- 
--	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
-+	if (vcpu->vcpu_id >= dist->nr_cpus)
- 		return -EBUSY;
- 
- 	for (i = 0; i < VGIC_NR_IRQS; i++) {
-@@ -2193,7 +2193,7 @@ static void vgic_destroy(struct kvm_device *dev)
- 
- static int vgic_create(struct kvm_device *dev, u32 type)
- {
--	return kvm_vgic_create(dev->kvm, VGIC_MAX_CPUS, VGIC_NR_IRQS);
-+	return kvm_vgic_create(dev->kvm, KVM_MAX_VCPUS, VGIC_NR_IRQS);
  }
  
- struct kvm_device_ops kvm_arm_vgic_v2_ops = {
++static int vgic_nr_shared_irqs(struct vgic_dist *dist)
++{
++	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
++}
++
+ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	unsigned long *pending, *enabled, *pend_percpu, *pend_shared;
+ 	unsigned long pending_private, pending_shared;
++	int shared = vgic_nr_shared_irqs(dist);
+ 	int vcpu_id;
+ 
+ 	vcpu_id = vcpu->vcpu_id;
+@@ -990,15 +996,15 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+ 
+ 	pending = vgic_bitmap_get_shared_map(&dist->irq_state);
+ 	enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
+-	bitmap_and(pend_shared, pending, enabled, VGIC_NR_SHARED_IRQS);
++	bitmap_and(pend_shared, pending, enabled, shared);
+ 	bitmap_and(pend_shared, pend_shared,
+ 		   vgic_bitmap_get_shared_map(&dist->irq_spi_target[vcpu_id]),
+-		   VGIC_NR_SHARED_IRQS);
++		   shared);
+ 
+ 	pending_private = find_first_bit(pend_percpu, VGIC_NR_PRIVATE_IRQS);
+-	pending_shared = find_first_bit(pend_shared, VGIC_NR_SHARED_IRQS);
++	pending_shared = find_first_bit(pend_shared, shared);
+ 	return (pending_private < VGIC_NR_PRIVATE_IRQS ||
+-		pending_shared < VGIC_NR_SHARED_IRQS);
++		pending_shared < vgic_nr_shared_irqs(dist));
+ }
+ 
+ /*
+@@ -1255,7 +1261,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	/* SPIs */
+-	for_each_set_bit(i, vgic_cpu->pending_shared, VGIC_NR_SHARED_IRQS) {
++	for_each_set_bit(i, vgic_cpu->pending_shared, vgic_nr_shared_irqs(dist)) {
+ 		if (!vgic_queue_hwirq(vcpu, i + VGIC_NR_PRIVATE_IRQS))
+ 			overflow = 1;
+ 	}
 -- 
 1.8.3.4
