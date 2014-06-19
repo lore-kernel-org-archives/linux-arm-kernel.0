@@ -1,70 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jun 2014 15:13:25 +0100
-Subject: [PATCH v2] ARM: KVM: add irqfd and irq routing support
-In-Reply-To: <20140605143950.GA10079@lvm>
-References: <1401694196-30861-1-git-send-email-eric.auger@linaro.org>
- <20140605102831.GA3994@lvm> <53906D63.9040508@linaro.org>
- <20140605143950.GA10079@lvm>
-Message-ID: <20140619141325.GB15659@arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 19 Jun 2014 10:15:40 -0400
+Subject: [PATCH] ahci: imx: manage only sata_ref_clk in
+ imx_sata_enable[disable]
+In-Reply-To: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
+References: <1401289539-3485-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140619141540.GB26904@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-I'm currently adding VFIO support for kvmtool, so I'm interested in this
-patch series (although actually from a PCI perspective).
-
-Eric: can you CC me on future versions of this series please? Once things
-start to stabilise, I can help with testing.
-
-On Thu, Jun 05, 2014 at 03:39:50PM +0100, Christoffer Dall wrote:
-> On Thu, Jun 05, 2014 at 03:15:15PM +0200, Eric Auger wrote:
-> > On 06/05/2014 12:28 PM, Christoffer Dall wrote:
-> > > On Mon, Jun 02, 2014 at 09:29:56AM +0200, Eric Auger wrote:
-> > >> +                  kvm_debug("Inject irqchip routed vIRQ %d\n",
-> > >> +                                  e->irqchip.pin);
-> > >> +                  kvm_vgic_inject_irq(kvm, 0, spi, level);
-> > >> +                  /*
-> > >> +                   * toggling down vIRQ wire is directly handled in
-> > >> +                   * process_maintenance for this reason:
-> > >> +                   * irqfd_resampler_ack is called in
-> > >> +                   * process_maintenance which holds the dist lock.
-> > >> +                   * irqfd_resampler_ack calls kvm_set_irq
-> > >> +                   * which ends_up calling kvm_vgic_inject_irq.
-> > >> +                   * This later attempts to take the lock -> deadlock!
-> > >> +                   */
-> > >
-> > > Not sure I understand this comment.  What are we trying to achieve, are
-> > > we using some sort of a workaround to avoid a deadlock?
-> >
-> > What I wanted to point out here is I would have prefered to handle both
-> > levels 0 and 1 in a symetrical manner. irqfd_resampler_ack (in eventfd)
-> > is calling kvm_set_irq with level 0. This would be the prefered way to
-> > toggle down the SPI at GIC input instead of doing this in
-> > process_maintenance in a dirty manner. However this does work because
-> > irqfd_resampler_ack is called in process_maintenance (the place where
-> > the EOI is analyzed). process_maintenance holds the dist lock and would
-> > eventually call kvm_vgic_inject_irq which also attempts to take the lock.
-> >
+On Wed, May 28, 2014 at 11:05:39PM +0800, Shawn Guo wrote:
+> Doing suspend/resume on imx6q and imx53 boards with no SATA disk
+> attached will trigger the following warning.
 > 
-> I'm afraid that's too much of a hack.  There's an external mechanism to
-> set an interrupt line to active (level=1) or inactive (level=0) and we
-> must support both.
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 661 at drivers/ata/libahci.c:224 ahci_enable_ahci+0x74/0x8)
+> Modules linked in:
+> CPU: 0 PID: 661 Comm: sh Tainted: G        W     3.15.0-rc5-next-20140521-000027
+> Backtrace:
+> [<80011c90>] (dump_backtrace) from [<80011e2c>] (show_stack+0x18/0x1c)
+>  r6:803a22f4 r5:00000000 r4:00000000 r3:00000000
+> [<80011e14>] (show_stack) from [<80661e60>] (dump_stack+0x88/0xa4)
+> [<80661dd8>] (dump_stack) from [<80028fdc>] (warn_slowpath_common+0x70/0x94)
+>  r5:00000009 r4:00000000
+> [<80028f6c>] (warn_slowpath_common) from [<80029024>] (warn_slowpath_null+0x24/)
+>  r8:808f68c4 r7:00000000 r6:00000000 r5:00000000 r4:e0810004
+> [<80029000>] (warn_slowpath_null) from [<803a22f4>] (ahci_enable_ahci+0x74/0x80)
+> [<803a2280>] (ahci_enable_ahci) from [<803a2324>] (ahci_reset_controller+0x24/0)
+>  r8:ddcd9410 r7:80351178 r6:ddcd9444 r5:dde8b850 r4:e0810000 r3:ddf35e90
+> [<803a2300>] (ahci_reset_controller) from [<803a2c68>] (ahci_platform_resume_ho)
+>  r7:80351178 r6:ddcd9444 r5:dde8b850 r4:ddcd9410
+> [<803a2c30>] (ahci_platform_resume_host) from [<803a38f0>] (imx_ahci_resume+0x2)
+>  r5:00000000 r4:ddcd9410
+> [<803a38c4>] (imx_ahci_resume) from [<803511ac>] (platform_pm_resume+0x34/0x54)
+> ....
 > 
-> The fact that vgic_process_maintenance() can set the interrupt line to
-> inactive is just something we exploit to properly handle level-triggered
-> interrupts, but the main API to the VGIC must absolutely be supported.
+> The reason is that the SATA controller has no working clock at this
+> point, and thus ahci_enable_ahci() fails to enable the controller.  In
+> case that there is no SATA disk attached, the imx_sata_disable() gets
+> called in ahci_imx_error_handler(), and both sata_clk and sata_ref_clk
+> will be disabled there.  Because all the imx_sata_enable() calls
+> afterward will return immediately due to imxpriv->no_device check, the
+> SATA controller working clock sata_clk will never get any chance to be
+> enabled again.
 > 
-> Am I completely wrong here?
+> This is a regression caused by commit 90870d79d4f2 (ahci-imx: Port to
+> library-ised ahci_platform).  Before the commit, only sata_ref_clk is
+> managed by the driver in enable/disable function.  But after the commit,
+> all the clocks are enabled/disabled in a row by ahci platform helpers
+> ahci_platform_enable[disable]_clks.  Since ahb_clk is a bus clock which
+> does not have gate at all, and i.MX low-power hardware module already
+> manages sata_clk across suspend/resume cycle, the only clock that needs
+> to be managed by software is sata_ref_clk.
 > 
-> The locking issue can be solved by splitting up the locking into a finer
-> granularity as needed or deferring the call to irqfd_resampler_ack()
-> until after unlocking the distributor lock in kvm_vgic_sync_hwstate().
+> So instead of using ahci_platform_enable[disable]_clks to manage all
+> the clocks in a row from imx_sata_enable[disable], we should manage
+> only sata_ref_clk in there.
+> 
+> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Fixes: 90870d79d4f2 (ahci-imx: Port to library-ised ahci_platform)
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-Why can't we do what PowerPC does for mpic and x86 does for IOAPIC and
-simply drop the distributor lock across the call to kvm_notify_acked_irq?
+Applied to libata/for-3.16-fixes.
 
-Given that I think the eventfd callbacks can block, holding a spinlock isn't
-safe anyway, regardless of the vgic re-entrancy issue.
+Thanks.
 
-Will
+-- 
+tejun
