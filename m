@@ -1,53 +1,136 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 18 Jun 2014 22:23:51 -0700
-Subject: [PATCH] i2c: s3c2410: resume the I2C controller earlier
-In-Reply-To: <1403153691-15606-1-git-send-email-dianders@chromium.org>
-References: <1403153691-15606-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=U0RAS3pi=i7smGo2rBJ+NfijXhmjX1PUs1rrwKkQewPA@mail.gmail.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 18 Jun 2014 22:43:19 -0700
+Subject: [PATCH v4 14/14] ARM64: KVM: fix big endian issue in
+ access_vm_reg for 32bit guest
+In-Reply-To: <20140614150507.GI14023@lvm>
+References: <1402590613-3341-1-git-send-email-victor.kamensky@linaro.org>
+ <1402590613-3341-15-git-send-email-victor.kamensky@linaro.org>
+ <20140614150507.GI14023@lvm>
+Message-ID: <CAA3XUr3mNvvHT68Q3bBKN6OoSss26CA6-=mf0v8EkuSU=z=HEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Christoffer,
 
-On Wed, Jun 18, 2014 at 9:54 PM, Doug Anderson <dianders@chromium.org> wrote:
-> From: Vincent Palatin <vpalatin@chromium.org>
->
-> When the wake-up is triggered by the PMIC RTC, the RTC driver is trying
-> to read the PMIC interrupt status over I2C and fails because the I2C
-> controller is not resumed yet.
-> Let's resume the I2C controller earlier in the _noirq phase
-> (as other hardwares are doing), so we can properly get the wake-up
-> condition.
->
-> Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/i2c/busses/i2c-s3c2410.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index e828a1d..b904132 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -1267,7 +1267,7 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
->         return 0;
->  }
->
-> -static int s3c24xx_i2c_resume(struct device *dev)
-> +static int s3c24xx_i2c_resume_noirq(struct device *dev)
->  {
->         struct platform_device *pdev = to_platform_device(dev);
->         struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
-> @@ -1285,7 +1285,7 @@ static int s3c24xx_i2c_resume(struct device *dev)
->  static const struct dev_pm_ops s3c24xx_i2c_dev_pm_ops = {
->  #ifdef CONFIG_PM_SLEEP
->         .suspend_noirq = s3c24xx_i2c_suspend_noirq,
-> -       .resume = s3c24xx_i2c_resume,
-> +       .resume_noirq = s3c24xx_i2c_resume_noirq,
+Please see inline.
 
-I looked at applying this to another i2c controller and stumbled upon
-feedback from Wolfram suggesting that I should add "poweroff, thaw,
-freeze, restore".  I'm happy to squash that into this patch or send a
-separate patch if people would like it.  Just let me know.
+On 14 June 2014 08:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Thu, Jun 12, 2014 at 09:30:13AM -0700, Victor Kamensky wrote:
+>> Fix issue with 32bit guests running on top of BE KVM host.
+>> Indexes of high and low words of 64bit cp15 register are
+>> swapped in case of big endian code, since 64bit cp15 state is
+>> restored or saved with double word write or read instruction.
+>>
+>> Define helper macros to access high low words of 64bit cp15
+>> register.
+>>
+>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+>>  arch/arm64/kvm/sys_regs.c         | 4 ++--
+>>  2 files changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 0a1d697..e9d2e11 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -140,6 +140,14 @@ struct kvm_vcpu_arch {
+>>  #define vcpu_sys_reg(v,r)    ((v)->arch.ctxt.sys_regs[(r)])
+>>  #define vcpu_cp15(v,r)               ((v)->arch.ctxt.cp15[(r)])
+>>
+>> +#ifdef CONFIG_CPU_BIG_ENDIAN
+>> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
+>> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
+>> +#else
+>> +#define vcpu_cp15_64_high(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
+>> +#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
+>> +#endif
+>> +
+>>  struct kvm_vm_stat {
+>>       u32 remote_tlb_flush;
+>>  };
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index 8e65e31..71aa9b0 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -137,9 +137,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+>>       if (!p->is_aarch32) {
+>>               vcpu_sys_reg(vcpu, r->reg) = val;
+>>       } else {
+>> -             vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
+>> +             vcpu_cp15_64_low(vcpu, r->reg) = val & 0xffffffffUL;
+>>               if (!p->is_32bit)
+>> -                     vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
+>> +                     vcpu_cp15_64_high(vcpu, r->reg) = val >> 32;
+>>       }
+>>       return true;
+>>  }
+>> --
+>> 1.8.1.4
+>>
+>
+> I thought there was a consensus here about handling 64-bit accesses
+> through the 64-bit values with the vcpu_sys_reg() interface?  Did you
+> give up on this for a particular reason?
 
--Doug
+I think I missed that. Do you want this patch to look like below?
+Personally, I find it a little bit less clear, but I am fine with it
+if you like it more. Or you meant something different?
+
+commit 2de73290a809ef8dbaed087ef2f86d662a006e36
+Author: Victor Kamensky <victor.kamensky@linaro.org>
+Date:   Mon May 12 13:57:21 2014 -0700
+
+    ARM64: KVM: fix big endian issue in access_vm_reg for 32bit guest
+
+    Fix issue with 32bit guests running on top of BE KVM host.
+    Indexes of high and low words of 64bit cp15 register are
+    swapped in case of big endian code, since 64bit cp15 state is
+    restored or saved with double word write or read instruction.
+
+    Define helper macro to access low words of 64bit cp15 register.
+
+    Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+
+diff --git a/arch/arm64/include/asm/kvm_host.h
+b/arch/arm64/include/asm/kvm_host.h
+index a10803c..fce74ce 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -140,6 +140,12 @@ struct kvm_vcpu_arch {
+ #define vcpu_sys_reg(v,r)      ((v)->arch.ctxt.sys_regs[(r)])
+ #define vcpu_cp15(v,r)         ((v)->arch.ctxt.cp15[(r)])
+
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 1)])
++#else
++#define vcpu_cp15_64_low(v,r) ((v)->arch.ctxt.cp15[((r) + 0)])
++#endif
++
+ struct kvm_vm_stat {
+        u32 remote_tlb_flush;
+ };
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 8e65e31..a5aa1d1 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -134,12 +134,10 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+        BUG_ON(!p->is_write);
+
+        val = *vcpu_reg(vcpu, p->Rt);
+-       if (!p->is_aarch32) {
++       if (!p->is_aarch32 || !p->is_32bit) {
+                vcpu_sys_reg(vcpu, r->reg) = val;
+        } else {
+-               vcpu_cp15(vcpu, r->reg) = val & 0xffffffffUL;
+-               if (!p->is_32bit)
+-                       vcpu_cp15(vcpu, r->reg + 1) = val >> 32;
++               vcpu_cp15_64_low(vcpu, r->reg) = val & 0xffffffffUL;
+        }
+        return true;
+ }
+
+Thanks,
+Victor
+
+> -Christoffer
