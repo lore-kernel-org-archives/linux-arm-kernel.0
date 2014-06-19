@@ -1,39 +1,33 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 19 Jun 2014 19:26:36 +0400
-Subject: [PATCH RESEND 4/5] ARM: clps711x: clep7312: Add common devices
- initialization
-In-Reply-To: <1403191597-28460-1-git-send-email-shc_work@mail.ru>
-References: <1403191597-28460-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1403191597-28460-4-git-send-email-shc_work@mail.ru>
+Date: Thu, 19 Jun 2014 19:26:33 +0400
+Subject: [PATCH RESEND 1/5] ARM: clps711x: Remove IO_ADDRESS() macro
+Message-ID: <1403191597-28460-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initialization of commonly used devices to the CLEP7312 generic
-board.
+All uses of the IO_ADDRESS() macro has been removed.
+This patch removes the definition of this macro.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/board-clep7312.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-clps711x/include/mach/hardware.h | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/board-clep7312.c b/arch/arm/mach-clps711x/board-clep7312.c
-index b33ba21..f9ca22b 100644
---- a/arch/arm/mach-clps711x/board-clep7312.c
-+++ b/arch/arm/mach-clps711x/board-clep7312.c
-@@ -25,6 +25,7 @@
- #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 5d6afda..292cbcb 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -24,10 +24,7 @@
  
- #include "common.h"
-+#include "devices.h"
+ #include <mach/clps711x.h>
  
- static void __init
- fixup_clep7312(struct tag *tags, char **cmdline)
-@@ -39,5 +40,6 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
- 	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
-+	.init_machine	= clps711x_devices_init,
- 	.restart	= clps711x_restart,
- MACHINE_END
+-#define IO_ADDRESS(x)		(0xdc000000 + (((x) & 0x03ffffff) | \
+-				(((x) >> 2) & 0x3c000000)))
+-
+-#define CLPS711X_VIRT_BASE	IOMEM(IO_ADDRESS(CLPS711X_PHYS_BASE))
++#define CLPS711X_VIRT_BASE	IOMEM(0xfe000000)
+ 
+ #ifndef __ASSEMBLY__
+ #define clps_readb(off)		readb(CLPS711X_VIRT_BASE + (off))
 -- 
 1.8.5.5
