@@ -1,42 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jun 2014 10:21:25 +0100
-Subject: [PATCH v2 1/9] KVM: ARM: vgic: plug irq injection race
-In-Reply-To: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
-References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403169693-13982-2-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 19 Jun 2014 10:21:24 +0100
+Subject: [PATCH v2 0/9] arm/arm64: KVM: dynamic VGIC sizing
+Message-ID: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it stands, nothing prevents userspace from injecting an interrupt
-before the guest's GIC is actually initialized.
+So far, the VGIC data structures have been statically sized, meaning
+that we always have to support more interrupts than we actually want,
+and more CPU interfaces than we should. This is a waste of resource,
+and is the kind of things that should be tuneable.
 
-This goes unnoticed so far (as everything is pretty much statically
-allocated), but ends up exploding in a spectacular way once we switch
-to a more dynamic allocation (the GIC data structure isn't there yet).
+This series addresses that issue by changing the data structures to be
+dynamically allocated, and adds a new configuration attribute to
+allocate the number of interrupts. When the attribute is not used, we
+fallback to the old behaviour of allocating a fixed number of
+interrupts.
 
-The fix is to test for the "ready" flag in the VGIC distributor before
-trying to inject the interrupt. Note that in order to avoid breaking
-userspace, we have to ignore what is essentially an error.
+The last patch of the series is a bit out of context, but tends to fit
+well here code-wise. It solves an interesting issue having to do with
+the placement of the GICV interface in Stage-2 when using 64k pages
+(if the HW is not 64k aligned, we need to tell userspace about the
+"sub-page offset" so it can correctly place the guest's GICC region).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This series is also the base for Andre Przywara's GICv3 distributor
+emulation code (which can support far more than 8 vcpus and 1020
+interrupts).
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 795ab48..c6da748 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1446,7 +1446,8 @@ out:
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level)
- {
--	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
-+	if (likely(vgic_initialized(kvm)) &&
-+	    vgic_update_irq_state(kvm, cpuid, irq_num, level))
- 		vgic_kick_vcpus(kvm);
- 
- 	return 0;
+This has been tested on both ARM (TC2) and arm64 (model).
+
+Marc Zyngier (9):
+  KVM: ARM: vgic: plug irq injection race
+  arm/arm64: KVM: vgic: switch to dynamic allocation
+  arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
+  arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
+  arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
+  arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
+  arm/arm64: KVM: vgic: delay vgic allocation until init time
+  arm/arm64: KVM: vgic: make number of irqs a configurable attribute
+  arm64: KVM: vgic: deal with GIC sub-page alignment
+
+ arch/arm/include/uapi/asm/kvm.h   |   2 +
+ arch/arm/kvm/arm.c                |  10 +-
+ arch/arm64/include/uapi/asm/kvm.h |   2 +
+ include/kvm/arm_vgic.h            |  54 +++---
+ virt/kvm/arm/vgic.c               | 357 ++++++++++++++++++++++++++++++++------
+ 5 files changed, 339 insertions(+), 86 deletions(-)
+
 -- 
 1.8.3.4
