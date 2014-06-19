@@ -1,44 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Jun 2014 10:20:42 +0100
-Subject: [STLinux Kernel] [PATCH 4/7] ARM: stih416-b2020e: Enable PWM on
- the B2020 Rev-E
-In-Reply-To: <20140619090546.GB2131@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>
- <1403103172-19856-4-git-send-email-lee.jones@linaro.org>
- <20140619090546.GB2131@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20140619092042.GB26560@lee--X1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Jun 2014 10:21:25 +0100
+Subject: [PATCH v2 1/9] KVM: ARM: vgic: plug irq injection race
+In-Reply-To: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
+References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403169693-13982-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > All the infrastructure is now in place for ST's PWM controller.  This
-> > patch takes the final step and enables the IP on the 2020 Rev-E
-> > development platform.
-> 
-> Why are you only enabling this for rev-E board?
+As it stands, nothing prevents userspace from injecting an interrupt
+before the guest's GIC is actually initialized.
 
-Purely for testing purposes, as it's the only board I have.  If
-anyone has the other revisions and would be happy to test the driver
-for me then great.
+This goes unnoticed so far (as everything is pretty much statically
+allocated), but ends up exploding in a spectacular way once we switch
+to a more dynamic allocation (the GIC data structure isn't there yet).
 
-> If you make the stih415 DT PWM nodes part of this series as well, then 
-> assuming there is no good reason to the contary, the PWM could 
-> be enabled for both stih415/6 in the common stih41x-b2020 DTS file which
-> is also included by rev-E (assuming that PWM wiring is not some rev-E specific
-> thing).
-> 
-> Also Ajit Signed-off-by needs adding to this series.
+The fix is to test for the "ready" flag in the VGIC distributor before
+trying to inject the interrupt. Note that in order to avoid breaking
+userspace, we have to ignore what is essentially an error.
 
-As you know, Thierry already picked this up.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Will fix for v2.
-
-> After that:
-> Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
-Thanks.
-
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 795ab48..c6da748 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1446,7 +1446,8 @@ out:
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level)
+ {
+-	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
++	if (likely(vgic_initialized(kvm)) &&
++	    vgic_update_irq_state(kvm, cpuid, irq_num, level))
+ 		vgic_kick_vcpus(kvm);
+ 
+ 	return 0;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.4
