@@ -1,76 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Jun 2014 11:11:18 +0200
-Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
- udelay
-In-Reply-To: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
-References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <53A2A936.3070109@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Jun 2014 10:19:27 +0100
+Subject: [PATCH v5 04/20] arm64: boot protocol documentation update for GICv3
+In-Reply-To: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
+References: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403169583-13668-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2014 10:39 AM, Amit Daniel Kachhap wrote:
-> This patch register the exynos mct clocksource as the current timer
-> as it has constant clock rate. This will generate correct udelay for the
-> exynos platform and avoid using unnecessary calibrated jiffies. This change
-> has been tested on exynos5420 based board and udelay is very close to
-> expected.
->
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
-> Changes in V2:
-> * Added #defines for ARM and ARM64 as pointed by Doug Anderson.
->
-> Patches from David Riley confirmed that udelay is broken in exynos5420.
-> Link to those patches are,
-> 1) https://patchwork.kernel.org/patch/4344911/
-> 2) https://patchwork.kernel.org/patch/4344881/
->
->   drivers/clocksource/exynos_mct.c | 15 +++++++++++++++
->   1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index f71d55f..02927e2 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -195,10 +195,25 @@ static u64 notrace exynos4_read_sched_clock(void)
->   	return exynos4_frc_read(&mct_frc);
->   }
->
-> +static struct delay_timer exynos4_delay_timer;
-> +
-> +static unsigned long exynos4_read_current_timer(void)
-> +{
-> +#ifdef ARM
-> +	return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
-> +#else /* ARM64, etc */
-> +	return exynos4_frc_read(&mct_frc);
-> +#endif
-> +}
-> +
+Linux has some requirements that must be satisfied in order to boot
+on a system built with a GICv3.
 
-There isn't another solution than that ? macros definitions in C file 
-are avoided as much as possible.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/arm64/booting.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
->   static void __init exynos4_clocksource_init(void)
->   {
->   	exynos4_mct_frc_start();
->
-> +	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
-
-&exynos4_read_current_timer ?
-
-> +	exynos4_delay_timer.freq = clk_rate;
-> +	register_current_timer_delay(&exynos4_delay_timer);
-> +
->   	if (clocksource_register_hz(&mct_frc, clk_rate))
->   		panic("%s: can't register clocksource\n", mct_frc.name);
->
->
-
-
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 37fc4f6..e28ccec 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -141,6 +141,12 @@ Before jumping into the kernel, the following conditions must be met:
+   the kernel image will be entered must be initialised by software at a
+   higher exception level to prevent execution in an UNKNOWN state.
+ 
++  For systems with a GICv3 interrupt controller, it is expected that:
++  - If EL3 is present, it must program ICC_SRE_EL3.Enable (bit 3) to
++    0b1 and ICC_SRE_EL3.SRE (bit 0) to 0b1.
++  - If the kernel is entered at EL1, EL2 must set ICC_SRE_EL2.Enable
++    (bit 3) to 0b1 and ICC_SRE_EL2.SRE (bit 0) to 0b1.
++
+ The requirements described above for CPU mode, caches, MMUs, architected
+ timers, coherency and system registers apply to all CPUs.  All CPUs must
+ enter the kernel in the same exception level.
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.3.4
