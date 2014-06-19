@@ -1,25 +1,25 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 19 Jun 2014 14:16:32 +0300
-Subject: [PATCH v2 10/18] ARM: dts: dra7xx-clocks: Add missing 32khz clocks
- used for PHY
-In-Reply-To: <1401345500-20188-11-git-send-email-kishon@ti.com>
+Date: Thu, 19 Jun 2014 14:20:39 +0300
+Subject: [PATCH v2 13/18] ARM: dts: dra7xx-clocks: Add missing clocks
+ for second PCIe PHY instance
+In-Reply-To: <1401345500-20188-14-git-send-email-kishon@ti.com>
 References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-11-git-send-email-kishon@ti.com>
-Message-ID: <53A2C690.1060106@ti.com>
+ <1401345500-20188-14-git-send-email-kishon@ti.com>
+Message-ID: <53A2C787.5060905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
-> Added missing 32khz clock used by PCIe PHY.
-> The documention for this node can be found @ ../bindings/clock/ti/gate.txt.
+> Added missing clocks used by second instance of PCIe PHY.
+> The documention for this nodes can be found @ ../bindings/clock/ti/gate.txt.
 
-You can drop the node documentation ref, and rather add a TRM reference 
-about hardware details. Other than that, looks good to me.
+Drop the ref to the binding doc and rather add a ref to TRM about the 
+clock layout. Also, is the register offset wrong on these? Should be 
+0x13b8, no, or is my TRM version wrong?
 
 -Tero
 
 >
-> Cc: Tony Lindgren <tony@atomide.com>
 > Cc: Rajendra Nayak <rnayak@ti.com>
 > Cc: Tero Kristo <t-kristo@ti.com>
 > Cc: Paul Walmsley <paul@pwsan.com>
@@ -28,28 +28,59 @@ about hardware details. Other than that, looks good to me.
 > Cc: Pawel Moll <pawel.moll@arm.com>
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
 > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->   arch/arm/boot/dts/dra7xx-clocks.dtsi |    8 ++++++++
->   1 file changed, 8 insertions(+)
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi |   24 ++++++++++++++++++++++++
+>   1 file changed, 24 insertions(+)
 >
 > diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index 44993ec..e1bd052 100644
+> index 3d8c9c2..a9ff0dc 100644
 > --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
 > +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -1165,6 +1165,14 @@
->   		reg = <0x021c>, <0x0220>;
+> @@ -1173,6 +1173,14 @@
+>   		ti,bit-shift = <8>;
 >   	};
 >
-> +	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
+> +	optfclk_pciephy2_32khz: optfclk_pciephy_32khz at 4a0093b4 {
 > +		compatible = "ti,gate-clock";
 > +		clocks = <&sys_32k_ck>;
 > +		#clock-cells = <0>;
-> +		reg = <0x13b0>;
+> +		reg = <0x13b4>;
 > +		ti,bit-shift = <8>;
 > +	};
 > +
 >   	optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
 >   		compatible = "ti,divider-clock";
 >   		clocks = <&apll_pcie_ck>;
+> @@ -1191,6 +1199,14 @@
+>   		ti,bit-shift = <9>;
+>   	};
+>
+> +	optfclk_pciephy2_clk: optfclk_pciephy_clk at 4a0093b4 {
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&apll_pcie_ck>;
+> +		#clock-cells = <0>;
+> +		reg = <0x13b4>;
+> +		ti,bit-shift = <9>;
+> +	};
+> +
+>   	optfclk_pciephy1_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
+>   		compatible = "ti,gate-clock";
+>   		clocks = <&optfclk_pciephy_div>;
+> @@ -1199,6 +1215,14 @@
+>   		ti,bit-shift = <10>;
+>   	};
+>
+> +	optfclk_pciephy2_div_clk: optfclk_pciephy_div_clk at 4a0093b4 {
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&optfclk_pciephy_div>;
+> +		#clock-cells = <0>;
+> +		reg = <0x13b4>;
+> +		ti,bit-shift = <10>;
+> +	};
+> +
+>   	apll_pcie_clkvcoldo: apll_pcie_clkvcoldo {
+>   		#clock-cells = <0>;
+>   		compatible = "fixed-factor-clock";
 >
