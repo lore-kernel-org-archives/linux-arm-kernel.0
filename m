@@ -1,89 +1,300 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Jun 2014 11:07:58 +0200
-Subject: [PATCH] clocksource: exynos-mct: Register the timer for stable
- udelay
-In-Reply-To: <CAD=FV=WHK7TDdqcAd6aVs2g8rcHJx834im_4nTKHJAkUisWq4A@mail.gmail.com>
-References: <1403091060-5054-1-git-send-email-amit.daniel@samsung.com>
- <CAD=FV=WHK7TDdqcAd6aVs2g8rcHJx834im_4nTKHJAkUisWq4A@mail.gmail.com>
-Message-ID: <53A2A86E.4090903@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Jun 2014 10:08:27 +0100
+Subject: [PATCH v4 5/6] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <CAL_JsqK_sRuns3sTnLXEfb9wC02q13wtDm4ZgXR8isWtQCxJ0A@mail.gmail.com>
+References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1402503520-8611-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAL_JsqK_sRuns3sTnLXEfb9wC02q13wtDm4ZgXR8isWtQCxJ0A@mail.gmail.com>
+Message-ID: <20140619090826.GC5401@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2014 01:17 AM, Doug Anderson wrote:
-> Amit,
->
-> Thanks for posting!
->
-> On Wed, Jun 18, 2014 at 4:31 AM, Amit Daniel Kachhap
-> <amit.daniel@samsung.com> wrote:
->> This patch register the exynos mct clocksource as the current timer
->> as it has constant clock rate. This will generate correct udelay for the
->> exynos platform and avoid using unnecessary calibrated jiffies. This change
->> have been tested on exynos5420 based board.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>
->> Patches from David Riley confirmed that udelay is broken in exynos5420.
->> Link to those patches are,
->> 1) https://patchwork.kernel.org/patch/4344911/
->> 2) https://patchwork.kernel.org/patch/4344881/
->>
->>   drivers/clocksource/exynos_mct.c | 11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->> index 8d64200..57cb3dc 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -198,10 +198,21 @@ static u64 notrace exynos4_read_sched_clock(void)
->>          return exynos4_frc_read(&mct_frc);
->>   }
->>
->> +static struct delay_timer exynos4_delay_timer;
->> +
->> +static unsigned long exynos4_read_current_timer(void)
->> +{
->> +       return exynos4_frc_read(&mct_frc);
->
-> This is terribly inefficient to read all 64-bits and then cast back to
-> a 32-bit value.  Replace with:
->
-> return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
->
->
->> +}
->> +
->>   static void __init exynos4_clocksource_init(void)
->>   {
->>          exynos4_mct_frc_start(0, 0);
->
-> Please rebase atop (1d80415 clocksource: exynos_mct: Don't reset the
-> counter during boot and resume), which is in linuxnext among other
-> places.
->
->>
->> +       exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
->> +       exynos4_delay_timer.freq = clk_rate;
->> +       register_current_timer_delay(&exynos4_delay_timer);
->> +
->>          if (clocksource_register_hz(&mct_frc, clk_rate))
->>                  panic("%s: can't register clocksource\n", mct_frc.name);
->
-> It does seem to work for me though.  :)
+On Thu, Jun 19, 2014 at 04:02:18AM +0100, Rob Herring wrote:
+> On Wed, Jun 11, 2014 at 11:18 AM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > This patch implements a generic CPU idle driver for ARM64 machines.
+> 
+> I fail to see anything arm64 specific here. The idle states binding is
+> for both arm32 and arm64, right? If not, please make it for both.
+> Otherwise, I'm okay with the binding for the most part. I need to take
+> another pass at it though.
 
-Doug,
+cpu_suspend prototypes differ and that has implications, in particular
+related to how to initialize the cpu_suspend back-end. I think that with some
+effort we might have a single common driver for arm32/64, I have to check if
+it is worth the additional ifdeffery that is likely to be needed.
 
-aren't you working on a 32 bits version ? So this patch could be 
-simplified ?
+Certainly the DT bindings are generic for arm32/arm64 and we are trying
+to make code using them generic too, the best we can.
 
-Thanks
-   -- Daniel
+I will post a v5 soon, please let me know if that's ok to go when time
+comes.
 
+Thank you,
+Lorenzo
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> 
+> Rob
+> 
+> > It relies on the DT idle states infrastructure to initialize idle
+> > states count and respective parameters. Current code assumes the driver
+> > is managing idle states on all possible CPUs but can be easily
+> > generalized to support heterogenous systems and build cpumasks at
+> > runtime using MIDRs or DT cpu nodes compatible properties.
+> >
+> > Suspend back-ends (eg PSCI) must register a suspend initializer with
+> > the CPU idle driver so that the suspend backend call can be detected,
+> > and the driver code can call the back-end infrastructure to complete the
+> > suspend backend initialization.
+> >
+> > Idle state index 0 is always initialized as a simple wfi state, ie always
+> > considered present and functional on all ARM64 platforms.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  drivers/cpuidle/Kconfig         |   5 ++
+> >  drivers/cpuidle/Kconfig.arm64   |  13 ++++
+> >  drivers/cpuidle/Makefile        |   4 +
+> >  drivers/cpuidle/cpuidle-arm64.c | 168 ++++++++++++++++++++++++++++++++++++++++
+> >  4 files changed, 190 insertions(+)
+> >  create mode 100644 drivers/cpuidle/Kconfig.arm64
+> >  create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+> >
+> > diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+> > index 760ce20..360c086 100644
+> > --- a/drivers/cpuidle/Kconfig
+> > +++ b/drivers/cpuidle/Kconfig
+> > @@ -44,6 +44,11 @@ depends on ARM
+> >  source "drivers/cpuidle/Kconfig.arm"
+> >  endmenu
+> >
+> > +menu "ARM64 CPU Idle Drivers"
+> > +depends on ARM64
+> > +source "drivers/cpuidle/Kconfig.arm64"
+> > +endmenu
+> > +
+> >  menu "MIPS CPU Idle Drivers"
+> >  depends on MIPS
+> >  source "drivers/cpuidle/Kconfig.mips"
+> > diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
+> > new file mode 100644
+> > index 0000000..b83612c
+> > --- /dev/null
+> > +++ b/drivers/cpuidle/Kconfig.arm64
+> > @@ -0,0 +1,13 @@
+> > +#
+> > +# ARM64 CPU Idle drivers
+> > +#
+> > +
+> > +config ARM64_CPUIDLE
+> > +       bool "Generic ARM64 CPU idle Driver"
+> > +       select OF_IDLE_STATES
+> > +       help
+> > +         Select this to enable generic cpuidle driver for ARM v8.
+> > +         It provides a generic idle driver whose idle states are configured
+> > +         at run-time through DT nodes. The CPUidle suspend backend is
+> > +         initialized by the device tree parsing code on matching the entry
+> > +         method to the respective CPU operations.
+> > diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+> > index d5ebf4b..e496242 100644
+> > --- a/drivers/cpuidle/Makefile
+> > +++ b/drivers/cpuidle/Makefile
+> > @@ -23,6 +23,10 @@ obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
+> >  obj-$(CONFIG_MIPS_CPS_CPUIDLE)         += cpuidle-cps.o
+> >
+> >  ###############################################################################
+> > +# ARM64 drivers
+> > +obj-$(CONFIG_ARM64_CPUIDLE)            += cpuidle-arm64.o
+> > +
+> > +###############################################################################
+> >  # POWERPC drivers
+> >  obj-$(CONFIG_PSERIES_CPUIDLE)          += cpuidle-pseries.o
+> >  obj-$(CONFIG_POWERNV_CPUIDLE)          += cpuidle-powernv.o
+> > diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+> > new file mode 100644
+> > index 0000000..4c932f8
+> > --- /dev/null
+> > +++ b/drivers/cpuidle/cpuidle-arm64.c
+> > @@ -0,0 +1,168 @@
+> > +/*
+> > + * ARM64 generic CPU idle driver.
+> > + *
+> > + * Copyright (C) 2014 ARM Ltd.
+> > + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#define pr_fmt(fmt) "CPUidle arm64: " fmt
+> > +
+> > +#include <linux/cpuidle.h>
+> > +#include <linux/cpumask.h>
+> > +#include <linux/cpu_pm.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +
+> > +#include <asm/psci.h>
+> > +#include <asm/suspend.h>
+> > +
+> > +#include "of_idle_states.h"
+> > +
+> > +typedef int (*suspend_init_fn)(struct cpuidle_driver *,
+> > +                              struct device_node *[]);
+> > +
+> > +struct cpu_suspend_ops {
+> > +       const char *id;
+> > +       suspend_init_fn init_fn;
+> > +};
+> > +
+> > +static const struct cpu_suspend_ops suspend_operations[] __initconst = {
+> > +       {"arm,psci", psci_dt_register_idle_states},
+> > +       {}
+> > +};
+> > +
+> > +static __init const struct cpu_suspend_ops *get_suspend_ops(const char *str)
+> > +{
+> > +       int i;
+> > +
+> > +       if (!str)
+> > +               return NULL;
+> > +
+> > +       for (i = 0; suspend_operations[i].id; i++)
+> > +               if (!strcmp(suspend_operations[i].id, str))
+> > +                       return &suspend_operations[i];
+> > +
+> > +       return NULL;
+> > +}
+> > +
+> > +/*
+> > + * arm_enter_idle_state - Programs CPU to enter the specified state
+> > + *
+> > + * dev: cpuidle device
+> > + * drv: cpuidle driver
+> > + * idx: state index
+> > + *
+> > + * Called from the CPUidle framework to program the device to the
+> > + * specified target state selected by the governor.
+> > + */
+> > +static int arm_enter_idle_state(struct cpuidle_device *dev,
+> > +                               struct cpuidle_driver *drv, int idx)
+> > +{
+> > +       int ret;
+> > +
+> > +       if (!idx) {
+> > +               cpu_do_idle();
+> > +               return idx;
+> > +       }
+> > +
+> > +       cpu_pm_enter();
+> > +       /*
+> > +        * Pass idle state index to cpu_suspend which in turn will call
+> > +        * the CPU ops suspend protocol with idle index as a parameter.
+> > +        *
+> > +        * Some states would not require context to be saved and flushed
+> > +        * to DRAM, so calling cpu_suspend would not be stricly necessary.
+> > +        * When power domains specifications for ARM CPUs are finalized then
+> > +        * this code can be optimized to prevent saving registers if not
+> > +        * needed.
+> > +        */
+> > +       ret = cpu_suspend(idx);
+> > +
+> > +       cpu_pm_exit();
+> > +
+> > +       return ret ? -1 : idx;
+> > +}
+> > +
+> > +struct cpuidle_driver arm64_idle_driver = {
+> > +       .name = "arm64_idle",
+> > +       .owner = THIS_MODULE,
+> > +};
+> > +
+> > +static struct device_node *state_nodes[CPUIDLE_STATE_MAX] __initdata;
+> > +
+> > +/*
+> > + * arm64_idle_init
+> > + *
+> > + * Registers the arm64 specific cpuidle driver with the cpuidle
+> > + * framework. It relies on core code to parse the idle states
+> > + * and initialize them using driver data structures accordingly.
+> > + */
+> > +static int __init arm64_idle_init(void)
+> > +{
+> > +       int i, ret;
+> > +       const char *entry_method;
+> > +       struct device_node *idle_states_node;
+> > +       const struct cpu_suspend_ops *suspend_init;
+> > +       struct cpuidle_driver *drv = &arm64_idle_driver;
+> > +
+> > +       idle_states_node = of_find_node_by_path("/cpus/idle-states");
+> > +       if (!idle_states_node)
+> > +               return -ENOENT;
+> > +
+> > +       if (of_property_read_string(idle_states_node, "entry-method",
+> > +                                   &entry_method)) {
+> > +               pr_warn(" * %s missing entry-method property\n",
+> > +                           idle_states_node->full_name);
+> > +               of_node_put(idle_states_node);
+> > +               ret = -EOPNOTSUPP;
+> > +               goto put_node;
+> > +       }
+> > +
+> > +       suspend_init = get_suspend_ops(entry_method);
+> > +       if (!suspend_init) {
+> > +               pr_warn("Missing suspend initializer\n");
+> > +               ret = -EOPNOTSUPP;
+> > +               goto put_node;
+> > +       }
+> > +
+> > +       /*
+> > +        * State at index 0 is standby wfi and considered standard
+> > +        * on all ARM platforms. If in some platforms simple wfi
+> > +        * can't be used as "state 0", DT bindings must be implemented
+> > +        * to work around this issue and allow installing a special
+> > +        * handler for idle state index 0.
+> > +        */
+> > +       drv->states[0].exit_latency = 1;
+> > +       drv->states[0].target_residency = 1;
+> > +       drv->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
+> > +       strncpy(drv->states[0].name, "ARM WFI", CPUIDLE_NAME_LEN);
+> > +       strncpy(drv->states[0].desc, "ARM WFI", CPUIDLE_DESC_LEN);
+> > +
+> > +       drv->cpumask = (struct cpumask *) cpu_possible_mask;
+> > +       /*
+> > +        * Start at index 1, request idle state nodes to be filled
+> > +        */
+> > +       ret = of_init_idle_driver(drv, state_nodes, 1, true);
+> > +       if (ret)
+> > +               goto put_node;
+> > +
+> > +       if (suspend_init->init_fn(drv, state_nodes)) {
+> > +               ret = -EOPNOTSUPP;
+> > +               goto put_node;
+> > +       }
+> > +
+> > +       for (i = 0; i < drv->state_count; i++)
+> > +               drv->states[i].enter = arm_enter_idle_state;
+> > +
+> > +       ret = cpuidle_register(drv, NULL);
+> > +
+> > +put_node:
+> > +       of_node_put(idle_states_node);
+> > +       return ret;
+> > +}
+> > +device_initcall(arm64_idle_init);
+> > --
+> > 1.8.4
+> >
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
