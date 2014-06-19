@@ -1,69 +1,70 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 19 Jun 2014 18:53:30 +0530
-Subject: [PATCH v2 10/18] ARM: dts: dra7xx-clocks: Add missing 32khz clocks
- used for PHY
-In-Reply-To: <53A2C690.1060106@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 19 Jun 2014 16:24:33 +0300
+Subject: [PATCH v2 07/18] ARM: dts: DRA7: Change the parent of
+ apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
+In-Reply-To: <53A2DEDA.5050104@ti.com>
 References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-11-git-send-email-kishon@ti.com> <53A2C690.1060106@ti.com>
-Message-ID: <53A2E452.5020109@ti.com>
+ <1401345500-20188-8-git-send-email-kishon@ti.com> <53A2C5B4.9080300@ti.com>
+ <53A2DEDA.5050104@ti.com>
+Message-ID: <53A2E491.5040406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
-
-On Thursday 19 June 2014 04:46 PM, Tero Kristo wrote:
-> On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
->> Added missing 32khz clock used by PCIe PHY.
->> The documention for this node can be found @ ../bindings/clock/ti/gate.txt.
-> 
-> You can drop the node documentation ref, and rather add a TRM reference about
-> hardware details. Other than that, looks good to me.
-
-You mean something like why 32KHz clock is used (**PRCM.PCIE_32K_GFCLK (based
-on PRM.SYS_32K) for debounce and wakeup logic inside the PCIe1_PHY_RX**)? Or
-something like **Figure 26-19. PCIe PHY Subsystem Integration of DRA TRM vE
-shows how 32KHz clock is being used** ?
-
-Thanks
-Kishon
-
-> 
-> -Tero
-> 
+On 06/19/2014 04:00 PM, Kishon Vijay Abraham I wrote:
+> Hi Tero,
+>
+> On Thursday 19 June 2014 04:42 PM, Tero Kristo wrote:
+>> On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
+>>> From: Keerthy <j-keerthy@ti.com>
+>>>
+>>> Change the parent of apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
+>>> from dpll_pcie_ref_ck.
 >>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Cc: Tero Kristo <t-kristo@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   arch/arm/boot/dts/dra7xx-clocks.dtsi |    8 ++++++++
->>   1 file changed, 8 insertions(+)
+>> Why? Needs a better changelog also.
+>
+> Figure 26-22. DPLL_PCIE_REF Functional Block Diagram in vE of DRA7xx ES1.0 TRM
+> shows the signal name for the output of post divider (M2) is CLKOUTLDO.
+>
+> Figure 26-21. PCIe PHY Clock Generator Overview shows CLKOUTLDO is used as
+> input to apll mux.
+>
+> So the actual output of dpll should be dpll_pcie_ref_m2ldo_ck instead of
+> dpll_pcie_ref_ck (which is the input of apll mux).
+
+Yep, this is what I want to see in the changelog, so please repost. The 
+original changelog had no info on it whatsoever.
+
+-Tero
+
+>
+> Thanks
+> Kishon
 >>
->> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> index 44993ec..e1bd052 100644
->> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> @@ -1165,6 +1165,14 @@
->>           reg = <0x021c>, <0x0220>;
->>       };
+>> -Tero
 >>
->> +    optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
->> +        compatible = "ti,gate-clock";
->> +        clocks = <&sys_32k_ck>;
->> +        #clock-cells = <0>;
->> +        reg = <0x13b0>;
->> +        ti,bit-shift = <8>;
->> +    };
->> +
->>       optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
->>           compatible = "ti,divider-clock";
->>           clocks = <&apll_pcie_ck>;
+>>>
+>>> Cc: Rajendra Nayak <rnayak@ti.com>
+>>> Cc: Tero Kristo <t-kristo@ti.com>
+>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>    arch/arm/boot/dts/dra7xx-clocks.dtsi |    2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>>> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>>> index 55e95c5..44993ec 100644
+>>> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>>> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>>> @@ -1152,7 +1152,7 @@
+>>>
+>>>        apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
+>>>            compatible = "ti,mux-clock";
+>>> -        clocks = <&dpll_pcie_ref_ck>, <&pciesref_acs_clk_ck>;
+>>> +        clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
+>>>            #clock-cells = <0>;
+>>>            reg = <0x021c 0x4>;
+>>>            ti,bit-shift = <7>;
+>>>
 >>
-> 
