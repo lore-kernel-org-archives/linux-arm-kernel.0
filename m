@@ -1,104 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jun 2014 10:21:32 +0100
-Subject: [PATCH v2 8/9] arm/arm64: KVM: vgic: make number of irqs a
- configurable attribute
-In-Reply-To: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
-References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403169693-13982-9-git-send-email-marc.zyngier@arm.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 19 Jun 2014 13:24:02 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAzLzNdIHZpZGVvOiBpbXhmYjogRml4IGxjZF9vcHMgLnNl?=
+ =?UTF-8?B?dF9wb3dlciBvbi9vZmYgaW52ZXJzaW9u?=
+In-Reply-To: <1403001999-12316-3-git-send-email-denis@eukrea.com>
+References: <1403001999-12316-1-git-send-email-denis@eukrea.com>
+ <1403001999-12316-3-git-send-email-denis@eukrea.com>
+Message-ID: <1403169842.261385087@f375.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make the number of interrupt configurable, use the new
-fancy device management API to add KVM_DEV_ARM_VGIC_GRP_NR_IRQS as
-a VGIC configurable attribute.
+Tue, 17 Jun 2014 12:46:39 +0200 ?? Denis Carikli <denis@eukrea.com>:
+> .set_power takes the blank level as argument instead
+> of an on/off parameter:
+> fb_blank calls fb_notifier_call_chain with the blank
+> level encoded in its parameters, which is then sent
+> as-is to the set_power callback.
+> 
+> imxfb_lcd_set_power was expecting an on/off parameter
+> instead.
+> This resulted in the inversion of the on/off behaviour.
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  drivers/video/fbdev/imxfb.c |   20 +++++++++++++++-----
+>  1 file changed, 15 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+> index 121cbd7..2ffbd5e 100644
+> --- a/drivers/video/fbdev/imxfb.c
+> +++ b/drivers/video/fbdev/imxfb.c
+> @@ -764,15 +764,25 @@ static int imxfb_lcd_get_power(struct lcd_device *lcddev)
+>  	return 1;
+>  }
+>  
+> -static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
+> +static int imxfb_lcd_set_power(struct lcd_device *lcddev, int blank)
+>  {
+>  	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+>  
+>  	if (!IS_ERR(fbi->lcd_pwr)) {
+> -		if (power && !regulator_is_enabled(fbi->lcd_pwr))
+> -			return regulator_enable(fbi->lcd_pwr);
+> -		else if (regulator_is_enabled(fbi->lcd_pwr))
+> -			return regulator_disable(fbi->lcd_pwr);
+> +		switch (blank) {
+> +		case FB_BLANK_VSYNC_SUSPEND:
+> +		case FB_BLANK_HSYNC_SUSPEND:
+> +		case FB_BLANK_NORMAL:
+> +		case FB_BLANK_POWERDOWN:
+> +			if (regulator_is_enabled(fbi->lcd_pwr))
+> +				return regulator_disable(fbi->lcd_pwr);
+> +			break;
+> +
+> +		case FB_BLANK_UNBLANK:
+> +			if (!regulator_is_enabled(fbi->lcd_pwr))
+> +				return regulator_enable(fbi->lcd_pwr);
+> +			break;
+> +		}
+>  	}
+>  
+>  	return 0;
 
-Userspace can now specify the exact size of the GIC (by increments
-of 32 interrupts).
+I think, the patch is correct, but we should update imxfb_lcd_get_power() in the same way.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Like as:
+if (!IS_ERR_OR_NULL(fbi->lcd_pwr))
+  if (!regulator_is_enabled(fbi->lcd_pwr))
+    return FB_BLANK_NORMAL;
+
+return FB_BLANK_UNBLANK;
+
 ---
- arch/arm/include/uapi/asm/kvm.h   |  1 +
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- virt/kvm/arm/vgic.c               | 29 +++++++++++++++++++++++++++++
- 3 files changed, 31 insertions(+)
-
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index e6ebdd3..8b51c1a 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -173,6 +173,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
- #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
- #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index e633ff8..b5cd6ed 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -159,6 +159,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
- #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
- #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6e13ff9..b0cd417 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2165,6 +2165,28 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 
- 		return vgic_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 val;
-+		int ret = 0;
-+
-+		if (get_user(val, uaddr))
-+			return -EFAULT;
-+
-+		if (val > 1024 || (val & 31))
-+			return -EINVAL;
-+
-+		mutex_lock(&dev->kvm->lock);
-+
-+		if (vgic_initialized(dev->kvm))
-+			ret = -EBUSY;
-+		else
-+			dev->kvm->arch.vgic.nr_irqs = val;
-+
-+		mutex_unlock(&dev->kvm->lock);
-+
-+		return ret;
-+	}
- 
- 	}
- 
-@@ -2201,6 +2223,11 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 		r = put_user(reg, uaddr);
- 		break;
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
-+		break;
-+	}
- 
- 	}
- 
-@@ -2237,6 +2264,8 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
- 		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
- 		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-+		return 0;
- 	}
- 	return -ENXIO;
- }
--- 
-1.8.3.4
