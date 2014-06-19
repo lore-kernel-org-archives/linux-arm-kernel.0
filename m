@@ -1,80 +1,78 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 19 Jun 2014 14:50:35 +0300
-Subject: [RFC 0/5] Tegra124 thermal management
-Message-ID: <1403178640-16052-1-git-send-email-mperttunen@nvidia.com>
+Date: Thu, 19 Jun 2014 14:50:37 +0300
+Subject: [RFC 2/5] ARM: tegra: Add soctherm and thermal zones to Tegra124
+ device tree
+In-Reply-To: <1403178640-16052-1-git-send-email-mperttunen@nvidia.com>
+References: <1403178640-16052-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1403178640-16052-3-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, this patchset implements basic polled thermal sensing support and
-hardware initiated shutdown ("thermtrip") in an overheating situations 
-for the Tegra124 system-on-chip.
+This adds the soctherm thermal sensing and management unit to the
+Tegra124 device tree along with the four thermal zones it exports.
 
-The driver uses the of-thermal framework to expose the sensors to the
-thermal subsystem, and this works well for the simplest case of polled
-sensors. However, there are two features I'd like to implement that
-as far as I know the framework isn't really ready for:
-- hardware based trip points, i.e., interrupts at a configured temperature
-- hardware initiated cooling
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ arch/arm/boot/dts/tegra124.dtsi | 47 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-Thermtrip is an example of the latter, but the hardware is also capable
-of less drastic measures. Currently, the driver doesn't attempt to expose
-thermtrip using the framework, instead opting to use custom device tree
-properties, but this is something I'd like to move away from.
-
-To implement hardware based trip points, the sensor - of-thermal interface
-would need a new function, which the of-thermal framework would use to
-tell the driver of a new trip point. I suppose the best way to do this
-would be to have of-thermal manage trip points, and when one is reached,
-tell the driver to prepare for the next one. The sensor driver should
-be capable of managing two trip points, and below and one above the
-current temperature.
-
-Hardware initiated cooling is a bit more interesting. The hardware that
-initiates the cooling procedure necessarily has some view of the thermal
-sensors / thermal zones, so the thermal zones defined in the device tree
-should map exactly to those ones. Hardware based cooling devices should
-be defined in the device tree just like any other cooling devices.
-The problematic part is binding a trip point to a hardware cooling device.
-There would need some additional interface to tell the cooling device
-the temperature of the trip point it is bound to.
-
-Hardware cooling devices can also track multiple thermal zones (for example,
-thermtrip can trigger based on cpu, gpu, memory and tsense sensors). To
-distinguish between these in the device tree, I can think of two options:
-1. Implement each tracked zone as a separate cooling device. (Probably by 
-   having an additional cooling-cell) This would make the interface simpler 
-   but allow impossible cooling mappings to be made in the device tree.
-2. When telling the cooling device of a particular trip point, also tell it
-   which thermal zone it is related to. This would require the cooling device
-   to have some kind of ability to detect that a thermal zone object is a
-   specific thermal zone.
-
-One more question related to hardware-initiated reset in an overheating
-situation: the "critical" trip level is designed to initiate a controller
-shutdown. Should there be a new trip level for an uncontrolled shutdown?
-
-Any thoughts would be appreciated.
-
-Thanks,
-Mikko Perttunen
-
-Mikko Perttunen (5):
-  ARM: tegra: Add PMC thermtrip programming to Jetson TK1 device tree
-  ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
-  ARM: tegra: Add thermal reset (thermtrip) support to PMC
-  clk: tegra: Add soctherm and tsensor clocks to T124 initialization
-    table
-  thermal: Add Tegra SOCTHERM thermal management driver
-
- arch/arm/boot/dts/tegra124-jetson-tk1.dts |   5 +
- arch/arm/boot/dts/tegra124.dtsi           |  47 +++
- arch/arm/mach-tegra/pmc.c                 |  95 +++++-
- drivers/clk/tegra/clk-tegra124.c          |   2 +
- drivers/thermal/Kconfig                   |   6 +
- drivers/thermal/Makefile                  |   1 +
- drivers/thermal/tegra_soctherm.c          | 502 ++++++++++++++++++++++++++++++
- 7 files changed, 654 insertions(+), 4 deletions(-)
- create mode 100644 drivers/thermal/tegra_soctherm.c
-
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index d675186..ca884e8 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -724,6 +724,53 @@
+ 		status = "disabled";
+ 	};
+ 
++	thermal-zones {
++		cpu {
++			polling-delay-passive = <1000>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&soctherm 0>;
++		};
++
++		mem {
++			polling-delay-passive = <1000>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&soctherm 1>;
++		};
++
++		gpu {
++			polling-delay-passive = <1000>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&soctherm 2>;
++		};
++
++		pllx {
++			polling-delay-passive = <1000>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&soctherm 3>;
++		};
++	};
++
++	soctherm: soctherm at 0,700e2000 {
++		compatible = "nvidia,tegra124-soctherm";
++		reg = <0x0 0x700e2000 0x0 0x1000>;
++		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_TSENSOR>,
++			<&tegra_car TEGRA124_CLK_SOC_THERM>;
++		clock-names = "tsensor", "soc-therm";
++		resets = <&tegra_car 78>;
++		reset-names = "soc-therm";
++
++		nvidia,thermtrip-threshold-cpu = <105>;
++		nvidia,thermtrip-threshold-gpu-mem = <105>;
++		nvidia,thermtrip-threshold-tsense = <105>;
++
++		#thermal-sensor-cells = <1>;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 1.8.1.5
