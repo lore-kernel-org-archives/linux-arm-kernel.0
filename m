@@ -1,124 +1,204 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 19 Jun 2014 12:30:40 +0200
-Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
- udelay
-In-Reply-To: <CADGdYn6YObHdRq6A9-L7qbD+EYiPrwhrKkLwyA5Z=0tDoWUzvA@mail.gmail.com>
-References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>	<53A2A936.3070109@linaro.org>
- <CADGdYn6YObHdRq6A9-L7qbD+EYiPrwhrKkLwyA5Z=0tDoWUzvA@mail.gmail.com>
-Message-ID: <53A2BBD0.3050106@linaro.org>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 19 Jun 2014 11:38:11 +0100
+Subject: [PATCH v4 01/13] arm: fiq: Add callbacks to manage FIQ routings
+In-Reply-To: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
+References: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1403174303-25456-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2014 12:21 PM, amit daniel kachhap wrote:
-> On Thu, Jun 19, 2014 at 2:41 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 06/19/2014 10:39 AM, Amit Daniel Kachhap wrote:
->>>
->>> This patch register the exynos mct clocksource as the current timer
->>> as it has constant clock rate. This will generate correct udelay for the
->>> exynos platform and avoid using unnecessary calibrated jiffies. This
->>> change
->>> has been tested on exynos5420 based board and udelay is very close to
->>> expected.
->>>
->>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>> ---
->>> Changes in V2:
->>> * Added #defines for ARM and ARM64 as pointed by Doug Anderson.
->>>
->>> Patches from David Riley confirmed that udelay is broken in exynos5420.
->>> Link to those patches are,
->>> 1) https://patchwork.kernel.org/patch/4344911/
->>> 2) https://patchwork.kernel.org/patch/4344881/
->>>
->>>    drivers/clocksource/exynos_mct.c | 15 +++++++++++++++
->>>    1 file changed, 15 insertions(+)
->>>
->>> diff --git a/drivers/clocksource/exynos_mct.c
->>> b/drivers/clocksource/exynos_mct.c
->>> index f71d55f..02927e2 100644
->>> --- a/drivers/clocksource/exynos_mct.c
->>> +++ b/drivers/clocksource/exynos_mct.c
->>> @@ -195,10 +195,25 @@ static u64 notrace exynos4_read_sched_clock(void)
->>>          return exynos4_frc_read(&mct_frc);
->>>    }
->>>
->>> +static struct delay_timer exynos4_delay_timer;
->>> +
->>> +static unsigned long exynos4_read_current_timer(void)
->>> +{
->>> +#ifdef ARM
->>> +       return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
->>> +#else /* ARM64, etc */
->>> +       return exynos4_frc_read(&mct_frc);
->>> +#endif
->>> +}
->>> +
->>
->>
->> There isn't another solution than that ? macros definitions in C file are
->> avoided as much as possible.
-> I also didn't want to use macros but used as a last option. you want
-> me to put more comments here?
-> Or something like below is also possible for checking the size of
-> (unsigned long) in runtime.
->
-> unsigned long x;
-> unsigned int size = (char *)(&x + 1) - (char *)(&x);
-> if (size == 4)
->             return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
-> else
->             return exynos4_frc_read(&mct_frc);
->
-> But this involves extra computation which should not be used for time
-> critical functions.
-> Any suggestion?
+Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
+virq into a FIQ virq. This is too inflexible for multi-platform kernels
+and makes runtime error checking impossible.
 
-AFAIU, Doug may change the exynos4_frc_read to be 32 bits. So may not 
-need those macros as 'exynos4_frc_read' could be used instead.
+We solve this by introducing a flexible mapping that allows interrupt
+controllers that support FIQ to register those mappings. This, in turn,
+makes it much possible for drivers in DT kernels to install FIQ handlers
+without knowing anything about the interrupt controller.
 
-Doug may confirm this.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/include/asm/fiq.h |   7 +++
+ arch/arm/kernel/fiq.c      | 103 ++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 108 insertions(+), 2 deletions(-)
 
->>>    static void __init exynos4_clocksource_init(void)
->>>    {
->>>          exynos4_mct_frc_start();
->>>
->>> +       exynos4_delay_timer.read_current_timer =
->>> &exynos4_read_current_timer;
->>
->>
->> &exynos4_read_current_timer ?
-> Any issue in the naming?
-
-No problem with the naming. As Tomasz pointed also, you are passing '&' 
-for the function pointer.
-
->>> +       exynos4_delay_timer.freq = clk_rate;
->>> +       register_current_timer_delay(&exynos4_delay_timer);
->>> +
->>>          if (clocksource_register_hz(&mct_frc, clk_rate))
->>>                  panic("%s: can't register clocksource\n", mct_frc.name);
->>>
->>>
->>
->>
->> --
->>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->> <http://twitter.com/#!/linaroorg> Twitter |
->> <http://www.linaro.org/linaro-blog/> Blog
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
->> in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index d493d0b..a7806ef 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -18,6 +18,11 @@
+ 
+ #include <asm/ptrace.h>
+ 
++struct fiq_chip {
++	void (*fiq_enable)(struct irq_data *data);
++	void (*fiq_disable)(struct irq_data *data);
++};
++
+ struct fiq_handler {
+ 	struct fiq_handler *next;
+ 	/* Name
+@@ -38,6 +43,8 @@ extern void release_fiq(struct fiq_handler *f);
+ extern void set_fiq_handler(void *start, unsigned int length);
+ extern void enable_fiq(int fiq);
+ extern void disable_fiq(int fiq);
++extern bool has_fiq(int fiq);
++extern void fiq_register_mapping(int irq, struct fiq_chip *chip);
+ 
+ /* helpers defined in fiqasm.S: */
+ extern void __set_fiq_regs(unsigned long const *regs);
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 918875d..567f8fd 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -40,6 +40,9 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/seq_file.h>
++#include <linux/irq.h>
++#include <linux/radix-tree.h>
++#include <linux/slab.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+@@ -52,7 +55,15 @@
+ 		(unsigned)&vector_fiq_offset;		\
+ 	})
+ 
++struct fiq_data {
++	struct fiq_chip *fiq_chip;
++	struct irq_data *irq_data;
++};
++
+ static unsigned long no_fiq_insn;
++static int fiq_start = -1;
++static RADIX_TREE(fiq_data_tree, GFP_KERNEL);
++static DEFINE_MUTEX(fiq_data_mutex);
+ 
+ /* Default reacquire function
+  * - we always relinquish FIQ control
+@@ -127,18 +138,65 @@ void release_fiq(struct fiq_handler *f)
+ 	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
+ }
+ 
+-static int fiq_start;
++static struct fiq_data *lookup_fiq_data(int fiq)
++{
++	struct fiq_data *data;
++
++	rcu_read_lock();
++	data = radix_tree_lookup(&fiq_data_tree, fiq);
++	rcu_read_unlock();
++
++	return data;
++}
+ 
+ void enable_fiq(int fiq)
+ {
++	struct fiq_data *data = lookup_fiq_data(fiq);
++
++	if (data) {
++		if (data->fiq_chip->fiq_enable)
++			data->fiq_chip->fiq_enable(data->irq_data);
++		enable_irq(fiq);
++		return;
++	}
++
++	if (WARN_ON(fiq_start == -1))
++		return;
++
+ 	enable_irq(fiq + fiq_start);
+ }
+ 
+ void disable_fiq(int fiq)
+ {
++	struct fiq_data *data = lookup_fiq_data(fiq);
++
++	if (data) {
++		if (data->fiq_chip->fiq_disable)
++			data->fiq_chip->fiq_disable(data->irq_data);
++		disable_irq(fiq);
++		return;
++	}
++
++	if (WARN_ON(fiq_start == -1))
++		return;
++
+ 	disable_irq(fiq + fiq_start);
+ }
+ 
++bool has_fiq(int fiq)
++{
++	struct fiq_data *data = lookup_fiq_data(fiq);
++
++	if (data)
++		return true;
++
++	if (fiq_start == -1)
++		return false;
++
++	return fiq > fiq_start;
++}
++EXPORT_SYMBOL(has_fiq);
++
+ EXPORT_SYMBOL(set_fiq_handler);
+ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
+@@ -147,9 +205,50 @@ EXPORT_SYMBOL(release_fiq);
+ EXPORT_SYMBOL(enable_fiq);
+ EXPORT_SYMBOL(disable_fiq);
+ 
++/*
++ * Add a mapping from a Linux irq to the fiq data.
++ */
++void fiq_register_mapping(int irq, struct fiq_chip *chip)
++{
++	struct fiq_data *fiq_data = NULL;
++	int res;
++
++	/* fiq_register_mapping can't be mixed with init_FIQ */
++	BUG_ON(fiq_start != -1);
++
++	fiq_data = kmalloc(sizeof(*fiq_data), GFP_KERNEL);
++	if (!fiq_data)
++		goto err;
++
++	fiq_data->fiq_chip = chip;
++	fiq_data->irq_data = irq_get_irq_data(irq);
++	BUG_ON(!fiq_data->irq_data);
++
++	mutex_lock(&fiq_data_mutex);
++	res = radix_tree_insert(&fiq_data_tree, irq, fiq_data);
++	mutex_unlock(&fiq_data_mutex);
++	if (res)
++		goto err;
++
++	return;
++
++err:
++	kfree(fiq_data);
++	pr_err("fiq: Cannot register mapping %d\n", irq);
++}
++
++/*
++ * Set the offset between normal IRQs and their FIQ shadows.
++ */
+ void __init init_FIQ(int start)
+ {
++	fiq_start = start;
++}
++
++static int __init init_default_fiq_handler(void)
++{
+ 	unsigned offset = FIQ_OFFSET;
+ 	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
+-	fiq_start = start;
++	return 0;
+ }
++pure_initcall(init_default_fiq_handler);
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.3
