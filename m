@@ -1,80 +1,79 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 20 Jun 2014 01:40:04 +0300
-Subject: v3.16-rc1 & default cachepolicy
-In-Reply-To: <20140619205853.GH3705@n2100.arm.linux.org.uk>
-References: <20140619203655.GE558@drone.musicnaut.iki.fi>
- <20140619205853.GH3705@n2100.arm.linux.org.uk>
-Message-ID: <20140619224004.GF558@drone.musicnaut.iki.fi>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 19 Jun 2014 15:43:48 -0700
+Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
+ suspend/resume
+In-Reply-To: <7h8uosyc3k.fsf@paris.lan>
+References: <1403155273-1057-1-git-send-email-dianders@chromium.org>
+ <7h8uosyc3k.fsf@paris.lan>
+Message-ID: <CAD=FV=XxNVmF+N5HF4SnZoJRJvkSUkpEx6ct4v2gtmAQ9n28-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Kevin,
 
-On Thu, Jun 19, 2014 at 09:58:53PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 19, 2014 at 11:36:55PM +0300, Aaro Koskinen wrote:
-> > When booting v3.16-rc1 on OMAP1, I noticed strange slowness.
-> > E.g. initramfs unpack takes several minutes. This was caused by default
-> > cachepolicy getting changed from writethrough -> uncached for some reason:
-> > 
-> > [    0.000000] Booting Linux on physical CPU 0x0
-> > [    0.000000] Initializing cgroup subsys cpu
-> > [    0.000000] Linux version 3.16.0-rc1-e3-los_880e+ (aaro at cooljazz) (gcc version 4.9.0 (GCC) ) #1 PREEMPT Thu Jun 19 22:51:42 EEST 2014
-> > [    0.000000] CPU: ARM925T [54029252] revision 2 (ARMv4T), cr=0000317f
-> > [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> > [    0.000000] Machine: Amstrad E3 (Delta)
-> > [    0.000000] Ignoring memory below PHYS_OFFSET: 0x02000000-0x10000000
-> > [    0.000000] bootconsole [earlycon0] enabled
-> > [    0.000000] Memory policy: Data cache uncached
-> > [...]
-> > [    4.602732] Unpacking initramfs...
-> > [  425.125093] Freeing initrd memory: 3532K (c1c00000 - c1f73000)
-> > 
-> > It seems this is caused by commit:
-> > 
-> > commit ca8f0b0a545f55b3dc6877cda24d609a8979c951
-> > Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Date:   Tue May 27 20:34:28 2014 +0100
-> > 
-> >     ARM: ensure C page table setup code follows assembly code
-> > 
-> > I can workaround this with "cachepolicy=writethrough" parameter.
-> 
-> It brings up the question - proc-arm925.S contains:
-> 
->         .long   PMD_TYPE_SECT | \
->                 PMD_BIT4 | \
->                 PMD_SECT_AP_WRITE | \
->                 PMD_SECT_AP_READ
->         .long   PMD_TYPE_SECT | \
->                 PMD_BIT4 | \
->                 PMD_SECT_AP_WRITE | \
->                 PMD_SECT_AP_READ
-> 
-> In other words, it's telling the assembly code to setup uncached mappings
-> for everything, even memory.  Most people want to set memory up (even at
-> the assembly code time) in cacheable mode... so I'd suggest adding:
-> 
->                 PMD_SECT_BUFFERABLE | \
->                 PMD_SECT_CACHEABLE | \
-> 
-> from the first.  You'll find it in the .macro at the end of proc-arm925.S.
-> Please let me know if that works for you.
+On Thu, Jun 19, 2014 at 11:43 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> Doug Anderson <dianders@chromium.org> writes:
+>
+>> The original code for the exynos i2c controller registered for the
+>> "noirq" variants.  However during review feedback it was moved to
+>> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
+>> longer actually "noirq" (despite functions named
+>> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
+>>
+>> i2c controllers that might have wakeup sources on them seem to need to
+>> resume at noirq time so that the individual drivers can actually read
+>> the i2c bus to handle their wakeup.
+>
+> I suspect usage of the noirq variants pre-dates the existence of the
+> late/early callbacks in the PM core, but based on the description above,
+> I suspect what you actually want is the late/early callbacks.
 
-So I tried the below change. But now it hangs early, even before
-the earlyprintk is working. :-/
+I think it actually really needs noirq.  ;)
 
-A.
+Specifically as soon as IRQs are enabled one of our children might get
+an interrupt.  To respond to that interrupt it might want to do an i2c
+transfer.
 
-diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
-index 97448c3..cb7c0e7 100644
---- a/arch/arm/mm/proc-arm925.S
-+++ b/arch/arm/mm/proc-arm925.S
-@@ -502,6 +502,8 @@ __\name\()_proc_info:
- 	.long	\cpu_val
- 	.long	\cpu_mask
- 	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_BUFFERABLE | \
-+		PMD_SECT_CACHEABLE | \
- 		PMD_BIT4 | \
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ
+Here's a snippet from me moving it to "resume early".  You can see
+that max77686 failed pretty much right away (the dummy is just the
+max77686 RTC for various reasons).  Note that the max77686 isn't doing
+anything tricky.  It uses regmap_irq (as per Javier's patches) and
+calls enable_irq_wake() at suspend time.  It uses a simple threaded
+IRQ:
+
+[  117.968055] PM: noirq resume of devices complete after 1.391 msecs
+[  117.968200] max77686 0-0009: Failed to read IRQ status: -5
+[  117.968697] dummy 0-0006: Failed to read IRQ status: -5
+[  117.968793] calling  12c60000.i2c+ @ 5891, parent: none
+[  117.968805] s3c-i2c 12c60000.i2c: slave address 0x00
+[  117.968814] s3c-i2c 12c60000.i2c: bus frequency set to 378 KHz
+[  117.968824] call 12c60000.i2c+ returned 0 after 23 usecs
+[  117.968831] calling  12c70000.i2c+ @ 5891, parent: none
+[  117.968841] s3c-i2c 12c70000.i2c: slave address 0x00
+[  117.968849] s3c-i2c 12c70000.i2c: bus frequency set to 378 KHz
+[  117.968858] call 12c70000.i2c+ returned 0 after 20 usecs
+[  117.968864] calling  12c80000.i2c+ @ 5891, parent: none
+[  117.968874] s3c-i2c 12c80000.i2c: slave address 0x00
+[  117.968882] s3c-i2c 12c80000.i2c: bus frequency set to 65 KHz
+[  117.968891] call 12c80000.i2c+ returned 0 after 20 usecs
+[  117.968897] calling  12c90000.i2c+ @ 5891, parent: none
+[  117.968907] s3c-i2c 12c90000.i2c: slave address 0x00
+[  117.968915] s3c-i2c 12c90000.i2c: bus frequency set to 65 KHz
+[  117.968923] call 12c90000.i2c+ returned 0 after 19 usecs
+[  117.968930] calling  12ca0000.i2c+ @ 5891, parent: none
+[  117.968940] s3c-i2c 12ca0000.i2c: slave address 0x00
+[  117.968948] s3c-i2c 12ca0000.i2c: bus frequency set to 65 KHz
+[  117.968957] call 12ca0000.i2c+ returned 0 after 20 usecs
+[  117.968964] calling  12cb0000.i2c+ @ 5891, parent: none
+[  117.968974] s3c-i2c 12cb0000.i2c: slave address 0x00
+[  117.968982] s3c-i2c 12cb0000.i2c: bus frequency set to 65 KHz
+[  117.968990] call 12cb0000.i2c+ returned 0 after 20 usecs
+[  117.968997] calling  12cd0000.i2c+ @ 5891, parent: none
+[  117.969006] s3c-i2c 12cd0000.i2c: slave address 0x00
+[  117.969014] s3c-i2c 12cd0000.i2c: bus frequency set to 65 KHz
+[  117.969022] call 12cd0000.i2c+ returned 0 after 19 usecs
+[  117.969029] calling  12ce0000.i2c+ @ 5891, parent: none
+[  117.969039] s3c-i2c 12ce0000.i2c: slave address 0x00
+[  117.969048] s3c-i2c 12ce0000.i2c: bus frequency set to 378 KHz
+[  117.969056] call 12ce0000.i2c+ returned 0 after 20 usecs
+[  117.969625] PM: early resume of devices complete after 1.469 msecs
