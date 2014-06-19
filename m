@@ -1,51 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 19 Jun 2014 09:54:31 -0500
-Subject: [PATCH] ARM: mvebu: Fix missing binding documentation for Armada
- 38x
-In-Reply-To: <1403186871-28204-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1403186871-28204-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAL_Jsq+JyngWXvk6ZzV8LPfGqVMDPyouJsADaokAGzgHv=gphQ@mail.gmail.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 20 Jun 2014 00:07:35 +0900
+Subject: [PATCH] gpio: crystalcove: Fix implicit declaration of function
+ 'seq_printf' error
+In-Reply-To: <1403190228-14344-1-git-send-email-lee.jones@linaro.org>
+References: <1403190228-14344-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAAVeFuKppwDusknaJg88m6r8KwWPJ=BJRuLsZavQL_JZTHTd+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 9:07 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> For the Armada 380 and Armada 385 SoCs, the common bindings for those
-> 2 SoCs, was forgotten. This patch add the documentation for the
-> marvell,aramda38x property.
+On Fri, Jun 20, 2014 at 12:03 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> drivers/gpio/gpio-crystalcove.c: In function 'crystalcove_gpio_dbg_show':
+> drivers/gpio/gpio-crystalcove.c:286:3: error: implicit declaration of function 'seq_printf'
+>    seq_printf(s, " gpio-%-2d %s %s %s %s ctlo=%2x,%s %s %s\n",
 >
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
-> Hi,
+> I'm looking for a quick Ack on this patch.  It's a fix to an immutable
+> branch that I'm carrying which is shared between GPIO and MFD.  Stephen
+> reported it when the MFD tree was sucked into -next.
 >
-> This fix should be merged in 3.16. For 3.15 I am not sure as it is not
-> a regression.
->
-> Thanks,
-> Gregory
->
->  Documentation/devicetree/bindings/arm/armada-38x.txt | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
-> index 11f2330a6554..b68bcb80d2de 100644
-> --- a/Documentation/devicetree/bindings/arm/armada-38x.txt
-> +++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
-> @@ -6,5 +6,9 @@ following property:
->
->  Required root node property:
->
-> +compatible: must contain "marvell,armada38x"
-> +
-> +Required root node property:
-> +
->   - compatible: must contain either "marvell,armada380" or
->     "marvell,armada385" depending on the variant of the SoC being used.
+> Alexandre,
+>   I believe Linus is out on vacation this week, so if you could take a
+> quick look at this, I'd be much obliged.
 
-This looks a bit strange. How about something like this:
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
 
-   - compatible: must contain either "marvell,armada380" or
-     "marvell,armada385" depending on the variant of the SoC being
-used and contain "marvell,armada38x".
+Hope that's fast enough. ;)
 
-Rob
+>
+> Linus,
+>   Once I've acquired the aforementioned Ack I'll fix this patch up into
+> our immutable branch and send another pull-request.
+> ---
+>  drivers/gpio/gpio-crystalcove.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/gpio/gpio-crystalcove.c b/drivers/gpio/gpio-crystalcove.c
+> index 5a98499..934462f 100644
+> --- a/drivers/gpio/gpio-crystalcove.c
+> +++ b/drivers/gpio/gpio-crystalcove.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/gpio.h>
+> +#include <linux/seq_file.h>
+>  #include <linux/bitops.h>
+>  #include <linux/regmap.h>
+>  #include <linux/mfd/intel_soc_pmic.h>
+> --
+> 1.8.3.2
+>
