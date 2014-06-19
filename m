@@ -1,67 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 19 Jun 2014 09:54:22 +0200
-Subject: [PATCH v2 7/7] ARM: at91/dt: enable the LCD panel on sama5d3xek
- boards
-In-Reply-To: <53A28D49.2040400@atmel.com>
-References: <1402329860-27520-1-git-send-email-boris.brezillon@free-electrons.com>
- <1402329860-27520-8-git-send-email-boris.brezillon@free-electrons.com>
- <53A28D49.2040400@atmel.com>
-Message-ID: <53A2972E.60202@free-electrons.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 19 Jun 2014 11:02:35 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <53A1B252.1030204@wwwdotorg.org>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
+ <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
+ <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
+ <20140617215119.GC24743@mithrandir>
+ <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
+ <53A1B252.1030204@wwwdotorg.org>
+Message-ID: <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 18, 2014 at 05:37:54PM +0200, Stephen Warren wrote:
+> On 06/18/2014 06:18 AM, Peter De Schrijver wrote:
+> > On Tue, Jun 17, 2014 at 11:51:20PM +0200, Thierry Reding wrote:
+> >> * PGP Signed by an unknown key
+> >>
+> >> On Tue, Jun 17, 2014 at 05:01:46PM +0300, Peter De Schrijver wrote:
+> >>> On Tue, Jun 17, 2014 at 02:13:15PM +0200, Thierry Reding wrote:
+> >>>>> Old Signed by an unknown key
+> >>>>
+> >>>> On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
+> >>>>> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+> >>>>>> This symbol needs to be exported to power on rails without using
+> >>>>>> tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
+> >>>>>> cannot be used in situations where the driver wants to handle clocking
+> >>>>>> by itself.
+> >>>>>
+> >>>>> Thierry, are you OK with this change?
+> >>>>
+> >>>> I would've preferred tegra_powergate_sequence_power_up() to be used
+> >>>
+> >>> I don't think the current tegra_powergate_sequence_power_up() API is very well
+> >>> defined though. I don't think the clocks and resets required by the sequence
+> >>> should be provided by the driver. For one, there can be several clocks and
+> >>> resets that need to be controlled for a single domain.
+> >>
+> >> Do you have any suggestions for what the API should look like? Even if
+> >> we plan to move to some different API, I think there's some advantage in
+> >> using it consistently if for no other reason than to make it easier to
+> >> replace occurrences later on.
+> >>
+> > 
+> > I think the API should only have the domain ID as input so:
+> > 
+> > int tegra_powerdomain_on(int id) 
+> > 
+> > /*
+> >  * Prerequisites: domain is off
+> >  * Result: domain is on, clocks of the modules in the domain are off, modules are in reset
+> >  */
+> > 
+> > int tegra_powerdomain_off(int id)
+> > 
+> > /*
+> >  * Prerequisites: all clocks of the modules in the domain are off
+> >  * result: domain is off
+> >  */
+> 
+> That doesn't make sense; the PMC doesn't have access to the clock and
+> reset IDs - that's why the API requires them to be passed in.
+> 
 
-On 19/06/2014 09:12, Bo Shen wrote:
-> Hi Boris,
->
-> On 06/10/2014 12:04 AM, Boris BREZILLON wrote:
->> diff --git a/arch/arm/boot/dts/sama5d33ek.dts
->> b/arch/arm/boot/dts/sama5d33ek.dts
->> index cbd6a3f..f2ab41d 100644
->> --- a/arch/arm/boot/dts/sama5d33ek.dts
->> +++ b/arch/arm/boot/dts/sama5d33ek.dts
->> @@ -36,9 +36,33 @@
->>               macb0: ethernet at f0028000 {
->>                   status = "okay";
->>               };
->> +
->> +            hlcdc: hlcdc at f0030000 {
->> +                status = "okay";
->> +
->> +                hlcdc-display-controller {
->> +                    atmel,panel = <&panel 3 0>;
->
-> One question here, in the driver code, it will configuration the frame
-> buffer mode depends on this parameter.
-> So, my question is if the framebuffer bits per pixel is different with
-> output bits per pixel, how to setting it?
->
-> For example, frame buffer use 16 bits/pixel, while output 24 bits/pixel.
+We should make driver look them up by name then. It doesn't make sense to
+move this knowledge to the drivers as there can be several modules in 1
+powerdomain. So every driver would then need to have access to all clock
+and reset IDs of the modules of the domain?
 
-Actually the HLCDC is responsible for converting input format (either
-RGB or YUV) to output format (one of the four supported RGB formats).
+Cheers,
 
-AFAICT, the HLCDC always converts the input format in RGB888 and then
-only use the relevant bits (i.e. if the output is RGB565, it will only
-takes MSB for each color).
-
-The REP field (available in all layer, e.g. LCDC_BASECFG4 for the base
-layer) is here to tell how the HLCDC should expand to 24 bits format.
-
-All this means that we don't have to bother about input to output format
-conversion.
-
->
->> +                };
->> +            };
->>           };
->>       };
->>
->
-> Best Regards,
-> Bo Shen
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Peter.
