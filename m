@@ -1,50 +1,37 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 19 Jun 2014 13:34:49 -0700
-Subject: [PATCH v2] arm: exynos: Support cluster power off on
- exynos5420/5800
-In-Reply-To: <1403181617-19743-1-git-send-email-a.kesavan@samsung.com>
- (Abhilash Kesavan's message of "Thu, 19 Jun 2014 18:10:17 +0530")
-References: <1403104722-14848-1-git-send-email-a.kesavan@samsung.com>
- <1403181617-19743-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <7hy4wsvdsm.fsf@paris.lan>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 19 Jun 2014 23:36:55 +0300
+Subject: v3.16-rc1 & default cachepolicy
+Message-ID: <20140619203655.GE558@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan <a.kesavan@samsung.com> writes:
+Hi,
 
-> Turning off a cluster when all 4 cores of the cluster are powered off
-> saves power significantly. Powering off the A15 L2 alone gives around
-> 100mW in savings. Add support for powering off the A15/A7 clusters on
-> exynos5420/5800.
->
-> The patch enables specific register bits which ensure that:
->    - cluster L2 will be turned on before the first man is powered up.
->    - last man will be turned off before the cluster L2 is turned off.
->    - core is powered down before powering it up.
->
-> Remove the exynos_cluster_power_control function completely as we can
-> rely on the above mentioned bits rather than polling the cluster power
-> status register.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> ---
-> Change in v2:
-> Added a macro for the COMMON_OPTION register and used it in the MCPM
-> back-end.
->
-> The patch is based on Linux-next 20140619. It has been tested on an
-> exynos5420-based chromebook using the "/dev/bL_switcher" interface as
-> well as the script provided by Nicolas Pitre and Dave Martin [1].
->
-> Patch depends on:
-> [v2] ARM: EXYNOS: mcpm: Don't rely on firmware's secondary_cpu_start
->
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg31257.html
+When booting v3.16-rc1 on OMAP1, I noticed strange slowness.
+E.g. initramfs unpack takes several minutes. This was caused by default
+cachepolicy getting changed from writethrough -> uncached for some reason:
 
-Tested on exynos5800/Chromebook2 along with the dependency patch and using
-the script from Dave and Nico.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Initializing cgroup subsys cpu
+[    0.000000] Linux version 3.16.0-rc1-e3-los_880e+ (aaro at cooljazz) (gcc version 4.9.0 (GCC) ) #1 PREEMPT Thu Jun 19 22:51:42 EEST 2014
+[    0.000000] CPU: ARM925T [54029252] revision 2 (ARMv4T), cr=0000317f
+[    0.000000] CPU: VIVT data cache, VIVT instruction cache
+[    0.000000] Machine: Amstrad E3 (Delta)
+[    0.000000] Ignoring memory below PHYS_OFFSET: 0x02000000-0x10000000
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Memory policy: Data cache uncached
+[...]
+[    4.602732] Unpacking initramfs...
+[  425.125093] Freeing initrd memory: 3532K (c1c00000 - c1f73000)
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+It seems this is caused by commit:
 
-Kevin
+commit ca8f0b0a545f55b3dc6877cda24d609a8979c951
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Tue May 27 20:34:28 2014 +0100
+
+    ARM: ensure C page table setup code follows assembly code
+
+I can workaround this with "cachepolicy=writethrough" parameter.
+
+A.
