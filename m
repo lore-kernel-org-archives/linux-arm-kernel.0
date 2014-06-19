@@ -1,37 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Jun 2014 12:29:55 +0200
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 19 Jun 2014 12:30:40 +0200
 Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
  udelay
 In-Reply-To: <CADGdYn6YObHdRq6A9-L7qbD+EYiPrwhrKkLwyA5Z=0tDoWUzvA@mail.gmail.com>
-References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
- <53A2A936.3070109@linaro.org>
+References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>	<53A2A936.3070109@linaro.org>
  <CADGdYn6YObHdRq6A9-L7qbD+EYiPrwhrKkLwyA5Z=0tDoWUzvA@mail.gmail.com>
-Message-ID: <4808230.DmzmRfAocp@wuerfel>
+Message-ID: <53A2BBD0.3050106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 June 2014 15:51:58 amit daniel kachhap wrote:
+On 06/19/2014 12:21 PM, amit daniel kachhap wrote:
+> On Thu, Jun 19, 2014 at 2:41 PM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On 06/19/2014 10:39 AM, Amit Daniel Kachhap wrote:
+>>>
+>>> This patch register the exynos mct clocksource as the current timer
+>>> as it has constant clock rate. This will generate correct udelay for the
+>>> exynos platform and avoid using unnecessary calibrated jiffies. This
+>>> change
+>>> has been tested on exynos5420 based board and udelay is very close to
+>>> expected.
+>>>
+>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>> ---
+>>> Changes in V2:
+>>> * Added #defines for ARM and ARM64 as pointed by Doug Anderson.
+>>>
+>>> Patches from David Riley confirmed that udelay is broken in exynos5420.
+>>> Link to those patches are,
+>>> 1) https://patchwork.kernel.org/patch/4344911/
+>>> 2) https://patchwork.kernel.org/patch/4344881/
+>>>
+>>>    drivers/clocksource/exynos_mct.c | 15 +++++++++++++++
+>>>    1 file changed, 15 insertions(+)
+>>>
+>>> diff --git a/drivers/clocksource/exynos_mct.c
+>>> b/drivers/clocksource/exynos_mct.c
+>>> index f71d55f..02927e2 100644
+>>> --- a/drivers/clocksource/exynos_mct.c
+>>> +++ b/drivers/clocksource/exynos_mct.c
+>>> @@ -195,10 +195,25 @@ static u64 notrace exynos4_read_sched_clock(void)
+>>>          return exynos4_frc_read(&mct_frc);
+>>>    }
+>>>
+>>> +static struct delay_timer exynos4_delay_timer;
+>>> +
+>>> +static unsigned long exynos4_read_current_timer(void)
+>>> +{
+>>> +#ifdef ARM
+>>> +       return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
+>>> +#else /* ARM64, etc */
+>>> +       return exynos4_frc_read(&mct_frc);
+>>> +#endif
+>>> +}
+>>> +
+>>
+>>
+>> There isn't another solution than that ? macros definitions in C file are
+>> avoided as much as possible.
 > I also didn't want to use macros but used as a last option. you want
 > me to put more comments here?
 > Or something like below is also possible for checking the size of
 > (unsigned long) in runtime.
-> 
+>
 > unsigned long x;
 > unsigned int size = (char *)(&x + 1) - (char *)(&x);
-
-reimplementing "sizeof (long)"?
-
 > if (size == 4)
->            return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
-
-readl_relaxed(), certainly
-
+>             return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
 > else
->            return exynos4_frc_read(&mct_frc);
-> 
+>             return exynos4_frc_read(&mct_frc);
+>
 > But this involves extra computation which should not be used for time
 > critical functions.
+> Any suggestion?
 
-sizeof is a constant expression, the compiler will optimize this.
+AFAIU, Doug may change the exynos4_frc_read to be 32 bits. So may not 
+need those macros as 'exynos4_frc_read' could be used instead.
 
-	Arnd
+Doug may confirm this.
+
+>>>    static void __init exynos4_clocksource_init(void)
+>>>    {
+>>>          exynos4_mct_frc_start();
+>>>
+>>> +       exynos4_delay_timer.read_current_timer =
+>>> &exynos4_read_current_timer;
+>>
+>>
+>> &exynos4_read_current_timer ?
+> Any issue in the naming?
+
+No problem with the naming. As Tomasz pointed also, you are passing '&' 
+for the function pointer.
+
+>>> +       exynos4_delay_timer.freq = clk_rate;
+>>> +       register_current_timer_delay(&exynos4_delay_timer);
+>>> +
+>>>          if (clocksource_register_hz(&mct_frc, clk_rate))
+>>>                  panic("%s: can't register clocksource\n", mct_frc.name);
+>>>
+>>>
+>>
+>>
+>> --
+>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+>> in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
