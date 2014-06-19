@@ -1,62 +1,110 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Jun 2014 12:17:35 +0200
-Subject: The problem of fixing the obvious problem...
-In-Reply-To: <20140619094319.GN32514@n2100.arm.linux.org.uk>
-References: <20140619094319.GN32514@n2100.arm.linux.org.uk>
-Message-ID: <4332175.W7nZ6A4hH1@wuerfel>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Thu, 19 Jun 2014 15:51:58 +0530
+Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
+ udelay
+In-Reply-To: <53A2A936.3070109@linaro.org>
+References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
+ <53A2A936.3070109@linaro.org>
+Message-ID: <CADGdYn6YObHdRq6A9-L7qbD+EYiPrwhrKkLwyA5Z=0tDoWUzvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 June 2014 10:43:19 Russell King - ARM Linux wrote:
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 0ba482638ebf..2085b3d42ed6 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -28,7 +28,6 @@ config ARCH_OMAP4
->         select ARM_CPU_SUSPEND if PM
->         select ARM_ERRATA_720789
->         select ARM_GIC
-> -       select CACHE_L2X0
->         select HAVE_ARM_SCU if SMP
->         select HAVE_ARM_TWD if SMP
->         select OMAP_INTERCONNECT
-> 
-> May look as if it's the right thing to do, but there's symbols lower down
-> (PL310_ERRATA_*) which are selected which depend on this symbol being
-> enabled.
-> 
-> What this means is that it's now possible for OMAP to be configured with
-> CACHE_L2X0 disabled _and_ for the PL310_ERRATA_* options to be forced on,
-> which results in:
-> 
-> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_588369 which has unmet direct dependencies (CACHE_L2X0)
-> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_727915 which has unmet direct dependencies (CACHE_L2X0)
-> 
-> So, let's clean up this sillyness by doing the job properly - ensuring
-> that /all/ PL310_ERRATA_* symbols are selected conditionally on
-> CACHE_L2X0 (whether or not CACHE_L2X0 is selected), so when people remove
-> that select statement, it doesn't cause these kinds of side effects.
-> 
-> The patch below will be in linux-next tomorrow.
-> 
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Subject: [PATCH] ARM: l2c: fix dependencies on PL310 errata symbols
-> 
-> A number of configurations spit out warnings similar to:
-> 
-> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_588369 which has unmet direct dependencies (CACHE_L2X0)
-> warning: (SOC_IMX6 && SOC_VF610 && ARCH_OMAP4) selects PL310_ERRATA_727915 which has unmet direct dependencies (CACHE_L2X0)
-> 
-> Clean up the dependencies here:
-> * PL310 symbols should only be selected when CACHE_L2X0 is enabled.
-> * Since the cache-l2x0 code detects PL310 presence at runtime, and we will
->   eventually get rid of CACHE_PL310, surround these errata options with an
->   if CACHE_L2X0 conditional rather than repeating the dependency against
->   each.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
+On Thu, Jun 19, 2014 at 2:41 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 06/19/2014 10:39 AM, Amit Daniel Kachhap wrote:
+>>
+>> This patch register the exynos mct clocksource as the current timer
+>> as it has constant clock rate. This will generate correct udelay for the
+>> exynos platform and avoid using unnecessary calibrated jiffies. This
+>> change
+>> has been tested on exynos5420 based board and udelay is very close to
+>> expected.
+>>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>> Changes in V2:
+>> * Added #defines for ARM and ARM64 as pointed by Doug Anderson.
+>>
+>> Patches from David Riley confirmed that udelay is broken in exynos5420.
+>> Link to those patches are,
+>> 1) https://patchwork.kernel.org/patch/4344911/
+>> 2) https://patchwork.kernel.org/patch/4344881/
+>>
+>>   drivers/clocksource/exynos_mct.c | 15 +++++++++++++++
+>>   1 file changed, 15 insertions(+)
+>>
+>> diff --git a/drivers/clocksource/exynos_mct.c
+>> b/drivers/clocksource/exynos_mct.c
+>> index f71d55f..02927e2 100644
+>> --- a/drivers/clocksource/exynos_mct.c
+>> +++ b/drivers/clocksource/exynos_mct.c
+>> @@ -195,10 +195,25 @@ static u64 notrace exynos4_read_sched_clock(void)
+>>         return exynos4_frc_read(&mct_frc);
+>>   }
+>>
+>> +static struct delay_timer exynos4_delay_timer;
+>> +
+>> +static unsigned long exynos4_read_current_timer(void)
+>> +{
+>> +#ifdef ARM
+>> +       return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
+>> +#else /* ARM64, etc */
+>> +       return exynos4_frc_read(&mct_frc);
+>> +#endif
+>> +}
+>> +
+>
+>
+> There isn't another solution than that ? macros definitions in C file are
+> avoided as much as possible.
+I also didn't want to use macros but used as a last option. you want
+me to put more comments here?
+Or something like below is also possible for checking the size of
+(unsigned long) in runtime.
 
-Thanks a lot!
+unsigned long x;
+unsigned int size = (char *)(&x + 1) - (char *)(&x);
+if (size == 4)
+           return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
+else
+           return exynos4_frc_read(&mct_frc);
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+But this involves extra computation which should not be used for time
+critical functions.
+Any suggestion?
+
+>
+>
+>>   static void __init exynos4_clocksource_init(void)
+>>   {
+>>         exynos4_mct_frc_start();
+>>
+>> +       exynos4_delay_timer.read_current_timer =
+>> &exynos4_read_current_timer;
+>
+>
+> &exynos4_read_current_timer ?
+Any issue in the naming?
+>
+>
+>> +       exynos4_delay_timer.freq = clk_rate;
+>> +       register_current_timer_delay(&exynos4_delay_timer);
+>> +
+>>         if (clocksource_register_hz(&mct_frc, clk_rate))
+>>                 panic("%s: can't register clocksource\n", mct_frc.name);
+>>
+>>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
