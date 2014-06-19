@@ -1,235 +1,107 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jun 2014 11:49:22 +0100
-Subject: [PATCHv3 3/4] arm64: Update the Image header
+Date: Thu, 19 Jun 2014 11:49:23 +0100
+Subject: [PATCHv3 4/4] arm64: Enable TEXT_OFFSET fuzzing
 In-Reply-To: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
 References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403174963-10730-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the kernel Image is stripped of everything past the initial
-stack, and at runtime the memory is initialised and used by the kernel.
-This makes the effective minimum memory footprint of the kernel larger
-than the size of the loaded binary, though bootloaders have no mechanism
-to identify how large this minimum memory footprint is. This makes it
-difficult to choose safe locations to place both the kernel and other
-binaries required at boot (DTB, initrd, etc), such that the kernel won't
-clobber said binaries or other reserved memory during initialisation.
+The arm64 Image header contains a text_offset field which bootloaders
+are supposed to read to determine the offset (from a 2MB aligned "start
+of memory" per booting.txt) at which to load the kernel. The offset is
+not well respected by bootloaders at present, and due to the lack of
+variation there is little incentive to support it. This is unfortunate
+for the sake of future kernels where we may wish to vary the text offset
+(even zeroing it).
 
-Additionally when big endian support was added the image load offset was
-overlooked, and is currently of an arbitrary endianness, which makes it
-difficult for bootloaders to make use of it. It seems that bootloaders
-aren't respecting the image load offset at present anyway, and are
-assuming that offset 0x80000 will always be correct.
-
-This patch adds an effective image size to the kernel header which
-describes the amount of memory from the start of the kernel Image binary
-which the kernel expects to use before detecting memory and handling any
-memory reservations. This can be used by bootloaders to choose suitable
-locations to load the kernel and/or other binaries such that the kernel
-will not clobber any memory unexpectedly. As before, memory reservations
-are required to prevent the kernel from clobbering these locations
-later.
-
-Both the image load offset and the effective image size are forced to be
-little-endian regardless of the native endianness of the kernel to
-enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
-which wish to make use of the load offset can inspect the effective
-image size field for a non-zero value to determine if the offset is of a
-known endianness. To enable software to determine the endinanness of the
-kernel as may be required for certain use-cases, a new flags field (also
-little-endian) is added to the kernel header to export this information.
-
-The documentation is updated to clarify these details. To discourage
-future assumptions regarding the value of text_offset, the value at this
-point in time is removed from the main flow of the documentation (though
-kept as a compatibility note). Some minor formatting issues in the
-documentation are also corrected.
+This patch adds options to arm64 to enable fuzz-testing of text_offset.
+CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET forces the text offset to a random
+16-byte aligned value value in the range [0..2MB) upon a build of the
+kernel. It is recommended that distribution kernels enable randomization
+to test bootloaders such that any compliance issues can be fixed early.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Tom Rini <trini@ti.com>
-Cc: Geoff Levand <geoff@infradead.org>
-Cc: Kevin Hilman <kevin.hilman@linaro.org>
 ---
- Documentation/arm64/booting.txt | 43 ++++++++++++++++++++++------
- arch/arm64/include/asm/image.h  | 62 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/head.S        |  6 ++--
- arch/arm64/kernel/vmlinux.lds.S |  3 ++
- 4 files changed, 103 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm64/include/asm/image.h
+ arch/arm64/Kconfig.debug        | 16 ++++++++++++++++
+ arch/arm64/Makefile             |  4 ++++
+ arch/arm64/kernel/head.S        |  8 ++++++--
+ arch/arm64/kernel/vmlinux.lds.S |  5 +++++
+ 4 files changed, 31 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 37fc4f6..85af34d 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -72,27 +72,54 @@ The decompressed kernel image contains a 64-byte header as follows:
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 1c1b756..566bf80 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -28,4 +28,20 @@ config PID_IN_CONTEXTIDR
+ 	  instructions during context switch. Say Y here only if you are
+ 	  planning to use hardware trace tools with this kernel.
  
-   u32 code0;			/* Executable code */
-   u32 code1;			/* Executable code */
--  u64 text_offset;		/* Image load offset */
--  u64 res0	= 0;		/* reserved */
--  u64 res1	= 0;		/* reserved */
-+  u64 text_offset;		/* Image load offset, little endian */
-+  u64 image_size;		/* Effective Image size, little endian */
-+  u64 flags;			/* kernel flags, little endian */
-   u64 res2	= 0;		/* reserved */
-   u64 res3	= 0;		/* reserved */
-   u64 res4	= 0;		/* reserved */
-   u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
--  u32 res5 = 0;      		/* reserved */
-+  u32 res5;      		/* reserved (used for PE COFF offset) */
++config ARM64_RANDOMIZE_TEXT_OFFSET
++	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
++	default N
++	help
++	  Say Y here if you want the image load offset (AKA TEXT_OFFSET)
++	  of the kernel to be randomized at build-time. When selected,
++	  this option will cause TEXT_OFFSET to be randomized upon any
++	  build of the kernel, and the offset will be reflected in the
++	  text_offset field of the resulting Image. This can be used to
++	  fuzz-test bootloaders which respect text_offset.
++
++	  This option is intended for bootloader and/or kernel testing
++	  only. Bootloaders must make no assumptions regarding the value
++	  of TEXT_OFFSET and platforms must not require a specific
++	  value.
++
+ endmenu
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 8185a91..e8d025c 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -38,7 +38,11 @@ CHECKFLAGS	+= -D__aarch64__
+ head-y		:= arch/arm64/kernel/head.o
  
+ # The byte offset of the kernel image in RAM from the start of RAM.
++ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
++TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%04x0\n", int(65535 * rand())}')
++else
+ TEXT_OFFSET := 0x00080000
++endif
  
- Header notes:
+ export	TEXT_OFFSET GZFLAGS
  
-+- As of v3.17, all fields are little endian unless stated otherwise.
-+
- - code0/code1 are responsible for branching to stext.
-+
- - when booting through EFI, code0/code1 are initially skipped.
-   res5 is an offset to the PE header and the PE header has the EFI
--  entry point (efi_stub_entry). When the stub has done its work, it
-+  entry point (efi_stub_entry).  When the stub has done its work, it
-   jumps to code0 to resume the normal boot process.
- 
--The image must be placed at the specified offset (currently 0x80000)
--from the start of the system RAM and called there. The start of the
--system RAM must be aligned to 2MB.
-+- Prior to v3.17, the endianness of text_offset was not specified.  In
-+  these cases image_size is zero and text_offset is 0x80000 in the
-+  endianness of the kernel.  Where image_size is non-zero image_size is
-+  little-endian and must be respected.  Where image_size is zero,
-+  text_offset can be assumed to be 0x80000.
-+
-+- The flags field (introduced in v3.17) is a little-endian 64-bit field
-+  composed as follows:
-+  Bit 0: 	Kernel endianness.  1 if BE, 0 if LE.
-+  Bits 1-63:	Reserved.
-+
-+- When image_size is zero, a bootloader should attempt to keep as much
-+  memory as possible free for use by the kernel immediately after the
-+  end of the kernel image. The amount of space required will vary
-+  depending on selected features, and is effectively unbound.
-+
-+The Image must be placed text_offset bytes from a 2MB aligned base
-+address near the start of usable system RAM and called there. Memory
-+below that base address is currently unusable by Linux, and therefore it
-+is strongly recommended that this location is the start of system RAM.
-+At least image_size bytes from the start of the image must be free for
-+use by the kernel.
-+
-+Any memory described to the kernel (even that below the 2MB aligned base
-+address) which is not marked as reserved from the kernel e.g. with a
-+memreserve region in the device tree) will be considered as available to
-+the kernel.
- 
- Before jumping into the kernel, the following conditions must be met:
- 
-diff --git a/arch/arm64/include/asm/image.h b/arch/arm64/include/asm/image.h
-new file mode 100644
-index 0000000..8fae075
---- /dev/null
-+++ b/arch/arm64/include/asm/image.h
-@@ -0,0 +1,62 @@
-+/*
-+ * Linker script macros to generate Image header fields.
-+ *
-+ * Copyright (C) 2014 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_IMAGE_H
-+#define __ASM_IMAGE_H
-+
-+#ifndef LINKER_SCRIPT
-+#error This file should only be included in vmlinux.lds.S
-+#endif
-+
-+/*
-+ * There aren't any ELF relocations we can use to endian-swap values known only
-+ * at link time (e.g. the subtraction of two symbol addresses), so we must get
-+ * the linker to endian-swap certain values before emitting them.
-+ */
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define DATA_LE64(data)					\
-+	((((data) & 0x00000000000000ff) << 56) |	\
-+	 (((data) & 0x000000000000ff00) << 40) |	\
-+	 (((data) & 0x0000000000ff0000) << 24) |	\
-+	 (((data) & 0x00000000ff000000) << 8)  |	\
-+	 (((data) & 0x000000ff00000000) >> 8)  |	\
-+	 (((data) & 0x0000ff0000000000) >> 24) |	\
-+	 (((data) & 0x00ff000000000000) >> 40) |	\
-+	 (((data) & 0xff00000000000000) >> 56))
-+#else
-+#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
-+#endif
-+
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define __HEAD_FLAG_BE	1
-+#else
-+#define __HEAD_FLAG_BE	0
-+#endif
-+
-+#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
-+
-+/*
-+ * These will output as part of the Image header, which should be little-endian
-+ * regardless of the endianness of the kernel. While constant values could be
-+ * endian swapped in head.S, all are done here for consistency.
-+ */
-+#define HEAD_SYMBOLS						\
-+	_kernel_size_le		= DATA_LE64(_end - _text);	\
-+	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
-+	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
-+
-+#endif /* __ASM_IMAGE_H */
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index e048f2b..7b59c3d 100644
+index 7b59c3d..8483504 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -108,9 +108,9 @@ efi_head:
- 	b	stext				// branch to kernel start, magic
- 	.long	0				// reserved
+@@ -37,8 +37,12 @@
+ 
+ #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+ 
+-#if (KERNEL_RAM_VADDR & 0xfffff) != 0x80000
+-#error KERNEL_RAM_VADDR must start at 0xXXX80000
++#if (TEXT_OFFSET & 0xf) != 0
++#error TEXT_OFFSET must be at least 16B aligned
++#elif (PAGE_OFFSET & 0xfffff) != 0
++#error PAGE_OFFSET must be at least 2MB aligned
++#elif TEXT_OFFSET > 0xfffff
++#error TEXT_OFFSET must be less than 2MB
  #endif
--	.quad	TEXT_OFFSET			// Image load offset from start of RAM
--	.quad	0				// reserved
--	.quad	0				// reserved
-+	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
-+	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
-+	.quad	_kernel_flags_le		// Informative flags, little-endian
- 	.quad	0				// reserved
- 	.quad	0				// reserved
- 	.quad	0				// reserved
+ 
+ 	.macro	pgtbl, ttb0, ttb1, virt_to_phys
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index c6648d3..9cbf77a 100644
+index 9cbf77a..d1270c3 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -5,6 +5,7 @@
+@@ -124,3 +124,8 @@ SECTIONS
   */
- 
- #include <asm-generic/vmlinux.lds.h>
-+#include <asm/image.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
-@@ -114,6 +115,8 @@ SECTIONS
- 	_end = .;
- 
- 	STABS_DEBUG
+ ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) > __hyp_idmap_text_end),
+        "HYP init code too big")
 +
-+	HEAD_SYMBOLS
- }
- 
- /*
++/*
++ * If padding is applied before .head.text, virt<->phys conversions will fail.
++ */
++ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
 -- 
 1.9.1
