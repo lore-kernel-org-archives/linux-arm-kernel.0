@@ -1,59 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jun 2014 11:56:58 +0100
-Subject: [PATCHv2 2/4] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140618171519.GF17851@arm.com>
-References: <1403024674-25108-1-git-send-email-mark.rutland@arm.com>
- <1403024674-25108-3-git-send-email-mark.rutland@arm.com>
- <20140618171519.GF17851@arm.com>
-Message-ID: <20140619105658.GB22217@leverpostej>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 19 Jun 2014 12:59:27 +0200
+Subject: [STLinux Kernel] [PATCH 4/7] ARM: stih416-b2020e: Enable PWM
+ on the B2020 Rev-E
+In-Reply-To: <20140619101236.GA7390@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1403103172-19856-1-git-send-email-lee.jones@linaro.org>	<1403103172-19856-4-git-send-email-lee.jones@linaro.org>	<20140619090546.GB2131@griffinp-ThinkPad-X1-Carbon-2nd>	<20140619092042.GB26560@lee--X1>
+ <20140619101236.GA7390@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <53A2C28F.1080007@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 06:15:20PM +0100, Will Deacon wrote:
-> On Tue, Jun 17, 2014 at 06:04:32PM +0100, Mark Rutland wrote:
-> > Currently reading /proc/cpuinfo will result in information being read
-> > out of the MIDR_EL1 of the current CPU, and the information is not
-> > associated with any particular logical CPU number.
-> > 
-> > This is problematic for systems with heterogeneous CPUs (i.e.
-> > big.LITTLE) where fields will vary across CPUs, and the output will
-> > differ depending on the executing CPU. Additionally the output is
-> > different in format to the 32-bit ARM Linux port, where information is
-> > printed out for each CPU.
-> > 
-> > This patch adds the necessary infrastructure to log the relevant
-> > registers (currently just MIDR_EL1) and print out the logged
-> > information.
+Hi Peter,
+
+On 06/19/2014 12:12 PM, Peter Griffin wrote:
+> Hi Lee,
 > 
-> [...]
+>>> Why are you only enabling this for rev-E board?
+>>
+>> Purely for testing purposes, as it's the only board I have.  If
+>> anyone has the other revisions and would be happy to test the driver
+>> for me then great.
 > 
-> > diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-> > new file mode 100644
-> > index 0000000..74bf9bb
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/cpu.h
-> > @@ -0,0 +1,30 @@
-> > +/*
-> > + *  arch/arm/include/asm/cpu.h
-> > + *
-> > + *  Copyright (C) 2004-2014 ARM Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +#ifndef __ASM_ARM64_CPU_H
-> > +#define __ASM_ARM64_CPU_H
+> Ok that's what I suspected.
 > 
-> We're trying to have a consistent style for these guards, so please use
-> __ASM_CPU_H here instead.
+> If you tell me how, I can test on a Rev C board. But as there are several other 
+> revisions I think checking the board schematics would be the quickest way forward.
 
-Done (also added /* __ASM_CPU_H */ to the #endif for consistency).
+Only Rev C & E are in the wild now, so checking these two boards will
+be enough.
 
-> That said, does this actually need to be in a header file? If you move
-> cpuinfo_store_cpu into setup.c, this structure can be private to that
-> file, no?
+Thanks,
+Maxime
 
-Per your comments on patch 3 I'll ignore this :)
+> 
+>>> If you make the stih415 DT PWM nodes part of this series as well, then 
+>>> assuming there is no good reason to the contary, the PWM could 
+>>> be enabled for both stih415/6 in the common stih41x-b2020 DTS file which
+>>> is also included by rev-E (assuming that PWM wiring is not some rev-E specific
+>>> thing).
+> 
+> Can you add the stih415 bindings in V2 as well?
+> 
+> regards,
+> 
+> Peter
+> 
+> _______________________________________________
+> Kernel mailing list
+> Kernel at stlinux.com
+> http://www.stlinux.com/mailman/listinfo/kernel
+> 
 
-Mark.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140619/4cb3411c/attachment.sig>
