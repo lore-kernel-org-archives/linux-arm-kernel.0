@@ -1,49 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 19 Jun 2014 17:49:49 -0400 (EDT)
-Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8
- kernels
-In-Reply-To: <7hk38cvcrm.fsf@paris.lan>
-References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
- <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
- <53A1D701.8060404@codeaurora.org>
- <CAGa+x86DfDjQG8gN2-x7Kapt2ipsYt879R4OK6JWGoaT93VVig@mail.gmail.com>
- <53A1D8FE.6030404@codeaurora.org>
- <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
- <alpine.LFD.2.11.1406181720130.16842@knanqh.ubzr> <7hk38cycuh.fsf@paris.lan>
- <alpine.LFD.2.11.1406191630260.16842@knanqh.ubzr>
- <7hk38cvcrm.fsf@paris.lan>
-Message-ID: <alpine.LFD.2.11.1406191732590.16842@knanqh.ubzr>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 20 Jun 2014 01:40:04 +0300
+Subject: v3.16-rc1 & default cachepolicy
+In-Reply-To: <20140619205853.GH3705@n2100.arm.linux.org.uk>
+References: <20140619203655.GE558@drone.musicnaut.iki.fi>
+ <20140619205853.GH3705@n2100.arm.linux.org.uk>
+Message-ID: <20140619224004.GF558@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jun 2014, Kevin Hilman wrote:
+Hi,
 
-> Nicolas Pitre <nicolas.pitre@linaro.org> writes:
+On Thu, Jun 19, 2014 at 09:58:53PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 19, 2014 at 11:36:55PM +0300, Aaro Koskinen wrote:
+> > When booting v3.16-rc1 on OMAP1, I noticed strange slowness.
+> > E.g. initramfs unpack takes several minutes. This was caused by default
+> > cachepolicy getting changed from writethrough -> uncached for some reason:
+> > 
+> > [    0.000000] Booting Linux on physical CPU 0x0
+> > [    0.000000] Initializing cgroup subsys cpu
+> > [    0.000000] Linux version 3.16.0-rc1-e3-los_880e+ (aaro at cooljazz) (gcc version 4.9.0 (GCC) ) #1 PREEMPT Thu Jun 19 22:51:42 EEST 2014
+> > [    0.000000] CPU: ARM925T [54029252] revision 2 (ARMv4T), cr=0000317f
+> > [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> > [    0.000000] Machine: Amstrad E3 (Delta)
+> > [    0.000000] Ignoring memory below PHYS_OFFSET: 0x02000000-0x10000000
+> > [    0.000000] bootconsole [earlycon0] enabled
+> > [    0.000000] Memory policy: Data cache uncached
+> > [...]
+> > [    4.602732] Unpacking initramfs...
+> > [  425.125093] Freeing initrd memory: 3532K (c1c00000 - c1f73000)
+> > 
+> > It seems this is caused by commit:
+> > 
+> > commit ca8f0b0a545f55b3dc6877cda24d609a8979c951
+> > Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Date:   Tue May 27 20:34:28 2014 +0100
+> > 
+> >     ARM: ensure C page table setup code follows assembly code
+> > 
+> > I can workaround this with "cachepolicy=writethrough" parameter.
 > 
-> > On Thu, 19 Jun 2014, Kevin Hilman wrote:
-> >
-> >> I think this should probably be officialized since we've taken away the
-> >> ability for magic-number checking tools (like 'file') to distinguish
-> >> between big- and little-endian zImages.
-> >> 
-> >> For now, I've updated my tools to check for 'setend be' in ARM and
-> >> Thumb2 mode, but if this does get officialized, I'll gladly move over to
-> >> it.
-> >
-> > Would you ACK this patch?
-> >
-> > ----- >8
-> > ARM: zImage: identify kernel endianness
-> >
-> > With patch #8067/1 applied, it is no longer possible to determine the
+> It brings up the question - proc-arm925.S contains:
 > 
-> minor nit: I'd rather see a commit id (commit subject) instead of the
-> reference in RMK's patch tracker, but other than that...
+>         .long   PMD_TYPE_SECT | \
+>                 PMD_BIT4 | \
+>                 PMD_SECT_AP_WRITE | \
+>                 PMD_SECT_AP_READ
+>         .long   PMD_TYPE_SECT | \
+>                 PMD_BIT4 | \
+>                 PMD_SECT_AP_WRITE | \
+>                 PMD_SECT_AP_READ
+> 
+> In other words, it's telling the assembly code to setup uncached mappings
+> for everything, even memory.  Most people want to set memory up (even at
+> the assembly code time) in cacheable mode... so I'd suggest adding:
+> 
+>                 PMD_SECT_BUFFERABLE | \
+>                 PMD_SECT_CACHEABLE | \
+> 
+> from the first.  You'll find it in the .macro at the end of proc-arm925.S.
+> Please let me know if that works for you.
 
-The commit ID may not be stable, unless RMK moves it to his devel-stable 
-branch.  I'll add the commit subject though.
+So I tried the below change. But now it hangs early, even before
+the earlyprintk is working. :-/
 
-Queued as patch #8079/1.
+A.
 
-
-Nicolas
+diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
+index 97448c3..cb7c0e7 100644
+--- a/arch/arm/mm/proc-arm925.S
++++ b/arch/arm/mm/proc-arm925.S
+@@ -502,6 +502,8 @@ __\name\()_proc_info:
+ 	.long	\cpu_val
+ 	.long	\cpu_mask
+ 	.long   PMD_TYPE_SECT | \
++		PMD_SECT_BUFFERABLE | \
++		PMD_SECT_CACHEABLE | \
+ 		PMD_BIT4 | \
+ 		PMD_SECT_AP_WRITE | \
+ 		PMD_SECT_AP_READ
