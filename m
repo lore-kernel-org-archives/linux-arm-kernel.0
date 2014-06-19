@@ -1,179 +1,84 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jun 2014 10:19:34 +0100
-Subject: [PATCH v5 11/20] KVM: ARM: vgic: abstract VMCR access
+Date: Thu, 19 Jun 2014 10:19:41 +0100
+Subject: [PATCH v5 18/20] arm64: KVM: move HCR_EL2.{IMO,
+ FMO} manipulation into the vgic switch code
 In-Reply-To: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
 References: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403169583-13668-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403169583-13668-19-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly messing with with the GICH_VMCR bits for the CPU
-interface save/restore code, add accessors that encode/decode the
-entire set of registers exposed by VMCR.
+GICv3 requires the IMO and FMO bits to be tightly coupled with some
+of the interrupt controller's register switch.
 
-Not the most efficient thing, but given that this code is only used
-by the save/restore code, performance is far from being critical.
+In order to have similar code paths, move the manipulation of these
+bits to the GICv2 switch code.
 
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  9 +++++++
- virt/kvm/arm/vgic.c    | 69 ++++++++++++++++++++++++++++++++++++++------------
- 2 files changed, 62 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h |  5 +++--
+ arch/arm64/kvm/hyp.S             | 17 ++++++++++++-----
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index cdfa5d9..f515800 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -81,6 +81,13 @@ struct vgic_lr {
- 	u8	state;
- };
- 
-+struct vgic_vmcr {
-+	u32	ctlr;
-+	u32	abpr;
-+	u32	bpr;
-+	u32	pmr;
-+};
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 3d69030..cc83520 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -76,9 +76,10 @@
+  */
+ #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+ 			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
+-			 HCR_AMO | HCR_IMO | HCR_FMO | \
+-			 HCR_SWIO | HCR_TIDCP | HCR_RW)
++			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+ #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
++#define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
 +
- struct vgic_ops {
- 	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
- 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
-@@ -90,6 +97,8 @@ struct vgic_ops {
- 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
- 	void	(*enable_underflow)(struct kvm_vcpu *vcpu);
- 	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
-+	void	(*get_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+	void	(*set_vmcr)(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- };
  
- struct vgic_dist {
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 369016c..b097a2c 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -100,8 +100,10 @@ static void vgic_kick_vcpus(struct kvm *kvm);
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
- static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
- static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
--static u32 vgic_nr_lr;
-+static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ /* Hyp System Control Register (SCTLR_EL2) bits */
+ #define SCTLR_EL2_EE	(1 << 25)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 56df9a3..5945f3b 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -335,11 +335,8 @@
+ .endm
  
-+static u32 vgic_nr_lr;
- static unsigned int vgic_maint_irq;
+ .macro activate_traps
+-	ldr	x2, [x0, #VCPU_IRQ_LINES]
+-	ldr	x1, [x0, #VCPU_HCR_EL2]
+-	orr	x2, x2, x1
+-	msr	hcr_el2, x2
+-
++	ldr     x2, [x0, #VCPU_HCR_EL2]
++	msr     hcr_el2, x2
+ 	ldr	x2, =(CPTR_EL2_TTA)
+ 	msr	cptr_el2, x2
  
- static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
-@@ -1057,6 +1059,28 @@ static void vgic_v2_disable_underflow(struct kvm_vcpu *vcpu)
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
- }
+@@ -382,12 +379,22 @@
+ 	ldr	x24, [x24, VGIC_SAVE_FN]
+ 	kern_hyp_va	x24
+ 	blr	x24
++	mrs	x24, hcr_el2
++	mov	x25, #HCR_INT_OVERRIDE
++	neg	x25, x25
++	and	x24, x24, x25
++	msr	hcr_el2, x24
+ .endm
  
-+static void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >> GICH_VMCR_CTRL_SHIFT;
-+	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >> GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >> GICH_VMCR_BINPOINT_SHIFT;
-+	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >> GICH_VMCR_PRIMASK_SHIFT;
-+}
-+
-+static void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-+	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) & GICH_VMCR_ALIAS_BINPOINT_MASK;
-+	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) & GICH_VMCR_BINPOINT_MASK;
-+	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) & GICH_VMCR_PRIMASK_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-+}
-+
- static const struct vgic_ops vgic_ops = {
- 	.get_lr			= vgic_v2_get_lr,
- 	.set_lr			= vgic_v2_set_lr,
-@@ -1066,6 +1090,8 @@ static const struct vgic_ops vgic_ops = {
- 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
- 	.enable_underflow	= vgic_v2_enable_underflow,
- 	.disable_underflow	= vgic_v2_disable_underflow,
-+	.get_vmcr		= vgic_v2_get_vmcr,
-+	.set_vmcr		= vgic_v2_set_vmcr,
- };
- 
- static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1110,6 +1136,16 @@ static inline void vgic_disable_underflow(struct kvm_vcpu *vcpu)
- 	vgic_ops.disable_underflow(vcpu);
- }
- 
-+static inline void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	vgic_ops.get_vmcr(vcpu, vmcr);
-+}
-+
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	vgic_ops.set_vmcr(vcpu, vmcr);
-+}
-+
- static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1863,39 +1899,40 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
- 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
- {
--	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	u32 reg, mask = 0, shift = 0;
- 	bool updated = false;
-+	struct vgic_vmcr vmcr;
-+	u32 *vmcr_field;
-+	u32 reg;
-+
-+	vgic_get_vmcr(vcpu, &vmcr);
- 
- 	switch (offset & ~0x3) {
- 	case GIC_CPU_CTRL:
--		mask = GICH_VMCR_CTRL_MASK;
--		shift = GICH_VMCR_CTRL_SHIFT;
-+		vmcr_field = &vmcr.ctlr;
- 		break;
- 	case GIC_CPU_PRIMASK:
--		mask = GICH_VMCR_PRIMASK_MASK;
--		shift = GICH_VMCR_PRIMASK_SHIFT;
-+		vmcr_field = &vmcr.pmr;
- 		break;
- 	case GIC_CPU_BINPOINT:
--		mask = GICH_VMCR_BINPOINT_MASK;
--		shift = GICH_VMCR_BINPOINT_SHIFT;
-+		vmcr_field = &vmcr.bpr;
- 		break;
- 	case GIC_CPU_ALIAS_BINPOINT:
--		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
--		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+		vmcr_field = &vmcr.abpr;
- 		break;
-+	default:
-+		BUG();
- 	}
- 
- 	if (!mmio->is_write) {
--		reg = (vgic_cpu->vgic_v2.vgic_vmcr & mask) >> shift;
-+		reg = *vmcr_field;
- 		mmio_data_write(mmio, ~0, reg);
- 	} else {
- 		reg = mmio_data_read(mmio, ~0);
--		reg = (reg << shift) & mask;
--		if (reg != (vgic_cpu->vgic_v2.vgic_vmcr & mask))
-+		if (reg != *vmcr_field) {
-+			*vmcr_field = reg;
-+			vgic_set_vmcr(vcpu, &vmcr);
- 			updated = true;
--		vgic_cpu->vgic_v2.vgic_vmcr &= ~mask;
--		vgic_cpu->vgic_v2.vgic_vmcr |= reg;
-+		}
- 	}
- 	return updated;
- }
+ /*
+  * Call into the vgic backend for state restoring
+  */
+ .macro restore_vgic_state
++	mrs	x24, hcr_el2
++	ldr	x25, [x0, #VCPU_IRQ_LINES]
++	orr	x24, x24, #HCR_INT_OVERRIDE
++	orr	x24, x24, x25
++	msr	hcr_el2, x24
+ 	adr	x24, __vgic_sr_vectors
+ 	ldr	x24, [x24, #VGIC_RESTORE_FN]
+ 	kern_hyp_va	x24
 -- 
 1.8.3.4
