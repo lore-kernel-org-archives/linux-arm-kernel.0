@@ -1,22 +1,28 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 19 Jun 2014 11:38:20 +0100
-Subject: [PATCH v4 10/13] serial: asc: Add support for KGDB's FIQ/NMI mode
+Date: Thu, 19 Jun 2014 11:38:21 +0100
+Subject: [PATCH v4 11/13] serial: asc: Adopt readl_/writel_relaxed()
 In-Reply-To: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
 References: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
  <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1403174303-25456-11-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1403174303-25456-12-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a .poll_init() function that enables UART RX and registers the
-UART's irq with KGDB. By providing this information to KGDB the serial
-driver offers "permission" for KGDB to route the UART interrupt signal
-from the drivers own handler to KGDBs FIQ handler (which will eventually
-use the UART's polled I/O callbacks to interact with the user).
+The architectures supported by this driver have expensive
+implementations of writel(), reliant on spin locks and explicit L2 cache
+management. These architectures provide a cheaper writel_relaxed() which
+is much better suited to peripherals that do not perform DMA. The
+situation with readl()/readl_relaxed()is similar although less acute.
 
-Note that the RX is not only enabled but also unmasked. This is required
-because otherwise the FIQ handler could never trigger. This unmask is
-copied from similar code in amba-pl011.c .
+This driver does not use DMA and will be more power efficient and more
+robust (due to absense of spin locks during console I/O) if it uses the
+relaxed variants.
+
+This driver is cross compilable for testing purposes and remains
+compilable on all architectures by falling back to writel() when
+writel_relaxed() does not exist. We also include explicit compiler
+barriers. There are redundant on ARM and SH but important on
+x86 because it defines "relaxed" differently.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
@@ -27,56 +33,35 @@ Cc: Jiri Slaby <jslaby@suse.cz>
 Cc: kernel at stlinux.com
 Cc: linux-serial at vger.kernel.org
 ---
- drivers/tty/serial/st-asc.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/tty/serial/st-asc.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index c7f61ac..4f376d8 100644
+index 4f376d8..58aa1c6 100644
 --- a/drivers/tty/serial/st-asc.c
 +++ b/drivers/tty/serial/st-asc.c
-@@ -30,6 +30,7 @@
- #include <linux/of_platform.h>
- #include <linux/serial_core.h>
- #include <linux/clk.h>
-+#include <linux/kgdb.h>
+@@ -152,12 +152,21 @@ static inline struct asc_port *to_asc_port(struct uart_port *port)
  
- #define DRIVER_NAME "st-asc"
- #define ASC_SERIAL_NAME "ttyAS"
-@@ -613,6 +614,25 @@ asc_verify_port(struct uart_port *port, struct serial_struct *ser)
+ static inline u32 asc_in(struct uart_port *port, u32 offset)
+ {
+-	return readl(port->membase + offset);
++	u32 r;
++
++	r = readl_relaxed(port->membase + offset);
++	barrier();
++	return r;
  }
  
- #ifdef CONFIG_CONSOLE_POLL
-+
-+#ifdef CONFIG_KGDB_FIQ
-+/*
-+ * Prepare the UART to be used from kgdb's NMI support.
-+ */
-+static int asc_poll_init(struct uart_port *port)
-+{
-+	struct asc_port *ascport = container_of(port, struct asc_port, port);
-+
-+	/* register the FIQ with kgdb */
-+	kgdb_register_fiq(ascport->port.irq);
-+
-+	/* enable RX interrupts in case the interrupt is used for NMI entry. */
-+	asc_enable_rx_interrupts(port);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_KGDB_FIQ */
-+
+ static inline void asc_out(struct uart_port *port, u32 offset, u32 value)
+ {
++#ifdef writel_relaxed
++	writel_relaxed(value, port->membase + offset);
++	barrier();
++#else
+ 	writel(value, port->membase + offset);
++#endif
+ }
+ 
  /*
-  * Console polling routines for writing and reading from the uart while
-  * in an interrupt or debug context (i.e. kgdb).
-@@ -656,6 +676,9 @@ static struct uart_ops asc_uart_ops = {
- 	.verify_port	= asc_verify_port,
- 	.pm		= asc_pm,
- #ifdef CONFIG_CONSOLE_POLL
-+#ifdef CONFIG_KGDB_FIQ
-+	.poll_init     = asc_poll_init,
-+#endif /* CONFIG_KGDB_FIQ */
- 	.poll_get_char = asc_get_poll_char,
- 	.poll_put_char = asc_put_poll_char,
- #endif /* CONFIG_CONSOLE_POLL */
 -- 
 1.9.3
