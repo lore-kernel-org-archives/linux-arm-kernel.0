@@ -1,129 +1,95 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 Jun 2014 10:45:41 +0100
-Subject: [PATCH 03/14] arm/arm64: KVM: refactor vgic_handle_mmio() function
-In-Reply-To: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
-References: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1403171152-24067-4-git-send-email-andre.przywara@arm.com>
+Date: Thu, 19 Jun 2014 10:45:38 +0100
+Subject: [PATCH 00/14] KVM GICv3 emulation
+Message-ID: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we only need to deal with one MMIO region for the GIC
-emulation, but we soon need to extend this. Refactor the existing
-code to allow easier addition of different ranges without code
-duplication.
+GICv3 is the ARM generic interrupt controller designed to overcome
+some limits of the prevalent GICv2. Most notably it lifts the 8-CPU
+limit. Though with recent patches from Marc there is support for
+hosts to use a GICv3, the CPU limitation still applies to KVM guests,
+since the current code emulates a GICv2 only.
+Also, GICv2 backward compatibility being optional in GICv3, a number
+of systems won't be able to run GICv2 guests.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- virt/kvm/arm/vgic.c |   72 ++++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 51 insertions(+), 21 deletions(-)
+This patch series provides code to emulate a GICv3 distributor and
+redistributor for any KVM guest. It requires a GICv3 in the host to
+work. With those patches one can run guests efficiently on any GICv3
+host. It has the following features:
+- Affinity routing (support for up to 255 VCPUs, more possible)
+- System registers (as opposed to MMIO access)
+- No ITS
+- No priority support (as the GICv2 emulation)
+- No save / restore support so far (will be added soon)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 8f1daf2..4c6b212 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -905,37 +905,28 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
- 	return true;
- }
- 
--/**
-- * vgic_handle_mmio - handle an in-kernel MMIO access
-+/*
-+ * vgic_handle_mmio_range - handle an in-kernel MMIO access
-  * @vcpu:	pointer to the vcpu performing the access
-  * @run:	pointer to the kvm_run structure
-  * @mmio:	pointer to the data describing the access
-+ * @ranges:	pointer to the register defining structure
-+ * @mmio_base:	base address for this mapping
-  *
-- * returns true if the MMIO access has been performed in kernel space,
-- * and false if it needs to be emulated in user space.
-+ * returns true if the MMIO access could be performed
-  */
--bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
--		      struct kvm_exit_mmio *mmio)
-+static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+			    struct kvm_exit_mmio *mmio,
-+			    const struct mmio_range *ranges,
-+			    unsigned long mmio_base)
- {
- 	const struct mmio_range *range;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--	unsigned long base = dist->vgic_dist_base;
- 	bool updated_state;
- 	unsigned long offset;
- 
--	if (!irqchip_in_kernel(vcpu->kvm) ||
--	    mmio->phys_addr < base ||
--	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
--		return false;
--
--	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
--	if (mmio->len > 4) {
--		kvm_inject_dabt(vcpu, mmio->phys_addr);
--		return true;
--	}
--
--	offset = mmio->phys_addr - base;
--	range = find_matching_range(vgic_dist_ranges, mmio, offset);
-+	offset = mmio->phys_addr - mmio_base;
-+	range = find_matching_range(ranges, mmio, offset);
- 	if (unlikely(!range || !range->handle_mmio)) {
- 		pr_warn("Unhandled access %d %08llx %d\n",
- 			mmio->is_write, mmio->phys_addr, mmio->len);
-@@ -943,7 +934,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	}
- 
- 	spin_lock(&vcpu->kvm->arch.vgic.lock);
--	offset = mmio->phys_addr - range->base - base;
-+	offset -= range->base;
- 	if (vgic_validate_access(dist, range, offset)) {
- 		updated_state = range->handle_mmio(vcpu, mmio, offset);
- 	} else {
-@@ -961,6 +952,45 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	return true;
- }
- 
-+#define IS_IN_RANGE(addr, alen, base, len) \
-+	(((addr) >= (base)) && (((addr) + (alen)) < ((base) + (len))))
-+
-+static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+				struct kvm_exit_mmio *mmio)
-+{
-+	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
-+
-+	if (!IS_IN_RANGE(mmio->phys_addr, mmio->len, base,
-+			 KVM_VGIC_V2_DIST_SIZE))
-+		return false;
-+
-+	/* GICv2 does not support accesses wider than 32 bits */
-+	if (mmio->len > 4) {
-+		kvm_inject_dabt(vcpu, mmio->phys_addr);
-+		return true;
-+	}
-+
-+	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
-+}
-+
-+/**
-+ * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-+ * @vcpu:      pointer to the vcpu performing the access
-+ * @run:       pointer to the kvm_run structure
-+ * @mmio:      pointer to the data describing the access
-+ *
-+ * returns true if the MMIO access has been performed in kernel space,
-+ * and false if it needs to be emulated in user space.
-+ */
-+bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		      struct kvm_exit_mmio *mmio)
-+{
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return false;
-+
-+	return vgic_v2_handle_mmio(vcpu, run, mmio);
-+}
-+
- static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
- {
- 	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
+The first 10 patches actually refactor the current VGIC code to make
+room for a different VGIC model to be dropped in with Patch 11/14.
+The remaining patches connect the new model to the kernel backend and
+the userland facing code.
+
+The series goes on top of both Marc's GICv3 host support series as
+well as his vgic-dyn patches.
+The necessary patches for kvmtool to enable the guest's GICv3 will be
+posted here as well.
+There was some testing on the fast model with some I/O and interrupt
+affinity shuffling in a Linux guest with a varying number of VCPUs.
+
+Please review and test.
+I would be grateful for people to test for GICv2 regressions also
+(so on a GICv2 host with current kvmtool/qemu), as there is quite
+some refactoring on that front.
+
+Much of the code was inspired by Marc, so send all praises to him
+(while I take the blame).
+
+Cheers,
+Andre.
+
+Andre Przywara (14):
+  arm/arm64: KVM: rework MPIDR assignment and add accessors
+  arm/arm64: KVM: pass down user space provided GIC type into vGIC code
+  arm/arm64: KVM: refactor vgic_handle_mmio() function
+  arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
+  arm/arm64: KVM: introduce per-VM ops
+  arm/arm64: KVM: make the maximum number of vCPUs a per-VM value
+  arm/arm64: KVM: make the value of ICC_SRE_EL1 a per-VM variable
+  arm/arm64: KVM: refactor MMIO accessors
+  arm/arm64: KVM: split GICv2 specific emulation code from vgic.c
+  arm/arm64: KVM: add opaque private pointer to MMIO accessors
+  arm/arm64: KVM: add virtual GICv3 distributor emulation
+  arm/arm64: KVM: add SGI system register trapping
+  arm/arm64: KVM: enable kernel side of GICv3 emulation
+  arm/arm64: KVM: allow userland to request a virtual GICv3
+
+ arch/arm/include/asm/kvm_emulate.h   |    2 +-
+ arch/arm/include/asm/kvm_host.h      |    3 +
+ arch/arm/kvm/Makefile                |    1 +
+ arch/arm/kvm/arm.c                   |   23 +-
+ arch/arm/kvm/coproc.c                |   19 +
+ arch/arm/kvm/psci.c                  |   15 +-
+ arch/arm64/include/asm/kvm_emulate.h |    3 +-
+ arch/arm64/include/asm/kvm_host.h    |    5 +
+ arch/arm64/include/uapi/asm/kvm.h    |    7 +
+ arch/arm64/kernel/asm-offsets.c      |    1 +
+ arch/arm64/kvm/Makefile              |    2 +
+ arch/arm64/kvm/sys_regs.c            |   37 +-
+ arch/arm64/kvm/vgic-v3-switch.S      |   14 +-
+ include/kvm/arm_vgic.h               |   38 +-
+ include/linux/irqchip/arm-gic-v3.h   |   26 +
+ include/linux/kvm_host.h             |    1 +
+ include/uapi/linux/kvm.h             |    1 +
+ virt/kvm/arm/vgic-v2-emul.c          |  802 +++++++++++++++++++++++++++
+ virt/kvm/arm/vgic-v2.c               |   22 +-
+ virt/kvm/arm/vgic-v3-emul.c          |  898 ++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic-v3.c               |  157 +++++-
+ virt/kvm/arm/vgic.c                  | 1017 +++++++---------------------------
+ virt/kvm/arm/vgic.h                  |  117 ++++
+ virt/kvm/kvm_main.c                  |    3 +
+ 24 files changed, 2346 insertions(+), 868 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic-v2-emul.c
+ create mode 100644 virt/kvm/arm/vgic-v3-emul.c
+ create mode 100644 virt/kvm/arm/vgic.h
+
 -- 
 1.7.9.5
