@@ -1,74 +1,56 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 19 Jun 2014 12:21:55 +0200
-Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
- udelay
-In-Reply-To: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
-References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <53A2B9C3.1050906@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Jun 2014 11:25:26 +0100
+Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
+In-Reply-To: <1403116902.17030.15.camel@smoke>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+ <1402950432.3708.22.camel@smoke>
+ <20140618164927.GA9612@leverpostej>
+ <1403116902.17030.15.camel@smoke>
+Message-ID: <20140619102526.GA22217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+On Wed, Jun 18, 2014 at 07:41:42PM +0100, Geoff Levand wrote:
+> Hi Mark,
 
-Please see my comments inline.
+Hi Geoff,
 
-On 19.06.2014 10:39, Amit Daniel Kachhap wrote:
-> This patch register the exynos mct clocksource as the current timer
-> as it has constant clock rate. This will generate correct udelay for the
-> exynos platform and avoid using unnecessary calibrated jiffies. This change
-> has been tested on exynos5420 based board and udelay is very close to
-> expected.
+Thanks for raising the issue. I can see from Kevin's comments that the
+kernel endianness is a useful piece of information, so I'll add a field
+to the header to export that for v3.
+
+> On Wed, 2014-06-18 at 17:49 +0100, Mark Rutland wrote:
+> > On Mon, Jun 16, 2014 at 09:27:12PM +0100, Geoff Levand wrote:
+> > While I initially considered having a field to specify byte order, it's
+> > incredibly likely that bootloaders will not use it. Maintaining a fixed
+> > endianness everywhere makes it simpler for bootloaders to do the right
+> > thing, and matches what existing bootloaders are already doing. That's
+> > less pain for loaders and less pain for the kernel, as things are less
+> > likely to go wrong.
+> > 
+> > To me it makes more sense to ensure these fields have a consistent
+> > endianness, rather than adding more room for possible mistakes.
 > 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
-> Changes in V2:
-> * Added #defines for ARM and ARM64 as pointed by Doug Anderson.
-> 
-> Patches from David Riley confirmed that udelay is broken in exynos5420.
-> Link to those patches are,
-> 1) https://patchwork.kernel.org/patch/4344911/
-> 2) https://patchwork.kernel.org/patch/4344881/
-> 
->  drivers/clocksource/exynos_mct.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index f71d55f..02927e2 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -195,10 +195,25 @@ static u64 notrace exynos4_read_sched_clock(void)
->  	return exynos4_frc_read(&mct_frc);
->  }
->  
-> +static struct delay_timer exynos4_delay_timer;
-> +
-> +static unsigned long exynos4_read_current_timer(void)
-> +{
-> +#ifdef ARM
-> +	return __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_L);
-> +#else /* ARM64, etc */
-> +	return exynos4_frc_read(&mct_frc);
-> +#endif
-> +}
-> +
+> I guess my view is that any software expected to support arm64 in both
+> big and little endian configurations should be tested with such, and
+> with this it is pretty simple to test and fix, so we shouldn't over
+> engineer it, but I don't really care how we fix it.
 
-No need for anything like this. Even if running on ARM64, the delay
-timer code should be able to cope with different timer widths. For
-delays, 32 bits are enough, so just always read the lower part.
+I disagree that the bootloader _must_ have to deal with the endianness
+of the kernel. If the user knows the endianness of the kernel and
+provides a filesystem of the appropriate endianness, I don't see why the
+bootloader should have to do anything differently. In most cases the
+bootloader has no need to care.
 
-Also use of raw accessors in drivers is discouraged - please use
-readl_relaxed().
+IMO It's far better to export the fields in the kernel header in a
+consistent endianness than it is to force every boot loader to inspect
+the endianness of the kernel image.  I can imagine there are going to be
+plenty of bootloaders which will not attempt to determine the endianness
+and will blindly assume a particular case. Exporting the kernel
+endianness does seem to make sense, but I think this should be in
+addition to the information bootloaders require rather than being part
+of the information bootloaders require.
 
-Btw. I don't even see support for this on ARM64 in mainline, where arch
-timer is always used for delays and AFAIK this is a platform requirement.
-
->  static void __init exynos4_clocksource_init(void)
->  {
->  	exynos4_mct_frc_start();
->  
-> +	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
-
-nit: No need for & for function pointers.
-
-Best regards,
-Tomasz
+Thanks,
+Mark.
