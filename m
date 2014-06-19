@@ -1,121 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 19 Jun 2014 14:54:15 +0200
-Subject: [PATCHv2 2/4] arm64: cpuinfo: print info for all CPUs
-In-Reply-To: <20140619113129.GC22217@leverpostej>
-References: <1403024674-25108-1-git-send-email-mark.rutland@arm.com>
- <1403024674-25108-3-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu9XJnFizEtOxyyXAdUH0OQgBjxuOeCV8FB5ajXtGe5gJQ@mail.gmail.com>
- <20140619113129.GC22217@leverpostej>
-Message-ID: <CAKv+Gu8Fj4BSpTMpY39reGkk4Lt34ebmWft9A-OUV7q3qFxhPQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 19 Jun 2014 18:30:10 +0530
+Subject: [PATCH v2 07/18] ARM: dts: DRA7: Change the parent of
+ apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
+In-Reply-To: <53A2C5B4.9080300@ti.com>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-8-git-send-email-kishon@ti.com> <53A2C5B4.9080300@ti.com>
+Message-ID: <53A2DEDA.5050104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2014 13:31, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jun 18, 2014 at 07:29:01PM +0100, Ard Biesheuvel wrote:
->> Hi Mark,
->
-> Hi Ard,
->
->> On 17 June 2014 19:04, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Currently reading /proc/cpuinfo will result in information being read
->> > out of the MIDR_EL1 of the current CPU, and the information is not
->> > associated with any particular logical CPU number.
->> >
->> > This is problematic for systems with heterogeneous CPUs (i.e.
->> > big.LITTLE) where fields will vary across CPUs, and the output will
->> > differ depending on the executing CPU. Additionally the output is
->> > different in format to the 32-bit ARM Linux port, where information is
->> > printed out for each CPU.
->> >
->> > This patch adds the necessary infrastructure to log the relevant
->> > registers (currently just MIDR_EL1) and print out the logged
->> > information.
->> >
->> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> > Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> > ---
->> >  arch/arm64/include/asm/cpu.h | 30 +++++++++++++++++++++++++++++
->> >  arch/arm64/kernel/Makefile   |  3 ++-
->> >  arch/arm64/kernel/cpuinfo.c  | 31 +++++++++++++++++++++++++++++
->> >  arch/arm64/kernel/setup.c    | 46 +++++++++++++++++++++++---------------------
->> >  arch/arm64/kernel/smp.c      |  6 ++++++
->> >  5 files changed, 93 insertions(+), 23 deletions(-)
->> >  create mode 100644 arch/arm64/include/asm/cpu.h
->> >  create mode 100644 arch/arm64/kernel/cpuinfo.c
->> >
->> [...]
->> > @@ -447,38 +447,40 @@ static const char *hwcap_str[] = {
->> >
->> >  static int c_show(struct seq_file *m, void *v)
->> >  {
->> > -       int i;
->> > +       int c;
->> >
->> > -       seq_printf(m, "Processor\t: %s rev %d (%s)\n",
->> > -                  cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
->> > +       for_each_online_cpu(c) {
->> > +               int i;
->> > +               struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, c);
->> > +               u32 midr = cpuinfo->reg_midr;
->> >
->> > -       for_each_online_cpu(i) {
->> >                 /*
->> >                  * glibc reads /proc/cpuinfo to determine the number of
->> >                  * online processors, looking for lines beginning with
->> >                  * "processor".  Give glibc what it expects.
->> >                  */
->> >  #ifdef CONFIG_SMP
->> > -               seq_printf(m, "processor\t: %d\n", i);
->> > +               seq_printf(m, "processor\t: %d\n", c);
->> >  #endif
->> > -       }
->> > +               seq_printf(m, "Type\t\t: %s rev %d (%s)\n",
->> > +                          cpu_name, MIDR_REVISION(midr), ELF_PLATFORM);
->> >
->> > -       /* dump out the processor features */
->> > -       seq_puts(m, "Features\t: ");
->> > +               /* dump out the processor features */
->> > +               seq_puts(m, "Features\t: ");
->> >
->> > -       for (i = 0; hwcap_str[i]; i++)
->> > -               if (elf_hwcap & (1 << i))
->> > -                       seq_printf(m, "%s ", hwcap_str[i]);
->> > +               for (i = 0; hwcap_str[i]; i++)
->> > +                       if (elf_hwcap & (1 << i))
->> > +                               seq_printf(m, "%s ", hwcap_str[i]);
->> >
+Hi Tero,
+
+On Thursday 19 June 2014 04:42 PM, Tero Kristo wrote:
+> On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
+>> From: Keerthy <j-keerthy@ti.com>
 >>
->> Same question as first time around: does it really make sense to print
->> the value of elf_hwcap (whose value depends only on the capabilities
->> of the boot cpu) for every CPU listed?
->
-> Sorry, factoring out the hwcap parsing slipped my mind when I went to
-> investigate the I-cache policy issue.
->
-> I've taken another look, and it's somewhat painful to sort out.
->
-> Ideally we'd read all of the cpuinfo data, parse that into hwcap fields,
-> then copy the boot CPU fields into the globals. Unfortunately
-> setup_processor happens before we setup the percpu offsets, and some of
-> the hwcaps are set elsewhere (fpsimd_init and
-> arch_timer_evtstrm_enable). It's not obvious to me how to handle those,
-> the timer case should certainly live in the timer driver.
->
-> We expect globally uniform hwcaps anyway, the CPUs should be identical
-> instruction-set wise (and the sanity checks from later in this series
-> will trigger were this not the case), so is this a problem?
->
-> I agree it would be nicer to have accurate per-CPU hwcaps were they to
-> differ, but that's a case we don't expect to support as far as I am
-> aware.
->
+>> Change the parent of apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
+>> from dpll_pcie_ref_ck.
+> 
+> Why? Needs a better changelog also.
 
-Well, considering that the purpose of this patch is to reveal minor
-differences between CPUs, it will be confusing at the least if you
-print elf_hwcap derived from CPU#0 for all other CPUs. So why not move
-the capabilties line out of the loop? I know you prefer it inside the
-loop for parity with other archs but IMO that only makes sense if the
-information presented is 100% accurate.
+Figure 26-22. DPLL_PCIE_REF Functional Block Diagram in vE of DRA7xx ES1.0 TRM
+shows the signal name for the output of post divider (M2) is CLKOUTLDO.
 
--- 
-Ard.
+Figure 26-21. PCIe PHY Clock Generator Overview shows CLKOUTLDO is used as
+input to apll mux.
+
+So the actual output of dpll should be dpll_pcie_ref_m2ldo_ck instead of
+dpll_pcie_ref_ck (which is the input of apll mux).
+
+Thanks
+Kishon
+> 
+> -Tero
+> 
+>>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   arch/arm/boot/dts/dra7xx-clocks.dtsi |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> index 55e95c5..44993ec 100644
+>> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> @@ -1152,7 +1152,7 @@
+>>
+>>       apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
+>>           compatible = "ti,mux-clock";
+>> -        clocks = <&dpll_pcie_ref_ck>, <&pciesref_acs_clk_ck>;
+>> +        clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
+>>           #clock-cells = <0>;
+>>           reg = <0x021c 0x4>;
+>>           ti,bit-shift = <7>;
+>>
+> 
