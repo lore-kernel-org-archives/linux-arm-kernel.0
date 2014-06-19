@@ -1,168 +1,150 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 Jun 2014 10:45:46 +0100
-Subject: [PATCH 08/14] arm/arm64: KVM: refactor MMIO accessors
+Date: Thu, 19 Jun 2014 10:45:52 +0100
+Subject: [PATCH 14/14] arm/arm64: KVM: allow userland to request a virtual
+ GICv3
 In-Reply-To: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
 References: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1403171152-24067-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <1403171152-24067-15-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMIO accessors for GICD_I[CS]ENABLER, GICD_I[CS]PENDR and
-GICD_ICFGR behave very similiar in GICv3, although the way the
-affected vCPU is determined differs.
-Factor out a generic, backend-facing implementation and use small
-wrappers in the current GICv2 emulation to ease code sharing later.
+With everything in place we allow userland to request the kernel
+using a virtual GICv3 in the guest, which finally lifts the 8 vCPU
+limit for a guest.
+Also we provide the necessary support for guests setting the memory
+addresses for the virtual distributor and redistributors.
+This requires some userland code to make use of that feature and
+explicitly ask for a virtual GICv3.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic.c |   93 ++++++++++++++++++++++++++++-----------------------
- 1 file changed, 52 insertions(+), 41 deletions(-)
+ arch/arm64/include/uapi/asm/kvm.h |    7 ++++++
+ include/kvm/arm_vgic.h            |    4 ++--
+ virt/kvm/arm/vgic-v3-emul.c       |    3 +++
+ virt/kvm/arm/vgic.c               |   46 ++++++++++++++++++++++++++-----------
+ 4 files changed, 45 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 5513de4..9a62081 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -77,6 +77,13 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_DIST_SIZE		0x1000
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
+ 
++/* Supported VGICv3 address types  */
++#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
++#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++
++#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
++#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+ #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 3b164ee..82e00a5 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -35,8 +35,8 @@
+ #define VGIC_MAX_IRQS		1024
+ 
+ /* Sanity checks... */
+-#if (KVM_MAX_VCPUS > 8)
+-#error	Invalid number of CPU interfaces
++#if (KVM_MAX_VCPUS > 255)
++#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
+ #endif
+ 
+ #if (VGIC_NR_IRQS_LEGACY & 31)
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index 68821fd..88c2cca 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -873,6 +873,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 		case KVM_VGIC_V2_ADDR_TYPE_DIST:
+ 		case KVM_VGIC_V2_ADDR_TYPE_CPU:
+ 			return -ENXIO;
++		case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++			return 0;
+ 		}
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 2de58b3..2a59dff 100644
+index 8a584e0..e3c7189 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -398,35 +398,54 @@ static bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu,
- 	return false;
- }
- 
--static bool handle_mmio_set_enable_reg(struct kvm_vcpu *vcpu,
--				       struct kvm_exit_mmio *mmio,
--				       phys_addr_t offset)
-+static bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
-+				   phys_addr_t offset, int vcpu_id, int access)
+@@ -1526,7 +1526,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
+ /**
+  * kvm_vgic_addr - set or get vgic VM base addresses
+  * @kvm:   pointer to the vm struct
+- * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
++ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
+  * @addr:  pointer to address value
+  * @write: if true set the address in the VM address space, if false read the
+  *          address
+@@ -1540,29 +1540,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
  {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_enabled,
--				       vcpu->vcpu_id, offset);
--	vgic_reg_access(mmio, reg, offset,
--			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
-+	u32 *reg;
-+	int mode = ACCESS_READ_VALUE | access;
-+	struct kvm_vcpu *target_vcpu = kvm_get_vcpu(kvm, vcpu_id);
+ 	int r = 0;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
++	int type_needed;
++	phys_addr_t *addr_ptr, block_size;
+ 
+ 	mutex_lock(&kvm->lock);
+ 	switch (type) {
+ 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+-		if (write) {
+-			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+-					       *addr, KVM_VGIC_V2_DIST_SIZE);
+-		} else {
+-			*addr = vgic->vgic_dist_base;
+-		}
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V2_DIST_SIZE;
+ 		break;
+ 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+-		if (write) {
+-			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+-					       *addr, KVM_VGIC_V2_CPU_SIZE);
+-		} else {
+-			*addr = vgic->vgic_cpu_base;
+-		}
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_cpu_base;
++		block_size = KVM_VGIC_V2_CPU_SIZE;
+ 		break;
++#ifdef CONFIG_ARM_GIC_V3
++	case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V3_DIST_SIZE;
++		break;
++	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_redist_base;
++		block_size = KVM_VGIC_V3_REDIST_SIZE;
++		break;
++#endif
+ 	default:
+ 		r = -ENODEV;
++		goto out;
++	}
 +
-+	reg = vgic_bitmap_get_reg(&kvm->arch.vgic.irq_enabled, vcpu_id, offset);
-+	vgic_reg_access(mmio, reg, offset, mode);
- 	if (mmio->is_write) {
--		vgic_update_state(vcpu->kvm);
-+		if (access & ACCESS_WRITE_CLEARBIT) {
-+			if (offset < 4) /* Force SGI enabled */
-+				*reg |= 0xffff;
-+			vgic_retire_disabled_irqs(target_vcpu);
-+		}
-+		vgic_update_state(kvm);
- 		return true;
++	if (vgic->vgic_model != type_needed) {
++		r = -ENODEV;
++		goto out;
  	}
  
- 	return false;
++	if (write)
++		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
++	else
++		*addr = *addr_ptr;
++
++out:
+ 	mutex_unlock(&kvm->lock);
+ 	return r;
  }
- 
-+static bool handle_mmio_set_enable_reg(struct kvm_vcpu *vcpu,
-+				       struct kvm_exit_mmio *mmio,
-+				       phys_addr_t offset)
-+{
-+	return vgic_handle_enable_reg(vcpu->kvm, mmio, offset,
-+				      vcpu->vcpu_id, ACCESS_WRITE_SETBIT);
-+}
-+
- static bool handle_mmio_clear_enable_reg(struct kvm_vcpu *vcpu,
- 					 struct kvm_exit_mmio *mmio,
- 					 phys_addr_t offset)
- {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_enabled,
--				       vcpu->vcpu_id, offset);
--	vgic_reg_access(mmio, reg, offset,
--			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
-+	return vgic_handle_enable_reg(vcpu->kvm, mmio, offset,
-+				      vcpu->vcpu_id, ACCESS_WRITE_CLEARBIT);
-+}
-+
-+static bool vgic_handle_pending_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
-+				    phys_addr_t offset, int vcpu_id, int access)
-+{
-+	u32 *reg;
-+	int mode = ACCESS_READ_VALUE | access;
-+
-+	reg = vgic_bitmap_get_reg(&kvm->arch.vgic.irq_state, vcpu_id, offset);
-+	vgic_reg_access(mmio, reg, offset, mode);
- 	if (mmio->is_write) {
--		if (offset < 4) /* Force SGI enabled */
--			*reg |= 0xffff;
--		vgic_retire_disabled_irqs(vcpu);
--		vgic_update_state(vcpu->kvm);
-+		vgic_update_state(kvm);
- 		return true;
- 	}
- 
-@@ -437,31 +456,16 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 					struct kvm_exit_mmio *mmio,
- 					phys_addr_t offset)
- {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
--				       vcpu->vcpu_id, offset);
--	vgic_reg_access(mmio, reg, offset,
--			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
--	if (mmio->is_write) {
--		vgic_update_state(vcpu->kvm);
--		return true;
--	}
--
--	return false;
-+	return vgic_handle_pending_reg(vcpu->kvm, mmio, offset,
-+				       vcpu->vcpu_id, ACCESS_WRITE_SETBIT);
- }
- 
- static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  struct kvm_exit_mmio *mmio,
- 					  phys_addr_t offset)
- {
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_state,
--				       vcpu->vcpu_id, offset);
--	vgic_reg_access(mmio, reg, offset,
--			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
--	if (mmio->is_write) {
--		vgic_update_state(vcpu->kvm);
--		return true;
--	}
--
-+	return vgic_handle_pending_reg(vcpu->kvm, mmio, offset,
-+				       vcpu->vcpu_id, ACCESS_WRITE_CLEARBIT);
- 	return false;
- }
- 
-@@ -587,14 +591,10 @@ static u16 vgic_cfg_compress(u32 val)
-  * LSB is always 0. As such, we only keep the upper bit, and use the
-  * two above functions to compress/expand the bits
-  */
--static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
--				struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+static bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
-+				phys_addr_t offset)
- {
- 	u32 val;
--	u32 *reg;
--
--	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
--				  vcpu->vcpu_id, offset >> 1);
- 
- 	if (offset & 4)
- 		val = *reg >> 16;
-@@ -623,6 +623,17 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
- 	return false;
- }
- 
-+static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
-+				struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+{
-+	u32 *reg;
-+
-+	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
-+				  vcpu->vcpu_id, offset >> 1);
-+
-+	return vgic_handle_cfg_reg(reg, mmio, offset);
-+}
-+
- static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
- 				struct kvm_exit_mmio *mmio, phys_addr_t offset)
- {
 -- 
 1.7.9.5
