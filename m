@@ -1,90 +1,59 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 19 Jun 2014 10:16:12 +0200
-Subject: [PATCH v2] ARM: msm: Update the references to DEBUG_MSM_UARTx
-In-Reply-To: <1401122260-12002-1-git-send-email-gdjakov@mm-sol.com>
-References: <1401116287.6068.15.camel@x220>
- <1401122260-12002-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1403165772.23136.17.camel@x220>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 19 Jun 2014 10:21:40 +0200
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <20140618195908.GJ32514@n2100.arm.linux.org.uk>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <20140618190108.GI32514@n2100.arm.linux.org.uk>
+ <201406182109.59059@pali>
+ <20140618195908.GJ32514@n2100.arm.linux.org.uk>
+Message-ID: <20140619082140.GB4309@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-05-26 at 19:37 +0300, Georgi Djakov wrote:
-> The Kconfig options DEBUG_MSM_UART1, DEBUG_MSM_UART2, DEBUG_MSM_UART3,
-> MSM_DEBUG_UART1, MSM_DEBUG_UART2 and MSM_DEBUG_UART3 are removed, but 
-> they are still referenced in the following files:
-> 	arch/arm/mach-msm/io.c,
-> 	arch/arm/mach-msm/board-trout.c
-> 	arch/arm/mach-msm/board-trout-gpio.c
+On Wed 2014-06-18 20:59:08, Russell King - ARM Linux wrote:
+> On Wed, Jun 18, 2014 at 09:09:58PM +0200, Pali Roh?r wrote:
+> > On Wednesday 18 June 2014 21:01:09 Russell King - ARM Linux 
+> > wrote:
+> > > On Wed, Jun 18, 2014 at 06:54:24PM +0200, Pali Roh?r wrote:
+> > > > Machine name from board description is some generic name on
+> > > > DT kernel. DT provides machine name property which is
+> > > > specific for board, so use it instead generic one when
+> > > > possible.
+> > > 
+> > > http://archive.arm.linux.org.uk/lurker/message/20130726.132850
+> > > .53d47576.en.html
+> > > 
+> > > "If userspace wants to get at the DT information about a
+> > > platform, we already have ways that can happen already - we
+> > > export the DT stuff so that kexec's tools can get at it."
+> > 
+> > Userspace application does not know that kernel using DT. And 
+> > also it does not want to get DT information. Only board/machine 
+> > name. So existing applications stop working after migration to 
+> > DT. And because legacy board boot code (without DT) is going to 
+> > be removed for ARM in near future this will permanently break 
+> > existing applications.
 > 
-> Fix this by updating the reference to the new Kconfig option.
+> We're already breaking the userspace API through moving to DT, because
+> all the device names in /sys/devices are changing.  Userspace is going
+> to have to cope with change as we move towards DT.  This is just
+> another aspect of moving towards DT, and one which userspace is going
+> to have to deal with.
 > 
-> Reported-by: Paul Bolle <pebolle@tiscali.nl>
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-> ---
+> > And sometimes it is even not possible to fix userspace 
+> > application if is closed source - binary only.
+> 
+> And why do we care about closed source?
 
-This patch is included neither in v3.16-rc1 nor in next-20140619. Did it
-run into problems or is it already queued somewhere?
- 
-> Changes since v1:
->  - Fixed similar issue in board-trout.c and board-trout-gpio.c
-> 
->  Applies to next-20140526.
-> 
->  arch/arm/mach-msm/board-trout-gpio.c |    2 +-
->  arch/arm/mach-msm/board-trout.c      |    2 +-
->  arch/arm/mach-msm/io.c               |    6 ++----
->  3 files changed, 4 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
-> index 87e1d01..e24930e 100644
-> --- a/arch/arm/mach-msm/board-trout-gpio.c
-> +++ b/arch/arm/mach-msm/board-trout-gpio.c
-> @@ -94,7 +94,7 @@ static int trout_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->  	}
->  
->  static struct msm_gpio_chip msm_gpio_banks[] = {
-> -#if defined(CONFIG_MSM_DEBUG_UART1)
-> +#if defined(CONFIG_DEBUG_MSM_UART) && (CONFIG_DEBUG_UART_PHYS == 0xa9a00000)
->  	/* H2W pins <-> UART1 */
->  	TROUT_GPIO_BANK("MISC2", 0x00,   TROUT_GPIO_MISC2_BASE, 0x40),
->  #else
-> diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
-> index 015d544..8369dfd 100644
-> --- a/arch/arm/mach-msm/board-trout.c
-> +++ b/arch/arm/mach-msm/board-trout.c
-> @@ -90,7 +90,7 @@ static void __init trout_map_io(void)
->  	msm_map_common_io();
->  	iotable_init(trout_io_desc, ARRAY_SIZE(trout_io_desc));
->  
-> -#ifdef CONFIG_MSM_DEBUG_UART3
-> +#if defined(CONFIG_DEBUG_MSM_UART) && (CONFIG_DEBUG_UART_PHYS == 0xa9c00000)
->  	/* route UART3 to the "H2W" extended usb connector */
->  	writeb(0x80, TROUT_CPLD_BASE + 0x00);
->  #endif
-> diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-> index 34e0947..b042dca 100644
-> --- a/arch/arm/mach-msm/io.c
-> +++ b/arch/arm/mach-msm/io.c
-> @@ -57,8 +57,7 @@ static struct map_desc msm_io_desc[] __initdata = {
->  		.length =   MSM_SHARED_RAM_SIZE,
->  		.type =     MT_DEVICE,
->  	},
-> -#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
-> -		defined(CONFIG_DEBUG_MSM_UART3)
-> +#if defined(CONFIG_DEBUG_MSM_UART)
->  	{
->  		/* Must be last: virtual and pfn filled in by debug_ll_addr() */
->  		.length = SZ_4K,
-> @@ -76,8 +75,7 @@ void __init msm_map_common_io(void)
->  	 * pages are peripheral interface or not.
->  	 */
->  	asm("mcr p15, 0, %0, c15, c2, 4" : : "r" (0));
-> -#if defined(CONFIG_DEBUG_MSM_UART1) || defined(CONFIG_DEBUG_MSM_UART2) || \
-> -		defined(CONFIG_DEBUG_MSM_UART3)
-> +#if defined(CONFIG_DEBUG_MSM_UART)
->  #ifdef CONFIG_MMU
->  	debug_ll_addr(&msm_io_desc[size - 1].pfn,
->  		      &msm_io_desc[size - 1].virtual);
+"No regressions". Recent DT changes broke userspace we care about. Now you can either
+revert DT changes, or fix the code to be compatible-enough. Second option is better, I guess.
 
+> If we listened to this argument, then we wouldn't ever be able to
+> change anything in procfs or sysfs.
 
-Paul Bolle
+If we find procfs/sysfs changes that break userspace, we revert them. Its 
+that simple.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
