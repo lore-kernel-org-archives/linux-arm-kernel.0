@@ -1,73 +1,79 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 19 Jun 2014 11:27:02 -0700
-Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8 kernels
-In-Reply-To: <alpine.LFD.2.11.1406181720130.16842@knanqh.ubzr> (Nicolas
- Pitre's message of "Wed, 18 Jun 2014 17:35:08 -0400 (EDT)")
-References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
- <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
- <53A1D701.8060404@codeaurora.org>
- <CAGa+x86DfDjQG8gN2-x7Kapt2ipsYt879R4OK6JWGoaT93VVig@mail.gmail.com>
- <53A1D8FE.6030404@codeaurora.org>
- <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
- <alpine.LFD.2.11.1406181720130.16842@knanqh.ubzr>
-Message-ID: <7hk38cycuh.fsf@paris.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Jun 2014 19:40:02 +0100
+Subject: [PATCH v5 04/20] arm64: boot protocol documentation update for
+ GICv3
+In-Reply-To: <20140619140149.GA30188@leverpostej>
+References: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
+ <1403169583-13668-5-git-send-email-marc.zyngier@arm.com>
+ <20140619140149.GA30188@leverpostej>
+Message-ID: <53A32E82.20803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nicolas.pitre@linaro.org> writes:
+Hi Mark,
 
-> On Wed, 18 Jun 2014, Kevin Hilman wrote:
->
->> On Wed, Jun 18, 2014 at 11:22 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> > On 06/18/14 11:21, Kevin Hilman wrote:
->> >> On Wed, Jun 18, 2014 at 11:14 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> >>> On 06/18/14 10:55, Kevin Hilman wrote:
->> >>>> All of that to say, with this patch applied, I need a new (and
->> >>>> reliable) way to determine the endianness of a kernel just by looking
->> >>>> at the zImage.  Recommendations welcome.
->> >>> Assuming that you have the .config configured to be built into the
->> >>> kernel you could use extract-ikconfig
->> >>>
->> >>> $ ./scripts/extract-ikconfig zImage | grep CONFIG_CPU_ENDIAN_BE8
->> >> Unfortunately, I can't rely on having that built in since I want the
->> >> boot tools to be as generic as possible.
->> >>
->> >>
->> >
->> > Yeah ok. Perhaps you can look for the 'setend be' instruction right
->> > after the magic values instead.
->> 
->> Yeah, that works, as long as I can always assume that instruction will
->> be at the same offset (currently at 0x30).
->
-> Well... then you also have to test for the Thumb2 variant. 
+On 19/06/14 15:01, Mark Rutland wrote:
+> Hi Marc,
+> 
+> On Thu, Jun 19, 2014 at 10:19:27AM +0100, Marc Zyngier wrote:
+>> Linux has some requirements that must be satisfied in order to boot
+>> on a system built with a GICv3.
+>>
+>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  Documentation/arm64/booting.txt | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+>> index 37fc4f6..e28ccec 100644
+>> --- a/Documentation/arm64/booting.txt
+>> +++ b/Documentation/arm64/booting.txt
+>> @@ -141,6 +141,12 @@ Before jumping into the kernel, the following conditions must be met:
+>>    the kernel image will be entered must be initialised by software at a
+>>    higher exception level to prevent execution in an UNKNOWN state.
+>>  
+>> +  For systems with a GICv3 interrupt controller, it is expected that:
+>> +  - If EL3 is present, it must program ICC_SRE_EL3.Enable (bit 3) to
+>> +    0b1 and ICC_SRE_EL3.SRE (bit 0) to 0b1.
+>> +  - If the kernel is entered at EL1, EL2 must set ICC_SRE_EL2.Enable
+>> +    (bit 3) to 0b1 and ICC_SRE_EL2.SRE (bit 0) to 0b1.
+> 
+> Apologies for spotting this so late, but to me this sounds slightly
+> ambiguous. The use of "it is expected" doesn't read like a hard
+> requirement, and in the first point, it's ambiguous as to what "it" is.
+> 
+> I assume that if the GIC is communicated to the kernel as a GICv2 then
+> these points do not hold?
 
-Ah, right.
+The first point always holds, specially if the kernel is entered at EL2
+(see patch #2 and the way we initialize System Registers in head.S). At
+this stage, we haven't looked at DT yet, and must setup EL2
+independently of what the platform will describe. The only source of
+information we have is whether or not this CPU implements GICv3 System
+Registers (id_aa64pfr0_el1).
 
-> And that forces this instruction to always be there.
->
-> If we're to "officialize" this, I'd much prefer we add another magic 
-> value like this:
->
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index c95feab6ce..413fd94b53 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -128,6 +128,7 @@ start:
->  		.word	_magic_sig	@ Magic numbers to help the loader
->  		.word	_magic_start	@ absolute load/run zImage address
->  		.word	_magic_end	@ zImage end address
-> +		.word	0x04030201	@ endianness flag
->  
->   THUMB(		.thumb			)
->  1:
+Assuming EL3 doesn't set these two bits, you will end up trapping back
+to EL3. You can hope that EL3 will do the right thing (do what is
+described above and restart the offending instruction at EL2). If it
+doesn't, you're dead.
 
-I think this should probably be officialized since we've taken away the
-ability for magic-number checking tools (like 'file') to distinguish
-between big- and little-endian zImages.
+> How about:
+> 
+>   For systems with a GICv3 interrupt controller, where the presence of
+>   GICv3 is communicated to the kernel:
+>   - If EL3 is present:
+>     ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
+>     ICC_SRE_EL3.SRE (bit 0) must be initialised to 0b1.
+>   - If the kernel is entered at EL1:
+>     ICC.SRE_EL2.Enable (bit 3) must be initialised to 0b1
+>     ICC_SRE_EL2.SRE (bit 0) must be initialised to 0b1.
 
-For now, I've updated my tools to check for 'setend be' in ARM and
-Thumb2 mode, but if this does get officialized, I'll gladly move over to
-it.
+I'm happy with that change, provided that we get rid of the ", where the
+presence of GICv3 is communicated to the kernel".
 
-Kevin
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
