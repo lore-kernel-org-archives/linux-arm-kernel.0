@@ -1,44 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Jun 2014 16:03:48 +0100
-Subject: [PATCH] gpio: crystalcove: Fix implicit declaration of function
- 'seq_printf' error
-Message-ID: <1403190228-14344-1-git-send-email-lee.jones@linaro.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Thu, 19 Jun 2014 19:26:37 +0400
+Subject: [PATCH RESEND 5/5] ARM: clps711x: edb7211: Remove excess layer to
+ calling clps711x_devices_init()
+In-Reply-To: <1403191597-28460-1-git-send-email-shc_work@mail.ru>
+References: <1403191597-28460-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1403191597-28460-5-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/gpio/gpio-crystalcove.c: In function 'crystalcove_gpio_dbg_show':
-drivers/gpio/gpio-crystalcove.c:286:3: error: implicit declaration of function 'seq_printf'
-   seq_printf(s, " gpio-%-2d %s %s %s %s ctlo=%2x,%s %s %s\n",
+clps711x_devices_init() can be used directly in ".machine_init"
+without any intermediate function.
 
-Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
-I'm looking for a quick Ack on this patch.  It's a fix to an immutable
-branch that I'm carrying which is shared between GPIO and MFD.  Stephen
-reported it when the MFD tree was sucked into -next.
+ arch/arm/mach-clps711x/board-edb7211.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-Alexandre,
-  I believe Linus is out on vacation this week, so if you could take a
-quick look at this, I'd be much obliged.
-
-Linus,
-  Once I've acquired the aforementioned Ack I'll fix this patch up into
-our immutable branch and send another pull-request.
----
- drivers/gpio/gpio-crystalcove.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/gpio/gpio-crystalcove.c b/drivers/gpio/gpio-crystalcove.c
-index 5a98499..934462f 100644
---- a/drivers/gpio/gpio-crystalcove.c
-+++ b/drivers/gpio/gpio-crystalcove.c
-@@ -18,6 +18,7 @@
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
-+#include <linux/seq_file.h>
- #include <linux/bitops.h>
- #include <linux/regmap.h>
- #include <linux/mfd/intel_soc_pmic.h>
+diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
+index 7ad94ff..e6e0609 100644
+--- a/arch/arm/mach-clps711x/board-edb7211.c
++++ b/arch/arm/mach-clps711x/board-edb7211.c
+@@ -148,11 +148,6 @@ fixup_edb7211(struct tag *tags, char **cmdline)
+ 	memblock_add(0xc1000000, SZ_8M);
+ }
+ 
+-static void __init edb7211_init(void)
+-{
+-	clps711x_devices_init();
+-}
+-
+ static void __init edb7211_init_late(void)
+ {
+ 	gpio_request_array(edb7211_gpios, ARRAY_SIZE(edb7211_gpios));
+@@ -180,7 +175,7 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.init_time	= clps711x_timer_init,
+-	.init_machine	= edb7211_init,
++	.init_machine	= clps711x_devices_init,
+ 	.init_late	= edb7211_init_late,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
 -- 
-1.8.3.2
+1.8.5.5
