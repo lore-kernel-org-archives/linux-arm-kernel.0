@@ -1,62 +1,71 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 19 Jun 2014 18:30:10 +0530
-Subject: [PATCH v2 07/18] ARM: dts: DRA7: Change the parent of
- apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
-In-Reply-To: <53A2C5B4.9080300@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-8-git-send-email-kishon@ti.com> <53A2C5B4.9080300@ti.com>
-Message-ID: <53A2DEDA.5050104@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 19 Jun 2014 15:04:49 +0200
+Subject: [RFC 0/2] pwrseq: Add subsystem for power sequences
+Message-ID: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+Some background:
 
-On Thursday 19 June 2014 04:42 PM, Tero Kristo wrote:
-> On 05/29/2014 09:38 AM, Kishon Vijay Abraham I wrote:
->> From: Keerthy <j-keerthy@ti.com>
->>
->> Change the parent of apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
->> from dpll_pcie_ref_ck.
-> 
-> Why? Needs a better changelog also.
+Subsystems using discoverable buses, sometimes requires to handle a complex
+power sequence, to be able to initialize their devices.
 
-Figure 26-22. DPLL_PCIE_REF Functional Block Diagram in vE of DRA7xx ES1.0 TRM
-shows the signal name for the output of post divider (M2) is CLKOUTLDO.
+Historically, there have been several attempts and posted patches to address
+this problem. Here are a some links to a subset of discussions:
 
-Figure 26-21. PCIe PHY Clock Generator Overview shows CLKOUTLDO is used as
-input to apll mux.
+http://www.spinics.net/lists/linux-mmc/msg24411.html
+http://www.spinics.net/lists/linux-mmc/msg26564.html
+http://lwn.net/Articles/525422/
+http://linux-kernel.2935.n7.nabble.com/PATCHv9-0-3-Runtime-Interpreted-Power-Sequences-td555721.html
 
-So the actual output of dpll should be dpll_pcie_ref_m2ldo_ck instead of
-dpll_pcie_ref_ck (which is the input of apll mux).
 
-Thanks
-Kishon
-> 
-> -Tero
-> 
->>
->> Cc: Rajendra Nayak <rnayak@ti.com>
->> Cc: Tero Kristo <t-kristo@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>   arch/arm/boot/dts/dra7xx-clocks.dtsi |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> index 55e95c5..44993ec 100644
->> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> @@ -1152,7 +1152,7 @@
->>
->>       apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
->>           compatible = "ti,mux-clock";
->> -        clocks = <&dpll_pcie_ref_ck>, <&pciesref_acs_clk_ck>;
->> +        clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
->>           #clock-cells = <0>;
->>           reg = <0x021c 0x4>;
->>           ti,bit-shift = <7>;
->>
-> 
+What does the pwrseq subsystem do?
+
+The pwrseq subsystem handles complex power sequences, typically useful
+for subsystems that makes use of discoverable buses, like for example
+MMC and I2C.
+
+The pwrseq subsystem is dependant on CONFIG_OF to be able to parse a DT
+childnode to find out what power sequence method to bind for a device.
+
+>From the DT childnode, the pwrseq DT parser tries to locate a
+"power-method" property, which string is matched towards the list of
+supported pwrseq methods.
+
+Each pwrseq method implements it's own power sequence and interfaces
+the pwrseq core through a few callback functions.
+
+To instantiate a pwrseq method, clients shall use the devm_pwrseq_get()
+API. If needed, clients can explicity drop the references to a pwrseq
+method using devm_pwrseq_put() API.
+
+Besides instantiation, the pwrseq API provides clients opportunity to
+select a certain power state. In this intial version, PWRSEQ_POWER_ON
+and PWRSEQ_POWER_OFF are supported. Those are also mandatory for each
+pwrseq method to support.
+
+
+Ulf Hansson (2):
+  pwrseq: Add subsystem to handle complex power sequences
+  mmc: core: Add support for power sequences
+
+ .../devicetree/bindings/pwrseq/pwrseq.txt          |   48 ++++++
+ drivers/Makefile                                   |    2 +-
+ drivers/mmc/core/core.c                            |    7 +
+ drivers/mmc/core/host.c                            |    5 +
+ drivers/pwrseq/Makefile                            |    2 +
+ drivers/pwrseq/core.c                              |  175 ++++++++++++++++++++
+ drivers/pwrseq/core.h                              |   37 +++++
+ drivers/pwrseq/method.c                            |   38 +++++
+ include/linux/mmc/host.h                           |    3 +
+ include/linux/pwrseq.h                             |   50 ++++++
+ 10 files changed, 366 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/pwrseq/pwrseq.txt
+ create mode 100644 drivers/pwrseq/Makefile
+ create mode 100644 drivers/pwrseq/core.c
+ create mode 100644 drivers/pwrseq/core.h
+ create mode 100644 drivers/pwrseq/method.c
+ create mode 100644 include/linux/pwrseq.h
+
+-- 
+1.7.9.5
