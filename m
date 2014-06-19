@@ -1,69 +1,88 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 19 Jun 2014 20:20:29 +0200
-Subject: [PATCH v3 03/14] clk: max77686: Add DT include for MAX77686 PMIC clock
-In-Reply-To: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1403202040-12641-4-git-send-email-javier.martinez@collabora.co.uk>
+Date: Thu, 19 Jun 2014 20:20:26 +0200
+Subject: [PATCH v3 00/14] Add Maxim 77802 PMIC support
+Message-ID: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a dt-binding include for Maxim 77686
-PMIC clock IDs that can be to be shared between the
-clk-max77686 clock driver and DeviceTree source files.
+MAX77802 is a PMIC that contains 10 high efficiency Buck regulators,
+32 Low-dropout (LDO) regulators, two 32kHz buffered clock outputs,
+a Real-Time-Clock (RTC) and a I2C interface to program the individual
+regulators, clocks and the RTC.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- drivers/clk/clk-max77686.c                 |  7 +------
- include/dt-bindings/clock/maxim,max77686.h | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+), 6 deletions(-)
+This third version of the patch-set addresses several issues pointed
+out by Mark Brown, Lee Jones and Doug Anderson. The individual changes
+are added on each patch change log.
+
+This series are based on drivers added by Simon Glass to the Chrome OS
+kernel and adds support for the Maxim 77802 Power Management IC, their
+regulators, clocks, RTC and I2C interface.
+
+The patch-set has been tested on both Daisy/Snow (max77686) and Peach
+pit (max77802) Chromebooks and it's composed of the following patches:
+
+Doug Anderson (1):
+  mfd: max77686: Allow the max77686 rtc to wakeup the system
+
+Javier Martinez Canillas (13):
+  mfd: max77686: Convert to use regmap_irq
+  clk: max77686: Add DT include for MAX77686 PMIC clock
+  clk: max77686: Improve Maxim 77686 PMIC clocks binding
+  clk: Add generic driver for Maxim PMIC clocks
+  clk: max77686: Convert to the generic max clock driver
+  mfd: Add driver for Maxim 77802 Power Management IC
+  mfd: max77802: Add DT binding documentation
+  regmap: Add regmap_reg_copy function
+  regulator: Add driver for Maxim 77802 PMIC regulators
+  clk: Add driver for Maxim 77802 PMIC clocks
+  clk: max77802: Add DT binding documentation
+  rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
+  ARM: dts: Add max77802 device node for exynos5420-peach-pit
+
+ .../devicetree/bindings/clock/maxim,max77686.txt   |  15 +-
+ .../devicetree/bindings/clock/maxim,max77802.txt   |  42 ++
+ Documentation/devicetree/bindings/mfd/max77802.txt |  97 +++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         | 320 ++++++++++
+ drivers/base/regmap/regmap.c                       |  34 +
+ drivers/clk/Kconfig                                |  11 +
+ drivers/clk/Makefile                               |   2 +
+ drivers/clk/clk-max-gen.c                          | 197 ++++++
+ drivers/clk/clk-max-gen.h                          |  32 +
+ drivers/clk/clk-max77686.c                         | 183 +-----
+ drivers/clk/clk-max77802.c                         |  99 +++
+ drivers/mfd/Kconfig                                |  15 +
+ drivers/mfd/Makefile                               |   3 +-
+ drivers/mfd/max77686-irq.c                         | 319 ----------
+ drivers/mfd/max77686.c                             |  97 ++-
+ drivers/mfd/max77802.c                             | 368 +++++++++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/max77802.c                       | 691 +++++++++++++++++++++
+ drivers/rtc/Kconfig                                |  10 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-max77686.c                         |  55 +-
+ drivers/rtc/rtc-max77802.c                         | 637 +++++++++++++++++++
+ include/dt-bindings/clock/maxim,max77686.h         |  23 +
+ include/dt-bindings/clock/maxim,max77802.h         |  22 +
+ include/linux/mfd/max77686-private.h               |  28 +-
+ include/linux/mfd/max77686.h                       |   2 -
+ include/linux/mfd/max77802-private.h               | 307 +++++++++
+ include/linux/mfd/max77802.h                       | 124 ++++
+ include/linux/regmap.h                             |   9 +
+ 30 files changed, 3221 insertions(+), 532 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+ create mode 100644 drivers/clk/clk-max-gen.c
+ create mode 100644 drivers/clk/clk-max-gen.h
+ create mode 100644 drivers/clk/clk-max77802.c
+ delete mode 100644 drivers/mfd/max77686-irq.c
+ create mode 100644 drivers/mfd/max77802.c
+ create mode 100644 drivers/regulator/max77802.c
+ create mode 100644 drivers/rtc/rtc-max77802.c
  create mode 100644 include/dt-bindings/clock/maxim,max77686.h
+ create mode 100644 include/dt-bindings/clock/maxim,max77802.h
+ create mode 100644 include/linux/mfd/max77802-private.h
+ create mode 100644 include/linux/mfd/max77802.h
 
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 3d7e8dd..185b611 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -30,12 +30,7 @@
- #include <linux/mutex.h>
- #include <linux/clkdev.h>
- 
--enum {
--	MAX77686_CLK_AP = 0,
--	MAX77686_CLK_CP,
--	MAX77686_CLK_PMIC,
--	MAX77686_CLKS_NUM,
--};
-+#include <dt-bindings/clock/maxim,max77686.h>
- 
- struct max77686_clk {
- 	struct max77686_dev *iodev;
-diff --git a/include/dt-bindings/clock/maxim,max77686.h b/include/dt-bindings/clock/maxim,max77686.h
-new file mode 100644
-index 0000000..7b28b09
---- /dev/null
-+++ b/include/dt-bindings/clock/maxim,max77686.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2014 Google, Inc
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants clocks for the Maxim 77686 PMIC.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
-+#define _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
-+
-+/* Fixed rate clocks. */
-+
-+#define MAX77686_CLK_AP		0
-+#define MAX77686_CLK_CP		1
-+#define MAX77686_CLK_PMIC	2
-+
-+/* Total number of clocks. */
-+#define MAX77686_CLKS_NUM		(MAX77686_CLK_PMIC + 1)
-+
-+#endif /* _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H */
 -- 
 2.0.0.rc2
