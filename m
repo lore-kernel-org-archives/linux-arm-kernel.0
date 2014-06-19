@@ -1,87 +1,59 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 19 Jun 2014 21:53:33 +0200
-Subject: [PATCHv2] mm: page_alloc: fix CMA area initialisation when pageblock >
- MAX_ORDER
-In-Reply-To: <1403201524.32688.62.camel@deneb.redhat.com>
-References: <1402522435-13884-1-git-send-email-msalter@redhat.com>
- <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
- <xa1t61jzwfo6.fsf@mina86.com> <1403201524.32688.62.camel@deneb.redhat.com>
-Message-ID: <xa1td2e41xs2.fsf@mina86.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 20 Jun 2014 01:31:21 +0530
+Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
+In-Reply-To: <CAJAp7OgfsVs9C0RNrDnQ5g7heba7JjaYFrj7wVUqT_m+wu-A3A@mail.gmail.com>
+References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <7hvbrzbh1u.fsf@paris.lan>
+ <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
+ <7hzjha8b97.fsf@paris.lan>
+ <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
+ <7hegym6uca.fsf@paris.lan>
+ <CAJe_ZhfmsgvnVu-VgN63LaZ-522HuAY_EVfB6ujQjdzBE+u=zA@mail.gmail.com>
+ <CAJAp7OgfsVs9C0RNrDnQ5g7heba7JjaYFrj7wVUqT_m+wu-A3A@mail.gmail.com>
+Message-ID: <CAJe_ZhcSMrN6OeRjo7cG7CMobjEPMMB7o0eUD9HAFskravSQ3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE,
-the following is triggered at early boot:
+On 19 June 2014 23:52, Bjorn Andersson <bjorn@kryo.se> wrote:
+> On Wed, Jun 18, 2014 at 8:55 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>> On 18 June 2014 22:14, Kevin Hilman <khilman@linaro.org> wrote:
+> [...]
+>>> Thinking more about what this RPM driver actually does, and since you
+>>> mentioned patterns across SoCs, it seems to me the RPM driver bascially
+>>> just doing the IPC.
+>>>
+>>> So, rather than MFD or drivers/soc, it seems to me that it should be
+>>> implmented as a controller in the new common mailbox framwork[1] being
+>>> worked on by Jassi Brar (added to Cc.)
+>>>
+>>> IIUC, RPM is actually only doing one-way IPC (it only exposes a write()
+>>> interface to clients) so it seems like a rather simple implementation of
+>>> a mailbox controller.
+>>>
+>> Yup, qcom_rpm.c is exactly what drivers/mailbox/ is meant for.
+>>
+>
+> The RPM provides a register file with 80ish registers of variable size, to
+> program the hardware you write to these registers. Then you write to a register
+> selector register and then signal an outgoing interrupt.
+>
+For mailbox_request_channel(), you have dev_get_qcom_rpm()  and
+qcom_rpm_write() for mbox_send_message()
+Rest all is what you need to fire off a message to remote or register
+for interrupts. So nothing new to me.
 
-  SMP: Total of 8 processors activated.
-  devtmpfs: initialized
-  Unable to handle kernel NULL pointer dereference at virtual address 00000008
-  pgd = fffffe0000050000
-  [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
-  Internal error: Oops: 96000006 [#1] SMP
-  Modules linked in:
-  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
-  task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
-  PC is at __list_add+0x10/0xd4
-  LR is at free_one_page+0x270/0x638
-  ...
-  Call trace:
-  [<fffffe00003ee970>] __list_add+0x10/0xd4
-  [<fffffe000019c478>] free_one_page+0x26c/0x638
-  [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
-  [<fffffe000019d5e8>] __free_pages+0x74/0xbc
-  [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
-  [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
-  [<fffffe0000090418>] do_one_initcall+0xc4/0x154
-  [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
-  [<fffffe00007520a0>] kernel_init+0xc/0xd4
+> That is, the interface exposed to the kernel by the SoC is not an mailbox like
+> interface.
+>
+ I don't understand how having to program 80 registers makes it "not
+like mailbox"?
+ I have used mailbox api to pass messages between CPUs (using PPI)
+under same instance of Linux and otoh I think it could also support
+IPC over gpio (if someone gets that desperate).
+Mailbox isn't about how you program the h/w. Do whatever is needed to
+send a message across.
 
-This happens because init_cma_reserved_pageblock() calls
-__free_one_page() with pageblock_order as page order but it is bigger
-han MAX_ORDER.  This in turn causes accesses past zone->free_list[].
+BTW I haven't looked closely, but probably you could push the data tables in DT?
 
-Fix the problem by changing init_cma_reserved_pageblock() such that it
-splits pageblock into individual MAX_ORDER pages if pageblock is
-bigger than a MAX_ORDER page.
-
-In cases where !CONFIG_HUGETLB_PAGE_SIZE_VARIABLE, which is all
-architectures expect for ia64, powerpc and tile at the moment, the
-?pageblock_order > MAX_ORDER? condition will be optimised out since
-both sides of the operator are constants.  In cases where pageblock
-size is variable, the performance degradation should not be
-significant anyway since init_cma_reserved_pageblock() is called
-only at boot time at most MAX_CMA_AREAS times which by default is
-eight.
-
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-Reported-by: Mark Salter <msalter@redhat.com>
----
- mm/page_alloc.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 7f97767..fe114db 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -817,7 +817,18 @@ void __init init_cma_reserved_pageblock(struct page *page)
- 
- 	set_page_refcounted(page);
- 	set_pageblock_migratetype(page, MIGRATE_CMA);
--	__free_pages(page, pageblock_order);
-+
-+	if (pageblock_order > MAX_ORDER) {
-+		i = pageblock_order - MAX_ORDER;
-+		i = 1 << i;
-+		p = page;
-+		do {
-+			__free_pages(p, MAX_ORDER);
-+		} while (p += MAX_ORDER_NR_PAGES, --i);
-+	} else {
-+		__free_pages(page, pageblock_order);
-+	}
-+
- 	adjust_managed_page_count(page, pageblock_nr_pages);
- }
- #endif
--- 
-2.0.0.526.g5318336
+Cheers
+-Jassi
