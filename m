@@ -1,127 +1,97 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 18 Jun 2014 18:31:36 -0700
-Subject: [PATCH v8 0/4] arm: dirty page logging support for ARMv7
-Message-ID: <1403141500-31010-1-git-send-email-m.smarduch@samsung.com>
+Date: Wed, 18 Jun 2014 18:31:37 -0700
+Subject: [PATCH v8 1/4] arm: add ARMv7 HYP API to flush VM TLBs without address
+ param
+In-Reply-To: <1403141500-31010-1-git-send-email-m.smarduch@samsung.com>
+References: <1403141500-31010-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1403141500-31010-2-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for dirty page logging so far tested only on ARMv7,
-and verified to compile on ARMv8. With dirty page logging, GICv2 vGIC and arch 
-timer save/restore support, live migration is supported.
+Patch adds HYP interface for global VM TLB invalidation without address
+parameter. Moved VM TLB flushing back to architecture layer.
+This patch depends on the unmap_range() patch, it needs to be applied first.
+No changes to ARMv8.
 
-Dirty page logging support -
-- initially write protects VM RAM memory regions - 2nd stage page tables
-- add support to read dirty page log and again write protect the dirty pages 
-  - second stage page table for next pass.
-- second stage huge page are dissolved into page tables to keep track of
-  dirty pages at page granularity. Tracking at huge page granularity limits
-  migration to an almost idle system.
-- In the event migration is canceled, normal behavior is resumed huge pages
-  are rebuilt over time.
-- At this time reverse mappings are not used to for write protecting of 2nd 
-  stage tables.
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/include/asm/kvm_asm.h  |    1 +
+ arch/arm/include/asm/kvm_host.h |    2 ++
+ arch/arm/kvm/interrupts.S       |   11 +++++++++++
+ arch/arm/kvm/mmu.c              |   16 ++++++++++++++++
+ 4 files changed, 30 insertions(+)
 
-- Future work
-  - Enable diry memory logging to work on ARMv8 FastModels.
-
-Test Environment:
----------------------------------------------------------------------------
-NOTE: RUNNING on FAST Models will hardly ever fail and mask bugs, infact
-      initially light loads were succeeding without dirty page logging support.
----------------------------------------------------------------------------
-- Will put all components on github, including test setup diagram
-- In short summary
-  o Two ARM Exyonys 5440 development platforms - 4-way 1.7 GHz, with 8GB, 256GB
-    storage, 1GBs Ethernet, with swap enabled
-  o NFS Server runing Ubuntu 13.04
-    - both ARM boards mount shared file system
-    - Shared file system includes - QEMU, Guest Kernel, DTB, multiple Ext3 root
-      file systems.
-  o Component versions: qemu-1.7.5, vexpress-a15, host/guest kernel 3.15-rc1,
-  o Use QEMU Ctr+A+C and migrate -d tcp:IP:port command
-    - Destination command syntax: can change smp to 4, machine model outdated,
-      but has been tested on virt by others (need to upgrade)
-
-        /mnt/migration/qemu-system-arm -enable-kvm -smp 2 -kernel \
-        /mnt/migration/zImage -dtb /mnt/migration/guest-a15.dtb -m 1792 \
-        -M vexpress-a15 -cpu cortex-a15 -nographic \
-        -append "root=/dev/vda rw console=ttyAMA0 rootwait" \
-        -drive if=none,file=/mnt/migration/guest1.root,id=vm1 \
-        -device virtio-blk-device,drive=vm1 \
-        -netdev type=tap,id=net0,ifname=tap0 \
-        -device virtio-net-device,netdev=net0,mac="52:54:00:12:34:58" \
-        -incoming tcp:0:4321
-
-    - Source command syntax same except '-incoming'
-
-  o Test migration of multiple VMs use tap0, tap1, ..., and guest0.root, .....
-    has been tested as well.
-  o On source run multiple copies of 'dirtyram.arm' - simple program to dirty
-    pages periodically.
-    ./dirtyarm.ram <total mmap size> <dirty page size> <sleep time>
-    Example:
-    ./dirtyram.arm 102580 812 30
-    - dirty 102580 pages
-    - 812 pages every 30ms with an incrementing counter
-    - run anywhere from one to as many copies as VM resources can support. If
-      the dirty rate is too high migration will run indefintely
-    - run date output loop, check date is picked up smoothly
-    - place guest/host into page reclaim/swap mode - by whatever means in this
-      case run multiple copies of 'dirtyram.ram' on host
-    - issue migrate command(s) on source
-    - Top result is 409600, 8192, 5
-  o QEMU is instrumented to save RAM memory regions on source and destination
-    after memory is migrated, but before guest started. Later files are
-    checksummed on both ends for correctness, given VMs are small this works.
-  o Guest kernel is instrumented to capture current cycle counter - last cycle
-    and compare to qemu down time to test arch timer accuracy.
-  o Network failover is at L3 due to interface limitations, ping continues
-    working transparently
-  o Also tested 'migrate_cancel' to test reassemble of huge pages (inserted low
-    level instrumentation code).
-
-- Basic Network Test - Assuming one ethernet interface available
-
-Source host IP 192.168.10.101/24, VM tap0 192.168.2.1/24 and
-VM eth0 192.168.2.100/24 with default route 192.168.2.1
-
-Destination host IP 192.168.10.100/24, VM same settings as above.
-Both VMs have identical MAC addresses.
-
-Initially NFS server route to 192.168.2.100 is via 192.168.10.101
-
-- ssh 192.168.2.100
-- start migration from source to destination
-- after migration ends
-- on NFS server switch routes.
-   route add -host 192.168.2.100 gw 192.168.10.100
-
-ssh should resume after route switch. ping as well should work
-seamlessly.
-
-Changes since v7:
-- Reworked write protection of dirty page mask
-- Moved generic code back to architecture layer, keep it there for time being,
-  until a KVM framework for architecture functions to override genric 
-  ones is defined.
-- Fixed conditon bug for marking pages dirty
-  
-
-Mario Smarduch (4):
-  add ARMv7 HYP API to flush VM TLBs without address param
-  dirty page logging inital mem region write protect (w/no huge PUD
-    support)
-  dirty log write protect management support
-  dirty page logging 2nd stage page fault handling support
-
- arch/arm/include/asm/kvm_asm.h        |    1 +
- arch/arm/include/asm/kvm_host.h       |    6 +
- arch/arm/include/asm/kvm_mmu.h        |   20 ++++
- arch/arm/include/asm/pgtable-3level.h |    1 +
- arch/arm/kvm/arm.c                    |   92 +++++++++++++++
- arch/arm/kvm/interrupts.S             |   11 ++
- arch/arm/kvm/mmu.c                    |  197 ++++++++++++++++++++++++++++++++-
- 7 files changed, 322 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 53b3c4a..21bc519 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
+ 
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 193ceaf..ac3bb65 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -231,4 +231,6 @@ int kvm_perf_teardown(void);
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+ 
++void kvm_tlb_flush_vmid(struct kvm *kvm);
++
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 0d68d40..a3717b7 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	bx	lr
+ ENDPROC(__kvm_tlb_flush_vmid_ipa)
+ 
++/**
++ * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
++ * @kvm:	pointer to kvm structure
++ *
++ * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
++ * parameter
++ */
++ENTRY(__kvm_tlb_flush_vmid)
++	b	__kvm_tlb_flush_vmid_ipa
++ENDPROC(__kvm_tlb_flush_vmid)
++
+ /********************************************************************
+  * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+  * domain, for all VMIDs
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 2ac9588..e90b9e4 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -56,6 +56,22 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+ }
+ 
++#ifdef CONFIG_ARM
++/**
++ * kvm_tlb_flush_vmid() - flush all VM TLB entries
++ * @kvm:	pointer to kvm structure.
++ *
++ * Interface to HYP function to flush all VM TLB entries without address
++ * parameter. In HYP mode reuses __kvm_tlb_flush_vmid_ipa() function used by
++ * kvm_tlb_flush_vmid_ipa().
++ */
++void kvm_tlb_flush_vmid(struct kvm *kvm)
++{
++	if (kvm)
++		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
++}
++#endif
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
+ {
 -- 
 1.7.9.5
