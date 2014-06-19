@@ -1,256 +1,49 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 19 Jun 2014 21:43:13 +0000
-Subject: [PATCH 13/14] arm/arm64: KVM: enable kernel side of GICv3
- emulation
-In-Reply-To: <1403171152-24067-14-git-send-email-andre.przywara@arm.com>
-References: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
- <1403171152-24067-14-git-send-email-andre.przywara@arm.com>
-Message-ID: <7783833e172b468a89c53fa18c3f3bc5@BY2PR07MB203.namprd07.prod.outlook.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 19 Jun 2014 17:49:49 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8
+ kernels
+In-Reply-To: <7hk38cvcrm.fsf@paris.lan>
+References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+ <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
+ <53A1D701.8060404@codeaurora.org>
+ <CAGa+x86DfDjQG8gN2-x7Kapt2ipsYt879R4OK6JWGoaT93VVig@mail.gmail.com>
+ <53A1D8FE.6030404@codeaurora.org>
+ <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
+ <alpine.LFD.2.11.1406181720130.16842@knanqh.ubzr> <7hk38cycuh.fsf@paris.lan>
+ <alpine.LFD.2.11.1406191630260.16842@knanqh.ubzr>
+ <7hk38cvcrm.fsf@paris.lan>
+Message-ID: <alpine.LFD.2.11.1406191732590.16842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 19 Jun 2014, Kevin Hilman wrote:
+
+> Nicolas Pitre <nicolas.pitre@linaro.org> writes:
+> 
+> > On Thu, 19 Jun 2014, Kevin Hilman wrote:
+> >
+> >> I think this should probably be officialized since we've taken away the
+> >> ability for magic-number checking tools (like 'file') to distinguish
+> >> between big- and little-endian zImages.
+> >> 
+> >> For now, I've updated my tools to check for 'setend be' in ARM and
+> >> Thumb2 mode, but if this does get officialized, I'll gladly move over to
+> >> it.
+> >
+> > Would you ACK this patch?
+> >
+> > ----- >8
+> > ARM: zImage: identify kernel endianness
+> >
+> > With patch #8067/1 applied, it is no longer possible to determine the
+> 
+> minor nit: I'd rather see a commit id (commit subject) instead of the
+> reference in RMK's patch tracker, but other than that...
+
+The commit ID may not be stable, unless RMK moves it to his devel-stable 
+branch.  I'll add the commit subject though.
+
+Queued as patch #8079/1.
 
 
------Original Message-----
-From: kvmarm-bounces@lists.cs.columbia.edu [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Andre Przywara
-Sent: Thursday, June 19, 2014 2:46 AM
-To: linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org
-Cc: christoffer.dall at linaro.org
-Subject: [PATCH 13/14] arm/arm64: KVM: enable kernel side of GICv3 emulation
-
-With all the necessary GICv3 emulation code in place, we can now connect the code to the GICv3 backend in the kernel.
-The LR register handling is different depending on the emulated GIC model, so provide different implementations for each.
-Also allow non-v2-compatible GICv3 implementations (which don't provide MMIO regions for the virtual CPU interface in the DT), but restrict those hosts to use GICv3 guests only.
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- virt/kvm/arm/vgic-v3.c |  138 ++++++++++++++++++++++++++++++++++++++----------
- virt/kvm/arm/vgic.c    |    2 +
- 2 files changed, 112 insertions(+), 28 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c index 7d9c85e..d26d12f 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -34,6 +34,7 @@
- #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
- #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
- #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
-+#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
- 
- /*
-  * LRs are stored in reverse order in memory. make sure we index them @@ -43,7 +44,35 @@
- 
- static u32 ich_vtr_el2;
- 
--static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
-+static u64 sync_lr_val(u8 state)
-+{
-+	u64 lr_val = 0;
-+
-+	if (state & LR_STATE_PENDING)
-+		lr_val |= ICH_LR_PENDING_BIT;
-+	if (state & LR_STATE_ACTIVE)
-+		lr_val |= ICH_LR_ACTIVE_BIT;
-+	if (state & LR_EOI_INT)
-+		lr_val |= ICH_LR_EOI;
-+
-+	return lr_val;
-+}
-+
-+static u8 sync_lr_state(u64 lr_val)
-+{
-+	u8 state = 0;
-+
-+	if (lr_val & ICH_LR_PENDING_BIT)
-+		state |= LR_STATE_PENDING;
-+	if (lr_val & ICH_LR_ACTIVE_BIT)
-+		state |= LR_STATE_ACTIVE;
-+	if (lr_val & ICH_LR_EOI)
-+		state |= LR_EOI_INT;
-+
-+	return state;
-+}
-+
-+static struct vgic_lr vgic_v2_on_v3_get_lr(const struct kvm_vcpu *vcpu, 
-+int lr)
- {
- 	struct vgic_lr lr_desc;
- 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
-@@ -53,30 +82,53 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
- 		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
- 	else
- 		lr_desc.source = 0;
--	lr_desc.state	= 0;
-+	lr_desc.state	= sync_lr_state(val);
- 
--	if (val & ICH_LR_PENDING_BIT)
--		lr_desc.state |= LR_STATE_PENDING;
--	if (val & ICH_LR_ACTIVE_BIT)
--		lr_desc.state |= LR_STATE_ACTIVE;
--	if (val & ICH_LR_EOI)
--		lr_desc.state |= LR_EOI_INT;
-+	return lr_desc;
-+}
-+
-+static struct vgic_lr vgic_v3_on_v3_get_lr(const struct kvm_vcpu *vcpu, 
-+int lr) {
-+	struct vgic_lr lr_desc;
-+	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
-+
-+	lr_desc.irq	= val & ICH_LR_VIRTUALID_MASK;
-+	lr_desc.source	= 0;
-+	lr_desc.state	= sync_lr_state(val);
- 
- 	return lr_desc;
- }
- 
--static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
--			   struct vgic_lr lr_desc)
-+static void vgic_v3_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
-+				 struct vgic_lr lr_desc)
- {
--	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
--		      lr_desc.irq);
-+	u64 lr_val;
- 
--	if (lr_desc.state & LR_STATE_PENDING)
--		lr_val |= ICH_LR_PENDING_BIT;
--	if (lr_desc.state & LR_STATE_ACTIVE)
--		lr_val |= ICH_LR_ACTIVE_BIT;
--	if (lr_desc.state & LR_EOI_INT)
--		lr_val |= ICH_LR_EOI;
-+	lr_val = lr_desc.irq;
-+
-+	/*
-+	 * currently all guest IRQs are Group1, as Group0 would result
-+	 * in a FIQ in the guest, which it wouldn't expect.
-+	 * Eventually we want to make this configurable, so we may revisit
-+	 * this in the future.
-+	 */
-+	lr_val |= ICH_LR_GROUP;
-+
-+	lr_val |= sync_lr_val(lr_desc.state);
-+
-+	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val; }
-+
-+static void vgic_v2_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
-+				 struct vgic_lr lr_desc)
-+{
-+	u64 lr_val;
-+
-+	lr_val = lr_desc.irq;
-+
-+	lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
-+
-+	lr_val |= sync_lr_val(lr_desc.state);
- 
- 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;  } @@ -145,9 +197,8 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 
- static void vgic_v3_enable(struct kvm_vcpu *vcpu)  {
--	struct vgic_v3_cpu_if *vgic_v3;
-+	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
- 
--	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
- 	/*
- 	 * By forcing VMCR to zero, the GIC will restore the binary
- 	 * points to their reset values. Anything else resets to zero @@ -155,7 +206,14 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 	 */
- 	vgic_v3->vgic_vmcr = 0;
- 
--	vgic_v3->vgic_sre	= 0;
-+	/*
-+	 * Set the SRE_EL1 value depending on the configured
-+	 * emulated vGIC model.
-+	 */
-+	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+		vgic_v3->vgic_sre	= ICC_SRE_EL1_SRE;
-+	else
-+		vgic_v3->vgic_sre	= 0;
- 
- 	/* Get the show on the road... */
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
-@@ -173,6 +231,15 @@ static const struct vgic_ops vgic_v3_ops = {
- 	.enable			= vgic_v3_enable,
- };
- 
-+static void init_vgic_v3_emul(struct kvm *kvm) {
-+	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
-+
-+	vm_ops->get_lr = vgic_v3_on_v3_get_lr;
-+	vm_ops->set_lr = vgic_v3_on_v3_set_lr;
-+	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
-+}
-+
- static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)  {
- 	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops; @@ -184,14 +251,28 @@ static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
- 		if (nr_vcpus > 8)
- 			return false;
- 
--		vm_ops->get_lr = vgic_v3_get_lr;
--		vm_ops->set_lr = vgic_v3_set_lr;
-+		vm_ops->get_lr = vgic_v2_on_v3_get_lr;
-+		vm_ops->set_lr = vgic_v2_on_v3_set_lr;
- 		kvm->arch.max_vcpus = 8;
- 		return true;
-+	case KVM_DEV_TYPE_ARM_VGIC_V3:
-+		init_vgic_v3_emul(kvm);
-+		return true;
- 	}
- 	return false;
- }
- 
-+static bool vgic_v3_init_emul(struct kvm *kvm, int type) {
-+	switch (type) {
-+	case KVM_DEV_TYPE_ARM_VGIC_V3:
-+		init_vgic_v3_emul(kvm);
-+		return true;
-+	}
-+
-+	return false;
-+}
-+
- static struct vgic_params vgic_v3_params;
- 
- /**
-@@ -233,12 +314,13 @@ int vgic_v3_probe(struct device_node *vgic_node,
- 
- 	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
- 	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
--		kvm_err("Cannot obtain GICV region\n");
--		ret = -ENXIO;
--		goto out;
-+		kvm_info("GICv3: GICv2 emulation not available\n");
-+		vgic->vcpu_base = 0;
-+		vgic->init_emul = vgic_v3_init_emul;
-+	} else {
-+		vgic->vcpu_base = vcpu_res.start;
-+		vgic->init_emul = vgic_v3_init_emul_compat;
- 	}
-
-Are we returning error while GICv2 emulation is request from user when it is not supported, I might have missed the code. 
-
-
--	vgic->init_emul = vgic_v3_init_emul_compat;
--	vgic->vcpu_base = vcpu_res.start;
- 	vgic->vctrl_base = NULL;
- 	vgic->type = VGIC_V3;
- 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c index fa150c7..8a584e0 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1424,6 +1424,8 @@ static bool init_emulation_ops(struct kvm *kvm, int type)
- 	switch (type) {
- 	case KVM_DEV_TYPE_ARM_VGIC_V2:
- 		return vgic_v2_init_emulation_ops(kvm, type);
-+	case KVM_DEV_TYPE_ARM_VGIC_V3:
-+		return vgic_v3_init_emulation_ops(kvm, type);
- 	}
- 	return false;
- }
---
-1.7.9.5
-
-_______________________________________________
-kvmarm mailing list
-kvmarm at lists.cs.columbia.edu
-https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Nicolas
