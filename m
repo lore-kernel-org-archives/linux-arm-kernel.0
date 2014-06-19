@@ -1,61 +1,65 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 19 Jun 2014 13:57:01 -0700
-Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8 kernels
-In-Reply-To: <alpine.LFD.2.11.1406191630260.16842@knanqh.ubzr> (Nicolas
- Pitre's message of "Thu, 19 Jun 2014 16:32:12 -0400 (EDT)")
-References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
- <CAGa+x85P-M3qUD6L=kezkiQ1NJymEZ9P=u2ANUZJu2b3F+o5LA@mail.gmail.com>
- <53A1D701.8060404@codeaurora.org>
- <CAGa+x86DfDjQG8gN2-x7Kapt2ipsYt879R4OK6JWGoaT93VVig@mail.gmail.com>
- <53A1D8FE.6030404@codeaurora.org>
- <CAGa+x87rnQntQpTkR6dZr29NvEQ4x8SOAyo+z9xuYHEdxdG1xg@mail.gmail.com>
- <alpine.LFD.2.11.1406181720130.16842@knanqh.ubzr>
- <7hk38cycuh.fsf@paris.lan>
- <alpine.LFD.2.11.1406191630260.16842@knanqh.ubzr>
-Message-ID: <7hk38cvcrm.fsf@paris.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jun 2014 21:58:53 +0100
+Subject: v3.16-rc1 & default cachepolicy
+In-Reply-To: <20140619203655.GE558@drone.musicnaut.iki.fi>
+References: <20140619203655.GE558@drone.musicnaut.iki.fi>
+Message-ID: <20140619205853.GH3705@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nicolas.pitre@linaro.org> writes:
+On Thu, Jun 19, 2014 at 11:36:55PM +0300, Aaro Koskinen wrote:
+> Hi,
+> 
+> When booting v3.16-rc1 on OMAP1, I noticed strange slowness.
+> E.g. initramfs unpack takes several minutes. This was caused by default
+> cachepolicy getting changed from writethrough -> uncached for some reason:
+> 
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Initializing cgroup subsys cpu
+> [    0.000000] Linux version 3.16.0-rc1-e3-los_880e+ (aaro at cooljazz) (gcc version 4.9.0 (GCC) ) #1 PREEMPT Thu Jun 19 22:51:42 EEST 2014
+> [    0.000000] CPU: ARM925T [54029252] revision 2 (ARMv4T), cr=0000317f
+> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> [    0.000000] Machine: Amstrad E3 (Delta)
+> [    0.000000] Ignoring memory below PHYS_OFFSET: 0x02000000-0x10000000
+> [    0.000000] bootconsole [earlycon0] enabled
+> [    0.000000] Memory policy: Data cache uncached
+> [...]
+> [    4.602732] Unpacking initramfs...
+> [  425.125093] Freeing initrd memory: 3532K (c1c00000 - c1f73000)
+> 
+> It seems this is caused by commit:
+> 
+> commit ca8f0b0a545f55b3dc6877cda24d609a8979c951
+> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> Date:   Tue May 27 20:34:28 2014 +0100
+> 
+>     ARM: ensure C page table setup code follows assembly code
+> 
+> I can workaround this with "cachepolicy=writethrough" parameter.
 
-> On Thu, 19 Jun 2014, Kevin Hilman wrote:
->
->> I think this should probably be officialized since we've taken away the
->> ability for magic-number checking tools (like 'file') to distinguish
->> between big- and little-endian zImages.
->> 
->> For now, I've updated my tools to check for 'setend be' in ARM and
->> Thumb2 mode, but if this does get officialized, I'll gladly move over to
->> it.
->
-> Would you ACK this patch?
->
-> ----- >8
-> ARM: zImage: identify kernel endianness
->
-> With patch #8067/1 applied, it is no longer possible to determine the
+It brings up the question - proc-arm925.S contains:
 
-minor nit: I'd rather see a commit id (commit subject) instead of the
-reference in RMK's patch tracker, but other than that...
+        .long   PMD_TYPE_SECT | \
+                PMD_BIT4 | \
+                PMD_SECT_AP_WRITE | \
+                PMD_SECT_AP_READ
+        .long   PMD_TYPE_SECT | \
+                PMD_BIT4 | \
+                PMD_SECT_AP_WRITE | \
+                PMD_SECT_AP_READ
 
-> endianness of a compiled kernel image.  This normally shouldn't matter
-> to the boot environment, except for those cases where the selection of
-> a ramdisk or root filesystem with a matching endianness has to be
-> automated.
->
-> Let's add a flag to the zImage header indicating the actual endianness.
-> Four bytes from offset 0x30 can be interpreted as follows:
->
-> 	04 03 02 01	big endian kernel
->
-> 	01 02 03 04	little endian kernel
->
-> Anything else should be interpreted as "unknown", in which case it is
-> most likely that patch #8067/1 was not applied either and the zImage
-> magic number at offset 0x24 could be used instead to determine
-> endianness. No zImage before this patch ever produced 0x01020304 nor
-> 0x04030201 at offset 0x30 so there is no confusion possible.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+In other words, it's telling the assembly code to setup uncached mappings
+for everything, even memory.  Most people want to set memory up (even at
+the assembly code time) in cacheable mode... so I'd suggest adding:
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+                PMD_SECT_BUFFERABLE | \
+                PMD_SECT_CACHEABLE | \
+
+from the first.  You'll find it in the .macro at the end of proc-arm925.S.
+Please let me know if that works for you.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
