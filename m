@@ -1,40 +1,85 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 19 Jun 2014 10:33:51 -0400
-Subject: [PATCH v3 2/2] ata: Fix the dma state machine lockup for the
- IDENTIFY DEVICE PIO mode command.
-In-Reply-To: <CAOHikRAaMaMc1zHU3B_Qqg8fRndCqHQTDR7wpCoaS_kafkgzdw@mail.gmail.com>
-References: <1403160654-31612-1-git-send-email-stripathi@apm.com>
- <20140619141047.GA26904@htj.dyndns.org>
- <CAOHikRAX1NfeCRWVJtv_FTHHheYxU5uKVk_hytdEmb_j-5_wnA@mail.gmail.com>
- <20140619142148.GD26904@htj.dyndns.org>
- <CAOHikRAaMaMc1zHU3B_Qqg8fRndCqHQTDR7wpCoaS_kafkgzdw@mail.gmail.com>
-Message-ID: <20140619143351.GE26904@htj.dyndns.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 19 Jun 2014 16:40:20 +0200
+Subject: [PATCH v2] ARM: KVM: add irqfd and irq routing support
+In-Reply-To: <20140619141325.GB15659@arm.com>
+References: <1401694196-30861-1-git-send-email-eric.auger@linaro.org>
+ <20140605102831.GA3994@lvm> <53906D63.9040508@linaro.org>
+ <20140605143950.GA10079@lvm> <20140619141325.GB15659@arm.com>
+Message-ID: <53A2F654.50908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Jun 19, 2014 at 07:57:33PM +0530, Suman Tripathi wrote:
-> [suman] : Are you ok if I make ahci_qc_issue in the ahci.h as not static
-> and make it as EXPORT_SYMBOL_GPL ? Currenty ahci_qc_issue is static.
-> If you take the current case , I only had to make  ahci_sw_activity as non
-> static and use it. So both the intention is same.
-
-Yeah, sure.  We end up having to export a function anyway.  Better to
-avoid duplicating the function body.
-
-> So, it's just ATA_CMD_ID_ATA and ATA_CMD_ID_ATAPI is okay?  That's
-> kinda weird.
+On 06/19/2014 04:13 PM, Will Deacon wrote:
+> Hi all,
 > 
-> [suman] : Not tested for ATA_CMD_ID_ATAPI. It's just for ATA_CMD_ID_ATA for
-> now.
+> I'm currently adding VFIO support for kvmtool, so I'm interested in this
+> patch series (although actually from a PCI perspective).
+> 
+> Eric: can you CC me on future versions of this series please? Once things
+> start to stabilise, I can help with testing.
 
-Can you give it a test?  The two commands are really similar, so it'd
-be surprising if the controller only chokes on one of them.  Another
-thing worthwhile testing is "libata.force=noncq,pio0" so that you can
-be sure other pio commands are okay.
+Hi Will,
 
-Thanks.
+sure I will CC you.
+> 
+> On Thu, Jun 05, 2014 at 03:39:50PM +0100, Christoffer Dall wrote:
+>> On Thu, Jun 05, 2014 at 03:15:15PM +0200, Eric Auger wrote:
+>>> On 06/05/2014 12:28 PM, Christoffer Dall wrote:
+>>>> On Mon, Jun 02, 2014 at 09:29:56AM +0200, Eric Auger wrote:
+>>>>> +                  kvm_debug("Inject irqchip routed vIRQ %d\n",
+>>>>> +                                  e->irqchip.pin);
+>>>>> +                  kvm_vgic_inject_irq(kvm, 0, spi, level);
+>>>>> +                  /*
+>>>>> +                   * toggling down vIRQ wire is directly handled in
+>>>>> +                   * process_maintenance for this reason:
+>>>>> +                   * irqfd_resampler_ack is called in
+>>>>> +                   * process_maintenance which holds the dist lock.
+>>>>> +                   * irqfd_resampler_ack calls kvm_set_irq
+>>>>> +                   * which ends_up calling kvm_vgic_inject_irq.
+>>>>> +                   * This later attempts to take the lock -> deadlock!
+>>>>> +                   */
+>>>>
+>>>> Not sure I understand this comment.  What are we trying to achieve, are
+>>>> we using some sort of a workaround to avoid a deadlock?
+>>>
+>>> What I wanted to point out here is I would have prefered to handle both
+>>> levels 0 and 1 in a symetrical manner. irqfd_resampler_ack (in eventfd)
+>>> is calling kvm_set_irq with level 0. This would be the prefered way to
+>>> toggle down the SPI at GIC input instead of doing this in
+>>> process_maintenance in a dirty manner. However this does work because
+>>> irqfd_resampler_ack is called in process_maintenance (the place where
+>>> the EOI is analyzed). process_maintenance holds the dist lock and would
+>>> eventually call kvm_vgic_inject_irq which also attempts to take the lock.
+>>>
+>>
+>> I'm afraid that's too much of a hack.  There's an external mechanism to
+>> set an interrupt line to active (level=1) or inactive (level=0) and we
+>> must support both.
+>>
+>> The fact that vgic_process_maintenance() can set the interrupt line to
+>> inactive is just something we exploit to properly handle level-triggered
+>> interrupts, but the main API to the VGIC must absolutely be supported.
+>>
+>> Am I completely wrong here?
+>>
+>> The locking issue can be solved by splitting up the locking into a finer
+>> granularity as needed or deferring the call to irqfd_resampler_ack()
+>> until after unlocking the distributor lock in kvm_vgic_sync_hwstate().
+> 
+> Why can't we do what PowerPC does for mpic and x86 does for IOAPIC and
+> simply drop the distributor lock across the call to kvm_notify_acked_irq?
 
--- 
-tejun
+Yes, I am about to release a new version for this RFC that uses a finer
+granularity for the dist lock, as you and Christoffer suggested.
+
+> 
+> Given that I think the eventfd callbacks can block, holding a spinlock isn't
+> safe anyway, regardless of the vgic re-entrancy issue.
+yes you're fully right.
+
+Best Regards
+
+Eric
+> 
+> Will
+> 
