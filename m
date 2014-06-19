@@ -1,146 +1,149 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Jun 2014 11:28:47 +0200
-Subject: [PATCH v2 12/20] clk: sunxi: Add A23 APB0 support to
- sun6i-a31-apb0-clk
-In-Reply-To: <CAGb2v64D6qBtXGXzn25443s_oj_=Z-u_P6+-MX52Lz54+9bQyQ@mail.gmail.com>
-References: <1403016777-15121-1-git-send-email-wens@csie.org>
- <1403016777-15121-13-git-send-email-wens@csie.org>
- <20140618102623.GQ19730@lukather>
- <CAGb2v64D6qBtXGXzn25443s_oj_=Z-u_P6+-MX52Lz54+9bQyQ@mail.gmail.com>
-Message-ID: <20140619092847.GW19730@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Jun 2014 10:30:12 +0100
+Subject: [PATCH v4 5/6] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <53A205CE.4080201@linaro.org>
+References: <1402503520-8611-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1402503520-8611-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <53A205CE.4080201@linaro.org>
+Message-ID: <20140619093010.GD5401@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 12:33:41PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Jun 18, 2014 at 6:26 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Tue, Jun 17, 2014 at 10:52:49PM +0800, Chen-Yu Tsai wrote:
-> >> The A23 has an almost identical PRCM clock tree. The difference in
-> >> the APB0 clock is the smallest divisor is 1, instead of 2.
-> >>
-> >> This patch extends the sun6i-a31-apb0-clk driver to take divider
-> >> tables associated to compatibles, and adds a compatible for the A23
-> >> variant.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
-> >>  drivers/clk/sunxi/clk-sun6i-apb0.c                | 28 ++++++++++++++++++-----
-> >>  2 files changed, 23 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> index af9e47d..e3a47ec 100644
-> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> @@ -28,6 +28,7 @@ Required properties:
-> >>       "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
-> >>       "allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
-> >>       "allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
-> >> +     "allwinner,sun8i-a23-apb0-clk" - for the APB0 clock on A23
-> >>       "allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
-> >>       "allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
-> >>       "allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
-> >> diff --git a/drivers/clk/sunxi/clk-sun6i-apb0.c b/drivers/clk/sunxi/clk-sun6i-apb0.c
-> >> index 11f17c3..2197ac7 100644
-> >> --- a/drivers/clk/sunxi/clk-sun6i-apb0.c
-> >> +++ b/drivers/clk/sunxi/clk-sun6i-apb0.c
-> >> @@ -11,6 +11,7 @@
-> >>  #include <linux/clk-provider.h>
-> >>  #include <linux/module.h>
-> >>  #include <linux/of.h>
-> >> +#include <linux/of_device.h>
-> >>  #include <linux/platform_device.h>
-> >>
-> >>  /*
-> >> @@ -28,6 +29,21 @@ static const struct clk_div_table sun6i_a31_apb0_divs[] = {
-> 
-> For reference:
-> 
-> static const struct clk_div_table sun6i_a31_apb0_divs[] = {
->         { .val = 0, .div = 2, },
->         { .val = 1, .div = 2, },
->         { .val = 2, .div = 4, },
->         { .val = 3, .div = 8, },
->         { /* sentinel */ },
-> };
-> 
-> 
-> >>       { /* sentinel */ },
-> >>  };
-> >>
-> >> +/* The A23 APB0 clock has a standard power of 2 divisor */
-> >
-> > Why not just pass CLK_DIVIDER_POWER_OF_TWO then, instead of a table?
-> 
-> The A31 APB0 clock uses a table for the odd /2 divisor for value 0.
-> The standard table I'm using for the A23 is just to keep it simple
-> and alike.
-> 
-> >> +static const struct clk_div_table sun8i_a23_apb0_divs[] = {
-> >> +     { .val = 0, .div = 1, },
-> >> +     { .val = 1, .div = 2, },
-> >> +     { .val = 2, .div = 4, },
-> >> +     { .val = 3, .div = 8, },
-> >> +     { /* sentinel */ },
-> >> +};
-> >> +
-> >> +const struct of_device_id sun6i_a31_apb0_clk_dt_ids[] = {
-> >> +     { .compatible = "allwinner,sun6i-a31-apb0-clk", .data = &sun6i_a31_apb0_divs },
-> >> +     { .compatible = "allwinner,sun8i-a23-apb0-clk", .data = &sun8i_a23_apb0_divs },
-> >> +     { /* sentinel */ }
-> >> +};
-> >> +
-> >>  static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
-> >>  {
-> >>       struct device_node *np = pdev->dev.of_node;
-> >> @@ -36,12 +52,17 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
-> >>       struct resource *r;
-> >>       void __iomem *reg;
-> >>       struct clk *clk;
-> >> +     const struct of_device_id *device;
-> >>
-> >>       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >>       reg = devm_ioremap_resource(&pdev->dev, r);
-> >>       if (IS_ERR(reg))
-> >>               return PTR_ERR(reg);
-> >>
-> >> +     device = of_match_device(sun6i_a31_apb0_clk_dt_ids, &pdev->dev);
-> >> +     if (!device)
-> >> +             return -EINVAL;
-> >> +
-> >>       clk_parent = of_clk_get_parent_name(np, 0);
-> >>       if (!clk_parent)
-> >>               return -EINVAL;
-> >> @@ -49,7 +70,7 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
-> >>       of_property_read_string(np, "clock-output-names", &clk_name);
-> >>
-> >>       clk = clk_register_divider_table(&pdev->dev, clk_name, clk_parent,
-> >> -                                      0, reg, 0, 2, 0, sun6i_a31_apb0_divs,
-> >> +                                      0, reg, 0, 2, 0, device->data,
-> >
-> > I'm not sure that it will actually work for the A31, since it does
-> > define some dividers anyway, and the divider table is !NULL, even
-> > though there's actually no dividers defined.
-> 
-> I'm not following. The A31 does have a table defined. It's just cut
-> off in this patch. I asked Boris to add the table when he was working
-> on the A31 PRCM clocks. See above.
+On Wed, Jun 18, 2014 at 10:34:06PM +0100, Daniel Lezcano wrote:
 
-Ah right. My bad.
+[...]
 
-If these two clocks are these different though, maybe it would just be
-easier to add a new driver. These are trivial enough anyway.
+> > +/*
+> > + * arm_enter_idle_state - Programs CPU to enter the specified state
+> > + *
+> > + * dev: cpuidle device
+> > + * drv: cpuidle driver
+> > + * idx: state index
+> > + *
+> > + * Called from the CPUidle framework to program the device to the
+> > + * specified target state selected by the governor.
+> > + */
+> > +static int arm_enter_idle_state(struct cpuidle_device *dev,
+> > +				struct cpuidle_driver *drv, int idx)
+> > +{
+> > +	int ret;
+> > +
+> > +	if (!idx) {
+> > +		cpu_do_idle();
+> > +		return idx;
+> > +	}
+> > +
+> > +	cpu_pm_enter();
+> > +	/*
+> > +	 * Pass idle state index to cpu_suspend which in turn will call
+> > +	 * the CPU ops suspend protocol with idle index as a parameter.
+> > +	 *
+> > +	 * Some states would not require context to be saved and flushed
+> > +	 * to DRAM, so calling cpu_suspend would not be stricly necessary.
+> > +	 * When power domains specifications for ARM CPUs are finalized then
+> > +	 * this code can be optimized to prevent saving registers if not
+> > +	 * needed.
+> > +	 */
+> > +	ret = cpu_suspend(idx);
+> > +
+> > +	cpu_pm_exit();
+> > +
+> > +	return ret ? -1 : idx;
+> 
+> Is it sure cpu_suspend will return always 0 on success ?
 
-Maxime
+Yes. Now, we have to define "success". On ARM32/64 success means
+returning through cpu_resume, which can also happen if a CPU is soft
+rebooted following a power down failure. It depends on how the
+cpu_suspend back-end behaves on power down failure, if it just returns
+or it soft-reboots the CPU. It is an implementation detail, do not think
+it is a major problem at the moment.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140619/e729a4ca/attachment.sig>
+> > +}
+> > +
+> > +struct cpuidle_driver arm64_idle_driver = {
+> > +	.name = "arm64_idle",
+> > +	.owner = THIS_MODULE,
+> > +};
+> > +
+> > +static struct device_node *state_nodes[CPUIDLE_STATE_MAX] __initdata;
+> > +
+> > +/*
+> > + * arm64_idle_init
+> > + *
+> > + * Registers the arm64 specific cpuidle driver with the cpuidle
+> > + * framework. It relies on core code to parse the idle states
+> > + * and initialize them using driver data structures accordingly.
+> > + */
+> > +static int __init arm64_idle_init(void)
+> > +{
+> > +	int i, ret;
+> > +	const char *entry_method;
+> > +	struct device_node *idle_states_node;
+> > +	const struct cpu_suspend_ops *suspend_init;
+> > +	struct cpuidle_driver *drv = &arm64_idle_driver;
+> > +
+> > +	idle_states_node = of_find_node_by_path("/cpus/idle-states");
+> > +	if (!idle_states_node)
+> > +		return -ENOENT;
+> > +
+> > +	if (of_property_read_string(idle_states_node, "entry-method",
+> > +				    &entry_method)) {
+> > +		pr_warn(" * %s missing entry-method property\n",
+> > +			    idle_states_node->full_name);
+> > +		of_node_put(idle_states_node);
+> > +		ret = -EOPNOTSUPP;
+> > +		goto put_node;
+> > +	}
+> > +
+> > +	suspend_init = get_suspend_ops(entry_method);
+> > +	if (!suspend_init) {
+> > +		pr_warn("Missing suspend initializer\n");
+> > +		ret = -EOPNOTSUPP;
+> > +		goto put_node;
+> > +	}
+> > +
+> > +	/*
+> > +	 * State at index 0 is standby wfi and considered standard
+> > +	 * on all ARM platforms. If in some platforms simple wfi
+> > +	 * can't be used as "state 0", DT bindings must be implemented
+> > +	 * to work around this issue and allow installing a special
+> > +	 * handler for idle state index 0.
+> > +	 */
+> > +	drv->states[0].exit_latency = 1;
+> > +	drv->states[0].target_residency = 1;
+> > +	drv->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
+> > +	strncpy(drv->states[0].name, "ARM WFI", CPUIDLE_NAME_LEN);
+> > +	strncpy(drv->states[0].desc, "ARM WFI", CPUIDLE_DESC_LEN);
+> 
+> Please do not copy the state name and desc strings, they will be 
+> converted to 'const char *'.
+
+Ok, I need to sync this code with those changes though.
+
+> > +	drv->cpumask = (struct cpumask *) cpu_possible_mask;
+> > +	/*
+> > +	 * Start at index 1, request idle state nodes to be filled
+> > +	 */
+> > +	ret = of_init_idle_driver(drv, state_nodes, 1, true);
+> > +	if (ret)
+> > +		goto put_node;
+> > +
+> > +	if (suspend_init->init_fn(drv, state_nodes)) {
+> > +		ret = -EOPNOTSUPP;
+> > +		goto put_node;
+> > +	}
+> > +
+> > +	for (i = 0; i < drv->state_count; i++)
+> > +		drv->states[i].enter = arm_enter_idle_state;
+> 
+> May be s/arm/arm64/ ?
+
+Well, yes, unless we go for a common arm/arm64 driver (see Rob's email),
+with related pros and cons.
+
+Let's make a decision on this asap, I do not think we are that far from
+a common solution.
+
+Thanks a lot,
+Lorenzo
