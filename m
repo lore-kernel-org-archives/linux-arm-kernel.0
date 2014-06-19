@@ -1,56 +1,69 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 19 Jun 2014 08:45:45 -0500
-Subject: [PATCH 4/9] usb: phy: add the Berlin USB PHY driver
-In-Reply-To: <CAFp+6iH+J4T=7pJU_+ZZKrgDwJWwQfznv9NWuy5SkLgz_j75_Q@mail.gmail.com>
-References: <1401983326-19205-1-git-send-email-antoine.tenart@free-electrons.com>
- <1401983326-19205-5-git-send-email-antoine.tenart@free-electrons.com>
- <CAFp+6iEKLD_rLg84h3J2oyzw7vizEV-Eqo0e_jqurx_v9ZX2JA@mail.gmail.com>
- <20140606071106.GA30156@kwain>
- <CAFp+6iH+J4T=7pJU_+ZZKrgDwJWwQfznv9NWuy5SkLgz_j75_Q@mail.gmail.com>
-Message-ID: <20140619134545.GB23782@saruman.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 19 Jun 2014 08:57:00 -0500
+Subject: [PATCH] of: Check for phys_addr_t overflows in
+ early_init_dt_add_memory_arch
+In-Reply-To: <1403154257-14591-1-git-send-email-lauraa@codeaurora.org>
+References: <1403154257-14591-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAL_JsqJW-mBb7C=ni2YLK-h9kfcAHs6b-uVJ-Zi-+MW0F_x1=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 06, 2014 at 04:32:03PM +0530, Vivek Gautam wrote:
-> Hi,
-> 
-> On Fri, Jun 6, 2014 at 12:41 PM, Antoine T?nart
-> <antoine.tenart@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Fri, Jun 06, 2014 at 12:09:06PM +0530, Vivek Gautam wrote:
-> >> On Thu, Jun 5, 2014 at 9:18 PM, Antoine T?nart
-> >> <antoine.tenart@free-electrons.com> wrote:
-> >> > Add the driver driving the Marvell Berlin USB PHY. This allows to
-> >> > initialize the PHY and to use it from the USB driver later.
-> >>
-> >> Just out of curiosity, going forward we would like to have phy drivers based on
-> >> generic phy framework (drivers/phy).
-> >> Any particular reason that we are still adding phy drivers in usb-phy layer ?
-> >>
-> >> Looking at it, seems like it can very well be written based on phy framework.
-> >
-> > This USB controller are ChipIdea compatible, and the ChipIdea common
-> > functions use the usb_phy framework. That's why this PHY driver is
-> > there.
-> 
-> Ok, i see that now. In that case shouldn't we be moving even the chipidea
-> drivers to use the generic phy functions to get the phy and init/exit it.
+On Thu, Jun 19, 2014 at 12:04 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> The common early_init_dt_add_memory_arch takes the base and size
+> of a memory region as u64 types. The function never checks if
+> the base and size can actually fit in a phys_addr_t which may
+> be smaller than 64-bits. This may result in incorrect memory
+> being passed to memblock_add if the memory falls outside the
+> range of phys_addr_t. Add range checks for the base and size if
+> phys_addr_t is smaller than u64.
+>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+> Geert, can you drop my other patch and give this a test to see if it fixes
+> your bootup problem?
+>
+> ---
+>  drivers/of/fdt.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index c4cddf0..f72132c 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -880,6 +880,21 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+>         const u64 phys_offset = __pa(PAGE_OFFSET);
+>         base &= PAGE_MASK;
+>         size &= PAGE_MASK;
+> +
+> +#ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
+> +       if (base > ULONG_MAX) {
 
-yes, we should :-)
+How about removing the ifdef and doing something like:
 
-> I think Felipe and Kishon can comment on this better, and tell how
-> things should be. :-)
+if ((base >> 32) && (sizeof(phys_addr_t) != sizeof(u64)))
 
-yeah, this will just make it a little more difficult to deprecate
-current usb phy layer.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140619/c28e2865/attachment-0001.sig>
+> +               pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+> +                               base, base + size);
+> +               return;
+> +       }
+> +
+> +       if (base + size > ULONG_MAX) {
+> +               pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
+> +                               ULONG_MAX, base + size);
+> +               size = ULONG_MAX - base;
+> +       }
+> +#endif
+> +
+>         if (base + size < phys_offset) {
+>                 pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+>                            base, base + size);
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
