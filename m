@@ -1,39 +1,64 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Thu, 19 Jun 2014 11:37:48 +0530
-Subject: [PATCH v2] ARM: dts: exynos4: fix pwm-cells in pwm node
-In-Reply-To: <1403143414-6242-1-git-send-email-jaewon02.kim@samsung.com>
-References: <1403143414-6242-1-git-send-email-jaewon02.kim@samsung.com>
-Message-ID: <CAK5sBcFJpSvpwXGPckDcUoZP_Xqqo3Bm6p5qjF_mnZg6b7+T3g@mail.gmail.com>
+From: vidyas@nvidia.com (Vidya Sagar)
+Date: Thu, 19 Jun 2014 12:06:00 +0530
+Subject: [PATCH v4] ARM: fix debug prints relevant to PCI devices
+Message-ID: <1403159760-32627-1-git-send-email-vidyas@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaewon,
+As per PCIe spec, fast back-to-back transactions feature
+is not applicable to PCIe devices. Hence, do not print
+that fast back-to-back trasactions are disabled when
+there is a PCIe device found on the bus
 
-On Thu, Jun 19, 2014 at 7:33 AM, Jaewon Kim <jaewon02.kim@samsung.com> wrote:
-> pwm-cells should be 3. Third cell is optional PWM flags. And This flag
-> supported by this binding is PWM_POLARITY_INVERTED.
->
-> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> ---
->
-> Changes in v2:
->  - Remove unnecessary handle.
->
->  arch/arm/boot/dts/exynos4.dtsi |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index b8ece4b..e118356 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -554,7 +554,7 @@
->                 interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
->                 clocks = <&clock CLK_PWM>;
->                 clock-names = "timers";
-> -               #pwm-cells = <2>;
-> +               #pwm-cells = <3>;
->                 status = "disabled";
->         };
+Signed-off-by: Vidya Sagar <vidyas@nvidia.com>
+---
+v4:
+* initialized 'has_pcie_dev' to 'false'
 
-I think I had already reviewed this patch. Anyway,
-Reviewed-by: Sachin Kamat <sachin.kamat@samsung.com>
+v3:
+* removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
+
+v2:
+* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
+* replaced printk with pr_info
+
+ arch/arm/kernel/bios32.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..03c56ba 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
++	bool has_pcie_dev = false;
+ 
+ 	/*
+ 	 * Walk the devices on this bus, working out what we can
+@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		u16 status;
+ 
++		if (!has_pcie_dev)
++			has_pcie_dev = pci_is_pcie(dev);
+ 		pci_read_config_word(dev, PCI_STATUS, &status);
+ 
+ 		/*
+@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 
+ 	/*
+ 	 * Report what we did for this bus
++	 * (only if the bus doesn't have any PCIe devices)
+ 	 */
+-	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+-		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
++	if (!has_pcie_dev)
++		pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
++			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-- 
+1.8.1.5
