@@ -1,173 +1,235 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jun 2014 11:49:21 +0100
-Subject: [PATCHv3 2/4] arm64: place initial page tables above the kernel
+Date: Thu, 19 Jun 2014 11:49:22 +0100
+Subject: [PATCHv3 3/4] arm64: Update the Image header
 In-Reply-To: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
 References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1403174963-10730-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we place swapper_pg_dir and idmap_pg_dir below the kernel
-image, between PHYS_OFFSET and (PHYS_OFFSET + TEXT_OFFSET). However,
-bootloaders may use portions of this memory below the kernel and we do
-not parse the memory reservation list until after the MMU has been
-enabled. As such we may clobber some memory a bootloader wishes to have
-preserved.
+Currently the kernel Image is stripped of everything past the initial
+stack, and at runtime the memory is initialised and used by the kernel.
+This makes the effective minimum memory footprint of the kernel larger
+than the size of the loaded binary, though bootloaders have no mechanism
+to identify how large this minimum memory footprint is. This makes it
+difficult to choose safe locations to place both the kernel and other
+binaries required at boot (DTB, initrd, etc), such that the kernel won't
+clobber said binaries or other reserved memory during initialisation.
 
-To enable the use of all of this memory by bootloaders (when the
-required memory reservations are communicated to the kernel) it is
-necessary to move our initial page tables elsewhere. As we currently
-have an effectively unbound requirement for memory at the end of the
-kernel image for .bss, we can place the page tables here.
+Additionally when big endian support was added the image load offset was
+overlooked, and is currently of an arbitrary endianness, which makes it
+difficult for bootloaders to make use of it. It seems that bootloaders
+aren't respecting the image load offset at present anyway, and are
+assuming that offset 0x80000 will always be correct.
 
-This patch moves the initial page table to the end of the kernel image,
-after the BSS. As they do not consist of any initialised data they will
-be stripped from the kernel Image as with the BSS. The BSS clearing
-routine is updated to stop at __bss_stop rather than _end so as to not
-clobber the page tables, and memory reservations made redundant by the
-new organisation are removed.
+This patch adds an effective image size to the kernel header which
+describes the amount of memory from the start of the kernel Image binary
+which the kernel expects to use before detecting memory and handling any
+memory reservations. This can be used by bootloaders to choose suitable
+locations to load the kernel and/or other binaries such that the kernel
+will not clobber any memory unexpectedly. As before, memory reservations
+are required to prevent the kernel from clobbering these locations
+later.
+
+Both the image load offset and the effective image size are forced to be
+little-endian regardless of the native endianness of the kernel to
+enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
+which wish to make use of the load offset can inspect the effective
+image size field for a non-zero value to determine if the offset is of a
+known endianness. To enable software to determine the endinanness of the
+kernel as may be required for certain use-cases, a new flags field (also
+little-endian) is added to the kernel header to export this information.
+
+The documentation is updated to clarify these details. To discourage
+future assumptions regarding the value of text_offset, the value at this
+point in time is removed from the main flow of the documentation (though
+kept as a compatibility note). Some minor formatting issues in the
+documentation are also corrected.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Laura Abbott <lauraa@codeaurora.org>
+Acked-by: Tom Rini <trini@ti.com>
+Cc: Geoff Levand <geoff@infradead.org>
+Cc: Kevin Hilman <kevin.hilman@linaro.org>
 ---
- arch/arm64/include/asm/page.h   |  9 +++++++++
- arch/arm64/kernel/head.S        | 28 ++++++++--------------------
- arch/arm64/kernel/vmlinux.lds.S |  7 +++++++
- arch/arm64/mm/init.c            | 12 ++++--------
- 4 files changed, 28 insertions(+), 28 deletions(-)
+ Documentation/arm64/booting.txt | 43 ++++++++++++++++++++++------
+ arch/arm64/include/asm/image.h  | 62 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/head.S        |  6 ++--
+ arch/arm64/kernel/vmlinux.lds.S |  3 ++
+ 4 files changed, 103 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/image.h
 
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 46bf666..a6331e6 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -31,6 +31,15 @@
- /* We do define AT_SYSINFO_EHDR but don't use the gate mechanism */
- #define __HAVE_ARCH_GATE_AREA		1
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 37fc4f6..85af34d 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -72,27 +72,54 @@ The decompressed kernel image contains a 64-byte header as follows:
  
-+/*
-+ * The idmap and swapper page tables need some space reserved in the kernel
-+ * image. The idmap only requires a pgd and a next level table to (section) map
-+ * the kernel, while the swapper also maps the FDT and requires an additional
-+ * table to map an early UART. See __create_page_tables for more information.
-+ */
-+#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-+#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
+   u32 code0;			/* Executable code */
+   u32 code1;			/* Executable code */
+-  u64 text_offset;		/* Image load offset */
+-  u64 res0	= 0;		/* reserved */
+-  u64 res1	= 0;		/* reserved */
++  u64 text_offset;		/* Image load offset, little endian */
++  u64 image_size;		/* Effective Image size, little endian */
++  u64 flags;			/* kernel flags, little endian */
+   u64 res2	= 0;		/* reserved */
+   u64 res3	= 0;		/* reserved */
+   u64 res4	= 0;		/* reserved */
+   u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
+-  u32 res5 = 0;      		/* reserved */
++  u32 res5;      		/* reserved (used for PE COFF offset) */
+ 
+ 
+ Header notes:
+ 
++- As of v3.17, all fields are little endian unless stated otherwise.
 +
- #ifndef __ASSEMBLY__
+ - code0/code1 are responsible for branching to stext.
++
+ - when booting through EFI, code0/code1 are initially skipped.
+   res5 is an offset to the PE header and the PE header has the EFI
+-  entry point (efi_stub_entry). When the stub has done its work, it
++  entry point (efi_stub_entry).  When the stub has done its work, it
+   jumps to code0 to resume the normal boot process.
  
- #ifdef CONFIG_ARM64_64K_PAGES
+-The image must be placed at the specified offset (currently 0x80000)
+-from the start of the system RAM and called there. The start of the
+-system RAM must be aligned to 2MB.
++- Prior to v3.17, the endianness of text_offset was not specified.  In
++  these cases image_size is zero and text_offset is 0x80000 in the
++  endianness of the kernel.  Where image_size is non-zero image_size is
++  little-endian and must be respected.  Where image_size is zero,
++  text_offset can be assumed to be 0x80000.
++
++- The flags field (introduced in v3.17) is a little-endian 64-bit field
++  composed as follows:
++  Bit 0: 	Kernel endianness.  1 if BE, 0 if LE.
++  Bits 1-63:	Reserved.
++
++- When image_size is zero, a bootloader should attempt to keep as much
++  memory as possible free for use by the kernel immediately after the
++  end of the kernel image. The amount of space required will vary
++  depending on selected features, and is effectively unbound.
++
++The Image must be placed text_offset bytes from a 2MB aligned base
++address near the start of usable system RAM and called there. Memory
++below that base address is currently unusable by Linux, and therefore it
++is strongly recommended that this location is the start of system RAM.
++At least image_size bytes from the start of the image must be free for
++use by the kernel.
++
++Any memory described to the kernel (even that below the 2MB aligned base
++address) which is not marked as reserved from the kernel e.g. with a
++memreserve region in the device tree) will be considered as available to
++the kernel.
+ 
+ Before jumping into the kernel, the following conditions must be met:
+ 
+diff --git a/arch/arm64/include/asm/image.h b/arch/arm64/include/asm/image.h
+new file mode 100644
+index 0000000..8fae075
+--- /dev/null
++++ b/arch/arm64/include/asm/image.h
+@@ -0,0 +1,62 @@
++/*
++ * Linker script macros to generate Image header fields.
++ *
++ * Copyright (C) 2014 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_IMAGE_H
++#define __ASM_IMAGE_H
++
++#ifndef LINKER_SCRIPT
++#error This file should only be included in vmlinux.lds.S
++#endif
++
++/*
++ * There aren't any ELF relocations we can use to endian-swap values known only
++ * at link time (e.g. the subtraction of two symbol addresses), so we must get
++ * the linker to endian-swap certain values before emitting them.
++ */
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define DATA_LE64(data)					\
++	((((data) & 0x00000000000000ff) << 56) |	\
++	 (((data) & 0x000000000000ff00) << 40) |	\
++	 (((data) & 0x0000000000ff0000) << 24) |	\
++	 (((data) & 0x00000000ff000000) << 8)  |	\
++	 (((data) & 0x000000ff00000000) >> 8)  |	\
++	 (((data) & 0x0000ff0000000000) >> 24) |	\
++	 (((data) & 0x00ff000000000000) >> 40) |	\
++	 (((data) & 0xff00000000000000) >> 56))
++#else
++#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
++#endif
++
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define __HEAD_FLAG_BE	1
++#else
++#define __HEAD_FLAG_BE	0
++#endif
++
++#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
++
++/*
++ * These will output as part of the Image header, which should be little-endian
++ * regardless of the endianness of the kernel. While constant values could be
++ * endian swapped in head.S, all are done here for consistency.
++ */
++#define HEAD_SYMBOLS						\
++	_kernel_size_le		= DATA_LE64(_end - _text);	\
++	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
++	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
++
++#endif /* __ASM_IMAGE_H */
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 7ec7817..e048f2b 100644
+index e048f2b..7b59c3d 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -35,29 +35,17 @@
- #include <asm/page.h>
- #include <asm/virt.h>
- 
--/*
-- * swapper_pg_dir is the virtual address of the initial page table. We place
-- * the page tables 3 * PAGE_SIZE below KERNEL_RAM_VADDR. The idmap_pg_dir has
-- * 2 pages and is placed below swapper_pg_dir.
-- */
- #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
- 
- #if (KERNEL_RAM_VADDR & 0xfffff) != 0x80000
- #error KERNEL_RAM_VADDR must start at 0xXXX80000
+@@ -108,9 +108,9 @@ efi_head:
+ 	b	stext				// branch to kernel start, magic
+ 	.long	0				// reserved
  #endif
- 
--#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
--#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
--
--	.globl	swapper_pg_dir
--	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - SWAPPER_DIR_SIZE
--
--	.globl	idmap_pg_dir
--	.equ	idmap_pg_dir, swapper_pg_dir - IDMAP_DIR_SIZE
--
--	.macro	pgtbl, ttb0, ttb1, phys
--	add	\ttb1, \phys, #TEXT_OFFSET - SWAPPER_DIR_SIZE
--	sub	\ttb0, \ttb1, #IDMAP_DIR_SIZE
-+	.macro	pgtbl, ttb0, ttb1, virt_to_phys
-+	ldr	\ttb1, =swapper_pg_dir
-+	ldr	\ttb0, =idmap_pg_dir
-+	add	\ttb1, \ttb1, \virt_to_phys
-+	add	\ttb0, \ttb0, \virt_to_phys
- 	.endm
- 
- #ifdef CONFIG_ARM64_64K_PAGES
-@@ -414,7 +402,7 @@ ENTRY(secondary_startup)
- 	mov	x23, x0				// x23=current cpu_table
- 	cbz	x23, __error_p			// invalid processor (x23=0)?
- 
--	pgtbl	x25, x26, x24			// x25=TTBR0, x26=TTBR1
-+	pgtbl	x25, x26, x28			// x25=TTBR0, x26=TTBR1
- 	ldr	x12, [x23, #CPU_INFO_SETUP]
- 	add	x12, x12, x28			// __virt_to_phys
- 	blr	x12				// initialise processor
-@@ -528,7 +516,7 @@ ENDPROC(__calc_phys_offset)
-  *   - pgd entry for fixed mappings (TTBR1)
-  */
- __create_page_tables:
--	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
-+	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
- 	mov	x27, lr
- 
- 	/*
-@@ -617,7 +605,7 @@ ENDPROC(__create_page_tables)
- __switch_data:
- 	.quad	__mmap_switched
- 	.quad	__bss_start			// x6
--	.quad	_end				// x7
-+	.quad	__bss_stop			// x7
- 	.quad	processor_id			// x4
- 	.quad	__fdt_pointer			// x5
- 	.quad	memstart_addr			// x6
+-	.quad	TEXT_OFFSET			// Image load offset from start of RAM
+-	.quad	0				// reserved
+-	.quad	0				// reserved
++	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
++	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
++	.quad	_kernel_flags_le		// Informative flags, little-endian
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index f1e6d5c..c6648d3 100644
+index c6648d3..9cbf77a 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -104,6 +104,13 @@ SECTIONS
- 	_edata = .;
+@@ -5,6 +5,7 @@
+  */
  
- 	BSS_SECTION(0, 0, 0)
-+
-+	. = ALIGN(PAGE_SIZE);
-+	idmap_pg_dir = .;
-+	. += IDMAP_DIR_SIZE;
-+	swapper_pg_dir = .;
-+	. += SWAPPER_DIR_SIZE;
-+
+ #include <asm-generic/vmlinux.lds.h>
++#include <asm/image.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
+@@ -114,6 +115,8 @@ SECTIONS
  	_end = .;
  
  	STABS_DEBUG
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 091d428..35bca76 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -126,20 +126,16 @@ static void arm64_memory_present(void)
++
++	HEAD_SYMBOLS
+ }
  
- void __init arm64_memblock_init(void)
- {
--	/* Register the kernel text, kernel data and initrd with memblock */
-+	/*
-+	 * Register the kernel text, kernel data, initrd, and initial
-+	 * pagetables with memblock.
-+	 */
- 	memblock_reserve(__pa(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (initrd_start)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
--	/*
--	 * Reserve the page tables.  These are already in use,
--	 * and can only be in node 0.
--	 */
--	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
--	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
--
- 	early_init_fdt_scan_reserved_mem();
- 	dma_contiguous_reserve(0);
- 
+ /*
 -- 
 1.9.1
