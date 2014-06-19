@@ -1,54 +1,66 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 18 Jun 2014 16:46:11 -0700
-Subject: [PATCH v6 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
- support.
-In-Reply-To: <20140617.132024.1213369771856463527.davem@davemloft.net>
-References: <1402964326-11147-5-git-send-email-isubramanian@apm.com>
- <20140616.214247.1154200670003936158.davem@davemloft.net>
- <CAKh23F=2undAW=nWibOreAM8DJiQKpLx=OboCX=fNZE+OU=AbA@mail.gmail.com>
- <20140617.132024.1213369771856463527.davem@davemloft.net>
-Message-ID: <CAKh23FmnZqZkDaGYPfnKRrvCYQ4_6W_RRKbqEbc4nbD6jqQaLA@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 19 Jun 2014 02:06:20 +0200
+Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
+ devices
+In-Reply-To: <5537724.LlmJ2hxcKn@wuerfel>
+References: <53A05E2D.6020702@samsung.com> <5027740.B7iVUcUX2T@wuerfel>
+ <53A0B27E.5010708@gmail.com> <5537724.LlmJ2hxcKn@wuerfel>
+Message-ID: <53A2297C.106@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 1:20 PM, David Miller <davem@davemloft.net> wrote:
-> From: Iyappan Subramanian <isubramanian@apm.com>
-> Date: Tue, 17 Jun 2014 12:21:08 -0700
->
->> On Mon, Jun 16, 2014 at 9:42 PM, David Miller <davem@davemloft.net> wrote:
->>> From: Iyappan Subramanian <isubramanian@apm.com>
->>> Date: Mon, 16 Jun 2014 17:18:46 -0700
->>>
->>>> +static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
->>>> +                                      struct net_device *ndev)
->>>> +{
->>>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
->>>> +     struct xgene_enet_desc_ring *tx_ring = pdata->tx_ring;
->>>> +     struct xgene_enet_desc_ring *cp_ring = tx_ring->cp_ring;
->>>> +     u32 tx_level, cq_level;
->>>> +
->>>> +     tx_level = xgene_enet_ring_len(tx_ring);
->>>> +     cq_level = xgene_enet_ring_len(cp_ring);
->>>> +     if (unlikely(tx_level > pdata->tx_qcnt_hi ||
->>>> +                  cq_level > pdata->cp_qcnt_hi)) {
->>>> +             netif_stop_queue(ndev);
->>>> +             return NETDEV_TX_BUSY;
->>>> +     }
->>>> +
->>>> +     if (xgene_enet_setup_tx_desc(tx_ring, skb))
->>>> +             return NETDEV_TX_OK;
->>>
->>> If you return NETDEV_TX_OK, it is your responsibility to deal with the
->>> SKB, because you own it.
->>>
->>> In particular, you have to free the packet.
->>
->> skb freeing happens in xgene_enet_tx_completion().
->
-> You're not queueing up the packet when DMA mapping the packet fails,
-> which is the only condition that causes xgene_enet_setup_tx_desc() to
-> return an error, so xgene_enet_tx_completion() will not be called.
->
-> Can you really not see this?
+Hi,
 
-I am sorry I missed that.  I will fix this.
+On 06/18/2014 02:57 PM, Arnd Bergmann wrote:
+> On Tuesday 17 June 2014 23:26:22 Tomasz Figa wrote:
+>> On 17.06.2014 17:42, Arnd Bergmann wrote:
+>>> This seems like a reasonable way of solving the problem, but I think
+>>> there is an even better one that we have about in the past: if we
+>>> promote syscon from a platform driver into a a drivers/base/ helper
+>>> that is independent of the platform device matching, we can use
+>>> call syscon_regmap_lookup_* for any device node, whether it's already
+>>> bound to a driver or not, which do what you need. It would also make
+>>> it easier to call the syscon code before the platform_device
+>>> infrastructure gets initialized, which is something a number of
+>>> people have asked for, e.g. for using regmap to do SMP bringup
+>>> or for clock registration.
+>>
+>> Basically, unless I'm missing your point, this is what my patch does,
+>> except that I don't move it to drivers/base/ and the registration
+>> function I added require a pointer to struct device. Indeed, decoupling
+>> it further from the driver model, by adding of_syscon_register() should
+>> be useful for early users.
+> 
+> I believe the part you are missing is that with the approach I suggested,
+> there would be no registration function at all. You can easily do the
+> lookup from the client drivers using the DT data structures, with no
+> need for the device at all. The only exception today is the clps711x
+> platform using syscon_regmap_lookup_by_pdevname(), but that should be
+> solved in 3.17 when clps711x becomes DT-only.
+
+I agree with Arnd. This patch is doing the part of what we wanted to do with it.
+It means create a list of registered devices.
+But you are working with struct device which you can't use in early phase
+which is the feature we wanted to use. But currently we have workaround
+in the kernel and clk subsystem is not able to work with regmap anyway.
+
+Moving to proper location is just the last step.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140619/fb7b5507/attachment.sig>
