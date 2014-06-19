@@ -1,46 +1,55 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 18 Jun 2014 21:54:51 -0700
-Subject: [PATCH] i2c: s3c2410: resume the I2C controller earlier
-Message-ID: <1403153691-15606-1-git-send-email-dianders@chromium.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 18 Jun 2014 22:04:17 -0700
+Subject: [PATCH] of: Check for phys_addr_t overflows in
+ early_init_dt_add_memory_arch
+Message-ID: <1403154257-14591-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vincent Palatin <vpalatin@chromium.org>
+The common early_init_dt_add_memory_arch takes the base and size
+of a memory region as u64 types. The function never checks if
+the base and size can actually fit in a phys_addr_t which may
+be smaller than 64-bits. This may result in incorrect memory
+being passed to memblock_add if the memory falls outside the
+range of phys_addr_t. Add range checks for the base and size if
+phys_addr_t is smaller than u64.
 
-When the wake-up is triggered by the PMIC RTC, the RTC driver is trying
-to read the PMIC interrupt status over I2C and fails because the I2C
-controller is not resumed yet.
-Let's resume the I2C controller earlier in the _noirq phase
-(as other hardwares are doing), so we can properly get the wake-up
-condition.
-
-Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- drivers/i2c/busses/i2c-s3c2410.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Geert, can you drop my other patch and give this a test to see if it fixes
+your bootup problem?
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index e828a1d..b904132 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1267,7 +1267,7 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
- 	return 0;
- }
- 
--static int s3c24xx_i2c_resume(struct device *dev)
-+static int s3c24xx_i2c_resume_noirq(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
-@@ -1285,7 +1285,7 @@ static int s3c24xx_i2c_resume(struct device *dev)
- static const struct dev_pm_ops s3c24xx_i2c_dev_pm_ops = {
- #ifdef CONFIG_PM_SLEEP
- 	.suspend_noirq = s3c24xx_i2c_suspend_noirq,
--	.resume = s3c24xx_i2c_resume,
-+	.resume_noirq = s3c24xx_i2c_resume_noirq,
- #endif
- };
- 
+---
+ drivers/of/fdt.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index c4cddf0..f72132c 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -880,6 +880,21 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+ 	const u64 phys_offset = __pa(PAGE_OFFSET);
+ 	base &= PAGE_MASK;
+ 	size &= PAGE_MASK;
++
++#ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
++	if (base > ULONG_MAX) {
++		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
++				base, base + size);
++		return;
++	}
++
++	if (base + size > ULONG_MAX) {
++		pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
++				ULONG_MAX, base + size);
++		size = ULONG_MAX - base;
++	}
++#endif
++
+ 	if (base + size < phys_offset) {
+ 		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+ 			   base, base + size);
 -- 
-2.0.0.526.g5318336
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
