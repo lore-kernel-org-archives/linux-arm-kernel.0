@@ -1,128 +1,112 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 19 Jun 2014 13:01:57 +0100
-Subject: [PATCH v4 11/13] serial: asc: Adopt readl_/writel_relaxed()
-In-Reply-To: <53A2CD8D.1050106@linaro.org>
-References: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
- <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
- <1403174303-25456-12-git-send-email-daniel.thompson@linaro.org>
- <53A2C9A3.9090507@linaro.org> <53A2CD8D.1050106@linaro.org>
-Message-ID: <53A2D135.4020700@linaro.org>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Thu, 19 Jun 2014 17:53:36 +0530
+Subject: [PATCH v2 2/3] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <20140619085607.GB5401@e102568-lin.cambridge.arm.com>
+References: <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
+ <1398147435-3122-1-git-send-email-a.kesavan@samsung.com>
+ <535650AE.90501@linaro.org>
+ <alpine.LFD.2.11.1404221129150.980@knanqh.ubzr>
+ <5356C134.8070707@linaro.org>
+ <alpine.LFD.2.11.1404221540540.980@knanqh.ubzr>
+ <20140423161325.GB1243@e102568-lin.cambridge.arm.com>
+ <CAM4voa=Lv3xpHfHVcua1jpajEY1XPrXKK=vS4-_3r+etmB4DDQ@mail.gmail.com>
+ <20140619085607.GB5401@e102568-lin.cambridge.arm.com>
+Message-ID: <CAM4voa=DpWdiqBPabo1-x0L-5MyLpLQrE3-=OFBGvg2pQLy3NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lorenzo,
 
-
-On 19/06/14 12:46, Daniel Thompson wrote:
-> On 19/06/14 12:29, Srinivas Kandagatla wrote:
->> Hi Dan,
+On Thu, Jun 19, 2014 at 2:26 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, Jun 17, 2014 at 03:38:29AM +0100, Abhilash Kesavan wrote:
+>> Hi Lorenzo,
 >>
->> On 19/06/14 11:38, Daniel Thompson wrote:
->>> The architectures supported by this driver have expensive
->>> implementations of writel(), reliant on spin locks and explicit L2 cache
->>> management. These architectures provide a cheaper writel_relaxed() which
->>> is much better suited to peripherals that do not perform DMA. The
->>> situation with readl()/readl_relaxed()is similar although less acute.
->>>
->>> This driver does not use DMA and will be more power efficient and more
->>> robust (due to absense of spin locks during console I/O) if it uses the
->>> relaxed variants.
->>>
->>> This driver is cross compilable for testing purposes and remains
->>> compilable on all architectures by falling back to writel() when
->>> writel_relaxed() does not exist. We also include explicit compiler
->>> barriers. There are redundant on ARM and SH but important on
->>> x86 because it defines "relaxed" differently.
->>>
->> Why are we concern about x86 for this driver?
->> As per my understanding this IP is only seen on ARM and SH based CPUs so
->> why cant we just use relaxed versions, why ifdefs?
->> I think, this would involve fixing the kconfig and make it depend on SH
->> and ARM based platforms only.
->
-> You mean just drop the COMPILE_TEST?
->
-> In generally I like as much code as possible to compile on x86. Its
-> worthwhile protection against the excessive/accidental ARMisms which
-> could easily impact less common architectures (such as SH).
-
-That's fair. Does this mean that we are going do similar changes to 
-other ST drivers too?
-
->
-TBH, there is no SH based SOCs in mainline which uses this driver. I 
-don't think ST would add SH only SOCs to mainline in near future.
-
->
->> On the other hand, This patch looks more generic and applicable to most
->> of the drivers. Am not sure which way is the right one.
->
-> I'm particularly keen on doing the right thing where readl_relaxed() is
-> concerned because this function has a compiler barrier on ARM but not on
-> x86.
->
-My only concern is code duplication all across ST drivers.
-
-> Since having asc_in/asc_out made it easy to portably make these changes
-> I decided is was better to be redundantly exemplary than conceal secret
-> portability issues.
-Your change would fit in nicely with as asc_in/out are wrappers and fix 
-st-asc but this would be just for asc driver.
-What about other drivers which fall in same category?
-
-So I think we should just drop COMPILE_TEST and possibly make it 
-specific to ARM and SH or ARM only.
-
---srini
-
->
-> Don't feel that strongly though. Can easily change it if you're unconvinced.
->
->
->
+>> On Wed, Apr 23, 2014 at 9:43 PM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>> > On Tue, Apr 22, 2014 at 08:56:23PM +0100, Nicolas Pitre wrote:
+>> >>
+>> >> [ Moved Lorenzo up in the addressee list to get his attention ]
+>> >
+>> > Sorry for the delay in replying.
+>> >
+>> >> On Tue, 22 Apr 2014, Daniel Lezcano wrote:
+>> >>
+>> >> > On 04/22/2014 05:40 PM, Nicolas Pitre wrote:
+>> >> > > On Tue, 22 Apr 2014, Daniel Lezcano wrote:
+>> >> > >
+>> >> > > > On 04/22/2014 08:17 AM, Abhilash Kesavan wrote:
+>> >> > > > > +/*
+>> >> > > > > + * The common v7_exit_coherency_flush API could not be used because of the
+>> >> > > > > + * Erratum 799270 workaround. This macro is the same as the common one (in
+>> >> > > > > + * arch/arm/include/asm/cacheflush.h) except for the erratum handling.
+>> >> > > > > + */
+>> >> > > > > +#define exynos_v7_exit_coherency_flush(level) \
+>> >> > > > > +     asm volatile( \
+>> >> > > > > +     "stmfd  sp!, {fp, ip}\n\t"\
+>> >> > > > > +     "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
+>> >> > > > > +     "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
+>> >> > > > > +     "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
+>> >> > > > > +     "isb\n\t"\
+>> >> > > > > +     "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
+>> >> > > > > +     "clrex\n\t"\
+>> >> > > > > +     "mrc    p15, 0, r0, c1, c0, 1   @ get ACTLR\n\t" \
+>> >> > > > > +     "bic    r0, r0, #(1 << 6)       @ disable local coherency\n\t" \
+>> >> > > > > +     /* Dummy Load of a device register to avoid Erratum 799270 */ \
+>> >> > > >
+>> >> > > > Wouldn't make sense to add the erratum in the Kconfig and re-use it in the
+>> >> > > > generic v7_exit_coherency_flush macro instead of redefining it ?
+>> >> > >
+>> >> > > The implementation of the erratum (the dummy device register load) is
+>> >> > > platform specific I'm afraid.
+>> >> > >
+>> >> > > Is TC2 also concerned by this erratum, or is this Samsung specific?
+>> >> >
+>> >> > Sounds like it is ARM Cortex-A15MP specific:
+>> >> >
+>> >> > http://infocenter.arm.com/help/topic/com.arm.doc.epm028090/cortex_a15_mpcore_software_developers_errata_notice_r2_v12.pdf
+>> >> >
+>> >> > Page 31.
+>> >>
+>> >> The condition for hitting the erratum is: "The L2 cache block has been
+>> >> idle for 256 or more cycles with no memory requests from any core, no
+>> >> external snoops, and no ACP requests".
+>> >>
+>> >> Given that the operation that almost immediately precedes the
+>> >> problematic mcr is a call to v7_flush_dcache_louis or
+>> >> v7_flush_dcache_all, is this possible that the condition for the erratum
+>> >> could ever be met?
+>> >
+>> > Yes, if we execute out of the I-cache (no-data accesses) I think this might be
+>> > triggered.
+>> >
+>> > On a side note, the errata affects also the setting of SMP bit
+>> > (__v7_ca15mp_setup and cpu_v7_do_resume) but we do nothing there (it
+>> > is a different situation though, MMU there is off and D-cache off...but
+>> > I-cache is allowed to be on, so I am actually checking if we should be doing
+>> > something there too).
+>> >
+>> >> If no then we should document that v7_exit_coherency_flush(() is safe
+>> >> against erratum 799270 and use it here.
+>> >
+>> > Eh, I wish we could use it safely, I am currently investigating and will get
+>> > back to you asap.
 >>
->>
->> --srini
->>
->>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->>> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
->>> Cc: Maxime Coquelin <maxime.coquelin@st.com>
->>> Cc: Patrice Chotard <patrice.chotard@st.com>
->>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>> Cc: Jiri Slaby <jslaby@suse.cz>
->>> Cc: kernel at stlinux.com
->>> Cc: linux-serial at vger.kernel.org
->>> ---
->>>    drivers/tty/serial/st-asc.c | 11 ++++++++++-
->>>    1 file changed, 10 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
->>> index 4f376d8..58aa1c6 100644
->>> --- a/drivers/tty/serial/st-asc.c
->>> +++ b/drivers/tty/serial/st-asc.c
->>> @@ -152,12 +152,21 @@ static inline struct asc_port
->>> *to_asc_port(struct uart_port *port)
->>>
->>>    static inline u32 asc_in(struct uart_port *port, u32 offset)
->>>    {
->>> -    return readl(port->membase + offset);
->>> +    u32 r;
->>> +
->>> +    r = readl_relaxed(port->membase + offset);
->>> +    barrier();
->>> +    return r;
->>>    }
->>>
->>>    static inline void asc_out(struct uart_port *port, u32 offset, u32
->>> value)
->>>    {
->>> +#ifdef writel_relaxed
->>> +    writel_relaxed(value, port->membase + offset);
->>> +    barrier();
->>> +#else
->>>        writel(value, port->membase + offset);
->>> +#endif
->>>    }
->>>
->>>    /*
->>>
+>> Have you been able to come to a conclusion regarding the necessity of
+>> the erratum workaround ? We are currently carrying the workaround in
+>> the merged exynos back-end.
+>
+> Yes. There is a way to avoid it, but we would end up deviating from the
+> standard power down procedure, so I am keener on duplicating the macro and
+> adding errata code there (current code) rather than rewriting the whole
+> thing, which has to be retested and we will still have a procedure that
+> differs from the standard one to work around that issue. At least as it is
+> it is explicit.
+Thanks for checking. I will leave the code as it is then.
+
+Regards,
+Abhilash
+>
+> Thanks,
+> Lorenzo
 >
