@@ -1,10 +1,10 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 19 Jun 2014 20:32:00 +0400
+Date: Thu, 19 Jun 2014 20:34:00 +0400
 Subject: [PATCH] ARM: mvebu: Fix missing binding documentation for Armada
  38x
 In-Reply-To: <1403186871-28204-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1403186871-28204-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <53A31080.40707@cogentembedded.com>
+Message-ID: <53A310F8.8090207@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -36,13 +36,7 @@ On 06/19/2014 06:07 PM, Gregory CLEMENT wrote:
 >   Required root node property:
 >
 > +compatible: must contain "marvell,armada38x"
-> +
-> +Required root node property:
 
-    Duplicate statement with the above?
-
-> +
->    - compatible: must contain either "marvell,armada380" or
->      "marvell,armada385" depending on the variant of the SoC being used.
+    Oh, and the wildcards are a no-no in the "compatible" prop.
 
 WBR, Sergei
