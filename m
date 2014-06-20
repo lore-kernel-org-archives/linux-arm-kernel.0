@@ -1,159 +1,50 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 20 Jun 2014 11:31:29 -0400
-Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
-In-Reply-To: <CAErSpo6=vi0SR0A3u5BCLgiGxoH48N5R=e8VAnFDG=K61qLxnw@mail.gmail.com>
-References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo6=vi0SR0A3u5BCLgiGxoH48N5R=e8VAnFDG=K61qLxnw@mail.gmail.com>
-Message-ID: <53A453D1.4040308@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jun 2014 16:36:14 +0100
+Subject: [PATCH RFC 04/30] net: fec: fix interrupt handling races
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1725F962@AcuExch.aculab.com>
+References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
+ <E1Wxxfn-0005X5-KD@rmk-PC.arm.linux.org.uk>
+ <063D6719AE5E284EB5DD2968C1650D6D1725F962@AcuExch.aculab.com>
+Message-ID: <20140620153614.GU32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/17/2014 8:08 PM, Bjorn Helgaas wrote:
-> On Tue, Jun 10, 2014 at 02:51:19PM -0400, Murali Karicheri wrote:
->> This patch adds a PCIe controller driver for Keystone SoCs. This
->> is based on v1 of the series posted to the mailing list.
->>
->> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> CC: Russell King <linux@arm.linux.org.uk>
->> CC: Grant Likely <grant.likely@linaro.org>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Mohit Kumar <mohit.kumar@st.com>
->> CC: Jingoo Han <jg1.han@samsung.com>
->> CC: Bjorn Helgaas <bhelgaas@google.com>
->> CC: Pratyush Anand <pratyush.anand@st.com>
->> CC: Richard Zhu <r65037@freescale.com>
->> CC: Kishon Vijay Abraham I <kishon@ti.com>
->> CC: Marek Vasut <marex@denx.de>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Pawel Moll <pawel.moll@arm.com>
->> CC: Mark Rutland <mark.rutland@arm.com>
->> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> CC: Kumar Gala <galak@codeaurora.org>
->> CC: Randy Dunlap <rdunlap@infradead.org>
->> CC: Grant Likely <grant.likely@linaro.org>
->>
->>
->> Changelog:
->>
->> V2
->>   - Split the designware pcie enhancement patch to multiple
->>     patches based on functionality added
->>   - Remove the quirk code and add a patch to fix mps/mrss
->>     tuning for ARM. Use kernel command line parameter
->>     pci=pcie_bus_perf to work with Keystone PCI Controller.
->>     Following patch addressed this.
->>       [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
->>   - Add documentation for device tree bindings
->>   - Add separate interrupt controller nodes for MSI and Legacy
->>     IRQs and use irq map for legacy IRQ
->>   - Use compatibility to identify v3.65 version of the DW hardware
->>     and use it to customize the designware common code.
->>   - Use reg property for configuration space instead of range
->>   - Other minor updates based on code inspection.
->>
->> V1
->>   - Add an interrupt controller node for Legacy irq chip and use
->>     interrupt map/map-mask property to map legacy IRQs A/B/C/D
->>   - Add a Phy driver to replace the original serdes driver
->>   - Move common application register handling code to a separate
->>     file to allow re-use across other platforms that use older
->>     DW PCIe h/w
->>   - PCI quirk for maximum read request size. Check and override only
->>     if the maximum is higher than what controller can handle.
->>   - Converted to a module platform driver.
->>
->>
->> Murali Karicheri (8):
->>    PCI: designware: add rd[wr]_other_conf API
->>    PCI: designware: refactor host init code to re-use on v3.65 DW pci hw
->>    PCI: designware: update pcie core driver to work with dw hw version
->>      3.65
->>    PCI: designware: add msi controller functions for v3.65 hw
->>    PCI: designware: add PCI controller functions for v3.65 DW hw
->>    phy: Add serdes phy driver for keystone
->>    PCI: keystone: add pcie driver based on designware core driver
->>    ARM: keystone: add pcie related options
->>
->>   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
->>   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
->>   .../bindings/phy/phy-keystone-serdes.txt           |   25 ++
->>   arch/arm/mach-keystone/Kconfig                     |    1 +
->>   drivers/pci/host/Kconfig                           |   12 +
->>   drivers/pci/host/Makefile                          |    2 +
->>   drivers/pci/host/pci-dw-v3_65-msi.c                |  149 +++++++
->>   drivers/pci/host/pci-dw-v3_65.c                    |  390 ++++++++++++++++++
->>   drivers/pci/host/pci-dw-v3_65.h                    |   34 ++
->>   drivers/pci/host/pci-keystone.c                    |  418 ++++++++++++++++++++
->>   drivers/pci/host/pcie-designware.c                 |  175 +++++---
->>   drivers/pci/host/pcie-designware.h                 |   42 +-
->>   drivers/phy/Kconfig                                |    6 +
->>   drivers/phy/Makefile                               |    1 +
->>   drivers/phy/phy-keystone-serdes.c                  |  230 +++++++++++
->>   15 files changed, 1531 insertions(+), 52 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
->>   create mode 100644 Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
->>   create mode 100644 drivers/pci/host/pci-dw-v3_65-msi.c
->>   create mode 100644 drivers/pci/host/pci-dw-v3_65.c
->>   create mode 100644 drivers/pci/host/pci-dw-v3_65.h
->>   create mode 100644 drivers/pci/host/pci-keystone.c
->>   create mode 100644 drivers/phy/phy-keystone-serdes.c
-> I'm not willing to merge phy-keystone-serdes.c because I don't
-> maintain drivers/phy and because of the binary blob of register values
-> it contains, but maybe somebody else will.  I assume it could be
-> merged by itself before the rest of this.
->
-> I'm looking for acks from Mohit and/or Jingoo for the pci/host
-> changes, and from Arnd for the devicetree/bindings changes.
->
-> Adding these "-dw-3_64" files is sort of ugly.  If that code is only
-> used by keystone, maybe it could just be moved to pci-keystone.c?  But
-> I'll defer to Mohit and Jingoo on that and the way you modify
-> pcie-designware.c.
->
-> Bjorn
-Bjorn, Jingoo,
+On Fri, Jun 20, 2014 at 12:39:57PM +0000, David Laight wrote:
+> It is usually possible to reduce the interrupt count even further by:
+> 1) processing the rings.
+> 2) clear the IRQ.
+> 3) check the rings for new entries, if any start again.
+> This means that you don't take the interrupt for anything that completes
+> while processing the earlier ring entries.
+> 
+> The slight downside is that it is easy to exit the ISR before the IRQ
+> line actually drops - resulting in a spurious interrupt.
+> 
+> (patch 24 seems to be similar).
 
-Unfortunately I lost Jingoo's email from my Inbox. So I cut-n-paste the 
-comment from
-internet and respond.
+ITYM patch 26, as patch 24 is an update to the errata workaround.
 
-Jingoo Han wrote:-
-=============================================================================
-I think so, too.
+Patch 4 is what I regard to be the bare minimum fix, patch 26 is an
+improvement over it.
 
-DT maintainers and arch maintainers should review the following
-dt bindings.
-   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
-   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
-Generic PHY maintainer (Kishon Vijay Abraham I) should review the
-following phy driver.
-   drivers/phy/phy-keystone-serdes.c
+Remember though that the real interrupt processing happens in the NAPI
+handler, not the main interrupt handler - upon seeing a transmit and/or
+receive complete interrupt, the main interrupt handler masks both of
+these interrupts at the chip and triggers the NAPI handler to run.
 
- >
- > I'm looking for acks from Mohit and/or Jingoo for the pci/host
- > changes, and from Arnd for the devicetree/bindings changes.
- >
- > Adding these "-dw-3_64" files is sort of ugly.  If that code is only
- > used by keystone, maybe it could just be moved to pci-keystone.c?  But
- > I'll defer to Mohit and Jingoo on that and the way you modify
- > pcie-designware.c.
+Nevertheless, your suggestion is equally valid for a NAPI handler:
+- process the rings
+- clear the interrupt(s)
+- if more work is allowed (according to the NAPI weight), repeat
 
-I agree with Bjorn Helgaas's opinion. These three "-dw-3_64" files
-look terrible! I don't have a good way to handle this; however,
-moving this code to pci-keystone.c looks better.
-======================================================================
+This is simple enough for the RX ring, where each packet received is
+equal one one NAPI unit of work.  The TX side is less obvious as
+the NAPI documentation suggests that cleaning the ring partially
+equates to no NAPI units of work but a clean of the entire ring
+equates to the full allowance.  Maybe I've mis-understood something
+there (which would mean there's another bug which needs fixing in the
+tx reaping code...)
 
-The original RFC I had submitted had all of the application space register
-handling code as part of the Keystone PCI driver. As per Arnd's comment 
-(See
-my change log against v1), the code was moved to a separate file so that
-the next driver that has same version of the DW hw could re-use this code.
-I agree with Arnd and moved the code to v_3_65 specific files.  What is
-your proposal?  Do you have objection to the file name? or it's content?
-
-If objection is on the file name,  please suggest alternate names. If you
-are okay with the file name, and doesn't like the code, it will be helpful
-to review the code and provide specific comments against the patch itself
-so that I can address the same.
-
-Murali
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
