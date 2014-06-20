@@ -1,70 +1,89 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jun 2014 13:59:58 +0100
-Subject: [PATCH v3 0/9] arm64: KVM: debug infrastructure support
-Message-ID: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 20 Jun 2014 14:00:00 +0100
+Subject: [PATCH v3 2/9] arm64: move DBG_MDSCR_* to asm/debug-monitors.h
+In-Reply-To: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
+References: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403269207-1625-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds debug support, a key feature missing from the
-KVM/arm64 port.
+In order to be able to use the DBG_MDSCR_* macros from the KVM code,
+move the relevant definitions to the obvious include file.
 
-The main idea is to keep track of whether the debug registers are
-"dirty" (changed by the guest) or not. In this case, perform the usual
-save/restore dance, for one run only. It means we only have a penalty
-if a guest is actively using the debug registers.
+Also move the debug_el enum to a portion of the file that is guarded
+by #ifndef __ASSEMBLY__ in order to use that file from assembly code.
 
-The amount of registers is properly frightening, but CPUs actually
-only implement a subset of them. Also, there is a number of registers
-we don't bother emulating (things having to do with external debug and
-OSlock).
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/debug-monitors.h | 19 ++++++++++++++-----
+ arch/arm64/kernel/debug-monitors.c      |  9 ---------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
-External debug is when you actually plug a physical JTAG into the CPU.
-OSlock is a way to prevent "other software" to play with the debug
-registers. My understanding is that it is only useful in combination
-with the external debug. In both case, implementing support for this
-is probably not worth the effort, at least for the time being.
-
-This has been tested on a Cortex-A53/A57 platform, running both 32 and
-64bit guests, on top of 3.16-rc1. This code also lives in my tree in
-the kvm-arm64/debug-trap branch.
-
->From v2 [2]:
-- Fixed a number of very stupid bugs in the macros generating the trap
-  entries
-- Added some documentation explaining why we don't bother emulating
-  external debug and the OSlock stuff
-- Other bits of documentation here and there
-
->From v1 [1]:
-- Renamed trap_wi_raz to trap_raz_wi
-- Renamed skip_clean_debug_state to skip_debug_state
-- Simplified debug state computing, moved to its own macro
-- Added some comment to make the logic more obvious
-
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009332.html
-[2]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-May/009534.html
-
-Marc Zyngier (9):
-  arm64: KVM: rename pm_fake handler to trap_raz_wi
-  arm64: move DBG_MDSCR_* to asm/debug-monitors.h
-  arm64: KVM: add trap handlers for AArch64 debug registers
-  arm64: KVM: common infrastructure for handling AArch32 CP14/CP15
-  arm64: KVM: use separate tables for AArch32 32 and 64bit traps
-  arm64: KVM: check ordering of all system register tables
-  arm64: KVM: add trap handlers for AArch32 debug registers
-  arm64: KVM: implement lazy world switch for debug registers
-  arm64: KVM: enable trapping of all debug registers
-
- arch/arm64/include/asm/debug-monitors.h |  19 +-
- arch/arm64/include/asm/kvm_asm.h        |  39 ++-
- arch/arm64/include/asm/kvm_coproc.h     |   3 +-
- arch/arm64/include/asm/kvm_host.h       |  12 +-
- arch/arm64/kernel/asm-offsets.c         |   1 +
- arch/arm64/kernel/debug-monitors.c      |   9 -
- arch/arm64/kvm/handle_exit.c            |   4 +-
- arch/arm64/kvm/hyp.S                    | 470 ++++++++++++++++++++++++++++-
- arch/arm64/kvm/sys_regs.c               | 520 ++++++++++++++++++++++++++++----
- 9 files changed, 978 insertions(+), 99 deletions(-)
-
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index 6e9b5b3..7fb3437 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -18,6 +18,15 @@
+ 
+ #ifdef __KERNEL__
+ 
++/* Low-level stepping controls. */
++#define DBG_MDSCR_SS		(1 << 0)
++#define DBG_SPSR_SS		(1 << 21)
++
++/* MDSCR_EL1 enabling bits */
++#define DBG_MDSCR_KDE		(1 << 13)
++#define DBG_MDSCR_MDE		(1 << 15)
++#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
++
+ #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
+ 
+ /* AArch64 */
+@@ -73,11 +82,6 @@
+ 
+ #define CACHE_FLUSH_IS_SAFE		1
+ 
+-enum debug_el {
+-	DBG_ACTIVE_EL0 = 0,
+-	DBG_ACTIVE_EL1,
+-};
+-
+ /* AArch32 */
+ #define DBG_ESR_EVT_BKPT	0x4
+ #define DBG_ESR_EVT_VECC	0x5
+@@ -115,6 +119,11 @@ void unregister_break_hook(struct break_hook *hook);
+ 
+ u8 debug_monitors_arch(void);
+ 
++enum debug_el {
++	DBG_ACTIVE_EL0 = 0,
++	DBG_ACTIVE_EL1,
++};
++
+ void enable_debug_monitors(enum debug_el el);
+ void disable_debug_monitors(enum debug_el el);
+ 
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index a7fb874..e022f87 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -30,15 +30,6 @@
+ #include <asm/cputype.h>
+ #include <asm/system_misc.h>
+ 
+-/* Low-level stepping controls. */
+-#define DBG_MDSCR_SS		(1 << 0)
+-#define DBG_SPSR_SS		(1 << 21)
+-
+-/* MDSCR_EL1 enabling bits */
+-#define DBG_MDSCR_KDE		(1 << 13)
+-#define DBG_MDSCR_MDE		(1 << 15)
+-#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
+-
+ /* Determine debug architecture. */
+ u8 debug_monitors_arch(void)
+ {
 -- 
 1.8.3.4
