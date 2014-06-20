@@ -1,50 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jun 2014 16:36:14 +0100
-Subject: [PATCH RFC 04/30] net: fec: fix interrupt handling races
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1725F962@AcuExch.aculab.com>
-References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
- <E1Wxxfn-0005X5-KD@rmk-PC.arm.linux.org.uk>
- <063D6719AE5E284EB5DD2968C1650D6D1725F962@AcuExch.aculab.com>
-Message-ID: <20140620153614.GU32514@n2100.arm.linux.org.uk>
+From: ddutile@redhat.com (Don Dutile)
+Date: Fri, 20 Jun 2014 11:40:31 -0400
+Subject: [PATCH v0 2/3] ata: Fix the link down in first attempt for the
+ APM X-Gene SoC AHCI SATA host controller driver.
+In-Reply-To: <53A45286.2040000@cogentembedded.com>
+References: <1403253147-14341-1-git-send-email-stripathi@apm.com>
+ <1403253147-14341-3-git-send-email-stripathi@apm.com>
+ <53A45286.2040000@cogentembedded.com>
+Message-ID: <53A455EF.7000808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 12:39:57PM +0000, David Laight wrote:
-> It is usually possible to reduce the interrupt count even further by:
-> 1) processing the rings.
-> 2) clear the IRQ.
-> 3) check the rings for new entries, if any start again.
-> This means that you don't take the interrupt for anything that completes
-> while processing the earlier ring entries.
-> 
-> The slight downside is that it is easy to exit the ISR before the IRQ
-> line actually drops - resulting in a spurious interrupt.
-> 
-> (patch 24 seems to be similar).
+On 06/20/2014 11:25 AM, Sergei Shtylyov wrote:
+> On 06/20/2014 12:32 PM, Suman Tripathi wrote:
+>
+>> This patch fixes the link down issue by retry for the APM X-Gene SoC
+>> SATA host controller driver. Due to board design issue and short margin
+>> limitation, it is observed that once out of many thousands power cycle
+>> test, the sata link may not link up.
+>
+>> Signed-off-by: Loc Ho <lho@apm.com>
+>> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+>> ---
+>>   drivers/ata/ahci_xgene.c | 9 +++++++++
+>>   1 file changed, 9 insertions(+)
+>
+>> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+>> index 5f0f750..d43b6ce 100644
+>> --- a/drivers/ata/ahci_xgene.c
+>> +++ b/drivers/ata/ahci_xgene.c
+> [...]
+>> @@ -235,15 +238,21 @@ static int xgene_ahci_do_hardreset(struct ata_link *link,
+>>       u8 *d2h_fis = pp->rx_fis + RX_FIS_D2H_REG;
+>>       void __iomem *port_mmio = ahci_port_base(ap);
+>>       struct ata_taskfile tf;
+>> +    int link_down_retry = 0;
+>>       int rc;
+>>       u32 val;
+>>
+>> +hardreset_retry:
+>>       /* clear D2H reception area to properly wait for D2H FIS */
+>>       ata_tf_init(link->device, &tf);
+>>       tf.command = ATA_BUSY;
+>>       ata_tf_to_fis(&tf, 0, 0, d2h_fis);
+>>       rc = sata_link_hardreset(link, timing, deadline, online,
+>>                    ahci_check_ready);
+>> +
+>> +    if (!*online)
+>> +        if (link_down_retry++ < MAX_LINK_DOWN_RETRY)
+>
+>     Could be folded into single *if* (and so indentation decreased).
+>
+better yet, for readability, a single while() loop
 
-ITYM patch 26, as patch 24 is an update to the errata workaround.
-
-Patch 4 is what I regard to be the bare minimum fix, patch 26 is an
-improvement over it.
-
-Remember though that the real interrupt processing happens in the NAPI
-handler, not the main interrupt handler - upon seeing a transmit and/or
-receive complete interrupt, the main interrupt handler masks both of
-these interrupts at the chip and triggers the NAPI handler to run.
-
-Nevertheless, your suggestion is equally valid for a NAPI handler:
-- process the rings
-- clear the interrupt(s)
-- if more work is allowed (according to the NAPI weight), repeat
-
-This is simple enough for the RX ring, where each packet received is
-equal one one NAPI unit of work.  The TX side is less obvious as
-the NAPI documentation suggests that cleaning the ring partially
-equates to no NAPI units of work but a clean of the entire ring
-equates to the full allowance.  Maybe I've mis-understood something
-there (which would mean there's another bug which needs fixing in the
-tx reaping code...)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+>> +            goto hardreset_retry;
+>
+> WBR, Sergei
+>
