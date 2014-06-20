@@ -1,61 +1,31 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Fri, 20 Jun 2014 02:59:38 +0300
-Subject: [PATCH 1/2] drm/exynos/fbdev: don't set fix.smem/mmio_{start,len}
-In-Reply-To: <1396603322-13585-1-git-send-email-djkurtz@chromium.org>
-References: <1396603322-13585-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <20140620025938.2e80efa0@i7>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 19 Jun 2014 17:36:03 -0700
+Subject: [PATCH v4 09/13] serial: amba-pl011: Pass FIQ information to KGDB.
+In-Reply-To: <1403174303-25456-10-git-send-email-daniel.thompson@linaro.org>
+References: <1401961994-18033-1-git-send-email-daniel.thompson@linaro.org>
+ <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
+ <1403174303-25456-10-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140620003603.GA30850@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  4 Apr 2014 17:22:01 +0800
-Daniel Kurtz <djkurtz@chromium.org> wrote:
-
-> Kernel access to the eyxnos fbdev framebuffer is via its gem object's
-> kernel mapping (kvaddr, stored in info->screen_base).
+On Thu, Jun 19, 2014 at 11:38:19AM +0100, Daniel Thompson wrote:
+> If the AMBA bus has provided the pl011 with a FIQ resource (i.e. a
+> second IRQ) then speculatively register it with KGDB when the polling
+> driver is initialized.
 > 
-> User space access is provided by mmap(), read() and write() of /dev/fb/fb0.
-> These functions also only use screen_base/screen_size().
+> By providing this information to KGDB the serial driver offers
+> "permission" for KGDB to route the UART interrupt signal from the
+> drivers own handler to KGDBs FIQ handler (which will eventually use the
+> UART's polled I/O callbacks to interact with the user). This permission
+> also implies the amba-pl011 driver has already unmasked RX interrupts
+> (otherwise the FIQ handler will never trigger).
 > 
-> Therefore, it is not necessary to set fix->smem_{start,len} or
-> fix->mmio_{start,len} fields.
-> 
-> This avoids leaking kernel, physical and dma mapped addresses to user
-> space via the ioctls FBIOGET_VSCREENINFO and FBIOGET_FSCREENINFO.
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.cz>
+> Cc: linux-serial at vger.kernel.org
 > ---
->  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 7 -------
->  1 file changed, 7 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> index 5fa342e..2dcc589 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> @@ -123,14 +123,7 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
->  
->  	dev->mode_config.fb_base = (resource_size_t)buffer->dma_addr;
->  	fbi->screen_base = buffer->kvaddr + offset;
-> -	if (is_drm_iommu_supported(dev))
-> -		fbi->fix.smem_start = (unsigned long)
-> -			(page_to_phys(sg_page(buffer->sgt->sgl)) + offset);
-> -	else
-> -		fbi->fix.smem_start = (unsigned long)buffer->dma_addr;
-> -
->  	fbi->screen_size = size;
-> -	fbi->fix.smem_len = size;
 
-Can we keep proper initialization of 'smem_len'? Some userland
-applications use it for calculating the size for mmap:
-
-    http://cgit.freedesktop.org/xorg/xserver/tree/hw/xfree86/fbdevhw/fbdevhw.c?id=xorg-server-1.15.99.903#n571
-
->  
->  	return 0;
->  }
-
-Basically, this patch breaks the xf86-video-fbdev ddx and some users
-are already unhappy.
-
--- 
-Best regards,
-Siarhei Siamashka
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
