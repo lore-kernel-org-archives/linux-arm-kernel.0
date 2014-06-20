@@ -1,40 +1,50 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 20 Jun 2014 10:11:37 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: Add QCOM GSBI driver
-In-Reply-To: <1403081542-28291-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1403081542-28291-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <53A3FAC9.3040709@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Jun 2014 10:12:26 +0100
+Subject: [PATCH V4 1/2] arm: mm: Introduce {pte,pmd}_isset and
+ {pte,pmd}_isclear
+In-Reply-To: <1402929159-11028-2-git-send-email-steve.capper@linaro.org>
+References: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
+ <1402929159-11028-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140620091226.GJ25104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
-
-Can you take this fix for next RC, without this patch we can not see 
-serial working on IFC6410 board.
-
-thanks
-srini
-
-On 18/06/14 09:52, Srinivas Kandagatla wrote:
-> This patch adds QCOM GSBI config option to multi_v7_defconfig. Serial
-> driver on QCOM APQ8064 depends on GSBI driver, so without this patch
-> there is no serial console on IF6410 board using multi_v7_defconfig.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Mon, Jun 16, 2014 at 03:32:38PM +0100, Steve Capper wrote:
+> Long descriptors on ARM are 64 bits, and some pte functions such as
+> pte_dirty return a bitwise-and of a flag with the pte value. If the
+> flag to be tested resides in the upper 32 bits of the pte, then we run
+> into the danger of the result being dropped if downcast.
+> 
+> For example:
+> 	gather_stats(page, md, pte_dirty(*pte), 1);
+> where pte_dirty(*pte) is downcast to an int.
+> 
+> This patch introduces a new macro pte_isset which performs the bitwise
+> and, then performs a double logical invert (where needed) to ensure
+> predictable downcasting. The logical inverse pte_isclear is also
+> introduced.
+> 
+> Equivalent pmd functions for Transparent HugePages have also been
+> added.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 > ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index e2d6204..f71731f 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -352,6 +352,7 @@ CONFIG_MFD_NVEC=y
->   CONFIG_KEYBOARD_NVEC=y
->   CONFIG_SERIO_NVEC_PS2=y
->   CONFIG_NVEC_POWER=y
-> +CONFIG_QCOM_GSBI=y
->   CONFIG_COMMON_CLK_QCOM=y
->   CONFIG_MSM_GCC_8660=y
->   CONFIG_MSM_MMCC_8960=y
->
+>  arch/arm/include/asm/pgtable-3level.h | 10 +++++++---
+>  arch/arm/include/asm/pgtable.h        | 18 +++++++++++-------
+>  2 files changed, 18 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 85c60ad..bde49f9 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -207,16 +207,20 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+>  #define pte_huge(pte)		(pte_val(pte) && !(pte_val(pte) & PTE_TABLE_BIT))
+>  #define pte_mkhuge(pte)		(__pte(pte_val(pte) & ~PTE_TABLE_BIT))
+>  
+> -#define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
+> +#define pmd_isset(pmd, val)	((u32)(val) == (val) ? pmd_val(pmd) & (val) \
+> +						: !!(pmd_val(pmd) & (val)))
+
+What does GCC generate for this as opposed to an unconditional !!?
+
+Will
