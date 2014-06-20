@@ -1,42 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Jun 2014 10:21:35 +0100
-Subject: [PATCH V4 2/2] arm: mm: Switch back to L_PTE_WRITE
-In-Reply-To: <1402929159-11028-3-git-send-email-steve.capper@linaro.org>
-References: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
- <1402929159-11028-3-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140620092135.GK25104@arm.com>
+Date: Fri, 20 Jun 2014 10:33:40 +0100
+Subject: [PATCHv3 1/5] lib/genalloc.c: Add power aligned algorithm
+In-Reply-To: <1402969165-7526-2-git-send-email-lauraa@codeaurora.org>
+References: <1402969165-7526-1-git-send-email-lauraa@codeaurora.org>
+ <1402969165-7526-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140620093340.GL25104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 03:32:39PM +0100, Steve Capper wrote:
-> For LPAE, we have the following means for encoding writable or dirty
-> ptes:
->                               L_PTE_DIRTY       L_PTE_RDONLY
->     !pte_dirty && !pte_write        0               1
->     !pte_dirty && pte_write         0               1
->     pte_dirty && !pte_write         1               1
->     pte_dirty && pte_write          1               0
-> 
-> So we can't distinguish between writable clean ptes and read only
-> ptes. This can cause problems with ptes being incorrectly flagged as
-> read only when they are writable but not dirty.
-> 
-> This patch re-introduces the L_PTE_WRITE bit for both short descriptors
-> and long descriptors, by reverting
->   36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
-> 
-> For short descriptors the L_PTE_RDONLY bit is renamed to L_PTE_WRITE
-> and the pertinent logic changed. For long descriptors, L_PTE_WRITE is
-> implemented as a new software bit.
-> 
-> HugeTLB pages will use the L_PTE_WRITE semantics automatically.
-> 
-> We need to add some logic to Transparent HugePages to ensure that they
-> correctly interpret the revised pgprot permissions.
+Hi Laura,
 
-I think this look alright, but it certainly needs some stress testing. Have
-you given it a good hammering? If so, this could use some exposure in -next.
+On Tue, Jun 17, 2014 at 02:39:21AM +0100, Laura Abbott wrote:
+> One of the more common algorithms used for allocation
+> is to align the start address of the allocation to
+> the order of size requested. Add this as an algorithm
+> option for genalloc.
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+Good idea, I didn't know this even existed!
+
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  include/linux/genalloc.h |  4 ++++
+>  lib/genalloc.c           | 21 +++++++++++++++++++++
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
+> index 1c2fdaa..3cd0934 100644
+> --- a/include/linux/genalloc.h
+> +++ b/include/linux/genalloc.h
+> @@ -110,6 +110,10 @@ extern void gen_pool_set_algo(struct gen_pool *pool, genpool_algo_t algo,
+>  extern unsigned long gen_pool_first_fit(unsigned long *map, unsigned long size,
+>  		unsigned long start, unsigned int nr, void *data);
+>  
+> +extern unsigned long gen_pool_first_fit_order_align(unsigned long *map,
+> +		unsigned long size, unsigned long start, unsigned int nr,
+> +		void *data);
+> +
+>  extern unsigned long gen_pool_best_fit(unsigned long *map, unsigned long size,
+>  		unsigned long start, unsigned int nr, void *data);
+>  
+> diff --git a/lib/genalloc.c b/lib/genalloc.c
+> index bdb9a45..9758529 100644
+> --- a/lib/genalloc.c
+> +++ b/lib/genalloc.c
+> @@ -481,6 +481,27 @@ unsigned long gen_pool_first_fit(unsigned long *map, unsigned long size,
+>  EXPORT_SYMBOL(gen_pool_first_fit);
+>  
+>  /**
+> + * gen_pool_first_fit_order_align - find the first available region
+> + * of memory matching the size requirement. The region will be aligned
+> + * to the order of the size specified.
+> + * @map: The address to base the search on
+> + * @size: The bitmap size in bits
+> + * @start: The bitnumber to start searching at
+> + * @nr: The number of zeroed bits we're looking for
+> + * @data: additional data - unused
+
+It doesn't look unused to me.
+
+> + */
+> +unsigned long gen_pool_first_fit_order_align(unsigned long *map,
+> +		unsigned long size, unsigned long start,
+> +		unsigned int nr, void *data)
+> +{
+> +	unsigned long order = (unsigned long) data;
+> +	unsigned long align_mask = (1 << get_order(nr << order)) - 1;
+
+Why isn't the order just order?
 
 Will
