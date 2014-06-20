@@ -1,63 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 19 Jun 2014 23:33:27 -0400 (EDT)
-Subject: [PATCHv2] of: Check for phys_addr_t overflows in
- early_init_dt_add_memory_arch
-In-Reply-To: <1403234018-10942-1-git-send-email-lauraa@codeaurora.org>
-References: <1403234018-10942-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <alpine.LFD.2.11.1406192329400.16842@knanqh.ubzr>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 20 Jun 2014 11:59:01 +0800
+Subject: [PATCH v3 0/2]]ata: Fix the dma state machine lockup for APM
+ X-Gene SoC
+In-Reply-To: <1403160538-31565-1-git-send-email-stripathi@apm.com>
+References: <1403160538-31565-1-git-send-email-stripathi@apm.com>
+Message-ID: <CACVXFVPqhVSoxQQi4kS2+_Xmn9xAFcbRSpvoxU-yGJkxM7FUtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jun 2014, Laura Abbott wrote:
+Hi Suman,
 
-> The common early_init_dt_add_memory_arch takes the base and size
-> of a memory region as u64 types. The function never checks if
-> the base and size can actually fit in a phys_addr_t which may
-> be smaller than 64-bits. This may result in incorrect memory
-> being passed to memblock_add if the memory falls outside the
-> range of phys_addr_t. Add range checks for the base and size if
-> phys_addr_t is smaller than u64.
-> 
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
+On Thu, Jun 19, 2014 at 2:48 PM, Suman Tripathi <stripathi@apm.com> wrote:
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 > ---
-> v2: Switched to sizeof(phys_addr_t) < sizeof(u64) instead of macros.
-> Sending to right e-mails/mailing lists this time.
-> 
->  drivers/of/fdt.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index c4cddf0..b777d8f 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -880,6 +880,21 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
->  	const u64 phys_offset = __pa(PAGE_OFFSET);
->  	base &= PAGE_MASK;
->  	size &= PAGE_MASK;
-> +
-> +	if (sizeof(phys_addr_t) < sizeof(u64)) {
-> +		if (base > ULONG_MAX) {
-> +			pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
-> +					base, base + size);
-> +			return;
-> +		}
-> +
-> +		if (base + size > ULONG_MAX) {
-> +			pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
-> +					ULONG_MAX, base + size);
-> +			size = ULONG_MAX - base;
-> +		}
-> +	}
-> +
->  	if (base + size < phys_offset) {
->  		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
->  			   base, base + size);
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+> Suman Tripathi (2):
+>   libahci: Implement the function ahci_restart_engine to restart the
+>     port dma engine.
+>   ata: Fix the dma state machine lockup for the IDENTIFY DEVICE PIO mode
+>     command.
+>
+>  drivers/ata/ahci.h       |  2 ++
+>  drivers/ata/ahci_xgene.c | 70 +++++++++++++++++++++++++++++++++++++++---------
+>  drivers/ata/libahci.c    | 15 ++++++++++-
+>  3 files changed, 73 insertions(+), 14 deletions(-)
+
+These two patches does fix boot failure on our mustang board, thanks
+Suman!
+
+Reported-and-Tested-by: Ming Lei <ming.lei@canonical.com>
+
+Thanks,
+-- 
+Ming Lei
