@@ -1,57 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 20 Jun 2014 13:02:33 +0100
-Subject: [PATCH 9/9] mfd: as3722: Rid driver of superfluous I2C device ID
- structure
-In-Reply-To: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
-References: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1403265753-25851-11-git-send-email-lee.jones@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jun 2014 13:11:18 +0100
+Subject: [PATCH RFC 00/30] Initial round of Freescale FEC ethernet patches
+Message-ID: <20140620121118.GR32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also remove unused second probe() parameter 'i2c_device_id'.
+This is my initial round of patches (roughly half of my total patch
+set) for the Freescale FEC driver.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/as3722.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+I'm sending this set out initially for comments and testing.  One of
+my motivations for only sending half is to get this half into a state
+where DaveM is happy to merge it before I sort out the remainder.
+There's quite a lot here, so bear with me on this.
 
-diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
-index 39fa554..cb2fcf9 100644
---- a/drivers/mfd/as3722.c
-+++ b/drivers/mfd/as3722.c
-@@ -354,8 +354,7 @@ static int as3722_i2c_of_probe(struct i2c_client *i2c,
- 	return 0;
- }
- 
--static int as3722_i2c_probe(struct i2c_client *i2c,
--			const struct i2c_device_id *id)
-+static int as3722_i2c_probe(struct i2c_client *i2c)
- {
- 	struct as3722 *as3722;
- 	unsigned long irq_flags;
-@@ -428,21 +427,14 @@ static const struct of_device_id as3722_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, as3722_of_match);
- 
--static const struct i2c_device_id as3722_i2c_id[] = {
--	{ "as3722", 0 },
--	{},
--};
--MODULE_DEVICE_TABLE(i2c, as3722_i2c_id);
--
- static struct i2c_driver as3722_i2c_driver = {
- 	.driver = {
- 		.name = "as3722",
- 		.owner = THIS_MODULE,
- 		.of_match_table = as3722_of_match,
- 	},
--	.probe = as3722_i2c_probe,
-+	.probe2 = as3722_i2c_probe,
- 	.remove = as3722_i2c_remove,
--	.id_table = as3722_i2c_id,
- };
- 
- module_i2c_driver(as3722_i2c_driver);
+I've tried to sort the fixes before the cleanups as best I can, but
+reordering the series is a full-time job due to it's size - it's taken
+from Monday until now to get this far with it, so I'm hoping that there
+won't be any "you should rearrange the patches as X" comments.
+
+While the original series was well tested during it's original
+development, including with performance tests on each patch, that
+testing and validation has been lost due to the changes during the
+last merge window, and subsequent rebasing and updating of the patches.
+
+The series is based on v3.16-rc1, and as such, I have added Andy's
+checksum fix to the start of the series.  This patch is not strictly
+part of the RFC, but is included because my complete patch series needs
+to account for that change.
+
+Some of these patches are to fix theoretical problems in the driver
+(ones which have been found via a review of the code) others address
+real observable problems (such as poor half-duplex performance.)
+
+Towards the end of this series, I have included a patch which was
+initially at the beginning of the series for dumping out the state of
+the transmit ring, which is very useful to debug transmit problems.
+This was acceptable when the transmit ring was between 16 and 128
+descriptors, but during the recent merge window, this was increased to
+512 descriptors, so it will now print around 512 lines to the kernel
+message log on transmit timeout.  I'm not entirely convinced this is a
+good idea - maybe it should become optional, or maybe the timed-out ring
+status should be available via debugfs, but that's a problem to retrieve
+if you're running NFS rootfs and the timeout doesn't recover properly.
+
+This series of patches is also available from the following *unstable*
+git branch - unstable as it's provided for convenience so you don't
+have to apply all these patches individually, unstable as the patches
+need to have attributations added, unstable because DaveM will probably
+want to apply them as patches to his tree:
+
+  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git fec-testing
+
+ drivers/net/ethernet/freescale/fec.h      |  10 +-
+ drivers/net/ethernet/freescale/fec_main.c | 383 +++++++++++++++++-------------
+ 2 files changed, 225 insertions(+), 168 deletions(-)
+
 -- 
-1.8.3.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
