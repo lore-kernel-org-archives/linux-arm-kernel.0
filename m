@@ -1,58 +1,119 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 20 Jun 2014 17:01:21 +0200
-Subject: [PATCH v3 1/7] genirq: generic chip: export irq_map_generic_chip
- function
+Date: Fri, 20 Jun 2014 17:01:22 +0200
+Subject: [PATCH v3 2/7] irqchip: atmel-aic: move binding doc to
+ interrupt-controller directory
 In-Reply-To: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1403276487-8792-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export the generic irq map function in order to provide irq_domain ops with
-generic mapping and specific of xlate function (needed by the new atmel
-AIC driver).
+Move atmel aic driver doc to the interrupt-controller directory as the new
+driver now lays in drivers/irqchip/atmel-aic.c.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- include/linux/irq.h       | 2 ++
- kernel/irq/generic-chip.c | 5 +++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/arm/atmel-aic.txt          | 42 ----------------------
+ .../bindings/interrupt-controller/atmel,aic.txt    | 42 ++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 42 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 0d998d8..62af592 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
- int irq_gc_set_wake(struct irq_data *d, unsigned int on);
- 
- /* Setup functions for irq_chip_generic */
-+int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-+			 irq_hw_number_t hw_irq);
- struct irq_chip_generic *
- irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
- 		       void __iomem *reg_base, irq_flow_handler_t handler);
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index 452d6f2..cf80e7b 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
- /*
-  * irq_map_generic_chip - Map a generic chip for an irq domain
-  */
--static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
--				irq_hw_number_t hw_irq)
-+int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-+			 irq_hw_number_t hw_irq)
- {
- 	struct irq_data *data = irq_get_irq_data(virq);
- 	struct irq_domain_chip_generic *dgc = d->gc;
-@@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
- 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(irq_map_generic_chip);
- 
- struct irq_domain_ops irq_generic_chip_ops = {
- 	.map	= irq_map_generic_chip,
+diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/arm/atmel-aic.txt
+deleted file mode 100644
+index 2742e9c..0000000
+--- a/Documentation/devicetree/bindings/arm/atmel-aic.txt
++++ /dev/null
+@@ -1,42 +0,0 @@
+-* Advanced Interrupt Controller (AIC)
+-
+-Required properties:
+-- compatible: Should be "atmel,<chip>-aic"
+-  <chip> can be "at91rm9200" or "sama5d3"
+-- interrupt-controller: Identifies the node as an interrupt controller.
+-- interrupt-parent: For single AIC system, it is an empty property.
+-- #interrupt-cells: The number of cells to define the interrupts. It should be 3.
+-  The first cell is the IRQ number (aka "Peripheral IDentifier" on datasheet).
+-  The second cell is used to specify flags:
+-    bits[3:0] trigger type and level flags:
+-      1 = low-to-high edge triggered.
+-      2 = high-to-low edge triggered.
+-      4 = active high level-sensitive.
+-      8 = active low level-sensitive.
+-      Valid combinations are 1, 2, 3, 4, 8.
+-      Default flag for internal sources should be set to 4 (active high).
+-  The third cell is used to specify the irq priority from 0 (lowest) to 7
+-  (highest).
+-- reg: Should contain AIC registers location and length
+-- atmel,external-irqs: u32 array of external irqs.
+-
+-Examples:
+-	/*
+-	 * AIC
+-	 */
+-	aic: interrupt-controller at fffff000 {
+-		compatible = "atmel,at91rm9200-aic";
+-		interrupt-controller;
+-		interrupt-parent;
+-		#interrupt-cells = <3>;
+-		reg = <0xfffff000 0x200>;
+-	};
+-
+-	/*
+-	 * An interrupt generating device that is wired to an AIC.
+-	 */
+-	dma: dma-controller at ffffec00 {
+-		compatible = "atmel,at91sam9g45-dma";
+-		reg = <0xffffec00 0x200>;
+-		interrupts = <21 4 5>;
+-	};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
+new file mode 100644
+index 0000000..2742e9c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
+@@ -0,0 +1,42 @@
++* Advanced Interrupt Controller (AIC)
++
++Required properties:
++- compatible: Should be "atmel,<chip>-aic"
++  <chip> can be "at91rm9200" or "sama5d3"
++- interrupt-controller: Identifies the node as an interrupt controller.
++- interrupt-parent: For single AIC system, it is an empty property.
++- #interrupt-cells: The number of cells to define the interrupts. It should be 3.
++  The first cell is the IRQ number (aka "Peripheral IDentifier" on datasheet).
++  The second cell is used to specify flags:
++    bits[3:0] trigger type and level flags:
++      1 = low-to-high edge triggered.
++      2 = high-to-low edge triggered.
++      4 = active high level-sensitive.
++      8 = active low level-sensitive.
++      Valid combinations are 1, 2, 3, 4, 8.
++      Default flag for internal sources should be set to 4 (active high).
++  The third cell is used to specify the irq priority from 0 (lowest) to 7
++  (highest).
++- reg: Should contain AIC registers location and length
++- atmel,external-irqs: u32 array of external irqs.
++
++Examples:
++	/*
++	 * AIC
++	 */
++	aic: interrupt-controller at fffff000 {
++		compatible = "atmel,at91rm9200-aic";
++		interrupt-controller;
++		interrupt-parent;
++		#interrupt-cells = <3>;
++		reg = <0xfffff000 0x200>;
++	};
++
++	/*
++	 * An interrupt generating device that is wired to an AIC.
++	 */
++	dma: dma-controller at ffffec00 {
++		compatible = "atmel,at91sam9g45-dma";
++		reg = <0xffffec00 0x200>;
++		interrupts = <21 4 5>;
++	};
 -- 
 1.8.3.2
