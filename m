@@ -1,12 +1,13 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 20 Jun 2014 13:56:54 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 17/20] ARM: sunxi: Introduce
+Date: Fri, 20 Jun 2014 13:59:07 +0800
+Subject: Fwd: [linux-sunxi] Re: [PATCH v2 17/20] ARM: sunxi: Introduce
  Allwinner A23 support
-In-Reply-To: <20140618122646.GS19730@lukather>
+In-Reply-To: <CAGb2v67zkwvspdDr-rKv=5uT5mvP4e1ZyzHSSOXmvaiOxA+7OA@mail.gmail.com>
 References: <1403016777-15121-1-git-send-email-wens@csie.org>
  <1403016777-15121-18-git-send-email-wens@csie.org>
  <20140618122646.GS19730@lukather>
-Message-ID: <CAGb2v67zkwvspdDr-rKv=5uT5mvP4e1ZyzHSSOXmvaiOxA+7OA@mail.gmail.com>
+ <CAGb2v67zkwvspdDr-rKv=5uT5mvP4e1ZyzHSSOXmvaiOxA+7OA@mail.gmail.com>
+Message-ID: <CAGb2v65VMBLBf787UmUkmTqhXAZZxSqmFUMwDAWTFtSi7s0yqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -58,6 +59,8 @@ On Wed, Jun 18, 2014 at 8:26 PM, Maxime Ripard
 >
 > I haven't seen anything in your code that needed to use this
 > function. Am I missing something?
+
+(Adding Maxime back to recipients...)
 
 My mistake. From the log I thought all timers needed the reset
 controller. Turns out only the high speed timer does.
