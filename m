@@ -1,80 +1,51 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 20 Jun 2014 23:27:26 +0100
-Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
-References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <CAFEAcA-NZiRDDeUc7n+6hxgjG1V3qYXPAwyfSdtyz=ZCcD8kiw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 21 Jun 2014 02:28:35 +0400
+Subject: [PATCH v3 3/3] ARM: shmobile: henninger: enable internal PCI
+In-Reply-To: <201406210051.28040.sergei.shtylyov@cogentembedded.com>
+References: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
+ <201406210051.28040.sergei.shtylyov@cogentembedded.com>
+Message-ID: <53A4B593.1020700@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2014 16:21, Pawel Moll <pawel.moll@arm.com> wrote:
-> This patch adds basic DT bindings for the PL11x CLCD cells
-> and make their fbdev driver use them.
+Hello.
 
-> +* ARM PrimeCell Color LCD Controller PL110/PL111
-> +
-> +See also Documentation/devicetree/bindings/arm/primecell.txt
-> +
-> +Required properties:
-> +
-> +- compatible: must be one of:
-> +       "arm,pl110", "arm,primecell"
-> +       "arm,pl111", "arm,primecell"
-> +
-> +- reg: base address and size of the control registers block
-> +
-> +- interrupt-names: either the single entry "combined" representing a
-> +       combined interrupt output (CLCDINTR), or the four entries
-> +       "mbe", "vcomp", "lnbu", "fuf" representing the individual
-> +       CLCDMBEINTR, CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR interrupts
-> +
-> +- interrupts: contains an interrupt specifier for each entry in
-> +       interrupt-names
-> +
-> +- clocks-names: should contain "clcdclk" and "apb_pclk"
-> +
-> +- clocks: contains phandle and clock specifier pairs for the entries
-> +       in the clock-names property. See
-> +       Documentation/devicetree/binding/clock/clock-bindings.txt
-> +
-> +Optional properties:
-> +
-> +- arm,pl11x,framebuffer-base: a pair of two 32-bit values, address and size,
-> +       defining the framebuffer that must be used; if not present, the
-> +       framebuffer may be located anywhere in the memory
-> +
-> +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
-> +       cell's memory interface can handle
-> +
-> +Required sub-nodes:
-> +
-> +- port: describes LCD panel signals, following the common binding
-> +       for video transmitter interfaces; see
-> +       Documentation/devicetree/bindings/media/video-interfaces.txt;
-> +       when it is a TFT panel, the port's endpoint must define the
-> +       following property:
-> +
-> +       - arm,pl11x,tft-r0g0b0-pads: an array of three 32-bit values,
-> +               defining the way CLD pads are wired up; this implicitly
-> +               defines available color modes, for example:
-> +               - PL111 TFT 4:4:4 panel:
-> +                       arm,pl11x,tft-r0g0b0-pads = <4 15 20>;
-> +               - PL110 TFT (1:)5:5:5 panel:
-> +                       arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
-> +               - PL111 TFT (1:)5:5:5 panel:
-> +                       arm,pl11x,tft-r0g0b0-pads = <3 11 19>;
-> +               - PL111 TFT 5:6:5 panel:
-> +                       arm,pl11x,tft-r0g0b0-pads = <3 10 19>;
-> +               - PL110 and PL111 TFT 8:8:8 panel:
-> +                       arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-> +               - PL110 and PL111 TFT 8:8:8 panel, R & B components swapped:
-> +                       arm,pl11x,tft-r0g0b0-pads = <16 8 0>;
+On 06/21/2014 12:51 AM, Sergei Shtylyov wrote:
 
-How does this work for boards like the versatilepb which have a
-mux between a PL110 and the TFT, allowing it to efffectively
-rewire the pads at runtime under control of the SYS_CLCD
-sysreg (to give a wider range of colour modes than the
-PL110 supports natively)?
+> Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
+> them.
 
-thanks
--- PMM
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+> ---
+> Changes in version 3:
+> - refreshed the patch.
+
+>   arch/arm/boot/dts/r8a7791-henninger.dts |   22 ++++++++++++++++++++++
+>   1 file changed, 22 insertions(+)
+>
+> Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
+> +++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+[...]
+> @@ -217,3 +227,15 @@
+>   		spi-cpha;
+>   	};
+>   };
+> +
+> +&pci0 {
+> +	status = "okay";
+> +	pinctrl-0 = <&usb0_pins>;
+> +	pinctrl-names = "default";
+> +};
+> +
+> +&pci1 {
+> +	status = "okay";
+> +	pinctrl-0 = <&usb1_pins>;
+> +	pinctrl-names = "default";
+> +};
+
+    Gah, I forgot to refresh this patch one final time before sending out... :-/
+
+WBR, Sergei
