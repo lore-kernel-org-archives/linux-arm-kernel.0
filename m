@@ -1,136 +1,167 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jun 2014 18:09:01 +0100
-Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
-References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140620170901.GA12059@leverpostej>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 20 Jun 2014 13:11:37 -0400
+Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
+In-Reply-To: <53A453D1.4040308@ti.com>
+References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
+ <CAErSpo6=vi0SR0A3u5BCLgiGxoH48N5R=e8VAnFDG=K61qLxnw@mail.gmail.com>
+ <53A453D1.4040308@ti.com>
+Message-ID: <53A46B49.3040009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
-
-On Tue, Jun 17, 2014 at 04:21:33PM +0100, Pawel Moll wrote:
-> This patch adds basic DT bindings for the PL11x CLCD cells
-> and make their fbdev driver use them.
+On Friday 20 June 2014 11:31 AM, Murali Karicheri wrote:
+> On 6/17/2014 8:08 PM, Bjorn Helgaas wrote:
+>> On Tue, Jun 10, 2014 at 02:51:19PM -0400, Murali Karicheri wrote:
+>>> This patch adds a PCIe controller driver for Keystone SoCs. This
+>>> is based on v1 of the series posted to the mailing list.
+>>>
+>>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> CC: Russell King <linux@arm.linux.org.uk>
+>>> CC: Grant Likely <grant.likely@linaro.org>
+>>> CC: Rob Herring <robh+dt@kernel.org>
+>>> CC: Mohit Kumar <mohit.kumar@st.com>
+>>> CC: Jingoo Han <jg1.han@samsung.com>
+>>> CC: Bjorn Helgaas <bhelgaas@google.com>
+>>> CC: Pratyush Anand <pratyush.anand@st.com>
+>>> CC: Richard Zhu <r65037@freescale.com>
+>>> CC: Kishon Vijay Abraham I <kishon@ti.com>
+>>> CC: Marek Vasut <marex@denx.de>
+>>> CC: Arnd Bergmann <arnd@arndb.de>
+>>> CC: Pawel Moll <pawel.moll@arm.com>
+>>> CC: Mark Rutland <mark.rutland@arm.com>
+>>> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>> CC: Kumar Gala <galak@codeaurora.org>
+>>> CC: Randy Dunlap <rdunlap@infradead.org>
+>>> CC: Grant Likely <grant.likely@linaro.org>
+>>>
+>>>
+>>> Changelog:
+>>>
+>>> V2
+>>>   - Split the designware pcie enhancement patch to multiple
+>>>     patches based on functionality added
+>>>   - Remove the quirk code and add a patch to fix mps/mrss
+>>>     tuning for ARM. Use kernel command line parameter
+>>>     pci=pcie_bus_perf to work with Keystone PCI Controller.
+>>>     Following patch addressed this.
+>>>       [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
+>>>   - Add documentation for device tree bindings
+>>>   - Add separate interrupt controller nodes for MSI and Legacy
+>>>     IRQs and use irq map for legacy IRQ
+>>>   - Use compatibility to identify v3.65 version of the DW hardware
+>>>     and use it to customize the designware common code.
+>>>   - Use reg property for configuration space instead of range
+>>>   - Other minor updates based on code inspection.
+>>>
+>>> V1
+>>>   - Add an interrupt controller node for Legacy irq chip and use
+>>>     interrupt map/map-mask property to map legacy IRQs A/B/C/D
+>>>   - Add a Phy driver to replace the original serdes driver
+>>>   - Move common application register handling code to a separate
+>>>     file to allow re-use across other platforms that use older
+>>>     DW PCIe h/w
+>>>   - PCI quirk for maximum read request size. Check and override only
+>>>     if the maximum is higher than what controller can handle.
+>>>   - Converted to a module platform driver.
+>>>
+>>>
+>>> Murali Karicheri (8):
+>>>    PCI: designware: add rd[wr]_other_conf API
+>>>    PCI: designware: refactor host init code to re-use on v3.65 DW pci hw
+>>>    PCI: designware: update pcie core driver to work with dw hw version
+>>>      3.65
+>>>    PCI: designware: add msi controller functions for v3.65 hw
+>>>    PCI: designware: add PCI controller functions for v3.65 DW hw
+>>>    phy: Add serdes phy driver for keystone
+>>>    PCI: keystone: add pcie driver based on designware core driver
+>>>    ARM: keystone: add pcie related options
+>>>
+>>>   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
+>>>   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
+>>>   .../bindings/phy/phy-keystone-serdes.txt           |   25 ++
+>>>   arch/arm/mach-keystone/Kconfig                     |    1 +
+>>>   drivers/pci/host/Kconfig                           |   12 +
+>>>   drivers/pci/host/Makefile                          |    2 +
+>>>   drivers/pci/host/pci-dw-v3_65-msi.c                |  149 +++++++
+>>>   drivers/pci/host/pci-dw-v3_65.c                    |  390 ++++++++++++++++++
+>>>   drivers/pci/host/pci-dw-v3_65.h                    |   34 ++
+>>>   drivers/pci/host/pci-keystone.c                    |  418 ++++++++++++++++++++
+>>>   drivers/pci/host/pcie-designware.c                 |  175 +++++---
+>>>   drivers/pci/host/pcie-designware.h                 |   42 +-
+>>>   drivers/phy/Kconfig                                |    6 +
+>>>   drivers/phy/Makefile                               |    1 +
+>>>   drivers/phy/phy-keystone-serdes.c                  |  230 +++++++++++
+>>>   15 files changed, 1531 insertions(+), 52 deletions(-)
+>>>   create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
+>>>   create mode 100644 Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
+>>>   create mode 100644 drivers/pci/host/pci-dw-v3_65-msi.c
+>>>   create mode 100644 drivers/pci/host/pci-dw-v3_65.c
+>>>   create mode 100644 drivers/pci/host/pci-dw-v3_65.h
+>>>   create mode 100644 drivers/pci/host/pci-keystone.c
+>>>   create mode 100644 drivers/phy/phy-keystone-serdes.c
+>> I'm not willing to merge phy-keystone-serdes.c because I don't
+>> maintain drivers/phy and because of the binary blob of register values
+>> it contains, but maybe somebody else will.  I assume it could be
+>> merged by itself before the rest of this.
+>>
+>> I'm looking for acks from Mohit and/or Jingoo for the pci/host
+>> changes, and from Arnd for the devicetree/bindings changes.
+>>
+>> Adding these "-dw-3_64" files is sort of ugly.  If that code is only
+>> used by keystone, maybe it could just be moved to pci-keystone.c?  But
+>> I'll defer to Mohit and Jingoo on that and the way you modify
+>> pcie-designware.c.
+>>
+>> Bjorn
+> Bjorn, Jingoo,
 > 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
-> Changes since v6:
-> - replaced in-node device-timing subnode with the standard
->   video interface bindings (as in: ports & endpoints); only
->   "panel-dpi" compatible panels are supported in the driver
+> Unfortunately I lost Jingoo's email from my Inbox. So I cut-n-paste the comment from
+> internet and respond.
 > 
-> Changes since v5:
-> - realised that dma_alloc_writecombine() is a arm-specific function;
->   replaced with generic dma_alloc_coherent()/dma_mmap_writecombine()
+> Jingoo Han wrote:-
+> =============================================================================
+> I think so, too.
 > 
-> Changes since v4:
-> - simplified the pads description property and made it optional
+> DT maintainers and arch maintainers should review the following
+> dt bindings.
+>   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
+>   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
+> Generic PHY maintainer (Kishon Vijay Abraham I) should review the
+> following phy driver.
+>   drivers/phy/phy-keystone-serdes.c
 > 
-> Changes since v3:
-> - changed wording and order of interrupt-names and interrupts
->   properties documentation
-> - changed wording of arm,pl11x,framebuffer-base property
->   documentation
-> - cleaned up binding documentation indentation
+>>
+>> I'm looking for acks from Mohit and/or Jingoo for the pci/host
+>> changes, and from Arnd for the devicetree/bindings changes.
+>>
+>> Adding these "-dw-3_64" files is sort of ugly.  If that code is only
+>> used by keystone, maybe it could just be moved to pci-keystone.c?  But
+>> I'll defer to Mohit and Jingoo on that and the way you modify
+>> pcie-designware.c.
 > 
-> Changes since v2:
-> - replaced video-ram phandle with arm,pl11x,framebuffer-base
-> - replaced panel-* properties with arm,pl11x,panel-data-pads
-> - replaced max-framebuffer-size with max-memory-bandwidth
-> - modified clcdfb_of_init_tft_panel() to use the pads
->   data and take differences between PL110 and PL110 into
->   account
+> I agree with Bjorn Helgaas's opinion. These three "-dw-3_64" files
+> look terrible! I don't have a good way to handle this; however,
+> moving this code to pci-keystone.c looks better.
+> ======================================================================
 > 
-> Changes since v1:
-> - minor code cleanups as suggested by Sylwester Nawrocki
+> The original RFC I had submitted had all of the application space register
+> handling code as part of the Keystone PCI driver. As per Arnd's comment (See
+> my change log against v1), the code was moved to a separate file so that
+> the next driver that has same version of the DW hw could re-use this code.
+> I agree with Arnd and moved the code to v_3_65 specific files.  What is
+> your proposal?  Do you have objection to the file name? or it's content?
 > 
->  .../devicetree/bindings/video/arm,pl11x.txt        | 102 ++++++++
->  drivers/video/fbdev/Kconfig                        |   1 +
->  drivers/video/fbdev/amba-clcd.c                    | 268 +++++++++++++++++++++
->  3 files changed, 371 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/arm,pl11x.txt
+> If objection is on the file name,  please suggest alternate names. If you
+> are okay with the file name, and doesn't like the code, it will be helpful
+> to review the code and provide specific comments against the patch itself
+> so that I can address the same.
 > 
-> diff --git a/Documentation/devicetree/bindings/video/arm,pl11x.txt b/Documentation/devicetree/bindings/video/arm,pl11x.txt
-> new file mode 100644
-> index 0000000..54124c6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/arm,pl11x.txt
-> @@ -0,0 +1,102 @@
-> +* ARM PrimeCell Color LCD Controller PL110/PL111
-> +
-> +See also Documentation/devicetree/bindings/arm/primecell.txt
-> +
-> +Required properties:
-> +
-> +- compatible: must be one of:
-> +	"arm,pl110", "arm,primecell"
-> +	"arm,pl111", "arm,primecell"
-> +
-> +- reg: base address and size of the control registers block
-> +
-> +- interrupt-names: either the single entry "combined" representing a
-> +	combined interrupt output (CLCDINTR), or the four entries
-> +	"mbe", "vcomp", "lnbu", "fuf" representing the individual
-> +	CLCDMBEINTR, CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR interrupts
-> +
-> +- interrupts: contains an interrupt specifier for each entry in
-> +	interrupt-names
-> +
-> +- clocks-names: should contain "clcdclk" and "apb_pclk"
+Arnd suggestion was to have the version 3.65 code in generic place since
+its IP specific and just in case some other vendor using the same version
+can leverage the code.
 
-s/clocks-names/clock-names/
+Concern here seems toe really those name of the files. I can't think of
+any other appropriate name. 
 
-> +
-> +- clocks: contains phandle and clock specifier pairs for the entries
-> +	in the clock-names property. See
-> +	Documentation/devicetree/binding/clock/clock-bindings.txt
-> +
-> +Optional properties:
-> +
-> +- arm,pl11x,framebuffer-base: a pair of two 32-bit values, address and size,
-> +	defining the framebuffer that must be used; if not present, the
-> +	framebuffer may be located anywhere in the memory
-
-The name is confusing: this is a base _and_ size.
-
-When should this be used, and what is valid to point it at?
-
-How does this play with memory carveouts (CMA, reserved-memory)?
-
-> +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
-> +	cell's memory interface can handle
-
-When should I set this, given it is optional?
-
-> +
-> +Required sub-nodes:
-> +
-> +- port: describes LCD panel signals, following the common binding
-> +	for video transmitter interfaces; see
-> +	Documentation/devicetree/bindings/media/video-interfaces.txt;
-> +	when it is a TFT panel, the port's endpoint must define the
-> +	following property:
-> +
-> +	- arm,pl11x,tft-r0g0b0-pads: an array of three 32-bit values,
-> +		defining the way CLD pads are wired up; this implicitly
-> +		defines available color modes, for example:
-> +		- PL111 TFT 4:4:4 panel:
-> +			arm,pl11x,tft-r0g0b0-pads = <4 15 20>;
-> +		- PL110 TFT (1:)5:5:5 panel:
-> +			arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
-> +		- PL111 TFT (1:)5:5:5 panel:
-> +			arm,pl11x,tft-r0g0b0-pads = <3 11 19>;
-> +		- PL111 TFT 5:6:5 panel:
-> +			arm,pl11x,tft-r0g0b0-pads = <3 10 19>;
-> +		- PL110 and PL111 TFT 8:8:8 panel:
-> +			arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-> +		- PL110 and PL111 TFT 8:8:8 panel, R & B components swapped:
-> +			arm,pl11x,tft-r0g0b0-pads = <16 8 0>;
-
-I'm somewhat lost trying to figure out this mapping. Am I not looking at
-this in the right way, or is there any documentation which makes this
-clearer?
-
-Thanks,
-Mark.
+Regards,
+Santosh
