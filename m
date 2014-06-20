@@ -1,20 +1,24 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 21 Jun 2014 00:44:50 +0400
-Subject: [PATCH v3 0/3] Add R8A7791/Koelsch/Henninger board PCI DT support
-Message-ID: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Jun 2014 16:44:43 -0400
+Subject: [PATCH] ARM: mvebu: mark armada_370_xp_pmsu_idle_prepare() as
+ static
+In-Reply-To: <1401116474-31221-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1401116474-31221-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140620204443.GK21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, May 26, 2014 at 05:01:14PM +0200, Thomas Petazzoni wrote:
+> The armada_370_xp_pmsu_idle_prepare() function is only used internally
+> to pmsu.c, so there's no reason to not use the static qualifier.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-v3.16-rc1-20140618' tag. Here we add PCI USB device tree support
-for the R8A7791-based Koelsch and Henninger boards. As the 'pci-rcar-gen2'
-driver device tree support has been merged for 3.16, this patchset can now be
-merged too... 
+Applied to mvebu/soc with Gregory's Ack.
 
-[1/3] ARM: shmobile: r8a7791: add internal PCI bridge nodes
-[2/3] ARM: shmobile: koelsch: enable internal PCI
-[3/3] ARM: shmobile: henninger: enable internal PCI
+thx,
 
-WBR, Sergei
+Jason.
