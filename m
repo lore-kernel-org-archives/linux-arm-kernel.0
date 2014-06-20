@@ -1,73 +1,51 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 20 Jun 2014 20:33:38 +0800
-Subject: [PATCH 0/7] ARM: dts: ssi device node updates
-In-Reply-To: <1402995995-15098-1-git-send-email-mpa@pengutronix.de>
-References: <1402995995-15098-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140620123337.GI28225@dragon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jun 2014 13:36:02 +0100
+Subject: [PATCH v9 3/3] dt-bindings: add mtk-timer bindings
+In-Reply-To: <1403264929-21325-4-git-send-email-matthias.bgg@gmail.com>
+References: <1403264929-21325-1-git-send-email-matthias.bgg@gmail.com>
+ <1403264929-21325-4-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <20140620123602.GK30188@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 17, 2014 at 11:06:28AM +0200, Markus Pargmann wrote:
-> This series cleans up some old or unnecessary properties from the dts files.
+On Fri, Jun 20, 2014 at 12:48:49PM +0100, Matthias Brugger wrote:
+> Add binding documentation for the General Porpose Timer driver of
+> the Mediatek SoCs.
 > 
-> Patch 1 removes an enabled ssi unit that is not used.
-
-Instead of holding the whole series by waiting ACK from ventana board
-maintainer on the first patch, I choose to keep the ssi node and remove
-fsl,mode property.  The ssi node can be removed later in another patch
-after board maintainer confirms.
-
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../bindings/timer/mediatek,mtk-timer.txt          |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
 > 
-> Patch 2 adds ssi DMA properties based on the previous definiton of
-> fsl,ssi-dma-events for imx50.
-> 
-> Patches 3 and 4 remove the old non-generic fsl,ssi-dma-events property. The
-> generic dmas property is still present and used.
-> 
-> Patch 5,6 and 7 remove the fsl,mode properties for ssi units that are
-> connected with sgtl5000 cards. The sgtl5000 already configures the connection
-> between codec and CPU DAI correctly, so we don't need fsl,mode here.
+> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> new file mode 100644
+> index 0000000..10b7e09
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> @@ -0,0 +1,18 @@
+> +Mediatek MT6577, MT6572 and MT6589 Timers
+> +---------------------------------------
+> +
+> +Required properties:
+> +- compatible: Should be "mediatek,mt6577-timer"
+> +- reg: Should contain location and length for timers register.
+> +- clocks: Clocks driving the timer hardware. This list should include two
+> +	clocks. The order is system clock and as second clock the RTC clock.
+> +
+> +Examples:
+> +
+> +	timer at 10008000 {
+> +		compatible = "mediatek,mt6577-timer";
+> +		reg = <0x10008000 0x80>;
+> +		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&system_clk>, <&rtc_clk>;
+> +		clock-names = "system-clk", "rtc-clk";
 
-There are some a number of new boards on my imx/dt branch across
-different i.MX series.  Since the last 3 patches are all about board
-level files, I just squashed them and made the same change for those
-new boards in there.
+These names should be mentioned above, or removed.
 
-Also, I updated the patch subject a little bit, primarily on prefix.
-And the last one should be about audio cards, not only sgtl5000.  So in
-all, the new summary looks like the following.
+This looks fine otherwise.
 
-Markus Pargmann (4):
-  ARM: dts: imx50: add ssi dma properties
-  ARM: dts: imx5: remove fsl,ssi-dma-events
-  ARM: dts: imx6qdl: remove fsl,ssi-dma-events
-  ARM: dts: imx: remove ssi fsl,mode for audio cards
-
- arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts | 1 -
- arch/arm/boot/dts/imx25-pdk.dts                        | 1 -
- arch/arm/boot/dts/imx27-eukrea-mbimxsd27-baseboard.dts | 1 -
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi        | 1 -
- arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts | 1 -
- arch/arm/boot/dts/imx50.dtsi                           | 8 ++++++--
- arch/arm/boot/dts/imx51-babbage.dts                    | 1 -
- arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts | 1 -
- arch/arm/boot/dts/imx51.dtsi                           | 3 ---
- arch/arm/boot/dts/imx53-m53evk.dts                     | 1 -
- arch/arm/boot/dts/imx53-mba53.dts                      | 1 -
- arch/arm/boot/dts/imx53-qsb-common.dtsi                | 1 -
- arch/arm/boot/dts/imx53-tx53.dtsi                      | 1 -
- arch/arm/boot/dts/imx53-voipac-bsb.dts                 | 1 -
- arch/arm/boot/dts/imx53.dtsi                           | 3 ---
- arch/arm/boot/dts/imx6dl-riotboard.dts                 | 1 -
- arch/arm/boot/dts/imx6q-gw5400-a.dts                   | 1 -
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi                  | 1 -
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi                  | 1 -
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi                  | 2 --
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi              | 1 -
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi               | 1 -
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi                 | 1 -
- arch/arm/boot/dts/imx6qdl-tx6.dtsi                     | 1 -
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi               | 1 -
- arch/arm/boot/dts/imx6qdl.dtsi                         | 3 ---
- arch/arm/boot/dts/imx6sl-evk.dts                       | 1 -
- 27 files changed, 6 insertions(+), 35 deletions(-)
+Mark.
