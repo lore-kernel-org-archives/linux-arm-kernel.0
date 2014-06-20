@@ -1,90 +1,170 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 20 Jun 2014 17:02:56 +0200
-Subject: [PATCH v2] clocksource: exynos_mct: Fix ftrace
-In-Reply-To: <1403197706-29966-1-git-send-email-dianders@chromium.org>
-References: <1403197706-29966-1-git-send-email-dianders@chromium.org>
-Message-ID: <53A44D20.2070507@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 20 Jun 2014 11:04:19 -0400
+Subject: [PATCH] dt/documentation: add specification of dma bus information
+In-Reply-To: <5395BDA7.3060507@ti.com>
+References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAOMZO5Ceg9RpC8Lgt0BwGTuaz-Z2614Die2PrbtT_j4QYjL_sA@mail.gmail.com>
+ <5395BDA7.3060507@ti.com>
+Message-ID: <53A44D73.6080200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2014 07:08 PM, Doug Anderson wrote:
-> In (93bfb76 clocksource: exynos_mct: register sched_clock callback) we
-> supported using the MCT as a scheduler clock.
+On Monday 09 June 2014 09:59 AM, Santosh Shilimkar wrote:
+> On Sunday 08 June 2014 10:13 PM, Fabio Estevam wrote:
+>> On Thu, Jun 5, 2014 at 12:22 PM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>>> Recently we introduced the generic device tree infrastructure for couple of DMA
+>>> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
+>>> its useful for future users.
+>>>
+>>> The "dma-ranges" property is intended to be used for describing the
+>>> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
+>>>
+>>> The "dma-coherent" property is intended to be used for identifying devices
+>>> supported coherent DMA operations.
+>>>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>> Cc: Shawn Guo <shawn.guo@freescale.com>
+>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
+>>>  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
+>>>  1 file changed, 60 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+>>> index 1f013bd..f0120c1 100644
+>>> --- a/Documentation/devicetree/booting-without-of.txt
+>>> +++ b/Documentation/devicetree/booting-without-of.txt
+>>> @@ -51,6 +51,8 @@ Table of Contents
+>>>
+>>>    VIII - Specifying device power management information (sleep property)
+>>>
+>>> +  VIV - Specifying dma bus information
+>>
+>> "9" in Roman numeral is "IX"
+>>
+> Yeah.. Not sure what I was thinking...
+> 
+Updated patch end of the email with the typo fixed.
 
-Hi Thomas,
+Rob,
+Can you please pick this up if you are ok with the it.
 
-is it possible you update the tip/timers/core so I can get visibility on 
-the above patch to apply this one ?
+Regards,
+Santosh
 
-Thanks
-   -- Daniel
+>From b72e949a194d766fe029fe6bb5939467f2fbe9b9 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Fri, 20 Jun 2014 11:01:54 -0400
+Subject: [PATCH] dt/documentation: add specification of dma bus information
 
+Recently we introduced the generic device tree infrastructure for couple of DMA
+bus parameter, dma-ranges and dma-coherent. Update the documentation so that
+its useful for future users.
 
-> We properly marked
-> exynos4_read_sched_clock() as notrace.  However, we then went and
-> called another function that _wasn't_ notrace.  That means if you do:
->
->    cd /sys/kernel/debug/tracing/
->    echo function_graph > current_tracer
->
-> You'll get a crash.
->
-> Fix this (but still let other readers of the MCT be trace-enabled) by
-> adding an extra function.  It's important to keep other users of MCT
-> traceable because the MCT is actually quite slow to access and we want
-> exynos4_frc_read() to show up in ftrace profiles if it's the
-> bottleneck.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> Changes in v2:
-> - Split out from other patches so this can go into 3.16.
-> - Better comment about why exynos4_frc_read() should be traceable.
-> - No more useless inline.
->
->   drivers/clocksource/exynos_mct.c | 9 +++++++--
->   1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index f71d55f..5ce99c0 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -162,7 +162,7 @@ static void exynos4_mct_frc_start(void)
->   	exynos4_mct_write(reg, EXYNOS4_MCT_G_TCON);
->   }
->
-> -static cycle_t exynos4_frc_read(struct clocksource *cs)
-> +static cycle_t notrace _exynos4_frc_read(void)
->   {
->   	unsigned int lo, hi;
->   	u32 hi2 = __raw_readl(reg_base + EXYNOS4_MCT_G_CNT_U);
-> @@ -176,6 +176,11 @@ static cycle_t exynos4_frc_read(struct clocksource *cs)
->   	return ((cycle_t)hi << 32) | lo;
->   }
->
-> +static cycle_t exynos4_frc_read(struct clocksource *cs)
-> +{
-> +	return _exynos4_frc_read();
-> +}
-> +
->   static void exynos4_frc_resume(struct clocksource *cs)
->   {
->   	exynos4_mct_frc_start();
-> @@ -192,7 +197,7 @@ struct clocksource mct_frc = {
->
->   static u64 notrace exynos4_read_sched_clock(void)
->   {
-> -	return exynos4_frc_read(&mct_frc);
-> +	return _exynos4_frc_read();
->   }
->
->   static void __init exynos4_clocksource_init(void)
->
+The "dma-ranges" property is intended to be used for describing the
+configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
 
+The "dma-coherent" property is intended to be used for identifying devices
+supported coherent DMA operations.
 
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+
+diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+index 1f013bd..0b0928c 100644
+--- a/Documentation/devicetree/booting-without-of.txt
++++ b/Documentation/devicetree/booting-without-of.txt
+@@ -51,6 +51,8 @@ Table of Contents
+ 
+   VIII - Specifying device power management information (sleep property)
+ 
++  IX - Specifying dma bus information
++
+   Appendix A - Sample SOC node for MPC8540
+ 
+ 
+@@ -1332,6 +1334,64 @@ reasonably grouped in this manner, then create a virtual sleep controller
+ (similar to an interrupt nexus, except that defining a standardized
+ sleep-map should wait until its necessity is demonstrated).
+ 
++IX - Specifying dma bus information
++
++Some devices may have DMA memory range shifted relatively to the beginning of
++RAM, or even placed outside of kernel RAM. For example, the Keystone 2 SoC
++worked in LPAE mode with 4G memory has:
++- RAM range: [0x8 0000 0000, 0x8 FFFF FFFF]
++- DMA range: [  0x8000 0000,   0xFFFF FFFF]
++and DMA range is aliased into first 2G of RAM in HW.
++
++In such cases, DMA addresses translation should be performed between CPU phys
++and DMA addresses. The "dma-ranges" property is intended to be used
++for describing the configuration of such system in DT.
++
++In addition, each DMA master device on the DMA bus may or may not support
++coherent DMA operations. The "dma-coherent" property is intended to be used
++for identifying devices supported coherent DMA operations in DT.
++
++* DMA Bus master
++Optional property:
++- dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
++	(child-bus-address, parent-bus-address, length). Each triplet specified
++	describes a contiguous DMA address range.
++	The dma-ranges property is used to describe the direct memory access (DMA)
++	structure of a memory-mapped bus whose device tree parent can be accessed
++	from DMA operations originating from the bus. It provides a means of
++	defining a mapping or translation between the physical address space of
++	the bus and the physical address space of the parent of the bus.
++	(for more information see ePAPR specification)
++
++* DMA Bus child
++Optional property:
++- dma-ranges: <empty> value. if present - It means that DMA addresses
++	translation has to be enabled for this device.
++- dma-coherent: Present if dma operations are coherent
++
++Example:
++soc {
++		compatible = "ti,keystone","simple-bus";
++		ranges = <0x0 0x0 0x0 0xc0000000>;
++		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
++
++		[...]
++
++		usb: usb at 2680000 {
++			compatible = "ti,keystone-dwc3";
++
++			[...]
++
++			dma-coherent;
++			dma-ranges;
++
++			dwc3 at 2690000 {
++				compatible = "synopsys,dwc3";
++				[...]
++			};
++		};
++};
++
+ Appendix A - Sample SOC node for MPC8540
+ ========================================
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
