@@ -1,52 +1,53 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 20 Jun 2014 17:24:15 +0200
-Subject: A clockevent IRQ delivery question
-In-Reply-To: <CAJgR-Bj+tgCpKTT7FxM-1JMvN7CKUgpaikfbXPQx5ep6+7W2mA@mail.gmail.com>
-References: <CAJgR-BjUpaR0cxew+-fz5YcDu0VKzim-rhLF4j1hEnR_4O+Jsg@mail.gmail.com>	<53A446C0.10200@linaro.org>
- <CAJgR-Bj+tgCpKTT7FxM-1JMvN7CKUgpaikfbXPQx5ep6+7W2mA@mail.gmail.com>
-Message-ID: <53A4521F.2070309@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Jun 2014 19:25:58 +0400
+Subject: [PATCH v0 2/3] ata: Fix the link down in first attempt for the
+ APM X-Gene SoC AHCI SATA host controller driver.
+In-Reply-To: <1403253147-14341-3-git-send-email-stripathi@apm.com>
+References: <1403253147-14341-1-git-send-email-stripathi@apm.com>
+ <1403253147-14341-3-git-send-email-stripathi@apm.com>
+Message-ID: <53A45286.2040000@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2014 05:18 PM, Jon Loeliger wrote:
->>
->> Hi Jon,
->
-> Hi Daniel,
->
->> you can have a look at the exynos_mct driver which has similar design.
->
-> OK, I'll give that a once-over!
->
-> So yeah, it is pretty clearly doing what I was (slowly) deducing: PPIs are
-> getting percpu stuff, and SPI are all getting just this
-> smp_processor_id() stuff.
->
->> There was a notifier for cpu bootup but Thomas added a force affinity api,
->> so even if the cpu is not in the online mask, the irq is correctly set
->> (commit 30ccf03b).
->
-> Ah, I see.  I'll track that commit down.  Thanks.
+On 06/20/2014 12:32 PM, Suman Tripathi wrote:
 
-You are welcome. Let me know if that helped you.
+> This patch fixes the link down issue by retry for the APM X-Gene SoC
+> SATA host controller driver. Due to board design issue and short margin
+> limitation, it is observed that once out of many thousands power cycle
+> test, the sata link may not link up.
 
-Thanks
-   -- Daniel
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   drivers/ata/ahci_xgene.c | 9 +++++++++
+>   1 file changed, 9 insertions(+)
 
->> By the way, did you try to use the A9 local timers (twd) ?
+> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+> index 5f0f750..d43b6ce 100644
+> --- a/drivers/ata/ahci_xgene.c
+> +++ b/drivers/ata/ahci_xgene.c
+[...]
+> @@ -235,15 +238,21 @@ static int xgene_ahci_do_hardreset(struct ata_link *link,
+>   	u8 *d2h_fis = pp->rx_fis + RX_FIS_D2H_REG;
+>   	void __iomem *port_mmio = ahci_port_base(ap);
+>   	struct ata_taskfile tf;
+> +	int link_down_retry = 0;
+>   	int rc;
+>   	u32 val;
 >
-> Not yet.  I hit the global timer just to get my port going.  I needed to
-> implement and verify our timer block.  But I can give the TWD a
-> run as well!
->
-> Thanks!
-> jdl
->
+> +hardreset_retry:
+>   	/* clear D2H reception area to properly wait for D2H FIS */
+>   	ata_tf_init(link->device, &tf);
+>   	tf.command = ATA_BUSY;
+>   	ata_tf_to_fis(&tf, 0, 0, d2h_fis);
+>   	rc = sata_link_hardreset(link, timing, deadline, online,
+>   				 ahci_check_ready);
+> +
+> +	if (!*online)
+> +		if (link_down_retry++ < MAX_LINK_DOWN_RETRY)
 
+    Could be folded into single *if* (and so indentation decreased).
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> +			goto hardreset_retry;
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+WBR, Sergei
