@@ -1,51 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 21 Jun 2014 02:28:35 +0400
-Subject: [PATCH v3 3/3] ARM: shmobile: henninger: enable internal PCI
-In-Reply-To: <201406210051.28040.sergei.shtylyov@cogentembedded.com>
-References: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
- <201406210051.28040.sergei.shtylyov@cogentembedded.com>
-Message-ID: <53A4B593.1020700@cogentembedded.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 21 Jun 2014 00:29:54 +0200
+Subject: [PATCH 1/3] pwm: add Rockchip SoC PWM support
+In-Reply-To: <20140620220034.GA927@gmail.com>
+References: <1399504115-16257-1-git-send-email-b.galvani@gmail.com>
+ <1399504115-16257-2-git-send-email-b.galvani@gmail.com>
+ <20140617214253.GA24743@mithrandir>
+ <20140620220034.GA927@gmail.com>
+Message-ID: <20140620222953.GC29400@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 06/21/2014 12:51 AM, Sergei Shtylyov wrote:
-
-> Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
-> them.
-
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-> ---
-> Changes in version 3:
-> - refreshed the patch.
-
->   arch/arm/boot/dts/r8a7791-henninger.dts |   22 ++++++++++++++++++++++
->   1 file changed, 22 insertions(+)
->
-> Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-> +++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+On Sat, Jun 21, 2014 at 12:00:36AM +0200, Beniamino Galvani wrote:
+> On Tue, Jun 17, 2014 at 11:42:58PM +0200, Thierry Reding wrote:
+> > On Thu, May 08, 2014 at 01:08:33AM +0200, Beniamino Galvani wrote:
 [...]
-> @@ -217,3 +227,15 @@
->   		spi-cpha;
->   	};
->   };
-> +
-> +&pci0 {
-> +	status = "okay";
-> +	pinctrl-0 = <&usb0_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&pci1 {
-> +	status = "okay";
-> +	pinctrl-0 = <&usb1_pins>;
-> +	pinctrl-names = "default";
-> +};
+> > > diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+[...]
+> > > +static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> > > +			       int duty_ns, int period_ns)
+> > > +{
+> > > +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+> > > +	unsigned long clk_rate, period, duty;
+> > > +	u64 div;
+> > > +	int ret;
+> > > +
+> > > +	clk_rate = clk_get_rate(pc->clk);
+> > > +
+> > > +	/*
+> > > +	 * Since period and duty cycle registers have a width of 32
+> > > +	 * bits, every possible input period can be obtained using the
+> > > +	 * default prescaler value for all practical clock rate values.
+> > > +	 */
+> > > +	div = clk_rate;
+> > > +	div *= period_ns;
+> > 
+> > Perhaps shorten this to "div = clk_rate * period_ns;"?
+> 
+> I will change this, adding a cast to avoid the truncation of the
+> result to 32 bits: "div = (u64)clk_rate * period_ns;"
 
-    Gah, I forgot to refresh this patch one final time before sending out... :-/
+Alternatively you could simply make clk_rate a u64 since it's only used
+in this context anyway.
 
-WBR, Sergei
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140621/7a94349a/attachment.sig>
