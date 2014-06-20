@@ -1,49 +1,27 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 20 Jun 2014 22:52:53 +0800
-Subject: [PATCH v3 4/4] ARM: sun8i: dt: Add Ippo-q8h v5 support
+Date: Fri, 20 Jun 2014 22:52:52 +0800
+Subject: [PATCH v3 3/4] ARM: sunxi: Add Allwinner A23 dtsi
 In-Reply-To: <1403275973-24259-1-git-send-email-wens@csie.org>
 References: <1403275973-24259-1-git-send-email-wens@csie.org>
-Message-ID: <1403275973-24259-5-git-send-email-wens@csie.org>
+Message-ID: <1403275973-24259-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ippo-q8h is a tablet circuit board commonly found in cheap Android
-tablets with A23 SoCs. There are at least 2 versions of the board, with
-different peripherals, such as WiFi chips.
-
-Common features among these tablets include 512 MB DRAM, NAND, MMC, LCD,
-capacitive touchscreen, accelerometer, 1 or 2 camera sensors, USB OTG,
-microphone and speaker.
-
-v5 of these board designs has a ESP8089 WiFi chip (not supported)
-connected to mmc1. This patch adds very basic support.
+The Allwinner A23 is a tablet oriented SoC with 2 Cortex-A7 cores
+and a Mali-400MP2 GPU.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/Makefile                  |  2 ++
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 31 +++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+ arch/arm/boot/dts/sun8i-a23.dtsi | 160 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 160 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a23.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5986ff6..774a14b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -380,6 +380,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-cubietruck.dtb \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-olinuxino-micro.dtb
-+dtb-$(CONFIG_MACH_SUN8I) += \
-+	sun8i-a23-ippo-q8h-v5.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-iris-512.dtb \
- 	tegra20-medcom-wide.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
 new file mode 100644
-index 0000000..64ec56f
+index 0000000..ac5f69a
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-@@ -0,0 +1,31 @@
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -0,0 +1,160 @@
 +/*
 + * Copyright 2014 Chen-Yu Tsai
 + *
@@ -57,23 +35,152 @@ index 0000000..64ec56f
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+/dts-v1/;
-+/include/ "sun8i-a23.dtsi"
++/include/ "skeleton.dtsi"
 +
 +/ {
-+	model = "Ippo Q8H Dual Core Tablet (v5)";
-+	compatible = "ippo,q8h-v5", "allwinner,sun8i-a23";
++	interrupt-parent = <&gic>;
 +
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++		serial4 = &uart4;
++		serial5 = &r_uart;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <0>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <1>;
++		};
++	};
++
++	memory {
++		reg = <0x40000000 0x40000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		osc24M: osc24M_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++			clock-output-names = "osc24M";
++		};
++
++		osc32k: osc32k_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			clock-output-names = "osc32k";
++		};
 +	};
 +
 +	soc at 01c00000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		timer at 01c20c00 {
++			compatible = "allwinner,sun4i-a10-timer";
++			reg = <0x01c20c00 0xa0>;
++			interrupts = <0 18 4>,
++				     <0 19 4>;
++			clocks = <&osc24M>;
++		};
++
++		wdt0: watchdog at 01c20ca0 {
++			compatible = "allwinner,sun6i-a31-wdt";
++			reg = <0x01c20ca0 0x20>;
++			interrupts = <0 25 4>;
++		};
++
++		uart0: serial at 01c28000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28000 0x400>;
++			interrupts = <0 0 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc24M>;
++			status = "disabled";
++		};
++
++		uart1: serial at 01c28400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28400 0x400>;
++			interrupts = <0 1 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc24M>;
++			status = "disabled";
++		};
++
++		uart2: serial at 01c28800 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28800 0x400>;
++			interrupts = <0 2 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc24M>;
++			status = "disabled";
++		};
++
++		uart3: serial at 01c28c00 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28c00 0x400>;
++			interrupts = <0 3 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc24M>;
++			status = "disabled";
++		};
++
++		uart4: serial at 01c29000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c29000 0x400>;
++			interrupts = <0 4 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc24M>;
++			status = "disabled";
++		};
++
++		gic: interrupt-controller at 01c81000 {
++			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
++			reg = <0x01c81000 0x1000>,
++			      <0x01c82000 0x1000>,
++			      <0x01c84000 0x2000>,
++			      <0x01c86000 0x2000>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			interrupts = <1 9 0xf04>;
++		};
++
 +		r_uart: serial at 01f02800 {
-+			status = "okay";
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01f02800 0x400>;
++			interrupts = <0 38 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&osc24M>;
++			status = "disabled";
 +		};
 +	};
 +};
-+
 -- 
 2.0.0
