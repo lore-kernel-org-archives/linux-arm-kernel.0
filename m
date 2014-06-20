@@ -1,34 +1,87 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Fri, 20 Jun 2014 09:29:47 +0200
-Subject: [PATCH] ARM: nommu: Remove unnecessary prototype for kobjsize()
-Message-ID: <1403249387-27797-1-git-send-email-tklauser@distanz.ch>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Fri, 20 Jun 2014 09:37:44 +0200
+Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
+In-Reply-To: <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
+References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
+ <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <CAG374jDD+yUiBgJFpkmpgAa+Z7+v+ANo6V90YQnhTuftm2np+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prototype for kobjsize() is already defined in linux/mm.h which is
-included where kobjsize() is used.
+Hi Phil,
 
-Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
----
- arch/arm/include/asm/pgtable-nommu.h |    6 ------
- 1 file changed, 6 deletions(-)
+Just a question...
 
-diff --git a/arch/arm/include/asm/pgtable-nommu.h b/arch/arm/include/asm/pgtable-nommu.h
-index 0642228..e184eaf 100644
---- a/arch/arm/include/asm/pgtable-nommu.h
-+++ b/arch/arm/include/asm/pgtable-nommu.h
-@@ -69,12 +69,6 @@ static inline int pte_file(pte_t pte) { return 0; }
- #define pgprot_writecombine(prot) __pgprot(0)
- #define pgprot_dmacoherent(prot) __pgprot(0)
- 
--
--/*
-- * These would be in other places but having them here reduces the diffs.
-- */
--extern unsigned int kobjsize(const void *objp);
--
- /*
-  * No page table caches to initialise.
-  */
--- 
-1.7.9.5
+On 12 May 2014 12:57, Phil Edworthy <phil.edworthy@renesas.com> wrote:
+> This PCIe Host driver currently does not support MSI, so cards
+> fall back to INTx interrupts.
+>
+
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> ---
+>  drivers/pci/host/Kconfig     |   6 +
+>  drivers/pci/host/Makefile    |   1 +
+>  drivers/pci/host/pcie-rcar.c | 768 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 775 insertions(+)
+>  create mode 100644 drivers/pci/host/pcie-rcar.c
+>
+> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+> new file mode 100644
+> index 0000000..3c524b9
+> --- /dev/null
+> +++ b/drivers/pci/host/pcie-rcar.c
+
+> +static void rcar_pcie_enable(struct rcar_pcie *pcie)
+> +{
+> +       struct platform_device *pdev = to_platform_device(pcie->dev);
+> +
+> +       rcar_pci.nr_controllers = 1;
+> +       rcar_pci.private_data = (void **)&pcie;
+> +
+> +       pci_common_init_dev(&pdev->dev, &rcar_pci);
+> +#ifdef CONFIG_PCI_DOMAINS
+> +       rcar_pci.domain++;
+> +#endif
+> +}
+> +
+
+How does it work when you have 2 PCIe DT node ?
+(because for my point of view pci_common_init_dev() can't be called twice)
+
+void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+{
+    struct pci_sys_data *sys;
+    LIST_HEAD(head);
+
+    pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+    if (hw->preinit)
+        hw->preinit();
+    pcibios_init_hw(parent, hw, &head);
+...
+
+static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+                struct list_head *head)
+{
+    struct pci_sys_data *sys = NULL;
+    int ret;
+    int nr, busnr;
+
+    for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
+        sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
+        if (!sys)
+            panic("PCI: unable to allocate sys data!");
+
+#ifdef CONFIG_PCI_DOMAINS
+        sys->domain  = hw->domain;
+#endif
+        sys->busnr   = busnr;
+...
+
+the issue is that sys->busnr always starts to zero ...
+
+how did you fix this problem?
+
+Thanks.
+Best Regards
+
+Gabriel.
