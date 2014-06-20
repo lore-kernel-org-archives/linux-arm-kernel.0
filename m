@@ -1,82 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 21 Jun 2014 00:38:48 +0400
-Subject: [PATCH v4 2/2] ARM: shmobile: lager: enable internal PCI
-In-Reply-To: <201406210034.57784.sergei.shtylyov@cogentembedded.com>
-References: <201406210034.57784.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201406210038.49541.sergei.shtylyov@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Jun 2014 16:39:27 -0400
+Subject: [PATCH] ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7
+ platforms
+In-Reply-To: <1402488397-31381-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1402488397-31381-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140620203927.GJ21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+On Wed, Jun 11, 2014 at 02:06:37PM +0200, Thomas Petazzoni wrote:
+> On Marvell Armada platforms, the PMSU (Power Management Service Unit)
+> controls a number of power management related activities, needed for
+> things like suspend/resume, CPU hotplug, cpuidle or even simply SMP.
+> 
+> Since cpuidle support was added for Armada XP, the pmsu.c file in
+> arch/arm/mach-mvebu/ calls the cpu_suspend() and cpu_resume() ARM
+> functions, which are only available when
+> CONFIG_ARM_CPU_SUSPEND=y. Therefore, configurations that have
+> CONFIG_ARM_CPU_SUSPEND disabled due to PM_SLEEP being disabled no
+> longer build properly, due to undefined references to cpu_suspend()
+> and cpu_resume().
+> 
+> To fix this, this patch simply ensures CONFIG_ARM_CPU_SUSPEND is
+> always enabled for Marvell EBU v7 platforms. Doing things in a more
+> fine-grained way would require a lot of #ifdef-ery in pmsu.c to
+> isolate the parts that use cpu_suspend()/cpu_resume(), and those parts
+> would anyway have been needed as soon as either one of suspend/resume,
+> CPU hotplug or cpuidle was enabled.
+> 
+> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Jason, this patch is against the mvebu/soc branch, and should be
+> pushed to 3.16, where the problem was introduced.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
-them.
+Applied to mvebu/fixes with Ezequiel's Ack.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
-[Sergei: enabled PCI0]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+thx,
 
----
-Changes in version 4:
-- refreshed the patch.
-
-Changes in version 3:
-- refreshed the patch.
-
-Changes in version 2:
-- enabled PCI0 device;
-- reworded summary and changelog;
-- refreshed the patch.
-
- arch/arm/boot/dts/r8a7790-lager.dts |   33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
-+++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -219,6 +219,21 @@
- 		renesas,groups = "i2c3";
- 		renesas,function = "i2c3";
- 	};
-+
-+	usb0_pins: usb0 {
-+		renesas,groups = "usb0";
-+		renesas,function = "usb0";
-+	};
-+
-+	usb1_pins: usb1 {
-+		renesas,groups = "usb1";
-+		renesas,function = "usb1";
-+	};
-+
-+	usb2_pins: usb2 {
-+		renesas,groups = "usb2";
-+		renesas,function = "usb2";
-+	};
- };
- 
- &ether {
-@@ -368,3 +383,21 @@
- 		regulator-always-on;
- 	};
- };
-+
-+&pci0 {
-+	status = "okay";
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci2 {
-+	status = "okay";
-+	pinctrl-0 = <&usb2_pins>;
-+	pinctrl-names = "default";
-+};
+Jason.
