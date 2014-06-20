@@ -1,79 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jun 2014 09:54:00 +0100
-Subject: [PATCH v5 04/20] arm64: boot protocol documentation update for
- GICv3
-In-Reply-To: <53A32E82.20803@arm.com>
-References: <1403169583-13668-1-git-send-email-marc.zyngier@arm.com>
- <1403169583-13668-5-git-send-email-marc.zyngier@arm.com>
- <20140619140149.GA30188@leverpostej> <53A32E82.20803@arm.com>
-Message-ID: <20140620085400.GB30188@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Jun 2014 09:55:43 +0100
+Subject: [PATCHv3 3/4] arm64: Update the Image header
+In-Reply-To: <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
+References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
+ <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140620085543.GH25104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 07:40:02PM +0100, Marc Zyngier wrote:
-> Hi Mark,
-> 
-> On 19/06/14 15:01, Mark Rutland wrote:
-> > Hi Marc,
-> > 
-> > On Thu, Jun 19, 2014 at 10:19:27AM +0100, Marc Zyngier wrote:
-> >> Linux has some requirements that must be satisfied in order to boot
-> >> on a system built with a GICv3.
-> >>
-> >> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  Documentation/arm64/booting.txt | 6 ++++++
-> >>  1 file changed, 6 insertions(+)
-> >>
-> >> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> >> index 37fc4f6..e28ccec 100644
-> >> --- a/Documentation/arm64/booting.txt
-> >> +++ b/Documentation/arm64/booting.txt
-> >> @@ -141,6 +141,12 @@ Before jumping into the kernel, the following conditions must be met:
-> >>    the kernel image will be entered must be initialised by software at a
-> >>    higher exception level to prevent execution in an UNKNOWN state.
-> >>  
-> >> +  For systems with a GICv3 interrupt controller, it is expected that:
-> >> +  - If EL3 is present, it must program ICC_SRE_EL3.Enable (bit 3) to
-> >> +    0b1 and ICC_SRE_EL3.SRE (bit 0) to 0b1.
-> >> +  - If the kernel is entered at EL1, EL2 must set ICC_SRE_EL2.Enable
-> >> +    (bit 3) to 0b1 and ICC_SRE_EL2.SRE (bit 0) to 0b1.
-> > 
-> > Apologies for spotting this so late, but to me this sounds slightly
-> > ambiguous. The use of "it is expected" doesn't read like a hard
-> > requirement, and in the first point, it's ambiguous as to what "it" is.
-> > 
-> > I assume that if the GIC is communicated to the kernel as a GICv2 then
-> > these points do not hold?
-> 
-> The first point always holds, specially if the kernel is entered at EL2
-> (see patch #2 and the way we initialize System Registers in head.S). At
-> this stage, we haven't looked at DT yet, and must setup EL2
-> independently of what the platform will describe. The only source of
-> information we have is whether or not this CPU implements GICv3 System
-> Registers (id_aa64pfr0_el1).
->
-> Assuming EL3 doesn't set these two bits, you will end up trapping back
-> to EL3. You can hope that EL3 will do the right thing (do what is
-> described above and restart the offending instruction at EL2). If it
-> doesn't, you're dead.
-> 
-> > How about:
-> > 
-> >   For systems with a GICv3 interrupt controller, where the presence of
-> >   GICv3 is communicated to the kernel:
-> >   - If EL3 is present:
-> >     ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
-> >     ICC_SRE_EL3.SRE (bit 0) must be initialised to 0b1.
-> >   - If the kernel is entered at EL1:
-> >     ICC.SRE_EL2.Enable (bit 3) must be initialised to 0b1
-> >     ICC_SRE_EL2.SRE (bit 0) must be initialised to 0b1.
-> 
-> I'm happy with that change, provided that we get rid of the ", where the
-> presence of GICv3 is communicated to the kernel".
+On Thu, Jun 19, 2014 at 11:49:22AM +0100, Mark Rutland wrote:
+> Currently the kernel Image is stripped of everything past the initial
+> stack, and at runtime the memory is initialised and used by the kernel.
+> This makes the effective minimum memory footprint of the kernel larger
+> than the size of the loaded binary, though bootloaders have no mechanism
+> to identify how large this minimum memory footprint is. This makes it
+> difficult to choose safe locations to place both the kernel and other
+> binaries required at boot (DTB, initrd, etc), such that the kernel won't
+> clobber said binaries or other reserved memory during initialisation.
 
-Sure, given the above that sounds fine by me.
+[...]
 
-Thanks,
-Mark.
+> +/*
+> + * There aren't any ELF relocations we can use to endian-swap values known only
+> + * at link time (e.g. the subtraction of two symbol addresses), so we must get
+> + * the linker to endian-swap certain values before emitting them.
+> + */
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +#define DATA_LE64(data)					\
+> +	((((data) & 0x00000000000000ff) << 56) |	\
+> +	 (((data) & 0x000000000000ff00) << 40) |	\
+
+Are you sure that these shifts are valid without a UL prefix on the first
+constant operand? I don't think the leading zeroes promote the mask to a
+64-bit type, so you end up shifting greater than the width of the type.
+
+I guess the compiler doesn't allocate (data & 0xff) into a w register?
+
+Will
