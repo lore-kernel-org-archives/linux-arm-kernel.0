@@ -1,59 +1,63 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 20 Jun 2014 13:02:26 +0100
-Subject: [PATCH 2/9] i2c: Add pointer dereference protection to i2c_match_id()
+Date: Fri, 20 Jun 2014 13:02:27 +0100
+Subject: [PATCH 3/9] i2c: Add the ability to match device to compatible string
+ without an of_node
 In-Reply-To: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
 References: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1403265753-25851-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1403265753-25851-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we're providing dereference protection for i2c_match_id(), which
-saves us having to do it each time it's called.  We're also stripping
-out the (now) needless checks in i2c_device_match().  This patch paves
-the way for other, similar code trimming.
+A great deal of I2C devices are currently matched via DT node name, and
+as such the compatible naming convention of '<vendor>,<device>' has gone
+somewhat awry - some nodes don't supply one, some supply an arbitrary
+string and others the correct device name with an arbitrary vendor prefix.
+
+In an effort to correct this problem we have to supply a mechanism to
+match a device by compatible string AND by simple device name.  This
+function strips off the '<vendor>,' part of a supplied compatible string
+and attempts to match without it.
+
+The plan is to remove this function once all of the compatible strings
+for each device have been brought into line.
 
 Acked-by: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/i2c/i2c-core.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/i2c/i2c-core.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 7c7f4b8..d3802dc 100644
+index d3802dc..8a37745 100644
 --- a/drivers/i2c/i2c-core.c
 +++ b/drivers/i2c/i2c-core.c
-@@ -82,6 +82,9 @@ void i2c_transfer_trace_unreg(void)
- static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
- 						const struct i2c_client *client)
- {
-+	if (!(id && client))
-+		return NULL;
-+
- 	while (id->name[0]) {
- 		if (strcmp(client->name, id->name) == 0)
- 			return id;
-@@ -95,8 +98,6 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
- 	struct i2c_client	*client = i2c_verify_client(dev);
- 	struct i2c_driver	*driver;
- 
--	if (!client)
--		return 0;
- 
- 	/* Attempt an OF style match */
- 	if (of_driver_match_device(dev, drv))
-@@ -107,9 +108,10 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
- 		return 1;
- 
- 	driver = to_i2c_driver(drv);
--	/* match on an id table if there is one */
--	if (driver->id_table)
--		return i2c_match_id(driver->id_table, client) != NULL;
-+
-+	/* Finally an I2C match */
-+	if (i2c_match_id(driver->id_table, client))
-+		return 1;
- 
- 	return 0;
+@@ -1090,6 +1090,27 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+ 	return i2c_verify_adapter(dev);
  }
+ EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
++
++static const struct of_device_id*
++i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
++				  struct i2c_client *client)
++{
++	const char *name;
++
++	for (; matches->compatible[0]; matches++) {
++		name = strchr(matches->compatible, ',');
++		if (!name)
++			name = matches->compatible;
++		else
++			name++;
++
++		if (!strnicmp(client->name, name, strlen(client->name)))
++			return matches;
++	}
++
++	return NULL;
++}
++
+ #else
+ static void of_i2c_register_devices(struct i2c_adapter *adap) { }
+ #endif /* CONFIG_OF */
 -- 
 1.8.3.2
