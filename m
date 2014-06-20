@@ -1,25 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jun 2014 21:15:11 +0200
-Subject: [PATCH v2 0/2] Improve mvebu_get_soc_id
-In-Reply-To: <1403274953-21790-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1403274953-21790-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140620191511.GB32533@lunn.ch>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 20 Jun 2014 15:29:18 -0400
+Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
+In-Reply-To: <5207109.Ir8j6FZuiX@wuerfel>
+References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
+ <CAJ5Y-eZ0z-SPSn9oxced2GOAw+OA5rC+uq4pCSXh5H2JujPm1g@mail.gmail.com>
+ <CAJ5Y-ebp1rrRwDWCWSqkSpFg0jr4JktzKpBhWQv9jrwxhqndQQ@mail.gmail.com>
+ <5207109.Ir8j6FZuiX@wuerfel>
+Message-ID: <CAJ5Y-eYd_dyhzOdnxsi96mGN6dqihN_5rw83FsFwauZzUVz9YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 04:35:51PM +0200, Gregory CLEMENT wrote:
-> Hi,
-> 
-> The first use -ENODEV as return value instead of -1 as suggested by
-> Arnd for the second patch.
-> 
-> The second patch allows to get the SoC Id and the revision without using
-> the PCI register on Armada 38x.
+Hi Arnd,
 
-Hi Gregory
+On 20 June 2014 15:08, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 20 June 2014 14:55:16 Ashwin Chaugule wrote:
+>> So, in order to get an mbox->dev for ACPI platforms, we'd need an
+>> entry in the DSDT table. That seems rather pointless, since the DSDT
+>> is reserved for devices and is supposed to be OS agnostic. Since the
+>> mailbox controller itself is not really a "device" with a resource
+>> descriptor, I dont see the point in adding a dummy DSDT entry for the
+>> sake of getting this `struct device`. Also, I'm told adding new
+>> entries to this table requires registering a unique 4 character
+>> identifier and approval from some committees. If there are other ways
+>> to get this structure I'd like to hear about it.
+>>
+>> The other alternative would be to piggy back on the ACPI CPU detection
+>> code, which looks for the ACPI0007 device node in the DSDT and use
+>> that as the mbox controller device. This node is already registered
+>> and is an established method to detect CPUs. But I'm not sure what
+>> happens when CPUs are hotplugged off, we surely dont want mailbox
+>> clients such as PCC to break.
+>
+> The main question here is whether you expect having to support multiple
+> mailbox devices in an ACPI system. If you think there is never more than
+> one, you wouldn't need a DSDT entry, but if you can end up in a situation
+> where another device needs to specify which mailbox it is using, then
+> you need that entry anyway.
 
-I just tested on Kirkwood. No regression.
+At this point, I dont see the need for multiple mailbox devices. But
+I'm not seeing why we'd need a DSDT entry only if there are more than
+one mailbox devices? I'd obviously prefer not having a DSDT entry for
+this, and the patch I posted is the only way I could see to keep DT
+and ACPI mbox supported at runtime without DSDT involved. Please let
+me know if there are better ways.
 
-Once we get the compatible string worked out, i will post a Tested-by:
-
-     Andrew
+Cheers,
+Ashwin
