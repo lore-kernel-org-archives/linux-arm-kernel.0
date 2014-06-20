@@ -1,550 +1,168 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Fri, 20 Jun 2014 09:54:59 +0000
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <20140618123104.GI32699@arm.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <5537408.I9tiuCA96J@wuerfel> <20140616164517.GY16758@arm.com>
- <8028011.DbLMpGku5b@wuerfel> <20140616182645.GD16758@arm.com>
- <836ade98fe6141f58476bf981ac5a6bf@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140618123104.GI32699@arm.com>
-Message-ID: <d3c51c2360874a8b9deefaaa8beaf0d9@BL2PR03MB468.namprd03.prod.outlook.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 20 Jun 2014 11:01:50 +0100
+Subject: [PATCH v4] ARM: add get_user() support for 8 byte types
+In-Reply-To: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
+References: <1402587755-29245-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1403258510-5760-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Recent contributions, including to DRM and binder, introduce 64-bit
+values in their interfaces. Common motivation example of this is to allow
+the same ABI for 32- and 64-bit userspaces (and therefore also a shared
+ABI for 32/64 hybrid userspaces). Anyhow, the developers would like to
+avoid gotchas like having to use copy_from_user().
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, June 18, 2014 6:01 PM
-> To: Sethi Varun-B16395
-> Cc: Arnd Bergmann; Kefeng Wang; Catalin Marinas; Tianhong Ding;
-> huxinwei at huawei.com; Zefan Li; Zhen Lei; Dave P Martin; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH RFC v1 1/2] documentation/iommu: Add description of
-> Hisilicon System MMU binding
-> 
-> On Wed, Jun 18, 2014 at 12:10:11PM +0100, Varun Sethi wrote:
-> > Hi Will,
-> 
-> Hello,
-> 
-> > > Ok. If Thierry's binding gets in for 3.17, then I'll try to convert
-> > > the ARM SMMU driver over to it for 3.18 providing we don't grow any
-> > > in-tree users of the existing binding in the meantime (or 3.17
-> > > depending on how early it gets queued).
-> > >
-> > > Sound fair?
-> > Would you be considering the handling of hot plug masters in the
-> > arm-smmu driver while incorporating the new binding?
-> 
-> Not yet, no. I've not seen any bindings going near hotplug yet, so
-> somebody would have to propose an extension to what we have.
-> 
-> Note that I *have* been playing with PCI on the ARM SMMU (see the patch
-> below) but I currently just assume RequesterID == StreamID, which is true
-> for the platform I'm using.
-> 
-> Will
-> 
-> --->8
-> 
-> commit a492cdaa266afc087e7d27692030455690fbca62
-> Author: Will Deacon <will.deacon@arm.com>
-> Date:   Thu May 1 18:05:08 2014 +0100
-> 
->     iommu/arm-smmu: add support for PCI master devices
-> 
->     This patch extends the ARM SMMU driver so that it can handle PCI
-> master
->     devices in addition to platform devices described in the device tree.
-> 
->     The driver is informed about the PCI host controller in the DT via a
->     phandle to the host controller in the mmu-masters property. The host
->     controller is then added to the master tree for that SMMU, just like
-> a
->     normal master (although it probably doesn't advertise any StreamIDs).
-> 
->     When a device is added to the PCI bus, we set the archdata.iommu
-> pointer
->     for that device to describe its StreamID (actually its RequesterID
-> for
->     the moment). This allows us to re-use our existing data structures
-> using
->     the host controller of_node for everything apart from StreamID
->     configuration, where we reach into the archdata for the information
-> we
->     require.
-> 
->     Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
-> 1599354e974d..0e2a12bd58a2 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -39,6 +39,7 @@
->  #include <linux/mm.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/pci.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> @@ -329,14 +330,7 @@ struct arm_smmu_smr {
->  	u16				id;
->  };
-> 
-> -struct arm_smmu_master {
-> -	struct device_node		*of_node;
-> -
-> -	/*
-> -	 * The following is specific to the master's position in the
-> -	 * SMMU chain.
-> -	 */
-> -	struct rb_node			node;
-> +struct arm_smmu_master_cfg {
->  	int				num_streamids;
->  	u16				streamids[MAX_MASTER_STREAMIDS];
-> 
-> @@ -347,6 +341,17 @@ struct arm_smmu_master {
->  	struct arm_smmu_smr		*smrs;
->  };
-> 
-> +struct arm_smmu_master {
-> +	struct device_node		*of_node;
-> +
-> +	/*
-> +	 * The following is specific to the master's position in the
-> +	 * SMMU chain.
-> +	 */
-> +	struct rb_node			node;
-> +	struct arm_smmu_master_cfg	cfg;
-> +};
-> +
->  struct arm_smmu_device {
->  	struct device			*dev;
->  	struct device_node		*parent_of_node;
-> @@ -437,6 +442,18 @@ static void parse_driver_options(struct
-> arm_smmu_device *smmu)
->  	} while (arm_smmu_options[++i].opt);
->  }
-> 
-> +static struct device *dev_get_master_dev(struct device *dev) {
-> +	if (dev_is_pci(dev)) {
-> +		struct pci_bus *bus = to_pci_dev(dev)->bus;
-> +		while (!pci_is_root_bus(bus))
-> +			bus = bus->parent;
-> +		return bus->bridge->parent;
-> +	}
-> +
-> +	return dev;
-> +}
-> +
->  static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device
-> *smmu,
->  						struct device_node *dev_node)
->  {
-> @@ -457,6 +474,18 @@ static struct arm_smmu_master
-> *find_smmu_master(struct arm_smmu_device *smmu,
->  	return NULL;
->  }
-> 
-> +static struct arm_smmu_master_cfg *
-> +find_smmu_master_cfg(struct arm_smmu_device *smmu, struct device *dev)
-> +{
-> +	struct arm_smmu_master *master;
-> +
-> +	if (dev_is_pci(dev))
-> +		return dev->archdata.iommu;
-> +
-> +	master = find_smmu_master(smmu, dev_get_master_dev(dev)->of_node);
-> +	return master ? &master->cfg : NULL;
-> +}
-> +
->  static int insert_smmu_master(struct arm_smmu_device *smmu,
->  			      struct arm_smmu_master *master)  { @@ -508,11
-> +537,11 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
->  	if (!master)
->  		return -ENOMEM;
-> 
-> -	master->of_node		= masterspec->np;
-> -	master->num_streamids	= masterspec->args_count;
-> +	master->of_node			= masterspec->np;
-> +	master->cfg.num_streamids	= masterspec->args_count;
-> 
-> -	for (i = 0; i < master->num_streamids; ++i)
-> -		master->streamids[i] = masterspec->args[i];
-> +	for (i = 0; i < master->cfg.num_streamids; ++i)
-> +		master->cfg.streamids[i] = masterspec->args[i];
-> 
->  	return insert_smmu_master(smmu, master);  } @@ -537,6 +566,42 @@
-> out_unlock:
->  	return parent;
->  }
-> 
-> +static struct arm_smmu_device *find_parent_smmu_for_device(struct
-> +device *dev) {
-> +	struct arm_smmu_device *child, *parent, *smmu;
-> +	struct arm_smmu_master *master = NULL;
-> +	struct device_node *dev_node = dev_get_master_dev(dev)->of_node;
-> +
-> +	spin_lock(&arm_smmu_devices_lock);
-> +	list_for_each_entry(parent, &arm_smmu_devices, list) {
-> +		smmu = parent;
-> +
-> +		/* Try to find a child of the current SMMU. */
-> +		list_for_each_entry(child, &arm_smmu_devices, list) {
-> +			if (child->parent_of_node == parent->dev->of_node) {
-> +				/* Does the child sit above our master? */
-> +				master = find_smmu_master(child, dev_node);
-> +				if (master) {
-> +					smmu = NULL;
-> +					break;
-> +				}
-> +			}
-> +		}
-> +
-> +		/* We found some children, so keep searching. */
-> +		if (!smmu) {
-> +			master = NULL;
-> +			continue;
-> +		}
-> +
-> +		master = find_smmu_master(smmu, dev_node);
-> +		if (master)
-> +			break;
-> +	}
-> +	spin_unlock(&arm_smmu_devices_lock);
-> +	return master ? smmu : NULL;
-> +}
-> +
->  static int __arm_smmu_alloc_bitmap(unsigned long *map, int start, int
-> end)  {
->  	int idx;
-> @@ -853,7 +918,8 @@ static void arm_smmu_init_context_bank(struct
-> arm_smmu_domain *smmu_domain)  }
-> 
->  static int arm_smmu_init_domain_context(struct iommu_domain *domain,
-> -					struct device *dev)
-> +					struct device *dev,
-> +					struct arm_smmu_device *device_smmu)
->  {
->  	int irq, ret, start;
->  	struct arm_smmu_domain *smmu_domain = domain->priv; @@ -866,15
-> +932,15 @@ static int arm_smmu_init_domain_context(struct iommu_domain
-> *domain,
->  	 * early, and therefore check that the root SMMU does indeed have
->  	 * a StreamID for the master in question.
->  	 */
-> -	parent = dev->archdata.iommu;
-> +	parent = device_smmu;
->  	smmu_domain->output_mask = -1;
->  	do {
->  		smmu = parent;
->  		smmu_domain->output_mask &= (1ULL << smmu->s2_output_size) -
-> 1;
->  	} while ((parent = find_parent_smmu(smmu)));
-> 
-> -	if (!find_smmu_master(smmu, dev->of_node)) {
-> -		dev_err(dev, "unable to find root SMMU for device\n");
-> +	if (!find_smmu_master_cfg(smmu, dev)) {
-> +		dev_err(dev, "unable to find root SMMU config for device\n");
->  		return -ENODEV;
->  	}
-> 
-> @@ -918,7 +984,8 @@ static int arm_smmu_init_domain_context(struct
-> iommu_domain *domain,
-> 
->  	root_cfg->smmu = smmu;
->  	arm_smmu_init_context_bank(smmu_domain);
-> -	return ret;
-> +	smmu_domain->leaf_smmu = device_smmu;
-> +	return 0;
-> 
->  out_free_context:
->  	__arm_smmu_free_bitmap(smmu->context_map, root_cfg->cbndx); @@ -
-> 1054,7 +1121,7 @@ static void arm_smmu_domain_destroy(struct iommu_domain
-> *domain)  }
-> 
->  static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
-> -					  struct arm_smmu_master *master)
-> +					  struct arm_smmu_master_cfg *cfg)
->  {
->  	int i;
->  	struct arm_smmu_smr *smrs;
-> @@ -1063,18 +1130,18 @@ static int arm_smmu_master_configure_smrs(struct
-> arm_smmu_device *smmu,
->  	if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH))
->  		return 0;
-> 
-> -	if (master->smrs)
-> +	if (cfg->smrs)
->  		return -EEXIST;
-> 
-> -	smrs = kmalloc(sizeof(*smrs) * master->num_streamids, GFP_KERNEL);
-> +	smrs = kmalloc(sizeof(*smrs) * cfg->num_streamids, GFP_KERNEL);
->  	if (!smrs) {
-> -		dev_err(smmu->dev, "failed to allocate %d SMRs for master
-> %s\n",
-> -			master->num_streamids, master->of_node->name);
-> +		dev_err(smmu->dev, "failed to allocate %d SMRs\n",
-> +			cfg->num_streamids);
->  		return -ENOMEM;
->  	}
-> 
->  	/* Allocate the SMRs on the root SMMU */
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> +	for (i = 0; i < cfg->num_streamids; ++i) {
->  		int idx = __arm_smmu_alloc_bitmap(smmu->smr_map, 0,
->  						  smmu->num_mapping_groups);
->  		if (IS_ERR_VALUE(idx)) {
-> @@ -1085,18 +1152,18 @@ static int arm_smmu_master_configure_smrs(struct
-> arm_smmu_device *smmu,
->  		smrs[i] = (struct arm_smmu_smr) {
->  			.idx	= idx,
->  			.mask	= 0, /* We don't currently share SMRs */
-> -			.id	= master->streamids[i],
-> +			.id	= cfg->streamids[i],
->  		};
->  	}
-> 
->  	/* It worked! Now, poke the actual hardware */
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> +	for (i = 0; i < cfg->num_streamids; ++i) {
->  		u32 reg = SMR_VALID | smrs[i].id << SMR_ID_SHIFT |
->  			  smrs[i].mask << SMR_MASK_SHIFT;
->  		writel_relaxed(reg, gr0_base +
-> ARM_SMMU_GR0_SMR(smrs[i].idx));
->  	}
-> 
-> -	master->smrs = smrs;
-> +	cfg->smrs = smrs;
->  	return 0;
-> 
->  err_free_smrs:
-> @@ -1107,44 +1174,44 @@ err_free_smrs:
->  }
-> 
->  static void arm_smmu_master_free_smrs(struct arm_smmu_device *smmu,
-> -				      struct arm_smmu_master *master)
-> +				      struct arm_smmu_master_cfg *cfg)
->  {
->  	int i;
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-> -	struct arm_smmu_smr *smrs = master->smrs;
-> +	struct arm_smmu_smr *smrs = cfg->smrs;
-> 
->  	/* Invalidate the SMRs before freeing back to the allocator */
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> +	for (i = 0; i < cfg->num_streamids; ++i) {
->  		u8 idx = smrs[i].idx;
->  		writel_relaxed(~SMR_VALID, gr0_base + ARM_SMMU_GR0_SMR(idx));
->  		__arm_smmu_free_bitmap(smmu->smr_map, idx);
->  	}
-> 
-> -	master->smrs = NULL;
-> +	cfg->smrs = NULL;
->  	kfree(smrs);
->  }
-> 
->  static void arm_smmu_bypass_stream_mapping(struct arm_smmu_device *smmu,
-> -					   struct arm_smmu_master *master)
-> +					   struct arm_smmu_master_cfg *cfg)
->  {
->  	int i;
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-> 
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> -		u16 sid = master->streamids[i];
-> +	for (i = 0; i < cfg->num_streamids; ++i) {
-> +		u16 sid = cfg->streamids[i];
->  		writel_relaxed(S2CR_TYPE_BYPASS,
->  			       gr0_base + ARM_SMMU_GR0_S2CR(sid));
->  	}
->  }
-> 
->  static int arm_smmu_domain_add_master(struct arm_smmu_domain
-> *smmu_domain,
-> -				      struct arm_smmu_master *master)
-> +				      struct arm_smmu_master_cfg *cfg)
->  {
->  	int i, ret;
->  	struct arm_smmu_device *parent, *smmu = smmu_domain->root_cfg.smmu;
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-> 
-> -	ret = arm_smmu_master_configure_smrs(smmu, master);
-> +	ret = arm_smmu_master_configure_smrs(smmu, cfg);
->  	if (ret)
->  		return ret;
-> 
-> @@ -1159,14 +1226,14 @@ static int arm_smmu_domain_add_master(struct
-> arm_smmu_domain *smmu_domain,
->  		if (smmu->features & ARM_SMMU_FEAT_STREAM_MATCH)
->  			continue;
-> 
-> -		arm_smmu_bypass_stream_mapping(smmu, master);
-> +		arm_smmu_bypass_stream_mapping(smmu, cfg);
->  		smmu = parent;
->  	}
-> 
->  	/* Now we're at the root, time to point at our context bank */
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> +	for (i = 0; i < cfg->num_streamids; ++i) {
->  		u32 idx, s2cr;
-> -		idx = master->smrs ? master->smrs[i].idx : master-
-> >streamids[i];
-> +		idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
->  		s2cr = S2CR_TYPE_TRANS |
->  		       (smmu_domain->root_cfg.cbndx << S2CR_CBNDX_SHIFT);
->  		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx)); @@ -
-> 1176,7 +1243,7 @@ static int arm_smmu_domain_add_master(struct
-> arm_smmu_domain *smmu_domain,  }
-> 
->  static void arm_smmu_domain_remove_master(struct arm_smmu_domain
-> *smmu_domain,
-> -					  struct arm_smmu_master *master)
-> +					  struct arm_smmu_master_cfg *cfg)
->  {
->  	struct arm_smmu_device *smmu = smmu_domain->root_cfg.smmu;
-> 
-> @@ -1184,18 +1251,19 @@ static void arm_smmu_domain_remove_master(struct
-> arm_smmu_domain *smmu_domain,
->  	 * We *must* clear the S2CR first, because freeing the SMR means
->  	 * that it can be re-allocated immediately.
->  	 */
-> -	arm_smmu_bypass_stream_mapping(smmu, master);
-> -	arm_smmu_master_free_smrs(smmu, master);
-> +	arm_smmu_bypass_stream_mapping(smmu, cfg);
-> +	arm_smmu_master_free_smrs(smmu, cfg);
->  }
-> 
->  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct
-> device *dev)  {
->  	int ret = -EINVAL;
->  	struct arm_smmu_domain *smmu_domain = domain->priv;
-> -	struct arm_smmu_device *device_smmu = dev->archdata.iommu;
-> -	struct arm_smmu_master *master;
-> +	struct arm_smmu_device *device_smmu;
-> +	struct arm_smmu_master_cfg *cfg;
->  	unsigned long flags;
-> 
-> +	device_smmu = dev_get_master_dev(dev)->archdata.iommu;
->  	if (!device_smmu) {
->  		dev_err(dev, "cannot attach to SMMU, is it on the same
-> bus?\n");
->  		return -ENXIO;
-> @@ -1208,11 +1276,9 @@ static int arm_smmu_attach_dev(struct iommu_domain
-> *domain, struct device *dev)
->  	spin_lock_irqsave(&smmu_domain->lock, flags);
->  	if (!smmu_domain->leaf_smmu) {
->  		/* Now that we have a master, we can finalise the domain */
-> -		ret = arm_smmu_init_domain_context(domain, dev);
-> +		ret = arm_smmu_init_domain_context(domain, dev, device_smmu);
->  		if (IS_ERR_VALUE(ret))
->  			goto err_unlock;
-> -
-> -		smmu_domain->leaf_smmu = device_smmu;
->  	} else if (smmu_domain->leaf_smmu != device_smmu) {
->  		dev_err(dev,
->  			"cannot attach to SMMU %s whilst already attached to
-> domain on SMMU %s\n", @@ -1223,11 +1289,11 @@ static int
-> arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
->  	spin_unlock_irqrestore(&smmu_domain->lock, flags);
-> 
->  	/* Looks ok, so add the device to the domain */
-> -	master = find_smmu_master(smmu_domain->leaf_smmu, dev->of_node);
-> -	if (!master)
-> +	cfg = find_smmu_master_cfg(smmu_domain->leaf_smmu, dev);
-> +	if (!cfg)
->  		return -ENODEV;
-> 
-> -	return arm_smmu_domain_add_master(smmu_domain, master);
-> +	return arm_smmu_domain_add_master(smmu_domain, cfg);
-> 
->  err_unlock:
->  	spin_unlock_irqrestore(&smmu_domain->lock, flags); @@ -1237,11
-> +1303,11 @@ err_unlock:
->  static void arm_smmu_detach_dev(struct iommu_domain *domain, struct
-> device *dev)  {
->  	struct arm_smmu_domain *smmu_domain = domain->priv;
-> -	struct arm_smmu_master *master;
-> +	struct arm_smmu_master_cfg *cfg;
-> 
-> -	master = find_smmu_master(smmu_domain->leaf_smmu, dev->of_node);
-> -	if (master)
-> -		arm_smmu_domain_remove_master(smmu_domain, master);
-> +	cfg = find_smmu_master_cfg(smmu_domain->leaf_smmu, dev);
-> +	if (cfg)
-> +		arm_smmu_domain_remove_master(smmu_domain, cfg);
->  }
-> 
->  static bool arm_smmu_pte_is_contiguous_range(unsigned long addr, @@ -
-> 1549,8 +1615,7 @@ static int arm_smmu_domain_has_cap(struct iommu_domain
-> *domain,
-> 
->  static int arm_smmu_add_device(struct device *dev)  {
-> -	struct arm_smmu_device *child, *parent, *smmu;
-> -	struct arm_smmu_master *master = NULL;
-> +	struct arm_smmu_device *smmu;
->  	struct iommu_group *group;
->  	int ret;
-> 
-> @@ -1559,35 +1624,8 @@ static int arm_smmu_add_device(struct device *dev)
->  		return -EINVAL;
->  	}
-> 
-> -	spin_lock(&arm_smmu_devices_lock);
-> -	list_for_each_entry(parent, &arm_smmu_devices, list) {
-> -		smmu = parent;
-> -
-> -		/* Try to find a child of the current SMMU. */
-> -		list_for_each_entry(child, &arm_smmu_devices, list) {
-> -			if (child->parent_of_node == parent->dev->of_node) {
-> -				/* Does the child sit above our master? */
-> -				master = find_smmu_master(child, dev->of_node);
-> -				if (master) {
-> -					smmu = NULL;
-> -					break;
-> -				}
-> -			}
-> -		}
-> -
-> -		/* We found some children, so keep searching. */
-> -		if (!smmu) {
-> -			master = NULL;
-> -			continue;
-> -		}
-> -
-> -		master = find_smmu_master(smmu, dev->of_node);
-> -		if (master)
-> -			break;
-> -	}
-> -	spin_unlock(&arm_smmu_devices_lock);
-> -
-> -	if (!master)
-> +	smmu = find_parent_smmu_for_device(dev);
-> +	if (!smmu)
->  		return -ENODEV;
-> 
->  	group = iommu_group_alloc();
-> @@ -1596,15 +1634,35 @@ static int arm_smmu_add_device(struct device
-> *dev)
->  		return PTR_ERR(group);
->  	}
-> 
-> +	if (dev_is_pci(dev)) {
-> +		struct arm_smmu_master_cfg *cfg;
-> +		struct pci_dev *pdev = to_pci_dev(dev);
-> +
-> +		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> +		if (!cfg) {
-> +			ret = -ENOMEM;
-> +			goto out_put_group;
-> +		}
-> +
-> +		cfg->num_streamids = 1;
-> +		cfg->streamids[0] = PCI_DEVID(pdev->bus->number, pdev-
-> >devfn);
-[Sethi Varun-B16395] We should be considering the bus topology i.e. what if the device is setting behind a bridge? It's possible the requestor id for the DMA transaction belongs to the bridge. Also, the iommu group creation should also take in to account the topology.
+This feature is already implemented on x86-32 and the majority of other
+32-bit architectures. The current list of get_user_8 hold out
+architectures are: arm, avr32, blackfin, m32r, metag, microblaze,
+mn10300, sh.
 
--Varun
+Credit:
+
+    My name sits rather uneasily at the top of this patch. The v1 and
+    v2 versions of the patch were written by Rob Clark and to produce v4
+    I mostly copied code from Russell King and H. Peter Anvin. However I
+    have mangled the patch sufficiently that *blame* is rightfully mine
+    even if credit should more widely shared.
+
+Changelog:
+
+v4: remove an inlined add on big endian systems (spotted by Russell King),
+    used __ARMEB__ rather than BIG_ENDIAN (to match rest of file),
+    cleared r3 on EFAULT during __get_user_8.
+v3: fix a couple of checkpatch issues
+v2: pass correct size to check_uaccess, and better handling of narrowing
+    double word read with __get_user_xb() (Russell King's suggestion)
+v1: original
+
+Signed-off-by: Rob Clark <robdclark@gmail.com>
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+---
+ arch/arm/include/asm/uaccess.h | 20 +++++++++++++++++++-
+ arch/arm/lib/getuser.S         | 37 ++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 55 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 75d9579..7057cf8 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -107,6 +107,8 @@ static inline void set_fs(mm_segment_t fs)
+ extern int __get_user_1(void *);
+ extern int __get_user_2(void *);
+ extern int __get_user_4(void *);
++extern int __get_user_lo8(void *);
++extern int __get_user_8(void *);
+ 
+ #define __GUP_CLOBBER_1	"lr", "cc"
+ #ifdef CONFIG_CPU_USE_DOMAINS
+@@ -115,6 +117,8 @@ extern int __get_user_4(void *);
+ #define __GUP_CLOBBER_2 "lr", "cc"
+ #endif
+ #define __GUP_CLOBBER_4	"lr", "cc"
++#define __GUP_CLOBBER_lo8 "lr", "cc"
++#define __GUP_CLOBBER_8	"lr", "cc"
+ 
+ #define __get_user_x(__r2,__p,__e,__l,__s)				\
+ 	   __asm__ __volatile__ (					\
+@@ -125,11 +129,19 @@ extern int __get_user_4(void *);
+ 		: "0" (__p), "r" (__l)					\
+ 		: __GUP_CLOBBER_##__s)
+ 
++/* narrowing a double-word get into a single 32bit word register: */
++#ifdef __ARMEB__
++#define __get_user_xb(__r2, __p, __e, __l, __s)				\
++	__get_user_x(__r2, __p, __e, __l, lo8)
++#else
++#define __get_user_xb __get_user_x
++#endif
++
+ #define __get_user_check(x,p)							\
+ 	({								\
+ 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
+ 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
+-		register unsigned long __r2 asm("r2");			\
++		register typeof(x) __r2 asm("r2");			\
+ 		register unsigned long __l asm("r1") = __limit;		\
+ 		register int __e asm("r0");				\
+ 		switch (sizeof(*(__p))) {				\
+@@ -142,6 +154,12 @@ extern int __get_user_4(void *);
+ 		case 4:							\
+ 			__get_user_x(__r2, __p, __e, __l, 4);		\
+ 			break;						\
++		case 8:							\
++			if (sizeof((x)) < 8)				\
++				__get_user_xb(__r2, __p, __e, __l, 4);	\
++			else						\
++				__get_user_x(__r2, __p, __e, __l, 8);	\
++			break;						\
+ 		default: __e = __get_user_bad(); break;			\
+ 		}							\
+ 		x = (typeof(*(p))) __r2;				\
+diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+index 9b06bb4..82b024a 100644
+--- a/arch/arm/lib/getuser.S
++++ b/arch/arm/lib/getuser.S
+@@ -18,7 +18,7 @@
+  * Inputs:	r0 contains the address
+  *		r1 contains the address limit, which must be preserved
+  * Outputs:	r0 is the error code
+- *		r2 contains the zero-extended value
++ *		r2, r3 contains the zero-extended value
+  *		lr corrupted
+  *
+  * No other registers must be altered.  (see <asm/uaccess.h>
+@@ -66,15 +66,50 @@ ENTRY(__get_user_4)
+ 	mov	pc, lr
+ ENDPROC(__get_user_4)
+ 
++ENTRY(__get_user_8)
++	check_uaccess r0, 8, r1, r2, __get_user_bad
++#ifdef CONFIG_THUMB2_KERNEL
++5: TUSER(ldr)	r2, [r0]
++6: TUSER(ldr)	r3, [r0, #4]
++#else
++5: TUSER(ldr)	r2, [r0], #4
++6: TUSER(ldr)	r3, [r0]
++#endif
++	mov	r0, #0
++	mov	pc, lr
++ENDPROC(__get_user_8)
++
++#ifdef __ARMEB__
++ENTRY(__get_user_lo8)
++	check_uaccess r0, 8, r1, r2, __get_user_bad
++#ifdef CONFIG_CPU_USE_DOMAINS
++	add	r0, r0, #4
++7:	ldrt	r2, [r0]
++#else
++7:	ldr	r2, [r0, #4]
++#endif
++	mov	r0, #0
++	mov	pc, lr
++ENDPROC(__get_user_lo8)
++#endif
++
++__get_user_bad8:
++	mov	r3, #0
+ __get_user_bad:
+ 	mov	r2, #0
+ 	mov	r0, #-EFAULT
+ 	mov	pc, lr
+ ENDPROC(__get_user_bad)
++ENDPROC(__get_user_bad8)
+ 
+ .pushsection __ex_table, "a"
+ 	.long	1b, __get_user_bad
+ 	.long	2b, __get_user_bad
+ 	.long	3b, __get_user_bad
+ 	.long	4b, __get_user_bad
++	.long	5b, __get_user_bad8
++	.long	6b, __get_user_bad8
++#ifdef __ARMEB__
++	.long   7b, __get_user_bad
++#endif
+ .popsection
+-- 
+1.9.3
