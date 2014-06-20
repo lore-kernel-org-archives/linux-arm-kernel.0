@@ -1,69 +1,87 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Jun 2014 14:46:17 -0500
-Subject: [PATCH] dt/documentation: add specification of dma bus information
-In-Reply-To: <53A48553.2080504@ti.com>
-References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
- <CAL_JsqJAtWnHKPVpDsdOOzT_X=npc3hroLNTGqULM2SJr=1OEg@mail.gmail.com>
- <53A46CB7.1030109@ti.com> <4193075.zZSpRTFEYz@wuerfel>
- <53A48553.2080504@ti.com>
-Message-ID: <CAL_JsqLYho6dRA=-ovKqF7H4EGHJcH_aN3ywd+76oXSprfTMbQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Jun 2014 16:21:00 -0400
+Subject: [PATCH] ARM: mvebu: rename ARM_ERRATA_753970
+In-Reply-To: <1401094871.25902.20.camel@x220>
+References: <201404052101.19381.arnd@arndb.de>
+ <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
+ <53418889.2050002@free-electrons.com>
+ <1396805315.7723.8.camel@x220> <1401094871.25902.20.camel@x220>
+Message-ID: <20140620202100.GG21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 2:02 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Friday 20 June 2014 02:56 PM, Arnd Bergmann wrote:
->> On Friday 20 June 2014 13:17:43 Santosh Shilimkar wrote:
->>>>> +                       dma-coherent;
->>>>> +                       dma-ranges;
->>>>> +
->>>>> +                       dwc3 at 2690000 {
->>>>> +                               compatible = "synopsys,dwc3";
->>>>> +                               [...]
->>>>> +                       };
->>>>
->>>> This example is a bit strange. I don't understand the relationship
->>>> between keystone-dwc3 and synopsys,dwc3, nor do I want to. I'd prefer
->>>> to see a simple example here.
->>
->>
->>>> dma-ranges is a property of the parent which you show, but
->>>> dma-coherent originally was a property of the bus master itself. While
->>>> we need to support that, are we changing that? We need to be clear on
->>>> where the property belongs even if the kernel is more lax.
->>>>
->>> I don't think we are changing it fundamentally but may be I missing
->>> your point. The dma-coherent as is now a per-device property.
->>> USB is one of the bus master supports coherency and hence showed
->>> up in above example.
->>
->> I think it's enough if you just drop the "synopsys,dwc3" node and the
->> intermediate dma-ranges property from the example, leaving the
->> dma-coherent property in the "ti,keystone-dwc3" node.
->>
-> Thanks Arnd. That should avoid the confusion. Just to see if Rob is
-> fine by it, the example will look like below.
+Paul,
 
-Yes. Looks fine.
+Working through my back-log...
 
-Rob
+On Mon, May 26, 2014 at 11:01:11AM +0200, Paul Bolle wrote:
+> ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
+> commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
+> PL310 errata workarounds"). Two selects were added in v3.15-rc1 that
+> still use the previous name. Rename these.
+> 
+> Make these statements depend on CACHE_PL310, like all other selects of
+> PL310_ERRATA_753970. That way it will only be selected if its dependency
+> is met.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> I reported this before v3.15-rc1. I don't know whether any fixes are
+> pending. None are in linux-next. 
 
->
-> Example:
-> soc {
->                 compatible = "ti,keystone","simple-bus";
->                 ranges = <0x0 0x0 0x0 0xc0000000>;
->                 dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
->
->                 [...]
->
->                 usb: usb at 2680000 {
->                         compatible = "ti,keystone-dwc3";
->
->                         [...]
->                         dma-coherent;
->                 };
-> };
->
-> Regards,
-> Santosh
+It looks like rmk just added a patch to fixing the selection of the
+erratas.  Could you please take a look and either rebase or drop this
+patch?
+
+thx,
+
+Jason.
+
+> And ignoring an errata were one
+> apparently could be needed sounds, well, scary. Perhaps it is not.
+> Anyhow, to make sure this gets fixed, hopefully before v3.15, I'm
+> submitting this (untested!) patch.
+> 
+> A related observation. There are three PL310 errata options: one depends
+> on CACHE_PL310, three depend on CACHE_L2X0. The one depending on
+> CACHE_PL310 is selected only if CACHE_PL310 is set.
+> 
+> But the three depending on CACHE_L2X0 are selected a few times if
+> CACHE_L2X0 is set, in other cases if CACHE_PL310 is set, and in some
+> cases always. There may be good reasons for this, but it looks odd. I
+> know nothing about the PL310 cache and its erratas, so I haven't looked
+> into this any further.
+> 
+>  arch/arm/mach-mvebu/Kconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 3f73eecbcfb0..501d0f42e7b2 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -35,7 +35,7 @@ config MACH_ARMADA_370
+>  config MACH_ARMADA_375
+>  	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
+>  	select ARM_ERRATA_720789
+> -	select ARM_ERRATA_753970
+> +	select PL310_ERRATA_753970 if CACHE_PL310
+>  	select ARM_GIC
+>  	select ARMADA_375_CLK
+>  	select CPU_V7
+> @@ -48,7 +48,7 @@ config MACH_ARMADA_375
+>  config MACH_ARMADA_38X
+>  	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
+>  	select ARM_ERRATA_720789
+> -	select ARM_ERRATA_753970
+> +	select PL310_ERRATA_753970 if CACHE_PL310
+>  	select ARM_GIC
+>  	select ARMADA_38X_CLK
+>  	select CPU_V7
+> -- 
+> 1.9.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
