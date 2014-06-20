@@ -1,64 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jun 2014 21:05:30 +0200
-Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
-In-Reply-To: <53A46B49.3040009@ti.com>
-References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
- <53A453D1.4040308@ti.com> <53A46B49.3040009@ti.com>
-Message-ID: <14956334.eDhb2zObBc@wuerfel>
+Date: Fri, 20 Jun 2014 21:08:55 +0200
+Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
+In-Reply-To: <CAJ5Y-ebp1rrRwDWCWSqkSpFg0jr4JktzKpBhWQv9jrwxhqndQQ@mail.gmail.com>
+References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
+ <CAJ5Y-eZ0z-SPSn9oxced2GOAw+OA5rC+uq4pCSXh5H2JujPm1g@mail.gmail.com>
+ <CAJ5Y-ebp1rrRwDWCWSqkSpFg0jr4JktzKpBhWQv9jrwxhqndQQ@mail.gmail.com>
+Message-ID: <5207109.Ir8j6FZuiX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 June 2014 13:11:37 Santosh Shilimkar wrote:
-> > 
-> > Unfortunately I lost Jingoo's email from my Inbox. So I cut-n-paste the comment from
-> > internet and respond.
-> > 
-> > Jingoo Han wrote:-
-> > =============================================================================
-> > I think so, too.
-> > 
-> > DT maintainers and arch maintainers should review the following
-> > dt bindings.
-> >   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
-> >   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
-> > Generic PHY maintainer (Kishon Vijay Abraham I) should review the
-> > following phy driver.
-> >   drivers/phy/phy-keystone-serdes.c
-> > 
-> >>
-> >> I'm looking for acks from Mohit and/or Jingoo for the pci/host
-> >> changes, and from Arnd for the devicetree/bindings changes.
-> >>
-> >> Adding these "-dw-3_64" files is sort of ugly.  If that code is only
-> >> used by keystone, maybe it could just be moved to pci-keystone.c?  But
-> >> I'll defer to Mohit and Jingoo on that and the way you modify
-> >> pcie-designware.c.
-> > 
-> > I agree with Bjorn Helgaas's opinion. These three "-dw-3_64" files
-> > look terrible! I don't have a good way to handle this; however,
-> > moving this code to pci-keystone.c looks better.
-> > ======================================================================
-> > 
-> > The original RFC I had submitted had all of the application space register
-> > handling code as part of the Keystone PCI driver. As per Arnd's comment (See
-> > my change log against v1), the code was moved to a separate file so that
-> > the next driver that has same version of the DW hw could re-use this code.
-> > I agree with Arnd and moved the code to v_3_65 specific files.  What is
-> > your proposal?  Do you have objection to the file name? or it's content?
-> > 
-> > If objection is on the file name,  please suggest alternate names. If you
-> > are okay with the file name, and doesn't like the code, it will be helpful
-> > to review the code and provide specific comments against the patch itself
-> > so that I can address the same.
-> > 
-> Arnd suggestion was to have the version 3.65 code in generic place since
-> its IP specific and just in case some other vendor using the same version
-> can leverage the code.
+On Friday 20 June 2014 14:55:16 Ashwin Chaugule wrote:
+> So, in order to get an mbox->dev for ACPI platforms, we'd need an
+> entry in the DSDT table. That seems rather pointless, since the DSDT
+> is reserved for devices and is supposed to be OS agnostic. Since the
+> mailbox controller itself is not really a "device" with a resource
+> descriptor, I dont see the point in adding a dummy DSDT entry for the
+> sake of getting this `struct device`. Also, I'm told adding new
+> entries to this table requires registering a unique 4 character
+> identifier and approval from some committees. If there are other ways
+> to get this structure I'd like to hear about it.
 > 
-> Concern here seems toe really those name of the files. I can't think of
-> any other appropriate name. 
+> The other alternative would be to piggy back on the ACPI CPU detection
+> code, which looks for the ACPI0007 device node in the DSDT and use
+> that as the mbox controller device. This node is already registered
+> and is an established method to detect CPUs. But I'm not sure what
+> happens when CPUs are hotplugged off, we surely dont want mailbox
+> clients such as PCC to break.
 
-We should definitely keep the version in the DT "compatible" strings
-wherever we know it. Regarding a better file name, I have no idea.
+The main question here is whether you expect having to support multiple
+mailbox devices in an ACPI system. If you think there is never more than
+one, you wouldn't need a DSDT entry, but if you can end up in a situation
+where another device needs to specify which mailbox it is using, then
+you need that entry anyway.
 
 	Arnd
