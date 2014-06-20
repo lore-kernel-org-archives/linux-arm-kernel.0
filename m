@@ -1,41 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jun 2014 14:23:28 +0200
-Subject: [PATCH] staging/lustre: disable virtual block device for 64K pages
-In-Reply-To: <20140619191051.GA26573@kroah.com>
-References: <20140619183321.GA23200@fluid.dannf>
- <20140619191051.GA26573@kroah.com>
-Message-ID: <4592947.kMtdJTsB2U@wuerfel>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 20 Jun 2014 14:28:48 +0200
+Subject: [PATCH v9.1] of: Provide function to request and map memory
+In-Reply-To: <1403264929-21325-2-git-send-email-matthias.bgg@gmail.com>
+References: <1403264929-21325-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1403267328-23085-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lustre virtual block device cannot handle 64K pages and fails at compile
-time. To avoid running into this error, let's disable the Kconfig option
-for this driver in cases it doesn't support.
+A call to of_iomap does not request the memory region.
+This patch adds the function of_io_request_and_map which requests
+the memory region before mapping it.
 
-Reported-by: Dann Frazier <dann.frazier@canonical.com>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+Suggested-by: Rob Herring <robh@kernel.org>
+Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
-On Thursday 19 June 2014 12:10:51 Greg KH wrote:
-> On Thu, Jun 19, 2014 at 12:33:21PM -0600, dann frazier wrote:
-> > drivers/staging/lustre/lustre/llite/lloop.c:523:18: error: previously used here
-> >   CLASSERT(PAGE_CACHE_SIZE < (1 << (sizeof(unsigned short) * 8)));
-> >                   ^
-> 
-> Looks like lustre can't handle 64K page sizes, so it refuses to build :(
-> 
-> I sugest turning this code off, you really don't want to be running it
-> anyway...
+Changes for v9.1:
+- fixed the Author email address
 
-something like this?
+ drivers/of/address.c       |   29 +++++++++++++++++++++++++++++
+ include/linux/of_address.h |    8 ++++++++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
-index 209e4c7..4f65ba1 100644
---- a/drivers/staging/lustre/lustre/Kconfig
-+++ b/drivers/staging/lustre/lustre/Kconfig
-@@ -57,4 +57,5 @@ config LUSTRE_TRANSLATE_ERRNOS
- config LUSTRE_LLITE_LLOOP
- 	tristate "Lustre virtual block device"
- 	depends on LUSTRE_FS && BLOCK
-+	depends on !PPC_64K_PAGES && !ARM64_64K_PAGES
- 	default m
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index cb4242a..09074ba 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -721,3 +721,32 @@ void __iomem *of_iomap(struct device_node *np, int index)
+ 	return ioremap(res.start, resource_size(&res));
+ }
+ EXPORT_SYMBOL(of_iomap);
++
++/*
++ * of_io_request_and_map - Requests a resource and maps the memory mapped IO
++ *			   for a given device_node
++ * @device:	the device whose io range will be mapped
++ * @index:	index of the io range
++ * @name:	name of the resource
++ *
++ * Returns a pointer to the requested and mapped memory
++ */
++void __iomem *of_io_request_and_map(struct device_node *np, int index,
++					char *name)
++{
++	struct resource res;
++	void __iomem *mem;
++
++	if (of_address_to_resource(np, index, &res))
++		return NULL;
++
++	if (!request_mem_region(res.start, resource_size(&res), name))
++		return NULL;
++
++	mem = ioremap(res.start, resource_size(&res));
++	if (!mem)
++		release_mem_region(res.start, resource_size(&res));
++
++	return mem;
++}
++EXPORT_SYMBOL(of_io_request_and_map);
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 5f6ed6b..725b875 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -96,6 +96,8 @@ static inline struct of_pci_range *of_pci_range_parser_one(
+ extern int of_address_to_resource(struct device_node *dev, int index,
+ 				  struct resource *r);
+ void __iomem *of_iomap(struct device_node *node, int index);
++void __iomem *of_io_request_and_map(struct device_node *device,
++					int index, char *name);
+ #else
+ static inline int of_address_to_resource(struct device_node *dev, int index,
+ 					 struct resource *r)
+@@ -107,6 +109,12 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
+ {
+ 	return NULL;
+ }
++
++static inline void __iomem *of_io_request_and_map(struct device_node *device,
++					int index, char *name)
++{
++	return NULL;
++}
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_PCI)
+-- 
+1.7.9.5
