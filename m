@@ -1,95 +1,99 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:00 +0200
-Subject: [PATCH 0/9] ARM: shmobile: Move SoC-specific header files
-Message-ID: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
+Date: Fri, 20 Jun 2014 18:53:08 +0200
+Subject: [PATCH 8/9] ARM: shmobile: Move sh7372.h
+In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
+References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1403283189-21688-9-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's Friday afternoon, hence the ideal time for a no-brainer patch
-series to move the shmobile SoC-specific header files, so they can be
-included as "<soc>.h" instead of the old style <mach/<soc>.h>.
+Change location of sh7372.h so it can be included as "sh7372.h"
+instead of the old style <mach/sh7372.h>
 
-All build-tested. Multi-platform shmobile also boot-tested on
-r8a7791/koelsch.
-
-  [1/9] ARM: shmobile: Move r7s72100.h
-  [2/9] ARM: shmobile: Move r8a73a4.h
-  [3/9] ARM: shmobile: Move r8a7740.h
-  [4/9] ARM: shmobile: Move r8a7778.h
-  [5/9] ARM: shmobile: Move r8a7779.h
-  [6/9] ARM: shmobile: Move r8a7790.h
-  [7/9] ARM: shmobile: Move r8a7791.h
-  [8/9] ARM: shmobile: Move sh7372.h
-  [9/9] ARM: shmobile: Move sh73a0.h
-
- arch/arm/mach-shmobile/board-ape6evm-reference.c         |  4 +++-
- arch/arm/mach-shmobile/board-ape6evm.c                   |  4 +++-
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c |  4 +++-
- arch/arm/mach-shmobile/board-armadillo800eva.c           |  4 +++-
- arch/arm/mach-shmobile/board-bockw-reference.c           |  4 +++-
- arch/arm/mach-shmobile/board-bockw.c                     |  4 +++-
- arch/arm/mach-shmobile/board-genmai-reference.c          |  4 +++-
- arch/arm/mach-shmobile/board-genmai.c                    |  4 +++-
- arch/arm/mach-shmobile/board-koelsch-reference.c         |  4 +++-
- arch/arm/mach-shmobile/board-koelsch.c                   |  4 +++-
- arch/arm/mach-shmobile/board-kzm9g-reference.c           |  4 +++-
- arch/arm/mach-shmobile/board-kzm9g.c                     |  4 +++-
- arch/arm/mach-shmobile/board-lager-reference.c           |  4 +++-
- arch/arm/mach-shmobile/board-lager.c                     | 14 ++++++++------
- arch/arm/mach-shmobile/board-mackerel.c                  |  4 +++-
- arch/arm/mach-shmobile/board-marzen-reference.c          |  4 +++-
- arch/arm/mach-shmobile/board-marzen.c                    |  4 +++-
- arch/arm/mach-shmobile/clock-r7s72100.c                  |  3 ++-
- arch/arm/mach-shmobile/clock-r8a7740.c                   |  3 ++-
- arch/arm/mach-shmobile/clock-r8a7779.c                   |  3 ++-
- arch/arm/mach-shmobile/clock-r8a7790.c                   |  3 ++-
- arch/arm/mach-shmobile/intc-sh73a0.c                     |  4 +++-
- arch/arm/mach-shmobile/pm-r8a7779.c                      |  4 +++-
- arch/arm/mach-shmobile/pm-r8a7790.c                      |  4 +++-
- arch/arm/mach-shmobile/pm-r8a7791.c                      |  6 ++++--
- arch/arm/mach-shmobile/pm-sh7372.c                       |  4 +++-
- arch/arm/mach-shmobile/{include/mach => }/r7s72100.h     |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7740.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7778.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7779.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7790.h      |  0
- arch/arm/mach-shmobile/{include/mach => }/r8a7791.h      |  0
- arch/arm/mach-shmobile/setup-r7s72100.c                  |  4 +++-
- arch/arm/mach-shmobile/setup-r8a73a4.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7740.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7778.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7779.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7790.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-r8a7791.c                   |  4 +++-
- arch/arm/mach-shmobile/setup-sh7372.c                    |  4 +++-
- arch/arm/mach-shmobile/setup-sh73a0.c                    |  4 +++-
- arch/arm/mach-shmobile/{include/mach => }/sh7372.h       |  0
- arch/arm/mach-shmobile/{include/mach => }/sh73a0.h       |  0
- arch/arm/mach-shmobile/smp-r8a7779.c                     |  4 +++-
- arch/arm/mach-shmobile/smp-r8a7790.c                     |  4 +++-
- arch/arm/mach-shmobile/smp-r8a7791.c                     |  4 +++-
- arch/arm/mach-shmobile/smp-sh73a0.c                      |  4 +++-
- 48 files changed, 119 insertions(+), 45 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r7s72100.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7740.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7778.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7779.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7790.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7791.h (100%)
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/mach-shmobile/board-mackerel.c            | 4 +++-
+ arch/arm/mach-shmobile/pm-sh7372.c                 | 4 +++-
+ arch/arm/mach-shmobile/setup-sh7372.c              | 4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/sh7372.h | 0
+ 4 files changed, 9 insertions(+), 3 deletions(-)
  rename arch/arm/mach-shmobile/{include/mach => }/sh7372.h (100%)
- rename arch/arm/mach-shmobile/{include/mach => }/sh73a0.h (100%)
 
-Have a nice weekend!
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 0ece865cbc4d..304b76f3bf4a 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -51,6 +51,7 @@
+ #include <linux/tca6416_keypad.h>
+ #include <linux/usb/renesas_usbhs.h>
+ #include <linux/dma-mapping.h>
++
+ #include <video/sh_mobile_hdmi.h>
+ #include <video/sh_mobile_lcdc.h>
+ #include <media/sh_mobile_ceu.h>
+@@ -58,13 +59,14 @@
+ #include <media/soc_camera_platform.h>
+ #include <sound/sh_fsi.h>
+ #include <sound/simple_card.h>
+-#include <mach/sh7372.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
++
+ #include "common.h"
+ #include "irqs.h"
+ #include "pm-rmobile.h"
+ #include "sh-gpio.h"
++#include "sh7372.h"
+ 
+ /*
+  * Address	Interface		BusWidth	note
+diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+index 7ef9a0126780..7e5c2676c489 100644
+--- a/arch/arm/mach-shmobile/pm-sh7372.c
++++ b/arch/arm/mach-shmobile/pm-sh7372.c
+@@ -21,13 +21,15 @@
+ #include <linux/irq.h>
+ #include <linux/bitrev.h>
+ #include <linux/console.h>
++
+ #include <asm/cpuidle.h>
+ #include <asm/io.h>
+ #include <asm/tlbflush.h>
+ #include <asm/suspend.h>
+-#include <mach/sh7372.h>
++
+ #include "common.h"
+ #include "pm-rmobile.h"
++#include "sh7372.h"
+ 
+ /* DBG */
+ #define DBGREG1 IOMEM(0xe6100020)
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index 5571f867c611..9cdfcdfd38fc 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -33,15 +33,17 @@
+ #include <linux/pm_domain.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/platform_data/sh_ipmmu.h>
+-#include <mach/sh7372.h>
++
+ #include <asm/mach/map.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
++
+ #include "common.h"
+ #include "dma-register.h"
+ #include "irqs.h"
+ #include "pm-rmobile.h"
++#include "sh7372.h"
+ 
+ static struct map_desc sh7372_io_desc[] __initdata = {
+ 	/* create a 1:1 entity map for 0xe6xxxxxx
+diff --git a/arch/arm/mach-shmobile/include/mach/sh7372.h b/arch/arm/mach-shmobile/sh7372.h
+similarity index 100%
+rename from arch/arm/mach-shmobile/include/mach/sh7372.h
+rename to arch/arm/mach-shmobile/sh7372.h
+-- 
+1.9.1
