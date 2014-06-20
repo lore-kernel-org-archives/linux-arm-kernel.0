@@ -1,33 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 20 Jun 2014 00:02:24 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable CONFIG_IMX_IPUV3_CORE
-Message-ID: <1403233344-28333-1-git-send-email-festevam@gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 19 Jun 2014 20:13:38 -0700
+Subject: [PATCHv2] of: Check for phys_addr_t overflows in
+ early_init_dt_add_memory_arch
+Message-ID: <1403234018-10942-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+The common early_init_dt_add_memory_arch takes the base and size
+of a memory region as u64 types. The function never checks if
+the base and size can actually fit in a phys_addr_t which may
+be smaller than 64-bits. This may result in incorrect memory
+being passed to memblock_add if the memory falls outside the
+range of phys_addr_t. Add range checks for the base and size if
+phys_addr_t is smaller than u64.
 
-Since commit 39b9004d1f (gpu: ipu-v3: Move i.MX IPUv3 core driver out of 
-staging) the ipuv3 core driver is no longer built bey default.
-
-Select CONFIG_IMX_IPUV3_CORE so that the core ipuv3 code can be built again.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+v2: Switched to sizeof(phys_addr_t) < sizeof(u64) instead of macros.
+Sending to right e-mails/mailing lists this time.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index a6f182e..64b078d 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -187,6 +187,7 @@ CONFIG_VIDEO_MX3=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_CODA=y
- CONFIG_SOC_CAMERA_OV2640=y
-+CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ drivers/of/fdt.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index c4cddf0..b777d8f 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -880,6 +880,21 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+ 	const u64 phys_offset = __pa(PAGE_OFFSET);
+ 	base &= PAGE_MASK;
+ 	size &= PAGE_MASK;
++
++	if (sizeof(phys_addr_t) < sizeof(u64)) {
++		if (base > ULONG_MAX) {
++			pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
++					base, base + size);
++			return;
++		}
++
++		if (base + size > ULONG_MAX) {
++			pr_warning("Ignoring memory range 0x%lx - 0x%llx\n",
++					ULONG_MAX, base + size);
++			size = ULONG_MAX - base;
++		}
++	}
++
+ 	if (base + size < phys_offset) {
+ 		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
+ 			   base, base + size);
 -- 
-1.8.3.2
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
