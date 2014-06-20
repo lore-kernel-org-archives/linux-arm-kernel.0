@@ -1,63 +1,83 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 20 Jun 2014 13:02:27 +0100
-Subject: [PATCH 3/9] i2c: Add the ability to match device to compatible string
- without an of_node
+Date: Fri, 20 Jun 2014 13:02:28 +0100
+Subject: [PATCH 4/9] i2c: Match using traditional OF methods,
+ then by vendor-less compatible strings
 In-Reply-To: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
 References: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1403265753-25851-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1403265753-25851-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A great deal of I2C devices are currently matched via DT node name, and
-as such the compatible naming convention of '<vendor>,<device>' has gone
-somewhat awry - some nodes don't supply one, some supply an arbitrary
-string and others the correct device name with an arbitrary vendor prefix.
-
-In an effort to correct this problem we have to supply a mechanism to
-match a device by compatible string AND by simple device name.  This
-function strips off the '<vendor>,' part of a supplied compatible string
-and attempts to match without it.
-
-The plan is to remove this function once all of the compatible strings
-for each device have been brought into line.
+This function provides a single call for all I2C devices which need to
+match firstly using traditional OF means i.e by of_node, then if that
+fails we attempt to match using the supplied I2C client name with a
+list of supplied compatible strings with the '<vendor>,' string
+removed.  The latter is required due to the unruly naming conventions
+used currently by I2C devices.
 
 Acked-by: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/i2c/i2c-core.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ drivers/i2c/i2c-core.c | 16 ++++++++++++++++
+ include/linux/i2c.h    | 12 ++++++++++++
+ 2 files changed, 28 insertions(+)
 
 diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index d3802dc..8a37745 100644
+index 8a37745..a9c97c4 100644
 --- a/drivers/i2c/i2c-core.c
 +++ b/drivers/i2c/i2c-core.c
-@@ -1090,6 +1090,27 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
- 	return i2c_verify_adapter(dev);
+@@ -1111,6 +1111,22 @@ i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
+ 	return NULL;
  }
- EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
-+
-+static const struct of_device_id*
-+i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
-+				  struct i2c_client *client)
+ 
++const struct of_device_id
++*i2c_of_match_device(const struct of_device_id *matches,
++		     struct i2c_client *client)
 +{
-+	const char *name;
++	const struct of_device_id *match;
 +
-+	for (; matches->compatible[0]; matches++) {
-+		name = strchr(matches->compatible, ',');
-+		if (!name)
-+			name = matches->compatible;
-+		else
-+			name++;
++	if (!(client && matches))
++		return NULL;
 +
-+		if (!strnicmp(client->name, name, strlen(client->name)))
-+			return matches;
-+	}
++	match = of_match_device(matches, &client->dev);
++	if (match)
++		return match;
 +
-+	return NULL;
++	return i2c_of_match_device_strip_vendor(matches, client);
 +}
-+
++EXPORT_SYMBOL_GPL(i2c_of_match_device);
  #else
  static void of_i2c_register_devices(struct i2c_adapter *adap) { }
  #endif /* CONFIG_OF */
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index b556e0a..3d0350c 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -564,6 +564,10 @@ extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
+ /* must call put_device() when done with returned i2c_adapter device */
+ extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
+ 
++extern const struct of_device_id
++*i2c_of_match_device(const struct of_device_id *matches,
++		     struct i2c_client *client);
++
+ #else
+ 
+ static inline struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
+@@ -575,6 +579,14 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
+ {
+ 	return NULL;
+ }
++
++const struct of_device_id
++*i2c_of_match_device(const struct of_device_id *matches,
++		     struct i2c_client *client)
++{
++	return NULL;
++}
++
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_I2C_H */
 -- 
 1.8.3.2
