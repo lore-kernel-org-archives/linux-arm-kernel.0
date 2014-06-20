@@ -1,33 +1,124 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Fri, 20 Jun 2014 01:33:59 -0700
-Subject: [PATCH] arm64: add the ability to hook the fault code
-In-Reply-To: <20140620082556.GD25104@arm.com>
-References: <1403175296-25181-1-git-send-email-zhangwm@marvell.com>
- <20140620082556.GD25104@arm.com>
-Message-ID: <9034CBD80F070943B59700D7F8149ED90182148D02@SC-VEXCH4.marvell.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 20 Jun 2014 09:34:38 +0100
+Subject: [PATCH 04/14] arm/arm64: KVM: wrap 64 bit MMIO accesses with
+ two 32 bit ones
+In-Reply-To: <a090b95a6bf343e9b0ae036f387dc4aa@BY2PR07MB203.namprd07.prod.outlook.com>
+References: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
+ <1403171152-24067-5-git-send-email-andre.przywara@arm.com>
+ <a090b95a6bf343e9b0ae036f387dc4aa@BY2PR07MB203.namprd07.prod.outlook.com>
+Message-ID: <53A3F21E.5070306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+On 19/06/14 22:15, Chalamarla, Tirumalesh wrote:
+>
+>
 > -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: 2014?6?20? 16:26
-> To: Neil Zhang
-> Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH] arm64: add the ability to hook the fault code
-> 
-> On Thu, Jun 19, 2014 at 11:54:56AM +0100, Neil Zhang wrote:
-> > Add the ability to hook the fault code for future use.
-> 
-> Do you have a user for this in the kernel tree? I'd rather add the hook with
-> the first user, if it doesn't exist already.
-> 
+> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Andre Przywara
+> Sent: Thursday, June 19, 2014 2:46 AM
+> To: linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org
+> Cc: christoffer.dall at linaro.org
+> Subject: [PATCH 04/14] arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
+>
+> Some GICv3 registers can and will be accessed as 64 bit registers.
+> Currently the register handling code can only deal with 32 bit accesses, so we do two consecutive calls to cover this.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic.c |   48 +++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 45 insertions(+), 3 deletions(-)
+>
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c index 4c6b212..b3cf4c7 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -906,6 +906,48 @@ static bool vgic_validate_access(const struct vgic_dist *dist,  }
+>
+>  /*
+> + * Call the respective handler function for the given range.
+> + * We split up any 64 bit accesses into two consecutive 32 bit
+> + * handler calls and merge the result afterwards.
+> + */
+> +static bool call_range_handler(struct kvm_vcpu *vcpu,
+> +                            struct kvm_exit_mmio *mmio,
+> +                            unsigned long offset,
+> +                            const struct mmio_range *range) {
+> +     u32 *data32 = (void *)mmio->data;
+> +     struct kvm_exit_mmio mmio32;
+> +     bool ret;
+> +
+> +     if (likely(mmio->len <= 4))
+> +             return range->handle_mmio(vcpu, mmio, offset);
+> +
+> +     /*
+> +      * We assume that any access greater than 4 bytes is actually
+> +      * 8 bytes long, caused by a 64-bit access
+> +      */
+> +
+> +     mmio32.len = 4;
+> +     mmio32.is_write = mmio->is_write;
+> +
+> +     mmio32.phys_addr = mmio->phys_addr + 4;
+> +     if (mmio->is_write)
+> +             *(u32 *)mmio32.data = data32[1];
+> +     ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
+> +     if (!mmio->is_write)
+> +             data32[1] = *(u32 *)mmio32.data;
+> +
+> +     mmio32.phys_addr = mmio->phys_addr;
+> +     if (mmio->is_write)
+> +             *(u32 *)mmio32.data = data32[0];
+> +     ret |= range->handle_mmio(vcpu, &mmio32, offset);
+> +     if (!mmio->is_write)
+> +             data32[0] = *(u32 *)mmio32.data;
+> +
+> +     return ret;
+> +}
+>
+> Any reason to use two 32 bits instead of one 64 bit. AArch32 on ARMv8 may be.
 
-Marvell Soc has a feature to use the external abort.
-I didn't submit it since it's a private feature.
+For the registers we care about right now we get along with this split.
+And it seems to be less intrusive.
+I have a patch to support native 64-bit accesses, but it needs some more
+work. If there is high demand for it, I can post it (but Marc didn't
+like the first version so much ;-) )
 
-> Will
+Regards,
+Andre.
 
-Best Regards,
-Neil Zhang
+>
+> +
+> +/*
+>   * vgic_handle_mmio_range - handle an in-kernel MMIO access
+>   * @vcpu:    pointer to the vcpu performing the access
+>   * @run:     pointer to the kvm_run structure
+> @@ -936,10 +978,10 @@ static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>       spin_lock(&vcpu->kvm->arch.vgic.lock);
+>       offset -= range->base;
+>       if (vgic_validate_access(dist, range, offset)) {
+> -             updated_state = range->handle_mmio(vcpu, mmio, offset);
+> +             updated_state = call_range_handler(vcpu, mmio, offset, range);
+>       } else {
+> -             vgic_reg_access(mmio, NULL, offset,
+> -                             ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
+> +             if (!mmio->is_write)
+> +                     memset(mmio->data, 0, mmio->len);
+>
+>              What is the use of this memset.
+>
+>               updated_state = false;
+>       }
+>       spin_unlock(&vcpu->kvm->arch.vgic.lock);
+> --
+> 1.7.9.5
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
