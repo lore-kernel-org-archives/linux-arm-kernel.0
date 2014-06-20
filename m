@@ -1,58 +1,171 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 20 Jun 2014 12:39:57 +0000
-Subject: [PATCH RFC 04/30] net: fec: fix interrupt handling races
-In-Reply-To: <E1Wxxfn-0005X5-KD@rmk-PC.arm.linux.org.uk>
-References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
- <E1Wxxfn-0005X5-KD@rmk-PC.arm.linux.org.uk>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1725F962@AcuExch.aculab.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Jun 2014 13:59:59 +0100
+Subject: [PATCH v3 1/9] arm64: KVM: rename pm_fake handler to trap_raz_wi
+In-Reply-To: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
+References: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403269207-1625-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King
-> While running: while :; do iperf -c <HOST> -P 4; done, transmit timeouts
-> are regularly reported.  With the tx ring dumping in place, we can see
-> that all entries are in use, and the hardware has finished transmitting
-> these packets.  However, the driver has not reclaimed these ring
-> entries.
-> 
-> This can occur if the interrupt handler is invoked at the wrong moment -
-> eg:
-> 
-> 	CPU0				CPU1
-> 	fec_enet_tx()
-> 					interrupt, IEVENT = FEC_ENET_TXF
-> 					FEC_ENET_TXF cleared
-> 					napi_schedule_prep()
-> 	napi_complete()
-> 
-> The result is that we clear the transmit interrupt, but we don't trigger
-> any cleaning of the transmit ring.  Instead, use a different strategy:
-> 
-> - When receiving a transmit or receive interrupt, disable both tx and rx
->   interrupts, but do not acknowledge them.  Schedule a napi poll.  Don't
->   loop.
-> 
-> - When we are polled, read IEVENT, acknowledging the pending transmit
->   and receive interrupts, before then going on to process the
->   appropriate rings.
-> 
-> This allows us to avoid the race, and has a number of other advantages:
-> - we cut down on the number of transmit interrupts we have to process.
-> - we only look at the rings which have pending events.
-> - we gain additional throughput: the iperf total bandwidth increases
->   from about 180Mbps to 240Mbps:
-...
+pm_fake doesn't quite describe what the handler does (ignoring writes
+and returning 0 for reads).
 
-It is usually possible to reduce the interrupt count even further by:
-1) processing the rings.
-2) clear the IRQ.
-3) check the rings for new entries, if any start again.
-This means that you don't take the interrupt for anything that completes
-while processing the earlier ring entries.
+As we're about to use it (a lot) in a different context, rename it
+with a (admitedly cryptic) name that make sense for all users.
 
-The slight downside is that it is easy to exit the ISR before the IRQ
-line actually drops - resulting in a spurious interrupt.
+Reviewed-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c | 83 ++++++++++++++++++++++++-----------------------
+ 1 file changed, 43 insertions(+), 40 deletions(-)
 
-(patch 24 seems to be similar).
-
-	David
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index c59a1bd..4abd84e 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -163,18 +163,9 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
+ 
+-/*
+- * We could trap ID_DFR0 and tell the guest we don't support performance
+- * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
+- * NAKed, so it will read the PMCR anyway.
+- *
+- * Therefore we tell the guest we have 0 counters.  Unfortunately, we
+- * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
+- * all PM registers, which doesn't crash the guest kernel at least.
+- */
+-static bool pm_fake(struct kvm_vcpu *vcpu,
+-		    const struct sys_reg_params *p,
+-		    const struct sys_reg_desc *r)
++static bool trap_raz_wi(struct kvm_vcpu *vcpu,
++			const struct sys_reg_params *p,
++			const struct sys_reg_desc *r)
+ {
+ 	if (p->is_write)
+ 		return ignore_write(vcpu, p);
+@@ -201,6 +192,17 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ /*
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
++ *
++ * We could trap ID_DFR0 and tell the guest we don't support performance
++ * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
++ * NAKed, so it will read the PMCR anyway.
++ *
++ * Therefore we tell the guest we have 0 counters.  Unfortunately, we
++ * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
++ * all PM registers, which doesn't crash the guest kernel at least.
++ *
++ * Same goes for the whole debug infrastructure, which probably breaks
++ * some guest functionnality. This should be fixed.
+  */
+ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	/* DC ISW */
+@@ -260,10 +262,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	/* PMINTENSET_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMINTENCLR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
+-	  pm_fake },
++	  trap_raz_wi },
+ 
+ 	/* MAIR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
+@@ -292,43 +294,43 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	/* PMCR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMCNTENSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMCNTENCLR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMOVSCLR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMSWINC_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMSELR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMCEID0_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMCEID1_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMCCNTR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMXEVTYPER_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMXEVCNTR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMUSERENR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
+-	  pm_fake },
++	  trap_raz_wi },
+ 	/* PMOVSSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
+-	  pm_fake },
++	  trap_raz_wi },
+ 
+ 	/* TPIDR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
+@@ -374,19 +376,20 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
+ 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
+ 
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), pm_fake },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), pm_fake },
++	/* PMU */
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
+ 
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+-- 
+1.8.3.4
