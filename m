@@ -1,53 +1,83 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Jun 2014 12:45:46 -0500
-Subject: [PATCH v2 04/18] PCI: designware: use untranslated address while
- programming ATU
-In-Reply-To: <1401345500-20188-5-git-send-email-kishon@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-5-git-send-email-kishon@ti.com>
-Message-ID: <CAL_JsqJxppWOOWoX1MYF26OWXW7BdMZP1BQpq8cSgJ3n1QF5PA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 20 Jun 2014 10:47:09 -0700
+Subject: [PATCH v2] clocksource: exynos-mct: Register the timer for stable
+ udelay
+In-Reply-To: <CADGdYn6ZCvnfod3smE_mdJhK-BdkHMtno2GCH8jzX=BRWDCRPQ@mail.gmail.com>
+References: <1403167145-5267-1-git-send-email-amit.daniel@samsung.com>
+ <53A2B9C3.1050906@gmail.com>
+ <CAD=FV=VmC-p4_R1GV3U3bg1JojTzNYKyFTa8o8QMJ=3m=WuRYA@mail.gmail.com>
+ <53A30D08.6070107@gmail.com>
+ <CAD=FV=UjFJ9utR9i=Xu4DRQ7gdULCtXQXgsQ8gUYm6-V5U4GaQ@mail.gmail.com>
+ <53A31291.9000007@gmail.com> <20140620081509.GA25104@arm.com>
+ <CADGdYn6ZCvnfod3smE_mdJhK-BdkHMtno2GCH8jzX=BRWDCRPQ@mail.gmail.com>
+Message-ID: <CAD=FV=UJFnDj_fuehfTUjMEzS52dWxVUjHSFxPS9oj63pNKT4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 29, 2014 at 1:38 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
-> address. So whenever the cpu issues a read/write request, the 4 most
-> significant bits are used by L3 to determine the target controller.
-> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
-> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
-> the outbound translation window the *base* should be programmed as 0x000_0000.
-> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
-> we have programmed in the translation window with base as 0x000_0000.
->
-> This is needed when the dt node is modelled something like below
-> axi {
->         compatible = "simple-bus";
->         #size-cells = <1>;
->         #address-cells = <1>;
->         ranges = <0x0        0x20000000 0x10000000 // 28-bit bus
->                   0x51000000 0x51000000 0x3000>;
->         pcie at 51000000 {
->                 reg = <0x1000 0x2000>, <0x51002000 0x14c>, <0x51000000 0x2000>;
->                 reg-names = "config", "ti_conf", "rc_dbics";
->                 #address-cells = <3>;
->                 #size-cells = <2>;
->                 ranges = <0x81000000 0 0          0x03000 0 0x00010000
->                           0x82000000 0 0x20013000 0x13000 0 0xffed000>;
->         };
-> };
->
-> Here the CPU address for configuration space is 0x20013000 and the controller
-> address for configuration space is 0x13000. The controller address should be
-> used while programming the ATU (in order for translation to happen properly in
-> DRA7xx).
+Hi,
 
-This talks about config space, but the ranges field is PCI memory
-space. Also, does this actually work because I though Linux expects
-memory BARs to be 1MB aligned.
+On Fri, Jun 20, 2014 at 4:19 AM, amit daniel kachhap
+<amit.daniel@samsung.com> wrote:
+> On Fri, Jun 20, 2014 at 1:45 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Thu, Jun 19, 2014 at 05:40:49PM +0100, Tomasz Figa wrote:
+>>> On 19.06.2014 18:31, Doug Anderson wrote:
+>>> >>> My personal vote would be to submit a patch to change "cycles_t" to
+>>> >>> always be 32-bits.  Given that 32-bits was fine for udelay() for ARM
+>>> >>> that seems sane and simple.  If someone later comes up with a super
+>>> >>> compelling reason why we need 64-bit timers for udelay (really??) then
+>>> >>> they can later add all the complexity needed.
+>>> >>
+>>> >> Yes, this could work. I'm not sure what else cycles_t is used for, though.
+>>> >
+>>> > True, it is a bit questionable to change this since it's a type that's
+>>> > not obviously just for udelay().  Perhaps a better option would be to
+>>> > make a new typedef for the result of read_current_timer().  ...or just
+>>> > change it to return a u32?
+>>> >
+>>>
+>>> Sounds good to me, but let's hear other opinions. I'm adding Will and
+>>> Jonathan as they wrote the ARM delay timer code.
+>>
+>> I think cycles_t is only used for small interval calculations at the moment,
+>> but I remember Ted mentioning something about using it (or something
+>> similar) as a source of early entropy, in which case the more bits the
+>> better.
+>>
+> Will,
+> Thanks for the clarification that cycles_t is used for short
+> intervals. So it is safe to return lower 32 bit
+> counter for read_current_timer.
 
-Getting the controller offset should work whether you specify the
-address as 0x13000 with translation or the absolute address
-0x20013000. In other words, the driver should know how many bits to
-mask off to get the offset.
+As I looked at it more, I realized that we have two types in Linux.
+There's cycle_t and cycles_t.  Whoa, confusing!
 
-Rob
+I'd perhaps advocate a wholesale rename of cycles_t to avoid the
+confusion.  I don't have a good name for it, though.  cycle32_t?  Or
+we could just use u32 for the function...  :-/
+
+
+> Tomasz, Doug,
+> As of now let me send a minimal implementation of this read delay
+> timer to fix the broken udelay for exynos platforms so that it goes to
+> upstream in rc releases. I will also prepare a fix for all
+> raw_readl/writel in mct to relaxed version to make it consistent.
+
+I'm reworking my 32-bit conversion patches right now and it's getting
+messy to intermingle this with yours.  I'm going to pick up your patch
+and include it in my series.  I hope that's OK.
+
+My plan is:
+
+1. For 3.16 I think it's important to fix the udelay() problems and
+trying to rework cycle_t there doesn't seem like it makes sense.  I'll
+just use Amit's original code that uses exynos_frc_read().  It might
+not be quite as optimal but it's good as a safe bugfix.
+
+2. I'll post the cleanup patch moving away from the __raw_readl / __raw_writel
+
+3. I'll post a patch moving to 32-bit, including moving Amit's code to
+32-bit but with a compile time warning for now.  I'll add a KConfig
+depends to keep it from compiling on ARM64.  We can improve this once
+we change the delay timer to always request 32-bits.
+
+-Doug
