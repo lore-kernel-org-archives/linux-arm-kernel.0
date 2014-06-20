@@ -1,160 +1,99 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:06 +0200
-Subject: [PATCH 6/9] ARM: shmobile: Move r8a7790.h
+Date: Fri, 20 Jun 2014 18:53:01 +0200
+Subject: [PATCH 1/9] ARM: shmobile: Move r7s72100.h
 In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
 References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1403283189-21688-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1403283189-21688-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change location of r8a7790.h so it can be included as "r8a7790.h"
-instead of the old style <mach/r8a7790.h>
+Change location of r7s72100.h so it can be included using "r7s72100.h"
+instead of the old style <mach/r7s72100.h>.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/board-lager-reference.c      |  4 +++-
- arch/arm/mach-shmobile/board-lager.c                | 14 ++++++++------
- arch/arm/mach-shmobile/clock-r8a7790.c              |  3 ++-
- arch/arm/mach-shmobile/pm-r8a7790.c                 |  4 +++-
- arch/arm/mach-shmobile/{include/mach => }/r8a7790.h |  0
- arch/arm/mach-shmobile/setup-r8a7790.c              |  4 +++-
- arch/arm/mach-shmobile/smp-r8a7790.c                |  4 +++-
- 7 files changed, 22 insertions(+), 11 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7790.h (100%)
+ arch/arm/mach-shmobile/board-genmai-reference.c      | 4 +++-
+ arch/arm/mach-shmobile/board-genmai.c                | 4 +++-
+ arch/arm/mach-shmobile/clock-r7s72100.c              | 3 ++-
+ arch/arm/mach-shmobile/{include/mach => }/r7s72100.h | 0
+ arch/arm/mach-shmobile/setup-r7s72100.c              | 4 +++-
+ 5 files changed, 11 insertions(+), 4 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r7s72100.h (100%)
 
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index c2175c8e1ce7..41c808e56005 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -22,11 +22,13 @@
- #include <linux/init.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/rcar-du.h>
--#include <mach/r8a7790.h>
-+
- #include <asm/mach/arch.h>
-+
- #include "clock.h"
- #include "common.h"
- #include "irqs.h"
-+#include "r8a7790.h"
- #include "rcar-gen2.h"
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+index c06dc5c12d1e..e5448f7b868a 100644
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -20,11 +20,13 @@
  
- /* DU */
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 6fb08dbc953c..b8b2b44970ce 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -31,6 +31,8 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/sh_mmcif.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mtd/mtd.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/camera-rcar.h>
- #include <linux/platform_data/gpio-rcar.h>
-@@ -43,21 +45,21 @@
- #include <linux/regulator/gpio-regulator.h>
- #include <linux/regulator/machine.h>
- #include <linux/sh_eth.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/rspi.h>
-+#include <linux/spi/spi.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/renesas_usbhs.h>
--#include <mach/r8a7790.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+-#include <mach/r7s72100.h>
 +
- #include <media/soc_camera.h>
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
--#include <linux/mtd/partitions.h>
--#include <linux/mtd/mtd.h>
--#include <linux/spi/flash.h>
--#include <linux/spi/rspi.h>
--#include <linux/spi/spi.h>
- #include <sound/rcar_snd.h>
- #include <sound/simple_card.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r8a7790.h"
- #include "rcar-gen2.h"
- 
- /*
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index ca980669806f..17435c1aa2fe 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -22,9 +22,10 @@
- #include <linux/kernel.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
--#include <mach/r8a7790.h>
 +
  #include "clock.h"
  #include "common.h"
-+#include "r8a7790.h"
- #include "rcar-gen2.h"
++#include "r7s72100.h"
  
  /*
-diff --git a/arch/arm/mach-shmobile/pm-r8a7790.c b/arch/arm/mach-shmobile/pm-r8a7790.c
-index 0f1090d851e7..8845433a00b3 100644
---- a/arch/arm/mach-shmobile/pm-r8a7790.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7790.c
-@@ -11,9 +11,11 @@
-  */
- 
- #include <linux/kernel.h>
+  * This is a really crude hack to provide clkdev support to platform
+diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+index a0994f36b348..e2a3ba4871c3 100644
+--- a/arch/arm/mach-shmobile/board-genmai.c
++++ b/arch/arm/mach-shmobile/board-genmai.c
+@@ -25,11 +25,13 @@
+ #include <linux/sh_eth.h>
+ #include <linux/spi/rspi.h>
+ #include <linux/spi/spi.h>
+-#include <mach/r7s72100.h>
 +
- #include <asm/io.h>
--#include <mach/r8a7790.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
 +
- #include "pm-rcar.h"
-+#include "r8a7790.h"
+ #include "common.h"
+ #include "irqs.h"
++#include "r7s72100.h"
  
- /* SYSC */
- #define SYSCIER 0x0c
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/r8a7790.h
+ /* Ether */
+ static const struct sh_eth_plat_data ether_pdata __initconst = {
+diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
+index 457dab0f8fc9..3eb2ec401e0c 100644
+--- a/arch/arm/mach-shmobile/clock-r7s72100.c
++++ b/arch/arm/mach-shmobile/clock-r7s72100.c
+@@ -19,8 +19,9 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/r7s72100.h>
++
+ #include "common.h"
++#include "r7s72100.h"
+ 
+ /* Frequency Control Registers */
+ #define FRQCR		0xfcfe0010
+diff --git a/arch/arm/mach-shmobile/include/mach/r7s72100.h b/arch/arm/mach-shmobile/r7s72100.h
 similarity index 100%
-rename from arch/arm/mach-shmobile/include/mach/r8a7790.h
-rename to arch/arm/mach-shmobile/r8a7790.h
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index a34229d5da41..c37d82d38617 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -26,11 +26,13 @@
- #include <linux/serial_sci.h>
- #include <linux/sh_dma.h>
+rename from arch/arm/mach-shmobile/include/mach/r7s72100.h
+rename to arch/arm/mach-shmobile/r7s72100.h
+diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
+index a55d68d89e6e..4a98b232d316 100644
+--- a/arch/arm/mach-shmobile/setup-r7s72100.c
++++ b/arch/arm/mach-shmobile/setup-r7s72100.c
+@@ -22,10 +22,12 @@
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
  #include <linux/sh_timer.h>
--#include <mach/r8a7790.h>
+-#include <mach/r7s72100.h>
 +
  #include <asm/mach/arch.h>
 +
  #include "common.h"
- #include "dma-register.h"
  #include "irqs.h"
-+#include "r8a7790.h"
- #include "rcar-gen2.h"
++#include "r7s72100.h"
  
- /* Audio-DMAC */
-diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
-index 7590e2b6e2fa..ad66beab2ea6 100644
---- a/arch/arm/mach-shmobile/smp-r8a7790.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7790.c
-@@ -17,10 +17,12 @@
- #include <linux/init.h>
- #include <linux/smp.h>
- #include <linux/io.h>
-+
- #include <asm/smp_plat.h>
--#include <mach/r8a7790.h>
-+
- #include "common.h"
- #include "pm-rcar.h"
-+#include "r8a7790.h"
- 
- #define RST		0xe6160000
- #define CA15BAR		0x0020
+ static struct resource mtu2_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xfcff0000, 0x400),
 -- 
 1.9.1
