@@ -1,99 +1,77 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:01 +0200
-Subject: [PATCH 1/9] ARM: shmobile: Move r7s72100.h
-In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1403283189-21688-2-git-send-email-geert+renesas@glider.be>
+From: jwerner@chromium.org (Julius Werner)
+Date: Fri, 20 Jun 2014 09:58:19 -0700
+Subject: [PATCH v1 6/9] usb: xhci: Add NVIDIA Tegra XHCI host-controller
+ driver
+In-Reply-To: <1403072180-4944-7-git-send-email-abrestic@chromium.org>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
+ <1403072180-4944-7-git-send-email-abrestic@chromium.org>
+Message-ID: <CAODwPW-HSY3RoBi9VEhHSJ98drTsdche-2=mKfAViXWaUa3X1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change location of r7s72100.h so it can be included using "r7s72100.h"
-instead of the old style <mach/r7s72100.h>.
+> +static const struct hc_driver tegra_xhci_hc_driver = {
+> +       .description =          "tegra-xhci-hcd",
+> +       .product_desc =         "Tegra xHCI Host Controller",
+> +       .hcd_priv_size =        sizeof(struct xhci_hcd *),
+> +
+> +       /*
+> +        * generic hardware linkage
+> +        */
+> +       .irq =                  xhci_irq,
+> +       .flags =                HCD_MEMORY | HCD_USB3 | HCD_SHARED,
+> +
+> +       /*
+> +        * basic lifecycle operations
+> +        */
+> +       .reset =                tegra_xhci_setup,
+> +       .start =                xhci_run,
+> +       .stop =                 xhci_stop,
+> +       .shutdown =             xhci_shutdown,
+> +
+> +       /*
+> +        * managing i/o requests and associated device resources
+> +        */
+> +       .urb_enqueue =          xhci_urb_enqueue,
+> +       .urb_dequeue =          xhci_urb_dequeue,
+> +       .alloc_dev =            xhci_alloc_dev,
+> +       .free_dev =             xhci_free_dev,
+> +       .alloc_streams =        xhci_alloc_streams,
+> +       .free_streams =         xhci_free_streams,
+> +       .add_endpoint =         xhci_add_endpoint,
+> +       .drop_endpoint =        xhci_drop_endpoint,
+> +       .endpoint_reset =       xhci_endpoint_reset,
+> +       .check_bandwidth =      xhci_check_bandwidth,
+> +       .reset_bandwidth =      xhci_reset_bandwidth,
+> +       .address_device =       xhci_address_device,
+> +       .enable_device =        xhci_enable_device,
+> +       .update_hub_device =    xhci_update_hub_device,
+> +       .reset_device =         xhci_discover_or_reset_device,
+> +
+> +       /*
+> +        * scheduling support
+> +        */
+> +       .get_frame_number =     xhci_get_frame,
+> +
+> +       /* Root hub support */
+> +       .hub_control =          xhci_hub_control,
+> +       .hub_status_data =      xhci_hub_status_data,
+> +       .bus_suspend =          xhci_bus_suspend,
+> +       .bus_resume =           xhci_bus_resume,
+> +};
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/board-genmai-reference.c      | 4 +++-
- arch/arm/mach-shmobile/board-genmai.c                | 4 +++-
- arch/arm/mach-shmobile/clock-r7s72100.c              | 3 ++-
- arch/arm/mach-shmobile/{include/mach => }/r7s72100.h | 0
- arch/arm/mach-shmobile/setup-r7s72100.c              | 4 +++-
- 5 files changed, 11 insertions(+), 4 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r7s72100.h (100%)
+I know I missed the first round of discussion where this was
+suggested, but I don't think it's a good idea to pull the whole
+hc_driver structure out into every platform implementation. It will
+lead to duplication, then to future additions only being applied to
+some of the implementations and everything getting out of sync. This
+is already a problem with the PCI/plat split (e.g. the LPM functions
+were only added to xhci-pci even though they should apply to both).
+Also, if I'm not mistaken this code would fail to compile as a module
+(you are referencing lots of symbols that are internal to the xhci-hcd
+module).
 
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index c06dc5c12d1e..e5448f7b868a 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -20,11 +20,13 @@
- 
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
--#include <mach/r7s72100.h>
-+
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+
- #include "clock.h"
- #include "common.h"
-+#include "r7s72100.h"
- 
- /*
-  * This is a really crude hack to provide clkdev support to platform
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index a0994f36b348..e2a3ba4871c3 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -25,11 +25,13 @@
- #include <linux/sh_eth.h>
- #include <linux/spi/rspi.h>
- #include <linux/spi/spi.h>
--#include <mach/r7s72100.h>
-+
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r7s72100.h"
- 
- /* Ether */
- static const struct sh_eth_plat_data ether_pdata __initconst = {
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 457dab0f8fc9..3eb2ec401e0c 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -19,8 +19,9 @@
- #include <linux/io.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
--#include <mach/r7s72100.h>
-+
- #include "common.h"
-+#include "r7s72100.h"
- 
- /* Frequency Control Registers */
- #define FRQCR		0xfcfe0010
-diff --git a/arch/arm/mach-shmobile/include/mach/r7s72100.h b/arch/arm/mach-shmobile/r7s72100.h
-similarity index 100%
-rename from arch/arm/mach-shmobile/include/mach/r7s72100.h
-rename to arch/arm/mach-shmobile/r7s72100.h
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index a55d68d89e6e..4a98b232d316 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -22,10 +22,12 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/sh_timer.h>
--#include <mach/r7s72100.h>
-+
- #include <asm/mach/arch.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r7s72100.h"
- 
- static struct resource mtu2_resources[] __initdata = {
- 	DEFINE_RES_MEM(0xfcff0000, 0x400),
--- 
-1.9.1
+I think at the very least you should add a function
+"xhci_default_driver(struct hc_driver *driver)" to xhci-plat.c (or
+even better to xhci.c and use it for PCI as well) that initializes all
+function pointers to the default (internal) symbols, and can then be
+overridden afterwards.
