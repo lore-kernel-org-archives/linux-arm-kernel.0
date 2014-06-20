@@ -1,71 +1,106 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Fri, 20 Jun 2014 13:17:29 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sdb: add gpio key support
-Message-ID: <1403241449-31514-1-git-send-email-b20788@freescale.com>
+Date: Fri, 20 Jun 2014 13:20:54 +0800
+Subject: [PATCH] ARM: imx: add suspend support for i.mx6sx
+Message-ID: <1403241654-31605-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for imx6sx-sdb board's gpio keys:
+Add suspend support for i.MX6SX.
 
-SW4(FUNC1): KEY_VOLUMEUP
-SW5(FUNC2): KEY_VOLUMEDOWN
+To enter suspend, echo mem > /sys/power/state.
+To exit suspend, using RTC alarm or enable debug UART wakeup.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dts |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/mach-imx/common.h      |    1 +
+ arch/arm/mach-imx/mach-imx6sx.c |    1 +
+ arch/arm/mach-imx/pm-imx6.c     |   29 ++++++++++++++++++++++++++---
+ 3 files changed, 28 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 9906f65..e082e84 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -8,6 +8,8 @@
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 7668ff5..50ee9c2 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -133,6 +133,7 @@ static inline void imx6_suspend(void __iomem *ocram_vbase) {}
+ void imx6q_pm_init(void);
+ void imx6dl_pm_init(void);
+ void imx6sl_pm_init(void);
++void imx6sx_pm_init(void);
+ void imx6q_pm_set_ccm_base(void __iomem *base);
  
- /dts-v1/;
+ #ifdef CONFIG_PM
+diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+index 02fccf6..b7a0bde 100644
+--- a/arch/arm/mach-imx/mach-imx6sx.c
++++ b/arch/arm/mach-imx/mach-imx6sx.c
+@@ -26,6 +26,7 @@ static void __init imx6sx_init_machine(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
  
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include "imx6sx.dtsi"
+ 	imx_anatop_init();
++	imx6sx_pm_init();
+ }
  
- / {
-@@ -18,6 +20,24 @@
- 		stdout-path = &uart1;
- 	};
+ static void __init imx6sx_init_irq(void)
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index 9392a8f..331055b 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -129,6 +129,14 @@ static const u32 imx6sl_mmdc_io_offset[] __initconst = {
+ 	0x330, 0x334, 0x320,        /* SDCKE0, SDCKE1, RESET */
+ };
  
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
++static const u32 imx6sx_mmdc_io_offset[] __initconst = {
++	0x2ec, 0x2f0, 0x2f4, 0x2f8, /* DQM0 ~ DQM3 */
++	0x60c, 0x610, 0x61c, 0x620, /* GPR_B0DS ~ GPR_B3DS */
++	0x300, 0x2fc, 0x32c, 0x5f4, /* CAS, RAS, SDCLK_0, GPR_ADDS */
++	0x310, 0x314, 0x5f8, 0x608, /* SODT0, SODT1, MODE_CTL, MODE */
++	0x330, 0x334, 0x338, 0x33c, /* SDQS0 ~ SDQS3 */
++};
 +
-+		volume-up {
-+			label = "Volume Up";
-+			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEUP>;
-+		};
-+
-+		volume-down {
-+			label = "Volume Down";
-+			gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEDOWN>;
-+		};
-+	};
-+
- 	memory {
- 		reg = <0x80000000 0x40000000>;
- 	};
-@@ -114,6 +134,13 @@
- 			>;
- 		};
+ static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
+ 	.cpu_type = MXC_CPU_IMX6Q,
+ 	.mmdc_compat = "fsl,imx6q-mmdc",
+@@ -159,6 +167,16 @@ static const struct imx6_pm_socdata imx6sl_pm_data __initconst = {
+ 	.mmdc_io_offset = imx6sl_mmdc_io_offset,
+ };
  
-+		pinctrl_gpio_keys: gpio_keysgrp {
-+			fsl,pins = <
-+				MX6SX_PAD_CSI_DATA04__GPIO1_IO_18 0x17059
-+				MX6SX_PAD_CSI_DATA05__GPIO1_IO_19 0x17059
-+			>;
-+		};
++static const struct imx6_pm_socdata imx6sx_pm_data __initconst = {
++	.cpu_type = MXC_CPU_IMX6SX,
++	.mmdc_compat = "fsl,imx6sx-mmdc",
++	.src_compat = "fsl,imx6sx-src",
++	.iomuxc_compat = "fsl,imx6sx-iomuxc",
++	.gpc_compat = "fsl,imx6sx-gpc",
++	.mmdc_io_num = ARRAY_SIZE(imx6sx_mmdc_io_offset),
++	.mmdc_io_offset = imx6sx_mmdc_io_offset,
++};
 +
- 		pinctrl_vcc_sd3: vccsd3grp {
- 			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+ /*
+  * This structure is for passing necessary data for low level ocram
+  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
+@@ -265,12 +283,12 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
+ 		val |= BM_CLPCR_VSTBY;
+ 		val |= BM_CLPCR_SBYOS;
+-		if (cpu_is_imx6sl()) {
++		if (cpu_is_imx6sl())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
++		if (cpu_is_imx6sl() || cpu_is_imx6sx())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+-		} else {
++		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+-		}
+ 		break;
+ 	default:
+ 		return -EINVAL;
+@@ -549,3 +567,8 @@ void __init imx6sl_pm_init(void)
+ {
+ 	imx6_pm_common_init(&imx6sl_pm_data);
+ }
++
++void __init imx6sx_pm_init(void)
++{
++	imx6_pm_common_init(&imx6sx_pm_data);
++}
 -- 
 1.7.9.5
