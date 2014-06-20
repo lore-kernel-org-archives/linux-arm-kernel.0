@@ -1,148 +1,130 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:05 +0200
-Subject: [PATCH 5/9] ARM: shmobile: Move r8a7779.h
+Date: Fri, 20 Jun 2014 18:53:09 +0200
+Subject: [PATCH 9/9] ARM: shmobile: Move sh73a0.h
 In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
 References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1403283189-21688-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1403283189-21688-10-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change location of r8a7779.h so it can be included as "r8a7779.h"
-instead of the old style <mach/r8a7779.h>
+Change location of sh73a0.h so it can be included as "sh73a0.h"
+instead of the old style <mach/sh73a0.h>
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/board-marzen-reference.c     | 4 +++-
- arch/arm/mach-shmobile/board-marzen.c               | 4 +++-
- arch/arm/mach-shmobile/clock-r8a7779.c              | 3 ++-
- arch/arm/mach-shmobile/pm-r8a7779.c                 | 4 +++-
- arch/arm/mach-shmobile/{include/mach => }/r8a7779.h | 0
- arch/arm/mach-shmobile/setup-r8a7779.c              | 4 +++-
- arch/arm/mach-shmobile/smp-r8a7779.c                | 4 +++-
- 7 files changed, 17 insertions(+), 6 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7779.h (100%)
+ arch/arm/mach-shmobile/board-kzm9g-reference.c     | 4 +++-
+ arch/arm/mach-shmobile/board-kzm9g.c               | 4 +++-
+ arch/arm/mach-shmobile/intc-sh73a0.c               | 4 +++-
+ arch/arm/mach-shmobile/setup-sh73a0.c              | 4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/sh73a0.h | 0
+ arch/arm/mach-shmobile/smp-sh73a0.c                | 4 +++-
+ 6 files changed, 15 insertions(+), 5 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/sh73a0.h (100%)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index 0a000b74ac6d..21b3e1ca2261 100644
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -22,12 +22,14 @@
- #include <linux/clk/shmobile.h>
- #include <linux/clocksource.h>
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+index e6285de6bc87..5d2621f202d1 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -25,11 +25,13 @@
+ #include <linux/irq.h>
+ #include <linux/input.h>
  #include <linux/of_platform.h>
--#include <mach/r8a7779.h>
+-#include <mach/sh73a0.h>
 +
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
-+
- #include "clock.h"
- #include "common.h"
- #include "irqs.h"
-+#include "r8a7779.h"
- 
- static void __init marzen_init_timer(void)
- {
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index fe445ef49fb9..25a1037e289d 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -41,13 +41,15 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+
- #include <media/soc_camera.h>
--#include <mach/r8a7779.h>
+ #include <asm/hardware/cache-l2x0.h>
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
- #include <asm/traps.h>
++
+ #include "common.h"
++#include "sh73a0.h"
+ 
+ static void __init kzm_init(void)
+ {
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index fff330f74925..1320e9d063b1 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -41,15 +41,17 @@
+ #include <linux/usb/r8a66597.h>
+ #include <linux/usb/renesas_usbhs.h>
+ #include <linux/videodev2.h>
++
+ #include <sound/sh_fsi.h>
+ #include <sound/simple_card.h>
+-#include <mach/sh73a0.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <video/sh_mobile_lcdc.h>
 +
  #include "common.h"
  #include "irqs.h"
-+#include "r8a7779.h"
- 
- /* Fixed 3.3V regulator to be used by SDHI0 */
- static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index e690927f3505..c51f9db3f66f 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -24,9 +24,10 @@
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
- #include <linux/sh_timer.h>
--#include <mach/r8a7779.h>
-+
- #include "clock.h"
- #include "common.h"
-+#include "r8a7779.h"
++#include "sh73a0.h"
  
  /*
-  *		MD1 = 1			MD1 = 0
-diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
-index f0f36cb5ffe7..69f70b7f7fb2 100644
---- a/arch/arm/mach-shmobile/pm-r8a7779.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7779.c
-@@ -19,10 +19,12 @@
- #include <linux/irq.h>
- #include <linux/interrupt.h>
- #include <linux/console.h>
-+
- #include <asm/io.h>
--#include <mach/r8a7779.h>
-+
- #include "common.h"
- #include "pm-rcar.h"
-+#include "r8a7779.h"
- 
- /* SYSC */
- #define SYSCIER 0x0c
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/r8a7779.h
-similarity index 100%
-rename from arch/arm/mach-shmobile/include/mach/r8a7779.h
-rename to arch/arm/mach-shmobile/r8a7779.h
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 2f59b99b9b86..8dbc407f4c8d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -40,14 +40,16 @@
- #include <linux/usb/ehci_pdriver.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/pm_runtime.h>
--#include <mach/r8a7779.h>
+  * external GPIO
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 1a8f9a7af983..44457a94897b 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -24,11 +24,13 @@
+ #include <linux/io.h>
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic.h>
+-#include <mach/sh73a0.h>
 +
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
++
+ #include "intc.h"
+ #include "irqs.h"
++#include "sh73a0.h"
+ 
+ enum {
+ 	UNUSED = 0,
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index b30bbee6dc65..224882151667 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -32,14 +32,16 @@
+ #include <linux/sh_timer.h>
+ #include <linux/platform_data/sh_ipmmu.h>
+ #include <linux/platform_data/irq-renesas-intc-irqpin.h>
+-#include <mach/sh73a0.h>
++
+ #include <asm/mach-types.h>
  #include <asm/mach/map.h>
- #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
 +
  #include "common.h"
+ #include "dma-register.h"
  #include "irqs.h"
-+#include "r8a7779.h"
++#include "sh73a0.h"
  
- static struct map_desc r8a7779_io_desc[] __initdata = {
- 	/* 2M entity map for 0xf0000000 (MPCORE) */
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index c230fc0c3fef..3100e355c3fd 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -23,13 +23,15 @@
- #include <linux/spinlock.h>
+ static struct map_desc sh73a0_io_desc[] __initdata = {
+ 	/* create a 1:1 entity map for 0xe6xxxxxx
+diff --git a/arch/arm/mach-shmobile/include/mach/sh73a0.h b/arch/arm/mach-shmobile/sh73a0.h
+similarity index 100%
+rename from arch/arm/mach-shmobile/include/mach/sh73a0.h
+rename to arch/arm/mach-shmobile/sh73a0.h
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index bf4aff99ed1c..22d8f87b23e9 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -22,10 +22,12 @@
+ #include <linux/smp.h>
  #include <linux/io.h>
  #include <linux/delay.h>
--#include <mach/r8a7779.h>
+-#include <mach/sh73a0.h>
 +
- #include <asm/cacheflush.h>
  #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
  #include <asm/smp_twd.h>
 +
  #include "common.h"
- #include "pm-rcar.h"
-+#include "r8a7779.h"
++#include "sh73a0.h"
  
- #define AVECR IOMEM(0xfe700040)
- #define R8A7779_SCU_BASE 0xf0000000
+ #define WUPCR		IOMEM(0xe6151010)
+ #define SRESCR		IOMEM(0xe6151018)
 -- 
 1.9.1
