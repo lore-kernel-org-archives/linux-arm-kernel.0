@@ -1,78 +1,36 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 20 Jun 2014 14:18:08 -0700
-Subject: [PATCH 1/3 v5] spi: s3c64xx: fix broken "cs_gpios" usage in the
- driver
-In-Reply-To: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
-References: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAD=FV=Ua+P0CBAfNj4SWWMWRKcEFdmh=akwy1-ZWoGOt2P9=cQ@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 20 Jun 2014 14:24:11 -0700
+Subject: [PATCH] ARM64: implement TASK_SIZE_OF
+In-Reply-To: <20140620082520.GC25104@arm.com>
+References: <1403122209-26352-1-git-send-email-ccross@android.com>
+ <20140620082520.GC25104@arm.com>
+Message-ID: <CAMbhsRTX6QeJVbzzQ6ds5=QhJE64mMWPoF5e=_f3uB24XtUKTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark or Kukjin,
+On Fri, Jun 20, 2014 at 1:25 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Colin,
+>
+> On Wed, Jun 18, 2014 at 09:10:09PM +0100, Colin Cross wrote:
+>> include/linux/sched.h implements TASK_SIZE_OF as TASK_SIZE if it
+>> is not set by the architecture headers.  TASK_SIZE uses the
+>> current task to determine the size of the virtual address space.
+>> On a 64-bit kernel this will cause reading /proc/pid/pagemap of a
+>> 64-bit process from a 32-bit process to return EOF when it reads
+>> past 0xffffffff.
+>>
+>> Implement TASK_SIZE_OF exactly the same as TASK_SIZE with
+>> test_tsk_thread_flag instead of test_thread_flag.
+>
+> Looks sane to me.
+>
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> I take it you're being bitten by this in real software, hence the CC stable
+> tag?
+>
+> Will
 
-On Thu, Jun 12, 2014 at 8:59 PM, Naveen Krishna Chatradhi
-<ch.naveen@samsung.com> wrote:
-> Since, (3146bee spi: s3c64xx: Added provision for dedicated cs pin)
->
-> spi-s3c64xx.c driver expects
-> 1. chip select gpios from "cs-gpio"(singular) under the
->    "controller-data" node of the client/slave device of the SPI.
->
-> 2. "cs-gpio"(singular) entry to be present in the SPI device node.
->
-> Eg of current broken usage:
-> &spi_1 {
->         cs-gpio <>;     /* this entry is checked during probe */
->         ...
->         slave_node {
->                 controller-data {
->                         cs-gpio <&gpioa2 5 0>;
->                         /* This field is parsed during .setup() */
->                 }
->         };
-> };
->
-> The following dts files which were using this driver. But,
-> din't have the "cs-gpio" entry under SPI node.
-> -- arch/arm/boot/dts/exynos4210-smdkv310.dts
-> -- arch/arm/boot/dts/exynos4412-trats2.dts
-> -- arch/arm/boot/dts/exynos5250-smdk5250.dts
->
-> Also, the SPI core and many drivers moved on to using "cs-gpios"
-> from SPI node and removed the gpio handling code from drivers
-> (including spi-s3c64xx.c).
->
-> Hence, spi-s3c64xx.c is broken since "Jun 21 11:26:12 2013" and
-> considering the time with no compliants about the breakage.
->
-> We are assuming it is safe to remove the "cs-gpio"(singular) usage
-> from device tree binding of spi-samsung.txt and makes appropriate
-> changes in the driver to use "cs-gpios"(plural) from
-> SPI device node.
->
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> ---
-> Changes since v4:
-> 1. Added reviewed by from Javier and Tested by from Doug
->
-> Changes since v3:
-> 1. Remove the sdd->cs_gpio and use gpio_is_valid(spi->cs_gpio) instead
-> 2. Keep cs->line only for Non-DT platforms and use spi->cs_gpio
->    for DT platforms
->
->  .../devicetree/bindings/spi/spi-samsung.txt        |    8 ++--
->  drivers/spi/spi-s3c64xx.c                          |   41 ++++++++------------
->  2 files changed, 20 insertions(+), 29 deletions(-)
-
-Is one of you two planning to apply (parts 1 and 2)?  I know that
-Kukjin needs to handle the part 3 (the .dts files)...
-
-Ideally it seems like it could go to 3.16 since it is a bugfix...
-
-Thanks!
-
--Doug
+Yes, it causes memory statistics produced by Android's procrank tool
+to be completely wrong.  It applies cleanly to at least 3.10.44,
+3.12.22, and 3.14.8.
