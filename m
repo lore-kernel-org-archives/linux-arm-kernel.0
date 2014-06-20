@@ -1,89 +1,296 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jun 2014 14:00:00 +0100
-Subject: [PATCH v3 2/9] arm64: move DBG_MDSCR_* to asm/debug-monitors.h
+Date: Fri, 20 Jun 2014 14:00:02 +0100
+Subject: [PATCH v3 4/9] arm64: KVM: common infrastructure for handling AArch32
+ CP14/CP15
 In-Reply-To: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
 References: <1403269207-1625-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403269207-1625-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403269207-1625-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to use the DBG_MDSCR_* macros from the KVM code,
-move the relevant definitions to the obvious include file.
+As we're about to trap a bunch of CP14 registers, let's rework
+the CP15 handling so it can be generalized and work with multiple
+tables.
 
-Also move the debug_el enum to a portion of the file that is guarded
-by #ifndef __ASSEMBLY__ in order to use that file from assembly code.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Anup Patel <anup.patel@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/debug-monitors.h | 19 ++++++++++++++-----
- arch/arm64/kernel/debug-monitors.c      |  9 ---------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h    |   2 +-
+ arch/arm64/include/asm/kvm_coproc.h |   3 +-
+ arch/arm64/include/asm/kvm_host.h   |   9 ++-
+ arch/arm64/kvm/handle_exit.c        |   4 +-
+ arch/arm64/kvm/sys_regs.c           | 133 +++++++++++++++++++++++++++++-------
+ 5 files changed, 122 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index 6e9b5b3..7fb3437 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -18,6 +18,15 @@
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index e6b159a..12f9dd7 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -93,7 +93,7 @@
+ #define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
+ #define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
+ #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
+-#define NR_CP15_REGS	(NR_SYS_REGS * 2)
++#define NR_COPRO_REGS	(NR_SYS_REGS * 2)
  
- #ifdef __KERNEL__
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_TRAP	  1
+diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
+index 9a59301..0b52377 100644
+--- a/arch/arm64/include/asm/kvm_coproc.h
++++ b/arch/arm64/include/asm/kvm_coproc.h
+@@ -39,7 +39,8 @@ void kvm_register_target_sys_reg_table(unsigned int target,
+ 				       struct kvm_sys_reg_target_table *table);
  
-+/* Low-level stepping controls. */
-+#define DBG_MDSCR_SS		(1 << 0)
-+#define DBG_SPSR_SS		(1 << 21)
-+
-+/* MDSCR_EL1 enabling bits */
-+#define DBG_MDSCR_KDE		(1 << 13)
-+#define DBG_MDSCR_MDE		(1 << 15)
-+#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
-+
- #define	DBG_ESR_EVT(x)		(((x) >> 27) & 0x7)
+ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 79573c86..108a297 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -86,7 +86,7 @@ struct kvm_cpu_context {
+ 	struct kvm_regs	gp_regs;
+ 	union {
+ 		u64 sys_regs[NR_SYS_REGS];
+-		u32 cp15[NR_CP15_REGS];
++		u32 copro[NR_COPRO_REGS];
+ 	};
+ };
  
- /* AArch64 */
-@@ -73,11 +82,6 @@
+@@ -141,7 +141,12 @@ struct kvm_vcpu_arch {
  
- #define CACHE_FLUSH_IS_SAFE		1
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+ #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+-#define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
++/*
++ * CP14 and CP15 live in the same array, as they are backed by the
++ * same system registers.
++ */
++#define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
++#define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
  
--enum debug_el {
--	DBG_ACTIVE_EL0 = 0,
--	DBG_ACTIVE_EL1,
--};
--
- /* AArch32 */
- #define DBG_ESR_EVT_BKPT	0x4
- #define DBG_ESR_EVT_VECC	0x5
-@@ -115,6 +119,11 @@ void unregister_break_hook(struct break_hook *hook);
+ struct kvm_vm_stat {
+ 	u32 remote_tlb_flush;
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 182415e..e28be51 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -73,9 +73,9 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
+ 	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
+ 	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
+-	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_32,
+ 	[ESR_EL2_EC_CP14_LS]	= kvm_handle_cp14_load_store,
+-	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_64,
+ 	[ESR_EL2_EC_HVC32]	= handle_hvc,
+ 	[ESR_EL2_EC_SMC32]	= handle_smc,
+ 	[ESR_EL2_EC_HVC64]	= handle_hvc,
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 808e3b2..fb6eece 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -483,6 +483,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  NULL, reset_val, FPEXC32_EL2, 0x70 },
+ };
  
- u8 debug_monitors_arch(void);
- 
-+enum debug_el {
-+	DBG_ACTIVE_EL0 = 0,
-+	DBG_ACTIVE_EL1,
++/* Trapped cp14 registers */
++static const struct sys_reg_desc cp14_regs[] = {
 +};
 +
- void enable_debug_monitors(enum debug_el el);
- void disable_debug_monitors(enum debug_el el);
+ /*
+  * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
+  * depending on the way they are accessed (as a 32bit or a 64bit
+@@ -590,26 +594,29 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
+ }
  
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index a7fb874..e022f87 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -30,15 +30,6 @@
- #include <asm/cputype.h>
- #include <asm/system_misc.h>
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
+-{
+-	kvm_inject_undefined(vcpu);
+-	return 1;
+-}
+-
+-static void emulate_cp15(struct kvm_vcpu *vcpu,
+-			 const struct sys_reg_params *params)
++/*
++ * emulate_cp --  tries to match a sys_reg access in a handling table, and
++ *                call the corresponding trap handler.
++ *
++ * @params: pointer to the descriptor of the access
++ * @table: array of trap descriptors
++ * @num: size of the trap descriptor array
++ *
++ * Return 0 if the access has been handled, and -1 if not.
++ */
++static int emulate_cp(struct kvm_vcpu *vcpu,
++		      const struct sys_reg_params *params,
++		      const struct sys_reg_desc *table,
++		      size_t num)
+ {
+-	size_t num;
+-	const struct sys_reg_desc *table, *r;
++	const struct sys_reg_desc *r;
  
--/* Low-level stepping controls. */
--#define DBG_MDSCR_SS		(1 << 0)
--#define DBG_SPSR_SS		(1 << 21)
--
--/* MDSCR_EL1 enabling bits */
--#define DBG_MDSCR_KDE		(1 << 13)
--#define DBG_MDSCR_MDE		(1 << 15)
--#define DBG_MDSCR_MASK		~(DBG_MDSCR_KDE | DBG_MDSCR_MDE)
--
- /* Determine debug architecture. */
- u8 debug_monitors_arch(void)
+-	table = get_target_table(vcpu->arch.target, false, &num);
++	if (!table)
++		return -1;	/* Not handled */
+ 
+-	/* Search target-specific then generic table. */
+ 	r = find_reg(params, table, num);
+-	if (!r)
+-		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
+ 
+-	if (likely(r)) {
++	if (r) {
+ 		/*
+ 		 * Not having an accessor means that we have
+ 		 * configured a trap that we don't know how to
+@@ -621,22 +628,51 @@ static void emulate_cp15(struct kvm_vcpu *vcpu,
+ 		if (likely(r->access(vcpu, params, r))) {
+ 			/* Skip instruction, since it was emulated */
+ 			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-			return;
+ 		}
+-		/* If access function fails, it should complain. */
++
++		/* Handled */
++		return 0;
+ 	}
+ 
+-	kvm_err("Unsupported guest CP15 access at: %08lx\n", *vcpu_pc(vcpu));
++	/* Not handled */
++	return -1;
++}
++
++static void unhandled_cp_access(struct kvm_vcpu *vcpu,
++				struct sys_reg_params *params)
++{
++	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
++	int cp;
++
++	switch(hsr_ec) {
++	case ESR_EL2_EC_CP15_32:
++	case ESR_EL2_EC_CP15_64:
++		cp = 15;
++		break;
++	case ESR_EL2_EC_CP14_MR:
++	case ESR_EL2_EC_CP14_64:
++		cp = 14;
++		break;
++	default:
++		WARN_ON((cp = -1));
++	}
++
++	kvm_err("Unsupported guest CP%d access at: %08lx\n",
++		cp, *vcpu_pc(vcpu));
+ 	print_sys_reg_instr(params);
+ 	kvm_inject_undefined(vcpu);
+ }
+ 
+ /**
+- * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
++ * kvm_handle_cp_64 -- handles a mrrc/mcrr trap on a guest CP15 access
+  * @vcpu: The VCPU pointer
+  * @run:  The kvm_run struct
+  */
+-int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *global,
++			    size_t nr_global,
++			    const struct sys_reg_desc *target_specific,
++			    size_t nr_specific)
+ {
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+@@ -665,8 +701,14 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		*vcpu_reg(vcpu, params.Rt) = val;
+ 	}
+ 
+-	emulate_cp15(vcpu, &params);
++	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
++		goto out;
++	if (!emulate_cp(vcpu, &params, global, nr_global))
++		goto out;
+ 
++	unhandled_cp_access(vcpu, &params);
++
++out:
+ 	/* Do the opposite hack for the read side */
+ 	if (!params.is_write) {
+ 		u64 val = *vcpu_reg(vcpu, params.Rt);
+@@ -682,7 +724,11 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+  * @vcpu: The VCPU pointer
+  * @run:  The kvm_run struct
+  */
+-int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *global,
++			    size_t nr_global,
++			    const struct sys_reg_desc *target_specific,
++			    size_t nr_specific)
+ {
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+@@ -697,10 +743,51 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	params.Op1 = (hsr >> 14) & 0x7;
+ 	params.Op2 = (hsr >> 17) & 0x7;
+ 
+-	emulate_cp15(vcpu, &params);
++	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
++		return 1;
++	if (!emulate_cp(vcpu, &params, global, nr_global))
++		return 1;
++
++	unhandled_cp_access(vcpu, &params);
+ 	return 1;
+ }
+ 
++int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	const struct sys_reg_desc *target_specific;
++	size_t num;
++
++	target_specific = get_target_table(vcpu->arch.target, false, &num);
++	return kvm_handle_cp_64(vcpu,
++				cp15_regs, ARRAY_SIZE(cp15_regs),
++				target_specific, num);
++}
++
++int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	const struct sys_reg_desc *target_specific;
++	size_t num;
++
++	target_specific = get_target_table(vcpu->arch.target, false, &num);
++	return kvm_handle_cp_32(vcpu,
++				cp15_regs, ARRAY_SIZE(cp15_regs),
++				target_specific, num);
++}
++
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	return kvm_handle_cp_64(vcpu,
++				cp14_regs, ARRAY_SIZE(cp14_regs),
++				NULL, 0);
++}
++
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	return kvm_handle_cp_32(vcpu,
++				cp14_regs, ARRAY_SIZE(cp14_regs),
++				NULL, 0);
++}
++
+ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+ 			   const struct sys_reg_params *params)
  {
 -- 
 1.8.3.4
