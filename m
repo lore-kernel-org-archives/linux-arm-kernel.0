@@ -1,30 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jun 2014 16:23:36 +0100
-Subject: A clockevent IRQ delivery question
-In-Reply-To: <CAJgR-Bj+tgCpKTT7FxM-1JMvN7CKUgpaikfbXPQx5ep6+7W2mA@mail.gmail.com>
-References: <CAJgR-BjUpaR0cxew+-fz5YcDu0VKzim-rhLF4j1hEnR_4O+Jsg@mail.gmail.com>
- <53A446C0.10200@linaro.org>
- <CAJgR-Bj+tgCpKTT7FxM-1JMvN7CKUgpaikfbXPQx5ep6+7W2mA@mail.gmail.com>
-Message-ID: <20140620152335.GT32514@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Jun 2014 19:24:16 +0400
+Subject: [PATCH v0 1/3] ata: Fix the watermark threshold for the APM X-Gene
+ SATA host controller driver.
+In-Reply-To: <1403253147-14341-2-git-send-email-stripathi@apm.com>
+References: <1403253147-14341-1-git-send-email-stripathi@apm.com>
+ <1403253147-14341-2-git-send-email-stripathi@apm.com>
+Message-ID: <53A45220.1030406@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 10:18:58AM -0500, Jon Loeliger wrote:
-> > There was a notifier for cpu bootup but Thomas added a force affinity api,
-> > so even if the cpu is not in the online mask, the irq is correctly set
-> > (commit 30ccf03b).
-> 
-> Ah, I see.  I'll track that commit down.  Thanks.
+Hello.
 
-Note that there is an outstanding bug report that the IRQ affinity
-forcing breaks CPU hotplug... which would be a regression.  Linus'
-policy is that if a bug fix causes a new regression, then the bug
-fix is wrong and needs to be reverted.
+On 06/20/2014 12:32 PM, Suman Tripathi wrote:
 
-So... don't hang your hopes on this just yet... the "fix" for this
-_has_ caused a regression elsewhere, and we need to sort out what
-we're doing about that first.
+> This patch fixes the watermark threshold of the receive FIFO for the
+> APM X-Gene SATA host controller driver.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   drivers/ata/ahci_xgene.c | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+
+> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+> index 77c89bf..5f0f750 100644
+> --- a/drivers/ata/ahci_xgene.c
+> +++ b/drivers/ata/ahci_xgene.c
+> @@ -68,6 +68,10 @@
+>   #define PORTAXICFG_OUTTRANS_SET(dst, src) \
+>   		(((dst) & ~0x00f00000) | (((u32)(src) << 0x14) & 0x00f00000))
+>
+> +#define PORTRANSCFG				0xc8
+> +#define PORTRANSCFG_RXWM_SET(dst, src)		\
+> +		(((dst) & ~0x0000007f) | (((u32) (src) << 0) & 0x0000007f))
+
+    Please renmove space after (u32) for consistency with the above macro. And 
+why shift by 0 bits?
+
+WBR, Sergei
