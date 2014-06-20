@@ -1,27 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 20 Jun 2014 16:52:48 -0400
-Subject: [PATCHv4 3/4] ARM: mvebu: Add LaCie 2Big and 5Big Network v2
-In-Reply-To: <1401132591-26305-4-git-send-email-andrew@lunn.ch>
-References: <1401132591-26305-1-git-send-email-andrew@lunn.ch>
- <1401132591-26305-4-git-send-email-andrew@lunn.ch>
-Message-ID: <20140620205248.GN21711@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jun 2014 21:53:40 +0100
+Subject: [PATCH] ARM: mvebu: rename ARM_ERRATA_753970
+In-Reply-To: <20140620202100.GG21711@titan.lakedaemon.net>
+References: <201404052101.19381.arnd@arndb.de>
+ <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
+ <53418889.2050002@free-electrons.com> <1396805315.7723.8.camel@x220>
+ <1401094871.25902.20.camel@x220>
+ <20140620202100.GG21711@titan.lakedaemon.net>
+Message-ID: <20140620205340.GX32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 26, 2014 at 09:29:50PM +0200, Andrew Lunn wrote:
-> Enable building LaCie 2Big and 5Big Network v2 in the mvebu v5 kernel.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> v3->v4
->   Add G762 fan controller
-> ---
->  arch/arm/configs/mvebu_v5_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+On Fri, Jun 20, 2014 at 04:21:00PM -0400, Jason Cooper wrote:
+> It looks like rmk just added a patch to fixing the selection of the
+> erratas.  Could you please take a look and either rebase or drop this
+> patch?
 
-This patch and 4/4 applied to mvebu/defconfig.
+Yes please.  If it's needed, just update it to be:
 
-thx,
+> > diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> > index 3f73eecbcfb0..501d0f42e7b2 100644
+> > --- a/arch/arm/mach-mvebu/Kconfig
+> > +++ b/arch/arm/mach-mvebu/Kconfig
+> > @@ -35,7 +35,7 @@ config MACH_ARMADA_370
+> >  config MACH_ARMADA_375
+> >  	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
+> >  	select ARM_ERRATA_720789
+> > -	select ARM_ERRATA_753970
+> > +	select PL310_ERRATA_753970 if CACHE_PL310
 
-Jason.
+	select PL310_ERRATA_753970 if CACHE_L2X0
+
+for both platforms.  Although there's no harm in using CACHE_PL310 at
+the moment, my longer term plan is to eventually kill CACHE_PL310 as
+it's entirely redundant for ARM versions of the L2 cache (it's only
+used by the old L2x0 code which I've been unable to eliminate entirely.)
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
