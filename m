@@ -1,56 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jun 2014 11:32:07 +0100
-Subject: [PATCHv3 3/4] arm64: Update the Image header
-In-Reply-To: <20140620085543.GH25104@arm.com>
-References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
- <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
- <20140620085543.GH25104@arm.com>
-Message-ID: <20140620103206.GF30188@leverpostej>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 20 Jun 2014 12:33:13 +0200
+Subject: [PATCH 0/4] Add support for Exynos clock output configuration
+In-Reply-To: <CAD8Lp46pFGWSA6c1r-xGUbNDkcACyZZkru+m7+xH+BQRr7ULPg@mail.gmail.com>
+References: <CAD8Lp46pFGWSA6c1r-xGUbNDkcACyZZkru+m7+xH+BQRr7ULPg@mail.gmail.com>
+Message-ID: <53A40DE9.4030100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 09:55:43AM +0100, Will Deacon wrote:
-> On Thu, Jun 19, 2014 at 11:49:22AM +0100, Mark Rutland wrote:
-> > Currently the kernel Image is stripped of everything past the initial
-> > stack, and at runtime the memory is initialised and used by the kernel.
-> > This makes the effective minimum memory footprint of the kernel larger
-> > than the size of the loaded binary, though bootloaders have no mechanism
-> > to identify how large this minimum memory footprint is. This makes it
-> > difficult to choose safe locations to place both the kernel and other
-> > binaries required at boot (DTB, initrd, etc), such that the kernel won't
-> > clobber said binaries or other reserved memory during initialisation.
+Hi Daniel,
+
+On 18.06.2014 18:17, Daniel Drake wrote:
+> Hi Tomasz,
 > 
-> [...]
+> On Tue, May 20, 2014 at 5:43 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Since the block responsible for handling the pin is PMU, not CMU,
+>> a separate driver, that binds to PMU node is required and acquires
+>> all input clocks by standard DT clock look-up. This way we don't need
+>> any cross-IP block drivers and cross-driver register sharing or
+>> nodes for fake devices.
+>>
+>> To represent the PMU mux/gate clock, generic composite clock is registered.
+>>
+>> Tested on Odroid U3, with HSIC/USB hub using CLKOUT as reference clock,
+>> with some additional patches.
+>>
+>> Depends on:
+>> [PATCHv5 0/4] Enable usbphy and hsotg for exynos4
+>> (No link, sorry, I could not find it in any archive yet...)
+>> for Exynos4210/4x12 PMU binding and DT nodes.
 > 
-> > +/*
-> > + * There aren't any ELF relocations we can use to endian-swap values known only
-> > + * at link time (e.g. the subtraction of two symbol addresses), so we must get
-> > + * the linker to endian-swap certain values before emitting them.
-> > + */
-> > +#ifdef CONFIG_CPU_BIG_ENDIAN
-> > +#define DATA_LE64(data)					\
-> > +	((((data) & 0x00000000000000ff) << 56) |	\
-> > +	 (((data) & 0x000000000000ff00) << 40) |	\
+> This isn't working for me.
+> Testing linus master e99cfa2d0634881b8a41d56c48b5956b9a3ba162 plus:
+>     ARM: dts: exynos4: add port sub-nodes to exynos usb host modules
+>     ARM: dts: exynos4412-odroidx: enable common hardware blocks
+>     ARM: dts: exynos4412-odroidx: add support for USB (phy, host, device)
+>     ARM: dts: refactor Odroid DTS file and add support for Odroid X2 and U2/U3
 > 
-> Are you sure that these shifts are valid without a UL prefix on the first
-> constant operand? I don't think the leading zeroes promote the mask to a
-> 64-bit type, so you end up shifting greater than the width of the type.
+> Testing on ODROID-U2.
+> 
+> I apply the first patch here (clk: samsung: exynos4: Add missing
+> CPU/DMC clock hierarchy) and things continue to work. Now when I add
+> the second patch "clk: samsung: exynos4: Add CLKOUT clock hierarchy"
+> boot hangs at:
+> 
+> [    4.753740] s3c-rtc 10070000.rtc: setting system clock to
+> 2000-01-01 02:43:30 UTC (946694610)
+> [    4.753809] ### dt-test ### No testcase data in device tree; not
+> running tests
+> [    4.791155] gps-power-domain: Power-off latency e
+> 
+> Any ideas?
 
-A key point to bear in mind is that this is in ld, not gas or gcc, which
-is why I needed a new macro in the first place. See the error on #ifndef
-LINKER_SCRIPT at the top of the file.
+Thanks for testing.
 
-As far as I can tell these are valid within ld. The GNU ld documentation
-says expressions should be evaluated as 64-bit values (given that
-aarch64 is 64-bit) [1].
+It's most likely an issue with ISP power domain. Certain clock
+controller registers are located there and there is no proper handling
+of this in the clock driver yet. You can test things by skipping patch 3
+and this should give you a working clkout, just limited to clocks not
+going through clkout hierarchies of clock domains, e.g. xxti and xusbxti.
 
-The kernel header looks correct when inspected with a hex editor, for
-both LE and BE.
+I'm aware of the problem and will fix it in next version.
 
-> I guess the compiler doesn't allocate (data & 0xff) into a w register?
-
-I would guess it wouldn't allocate anything given it is not involved :)
-
-Mark.
-
-[1] https://sourceware.org/binutils/docs/ld/Expressions.html#Expressions
+Best regards,
+Tomasz
