@@ -1,58 +1,18 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Jun 2014 09:50:08 +0100
-Subject: [PATCHv3 4/4] arm64: Enable TEXT_OFFSET fuzzing
-In-Reply-To: <1403174963-10730-5-git-send-email-mark.rutland@arm.com>
-References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
- <1403174963-10730-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <20140620085008.GG25104@arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 20 Jun 2014 16:52:05 +0800
+Subject: [PATCH 1/2] ARM: i.MX system: Simplify handling watchdog clock
+In-Reply-To: <1403251065.844555501@f422.i.mail.ru>
+References: <1402644373-8408-1-git-send-email-shc_work@mail.ru>
+ <1403239006.737527842@f277.i.mail.ru> <20140620075031.GC28225@dragon>
+ <1403251065.844555501@f422.i.mail.ru>
+Message-ID: <20140620085204.GH28225@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 11:49:23AM +0100, Mark Rutland wrote:
-> The arm64 Image header contains a text_offset field which bootloaders
-> are supposed to read to determine the offset (from a 2MB aligned "start
-> of memory" per booting.txt) at which to load the kernel. The offset is
-> not well respected by bootloaders at present, and due to the lack of
-> variation there is little incentive to support it. This is unfortunate
-> for the sake of future kernels where we may wish to vary the text offset
-> (even zeroing it).
-> 
-> This patch adds options to arm64 to enable fuzz-testing of text_offset.
-> CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET forces the text offset to a random
-> 16-byte aligned value value in the range [0..2MB) upon a build of the
-> kernel. It is recommended that distribution kernels enable randomization
-> to test bootloaders such that any compliance issues can be fixed early.
+On Fri, Jun 20, 2014 at 11:57:45AM +0400, Alexander Shiyan wrote:
+> You are right.
+> If this is the only issue on this series, could you fix it during the applying?
 
-[...]
+Okay.  Fixed it and applied both patches.
 
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index 1c1b756..566bf80 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -28,4 +28,20 @@ config PID_IN_CONTEXTIDR
->  	  instructions during context switch. Say Y here only if you are
->  	  planning to use hardware trace tools with this kernel.
->  
-> +config ARM64_RANDOMIZE_TEXT_OFFSET
-> +	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
-
-Lose the (EXPERIMENTAL) suffix -- this already lives under Kconfig.debug.
-
-> +	default N
-
-I think this is redundant.
-
-> +	help
-> +	  Say Y here if you want the image load offset (AKA TEXT_OFFSET)
-> +	  of the kernel to be randomized at build-time. When selected,
-> +	  this option will cause TEXT_OFFSET to be randomized upon any
-> +	  build of the kernel, and the offset will be reflected in the
-> +	  text_offset field of the resulting Image. This can be used to
-> +	  fuzz-test bootloaders which respect text_offset.
-> +
-> +	  This option is intended for bootloader and/or kernel testing
-> +	  only. Bootloaders must make no assumptions regarding the value
-> +	  of TEXT_OFFSET and platforms must not require a specific
-> +	  value.
-
-Will
+Shawn
