@@ -1,110 +1,148 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:03 +0200
-Subject: [PATCH 3/9] ARM: shmobile: Move r8a7740.h
+Date: Fri, 20 Jun 2014 18:53:05 +0200
+Subject: [PATCH 5/9] ARM: shmobile: Move r8a7779.h
 In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
 References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1403283189-21688-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1403283189-21688-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change location of r8a7740.h so it can be included as "r8a7740.h"
-instead of the old style <mach/r8a7740.h>
+Change location of r8a7779.h so it can be included as "r8a7779.h"
+instead of the old style <mach/r8a7779.h>
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 4 +++-
- arch/arm/mach-shmobile/board-armadillo800eva.c           | 4 +++-
- arch/arm/mach-shmobile/clock-r8a7740.c                   | 3 ++-
- arch/arm/mach-shmobile/{include/mach => }/r8a7740.h      | 0
- arch/arm/mach-shmobile/setup-r8a7740.c                   | 4 +++-
- 5 files changed, 11 insertions(+), 4 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7740.h (100%)
+ arch/arm/mach-shmobile/board-marzen-reference.c     | 4 +++-
+ arch/arm/mach-shmobile/board-marzen.c               | 4 +++-
+ arch/arm/mach-shmobile/clock-r8a7779.c              | 3 ++-
+ arch/arm/mach-shmobile/pm-r8a7779.c                 | 4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/r8a7779.h | 0
+ arch/arm/mach-shmobile/setup-r8a7779.c              | 4 +++-
+ arch/arm/mach-shmobile/smp-r8a7779.c                | 4 +++-
+ 7 files changed, 17 insertions(+), 6 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7779.h (100%)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-index 0ae49823e67f..84bc6cb6d5aa 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-@@ -24,10 +24,12 @@
- #include <linux/kernel.h>
- #include <linux/gpio.h>
- #include <linux/io.h>
--#include <mach/r8a7740.h>
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index 0a000b74ac6d..21b3e1ca2261 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -22,12 +22,14 @@
+ #include <linux/clk/shmobile.h>
+ #include <linux/clocksource.h>
+ #include <linux/of_platform.h>
+-#include <mach/r8a7779.h>
 +
+ #include <asm/irq.h>
  #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
-+
- #include "common.h"
-+#include "r8a7740.h"
- 
- /*
-  * CON1		Camera Module
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 395638da837c..fc73246ca104 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -45,7 +45,7 @@
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/i2c-gpio.h>
- #include <linux/reboot.h>
--#include <mach/r8a7740.h>
-+
- #include <media/mt9t112.h>
- #include <media/sh_mobile_ceu.h>
- #include <media/soc_camera.h>
-@@ -59,9 +59,11 @@
- #include <video/sh_mobile_hdmi.h>
- #include <sound/sh_fsi.h>
- #include <sound/simple_card.h>
-+
- #include "common.h"
- #include "irqs.h"
- #include "pm-rmobile.h"
-+#include "r8a7740.h"
- #include "sh-gpio.h"
- 
- /*
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index ffefec53b058..789091cfa37a 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -22,9 +22,10 @@
- #include <linux/io.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
--#include <mach/r8a7740.h>
 +
  #include "clock.h"
  #include "common.h"
-+#include "r8a7740.h"
+ #include "irqs.h"
++#include "r8a7779.h"
  
- /*
-  *        |  MDx  |  XTAL1/EXTAL1   |  System   | EXTALR |
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
-similarity index 100%
-rename from arch/arm/mach-shmobile/include/mach/r8a7740.h
-rename to arch/arm/mach-shmobile/r8a7740.h
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 10170b3560c2..348af358a239 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -31,15 +31,17 @@
- #include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
- #include <linux/platform_data/sh_ipmmu.h>
--#include <mach/r8a7740.h>
+ static void __init marzen_init_timer(void)
+ {
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index fe445ef49fb9..25a1037e289d 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -41,13 +41,15 @@
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mfd/tmio.h>
 +
+ #include <media/soc_camera.h>
+-#include <mach/r8a7779.h>
  #include <asm/mach-types.h>
- #include <asm/mach/map.h>
  #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
+ #include <asm/traps.h>
 +
  #include "common.h"
- #include "dma-register.h"
  #include "irqs.h"
- #include "pm-rmobile.h"
-+#include "r8a7740.h"
++#include "r8a7779.h"
  
- static struct map_desc r8a7740_io_desc[] __initdata = {
- 	 /*
+ /* Fixed 3.3V regulator to be used by SDHI0 */
+ static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index e690927f3505..c51f9db3f66f 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -24,9 +24,10 @@
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+ #include <linux/sh_timer.h>
+-#include <mach/r8a7779.h>
++
+ #include "clock.h"
+ #include "common.h"
++#include "r8a7779.h"
+ 
+ /*
+  *		MD1 = 1			MD1 = 0
+diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
+index f0f36cb5ffe7..69f70b7f7fb2 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7779.c
++++ b/arch/arm/mach-shmobile/pm-r8a7779.c
+@@ -19,10 +19,12 @@
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
+ #include <linux/console.h>
++
+ #include <asm/io.h>
+-#include <mach/r8a7779.h>
++
+ #include "common.h"
+ #include "pm-rcar.h"
++#include "r8a7779.h"
+ 
+ /* SYSC */
+ #define SYSCIER 0x0c
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/r8a7779.h
+similarity index 100%
+rename from arch/arm/mach-shmobile/include/mach/r8a7779.h
+rename to arch/arm/mach-shmobile/r8a7779.h
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 2f59b99b9b86..8dbc407f4c8d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -40,14 +40,16 @@
+ #include <linux/usb/ehci_pdriver.h>
+ #include <linux/usb/ohci_pdriver.h>
+ #include <linux/pm_runtime.h>
+-#include <mach/r8a7779.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
+ #include <asm/hardware/cache-l2x0.h>
++
+ #include "common.h"
+ #include "irqs.h"
++#include "r8a7779.h"
+ 
+ static struct map_desc r8a7779_io_desc[] __initdata = {
+ 	/* 2M entity map for 0xf0000000 (MPCORE) */
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index c230fc0c3fef..3100e355c3fd 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -23,13 +23,15 @@
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+-#include <mach/r8a7779.h>
++
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ #include <asm/smp_twd.h>
++
+ #include "common.h"
+ #include "pm-rcar.h"
++#include "r8a7779.h"
+ 
+ #define AVECR IOMEM(0xfe700040)
+ #define R8A7779_SCU_BASE 0xf0000000
 -- 
 1.9.1
