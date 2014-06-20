@@ -1,56 +1,35 @@
-From: loeliger@gmail.com (Jon Loeliger)
-Date: Fri, 20 Jun 2014 09:24:10 -0500
-Subject: A clockevent IRQ delivery question
-In-Reply-To: <CAOh2x=mcmuDb_Mnp2uggNg49m5qrhZqhCR79ZHc4xZEFVNjZpw@mail.gmail.com>
-References: <CAJgR-BjUpaR0cxew+-fz5YcDu0VKzim-rhLF4j1hEnR_4O+Jsg@mail.gmail.com>
- <CAOh2x=mcmuDb_Mnp2uggNg49m5qrhZqhCR79ZHc4xZEFVNjZpw@mail.gmail.com>
-Message-ID: <CAJgR-Bi2YhBjJmHW1TmEYwqs4O+w5GJgUacSaVhb+xfGhk79LA@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Fri, 20 Jun 2014 16:24:32 +0200
+Subject: [PATCH] arm, imx6, dts: add aristainetos board support
+In-Reply-To: <20140620130628.GK28225@dragon>
+References: <1402468548-17539-1-git-send-email-hs@denx.de>
+ <20140618132915.GK8860@dragon> <53A2C8DD.7000601@denx.de>
+ <20140620130628.GK28225@dragon>
+Message-ID: <53A44420.6010106@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 12:51 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Cc'ing Daniel .. He is maintaining clockevent drivers.
+Hello Shwan,
 
-Hi Viresh,
-
-Thanks.
-
-
-> On Thu, Jun 19, 2014 at 9:47 PM, Jon Loeliger <loeliger@gmail.com> wrote:
-
->> The problem I see is that near what should be the login prompt,
->> the system hangs.
+Am 20.06.2014 15:06, schrieb Shawn Guo:
+> On Thu, Jun 19, 2014 at 01:26:21PM +0200, Heiko Schocher wrote:
+>>>> +	pinctrl-names = "default";
+>>>> +	pinctrl-0 =<&pinctrl_hog&pinctrl_backlight&pinctrl_gpio>;
+>>>
+>>> pinctrl_backlight and pinctrl_gpio shouldn't be in there.
 >>
->> Some questions:
+>> removed&pinctrl_backlight, removed device specific gpios to
+>> device nodes ... but there are some gpios only used with GPIO API ...
 >>
->> In my clockevent init() function, should I be setting the cpumask
->> to cpu_all_mask, cpu_possible_mask, cpumask_of(smp_processor_id())
->> or something else?  Empirically, cpu_possible_mask wasn't working
->> and cpumask_of(smp_processor_id()) allowed the boot to get past
->> the delay calibration.
->>
->> Should I also use irq_set_affinity(smp_processor_id()) here?
->>
->> I think what I am missing is an understanding of which CPUs will or
->> should get the IRQ delivered to it, and how do I arrange to make
->> that happen.
->>
->> Boot log and DTS fragment below.
->>
->> Thanks,
->> jdl
+>> Where to move this pinctrls ?
+>
+> For GPIO that do not have a clear client device owing, it's fine to have
+> it in hog group.
 
-So, for the record, I fixed an incorrect clearing of an interrupt in
-my code, and managed to get a full boot using both a cpumask
-of cpumask_of(smp_processor_id()) and a call to
-irq_set_affinity(smp_processor_id()).
+Ok, so I put them back to the DTS.
 
-Looking at /proc interrupt info, that IRQ does, in fact, only get
-delivered to the boot core.  So I guess at this point it is more
-a question of should it be balanced?  And if so, how is that
-achieved?  Would a collection of percpu() data structures and
-IRQs make that happen?  Or is the percpu() pattern only used
-when the IRQ *is* delivered privately like the GIC PPIs?
-
-Thanks,
-jdl
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
