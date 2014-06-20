@@ -1,52 +1,62 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Sat, 21 Jun 2014 00:29:54 +0200
-Subject: [PATCH 1/3] pwm: add Rockchip SoC PWM support
-In-Reply-To: <20140620220034.GA927@gmail.com>
-References: <1399504115-16257-1-git-send-email-b.galvani@gmail.com>
- <1399504115-16257-2-git-send-email-b.galvani@gmail.com>
- <20140617214253.GA24743@mithrandir>
- <20140620220034.GA927@gmail.com>
-Message-ID: <20140620222953.GC29400@mithrandir>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 Jun 2014 17:33:06 -0500
+Subject: [PATCH v2] ARM: mvebu: Fix missing binding documentation for
+ Armada 38x
+In-Reply-To: <20140620185241.GC21711@titan.lakedaemon.net>
+References: <1403196043-6317-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140620185241.GC21711@titan.lakedaemon.net>
+Message-ID: <CAL_JsqKinUvcJ+OOoD70zD6CH393cgZWC+4gRO=8XORyE6fVKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 21, 2014 at 12:00:36AM +0200, Beniamino Galvani wrote:
-> On Tue, Jun 17, 2014 at 11:42:58PM +0200, Thierry Reding wrote:
-> > On Thu, May 08, 2014 at 01:08:33AM +0200, Beniamino Galvani wrote:
-[...]
-> > > diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-[...]
-> > > +static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> > > +			       int duty_ns, int period_ns)
-> > > +{
-> > > +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-> > > +	unsigned long clk_rate, period, duty;
-> > > +	u64 div;
-> > > +	int ret;
-> > > +
-> > > +	clk_rate = clk_get_rate(pc->clk);
-> > > +
-> > > +	/*
-> > > +	 * Since period and duty cycle registers have a width of 32
-> > > +	 * bits, every possible input period can be obtained using the
-> > > +	 * default prescaler value for all practical clock rate values.
-> > > +	 */
-> > > +	div = clk_rate;
-> > > +	div *= period_ns;
-> > 
-> > Perhaps shorten this to "div = clk_rate * period_ns;"?
-> 
-> I will change this, adding a cast to avoid the truncation of the
-> result to 32 bits: "div = (u64)clk_rate * period_ns;"
+On Fri, Jun 20, 2014 at 1:52 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Thu, Jun 19, 2014 at 06:40:43PM +0200, Gregory CLEMENT wrote:
+>> For the Armada 380 and Armada 385 SoCs, the common bindings for those
+>> 2 SoCs, was forgotten. This patch add the documentation for the
+>> marvell,aramda38x property.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> --
+>> Hi,
+>>
+>> This fix should be merged in 3.16. For 3.15 I am not sure as it is not
+>> a regression.
+>>
+>> Changelog:
+>> v1->v2
+>>
+>> - Reformulate to make clear that we will need marvell,armada38x _and_ a
+>> SoC specific string. For consistency I duplicated what we have done in
+>> armada-370-xp.txt
+>>
+>>
+>> Thanks,
+>> Gregory
+>>
+>>
+>>  Documentation/devicetree/bindings/arm/armada-38x.txt | 17 +++++++++++++++--
+>>  1 file changed, 15 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
+>> index 11f2330a6554..fa08760046df 100644
+>> --- a/Documentation/devicetree/bindings/arm/armada-38x.txt
+>> +++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
+>> @@ -6,5 +6,18 @@ following property:
+>>
+>>  Required root node property:
+>>
+>> - - compatible: must contain either "marvell,armada380" or
+>> -   "marvell,armada385" depending on the variant of the SoC being used.
+>> +compatible: must contain "marvell,armada38x"
+>
+> I agree with Sergei on this one.  We generally avoid wildcards in
+> compatible strings.  Is there a use case where specifying one of the
+> below wouldn't be sufficient?
 
-Alternatively you could simply make clk_rate a u64 since it's only used
-in this context anyway.
+Isn't this a case of just documenting what is already in use?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140621/7a94349a/attachment.sig>
+I agree wildcards alone are not good, but along with a specific
+compatible is okay. But also there should be some need to have the
+common property.
+
+Rob
