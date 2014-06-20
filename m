@@ -1,54 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jun 2014 11:52:17 +0100
-Subject: [PATCH 1/2] clocksource: arm_arch_timer: remove static from
- arch_timer_init
-In-Reply-To: <3602534.r5eJA8RqrN@diego>
-References: <70167479.zcs3JF0luJ@diego>
- <3602534.r5eJA8RqrN@diego>
-Message-ID: <20140620105217.GI30188@leverpostej>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 20 Jun 2014 13:11:42 +0200
+Subject: [PATCH linux-next] ARM: shmobile: rcar-gen2: update call to
+ dma_contiguous_reserve_area
+In-Reply-To: <1403170270-17877-1-git-send-email-vincent.stehle@laposte.net>
+References: <1403170270-17877-1-git-send-email-vincent.stehle@laposte.net>
+Message-ID: <5123262.2QjNse2sTm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 11:44:11AM +0100, Heiko St?bner wrote:
-> There exist SoCs that need some special setup procedure for their architected-timer
-> to work. Therefore allow arch_timer_init to be called from such specialized
-> clocksources.
+Hi Vincent,
+
+Thank you for the patch.
+
+On Thursday 19 June 2014 11:31:10 Vincent Stehl? wrote:
+> Commit 5ea3b1b2f8ad 'cma: add placement specifier for "cma=" kernel
+> parameter' adds a new 'fixed' parameter to dma_contiguous_reserve_area().
+> Update rcar_gen2_reserve() accordingly.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This fixes the following compilation error:
+> 
+>   arch/arm/mach-shmobile/setup-rcar-gen2.c: In function ?rcar_gen2_reserve?:
+> arch/arm/mach-shmobile/setup-rcar-gen2.c:182:10: error: too few arguments
+> to function ?dma_contiguous_reserve_area?
+> 
+> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
->  drivers/clocksource/arm_arch_timer.c | 2 +-
->  drivers/clocksource/arm_arch_timer.h | 7 +++++++
->  2 files changed, 8 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clocksource/arm_arch_timer.h
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..55116d6 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -635,7 +635,7 @@ static void __init arch_timer_common_init(void)
->  	arch_timer_arch_init();
+> Hi,
+> 
+> This can be seen with linux next-20140619 and e.g. arm allmodconfig.
+> 
+> Best regards,
+> 
+> V.
+> 
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> b/arch/arm/mach-shmobile/setup-rcar-gen2.c index 73fb2a6..42d5b43 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -179,6 +179,6 @@ void __init rcar_gen2_reserve(void)
+>  #ifdef CONFIG_DMA_CMA
+>  	if (mrc.size)
+>  		dma_contiguous_reserve_area(mrc.size, mrc.base, 0,
+> -					    &rcar_gen2_dma_contiguous);
+> +					    &rcar_gen2_dma_contiguous, true);
+>  #endif
 >  }
->  
-> -static void __init arch_timer_init(struct device_node *np)
-> +void __init arch_timer_init(struct device_node *np)
->  {
->  	int i;
->  
-> diff --git a/drivers/clocksource/arm_arch_timer.h b/drivers/clocksource/arm_arch_timer.h
-> new file mode 100644
-> index 0000000..af3974d
-> --- /dev/null
-> +++ b/drivers/clocksource/arm_arch_timer.h
-> @@ -0,0 +1,7 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +void __init arch_timer_init(struct device_node *np);
 
-If we _really_ need this (which I hope we don't), we already have
-include/clocksource/arm_arch_timer.h.
+-- 
+Regards,
 
-Mark.
+Laurent Pinchart
