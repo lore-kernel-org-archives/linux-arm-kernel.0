@@ -1,77 +1,36 @@
-From: jwerner@chromium.org (Julius Werner)
-Date: Fri, 20 Jun 2014 09:58:19 -0700
-Subject: [PATCH v1 6/9] usb: xhci: Add NVIDIA Tegra XHCI host-controller
- driver
-In-Reply-To: <1403072180-4944-7-git-send-email-abrestic@chromium.org>
-References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
- <1403072180-4944-7-git-send-email-abrestic@chromium.org>
-Message-ID: <CAODwPW-HSY3RoBi9VEhHSJ98drTsdche-2=mKfAViXWaUa3X1g@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 20 Jun 2014 10:03:30 -0700
+Subject: [PATCHv3 3/4] arm64: Update the Image header
+In-Reply-To: <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
+References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
+ <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403283810.17030.68.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +static const struct hc_driver tegra_xhci_hc_driver = {
-> +       .description =          "tegra-xhci-hcd",
-> +       .product_desc =         "Tegra xHCI Host Controller",
-> +       .hcd_priv_size =        sizeof(struct xhci_hcd *),
-> +
-> +       /*
-> +        * generic hardware linkage
-> +        */
-> +       .irq =                  xhci_irq,
-> +       .flags =                HCD_MEMORY | HCD_USB3 | HCD_SHARED,
-> +
-> +       /*
-> +        * basic lifecycle operations
-> +        */
-> +       .reset =                tegra_xhci_setup,
-> +       .start =                xhci_run,
-> +       .stop =                 xhci_stop,
-> +       .shutdown =             xhci_shutdown,
-> +
-> +       /*
-> +        * managing i/o requests and associated device resources
-> +        */
-> +       .urb_enqueue =          xhci_urb_enqueue,
-> +       .urb_dequeue =          xhci_urb_dequeue,
-> +       .alloc_dev =            xhci_alloc_dev,
-> +       .free_dev =             xhci_free_dev,
-> +       .alloc_streams =        xhci_alloc_streams,
-> +       .free_streams =         xhci_free_streams,
-> +       .add_endpoint =         xhci_add_endpoint,
-> +       .drop_endpoint =        xhci_drop_endpoint,
-> +       .endpoint_reset =       xhci_endpoint_reset,
-> +       .check_bandwidth =      xhci_check_bandwidth,
-> +       .reset_bandwidth =      xhci_reset_bandwidth,
-> +       .address_device =       xhci_address_device,
-> +       .enable_device =        xhci_enable_device,
-> +       .update_hub_device =    xhci_update_hub_device,
-> +       .reset_device =         xhci_discover_or_reset_device,
-> +
-> +       /*
-> +        * scheduling support
-> +        */
-> +       .get_frame_number =     xhci_get_frame,
-> +
-> +       /* Root hub support */
-> +       .hub_control =          xhci_hub_control,
-> +       .hub_status_data =      xhci_hub_status_data,
-> +       .bus_suspend =          xhci_bus_suspend,
-> +       .bus_resume =           xhci_bus_resume,
-> +};
+Hi Mark,
 
-I know I missed the first round of discussion where this was
-suggested, but I don't think it's a good idea to pull the whole
-hc_driver structure out into every platform implementation. It will
-lead to duplication, then to future additions only being applied to
-some of the implementations and everything getting out of sync. This
-is already a problem with the PCI/plat split (e.g. the LPM functions
-were only added to xhci-pci even though they should apply to both).
-Also, if I'm not mistaken this code would fail to compile as a module
-(you are referencing lots of symbols that are internal to the xhci-hcd
-module).
+On Thu, 2014-06-19 at 11:49 +0100, Mark Rutland wrote: 
+> diff --git a/arch/arm64/include/asm/image.h b/arch/arm64/include/asm/image.h
+> new file mode 100644
+> index 0000000..8fae075
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/image.h
+> @@ -0,0 +1,62 @@
+> +/*
+> + * Linker script macros to generate Image header fields.
 
-I think at the very least you should add a function
-"xhci_default_driver(struct hc_driver *driver)" to xhci-plat.c (or
-even better to xhci.c and use it for PCI as well) that initializes all
-function pointers to the default (internal) symbols, and can then be
-overridden afterwards.
+...
+
+> + */
+> +#ifndef __ASM_IMAGE_H
+> +#define __ASM_IMAGE_H
+> +
+> +#ifndef LINKER_SCRIPT
+> +#error This file should only be included in vmlinux.lds.S
+> +#endif
+
+Since this is just used by the linker script, shouldn't it go in
+arch/arm64/kernel/image.h?
+
+-Geoff
