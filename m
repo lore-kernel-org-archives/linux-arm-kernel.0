@@ -1,67 +1,57 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 20 Jun 2014 22:52:49 +0800
-Subject: [PATCH v3 0/4] ARM: sunxi: Introduce Allwinner A23 (sun8i) support
-Message-ID: <1403275973-24259-1-git-send-email-wens@csie.org>
+Date: Fri, 20 Jun 2014 22:52:51 +0800
+Subject: [PATCH v3 2/4] ARM: sunxi: Add earlyprintk support using R_UART
+ (sun6i/sun8i)
+In-Reply-To: <1403275973-24259-1-git-send-email-wens@csie.org>
+References: <1403275973-24259-1-git-send-email-wens@csie.org>
+Message-ID: <1403275973-24259-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+sun6i/sun8i have a UART in the RTC block group, which can be used
+as an early console. This is most useful on sun8i as UART0 is muxed
+with MMC0, which is not available if we boot from MMC.
 
-This is v3 of the Allwinner A23 support series. It has been trimmed
-down to only support uarts, timers and reboot via watchdog, as
-requested by Maxime. All of these blocks are compatible with those
-found in the A31, and use the existing drivers in the kernel. The
-series is based on v3.16-rc1.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-The A23 is a mix of Allwinner's previous A20 (sun7i) and A31 (sun6i)
-SoC's, but also a step forward. Most of the IP blocks are the same as
-in the A31, with some features stripped out. However it has a Mali GPU,
-instead of a PowerVR.
-
-The patches are a result of comparing the current working sun6i platform
-with the A23 user manual, and various kernel and u-boot sources for A23
-and A31 from Allwinner.
-
-Patch 1 adds the DT binding for the A23 SoC.
-Patch 2 adds the Kconfig option to select R_UART as the early console.
-Patch 3 adds the DTSI for the SoC. Only the basic stuff.
-Patch 4 adds the DTS for the device I have, which is a cheap A23 tablet.
-
-
-Relevant changes since v2:
-
-  - Changed memory range to 1GB, same as maximum supported size.
-  - Dropped timer_init call.
-  - Trimmed down dtsi/dts to only gic, uarts, timers and the watchdog.
-
-Relevant changes since v1:
-
-  - Change depends on for DEBUG_SUNXI_R_UART
-  - Added memory node to sun8i DTSI
-
-
-Thanks, and sorry for the noise from the previous patches.
-
-
-Cheers
-ChenYu
-
-
-Chen-Yu Tsai (4):
-  ARM: sunxi: Introduce Allwinner A23 support
-  ARM: sunxi: Add earlyprintk support using R_UART (sun6i/sun8i)
-  ARM: sunxi: Add Allwinner A23 dtsi
-  ARM: sun8i: dt: Add Ippo-q8h v5 support
-
- arch/arm/Kconfig.debug                      |  10 ++
- arch/arm/boot/dts/Makefile                  |   2 +
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts |  31 ++++++
- arch/arm/boot/dts/sun8i-a23.dtsi            | 160 ++++++++++++++++++++++++++++
- arch/arm/mach-sunxi/Kconfig                 |   5 +
- arch/arm/mach-sunxi/sunxi.c                 |   9 ++
- 6 files changed, 217 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
- create mode 100644 arch/arm/boot/dts/sun8i-a23.dtsi
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8f90595..3548612 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -715,6 +715,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Allwinner A1X based platforms on the UART1.
+ 
++	config DEBUG_SUNXI_R_UART
++		bool "Kernel low-level debugging messages via sunXi R_UART"
++		depends on MACH_SUN6I || MACH_SUN8I
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Allwinner A31/A23 based platforms on the R_UART.
++
+ 	config TEGRA_DEBUG_UART_AUTO_ODMDATA
+ 		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
+ 		depends on ARCH_TEGRA
+@@ -1043,6 +1051,7 @@ config DEBUG_UART_PHYS
+ 	default 0x01c28400 if DEBUG_SUNXI_UART1
+ 	default 0x01d0c000 if DEBUG_DAVINCI_DA8XX_UART1
+ 	default 0x01d0d000 if DEBUG_DAVINCI_DA8XX_UART2
++	default 0x01f02800 if DEBUG_SUNXI_R_UART
+ 	default 0x02530c00 if DEBUG_KEYSTONE_UART0
+ 	default 0x02531000 if DEBUG_KEYSTONE_UART1
+ 	default 0x03010fe0 if ARCH_RPC
+@@ -1118,6 +1127,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf1600000 if ARCH_INTEGRATOR
+ 	default 0xf1c28000 if DEBUG_SUNXI_UART0
+ 	default 0xf1c28400 if DEBUG_SUNXI_UART1
++	default 0xf1f02800 if DEBUG_SUNXI_R_UART
+ 	default 0xf2100000 if DEBUG_PXA_UART1
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
 -- 
 2.0.0
