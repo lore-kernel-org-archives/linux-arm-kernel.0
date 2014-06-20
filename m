@@ -1,60 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jun 2014 13:11:18 +0100
-Subject: [PATCH RFC 00/30] Initial round of Freescale FEC ethernet patches
-Message-ID: <20140620121118.GR32514@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 20 Jun 2014 13:11:53 +0100
+Subject: [PATCH RFC 02/30] net: fec: iMX6 FEC does not support half-duplex
+ gigabit
+In-Reply-To: <20140620121118.GR32514@n2100.arm.linux.org.uk>
+References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
+Message-ID: <E1Wxxfd-0005Wx-Cl@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is my initial round of patches (roughly half of my total patch
-set) for the Freescale FEC driver.
+The iMX6 gigabit FEC does not support half-duplex gigabit operation.
+Phys attacked to the FEC may support this, and we currently do nothing
+to disable this feature.  This may result in an invalid configuration.
+Mask out phy support for gigabit half-duplex operation.
 
-I'm sending this set out initially for comments and testing.  One of
-my motivations for only sending half is to get this half into a state
-where DaveM is happy to merge it before I sort out the remainder.
-There's quite a lot here, so bear with me on this.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/net/ethernet/freescale/fec_main.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-I've tried to sort the fixes before the cleanups as best I can, but
-reordering the series is a full-time job due to it's size - it's taken
-from Monday until now to get this far with it, so I'm hoping that there
-won't be any "you should rearrange the patches as X" comments.
-
-While the original series was well tested during it's original
-development, including with performance tests on each patch, that
-testing and validation has been lost due to the changes during the
-last merge window, and subsequent rebasing and updating of the patches.
-
-The series is based on v3.16-rc1, and as such, I have added Andy's
-checksum fix to the start of the series.  This patch is not strictly
-part of the RFC, but is included because my complete patch series needs
-to account for that change.
-
-Some of these patches are to fix theoretical problems in the driver
-(ones which have been found via a review of the code) others address
-real observable problems (such as poor half-duplex performance.)
-
-Towards the end of this series, I have included a patch which was
-initially at the beginning of the series for dumping out the state of
-the transmit ring, which is very useful to debug transmit problems.
-This was acceptable when the transmit ring was between 16 and 128
-descriptors, but during the recent merge window, this was increased to
-512 descriptors, so it will now print around 512 lines to the kernel
-message log on transmit timeout.  I'm not entirely convinced this is a
-good idea - maybe it should become optional, or maybe the timed-out ring
-status should be available via debugfs, but that's a problem to retrieve
-if you're running NFS rootfs and the timeout doesn't recover properly.
-
-This series of patches is also available from the following *unstable*
-git branch - unstable as it's provided for convenience so you don't
-have to apply all these patches individually, unstable as the patches
-need to have attributations added, unstable because DaveM will probably
-want to apply them as patches to his tree:
-
-  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git fec-testing
-
- drivers/net/ethernet/freescale/fec.h      |  10 +-
- drivers/net/ethernet/freescale/fec_main.c | 383 +++++++++++++++++-------------
- 2 files changed, 225 insertions(+), 168 deletions(-)
-
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 77037fd377b8..a91fe68030e6 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1667,6 +1667,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
+ 	/* mask with MAC supported features */
+ 	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT) {
+ 		phy_dev->supported &= PHY_GBIT_FEATURES;
++		phy_dev->supported &= ~SUPPORTED_1000baseT_Half;
+ #if !defined(CONFIG_M5272)
+ 		phy_dev->supported |= SUPPORTED_Pause;
+ #endif
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
