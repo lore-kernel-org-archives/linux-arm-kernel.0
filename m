@@ -1,56 +1,68 @@
-From: zhangfei.gao@linaro.org (zhangfei)
+From: wens@csie.org (Chen-Yu Tsai)
 Date: Fri, 20 Jun 2014 13:56:54 +0800
-Subject: [PATCH RFC 1/2] libahci_platform: add
- ahci_platform_get_of_property
-In-Reply-To: <53A293CB.3040704@redhat.com>
-References: <xuwei5@hisilicon.com, kefeng.wang@linaro.org,
- > <1403067249-8021-1-git-send-email-zhangfei.gao@linaro.org>
- <1403067249-8021-2-git-send-email-zhangfei.gao@linaro.org>
- <20140618140352.GD11895@leverpostej> <53A24950.2020300@linaro.org>
- <53A293CB.3040704@redhat.com>
-Message-ID: <53A3CD26.3070001@linaro.org>
+Subject: [linux-sunxi] Re: [PATCH v2 17/20] ARM: sunxi: Introduce
+ Allwinner A23 support
+In-Reply-To: <20140618122646.GS19730@lukather>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+ <1403016777-15121-18-git-send-email-wens@csie.org>
+ <20140618122646.GS19730@lukather>
+Message-ID: <CAGb2v67zkwvspdDr-rKv=5uT5mvP4e1ZyzHSSOXmvaiOxA+7OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/19/2014 03:39 PM, Hans de Goede wrote:
-> Hi,
->
-> On 06/19/2014 04:22 AM, zhangfei wrote:
->> Hi Mark,
+On Wed, Jun 18, 2014 at 8:26 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jun 17, 2014 at 10:52:54PM +0800, Chen-Yu Tsai wrote:
+>> The Allwinner A23 is a dual-core Cortex-A7-based SoC. It re-uses most of
+>> the IPs found in previous SoCs, notably the A31.
 >>
->> On 06/18/2014 10:03 PM, Mark Rutland wrote:
->>> On Wed, Jun 18, 2014 at 05:54:08AM +0100, Zhangfei Gao wrote:
->>>> Instead of setting hflags in different files,
->>>> ahci_platform_get_of_property set hpriv->flags when ahci_platform_init_host
->>>> according to property in dts.
->>>
->>> The AHCI_HFLAGS are a Linux implementation detail, so it would be nice
->>> to have a good justification for each of these being turned into DT
->>> properties.
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/mach-sunxi/Kconfig |  8 ++++++++
+>>  arch/arm/mach-sunxi/sunxi.c | 10 ++++++++++
+>>  2 files changed, 18 insertions(+)
 >>
->> Do you mean only add required property now?
+>> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+>> index 0fbd4f1..6434e3b 100644
+>> --- a/arch/arm/mach-sunxi/Kconfig
+>> +++ b/arch/arm/mach-sunxi/Kconfig
+>> @@ -35,4 +35,12 @@ config MACH_SUN7I
+>>       select HAVE_ARM_ARCH_TIMER
+>>       select SUN5I_HSTIMER
+>>
+>> +config MACH_SUN8I
+>> +     bool "Allwinner A23 (sun8i) SoCs support"
+>> +     default ARCH_SUNXI
+>> +     select ARCH_HAS_RESET_CONTROLLER
+>> +     select ARM_GIC
+>> +     select MFD_SUN6I_PRCM
+>> +     select RESET_CONTROLLER
+>> +
+>>  endif
+>> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+>> index 3f9587b..962ff30 100644
+>> --- a/arch/arm/mach-sunxi/sunxi.c
+>> +++ b/arch/arm/mach-sunxi/sunxi.c
+>> @@ -53,3 +53,13 @@ static const char * const sun7i_board_dt_compat[] = {
+>>  DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+>>       .dt_compat      = sun7i_board_dt_compat,
+>>  MACHINE_END
+>> +
+>> +static const char * const sun8i_board_dt_compat[] = {
+>> +     "allwinner,sun8i-a23",
+>> +     NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
+>> +     .init_time      = sun6i_timer_init,
 >
-> No you should not add any properties at all using properties to set SoC specific quirks
-> is just wrong, if a device is not 100% ahci compatible you should use a SoC specific
-> compatible string for it, and set quirks in the kernel driver based on that.
->
-> Devicetree is supposed to describe hardware, in this case the quirks are a property
-> of the specific model of the hardware, so this should be expressed through the
-> compatible string. Extra properties in devicetree are meant to be used for board
-> specific things, like having a gpio to enable power to the sata target device.
-> Extra properties should not be used in the way you are proposing to use them now.
->
+> I haven't seen anything in your code that needed to use this
+> function. Am I missing something?
 
-OK, got it.
+My mistake. From the log I thought all timers needed the reset
+controller. Turns out only the high speed timer does.
 
-What I thoutht is using ahci_platform_get_of_property could make 
-ahci_platform.c more shareable, adding the chance of removing specific 
-compatible.
-Just refer mmc_of_parse and sdhci_get_of_property, they are parsing 
-property directly from dts.
+I'll remove the call in the next version.
 
-Anyway, it is fine, here is not so many cases like mmc.
 
-Thanks
+ChenYu
