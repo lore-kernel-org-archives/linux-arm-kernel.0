@@ -1,55 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Jun 2014 18:49:52 +0100
-Subject: [PATCH RFC v1 1/2] documentation/iommu: Add description of
- Hisilicon System MMU binding
-In-Reply-To: <d3c51c2360874a8b9deefaaa8beaf0d9@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1401975430-2648-1-git-send-email-thunder.leizhen@huawei.com>
- <5537408.I9tiuCA96J@wuerfel> <20140616164517.GY16758@arm.com>
- <8028011.DbLMpGku5b@wuerfel> <20140616182645.GD16758@arm.com>
- <836ade98fe6141f58476bf981ac5a6bf@BL2PR03MB468.namprd03.prod.outlook.com>
- <20140618123104.GI32699@arm.com>
- <d3c51c2360874a8b9deefaaa8beaf0d9@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <20140620174952.GD30656@arm.com>
+Date: Fri, 20 Jun 2014 18:50:51 +0100
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <39682213.otHMo6zoRf@wuerfel>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <20140617233714.GD25525@mithrandir>
+ <20140618101439.GF32699@arm.com> <39682213.otHMo6zoRf@wuerfel>
+Message-ID: <20140620175051.GE30656@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 10:54:59AM +0100, Varun Sethi wrote:
-> Hi Will,
+On Fri, Jun 20, 2014 at 04:53:08PM +0100, Arnd Bergmann wrote:
+> On Wednesday 18 June 2014 11:14:39 Will Deacon wrote:
+> > On Wed, Jun 18, 2014 at 12:37:16AM +0100, Thierry Reding wrote:
+> >   - Each master has a set of fixed StreamIDs
+> >   - StreamIDs can be remastered by adding a constant offset (this could also
+> >     be used to describe RequesterID -> StreamID mapping)
+> > 
+> > I'd hope this would be sufficient for most people. Dynamic ID assignment can
+> > be worked out later (I'm not even sure it belongs in this binding) and any
+> > mappings other than `add a constant offset' can be treated on a case-by-case
+> > basis. We don't want to throw the kitchen sink at a language for describing
+> > arbitrary transformations!
+> > 
+> > > We've had similar discussions before (power sequences anyone?) where we
+> > > tried to come up with a generic way to describe something in device tree
+> > > that just didn't work out too well. Some things are better done in code,
+> > > so I think we should at least consider that possibility rather than
+> > > blindly try and force everything into device tree.
+> > 
+> > If we can support 90% of SoCs with a simple DT-based description, we can
+> > address the corner cases as they arise. I'm not ruling our hardcoding
+> > topology if we have no choice, but I don't think that's a healthy place to
+> > start from.
+> 
+> So we could use the "arm,gicv3" comaptible string for all those that
+> have a relatively simple mapping, and describe that mapping entirely
+> in DT properties, but use a different compatible string for those
+> SoCs that have a mapping which we can't easily describe, and then
+> put that into code?
 
-Hello,
-
-> > Note that I *have* been playing with PCI on the ARM SMMU (see the patch
-> > below) but I currently just assume RequesterID == StreamID, which is true
-> > for the platform I'm using.
-
-[...]
-
-> > @@ -1596,15 +1634,35 @@ static int arm_smmu_add_device(struct device
-> > *dev)
-> >               return PTR_ERR(group);
-> >       }
-> >
-> > +     if (dev_is_pci(dev)) {
-> > +             struct arm_smmu_master_cfg *cfg;
-> > +             struct pci_dev *pdev = to_pci_dev(dev);
-> > +
-> > +             cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
-> > +             if (!cfg) {
-> > +                     ret = -ENOMEM;
-> > +                     goto out_put_group;
-> > +             }
-> > +
-> > +             cfg->num_streamids = 1;
-> > +             cfg->streamids[0] = PCI_DEVID(pdev->bus->number, pdev-
-> > >devfn);
-> [Sethi Varun-B16395] We should be considering the bus topology i.e. what
-> if the device is setting behind a bridge? It's possible the requestor id
-> for the DMA transaction belongs to the bridge. Also, the iommu group
-> creation should also take in to account the topology.
-
-Yeah, as I mentioned above, this assumes that RequesterID == StreamID. Are
-you simply alluding to a non-transparent PCI bridge, or do you have
-something different? For non-transparent bridges, I guess we can re-use the
-code already in the kernel (VFIO handles this with its groups IIUC)?
+That doesn't sound unreasonable, but I don't think we should commit to
+putting things into code until they come along and we can't describe them.
 
 Will
