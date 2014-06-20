@@ -1,53 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Jun 2014 19:25:58 +0400
-Subject: [PATCH v0 2/3] ata: Fix the link down in first attempt for the
- APM X-Gene SoC AHCI SATA host controller driver.
-In-Reply-To: <1403253147-14341-3-git-send-email-stripathi@apm.com>
-References: <1403253147-14341-1-git-send-email-stripathi@apm.com>
- <1403253147-14341-3-git-send-email-stripathi@apm.com>
-Message-ID: <53A45286.2040000@cogentembedded.com>
+From: loeliger@gmail.com (Jon Loeliger)
+Date: Fri, 20 Jun 2014 10:31:06 -0500
+Subject: A clockevent IRQ delivery question
+In-Reply-To: <20140620152335.GT32514@n2100.arm.linux.org.uk>
+References: <CAJgR-BjUpaR0cxew+-fz5YcDu0VKzim-rhLF4j1hEnR_4O+Jsg@mail.gmail.com>
+ <53A446C0.10200@linaro.org>
+ <CAJgR-Bj+tgCpKTT7FxM-1JMvN7CKUgpaikfbXPQx5ep6+7W2mA@mail.gmail.com>
+ <20140620152335.GT32514@n2100.arm.linux.org.uk>
+Message-ID: <CAJgR-BiLiskWsFOK2Nr7ysTktkkAJnz8p4HJBb_YJReN3KzQXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2014 12:32 PM, Suman Tripathi wrote:
+> Note that there is an outstanding bug report that the IRQ affinity
+> forcing breaks CPU hotplug... which would be a regression.  Linus'
+> policy is that if a bug fix causes a new regression, then the bug
+> fix is wrong and needs to be reverted.
 
-> This patch fixes the link down issue by retry for the APM X-Gene SoC
-> SATA host controller driver. Due to board design issue and short margin
-> limitation, it is observed that once out of many thousands power cycle
-> test, the sata link may not link up.
+Thanks, Russell.  Yeah, I *just* saw that too.
 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->   drivers/ata/ahci_xgene.c | 9 +++++++++
->   1 file changed, 9 insertions(+)
+> So... don't hang your hopes on this just yet... the "fix" for this
+> _has_ caused a regression elsewhere, and we need to sort out what
+> we're doing about that first.
 
-> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-> index 5f0f750..d43b6ce 100644
-> --- a/drivers/ata/ahci_xgene.c
-> +++ b/drivers/ata/ahci_xgene.c
-[...]
-> @@ -235,15 +238,21 @@ static int xgene_ahci_do_hardreset(struct ata_link *link,
->   	u8 *d2h_fis = pp->rx_fis + RX_FIS_D2H_REG;
->   	void __iomem *port_mmio = ahci_port_base(ap);
->   	struct ata_taskfile tf;
-> +	int link_down_retry = 0;
->   	int rc;
->   	u32 val;
->
-> +hardreset_retry:
->   	/* clear D2H reception area to properly wait for D2H FIS */
->   	ata_tf_init(link->device, &tf);
->   	tf.command = ATA_BUSY;
->   	ata_tf_to_fis(&tf, 0, 0, d2h_fis);
->   	rc = sata_link_hardreset(link, timing, deadline, online,
->   				 ahci_check_ready);
-> +
-> +	if (!*online)
-> +		if (link_down_retry++ < MAX_LINK_DOWN_RETRY)
+OK, I'll leave things as they stand in my port for now
+as that appears to be working even if not ideal yet!
 
-    Could be folded into single *if* (and so indentation decreased).
+And Daniel, while it looks like I understand it better now (Thanks!),
+I'm going to wait a bit to see where that bug settles out! :-)
 
-> +			goto hardreset_retry;
-
-WBR, Sergei
+Thanks,
+jdl
