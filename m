@@ -1,42 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Jun 2014 11:22:59 +0100
-Subject: [PATCH] arm: ptrace: fix syscall modification under
- PTRACE_O_TRACESECCOMP
-In-Reply-To: <20140618202748.GA9022@www.outflux.net>
-References: <20140618202748.GA9022@www.outflux.net>
-Message-ID: <20140620102258.GA26626@arm.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 20 Jun 2014 11:26:34 +0100
+Subject: [PATCH] ARM: arm925: ensure assembly sets up writethrough mapping
+In-Reply-To: <20140620085759.GG558@drone.musicnaut.iki.fi>
+References: <20140620085759.GG558@drone.musicnaut.iki.fi>
+Message-ID: <E1Wxw1i-0004OA-GW@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+Commit ca8f0b0a545f ("ARM: ensure C page table setup code follows
+assembly code") did what it said on the tin, but some of the older
+CPU code omitted the default cache policy from their files.  This
+results in the kernel running with the caches disabled.  Fix this
+for ARM925.
 
-I'm struggling to see the bug in the current code, so apologies if my
-questions aren't helpful.
+Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/proc-arm925.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-On Wed, Jun 18, 2014 at 09:27:48PM +0100, Kees Cook wrote:
-> An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
-> (stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
-> (stored to current_thread_info()->syscall). When this happens, the
-> syscall can change across the call to secure_computing(), since it may
-> block on tracer notification, and the tracer can then make changes
-> to the process, before we return from secure_computing(). This
-> means the code must respect the changed syscall after the
-> secure_computing() call in syscall_trace_enter(). The same is true
-> for tracehook_report_syscall_entry() which may also block and change
-> the syscall.
-
-I don't think I understand what you mean by `the code must respect the
-changed syscall'. The current code does indeed issue the new syscall, so are
-you more concerned with secure_computing changing ->syscall, then the
-debugger can't see the new syscall when it sees the trap from tracehook?
-Are these even supposed to inter-operate?
-
-> The x86 code handles this (it expects orig_ax to always be the
-> desired syscall). In the ARM case, this means we should not be touching
-> current_thread_info()->syscall after its initial assignment. All failures
-> should result in a -1 syscall, though.
-
-The only time we explicitly touch ->syscall is when we're aborting the call
-(i.e. writing -1), which I think is fine.
-
-Will
+diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
+index 97448c3acf38..ba0d58e1a2a2 100644
+--- a/arch/arm/mm/proc-arm925.S
++++ b/arch/arm/mm/proc-arm925.S
+@@ -502,6 +502,7 @@ __\name\()_proc_info:
+ 	.long	\cpu_val
+ 	.long	\cpu_mask
+ 	.long   PMD_TYPE_SECT | \
++		PMD_SECT_CACHEABLE | \
+ 		PMD_BIT4 | \
+ 		PMD_SECT_AP_WRITE | \
+ 		PMD_SECT_AP_READ
+-- 
+1.8.3.1
