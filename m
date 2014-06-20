@@ -1,74 +1,62 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 20 Jun 2014 16:00:45 +0000
-Subject: [PATCH RFC 04/30] net: fec: fix interrupt handling races
-In-Reply-To: <20140620153614.GU32514@n2100.arm.linux.org.uk>
-References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
- <E1Wxxfn-0005X5-KD@rmk-PC.arm.linux.org.uk>
- <063D6719AE5E284EB5DD2968C1650D6D1725F962@AcuExch.aculab.com>
- <20140620153614.GU32514@n2100.arm.linux.org.uk>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1725FB35@AcuExch.aculab.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Jun 2014 18:18:23 +0200
+Subject: [PATCH v2 04/18] PCI: designware: use untranslated address while
+ programming ATU
+In-Reply-To: <53A1571B.7080806@ti.com>
+References: <1401345500-20188-1-git-send-email-kishon@ti.com>
+ <1401345500-20188-5-git-send-email-kishon@ti.com> <53A1571B.7080806@ti.com>
+Message-ID: <5173253.SQfLkZY3Wx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux
-> On Fri, Jun 20, 2014 at 12:39:57PM +0000, David Laight wrote:
-> > It is usually possible to reduce the interrupt count even further by:
-> > 1) processing the rings.
-> > 2) clear the IRQ.
-> > 3) check the rings for new entries, if any start again.
-> > This means that you don't take the interrupt for anything that completes
-> > while processing the earlier ring entries.
-> >
-> > The slight downside is that it is easy to exit the ISR before the IRQ
-> > line actually drops - resulting in a spurious interrupt.
-> >
-> > (patch 24 seems to be similar).
+On Wednesday 18 June 2014 14:38:43 Kishon Vijay Abraham I wrote:
+> On Thursday 29 May 2014 12:08 PM, Kishon Vijay Abraham I wrote:
+> > 
+> > Here the CPU address for configuration space is 0x20013000 and the controller
+> > address for configuration space is 0x13000. The controller address should be
+> > used while programming the ATU (in order for translation to happen properly in
+> > DRA7xx).
 > 
-> ITYM patch 26, as patch 24 is an update to the errata workaround.
+> I've fixed this up with what you suggested in the v1 of the series. Do you
+> think this is fine?
 
-Misread my jottings.
-> 
-> Patch 4 is what I regard to be the bare minimum fix, patch 26 is an
-> improvement over it.
-> 
-> Remember though that the real interrupt processing happens in the NAPI
-> handler, not the main interrupt handler - upon seeing a transmit and/or
-> receive complete interrupt, the main interrupt handler masks both of
-> these interrupts at the chip and triggers the NAPI handler to run.
-> 
-> Nevertheless, your suggestion is equally valid for a NAPI handler:
-> - process the rings
-> - clear the interrupt(s)
-> - if more work is allowed (according to the NAPI weight), repeat
+Hi Kishon,
 
-Not quite, you only want to clear the hardware IRQ and unmask the ISR
-when there are no ring entries to process.
-(There is no point doing the slow bus cycles until then.)
+Yes, I think this will work and do the right thing in all cases. I'm not
+completely sure if the change should be generalized into the range
+parser or better kept in the pcie-designware driver as you do it here:
 
-If you clear the hardware IRQ at the start of processing the ring you'll
-get another interrupt when you finally enable the interrupt for a rx
-packet that arrives while processing the earlier packets.
-However you must check the ring AFTER clearing the IRQ - otherwise
-you miss the interrupt for a packet the arrives at that time.
+> > @@ -406,6 +413,12 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >               pp->config.cfg1_size = resource_size(cfg_res)/2;
+> >               pp->cfg0_base = cfg_res->start;
+> >               pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
+> > +
+> > +             /* Find the untranslated configuration space address */
+> > +             index = of_property_match_string(np, "reg-names", "config");
+> > +             addrp = of_get_address(np, index, false, false);
+> > +             pp->cfg0_mod_addr = of_read_number(addrp, ns);
+> > +             pp->cfg1_mod_addr = pp->cfg0_mod_addr + pp->config.cfg0_size;
 
-So the sequence is:
-1) Find that there are no ring entries to process.
-(a packet can arrive here)
-2) Clear the IRQ request.
-3) Check there are still no ring entries to process.
-4) Unmask the interrupt.
+I think I've recently seen some objections to hand-parsing standard
+properties in driver code.
 
-> This is simple enough for the RX ring, where each packet received is
-> equal one one NAPI unit of work.  The TX side is less obvious as
-> the NAPI documentation suggests that cleaning the ring partially
-> equates to no NAPI units of work but a clean of the entire ring
-> equates to the full allowance.  Maybe I've mis-understood something
-> there (which would mean there's another bug which needs fixing in the
-> tx reaping code...)
+> >       } else {
+> >               dev_err(pp->dev, "missing *config* reg space\n");
+> >       }
+> > @@ -431,12 +444,20 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >                       pp->config.io_size = resource_size(&pp->io);
+> >                       pp->config.io_bus_addr = range.pci_addr;
+> >                       pp->io_base = range.cpu_addr;
+> > +
+> > +                     /* Find the untranslated IO space address */
+> > +                     pp->io_mod_addr = of_read_number(parser.range -
+> > +                                                      parser.np + na, ns);
+> >               }
 
-I've never tried to understand NAPI work limits.
-I suspect that once the NAPI callbacks for other devices (etc) have
-had a chance to run, you get called again.
-So you'd leave the hardware interrupt masked until then.
+So the of_read_number() call could be moved into of_pci_range_to_resource(),
+with another field added to struct of_pci_range to carry the address on
+the parent bus. Any other thoughts on this? Maybe Rob Herring or Andrew
+Murray have a strong opinion on this.
 
-	David
+
+	Arnd
