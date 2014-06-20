@@ -1,106 +1,63 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 20 Jun 2014 16:13:59 -0700
-Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
- suspend/resume
-In-Reply-To: <CAD=FV=Uz9O0i2gmuk2+BHa-Tksvyxv0+MTi2UEjVREAMNCK7Ug@mail.gmail.com>
- (Doug Anderson's message of "Fri, 20 Jun 2014 15:05:56 -0700")
-References: <1403155273-1057-1-git-send-email-dianders@chromium.org>
- <7h8uosyc3k.fsf@paris.lan>
- <CAD=FV=XxNVmF+N5HF4SnZoJRJvkSUkpEx6ct4v2gtmAQ9n28-Q@mail.gmail.com>
- <7hwqcbs166.fsf@paris.lan>
- <CAD=FV=Uz9O0i2gmuk2+BHa-Tksvyxv0+MTi2UEjVREAMNCK7Ug@mail.gmail.com>
-Message-ID: <7h7g4brx6w.fsf@paris.lan>
+From: tthayer@altera.com (tthayer at altera.com)
+Date: Fri, 20 Jun 2014 18:22:01 -0500
+Subject: [PATCHv6 1/3] devicetree: Addition of the Altera SDRAM controller
+Message-ID: <1403306523-4174-2-git-send-email-tthayer@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson <dianders@chromium.org> writes:
+From: Thor Thayer <tthayer@altera.com>
 
-> Kevin,
->
-> On Fri, Jun 20, 2014 at 2:48 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> Hi Doug,
->>
->> Doug Anderson <dianders@chromium.org> writes:
->>
->>> On Thu, Jun 19, 2014 at 11:43 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>> Doug Anderson <dianders@chromium.org> writes:
->>>>
->>>>> The original code for the exynos i2c controller registered for the
->>>>> "noirq" variants.  However during review feedback it was moved to
->>>>> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
->>>>> longer actually "noirq" (despite functions named
->>>>> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
->>>>>
->>>>> i2c controllers that might have wakeup sources on them seem to need to
->>>>> resume at noirq time so that the individual drivers can actually read
->>>>> the i2c bus to handle their wakeup.
->>>>
->>>> I suspect usage of the noirq variants pre-dates the existence of the
->>>> late/early callbacks in the PM core, but based on the description above,
->>>> I suspect what you actually want is the late/early callbacks.
->>>
->>> I think it actually really needs noirq.  ;)
->>
->> Yes, it appears it does.   Objection withdrawn.
->>
->> I just wanted to be sure because since the introduction of late/early,
->> the need for noirq should be pretty rare, but there certainly are needs.
->>
->> <tangent>
->> In this case though, the need for it has more to do with the
->> lack of a way for us to describe non parent-child device dependencies
->> than whether or not IRQs are enabled or not.
->> </tangent>
->
-> Actually, I'm not sure that's true, but I'll talk through it and you
-> can point to where I'm wrong (I often am!)
->
-> If you're a wakeup device then you need to be ready to handle
-> interrupts as soon as the "noirq" phase of resume is done, right?
+Addition of the Altera SDRAM Controller bindings and device tree changes.
 
-As soon as the noirq phase of your own driver is done, correct.
+v2: Changes to SoC SDRAM EDAC code.
 
-> Said another way: you need to be ready to handle interrupts _before_
-> the normal resume code is called and be ready to handle interrupts
-> even _before_ the early resume code is called.
+v3: Implement code suggestions for SDRAM EDAC code.
 
-Correct.
+v4: Remove syscon from SDRAM controller bindings.
 
-> That means if you are implementing a bus that's needed by any devices
-> with wakeup interrupts then it's your responsibility to also be
-> prepared to run this early.
->
-> In this particular case the max77686 driver doesn't need to do
-> anything at all to be ready to handle interrupts.  It's suspend and
-> resume code is just boilerplate "enable wakeups / disable wakeups" and
-> it has no "noirq" code.  The max77686 driver doesn't have any "noirq"
-> wake call because it would just be empty.
->
-> Said another way: the problem isn't that the max77686 wakeup gets
-> called before the i2c wakeup.  The problem is that i2c is needed ASAP
-> once IRQs are enabled and thus needs to be run noirq.
->
-> Does that sound semi-correct?
+v5: No Change, bump version for consistency.
 
-Yes that's correct.
+v6: Only map the ctrlcfg register as syscon.
 
-My point above was (trying to be) that ultimately this is an ordering
-issue.  e.g. the bus device needs to be "ready" before wakeup devices on
-that bus can handle wakeup interrupts etc.  The way we're handling that
-ordering is by the implied ordering of noirq, late/early and "normal"
-callbacks.  That's convenient, but not exactly obvious.   
+Signed-off-by: Thor Thayer <tthayer@altera.com>
+---
+ .../bindings/arm/altera/socfpga-sdram.txt          |   11 +++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
+ 2 files changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
 
-It works because we dont' typically need too many layers here, but it
-would be much more understandable if we could describe this kind of
-dependency in a way that the suspend/resume code would suspend/resume
-things in the right order rather than by tinkering with callback levels
-(since otherwise suspend/resume ordering just depends on probe order.)
-
-This issue then usually gets me headed down my usual rant path about how
-I think runtime PM is much better suited for handling ordering and
-dependencies becuase it automatically handles parent/child dependencies
-and non parent/child dependencies can be handled by taking advantage of
-the get/put APIs which are refcounted, ect etc. but that's another can
-worms.
-
-Kevin
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+new file mode 100644
+index 0000000..5027026
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+@@ -0,0 +1,11 @@
++Altera SOCFPGA SDRAM Controller
++
++Required properties:
++- compatible : "altr,sdr-ctl";
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++	sdrctl at ffc25000 {
++		compatible = "altr,sdr-ctl";
++		reg = <0xffc25000 0x4>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 4676f25..310292e 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -682,6 +682,11 @@
+ 			clocks = <&l4_sp_clk>;
+ 		};
+ 
++		sdrctl at ffc25000 {
++			compatible = "altr,sdr-ctl", "syscon";
++			reg = <0xffc25000 0x4>;
++		};
++
+ 		rst: rstmgr at ffd05000 {
+ 			compatible = "altr,rst-mgr";
+ 			reg = <0xffd05000 0x1000>;
+-- 
+1.7.9.5
