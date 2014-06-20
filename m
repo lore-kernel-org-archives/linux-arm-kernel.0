@@ -1,140 +1,77 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 20 Jun 2014 16:53:09 -0700
-Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
- suspend/resume
-In-Reply-To: <7h7g4brx6w.fsf@paris.lan>
-References: <1403155273-1057-1-git-send-email-dianders@chromium.org>
- <7h8uosyc3k.fsf@paris.lan>
- <CAD=FV=XxNVmF+N5HF4SnZoJRJvkSUkpEx6ct4v2gtmAQ9n28-Q@mail.gmail.com>
- <7hwqcbs166.fsf@paris.lan>
- <CAD=FV=Uz9O0i2gmuk2+BHa-Tksvyxv0+MTi2UEjVREAMNCK7Ug@mail.gmail.com>
- <7h7g4brx6w.fsf@paris.lan>
-Message-ID: <CAD=FV=VmPMf6tCNmKJ1o5J7PyAXoU8fb6+s+Fkv18FH2WaQp7A@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Jun 2014 19:57:53 -0400
+Subject: [PATCH v2] ARM: mvebu: Fix missing binding documentation for
+ Armada 38x
+In-Reply-To: <CAL_JsqKinUvcJ+OOoD70zD6CH393cgZWC+4gRO=8XORyE6fVKA@mail.gmail.com>
+References: <1403196043-6317-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140620185241.GC21711@titan.lakedaemon.net>
+ <CAL_JsqKinUvcJ+OOoD70zD6CH393cgZWC+4gRO=8XORyE6fVKA@mail.gmail.com>
+Message-ID: <20140620235753.GS21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+On Fri, Jun 20, 2014 at 05:33:06PM -0500, Rob Herring wrote:
+> On Fri, Jun 20, 2014 at 1:52 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Thu, Jun 19, 2014 at 06:40:43PM +0200, Gregory CLEMENT wrote:
+> >> For the Armada 380 and Armada 385 SoCs, the common bindings for those
+> >> 2 SoCs, was forgotten. This patch add the documentation for the
+> >> marvell,aramda38x property.
+> >>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> --
+> >> Hi,
+> >>
+> >> This fix should be merged in 3.16. For 3.15 I am not sure as it is not
+> >> a regression.
+> >>
+> >> Changelog:
+> >> v1->v2
+> >>
+> >> - Reformulate to make clear that we will need marvell,armada38x _and_ a
+> >> SoC specific string. For consistency I duplicated what we have done in
+> >> armada-370-xp.txt
+> >>
+> >>
+> >> Thanks,
+> >> Gregory
+> >>
+> >>
+> >>  Documentation/devicetree/bindings/arm/armada-38x.txt | 17 +++++++++++++++--
+> >>  1 file changed, 15 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
+> >> index 11f2330a6554..fa08760046df 100644
+> >> --- a/Documentation/devicetree/bindings/arm/armada-38x.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
+> >> @@ -6,5 +6,18 @@ following property:
+> >>
+> >>  Required root node property:
+> >>
+> >> - - compatible: must contain either "marvell,armada380" or
+> >> -   "marvell,armada385" depending on the variant of the SoC being used.
+> >> +compatible: must contain "marvell,armada38x"
+> >
+> > I agree with Sergei on this one.  We generally avoid wildcards in
+> > compatible strings.  Is there a use case where specifying one of the
+> > below wouldn't be sufficient?
+> 
+> Isn't this a case of just documenting what is already in use?
 
-On Fri, Jun 20, 2014 at 4:13 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Doug Anderson <dianders@chromium.org> writes:
->
->> Kevin,
->>
->> On Fri, Jun 20, 2014 at 2:48 PM, Kevin Hilman <khilman@linaro.org> wrote:
->>> Hi Doug,
->>>
->>> Doug Anderson <dianders@chromium.org> writes:
->>>
->>>> On Thu, Jun 19, 2014 at 11:43 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>>> Doug Anderson <dianders@chromium.org> writes:
->>>>>
->>>>>> The original code for the exynos i2c controller registered for the
->>>>>> "noirq" variants.  However during review feedback it was moved to
->>>>>> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
->>>>>> longer actually "noirq" (despite functions named
->>>>>> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
->>>>>>
->>>>>> i2c controllers that might have wakeup sources on them seem to need to
->>>>>> resume at noirq time so that the individual drivers can actually read
->>>>>> the i2c bus to handle their wakeup.
->>>>>
->>>>> I suspect usage of the noirq variants pre-dates the existence of the
->>>>> late/early callbacks in the PM core, but based on the description above,
->>>>> I suspect what you actually want is the late/early callbacks.
->>>>
->>>> I think it actually really needs noirq.  ;)
->>>
->>> Yes, it appears it does.   Objection withdrawn.
->>>
->>> I just wanted to be sure because since the introduction of late/early,
->>> the need for noirq should be pretty rare, but there certainly are needs.
->>>
->>> <tangent>
->>> In this case though, the need for it has more to do with the
->>> lack of a way for us to describe non parent-child device dependencies
->>> than whether or not IRQs are enabled or not.
->>> </tangent>
->>
->> Actually, I'm not sure that's true, but I'll talk through it and you
->> can point to where I'm wrong (I often am!)
->>
->> If you're a wakeup device then you need to be ready to handle
->> interrupts as soon as the "noirq" phase of resume is done, right?
->
-> As soon as the noirq phase of your own driver is done, correct.
->
->> Said another way: you need to be ready to handle interrupts _before_
->> the normal resume code is called and be ready to handle interrupts
->> even _before_ the early resume code is called.
->
-> Correct.
->
->> That means if you are implementing a bus that's needed by any devices
->> with wakeup interrupts then it's your responsibility to also be
->> prepared to run this early.
->>
->> In this particular case the max77686 driver doesn't need to do
->> anything at all to be ready to handle interrupts.  It's suspend and
->> resume code is just boilerplate "enable wakeups / disable wakeups" and
->> it has no "noirq" code.  The max77686 driver doesn't have any "noirq"
->> wake call because it would just be empty.
->>
->> Said another way: the problem isn't that the max77686 wakeup gets
->> called before the i2c wakeup.  The problem is that i2c is needed ASAP
->> once IRQs are enabled and thus needs to be run noirq.
->>
->> Does that sound semi-correct?
->
-> Yes that's correct.
->
-> My point above was (trying to be) that ultimately this is an ordering
-> issue.  e.g. the bus device needs to be "ready" before wakeup devices on
-> that bus can handle wakeup interrupts etc.  The way we're handling that
-> ordering is by the implied ordering of noirq, late/early and "normal"
-> callbacks.  That's convenient, but not exactly obvious.
->
-> It works because we dont' typically need too many layers here, but it
-> would be much more understandable if we could describe this kind of
-> dependency in a way that the suspend/resume code would suspend/resume
-> things in the right order rather than by tinkering with callback levels
-> (since otherwise suspend/resume ordering just depends on probe order.)
->
-> This issue then usually gets me headed down my usual rant path about how
-> I think runtime PM is much better suited for handling ordering and
-> dependencies becuase it automatically handles parent/child dependencies
-> and non parent/child dependencies can be handled by taking advantage of
-> the get/put APIs which are refcounted, ect etc. but that's another can
-> worms.
+Technically, yes.  However, there are no products shipping with this SoC
+yet.  So there aren't any _real_ users other than the developers
+bringing in mainline support.
 
-Ah, I gotcha.  Yes, I'm a fan of having explicit dependency orderings too.
+> I agree wildcards alone are not good, but along with a specific
+> compatible is okay. But also there should be some need to have the
+> common property.
 
-So I guess in this case the truly correct way to handle it is:
+I'm curious what you would consider to be a sufficient need?  This can
+be easily handled by a match table, but a match table could also be
+considered rather heavy for this task.
 
-1. i2c controller should have Runtime PM even though (as per the code
-now) there's nothing you can do to it to save power under normal
-circumstances.  So the runtime "suspend" code would be a no-op.
+I think any implementation-based justification is prone to opening a can
+of worms.  And I'm struggling to see a DT-only justification...
 
-2. When the i2c controller is told to runtime resume, it should
-double-check if a full SoC poweroff has happened since the last time
-it checked.  In this case it should reinit its hardware.
+thx,
 
-3. If the i2c controller gets a full "resume" callback then it should
-also reinit the hardware just so it's not sitting in a half-configured
-state until the first peripheral uses it.
-
-If later someone finds a way to power gate the i2c controller when no
-active transfers are going (and we actually save non-trivial power
-doing this) then we've got a nice place to put that code.
-
-NOTE: Unless we can actually save power by power gating the i2c
-peripheral when there are no active transfers, we would also just have
-the i2c_xfer() init the hardware if needed.  Maybe that's kinda gross,
-though.
-
-
--Doug
-
-
-P.S. Just to confirm: you're not opposed to landing the noirq code
-as-is.  This discussion is about how someone could make it better in
-the future...
+Jason.
