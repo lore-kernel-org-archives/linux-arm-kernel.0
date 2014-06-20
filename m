@@ -1,74 +1,41 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 20 Jun 2014 20:15:06 +0800
-Subject: [PATCH 1/2] drm/exynos/fbdev: don't set fix.smem/mmio_{start, len}
-In-Reply-To: <20140620025938.2e80efa0@i7>
-References: <1396603322-13585-1-git-send-email-djkurtz@chromium.org>
- <20140620025938.2e80efa0@i7>
-Message-ID: <CAGS+omCT6u6rBz0QKTju3d=_+G29RD515M5BeX_KEbvWyANg9Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Jun 2014 14:23:28 +0200
+Subject: [PATCH] staging/lustre: disable virtual block device for 64K pages
+In-Reply-To: <20140619191051.GA26573@kroah.com>
+References: <20140619183321.GA23200@fluid.dannf>
+ <20140619191051.GA26573@kroah.com>
+Message-ID: <4592947.kMtdJTsB2U@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 7:59 AM, Siarhei Siamashka
-<siarhei.siamashka@gmail.com> wrote:
->
-> On Fri,  4 Apr 2014 17:22:01 +0800
-> Daniel Kurtz <djkurtz@chromium.org> wrote:
->
-> > Kernel access to the eyxnos fbdev framebuffer is via its gem object's
-> > kernel mapping (kvaddr, stored in info->screen_base).
-> >
-> > User space access is provided by mmap(), read() and write() of /dev/fb/fb0.
-> > These functions also only use screen_base/screen_size().
-> >
-> > Therefore, it is not necessary to set fix->smem_{start,len} or
-> > fix->mmio_{start,len} fields.
-> >
-> > This avoids leaking kernel, physical and dma mapped addresses to user
-> > space via the ioctls FBIOGET_VSCREENINFO and FBIOGET_FSCREENINFO.
-> >
-> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> > ---
-> >  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 7 -------
-> >  1 file changed, 7 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> > index 5fa342e..2dcc589 100644
-> > --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> > +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> > @@ -123,14 +123,7 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
-> >
-> >       dev->mode_config.fb_base = (resource_size_t)buffer->dma_addr;
-> >       fbi->screen_base = buffer->kvaddr + offset;
-> > -     if (is_drm_iommu_supported(dev))
-> > -             fbi->fix.smem_start = (unsigned long)
-> > -                     (page_to_phys(sg_page(buffer->sgt->sgl)) + offset);
-> > -     else
-> > -             fbi->fix.smem_start = (unsigned long)buffer->dma_addr;
-> > -
-> >       fbi->screen_size = size;
-> > -     fbi->fix.smem_len = size;
->
-> Can we keep proper initialization of 'smem_len'? Some userland
-> applications use it for calculating the size for mmap:
->
->     http://cgit.freedesktop.org/xorg/xserver/tree/hw/xfree86/fbdevhw/fbdevhw.c?id=xorg-server-1.15.99.903#n571
->
-> >
-> >       return 0;
-> >  }
->
-> Basically, this patch breaks the xf86-video-fbdev ddx and some users
-> are already unhappy.
+The lustre virtual block device cannot handle 64K pages and fails at compile
+time. To avoid running into this error, let's disable the Kconfig option
+for this driver in cases it doesn't support.
 
+Reported-by: Dann Frazier <dann.frazier@canonical.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I'm so sorry this patch broke things for some users.
-Can you upload a patch to correct it?
-I'll happily review it.
+---
+On Thursday 19 June 2014 12:10:51 Greg KH wrote:
+> On Thu, Jun 19, 2014 at 12:33:21PM -0600, dann frazier wrote:
+> > drivers/staging/lustre/lustre/llite/lloop.c:523:18: error: previously used here
+> >   CLASSERT(PAGE_CACHE_SIZE < (1 << (sizeof(unsigned short) * 8)));
+> >                   ^
+> 
+> Looks like lustre can't handle 64K page sizes, so it refuses to build :(
+> 
+> I sugest turning this code off, you really don't want to be running it
+> anyway...
 
--djk
+something like this?
 
->
->
-> --
-> Best regards,
-> Siarhei Siamashka
+diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
+index 209e4c7..4f65ba1 100644
+--- a/drivers/staging/lustre/lustre/Kconfig
++++ b/drivers/staging/lustre/lustre/Kconfig
+@@ -57,4 +57,5 @@ config LUSTRE_TRANSLATE_ERRNOS
+ config LUSTRE_LLITE_LLOOP
+ 	tristate "Lustre virtual block device"
+ 	depends on LUSTRE_FS && BLOCK
++	depends on !PPC_64K_PAGES && !ARM64_64K_PAGES
+ 	default m
