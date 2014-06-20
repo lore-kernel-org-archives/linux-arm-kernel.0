@@ -1,40 +1,35 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 20 Jun 2014 08:36:46 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogaS5NWCBzeXN0ZW06IFNpbXBsaWZ5IGhh?=
- =?UTF-8?B?bmRsaW5nIHdhdGNoZG9nIGNsb2Nr?=
-In-Reply-To: <20140620042651.GC7299@dragon>
-References: <1402644373-8408-1-git-send-email-shc_work@mail.ru>
- <20140620042651.GC7299@dragon>
-Message-ID: <1403239006.737527842@f277.i.mail.ru>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Thu, 19 Jun 2014 21:59:28 -0700
+Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
+In-Reply-To: <CAJe_ZhcSMrN6OeRjo7cG7CMobjEPMMB7o0eUD9HAFskravSQ3w@mail.gmail.com>
+References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <7hvbrzbh1u.fsf@paris.lan>
+ <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
+ <7hzjha8b97.fsf@paris.lan>
+ <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
+ <7hegym6uca.fsf@paris.lan>
+ <CAJe_ZhfmsgvnVu-VgN63LaZ-522HuAY_EVfB6ujQjdzBE+u=zA@mail.gmail.com>
+ <CAJAp7OgfsVs9C0RNrDnQ5g7heba7JjaYFrj7wVUqT_m+wu-A3A@mail.gmail.com>
+ <CAJe_ZhcSMrN6OeRjo7cG7CMobjEPMMB7o0eUD9HAFskravSQ3w@mail.gmail.com>
+Message-ID: <CAJAp7OgXDYh1VEZ43UBbs8L-d2P-7ub0Yg3s73BcqC6ekzEBJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fri, 20 Jun 2014 12:26:52 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> On Fri, Jun 13, 2014 at 11:26:12AM +0400, Alexander Shiyan wrote:
-> > This patch simplifies handling watchdog clock a bit.
-> > As an additional change, now we properly check WDT clock in a reset
-> > function.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/mach-imx/system.c | 20 +++++++-------------
-> >  1 file changed, 7 insertions(+), 13 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-> > index 3b0733e..ae521f3 100644
-> > --- a/arch/arm/mach-imx/system.c
-> > +++ b/arch/arm/mach-imx/system.c
-> > @@ -42,7 +42,7 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
-> >  {
-> >  	unsigned int wcr_enable;
-> >  
-> > -	if (wdog_clk)
-> > +	if (!IS_ERR_OR_NULL(wdog_clk))
-> 
-> I think this should just be if (!IS_ERR(wdog_clk)).
+On Thu, Jun 19, 2014 at 1:01 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+[...]
+> Mailbox isn't about how you program the h/w. Do whatever is needed to
+> send a message across.
+>
 
-No, this is a part of commit log.
-wdog_clk can be NULL if mxc_arch_reset_init() is not called, 
-so we just protect mxc_restart() for such cases.
+But there are no messages to get across here, each individual resource
+is exposed directly in the address space of the Linux system.
 
----
+> BTW I haven't looked closely, but probably you could push the data tables in DT?
+>
+
+The first RFC for this had all configuration in devicetree; we decided
+not to go that path as this gave a cleaner abstraction and is less
+error prone.
+
+Regards,
+Bjorn
