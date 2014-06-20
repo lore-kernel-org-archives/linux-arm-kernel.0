@@ -1,22 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Jun 2014 09:56:49 +0100
-Subject: [PATCHv3 0/4] arm64: simplify restrictions on bootloaders
-In-Reply-To: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
-References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20140620085649.GI25104@arm.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 20 Jun 2014 11:57:59 +0300
+Subject: v3.16-rc1 & default cachepolicy
+In-Reply-To: <20140619233626.GI3705@n2100.arm.linux.org.uk>
+References: <20140619203655.GE558@drone.musicnaut.iki.fi>
+ <20140619205853.GH3705@n2100.arm.linux.org.uk>
+ <20140619224004.GF558@drone.musicnaut.iki.fi>
+ <20140619233626.GI3705@n2100.arm.linux.org.uk>
+Message-ID: <20140620085759.GG558@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 11:49:19AM +0100, Mark Rutland wrote:
-> Hi all,
+Hi,
+
+On Fri, Jun 20, 2014 at 12:36:26AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 20, 2014 at 01:40:04AM +0300, Aaro Koskinen wrote:
+> > So I tried the below change. But now it hangs early, even before
+> > the earlyprintk is working. :-/
 > 
-> This is version 3 of the boot simplification series I posted previously [1,4].
-> Many thanks to those who reviewed / tested the prior postings.
+> Thanks for trying.  I notice you said "write-through", so can you
+> drop the PMD_SECT_BUFFERABLE flag and try again please?
 
-Other than my minor comments:
+Yes, that works.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-for the series.
-
-Will
+A.
