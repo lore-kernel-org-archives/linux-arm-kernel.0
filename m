@@ -1,62 +1,71 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 19 Jun 2014 22:17:40 -0700
-Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <7hegym6uca.fsf@paris.lan>
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- <7hvbrzbh1u.fsf@paris.lan>
- <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
- <7hzjha8b97.fsf@paris.lan>
- <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
- <7hegym6uca.fsf@paris.lan>
-Message-ID: <CAJAp7Ogw967gbBGmiifhtNTsZ57g8MMy4mUR1YwvpWVSZnmOjA@mail.gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Fri, 20 Jun 2014 13:17:29 +0800
+Subject: [PATCH] ARM: dts: imx6sx-sdb: add gpio key support
+Message-ID: <1403241449-31514-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 9:44 AM, Kevin Hilman <khilman@linaro.org> wrote:
-[...]
-> Thinking more about what this RPM driver actually does, and since you
-> mentioned patterns across SoCs, it seems to me the RPM driver bascially
-> just doing the IPC.
->
+This patch adds support for imx6sx-sdb board's gpio keys:
 
-Yes, technically this is IPC. But it's all exposed in memory as if it
-was hardware, so there's no messages or packets to be interpreted by
-the other side.
+SW4(FUNC1): KEY_VOLUMEUP
+SW5(FUNC2): KEY_VOLUMEDOWN
 
-> So, rather than MFD or drivers/soc, it seems to me that it should be
-> implmented as a controller in the new common mailbox framwork[1] being
-> worked on by Jassi Brar (added to Cc.)
->
-> IIUC, RPM is actually only doing one-way IPC (it only exposes a write()
-> interface to clients) so it seems like a rather simple implementation of
-> a mailbox controller.
->
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/boot/dts/imx6sx-sdb.dts |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-What I think you miss here is the detail of that what the regulator
-writes is not what is passed over the IPC, but rather is just an
-interface to abstract away how things are spread our in the register
-space.
-
-So the only place where we do have a "mailbox" here is the actual
-function call between the regulator and the rpm drivers; not between
-the rpm driver and the rpm.
-
-> I believe Bjorn is already on the list of folks Cc'd on the common
-> mailbox framework, so it would be good to hear from him why RPM wouldn't
-> fit under that framework.
->
-
-In a separate group of Qualcomm platforms the communication with the
-RPM is done by passing messages over a shared memory channel; as this
-requires a completely different implementation of the rpm driver, I
-have started to look at Jassi's patch series.
-
-Unfortunately at this point it does not look like the proposed mailbox
-framework would reduce the complexity of the implementation nor
-provide any additional benefits when it comes to being able to
-exchange the underlaying communication methods.
-
-But I will continue to follow the development of the mailbox framework.
-
-Regards,
-Bjorn
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 9906f65..e082e84 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -8,6 +8,8 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ #include "imx6sx.dtsi"
+ 
+ / {
+@@ -18,6 +20,24 @@
+ 		stdout-path = &uart1;
+ 	};
+ 
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEUP>;
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEDOWN>;
++		};
++	};
++
+ 	memory {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+@@ -114,6 +134,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_gpio_keys: gpio_keysgrp {
++			fsl,pins = <
++				MX6SX_PAD_CSI_DATA04__GPIO1_IO_18 0x17059
++				MX6SX_PAD_CSI_DATA05__GPIO1_IO_19 0x17059
++			>;
++		};
++
+ 		pinctrl_vcc_sd3: vccsd3grp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+-- 
+1.7.9.5
