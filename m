@@ -1,36 +1,18 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 20 Jun 2014 16:33:32 -0400
-Subject: [PATCH] ARM: mvebu: Fix broken SoC ID detection
-In-Reply-To: <1402347165-19988-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1402347165-19988-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140620203332.GI21711@titan.lakedaemon.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 21 Jun 2014 00:34:57 +0400
+Subject: [PATCH v4 0/2] Add R8A7790/Lager board PCI USB DT support
+Message-ID: <201406210034.57784.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 09, 2014 at 05:52:45PM -0300, Ezequiel Garcia wrote:
-> Currently the mvebu boards need to detect the SoC revision in order to apply
-> some quirks needed to workaround issues found on I2C and thermal controllers
-> present only in very early SoC.
-> 
-> This detection requires PCI address translation to work, so we need to
-> explicitly select OF_ADDRESS_PCI.
-> 
-> This can be considered a partial revert of the following commit, that
-> wrongly removed the option selection:
-> 
-> commit 55400f3a1f89e39761f45c19f6e4235a329c400b
-> Author: Rob Herring <robh@kernel.org>
-> Date:   Tue Apr 22 14:15:52 2014 -0500
-> 
->     ARM: mvebu: clean-up unneeded kconfig selects
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+Hello.
 
-Applied to mvebu/fixes with Rob's Ack.
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-v3.16-rc1-20140618' tag. Here we add PCI USB device tree support
+for the R8A7790-based Lager board. As the 'pci-rcar-gen2' driver device tree
+support has been merged for 3.16, this patchset can now be merged too...
 
-thx,
+[1/2] ARM: shmobile: r8a7790: add internal PCI bridge nodes
+[2/2] ARM: shmobile: lager: enable internal PCI
 
-Jason.
+WBR, Sergei
