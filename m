@@ -1,94 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jun 2014 09:46:21 +0100
-Subject: [PATCH 04/14] arm/arm64: KVM: wrap 64 bit MMIO accesses with
- two 32 bit ones
-In-Reply-To: <53A3F21E.5070306@arm.com>
-References: <1403171152-24067-1-git-send-email-andre.przywara@arm.com>
- <1403171152-24067-5-git-send-email-andre.przywara@arm.com>
- <a090b95a6bf343e9b0ae036f387dc4aa@BY2PR07MB203.namprd07.prod.outlook.com>
- <53A3F21E.5070306@arm.com>
-Message-ID: <53A3F4DD.1090405@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Jun 2014 09:50:08 +0100
+Subject: [PATCHv3 4/4] arm64: Enable TEXT_OFFSET fuzzing
+In-Reply-To: <1403174963-10730-5-git-send-email-mark.rutland@arm.com>
+References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
+ <1403174963-10730-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140620085008.GG25104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/14 09:34, Andre Przywara wrote:
+On Thu, Jun 19, 2014 at 11:49:23AM +0100, Mark Rutland wrote:
+> The arm64 Image header contains a text_offset field which bootloaders
+> are supposed to read to determine the offset (from a 2MB aligned "start
+> of memory" per booting.txt) at which to load the kernel. The offset is
+> not well respected by bootloaders at present, and due to the lack of
+> variation there is little incentive to support it. This is unfortunate
+> for the sake of future kernels where we may wish to vary the text offset
+> (even zeroing it).
 > 
-> On 19/06/14 22:15, Chalamarla, Tirumalesh wrote:
->>
->>
->> -----Original Message-----
->> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Andre Przywara
->> Sent: Thursday, June 19, 2014 2:46 AM
->> To: linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org
->> Cc: christoffer.dall at linaro.org
->> Subject: [PATCH 04/14] arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
->>
->> Some GICv3 registers can and will be accessed as 64 bit registers.
->> Currently the register handling code can only deal with 32 bit accesses, so we do two consecutive calls to cover this.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic.c |   48 +++++++++++++++++++++++++++++++++++++++++++++---
->>  1 file changed, 45 insertions(+), 3 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c index 4c6b212..b3cf4c7 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -906,6 +906,48 @@ static bool vgic_validate_access(const struct vgic_dist *dist,  }
->>  
->>  /*
->> + * Call the respective handler function for the given range.
->> + * We split up any 64 bit accesses into two consecutive 32 bit
->> + * handler calls and merge the result afterwards.
->> + */
->> +static bool call_range_handler(struct kvm_vcpu *vcpu,
->> +			       struct kvm_exit_mmio *mmio,
->> +			       unsigned long offset,
->> +			       const struct mmio_range *range) {
->> +	u32 *data32 = (void *)mmio->data;
->> +	struct kvm_exit_mmio mmio32;
->> +	bool ret;
->> +
->> +	if (likely(mmio->len <= 4))
->> +		return range->handle_mmio(vcpu, mmio, offset);
->> +
->> +	/*
->> +	 * We assume that any access greater than 4 bytes is actually
->> +	 * 8 bytes long, caused by a 64-bit access
->> +	 */
->> +
->> +	mmio32.len = 4;
->> +	mmio32.is_write = mmio->is_write;
->> +
->> +	mmio32.phys_addr = mmio->phys_addr + 4;
->> +	if (mmio->is_write)
->> +		*(u32 *)mmio32.data = data32[1];
->> +	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
->> +	if (!mmio->is_write)
->> +		data32[1] = *(u32 *)mmio32.data;
->> +
->> +	mmio32.phys_addr = mmio->phys_addr;
->> +	if (mmio->is_write)
->> +		*(u32 *)mmio32.data = data32[0];
->> +	ret |= range->handle_mmio(vcpu, &mmio32, offset);
->> +	if (!mmio->is_write)
->> +		data32[0] = *(u32 *)mmio32.data;
->> +
->> +	return ret;
->> +}
->>
->> Any reason to use two 32 bits instead of one 64 bit. AArch32 on ARMv8 may be.
-> 
-> For the registers we care about right now we get along with this split.
-> And it seems to be less intrusive.
-> I have a patch to support native 64-bit accesses, but it needs some more
-> work. If there is high demand for it, I can post it (but Marc didn't
-> like the first version so much ;-) )
+> This patch adds options to arm64 to enable fuzz-testing of text_offset.
+> CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET forces the text offset to a random
+> 16-byte aligned value value in the range [0..2MB) upon a build of the
+> kernel. It is recommended that distribution kernels enable randomization
+> to test bootloaders such that any compliance issues can be fixed early.
 
-The main reason is that GICv3 doesn't mandate nor guarantee any form of
-64bit atomicity. There is strictly no need to provide a guarantee that
-the architecture doesn't/cannot offer (think AArch32 guests for example).
+[...]
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index 1c1b756..566bf80 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -28,4 +28,20 @@ config PID_IN_CONTEXTIDR
+>  	  instructions during context switch. Say Y here only if you are
+>  	  planning to use hardware trace tools with this kernel.
+>  
+> +config ARM64_RANDOMIZE_TEXT_OFFSET
+> +	bool "Randomize TEXT_OFFSET at build time (EXPERIMENTAL)"
+
+Lose the (EXPERIMENTAL) suffix -- this already lives under Kconfig.debug.
+
+> +	default N
+
+I think this is redundant.
+
+> +	help
+> +	  Say Y here if you want the image load offset (AKA TEXT_OFFSET)
+> +	  of the kernel to be randomized at build-time. When selected,
+> +	  this option will cause TEXT_OFFSET to be randomized upon any
+> +	  build of the kernel, and the offset will be reflected in the
+> +	  text_offset field of the resulting Image. This can be used to
+> +	  fuzz-test bootloaders which respect text_offset.
+> +
+> +	  This option is intended for bootloader and/or kernel testing
+> +	  only. Bootloaders must make no assumptions regarding the value
+> +	  of TEXT_OFFSET and platforms must not require a specific
+> +	  value.
+
+Will
