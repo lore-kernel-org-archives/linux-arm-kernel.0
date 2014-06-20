@@ -1,121 +1,95 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:07 +0200
-Subject: [PATCH 7/9] ARM: shmobile: Move r8a7791.h
-In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1403283189-21688-8-git-send-email-geert+renesas@glider.be>
+Date: Fri, 20 Jun 2014 18:53:00 +0200
+Subject: [PATCH 0/9] ARM: shmobile: Move SoC-specific header files
+Message-ID: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change location of r8a7791.h so it can be included as "r8a7791.h"
-instead of the old style <mach/r8a7791.h>
+It's Friday afternoon, hence the ideal time for a no-brainer patch
+series to move the shmobile SoC-specific header files, so they can be
+included as "<soc>.h" instead of the old style <mach/<soc>.h>.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/board-koelsch-reference.c    | 4 +++-
- arch/arm/mach-shmobile/board-koelsch.c              | 4 +++-
- arch/arm/mach-shmobile/pm-r8a7791.c                 | 6 ++++--
- arch/arm/mach-shmobile/{include/mach => }/r8a7791.h | 0
- arch/arm/mach-shmobile/setup-r8a7791.c              | 4 +++-
- arch/arm/mach-shmobile/smp-r8a7791.c                | 4 +++-
- 6 files changed, 16 insertions(+), 6 deletions(-)
+All build-tested. Multi-platform shmobile also boot-tested on
+r8a7791/koelsch.
+
+  [1/9] ARM: shmobile: Move r7s72100.h
+  [2/9] ARM: shmobile: Move r8a73a4.h
+  [3/9] ARM: shmobile: Move r8a7740.h
+  [4/9] ARM: shmobile: Move r8a7778.h
+  [5/9] ARM: shmobile: Move r8a7779.h
+  [6/9] ARM: shmobile: Move r8a7790.h
+  [7/9] ARM: shmobile: Move r8a7791.h
+  [8/9] ARM: shmobile: Move sh7372.h
+  [9/9] ARM: shmobile: Move sh73a0.h
+
+ arch/arm/mach-shmobile/board-ape6evm-reference.c         |  4 +++-
+ arch/arm/mach-shmobile/board-ape6evm.c                   |  4 +++-
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c |  4 +++-
+ arch/arm/mach-shmobile/board-armadillo800eva.c           |  4 +++-
+ arch/arm/mach-shmobile/board-bockw-reference.c           |  4 +++-
+ arch/arm/mach-shmobile/board-bockw.c                     |  4 +++-
+ arch/arm/mach-shmobile/board-genmai-reference.c          |  4 +++-
+ arch/arm/mach-shmobile/board-genmai.c                    |  4 +++-
+ arch/arm/mach-shmobile/board-koelsch-reference.c         |  4 +++-
+ arch/arm/mach-shmobile/board-koelsch.c                   |  4 +++-
+ arch/arm/mach-shmobile/board-kzm9g-reference.c           |  4 +++-
+ arch/arm/mach-shmobile/board-kzm9g.c                     |  4 +++-
+ arch/arm/mach-shmobile/board-lager-reference.c           |  4 +++-
+ arch/arm/mach-shmobile/board-lager.c                     | 14 ++++++++------
+ arch/arm/mach-shmobile/board-mackerel.c                  |  4 +++-
+ arch/arm/mach-shmobile/board-marzen-reference.c          |  4 +++-
+ arch/arm/mach-shmobile/board-marzen.c                    |  4 +++-
+ arch/arm/mach-shmobile/clock-r7s72100.c                  |  3 ++-
+ arch/arm/mach-shmobile/clock-r8a7740.c                   |  3 ++-
+ arch/arm/mach-shmobile/clock-r8a7779.c                   |  3 ++-
+ arch/arm/mach-shmobile/clock-r8a7790.c                   |  3 ++-
+ arch/arm/mach-shmobile/intc-sh73a0.c                     |  4 +++-
+ arch/arm/mach-shmobile/pm-r8a7779.c                      |  4 +++-
+ arch/arm/mach-shmobile/pm-r8a7790.c                      |  4 +++-
+ arch/arm/mach-shmobile/pm-r8a7791.c                      |  6 ++++--
+ arch/arm/mach-shmobile/pm-sh7372.c                       |  4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/r7s72100.h     |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7740.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7778.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7779.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7790.h      |  0
+ arch/arm/mach-shmobile/{include/mach => }/r8a7791.h      |  0
+ arch/arm/mach-shmobile/setup-r7s72100.c                  |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a73a4.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7740.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7778.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7779.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7790.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-r8a7791.c                   |  4 +++-
+ arch/arm/mach-shmobile/setup-sh7372.c                    |  4 +++-
+ arch/arm/mach-shmobile/setup-sh73a0.c                    |  4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/sh7372.h       |  0
+ arch/arm/mach-shmobile/{include/mach => }/sh73a0.h       |  0
+ arch/arm/mach-shmobile/smp-r8a7779.c                     |  4 +++-
+ arch/arm/mach-shmobile/smp-r8a7790.c                     |  4 +++-
+ arch/arm/mach-shmobile/smp-r8a7791.c                     |  4 +++-
+ arch/arm/mach-shmobile/smp-sh73a0.c                      |  4 +++-
+ 48 files changed, 119 insertions(+), 45 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r7s72100.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7740.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7778.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7779.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7790.h (100%)
  rename arch/arm/mach-shmobile/{include/mach => }/r8a7791.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/sh7372.h (100%)
+ rename arch/arm/mach-shmobile/{include/mach => }/sh73a0.h (100%)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 5e0375fdc6f7..3ff88c138896 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -23,11 +23,13 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/rcar-du.h>
--#include <mach/r8a7791.h>
-+
- #include <asm/mach/arch.h>
-+
- #include "clock.h"
- #include "common.h"
- #include "irqs.h"
-+#include "r8a7791.h"
- #include "rcar-gen2.h"
- 
- /* DU */
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index db4b8a311c75..2cd3194a2d47 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -45,11 +45,13 @@
- #include <linux/spi/flash.h>
- #include <linux/spi/rspi.h>
- #include <linux/spi/spi.h>
--#include <mach/r8a7791.h>
-+
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r8a7791.h"
- #include "rcar-gen2.h"
- 
- /* DU */
-diff --git a/arch/arm/mach-shmobile/pm-r8a7791.c b/arch/arm/mach-shmobile/pm-r8a7791.c
-index 15190875d507..b7e6513fb38a 100644
---- a/arch/arm/mach-shmobile/pm-r8a7791.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7791.c
-@@ -10,10 +10,12 @@
-  * for more details.
-  */
- 
--#include <asm/io.h>
- #include <linux/kernel.h>
--#include <mach/r8a7791.h>
-+
-+#include <asm/io.h>
-+
- #include "pm-rcar.h"
-+#include "r8a7791.h"
- 
- /* SYSC */
- #define SYSCIER 0x0c
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7791.h b/arch/arm/mach-shmobile/r8a7791.h
-similarity index 100%
-rename from arch/arm/mach-shmobile/include/mach/r8a7791.h
-rename to arch/arm/mach-shmobile/r8a7791.h
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index 7e970d005f7f..8823324ac5a9 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -26,10 +26,12 @@
- #include <linux/platform_data/irq-renesas-irqc.h>
- #include <linux/serial_sci.h>
- #include <linux/sh_timer.h>
--#include <mach/r8a7791.h>
-+
- #include <asm/mach/arch.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r8a7791.h"
- #include "rcar-gen2.h"
- 
- static const struct resource pfc_resources[] __initconst = {
-diff --git a/arch/arm/mach-shmobile/smp-r8a7791.c b/arch/arm/mach-shmobile/smp-r8a7791.c
-index c6543b6ec759..248255524127 100644
---- a/arch/arm/mach-shmobile/smp-r8a7791.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7791.c
-@@ -17,9 +17,11 @@
- #include <linux/init.h>
- #include <linux/smp.h>
- #include <linux/io.h>
-+
- #include <asm/smp_plat.h>
--#include <mach/r8a7791.h>
-+
- #include "common.h"
-+#include "r8a7791.h"
- #include "rcar-gen2.h"
- 
- #define RST		0xe6160000
--- 
-1.9.1
+Have a nice weekend!
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
