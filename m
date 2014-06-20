@@ -1,60 +1,120 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 20 Jun 2014 13:29:56 -0400
-Subject: [PATCH v2 3/8] PCI: designware: update pcie core driver to work
- with dw hw version 3.65
-In-Reply-To: <53A46EE7.6080209@ti.com>
-References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
- <1402426287-31157-4-git-send-email-m-karicheri2@ti.com>
- <2CC2A0A4A178534D93D5159BF3BCB6619C5F8168DA@EAPEX1MAIL1.st.com>
- <53A46EE7.6080209@ti.com>
-Message-ID: <53A46F94.1020901@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 20 Jun 2014 10:36:35 -0700
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <20140620172330.GA30656@arm.com>
+References: <20140618202748.GA9022@www.outflux.net>
+ <20140620102258.GA26626@arm.com>
+ <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
+ <20140620172330.GA30656@arm.com>
+Message-ID: <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 June 2014 01:27 PM, Murali Karicheri wrote:
-> On 6/18/2014 3:13 AM, Mohit KUMAR DCG wrote:
->> Hello Murali,
+On Fri, Jun 20, 2014 at 10:23 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jun 20, 2014 at 05:44:52PM +0100, Kees Cook wrote:
+>> On Fri, Jun 20, 2014 at 3:22 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > I'm struggling to see the bug in the current code, so apologies if my
+>> > questions aren't helpful.
+>> >
+>> > On Wed, Jun 18, 2014 at 09:27:48PM +0100, Kees Cook wrote:
+>> >> An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
+>> >> (stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
+>> >> (stored to current_thread_info()->syscall). When this happens, the
+>> >> syscall can change across the call to secure_computing(), since it may
+>> >> block on tracer notification, and the tracer can then make changes
+>> >> to the process, before we return from secure_computing(). This
+>> >> means the code must respect the changed syscall after the
+>> >> secure_computing() call in syscall_trace_enter(). The same is true
+>> >> for tracehook_report_syscall_entry() which may also block and change
+>> >> the syscall.
+>> >
+>> > I don't think I understand what you mean by `the code must respect the
+>> > changed syscall'. The current code does indeed issue the new syscall, so are
+>> > you more concerned with secure_computing changing ->syscall, then the
+>> > debugger can't see the new syscall when it sees the trap from tracehook?
+>> > Are these even supposed to inter-operate?
 >>
->>> -----Original Message-----
->>> From: Murali Karicheri [mailto:m-karicheri2 at ti.com]
->>> Sent: Wednesday, June 11, 2014 12:21 AM
->>> To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
->>> linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-
->>> doc at vger.kernel.org
->>> Cc: Murali Karicheri; Santosh Shilimkar; Russell King; Grant Likely; Rob Herring;
->>> Mohit KUMAR DCG; Jingoo Han; Bjorn Helgaas; Pratyush ANAND; Richard
->>> Zhu; Kishon Vijay Abraham I; Marek Vasut; Arnd Bergmann; Pawel Moll;
->>> Mark Rutland; Ian Campbell; Kumar Gala; Randy Dunlap
->>> Subject: [PATCH v2 3/8] PCI: designware: update pcie core driver to work
->>> with dw hw version 3.65
->>>
->>> v3.65 version of the dw hw has MSI controller implemented in the application
->>> space. Add a version variable in the port struct to identify v3.65 hardware for
->>> different code treatment. This variable will have DW_V3_65 bit set when
->>> running on this hw version. The host init code is expected to set this version
->>> based on compatibility string dw,snps-pcie-v3.65.
->>>
->>> Some of the MSI specific functions from current DW driver are re-used on
->>> v3.65 hw. However on v3.65, MSI controller registers are in the application
->>> register space and PCIE_MSI_INTR0_ENABLE is not applicable.
->>> Modify assign_irq() to check for version and not execute the code for
->>> PCIE_MSI_INTR0_ENABLE configuration on v3.65 hw. Additionally MSI IRQ
->>> register in application space is written by EP to raise an MSI IRQ. So add a
->>> get_msi_data() function in pcie_host_ops to retrieve the register address in
->>> dw_msi_setup_irq(). v3.65 dw core driver implements this function.
->>>
->>> Also make some of the functions available in dw core driver global and make
->>> their prototypes available in the header file for re-use on v3.65.
->>>
->> - Pls apply MSI specific changes on the top of Lucas patches:
->> [PATCH 0/4] proper multi MSI handling for designware host
+>> The problem is the use of "scno" in the call -- it results in ignoring
+>> the value that may be set up in ->syscall by a tracer:
 >>
->> Thanks
->> Mohit
-> Ok. I have pulled in Lucas's patches and use it for my work.
+>> syscall_trace_enter(regs, scno):
+>>     current_thread_info()->syscall = scno;
+>>     secure_computing(scno):
+>>         [block on ptrace]
+>>         [ptracer changes current_thread_info()->syscall vis PTRACE_SET_SYSCALL]
+>>     ...
+>>     return scno;
+>>
+>> This means the tracer's changed syscall value will be ignored
+>> (syscall_trace_enter returns original "scno" instead of actual
+>> current_thread_info()->syscall). In the original code, failure cases
+>> were propagated correctly, but not tracer-induced changes.
+>>
+>> Is that more clear? It's not an obvious state (due to the external
+>> modification of process state during the ptrace blocking). I've also
+>> got tests for this, if that's useful to further illustrate:
+>>
+>> https://github.com/kees/seccomp/commit/bd24e174593f79784b97178b583f17e0ea9d2aa7
+>
+> Right, gotcha. Thanks for the explanation. I was confused, because
+> tracehook_report_syscall does the right thing (returns
+> current_thread_info()->syscall), but if we don't have TIF_SYSCALL_TRACE set,
+> then updates during the secure_computing callback will be ignored.
+>
+> However, my fix to this is significantly smaller than your patch, so I fear
+> I'm still missing something.
 
-Are those patches already acked and getting into the queue. Please
-don't create UN-necessary merge dependencies otherwise.
+Oh, yes, that's much smaller. Nice! I will test this and report back.
 
-regards,
-Santosh
+>
+> Will
+>
+> --->8
+>
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 0dd3b79b15c3..0c27ed6f3f23 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -908,7 +908,7 @@ enum ptrace_syscall_dir {
+>         PTRACE_SYSCALL_EXIT,
+>  };
+>
+> -static int tracehook_report_syscall(struct pt_regs *regs,
+> +static void tracehook_report_syscall(struct pt_regs *regs,
+>                                     enum ptrace_syscall_dir dir)
+>  {
+>         unsigned long ip;
+> @@ -926,7 +926,6 @@ static int tracehook_report_syscall(struct pt_regs *regs,
+>                 current_thread_info()->syscall = -1;
+>
+>         regs->ARM_ip = ip;
+> -       return current_thread_info()->syscall;
+>  }
+>
+>  asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+> @@ -938,7 +937,9 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+>                 return -1;
+>
+>         if (test_thread_flag(TIF_SYSCALL_TRACE))
+> -               scno = tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+> +               tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+> +
+> +       scno = current_thread_info()->syscall;
+
+Perhaps it'd be worth adding a comment above this line just for people
+looking at this in the future. Something like:
+
+/* secure_computing and tracehook_report_syscall may have changed syscall */
+
+-Kees
+
+>
+>         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>                 trace_sys_enter(regs, scno);
+
+
+
+-- 
+Kees Cook
+Chrome OS Security
