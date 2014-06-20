@@ -1,130 +1,160 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:09 +0200
-Subject: [PATCH 9/9] ARM: shmobile: Move sh73a0.h
+Date: Fri, 20 Jun 2014 18:53:06 +0200
+Subject: [PATCH 6/9] ARM: shmobile: Move r8a7790.h
 In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
 References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1403283189-21688-10-git-send-email-geert+renesas@glider.be>
+Message-ID: <1403283189-21688-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change location of sh73a0.h so it can be included as "sh73a0.h"
-instead of the old style <mach/sh73a0.h>
+Change location of r8a7790.h so it can be included as "r8a7790.h"
+instead of the old style <mach/r8a7790.h>
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/board-kzm9g-reference.c     | 4 +++-
- arch/arm/mach-shmobile/board-kzm9g.c               | 4 +++-
- arch/arm/mach-shmobile/intc-sh73a0.c               | 4 +++-
- arch/arm/mach-shmobile/setup-sh73a0.c              | 4 +++-
- arch/arm/mach-shmobile/{include/mach => }/sh73a0.h | 0
- arch/arm/mach-shmobile/smp-sh73a0.c                | 4 +++-
- 6 files changed, 15 insertions(+), 5 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/sh73a0.h (100%)
+ arch/arm/mach-shmobile/board-lager-reference.c      |  4 +++-
+ arch/arm/mach-shmobile/board-lager.c                | 14 ++++++++------
+ arch/arm/mach-shmobile/clock-r8a7790.c              |  3 ++-
+ arch/arm/mach-shmobile/pm-r8a7790.c                 |  4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/r8a7790.h |  0
+ arch/arm/mach-shmobile/setup-r8a7790.c              |  4 +++-
+ arch/arm/mach-shmobile/smp-r8a7790.c                |  4 +++-
+ 7 files changed, 22 insertions(+), 11 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7790.h (100%)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index e6285de6bc87..5d2621f202d1 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -25,11 +25,13 @@
- #include <linux/irq.h>
- #include <linux/input.h>
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index c2175c8e1ce7..41c808e56005 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -22,11 +22,13 @@
+ #include <linux/init.h>
  #include <linux/of_platform.h>
--#include <mach/sh73a0.h>
+ #include <linux/platform_data/rcar-du.h>
+-#include <mach/r8a7790.h>
 +
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
 +
+ #include "clock.h"
  #include "common.h"
-+#include "sh73a0.h"
+ #include "irqs.h"
++#include "r8a7790.h"
+ #include "rcar-gen2.h"
  
- static void __init kzm_init(void)
- {
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index fff330f74925..1320e9d063b1 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -41,15 +41,17 @@
- #include <linux/usb/r8a66597.h>
+ /* DU */
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index 6fb08dbc953c..b8b2b44970ce 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -31,6 +31,8 @@
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mmcif.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/mtd.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/camera-rcar.h>
+ #include <linux/platform_data/gpio-rcar.h>
+@@ -43,21 +45,21 @@
+ #include <linux/regulator/gpio-regulator.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/sh_eth.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/rspi.h>
++#include <linux/spi/spi.h>
+ #include <linux/usb/phy.h>
  #include <linux/usb/renesas_usbhs.h>
- #include <linux/videodev2.h>
+-#include <mach/r8a7790.h>
 +
- #include <sound/sh_fsi.h>
- #include <sound/simple_card.h>
--#include <mach/sh73a0.h>
- #include <asm/hardware/cache-l2x0.h>
+ #include <media/soc_camera.h>
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
- #include <video/sh_mobile_lcdc.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/spi/flash.h>
+-#include <linux/spi/rspi.h>
+-#include <linux/spi/spi.h>
+ #include <sound/rcar_snd.h>
+ #include <sound/simple_card.h>
 +
  #include "common.h"
  #include "irqs.h"
-+#include "sh73a0.h"
++#include "r8a7790.h"
+ #include "rcar-gen2.h"
  
  /*
-  * external GPIO
-diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-index 1a8f9a7af983..44457a94897b 100644
---- a/arch/arm/mach-shmobile/intc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-@@ -24,11 +24,13 @@
- #include <linux/io.h>
- #include <linux/irqchip.h>
- #include <linux/irqchip/arm-gic.h>
--#include <mach/sh73a0.h>
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index ca980669806f..17435c1aa2fe 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -22,9 +22,10 @@
+ #include <linux/kernel.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/r8a7790.h>
 +
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+
- #include "intc.h"
- #include "irqs.h"
-+#include "sh73a0.h"
+ #include "clock.h"
+ #include "common.h"
++#include "r8a7790.h"
+ #include "rcar-gen2.h"
  
- enum {
- 	UNUSED = 0,
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index b30bbee6dc65..224882151667 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -32,14 +32,16 @@
- #include <linux/sh_timer.h>
- #include <linux/platform_data/sh_ipmmu.h>
- #include <linux/platform_data/irq-renesas-intc-irqpin.h>
--#include <mach/sh73a0.h>
+ /*
+diff --git a/arch/arm/mach-shmobile/pm-r8a7790.c b/arch/arm/mach-shmobile/pm-r8a7790.c
+index 0f1090d851e7..8845433a00b3 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7790.c
++++ b/arch/arm/mach-shmobile/pm-r8a7790.c
+@@ -11,9 +11,11 @@
+  */
+ 
+ #include <linux/kernel.h>
 +
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
+ #include <asm/io.h>
+-#include <mach/r8a7790.h>
++
+ #include "pm-rcar.h"
++#include "r8a7790.h"
+ 
+ /* SYSC */
+ #define SYSCIER 0x0c
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/r8a7790.h
+similarity index 100%
+rename from arch/arm/mach-shmobile/include/mach/r8a7790.h
+rename to arch/arm/mach-shmobile/r8a7790.h
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index a34229d5da41..c37d82d38617 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -26,11 +26,13 @@
+ #include <linux/serial_sci.h>
+ #include <linux/sh_dma.h>
+ #include <linux/sh_timer.h>
+-#include <mach/r8a7790.h>
++
  #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
 +
  #include "common.h"
  #include "dma-register.h"
  #include "irqs.h"
-+#include "sh73a0.h"
++#include "r8a7790.h"
+ #include "rcar-gen2.h"
  
- static struct map_desc sh73a0_io_desc[] __initdata = {
- 	/* create a 1:1 entity map for 0xe6xxxxxx
-diff --git a/arch/arm/mach-shmobile/include/mach/sh73a0.h b/arch/arm/mach-shmobile/sh73a0.h
-similarity index 100%
-rename from arch/arm/mach-shmobile/include/mach/sh73a0.h
-rename to arch/arm/mach-shmobile/sh73a0.h
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index bf4aff99ed1c..22d8f87b23e9 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -22,10 +22,12 @@
+ /* Audio-DMAC */
+diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+index 7590e2b6e2fa..ad66beab2ea6 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7790.c
++++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+@@ -17,10 +17,12 @@
+ #include <linux/init.h>
  #include <linux/smp.h>
  #include <linux/io.h>
- #include <linux/delay.h>
--#include <mach/sh73a0.h>
 +
  #include <asm/smp_plat.h>
- #include <asm/smp_twd.h>
+-#include <mach/r8a7790.h>
 +
  #include "common.h"
-+#include "sh73a0.h"
+ #include "pm-rcar.h"
++#include "r8a7790.h"
  
- #define WUPCR		IOMEM(0xe6151010)
- #define SRESCR		IOMEM(0xe6151018)
+ #define RST		0xe6160000
+ #define CA15BAR		0x0020
 -- 
 1.9.1
