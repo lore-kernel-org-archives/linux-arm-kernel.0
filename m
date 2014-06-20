@@ -1,58 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 21 Jun 2014 00:51:27 +0400
-Subject: [PATCH v3 3/3] ARM: shmobile: henninger: enable internal PCI
-In-Reply-To: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
-References: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201406210051.28040.sergei.shtylyov@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Jun 2014 16:51:47 -0400
+Subject: [PATCHv4 1/4] ARM: Kirkwood: Add setup file for netxbig LEDs
+In-Reply-To: <1401132591-26305-2-git-send-email-andrew@lunn.ch>
+References: <1401132591-26305-1-git-send-email-andrew@lunn.ch>
+ <1401132591-26305-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20140620205147.GL21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
-them.
+On Mon, May 26, 2014 at 09:29:48PM +0200, Andrew Lunn wrote:
+> There is currently no DT binding for the CPLD which controls the LEDs
+> on the Net 2Big and Net 5Big. So use a platform device.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> v3-v4:
+>   rename board-nextbig.c to nextbig.c
+> ---
+>  arch/arm/mach-mvebu/Kconfig    |   7 ++
+>  arch/arm/mach-mvebu/Makefile   |   1 +
+>  arch/arm/mach-mvebu/board.h    |   5 ++
+>  arch/arm/mach-mvebu/kirkwood.c |   3 +
+>  arch/arm/mach-mvebu/netxbig.c  | 191 +++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 207 insertions(+)
+>  create mode 100644 arch/arm/mach-mvebu/netxbig.c
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Applied to mvebu/soc
 
----
-Changes in version 3:
-- refreshed the patch.
+thx,
 
- arch/arm/boot/dts/r8a7791-henninger.dts |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -120,6 +120,16 @@
- 				 "msiof0_tx";
- 		renesas,function = "msiof0";
- 	};
-+
-+	usb0_pins: usb0 {
-+		renesas,groups = "usb0";
-+		renesas,function = "usb0";
-+	};
-+
-+	usb1_pins: usb1 {
-+		renesas,groups = "usb1";
-+		renesas,function = "usb1";
-+	};
- };
- 
- &scif0 {
-@@ -217,3 +227,15 @@
- 		spi-cpha;
- 	};
- };
-+
-+&pci0 {
-+	status = "okay";
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
+Jason.
