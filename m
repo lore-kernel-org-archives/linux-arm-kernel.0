@@ -1,84 +1,110 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Jun 2014 18:53:04 +0200
-Subject: [PATCH 4/9] ARM: shmobile: Move r8a7778.h
+Date: Fri, 20 Jun 2014 18:53:03 +0200
+Subject: [PATCH 3/9] ARM: shmobile: Move r8a7740.h
 In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
 References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1403283189-21688-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1403283189-21688-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change location of r8a7778.h so it can be included as "r8a7778.h"
-instead of the old style <mach/r8a7778.h>
+Change location of r8a7740.h so it can be included as "r8a7740.h"
+instead of the old style <mach/r8a7740.h>
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/board-bockw-reference.c      | 4 +++-
- arch/arm/mach-shmobile/board-bockw.c                | 4 +++-
- arch/arm/mach-shmobile/{include/mach => }/r8a7778.h | 0
- arch/arm/mach-shmobile/setup-r8a7778.c              | 4 +++-
- 4 files changed, 9 insertions(+), 3 deletions(-)
- rename arch/arm/mach-shmobile/{include/mach => }/r8a7778.h (100%)
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 4 +++-
+ arch/arm/mach-shmobile/board-armadillo800eva.c           | 4 +++-
+ arch/arm/mach-shmobile/clock-r8a7740.c                   | 3 ++-
+ arch/arm/mach-shmobile/{include/mach => }/r8a7740.h      | 0
+ arch/arm/mach-shmobile/setup-r8a7740.c                   | 4 +++-
+ 5 files changed, 11 insertions(+), 4 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7740.h (100%)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw-reference.c b/arch/arm/mach-shmobile/board-bockw-reference.c
-index 91ff3a27ccc7..ba840cd333b9 100644
---- a/arch/arm/mach-shmobile/board-bockw-reference.c
-+++ b/arch/arm/mach-shmobile/board-bockw-reference.c
-@@ -19,9 +19,11 @@
-  */
- 
- #include <linux/of_platform.h>
--#include <mach/r8a7778.h>
-+
- #include <asm/mach/arch.h>
-+
- #include "common.h"
-+#include "r8a7778.h"
- 
- /*
-  *	see board-bock.c for checking detail of dip-switch
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 8cb057f95c44..b4e4789017bc 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -34,13 +34,15 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
- #include <linux/usb/renesas_usbhs.h>
-+
- #include <media/soc_camera.h>
--#include <mach/r8a7778.h>
- #include <asm/mach/arch.h>
- #include <sound/rcar_snd.h>
- #include <sound/simple_card.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r8a7778.h"
- 
- #define FPGA	0x18200000
- #define IRQ0MR	0x30
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/r8a7778.h
-similarity index 100%
-rename from arch/arm/mach-shmobile/include/mach/r8a7778.h
-rename to arch/arm/mach-shmobile/r8a7778.h
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index d9f4529d8e40..2ccc0128b469 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -37,11 +37,13 @@
- #include <linux/usb/ehci_pdriver.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/dma-mapping.h>
--#include <mach/r8a7778.h>
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+index 0ae49823e67f..84bc6cb6d5aa 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+@@ -24,10 +24,12 @@
+ #include <linux/kernel.h>
+ #include <linux/gpio.h>
+ #include <linux/io.h>
+-#include <mach/r8a7740.h>
 +
  #include <asm/mach/arch.h>
  #include <asm/hardware/cache-l2x0.h>
 +
  #include "common.h"
- #include "irqs.h"
-+#include "r8a7778.h"
++#include "r8a7740.h"
  
- /* SCIF */
- #define R8A7778_SCIF(index, baseaddr, irq)			\
+ /*
+  * CON1		Camera Module
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 395638da837c..fc73246ca104 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -45,7 +45,7 @@
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/reboot.h>
+-#include <mach/r8a7740.h>
++
+ #include <media/mt9t112.h>
+ #include <media/sh_mobile_ceu.h>
+ #include <media/soc_camera.h>
+@@ -59,9 +59,11 @@
+ #include <video/sh_mobile_hdmi.h>
+ #include <sound/sh_fsi.h>
+ #include <sound/simple_card.h>
++
+ #include "common.h"
+ #include "irqs.h"
+ #include "pm-rmobile.h"
++#include "r8a7740.h"
+ #include "sh-gpio.h"
+ 
+ /*
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index ffefec53b058..789091cfa37a 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -22,9 +22,10 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/r8a7740.h>
++
+ #include "clock.h"
+ #include "common.h"
++#include "r8a7740.h"
+ 
+ /*
+  *        |  MDx  |  XTAL1/EXTAL1   |  System   | EXTALR |
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
+similarity index 100%
+rename from arch/arm/mach-shmobile/include/mach/r8a7740.h
+rename to arch/arm/mach-shmobile/r8a7740.h
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 10170b3560c2..348af358a239 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -31,15 +31,17 @@
+ #include <linux/sh_dma.h>
+ #include <linux/sh_timer.h>
+ #include <linux/platform_data/sh_ipmmu.h>
+-#include <mach/r8a7740.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
++
+ #include "common.h"
+ #include "dma-register.h"
+ #include "irqs.h"
+ #include "pm-rmobile.h"
++#include "r8a7740.h"
+ 
+ static struct map_desc r8a7740_io_desc[] __initdata = {
+ 	 /*
 -- 
 1.9.1
