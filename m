@@ -1,74 +1,100 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 21 Jun 2014 01:25:26 +0400
-Subject: [PATCH v4 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
- nodes
-In-Reply-To: <4490558.0d3xbrzEgW@wuerfel>
-References: <201406210034.57784.sergei.shtylyov@cogentembedded.com>
- <4637423.jWRbL1GbCK@wuerfel> <53A4A0E5.50904@cogentembedded.com>
- <4490558.0d3xbrzEgW@wuerfel>
-Message-ID: <53A4A6C6.9000703@cogentembedded.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 20 Jun 2014 17:43:05 -0400
+Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
+In-Reply-To: <4600246.SKVsl5kA9F@wuerfel>
+References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
+ <5207109.Ir8j6FZuiX@wuerfel>
+ <CAJ5Y-eYd_dyhzOdnxsi96mGN6dqihN_5rw83FsFwauZzUVz9YA@mail.gmail.com>
+ <4600246.SKVsl5kA9F@wuerfel>
+Message-ID: <CAJ5Y-eYN6NfFdKAkv5yrHTdeRNWJfvgPVL61EjZdgN0DYP8zpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2014 01:10 AM, Arnd Bergmann wrote:
+Hello,
 
->>>> +       pci0: pci at ee090000 {
->>>> +               compatible = "renesas,pci-r8a7790";
->>>> +               clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
->>>> +               reg = <0x0 0xee090000 0x0 0xc00>,
->>>> +                     <0x0 0xee080000 0x0 0x1100>;
->>>> +               interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
->>>> +               status = "disabled";
->>>> +
->>>> +               bus-range = <0 0>;
->>>> +               #address-cells = >;
->>>> +               #size-cells = <2>;
->>>> +               #interrupt-cells = <1>;
->>>> +               interrupt-map-mask = <0xff00 0 0 0x7>;
->>>> +               interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
->>>> +                                0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
->>>> +                                0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
->>>> +       };
+On 20 June 2014 16:49, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 20 June 2014 15:29:18 Ashwin Chaugule wrote:
+>>
+>> On 20 June 2014 15:08, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 20 June 2014 14:55:16 Ashwin Chaugule wrote:
+>> >> So, in order to get an mbox->dev for ACPI platforms, we'd need an
+>> >> entry in the DSDT table. That seems rather pointless, since the DSDT
+>> >> is reserved for devices and is supposed to be OS agnostic. Since the
+>> >> mailbox controller itself is not really a "device" with a resource
+>> >> descriptor, I dont see the point in adding a dummy DSDT entry for the
+>> >> sake of getting this `struct device`. Also, I'm told adding new
+>> >> entries to this table requires registering a unique 4 character
+>> >> identifier and approval from some committees. If there are other ways
+>> >> to get this structure I'd like to hear about it.
+>> >>
+>> >> The other alternative would be to piggy back on the ACPI CPU detection
+>> >> code, which looks for the ACPI0007 device node in the DSDT and use
+>> >> that as the mbox controller device. This node is already registered
+>> >> and is an established method to detect CPUs. But I'm not sure what
+>> >> happens when CPUs are hotplugged off, we surely dont want mailbox
+>> >> clients such as PCC to break.
+>> >
+>> > The main question here is whether you expect having to support multiple
+>> > mailbox devices in an ACPI system. If you think there is never more than
+>> > one, you wouldn't need a DSDT entry, but if you can end up in a situation
+>> > where another device needs to specify which mailbox it is using, then
+>> > you need that entry anyway.
+>>
+>> At this point, I dont see the need for multiple mailbox devices. But
+>> I'm not seeing why we'd need a DSDT entry only if there are more than
+>> one mailbox devices? I'd obviously prefer not having a DSDT entry for
+>> this, and the patch I posted is the only way I could see to keep DT
+>> and ACPI mbox supported at runtime without DSDT involved. Please let
+>> me know if there are better ways.
+>
+> It's mostly a matter of consistency: We can have multiple interrupt
+> controllers, pin controllers, clock controllers, dma engines, etc,
+> and in the DT case we use references to the nodes wherever we have
+> other devices referring to a mailbox name.
+>
+> I believe Intel's embedded chips are moving in the same direction
+> with their ACPI support. If the ACPI spec gains support for mailbox
+> devices, locking them into having only a single device may be
+> a problem later for them.
+>
+> Note that "device" here doesn't have to mean a platform device that
+> is instantiated from DSDT, it can be any mailbox provider that is
+> registered in an arbitrary way, as long as you have a method to map
+> back from the (consumer-device, name-string) tuple back to the
+> (provider, channel) tuple. I have read your patch again now and noticed
+> that you actually tried to do this, but unfortunately you got it
+> wrong by requiring the consumer to fill out the name of the provider
+> in the request. You can't do that, because it's not generic enough
+> to support devices that can be reused, and it means that drivers
+> using the API are never portable between DT and ACPI. You have to
+> get rid of the "ctrl_name" field in the mbox_client structure and
+> change the lookup to be based only on cd->dev and cl->chan_name,
+> using whatever tables you have available in ACPI.
 
->>> Hmm, this device node is not actually compliant to the PCI binding,
->>> it needs a "ranges" property that can be used to look up the memory
->>> and I/O space windows.
+I think you looked at the previous version of the patch. I'm attaching
+the latest version here again FWIW. In this version, I removed the
+"ctrl_name" field and rely on the cl->chan_name to provide the info as
+described in Jassi' original patch.
 
->>      The PCI driver doesn't support I/O space.
 
-> Well, whichever windows are registered by the driver should come
-> from the ranges property.
+linux/mailbox_client.h
 
-    I know. Too bad the driver's original author managed to misunderstand that...
+ 18  * struct mbox_client - User of a mailbox
+ 19  * @dev:        The client device
+ 20  * @chan_name:      The "controller:channel" this client wants
 
->>> It also needs a device_type property.
+Instead of dev, I added a name string to the mbox controller
+structure. So now the client gets its channel by requesting
+"controller:channel" where controller should match with mbox->name and
+channel becomes an index into mbox->chans[].
 
->>      Hm, are you sure about that? I thought only PCI devices should have it...
 
-> Yes, pretty sure it's needed in both the host controller and the
-> devices.
-
-     I don't understand the case of the PCI devices, honestly. Shouldn't the 
-"device_type" prop reflect the device's functionality rather than the bus 
-where it's located?
-
->>> I realize that the driver doesn't currently use them, but you should
->>> adhere to the binding anyway, so we can fix the driver at some point.
-
->>      Sigh, agreed about the need to fix the driver. Too bad you've spoken up
->> only now though. And you've ACKed the DT bindings without those properties
->> documented or even present in an example...
-
-> Yes, I realized that too late as well, sorry about it. For some reason
-> I only looked at the interrupt-map being done right and forgot to
-> check the ranges.
-
-> We definitely need to move the code handling the ranges into a common
-> location to avoid this mistake in the future.
-
-    It is already in the common location, AFAIK; what's lacking there is the 
-code that parses "dma-ranges" as well but that should be pretty easy to add...
-
-> 	Arnd
-
-WBR, Sergei
+Cheers,
+Ashwin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-Mailbox-Add-support-for-ACPI.patch
+Type: text/x-patch
+Size: 8409 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140620/5a4ff595/attachment.bin>
