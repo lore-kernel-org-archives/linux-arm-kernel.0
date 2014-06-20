@@ -1,80 +1,71 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 20 Jun 2014 11:10:46 -0700
-Subject: [PATCH] arm: ptrace: fix syscall modification under
- PTRACE_O_TRACESECCOMP
-In-Reply-To: <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
-References: <20140618202748.GA9022@www.outflux.net>
- <20140620102258.GA26626@arm.com>
- <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
- <20140620172330.GA30656@arm.com>
- <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
-Message-ID: <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Jun 2014 19:17:48 +0100
+Subject: [PATCH V4 2/2] arm: mm: Switch back to L_PTE_WRITE
+In-Reply-To: <1402929159-11028-3-git-send-email-steve.capper@linaro.org>
+References: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
+ <1402929159-11028-3-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140620181748.GW32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 10:36 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Jun 20, 2014 at 10:23 AM, Will Deacon <will.deacon@arm.com> wrote:
->> On Fri, Jun 20, 2014 at 05:44:52PM +0100, Kees Cook wrote:
->>> On Fri, Jun 20, 2014 at 3:22 AM, Will Deacon <will.deacon@arm.com> wrote:
->>> > I'm struggling to see the bug in the current code, so apologies if my
->>> > questions aren't helpful.
->>> >
->>> > On Wed, Jun 18, 2014 at 09:27:48PM +0100, Kees Cook wrote:
->>> >> An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
->>> >> (stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
->>> >> (stored to current_thread_info()->syscall). When this happens, the
->>> >> syscall can change across the call to secure_computing(), since it may
->>> >> block on tracer notification, and the tracer can then make changes
->>> >> to the process, before we return from secure_computing(). This
->>> >> means the code must respect the changed syscall after the
->>> >> secure_computing() call in syscall_trace_enter(). The same is true
->>> >> for tracehook_report_syscall_entry() which may also block and change
->>> >> the syscall.
->>> >
->>> > I don't think I understand what you mean by `the code must respect the
->>> > changed syscall'. The current code does indeed issue the new syscall, so are
->>> > you more concerned with secure_computing changing ->syscall, then the
->>> > debugger can't see the new syscall when it sees the trap from tracehook?
->>> > Are these even supposed to inter-operate?
->>>
->>> The problem is the use of "scno" in the call -- it results in ignoring
->>> the value that may be set up in ->syscall by a tracer:
->>>
->>> syscall_trace_enter(regs, scno):
->>>     current_thread_info()->syscall = scno;
->>>     secure_computing(scno):
->>>         [block on ptrace]
->>>         [ptracer changes current_thread_info()->syscall vis PTRACE_SET_SYSCALL]
->>>     ...
->>>     return scno;
->>>
->>> This means the tracer's changed syscall value will be ignored
->>> (syscall_trace_enter returns original "scno" instead of actual
->>> current_thread_info()->syscall). In the original code, failure cases
->>> were propagated correctly, but not tracer-induced changes.
->>>
->>> Is that more clear? It's not an obvious state (due to the external
->>> modification of process state during the ptrace blocking). I've also
->>> got tests for this, if that's useful to further illustrate:
->>>
->>> https://github.com/kees/seccomp/commit/bd24e174593f79784b97178b583f17e0ea9d2aa7
->>
->> Right, gotcha. Thanks for the explanation. I was confused, because
->> tracehook_report_syscall does the right thing (returns
->> current_thread_info()->syscall), but if we don't have TIF_SYSCALL_TRACE set,
->> then updates during the secure_computing callback will be ignored.
->>
->> However, my fix to this is significantly smaller than your patch, so I fear
->> I'm still missing something.
->
-> Oh, yes, that's much smaller. Nice! I will test this and report back.
+On Mon, Jun 16, 2014 at 03:32:39PM +0100, Steve Capper wrote:
+> For LPAE, we have the following means for encoding writable or dirty
+> ptes:
+>                               L_PTE_DIRTY       L_PTE_RDONLY
+>     !pte_dirty && !pte_write        0               1
+>     !pte_dirty && pte_write         0               1
+>     pte_dirty && !pte_write         1               1
+>     pte_dirty && pte_write          1               0
+> 
+> So we can't distinguish between writable clean ptes and read only
+> ptes. This can cause problems with ptes being incorrectly flagged as
+> read only when they are writable but not dirty.
+> 
+> This patch re-introduces the L_PTE_WRITE bit for both short descriptors
+> and long descriptors, by reverting
+>   36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
 
-Yup, I can confirm this works. Thanks!
+Why are we still going about this in this over complicated manner?
+I'm not happy with this.  I thought after fixing the problem with
+using bits above bit 32 that we could drop this silly conversion
+which makes the code harder to read.
 
-Tested-by: Kees Cook <keescook@chromium.org>
+Right, let's get down to the detail.  LPAE has it's existing bit
+which tells it that the mapping is read only.  This is bit 7, which
+is the AP[2] bit.
 
--Kees
+At present, AP[2] is mapped to L_PTE_RDONLY.  When a PTE is set, the
+3-level page table code in proc-v7-3level.S checks the L_PTE_DIRTY
+bit, and if that is clear, it sets L_PTE_RDONLY.  *This* is the
+problem you're trying to solve.
+
+You are solving that by adding L_PTE_WRITE as bit 58 on LPAE, and
+then translating bit 58 _and_ the L_PTE_DIRTY state down to a
+read-only status for the hardware in AP[2], and rolling the change
+to make L_PTE_WRITE apply everywhere.
+
+Now, in patch 1, we solve the problem that using high bits in the
+PTE result in the return value being down-cast to zero.  So, with
+patch 1 in place, we can use *any* bit in the PTE to correspond
+with any of the L_PTE_* flags.  Remember this very important point:
+L_PTE_* flags are the *Linux* representation of the page table state,
+which may not necessarily be the state of the hardware (it isn't on
+2-level systems - there's a translation that this stuff goes through.)
+
+So, what I say is why not, for the troublesome 3-level case:
+
+- Assign bit 58 for L_PTE_RDONLY
+- Convert the state of bit 58 and L_PTE_DIRTY to the AP[2] bit:
+
+	ubfx	ip, rh, #(58 - 32)		@ L_PTE_RDONLY
+	bfi	rl, ip, #7, #1			@ PTE_AP2
+        tst     rh, #1 << (55 - 32)             @ L_PTE_DIRTY
+        orreq   rl, #PTE_AP2
+
+This means we keep the read-only terminology, which is much more
+understandable when reading the assembly code than what we had when
+we used the write terminology.
 
 -- 
-Kees Cook
-Chrome OS Security
+FTTC broadband for 0.8mile line: now@9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
