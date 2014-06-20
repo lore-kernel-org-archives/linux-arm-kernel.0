@@ -1,31 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jun 2014 11:04:58 +0100
-Subject: [PATCH V4 1/2] arm: mm: Introduce {pte,pmd}_isset and
- {pte,pmd}_isclear
-In-Reply-To: <20140620091226.GJ25104@arm.com>
-References: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
- <1402929159-11028-2-git-send-email-steve.capper@linaro.org>
- <20140620091226.GJ25104@arm.com>
-Message-ID: <20140620100458.GQ32514@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jun 2014 11:17:17 +0100
+Subject: [PATCH 3/4] arm64: export effective Image size to bootloaders
+In-Reply-To: <1403201268.17030.59.camel@smoke>
+References: <1400233839-15140-1-git-send-email-mark.rutland@arm.com>
+ <1400233839-15140-4-git-send-email-mark.rutland@arm.com>
+ <1402950432.3708.22.camel@smoke>
+ <20140618164927.GA9612@leverpostej>
+ <1403116902.17030.15.camel@smoke>
+ <20140619102526.GA22217@leverpostej>
+ <1403201268.17030.59.camel@smoke>
+Message-ID: <20140620101717.GE30188@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 10:12:26AM +0100, Will Deacon wrote:
-> On Mon, Jun 16, 2014 at 03:32:38PM +0100, Steve Capper wrote:
-> > -#define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
-> > +#define pmd_isset(pmd, val)	((u32)(val) == (val) ? pmd_val(pmd) & (val) \
-> > +						: !!(pmd_val(pmd) & (val)))
+On Thu, Jun 19, 2014 at 07:07:48PM +0100, Geoff Levand wrote:
+> Hi Mark,
 > 
-> What does GCC generate for this as opposed to an unconditional !!?
+> On Thu, 2014-06-19 at 11:25 +0100, Mark Rutland wrote:
+> > I disagree that the bootloader _must_ have to deal with the endianness
+> > of the kernel. If the user knows the endianness of the kernel and
+> > provides a filesystem of the appropriate endianness, I don't see why the
+> > bootloader should have to do anything differently. In most cases the
+> > bootloader has no need to care.
+> 
+> As I mentioned, I don't really care how this is fixed, but there will be
+> bootloaders built as both big and little endian (kexec based ones for
+> example), and so no matter what, bootloaders will need to deal with
+> converting values.
 
-For any constant "val", the result of (u32)(val) == (val) is also a
-constant, so GCC should evaluate it at build time and not run time.
+Sure, bootloaders will need to convert values in some cases.
 
-An unconditional !! would result in GCC doing the test and then
-constructing code to turn it into a zero-or-one condition, and with
-complicated tests, it can really add a lot of additional complexity,
-even if it can properly optimise the simple case.
+By having a fixed endian header format, whether or not you need to
+byteswap values becomes a fixed property of the bootloader (i.e. whether
+it is BE or not) rather than a dynamic property of the kernel Image. So
+you only require a single path through your loader for BE and LE
+kernels.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+If you have constructs like LE64_TO_CPU available to your loader, then
+it becomes trivial to write an endian-clean loader. The only pain is
+having to test if image_size is non-zero first, but that test is
+independent of endiannness.
+
+Mark.
