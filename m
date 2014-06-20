@@ -1,175 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Jun 2014 10:50:25 -0500
-Subject: [PATCH] dt/documentation: add specification of dma bus information
-In-Reply-To: <53A44D73.6080200@ti.com>
-References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
- <CAOMZO5Ceg9RpC8Lgt0BwGTuaz-Z2614Die2PrbtT_j4QYjL_sA@mail.gmail.com>
- <5395BDA7.3060507@ti.com> <53A44D73.6080200@ti.com>
-Message-ID: <CAL_JsqJAtWnHKPVpDsdOOzT_X=npc3hroLNTGqULM2SJr=1OEg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Jun 2014 17:53:08 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140618101439.GF32699@arm.com>
+References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
+ <20140617233714.GD25525@mithrandir> <20140618101439.GF32699@arm.com>
+Message-ID: <39682213.otHMo6zoRf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 10:04 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Monday 09 June 2014 09:59 AM, Santosh Shilimkar wrote:
->> On Sunday 08 June 2014 10:13 PM, Fabio Estevam wrote:
->>> On Thu, Jun 5, 2014 at 12:22 PM, Santosh Shilimkar
->>> <santosh.shilimkar@ti.com> wrote:
->>>> Recently we introduced the generic device tree infrastructure for couple of DMA
->>>> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
->>>> its useful for future users.
->>>>
->>>> The "dma-ranges" property is intended to be used for describing the
->>>> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
->>>>
->>>> The "dma-coherent" property is intended to be used for identifying devices
->>>> supported coherent DMA operations.
->>>>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>> Cc: Grant Likely <grant.likely@linaro.org>
->>>> Cc: Rob Herring <robh+dt@kernel.org>
->>>> Cc: Pawel Moll <pawel.moll@arm.com>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->>>> Cc: Shawn Guo <shawn.guo@freescale.com>
->>>> Cc: Kumar Gala <galak@codeaurora.org>
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> ---
->>>>  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
->>>>  1 file changed, 60 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
->>>> index 1f013bd..f0120c1 100644
->>>> --- a/Documentation/devicetree/booting-without-of.txt
->>>> +++ b/Documentation/devicetree/booting-without-of.txt
->>>> @@ -51,6 +51,8 @@ Table of Contents
->>>>
->>>>    VIII - Specifying device power management information (sleep property)
->>>>
->>>> +  VIV - Specifying dma bus information
->>>
->>> "9" in Roman numeral is "IX"
->>>
->> Yeah.. Not sure what I was thinking...
->>
-> Updated patch end of the email with the typo fixed.
->
-> Rob,
-> Can you please pick this up if you are ok with the it.
->
-> Regards,
-> Santosh
->
-> From b72e949a194d766fe029fe6bb5939467f2fbe9b9 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Fri, 20 Jun 2014 11:01:54 -0400
-> Subject: [PATCH] dt/documentation: add specification of dma bus information
->
-> Recently we introduced the generic device tree infrastructure for couple of DMA
-> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
-> its useful for future users.
->
-> The "dma-ranges" property is intended to be used for describing the
-> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
->
-> The "dma-coherent" property is intended to be used for identifying devices
-> supported coherent DMA operations.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Acked-by: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->
-> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
-> index 1f013bd..0b0928c 100644
-> --- a/Documentation/devicetree/booting-without-of.txt
-> +++ b/Documentation/devicetree/booting-without-of.txt
-> @@ -51,6 +51,8 @@ Table of Contents
->
->    VIII - Specifying device power management information (sleep property)
->
-> +  IX - Specifying dma bus information
-> +
->    Appendix A - Sample SOC node for MPC8540
->
->
-> @@ -1332,6 +1334,64 @@ reasonably grouped in this manner, then create a virtual sleep controller
->  (similar to an interrupt nexus, except that defining a standardized
->  sleep-map should wait until its necessity is demonstrated).
->
-> +IX - Specifying dma bus information
-> +
-> +Some devices may have DMA memory range shifted relatively to the beginning of
-> +RAM, or even placed outside of kernel RAM. For example, the Keystone 2 SoC
-> +worked in LPAE mode with 4G memory has:
-> +- RAM range: [0x8 0000 0000, 0x8 FFFF FFFF]
-> +- DMA range: [  0x8000 0000,   0xFFFF FFFF]
-> +and DMA range is aliased into first 2G of RAM in HW.
-> +
-> +In such cases, DMA addresses translation should be performed between CPU phys
-> +and DMA addresses. The "dma-ranges" property is intended to be used
-> +for describing the configuration of such system in DT.
-> +
-> +In addition, each DMA master device on the DMA bus may or may not support
-> +coherent DMA operations. The "dma-coherent" property is intended to be used
-> +for identifying devices supported coherent DMA operations in DT.
-> +
-> +* DMA Bus master
-> +Optional property:
-> +- dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
-> +       (child-bus-address, parent-bus-address, length). Each triplet specified
-> +       describes a contiguous DMA address range.
-> +       The dma-ranges property is used to describe the direct memory access (DMA)
-> +       structure of a memory-mapped bus whose device tree parent can be accessed
-> +       from DMA operations originating from the bus. It provides a means of
-> +       defining a mapping or translation between the physical address space of
-> +       the bus and the physical address space of the parent of the bus.
-> +       (for more information see ePAPR specification)
-> +
-> +* DMA Bus child
-> +Optional property:
-> +- dma-ranges: <empty> value. if present - It means that DMA addresses
-> +       translation has to be enabled for this device.
-> +- dma-coherent: Present if dma operations are coherent
-> +
-> +Example:
-> +soc {
-> +               compatible = "ti,keystone","simple-bus";
-> +               ranges = <0x0 0x0 0x0 0xc0000000>;
-> +               dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
-> +
-> +               [...]
-> +
-> +               usb: usb at 2680000 {
-> +                       compatible = "ti,keystone-dwc3";
-> +
-> +                       [...]
-> +
-> +                       dma-coherent;
-> +                       dma-ranges;
-> +
-> +                       dwc3 at 2690000 {
-> +                               compatible = "synopsys,dwc3";
-> +                               [...]
-> +                       };
+On Wednesday 18 June 2014 11:14:39 Will Deacon wrote:
+> On Wed, Jun 18, 2014 at 12:37:16AM +0100, Thierry Reding wrote:
+>   - Each master has a set of fixed StreamIDs
+>   - StreamIDs can be remastered by adding a constant offset (this could also
+>     be used to describe RequesterID -> StreamID mapping)
+> 
+> I'd hope this would be sufficient for most people. Dynamic ID assignment can
+> be worked out later (I'm not even sure it belongs in this binding) and any
+> mappings other than `add a constant offset' can be treated on a case-by-case
+> basis. We don't want to throw the kitchen sink at a language for describing
+> arbitrary transformations!
+> 
+> > We've had similar discussions before (power sequences anyone?) where we
+> > tried to come up with a generic way to describe something in device tree
+> > that just didn't work out too well. Some things are better done in code,
+> > so I think we should at least consider that possibility rather than
+> > blindly try and force everything into device tree.
+> 
+> If we can support 90% of SoCs with a simple DT-based description, we can
+> address the corner cases as they arise. I'm not ruling our hardcoding
+> topology if we have no choice, but I don't think that's a healthy place to
+> start from.
 
-This example is a bit strange. I don't understand the relationship
-between keystone-dwc3 and synopsys,dwc3, nor do I want to. I'd prefer
-to see a simple example here.
+So we could use the "arm,gicv3" comaptible string for all those that
+have a relatively simple mapping, and describe that mapping entirely
+in DT properties, but use a different compatible string for those
+SoCs that have a mapping which we can't easily describe, and then
+put that into code?
 
-dma-ranges is a property of the parent which you show, but
-dma-coherent originally was a property of the bus master itself. While
-we need to support that, are we changing that? We need to be clear on
-where the property belongs even if the kernel is more lax.
-
-Rob
+	Arnd
