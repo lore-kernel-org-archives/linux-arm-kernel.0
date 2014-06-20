@@ -1,51 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 20 Jun 2014 22:52:50 +0800
-Subject: [PATCH v3 1/4] ARM: sunxi: Introduce Allwinner A23 support
-In-Reply-To: <1403275973-24259-1-git-send-email-wens@csie.org>
-References: <1403275973-24259-1-git-send-email-wens@csie.org>
-Message-ID: <1403275973-24259-2-git-send-email-wens@csie.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 20 Jun 2014 17:01:20 +0200
+Subject: [PATCH v3 0/7] ARM: at91: move aic driver to drivers/irqchips
+Message-ID: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A23 is a dual-core Cortex-A7-based SoC. It re-uses most of
-the IPs found in previous SoCs, notably the A31.
+Hello,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/mach-sunxi/Kconfig | 5 +++++
- arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
- 2 files changed, 14 insertions(+)
+This series moves the AIC driver to the irqchip directory and make use of
+the generic chip framework whenever possible.
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 0fbd4f1..f776c5f 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -35,4 +35,9 @@ config MACH_SUN7I
- 	select HAVE_ARM_ARCH_TIMER
- 	select SUN5I_HSTIMER
- 
-+config MACH_SUN8I
-+	bool "Allwinner A23 (sun8i) SoCs support"
-+	default ARCH_SUNXI
-+	select ARM_GIC
-+
- endif
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 3f9587b..4d09469 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -53,3 +53,12 @@ static const char * const sun7i_board_dt_compat[] = {
- DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
- 	.dt_compat	= sun7i_board_dt_compat,
- MACHINE_END
-+
-+static const char * const sun8i_board_dt_compat[] = {
-+	"allwinner,sun8i-a23",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
-+	.dt_compat	= sun8i_board_dt_compat,
-+MACHINE_END
+This driver only support DT boards (all legacy board files should be soon
+replaced by their DT versions).
+
+Best Regards,
+
+Boris
+
+Changes since v2:
+ - remove irq line muxing definition
+ - rework Kconfig options
+
+Changes since v1:
+ - rework the irq-mux bindings
+
+Boris BREZILLON (7):
+  genirq: generic chip: export irq_map_generic_chip function
+  irqchip: atmel-aic: move binding doc to interrupt-controller directory
+  irqchip: atmel-aic: add new atmel AIC driver
+  ARM: at91: introduce OLD_IRQ_AT91 Kconfig option
+  ARM: at91: enclose at91_aic_xx calls in
+    IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks
+  ARM: at91: make use of the new AIC driver for dt enabled boards
+  ARM: at91: remove old irq material
+
+ .../devicetree/bindings/arm/atmel-aic.txt          |  42 --
+ .../bindings/interrupt-controller/atmel,aic.txt    |  42 ++
+ arch/arm/mach-at91/Kconfig                         |  17 +-
+ arch/arm/mach-at91/Kconfig.non_dt                  |   6 +
+ arch/arm/mach-at91/Makefile                        |   3 +-
+ arch/arm/mach-at91/board-dt-rm9200.c               |  13 -
+ arch/arm/mach-at91/board-dt-sam9.c                 |  13 -
+ arch/arm/mach-at91/board-dt-sama5.c                |  13 -
+ arch/arm/mach-at91/irq.c                           | 270 +-------
+ arch/arm/mach-at91/pm.c                            |  32 +-
+ arch/arm/mach-at91/setup.c                         |   3 +-
+ drivers/irqchip/Kconfig                            |   7 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-atmel-aic.c                    | 700 +++++++++++++++++++++
+ include/linux/irq.h                                |   2 +
+ kernel/irq/generic-chip.c                          |   5 +-
+ 16 files changed, 800 insertions(+), 369 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
+ create mode 100644 drivers/irqchip/irq-atmel-aic.c
+
 -- 
-2.0.0
+1.8.3.2
