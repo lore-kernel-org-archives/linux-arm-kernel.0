@@ -1,54 +1,33 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 21 Jun 2014 01:00:21 +0400
-Subject: [PATCH v4 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
- nodes
-In-Reply-To: <4637423.jWRbL1GbCK@wuerfel>
-References: <201406210034.57784.sergei.shtylyov@cogentembedded.com>
- <201406210036.59693.sergei.shtylyov@cogentembedded.com>
- <4637423.jWRbL1GbCK@wuerfel>
-Message-ID: <53A4A0E5.50904@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Jun 2014 17:10:12 -0400
+Subject: [PATCH] ARM: mvebu: rename ARM_ERRATA_753970
+In-Reply-To: <1403296977.16903.10.camel@x41>
+References: <201404052101.19381.arnd@arndb.de>
+ <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
+ <53418889.2050002@free-electrons.com>
+ <1396805315.7723.8.camel@x220> <1401094871.25902.20.camel@x220>
+ <20140620202100.GG21711@titan.lakedaemon.net>
+ <1403296977.16903.10.camel@x41>
+Message-ID: <20140620211012.GP21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Jun 20, 2014 at 10:42:57PM +0200, Paul Bolle wrote:
+> Jason Cooper schreef op vr 20-06-2014 om 16:21 [-0400]:
+> > It looks like rmk just added a patch to fixing the selection of the
+> > erratas.  Could you please take a look and either rebase or drop this
+> > patch?
+> 
+> Sure, no problem. What tree should I check?
 
-On 06/21/2014 12:51 AM, Arnd Bergmann wrote:
+It's
 
->> +       pci0: pci at ee090000 {
->> +               compatible = "renesas,pci-r8a7790";
->> +               clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
->> +               reg = <0x0 0xee090000 0x0 0xc00>,
->> +                     <0x0 0xee080000 0x0 0x1100>;
->> +               interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
->> +               status = "disabled";
->> +
->> +               bus-range = <0 0>;
->> +               #address-cells = >;
->> +               #size-cells = <2>;
->> +               #interrupt-cells = <1>;
->> +               interrupt-map-mask = <0xff00 0 0 0x7>;
->> +               interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
->> +                                0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
->> +                                0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
->> +       };
+  a641f3a6abce ARM: l2c: fix dependencies on PL310 errata symbols
 
-> Hmm, this device node is not actually compliant to the PCI binding,
-> it needs a "ranges" property that can be used to look up the memory
-> and I/O space windows.
+in Russell's fixes branch:
 
-    The PCI driver doesn't support I/O space.
+  http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git fixes
 
-> It also needs a device_type property.
+thx,
 
-    Hm, are you sure about that? I thought only PCI devices should have it...
-
-> I realize that the driver doesn't currently use them, but you should
-> adhere to the binding anyway, so we can fix the driver at some point.
-
-    Sigh, agreed about the need to fix the driver. Too bad you've spoken up 
-only now though. And you've ACKed the DT bindings without those properties 
-documented or even present in an example... :-(
-
-> 	Arnd
-
-WBR, Sergei
+Jason.
