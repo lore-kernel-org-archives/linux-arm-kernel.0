@@ -1,45 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Jun 2014 18:50:51 +0100
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <39682213.otHMo6zoRf@wuerfel>
-References: <1400877395-4235-1-git-send-email-thierry.reding@gmail.com>
- <20140617233714.GD25525@mithrandir>
- <20140618101439.GF32699@arm.com> <39682213.otHMo6zoRf@wuerfel>
-Message-ID: <20140620175051.GE30656@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 20 Jun 2014 11:10:46 -0700
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+References: <20140618202748.GA9022@www.outflux.net>
+ <20140620102258.GA26626@arm.com>
+ <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
+ <20140620172330.GA30656@arm.com>
+ <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+Message-ID: <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 04:53:08PM +0100, Arnd Bergmann wrote:
-> On Wednesday 18 June 2014 11:14:39 Will Deacon wrote:
-> > On Wed, Jun 18, 2014 at 12:37:16AM +0100, Thierry Reding wrote:
-> >   - Each master has a set of fixed StreamIDs
-> >   - StreamIDs can be remastered by adding a constant offset (this could also
-> >     be used to describe RequesterID -> StreamID mapping)
-> > 
-> > I'd hope this would be sufficient for most people. Dynamic ID assignment can
-> > be worked out later (I'm not even sure it belongs in this binding) and any
-> > mappings other than `add a constant offset' can be treated on a case-by-case
-> > basis. We don't want to throw the kitchen sink at a language for describing
-> > arbitrary transformations!
-> > 
-> > > We've had similar discussions before (power sequences anyone?) where we
-> > > tried to come up with a generic way to describe something in device tree
-> > > that just didn't work out too well. Some things are better done in code,
-> > > so I think we should at least consider that possibility rather than
-> > > blindly try and force everything into device tree.
-> > 
-> > If we can support 90% of SoCs with a simple DT-based description, we can
-> > address the corner cases as they arise. I'm not ruling our hardcoding
-> > topology if we have no choice, but I don't think that's a healthy place to
-> > start from.
-> 
-> So we could use the "arm,gicv3" comaptible string for all those that
-> have a relatively simple mapping, and describe that mapping entirely
-> in DT properties, but use a different compatible string for those
-> SoCs that have a mapping which we can't easily describe, and then
-> put that into code?
+On Fri, Jun 20, 2014 at 10:36 AM, Kees Cook <keescook@chromium.org> wrote:
+> On Fri, Jun 20, 2014 at 10:23 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Fri, Jun 20, 2014 at 05:44:52PM +0100, Kees Cook wrote:
+>>> On Fri, Jun 20, 2014 at 3:22 AM, Will Deacon <will.deacon@arm.com> wrote:
+>>> > I'm struggling to see the bug in the current code, so apologies if my
+>>> > questions aren't helpful.
+>>> >
+>>> > On Wed, Jun 18, 2014 at 09:27:48PM +0100, Kees Cook wrote:
+>>> >> An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
+>>> >> (stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
+>>> >> (stored to current_thread_info()->syscall). When this happens, the
+>>> >> syscall can change across the call to secure_computing(), since it may
+>>> >> block on tracer notification, and the tracer can then make changes
+>>> >> to the process, before we return from secure_computing(). This
+>>> >> means the code must respect the changed syscall after the
+>>> >> secure_computing() call in syscall_trace_enter(). The same is true
+>>> >> for tracehook_report_syscall_entry() which may also block and change
+>>> >> the syscall.
+>>> >
+>>> > I don't think I understand what you mean by `the code must respect the
+>>> > changed syscall'. The current code does indeed issue the new syscall, so are
+>>> > you more concerned with secure_computing changing ->syscall, then the
+>>> > debugger can't see the new syscall when it sees the trap from tracehook?
+>>> > Are these even supposed to inter-operate?
+>>>
+>>> The problem is the use of "scno" in the call -- it results in ignoring
+>>> the value that may be set up in ->syscall by a tracer:
+>>>
+>>> syscall_trace_enter(regs, scno):
+>>>     current_thread_info()->syscall = scno;
+>>>     secure_computing(scno):
+>>>         [block on ptrace]
+>>>         [ptracer changes current_thread_info()->syscall vis PTRACE_SET_SYSCALL]
+>>>     ...
+>>>     return scno;
+>>>
+>>> This means the tracer's changed syscall value will be ignored
+>>> (syscall_trace_enter returns original "scno" instead of actual
+>>> current_thread_info()->syscall). In the original code, failure cases
+>>> were propagated correctly, but not tracer-induced changes.
+>>>
+>>> Is that more clear? It's not an obvious state (due to the external
+>>> modification of process state during the ptrace blocking). I've also
+>>> got tests for this, if that's useful to further illustrate:
+>>>
+>>> https://github.com/kees/seccomp/commit/bd24e174593f79784b97178b583f17e0ea9d2aa7
+>>
+>> Right, gotcha. Thanks for the explanation. I was confused, because
+>> tracehook_report_syscall does the right thing (returns
+>> current_thread_info()->syscall), but if we don't have TIF_SYSCALL_TRACE set,
+>> then updates during the secure_computing callback will be ignored.
+>>
+>> However, my fix to this is significantly smaller than your patch, so I fear
+>> I'm still missing something.
+>
+> Oh, yes, that's much smaller. Nice! I will test this and report back.
 
-That doesn't sound unreasonable, but I don't think we should commit to
-putting things into code until they come along and we can't describe them.
+Yup, I can confirm this works. Thanks!
 
-Will
+Tested-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
