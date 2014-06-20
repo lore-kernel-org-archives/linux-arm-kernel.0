@@ -1,87 +1,163 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Jun 2014 13:14:16 +0100
-Subject: [PATCH RFC 30/30] net: fec: consolidate hwtstamp implementation
-In-Reply-To: <20140620121118.GR32514@n2100.arm.linux.org.uk>
-References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
-Message-ID: <E1Wxxhw-0005Yn-Ey@rmk-PC.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jun 2014 13:14:50 +0100
+Subject: [PATCH 2/2] clocksource: add rockchip-specific armv7-timer setup
+In-Reply-To: <1653387.oFu7qPFqm3@diego>
+References: <70167479.zcs3JF0luJ@diego> <3807304.rhf3VZXZNa@diego>
+ <20140620105123.GH30188@leverpostej> <1653387.oFu7qPFqm3@diego>
+Message-ID: <20140620121450.GJ30188@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both transmit and receive use the same infrastructure for calculating
-the packet timestamp.  Rather than duplicating the code, provide a
-function to do this common work.  Model this function in the Intel
-e1000e version which avoids calling ns_to_ktime() within the spinlock;
-the spinlock is critical for timecounter_cyc2time() but not
-ns_to_ktime().
+On Fri, Jun 20, 2014 at 12:27:26PM +0100, Heiko St?bner wrote:
+> Am Freitag, 20. Juni 2014, 11:51:23 schrieb Mark Rutland:
+> > On Fri, Jun 20, 2014 at 11:44:49AM +0100, Heiko St?bner wrote:
+> > > The armv7-timer on Rockchip RK3288 SoCs needs an underlying timer to run.
+> > > Therefore the special rockchip,rk3288-armv7-timer does this setup and
+> > > then initializes the architected timer using the new locally exposed
+> > > arch_timer_init.
+> > > 
+> > > Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > > 
+> > >  .../bindings/arm/rockchip/armv7-timer.txt          | 22 +++++++++
+> > >  drivers/clocksource/Makefile                       |  1 +
+> > >  drivers/clocksource/rockchip_timer.c               | 57
+> > >  ++++++++++++++++++++++ 3 files changed, 80 insertions(+)
+> > >  create mode 100644
+> > >  Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt create
+> > >  mode 100644 drivers/clocksource/rockchip_timer.c
+> > > 
+> > > diff --git
+> > > a/Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt
+> > > b/Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt new file
+> > > mode 100644
+> > > index 0000000..4c1950a
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt
+> > > @@ -0,0 +1,22 @@
+> > > +Rockchip armv7-timer:
+> > > +---------------------
+> > > +
+> > > +The architected timer on rk3288 SoCs has special setup requirements, as
+> > > +the cpu-timer block needs to supply the architected timer.
+> > > +
+> > > +Required node properties:
+> > > +- compatible value : = "rockchip,rk3288-armv7-timer";
+> > > +- reg : physical base address and the size of the registers window
+> > > +        of the supplying timer block
+> > > +- CP15 Timer node properties as described in bindings/arm/arch_timer.txt
+> > > +
+> > > +Example:
+> > > +
+> > > +architected-timer {
+> > > +	compatible = "rockchip,rk3288-armv7-timer";
+> > > +	reg = <0xff810020 0x20>;
+> > > +	interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
+> > > IRQ_TYPE_LEVEL_HIGH)>,
+> > > +		     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | 
+> IRQ_TYPE_LEVEL_HIGH)>,
+> > > +		     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | 
+> IRQ_TYPE_LEVEL_HIGH)>;
+> > > +	clock-frequency = <24000000>;
+> > > +};
+> > > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> > > index 800b130..cbad225 100644
+> > > --- a/drivers/clocksource/Makefile
+> > > +++ b/drivers/clocksource/Makefile
+> > > @@ -20,6 +20,7 @@ obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
+> > > 
+> > >  obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+> > >  obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+> > >  obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+> > > 
+> > > +obj-$(CONFIG_ARCH_ROCKCHIP)	+= rockchip_timer.o
+> > > 
+> > >  obj-$(CONFIG_ARCH_U300)		+= timer-u300.o
+> > >  obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+> > >  obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
+> > > 
+> > > diff --git a/drivers/clocksource/rockchip_timer.c
+> > > b/drivers/clocksource/rockchip_timer.c new file mode 100644
+> > > index 0000000..46c2146
+> > > --- /dev/null
+> > > +++ b/drivers/clocksource/rockchip_timer.c
+> > > @@ -0,0 +1,57 @@
+> > > +/*
+> > > + * Copyright (c) 2014 MundoReader S.L.
+> > > + * Author: Heiko Stuebner <heiko@sntech.de>
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License as published by
+> > > + * the Free Software Foundation; either version 2 of the License, or
+> > > + * (at your option) any later version.
+> > > + *
+> > > + * This program is distributed in the hope that it will be useful,
+> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > + * GNU General Public License for more details.
+> > > + */
+> > > +
+> > > +#include <linux/init.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/of_address.h>
+> > > +#include <linux/clockchips.h>
+> > > +#include "arm_arch_timer.h"
+> > > +
+> > > +#define TIMER_LOAD_COUNT0		0x00
+> > > +#define TIMER_LOAD_COUNT1		0x04
+> > > +#define TIMER_CURRENT_VALUE0		0x08
+> > > +#define TIMER_CURRENT_VALUE1		0x0c
+> > > +#define TIMER_CONTROL_REG		0x10
+> > > +#define TIMER_INT_STATUS		0x18
+> > > +
+> > > +#define TIMER_DISABLE			(0 << 0)
+> > > +#define TIMER_ENABLE			(1 << 0)
+> > > +#define TIMER_MODE_FREE_RUNNING		(0 << 1)
+> > > +#define TIMER_MODE_USER_DEFINED_COUNT	(1 << 1)
+> > > +#define TIMER_INT_MASK			(0 << 2)
+> > > +#define TIMER_INT_UNMASK		(1 << 2)
+> > > +
+> > > +static __init void rk3288_arch_timer_init(struct device_node *np)
+> > > +{
+> > > +	void __iomem *reg_base;
+> > > +
+> > > +	reg_base = of_io_request_and_map(np, 0, "rk3288-armv7-timer");
+> > > +	if (!reg_base) {
+> > > +		pr_warn("%s: Can't get resource\n", __func__);
+> > > +		return;
+> > > +	}
+> > > +
+> > > +	writel(TIMER_DISABLE, reg_base + TIMER_CONTROL_REG);
+> > > +
+> > > +	writel(0xffffffff, reg_base + TIMER_LOAD_COUNT0);
+> > > +	writel(0xffffffff, reg_base + TIMER_LOAD_COUNT1);
+> > > +
+> > > +	writel(TIMER_ENABLE | TIMER_MODE_FREE_RUNNING,
+> > > +	       reg_base + TIMER_CONTROL_REG);
+> > 
+> > Given that this is unconditionally set up in this way, could this not be
+> > done in the fimrware/bootloader?
+> > 
+> > That way you could also setup CNTFREQ correctly, and virtualisation can
+> > just work out of the box.
+> 
+> It always comes back to this :-) . And as always the counter-argument would be 
+> that I cannot influence the current bootloader, there are already devices 
+> shipping in this constellation. And of course quite some more SoCs using this 
+> pattern.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/net/ethernet/freescale/fec_main.c | 37 ++++++++++++++++---------------
- 1 file changed, 19 insertions(+), 18 deletions(-)
+Sure, but we aren't yet supporting the architected timer on those
+systems. :)
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 3dbba3354aef..551a2015b253 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1065,6 +1065,21 @@ static void fec_enet_timeout_work(struct work_struct *work)
- }
- 
- static void
-+fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
-+	struct skb_shared_hwtstamps *hwtstamps)
-+{
-+	unsigned long flags;
-+	u64 ns;
-+
-+	spin_lock_irqsave(&fep->tmreg_lock, flags);
-+	ns = timecounter_cyc2time(&fep->tc, ts);
-+	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
-+
-+	memset(hwtstamps, 0, sizeof(*hwtstamps));
-+	hwtstamps->hwtstamp = ns_to_ktime(ns);
-+}
-+
-+static void
- fec_enet_tx(struct net_device *ndev)
- {
- 	struct	fec_enet_private *fep;
-@@ -1122,14 +1137,9 @@ fec_enet_tx(struct net_device *ndev)
- 		if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS) &&
- 			fep->bufdesc_ex) {
- 			struct skb_shared_hwtstamps shhwtstamps;
--			unsigned long flags;
- 			struct bufdesc_ex *ebdp = (struct bufdesc_ex *)bdp;
- 
--			memset(&shhwtstamps, 0, sizeof(shhwtstamps));
--			spin_lock_irqsave(&fep->tmreg_lock, flags);
--			shhwtstamps.hwtstamp = ns_to_ktime(
--				timecounter_cyc2time(&fep->tc, ebdp->ts));
--			spin_unlock_irqrestore(&fep->tmreg_lock, flags);
-+			fec_enet_hwtstamp(fep, ebdp->ts, &shhwtstamps);
- 			skb_tstamp_tx(skb, &shhwtstamps);
- 		}
- 
-@@ -1289,18 +1299,9 @@ fec_enet_rx(struct net_device *ndev, int budget)
- 			skb->protocol = eth_type_trans(skb, ndev);
- 
- 			/* Get receive timestamp from the skb */
--			if (fep->hwts_rx_en && fep->bufdesc_ex) {
--				struct skb_shared_hwtstamps *shhwtstamps =
--							    skb_hwtstamps(skb);
--				unsigned long flags;
--
--				memset(shhwtstamps, 0, sizeof(*shhwtstamps));
--
--				spin_lock_irqsave(&fep->tmreg_lock, flags);
--				shhwtstamps->hwtstamp = ns_to_ktime(
--				    timecounter_cyc2time(&fep->tc, ebdp->ts));
--				spin_unlock_irqrestore(&fep->tmreg_lock, flags);
--			}
-+			if (fep->hwts_rx_en && fep->bufdesc_ex)
-+				fec_enet_hwtstamp(fep, ebdp->ts,
-+						  skb_hwtstamps(skb));
- 
- 			if (fep->bufdesc_ex &&
- 			    (fep->csum_flags & FLAG_RX_CSUM_ENABLED)) {
--- 
-1.8.3.1
+This isn't so much a pattern as an unholy tapestry of braindead.
+
+> > This looks like a clock driver in disguise...
+> 
+> Yeah, that was my other idea - doing this as a clock. So would you be ok, with 
+> the arch-timer getting the possibility to handle an optional clock?
+
+I would very much not like to do this, but it is better than a driver
+whose sole purpose is to not be a clock driver.
+
+Mark.
