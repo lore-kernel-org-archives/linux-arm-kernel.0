@@ -1,46 +1,44 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 20 Jun 2014 13:48:49 +0200
-Subject: [PATCH v9 3/3] dt-bindings: add mtk-timer bindings
-In-Reply-To: <1403264929-21325-1-git-send-email-matthias.bgg@gmail.com>
-References: <1403264929-21325-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1403264929-21325-4-git-send-email-matthias.bgg@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 20 Jun 2014 13:02:23 +0100
+Subject: [PATCH v3 0/7] i2c: Relax mandatory I2C ID table passing
+Message-ID: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the General Porpose Timer driver of
-the Mediatek SoCs.
+Hi Wolfram,
+ 
+As previously discussed I believe it should be okay for an I2C device
+driver _not_ supply an I2C ID table to match to.  The I2C subsystem
+should be able to match via other means, such as via OF tables.  The
+blocking factor during our previous conversation was to keep
+registering via sysfs up and running.  This set does that.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/timer/mediatek,mtk-timer.txt          |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+After thinking more deeply about the problem, it occurred to me that
+any I2C device driver which uses the sysfs method and issues an
+of_match_device() would also fail their probe().  Bolted on to this
+set is a new, more generic way for these devices to match against
+either of the I2C/OF tables.
 
-diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-new file mode 100644
-index 0000000..10b7e09
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-@@ -0,0 +1,18 @@
-+Mediatek MT6577, MT6572 and MT6589 Timers
-+---------------------------------------
-+
-+Required properties:
-+- compatible: Should be "mediatek,mt6577-timer"
-+- reg: Should contain location and length for timers register.
-+- clocks: Clocks driving the timer hardware. This list should include two
-+	clocks. The order is system clock and as second clock the RTC clock.
-+
-+Examples:
-+
-+	timer at 10008000 {
-+		compatible = "mediatek,mt6577-timer";
-+		reg = <0x10008000 0x80>;
-+		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&system_clk>, <&rtc_clk>;
-+		clock-names = "system-clk", "rtc-clk";
-+	};
--- 
-1.7.9.5
+I hope this ticks all of your boxes.
+
+v3:
+  - Insist on passing 'struct i2c_client' instead of 'struct device'
+  - Remove hook from of_match_device()
+
+v2:
+  - Removal of ACPI support (this is really an OF issue).
+  - Add a new .probe2( with will seamlessly replace
+  - Supply a warning on devices matching via OF without a suitable compatible
+  - Remove unified match_device() - bad idea as it subverts type-safe behaviour
+  - Provide examples of the kind of clean-up possible after this set.
+    - I already have the full support from the maintainer of these drivers =;-)
+
+Kind regards,
+Lee
+
+ arch/arm/configs/multi_v7_defconfig |  1 +
+ drivers/i2c/i2c-core.c              | 72 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------
+ drivers/mfd/88pm860x-core.c         |  5 ++---
+ drivers/mfd/as3722.c                | 12 ++----------
+ include/linux/i2c.h                 | 22 +++++++++++++++++++++-
+ 5 files changed, 89 insertions(+), 23 deletions(-)
