@@ -1,35 +1,28 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Thu, 19 Jun 2014 21:59:28 -0700
-Subject: [PATCH v3 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <CAJe_ZhcSMrN6OeRjo7cG7CMobjEPMMB7o0eUD9HAFskravSQ3w@mail.gmail.com>
-References: <1402944372-31901-1-git-send-email-bjorn.andersson@sonymobile.com>
- <7hvbrzbh1u.fsf@paris.lan>
- <CAJAp7OhHr4Cgcp9pvQ3=MAie_zSnFJxG28Vf37qJ98BK7P1jaQ@mail.gmail.com>
- <7hzjha8b97.fsf@paris.lan>
- <842A7147-A2CC-42BD-9947-CBADF738DC92@codeaurora.org>
- <7hegym6uca.fsf@paris.lan>
- <CAJe_ZhfmsgvnVu-VgN63LaZ-522HuAY_EVfB6ujQjdzBE+u=zA@mail.gmail.com>
- <CAJAp7OgfsVs9C0RNrDnQ5g7heba7JjaYFrj7wVUqT_m+wu-A3A@mail.gmail.com>
- <CAJe_ZhcSMrN6OeRjo7cG7CMobjEPMMB7o0eUD9HAFskravSQ3w@mail.gmail.com>
-Message-ID: <CAJAp7OgXDYh1VEZ43UBbs8L-d2P-7ub0Yg3s73BcqC6ekzEBJQ@mail.gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Fri, 20 Jun 2014 13:12:44 +0800
+Subject: [PATCH 1/3] ARM: imx: defconfig: select SOC_IMX6SX by default
+Message-ID: <1403241164-31417-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 1:01 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
-[...]
-> Mailbox isn't about how you program the h/w. Do whatever is needed to
-> send a message across.
->
+Enable i.MX6SX SOC support.
 
-But there are no messages to get across here, each individual resource
-is exposed directly in the address space of the Linux system.
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-> BTW I haven't looked closely, but probably you could push the data tables in DT?
->
-
-The first RFC for this had all configuration in devicetree; we decided
-not to go that path as this gave a cleaner abstraction and is less
-error prone.
-
-Regards,
-Bjorn
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index a6f182e..e9f481e 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -37,6 +37,7 @@ CONFIG_SOC_IMX50=y
+ CONFIG_SOC_IMX53=y
+ CONFIG_SOC_IMX6Q=y
+ CONFIG_SOC_IMX6SL=y
++CONFIG_SOC_IMX6SX=y
+ CONFIG_SOC_VF610=y
+ CONFIG_PCI=y
+ CONFIG_PCI_IMX6=y
+-- 
+1.7.9.5
