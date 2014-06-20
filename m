@@ -1,74 +1,83 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 20 Jun 2014 09:44:52 -0700
-Subject: [PATCH] arm: ptrace: fix syscall modification under
- PTRACE_O_TRACESECCOMP
-In-Reply-To: <20140620102258.GA26626@arm.com>
-References: <20140618202748.GA9022@www.outflux.net>
- <20140620102258.GA26626@arm.com>
-Message-ID: <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 20 Jun 2014 18:53:02 +0200
+Subject: [PATCH 2/9] ARM: shmobile: Move r8a73a4.h
+In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
+References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1403283189-21688-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 3:22 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Kees,
->
-> I'm struggling to see the bug in the current code, so apologies if my
-> questions aren't helpful.
->
-> On Wed, Jun 18, 2014 at 09:27:48PM +0100, Kees Cook wrote:
->> An x86 tracer wanting to change the syscall uses PTRACE_SETREGS
->> (stored to regs->orig_ax), and an ARM tracer uses PTRACE_SET_SYSCALL
->> (stored to current_thread_info()->syscall). When this happens, the
->> syscall can change across the call to secure_computing(), since it may
->> block on tracer notification, and the tracer can then make changes
->> to the process, before we return from secure_computing(). This
->> means the code must respect the changed syscall after the
->> secure_computing() call in syscall_trace_enter(). The same is true
->> for tracehook_report_syscall_entry() which may also block and change
->> the syscall.
->
-> I don't think I understand what you mean by `the code must respect the
-> changed syscall'. The current code does indeed issue the new syscall, so are
-> you more concerned with secure_computing changing ->syscall, then the
-> debugger can't see the new syscall when it sees the trap from tracehook?
-> Are these even supposed to inter-operate?
+Change location of r8a73a4.h so it can be included as "r8a73a4.h"
+instead of the old style <mach/r8a73a4.h>
 
-The problem is the use of "scno" in the call -- it results in ignoring
-the value that may be set up in ->syscall by a tracer:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/mach-shmobile/board-ape6evm-reference.c    | 4 +++-
+ arch/arm/mach-shmobile/board-ape6evm.c              | 4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h | 0
+ arch/arm/mach-shmobile/setup-r8a73a4.c              | 4 +++-
+ 4 files changed, 9 insertions(+), 3 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a73a4.h (100%)
 
-syscall_trace_enter(regs, scno):
-    current_thread_info()->syscall = scno;
-    secure_computing(scno):
-        [block on ptrace]
-        [ptracer changes current_thread_info()->syscall vis PTRACE_SET_SYSCALL]
-    ...
-    return scno;
-
-This means the tracer's changed syscall value will be ignored
-(syscall_trace_enter returns original "scno" instead of actual
-current_thread_info()->syscall). In the original code, failure cases
-were propagated correctly, but not tracer-induced changes.
-
-Is that more clear? It's not an obvious state (due to the external
-modification of process state during the ptrace blocking). I've also
-got tests for this, if that's useful to further illustrate:
-
-https://github.com/kees/seccomp/commit/bd24e174593f79784b97178b583f17e0ea9d2aa7
-
->
->> The x86 code handles this (it expects orig_ax to always be the
->> desired syscall). In the ARM case, this means we should not be touching
->> current_thread_info()->syscall after its initial assignment. All failures
->> should result in a -1 syscall, though.
->
-> The only time we explicitly touch ->syscall is when we're aborting the call
-> (i.e. writing -1), which I think is fine.
-
-That was the error path, which was okay. This rearranges things to
-both handle error conditions and tracer changes.
-
--Kees
-
+diff --git a/arch/arm/mach-shmobile/board-ape6evm-reference.c b/arch/arm/mach-shmobile/board-ape6evm-reference.c
+index 76e4ff14be68..2f7723e5fe91 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm-reference.c
++++ b/arch/arm/mach-shmobile/board-ape6evm-reference.c
+@@ -24,10 +24,12 @@
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
+ #include <linux/sh_clk.h>
+-#include <mach/r8a73a4.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
++#include "r8a73a4.h"
+ 
+ static void __init ape6evm_add_standard_devices(void)
+ {
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index 8f8da25310e7..485567876d39 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -33,11 +33,13 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/sh_clk.h>
+ #include <linux/smsc911x.h>
+-#include <mach/r8a73a4.h>
++
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
+ #include "irqs.h"
++#include "r8a73a4.h"
+ 
+ /* LEDS */
+ static struct gpio_led ape6evm_leds[] = {
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/r8a73a4.h
+similarity index 100%
+rename from arch/arm/mach-shmobile/include/mach/r8a73a4.h
+rename to arch/arm/mach-shmobile/r8a73a4.h
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index da94d9b9292e..f470b3cc0b7b 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -24,11 +24,13 @@
+ #include <linux/serial_sci.h>
+ #include <linux/sh_dma.h>
+ #include <linux/sh_timer.h>
+-#include <mach/r8a73a4.h>
++
+ #include <asm/mach/arch.h>
++
+ #include "common.h"
+ #include "dma-register.h"
+ #include "irqs.h"
++#include "r8a73a4.h"
+ 
+ static const struct resource pfc_resources[] = {
+ 	DEFINE_RES_MEM(0xe6050000, 0x9000),
 -- 
-Kees Cook
-Chrome OS Security
+1.9.1
