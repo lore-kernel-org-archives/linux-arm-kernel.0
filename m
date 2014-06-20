@@ -1,44 +1,65 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Jun 2014 13:12:18 +0100
-Subject: [PATCH RFC 07/30] net: fec: ensure that a disconnected phy isn't
- configured
+Date: Fri, 20 Jun 2014 13:12:24 +0100
+Subject: [PATCH RFC 08/30] net: fec: stop the phy before shutting down the MAC
 In-Reply-To: <20140620121118.GR32514@n2100.arm.linux.org.uk>
 References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
-Message-ID: <E1Wxxg2-0005XH-Un@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wxxg8-0005XL-1l@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we disconnect from a phy, we should forget our pointer to it so we
-don't accidentally try to configure it.  We handle a NULL phy pointer
-correctly in most places, except fec_enet_set_pauseparam().  Fix this
-too.
+When the network interface goes down, stop the phy to prevent further
+link up status changes before taking the MAC or netif sections down.
+This prevents further reception of link up events which could
+potentially call fec_restart().
+
+Since phy_stop() takes the mutex which adjust_link() runs under, we
+also ensure that adjust_link() will not already be processing a link
+up event.
+
+We also need to do this when suspending as well - we don't want a
+mis-timed phy state change to restart the MAC after we have stopped
+it for suspend, and thus need to restart the phy when resuming.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/net/ethernet/freescale/fec_main.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 6a03d7eced4d..cf805468eecc 100644
+index cf805468eecc..e0a1ac1826b7 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1875,6 +1875,9 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
+@@ -2181,13 +2181,14 @@ fec_enet_close(struct net_device *ndev)
  {
  	struct fec_enet_private *fep = netdev_priv(ndev);
  
-+	if (!fep->phy_dev)
-+		return -ENODEV;
++	phy_stop(fep->phy_dev);
 +
- 	if (pause->tx_pause != pause->rx_pause) {
- 		netdev_info(ndev,
- 			"hardware only support enable/disable both tx and rx");
-@@ -2186,6 +2189,7 @@ fec_enet_close(struct net_device *ndev)
+ 	/* Don't know what to do yet. */
+ 	napi_disable(&fep->napi);
+ 	fep->opened = 0;
+ 	netif_tx_disable(ndev);
+ 	fec_stop(ndev);
  
- 	phy_stop(fep->phy_dev);
+-	phy_stop(fep->phy_dev);
  	phy_disconnect(fep->phy_dev);
-+	fep->phy_dev = NULL;
+ 	fep->phy_dev = NULL;
  
- 	fec_enet_clk_enable(ndev, false);
- 	pinctrl_pm_select_sleep_state(&fep->pdev->dev);
+@@ -2669,6 +2670,7 @@ fec_suspend(struct device *dev)
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 
+ 	if (netif_running(ndev)) {
++		phy_stop(fep->phy_dev);
+ 		fec_stop(ndev);
+ 		netif_device_detach(ndev);
+ 	}
+@@ -2702,6 +2704,7 @@ fec_resume(struct device *dev)
+ 	if (netif_running(ndev)) {
+ 		fec_restart(ndev, fep->full_duplex);
+ 		netif_device_attach(ndev);
++		phy_start(fep->phy_dev);
+ 	}
+ 
+ 	return 0;
 -- 
 1.8.3.1
