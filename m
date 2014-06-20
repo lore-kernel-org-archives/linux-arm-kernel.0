@@ -1,87 +1,64 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Fri, 20 Jun 2014 09:37:44 +0200
-Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
-References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
- <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <CAG374jDD+yUiBgJFpkmpgAa+Z7+v+ANo6V90YQnhTuftm2np+Q@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 20 Jun 2014 09:38:31 +0200
+Subject: [PATCH RFC 1/2] libahci_platform: add
+ ahci_platform_get_of_property
+In-Reply-To: <53A3CD26.3070001@linaro.org>
+References: <xuwei5@hisilicon.com, kefeng.wang@linaro.org,
+ > <1403067249-8021-1-git-send-email-zhangfei.gao@linaro.org>
+ <1403067249-8021-2-git-send-email-zhangfei.gao@linaro.org>
+ <20140618140352.GD11895@leverpostej> <53A24950.2020300@linaro.org>
+ <53A293CB.3040704@redhat.com> <53A3CD26.3070001@linaro.org>
+Message-ID: <53A3E4F7.4080504@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Phil,
+Hi,
 
-Just a question...
+On 06/20/2014 07:56 AM, zhangfei wrote:
+> 
+> 
+> On 06/19/2014 03:39 PM, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 06/19/2014 04:22 AM, zhangfei wrote:
+>>> Hi Mark,
+>>>
+>>> On 06/18/2014 10:03 PM, Mark Rutland wrote:
+>>>> On Wed, Jun 18, 2014 at 05:54:08AM +0100, Zhangfei Gao wrote:
+>>>>> Instead of setting hflags in different files,
+>>>>> ahci_platform_get_of_property set hpriv->flags when ahci_platform_init_host
+>>>>> according to property in dts.
+>>>>
+>>>> The AHCI_HFLAGS are a Linux implementation detail, so it would be nice
+>>>> to have a good justification for each of these being turned into DT
+>>>> properties.
+>>>
+>>> Do you mean only add required property now?
+>>
+>> No you should not add any properties at all using properties to set SoC specific quirks
+>> is just wrong, if a device is not 100% ahci compatible you should use a SoC specific
+>> compatible string for it, and set quirks in the kernel driver based on that.
+>>
+>> Devicetree is supposed to describe hardware, in this case the quirks are a property
+>> of the specific model of the hardware, so this should be expressed through the
+>> compatible string. Extra properties in devicetree are meant to be used for board
+>> specific things, like having a gpio to enable power to the sata target device.
+>> Extra properties should not be used in the way you are proposing to use them now.
+>>
+> 
+> OK, got it.
+> 
+> What I thoutht is using ahci_platform_get_of_property could make ahci_platform.c more shareable, adding the chance of removing specific compatible.
+> Just refer mmc_of_parse and sdhci_get_of_property, they are parsing property directly from dts.
 
-On 12 May 2014 12:57, Phil Edworthy <phil.edworthy@renesas.com> wrote:
-> This PCIe Host driver currently does not support MSI, so cards
-> fall back to INTx interrupts.
->
+I'm not familiar with sdhci_get_of_property, but mmc_of_parse is all about
+describing the board, not controller specific quirks. It sets things like
+how many bits the sdcard slot has (just because the controller has x
+bits does not mean they are all wired up), things like max speed (which again
+is not only a host but also a board property), things like which gpio to use for
+card detect, or if the mmc/sdio device is always present as it is soldered
+onto the board, etc.
 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> ---
->  drivers/pci/host/Kconfig     |   6 +
->  drivers/pci/host/Makefile    |   1 +
->  drivers/pci/host/pcie-rcar.c | 768 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 775 insertions(+)
->  create mode 100644 drivers/pci/host/pcie-rcar.c
->
-> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-> new file mode 100644
-> index 0000000..3c524b9
-> --- /dev/null
-> +++ b/drivers/pci/host/pcie-rcar.c
+Regards,
 
-> +static void rcar_pcie_enable(struct rcar_pcie *pcie)
-> +{
-> +       struct platform_device *pdev = to_platform_device(pcie->dev);
-> +
-> +       rcar_pci.nr_controllers = 1;
-> +       rcar_pci.private_data = (void **)&pcie;
-> +
-> +       pci_common_init_dev(&pdev->dev, &rcar_pci);
-> +#ifdef CONFIG_PCI_DOMAINS
-> +       rcar_pci.domain++;
-> +#endif
-> +}
-> +
-
-How does it work when you have 2 PCIe DT node ?
-(because for my point of view pci_common_init_dev() can't be called twice)
-
-void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
-{
-    struct pci_sys_data *sys;
-    LIST_HEAD(head);
-
-    pci_add_flags(PCI_REASSIGN_ALL_RSRC);
-    if (hw->preinit)
-        hw->preinit();
-    pcibios_init_hw(parent, hw, &head);
-...
-
-static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
-                struct list_head *head)
-{
-    struct pci_sys_data *sys = NULL;
-    int ret;
-    int nr, busnr;
-
-    for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
-        sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
-        if (!sys)
-            panic("PCI: unable to allocate sys data!");
-
-#ifdef CONFIG_PCI_DOMAINS
-        sys->domain  = hw->domain;
-#endif
-        sys->busnr   = busnr;
-...
-
-the issue is that sys->busnr always starts to zero ...
-
-how did you fix this problem?
-
-Thanks.
-Best Regards
-
-Gabriel.
+Hans
