@@ -1,92 +1,175 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 20 Jun 2014 11:48:02 -0400
-Subject: [PATCHv2] mm: page_alloc: fix CMA area initialisation when
- pageblock > MAX_ORDER
-In-Reply-To: <xa1td2e41xs2.fsf@mina86.com>
-References: <1402522435-13884-1-git-send-email-msalter@redhat.com>
- <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
- <xa1t61jzwfo6.fsf@mina86.com> <1403201524.32688.62.camel@deneb.redhat.com>
- <xa1td2e41xs2.fsf@mina86.com>
-Message-ID: <1403279282.755.23.camel@deneb.redhat.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 Jun 2014 10:50:25 -0500
+Subject: [PATCH] dt/documentation: add specification of dma bus information
+In-Reply-To: <53A44D73.6080200@ti.com>
+References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAOMZO5Ceg9RpC8Lgt0BwGTuaz-Z2614Die2PrbtT_j4QYjL_sA@mail.gmail.com>
+ <5395BDA7.3060507@ti.com> <53A44D73.6080200@ti.com>
+Message-ID: <CAL_JsqJAtWnHKPVpDsdOOzT_X=npc3hroLNTGqULM2SJr=1OEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-06-19 at 21:53 +0200, Michal Nazarewicz wrote:
-> With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE,
-> the following is triggered at early boot:
-> 
->   SMP: Total of 8 processors activated.
->   devtmpfs: initialized
->   Unable to handle kernel NULL pointer dereference at virtual address 00000008
->   pgd = fffffe0000050000
->   [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
->   Internal error: Oops: 96000006 [#1] SMP
->   Modules linked in:
->   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
->   task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
->   PC is at __list_add+0x10/0xd4
->   LR is at free_one_page+0x270/0x638
->   ...
->   Call trace:
->   [<fffffe00003ee970>] __list_add+0x10/0xd4
->   [<fffffe000019c478>] free_one_page+0x26c/0x638
->   [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
->   [<fffffe000019d5e8>] __free_pages+0x74/0xbc
->   [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
->   [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
->   [<fffffe0000090418>] do_one_initcall+0xc4/0x154
->   [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
->   [<fffffe00007520a0>] kernel_init+0xc/0xd4
-> 
-> This happens because init_cma_reserved_pageblock() calls
-> __free_one_page() with pageblock_order as page order but it is bigger
-> han MAX_ORDER.  This in turn causes accesses past zone->free_list[].
-> 
-> Fix the problem by changing init_cma_reserved_pageblock() such that it
-> splits pageblock into individual MAX_ORDER pages if pageblock is
-> bigger than a MAX_ORDER page.
-> 
-> In cases where !CONFIG_HUGETLB_PAGE_SIZE_VARIABLE, which is all
-> architectures expect for ia64, powerpc and tile at the moment, the
-> ?pageblock_order > MAX_ORDER? condition will be optimised out since
-> both sides of the operator are constants.  In cases where pageblock
-> size is variable, the performance degradation should not be
-> significant anyway since init_cma_reserved_pageblock() is called
-> only at boot time at most MAX_CMA_AREAS times which by default is
-> eight.
-> 
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> Reported-by: Mark Salter <msalter@redhat.com>
+On Fri, Jun 20, 2014 at 10:04 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Monday 09 June 2014 09:59 AM, Santosh Shilimkar wrote:
+>> On Sunday 08 June 2014 10:13 PM, Fabio Estevam wrote:
+>>> On Thu, Jun 5, 2014 at 12:22 PM, Santosh Shilimkar
+>>> <santosh.shilimkar@ti.com> wrote:
+>>>> Recently we introduced the generic device tree infrastructure for couple of DMA
+>>>> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
+>>>> its useful for future users.
+>>>>
+>>>> The "dma-ranges" property is intended to be used for describing the
+>>>> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
+>>>>
+>>>> The "dma-coherent" property is intended to be used for identifying devices
+>>>> supported coherent DMA operations.
+>>>>
+>>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>> Cc: Shawn Guo <shawn.guo@freescale.com>
+>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> ---
+>>>>  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
+>>>>  1 file changed, 60 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+>>>> index 1f013bd..f0120c1 100644
+>>>> --- a/Documentation/devicetree/booting-without-of.txt
+>>>> +++ b/Documentation/devicetree/booting-without-of.txt
+>>>> @@ -51,6 +51,8 @@ Table of Contents
+>>>>
+>>>>    VIII - Specifying device power management information (sleep property)
+>>>>
+>>>> +  VIV - Specifying dma bus information
+>>>
+>>> "9" in Roman numeral is "IX"
+>>>
+>> Yeah.. Not sure what I was thinking...
+>>
+> Updated patch end of the email with the typo fixed.
+>
+> Rob,
+> Can you please pick this up if you are ok with the it.
+>
+> Regards,
+> Santosh
+>
+> From b72e949a194d766fe029fe6bb5939467f2fbe9b9 Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Fri, 20 Jun 2014 11:01:54 -0400
+> Subject: [PATCH] dt/documentation: add specification of dma bus information
+>
+> Recently we introduced the generic device tree infrastructure for couple of DMA
+> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
+> its useful for future users.
+>
+> The "dma-ranges" property is intended to be used for describing the
+> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
+>
+> The "dma-coherent" property is intended to be used for identifying devices
+> supported coherent DMA operations.
+>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Acked-by: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  mm/page_alloc.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 7f97767..fe114db 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -817,7 +817,18 @@ void __init init_cma_reserved_pageblock(struct page *page)
->  
->  	set_page_refcounted(page);
->  	set_pageblock_migratetype(page, MIGRATE_CMA);
-> -	__free_pages(page, pageblock_order);
+>  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>
+> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+> index 1f013bd..0b0928c 100644
+> --- a/Documentation/devicetree/booting-without-of.txt
+> +++ b/Documentation/devicetree/booting-without-of.txt
+> @@ -51,6 +51,8 @@ Table of Contents
+>
+>    VIII - Specifying device power management information (sleep property)
+>
+> +  IX - Specifying dma bus information
 > +
-> +	if (pageblock_order > MAX_ORDER) {
-> +		i = pageblock_order - MAX_ORDER;
-> +		i = 1 << i;
-> +		p = page;
-> +		do {
-> +			__free_pages(p, MAX_ORDER);
-> +		} while (p += MAX_ORDER_NR_PAGES, --i);
-> +	} else {
-> +		__free_pages(page, pageblock_order);
-> +	}
+>    Appendix A - Sample SOC node for MPC8540
+>
+>
+> @@ -1332,6 +1334,64 @@ reasonably grouped in this manner, then create a virtual sleep controller
+>  (similar to an interrupt nexus, except that defining a standardized
+>  sleep-map should wait until its necessity is demonstrated).
+>
+> +IX - Specifying dma bus information
 > +
->  	adjust_managed_page_count(page, pageblock_nr_pages);
->  }
->  #endif
+> +Some devices may have DMA memory range shifted relatively to the beginning of
+> +RAM, or even placed outside of kernel RAM. For example, the Keystone 2 SoC
+> +worked in LPAE mode with 4G memory has:
+> +- RAM range: [0x8 0000 0000, 0x8 FFFF FFFF]
+> +- DMA range: [  0x8000 0000,   0xFFFF FFFF]
+> +and DMA range is aliased into first 2G of RAM in HW.
+> +
+> +In such cases, DMA addresses translation should be performed between CPU phys
+> +and DMA addresses. The "dma-ranges" property is intended to be used
+> +for describing the configuration of such system in DT.
+> +
+> +In addition, each DMA master device on the DMA bus may or may not support
+> +coherent DMA operations. The "dma-coherent" property is intended to be used
+> +for identifying devices supported coherent DMA operations in DT.
+> +
+> +* DMA Bus master
+> +Optional property:
+> +- dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
+> +       (child-bus-address, parent-bus-address, length). Each triplet specified
+> +       describes a contiguous DMA address range.
+> +       The dma-ranges property is used to describe the direct memory access (DMA)
+> +       structure of a memory-mapped bus whose device tree parent can be accessed
+> +       from DMA operations originating from the bus. It provides a means of
+> +       defining a mapping or translation between the physical address space of
+> +       the bus and the physical address space of the parent of the bus.
+> +       (for more information see ePAPR specification)
+> +
+> +* DMA Bus child
+> +Optional property:
+> +- dma-ranges: <empty> value. if present - It means that DMA addresses
+> +       translation has to be enabled for this device.
+> +- dma-coherent: Present if dma operations are coherent
+> +
+> +Example:
+> +soc {
+> +               compatible = "ti,keystone","simple-bus";
+> +               ranges = <0x0 0x0 0x0 0xc0000000>;
+> +               dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
+> +
+> +               [...]
+> +
+> +               usb: usb at 2680000 {
+> +                       compatible = "ti,keystone-dwc3";
+> +
+> +                       [...]
+> +
+> +                       dma-coherent;
+> +                       dma-ranges;
+> +
+> +                       dwc3 at 2690000 {
+> +                               compatible = "synopsys,dwc3";
+> +                               [...]
+> +                       };
 
-This still isn't quite right. __free_pages can only take up to
-MAX_ORDER-1 (MAX_ORDER_NR_PAGES is 1 << (MAX_ORDER - 1)). But
-I'm hitting a slightly different issue even with that fixed up. 
-Still looking...
+This example is a bit strange. I don't understand the relationship
+between keystone-dwc3 and synopsys,dwc3, nor do I want to. I'd prefer
+to see a simple example here.
+
+dma-ranges is a property of the parent which you show, but
+dma-coherent originally was a property of the bus master itself. While
+we need to support that, are we changing that? We need to be clear on
+where the property belongs even if the kernel is more lax.
+
+Rob
