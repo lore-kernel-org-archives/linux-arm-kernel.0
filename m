@@ -1,96 +1,158 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Fri, 20 Jun 2014 14:57:25 -0400
-Subject: [RFC v2 1/3] Mailbox: Add support for ACPI
-In-Reply-To: <CAJ5Y-ebp1rrRwDWCWSqkSpFg0jr4JktzKpBhWQv9jrwxhqndQQ@mail.gmail.com>
-References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
- <1402591692-7736-2-git-send-email-ashwin.chaugule@linaro.org>
- <4476889.LvjMyVbGZ8@wuerfel>
- <CAJ5Y-eZ0z-SPSn9oxced2GOAw+OA5rC+uq4pCSXh5H2JujPm1g@mail.gmail.com>
- <CAJ5Y-ebp1rrRwDWCWSqkSpFg0jr4JktzKpBhWQv9jrwxhqndQQ@mail.gmail.com>
-Message-ID: <CAJ5Y-eZkTwc-uc+fcHH+1WwBhP=wOrCBrPOKH-gQpqQ9AnTAFQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 20 Jun 2014 15:00:52 -0400
+Subject: [PATCH v2 2/2] ARM: mvebu: Use system controller to get the
+ soc id when possible
+In-Reply-To: <1403274953-21790-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1403274953-21790-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403274953-21790-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140620190052.GD21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2014 14:55, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
-> Hello,
->
-> On 12 June 2014 13:14, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
->> On 12 June 2014 13:02, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Thursday 12 June 2014 12:48:10 Ashwin Chaugule wrote:
->>>>
->>>> +#ifndef CONFIG_ACPI
->>>>         if (!mbox->of_xlate)
->>>>                 mbox->of_xlate = of_mbox_index_xlate;
->>>> -
->>>> +#endif
->>>>         mutex_lock(&con_mutex);
->>>>         list_add_tail(&mbox->node, &mbox_cons);
->>>>         mutex_unlock(&con_mutex);
->>>>
->>>
->>> You can't do #ifndef here, the driver must still work if
->>> both OF and ACPI are enabled.
->>
->> Ok. Here we could skip the macro altogether, since of_xlate wont be
->> called with ACPI anyway.
->>
->> Will need to look into using/faking mbox->dev to remove the other ifndefs.
->
->
-> So, in order to get an mbox->dev for ACPI platforms, we'd need an
-> entry in the DSDT table. That seems rather pointless, since the DSDT
-> is reserved for devices and is supposed to be OS agnostic. Since the
-> mailbox controller itself is not really a "device" with a resource
-> descriptor, I dont see the point in adding a dummy DSDT entry for the
-> sake of getting this `struct device`. Also, I'm told adding new
-> entries to this table requires registering a unique 4 character
-> identifier and approval from some committees. If there are other ways
-> to get this structure I'd like to hear about it.
->
-> The other alternative would be to piggy back on the ACPI CPU detection
-> code, which looks for the ACPI0007 device node in the DSDT and use
-> that as the mbox controller device. This node is already registered
-> and is an established method to detect CPUs. But I'm not sure what
-> happens when CPUs are hotplugged off, we surely dont want mailbox
-> clients such as PCC to break.
->
-> The third alternative is to ignore the dev refcounts for ACPI as shown
-> in this totally untested patch:
->
-> ----------------8<----------------------------------------
->
->
-> From 6fe6e583f0b23b08643a4a85545a9a5338b9b1a0 Mon Sep 17 00:00:00 2001
-> From: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Date: Wed, 11 Jun 2014 16:09:35 -0400
-> Subject: [PATCH] Mailbox: Add support for ACPI
->
-> The current mailbox framework only supports DT based bindings.
-> Add another mechanism for mailbox clients to register with mailbox
-> controllers and request for specific mailbox channels. This enables
-> usage of the mailbox framework on kernels with ACPI support.
->
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+On Fri, Jun 20, 2014 at 04:35:53PM +0200, Gregory CLEMENT wrote:
+> On Armada 38x it is possible to get the SoC Id and the revision
+> without using the PCI register. Accessing the PCI registers implies
+> enabling its clock and, because of the initialization issue, not
+> keeping them enable. So if possible it is better to avoid it.
+> 
+> Armada 370 and Armada XP provides the SoC ID values from the system
+> controller but not the revision.
+> 
+> Armada 375 provides both but the SoC ID value looks buggy (0x6660
+> instead of 0x6720).
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  drivers/mailbox/mailbox.c          | 177 ++++++++++++++++++++++++++-----------
->  include/linux/mailbox_client.h     |   2 +-
->  include/linux/mailbox_controller.h |   1 +
->  3 files changed, 129 insertions(+), 51 deletions(-)
->
+>  arch/arm/mach-mvebu/common.h            |  1 +
+>  arch/arm/mach-mvebu/mvebu-soc-id.c      | 20 +++++++++++++++++++-
+>  arch/arm/mach-mvebu/system-controller.c | 19 +++++++++++++++++++
+>  3 files changed, 39 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+> index b67fb7a10d8b..927d88627a6e 100644
+> --- a/arch/arm/mach-mvebu/common.h
+> +++ b/arch/arm/mach-mvebu/common.h
+> @@ -21,6 +21,7 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd);
+>  int mvebu_cpu_reset_deassert(int cpu);
+>  void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
+>  void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
+> +int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev);
+>  
+>  void armada_xp_cpu_die(unsigned int cpu);
+>  
+> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> index 12c66cac967d..922b1380b0be 100644
+> --- a/arch/arm/mach-mvebu/mvebu-soc-id.c
+> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> @@ -25,8 +25,10 @@
+>  #include <linux/of_address.h>
+>  #include <linux/slab.h>
+>  #include <linux/sys_soc.h>
+> +#include "common.h"
+>  #include "mvebu-soc-id.h"
+>  
+> +
+>  #define PCIE_DEV_ID_OFF		0x0
 
-> -------------------------8<-------------------------------
->
-> Btw I havent rebased to v7 of the mailbox patchwork yet, since I'd
-> like to hear feedback on the direction I'm taking with ACPI before I
-> rebase.
->
->
+whitespace?
 
-That probably messed up the formatting.. Attaching the patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-Mailbox-Add-support-for-ACPI.patch
-Type: text/x-patch
-Size: 8409 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140620/4018cce4/attachment.bin>
+>  #define PCIE_DEV_REV_OFF	0x8
+>  
+> @@ -54,7 +56,7 @@ int mvebu_get_soc_id(u32 *dev, u32 *rev)
+>  		return -ENODEV;
+>  }
+>  
+> -static int __init mvebu_soc_id_init(void)
+> +static int __init get_soc_id_by_pci(void)
+>  {
+>  	struct device_node *np;
+>  	int ret = 0;
+> @@ -129,6 +131,22 @@ clk_err:
+>  
+>  	return ret;
+>  }
+> +
+> +static int __init mvebu_soc_id_init(void)
+> +{
+> +
+> +	/*
+> +	 * First try to get the ID and the revision by the system
+> +	 * regsiter and use PCI registers only if it is not possible
+
+s/regsiter/register/
+
+> +	 */
+> +	if (!mvebu_system_controller_get_soc_id(&soc_dev_id, &soc_rev)) {
+> +		is_id_valid = true;
+> +		pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
+> +		return 0;
+> +	}
+> +
+> +	return get_soc_id_by_pci();
+> +}
+>  early_initcall(mvebu_soc_id_init);
+>  
+>  static int __init mvebu_soc_device(void)
+> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+> index 0c5524ac75b7..de90821129da 100644
+> --- a/arch/arm/mach-mvebu/system-controller.c
+> +++ b/arch/arm/mach-mvebu/system-controller.c
+> @@ -39,6 +39,9 @@ struct mvebu_system_controller {
+>  	u32 system_soft_reset;
+>  
+>  	u32 resume_boot_addr;
+> +
+> +	u32 dev_id;
+> +	u32 rev_id;
+>  };
+>  static struct mvebu_system_controller *mvebu_sc;
+>  
+> @@ -47,6 +50,8 @@ static const struct mvebu_system_controller armada_370_xp_system_controller = {
+>  	.system_soft_reset_offset = 0x64,
+>  	.rstoutn_mask_reset_out_en = 0x1,
+>  	.system_soft_reset = 0x1,
+> +	.dev_id = 0x38,
+> +	.rev_id = 0x3c,
+>  };
+>  
+>  static const struct mvebu_system_controller armada_375_system_controller = {
+> @@ -55,6 +60,8 @@ static const struct mvebu_system_controller armada_375_system_controller = {
+>  	.rstoutn_mask_reset_out_en = 0x1,
+>  	.system_soft_reset = 0x1,
+>  	.resume_boot_addr = 0xd4,
+> +	.dev_id = 0x38,
+> +	.rev_id = 0x3c,
+>  };
+>  
+>  static const struct mvebu_system_controller orion_system_controller = {
+> @@ -101,6 +108,18 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd)
+>  		;
+>  }
+>  
+> +int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev)
+> +{
+> +	if (of_machine_is_compatible("marvell,armada38x") &&
+
+As Sergei commented on your documentation patch, we try to avoid
+wildcards in compatible strings.  Perhaps a match list would be more
+appropriate?
+
+> +		system_controller_base) {
+> +		*dev = readl(system_controller_base + mvebu_sc->dev_id) >> 16;
+> +		*rev = (readl(system_controller_base + mvebu_sc->rev_id) >> 8)
+> +			& 0xF;
+> +		return 0;
+> +	} else
+> +		return -ENODEV;
+> +}
+> +
+>  #ifdef CONFIG_SMP
+>  void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
+>  {
+> -- 
+> 1.8.1.2
+> 
+
+thx,
+
+Jason.
