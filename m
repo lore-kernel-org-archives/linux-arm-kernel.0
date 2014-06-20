@@ -1,35 +1,56 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Jun 2014 11:26:34 +0100
-Subject: [PATCH] ARM: arm925: ensure assembly sets up writethrough mapping
-In-Reply-To: <20140620085759.GG558@drone.musicnaut.iki.fi>
-References: <20140620085759.GG558@drone.musicnaut.iki.fi>
-Message-ID: <E1Wxw1i-0004OA-GW@rmk-PC.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jun 2014 11:32:07 +0100
+Subject: [PATCHv3 3/4] arm64: Update the Image header
+In-Reply-To: <20140620085543.GH25104@arm.com>
+References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
+ <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
+ <20140620085543.GH25104@arm.com>
+Message-ID: <20140620103206.GF30188@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ca8f0b0a545f ("ARM: ensure C page table setup code follows
-assembly code") did what it said on the tin, but some of the older
-CPU code omitted the default cache policy from their files.  This
-results in the kernel running with the caches disabled.  Fix this
-for ARM925.
+On Fri, Jun 20, 2014 at 09:55:43AM +0100, Will Deacon wrote:
+> On Thu, Jun 19, 2014 at 11:49:22AM +0100, Mark Rutland wrote:
+> > Currently the kernel Image is stripped of everything past the initial
+> > stack, and at runtime the memory is initialised and used by the kernel.
+> > This makes the effective minimum memory footprint of the kernel larger
+> > than the size of the loaded binary, though bootloaders have no mechanism
+> > to identify how large this minimum memory footprint is. This makes it
+> > difficult to choose safe locations to place both the kernel and other
+> > binaries required at boot (DTB, initrd, etc), such that the kernel won't
+> > clobber said binaries or other reserved memory during initialisation.
+> 
+> [...]
+> 
+> > +/*
+> > + * There aren't any ELF relocations we can use to endian-swap values known only
+> > + * at link time (e.g. the subtraction of two symbol addresses), so we must get
+> > + * the linker to endian-swap certain values before emitting them.
+> > + */
+> > +#ifdef CONFIG_CPU_BIG_ENDIAN
+> > +#define DATA_LE64(data)					\
+> > +	((((data) & 0x00000000000000ff) << 56) |	\
+> > +	 (((data) & 0x000000000000ff00) << 40) |	\
+> 
+> Are you sure that these shifts are valid without a UL prefix on the first
+> constant operand? I don't think the leading zeroes promote the mask to a
+> 64-bit type, so you end up shifting greater than the width of the type.
 
-Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/proc-arm925.S | 1 +
- 1 file changed, 1 insertion(+)
+A key point to bear in mind is that this is in ld, not gas or gcc, which
+is why I needed a new macro in the first place. See the error on #ifndef
+LINKER_SCRIPT at the top of the file.
 
-diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
-index 97448c3acf38..ba0d58e1a2a2 100644
---- a/arch/arm/mm/proc-arm925.S
-+++ b/arch/arm/mm/proc-arm925.S
-@@ -502,6 +502,7 @@ __\name\()_proc_info:
- 	.long	\cpu_val
- 	.long	\cpu_mask
- 	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_CACHEABLE | \
- 		PMD_BIT4 | \
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ
--- 
-1.8.3.1
+As far as I can tell these are valid within ld. The GNU ld documentation
+says expressions should be evaluated as 64-bit values (given that
+aarch64 is 64-bit) [1].
+
+The kernel header looks correct when inspected with a hex editor, for
+both LE and BE.
+
+> I guess the compiler doesn't allocate (data & 0xff) into a w register?
+
+I would guess it wouldn't allocate anything given it is not involved :)
+
+Mark.
+
+[1] https://sourceware.org/binutils/docs/ld/Expressions.html#Expressions
