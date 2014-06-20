@@ -1,167 +1,185 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 20 Jun 2014 13:11:37 -0400
-Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
-In-Reply-To: <53A453D1.4040308@ti.com>
-References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo6=vi0SR0A3u5BCLgiGxoH48N5R=e8VAnFDG=K61qLxnw@mail.gmail.com>
- <53A453D1.4040308@ti.com>
-Message-ID: <53A46B49.3040009@ti.com>
+Date: Fri, 20 Jun 2014 13:17:43 -0400
+Subject: [PATCH] dt/documentation: add specification of dma bus information
+In-Reply-To: <CAL_JsqJAtWnHKPVpDsdOOzT_X=npc3hroLNTGqULM2SJr=1OEg@mail.gmail.com>
+References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAOMZO5Ceg9RpC8Lgt0BwGTuaz-Z2614Die2PrbtT_j4QYjL_sA@mail.gmail.com>
+ <5395BDA7.3060507@ti.com> <53A44D73.6080200@ti.com>
+ <CAL_JsqJAtWnHKPVpDsdOOzT_X=npc3hroLNTGqULM2SJr=1OEg@mail.gmail.com>
+Message-ID: <53A46CB7.1030109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 June 2014 11:31 AM, Murali Karicheri wrote:
-> On 6/17/2014 8:08 PM, Bjorn Helgaas wrote:
->> On Tue, Jun 10, 2014 at 02:51:19PM -0400, Murali Karicheri wrote:
->>> This patch adds a PCIe controller driver for Keystone SoCs. This
->>> is based on v1 of the series posted to the mailing list.
+On Friday 20 June 2014 11:50 AM, Rob Herring wrote:
+> On Fri, Jun 20, 2014 at 10:04 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Monday 09 June 2014 09:59 AM, Santosh Shilimkar wrote:
+>>> On Sunday 08 June 2014 10:13 PM, Fabio Estevam wrote:
+>>>> On Thu, Jun 5, 2014 at 12:22 PM, Santosh Shilimkar
+>>>> <santosh.shilimkar@ti.com> wrote:
+>>>>> Recently we introduced the generic device tree infrastructure for couple of DMA
+>>>>> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
+>>>>> its useful for future users.
+>>>>>
+>>>>> The "dma-ranges" property is intended to be used for describing the
+>>>>> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
+>>>>>
+>>>>> The "dma-coherent" property is intended to be used for identifying devices
+>>>>> supported coherent DMA operations.
+>>>>>
+>>>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>>> Cc: Shawn Guo <shawn.guo@freescale.com>
+>>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>> ---
+>>>>>  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
+>>>>>  1 file changed, 60 insertions(+)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+>>>>> index 1f013bd..f0120c1 100644
+>>>>> --- a/Documentation/devicetree/booting-without-of.txt
+>>>>> +++ b/Documentation/devicetree/booting-without-of.txt
+>>>>> @@ -51,6 +51,8 @@ Table of Contents
+>>>>>
+>>>>>    VIII - Specifying device power management information (sleep property)
+>>>>>
+>>>>> +  VIV - Specifying dma bus information
+>>>>
+>>>> "9" in Roman numeral is "IX"
+>>>>
+>>> Yeah.. Not sure what I was thinking...
 >>>
->>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> CC: Russell King <linux@arm.linux.org.uk>
->>> CC: Grant Likely <grant.likely@linaro.org>
->>> CC: Rob Herring <robh+dt@kernel.org>
->>> CC: Mohit Kumar <mohit.kumar@st.com>
->>> CC: Jingoo Han <jg1.han@samsung.com>
->>> CC: Bjorn Helgaas <bhelgaas@google.com>
->>> CC: Pratyush Anand <pratyush.anand@st.com>
->>> CC: Richard Zhu <r65037@freescale.com>
->>> CC: Kishon Vijay Abraham I <kishon@ti.com>
->>> CC: Marek Vasut <marex@denx.de>
->>> CC: Arnd Bergmann <arnd@arndb.de>
->>> CC: Pawel Moll <pawel.moll@arm.com>
->>> CC: Mark Rutland <mark.rutland@arm.com>
->>> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
->>> CC: Kumar Gala <galak@codeaurora.org>
->>> CC: Randy Dunlap <rdunlap@infradead.org>
->>> CC: Grant Likely <grant.likely@linaro.org>
->>>
->>>
->>> Changelog:
->>>
->>> V2
->>>   - Split the designware pcie enhancement patch to multiple
->>>     patches based on functionality added
->>>   - Remove the quirk code and add a patch to fix mps/mrss
->>>     tuning for ARM. Use kernel command line parameter
->>>     pci=pcie_bus_perf to work with Keystone PCI Controller.
->>>     Following patch addressed this.
->>>       [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
->>>   - Add documentation for device tree bindings
->>>   - Add separate interrupt controller nodes for MSI and Legacy
->>>     IRQs and use irq map for legacy IRQ
->>>   - Use compatibility to identify v3.65 version of the DW hardware
->>>     and use it to customize the designware common code.
->>>   - Use reg property for configuration space instead of range
->>>   - Other minor updates based on code inspection.
->>>
->>> V1
->>>   - Add an interrupt controller node for Legacy irq chip and use
->>>     interrupt map/map-mask property to map legacy IRQs A/B/C/D
->>>   - Add a Phy driver to replace the original serdes driver
->>>   - Move common application register handling code to a separate
->>>     file to allow re-use across other platforms that use older
->>>     DW PCIe h/w
->>>   - PCI quirk for maximum read request size. Check and override only
->>>     if the maximum is higher than what controller can handle.
->>>   - Converted to a module platform driver.
->>>
->>>
->>> Murali Karicheri (8):
->>>    PCI: designware: add rd[wr]_other_conf API
->>>    PCI: designware: refactor host init code to re-use on v3.65 DW pci hw
->>>    PCI: designware: update pcie core driver to work with dw hw version
->>>      3.65
->>>    PCI: designware: add msi controller functions for v3.65 hw
->>>    PCI: designware: add PCI controller functions for v3.65 DW hw
->>>    phy: Add serdes phy driver for keystone
->>>    PCI: keystone: add pcie driver based on designware core driver
->>>    ARM: keystone: add pcie related options
->>>
->>>   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
->>>   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
->>>   .../bindings/phy/phy-keystone-serdes.txt           |   25 ++
->>>   arch/arm/mach-keystone/Kconfig                     |    1 +
->>>   drivers/pci/host/Kconfig                           |   12 +
->>>   drivers/pci/host/Makefile                          |    2 +
->>>   drivers/pci/host/pci-dw-v3_65-msi.c                |  149 +++++++
->>>   drivers/pci/host/pci-dw-v3_65.c                    |  390 ++++++++++++++++++
->>>   drivers/pci/host/pci-dw-v3_65.h                    |   34 ++
->>>   drivers/pci/host/pci-keystone.c                    |  418 ++++++++++++++++++++
->>>   drivers/pci/host/pcie-designware.c                 |  175 +++++---
->>>   drivers/pci/host/pcie-designware.h                 |   42 +-
->>>   drivers/phy/Kconfig                                |    6 +
->>>   drivers/phy/Makefile                               |    1 +
->>>   drivers/phy/phy-keystone-serdes.c                  |  230 +++++++++++
->>>   15 files changed, 1531 insertions(+), 52 deletions(-)
->>>   create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
->>>   create mode 100644 Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
->>>   create mode 100644 drivers/pci/host/pci-dw-v3_65-msi.c
->>>   create mode 100644 drivers/pci/host/pci-dw-v3_65.c
->>>   create mode 100644 drivers/pci/host/pci-dw-v3_65.h
->>>   create mode 100644 drivers/pci/host/pci-keystone.c
->>>   create mode 100644 drivers/phy/phy-keystone-serdes.c
->> I'm not willing to merge phy-keystone-serdes.c because I don't
->> maintain drivers/phy and because of the binary blob of register values
->> it contains, but maybe somebody else will.  I assume it could be
->> merged by itself before the rest of this.
+>> Updated patch end of the email with the typo fixed.
 >>
->> I'm looking for acks from Mohit and/or Jingoo for the pci/host
->> changes, and from Arnd for the devicetree/bindings changes.
+>> Rob,
+>> Can you please pick this up if you are ok with the it.
 >>
->> Adding these "-dw-3_64" files is sort of ugly.  If that code is only
->> used by keystone, maybe it could just be moved to pci-keystone.c?  But
->> I'll defer to Mohit and Jingoo on that and the way you modify
->> pcie-designware.c.
+>> Regards,
+>> Santosh
 >>
->> Bjorn
-> Bjorn, Jingoo,
-> 
-> Unfortunately I lost Jingoo's email from my Inbox. So I cut-n-paste the comment from
-> internet and respond.
-> 
-> Jingoo Han wrote:-
-> =============================================================================
-> I think so, too.
-> 
-> DT maintainers and arch maintainers should review the following
-> dt bindings.
->   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
->   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
-> Generic PHY maintainer (Kishon Vijay Abraham I) should review the
-> following phy driver.
->   drivers/phy/phy-keystone-serdes.c
-> 
+>> From b72e949a194d766fe029fe6bb5939467f2fbe9b9 Mon Sep 17 00:00:00 2001
+>> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Date: Fri, 20 Jun 2014 11:01:54 -0400
+>> Subject: [PATCH] dt/documentation: add specification of dma bus information
 >>
->> I'm looking for acks from Mohit and/or Jingoo for the pci/host
->> changes, and from Arnd for the devicetree/bindings changes.
+>> Recently we introduced the generic device tree infrastructure for couple of DMA
+>> bus parameter, dma-ranges and dma-coherent. Update the documentation so that
+>> its useful for future users.
 >>
->> Adding these "-dw-3_64" files is sort of ugly.  If that code is only
->> used by keystone, maybe it could just be moved to pci-keystone.c?  But
->> I'll defer to Mohit and Jingoo on that and the way you modify
->> pcie-designware.c.
+>> The "dma-ranges" property is intended to be used for describing the
+>> configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
+>>
+>> The "dma-coherent" property is intended to be used for identifying devices
+>> supported coherent DMA operations.
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Acked-by: Shawn Guo <shawn.guo@freescale.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  Documentation/devicetree/booting-without-of.txt |   60 +++++++++++++++++++++++
+>>  1 file changed, 60 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+>> index 1f013bd..0b0928c 100644
+>> --- a/Documentation/devicetree/booting-without-of.txt
+>> +++ b/Documentation/devicetree/booting-without-of.txt
+>> @@ -51,6 +51,8 @@ Table of Contents
+>>
+>>    VIII - Specifying device power management information (sleep property)
+>>
+>> +  IX - Specifying dma bus information
+>> +
+>>    Appendix A - Sample SOC node for MPC8540
+>>
+>>
+>> @@ -1332,6 +1334,64 @@ reasonably grouped in this manner, then create a virtual sleep controller
+>>  (similar to an interrupt nexus, except that defining a standardized
+>>  sleep-map should wait until its necessity is demonstrated).
+>>
+>> +IX - Specifying dma bus information
+>> +
+>> +Some devices may have DMA memory range shifted relatively to the beginning of
+>> +RAM, or even placed outside of kernel RAM. For example, the Keystone 2 SoC
+>> +worked in LPAE mode with 4G memory has:
+>> +- RAM range: [0x8 0000 0000, 0x8 FFFF FFFF]
+>> +- DMA range: [  0x8000 0000,   0xFFFF FFFF]
+>> +and DMA range is aliased into first 2G of RAM in HW.
+>> +
+>> +In such cases, DMA addresses translation should be performed between CPU phys
+>> +and DMA addresses. The "dma-ranges" property is intended to be used
+>> +for describing the configuration of such system in DT.
+>> +
+>> +In addition, each DMA master device on the DMA bus may or may not support
+>> +coherent DMA operations. The "dma-coherent" property is intended to be used
+>> +for identifying devices supported coherent DMA operations in DT.
+>> +
+>> +* DMA Bus master
+>> +Optional property:
+>> +- dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
+>> +       (child-bus-address, parent-bus-address, length). Each triplet specified
+>> +       describes a contiguous DMA address range.
+>> +       The dma-ranges property is used to describe the direct memory access (DMA)
+>> +       structure of a memory-mapped bus whose device tree parent can be accessed
+>> +       from DMA operations originating from the bus. It provides a means of
+>> +       defining a mapping or translation between the physical address space of
+>> +       the bus and the physical address space of the parent of the bus.
+>> +       (for more information see ePAPR specification)
+>> +
+>> +* DMA Bus child
+>> +Optional property:
+>> +- dma-ranges: <empty> value. if present - It means that DMA addresses
+>> +       translation has to be enabled for this device.
+>> +- dma-coherent: Present if dma operations are coherent
+>> +
+>> +Example:
+>> +soc {
+>> +               compatible = "ti,keystone","simple-bus";
+>> +               ranges = <0x0 0x0 0x0 0xc0000000>;
+>> +               dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
+>> +
+>> +               [...]
+>> +
+>> +               usb: usb at 2680000 {
+>> +                       compatible = "ti,keystone-dwc3";
+>> +
+>> +                       [...]
+>> +
+>> +                       dma-coherent;
+>> +                       dma-ranges;
+>> +
+>> +                       dwc3 at 2690000 {
+>> +                               compatible = "synopsys,dwc3";
+>> +                               [...]
+>> +                       };
 > 
-> I agree with Bjorn Helgaas's opinion. These three "-dw-3_64" files
-> look terrible! I don't have a good way to handle this; however,
-> moving this code to pci-keystone.c looks better.
-> ======================================================================
+> This example is a bit strange. I don't understand the relationship
+> between keystone-dwc3 and synopsys,dwc3, nor do I want to. I'd prefer
+> to see a simple example here.
 > 
-> The original RFC I had submitted had all of the application space register
-> handling code as part of the Keystone PCI driver. As per Arnd's comment (See
-> my change log against v1), the code was moved to a separate file so that
-> the next driver that has same version of the DW hw could re-use this code.
-> I agree with Arnd and moved the code to v_3_65 specific files.  What is
-> your proposal?  Do you have objection to the file name? or it's content?
-> 
-> If objection is on the file name,  please suggest alternate names. If you
-> are okay with the file name, and doesn't like the code, it will be helpful
-> to review the code and provide specific comments against the patch itself
-> so that I can address the same.
-> 
-Arnd suggestion was to have the version 3.65 code in generic place since
-its IP specific and just in case some other vendor using the same version
-can leverage the code.
+OK. Will do.
 
-Concern here seems toe really those name of the files. I can't think of
-any other appropriate name. 
+> dma-ranges is a property of the parent which you show, but
+> dma-coherent originally was a property of the bus master itself. While
+> we need to support that, are we changing that? We need to be clear on
+> where the property belongs even if the kernel is more lax.
+> 
+I don't think we are changing it fundamentally but may be I missing
+your point. The dma-coherent as is now a per-device property.
+USB is one of the bus master supports coherency and hence showed
+up in above example.
 
 Regards,
 Santosh
