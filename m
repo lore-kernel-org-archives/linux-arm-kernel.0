@@ -1,43 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jun 2014 17:42:19 +0200
-Subject: [RFC 1/2] pwrseq: Add subsystem to handle complex power sequences
-In-Reply-To: <1403183091-27876-2-git-send-email-ulf.hansson@linaro.org>
-References: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>
- <1403183091-27876-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <4224745.HqdT4QrZdr@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 20 Jun 2014 17:47:16 +0200
+Subject: [PATCH v2 1/2] ARM: mvebu: Use the a standard errno in
+ mvebu_get_soc_id
+In-Reply-To: <1403274953-21790-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1403274953-21790-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403274953-21790-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140620174716.56d228a8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 June 2014 15:04:50 Ulf Hansson wrote:
-> +Power sequence DT bindings
-> +
-> +Each power sequence method has a corresponding "power-method" property string.
-> +This property shall be set in a subnode for a device. That subnode should also
-> +describe resourses which are specific to that power method.
-> +
-> +Do note, power sequences as such isn't encoded through DT. Instead those are
-> +implemented by each power method.
-> +
-> +Required subnode properties:
-> +- power-method: should contain the string for the power method to bind.
-> +
-> +       Supported power methods: None.
-> +
-> +Example:
-> +
-> +Note, the "clock" power method in this example isn't actually supported, but
-> +used to visualize how a childnode could be described.
+Dear Gregory CLEMENT,
 
-I'm not too thrilled about adding another top-level concept for these.
-This seems to duplicate some things that pm-domains do, but does them
-in a somewhata different way. Would it be possible to instead integrate
-it into the pm-domain code?
+On Fri, 20 Jun 2014 16:35:52 +0200, Gregory CLEMENT wrote:
+> Instead of using -1 as error value, use a standard errno.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/mvebu-soc-id.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-I also agree with Olof that having a standalone child device node is
-not the best representation. If you want to represent an SDIO device
-device that has some references to clocks, regulators, etc, then put
-that device into the tree and give it those properties.
-That would also let you worry about the sequencing in driver code rather
-than trying to come up with a completely generic model for it.
-
-	Arnd
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
