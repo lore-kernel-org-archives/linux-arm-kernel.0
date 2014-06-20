@@ -1,25 +1,50 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 20 Jun 2014 11:57:59 +0300
-Subject: v3.16-rc1 & default cachepolicy
-In-Reply-To: <20140619233626.GI3705@n2100.arm.linux.org.uk>
-References: <20140619203655.GE558@drone.musicnaut.iki.fi>
- <20140619205853.GH3705@n2100.arm.linux.org.uk>
- <20140619224004.GF558@drone.musicnaut.iki.fi>
- <20140619233626.GI3705@n2100.arm.linux.org.uk>
-Message-ID: <20140620085759.GG558@drone.musicnaut.iki.fi>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Fri, 20 Jun 2014 02:02:26 -0700
+Subject: [PATCH] arm64: add the ability to hook the fault code
+In-Reply-To: <20140620083946.GF25104@arm.com>
+References: <1403175296-25181-1-git-send-email-zhangwm@marvell.com>
+ <20140620082556.GD25104@arm.com>
+ <9034CBD80F070943B59700D7F8149ED90182148D02@SC-VEXCH4.marvell.com>
+ <20140620083946.GF25104@arm.com>
+Message-ID: <9034CBD80F070943B59700D7F8149ED90182148D14@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Jun 20, 2014 at 12:36:26AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 20, 2014 at 01:40:04AM +0300, Aaro Koskinen wrote:
-> > So I tried the below change. But now it hangs early, even before
-> > the earlyprintk is working. :-/
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 2014?6?20? 16:40
+> To: Neil Zhang
+> Cc: Catalin Marinas; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] arm64: add the ability to hook the fault code
 > 
-> Thanks for trying.  I notice you said "write-through", so can you
-> drop the PMD_SECT_BUFFERABLE flag and try again please?
+> On Fri, Jun 20, 2014 at 09:33:59AM +0100, Neil Zhang wrote:
+> >
+> > > -----Original Message-----
+> > > From: Will Deacon [mailto:will.deacon at arm.com]
+> > > Sent: 2014?6?20? 16:26
+> > > To: Neil Zhang
+> > > Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org;
+> > > linux-kernel at vger.kernel.org
+> > > Subject: Re: [PATCH] arm64: add the ability to hook the fault code
+> > >
+> > > On Thu, Jun 19, 2014 at 11:54:56AM +0100, Neil Zhang wrote:
+> > > > Add the ability to hook the fault code for future use.
+> > >
+> > > Do you have a user for this in the kernel tree? I'd rather add the
+> > > hook with the first user, if it doesn't exist already.
+> > >
+> >
+> > Marvell Soc has a feature to use the external abort.
+> > I didn't submit it since it's a private feature.
+> 
+> In which case, let's wait until we have a user of this in the mainline tree.
+> 
 
-Yes, that works.
+OK?
 
-A.
+> Will
+
+Best Regards,
+Neil Zhang
