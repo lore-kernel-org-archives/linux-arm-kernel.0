@@ -1,9 +1,9 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 21 Jun 2014 00:50:07 +0400
-Subject: [PATCH v3 2/3] ARM: shmobile: koelsch: enable internal PCI
+Date: Sat, 21 Jun 2014 00:51:27 +0400
+Subject: [PATCH v3 3/3] ARM: shmobile: henninger: enable internal PCI
 In-Reply-To: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
 References: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201406210050.08413.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201406210051.28040.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,19 +16,16 @@ Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Changes in version 3:
 - refreshed the patch.
 
-Changes in version 2:
-- refreshed the patch.
-
- arch/arm/boot/dts/r8a7791-koelsch.dts |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7791-henninger.dts |   22 ++++++++++++++++++++++
  1 file changed, 22 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -279,6 +279,16 @@
- 		renesas,groups = "i2c6";
- 		renesas,function = "i2c6";
+--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
++++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+@@ -120,6 +120,16 @@
+ 				 "msiof0_tx";
+ 		renesas,function = "msiof0";
  	};
 +
 +	usb0_pins: usb0 {
@@ -42,11 +39,12 @@ Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
 +	};
  };
  
- &ether {
-@@ -426,6 +436,18 @@
+ &scif0 {
+@@ -217,3 +227,15 @@
+ 		spi-cpha;
  	};
  };
- 
++
 +&pci0 {
 +	status = "okay";
 +	pinctrl-0 = <&usb0_pins>;
@@ -58,7 +56,3 @@ Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
 +	pinctrl-0 = <&usb1_pins>;
 +	pinctrl-names = "default";
 +};
-+
- &pcie_bus_clk {
- 	status = "okay";
- };
