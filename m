@@ -1,129 +1,34 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Jun 2014 09:27:18 +0200
-Subject: [RFC 1/2] pwrseq: Add subsystem to handle complex power sequences
-In-Reply-To: <CAOesGMj6xp_cXZRuqL5HOPX4AeDuCkj69E32xuPVgGk4xABLbQ@mail.gmail.com>
-References: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>	<1403183091-27876-2-git-send-email-ulf.hansson@linaro.org>
- <CAOesGMj6xp_cXZRuqL5HOPX4AeDuCkj69E32xuPVgGk4xABLbQ@mail.gmail.com>
-Message-ID: <53A3E256.8090307@redhat.com>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Fri, 20 Jun 2014 09:29:47 +0200
+Subject: [PATCH] ARM: nommu: Remove unnecessary prototype for kobjsize()
+Message-ID: <1403249387-27797-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The prototype for kobjsize() is already defined in linux/mm.h which is
+included where kobjsize() is used.
 
-On 06/19/2014 07:18 PM, Olof Johansson wrote:
-> Hi,
-> 
-> 
-> 
-> On Thu, Jun 19, 2014 at 6:04 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> The pwrseq subsystem handles complex power sequences, typically useful
->> for subsystems that makes use of discoverable buses, like for example
->> MMC and I2C.
->>
->> The pwrseq subsystem is dependant on CONFIG_OF to be able to parse a DT
->> childnode to find out what power sequence method to bind for a device.
->>
->> From the DT childnode, the pwrseq DT parser tries to locate a
->> "power-method" property, which string is matched towards the list of
->> supported pwrseq methods.
->>
->> Each pwrseq method implements it's own power sequence and interfaces
->> the pwrseq core through a few callback functions.
->>
->> To instantiate a pwrseq method, clients shall use the devm_pwrseq_get()
->> API. If needed, clients can explicity drop the references to a pwrseq
->> method using devm_pwrseq_put() API.
->>
->> Besides instantiation, the pwrseq API provides clients opportunity to
->> select a certain power state. In this intial version, PWRSEQ_POWER_ON
->> and PWRSEQ_POWER_OFF are supported. Those are also mandatory for each
->> pwrseq method to support.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  .../devicetree/bindings/pwrseq/pwrseq.txt          |   48 ++++++
->>  drivers/Makefile                                   |    2 +-
->>  drivers/pwrseq/Makefile                            |    2 +
->>  drivers/pwrseq/core.c                              |  175 ++++++++++++++++++++
->>  drivers/pwrseq/core.h                              |   37 +++++
->>  drivers/pwrseq/method.c                            |   38 +++++
->>  include/linux/pwrseq.h                             |   50 ++++++
->>  7 files changed, 351 insertions(+), 1 deletion(-)
->>  create mode 100644 Documentation/devicetree/bindings/pwrseq/pwrseq.txt
->>  create mode 100644 drivers/pwrseq/Makefile
->>  create mode 100644 drivers/pwrseq/core.c
->>  create mode 100644 drivers/pwrseq/core.h
->>  create mode 100644 drivers/pwrseq/method.c
->>  create mode 100644 include/linux/pwrseq.h
->>
->> diff --git a/Documentation/devicetree/bindings/pwrseq/pwrseq.txt b/Documentation/devicetree/bindings/pwrseq/pwrseq.txt
->> new file mode 100644
->> index 0000000..80848ae
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwrseq/pwrseq.txt
->> @@ -0,0 +1,48 @@
->> +Power sequence DT bindings
->> +
->> +Each power sequence method has a corresponding "power-method" property string.
->> +This property shall be set in a subnode for a device. That subnode should also
->> +describe resourses which are specific to that power method.
->> +
->> +Do note, power sequences as such isn't encoded through DT. Instead those are
->> +implemented by each power method.
->> +
->> +Required subnode properties:
->> +- power-method: should contain the string for the power method to bind.
->> +
->> +       Supported power methods: None.
->> +
->> +Example:
->> +
->> +Note, the "clock" power method in this example isn't actually supported, but
->> +used to visualize how a childnode could be described.
->> +
->> +// WLAN SDIO channel
->> +sdi1_per2 at 80118000 {
->> +       compatible = "arm,pl18x", "arm,primecell";
->> +       reg = <0x80118000 0x1000>;
->> +       interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
->> +
->> +       dmas = <&dma 32 0 0x2>, /* Logical - DevToMem */
->> +              <&dma 32 0 0x0>; /* Logical - MemToDev */
->> +       dma-names = "rx", "tx";
->> +
->> +       clocks = <&prcc_kclk 2 4>, <&prcc_pclk 2 6>;
->> +       clock-names = "sdi", "apb_pclk";
->> +
->> +       arm,primecell-periphid = <0x10480180>;
->> +       max-frequency = <100000000>;
->> +       bus-width = <4>;
->> +       non-removable;
->> +       pinctrl-names = "default", "sleep";
->> +       pinctrl-0 = <&sdi1_default_mode>;
->> +       pinctrl-1 = <&sdi1_sleep_mode>;
->> +
->> +       status = "okay";
->> +
->> +       pwrseq: pwrseq1 {
->> +               power-method = "clock";
->> +               clocks = <&someclk 1 2>, <&someclk 3 4>;
->> +               clock-names = "pwrseq1", "pwrseq2";
->> +       };
-> 
-> I am strongly against the subnode approach as a general framework. We
-> don't have a subnode for interrupts, nor for clocks or pinctrl. So why
-> should we have it for the power sequencing?
-> 
-> Sure, that fits the linux driver model better, but that's irrelevant
-> w.r.t. describing the hardware.
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ arch/arm/include/asm/pgtable-nommu.h |    6 ------
+ 1 file changed, 6 deletions(-)
 
-Actually this is about describing the hardware, when you have e.g. an
-mmc device which needs pwrseq, there will be 2 sets of certain
-resources, ie clocks for the host controller and clocks going directly
-to the mmc device. I think putting those both in the same subnode is
-a BAD idea, so we really do need a subnode to group the pwrseq resources
-together.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/include/asm/pgtable-nommu.h b/arch/arm/include/asm/pgtable-nommu.h
+index 0642228..e184eaf 100644
+--- a/arch/arm/include/asm/pgtable-nommu.h
++++ b/arch/arm/include/asm/pgtable-nommu.h
+@@ -69,12 +69,6 @@ static inline int pte_file(pte_t pte) { return 0; }
+ #define pgprot_writecombine(prot) __pgprot(0)
+ #define pgprot_dmacoherent(prot) __pgprot(0)
+ 
+-
+-/*
+- * These would be in other places but having them here reduces the diffs.
+- */
+-extern unsigned int kobjsize(const void *objp);
+-
+ /*
+  * No page table caches to initialise.
+  */
+-- 
+1.7.9.5
