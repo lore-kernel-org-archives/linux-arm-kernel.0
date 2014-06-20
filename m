@@ -1,22 +1,20 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 20 Jun 2014 22:42:57 +0200
-Subject: [PATCH] ARM: mvebu: rename ARM_ERRATA_753970
-In-Reply-To: <20140620202100.GG21711@titan.lakedaemon.net>
-References: <201404052101.19381.arnd@arndb.de>
- <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
- <53418889.2050002@free-electrons.com> <1396805315.7723.8.camel@x220>
- <1401094871.25902.20.camel@x220>
- <20140620202100.GG21711@titan.lakedaemon.net>
-Message-ID: <1403296977.16903.10.camel@x41>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 21 Jun 2014 00:44:50 +0400
+Subject: [PATCH v3 0/3] Add R8A7791/Koelsch/Henninger board PCI DT support
+Message-ID: <201406210044.51620.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper schreef op vr 20-06-2014 om 16:21 [-0400]:
-> It looks like rmk just added a patch to fixing the selection of the
-> erratas.  Could you please take a look and either rebase or drop this
-> patch?
+Hello.
 
-Sure, no problem. What tree should I check?
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-v3.16-rc1-20140618' tag. Here we add PCI USB device tree support
+for the R8A7791-based Koelsch and Henninger boards. As the 'pci-rcar-gen2'
+driver device tree support has been merged for 3.16, this patchset can now be
+merged too... 
 
+[1/3] ARM: shmobile: r8a7791: add internal PCI bridge nodes
+[2/3] ARM: shmobile: koelsch: enable internal PCI
+[3/3] ARM: shmobile: henninger: enable internal PCI
 
-Paul Bolle
+WBR, Sergei
