@@ -1,106 +1,74 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Fri, 20 Jun 2014 13:20:54 +0800
-Subject: [PATCH] ARM: imx: add suspend support for i.mx6sx
-Message-ID: <1403241654-31605-1-git-send-email-b20788@freescale.com>
+Date: Fri, 20 Jun 2014 13:44:05 +0800
+Subject: [PATCH] ARM: imx: add cpuidle support for i.mx6sx
+Message-ID: <1403243045-8521-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend support for i.MX6SX.
+Add cpuidle support for i.MX6SX, derive from i.MX6Q's
+cpuidle, two levels supported:
 
-To enter suspend, echo mem > /sys/power/state.
-To exit suspend, using RTC alarm or enable debug UART wakeup.
+1. WFI;
+2. WAIT mode.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/mach-imx/common.h      |    1 +
- arch/arm/mach-imx/mach-imx6sx.c |    1 +
- arch/arm/mach-imx/pm-imx6.c     |   29 ++++++++++++++++++++++++++---
- 3 files changed, 28 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/cpuidle-imx6q.c |    4 +++-
+ arch/arm/mach-imx/mach-imx6sx.c   |    7 +++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 7668ff5..50ee9c2 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -133,6 +133,7 @@ static inline void imx6_suspend(void __iomem *ocram_vbase) {}
- void imx6q_pm_init(void);
- void imx6dl_pm_init(void);
- void imx6sl_pm_init(void);
-+void imx6sx_pm_init(void);
- void imx6q_pm_set_ccm_base(void __iomem *base);
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index 6bcae04..fc0bb1e 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -13,6 +13,7 @@
  
- #ifdef CONFIG_PM
+ #include "common.h"
+ #include "cpuidle.h"
++#include "hardware.h"
+ 
+ static atomic_t master = ATOMIC_INIT(0);
+ static DEFINE_SPINLOCK(master_lock);
+@@ -66,7 +67,8 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
+ int __init imx6q_cpuidle_init(void)
+ {
+ 	/* Need to enable SCU standby for entering WAIT modes */
+-	imx_scu_standby_enable();
++	if (!cpu_is_imx6sx())
++		imx_scu_standby_enable();
+ 
+ 	/* Set INT_MEM_CLK_LPM bit to get a reliable WAIT mode support */
+ 	imx6q_set_int_mem_clk_lpm();
 diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-index 02fccf6..b7a0bde 100644
+index b7a0bde..74ff7d6 100644
 --- a/arch/arm/mach-imx/mach-imx6sx.c
 +++ b/arch/arm/mach-imx/mach-imx6sx.c
-@@ -26,6 +26,7 @@ static void __init imx6sx_init_machine(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
+@@ -12,6 +12,7 @@
+ #include <asm/mach/map.h>
  
- 	imx_anatop_init();
-+	imx6sx_pm_init();
- }
+ #include "common.h"
++#include "cpuidle.h"
  
- static void __init imx6sx_init_irq(void)
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 9392a8f..331055b 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -129,6 +129,14 @@ static const u32 imx6sl_mmdc_io_offset[] __initconst = {
- 	0x330, 0x334, 0x320,        /* SDCKE0, SDCKE1, RESET */
- };
- 
-+static const u32 imx6sx_mmdc_io_offset[] __initconst = {
-+	0x2ec, 0x2f0, 0x2f4, 0x2f8, /* DQM0 ~ DQM3 */
-+	0x60c, 0x610, 0x61c, 0x620, /* GPR_B0DS ~ GPR_B3DS */
-+	0x300, 0x2fc, 0x32c, 0x5f4, /* CAS, RAS, SDCLK_0, GPR_ADDS */
-+	0x310, 0x314, 0x5f8, 0x608, /* SODT0, SODT1, MODE_CTL, MODE */
-+	0x330, 0x334, 0x338, 0x33c, /* SDQS0 ~ SDQS3 */
-+};
-+
- static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
- 	.cpu_type = MXC_CPU_IMX6Q,
- 	.mmdc_compat = "fsl,imx6q-mmdc",
-@@ -159,6 +167,16 @@ static const struct imx6_pm_socdata imx6sl_pm_data __initconst = {
- 	.mmdc_io_offset = imx6sl_mmdc_io_offset,
- };
- 
-+static const struct imx6_pm_socdata imx6sx_pm_data __initconst = {
-+	.cpu_type = MXC_CPU_IMX6SX,
-+	.mmdc_compat = "fsl,imx6sx-mmdc",
-+	.src_compat = "fsl,imx6sx-src",
-+	.iomuxc_compat = "fsl,imx6sx-iomuxc",
-+	.gpc_compat = "fsl,imx6sx-gpc",
-+	.mmdc_io_num = ARRAY_SIZE(imx6sx_mmdc_io_offset),
-+	.mmdc_io_offset = imx6sx_mmdc_io_offset,
-+};
-+
- /*
-  * This structure is for passing necessary data for low level ocram
-  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
-@@ -265,12 +283,12 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
- 		val |= BM_CLPCR_VSTBY;
- 		val |= BM_CLPCR_SBYOS;
--		if (cpu_is_imx6sl()) {
-+		if (cpu_is_imx6sl())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
--		} else {
-+		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
--		}
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -549,3 +567,8 @@ void __init imx6sl_pm_init(void)
+ static void __init imx6sx_init_machine(void)
  {
- 	imx6_pm_common_init(&imx6sl_pm_data);
+@@ -38,6 +39,11 @@ static void __init imx6sx_init_irq(void)
+ 	irqchip_init();
  }
-+
-+void __init imx6sx_pm_init(void)
+ 
++static void __init imx6sx_init_late(void)
 +{
-+	imx6_pm_common_init(&imx6sx_pm_data);
++	imx6q_cpuidle_init();
 +}
++
+ static const char *imx6sx_dt_compat[] __initconst = {
+ 	"fsl,imx6sx",
+ 	NULL,
+@@ -48,5 +54,6 @@ DT_MACHINE_START(IMX6SX, "Freescale i.MX6 SoloX (Device Tree)")
+ 	.init_irq	= imx6sx_init_irq,
+ 	.init_machine	= imx6sx_init_machine,
+ 	.dt_compat	= imx6sx_dt_compat,
++	.init_late	= imx6sx_init_late,
+ 	.restart	= mxc_restart,
+ MACHINE_END
 -- 
 1.7.9.5
