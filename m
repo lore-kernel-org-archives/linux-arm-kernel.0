@@ -1,62 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jun 2014 18:18:23 +0200
-Subject: [PATCH v2 04/18] PCI: designware: use untranslated address while
- programming ATU
-In-Reply-To: <53A1571B.7080806@ti.com>
-References: <1401345500-20188-1-git-send-email-kishon@ti.com>
- <1401345500-20188-5-git-send-email-kishon@ti.com> <53A1571B.7080806@ti.com>
-Message-ID: <5173253.SQfLkZY3Wx@wuerfel>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Fri, 20 Jun 2014 18:36:55 +0200
+Subject: [PATCHv2] mm: page_alloc: fix CMA area initialisation when
+ pageblock > MAX_ORDER
+In-Reply-To: <1403279282.755.23.camel@deneb.redhat.com>
+References: <1402522435-13884-1-git-send-email-msalter@redhat.com>
+ <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
+ <xa1t61jzwfo6.fsf@mina86.com> <1403201524.32688.62.camel@deneb.redhat.com>
+ <xa1td2e41xs2.fsf@mina86.com> <1403279282.755.23.camel@deneb.redhat.com>
+Message-ID: <xa1tha3fv8pk.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 14:38:43 Kishon Vijay Abraham I wrote:
-> On Thursday 29 May 2014 12:08 PM, Kishon Vijay Abraham I wrote:
-> > 
-> > Here the CPU address for configuration space is 0x20013000 and the controller
-> > address for configuration space is 0x13000. The controller address should be
-> > used while programming the ATU (in order for translation to happen properly in
-> > DRA7xx).
-> 
-> I've fixed this up with what you suggested in the v1 of the series. Do you
-> think this is fine?
+On Fri, Jun 20 2014, Mark Salter <msalter@redhat.com> wrote:
+> This still isn't quite right. __free_pages can only take up to
+> MAX_ORDER-1 (MAX_ORDER_NR_PAGES is 1 << (MAX_ORDER - 1)).
 
-Hi Kishon,
+Good catch.  I'll send v3 in a few days then.
 
-Yes, I think this will work and do the right thing in all cases. I'm not
-completely sure if the change should be generalized into the range
-parser or better kept in the pcie-designware driver as you do it here:
-
-> > @@ -406,6 +413,12 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> >               pp->config.cfg1_size = resource_size(cfg_res)/2;
-> >               pp->cfg0_base = cfg_res->start;
-> >               pp->cfg1_base = cfg_res->start + pp->config.cfg0_size;
-> > +
-> > +             /* Find the untranslated configuration space address */
-> > +             index = of_property_match_string(np, "reg-names", "config");
-> > +             addrp = of_get_address(np, index, false, false);
-> > +             pp->cfg0_mod_addr = of_read_number(addrp, ns);
-> > +             pp->cfg1_mod_addr = pp->cfg0_mod_addr + pp->config.cfg0_size;
-
-I think I've recently seen some objections to hand-parsing standard
-properties in driver code.
-
-> >       } else {
-> >               dev_err(pp->dev, "missing *config* reg space\n");
-> >       }
-> > @@ -431,12 +444,20 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> >                       pp->config.io_size = resource_size(&pp->io);
-> >                       pp->config.io_bus_addr = range.pci_addr;
-> >                       pp->io_base = range.cpu_addr;
-> > +
-> > +                     /* Find the untranslated IO space address */
-> > +                     pp->io_mod_addr = of_read_number(parser.range -
-> > +                                                      parser.np + na, ns);
-> >               }
-
-So the of_read_number() call could be moved into of_pci_range_to_resource(),
-with another field added to struct of_pci_range to carry the address on
-the parent bus. Any other thoughts on this? Maybe Rob Herring or Andrew
-Murray have a strong opinion on this.
-
-
-	Arnd
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
