@@ -1,58 +1,43 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Fri, 20 Jun 2014 11:40:31 -0400
-Subject: [PATCH v0 2/3] ata: Fix the link down in first attempt for the
- APM X-Gene SoC AHCI SATA host controller driver.
-In-Reply-To: <53A45286.2040000@cogentembedded.com>
-References: <1403253147-14341-1-git-send-email-stripathi@apm.com>
- <1403253147-14341-3-git-send-email-stripathi@apm.com>
- <53A45286.2040000@cogentembedded.com>
-Message-ID: <53A455EF.7000808@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Jun 2014 17:42:19 +0200
+Subject: [RFC 1/2] pwrseq: Add subsystem to handle complex power sequences
+In-Reply-To: <1403183091-27876-2-git-send-email-ulf.hansson@linaro.org>
+References: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>
+ <1403183091-27876-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <4224745.HqdT4QrZdr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2014 11:25 AM, Sergei Shtylyov wrote:
-> On 06/20/2014 12:32 PM, Suman Tripathi wrote:
->
->> This patch fixes the link down issue by retry for the APM X-Gene SoC
->> SATA host controller driver. Due to board design issue and short margin
->> limitation, it is observed that once out of many thousands power cycle
->> test, the sata link may not link up.
->
->> Signed-off-by: Loc Ho <lho@apm.com>
->> Signed-off-by: Suman Tripathi <stripathi@apm.com>
->> ---
->>   drivers/ata/ahci_xgene.c | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->
->> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
->> index 5f0f750..d43b6ce 100644
->> --- a/drivers/ata/ahci_xgene.c
->> +++ b/drivers/ata/ahci_xgene.c
-> [...]
->> @@ -235,15 +238,21 @@ static int xgene_ahci_do_hardreset(struct ata_link *link,
->>       u8 *d2h_fis = pp->rx_fis + RX_FIS_D2H_REG;
->>       void __iomem *port_mmio = ahci_port_base(ap);
->>       struct ata_taskfile tf;
->> +    int link_down_retry = 0;
->>       int rc;
->>       u32 val;
->>
->> +hardreset_retry:
->>       /* clear D2H reception area to properly wait for D2H FIS */
->>       ata_tf_init(link->device, &tf);
->>       tf.command = ATA_BUSY;
->>       ata_tf_to_fis(&tf, 0, 0, d2h_fis);
->>       rc = sata_link_hardreset(link, timing, deadline, online,
->>                    ahci_check_ready);
->> +
->> +    if (!*online)
->> +        if (link_down_retry++ < MAX_LINK_DOWN_RETRY)
->
->     Could be folded into single *if* (and so indentation decreased).
->
-better yet, for readability, a single while() loop
+On Thursday 19 June 2014 15:04:50 Ulf Hansson wrote:
+> +Power sequence DT bindings
+> +
+> +Each power sequence method has a corresponding "power-method" property string.
+> +This property shall be set in a subnode for a device. That subnode should also
+> +describe resourses which are specific to that power method.
+> +
+> +Do note, power sequences as such isn't encoded through DT. Instead those are
+> +implemented by each power method.
+> +
+> +Required subnode properties:
+> +- power-method: should contain the string for the power method to bind.
+> +
+> +       Supported power methods: None.
+> +
+> +Example:
+> +
+> +Note, the "clock" power method in this example isn't actually supported, but
+> +used to visualize how a childnode could be described.
 
->> +            goto hardreset_retry;
->
-> WBR, Sergei
->
+I'm not too thrilled about adding another top-level concept for these.
+This seems to duplicate some things that pm-domains do, but does them
+in a somewhata different way. Would it be possible to instead integrate
+it into the pm-domain code?
+
+I also agree with Olof that having a standalone child device node is
+not the best representation. If you want to represent an SDIO device
+device that has some references to clocks, regulators, etc, then put
+that device into the tree and give it those properties.
+That would also let you worry about the sequencing in driver code rather
+than trying to come up with a completely generic model for it.
+
+	Arnd
