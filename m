@@ -1,23 +1,21 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 21 Jun 2014 12:59:42 +0800
-Subject: [PATCH] ARM: dts: imx51-eukrea-mbimxsd51-baseboard: unbreak esdhc.
-In-Reply-To: <1403096216-21292-1-git-send-email-denis@eukrea.com>
-References: <1403096216-21292-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140621045941.GD6818@dragon>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat, 21 Jun 2014 08:11:12 +0200
+Subject: [PATCH RFC 30/30] net: fec: consolidate hwtstamp implementation
+In-Reply-To: <E1Wxxhw-0005Yn-Ey@rmk-PC.arm.linux.org.uk>
+References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
+ <E1Wxxhw-0005Yn-Ey@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140621061112.GA3965@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 02:56:56PM +0200, Denis Carikli wrote:
-> The following commit:
-> 89d7e5c mmc: sdhci-esdhc-imx: add runtime pm support
-> has the effect of also disabling the hardware card detect
-> in runtime pm.
-> 
-> We switch to GPIO based detection to avoid this issue.
-> 
-> This patch is based on:
-> ARM: dts: imx51-babbage: Fix esdhc setup
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+On Fri, Jun 20, 2014 at 01:14:16PM +0100, Russell King wrote:
+> Both transmit and receive use the same infrastructure for calculating
+> the packet timestamp.  Rather than duplicating the code, provide a
+> function to do this common work.  Model this function in the Intel
+> e1000e version which avoids calling ns_to_ktime() within the spinlock;
+> the spinlock is critical for timecounter_cyc2time() but not
+> ns_to_ktime().
 
-Applied, thanks.
+Thanks for cleaning this up.
+
+Acked-by: Richard Cochran <richardcochran@gmail.com>
