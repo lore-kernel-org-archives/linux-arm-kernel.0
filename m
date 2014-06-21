@@ -1,39 +1,75 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 21 Jun 2014 16:59:13 +0800
-Subject: [PATCH 1/3] ARM: imx: defconfig: select SOC_IMX6SX by default
-In-Reply-To: <1403241164-31417-1-git-send-email-b20788@freescale.com>
-References: <1403241164-31417-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140621085912.GB18165@dragon>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Sat, 21 Jun 2014 11:04:46 +0200
+Subject: [PATCHv6 1/3] devicetree: Addition of the Altera SDRAM controller
+In-Reply-To: <1403306523-4174-2-git-send-email-tthayer@altera.com>
+References: <1403306523-4174-2-git-send-email-tthayer@altera.com>
+Message-ID: <20140621090446.GA8053@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 01:12:44PM +0800, Anson Huang wrote:
-> Enable i.MX6SX SOC support.
+Hi!
+
+On Fri, Jun 20, 2014 at 06:22:01PM -0500, tthayer at altera.com wrote:
+> From: Thor Thayer <tthayer@altera.com>
 > 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-
-Thanks for the patch.  But Fabio already had one for that.
-
-http://www.spinics.net/lists/arm-kernel/msg339159.html
-
-Shawn
-
+> Addition of the Altera SDRAM Controller bindings and device tree changes.
+> 
+> v2: Changes to SoC SDRAM EDAC code.
+> 
+> v3: Implement code suggestions for SDRAM EDAC code.
+> 
+> v4: Remove syscon from SDRAM controller bindings.
+> 
+> v5: No Change, bump version for consistency.
+> 
+> v6: Only map the ctrlcfg register as syscon.
+> 
+> Signed-off-by: Thor Thayer <tthayer@altera.com>
 > ---
->  arch/arm/configs/imx_v6_v7_defconfig |    1 +
->  1 file changed, 1 insertion(+)
+>  .../bindings/arm/altera/socfpga-sdram.txt          |   11 +++++++++++
+>  arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
+>  2 files changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
 > 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index a6f182e..e9f481e 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -37,6 +37,7 @@ CONFIG_SOC_IMX50=y
->  CONFIG_SOC_IMX53=y
->  CONFIG_SOC_IMX6Q=y
->  CONFIG_SOC_IMX6SL=y
-> +CONFIG_SOC_IMX6SX=y
->  CONFIG_SOC_VF610=y
->  CONFIG_PCI=y
->  CONFIG_PCI_IMX6=y
-> -- 
-> 1.7.9.5
-> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+> new file mode 100644
+> index 0000000..5027026
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+> @@ -0,0 +1,11 @@
+> +Altera SOCFPGA SDRAM Controller
+> +
+> +Required properties:
+> +- compatible : "altr,sdr-ctl";
+> +- reg : Should contain 1 register ranges(address and length)
+> +
+> +Example:
+> +	sdrctl at ffc25000 {
+> +		compatible = "altr,sdr-ctl";
+> +		reg = <0xffc25000 0x4>;
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 4676f25..310292e 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -682,6 +682,11 @@
+>  			clocks = <&l4_sp_clk>;
+>  		};
+>  
+> +		sdrctl at ffc25000 {
+> +			compatible = "altr,sdr-ctl", "syscon";
+
+Did you forget to add the syscon to the binding documentation?
+
+> +			reg = <0xffc25000 0x4>;
+> +		};
+> +
+>  		rst: rstmgr at ffd05000 {
+>  			compatible = "altr,rst-mgr";
+>  			reg = <0xffd05000 0x1000>;
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
