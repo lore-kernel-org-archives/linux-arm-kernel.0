@@ -1,41 +1,25 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 21 Jun 2014 16:39:28 -0300
-Subject: Dove DT and HDMI on v3.16-rc1 (was: Re: [PATCH RFC 0/5] Dove PMU
- support)
-In-Reply-To: <53A19DFA.7030207@gmail.com>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <535E079B.6010701@gmail.com> <20140428083144.GB6650@lunn.ch>
- <535F6DAF.1010400@gmail.com>
- <20140615152554.GA13870@n2100.arm.linux.org.uk>
- <53A19DFA.7030207@gmail.com>
-Message-ID: <20140621193928.GA5328@arch.cereza>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 21 Jun 2014 16:55:52 -0300
+Subject: [PATCH v2 2/6] input: touchscreen: imx25 tcq driver
+In-Reply-To: <53A55BD8.7030905@kernel.org>
+References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
+ <1402672899-6995-1-git-send-email-denis@eukrea.com>
+ <1402672899-6995-3-git-send-email-denis@eukrea.com>
+ <53A55BD8.7030905@kernel.org>
+Message-ID: <CAOMZO5BxZDX5TDZdUCbpTw2LpVC=vr4cnn4eSpzd_023wcy+Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 Jun 04:11 PM, Sebastian Hesselbarth wrote:
-[..]
-> 
-> as said on IRC, I really want this to be sorted out. I prepared a Dove
-> DT HDMI quick-hack and pushed it to
-> 
-> https://github.com/shesselba/linux-dove.git dove-drm-v3.16-rc1
-> 
+On Sat, Jun 21, 2014 at 7:18 AM, Jonathan Cameron <jic23@kernel.org> wrote:
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>
+> Could this not in theory fail?
 
-Tested the above branch using mvebu_v7_defconfig + Cubox-specific options
-and ran a few basic tests. I know it's not much, but here they are:
+Yes, but devm_ioremap_resource will take care of it, so we don't need
+to check for error here.
 
-* The bootlogo shows up
-
-* Legacy fbdev tests (fb-test, fb-test-rect, mplayer) worked fine in the 
-  default mode (1920x1080 in my case).
-
-* Set a few different modes with LibDRM modetest tool:
-  modetest -M armada-drm -s 18:640x480
-  modetest -M armada-drm -s 18:800x600
-  ...
-  modetest -M armada-drm -s 18:1920x1080
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+>
+>> +       mem = devm_ioremap_resource(dev, res);
+>> +       if (!mem)
+>> +               return -ENOMEM;
