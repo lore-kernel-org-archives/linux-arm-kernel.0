@@ -1,49 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 Jun 2014 00:11:29 +0100
-Subject: A clockevent IRQ delivery question
-In-Reply-To: <CAJgR-Bgn=5Ln53faiTP4hM5TLvCLu655HXY3w=5uwvTgxA9PxA@mail.gmail.com>
-References: <CAJgR-BjUpaR0cxew+-fz5YcDu0VKzim-rhLF4j1hEnR_4O+Jsg@mail.gmail.com>
- <53A446C0.10200@linaro.org>
- <CAJgR-Bj+tgCpKTT7FxM-1JMvN7CKUgpaikfbXPQx5ep6+7W2mA@mail.gmail.com>
- <20140620152335.GT32514@n2100.arm.linux.org.uk>
- <CAJgR-BiLiskWsFOK2Nr7ysTktkkAJnz8p4HJBb_YJReN3KzQXw@mail.gmail.com>
- <CAJgR-Bgn=5Ln53faiTP4hM5TLvCLu655HXY3w=5uwvTgxA9PxA@mail.gmail.com>
-Message-ID: <20140621231129.GZ32514@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 21 Jun 2014 19:51:08 -0400
+Subject: [PATCH v3 1/7] genirq: generic chip: export
+ irq_map_generic_chip function
+In-Reply-To: <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140621235108.GJ21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 21, 2014 at 05:44:59PM -0500, Jon Loeliger wrote:
-> On Fri, Jun 20, 2014 at 10:31 AM, Jon Loeliger <loeliger@gmail.com> wrote:
-> > OK, I'll leave things as they stand in my port for now
-> > as that appears to be working even if not ideal yet!
+On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
+> Export the generic irq map function in order to provide irq_domain ops with
+> generic mapping and specific of xlate function (needed by the new atmel
+> AIC driver).
 > 
-> Do I need to do some form of IRQ broadcast to ensure all CPUs are
-> receiving the timer ticks?  How do I set that up?  Pointer to an example?
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  include/linux/irq.h       | 2 ++
+>  kernel/irq/generic-chip.c | 5 +++--
+>  2 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index 0d998d8..62af592 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
+>  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
+>  
+>  /* Setup functions for irq_chip_generic */
+> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> +			 irq_hw_number_t hw_irq);
+>  struct irq_chip_generic *
+>  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
+>  		       void __iomem *reg_base, irq_flow_handler_t handler);
+> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+> index 452d6f2..cf80e7b 100644
+> --- a/kernel/irq/generic-chip.c
+> +++ b/kernel/irq/generic-chip.c
+> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
+>  /*
+>   * irq_map_generic_chip - Map a generic chip for an irq domain
+>   */
+> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> -				irq_hw_number_t hw_irq)
+> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> +			 irq_hw_number_t hw_irq)
+>  {
+>  	struct irq_data *data = irq_get_irq_data(virq);
+>  	struct irq_domain_chip_generic *dgc = d->gc;
+> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+>  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
+>  
+>  struct irq_domain_ops irq_generic_chip_ops = {
+>  	.map	= irq_map_generic_chip,
 
-Let me get this straight...
+Why can't you use irq_generic_chip_ops.map in your code and avoid this
+patch entirely?
 
-This SoC you're strugging with is a dual-core A9 system which decided to
-omit the TWD (which is part of the ARM SMP spec) and subsituted their
-own timers?
+thx,
 
-If that's true, then I have to ask... why do we care about this SoC?
-If vendors are going to go off and blatently do something different for
-no reason after ARM Ltd have tried to standardise stuff, then I think
-our position should be we don't want to know.
-
-Why?  Because of the additional support burden - not only in extra code
-to sort out their (probably) screwed timer implementation which is yet
-again different from everything else that we've seen so far, but also
-because (and I don't mean this personally towards you) of the additional
-support necessary to get the damned thing to work in the first place.
-
-I guess the more we bend over backwards to allow this kind of thing,
-the more people will think that it's an acceptable way forward.  The
-only way to stop this is for people to say no to it.
-
-So, the question is: does your SoC have the ARM TWD timers, and if it
-does, why can you not use those?
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Jason.
