@@ -1,33 +1,26 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 21 Jun 2014 10:52:37 +0200
-Subject: [linux-sunxi] Re: [PATCH v6 3/7] mfd: AXP20x: Add bindings
- documentation
-In-Reply-To: <20140618090616.GA23945@lee--X1>
-References: <1400528868-5971-1-git-send-email-carlo@caione.org>
- <1400528868-5971-4-git-send-email-carlo@caione.org>
- <539FED44.1050904@free-electrons.com>
- <20140618090616.GA23945@lee--X1>
-Message-ID: <CAOQ7t2bzv+1uJLoq-NKEsL084aqBTVy6ihtU0fotuncDTC8Aew@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 21 Jun 2014 16:57:11 +0800
+Subject: [PATCH v3] ARM: dts: imx6: add aristainetos board support
+In-Reply-To: <1403275967-22317-1-git-send-email-hs@denx.de>
+References: <1403275967-22317-1-git-send-email-hs@denx.de>
+Message-ID: <20140621085710.GA18165@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 11:06 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> On 19/05/2014 21:47, Carlo Caione wrote:
->> > Bindings documentation for the AXP20x driver. In this file also
->> > sub-nodes are documented.
->>
->> I think this patch has been forgotten (I didn't find it in linus' tree
->> or linux-next tree).
->
-> This patch-set became confusing.  Some of the patches were applied in
-> v5 and were still submitted for v6.  I need Carlo to rebase on top of
-> v3.16-rc1+ and re-submit with the Acks he's collected so far.
+On Fri, Jun 20, 2014 at 04:52:47PM +0200, Heiko Schocher wrote:
+> This patch add support for the imx6dl based aristainetos board
+> with following configuration:
+> 
+> CPU:   Freescale i.MX6DL rev1.1 at 792 MHz
+> DRAM:  1 GiB
+> NAND:  512 MiB
+> MMC:   FSL_SDHC: 0, FSL_SDHC: 1
+> SF: Detected N25Q128 with page size 256 Bytes, erase size 64 KiB, total 16 MiB
+> 
+> As this board can used with 2 different display types, the
+> differences between them are extracted into 2 DTS files, and
+> the common settings are collected in a common file.
+> 
+> Signed-off-by: Heiko Schocher <hs@denx.de>
 
-I'm confused too. At the time of the submission v6 was already the
-patchset without the patches from v5 already applied and v6 already
-contains all the ACKs I have collected (i.e. the input/misc driver has
-been already ack-ed by Dmitry, yet it seems not merged).
-So what exactly do you want me to resubmit? The whole v6 on top of v3.16-rc1+?
-
--- 
-Carlo Caione
+Applied, thanks.
