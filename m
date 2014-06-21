@@ -1,500 +1,88 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Jun 2014 11:51:28 +0100
-Subject: [PATCH v3 3/6] iio: adc: fsl,imx25-gcq driver
-In-Reply-To: <1402910933-20534-3-git-send-email-denis@eukrea.com>
-References: <1402910933-20534-1-git-send-email-denis@eukrea.com>
- <1402910933-20534-3-git-send-email-denis@eukrea.com>
-Message-ID: <53A563B0.60708@kernel.org>
+From: bay@hackerdom.ru (Alexander Bersenev)
+Date: Sat, 21 Jun 2014 17:04:01 +0600
+Subject: [PATCH v10 0/5] ARM: sunxi: Add support for consumer infrared devices
+Message-ID: <1403348646-31091-1-git-send-email-bay@hackerdom.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/06/14 10:28, Denis Carikli wrote:
-> From: Markus Pargmann <mpa@pengutronix.de>
->
-> This is a conversion queue driver for the mx25 SoC. It uses the central
-> ADC which is used by two seperate independent queues. This driver
-> prepares different conversion configurations for each possible input.
-> For a conversion it creates a conversionqueue of one item with the
-> correct configuration for the chosen channel. It then executes the queue
-> once and disables the conversion queue afterwards.
->
-> The reference voltages are configurable through devicetree subnodes,
-> depending on the connections of the ADC inputs.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-Having been unobservant and hence commented on previous version, I've
-just quickly lifted the remaining points over from that review to here.
+This patch introduces Consumer IR(CIR) support for sunxi boards.
 
-One little bug, but otherwise just small suggestions.
+This is based on Alexsey Shestacov's work based on the original driver 
+supplied by Allwinner.
 
-Jonathan
-> ---
-> Changelog v2->v3:
-> - Fixed compilation: I forgott to tell that this IIO patch was untested
->    in the previous cover letter. Now it is tested at runtime:
->    I left the touchscreen connected but I configured the TSC as an ADC
->    instead, set the refp to internal reference, and the refn to ngnd_adc(3)
->    for the first 4 channels(xp,yp,xn,yn) and observed the values changing
->    while touching the resistive 4-wire touchscreen.
-> - MX25_IIO_CHAN now became MX25_GCQ_CHAN and its .address is now gone
->    and the code using it adapted.
-> - The instances of struct iio_dev were renamed from idev to indio_dev.
-> - regmap_read return value is now checked in mx25_gcq_read_raw.
-> - Comparisons with MX25_NUM_CFGS are now fixed
-> - Cosmetics fix in a multiline comment.
-> ---
->   .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |   54 ++++
->   drivers/iio/adc/Kconfig                            |    7 +
->   drivers/iio/adc/Makefile                           |    1 +
->   drivers/iio/adc/fsl-imx25-gcq.c                    |  342 ++++++++++++++++++++
->   4 files changed, 404 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
->   create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
->
-> diff --git a/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt b/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
-> new file mode 100644
-> index 0000000..333fc55
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
-> @@ -0,0 +1,54 @@
-> +Freescale i.MX25 ADC GCQ device
-> +
-> +This is a generic conversion queue device that can convert any of the analog
-> +inputs using the ADC unit of the i.MX25.
-> +
-> +Required properties:
-> + - compatible: Should be "fsl,imx25-gcq".
-> + - reg: Should be the register range of the module.
-> + - interrupts: Should be the interrupt number of the module. Typically this is <1>.
-> + - interrupt-parent: phandle to the tsadc module of the i.MX25.
-> + - #address-cells: Should be <1> (setting for the subnodes)
-> + - #size-cells: Should be <0> (setting for the subnodes)
-> +
-> +Optionally you can define subnodes which define the positive and negative
-> +reference voltage for one of the analog inputs.
-> +
-> +Required properties for subnodes:
-> + - reg: Should be the number of the analog input.
-> +     0: xp
-> +     1: yp
-> +     2: xn
-> +     3: yn
-> +     4: wiper
-> +     5: inaux0
-> +     6: inaux1
-> +     7: inaux2
-> + - fsl,adc-refp: Positive reference input
-> +     0: yp
-> +     1: xp
-> +     2: External reference
-> +     3: Internal reference
-> + - fsl,adc-refn: Negative reference input
-> +     0: xn
-> +     1: yn
-> +     2: ngnd_adc
-> +     3: ngnd_adc
-> +
-> +
-> +Example:
-> +
-> +	adc: adc at 50030800 {
-> +		compatible = "fsl,imx25-gcq";
-> +		reg = <0x50030800 0x60>;
-> +		interrupt-parent = <&tscadc>;
-> +		interrupts = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		inaux at 5 {
-> +			reg = <5>;
-> +			fsl,adc-refp = <3>;
-> +			fsl,adc-refn = <3>;
-> +		};
-> +	};
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index a80d236..58efb8d 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -125,6 +125,13 @@ config EXYNOS_ADC
->   	  of SoCs for drivers such as the touchscreen and hwmon to use to share
->   	  this resource.
->
-> +config FSL_MX25_ADC
-> +	tristate "Freescale MX25 ADC driver"
-> +	depends on MFD_MX25_TSADC
-> +	help
-> +	  Generic Conversion Queue driver used for general purpose ADC in the
-> +	  MX25. This driver supports single measurements using the MX25 ADC.
-> +
->   config LP8788_ADC
->   	tristate "LP8788 ADC driver"
->   	depends on MFD_LP8788
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index 9d60f2d..2767fd6 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -14,6 +14,7 @@ obj-$(CONFIG_AD7887) += ad7887.o
->   obj-$(CONFIG_AD799X) += ad799x.o
->   obj-$(CONFIG_AT91_ADC) += at91_adc.o
->   obj-$(CONFIG_EXYNOS_ADC) += exynos_adc.o
-> +obj-$(CONFIG_FSL_MX25_ADC) += fsl-imx25-gcq.o
->   obj-$(CONFIG_LP8788_ADC) += lp8788_adc.o
->   obj-$(CONFIG_MAX1363) += max1363.o
->   obj-$(CONFIG_MCP320X) += mcp320x.o
-> diff --git a/drivers/iio/adc/fsl-imx25-gcq.c b/drivers/iio/adc/fsl-imx25-gcq.c
-> new file mode 100644
-> index 0000000..685cac5
-> --- /dev/null
-> +++ b/drivers/iio/adc/fsl-imx25-gcq.c
-> @@ -0,0 +1,342 @@
-> +/*
-> + * Copyright 2014 Markus Pargmann, Pengutronix <mpa@pengutronix.de>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + *
-> + * This is the driver for the imx25 GCQ (Generic Conversion Queue)
-> + * connected to the imx25 ADC.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/mfd/imx25-tsadc.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +
-> +#define MX25_GCQ_TIMEOUT (msecs_to_jiffies(2000))
-> +
-> +enum mx25_gcq_cfgs {
-> +	MX25_CFG_XP = 0,
-> +	MX25_CFG_YP,
-> +	MX25_CFG_XN,
-> +	MX25_CFG_YN,
-> +	MX25_CFG_WIPER,
-> +	MX25_CFG_INAUX0,
-> +	MX25_CFG_INAUX1,
-> +	MX25_CFG_INAUX2,
-> +	MX25_NUM_CFGS,
-> +};
-> +
-> +struct mx25_gcq_priv {
-> +	struct regmap *regs;
-> +	struct completion completed;
-> +	unsigned int settling_time;
-> +	struct clk *clk;
-> +	int irq;
-> +};
-> +
-> +#define MX25_CQG_CHAN(chan, id) {\
-> +		.type = IIO_VOLTAGE,\
-> +		.indexed = 1,\
-> +		.channel = chan,\
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),	\
-> +		.datasheet_name = id,				\
-> +	}
-> +
-> +static const struct iio_chan_spec mx25_gcq_channels[MX25_NUM_CFGS] = {
-> +	MX25_CQG_CHAN(0, "xp"),
-> +	MX25_CQG_CHAN(1, "yp"),
-> +	MX25_CQG_CHAN(2, "xn"),
-> +	MX25_CQG_CHAN(3, "yn"),
-> +	MX25_CQG_CHAN(4, "wiper"),
-> +	MX25_CQG_CHAN(5, "inaux0"),
-> +	MX25_CQG_CHAN(6, "inaux1"),
-> +	MX25_CQG_CHAN(7, "inaux2"),
-> +};
-> +
-> +static void mx25_gcq_disable_eoq(struct mx25_gcq_priv *priv)
-> +{
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_MR, MX25_ADCQ_MR_EOQ_IRQ,
-> +			MX25_ADCQ_MR_EOQ_IRQ);
-> +}
-> +
-> +static void mx25_gcq_enable_eoq(struct mx25_gcq_priv *priv)
-> +{
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_MR, MX25_ADCQ_MR_EOQ_IRQ, 0);
-> +}
-> +
-> +static irqreturn_t mx25_gcq_irq(int irq, void *data)
-> +{
-> +	struct mx25_gcq_priv *priv = data;
-> +	u32 stats;
-Not that much in here, but perhaps still makes sense for this to be a threaded
-irq?
-> +
-> +	regmap_read(priv->regs, MX25_ADCQ_SR, &stats);
-> +
-> +	if (stats & MX25_ADCQ_SR_EOQ) {
-> +		mx25_gcq_disable_eoq(priv);
-> +		complete(&priv->completed);
-> +	}
-> +
-> +	/* Disable conversion queue run */
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_FQS, 0);
-> +
-> +	/* Acknowledge all possible irqs */
-> +	regmap_write(priv->regs, MX25_ADCQ_SR, MX25_ADCQ_SR_FRR |
-> +			MX25_ADCQ_SR_FUR | MX25_ADCQ_SR_FOR | MX25_ADCQ_SR_EOQ |
-> +			MX25_ADCQ_SR_PD);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int mx25_gcq_read_raw(struct iio_dev *indio_dev,
-> +		struct iio_chan_spec const *chan, int *val, int *val2,
-> +		long mask)
-> +{
-> +	struct mx25_gcq_priv *priv = iio_priv(indio_dev);
-> +	long timeout;
-> +	u32 data;
-> +	int ret;
-> +
-> +	if (mask != IIO_CHAN_INFO_RAW)
-> +		return -EINVAL;
-> +
-> +	mutex_lock(&indio_dev->mlock);
-> +
-> +	/* Setup the configuration we want to use */
-> +	regmap_write(priv->regs, MX25_ADCQ_ITEM_7_0,
-> +			MX25_ADCQ_ITEM(0, chan->channel));
-> +
-> +	mx25_gcq_enable_eoq(priv);
-> +
-> +	/* Trigger queue for one run */
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_CR, MX25_ADCQ_CR_FQS,
-> +			MX25_ADCQ_CR_FQS);
-> +
-> +	timeout = wait_for_completion_interruptible_timeout(&priv->completed,
-> +			MX25_GCQ_TIMEOUT);
-> +	if (timeout < 0) {
-> +		dev_err(&indio_dev->dev, "ADC wait for measurement failed\n");
-> +		ret = timeout;
-> +		goto out;
-> +	} else if (timeout == 0) {
-> +		dev_err(&indio_dev->dev, "ADC timed out\n");
-> +		ret = -ETIMEDOUT;
-> +		goto out;
-> +	}
-> +
-> +	ret = regmap_read(priv->regs, MX25_ADCQ_FIFO, &data);
-> +	if (ret)
-> +		return ret;
-> +
-> +	*val = MX25_ADCQ_FIFO_DATA(data);
-> +
-> +	ret = IIO_VAL_INT;
-> +
-> +out:
-> +	mutex_unlock(&indio_dev->mlock);
-> +
-> +	return ret;
-> +}
-> +
-> +static const struct iio_info mx25_gcq_iio_info = {
-> +	.read_raw = mx25_gcq_read_raw,
-> +};
-> +
-> +static const struct regmap_config mx25_gcq_regconfig = {
-> +	.max_register = 0x5c,
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = 4,
-> +};
-> +
-> +static int mx25_gcq_setup_cfgs(struct platform_device *pdev,
-> +		struct mx25_gcq_priv *priv)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *child;
-> +	struct device *dev = &pdev->dev;
-> +	int ret;
-> +	int i;
-> +
-> +	/* Setup all configurations registers with a default conversion
-> +	 * configuration for each input
-> +	 */
-> +	for (i = 0; i < MX25_NUM_CFGS; ++i)
-> +		regmap_write(priv->regs, MX25_ADCQ_CFG(i),
-> +				MX25_ADCQ_CFG_YPLL_OFF |
-> +				MX25_ADCQ_CFG_XNUR_OFF |
-> +				MX25_ADCQ_CFG_XPUL_OFF |
-> +				MX25_ADCQ_CFG_REFP_INT |
-> +				(i << 4) |
-> +				MX25_ADCQ_CFG_REFN_NGND2);
-> +
-> +	for_each_child_of_node(np, child) {
-> +		u32 reg;
-> +		u32 refn;
-> +		u32 refp;
-> +
-> +		ret = of_property_read_u32(child, "reg", &reg);
-> +		if (ret) {
-> +			dev_err(dev, "Failed to get reg property\n");
-> +			return ret;
-> +		}
-> +
-> +		if (reg >= MX25_NUM_CFGS) {
-> +			dev_err(dev, "reg value is greater than the number of available configuration registers\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		ret = of_property_read_u32(child, "fsl,adc-refn", &refn);
-> +		if (ret) {
-> +			dev_err(dev, "Failed to get fsl,adc-refn property\n");
-> +			return ret;
-> +		}
-> +		if (refn < 0 || refn > 3) {
-> +			dev_err(dev, "Invalid fsl,adc-refn property value %d\n",
-> +							refn);
-> +			return -EINVAL;
-> +		}
-> +
-> +		ret = of_property_read_u32(child, "fsl,adc-refp", &refp);
-> +		if (ret) {
-> +			dev_err(dev, "Failed to get fsl,adc-refp property\n");
-> +			return ret;
-> +		}
-> +		if (refp < 0 || refp > 3) {
-> +			dev_err(dev, "Invalid fsl,adc-refp property value %d\n",
-> +							refp);
-> +			return -EINVAL;
-> +		}
-> +
-> +		regmap_update_bits(priv->regs, MX25_ADCQ_CFG(reg),
-> +				MX25_ADCQ_CFG_REFP_MASK |
-> +				MX25_ADCQ_CFG_REFN_MASK,
-> +				(refp << 7) | (refn << 2));
-> +	}
-> +	regmap_update_bits(priv->regs, MX25_ADCQ_CR,
-> +			MX25_ADCQ_CR_FRST | MX25_ADCQ_CR_QRST,
-> +			MX25_ADCQ_CR_FRST | MX25_ADCQ_CR_QRST);
-> +
-> +	regmap_write(priv->regs, MX25_ADCQ_CR,
-> +			MX25_ADCQ_CR_PDMSK |
-> +			MX25_ADCQ_CR_QSM_FQS);
-> +
-> +	return 0;
-> +}
-> +
-> +static int mx25_gcq_probe(struct platform_device *pdev)
-> +{
-> +	struct iio_dev *indio_dev;
-> +	struct mx25_gcq_priv *priv;
-> +	struct resource *res;
-> +	struct device *dev = &pdev->dev;
-> +	int ret;
-> +	void __iomem *mem;
-> +
-> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*priv));
-> +	if (!indio_dev)
-> +		return -ENOMEM;
-> +
-> +	priv = iio_priv(indio_dev);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-Check this succeeded?
-> +	mem = devm_ioremap_resource(dev, res);
-> +	if (!mem)
-> +		return -ENOMEM;
-> +
-> +	priv->regs = devm_regmap_init_mmio(dev, mem, &mx25_gcq_regconfig);
-> +	if (IS_ERR(priv->regs)) {
-> +		dev_err(dev, "Failed to initialize regmap\n");
-> +		return PTR_ERR(priv->regs);
-> +	}
-> +
-> +	init_completion(&priv->completed);
-> +
-> +	ret = mx25_gcq_setup_cfgs(pdev, priv);
-> +	if (ret)
-Why free an irq here that you haven't got yet?  Guessing this is left
-over from a different ordering of the code.
-> +		goto err_irq_free;
-> +
-> +	priv->clk = mx25_tsadc_get_ipg(pdev->dev.parent);
-> +	ret = clk_prepare_enable(priv->clk);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to enable clock\n");
-> +		return ret;
-> +	}
-> +
-> +	priv->irq = platform_get_irq(pdev, 0);
-> +	if (priv->irq <= 0) {
-> +		dev_err(dev, "Failed to get IRQ\n");
-> +		ret = priv->irq;
-> +		goto err_clk_unprepare;
-> +	}
-> +
-> +	ret = request_irq(priv->irq, mx25_gcq_irq, 0, pdev->name,
-> +			priv);
-Any significant loss in making this a threaded irq? Just a general good
-practice question if it doesn't matter.
-> +	if (ret) {
-> +		dev_err(dev, "Failed requesting IRQ\n");
-> +		goto err_clk_unprepare;
-> +	}
-> +
-> +	indio_dev->dev.parent = &pdev->dev;
-> +	indio_dev->channels = mx25_gcq_channels;
-> +	indio_dev->num_channels = ARRAY_SIZE(mx25_gcq_channels);
-> +	indio_dev->info = &mx25_gcq_iio_info;
-> +
-> +	ret = iio_device_register(indio_dev);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to register iio device\n");
-> +		goto err_irq_free;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	return 0;
-> +
-> +err_irq_free:
-> +	free_irq(priv->irq, (void *)priv);
-> +
-> +err_clk_unprepare:
-> +	clk_disable_unprepare(priv->clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int mx25_gcq_remove(struct platform_device *pdev)
-> +{
-> +	struct mx25_gcq_priv *priv = platform_get_drvdata(pdev);
-> +	struct iio_dev *indio_dev = iio_priv_to_dev(pdev);
-> +
-> +	iio_device_unregister(indio_dev);
-> +	free_irq(priv->irq, (void *)priv);
-> +	clk_disable_unprepare(priv->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct of_device_id mx25_gcq_ids[] = {
-> +	{ .compatible = "fsl,imx25-gcq", },
-> +	{ /* Sentinel */ }
-> +};
-> +
-> +static struct platform_driver mx25_gcq_driver = {
-> +	.driver		= {
-> +		.name	= "mx25-gcq",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = mx25_gcq_ids,
-> +	},
-> +	.probe		= mx25_gcq_probe,
-> +	.remove		= mx25_gcq_remove,
-> +};
-> +module_platform_driver(mx25_gcq_driver);
-> +
-> +MODULE_DESCRIPTION("ADC driver for Freescale mx25");
-> +MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
-> +MODULE_LICENSE("GPL v2");
->
+Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+
+---
+Changes since version 1: 
+ - Fix timer memory leaks 
+ - Fix race condition when driver unloads while interrupt handler is active
+ - Support Cubieboard 2(need testing)
+
+Changes since version 2:
+- More reliable keydown events
+- Documentation fixes
+- Rename registers accurding to A20 user manual
+- Remove some includes, order includes alphabetically
+- Use BIT macro
+- Typo fixes
+
+Changes since version 3:
+- Split the patch on smaller parts
+- More documentation fixes
+- Add clock-names in DT
+- Use devm_clk_get function to get the clocks
+- Removed gpios property from ir's DT
+- Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
+- Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
+- Add myself in the copyright ;)
+- Coding style and indentation fixes
+
+Changes since version 4:
+- Try to fix indentation errors by sending patches with git send-mail
+
+Changes since version 5:
+- More indentation fixes
+- Make patches pass checkpatch with --strict option
+- Replaced magic numbers with defines(patch by Priit Laes)
+- Fixed oops on loading(patch by Hans de Goede)
+
+Changes since version 6:
+- Removed constants from code
+- Better errrors handling on loading
+- Renamed sunxi-ir.c to sunxi-cir.c
+- Changed description of second commit
+- Order entries in dts and dtsi by register address
+- Code style fixes
+
+Changes since version 7:
+- Removed a couple of blank lines in code
+- Delay interrupts init until we are ready to handle them
+- Increased the reported duration of each pulse by one
+- Refactored defines
+
+Changes since version 8:
+- Split the DT patch to three
+- Code style fixes
+
+Changes since version 9:
+- Rebase patches on 3.16-rc1
+
+Alexander Bersenev (5):
+  ARM: sunxi: Add documentation for sunxi consumer infrared devices
+  [media] rc: add sunxi-ir driver
+  ARM: sunxi: Add pins for IR controller on A20 to dtsi
+  ARM: sunxi: Add IR controllers on A20 to dtsi
+  ARM: sunxi: Enable IR controller on cubieboard 2 and cubietruck in
+    dts
+
+ .../devicetree/bindings/media/sunxi-ir.txt         |   23 ++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |    6 +
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |    6 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   32 ++
+ drivers/media/rc/Kconfig                           |   10 +
+ drivers/media/rc/Makefile                          |    1 +
+ drivers/media/rc/sunxi-cir.c                       |  318 ++++++++++++++++++++
+ 7 files changed, 396 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
+ create mode 100644 drivers/media/rc/sunxi-cir.c
