@@ -1,17 +1,19 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 21 Jun 2014 12:40:27 +0800
-Subject: [PATCH 1/2] ARM: dts: mx5: Fix IPU port node placement
-In-Reply-To: <1402618960-9735-1-git-send-email-marex@denx.de>
-References: <1402618960-9735-1-git-send-email-marex@denx.de>
-Message-ID: <20140621044025.GA6818@dragon>
+Date: Sat, 21 Jun 2014 12:54:25 +0800
+Subject: [PATCH 1/3] ARM: dts: mbimxsd25: cmo-qvga: Fix lcd regulator
+In-Reply-To: <1403001999-12316-1-git-send-email-denis@eukrea.com>
+References: <1403001999-12316-1-git-send-email-denis@eukrea.com>
+Message-ID: <20140621045423.GC6818@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 13, 2014 at 02:22:39AM +0200, Marek Vasut wrote:
-> The "port" node was misplaced in the original patch, therefore making
-> the LCD dysfunctional on this board. Fix this by moving the "port" DT
-> node into the "display {}" node.
+On Tue, Jun 17, 2014 at 12:46:37PM +0200, Denis Carikli wrote:
+> The fixed-regulator's enable-active-high property
+> is needed to indicate that the GPIO regulator is
+> active high.
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
+> Before that the regulator state was inverted.
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 
-Applied both, thanks.
+Applied this one, thanks.
