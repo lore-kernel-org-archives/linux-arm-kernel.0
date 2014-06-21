@@ -1,150 +1,490 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 21 Jun 2014 01:59:22 +0200
-Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
- suspend/resume
-In-Reply-To: <CAD=FV=VmPMf6tCNmKJ1o5J7PyAXoU8fb6+s+Fkv18FH2WaQp7A@mail.gmail.com>
-References: <1403155273-1057-1-git-send-email-dianders@chromium.org>	<7h8uosyc3k.fsf@paris.lan>	<CAD=FV=XxNVmF+N5HF4SnZoJRJvkSUkpEx6ct4v2gtmAQ9n28-Q@mail.gmail.com>	<7hwqcbs166.fsf@paris.lan>	<CAD=FV=Uz9O0i2gmuk2+BHa-Tksvyxv0+MTi2UEjVREAMNCK7Ug@mail.gmail.com>	<7h7g4brx6w.fsf@paris.lan>
- <CAD=FV=VmPMf6tCNmKJ1o5J7PyAXoU8fb6+s+Fkv18FH2WaQp7A@mail.gmail.com>
-Message-ID: <53A4CADA.4030002@gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Fri, 20 Jun 2014 17:09:48 -0700
+Subject: [PATCH] arm64, ia64, ppc, s390, sh, tile, um, x86,
+ mm: Remove default gate area
+Message-ID: <5a78777a8fc1325e6f0ed7a802231b18250459c1.1403309371.git.luto@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.06.2014 01:53, Doug Anderson wrote:
-> Kevin,
-> 
-> On Fri, Jun 20, 2014 at 4:13 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> Doug Anderson <dianders@chromium.org> writes:
->>
->>> Kevin,
->>>
->>> On Fri, Jun 20, 2014 at 2:48 PM, Kevin Hilman <khilman@linaro.org> wrote:
->>>> Hi Doug,
->>>>
->>>> Doug Anderson <dianders@chromium.org> writes:
->>>>
->>>>> On Thu, Jun 19, 2014 at 11:43 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>>>> Doug Anderson <dianders@chromium.org> writes:
->>>>>>
->>>>>>> The original code for the exynos i2c controller registered for the
->>>>>>> "noirq" variants.  However during review feedback it was moved to
->>>>>>> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
->>>>>>> longer actually "noirq" (despite functions named
->>>>>>> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
->>>>>>>
->>>>>>> i2c controllers that might have wakeup sources on them seem to need to
->>>>>>> resume at noirq time so that the individual drivers can actually read
->>>>>>> the i2c bus to handle their wakeup.
->>>>>>
->>>>>> I suspect usage of the noirq variants pre-dates the existence of the
->>>>>> late/early callbacks in the PM core, but based on the description above,
->>>>>> I suspect what you actually want is the late/early callbacks.
->>>>>
->>>>> I think it actually really needs noirq.  ;)
->>>>
->>>> Yes, it appears it does.   Objection withdrawn.
->>>>
->>>> I just wanted to be sure because since the introduction of late/early,
->>>> the need for noirq should be pretty rare, but there certainly are needs.
->>>>
->>>> <tangent>
->>>> In this case though, the need for it has more to do with the
->>>> lack of a way for us to describe non parent-child device dependencies
->>>> than whether or not IRQs are enabled or not.
->>>> </tangent>
->>>
->>> Actually, I'm not sure that's true, but I'll talk through it and you
->>> can point to where I'm wrong (I often am!)
->>>
->>> If you're a wakeup device then you need to be ready to handle
->>> interrupts as soon as the "noirq" phase of resume is done, right?
->>
->> As soon as the noirq phase of your own driver is done, correct.
->>
->>> Said another way: you need to be ready to handle interrupts _before_
->>> the normal resume code is called and be ready to handle interrupts
->>> even _before_ the early resume code is called.
->>
->> Correct.
->>
->>> That means if you are implementing a bus that's needed by any devices
->>> with wakeup interrupts then it's your responsibility to also be
->>> prepared to run this early.
->>>
->>> In this particular case the max77686 driver doesn't need to do
->>> anything at all to be ready to handle interrupts.  It's suspend and
->>> resume code is just boilerplate "enable wakeups / disable wakeups" and
->>> it has no "noirq" code.  The max77686 driver doesn't have any "noirq"
->>> wake call because it would just be empty.
->>>
->>> Said another way: the problem isn't that the max77686 wakeup gets
->>> called before the i2c wakeup.  The problem is that i2c is needed ASAP
->>> once IRQs are enabled and thus needs to be run noirq.
->>>
->>> Does that sound semi-correct?
->>
->> Yes that's correct.
->>
->> My point above was (trying to be) that ultimately this is an ordering
->> issue.  e.g. the bus device needs to be "ready" before wakeup devices on
->> that bus can handle wakeup interrupts etc.  The way we're handling that
->> ordering is by the implied ordering of noirq, late/early and "normal"
->> callbacks.  That's convenient, but not exactly obvious.
->>
->> It works because we dont' typically need too many layers here, but it
->> would be much more understandable if we could describe this kind of
->> dependency in a way that the suspend/resume code would suspend/resume
->> things in the right order rather than by tinkering with callback levels
->> (since otherwise suspend/resume ordering just depends on probe order.)
->>
->> This issue then usually gets me headed down my usual rant path about how
->> I think runtime PM is much better suited for handling ordering and
->> dependencies becuase it automatically handles parent/child dependencies
->> and non parent/child dependencies can be handled by taking advantage of
->> the get/put APIs which are refcounted, ect etc. but that's another can
->> worms.
-> 
-> Ah, I gotcha.  Yes, I'm a fan of having explicit dependency orderings too.
-> 
-> So I guess in this case the truly correct way to handle it is:
-> 
-> 1. i2c controller should have Runtime PM even though (as per the code
-> now) there's nothing you can do to it to save power under normal
-> circumstances.  So the runtime "suspend" code would be a no-op.
-> 
-> 2. When the i2c controller is told to runtime resume, it should
-> double-check if a full SoC poweroff has happened since the last time
-> it checked.  In this case it should reinit its hardware.
-> 
-> 3. If the i2c controller gets a full "resume" callback then it should
-> also reinit the hardware just so it's not sitting in a half-configured
-> state until the first peripheral uses it.
-> 
-> If later someone finds a way to power gate the i2c controller when no
-> active transfers are going (and we actually save non-trivial power
-> doing this) then we've got a nice place to put that code.
-> 
-> NOTE: Unless we can actually save power by power gating the i2c
-> peripheral when there are no active transfers, we would also just have
-> the i2c_xfer() init the hardware if needed.  Maybe that's kinda gross,
-> though.
-> 
-> 
-> -Doug
-> 
-> 
-> P.S. Just to confirm: you're not opposed to landing the noirq code
-> as-is.  This discussion is about how someone could make it better in
-> the future...
-> 
+The core mm code will provide a default gate area based on
+FIXADDR_USER_START and FIXADDR_USER_END if
+!defined(__HAVE_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR).
 
-I'm not sure noirq is going to work correctly, at least not with current
-callbacks. I can see a call to clk_prepare_enable() there which needs to
-acquire a mutex.
+This default is only useful for ia64.  arm64, ppc, s390, sh, tile,
+64-bit UML, and x86_32 have their own code just to disable it.  arm,
+32-bit UML, and x86_64 have gate areas, but they have their own
+implementations.
 
-Would disabling the irq in suspend callback of your wakeup device and
-reenabling it in resume, while keeping their wakeup capability enabled,
-work for you? Then you could resume i2c in .resume_early callback
-without any issues.
+This gets rid of the default and moves the code into ia64.
 
-Best regards,
-Tomasz
+This should save some code on architectures without a gate area: it's
+now possible to inline the gate_area functions in the default case.
+
+Signed-off-by: Andy Lutomirski <luto@amacapital.net>
+---
+ arch/arm64/include/asm/page.h      |  3 ---
+ arch/arm64/kernel/vdso.c           | 19 -------------------
+ arch/ia64/include/asm/page.h       |  2 ++
+ arch/ia64/mm/init.c                | 26 ++++++++++++++++++++++++++
+ arch/powerpc/include/asm/page.h    |  3 ---
+ arch/powerpc/kernel/vdso.c         | 16 ----------------
+ arch/s390/include/asm/page.h       |  2 --
+ arch/s390/kernel/vdso.c            | 15 ---------------
+ arch/sh/include/asm/page.h         |  5 -----
+ arch/sh/kernel/vsyscall/vsyscall.c | 15 ---------------
+ arch/tile/include/asm/page.h       |  6 ------
+ arch/tile/kernel/vdso.c            | 15 ---------------
+ arch/um/include/asm/page.h         |  5 +++++
+ arch/x86/include/asm/page.h        |  1 -
+ arch/x86/include/asm/page_64.h     |  2 ++
+ arch/x86/um/asm/elf.h              |  1 -
+ arch/x86/um/mem_64.c               | 15 ---------------
+ arch/x86/vdso/vdso32-setup.c       | 19 +------------------
+ include/linux/mm.h                 | 17 ++++++++++++-----
+ mm/memory.c                        | 38 --------------------------------------
+ mm/nommu.c                         |  5 -----
+ 21 files changed, 48 insertions(+), 182 deletions(-)
+
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 46bf666..992710f 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -28,9 +28,6 @@
+ #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+ #define PAGE_MASK		(~(PAGE_SIZE-1))
+ 
+-/* We do define AT_SYSINFO_EHDR but don't use the gate mechanism */
+-#define __HAVE_ARCH_GATE_AREA		1
+-
+ #ifndef __ASSEMBLY__
+ 
+ #ifdef CONFIG_ARM64_64K_PAGES
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 50384fe..f630626 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -187,25 +187,6 @@ const char *arch_vma_name(struct vm_area_struct *vma)
+ }
+ 
+ /*
+- * We define AT_SYSINFO_EHDR, so we need these function stubs to keep
+- * Linux happy.
+- */
+-int in_gate_area_no_mm(unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-int in_gate_area(struct mm_struct *mm, unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-	return NULL;
+-}
+-
+-/*
+  * Update the vDSO data page to keep in sync with kernel timekeeping.
+  */
+ void update_vsyscall(struct timekeeper *tk)
+diff --git a/arch/ia64/include/asm/page.h b/arch/ia64/include/asm/page.h
+index f1e1b2e..1f1bf14 100644
+--- a/arch/ia64/include/asm/page.h
++++ b/arch/ia64/include/asm/page.h
+@@ -231,4 +231,6 @@ get_order (unsigned long size)
+ #define PERCPU_ADDR		(-PERCPU_PAGE_SIZE)
+ #define LOAD_OFFSET		(KERNEL_START - KERNEL_TR_PAGE_SIZE)
+ 
++#define __HAVE_ARCH_GATE_AREA	1
++
+ #endif /* _ASM_IA64_PAGE_H */
+diff --git a/arch/ia64/mm/init.c b/arch/ia64/mm/init.c
+index 25c3502..35efaa3 100644
+--- a/arch/ia64/mm/init.c
++++ b/arch/ia64/mm/init.c
+@@ -278,6 +278,32 @@ setup_gate (void)
+ 	ia64_patch_gate();
+ }
+ 
++static struct vm_area_struct gate_vma;
++
++static int __init gate_vma_init(void)
++{
++	gate_vma.vm_mm = NULL;
++	gate_vma.vm_start = FIXADDR_USER_START;
++	gate_vma.vm_end = FIXADDR_USER_END;
++	gate_vma.vm_flags = VM_READ | VM_MAYREAD | VM_EXEC | VM_MAYEXEC;
++	gate_vma.vm_page_prot = __P101;
++
++	return 0;
++}
++__initcall(gate_vma_init);
++
++struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
++{
++	return &gate_vma;
++}
++
++int in_gate_area_no_mm(unsigned long addr)
++{
++	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
++		return 1;
++	return 0;
++}
++
+ void ia64_mmu_init(void *my_cpu_data)
+ {
+ 	unsigned long pta, impl_va_bits;
+diff --git a/arch/powerpc/include/asm/page.h b/arch/powerpc/include/asm/page.h
+index 32e4e21..26fe1ae 100644
+--- a/arch/powerpc/include/asm/page.h
++++ b/arch/powerpc/include/asm/page.h
+@@ -48,9 +48,6 @@ extern unsigned int HPAGE_SHIFT;
+ #define HUGE_MAX_HSTATE		(MMU_PAGE_COUNT-1)
+ #endif
+ 
+-/* We do define AT_SYSINFO_EHDR but don't use the gate mechanism */
+-#define __HAVE_ARCH_GATE_AREA		1
+-
+ /*
+  * Subtle: (1 << PAGE_SHIFT) is an int, not an unsigned long. So if we
+  * assign PAGE_MASK to a larger type it gets extended the way we want
+diff --git a/arch/powerpc/kernel/vdso.c b/arch/powerpc/kernel/vdso.c
+index ce74c33..f174351 100644
+--- a/arch/powerpc/kernel/vdso.c
++++ b/arch/powerpc/kernel/vdso.c
+@@ -840,19 +840,3 @@ static int __init vdso_init(void)
+ 	return 0;
+ }
+ arch_initcall(vdso_init);
+-
+-int in_gate_area_no_mm(unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-int in_gate_area(struct mm_struct *mm, unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-	return NULL;
+-}
+-
+diff --git a/arch/s390/include/asm/page.h b/arch/s390/include/asm/page.h
+index 114258e..7b2ac6e 100644
+--- a/arch/s390/include/asm/page.h
++++ b/arch/s390/include/asm/page.h
+@@ -162,6 +162,4 @@ static inline int devmem_is_allowed(unsigned long pfn)
+ #include <asm-generic/memory_model.h>
+ #include <asm-generic/getorder.h>
+ 
+-#define __HAVE_ARCH_GATE_AREA 1
+-
+ #endif /* _S390_PAGE_H */
+diff --git a/arch/s390/kernel/vdso.c b/arch/s390/kernel/vdso.c
+index 6136490..0bbb7e0 100644
+--- a/arch/s390/kernel/vdso.c
++++ b/arch/s390/kernel/vdso.c
+@@ -316,18 +316,3 @@ static int __init vdso_init(void)
+ 	return 0;
+ }
+ early_initcall(vdso_init);
+-
+-int in_gate_area_no_mm(unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-int in_gate_area(struct mm_struct *mm, unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-	return NULL;
+-}
+diff --git a/arch/sh/include/asm/page.h b/arch/sh/include/asm/page.h
+index 15d9703..fe20d14 100644
+--- a/arch/sh/include/asm/page.h
++++ b/arch/sh/include/asm/page.h
+@@ -186,11 +186,6 @@ typedef struct page *pgtable_t;
+ #include <asm-generic/memory_model.h>
+ #include <asm-generic/getorder.h>
+ 
+-/* vDSO support */
+-#ifdef CONFIG_VSYSCALL
+-#define __HAVE_ARCH_GATE_AREA
+-#endif
+-
+ /*
+  * Some drivers need to perform DMA into kmalloc'ed buffers
+  * and so we have to increase the kmalloc minalign for this.
+diff --git a/arch/sh/kernel/vsyscall/vsyscall.c b/arch/sh/kernel/vsyscall/vsyscall.c
+index 5ca5797..ea2aa13 100644
+--- a/arch/sh/kernel/vsyscall/vsyscall.c
++++ b/arch/sh/kernel/vsyscall/vsyscall.c
+@@ -92,18 +92,3 @@ const char *arch_vma_name(struct vm_area_struct *vma)
+ 
+ 	return NULL;
+ }
+-
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-	return NULL;
+-}
+-
+-int in_gate_area(struct mm_struct *mm, unsigned long address)
+-{
+-	return 0;
+-}
+-
+-int in_gate_area_no_mm(unsigned long address)
+-{
+-	return 0;
+-}
+diff --git a/arch/tile/include/asm/page.h b/arch/tile/include/asm/page.h
+index 6727680..a213a8d 100644
+--- a/arch/tile/include/asm/page.h
++++ b/arch/tile/include/asm/page.h
+@@ -39,12 +39,6 @@
+ #define HPAGE_MASK	(~(HPAGE_SIZE - 1))
+ 
+ /*
+- * We do define AT_SYSINFO_EHDR to support vDSO,
+- * but don't use the gate mechanism.
+- */
+-#define __HAVE_ARCH_GATE_AREA		1
+-
+-/*
+  * If the Kconfig doesn't specify, set a maximum zone order that
+  * is enough so that we can create huge pages from small pages given
+  * the respective sizes of the two page types.  See <linux/mmzone.h>.
+diff --git a/arch/tile/kernel/vdso.c b/arch/tile/kernel/vdso.c
+index 1533af2..5bc51d7 100644
+--- a/arch/tile/kernel/vdso.c
++++ b/arch/tile/kernel/vdso.c
+@@ -121,21 +121,6 @@ const char *arch_vma_name(struct vm_area_struct *vma)
+ 	return NULL;
+ }
+ 
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-	return NULL;
+-}
+-
+-int in_gate_area(struct mm_struct *mm, unsigned long address)
+-{
+-	return 0;
+-}
+-
+-int in_gate_area_no_mm(unsigned long address)
+-{
+-	return 0;
+-}
+-
+ int setup_vdso_pages(void)
+ {
+ 	struct page **pagelist;
+diff --git a/arch/um/include/asm/page.h b/arch/um/include/asm/page.h
+index 5ff53d9..71c5d13 100644
+--- a/arch/um/include/asm/page.h
++++ b/arch/um/include/asm/page.h
+@@ -119,4 +119,9 @@ extern unsigned long uml_physmem;
+ #include <asm-generic/getorder.h>
+ 
+ #endif	/* __ASSEMBLY__ */
++
++#ifdef CONFIG_X86_32
++#define __HAVE_ARCH_GATE_AREA 1
++#endif
++
+ #endif	/* __UM_PAGE_H */
+diff --git a/arch/x86/include/asm/page.h b/arch/x86/include/asm/page.h
+index 775873d..802dde3 100644
+--- a/arch/x86/include/asm/page.h
++++ b/arch/x86/include/asm/page.h
+@@ -70,7 +70,6 @@ extern bool __virt_addr_valid(unsigned long kaddr);
+ #include <asm-generic/memory_model.h>
+ #include <asm-generic/getorder.h>
+ 
+-#define __HAVE_ARCH_GATE_AREA 1
+ #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
+ 
+ #endif	/* __KERNEL__ */
+diff --git a/arch/x86/include/asm/page_64.h b/arch/x86/include/asm/page_64.h
+index 0f1ddee..f408caf 100644
+--- a/arch/x86/include/asm/page_64.h
++++ b/arch/x86/include/asm/page_64.h
+@@ -39,4 +39,6 @@ void copy_page(void *to, void *from);
+ 
+ #endif	/* !__ASSEMBLY__ */
+ 
++#define __HAVE_ARCH_GATE_AREA 1
++
+ #endif /* _ASM_X86_PAGE_64_H */
+diff --git a/arch/x86/um/asm/elf.h b/arch/x86/um/asm/elf.h
+index 0feee2f..25a1022 100644
+--- a/arch/x86/um/asm/elf.h
++++ b/arch/x86/um/asm/elf.h
+@@ -216,6 +216,5 @@ extern long elf_aux_hwcap;
+ #define ELF_HWCAP (elf_aux_hwcap)
+ 
+ #define SET_PERSONALITY(ex) do ; while(0)
+-#define __HAVE_ARCH_GATE_AREA 1
+ 
+ #endif
+diff --git a/arch/x86/um/mem_64.c b/arch/x86/um/mem_64.c
+index c6492e7..f8fecad 100644
+--- a/arch/x86/um/mem_64.c
++++ b/arch/x86/um/mem_64.c
+@@ -9,18 +9,3 @@ const char *arch_vma_name(struct vm_area_struct *vma)
+ 
+ 	return NULL;
+ }
+-
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-	return NULL;
+-}
+-
+-int in_gate_area(struct mm_struct *mm, unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-int in_gate_area_no_mm(unsigned long addr)
+-{
+-	return 0;
+-}
+diff --git a/arch/x86/vdso/vdso32-setup.c b/arch/x86/vdso/vdso32-setup.c
+index e4f7781..e904c27 100644
+--- a/arch/x86/vdso/vdso32-setup.c
++++ b/arch/x86/vdso/vdso32-setup.c
+@@ -115,23 +115,6 @@ static __init int ia32_binfmt_init(void)
+ 	return 0;
+ }
+ __initcall(ia32_binfmt_init);
+-#endif
+-
+-#else  /* CONFIG_X86_32 */
+-
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-	return NULL;
+-}
+-
+-int in_gate_area(struct mm_struct *mm, unsigned long addr)
+-{
+-	return 0;
+-}
+-
+-int in_gate_area_no_mm(unsigned long addr)
+-{
+-	return 0;
+-}
++#endif /* CONFIG_SYSCTL */
+ 
+ #endif	/* CONFIG_X86_64 */
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index e03dd29..8981cc8 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -2014,13 +2014,20 @@ static inline bool kernel_page_present(struct page *page) { return true; }
+ #endif /* CONFIG_HIBERNATION */
+ #endif
+ 
++#ifdef __HAVE_ARCH_GATE_AREA
+ extern struct vm_area_struct *get_gate_vma(struct mm_struct *mm);
+-#ifdef	__HAVE_ARCH_GATE_AREA
+-int in_gate_area_no_mm(unsigned long addr);
+-int in_gate_area(struct mm_struct *mm, unsigned long addr);
++extern int in_gate_area_no_mm(unsigned long addr);
++extern int in_gate_area(struct mm_struct *mm, unsigned long addr);
+ #else
+-int in_gate_area_no_mm(unsigned long addr);
+-#define in_gate_area(mm, addr) ({(void)mm; in_gate_area_no_mm(addr);})
++static inline struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
++{
++	return NULL;
++}
++static inline int in_gate_area_no_mm(unsigned long addr) { return 0; }
++static inline int in_gate_area(struct mm_struct *mm, unsigned long addr)
++{
++	return 0;
++}
+ #endif	/* __HAVE_ARCH_GATE_AREA */
+ 
+ #ifdef CONFIG_SYSCTL
+diff --git a/mm/memory.c b/mm/memory.c
+index d67fd9f..099d234 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -3399,44 +3399,6 @@ int __pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
+ }
+ #endif /* __PAGETABLE_PMD_FOLDED */
+ 
+-#if !defined(__HAVE_ARCH_GATE_AREA)
+-
+-#if defined(AT_SYSINFO_EHDR)
+-static struct vm_area_struct gate_vma;
+-
+-static int __init gate_vma_init(void)
+-{
+-	gate_vma.vm_mm = NULL;
+-	gate_vma.vm_start = FIXADDR_USER_START;
+-	gate_vma.vm_end = FIXADDR_USER_END;
+-	gate_vma.vm_flags = VM_READ | VM_MAYREAD | VM_EXEC | VM_MAYEXEC;
+-	gate_vma.vm_page_prot = __P101;
+-
+-	return 0;
+-}
+-__initcall(gate_vma_init);
+-#endif
+-
+-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
+-{
+-#ifdef AT_SYSINFO_EHDR
+-	return &gate_vma;
+-#else
+-	return NULL;
+-#endif
+-}
+-
+-int in_gate_area_no_mm(unsigned long addr)
+-{
+-#ifdef AT_SYSINFO_EHDR
+-	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
+-		return 1;
+-#endif
+-	return 0;
+-}
+-
+-#endif	/* __HAVE_ARCH_GATE_AREA */
+-
+ static int __follow_pte(struct mm_struct *mm, unsigned long address,
+ 		pte_t **ptepp, spinlock_t **ptlp)
+ {
+diff --git a/mm/nommu.c b/mm/nommu.c
+index b78e3a8..c4ca56b 100644
+--- a/mm/nommu.c
++++ b/mm/nommu.c
+@@ -1981,11 +1981,6 @@ error:
+ 	return -ENOMEM;
+ }
+ 
+-int in_gate_area_no_mm(unsigned long addr)
+-{
+-	return 0;
+-}
+-
+ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ {
+ 	BUG();
+-- 
+1.9.3
