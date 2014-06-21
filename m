@@ -1,57 +1,43 @@
-From: bay@hackerdom.ru (Alexander Bersenev)
-Date: Sat, 21 Jun 2014 17:04:06 +0600
-Subject: [PATCH v10 5/5] ARM: sunxi: Enable IR controller on cubieboard 2 and
- cubietruck in dts
-In-Reply-To: <1403348646-31091-1-git-send-email-bay@hackerdom.ru>
-References: <1403348646-31091-1-git-send-email-bay@hackerdom.ru>
-Message-ID: <1403348646-31091-6-git-send-email-bay@hackerdom.ru>
+From: dwalter@google.com (Daniel Walter)
+Date: Sat, 21 Jun 2014 13:04:41 +0100
+Subject: [PATCH 2/9] [arch/arm/mach-pxa] replace strict_strto call with kstrto
+Message-ID: <20140621120441.GA5712@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables two IR devices in dts:
-- One IR device physically found on Cubieboard 2
-- One IR device physically found on Cubietruck
+ Replace obsolete call to strict_strto with kstrto
 
-Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
-Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+Signed-off-by: Daniel Walter <dwalter@google.com>
 ---
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts |    6 ++++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts  |    6 ++++++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/balloon3.c | 2 +-
+ arch/arm/mach-pxa/viper.c    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index a5ad945..a70f0b4 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -66,6 +66,12 @@
- 			};
- 		};
+diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
+index 43596e0..d897292 100644
+--- a/arch/arm/mach-pxa/balloon3.c
++++ b/arch/arm/mach-pxa/balloon3.c
+@@ -90,7 +90,7 @@ int __init parse_balloon3_features(char *arg)
+ 	if (!arg)
+ 		return 0;
  
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index b87fea9..96639d5 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -100,6 +100,12 @@
- 			status = "okay";
- 		};
+-	return strict_strtoul(arg, 0, &balloon3_features_present);
++	return kstrtoul(arg, 0, &balloon3_features_present);
+ }
+ early_param("balloon3_features", parse_balloon3_features);
  
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+index 41f27f6..de3b080 100644
+--- a/arch/arm/mach-pxa/viper.c
++++ b/arch/arm/mach-pxa/viper.c
+@@ -769,7 +769,7 @@ static unsigned long viper_tpm;
+ 
+ static int __init viper_tpm_setup(char *str)
+ {
+-	return strict_strtoul(str, 10, &viper_tpm) >= 0;
++	return kstrtoul(str, 10, &viper_tpm) >= 0;
+ }
+ 
+ __setup("tpm=", viper_tpm_setup);
 -- 
-1.7.1
+2.0.0.526.g5318336
