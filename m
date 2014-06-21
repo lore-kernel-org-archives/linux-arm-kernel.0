@@ -1,78 +1,82 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sat, 21 Jun 2014 11:06:18 +0200
-Subject: [PATCHv6 2/3] devicetree: Addition of the Altera SDRAM EDAC
-In-Reply-To: <1403306523-4174-3-git-send-email-tthayer@altera.com>
-References: <1403306523-4174-2-git-send-email-tthayer@altera.com>
- <1403306523-4174-3-git-send-email-tthayer@altera.com>
-Message-ID: <20140621090618.GB8053@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 21 Jun 2014 17:11:44 +0800
+Subject: [PATCH] ARM: dts: imx6sx-sdb: add gpio key support
+In-Reply-To: <1403241449-31514-1-git-send-email-b20788@freescale.com>
+References: <1403241449-31514-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140621091143.GC18165@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 06:22:02PM -0500, tthayer at altera.com wrote:
-> From: Thor Thayer <tthayer@altera.com>
+On Fri, Jun 20, 2014 at 01:17:29PM +0800, Anson Huang wrote:
+> This patch adds support for imx6sx-sdb board's gpio keys:
 > 
-> Addition of the Altera SDRAM EDAC bindings and device tree changes
+> SW4(FUNC1): KEY_VOLUMEUP
+> SW5(FUNC2): KEY_VOLUMEDOWN
 > 
-> v2: Changes to SoC EDAC source code.
-> 
-> v3: Fix typo in device tree documentation.
-> 
-> v4,v5: No changes - bump version for consistency.
-> 
-> v6: Assign ECC registers in SDRAM controller to EDAC
-> 
-> Signed-off-by: Thor Thayer <tthayer@altera.com>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 > ---
->  .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
->  arch/arm/boot/dts/socfpga.dtsi                     |    6 ++++++
->  2 files changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+>  arch/arm/boot/dts/imx6sx-sdb.dts |   27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> new file mode 100644
-> index 0000000..540c9cf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> @@ -0,0 +1,15 @@
-> +Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
-> +
-> +Required properties:
-> +- compatible : should contain "altr,sdram-edac";
-> +- reg : should contain the ECC register range in sdram
-> +        controller (address and length).
-> +- interrupts : Should contain the SDRAM ECC IRQ in the
-> +	appropriate format for the IRQ controller.
-> +
-> +Example:
-> +	sdramedac at 0 {
-> +		compatible = "altr,sdram-edac";
-> +		reg = <0xffc2502C 0x28>;
-> +		interrupts = <0 39 4>;
-> +	};
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 310292e..fe9832e 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -687,6 +687,12 @@
->  			reg = <0xffc25000 0x4>;
->  		};
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+> index 9906f65..e082e84 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+> @@ -8,6 +8,8 @@
 >  
-> +		sdramedac at 0 {
-                         ^^^
-
-Please fix the baseaddress (also in the binding doc).
-
-> +			compatible = "altr,sdram-edac";
-> +			reg = <0xffc2502C 0x28>;
-> +			interrupts = <0 39 4>;
+>  /dts-v1/;
+>  
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+>  #include "imx6sx.dtsi"
+>  
+>  / {
+> @@ -18,6 +20,24 @@
+>  		stdout-path = &uart1;
+>  	};
+>  
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_keys>;
+> +
+> +		volume-up {
+> +			label = "Volume Up";
+> +			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_VOLUMEUP>;
 > +		};
 > +
->  		rst: rstmgr at ffd05000 {
->  			compatible = "altr,rst-mgr";
->  			reg = <0xffd05000 0x1000>;
+> +		volume-down {
+> +			label = "Volume Down";
+> +			gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_VOLUMEDOWN>;
+> +		};
+> +	};
+> +
+>  	memory {
+>  		reg = <0x80000000 0x40000000>;
+>  	};
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+We generally have 'chosen' and 'memory' at the top of the board dts.  So
+I applied the patch after switching the order between 'gpio-keys' and
+'memory'.
+
+Shawn
+
+> @@ -114,6 +134,13 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_gpio_keys: gpio_keysgrp {
+> +			fsl,pins = <
+> +				MX6SX_PAD_CSI_DATA04__GPIO1_IO_18 0x17059
+> +				MX6SX_PAD_CSI_DATA05__GPIO1_IO_19 0x17059
+> +			>;
+> +		};
+> +
+>  		pinctrl_vcc_sd3: vccsd3grp {
+>  			fsl,pins = <
+>  				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+> -- 
+> 1.7.9.5
+> 
