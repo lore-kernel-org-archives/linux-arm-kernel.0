@@ -1,56 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 21 Jun 2014 21:56:04 +0800
-Subject: [PATCH 02/10] serial: 8250_dw: support DMA on the OF case
-In-Reply-To: <1402890635-12342-3-git-send-email-emilio@elopez.com.ar>
-References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
- <1402890635-12342-3-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CAGb2v676GgfHnR-XWdQCa-ecYtYRxePS1dgGL6QqbntUkBvi_g@mail.gmail.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Sat, 21 Jun 2014 16:22:05 +0200
+Subject: [PATCH v2 0/3] Add Rockchip Soc PWM driver
+Message-ID: <1403360528-12757-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 11:50 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> Currently, DMA properties on the DT are ignored when using the 8250_dw
-> driver. With this patch, DMA will be used when available.
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
->  drivers/tty/serial/8250/8250_dw.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-> index ed31135..f75c0bf 100644
-> --- a/drivers/tty/serial/8250/8250_dw.c
-> +++ b/drivers/tty/serial/8250/8250_dw.c
-> @@ -222,6 +222,8 @@ static int dw8250_probe_of(struct uart_port *p,
->                            struct dw8250_data *data)
->  {
->         struct device_node      *np = p->dev->of_node;
-> +       struct uart_8250_port   *up = container_of(p, struct uart_8250_port,
-> +                                                  port);
->         u32                     val;
->         bool has_ucv = true;
->
-> @@ -254,11 +256,14 @@ static int dw8250_probe_of(struct uart_port *p,
->                 }
->         }
->         if (has_ucv)
-> -               dw8250_setup_port(container_of(p, struct uart_8250_port, port));
-> +               dw8250_setup_port(up);
->
->         if (!of_property_read_u32(np, "reg-shift", &val))
->                 p->regshift = val;
->
-> +       if (of_get_property(np, "dmas", NULL))
-> +               up->dma = &data->dma;
-> +
+This series adds support for the PWM controller found on Rockchip
+RK29, RK30 and RK31 SoCs. It is based on the documentation publicly
+available [0] and kernel sources from Rockchip [1] and has been tested
+on RK3188.
 
-I suggest adding a comment here. Looking just at the patch,
-it's not very intuitive. But otherwise the patch looks good.
+The last patch, which adds device tree nodes in the dts, depends on
+the clocks introduced by Heiko in his recent submission of a new clk
+driver for Rockchip RK3188.
 
-ChenYu
+[0] http://dl.radxa.com/rock/docs/hw/ds/Rockchip%20RK30xx%20TRM%20V2.0.pdf
+[1] https://github.com/rkchrome/kernel
 
->         /* clock got configured through clk api, all done */
->         if (p->uartclk)
->                 return 0;
-> --
-> 2.0.0
+Changes in v2:
+  * address comments from Thierry Reding:
+    - remove dependency on OF
+    - use NSEC_PER_SEC from time.h
+    - fix MODULE_DEVICE_TABLE name
+    - make pwm_ops struct const
+    - indentation and cosmetics
+
+Beniamino Galvani (3):
+  pwm: add Rockchip SoC PWM support
+  pwm: rockchip: document device tree bindings
+  ARM: dts: rk3xxx: add PWM nodes
+
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |   17 ++
+ arch/arm/boot/dts/rk3188.dtsi                      |   40 +++++
+ arch/arm/boot/dts/rk3xxx.dtsi                      |   32 ++++
+ drivers/pwm/Kconfig                                |    7 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-rockchip.c                         |  177 ++++++++++++++++++++
+ 6 files changed, 274 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+ create mode 100644 drivers/pwm/pwm-rockchip.c
+
+-- 
+1.7.10.4
