@@ -1,10 +1,10 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Jun 2014 11:45:15 +0100
+Date: Sat, 21 Jun 2014 11:51:28 +0100
 Subject: [PATCH v3 3/6] iio: adc: fsl,imx25-gcq driver
 In-Reply-To: <1402910933-20534-3-git-send-email-denis@eukrea.com>
 References: <1402910933-20534-1-git-send-email-denis@eukrea.com>
  <1402910933-20534-3-git-send-email-denis@eukrea.com>
-Message-ID: <53A5623B.7090009@kernel.org>
+Message-ID: <53A563B0.60708@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,6 +23,12 @@ On 16/06/14 10:28, Denis Carikli wrote:
 >
 > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > Signed-off-by: Denis Carikli <denis@eukrea.com>
+Having been unobservant and hence commented on previous version, I've
+just quickly lifted the remaining points over from that review to here.
+
+One little bug, but otherwise just small suggestions.
+
+Jonathan
 > ---
 > Changelog v2->v3:
 > - Fixed compilation: I forgott to tell that this IIO patch was untested
@@ -221,6 +227,8 @@ On 16/06/14 10:28, Denis Carikli wrote:
 > +{
 > +	struct mx25_gcq_priv *priv = data;
 > +	u32 stats;
+Not that much in here, but perhaps still makes sense for this to be a threaded
+irq?
 > +
 > +	regmap_read(priv->regs, MX25_ADCQ_SR, &stats);
 > +
@@ -392,6 +400,7 @@ On 16/06/14 10:28, Denis Carikli wrote:
 > +	priv = iio_priv(indio_dev);
 > +
 > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+Check this succeeded?
 > +	mem = devm_ioremap_resource(dev, res);
 > +	if (!mem)
 > +		return -ENOMEM;
@@ -406,6 +415,8 @@ On 16/06/14 10:28, Denis Carikli wrote:
 > +
 > +	ret = mx25_gcq_setup_cfgs(pdev, priv);
 > +	if (ret)
+Why free an irq here that you haven't got yet?  Guessing this is left
+over from a different ordering of the code.
 > +		goto err_irq_free;
 > +
 > +	priv->clk = mx25_tsadc_get_ipg(pdev->dev.parent);
@@ -424,6 +435,8 @@ On 16/06/14 10:28, Denis Carikli wrote:
 > +
 > +	ret = request_irq(priv->irq, mx25_gcq_irq, 0, pdev->name,
 > +			priv);
+Any significant loss in making this a threaded irq? Just a general good
+practice question if it doesn't matter.
 > +	if (ret) {
 > +		dev_err(dev, "Failed requesting IRQ\n");
 > +		goto err_clk_unprepare;
