@@ -1,65 +1,131 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 21 Jun 2014 19:51:08 -0400
-Subject: [PATCH v3 1/7] genirq: generic chip: export
- irq_map_generic_chip function
-In-Reply-To: <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140621235108.GJ21711@titan.lakedaemon.net>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Sun, 22 Jun 2014 06:38:59 +0000
+Subject: [PATCH RFC 04/30] net: fec: fix interrupt handling races
+In-Reply-To: <E1Wxxfn-0005X5-KD@rmk-PC.arm.linux.org.uk>
+References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
+ <E1Wxxfn-0005X5-KD@rmk-PC.arm.linux.org.uk>
+Message-ID: <7c6bf164473641f0944dc77cd84375d8@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
-> Export the generic irq map function in order to provide irq_domain ops with
-> generic mapping and specific of xlate function (needed by the new atmel
-> AIC driver).
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  include/linux/irq.h       | 2 ++
->  kernel/irq/generic-chip.c | 5 +++--
->  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> index 0d998d8..62af592 100644
-> --- a/include/linux/irq.h
-> +++ b/include/linux/irq.h
-> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
->  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
->  
->  /* Setup functions for irq_chip_generic */
-> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> +			 irq_hw_number_t hw_irq);
->  struct irq_chip_generic *
->  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
->  		       void __iomem *reg_base, irq_flow_handler_t handler);
-> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-> index 452d6f2..cf80e7b 100644
-> --- a/kernel/irq/generic-chip.c
-> +++ b/kernel/irq/generic-chip.c
-> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
->  /*
->   * irq_map_generic_chip - Map a generic chip for an irq domain
->   */
-> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> -				irq_hw_number_t hw_irq)
-> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> +			 irq_hw_number_t hw_irq)
->  {
->  	struct irq_data *data = irq_get_irq_data(virq);
->  	struct irq_domain_chip_generic *dgc = d->gc;
-> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
->  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
->  
->  struct irq_domain_ops irq_generic_chip_ops = {
->  	.map	= irq_map_generic_chip,
+From: Russell King <rmk@arm.linux.org.uk> Data: Friday, June 20, 2014 8:12 PM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Duan Fugang-B38611; netdev at vger.kernel.org
+>Subject: [PATCH RFC 04/30] net: fec: fix interrupt handling races
+>
+>While running: while :; do iperf -c <HOST> -P 4; done, transmit timeouts
+>are regularly reported.  With the tx ring dumping in place, we can see
+>that all entries are in use, and the hardware has finished transmitting
+>these packets.  However, the driver has not reclaimed these ring entries.
+>
+>This can occur if the interrupt handler is invoked at the wrong moment -
+>eg:
+>
+>	CPU0				CPU1
+>	fec_enet_tx()
+>					interrupt, IEVENT = FEC_ENET_TXF
+>					FEC_ENET_TXF cleared
+>					napi_schedule_prep()
+>	napi_complete()
+>
+>The result is that we clear the transmit interrupt, but we don't trigger
+>any cleaning of the transmit ring.  Instead, use a different strategy:
+>
+>- When receiving a transmit or receive interrupt, disable both tx and rx
+>  interrupts, but do not acknowledge them.  Schedule a napi poll.  Don't
+>  loop.
+>
+>- When we are polled, read IEVENT, acknowledging the pending transmit
+>  and receive interrupts, before then going on to process the
+>  appropriate rings.
+>
+>This allows us to avoid the race, and has a number of other advantages:
+>- we cut down on the number of transmit interrupts we have to process.
+>- we only look at the rings which have pending events.
+>- we gain additional throughput: the iperf total bandwidth increases
+>  from about 180Mbps to 240Mbps:
+>
+>[  3]  0.0-10.0 sec  68.1 MBytes  57.0 Mbits/sec [  5]  0.0-10.0 sec  72.4
+>MBytes  60.5 Mbits/sec [  4]  0.0-10.1 sec  76.1 MBytes  63.5 Mbits/sec
+>[  6]  0.0-10.1 sec  71.9 MBytes  59.9 Mbits/sec
+>[SUM]  0.0-10.1 sec   288 MBytes   241 Mbits/sec
+>
+>Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>---
+> drivers/net/ethernet/freescale/fec_main.c | 40 +++++++++++++++++---------
+>-----
+> 1 file changed, 22 insertions(+), 18 deletions(-)
+>
+>diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>b/drivers/net/ethernet/freescale/fec_main.c
+>index 045ea71f2b59..4e695b742030 100644
+>--- a/drivers/net/ethernet/freescale/fec_main.c
+>+++ b/drivers/net/ethernet/freescale/fec_main.c
+>@@ -1369,29 +1369,25 @@ fec_enet_interrupt(int irq, void *dev_id)  {
+> 	struct net_device *ndev = dev_id;
+> 	struct fec_enet_private *fep = netdev_priv(ndev);
+>+	const unsigned napi_mask = FEC_ENET_RXF | FEC_ENET_TXF;
+> 	uint int_events;
+> 	irqreturn_t ret = IRQ_NONE;
+>
+>-	do {
+>-		int_events = readl(fep->hwp + FEC_IEVENT);
+>-		writel(int_events, fep->hwp + FEC_IEVENT);
+>+	int_events = readl(fep->hwp + FEC_IEVENT);
+>+	writel(int_events & ~napi_mask, fep->hwp + FEC_IEVENT);
+>
+>-		if (int_events & (FEC_ENET_RXF | FEC_ENET_TXF)) {
+>-			ret = IRQ_HANDLED;
+>+	if (int_events & napi_mask) {
+>+		ret = IRQ_HANDLED;
+>
+>-			/* Disable the RX interrupt */
+>-			if (napi_schedule_prep(&fep->napi)) {
+>-				writel(FEC_RX_DISABLED_IMASK,
+>-					fep->hwp + FEC_IMASK);
+>-				__napi_schedule(&fep->napi);
+>-			}
+>-		}
+>+		/* Disable the NAPI interrupts */
+>+		writel(FEC_ENET_MII, fep->hwp + FEC_IMASK);
+>+		napi_schedule(&fep->napi);
+>+	}
+>
+>-		if (int_events & FEC_ENET_MII) {
+>-			ret = IRQ_HANDLED;
+>-			complete(&fep->mdio_done);
+>-		}
+>-	} while (int_events);
+>+	if (int_events & FEC_ENET_MII) {
+>+		ret = IRQ_HANDLED;
+>+		complete(&fep->mdio_done);
+>+	}
+>
+> 	return ret;
+> }
+>@@ -1399,8 +1395,16 @@ fec_enet_interrupt(int irq, void *dev_id)  static
+>int fec_enet_rx_napi(struct napi_struct *napi, int budget)  {
+> 	struct net_device *ndev = napi->dev;
+>-	int pkts = fec_enet_rx(ndev, budget);
+> 	struct fec_enet_private *fep = netdev_priv(ndev);
+>+	int pkts;
+>+
+>+	/*
+>+	 * Clear any pending transmit or receive interrupts before
+>+	 * processing the rings to avoid racing with the hardware.
+>+	 */
+>+	writel(FEC_ENET_RXF | FEC_ENET_TXF, fep->hwp + FEC_IEVENT);
+>+
+>+	pkts = fec_enet_rx(ndev, budget);
+>
+> 	fec_enet_tx(ndev);
+>
+Can you add the interrupt check like below. If there have no tx interrupt, it is most likely no tx rings reclaim. 
+	Events = readl(fep->hwp + FEC_IEVENT);
+	If (events & FEC_ENET_RXF)
+		pkts = fec_enet_rx(ndev, budget);
+	if (events & FEC_ENET_TXF)
+		fec_enet_tx(ndev);
 
-Why can't you use irq_generic_chip_ops.map in your code and avoid this
-patch entirely?
-
-thx,
-
-Jason.
+Thanks,
+Andy
