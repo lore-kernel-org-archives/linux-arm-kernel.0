@@ -1,87 +1,40 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sun, 22 Jun 2014 20:41:24 +0200
-Subject: [PATCHv6 1/3] devicetree: Addition of the Altera SDRAM controller
-In-Reply-To: <CAF03EBeUdrqfjOPCf4XxaKL_ZSqAcrgSbpDfTKov9_5oG4-Btg@mail.gmail.com>
-References: <1403306523-4174-2-git-send-email-tthayer@altera.com>
- <20140621090446.GA8053@pengutronix.de>
- <CAF03EBeUdrqfjOPCf4XxaKL_ZSqAcrgSbpDfTKov9_5oG4-Btg@mail.gmail.com>
-Message-ID: <20140622184124.GC8053@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 Jun 2014 20:50:32 +0200
+Subject: [GIT PULL] Samsung fixes-1 for 3.16
+In-Reply-To: <53A69238.5070709@samsung.com>
+References: <53A69238.5070709@samsung.com>
+Message-ID: <6202115.rEhZ2ZRvNc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 01:31:02PM -0500, Thor Thayer wrote:
-> On Sat, Jun 21, 2014 at 4:04 AM, Steffen Trumtrar
-> <s.trumtrar@pengutronix.de> wrote:
-> > Hi!
-> >
-> > On Fri, Jun 20, 2014 at 06:22:01PM -0500, tthayer at altera.com wrote:
-> >> From: Thor Thayer <tthayer@altera.com>
-> >>
-> >> Addition of the Altera SDRAM Controller bindings and device tree changes.
-> >>
-> >> v2: Changes to SoC SDRAM EDAC code.
-> >>
-> >> v3: Implement code suggestions for SDRAM EDAC code.
-> >>
-> >> v4: Remove syscon from SDRAM controller bindings.
-> >>
-> >> v5: No Change, bump version for consistency.
-> >>
-> >> v6: Only map the ctrlcfg register as syscon.
-> >>
-> >> Signed-off-by: Thor Thayer <tthayer@altera.com>
-> >> ---
-> >>  .../bindings/arm/altera/socfpga-sdram.txt          |   11 +++++++++++
-> >>  arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
-> >>  2 files changed, 16 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >> new file mode 100644
-> >> index 0000000..5027026
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> >> @@ -0,0 +1,11 @@
-> >> +Altera SOCFPGA SDRAM Controller
-> >> +
-> >> +Required properties:
-> >> +- compatible : "altr,sdr-ctl";
-> >> +- reg : Should contain 1 register ranges(address and length)
-> >> +
-> >> +Example:
-> >> +     sdrctl at ffc25000 {
-> >> +             compatible = "altr,sdr-ctl";
-> >> +             reg = <0xffc25000 0x4>;
-> >> +     };
-> >> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> >> index 4676f25..310292e 100644
-> >> --- a/arch/arm/boot/dts/socfpga.dtsi
-> >> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> >> @@ -682,6 +682,11 @@
-> >>                       clocks = <&l4_sp_clk>;
-> >>               };
-> >>
-> >> +             sdrctl at ffc25000 {
-> >> +                     compatible = "altr,sdr-ctl", "syscon";
-> >
-> > Did you forget to add the syscon to the binding documentation?
-> >
-> Hi Steffen,
+On Sunday 22 June 2014 17:22:16 Kukjin Kim wrote:
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 > 
-> I guess I'm confused about when to use syscon. In my last series, I
-> was advised not to include syscon in the bindings but to use it in the
-> device tree. I had been including it in the binding document until
-> this patch.
+>    Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> 
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> tags/samsung-fixes-1
+> 
+> for you to fetch changes up to 7cbcb9d46f9194eb1f88c253a08c0292b2883acc:
+> 
+>    ARM: EXYNOS: Don't rely on firmware's secondary_cpu_start for mcpm 
+> (2014-06-21 19:30:53 +0900)
+> 
+> ----------------------------------------------------------------
+> Samsung fixes for 3.16
+> 
+> - use WFI macro in platform_do_lowpower because exynos cpuhotplug
+>    includes a hardcoded WFI instruction and it causes compile error
+>    in Thumb-2 mode.
+> - fix GIC reg sizes for exynos4 SoCs
+> - remove reset timer counter value during boot and resume for mct
+>    to fix a big jump in printk timestamps
+> - fix pm code to check cortex-A9 for another exynos SoCs
+> - don't rely on firmware's secondary_cpu_start for mcpm
 > 
 
-Oh, aha. Well, then I'm confused, too. Let's wait for one of the DT
-binding guys than.
+Pulled into fixes branch, thanks!
 
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
