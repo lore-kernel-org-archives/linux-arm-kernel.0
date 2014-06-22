@@ -1,32 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 Jun 2014 14:14:52 +0100
-Subject: [PATCH v3 1/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <1402404197-4236-2-git-send-email-clabbe.montjoie@gmail.com>
-References: <1402404197-4236-1-git-send-email-clabbe.montjoie@gmail.com>
- <1402404197-4236-2-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20140622131452.GF32514@n2100.arm.linux.org.uk>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 22 Jun 2014 17:17:08 +0400
+Subject: [PATCH 3/4] ARM: i.MX21 clk: Cleanup driver
+In-Reply-To: <1403443029-7014-1-git-send-email-shc_work@mail.ru>
+References: <1403443029-7014-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1403443029-7014-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 02:43:14PM +0200, LABBE Corentin wrote:
-> +int sunxi_aes_poll(struct ablkcipher_request *areq)
-> +{
-...
-> +	if (areq->src == NULL || areq->dst == NULL) {
-> +		dev_err(ss->dev, "ERROR: Some SGs are NULL %u\n", areq->nbytes);
-> +		return -1;
+This is a cleanup for i.MX21 clk driver. This change includes:
+- Reduce license text.
+- Remove unused definitions.
+- Remove unused #include and sort the rest.
+- Remove useless comment.
 
-You return -1 from here quite frequently.  Have you verified that there
-is no way for this return value to get to userspace?
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-imx21.c | 25 +------------------------
+ 1 file changed, 1 insertion(+), 24 deletions(-)
 
-Even if it can't get to userspace now, what if someone modifies the code
-so it can be returned?
-
-I detest crap that's written with "return -1" in it because it looks like
-there is no care with the established error handling semantics for the
-kernel (small negative numbers are errno codes.)
-
+diff --git a/arch/arm/mach-imx/clk-imx21.c b/arch/arm/mach-imx/clk-imx21.c
+index 3f914e4..9907135 100644
+--- a/arch/arm/mach-imx/clk-imx21.c
++++ b/arch/arm/mach-imx/clk-imx21.c
+@@ -7,23 +7,11 @@
+  * modify it under the terms of the GNU General Public License
+  * as published by the Free Software Foundation; either version 2
+  * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+  */
+ 
+ #include <linux/clk.h>
+-#include <linux/clkdev.h>
+ #include <linux/clk-provider.h>
+-#include <linux/io.h>
+-#include <linux/module.h>
+-#include <linux/err.h>
++#include <linux/clkdev.h>
+ 
+ #include "clk.h"
+ #include "common.h"
+@@ -34,18 +22,11 @@
+ /* Register offsets */
+ #define CCM_CSCR		IO_ADDR_CCM(0x0)
+ #define CCM_MPCTL0		IO_ADDR_CCM(0x4)
+-#define CCM_MPCTL1		IO_ADDR_CCM(0x8)
+ #define CCM_SPCTL0		IO_ADDR_CCM(0xc)
+-#define CCM_SPCTL1		IO_ADDR_CCM(0x10)
+-#define CCM_OSC26MCTL		IO_ADDR_CCM(0x14)
+ #define CCM_PCDR0		IO_ADDR_CCM(0x18)
+ #define CCM_PCDR1		IO_ADDR_CCM(0x1c)
+ #define CCM_PCCR0		IO_ADDR_CCM(0x20)
+ #define CCM_PCCR1		IO_ADDR_CCM(0x24)
+-#define CCM_CCSR		IO_ADDR_CCM(0x28)
+-#define CCM_PMCTL		IO_ADDR_CCM(0x2c)
+-#define CCM_PMCOUNT		IO_ADDR_CCM(0x30)
+-#define CCM_WKGDCTL		IO_ADDR_CCM(0x34)
+ 
+ static const char *mpll_osc_sel_clks[] = { "ckih_gate", "ckih_div1p5", };
+ static const char *mpll_sel_clks[] = { "fpm_gate", "mpll_osc_sel", };
+@@ -68,10 +49,6 @@ enum imx21_clks {
+ 
+ static struct clk *clk[clk_max];
+ 
+-/*
+- * must be called very early to get information about the
+- * available clock rate when the timer framework starts
+- */
+ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
+ {
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.5.5
