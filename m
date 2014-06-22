@@ -1,44 +1,66 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sun, 22 Jun 2014 17:31:45 +0200
-Subject: [PATCH 5/5] regulator: act8865: add act8846 to DT binding
- documentation
-In-Reply-To: <1403451105-31929-1-git-send-email-b.galvani@gmail.com>
-References: <1403451105-31929-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1403451105-31929-6-git-send-email-b.galvani@gmail.com>
+From: tushar.b@samsung.com (Tushar Behera)
+Date: Sun, 22 Jun 2014 21:23:37 +0530
+Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
+ Exynos5420
+In-Reply-To: <539ED472.5020102@gmail.com>
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
+ <CABxcv=kX07pNCd-YPYp6J8S5hHzG1rsoer1YRfdPE0g-xFqZnQ@mail.gmail.com>
+ <539ED472.5020102@gmail.com>
+Message-ID: <CAC5m3Byht1TRGu28Y-_mRY8iZT+=rrzpQS1jx5rxQaJ7XLKxTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new "active-semi,act8846" compatible string and a
-list of supported regulator names to the devicetree binding
-documentation for Active-Semi PMUs.
+On Mon, Jun 16, 2014 at 4:56 PM, Tushar Behera <trblinux@gmail.com> wrote:
+> On 06/11/2014 09:28 PM, Javier Martinez Canillas wrote:
+>> On Wed, Jun 11, 2014 at 7:32 AM, Tushar Behera <tushar.b@samsung.com> wrote:
+>>> Currently CLK_FOUT_EPLL was set as one of the parents of AUDSS mux.
+>>> As per the user manual, it should be CLK_MAU_EPLL.
+>>>
+>>> The problem surfaced when the bootloader in Peach-pit board set
+>>> the EPLL clock as the parent of AUDSS mux. While booting the kernel,
+>>> we used to get a system hang during late boot if CLK_MAU_EPLL was
+>>> disabled.
+>>>
+>>> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+>>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>>> Reported-by: Kevin Hilman <khilman@linaro.org>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5420.dtsi |    2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+>>> index e385322..79e9119 100644
+>>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>>> @@ -167,7 +167,7 @@
+>>>                 compatible = "samsung,exynos5420-audss-clock";
+>>>                 reg = <0x03810000 0x0C>;
+>>>                 #clock-cells = <1>;
+>>> -               clocks = <&clock CLK_FIN_PLL>, <&clock CLK_FOUT_EPLL>,
+>>> +               clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MAU_EPLL>,
+>>>                          <&clock CLK_SCLK_MAUDIO0>, <&clock CLK_SCLK_MAUPCM0>;
+>>>                 clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
+>>>         };
+>>> --
+>>> 1.7.9.5
+>>>
+>>> --
+>>
+>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>
+>
+> Kukjin,
+>
+> Would you please take this patch as a fix for 3.16?
+>
+> --
+> Tushar Behera
 
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
----
- .../devicetree/bindings/regulator/act8865-regulator.txt         |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Kukjin,
 
-diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-index bef1fbb..865614b 100644
---- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-@@ -1,13 +1,16 @@
--ACT8865 regulator
-+ACT88xx regulators
- -------------------
- 
- Required properties:
--- compatible: "active-semi,act8865"
-+- compatible: "active-semi,act8846" or "active-semi,act8865"
- - reg: I2C slave address
- 
- Any standard regulator properties can be used to configure the single regulator.
- 
- The valid names for regulators are:
-+	- for act8846:
-+	REG1, REG2, REG3, REG4, REG5, REG6, REG7, REG8, REG9, REG10, REG11, REG12
-+	- for act8865:
- 	DCDC_REG1, DCDC_REG2, DCDC_REG3, LDO_REG1, LDO_REG2, LDO_REG3, LDO_REG4.
- 
- Example:
--- 
-1.7.10.4
+Please pick this patch for 3.16. This is an essential fix required for
+Peach-pit/Peach-pi board.
+
+--
+Tushar Behera
