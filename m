@@ -1,156 +1,148 @@
-From: himangi774@gmail.com (Himangi Saraogi)
-Date: Sun, 22 Jun 2014 12:47:51 +0530
-Subject: [PATCH] usb: gadget: pxa25x_udc: use devm_ functions
-Message-ID: <20140622071751.GA5904@himangi-Dell>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Sun, 22 Jun 2014 07:49:11 +0000
+Subject: [PATCH RFC 24/30] net: fec: better implementation of iMX6
+ ERR006358 quirk
+In-Reply-To: <E1WxxhR-0005YP-Q1@rmk-PC.arm.linux.org.uk>
+References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
+ <E1WxxhR-0005YP-Q1@rmk-PC.arm.linux.org.uk>
+Message-ID: <316b383d2512440db51ea7c55992920d@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the use of devm_request_irq, devm_gpio_request,
-devm_clk_get etc. instead of the corresponding unmanaged interfaces. The
-calls to the functions like free_irq to free the allocated resources are
-removed as they are no longer required. Some labels in the probe function
-are also done away with and the name of the label err_gpio_pullup is
-changed to make it less specific to the context.
+From: Russell King <rmk@arm.linux.org.uk> Data: Friday, June 20, 2014 8:14 PM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Duan Fugang-B38611; netdev at vger.kernel.org
+>Subject: [PATCH RFC 24/30] net: fec: better implementation of iMX6
+>ERR006358 quirk
+>
+>Using a (delayed) workqueue for ERR006358 is not correct - a work queue is
+>a single-trigger device.  Once the work queue has been scheduled, it can't
+>be re-scheduled until it has been run.  This can cause problems - with an
+>appropriate packet timing, we can end up with packets queued, but not sent
+>by the hardware, resulting in the transmit timeout firing.
+>
+>Re-implement this as per the workaround detailed in the ERR006358
+>documentation - if there are packets waiting to be sent when we service
+>the transmit ring, and we see that the transmitter is not running, kick
+>the transmitter to run the pending entries in the ring.
+>
+>Testing here with a 10Mbit half duplex link sees the resulting iperf TCP
+>bandwidth increase from between 1 to 2Mbps to between 8 to 9Mbps.
+>
+>Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>---
+> drivers/net/ethernet/freescale/fec.h      |  1 -
+> drivers/net/ethernet/freescale/fec_main.c | 31 +++++---------------------
+>-----
+> 2 files changed, 5 insertions(+), 27 deletions(-)
+>
+>diff --git a/drivers/net/ethernet/freescale/fec.h
+>b/drivers/net/ethernet/freescale/fec.h
+>index 96d2a18f1b99..17e294970207 100644
+>--- a/drivers/net/ethernet/freescale/fec.h
+>+++ b/drivers/net/ethernet/freescale/fec.h
+>@@ -259,7 +259,6 @@ struct bufdesc_ex {
+> struct fec_enet_delayed_work {
+> 	struct delayed_work delay_work;
+> 	bool timeout;
+>-	bool trig_tx;
+> };
+>
+> /* The FEC buffer descriptors track the ring buffers.  The rx_bd_base and
+>diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>b/drivers/net/ethernet/freescale/fec_main.c
+>index 62120e47ef5a..957bb98add5a 100644
+>--- a/drivers/net/ethernet/freescale/fec_main.c
+>+++ b/drivers/net/ethernet/freescale/fec_main.c
+>@@ -342,22 +342,6 @@ fec_enet_clear_csum(struct sk_buff *skb, struct
+>net_device *ndev)
+> 	return 0;
+> }
+>
+>-static void
+>-fec_enet_submit_work(struct bufdesc *bdp, struct fec_enet_private *fep) -
+>{
+>-	const struct platform_device_id *id_entry =
+>-				platform_get_device_id(fep->pdev);
+>-	struct bufdesc *bdp_pre;
+>-
+>-	bdp_pre = fec_enet_get_prevdesc(bdp, fep);
+>-	if ((id_entry->driver_data & FEC_QUIRK_ERR006358) &&
+>-	    !(bdp_pre->cbd_sc & BD_ENET_TX_READY)) {
+>-		fep->delay_work.trig_tx = true;
+>-		schedule_delayed_work(&(fep->delay_work.delay_work),
+>-					msecs_to_jiffies(1));
+>-	}
+>-}
+>-
+> static int
+> fec_enet_txq_submit_frag_skb(struct sk_buff *skb, struct net_device *ndev)
+>{ @@ -545,8 +529,6 @@ static int fec_enet_txq_submit_skb(struct sk_buff
+>*skb, struct net_device *ndev)
+> 	status |= (BD_ENET_TX_READY | BD_ENET_TX_TC);
+> 	bdp->cbd_sc = status;
+>
+>-	fec_enet_submit_work(bdp, fep);
+>-
+> 	/* If this was the last BD in the ring, start at the beginning again.
+>*/
+> 	bdp = fec_enet_get_nextdesc(last_bdp, fep);
+>
+>@@ -735,8 +717,6 @@ static int fec_enet_txq_submit_tso(struct sk_buff *skb,
+>struct net_device *ndev)
+> 	/* Save skb pointer */
+> 	fep->tx_skbuff[index] = skb;
+>
+>-	fec_enet_submit_work(bdp, fep);
+>-
+> 	skb_tx_timestamp(skb);
+> 	fep->cur_tx = bdp;
+>
+>@@ -1065,11 +1045,6 @@ static void fec_enet_work(struct work_struct *work)
+> 		}
+> 		rtnl_unlock();
+> 	}
+>-
+>-	if (fep->delay_work.trig_tx) {
+>-		fep->delay_work.trig_tx = false;
+>-		writel(0, fep->hwp + FEC_X_DES_ACTIVE);
+>-	}
+> }
+>
+> static void
+>@@ -1166,7 +1141,11 @@ fec_enet_tx(struct net_device *ndev)
+> 				netif_wake_queue(ndev);
+> 		}
+> 	}
+>-	return;
+>+
+>+	/* ERR006538: Keep the transmitter going */
+>+	if (fep->dirty_tx != fep->cur_tx &&
+>+	    readl(fep->hwp + FEC_X_DES_ACTIVE) == 0)
+>+		writel(0, fep->hwp + FEC_X_DES_ACTIVE);
+> }
+>
+If fep->dirty_tx == fep->cur_tx, which means tx bd entry is empty, it doesn't need to trigger TDAR.
+The issue is the last tx frame cannot be trasmited by uDMA since uDMA had cleared the TDAR after user write TDAR.
+User					uDMA
+					Process the previous frame, detect the next BD ready bit,
+					The next BD ready bit is not set
+Set the next BD ready bit
+Set TDAR
+					Since the next BD ready bit detected as not set, start to clear TDAR.
 
-Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
-Acked-by: Julia Lawall <julia.lawall@lip6.fr>
----
- drivers/usb/gadget/pxa25x_udc.c | 73 +++++++++++++----------------------------
- 1 file changed, 22 insertions(+), 51 deletions(-)
+=> So, the next frame cannot be tramsmit until the next next frame is filled by user.
 
-diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
-index 9984437..f1a5cdc 100644
---- a/drivers/usb/gadget/pxa25x_udc.c
-+++ b/drivers/usb/gadget/pxa25x_udc.c
-@@ -2105,11 +2105,9 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
- 	if (irq < 0)
- 		return -ENODEV;
- 
--	dev->clk = clk_get(&pdev->dev, NULL);
--	if (IS_ERR(dev->clk)) {
--		retval = PTR_ERR(dev->clk);
--		goto err_clk;
--	}
-+	dev->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(dev->clk))
-+		return PTR_ERR(dev->clk);
- 
- 	pr_debug("%s: IRQ %d%s%s\n", driver_name, irq,
- 		dev->has_cfr ? "" : " (!cfr)",
-@@ -2120,15 +2118,16 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
- 	dev->dev = &pdev->dev;
- 	dev->mach = dev_get_platdata(&pdev->dev);
- 
--	dev->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
-+	dev->transceiver = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
- 
- 	if (gpio_is_valid(dev->mach->gpio_pullup)) {
--		if ((retval = gpio_request(dev->mach->gpio_pullup,
--				"pca25x_udc GPIO PULLUP"))) {
-+		retval = devm_gpio_request(&pdev->dev, dev->mach->gpio_pullup,
-+					   "pca25x_udc GPIO PULLUP");
-+		if (retval) {
- 			dev_dbg(&pdev->dev,
- 				"can't get pullup gpio %d, err: %d\n",
- 				dev->mach->gpio_pullup, retval);
--			goto err_gpio_pullup;
-+			goto err;
- 		}
- 		gpio_direction_output(dev->mach->gpio_pullup, 0);
- 	}
-@@ -2146,30 +2145,32 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
- 	dev->vbus = 0;
- 
- 	/* irq setup after old hardware state is cleaned up */
--	retval = request_irq(irq, pxa25x_udc_irq,
--			0, driver_name, dev);
-+	retval = devm_request_irq(&pdev->dev, irq, pxa25x_udc_irq, 0,
-+				  driver_name, dev);
- 	if (retval != 0) {
- 		pr_err("%s: can't get irq %d, err %d\n",
- 			driver_name, irq, retval);
--		goto err_irq1;
-+		goto err;
- 	}
- 	dev->got_irq = 1;
- 
- #ifdef CONFIG_ARCH_LUBBOCK
- 	if (machine_is_lubbock()) {
--		retval = request_irq(LUBBOCK_USB_DISC_IRQ, lubbock_vbus_irq,
--				     0, driver_name, dev);
-+		retval = devm_request_irq(&pdev->dev, LUBBOCK_USB_DISC_IRQ,
-+					  lubbock_vbus_irq, 0, driver_name,
-+					  dev);
- 		if (retval != 0) {
- 			pr_err("%s: can't get irq %i, err %d\n",
- 				driver_name, LUBBOCK_USB_DISC_IRQ, retval);
--			goto err_irq_lub;
-+			goto err;
- 		}
--		retval = request_irq(LUBBOCK_USB_IRQ, lubbock_vbus_irq,
--				     0, driver_name, dev);
-+		retval = devm_request_irq(&pdev->dev, LUBBOCK_USB_IRQ,
-+					  lubbock_vbus_irq, 0, driver_name,
-+					  dev);
- 		if (retval != 0) {
- 			pr_err("%s: can't get irq %i, err %d\n",
- 				driver_name, LUBBOCK_USB_IRQ, retval);
--			goto lubbock_fail0;
-+			goto err;
- 		}
- 	} else
- #endif
-@@ -2180,22 +2181,9 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
- 		return retval;
- 
- 	remove_debug_files(dev);
--#ifdef	CONFIG_ARCH_LUBBOCK
--lubbock_fail0:
--	free_irq(LUBBOCK_USB_DISC_IRQ, dev);
-- err_irq_lub:
--	free_irq(irq, dev);
--#endif
-- err_irq1:
--	if (gpio_is_valid(dev->mach->gpio_pullup))
--		gpio_free(dev->mach->gpio_pullup);
-- err_gpio_pullup:
--	if (!IS_ERR_OR_NULL(dev->transceiver)) {
--		usb_put_phy(dev->transceiver);
-+ err:
-+	if (!IS_ERR_OR_NULL(dev->transceiver))
- 		dev->transceiver = NULL;
--	}
--	clk_put(dev->clk);
-- err_clk:
- 	return retval;
- }
- 
-@@ -2217,25 +2205,8 @@ static int pxa25x_udc_remove(struct platform_device *pdev)
- 
- 	remove_debug_files(dev);
- 
--	if (dev->got_irq) {
--		free_irq(platform_get_irq(pdev, 0), dev);
--		dev->got_irq = 0;
--	}
--#ifdef CONFIG_ARCH_LUBBOCK
--	if (machine_is_lubbock()) {
--		free_irq(LUBBOCK_USB_DISC_IRQ, dev);
--		free_irq(LUBBOCK_USB_IRQ, dev);
--	}
--#endif
--	if (gpio_is_valid(dev->mach->gpio_pullup))
--		gpio_free(dev->mach->gpio_pullup);
--
--	clk_put(dev->clk);
--
--	if (!IS_ERR_OR_NULL(dev->transceiver)) {
--		usb_put_phy(dev->transceiver);
-+	if (!IS_ERR_OR_NULL(dev->transceiver))
- 		dev->transceiver = NULL;
--	}
- 
- 	the_controller = NULL;
- 	return 0;
--- 
-1.9.1
+The issue has happened customer product, and was fixed by previous workaround.
+The issue only happened at little packets transmission. Special for command communicate protocol to the other end.
+
+If you move the extra trigger to tx clean function, you must check:
+bdp_pre = fec_enet_get_prevdesc(fep->cur_tx, fep);
+bdp_next = fec_enet_get_nextdesc(fep->dirty_tx, fep); 
+if (bdp_next == bdp_pre &&
+	bdp_pre->cbd_sc & BD_ENET_TX_READY &&
+	readl(fep->hwp + FEC_X_DES_ACTIVE) == 0) 
+	writel(0, fep->hwp + FEC_X_DES_ACTIVE);
+
+Thanks,
+Andy
