@@ -1,120 +1,71 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 22 Jun 2014 18:15:19 +0800
-Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
- suspend/resume
-Message-ID: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
+From: manuel.schoelling@gmx.de (=?UTF-8?q?Manuel=20Sch=C3=B6lling?=)
+Date: Sun, 22 Jun 2014 12:21:01 +0200
+Subject: [PATCH] xilinx: Fix compiler warning
+Message-ID: <1403432461-18296-1-git-send-email-manuel.schoelling@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CP15 diagnostic register holds ARM errata bits on Cortex-A9, so it
-needs to be saved/restored on suspend/resume.  Otherwise, the
-effectiveness of errata workaround gets lost together with diagnostic
-register bit across suspend/resume cycle.
+The time comparsion functions require arguments of type unsigned long
+instead of (signed) long.
 
-The patch adds a couple of Cortex-A9 specific suspend and resume
-functions to handle the diagnostic register across suspend/resume cycle.
-
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Manuel Sch?lling <manuel.schoelling@gmx.de>
 ---
-Changes since v1:
- - Add Cortex-A9 specific processor function for suspend and resume
-   to handle diagnostic register across suspend/resume cycle
+ drivers/net/ethernet/xilinx/ll_temac_main.c       |    2 +-
+ drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c |    2 +-
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c     |    2 +-
+ init/do_mounts.c                                  |    1 -
+ 4 files changed, 3 insertions(+), 4 deletions(-)
 
- arch/arm/include/asm/glue-proc.h | 18 +++++++++---------
- arch/arm/mm/proc-v7.S            | 31 ++++++++++++++++++++++++++++++-
- 2 files changed, 39 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
-index 74a8b84f3cb1..74be7c22035a 100644
---- a/arch/arm/include/asm/glue-proc.h
-+++ b/arch/arm/include/asm/glue-proc.h
-@@ -221,15 +221,6 @@
- # endif
- #endif
+diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+index 4ef818a..8a6e5c2 100644
+--- a/drivers/net/ethernet/xilinx/ll_temac_main.c
++++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+@@ -72,7 +72,7 @@ void temac_iow(struct temac_local *lp, int offset, u32 value)
  
--#ifdef CONFIG_CPU_V7
--# ifdef CPU_NAME
--#  undef  MULTI_CPU
--#  define MULTI_CPU
--# else
--#  define CPU_NAME cpu_v7
--# endif
--#endif
--
- #ifdef CONFIG_CPU_V7M
- # ifdef CPU_NAME
- #  undef  MULTI_CPU
-@@ -248,6 +239,15 @@
- # endif
- #endif
+ int temac_indirect_busywait(struct temac_local *lp)
+ {
+-	long end = jiffies + 2;
++	unsigned long end = jiffies + 2;
  
-+#ifdef CONFIG_CPU_V7
-+/*
-+ * Cortex-A9 needs a different suspend/resume function, so we need
-+ * multiple CPU support for ARMv7 anyway.
-+ */
-+#  undef  MULTI_CPU
-+#  define MULTI_CPU
-+#endif
-+
- #ifndef MULTI_CPU
- #define cpu_proc_init			__glue(CPU_NAME,_proc_init)
- #define cpu_proc_fin			__glue(CPU_NAME,_proc_fin)
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3db2c2f04a30..e26bfaa419ee 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -152,6 +152,34 @@ ENTRY(cpu_v7_do_resume)
- ENDPROC(cpu_v7_do_resume)
- #endif
+ 	while (!(temac_ior(lp, XTE_RDY0_OFFSET) & XTE_RDY0_HARD_ACS_RDY_MASK)) {
+ 		if (time_before_eq(end, jiffies)) {
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+index d4abf47..3b67d60 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+@@ -19,7 +19,7 @@
+ /* Wait till MDIO interface is ready to accept a new transaction.*/
+ int axienet_mdio_wait_until_ready(struct axienet_local *lp)
+ {
+-	long end = jiffies + 2;
++	unsigned long end = jiffies + 2;
+ 	while (!(axienet_ior(lp, XAE_MDIO_MCR_OFFSET) &
+ 		 XAE_MDIO_MCR_READY_MASK)) {
+ 		if (time_before_eq(end, jiffies)) {
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 8c4aed3..782bb93 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -695,7 +695,7 @@ static irqreturn_t xemaclite_interrupt(int irq, void *dev_id)
  
-+/*
-+ * Cortex-A9 processor functions
-+ */
-+	globl_equ	cpu_ca9mp_proc_init,	cpu_v7_proc_init
-+	globl_equ	cpu_ca9mp_proc_fin,	cpu_v7_proc_fin
-+	globl_equ	cpu_ca9mp_reset,	cpu_v7_reset
-+	globl_equ	cpu_ca9mp_do_idle,	cpu_v7_do_idle
-+	globl_equ	cpu_ca9mp_dcache_clean_area, cpu_v7_dcache_clean_area
-+	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_switch_mm
-+	globl_equ	cpu_ca9mp_set_pte_ext,	cpu_v7_set_pte_ext
-+.globl	cpu_ca9mp_suspend_size
-+.equ	cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 1 * 4
-+#ifdef CONFIG_ARM_CPU_SUSPEND
-+ENTRY(cpu_ca9mp_do_suspend)
-+	stmfd	sp!, {r4}
-+	mrc	p15, 0, r4, c15, c0, 1  @ Diagnostic register
-+	stmia	r0!, {r4}
-+	ldmfd	sp!, {r4}
-+	b	cpu_v7_do_suspend
-+ENDPROC(cpu_ca9mp_do_suspend)
-+
-+ENTRY(cpu_ca9mp_do_resume)
-+	ldmia	r0!, {r4}
-+	mcr	p15, 0, r4, c15, c0, 1  @ Diagnostic register
-+	b	cpu_v7_do_resume
-+ENDPROC(cpu_ca9mp_do_resume)
-+#endif
-+
- #ifdef CONFIG_CPU_PJ4B
- 	globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
- 	globl_equ	cpu_pj4b_set_pte_ext,	cpu_v7_set_pte_ext
-@@ -418,6 +446,7 @@ __v7_setup_stack:
+ static int xemaclite_mdio_wait(struct net_local *lp)
+ {
+-	long end = jiffies + 2;
++	unsigned long end = jiffies + 2;
  
- 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
- 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-+	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
- #ifdef CONFIG_CPU_PJ4B
- 	define_processor_functions pj4b, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
- #endif
-@@ -470,7 +499,7 @@ __v7_ca5mp_proc_info:
- __v7_ca9mp_proc_info:
- 	.long	0x410fc090
- 	.long	0xff0ffff0
--	__v7_proc __v7_ca9mp_setup
-+	__v7_proc __v7_ca9mp_setup, proc_fns = ca9mp_processor_functions
- 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+ 	/* wait for the MDIO interface to not be busy or timeout
+ 	   after some time.
+diff --git a/init/do_mounts.c b/init/do_mounts.c
+index 60c4196..2d069a3 100644
+--- a/init/do_mounts.c
++++ b/init/do_mounts.c
+@@ -351,7 +351,6 @@ static void __init get_fs_names(char *page)
+ 				continue;
+ 			line++;
  
- #endif	/* CONFIG_ARM_LPAE */
+-			/* append fsname */
+ 			memmove(fsnames, line, strlen(line)+1);
+ 			fsnames += strlen(fsnames)+1;
+ 		} while (page != NULL);
 -- 
-1.8.3.2
+1.7.10.4
