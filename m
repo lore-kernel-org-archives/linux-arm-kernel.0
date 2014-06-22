@@ -1,45 +1,40 @@
-From: manuel.schoelling@gmx.de (Manuel Schoelling)
-Date: Sun, 22 Jun 2014 13:23:34 +0200
-Subject: [PATCH] xilinx: Fix compiler warning
-In-Reply-To: <53A6BAC5.80206@cogentembedded.com>
-References: <1403432461-18296-1-git-send-email-manuel.schoelling@gmx.de>
- <53A6BAC5.80206@cogentembedded.com>
-Message-ID: <1403436214.26292.4.camel@schoellingm.dzne.de>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Sun, 22 Jun 2014 12:25:02 +0100
+Subject: [RFC PATCH 2/6] arm/arm64: KVM: Rename =?UTF-8?Q?irq=5Factive?=
+ =?UTF-8?Q?=20to=20irq=5Fqueued?=
+In-Reply-To: <1402779067-34478-3-git-send-email-christoffer.dall@linaro.org>
+References: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
+ <1402779067-34478-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <40b2b2cd240d39950a3aa98c53c36fad@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On So, 2014-06-22 at 15:15 +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 06/22/2014 02:21 PM, Manuel Sch?lling wrote:
-> 
-> > The time comparsion functions require arguments of type unsigned long
-> > instead of (signed) long.
-> 
-> > Signed-off-by: Manuel Sch?lling <manuel.schoelling@gmx.de>
-> 
-> [...]
-> 
-> > diff --git a/init/do_mounts.c b/init/do_mounts.c
-> > index 60c4196..2d069a3 100644
-> > --- a/init/do_mounts.c
-> > +++ b/init/do_mounts.c
-> > @@ -351,7 +351,6 @@ static void __init get_fs_names(char *page)
-> >   				continue;
-> >   			line++;
-> >
-> > -			/* append fsname */
-> >   			memmove(fsnames, line, strlen(line)+1);
-> >   			fsnames += strlen(fsnames)+1;
-> >   		} while (page != NULL);
-> >
-> 
->    Seems like unrelated random change.
-Thanks, you are right: somehow this change made it into my patch.
-Probably I was not careful enough when using 'git commit -a'.
+On 2014-06-14 21:51, Christoffer Dall wrote:
+> We have a special bitmap on the distributor struct to keep track of 
+> when
+> level-triggered interrupts are queued on the list registers.  This 
+> was
+> named irq_active, which is confusing, because the active state of an
+> interrupt as per the GIC spec is a different thing, not specifically
+> related to edge-triggered/level-triggered configurations but rather
+> indicates an interrupt which has been ack'ed but not yet eoi'ed.
+>
+> Rename the bitmap and the corresponding accessor functions to 
+> irq_queued
+> to clarify what this is actually used for.
 
-Sorry, I will resend a fixed patch in a second.
+While I agree that irq_active is confusing, I would tend to object to 
+irq_queued for similar reasons. Edge interrupts get queued as well.
 
-> 
-> WBR, Sergei
-> 
+What this bit does is to allow or forbid resampling of a level 
+interrupt.
+
+How about irq_resample instead? That would mandate a small refactor of 
+the code (a bit set to one would allow resampling, which is the opposite 
+of the current logic), but would look better, I believe.
+
+What do you think?
+
+         M.
+-- 
+Who you jivin' with that Cosmik Debris?
