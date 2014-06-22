@@ -1,141 +1,156 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Sun, 22 Jun 2014 06:54:28 +0000
-Subject: [PATCH RFC 18/30] net: fec: remove inappropriate calls around
- fec_restart()
-In-Reply-To: <E1Wxxgx-0005Y0-50@rmk-PC.arm.linux.org.uk>
-References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
- <E1Wxxgx-0005Y0-50@rmk-PC.arm.linux.org.uk>
-Message-ID: <869ac1ad635844ee84adbecd2eb0d0dc@BLUPR03MB373.namprd03.prod.outlook.com>
+From: himangi774@gmail.com (Himangi Saraogi)
+Date: Sun, 22 Jun 2014 12:47:51 +0530
+Subject: [PATCH] usb: gadget: pxa25x_udc: use devm_ functions
+Message-ID: <20140622071751.GA5904@himangi-Dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk@arm.linux.org.uk> Data: Friday, June 20, 2014 8:13 PM
->To: linux-arm-kernel at lists.infradead.org
->Cc: Duan Fugang-B38611; netdev at vger.kernel.org
->Subject: [PATCH RFC 18/30] net: fec: remove inappropriate calls around
->fec_restart()
->
->This is the second stage to "move calls to quiesce/resume packet
->processing out of fec_restart()", where we remove calls which are not
->appropriate to the call site.
->
->In the majority of cases, there is no need to detach and reattach the
->interface as we are holding the queue xmit lock across the reset.  The
->exception to that is in fec_resume(), where we are already detached by the
->suspend function.  Here, we can remove the call to detach the interface.
->
->We also do not need to stop the transmit queue.  Holding the xmit lock is
->enough to ensure that the transmit packet processing is not running while
->we perform our task.  However, since fec_restart() always cleans the rings,
->we call netif_wake_queue() (or netif_device_attach() in the case of resume)
->just before dropping the xmit lock.  This prevents the watchdog firing.
->
->Lastly, always call napi_enable() after the device has been reattached in
->the resume path so that we know that the transmit packet processing is
->already in an enabled state, so we don't call netif_wake_queue() while
->detached.
->
->Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->---
-> drivers/net/ethernet/freescale/fec_main.c | 26 ++++++--------------------
-> 1 file changed, 6 insertions(+), 20 deletions(-)
->
->diff --git a/drivers/net/ethernet/freescale/fec_main.c
->b/drivers/net/ethernet/freescale/fec_main.c
->index 4a295b4bfb94..49c154af6da2 100644
->--- a/drivers/net/ethernet/freescale/fec_main.c
->+++ b/drivers/net/ethernet/freescale/fec_main.c
->@@ -1058,15 +1058,12 @@ static void fec_enet_work(struct work_struct *work)
-> 		fep->delay_work.timeout = false;
-> 		rtnl_lock();
-> 		if (netif_device_present(ndev) || netif_running(ndev)) {
->-			netif_device_detach(ndev);
-> 			napi_disable(&fep->napi);
->-			netif_tx_disable(ndev);
-> 			netif_tx_lock_bh(ndev);
-> 			fec_restart(ndev, fep->full_duplex);
->-			netif_tx_unlock_bh(ndev);
-> 			netif_wake_queue(ndev);
->+			netif_tx_unlock_bh(ndev);
-> 			napi_enable(&fep->napi);
->-			netif_device_attach(ndev);
-> 		}
-> 		rtnl_unlock();
-> 	}
->@@ -1524,15 +1521,12 @@ static void fec_enet_adjust_link(struct net_device
->*ndev)
->
-> 		/* if any of the above changed restart the FEC */
-> 		if (status_change) {
->-			netif_device_detach(ndev);
-> 			napi_disable(&fep->napi);
->-			netif_tx_disable(ndev);
-> 			netif_tx_lock_bh(ndev);
-> 			fec_restart(ndev, phy_dev->duplex);
->-			netif_tx_unlock_bh(ndev);
-> 			netif_wake_queue(ndev);
->+			netif_tx_unlock_bh(ndev);
-> 			napi_enable(&fep->napi);
->-			netif_device_attach(ndev);
-> 		}
-> 	} else {
-> 		if (fep->link) {
->@@ -1919,15 +1913,12 @@ static int fec_enet_set_pauseparam(struct
->net_device *ndev,
-> 		phy_start_aneg(fep->phy_dev);
-> 	}
-> 	if (netif_running(ndev)) {
->-		netif_device_detach(ndev);
-> 		napi_disable(&fep->napi);
->-		netif_tx_disable(ndev);
-> 		netif_tx_lock_bh(ndev);
-> 		fec_restart(ndev, fep->full_duplex);
->-		netif_tx_unlock_bh(ndev);
-> 		netif_wake_queue(ndev);
->+		netif_tx_unlock_bh(ndev);
-> 		napi_enable(&fep->napi);
->-		netif_device_attach(ndev);
-> 	}
->
-> 	return 0;
->@@ -2372,15 +2363,12 @@ static int fec_set_features(struct net_device
->*netdev,
->
-> 		if (netif_running(netdev)) {
-> 			fec_stop(netdev);
->-			netif_device_detach(netdev);
-> 			napi_disable(&fep->napi);
->-			netif_tx_disable(netdev);
-> 			netif_tx_lock_bh(netdev);
-> 			fec_restart(netdev, fep->phy_dev->duplex);
->-			netif_tx_unlock_bh(netdev);
-> 			netif_wake_queue(netdev);
->+			netif_tx_unlock_bh(netdev);
-> 			napi_enable(&fep->napi);
->-			netif_device_attach(netdev);
-> 		}
-> 	}
->
->@@ -2748,15 +2736,13 @@ fec_resume(struct device *dev)
->
-> 	rtnl_lock();
-> 	if (netif_running(ndev)) {
->-		netif_device_detach(ndev);
-> 		napi_disable(&fep->napi);
->-		netif_tx_disable(ndev);
-> 		netif_tx_lock_bh(ndev);
-> 		fec_restart(ndev, fep->full_duplex);
->+		netif_device_attach(ndev);
-> 		netif_tx_unlock_bh(ndev);
->-		netif_wake_queue(ndev);
->-		napi_enable(&fep->napi);
-> 		netif_device_attach(ndev);
->+		napi_enable(&fep->napi);
-> 		phy_start(fep->phy_dev);
-> 	}
-> 	rtnl_unlock();
->--
-Patch #17 anc #18 can merge to one patch.
+This patch introduces the use of devm_request_irq, devm_gpio_request,
+devm_clk_get etc. instead of the corresponding unmanaged interfaces. The
+calls to the functions like free_irq to free the allocated resources are
+removed as they are no longer required. Some labels in the probe function
+are also done away with and the name of the label err_gpio_pullup is
+changed to make it less specific to the context.
 
-Thanks,
-Andy
+Signed-off-by: Himangi Saraogi <himangi774@gmail.com>
+Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+---
+ drivers/usb/gadget/pxa25x_udc.c | 73 +++++++++++++----------------------------
+ 1 file changed, 22 insertions(+), 51 deletions(-)
+
+diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
+index 9984437..f1a5cdc 100644
+--- a/drivers/usb/gadget/pxa25x_udc.c
++++ b/drivers/usb/gadget/pxa25x_udc.c
+@@ -2105,11 +2105,9 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		return -ENODEV;
+ 
+-	dev->clk = clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(dev->clk)) {
+-		retval = PTR_ERR(dev->clk);
+-		goto err_clk;
+-	}
++	dev->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(dev->clk))
++		return PTR_ERR(dev->clk);
+ 
+ 	pr_debug("%s: IRQ %d%s%s\n", driver_name, irq,
+ 		dev->has_cfr ? "" : " (!cfr)",
+@@ -2120,15 +2118,16 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
+ 	dev->dev = &pdev->dev;
+ 	dev->mach = dev_get_platdata(&pdev->dev);
+ 
+-	dev->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
++	dev->transceiver = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+ 
+ 	if (gpio_is_valid(dev->mach->gpio_pullup)) {
+-		if ((retval = gpio_request(dev->mach->gpio_pullup,
+-				"pca25x_udc GPIO PULLUP"))) {
++		retval = devm_gpio_request(&pdev->dev, dev->mach->gpio_pullup,
++					   "pca25x_udc GPIO PULLUP");
++		if (retval) {
+ 			dev_dbg(&pdev->dev,
+ 				"can't get pullup gpio %d, err: %d\n",
+ 				dev->mach->gpio_pullup, retval);
+-			goto err_gpio_pullup;
++			goto err;
+ 		}
+ 		gpio_direction_output(dev->mach->gpio_pullup, 0);
+ 	}
+@@ -2146,30 +2145,32 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
+ 	dev->vbus = 0;
+ 
+ 	/* irq setup after old hardware state is cleaned up */
+-	retval = request_irq(irq, pxa25x_udc_irq,
+-			0, driver_name, dev);
++	retval = devm_request_irq(&pdev->dev, irq, pxa25x_udc_irq, 0,
++				  driver_name, dev);
+ 	if (retval != 0) {
+ 		pr_err("%s: can't get irq %d, err %d\n",
+ 			driver_name, irq, retval);
+-		goto err_irq1;
++		goto err;
+ 	}
+ 	dev->got_irq = 1;
+ 
+ #ifdef CONFIG_ARCH_LUBBOCK
+ 	if (machine_is_lubbock()) {
+-		retval = request_irq(LUBBOCK_USB_DISC_IRQ, lubbock_vbus_irq,
+-				     0, driver_name, dev);
++		retval = devm_request_irq(&pdev->dev, LUBBOCK_USB_DISC_IRQ,
++					  lubbock_vbus_irq, 0, driver_name,
++					  dev);
+ 		if (retval != 0) {
+ 			pr_err("%s: can't get irq %i, err %d\n",
+ 				driver_name, LUBBOCK_USB_DISC_IRQ, retval);
+-			goto err_irq_lub;
++			goto err;
+ 		}
+-		retval = request_irq(LUBBOCK_USB_IRQ, lubbock_vbus_irq,
+-				     0, driver_name, dev);
++		retval = devm_request_irq(&pdev->dev, LUBBOCK_USB_IRQ,
++					  lubbock_vbus_irq, 0, driver_name,
++					  dev);
+ 		if (retval != 0) {
+ 			pr_err("%s: can't get irq %i, err %d\n",
+ 				driver_name, LUBBOCK_USB_IRQ, retval);
+-			goto lubbock_fail0;
++			goto err;
+ 		}
+ 	} else
+ #endif
+@@ -2180,22 +2181,9 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
+ 		return retval;
+ 
+ 	remove_debug_files(dev);
+-#ifdef	CONFIG_ARCH_LUBBOCK
+-lubbock_fail0:
+-	free_irq(LUBBOCK_USB_DISC_IRQ, dev);
+- err_irq_lub:
+-	free_irq(irq, dev);
+-#endif
+- err_irq1:
+-	if (gpio_is_valid(dev->mach->gpio_pullup))
+-		gpio_free(dev->mach->gpio_pullup);
+- err_gpio_pullup:
+-	if (!IS_ERR_OR_NULL(dev->transceiver)) {
+-		usb_put_phy(dev->transceiver);
++ err:
++	if (!IS_ERR_OR_NULL(dev->transceiver))
+ 		dev->transceiver = NULL;
+-	}
+-	clk_put(dev->clk);
+- err_clk:
+ 	return retval;
+ }
+ 
+@@ -2217,25 +2205,8 @@ static int pxa25x_udc_remove(struct platform_device *pdev)
+ 
+ 	remove_debug_files(dev);
+ 
+-	if (dev->got_irq) {
+-		free_irq(platform_get_irq(pdev, 0), dev);
+-		dev->got_irq = 0;
+-	}
+-#ifdef CONFIG_ARCH_LUBBOCK
+-	if (machine_is_lubbock()) {
+-		free_irq(LUBBOCK_USB_DISC_IRQ, dev);
+-		free_irq(LUBBOCK_USB_IRQ, dev);
+-	}
+-#endif
+-	if (gpio_is_valid(dev->mach->gpio_pullup))
+-		gpio_free(dev->mach->gpio_pullup);
+-
+-	clk_put(dev->clk);
+-
+-	if (!IS_ERR_OR_NULL(dev->transceiver)) {
+-		usb_put_phy(dev->transceiver);
++	if (!IS_ERR_OR_NULL(dev->transceiver))
+ 		dev->transceiver = NULL;
+-	}
+ 
+ 	the_controller = NULL;
+ 	return 0;
+-- 
+1.9.1
