@@ -1,40 +1,60 @@
-From: maz@misterjones.org (Marc Zyngier)
-Date: Sun, 22 Jun 2014 12:25:02 +0100
-Subject: [RFC PATCH 2/6] arm/arm64: KVM: Rename =?UTF-8?Q?irq=5Factive?=
- =?UTF-8?Q?=20to=20irq=5Fqueued?=
-In-Reply-To: <1402779067-34478-3-git-send-email-christoffer.dall@linaro.org>
-References: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
- <1402779067-34478-3-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <40b2b2cd240d39950a3aa98c53c36fad@www.loen.fr>
+From: manuel.schoelling@gmx.de (=?UTF-8?q?Manuel=20Sch=C3=B6lling?=)
+Date: Sun, 22 Jun 2014 13:24:54 +0200
+Subject: [PATCH v2] xilinx: Fix compiler warning
+In-Reply-To: <53A6BAC5.80206@cogentembedded.com>
+References: <53A6BAC5.80206@cogentembedded.com>
+Message-ID: <1403436294-21301-1-git-send-email-manuel.schoelling@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-06-14 21:51, Christoffer Dall wrote:
-> We have a special bitmap on the distributor struct to keep track of 
-> when
-> level-triggered interrupts are queued on the list registers.  This 
-> was
-> named irq_active, which is confusing, because the active state of an
-> interrupt as per the GIC spec is a different thing, not specifically
-> related to edge-triggered/level-triggered configurations but rather
-> indicates an interrupt which has been ack'ed but not yet eoi'ed.
->
-> Rename the bitmap and the corresponding accessor functions to 
-> irq_queued
-> to clarify what this is actually used for.
+The time comparsion functions require arguments of type unsigned long
+instead of (signed) long.
 
-While I agree that irq_active is confusing, I would tend to object to 
-irq_queued for similar reasons. Edge interrupts get queued as well.
+Signed-off-by: Manuel Sch?lling <manuel.schoelling@gmx.de>
+---
+ drivers/net/ethernet/xilinx/ll_temac_main.c       |    2 +-
+ drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c |    2 +-
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c     |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-What this bit does is to allow or forbid resampling of a level 
-interrupt.
-
-How about irq_resample instead? That would mandate a small refactor of 
-the code (a bit set to one would allow resampling, which is the opposite 
-of the current logic), but would look better, I believe.
-
-What do you think?
-
-         M.
+diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+index 4ef818a..8a6e5c2 100644
+--- a/drivers/net/ethernet/xilinx/ll_temac_main.c
++++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+@@ -72,7 +72,7 @@ void temac_iow(struct temac_local *lp, int offset, u32 value)
+ 
+ int temac_indirect_busywait(struct temac_local *lp)
+ {
+-	long end = jiffies + 2;
++	unsigned long end = jiffies + 2;
+ 
+ 	while (!(temac_ior(lp, XTE_RDY0_OFFSET) & XTE_RDY0_HARD_ACS_RDY_MASK)) {
+ 		if (time_before_eq(end, jiffies)) {
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+index d4abf47..3b67d60 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+@@ -19,7 +19,7 @@
+ /* Wait till MDIO interface is ready to accept a new transaction.*/
+ int axienet_mdio_wait_until_ready(struct axienet_local *lp)
+ {
+-	long end = jiffies + 2;
++	unsigned long end = jiffies + 2;
+ 	while (!(axienet_ior(lp, XAE_MDIO_MCR_OFFSET) &
+ 		 XAE_MDIO_MCR_READY_MASK)) {
+ 		if (time_before_eq(end, jiffies)) {
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 8c4aed3..782bb93 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -695,7 +695,7 @@ static irqreturn_t xemaclite_interrupt(int irq, void *dev_id)
+ 
+ static int xemaclite_mdio_wait(struct net_local *lp)
+ {
+-	long end = jiffies + 2;
++	unsigned long end = jiffies + 2;
+ 
+ 	/* wait for the MDIO interface to not be busy or timeout
+ 	   after some time.
 -- 
-Who you jivin' with that Cosmik Debris?
+1.7.10.4
