@@ -1,74 +1,24 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 22 Jun 2014 22:48:44 +0200
-Subject: [PATCH v4 10/13] ARM: dts: rockchip: move oscillator input clock into
- main dtsi
-In-Reply-To: <1808429.dNxms7FR7U@diego>
-References: <1808429.dNxms7FR7U@diego>
-Message-ID: <1667363.AdZ5ojCAWZ@diego>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 22 Jun 2014 20:47:28 +0000 (UTC)
+Subject: [PATCH v2] ARM: AM43xx: hwmod: add DSS hwmod data
+In-Reply-To: <1402994233-22599-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1402994233-22599-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <alpine.DEB.2.02.1406222046220.13165@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock definitions get a lot shorter due to the soc clocks being handled by
-rk3188-cru and only the input clock remains. These can not simply live
-in the main rk3xxx.dtsi without affecting readability.
+On Tue, 17 Jun 2014, Tomi Valkeinen wrote:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3066a-clocks.dtsi | 6 ------
- arch/arm/boot/dts/rk3188-clocks.dtsi  | 6 ------
- arch/arm/boot/dts/rk3xxx.dtsi         | 6 ++++++
- 3 files changed, 6 insertions(+), 12 deletions(-)
+> From: Sathya Prakash M R <sathyap@ti.com>
+> 
+> Add DSS hwmod data for AM43xx.
+> 
+> Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
+> [tomi.valkeinen at ti.com: added missing dispc flags]
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Acked-by: Rajendra Nayak <rnayak@ti.com>
 
-diff --git a/arch/arm/boot/dts/rk3066a-clocks.dtsi b/arch/arm/boot/dts/rk3066a-clocks.dtsi
-index 6e307fc..0d4d667 100644
---- a/arch/arm/boot/dts/rk3066a-clocks.dtsi
-+++ b/arch/arm/boot/dts/rk3066a-clocks.dtsi
-@@ -31,12 +31,6 @@
- 			#clock-cells = <0>;
- 		};
- 
--		xin24m: xin24m {
--			compatible = "fixed-clock";
--			clock-frequency = <24000000>;
--			#clock-cells = <0>;
--		};
--
- 		dummy48m: dummy48m {
- 			compatible = "fixed-clock";
- 			clock-frequency = <48000000>;
-diff --git a/arch/arm/boot/dts/rk3188-clocks.dtsi b/arch/arm/boot/dts/rk3188-clocks.dtsi
-index b1b92dc..6bc0373 100644
---- a/arch/arm/boot/dts/rk3188-clocks.dtsi
-+++ b/arch/arm/boot/dts/rk3188-clocks.dtsi
-@@ -31,12 +31,6 @@
- 			#clock-cells = <0>;
- 		};
- 
--		xin24m: xin24m {
--			compatible = "fixed-clock";
--			clock-frequency = <24000000>;
--			#clock-cells = <0>;
--		};
--
- 		dummy48m: dummy48m {
- 			compatible = "fixed-clock";
- 			clock-frequency = <48000000>;
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index b47d5fe..0de3f06 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -26,6 +26,12 @@
- 		compatible = "simple-bus";
- 		ranges;
- 
-+		xin24m: xin24m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+			#clock-cells = <0>;
-+		};
-+
- 		scu at 1013c000 {
- 			compatible = "arm,cortex-a9-scu";
- 			reg = <0x1013c000 0x100>;
--- 
-1.9.0
+Thanks, queued with Tony's Acked-by: and Felipe's Tested-by: for 3.17.
+
+
+- Paul
