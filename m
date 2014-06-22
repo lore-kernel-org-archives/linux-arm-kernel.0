@@ -1,39 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 22 Jun 2014 11:35:02 +0100
-Subject: [PATCH 1/3 v5] spi: s3c64xx: fix broken "cs_gpios" usage in the
- driver
-In-Reply-To: <CAHfPSqCvHRMxPAVgRDrP-BSwuwJRP5O8Z+xy5Xot8t8mASNyAA@mail.gmail.com>
-References: <1402631992-500-1-git-send-email-ch.naveen@samsung.com>
- <CAD=FV=Ua+P0CBAfNj4SWWMWRKcEFdmh=akwy1-ZWoGOt2P9=cQ@mail.gmail.com>
- <20140621095149.GY5099@sirena.org.uk>
- <CAHfPSqCvHRMxPAVgRDrP-BSwuwJRP5O8Z+xy5Xot8t8mASNyAA@mail.gmail.com>
-Message-ID: <20140622103502.GJ24291@sirena.org.uk>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Sun, 22 Jun 2014 12:45:43 +0200
+Subject: [RFC PATCH 2/3] Enable BCM2835 mailbox support
+In-Reply-To: <5232F7C2.3070408@yahoo.com.au>
+References: <5232F7C2.3070408@yahoo.com.au>
+Message-ID: <1403433943.532.1.camel@goatlord.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 21, 2014 at 10:53:14PM +0530, Naveen Krishna Ch wrote:
+Hi Craig,
 
-> The revisions were pretty quick
+On Fri, 2013-09-13 at 23:32 +1200, Craig McGeachie wrote:
+> Reimplement BCM2835 mailbox support as a device registered with the
+> general purpose mailbox framework.
 
-Yes, this is part of what I'm concerned about - it often means that
-there are problems, either the review wasn't very detailed or the code
-is being written too hastily.  In this case this is coupled with the
-fact that it's an area of the code that has had problems in general is
-setting off alarm bells.
+As the work on common mailbox framework progressed, I've updated the
+driver to work with v7 of it (I've also ported the cpufreq and vchiq
+drivers, which I'd like to post once the mailbox framework and your
+drivers are in):
 
-> v4 to v5 : Added Acked-by and Revewied-by from Javier and Rob Herring
+https://github.com/hackerspace/rpi-linux/commits/lr-vchiq-new-mailbox
 
-Don't resend for tags - you should include tags if you do resend but
-they're not a good reason to do so.
+I'm not sending inline patches for review, since neither the framework
+nor your your mbox and thermal drivers are in yet, but I'm wondering if
+you could take a look and eventually fold the changes back into your
+drivers? (I've kept them in separate commits in my tree, so that it's
+easy for you to keep track of the changes).
 
-> Kindly review and let us know your comments.
-
-I will review it when I get to it, this isn't the only thing I've got
-sitting for review.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140622/f6900888/attachment.sig>
+Thank you,
+Lubo
