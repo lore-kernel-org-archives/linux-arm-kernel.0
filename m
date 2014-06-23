@@ -1,73 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Jun 2014 17:49:34 +0200
-Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
- driver
-In-Reply-To: <53A83A20.6090800@roeck-us.net>
-References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140507213318.GA2105@roeck-us.net>
- <20140515091123.GQ29258@lukather> <20140519150422.GA27329@lukather>
- <20140522203444.GE27329@lukather>
- <20140522211207.GA28704@roeck-us.net>
- <20140623103142.GB19730@lukather> <53A83A20.6090800@roeck-us.net>
-Message-ID: <20140623154934.GG19730@lukather>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 23 Jun 2014 16:59:46 +0100
+Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <CAL_Jsq+6SveWhzWPrtziTJ-tDOFaJV4sXO+r_CEhAZf=tQE6FA@mail.gmail.com>
+References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
+ <20140620170901.GA12059@leverpostej> <1403532837.3804.29.camel@hornet>
+ <CAL_Jsq+6SveWhzWPrtziTJ-tDOFaJV4sXO+r_CEhAZf=tQE6FA@mail.gmail.com>
+Message-ID: <1403539186.3804.46.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 07:30:56AM -0700, Guenter Roeck wrote:
-> >>The patches _are_ in my watchdog-next branch and get some coverage from
-> >>both my auto-builders and from Fenguang's build robots, so while they are
-> >>not in linux-next, they are not completely in the dark either.
+On Mon, 2014-06-23 at 16:43 +0100, Rob Herring wrote:
+> On Mon, Jun 23, 2014 at 9:13 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > On Fri, 2014-06-20 at 18:09 +0100, Mark Rutland wrote:
+> >> > +- clocks-names: should contain "clcdclk" and "apb_pclk"
+> >>
+> >> s/clocks-names/clock-names/
 > >
-> >So, this patch finally didn't make it into 3.16. Great. Now, we can't
-> >even reboot the boards.
+> > Haha - it took quite a few patch revisions to spot this one, thanks!
+> 
+> Was this tested?
+
+Yes it was. The typo sneaked in the documentation only, dts changes were
+fine.
+
+> >> > +- clocks: contains phandle and clock specifier pairs for the entries
+> >> > +   in the clock-names property. See
+> >> > +   Documentation/devicetree/binding/clock/clock-bindings.txt
+> >> > +
+> >> > +Optional properties:
+> >> > +
+> >> > +- arm,pl11x,framebuffer-base: a pair of two 32-bit values, address and size,
+> >> > +   defining the framebuffer that must be used; if not present, the
+> >> > +   framebuffer may be located anywhere in the memory
+> >>
+> >> The name is confusing: this is a base _and_ size.
 > >
-> >Given how it's just impossible to get something merged reliably
-> >through the watchdog tree, I guess I should just start merging the
-> >patches through mine?
+> > True. Can split it into two -base and -size or rename it into
+> > framebuffer or video-memory.
 > >
+> >> When should this be used, and what is valid to point it at?
+> >
+> > When the hardware design determines the address the memory transactions
+> > must be issued at. This is aimed at a situation (allegedly not
+> > impossible) when the memory map from the CLCD's point of view is
+> > different from the CPU's one (eg. the video memory is mapped at xxx for
+> > the CPU and yyy for the CLCD).
 > 
-> You can not really blame Wim here.
+> Humm, that sounds like what dma-ranges is for.
 > 
-> In this case, I suspect the major reason for not accepting the patch
-> is that I tried to provide a clean method / API for "reset through watchdog
-> subsystem", which went nowhere, in my understanding because someone objected
-> that it would be the wrong thing to do [1] and it didn't get approval /
-> acceptance from the arm maintainers. If it is wrong to reset the board
-> from the watchdog subsystem in a clean way, it is for sure even more wrong
-> to do it as you proposed in your patch.
+> >
+> >> How does this play with memory carveouts (CMA, reserved-memory)?
+> >
+> > It doesn't, and wasn't intended to (the original version of the binding
+> > was trying to do something like reserved-memory before it was defined),
+> > but someone managed to convince me not to do this, if it's a "low level"
+> > feature.
+> >
+> > I guess I can be re-convinced (again).
 > 
-> My conclusion therefore is that all board reset code should move back out
-> of the watchdog subsystem, and that we should not accept such code in the
-> future. This is not my personal preference, but I do believe that we should
-> do it in a clean way or not at all.
+> NAK on this property. Convinced?
 
-Well, considering that this patch isn't depending on your reboot API
-set, and that Wim never either commented on this patch, your reboot
-API patchset or your pull request to say that he was not willing to
-merge this, there's still a huge failure to communicate.
+Sure. Shame you weren't so clear in any of v3 to v6 nor in the
+discussions around v2.
 
-I'm fine with any technical reason, let's debate on that. But the
-point is there has been no debate at all, only silence from his side.
+> If this is only theoretical, then just drop it for now.
+> 
+> >> > +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
+> >> > +   cell's memory interface can handle
+> >>
+> >> When should I set this, given it is optional?
+> >
+> > When there is a (significant) limitation of the bandwidth available for
+> > the cell's memory interface. One will either be told by the soc guys or
+> > will figure it out in the hard way, as we did :-(
+> 
+> What are you going to do with this information? b/w is a function of
+> screen size and pixel depth. Are you going to refuse certain configs
+> based on that? Seems like someone doing their own modes should know
+> what they are doing and the limitations.
+> 
+> Again, drop it until there is a defined need for this.
 
-I have been told some patches would be merged and I merged through my
-tree some patches that were depending on this one based on that
-assumption.
+Yes, there is. Use case: PL111 is wired up to a HDMI formatter, which
+will take everything up to 1080p. This is what a DRM driver (what/if
+it's ready) will get from the encoder driver (and rightly so). But the
+chip interconnect limitations is make the chip being able to get 480p at
+60Hz tops. 
 
-And now, we have a regression.
+Or do you want me to add a subnode with timings for all achievable modes
+instead?
 
-Anyway... I guess I should just revert some commits now.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/ef626a28/attachment.sig>
+Pawel
