@@ -1,9 +1,9 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 Jun 2014 11:21:06 -0300
-Subject: [PATCH 3/3] ARM: dts: imx6sx-sdb: Add PMIC support
+Date: Mon, 23 Jun 2014 11:21:05 -0300
+Subject: [PATCH 2/3] ARM: dts: imx6sx-sdb: Add USB support
 In-Reply-To: <1403533266-16021-1-git-send-email-festevam@gmail.com>
 References: <1403533266-16021-1-git-send-email-festevam@gmail.com>
-Message-ID: <1403533266-16021-3-git-send-email-festevam@gmail.com>
+Message-ID: <1403533266-16021-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,141 +11,88 @@ From: Fabio Estevam <fabio.estevam@freescale.com>
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dts | 115 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 115 insertions(+)
+ arch/arm/boot/dts/imx6sx-sdb.dts | 55 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 18c228e..2571261 100644
+index da40f13..18c228e 100644
 --- a/arch/arm/boot/dts/imx6sx-sdb.dts
 +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -92,6 +92,114 @@
+@@ -58,6 +58,30 @@
+ 			gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
+ 			enable-active-high;
+ 		};
++
++		reg_usb_otg1_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb_otg1>;
++			regulator-name = "usb_otg1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++
++		reg_usb_otg2_vbus: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb_otg2>;
++			regulator-name = "usb_otg2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
+ 	};
+ };
+ 
+@@ -81,6 +105,19 @@
  	status = "okay";
  };
  
-+&i2c1 {
-+        clock-frequency = <100000>;
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&pinctrl_i2c1>;
-+        status = "okay";
-+
-+	pmic: pfuze100 at 08 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb_otg1_id>;
++	status = "okay";
 +};
 +
- &uart1 {
++&usbotg2 {
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	dr_mode = "host";
++	status = "okay";
++};
++
+ &usdhc2 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -178,6 +286,13 @@
+ 	pinctrl-0 = <&pinctrl_usdhc2>;
+@@ -163,6 +200,24 @@
  			>;
  		};
  
-+		pinctrl_i2c1: i2c1grp {
++		pinctrl_usb_otg1: usbotg1grp {
 +			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO01__I2C1_SDA		0x4001b8b1
-+				MX6SX_PAD_GPIO1_IO00__I2C1_SCL		0x4001b8b1
++				MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9	0x10b0
 +			>;
 +		};
 +
- 		pinctrl_vcc_sd3: vccsd3grp {
++		pinctrl_usb_otg1_id: usbotg1idgrp {
++			fsl,pins = <
++				MX6SX_PAD_GPIO1_IO10__ANATOP_OTG1_ID	0x17059
++			>;
++		};
++
++		pinctrl_usb_otg2: usbot2ggrp {
++			fsl,pins = <
++				MX6SX_PAD_GPIO1_IO12__GPIO1_IO_12	0x10b0
++			>;
++		};
++
+ 		pinctrl_usdhc2: usdhc2grp {
  			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+ 				MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059
 -- 
 1.8.3.2
