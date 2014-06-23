@@ -1,43 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:13 +0900
-Subject: [PATCH 04/29] ARM: shmobile: r8a7791: add USB3.0 clocks to device tree
+Date: Mon, 23 Jun 2014 11:28:15 +0900
+Subject: [PATCH 06/29] ARM: shmobile: lager: Add VDD MPU regulator for DVFS
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <308f306283894a0d3eeee7d1030289e4e668d49d.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <05f72e03b7553958609d1475c79491f90e6b50d3.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+From: Benoit Cousson <bcousson@baylibre.com>
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+The CA15 cluster is capable of voltage scaling. Add the regulator
+in the i2c3 node, to allow the generic CPUFreq driver to use it.
+
+Enable the i2c3 pin mux and the device node as well since the
+da9210 is connected to that bus.
+
+Note: In R-CAR Gen2, each frequency is using the same voltage,
+and DVS control is not used. Therefore, this patch set the
+voltage(Vmin/Vmax) to 1000mv.
+
+Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+[gaku.inami.xw at bp.renesas.com: Changes Vmin for disabling DVS]
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 8d7ffae..2c27e36 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -758,15 +758,15 @@
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
- 			clocks = <&cp_clk>, <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7791_CLK_SD0>,
--				 <&mmc0_clk>, <&hp_clk>, <&hp_clk>, <&rclk_clk>;
-+				 <&mmc0_clk>, <&hp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
- 				R8A7791_CLK_TPU0 R8A7791_CLK_SDHI2 R8A7791_CLK_SDHI1 R8A7791_CLK_SDHI0
--				R8A7791_CLK_MMCIF0 R8A7791_CLK_IIC0 R8A7791_CLK_IIC1 R8A7791_CLK_CMT1
-+				R8A7791_CLK_MMCIF0 R8A7791_CLK_IIC0 R8A7791_CLK_IIC1 R8A7791_CLK_SSUSB R8A7791_CLK_CMT1
- 			>;
- 			clock-output-names =
- 				"tpu0", "sdhi2", "sdhi1", "sdhi0",
--				"mmcif0", "i2c7", "i2c8", "cmt1";
-+				"mmcif0", "i2c7", "i2c8", "ssusb", "cmt1";
- 		};
- 		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index dd2fe46..6472cf0 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -204,6 +204,11 @@
+ 				 "msiof1_tx";
+ 		renesas,function = "msiof1";
+ 	};
++
++	i2c3_pins: i2c3 {
++		renesas,groups = "i2c3";
++		renesas,function = "i2c3";
++	};
+ };
+ 
+ &ether {
+@@ -317,3 +322,19 @@
+ 	cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++	status = "okay";
++
++	vdd_dvfs: regulator at 68 {
++		compatible = "diasemi,da9210";
++		reg = <0x68>;
++
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
 -- 
 2.0.0.rc2
