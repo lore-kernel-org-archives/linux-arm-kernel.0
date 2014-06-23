@@ -1,58 +1,93 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Mon, 23 Jun 2014 14:29:37 -0700
-Subject: SD50 freq clock -> wifi sd8797
-Message-ID: <CACUGKYPKxh0MseMDhdk1ZP_aCeMMCAMq+V0MEfCzrQVHUjkdLg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 23 Jun 2014 14:47:48 -0700
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <20140623213046.GR22347@spo001.leaseweb.com>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140507213318.GA2105@roeck-us.net> <20140515091123.GQ29258@lukather>
+ <20140519150422.GA27329@lukather> <20140522203444.GE27329@lukather>
+ <20140522211207.GA28704@roeck-us.net> <20140623103142.GB19730@lukather>
+ <53A83A20.6090800@roeck-us.net> <20140623154934.GG19730@lukather>
+ <20140623213046.GR22347@spo001.leaseweb.com>
+Message-ID: <53A8A084.3000005@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Guys,
+On 06/23/2014 02:30 PM, Wim Van Sebroeck wrote:
+> Hi All,
+>
+>> On Mon, Jun 23, 2014 at 07:30:56AM -0700, Guenter Roeck wrote:
+>>>>> The patches _are_ in my watchdog-next branch and get some coverage from
+>>>>> both my auto-builders and from Fenguang's build robots, so while they are
+>>>>> not in linux-next, they are not completely in the dark either.
+>>>>
+>>>> So, this patch finally didn't make it into 3.16. Great. Now, we can't
+>>>> even reboot the boards.
+>>>>
+>>>> Given how it's just impossible to get something merged reliably
+>>>> through the watchdog tree, I guess I should just start merging the
+>>>> patches through mine?
+>>>>
+>>>
+>>> You can not really blame Wim here.
+>>>
+>>> In this case, I suspect the major reason for not accepting the patch
+>>> is that I tried to provide a clean method / API for "reset through watchdog
+>>> subsystem", which went nowhere, in my understanding because someone objected
+>>> that it would be the wrong thing to do [1] and it didn't get approval /
+>>> acceptance from the arm maintainers. If it is wrong to reset the board
+>>> from the watchdog subsystem in a clean way, it is for sure even more wrong
+>>> to do it as you proposed in your patch.
+>>>
+>>> My conclusion therefore is that all board reset code should move back out
+>>> of the watchdog subsystem, and that we should not accept such code in the
+>>> future. This is not my personal preference, but I do believe that we should
+>>> do it in a clean way or not at all.
+>>
+>> Well, considering that this patch isn't depending on your reboot API
+>> set, and that Wim never either commented on this patch, your reboot
+>> API patchset or your pull request to say that he was not willing to
+>> merge this, there's still a huge failure to communicate.
+>>
+>> I'm fine with any technical reason, let's debate on that. But the
+>> point is there has been no debate at all, only silence from his side.
+>>
+>> I have been told some patches would be merged and I merged through my
+>> tree some patches that were depending on this one based on that
+>> assumption.
+>>
+>> And now, we have a regression.
+>>
+>> Anyway... I guess I should just revert some commits now.
+>>
+>
+> To continue the discussion: I would like to add an excerpt from drivers/watchdog/alim7101_wdt.c
+> /*
+>   *      Notifier for system down
+>   */
+>
+> static int wdt_notify_sys(struct notifier_block *this,
+>                                          unsigned long code, void *unused)
+> {
+>          if (code == SYS_DOWN || code == SYS_HALT)
+>                  wdt_turnoff();
+>
+>          if (code == SYS_RESTART) {
+>                  /*
+>                   * Cobalt devices have no way of rebooting themselves other
+>                   * than getting the watchdog to pull reset, so we restart the
+>                   * watchdog on reboot with no heartbeat
+>                   */
+>                  wdt_change(WDT_ENABLE);
+>                  pr_info("Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second\n");
+>          }
+>          return NOTIFY_DONE;
+> }
+>
+> For some systems the watchdog is the only way to reboot... So where we should put it, is not trivial neither...
+>
 
-I am using kernel 3.13 for iMX6SL and my wifi is a Marvell SD8797
-wifi/bluetooth module.
-The sdhci-esdhc-imx controller configured it as follows:
+Agreed. The above definitely doesn't look like a good solution to me.
 
-clock:          100000000 Hz
-actual clock:   99000000 Hz
-vdd:            21 (3.3 ~ 3.4 V)
-bus mode:       2 (push-pull)
-chip select:    0 (don't care)
-power mode:     2 (on)
-bus width:      2 (4 bits)
-timing spec:    5 (sd uhs SDR50)
-signal voltage: 0 (1.80 V)
-
-The above configuration works, but running (continuously) the wifi and
-the bluetooth at the same time (e.g. ping google.com and hcitool scan)
-caused it to get "mmc1: Timeout waiting for hardware interrupt." after
-80+ loops.
-
-I used an SDIO 3 analyzer and I got a frequency captured 99Mhz and
-102Mhz. But, I found a lot of CRC16 errors when the above frequency
-setting is being used.
-
-Then, I changed the frequency value to 90000000 (see below) in device
-tree. I pinging google.com and running hcitool scan  (continuously)
-for
-almost 4 days and did not get the mmc1 timeout.
-
-Updated clock:
-
-clock:          90000000 Hz
-actual clock:   66000000 Hz
-vdd:            21 (3.3 ~ 3.4 V)
-bus mode:       2 (push-pull)
-chip select:    0 (don't care)
-power mode:     2 (on)
-bus width:      2 (4 bits)
-timing spec:    5 (sd uhs SDR50)
-signal voltage: 0 (1.80 V)
-
-
-Is there any existing issue/errata that I should aware of with regards
-to the sdhci-esdhc-imx controller particularly to those device need a
-100Mhz frequency clock?.
-
-
-Regards,
-
-john
+Guenter
