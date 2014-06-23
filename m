@@ -1,50 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:52 +0900
-Subject: [PATCH 5/9] ARM: shmobile: Use shmobile_init_delay() on Genmai boards
+Date: Mon, 23 Jun 2014 11:26:51 +0900
+Subject: [PATCH 4/9] ARM: shmobile: Update r7s72100 DTS to include CPU
+ frequency
 In-Reply-To: <cover.1403487831.git.horms+renesas@verge.net.au>
 References: <cover.1403487831.git.horms+renesas@verge.net.au>
-Message-ID: <4387ac5282616ff14edc733aca79fe046ddb45f5.1403487831.git.horms+renesas@verge.net.au>
+Message-ID: <005407fdf1c65a06fc0a9c588408f57e2eacef7c.1403487831.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Adjust Genmai board support to use shmobile_init_delay() together
-with r7s72100 CPU Frequency settings from the DTS.
+Add CPU Frequency information to the r7s72100 DTS file. This
+will allow us to use the shared C code on r7s72100 and Genmai
+which reads out the clock frequency from DT and calculates the
+delay settings from there.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-genmai-reference.c | 2 +-
- arch/arm/mach-shmobile/board-genmai.c           | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index d341ef0..c06dc5c 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -47,7 +47,7 @@ static const char * const genmai_boards_compat_dt[] __initconst = {
- };
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index f50fbc8..bdee225 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -144,6 +144,7 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			clock-frequency = <400000000>;
+ 		};
+ 	};
  
- DT_MACHINE_START(GENMAI_DT, "genmai")
--	.init_early	= r7s72100_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_machine	= genmai_add_standard_devices,
- 	.dt_compat	= genmai_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index f0a8eca..a0994f3 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -154,7 +154,7 @@ static const char * const genmai_boards_compat_dt[] __initconst = {
- };
- 
- DT_MACHINE_START(GENMAI_DT, "genmai")
--	.init_early	= r7s72100_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_machine	= genmai_add_standard_devices,
- 	.dt_compat	= genmai_boards_compat_dt,
- MACHINE_END
 -- 
 2.0.0.rc2
