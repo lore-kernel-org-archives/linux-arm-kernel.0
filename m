@@ -1,101 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:25:26 +0900
-Subject: [PATCH] ARM: shmobile: add cpufreq-cpu0 driver for common SH-Mobile
-In-Reply-To: <cover.1403487159.git.horms+renesas@verge.net.au>
-References: <cover.1403487159.git.horms+renesas@verge.net.au>
-Message-ID: <06e32c91dbce3c24ccbe84e3af2a35199662bca0.1403487159.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Jun 2014 11:25:34 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v3.17
+Message-ID: <cover.1403487196.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-I add a new file(cpufreq.c) for the following reasons.
-- Registration of platform_device must be unified in SH-Mobile.
-- We can't create a node of cpufreq drivers into device tree.
-  (Because cpufreq driver is virtual device.)
+Please consider these Renesas ARM based SoC defconfig updates for v3.17.
 
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Makefile              |  1 +
- arch/arm/mach-shmobile/cpufreq.c             | 31 ++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/common.h |  7 +++++++
- 3 files changed, 39 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/cpufreq.c
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 38d5fe8..1b966da 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -48,6 +48,7 @@ obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
- # PM objects
- obj-$(CONFIG_SUSPEND)		+= suspend.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-+obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o pm-rmobile.o
- obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
- obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o pm-rmobile.o
-diff --git a/arch/arm/mach-shmobile/cpufreq.c b/arch/arm/mach-shmobile/cpufreq.c
-new file mode 100644
-index 0000000..e2c868f
---- /dev/null
-+++ b/arch/arm/mach-shmobile/cpufreq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * CPUFreq support code for SH-Mobile ARM
-+ *
-+ *  Copyright (C) 2014 Gaku Inami
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+
-+int __init shmobile_cpufreq_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_cpu_device_node_get(0);
-+	if (np == NULL) {
-+		pr_err("failed to find cpu0 node\n");
-+		return 0;
-+	}
-+
-+	if (of_get_property(np, "operating-points", NULL))
-+		platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
-+
-+	of_node_put(np);
-+
-+	return 0;
-+}
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index f7a360e..921a18e 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -45,12 +45,19 @@ int shmobile_cpuidle_init(void);
- static inline int shmobile_cpuidle_init(void) { return 0; }
- #endif
- 
-+#ifdef CONFIG_CPU_FREQ
-+int shmobile_cpufreq_init(void);
-+#else
-+static inline int shmobile_cpufreq_init(void) { return 0; }
-+#endif
-+
- extern void __iomem *shmobile_scu_base;
- 
- static inline void __init shmobile_init_late(void)
- {
- 	shmobile_suspend_init();
- 	shmobile_cpuidle_init();
-+	shmobile_cpufreq_init();
- }
- 
- #endif /* __ARCH_MACH_COMMON_H */
--- 
-2.0.0.rc2
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-defconfig-for-v3.17
+
+for you to fetch changes up to 468c570ed078f0326745bfe85868adb925659502:
+
+  ARM: shmobile: Enable CPUFREQ configuration (2014-06-16 19:44:34 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Updates for v3.17
+
+* Enable Marzen board and r8a7779 SoC, CPUFREQ and PM_RUNTIME in
+  shmobile (multiplatform) defconfig
+* Enable LED support in armadillo800eva defconfig
+
+----------------------------------------------------------------
+Gaku Inami (1):
+      ARM: shmobile: Enable CPUFREQ configuration
+
+Geert Uytterhoeven (1):
+      ARM: shmobile: armadillo800eva defconfig: Enable REGULATOR_GPIO and LEDS_GPIO
+
+Simon Horman (2):
+      ARM: shmobile: marzen: Add to shmobile defconfig
+      ARM: shmobile: Enable PM_RUNTIME in defconfig
+
+ arch/arm/configs/armadillo800eva_defconfig |  4 ++++
+ arch/arm/configs/shmobile_defconfig        | 21 ++++++++++++++++++++-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
