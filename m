@@ -1,98 +1,32 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 Jun 2014 11:21:05 -0300
-Subject: [PATCH 2/3] ARM: dts: imx6sx-sdb: Add USB support
-In-Reply-To: <1403533266-16021-1-git-send-email-festevam@gmail.com>
-References: <1403533266-16021-1-git-send-email-festevam@gmail.com>
-Message-ID: <1403533266-16021-2-git-send-email-festevam@gmail.com>
+Date: Mon, 23 Jun 2014 11:21:04 -0300
+Subject: [PATCH 1/3] ARM: dts: imx6sx: Fix usbmisc compatible string
+Message-ID: <1403533266-16021-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
+Fix usbmisc compatible string so that usbmisc node can be found and USB 
+functionality can be functional.
+
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dts | 55 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ arch/arm/boot/dts/imx6sx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index da40f13..18c228e 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -58,6 +58,30 @@
- 			gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
- 			enable-active-high;
- 		};
-+
-+		reg_usb_otg1_vbus: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb_otg1>;
-+			regulator-name = "usb_otg1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb_otg2_vbus: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb_otg2>;
-+			regulator-name = "usb_otg2_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
- 	};
- };
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 78ccf61..d3ed62c 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -753,7 +753,7 @@
  
-@@ -81,6 +105,19 @@
- 	status = "okay";
- };
- 
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usb_otg1_id>;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	vbus-supply = <&reg_usb_otg2_vbus>;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
- &usdhc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc2>;
-@@ -163,6 +200,24 @@
- 			>;
- 		};
- 
-+		pinctrl_usb_otg1: usbotg1grp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9	0x10b0
-+			>;
-+		};
-+
-+		pinctrl_usb_otg1_id: usbotg1idgrp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO10__ANATOP_OTG1_ID	0x17059
-+			>;
-+		};
-+
-+		pinctrl_usb_otg2: usbot2ggrp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO12__GPIO1_IO_12	0x10b0
-+			>;
-+		};
-+
- 		pinctrl_usdhc2: usdhc2grp {
- 			fsl,pins = <
- 				MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059
+ 			usbmisc: usbmisc at 02184800 {
+ 				#index-cells = <1>;
+-				compatible = "fsl,imx6sx-usbmisc";
++				compatible = "fsl,imx6sx-usbmisc", "fsl,imx6q-usbmisc";
+ 				reg = <0x02184800 0x200>;
+ 				clocks = <&clks IMX6SX_CLK_USBOH3>;
+ 			};
 -- 
 1.8.3.2
