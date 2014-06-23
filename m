@@ -1,36 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Jun 2014 09:46:09 +0100
-Subject: [PATCH] arm: ptrace: fix syscall modification under
- PTRACE_O_TRACESECCOMP
-In-Reply-To: <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
-References: <20140618202748.GA9022@www.outflux.net>
- <20140620102258.GA26626@arm.com>
- <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
- <20140620172330.GA30656@arm.com>
- <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
- <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
-Message-ID: <20140623084608.GA9316@arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 23 Jun 2014 11:01:44 +0200
+Subject: [PATCH v2] ARM: mvebu: rename ARM_ERRATA_753970
+In-Reply-To: <20140620205340.GX32514@n2100.arm.linux.org.uk>
+References: <201404052101.19381.arnd@arndb.de>
+ <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
+ <53418889.2050002@free-electrons.com> <1396805315.7723.8.camel@x220>
+ <1401094871.25902.20.camel@x220>
+ <20140620202100.GG21711@titan.lakedaemon.net>
+ <20140620205340.GX32514@n2100.arm.linux.org.uk>
+Message-ID: <1403514104.12982.20.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 07:10:46PM +0100, Kees Cook wrote:
-> On Fri, Jun 20, 2014 at 10:36 AM, Kees Cook <keescook@chromium.org> wrote:
-> > On Fri, Jun 20, 2014 at 10:23 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> Right, gotcha. Thanks for the explanation. I was confused, because
-> >> tracehook_report_syscall does the right thing (returns
-> >> current_thread_info()->syscall), but if we don't have TIF_SYSCALL_TRACE set,
-> >> then updates during the secure_computing callback will be ignored.
-> >>
-> >> However, my fix to this is significantly smaller than your patch, so I fear
-> >> I'm still missing something.
-> >
-> > Oh, yes, that's much smaller. Nice! I will test this and report back.
-> 
-> Yup, I can confirm this works. Thanks!
-> 
-> Tested-by: Kees Cook <keescook@chromium.org>
+ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970 in v3.2, through
+commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up Kconfig options for
+PL310 errata workarounds"). Two selects were added in v3.15 that still
+use the previous name. Rename these.
 
-Thanks, Kees. I'll post a patch shortly. I'll try and remember to keep an
-eye out for this when seccomp lands for arm64 too.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+v2: redone on top of next-21040623, and therefor on top of commit
+a641f3a6abce ("ARM: l2c: fix dependencies on PL310 errata symbols").
 
-Will
+Dropped the "if CACHE_PL310" fragments used in v1. No need to use "if
+CACHE_L2X0" instead. Both CACHE_PL310 and CACHE_L2X0 will be
+(indirectly) selected if MACH_ARMADA_375 or MACH_ARMADA_38X are set.
+
+Tested only with "make ARCH=arm menuconfig". So not compile tested! If
+that's not acceptable please let me know. (I have no access to these
+machines so runtime testing is not possible for me.)
+
+Perhaps we want something similar for v3.15+ stable. But that would
+require a different patch (v1 could probably be used for stable).
+
+ arch/arm/mach-mvebu/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 955d4a3afabd..8d4cf4fa118a 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -33,7 +33,7 @@ config MACH_ARMADA_370
+ config MACH_ARMADA_375
+ 	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
+ 	select ARM_ERRATA_720789
+-	select ARM_ERRATA_753970
++	select PL310_ERRATA_753970
+ 	select ARM_GIC
+ 	select ARMADA_375_CLK
+ 	select HAVE_ARM_SCU
+@@ -48,7 +48,7 @@ config MACH_ARMADA_375
+ config MACH_ARMADA_38X
+ 	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
+ 	select ARM_ERRATA_720789
+-	select ARM_ERRATA_753970
++	select PL310_ERRATA_753970
+ 	select ARM_GIC
+ 	select ARMADA_38X_CLK
+ 	select HAVE_ARM_SCU
+-- 
+1.9.3
