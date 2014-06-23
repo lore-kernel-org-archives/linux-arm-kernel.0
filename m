@@ -1,36 +1,102 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Mon, 23 Jun 2014 10:03:16 +0530
-Subject: [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for
- secure mode
-In-Reply-To: <5388CBB9.1050003@suse.de>
-References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
- <5388CBB9.1050003@suse.de>
-Message-ID: <CAK5sBcETe20PWRV+z5Gb=hQNk13wE0PbmcvEmC9TM6nD2mi=ew@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 23 Jun 2014 12:44:25 +0800
+Subject: [PATCH v2 09/20] clk: sunxi: Add sun6i MBUS clock support
+In-Reply-To: <20140618100404.GM19730@lukather>
+References: <1403016777-15121-1-git-send-email-wens@csie.org>
+ <1403016777-15121-10-git-send-email-wens@csie.org>
+ <20140618100404.GM19730@lukather>
+Message-ID: <CAGb2v64GobnAM+J7QxbZxWretA5632Xn9=-pkrobUQWrGHn_ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 30, 2014 at 11:49 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 28.05.2014 06:13, schrieb Sachin Kamat:
->> Almost all Exynos-series of SoCs that run in secure mode don't need
->> additional offset for every CPU, with Exynos4412 being the only
->> exception.
->>
->> Tested on Origen-Quad (Exynos4412) and Arndale-Octa (Exynos5420).
->>
->> While at it, fix the coding style (space around *).
->>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+On Wed, Jun 18, 2014 at 6:04 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jun 17, 2014 at 10:52:46PM +0800, Chen-Yu Tsai wrote:
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 >> ---
->>  arch/arm/mach-exynos/firmware.c |    9 +++++++--
->>  1 file changed, 7 insertions(+), 2 deletions(-)
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>>  drivers/clk/sunxi/clk-sunxi.c                     | 44 +++++++++++++++++++++++
+>>  2 files changed, 45 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index b9ec668..7b2ba41 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -40,6 +40,7 @@ Required properties:
+>>       "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+>>       "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+>>       "allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+>> +     "allwinner,sun6i-a31-mbus-clk" - for the MBUS clocks on A31 / A23
+>>       "allwinner,sun7i-a20-out-clk" - for the external output clocks
+>>       "allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+>>       "allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> index eca3c6e..a086b5b 100644
+>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -307,6 +307,37 @@ static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
+>>
+>>
+>>  /**
+>> + * sun6i_a31_get_mbus_factors() - calculates m factor for MBUS clocks
+>> + * MBUS rate is calculated as follows
+>> + * rate = parent_rate / (m + 1);
+>> + */
+>> +
+>> +static void sun6i_a31_get_mbus_factors(u32 *freq, u32 parent_rate,
+>> +                                    u8 *n, u8 *k, u8 *m, u8 *p)
+>> +{
+>> +     u8 div;
+>> +
+>> +     /* These clocks can only divide, so we will never be able to achieve
+>> +      * frequencies higher than the parent frequency */
+>> +     if (*freq > parent_rate)
+>> +             *freq = parent_rate;
+>> +
+>> +     div = DIV_ROUND_UP(parent_rate, *freq);
+>> +
+>> +     if (div > 8)
+>> +             div = 8;
+>> +
+>> +     *freq = parent_rate / div;
+>> +
+>> +     /* we were called to round the frequency, we can now return */
+>> +     if (n == NULL)
 >
-> Fixes ODROID-XU (Exynos5410) as well - thought it had been a prereq to
-> applying the 5410 patches...
->
-> Tested-by: Andreas F?rber <afaerber@suse.de>
->
+> s/n/m/ ?
 
-Kukjin, this patch is required to bring up 4 A15 cores on some 5410
-and 5420 based
-boards. Can you please queue this up for the upcoming rc as fixes?
+The factors clk driver passes all or none pointers.
+But I will change this to avoid the confusion.
+
+>> +             return;
+>> +
+>> +     *m = div - 1;
+>> +}
+>> +
+>> +
+>> +/**
+>>   * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
+>>   * CLK_OUT rate is calculated as follows
+>>   * rate = (parent_rate >> p) / (m + 1);
+>> @@ -447,6 +478,11 @@ static struct clk_factors_config sun4i_mod0_config = {
+>>       .pwidth = 2,
+>>  };
+>>
+>> +static struct clk_factors_config sun6i_a31_mbus_config = {
+>> +     .mshift = 0,
+>> +     .mwidth = 3,
+>
+> Actually, the A31 has an extra N factor.
+>
+> So this mbus clock looks like it's only about the A23, and not the A31
+> at all.
+
+I checked original sun6i code and sun6i code found in the A23 SDK.
+The original code uses the module 0 clock driver for mbus, so yes
+there's an extra N factor. The new code in the A23 SDK does not.
+
+Unfortunately I haven't been able to get my Hummingbird A31 up yet,
+so I can't poke around to check it.
+
+
+ChenYu
