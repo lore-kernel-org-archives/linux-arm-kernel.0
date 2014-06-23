@@ -1,40 +1,54 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 23 Jun 2014 14:31:00 +0300
-Subject: [PATCH] video: move Versatile CLCD helpers
-In-Reply-To: <1401283017-15386-1-git-send-email-linus.walleij@linaro.org>
-References: <1401283017-15386-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <53A80FF4.7030909@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 23 Jun 2014 12:31:08 +0100
+Subject: [PATCH] arm64: export __cpu_{clear,copy}_user_page functions
+In-Reply-To: <1403099643.32688.30.camel@deneb.redhat.com>
+References: <1403025266-2326-1-git-send-email-msalter@redhat.com>
+ <20140618103954.GC14680@arm.com>
+ <1403099643.32688.30.camel@deneb.redhat.com>
+Message-ID: <20140623113108.GE15907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/14 16:16, Linus Walleij wrote:
-> This moves the Versatile-specific helper code and panel database
-> down into the drivers/video folder next to the CLCD driver
-> itself, preserving the config symbol but also moving the header
-> to platform data.
+On Wed, Jun 18, 2014 at 02:54:03PM +0100, Mark Salter wrote:
+> On Wed, 2014-06-18 at 11:39 +0100, Catalin Marinas wrote:
+> > On Tue, Jun 17, 2014 at 06:14:26PM +0100, Mark Salter wrote:
+> > > The __cpu_clear_user_page() and __cpu_copy_user_page() functions
+> > > are not currently exported. This prevents modules from using
+> > > clear_user_page() and opy_user_page().
+> > > 
+> > > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > > ---
+> > >  arch/arm64/mm/copypage.c | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/mm/copypage.c b/arch/arm64/mm/copypage.c
+> > > index 9aecbac..13bbc3be 100644
+> > > --- a/arch/arm64/mm/copypage.c
+> > > +++ b/arch/arm64/mm/copypage.c
+> > > @@ -27,8 +27,10 @@ void __cpu_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
+> > >  	copy_page(kto, kfrom);
+> > >  	__flush_dcache_area(kto, PAGE_SIZE);
+> > >  }
+> > > +EXPORT_SYMBOL_GPL(__cpu_copy_user_page);
+> > >  
+> > >  void __cpu_clear_user_page(void *kaddr, unsigned long vaddr)
+> > >  {
+> > >  	clear_page(kaddr);
+> > >  }
+> > > +EXPORT_SYMBOL_GPL(__cpu_clear_user_page);
+> > 
+> > I wonder why we still have these functions. I don't think we need any
+> > D-cache flushing for copy_user_page(), so we could simply remove this
+> > code and define copy_user_page() as copy_page() (similarly for
+> > clear_user_page). I'll post a patch separately removing the copy_page,
+> > copy_user_page etc. functions (now that we also have optimised memcpy
+> > and memset).
 > 
-> This is necessary to rid the Integrator of this final <plat/*>
-> inclusion dependency and get us one less user of the
-> plat-versatile folder.
+> Even better. I much prefer removing code than adding it. Thanks.
 
-I don't like those display controller specific panel lookup tables at
-all, but... Maybe it's still better to have them in the driver itself
-instead of the arch/arm/.
+For the time being I'll merge your patch since using memset for
+clear_page adds a small overhead with checking the alignment and the
+fill value (not much but consistently slower in my mmap benchmarks).
 
-I presume it's easier to queue this via arm tree, as it touches quite
-many files there, and only adds a new file in video/.
-
-So my (grudging) ack:
-
-Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/0f6ed766/attachment.sig>
+-- 
+Catalin
