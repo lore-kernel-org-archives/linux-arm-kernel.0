@@ -1,184 +1,239 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Sun, 22 Jun 2014 22:11:49 -0500
-Subject: [PATCH v7 0/9] ARM: VDSO
-Message-ID: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+Date: Sun, 22 Jun 2014 22:11:57 -0500
+Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping, and synchronization
+In-Reply-To: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1403493118-7597-9-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide fast userspace implementations of gettimeofday and
-clock_gettime on systems that implement the generic timers extension
-defined in ARMv7.  This follows the example of arm64 in conception but
-significantly differs in some aspects of the implementation (C vs
-assembly, mainly).
+Initialize the vdso page list at boot, install the vdso mapping at
+exec time, and update the data page during timer ticks.  This code is
+not built if CONFIG_VDSO is not enabled.
 
-Clocks supported:
-- CLOCK_REALTIME
-- CLOCK_MONOTONIC
-- CLOCK_REALTIME_COARSE
-- CLOCK_MONOTONIC_COARSE
+Account for the vdso length when randomizing the offset from the
+stack.  The vdso is placed immediately following the sigpage with a
+separate install_special_mapping call in arm_install_vdso.
 
-This also provides clock_getres (as arm64 does).
-
-getcpu support is planned but not included at this time.
-
-Note that while the high-precision realtime and monotonic clock
-support depends on the generic timers extension, support for
-clock_getres and coarse clocks is independent of the timer
-implementation and is provided unconditionally.
-
-Run-time tested on OMAP5 and i.MX6, verifying that results obtained
-with the vdso are consistent with those obtained from the kernel.  On
-OMAP5 I observe a 3- to 4-fold speedup for gettimeofday /
-CLOCK_REALTIME, with even better (if less interesting) speedups for
-the coarse clock ids and clock_getres.
-
-I've been testing and benchmarking this with some custom test code
-which I have hosted here:
-
-https://github.com/nlynch-mentor/vdsotest
-
-If this series is applied to an already-built tree and
-CONFIG_VDSO is enabled, an incremental build may fail with:
-
-  fs/binfmt_elf.c: In function 'create_elf_tables':
-  fs/binfmt_elf.c:231:35: error: 'AT_SYSINFO_EHDR' undeclared (first use
-  in this function)
-
-This can be worked around by removing
-arch/arm/include/generated/asm/auxvec.h from the build tree.  I
-lean toward attributing this to a Kbuild limitation/bug, but would
-appreciate extra scrutiny on the patch "ARM: miscellaneous vdso
-infrastructure, preparation" to see if there's anything to correct
-there.
-
-Changes since v6:
-- Update to 3.16-rc1.
-- Remove -lgcc from link step - need to support GCC installations
-  without libgcc.
-- Force -O2 compilation to prevent GCC from emitting calls to libgcc
-  math routines.
-- Use custom post-processing to clear the EF_ARM_ABI_FLOAT_SOFT flag
-  if set in the ELF header to produce a shared object which is
-  architecturally allowed to be used by both soft- and hard-float
-  code.
-- Consolidate common arch timer code instead of duplicating it.
-- Prevent the VDSO from attempting CP15 access on memory-only
-  architected timer implementations by renaming the clocksource.
-
-Changes since v5:
-- Update to 3.15-rc1.
-- Place vdso at a randomized offset above the stack along with the
-  sigpage.
-- Properly export asm/auxvec.h.
-- Split patch into series for ease of review.
-
-Changes since v4:
-- Map data page at the beginning of the VMA to prevent orphan
-  sections at the end of output invalidating the calculated offset.
-- Move checkundef into cmd_vdsold to avoid spurious rebuilds.
-- Change vdso_init message to pr_debug.
-- Add -fno-stack-protector to cflags.
-
-Changes since v3:
-- Update to 3.14-rc6.
-- Record vdso base in mm context before installing mapping (for the
-  sake of perf_mmap_event).
-- Use a more seqcount-like API for critical sections.  Using seqcount
-  API directly, however, would leak kernel pointers to userspace when
-  lockdep is enabled.
-- Trap instead of looping forever in division-by-zero stubs.
-
-Changes since v2:
-- Update to 3.14-rc4.
-- Make vDSO configurable, depending on AEABI and MMU.
-- Defer shifting of nanosecond component of timespec: fixes observed
-  1ns inconsistencies for CLOCK_REALTIME, CLOCK_MONOTONIC (see
-  45a7905fc48f for arm64 equivalent).
-- Force reload of seq_count when spinning: without a memory clobber
-  after the load of vdata->seq_count, GCC can generate code like this:
-    2f8:   e59c9020        ldr     r9, [ip, #32]
-    2fc:   e3190001        tst     r9, #1
-    300:   1a000033        bne     3d4 <do_realtime+0x104>
-    304:   f57ff05b        dmb     ish
-    308:   e59c3034        ldr     r3, [ip, #52]   ; 0x34
-    ...
-    3d4:   eafffffe        b       3d4 <do_realtime+0x104>
-- Build vdso.so with -lgcc: calls to __lshrdi3, __divsi3 sometimes
-  emitted (especially with -Os).  Override certain libgcc functions to
-  prevent undefined symbols.
-- Do not clear PG_reserved on vdso pages.
-- Remove unnecessary get_page calls.
-- Simplify ELF signature check during init.
-- Use volatile for asm syscall fallbacks.
-- Check whether vdso_pagelist is initialized in arm_install_vdso.
-- Record clocksource mask in data page.
-- Reduce code duplication in do_realtime, do_monotonic.
-- Reduce calculations performed in critical sections.
-- Simplify coarse clock handling.
-- Move datapage load to its own assembly routine.
-- Tune vdso_data layout and tweak field names.
-- Check vdso shared object for undefined symbols during build.
-
-Changes since v1:
-- update to 3.14-rc1
-- ensure cache coherency for data page
-- Document the kernel-to-userspace protocol for vdso data page updates,
-  and note that the timekeeping core prevents concurrent updates.
-- update wall-to-monotonic fields unconditionally
-- move vdso_start, vdso_end declarations to vdso.h
-- correctly build and run when CONFIG_ARM_ARCH_TIMER=n
-- rearrange linker script to avoid overlapping sections when CONFIG_DEBUGINFO=n
-- remove use_syscall checks from coarse clock paths
-- crib BUG_INSTR (0xe7f001f2) from asm/bug.h for text fill
-
-Nathan Lynch (9):
-  clocksource: arm_arch_timer: change clocksource name if CP15
-    unavailable
-  clocksource: arm_arch_timer: enable counter access for 32-bit ARM
-  ARM: arch_timer: remove unused functions
-  arm64: arch_timer: remove unused functions
-  ARM: place sigpage at a random offset above stack
-  ARM: miscellaneous vdso infrastructure, preparation
-  ARM: add vdso user-space code
-  ARM: vdso initialization, mapping, and synchronization
-  ARM: add CONFIG_VDSO Kconfig and Makefile bits
-
- arch/arm/include/asm/Kbuild          |   1 -
- arch/arm/include/asm/arch_timer.h    |  25 ---
- arch/arm/include/asm/elf.h           |  11 ++
- arch/arm/include/asm/mmu.h           |   3 +
- arch/arm/include/asm/vdso.h          |  47 +++++
- arch/arm/include/asm/vdso_datapage.h |  60 +++++++
- arch/arm/include/uapi/asm/Kbuild     |   1 +
- arch/arm/include/uapi/asm/auxvec.h   |   7 +
- arch/arm/kernel/Makefile             |   1 +
- arch/arm/kernel/asm-offsets.c        |   5 +
- arch/arm/kernel/process.c            |  56 +++++-
- arch/arm/kernel/vdso.c               | 168 ++++++++++++++++++
- arch/arm/kernel/vdso/.gitignore      |   1 +
- arch/arm/kernel/vdso/Makefile        |  59 +++++++
- arch/arm/kernel/vdso/checkundef.sh   |   9 +
- arch/arm/kernel/vdso/datapage.S      |  15 ++
- arch/arm/kernel/vdso/vdso.S          |  35 ++++
- arch/arm/kernel/vdso/vdso.lds.S      |  88 ++++++++++
- arch/arm/kernel/vdso/vdsomunge.c     | 193 +++++++++++++++++++++
- arch/arm/kernel/vdso/vgettimeofday.c | 320 +++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig                  |  15 ++
- arch/arm64/include/asm/arch_timer.h  |  31 ----
- drivers/clocksource/arm_arch_timer.c |  48 +++++-
- 23 files changed, 1134 insertions(+), 65 deletions(-)
- create mode 100644 arch/arm/include/asm/vdso.h
- create mode 100644 arch/arm/include/asm/vdso_datapage.h
- create mode 100644 arch/arm/include/uapi/asm/auxvec.h
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm/kernel/process.c |  13 +++-
+ arch/arm/kernel/vdso.c    | 168 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 179 insertions(+), 2 deletions(-)
  create mode 100644 arch/arm/kernel/vdso.c
- create mode 100644 arch/arm/kernel/vdso/.gitignore
- create mode 100644 arch/arm/kernel/vdso/Makefile
- create mode 100755 arch/arm/kernel/vdso/checkundef.sh
- create mode 100644 arch/arm/kernel/vdso/datapage.S
- create mode 100644 arch/arm/kernel/vdso/vdso.S
- create mode 100644 arch/arm/kernel/vdso/vdso.lds.S
- create mode 100644 arch/arm/kernel/vdso/vdsomunge.c
- create mode 100644 arch/arm/kernel/vdso/vgettimeofday.c
 
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 40445fb71ac9..39b0d68aa068 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -520,6 +520,7 @@ extern struct page *get_signal_page(void);
+ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
++	unsigned long npages;
+ 	unsigned long addr;
+ 	unsigned long hint;
+ 	int ret;
+@@ -529,9 +530,11 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ 	if (!signal_page)
+ 		return -ENOMEM;
+ 
++	npages = (vdso_mapping_len >> PAGE_SHIFT) + 1;
++
+ 	down_write(&mm->mmap_sem);
+-	hint = vdso_addr(mm, 1);
+-	addr = get_unmapped_area(NULL, hint, PAGE_SIZE, 0, 0);
++	hint = vdso_addr(mm, npages);
++	addr = get_unmapped_area(NULL, hint, npages, 0, 0);
+ 	if (IS_ERR_VALUE(addr)) {
+ 		ret = addr;
+ 		goto up_fail;
+@@ -544,6 +547,12 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ 	if (ret == 0)
+ 		mm->context.sigpage = addr;
+ 
++	/* Unlike the sigpage, failure to install the vdso is unlikely
++	 * to be fatal to the process, so no error check needed
++	 * here.
++	 */
++	arm_install_vdso(mm, addr + PAGE_SIZE);
++
+  up_fail:
+ 	up_write(&mm->mmap_sem);
+ 	return ret;
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+new file mode 100644
+index 000000000000..0cfd25f09adf
+--- /dev/null
++++ b/arch/arm/kernel/vdso.c
+@@ -0,0 +1,168 @@
++/*
++ * Adapted from arm64 version.
++ *
++ * Copyright (C) 2012 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/err.h>
++#include <linux/kernel.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
++#include <linux/timekeeper_internal.h>
++#include <linux/vmalloc.h>
++
++#include <asm/barrier.h>
++#include <asm/cacheflush.h>
++#include <asm/page.h>
++#include <asm/vdso.h>
++#include <asm/vdso_datapage.h>
++
++static struct page **vdso_pagelist;
++
++unsigned long vdso_mapping_len __read_mostly;
++
++/*
++ * The vDSO data page.
++ */
++static union vdso_data_store vdso_data_store __page_aligned_data;
++static struct vdso_data *vdso_data = &vdso_data_store.data;
++
++static int __init vdso_init(void)
++{
++	unsigned long vdso_pages;
++	int i;
++
++	if (memcmp(&vdso_start, "\177ELF", 4)) {
++		pr_err("vDSO is not a valid ELF object!\n");
++		return -ENOEXEC;
++	}
++
++	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
++	pr_debug("vdso: %ld code pages at base %p\n", vdso_pages, &vdso_start);
++
++	/* Allocate the vDSO pagelist, plus a page for the data. */
++	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
++				GFP_KERNEL);
++	if (vdso_pagelist == NULL)
++		return -ENOMEM;
++
++	/* Grab the vDSO data page. */
++	vdso_pagelist[0] = virt_to_page(vdso_data);
++
++	/* Grab the vDSO code pages. */
++	for (i = 0; i < vdso_pages; i++)
++		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
++
++	/* Precompute the mapping size */
++	vdso_mapping_len = (vdso_pages + 1) << PAGE_SHIFT;
++
++	return 0;
++}
++arch_initcall(vdso_init);
++
++/* assumes mmap_sem is write-locked */
++void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
++{
++	int ret;
++
++	mm->context.vdso = ~0UL;
++
++	if (vdso_pagelist == NULL)
++		return;
++
++	/*
++	 * Put vDSO base into mm struct before calling
++	 * install_special_mapping so the perf counter mmap tracking
++	 * code will recognise it as a vDSO.
++	 */
++	mm->context.vdso = addr;
++
++	ret = install_special_mapping(mm, addr, vdso_mapping_len,
++				      VM_READ|VM_EXEC|
++				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
++				      vdso_pagelist);
++	if (ret) {
++		pr_notice_once("%s: install_special_mapping failed (%d)\n",
++			       __func__, ret);
++		mm->context.vdso = ~0UL;
++		return;
++	}
++}
++
++static void vdso_write_begin(struct vdso_data *vdata)
++{
++	++vdso_data->seq_count;
++	smp_wmb();
++}
++
++static void vdso_write_end(struct vdso_data *vdata)
++{
++	smp_wmb();
++	++vdso_data->seq_count;
++}
++
++/**
++ * update_vsyscall - update the vdso data page
++ *
++ * Increment the sequence counter, making it odd, indicating to
++ * userspace that an update is in progress.  Update the fields used
++ * for coarse clocks and, if the architected system timer is in use,
++ * the fields used for high precision clocks.  Increment the sequence
++ * counter again, making it even, indicating to userspace that the
++ * update is finished.
++ *
++ * Userspace is expected to sample seq_count before reading any other
++ * fields from the data page.  If seq_count is odd, userspace is
++ * expected to wait until it becomes even.  After copying data from
++ * the page, userspace must sample seq_count again; if it has changed
++ * from its previous value, userspace must retry the whole sequence.
++ *
++ * Calls to update_vsyscall are serialized by the timekeeping core.
++ */
++void update_vsyscall(struct timekeeper *tk)
++{
++	struct timespec xtime_coarse;
++	struct timespec *wtm = &tk->wall_to_monotonic;
++	bool use_syscall = strcmp(tk->clock->name, "arch_sys_counter");
++
++	vdso_write_begin(vdso_data);
++
++	xtime_coarse = __current_kernel_time();
++	vdso_data->use_syscall			= use_syscall;
++	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
++	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
++	vdso_data->wtm_clock_sec		= wtm->tv_sec;
++	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
++
++	if (!use_syscall) {
++		vdso_data->cs_cycle_last	= tk->cycle_last;
++		vdso_data->xtime_clock_sec	= tk->xtime_sec;
++		vdso_data->xtime_clock_snsec	= tk->xtime_nsec;
++		vdso_data->cs_mult		= tk->mult;
++		vdso_data->cs_shift		= tk->shift;
++		vdso_data->cs_mask		= tk->clock->mask;
++	}
++
++	vdso_write_end(vdso_data);
++
++	flush_dcache_page(virt_to_page(vdso_data));
++}
++
++void update_vsyscall_tz(void)
++{
++	vdso_data->tz_minuteswest	= sys_tz.tz_minuteswest;
++	vdso_data->tz_dsttime		= sys_tz.tz_dsttime;
++	flush_dcache_page(virt_to_page(vdso_data));
++}
 -- 
 1.9.3
