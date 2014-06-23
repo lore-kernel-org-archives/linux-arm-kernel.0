@@ -1,26 +1,83 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 23 Jun 2014 15:23:45 +0100
-Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <20140623141022.GJ32514@n2100.arm.linux.org.uk>
-References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
- <CAFEAcA-NZiRDDeUc7n+6hxgjG1V3qYXPAwyfSdtyz=ZCcD8kiw@mail.gmail.com>
- <1403531535.3804.11.camel@hornet>
- <20140623141022.GJ32514@n2100.arm.linux.org.uk>
-Message-ID: <1403533425.3804.35.camel@hornet>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 23 Jun 2014 07:30:56 -0700
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <20140623103142.GB19730@lukather>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140507213318.GA2105@roeck-us.net> <20140515091123.GQ29258@lukather>
+ <20140519150422.GA27329@lukather> <20140522203444.GE27329@lukather>
+ <20140522211207.GA28704@roeck-us.net> <20140623103142.GB19730@lukather>
+Message-ID: <53A83A20.6090800@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-06-23 at 15:10 +0100, Russell King - ARM Linux wrote:
-> As far as the CLD outputs are concerned, they are standard.  The PLD on
-> their outputs routes the CLD bits to the 8-bit red, green and blue
-> channels according to the configuration of SYS_CLCD to achieve the
-> various colour formats which the CLCD does not natively provide for.
-> 
-> So, it /is/ a PL110 with an independent external muxer.
+On 06/23/2014 03:31 AM, Maxime Ripard wrote:
+> On Thu, May 22, 2014 at 02:12:07PM -0700, Guenter Roeck wrote:
+>> On Thu, May 22, 2014 at 10:34:44PM +0200, Maxime Ripard wrote:
+>>> On Mon, May 19, 2014 at 05:04:22PM +0200, Maxime Ripard wrote:
+>>>> On Thu, May 15, 2014 at 11:11:23AM +0200, Maxime Ripard wrote:
+>>>>> On Wed, May 07, 2014 at 02:33:18PM -0700, Guenter Roeck wrote:
+>>>>>> On Tue, May 06, 2014 at 09:44:19PM -0500, Maxime Ripard wrote:
+>>>>>>> Most of the watchdog code is duplicated between the machine restart code and
+>>>>>>> the watchdog driver. Add the restart hook to the watchdog driver, to be able to
+>>>>>>> remove it from the machine code eventually.
+>>>>>>>
+>>>>>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>>>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>>>>>
+>>>>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>>>>
+>>>>> Wim, do you have any comment on this one?
+>>>>
+>>>> Ping?
+>>>>
+>>>> It would be really great to see this in 3.16, and we get quite close
+>>>> to the end of ARM's merge window.
+>>>
+>>> Ping?
+>>>
+>>> Guenter, since you seem to be the only responsive, may I suggest that
+>>> you start merging patches and do a pull request to either Wim or Linus
+>>> directly during the merge window?
+>>>
+>> I had prepared a pull request for Wim last weekend or so, but then there
+>> were more patches piling in and I got distracted, so I didn't have time
+>> to actually send it. I'll try again this weekend ... the kids should be
+>> busy learning for their finals, and I'll have Friday and Monday off
+>> from work, so I should be able to find the time.
+>>
+>> As for sending patches to Linus directly, well, Wim is the watchdog maintainer.
+>> I manage to upset enough people, and would not want to add Wim to the list.
+>>
+>> The patches _are_ in my watchdog-next branch and get some coverage from
+>> both my auto-builders and from Fenguang's build robots, so while they are
+>> not in linux-next, they are not completely in the dark either.
+>
+> So, this patch finally didn't make it into 3.16. Great. Now, we can't
+> even reboot the boards.
+>
+> Given how it's just impossible to get something merged reliably
+> through the watchdog tree, I guess I should just start merging the
+> patches through mine?
+>
 
-Cool, this means that one can still use this property do define which
-CLDs are wired to R/G/B-0s and make an informed decision in the driver
-based on this (although with a separate compatible value it won't be
-really necessary).
+You can not really blame Wim here.
 
-Pawel
+In this case, I suspect the major reason for not accepting the patch
+is that I tried to provide a clean method / API for "reset through watchdog
+subsystem", which went nowhere, in my understanding because someone objected
+that it would be the wrong thing to do [1] and it didn't get approval /
+acceptance from the arm maintainers. If it is wrong to reset the board
+from the watchdog subsystem in a clean way, it is for sure even more wrong
+to do it as you proposed in your patch.
+
+My conclusion therefore is that all board reset code should move back out
+of the watchdog subsystem, and that we should not accept such code in the
+future. This is not my personal preference, but I do believe that we should
+do it in a clean way or not at all.
+
+Guenter
+
+---
+[1] https://lkml.org/lkml/2014/5/15/838
