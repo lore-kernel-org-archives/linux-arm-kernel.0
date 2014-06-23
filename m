@@ -1,30 +1,73 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 23 Jun 2014 18:14:43 -0400
+Date: Mon, 23 Jun 2014 18:17:33 -0400
 Subject: [PATCH v3 1/7] genirq: generic chip: export
  irq_map_generic_chip function
-In-Reply-To: <53A889C0.2090207@free-electrons.com>
+In-Reply-To: <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
 References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
  <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140621235108.GJ21711@titan.lakedaemon.net>
- <53A68CF0.8040303@free-electrons.com>
- <20140623130705.GM21711@titan.lakedaemon.net>
- <53A842C3.6060606@free-electrons.com>
- <20140623175041.GB10202@titan.lakedaemon.net>
- <53A889C0.2090207@free-electrons.com>
-Message-ID: <20140623221443.GF10202@titan.lakedaemon.net>
+Message-ID: <20140623221733.GG10202@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 23/06/2014 19:50, Jason Cooper wrote:
-...
-> > I won't have a chance to dig deeper into this until tonight or the next
-> > few days.  But my primary concern is that they chose to export the
-> > struct for a reason.  I'd like to dig through the history and find out
-> > why.
+Thomas,
 
-Ok, I took a look.  It seems that was the most expedient way to
-implement the linear domain registration.  No mention of avoiding
-exporting the functions directly. :)
+Would you mind Acking this and letting me know how you'd like me to
+handle it?  It's a build requirement for the rest of the series, but
+it's in core code.
+
+I can do a separate topic branch for you or just merge it in with
+irqchip/core.  Whichever is easiest for you.
+
+On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
+> Export the generic irq map function in order to provide irq_domain ops with
+> generic mapping and specific of xlate function (needed by the new atmel
+> AIC driver).
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  include/linux/irq.h       | 2 ++
+>  kernel/irq/generic-chip.c | 5 +++--
+>  2 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index 0d998d8..62af592 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
+>  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
+>  
+>  /* Setup functions for irq_chip_generic */
+> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> +			 irq_hw_number_t hw_irq);
+>  struct irq_chip_generic *
+>  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
+>  		       void __iomem *reg_base, irq_flow_handler_t handler);
+> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+> index 452d6f2..cf80e7b 100644
+> --- a/kernel/irq/generic-chip.c
+> +++ b/kernel/irq/generic-chip.c
+> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
+>  /*
+>   * irq_map_generic_chip - Map a generic chip for an irq domain
+>   */
+> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> -				irq_hw_number_t hw_irq)
+> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> +			 irq_hw_number_t hw_irq)
+>  {
+>  	struct irq_data *data = irq_get_irq_data(virq);
+>  	struct irq_domain_chip_generic *dgc = d->gc;
+> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+>  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
+>  
+>  struct irq_domain_ops irq_generic_chip_ops = {
+>  	.map	= irq_map_generic_chip,
+> -- 
+> 1.8.3.2
+> 
 
 thx,
 
