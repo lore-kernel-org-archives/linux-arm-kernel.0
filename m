@@ -1,78 +1,75 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 23 Jun 2014 15:25:26 +0200
-Subject: [PATCH v2 1/2] ARM: dts: i.MX25: Fix gpt timers clocks.
-Message-ID: <1403529927-13868-1-git-send-email-denis@eukrea.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Mon, 23 Jun 2014 15:39:36 +0200
+Subject: [PATCH v7 0/7] ARM: berlin: add AHCI support
+Message-ID: <1403530783-17180-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without that fix, the board freeze during boot.
+This series adds the support for Berlin SoC AHCI controller. The
+controller allows to use the SATA host interface and, for example, the
+eSATA port on the BG2Q.
 
-This appeared after the following commit:
-  496f065 ARM: i.MX: Use of_clk_get_by_name() for timer clocks for DT case.
+The series adds a PHY driver to control the two SATA ports available,
+and adds a generic compatible to use the existing ahci_platform driver.
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-Changelog v1->v2:
-- Also fixed the ipg clock
-- Also fixed the ipg and per clocks for the other gpts
-- Also fixed the ipg clock for non-dt init.
----
- arch/arm/boot/dts/imx25.dtsi  |    8 ++++----
- arch/arm/mach-imx/clk-imx25.c |    2 +-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+Also enable the eSATA interface on the BG2Q DMP.
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index bb74d95..c174039 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -312,7 +312,7 @@
- 			gpt4: timer at 53f84000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f84000 0x4000>;
--				clocks = <&clks 9>, <&clks 45>;
-+				clocks = <&clks 95>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <1>;
- 			};
-@@ -320,7 +320,7 @@
- 			gpt3: timer at 53f88000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f88000 0x4000>;
--				clocks = <&clks 9>, <&clks 47>;
-+				clocks = <&clks 94>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <29>;
- 			};
-@@ -328,7 +328,7 @@
- 			gpt2: timer at 53f8c000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f8c000 0x4000>;
--				clocks = <&clks 9>, <&clks 47>;
-+				clocks = <&clks 93>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <53>;
- 			};
-@@ -336,7 +336,7 @@
- 			gpt1: timer at 53f90000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f90000 0x4000>;
--				clocks = <&clks 9>, <&clks 47>;
-+				clocks = <&clks 92>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <54>;
- 			};
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index 887b508..e759a6d 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -242,7 +242,7 @@ int __init mx25_clocks_init(void)
- {
- 	__mx25_clocks_init(24000000);
- 
--	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
-+	clk_register_clkdev(clk[gpt1_ipg], "ipg", "imx-gpt.0");
- 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
- 	/* i.mx25 has the i.mx21 type uart */
- 	clk_register_clkdev(clk[uart1_ipg], "ipg", "imx21-uart.0");
+Changes since v6:
+        - added the 'clocks' property and support in the PHY driver
+        - updated the PHY compatible
+
+Changes since v5:
+        - rebased on top of v3.16-rc1
+        - added the 'clocks' property in the sata node
+
+Changes since v4:
+        - updated PHY driver as tristate
+        - handled the case were no SATA port is enabled
+        - updated the compatible to a generic one
+        - cosmetic fixups
+
+Changes since v3:
+        - moved all PHY operations to the PHY driver
+        - removed PHY sub-nodes
+        - removed the custom Berlin AHCI driver and switched to
+          ahci_platform
+        - added multiple PHYs support to the libahci_platform
+
+Changes since v2:
+        - modeled each PHY as a sub-node
+        - cosmetic fixups
+
+Changes since v1:
+        - added a PHY driver, allowing to enable each port
+          individually and removed the 'force-port-map' property
+	- made the drivers a bit less magic :)
+        - wrote a function to select and configure registers in the
+          AHCI driver
+        - removed BG2 / BG2CD nodes
+
+Antoine T?nart (7):
+  phy: add a driver for the Berlin SATA PHY
+  Documentation: bindings: add the Berlin SATA PHY
+  ata: libahci: allow to use multiple PHYs
+  ata: ahci_platform: add a generic AHCI compatible
+  Documentation: bindings: document the sub-nodes AHCI bindings
+  ARM: berlin: add the AHCI node for the BG2Q
+  ARM: berlin: enable the eSATA interface on the BG2Q DMP
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |  37 ++++
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    |  16 ++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   8 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |  29 +++
+ drivers/ata/ahci.h                                 |   3 +-
+ drivers/ata/ahci_platform.c                        |   2 +
+ drivers/ata/libahci.c                              |   7 +
+ drivers/ata/libahci_platform.c                     | 170 +++++++++++---
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-berlin-sata.c                      | 246 +++++++++++++++++++++
+ 11 files changed, 490 insertions(+), 36 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+ create mode 100644 drivers/phy/phy-berlin-sata.c
+
 -- 
-1.7.9.5
+1.9.1
