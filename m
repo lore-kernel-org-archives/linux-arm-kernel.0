@@ -1,78 +1,95 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 23 Jun 2014 15:07:19 +0200
-Subject: [PATCH v2 2/2] video: imxfb: Fix lcd_ops .set_power and .get_power
- on/off inversion
-In-Reply-To: <1403528839-31901-1-git-send-email-denis@eukrea.com>
-References: <1403528839-31901-1-git-send-email-denis@eukrea.com>
-Message-ID: <1403528839-31901-2-git-send-email-denis@eukrea.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 23 Jun 2014 09:07:05 -0400
+Subject: [PATCH v3 1/7] genirq: generic chip: export
+ irq_map_generic_chip function
+In-Reply-To: <53A68CF0.8040303@free-electrons.com>
+References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140621235108.GJ21711@titan.lakedaemon.net>
+ <53A68CF0.8040303@free-electrons.com>
+Message-ID: <20140623130705.GM21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-.set_power takes the blank level as argument instead
-of an on/off parameter:
-fb_blank calls fb_notifier_call_chain with the blank
-level encoded in its parameters, which is then sent
-as-is to the set_power callback.
+On Sun, Jun 22, 2014 at 09:59:44AM +0200, Boris BREZILLON wrote:
+> 
+> On 22/06/2014 01:51, Jason Cooper wrote:
+> > On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
+> >> Export the generic irq map function in order to provide irq_domain ops with
+> >> generic mapping and specific of xlate function (needed by the new atmel
+> >> AIC driver).
+> >>
+> >> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >> ---
+> >>  include/linux/irq.h       | 2 ++
+> >>  kernel/irq/generic-chip.c | 5 +++--
+> >>  2 files changed, 5 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> >> index 0d998d8..62af592 100644
+> >> --- a/include/linux/irq.h
+> >> +++ b/include/linux/irq.h
+> >> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
+> >>  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
+> >>  
+> >>  /* Setup functions for irq_chip_generic */
+> >> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >> +			 irq_hw_number_t hw_irq);
+> >>  struct irq_chip_generic *
+> >>  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
+> >>  		       void __iomem *reg_base, irq_flow_handler_t handler);
+> >> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+> >> index 452d6f2..cf80e7b 100644
+> >> --- a/kernel/irq/generic-chip.c
+> >> +++ b/kernel/irq/generic-chip.c
+> >> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
+> >>  /*
+> >>   * irq_map_generic_chip - Map a generic chip for an irq domain
+> >>   */
+> >> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >> -				irq_hw_number_t hw_irq)
+> >> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >> +			 irq_hw_number_t hw_irq)
+> >>  {
+> >>  	struct irq_data *data = irq_get_irq_data(virq);
+> >>  	struct irq_domain_chip_generic *dgc = d->gc;
+> >> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >>  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+> >>  	return 0;
+> >>  }
+> >> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
+> >>  
+> >>  struct irq_domain_ops irq_generic_chip_ops = {
+> >>  	.map	= irq_map_generic_chip,
+> > Why can't you use irq_generic_chip_ops.map in your code and avoid this
 
-imxfb_lcd_set_power was expecting an on/off parameter
-instead.
-This resulted in the inversion of the on/off behaviour.
+s/code/declaration/, sorry for the misunderstanding.
 
-.get_power was also fixed in the same way.
+> > patch entirely?
+> 
+> Because in this case I'll have to remove constness from my
+> irq_domain_ops struct and initialize it in my init function.
+> This is not a big concern, but in general I tend to declare ops struct
+> with a const constraint.
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-Changelog v1->v2:
-- get_power which has the same issue, was also fixed as requested.
-- The commit message was updated to reflect that.
----
- drivers/video/fbdev/imxfb.c |   27 +++++++++++++++++++--------
- 1 file changed, 19 insertions(+), 8 deletions(-)
+/*
+ * We're the only user of irq_map_generic_chip() who
+ * doesn't also use irq_domain_xlate_onetwocell()
+ */
+static const struct irq_domain_ops aic_irq_ops = {
+	.map    = irq_generic_chip_ops.map,
+        .xlate  = aic_irq_domain_xlate,
+};
 
-diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
-index 121cbd7..f734757 100644
---- a/drivers/video/fbdev/imxfb.c
-+++ b/drivers/video/fbdev/imxfb.c
-@@ -758,21 +758,32 @@ static int imxfb_lcd_get_power(struct lcd_device *lcddev)
- {
- 	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
- 
--	if (!IS_ERR(fbi->lcd_pwr))
--		return regulator_is_enabled(fbi->lcd_pwr);
-+	if (!IS_ERR_OR_NULL(fbi->lcd_pwr))
-+		if (!regulator_is_enabled(fbi->lcd_pwr))
-+			return FB_BLANK_NORMAL;
- 
--	return 1;
-+	return FB_BLANK_UNBLANK;
- }
- 
--static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
-+static int imxfb_lcd_set_power(struct lcd_device *lcddev, int blank)
- {
- 	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
- 
- 	if (!IS_ERR(fbi->lcd_pwr)) {
--		if (power && !regulator_is_enabled(fbi->lcd_pwr))
--			return regulator_enable(fbi->lcd_pwr);
--		else if (regulator_is_enabled(fbi->lcd_pwr))
--			return regulator_disable(fbi->lcd_pwr);
-+		switch (blank) {
-+		case FB_BLANK_VSYNC_SUSPEND:
-+		case FB_BLANK_HSYNC_SUSPEND:
-+		case FB_BLANK_NORMAL:
-+		case FB_BLANK_POWERDOWN:
-+			if (regulator_is_enabled(fbi->lcd_pwr))
-+				return regulator_disable(fbi->lcd_pwr);
-+			break;
-+
-+		case FB_BLANK_UNBLANK:
-+			if (!regulator_is_enabled(fbi->lcd_pwr))
-+				return regulator_enable(fbi->lcd_pwr);
-+			break;
-+		}
- 	}
- 
- 	return 0;
--- 
-1.7.9.5
+Wouldn't work?
+
+> Tell me if you still want me to drop this patch and rework my init process.
+
+If the above is satisfactory for you, please do so.  If we get a few
+more chips that need one function, but not the other, then we'll revisit
+what we're exporting.  The comment should bring the issue up in a
+future grep.
+
+thx,
+
+Jason.
