@@ -1,146 +1,324 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 23 Jun 2014 17:10:03 -0400
-Subject: [PATCHv3] mm: page_alloc: fix CMA area initialisation when
- pageblock > MAX_ORDER
-In-Reply-To: <xa1tegyfv2gw.fsf@mina86.com>
-References: <1402522435-13884-1-git-send-email-msalter@redhat.com>
- <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
- <xa1t61jzwfo6.fsf@mina86.com> <1403201524.32688.62.camel@deneb.redhat.com>
- <xa1tfvj01z57.fsf@mina86.com> <1403285834.755.39.camel@deneb.redhat.com>
- <xa1tegyfv2gw.fsf@mina86.com>
-Message-ID: <1403557803.755.53.camel@deneb.redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 24 Jun 2014 01:11:11 +0400
+Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
+In-Reply-To: <20a0a16226d54b0e8d6f68e41046bbf2@HKXPR06MB168.apcprd06.prod.outlook.com>
+References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
+ <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
+ <53A209DA.9000000@cogentembedded.com>
+ <20a0a16226d54b0e8d6f68e41046bbf2@HKXPR06MB168.apcprd06.prod.outlook.com>
+Message-ID: <53A897EF.2020804@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-06-23 at 21:40 +0200, Michal Nazarewicz wrote:
-> With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE,
-> the following is triggered at early boot:
-> 
->   SMP: Total of 8 processors activated.
->   devtmpfs: initialized
->   Unable to handle kernel NULL pointer dereference at virtual address 00000008
->   pgd = fffffe0000050000
->   [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
->   Internal error: Oops: 96000006 [#1] SMP
->   Modules linked in:
->   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
->   task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
->   PC is at __list_add+0x10/0xd4
->   LR is at free_one_page+0x270/0x638
->   ...
->   Call trace:
->   [<fffffe00003ee970>] __list_add+0x10/0xd4
->   [<fffffe000019c478>] free_one_page+0x26c/0x638
->   [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
->   [<fffffe000019d5e8>] __free_pages+0x74/0xbc
->   [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
->   [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
->   [<fffffe0000090418>] do_one_initcall+0xc4/0x154
->   [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
->   [<fffffe00007520a0>] kernel_init+0xc/0xd4
-> 
-> This happens because init_cma_reserved_pageblock() calls
-> __free_one_page() with pageblock_order as page order but it is bigger
-> han MAX_ORDER.  This in turn causes accesses past zone->free_list[].
-> 
-> Fix the problem by changing init_cma_reserved_pageblock() such that it
-> splits pageblock into individual MAX_ORDER pages if pageblock is
-> bigger than a MAX_ORDER page.
-> 
-> In cases where !CONFIG_HUGETLB_PAGE_SIZE_VARIABLE, which is all
-> architectures expect for ia64, powerpc and tile at the moment, the
-> ?pageblock_order > MAX_ORDER? condition will be optimised out since
-> both sides of the operator are constants.  In cases where pageblock
-> size is variable, the performance degradation should not be
-> significant anyway since init_cma_reserved_pageblock() is called
-> only at boot time at most MAX_CMA_AREAS times which by default is
-> eight.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> Reported-by: Mark Salter <msalter@redhat.com>
-> Tested-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  mm/page_alloc.c | 16 ++++++++++++++--
->  1 file changed, 14 insertions(+), 2 deletions(-)
-> 
->  Mark Salter wrote:
->  > I ended up needing this (on top of your patch) to get the system to
->  > boot.  Each MAX_ORDER-1 group needs the refcount and migratetype set
->  > so that __free_pages does the right thing.
->  >
->  > diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->  > index 02fb1ed..a7ca6cc 100644
->  > --- a/mm/page_alloc.c
->  > +++ b/mm/page_alloc.c
->  > @@ -799,17 +799,18 @@ void __init init_cma_reserved_pageblock(struct page *page)
->  >  		set_page_count(p, 0);
->  >  	} while (++p, --i);
->  >  
->  > -	set_page_refcounted(page);
->  > -	set_pageblock_migratetype(page, MIGRATE_CMA);
->  > -
->  > -	if (pageblock_order > MAX_ORDER) {
->  > -		i = pageblock_order - MAX_ORDER;
->  > +	if (pageblock_order >= MAX_ORDER) {
->  > +		i = pageblock_order - MAX_ORDER + 1;
->  >  		i = 1 << i;
->  >  		p = page;
->  >  		do {
->  > -			__free_pages(p, MAX_ORDER);
->  > +			set_page_refcounted(p);
->  > +			set_pageblock_migratetype(p, MIGRATE_CMA);
->  > +			__free_pages(p, MAX_ORDER - 1);
->  >  		} while (p += MAX_ORDER_NR_PAGES, --i);
->  >  	} else {
->  > +		set_page_refcounted(page);
->  > +		set_pageblock_migratetype(page, MIGRATE_CMA);
->  >  		__free_pages(page, pageblock_order);
->  >  	}
-> 
->  This is kinda embarrassing, dunno how I missed that.
-> 
->  But each page actually does not need to have migratetype set, does it?
->  All of those pages are in a single pageblock so a single call
->  suffices.  If you track set_pageblock_migratetype down to pfn_to_bitidx
->  there is:
-> 
-> 	return (pfn >> pageblock_order) * NR_PAGEBLOCK_BITS;
-> 
->  so for pfns inside of a pageblock, they get truncated.  Or did I miss
->  yet another thing?
+Hello.
 
-Nope, my turn to miss something. You only need to set migrate type
-once per pageblock.
+On 06/23/2014 08:44 PM, Phil Edworthy wrote:
 
-> 
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index ee92384..fef9614 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -816,9 +816,21 @@ void __init init_cma_reserved_pageblock(struct page *page)
->  		set_page_count(p, 0);
->  	} while (++p, --i);
->  
-> -	set_page_refcounted(page);
->  	set_pageblock_migratetype(page, MIGRATE_CMA);
-> -	__free_pages(page, pageblock_order);
-> +
-> +	if (pageblock_order >= MAX_ORDER) {
-> +		i = pageblock_nr_pages;
-> +		p = page;
-> +		do {
-> +			set_page_refcounted(p);
-> +			__free_pages(p, MAX_ORDER - 1);
-> +			p += MAX_ORDER_NR_PAGES;
-> +		} while (i -= MAX_ORDER_NR_PAGES);
-> +	} else {
-> +		set_page_refcounted(page);
-> +		__free_pages(page, pageblock_order);
-> +	}
-> +
->  	adjust_managed_page_count(page, pageblock_nr_pages);
->  }
->  #endif
+>>      I'm investigating an imprecise external abort occurring once userland is
+>> started when I have NetMos
 
-This version works for me. Thanks.
+    Or is it MosChip now? Can't remember all their renames. :-)
+
+>> PCIe serial card inserted and the '8250_pci'
+>> driver
+>> enabled and I have found some issues in this driver, while at it...
+
+    I should mention that the serial PCI device has both I/O port and memory 
+BARs; it's the driver's choice to use the I/O ports.
+
+> Shame they didn't come before the driver was accepted,
+
+    Sorry, I don't usually review large patches -- it's very time consuming 
+(my review took 2+ hours and yet I haven't pointed out all issues).
+
+> but still, I welcome the comments. See below.
+
+    Thanks. :-)
+
+>>> This PCIe Host driver currently does not support MSI, so cards
+>>> fall back to INTx interrupts.
+
+>>> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+
+[...]
+
+>>> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+>>> new file mode 100644
+>>> index 0000000..3c524b9
+>>> --- /dev/null
+>>> +++ b/drivers/pci/host/pcie-rcar.c
+>>> @@ -0,0 +1,768 @@
+
+[...]
+
+>>> +static void pci_write_reg(struct rcar_pcie *pcie, unsigned long val,
+>>> +			  unsigned long reg)
+>>> +{
+>>> +	writel(val, pcie->base + reg);
+>>> +}
+>>> +
+>>> +static unsigned long pci_read_reg(struct rcar_pcie *pcie, unsigned long
+>> reg)
+>>> +{
+>>> +	return readl(pcie->base + reg);
+>>> +}
+
+>>      As a side note, these functions are hardly needed, and risk collision too...
+
+> Ben mentioned this in his review and as I said then, I found them useful during
+> development, so we agreed to leave them. Since they are static, there shouldn't
+> be a collision risk.
+
+    You're risking clashes even at the source level, not even at object file 
+level...
+
+>>> +static void rcar_pcie_setup_window(int win, struct resource *res,
+>>> +				   struct rcar_pcie *pcie)
+
+>>      As a side note, 'res' parameter is hardly needed here, as the function
+>> always gets
+>> called with the resources contained within 'struct rcar_pcie'...
+
+> Either I would have to pass an index to the resource in,
+
+    But you already do pass it, 'win' is the index!
+
+> or as I have done, a
+> pointer to the individual resource. I found it cleaner to pass the pointer.
+
+    You're actually pass excess parameters, both the index and the pointer.
+
+[...]
+
+>>> +
+>>> +	/* First resource is for IO */
+>>> +	mask = PAR_ENABLE;
+>>> +	if (res->flags & IORESOURCE_IO)
+>>> +		mask |= IO_SPACE;
+
+>>      For the memory space this works OK as you're identity-mapping the
+>> memory
+>> ranges in your device trees. However, for the I/O space this means that it
+>> won't work as the BARs in the PCIe devices get programmed with the PCI bus
+>> addresses but the PCIe window translation register is programmed with a
+>> CPU
+>> address which don't at all match (given your device trees) and hence one
+>> can't
+>> access the card's I/O mapped registers at all...
+
+> Hmm, I couldn't find any cards that supported I/O, so I wasn't able to test
+> this. Clearly this is an issue that needs looking into.
+
+    Will you look into it then, or should I?
+
+>>> +
+>>> +	pci_write_reg(pcie, mask, PCIEPTCTLR(win));
+>>> +}
+>>> +
+>>> +static int rcar_pcie_setup(int nr, struct pci_sys_data *sys)
+>>> +{
+>>> +	struct rcar_pcie *pcie = sys_to_pcie(sys);
+>>> +	struct resource *res;
+>>> +	int i;
+>>> +
+>>> +	pcie->root_bus_nr = -1;
+>>> +
+>>> +	/* Setup PCI resources */
+>>> +	for (i = 0; i < PCI_MAX_RESOURCES; i++) {
+>>> +
+>>> +		res = &pcie->res[i];
+>>> +		if (!res->flags)
+>>> +			continue;
+>>> +
+>>> +		rcar_pcie_setup_window(i, res, pcie);
+>>> +
+>>> +		if (res->flags & IORESOURCE_IO)
+>>> +			pci_ioremap_io(nr * SZ_64K, res->start);
+
+>>     I'm not sure why are you not calling pci_add_resource() for I/O space...
+
+    Sorry, did you reply to that?
+
+>> Also, this sets up only 64 KiB of I/O ports while your device tree describes
+>> I/O space 1 MiB is size.
+
+> This driver should be able to cope with multiple host controllers, so each
+> allocated 64KiB for I/O. 64KiB is all you need for I/O, but the R-Car PCIe
+> hardware has a 1MiB region (the smallest one) that can only be used for one
+> type of PCIe access.
+
+[...]
+
+>>> +static int rcar_pcie_hw_init(struct rcar_pcie *pcie)
+>>> +{
+>>> +	int err;
+>>> +
+>>> +	/* Begin initialization */
+>>> +	pci_write_reg(pcie, 0, PCIETCTLR);
+>>> +
+>>> +	/* Set mode */
+>>> +	pci_write_reg(pcie, 1, PCIEMSR);
+>>> +
+>>> +	/*
+>>> +	 * Initial header for port config space is type 1, set the device
+>>> +	 * class to match. Hardware takes care of propagating the IDSETR
+>>> +	 * settings, so there is no need to bother with a quirk.
+>>> +	 */
+>>> +	pci_write_reg(pcie, PCI_CLASS_BRIDGE_PCI << 16, IDSETR1);
+
+>>      Hm, shouldn't this be a host bridge? I've noticed that the bridge's I/O
+>> and memory base/limit registers are left uninitialized even though the BARs
+>> of the PICe devices behind this bridge are assigned.
+
+> No, I am pretty sure this is correct.
+
+    It just looks strange. What you actually have is clearly a host-to-PCI 
+bridge. Instead you have one "virtual" PCI bus consisting of only PCI-PCI 
+bridge device, and the real PCIe bus hanging from the PCI-PCI bridge. Weird...
+
+[...]
+
+>>> +
+>>> +	/* Terminate list of capabilities (Next Capability Offset=0) */
+>>> +	rcar_rmw32(pcie, RVCCAP(0), 0xfff0, 0);
+>>> +
+>>> +	/* Enable MAC data scrambling. */
+
+    I wonder what does MAC mean in the PCIe context...
+
+>>> +	rcar_rmw32(pcie, MACCTLR, SCRAMBLE_DISABLE, 0);
+
+>>      Doesn't the comment contradict the code here?
+
+> No, the rmw32 function is read, modify, write and the SCRAMBLE_DISABLE shown
+> here is the mask, not the value. If the last arg was 1, the call would set the
+> scramble disable bit to 1.
+
+    Ah, missed that, sorry.
+
+> Anyway, scrambling is enabled by default in the HW, so I'll remove this.
+
+    OK.
+
+>>> +
+>>> +	/* Finish initialization - establish a PCI Express link */
+>>> +	pci_write_reg(pcie, CFINIT, PCIETCTLR);
+>>> +
+>>> +	/* This will timeout if we don't have a link. */
+>>> +	err = rcar_pcie_wait_for_dl(pcie);
+>>> +	if (err)
+>>> +		return err;
+>>> +
+>>> +	/* Enable INTx interrupts */
+>>> +	rcar_rmw32(pcie, PCIEINTXR, 0, 0xF << 8);
+>>> +
+>>> +	/* Enable slave Bus Mastering */
+>>> +	rcar_rmw32(pcie, RCONF(PCI_STATUS), PCI_STATUS_DEVSEL_MASK,
+>>> +		PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+>> PCI_COMMAND_MASTER |
+>>> +		PCI_STATUS_CAP_LIST | PCI_STATUS_DEVSEL_FAST);
+
+>>      Hmm, you're mixing up PCI control/status registers' bits here; they're
+>> two 16-bit registers! So you're writing to 3 reserved LSBs of the PCI status
+>> register...
+
+    ... and therefore not writing these bits to the PCI command (not control, 
+sorry) register. Perhaps because of that PCI-PCI bridge remains inactive...
+
+> The mask arg should make sure that we don't write to reserved bits. However,
+
+    Look at rcar_rmw32() again -- it doesn't really do that.
+
+> the bits & mask combination is clearly wrong & I'll look at this.
+> Somewhere along the line, the use of the mask arg to the rcar_rmw32 function
+> has clearly gone astray. I checked all the rmw calls and found another couple
+> that are wrong.
+
+    OK, please fix those.
+
+[...]
+
+>>> +static int rcar_pcie_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct rcar_pcie *pcie;
+>>> +	unsigned int data;
+>>> +	struct of_pci_range range;
+>>> +	struct of_pci_range_parser parser;
+>>> +	const struct of_device_id *of_id;
+>>> +	int err, win = 0;
+>>> +	int (*hw_init_fn)(struct rcar_pcie *);
+>>> +
+>>> +	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
+>>> +	if (!pcie)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	pcie->dev = &pdev->dev;
+>>> +	platform_set_drvdata(pdev, pcie);
+>>> +
+>>> +	/* Get the bus range */
+>>> +	if (of_pci_parse_bus_range(pdev->dev.of_node, &pcie->busn)) {
+>>> +		dev_err(&pdev->dev, "failed to parse bus-range
+>> property\n");
+>>> +		return -EINVAL;
+>>> +	}
+>>> +
+>>> +	if (of_pci_range_parser_init(&parser, pdev->dev.of_node)) {
+>>> +		dev_err(&pdev->dev, "missing ranges property\n");
+>>> +		return -EINVAL;
+>>> +	}
+>>> +
+>>> +	err = rcar_pcie_get_resources(pdev, pcie);
+>>> +	if (err < 0) {
+>>> +		dev_err(&pdev->dev, "failed to request resources: %d\n",
+>> err);
+>>> +		return err;
+>>> +	}
+>>> +
+>>> +	for_each_of_pci_range(&parser, &range) {
+>>> +		of_pci_range_to_resource(&range, pdev->dev.of_node,
+>>> +						&pcie->res[win++]);
+
+>>      This function call is probably no good here as it fetches into the 'start'
+>> field of a 'struct resource' a CPU address instead of a PCI address...
+
+> No, the ranges describe the CPU addresses of the PCI memory and I/O regions, so
+> this is correct.
+
+    The problem actually is that you need to remember both CPU and PCI 
+addresses, so 'struct of_pci_range' looks more fitting here...
+
+>>> +
+>>> +		if (win > PCI_MAX_RESOURCES)
+>>> +			break;
+>>> +	}
+>>> +
+>>> +	 err = rcar_pcie_parse_map_dma_ranges(pcie, pdev->dev.of_node);
+>>> +	 if (err)
+>>> +		return err;
+>>> +
+>>> +	of_id = of_match_device(rcar_pcie_of_match, pcie->dev);
+>>> +	if (!of_id || !of_id->data)
+>>> +		return -EINVAL;
+>>> +	hw_init_fn = of_id->data;
+>>> +
+>>> +	/* Failure to get a link might just be that no cards are inserted */
+>>> +	err = hw_init_fn(pcie);
+>>> +	if (err) {
+>>> +		dev_info(&pdev->dev, "PCIe link down\n");
+>>> +		return 0;
+
+>>      Not quite sure why you exit normally here without enabling the hardware.
+>> I think the internal bridge should be visible regardless of whether link is
+>> detected or not...
+
+> Why would you want to see the bridge when you can do nothing with it? Aren't
+
+    Because it's the way PCI works. You have the built-in devices always 
+present and seen on a PCI bus. :-)
+
+> you are just wasting resources?
+
+    I think it's rather you who are wasting resources. ;-) Why not just fail 
+the probe when you have no link?
+
+WBR, Sergei
