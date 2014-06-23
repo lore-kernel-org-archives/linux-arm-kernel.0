@@ -1,83 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 23 Jun 2014 07:30:56 -0700
-Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
- driver
-In-Reply-To: <20140623103142.GB19730@lukather>
-References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140507213318.GA2105@roeck-us.net> <20140515091123.GQ29258@lukather>
- <20140519150422.GA27329@lukather> <20140522203444.GE27329@lukather>
- <20140522211207.GA28704@roeck-us.net> <20140623103142.GB19730@lukather>
-Message-ID: <53A83A20.6090800@roeck-us.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Jun 2014 16:40:07 +0200
+Subject: [PATCH 0/2] efi: preserve NEON registers on UEFI services calls
+In-Reply-To: <1403533095-2611-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1403533095-2611-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_GHr=jDn_18cTRhFFWjBeWzYbPs9N+-q5euoGyGmX3eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2014 03:31 AM, Maxime Ripard wrote:
-> On Thu, May 22, 2014 at 02:12:07PM -0700, Guenter Roeck wrote:
->> On Thu, May 22, 2014 at 10:34:44PM +0200, Maxime Ripard wrote:
->>> On Mon, May 19, 2014 at 05:04:22PM +0200, Maxime Ripard wrote:
->>>> On Thu, May 15, 2014 at 11:11:23AM +0200, Maxime Ripard wrote:
->>>>> On Wed, May 07, 2014 at 02:33:18PM -0700, Guenter Roeck wrote:
->>>>>> On Tue, May 06, 2014 at 09:44:19PM -0500, Maxime Ripard wrote:
->>>>>>> Most of the watchdog code is duplicated between the machine restart code and
->>>>>>> the watchdog driver. Add the restart hook to the watchdog driver, to be able to
->>>>>>> remove it from the machine code eventually.
->>>>>>>
->>>>>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>>>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>>>>>
->>>>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>>>>
->>>>> Wim, do you have any comment on this one?
->>>>
->>>> Ping?
->>>>
->>>> It would be really great to see this in 3.16, and we get quite close
->>>> to the end of ARM's merge window.
->>>
->>> Ping?
->>>
->>> Guenter, since you seem to be the only responsive, may I suggest that
->>> you start merging patches and do a pull request to either Wim or Linus
->>> directly during the merge window?
->>>
->> I had prepared a pull request for Wim last weekend or so, but then there
->> were more patches piling in and I got distracted, so I didn't have time
->> to actually send it. I'll try again this weekend ... the kids should be
->> busy learning for their finals, and I'll have Friday and Monday off
->> from work, so I should be able to find the time.
->>
->> As for sending patches to Linus directly, well, Wim is the watchdog maintainer.
->> I manage to upset enough people, and would not want to add Wim to the list.
->>
->> The patches _are_ in my watchdog-next branch and get some coverage from
->> both my auto-builders and from Fenguang's build robots, so while they are
->> not in linux-next, they are not completely in the dark either.
+On 23 June 2014 16:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> The current UEFI implementation for arm64 fails to preserve/restore the contents
+> of the NEON register file, which may result in data corruption, especially now
+> that those contents are lazily restored for user processes.
 >
-> So, this patch finally didn't make it into 3.16. Great. Now, we can't
-> even reboot the boards.
+> This series proposes to fix this by wrapping all runtime services calls, and
+> adding kernel_neon_begin()/kernel_neon_end() pairs to the wrappers.
 >
-> Given how it's just impossible to get something merged reliably
-> through the watchdog tree, I guess I should just start merging the
-> patches through mine?
+> The first patch moves the existing x86 versions of those wrappers to generic
+> code, so that the second patch can easily enable them by supplying a definition
+> for  efi_call_virt and adding a call to efi_native_runtime_setup().
 >
 
-You can not really blame Wim here.
+CC'ing Olivier and Mark (with correct email address this time).
 
-In this case, I suspect the major reason for not accepting the patch
-is that I tried to provide a clean method / API for "reset through watchdog
-subsystem", which went nowhere, in my understanding because someone objected
-that it would be the wrong thing to do [1] and it didn't get approval /
-acceptance from the arm maintainers. If it is wrong to reset the board
-from the watchdog subsystem in a clean way, it is for sure even more wrong
-to do it as you proposed in your patch.
+Also, as an additional note, the UEFI spec section 2.3.6.4 mandates
+that 'any additional execution state context' should be saved and
+restored by the callee, which would imply that doing it in the kernel
+is redundant. But current implementations of Tianocore/EDK2 don't seem
+to honor that requirement, and considering GCC's tendency to spill
+state to FPSIMD registers, we may choose to do so anyway to be on the
+safe side.
 
-My conclusion therefore is that all board reset code should move back out
-of the watchdog subsystem, and that we should not accept such code in the
-future. This is not my personal preference, but I do believe that we should
-do it in a clean way or not at all.
+-- 
+Ard.
 
-Guenter
-
----
-[1] https://lkml.org/lkml/2014/5/15/838
+> Ard Biesheuvel (2):
+>   efi/x86: move UEFI Runtime Services wrappers to generic code
+>   efi/arm64: preserve NEON registers on UEFI runtime services calls
+>
+>  arch/arm64/include/asm/efi.h   |  21 ++++++
+>  arch/arm64/kernel/efi.c        |  14 +---
+>  arch/x86/platform/efi/efi.c    | 144 +----------------------------------
+>  drivers/firmware/efi/Makefile  |   2 +-
+>  drivers/firmware/efi/runtime.c | 167 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/efi.h            |   2 +
+>  6 files changed, 194 insertions(+), 156 deletions(-)
+>  create mode 100644 drivers/firmware/efi/runtime.c
+>
+> --
+> 1.8.3.2
+>
