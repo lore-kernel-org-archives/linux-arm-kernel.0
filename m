@@ -1,140 +1,107 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 23 Jun 2014 21:40:47 +0200
-Subject: [PATCHv3] mm: page_alloc: fix CMA area initialisation when pageblock >
- MAX_ORDER
-In-Reply-To: <1403285834.755.39.camel@deneb.redhat.com>
-References: <1402522435-13884-1-git-send-email-msalter@redhat.com>
- <alpine.DEB.2.02.1406111557030.27885@chino.kir.corp.google.com>
- <xa1t61jzwfo6.fsf@mina86.com> <1403201524.32688.62.camel@deneb.redhat.com>
- <xa1tfvj01z57.fsf@mina86.com> <1403285834.755.39.camel@deneb.redhat.com>
-Message-ID: <xa1tegyfv2gw.fsf@mina86.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Mon, 23 Jun 2014 15:46:08 -0400
+Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
+In-Reply-To: <5338610.xCINKmsENX@wuerfel>
+References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
+ <4678828.UygJelrJo5@wuerfel>
+ <CAJ5Y-eZTmwiJViABy4MkioFYrXCoc2ho1AQ2RPThqDaUomvZ4Q@mail.gmail.com>
+ <5338610.xCINKmsENX@wuerfel>
+Message-ID: <CAJ5Y-eaA6vPvhbfMjys8PeSC7B+=ZLLBYh4Wi79Nh9=pwB3+sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With a kernel configured with ARM64_64K_PAGES && !TRANSPARENT_HUGEPAGE,
-the following is triggered at early boot:
+Hello,
 
-  SMP: Total of 8 processors activated.
-  devtmpfs: initialized
-  Unable to handle kernel NULL pointer dereference at virtual address 00000008
-  pgd = fffffe0000050000
-  [00000008] *pgd=00000043fba00003, *pmd=00000043fba00003, *pte=00e0000078010407
-  Internal error: Oops: 96000006 [#1] SMP
-  Modules linked in:
-  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc864k+ #44
-  task: fffffe03bc040000 ti: fffffe03bc080000 task.ti: fffffe03bc080000
-  PC is at __list_add+0x10/0xd4
-  LR is at free_one_page+0x270/0x638
-  ...
-  Call trace:
-  [<fffffe00003ee970>] __list_add+0x10/0xd4
-  [<fffffe000019c478>] free_one_page+0x26c/0x638
-  [<fffffe000019c8c8>] __free_pages_ok.part.52+0x84/0xbc
-  [<fffffe000019d5e8>] __free_pages+0x74/0xbc
-  [<fffffe0000c01350>] init_cma_reserved_pageblock+0xe8/0x104
-  [<fffffe0000c24de0>] cma_init_reserved_areas+0x190/0x1e4
-  [<fffffe0000090418>] do_one_initcall+0xc4/0x154
-  [<fffffe0000bf0a50>] kernel_init_freeable+0x204/0x2a8
-  [<fffffe00007520a0>] kernel_init+0xc/0xd4
+On 23 June 2014 15:10, Arnd Bergmann <arnd@arndb.de> wrote:
+>> Fair point. The more I think about this, it seems that if we want to
+>> use the mailbox framework for ACPI kernels, we should have a PCC
+>> specific bypass, something like the one you suggested below. The ACPI
+>> spec defines PCC as the only "mailbox" like mechanism. There are 3 PCC
+>> clients defined as well; CPPC, MPST and RASF. Each of these have their
+>> own ACPI tables and so they dont require special DSDT entries.
+>
+> Ok, I see. Can you describe what data is in these tables?
 
-This happens because init_cma_reserved_pageblock() calls
-__free_one_page() with pageblock_order as page order but it is bigger
-han MAX_ORDER.  This in turn causes accesses past zone->free_list[].
+For CPPC, its a field for version number, number of entries and then
+followed by a bunch of PCC entries that have the following structure:
 
-Fix the problem by changing init_cma_reserved_pageblock() such that it
-splits pageblock into individual MAX_ORDER pages if pageblock is
-bigger than a MAX_ORDER page.
+ 51 struct pcc_register_resource {
+ 52     u8 descriptor;
+ 53     u16 length;
+ 54     u8 space_id;
+ 55     u8 bit_width;
+ 56     u8 bit_offset;
+ 57     u8 access_size;
+ 58     u64 address;
+ 59 } __attribute__ ((packed));
 
-In cases where !CONFIG_HUGETLB_PAGE_SIZE_VARIABLE, which is all
-architectures expect for ia64, powerpc and tile at the moment, the
-?pageblock_order > MAX_ORDER? condition will be optimised out since
-both sides of the operator are constants.  In cases where pageblock
-size is variable, the performance degradation should not be
-significant anyway since init_cma_reserved_pageblock() is called
-only at boot time at most MAX_CMA_AREAS times which by default is
-eight.
+These essentially describe the PCC register space to be used by the
+respective protocol. e.g. CPPC uses these to exchange CPU performance
+metrics between the OS and the firmware.
+I believe MPST and RASF also follow the same format.
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-Reported-by: Mark Salter <msalter@redhat.com>
-Tested-by: Christopher Covington <cov@codeaurora.org>
----
- mm/page_alloc.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+>
+>> Moreover, these PCC client drivers will be very ACPI specific anyway.
+>> So, trying to emulate DT like mbox controller-client matching in ACPI
+>> at this point is rather pointless. It will require creating dummy DSDT
+>> entries for the PCC mailbox controller and PCC mailbox clients which
+>> have their own well defined ACPI tables (and so dont belong in the OS
+>> agnostic DSDT) and then coming up with customized Device Specific
+>> Methods (DSMs) for mbox clients to refer to mbox controllers.
+>
+> Actually you wouldn't necessarily need DSDT entries, the ACPI core could
+> just call platform_device_create() to instantiate the devices based on
+> the PCC tables.
+>
+>> The other alternative is to skip the mailbox framework altogether. One
+>> thing to note is that the PCC driver and its clients should work on
+>> X86, ARMv8 and any other platform that has ACPI support. Currently the
+>> Mailbox framework looks platform agnostic but is tied to DT, so it may
+>> not work well for everyone. But like I mentioned early on, the
+>> framework provides for async notification and queuing which is useful
+>> for PCC, so I'd prefer the PCC specific bypass option.
+>
+> The mailbox API should still work fine without DT, it would be easy
+> enough to add a lookup mechanism for architectures that create their
+> own platform devices from hardcoded kernel structures, or from ACPI
+> tables that are meant to emulate the DT bindings on embedded x86.
 
- Mark Salter wrote:
- > I ended up needing this (on top of your patch) to get the system to
- > boot.  Each MAX_ORDER-1 group needs the refcount and migratetype set
- > so that __free_pages does the right thing.
- >
- > diff --git a/mm/page_alloc.c b/mm/page_alloc.c
- > index 02fb1ed..a7ca6cc 100644
- > --- a/mm/page_alloc.c
- > +++ b/mm/page_alloc.c
- > @@ -799,17 +799,18 @@ void __init init_cma_reserved_pageblock(struct page *page)
- >  		set_page_count(p, 0);
- >  	} while (++p, --i);
- >  
- > -	set_page_refcounted(page);
- > -	set_pageblock_migratetype(page, MIGRATE_CMA);
- > -
- > -	if (pageblock_order > MAX_ORDER) {
- > -		i = pageblock_order - MAX_ORDER;
- > +	if (pageblock_order >= MAX_ORDER) {
- > +		i = pageblock_order - MAX_ORDER + 1;
- >  		i = 1 << i;
- >  		p = page;
- >  		do {
- > -			__free_pages(p, MAX_ORDER);
- > +			set_page_refcounted(p);
- > +			set_pageblock_migratetype(p, MIGRATE_CMA);
- > +			__free_pages(p, MAX_ORDER - 1);
- >  		} while (p += MAX_ORDER_NR_PAGES, --i);
- >  	} else {
- > +		set_page_refcounted(page);
- > +		set_pageblock_migratetype(page, MIGRATE_CMA);
- >  		__free_pages(page, pageblock_order);
- >  	}
+Right, a generic lookup method would be useful. I think we should
+probably revisit this option when/if there are ACPI cases which use
+anything other than the PCC mailbox controller.
 
- This is kinda embarrassing, dunno how I missed that.
+>
+> But treating PCC special probably does make most sense here, at
+> least the lookup path.
 
- But each page actually does not need to have migratetype set, does it?
- All of those pages are in a single pageblock so a single call
- suffices.  If you track set_pageblock_migratetype down to pfn_to_bitidx
- there is:
+Agreed.
 
-	return (pfn >> pageblock_order) * NR_PAGEBLOCK_BITS;
+>
+>> > The alternative would be not to use mbox_request_channel() at all
+>> > for now, but to add a new interface that can only be used PCC and
+>> > that matches by ID but is independent of the use of ACPI or DT,
+>> > something like:
+>> >
+>> > struct mbox_chan *pcc_mbox_get_channel(struct mbox_client *cl,
+>> >                         char *name, unsigned chan_id,
+>> >                         struct mbox_chan **chan)
+>> > {
+>> >         struct mbox_controller *mbox;
+>> >         mbox = mbox_find_pcc_controller(name, ...);
+>> >
+>> >         *chan = &mbox->chans[chan_id];
+>> >         return init_channel(*chan, cl);
+>> > }
+>> >
+>> > This would mean that we'd have to special-case "pcc" users, which is
+>> > not very nice, but at least it would work on both DT and ACPI,
+>> > and a future ACPI version could still add support for the mailbox
+>> > API later.
+>>
+>> I'll play around with this idea a bit and see how it looks.
+>>
+>
+> Ok, thanks for looking into this.
 
- so for pfns inside of a pageblock, they get truncated.  Or did I miss
- yet another thing?
-
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index ee92384..fef9614 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -816,9 +816,21 @@ void __init init_cma_reserved_pageblock(struct page *page)
- 		set_page_count(p, 0);
- 	} while (++p, --i);
- 
--	set_page_refcounted(page);
- 	set_pageblock_migratetype(page, MIGRATE_CMA);
--	__free_pages(page, pageblock_order);
-+
-+	if (pageblock_order >= MAX_ORDER) {
-+		i = pageblock_nr_pages;
-+		p = page;
-+		do {
-+			set_page_refcounted(p);
-+			__free_pages(p, MAX_ORDER - 1);
-+			p += MAX_ORDER_NR_PAGES;
-+		} while (i -= MAX_ORDER_NR_PAGES);
-+	} else {
-+		set_page_refcounted(page);
-+		__free_pages(page, pageblock_order);
-+	}
-+
- 	adjust_managed_page_count(page, pageblock_nr_pages);
- }
- #endif
--- 
-2.0.0.526.g5318336
+Cheers,
+Ashwin
