@@ -1,60 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:20 +0900
-Subject: [PATCH 11/29] ARM: shmobile: lager: add i2c1, i2c2 pins
+Date: Mon, 23 Jun 2014 11:28:23 +0900
+Subject: [PATCH 14/29] ARM: shmobile: lager: Remove duplicate i2c3 nodes
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <e1a2c4eb132018ce5b988c9ff5ba7a01e5494af5.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <aca4ec446c646d8794fdbf617d187423a227305d.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+Due to an error when merging df40f256b18300e1 ("ARM: shmobile:
+lager: add i2c1, i2c2 pins") a duplicate i2c3 node.
 
-Add pinctrl definitions for i2c1 and i2c2 busses on the Lager board
-to ensure these are setup correctly at initialisation time. The i2c0
-and i2c3 busses are connected to single function pins.
+This patch moves the duplicate and moves to old node to
+be closer to the other new i2c nodes.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-[horms+renesas at verge.net.au: Added shmobile to patch title]
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 32 ++++++++++++++------------------
+ 1 file changed, 14 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index bd92dcf..3297b86a 100644
+index b04d257..0890d47 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -144,6 +144,16 @@
- 		states = <3300000 1
- 			  1800000 0>;
- 	};
-+
-+	i2c1_pins: i2c1 {
-+		renesas,groups = "i2c1";
-+		renesas,function = "i2c1";
-+	};
-+
-+	i2c2_pins: i2c2 {
-+		renesas,groups = "i2c2";
-+		renesas,function = "i2c2";
-+	};
+@@ -333,22 +333,6 @@
+ 	status = "okay";
  };
  
- &extal_clk {
-@@ -349,10 +359,14 @@
+-&i2c3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c3_pins>;
+-	status = "okay";
+-
+-	vdd_dvfs: regulator at 68 {
+-		compatible = "diasemi,da9210";
+-		reg = <0x68>;
+-
+-		regulator-min-microvolt = <1000000>;
+-		regulator-max-microvolt = <1000000>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-};
+-
+ &cpu0 {
+ 	cpu0-supply = <&vdd_dvfs>;
+ };
+@@ -369,6 +353,18 @@
+ 	pinctrl-names = "default";
+ };
  
- &i2c1	{
- 	status = "ok";
-+	pinctrl-0 = <&i2c1_pins>;
+-&i2c3	{
+-	status = "ok";
++&i2c3 {
 +	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++	status = "okay";
++
++	vdd_dvfs: regulator at 68 {
++		compatible = "diasemi,da9210";
++		reg = <0x68>;
++
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
  };
- 
- &i2c2	{
- 	status = "ok";
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
- };
- 
- &i2c3	{
 -- 
 2.0.0.rc2
