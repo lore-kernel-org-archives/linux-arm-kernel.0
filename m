@@ -1,137 +1,80 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 23 Jun 2014 17:04:07 +0200
-Subject: [PATCH] ARM: mvebu: Fix the improper use of the compatible
- string armada38x using a wildcard
-In-Reply-To: <1403533011-21339-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1403533011-21339-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140623150407.GA6553@lunn.ch>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 23 Jun 2014 16:07:15 +0100
+Subject: [PATCH V4 2/2] arm: mm: Switch back to L_PTE_WRITE
+In-Reply-To: <20140620181748.GW32514@n2100.arm.linux.org.uk>
+References: <1402929159-11028-1-git-send-email-steve.capper@linaro.org>
+ <1402929159-11028-3-git-send-email-steve.capper@linaro.org>
+ <20140620181748.GW32514@n2100.arm.linux.org.uk>
+Message-ID: <20140623150714.GA4323@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 04:16:51PM +0200, Gregory CLEMENT wrote:
-> Wildcards in compatible strings should be avoid. "marvell,armada38x"
-> was recently introduced but was not yet used.
+On Fri, Jun 20, 2014 at 07:17:48PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 16, 2014 at 03:32:39PM +0100, Steve Capper wrote:
+> > For LPAE, we have the following means for encoding writable or dirty
+> > ptes:
+> >                               L_PTE_DIRTY       L_PTE_RDONLY
+> >     !pte_dirty && !pte_write        0               1
+> >     !pte_dirty && pte_write         0               1
+> >     pte_dirty && !pte_write         1               1
+> >     pte_dirty && pte_write          1               0
+> > 
+> > So we can't distinguish between writable clean ptes and read only
+> > ptes. This can cause problems with ptes being incorrectly flagged as
+> > read only when they are writable but not dirty.
+> > 
+> > This patch re-introduces the L_PTE_WRITE bit for both short descriptors
+> > and long descriptors, by reverting
+> >   36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
 > 
-> The armada 385 SoC is a superset of the armada 380 SoC (with more CPUs
-> and more PCIe slots). So this patch replaces the use of
-> "marvell,armada38x" by the "marvell,armada380" string.
+> Why are we still going about this in this over complicated manner?
+> I'm not happy with this.  I thought after fixing the problem with
+> using bits above bit 32 that we could drop this silly conversion
+> which makes the code harder to read.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Right, let's get down to the detail.  LPAE has it's existing bit
+> which tells it that the mapping is read only.  This is bit 7, which
+> is the AP[2] bit.
+> 
+> At present, AP[2] is mapped to L_PTE_RDONLY.  When a PTE is set, the
+> 3-level page table code in proc-v7-3level.S checks the L_PTE_DIRTY
+> bit, and if that is clear, it sets L_PTE_RDONLY.  *This* is the
+> problem you're trying to solve.
+> 
+> You are solving that by adding L_PTE_WRITE as bit 58 on LPAE, and
+> then translating bit 58 _and_ the L_PTE_DIRTY state down to a
+> read-only status for the hardware in AP[2], and rolling the change
+> to make L_PTE_WRITE apply everywhere.
+> 
+> Now, in patch 1, we solve the problem that using high bits in the
+> PTE result in the return value being down-cast to zero.  So, with
+> patch 1 in place, we can use *any* bit in the PTE to correspond
+> with any of the L_PTE_* flags.  Remember this very important point:
+> L_PTE_* flags are the *Linux* representation of the page table state,
+> which may not necessarily be the state of the hardware (it isn't on
+> 2-level systems - there's a translation that this stuff goes through.)
+> 
+> So, what I say is why not, for the troublesome 3-level case:
+> 
+> - Assign bit 58 for L_PTE_RDONLY
+> - Convert the state of bit 58 and L_PTE_DIRTY to the AP[2] bit:
+> 
+> 	ubfx	ip, rh, #(58 - 32)		@ L_PTE_RDONLY
+> 	bfi	rl, ip, #7, #1			@ PTE_AP2
+>         tst     rh, #1 << (55 - 32)             @ L_PTE_DIRTY
+>         orreq   rl, #PTE_AP2
+> 
+> This means we keep the read-only terminology, which is much more
+> understandable when reading the assembly code than what we had when
+> we used the write terminology.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Hi Russell,
+Thanks for the advice, yes segregating L_PTE_RDONLY from PTE_AP2 allows
+for a much smaller patch that leaves 2-level alone.
 
-> ---
-> Hi,
-> 
-> This fix should be merged in 3.16 and maybe sent as a fix for 3.15
-> too.
-> 
-> The initial patch (ARM: mvebu: Fix missing binding documentation for
-> Armada 38x) was re-written after the review about the use of the
-> wildcards here:
-> http://thread.gmane.org/gmane.linux.kernel/1728755/focus=79339 and
-> there:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/334225/focus=334311
-> 
-> 
-> Thanks,
-> Gregory
-> 
->  Documentation/devicetree/bindings/arm/armada-38x.txt | 14 ++++++++++++--
->  arch/arm/boot/dts/armada-380.dtsi                    |  2 +-
->  arch/arm/boot/dts/armada-385-db.dts                  |  2 +-
->  arch/arm/boot/dts/armada-385-rd.dts                  |  2 +-
->  arch/arm/boot/dts/armada-385.dtsi                    |  2 +-
->  arch/arm/boot/dts/armada-38x.dtsi                    |  2 +-
->  6 files changed, 17 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
-> index 11f2330a6554..ad9f8ed4d9bd 100644
-> --- a/Documentation/devicetree/bindings/arm/armada-38x.txt
-> +++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
-> @@ -6,5 +6,15 @@ following property:
->  
->  Required root node property:
->  
-> - - compatible: must contain either "marvell,armada380" or
-> -   "marvell,armada385" depending on the variant of the SoC being used.
-> + - compatible: must contain "marvell,armada380"
-> +
-> +In addition, boards using the Marvell Armada 385 SoC shall have the
-> +following property before the previous one:
-> +
-> +Required root node property:
-> +
-> +compatible: must contain "marvell,armada385"
-> +
-> +Example:
-> +
-> +compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada380";
-> diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
-> index e69bc6759c39..4173a8ab34e7 100644
-> --- a/arch/arm/boot/dts/armada-380.dtsi
-> +++ b/arch/arm/boot/dts/armada-380.dtsi
-> @@ -16,7 +16,7 @@
->  
->  / {
->  	model = "Marvell Armada 380 family SoC";
-> -	compatible = "marvell,armada380", "marvell,armada38x";
-> +	compatible = "marvell,armada380";
->  
->  	cpus {
->  		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-> index ff9637dd8d0f..4be6a2838a41 100644
-> --- a/arch/arm/boot/dts/armada-385-db.dts
-> +++ b/arch/arm/boot/dts/armada-385-db.dts
-> @@ -16,7 +16,7 @@
->  
->  / {
->  	model = "Marvell Armada 385 Development Board";
-> -	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada38x";
-> +	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada380";
->  
->  	chosen {
->  		bootargs = "console=ttyS0,115200 earlyprintk";
-> diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
-> index 40893255a3f0..aaca2861dc87 100644
-> --- a/arch/arm/boot/dts/armada-385-rd.dts
-> +++ b/arch/arm/boot/dts/armada-385-rd.dts
-> @@ -17,7 +17,7 @@
->  
->  / {
->  	model = "Marvell Armada 385 Reference Design";
-> -	compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada38x";
-> +	compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada380";
->  
->  	chosen {
->  		bootargs = "console=ttyS0,115200 earlyprintk";
-> diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
-> index f011009bf4cf..6283d7912f71 100644
-> --- a/arch/arm/boot/dts/armada-385.dtsi
-> +++ b/arch/arm/boot/dts/armada-385.dtsi
-> @@ -16,7 +16,7 @@
->  
->  / {
->  	model = "Marvell Armada 385 family SoC";
-> -	compatible = "marvell,armada385", "marvell,armada38x";
-> +	compatible = "marvell,armada385", "marvell,armada380";
->  
->  	cpus {
->  		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 3de364e81b52..689fa1a46728 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -20,7 +20,7 @@
->  
->  / {
->  	model = "Marvell Armada 38x family SoC";
-> -	compatible = "marvell,armada38x";
-> +	compatible = "marvell,armada380";
->  
->  	aliases {
->  		gpio0 = &gpio0;
-> -- 
-> 1.8.1.2
-> 
+I am running a barrage of tests on a new series now that follows this
+logic and will post a new revision soon.
+
+Cheers,
+-- 
+Steve
