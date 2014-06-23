@@ -1,88 +1,102 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 23 Jun 2014 08:21:49 +0200
-Subject: [PATCH 1/1] clk-imx35: Add clko clock support
-In-Reply-To: <20140620081546.GG28225@dragon>
-References: <1402990063-26908-1-git-send-email-alexander.stein@systec-electronic.com>
- <20140620081546.GG28225@dragon>
-Message-ID: <2789534.qY6c0ymzGl@ws-stein>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 23 Jun 2014 12:50:33 +0530
+Subject: [PATCH V3 03/16] irqchip: crossbar: introduce ti,irqs-skip to skip
+In-Reply-To: <20140621023302.GE21711@titan.lakedaemon.net>
+References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
+ <1402917796-31574-4-git-send-email-r.sricharan@ti.com>
+ <20140621023302.GE21711@titan.lakedaemon.net>
+Message-ID: <53A7D541.6090009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 June 2014 16:15:47, Shawn Guo wrote:
-> On Tue, Jun 17, 2014 at 09:27:43AM +0200, Alexander Stein wrote:
-> > This adds a new clk which is programmable using different sources and
-> > dividers.
-> > 
-> > Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> > ---
-> > I know some (most) of the new lines are larger than 80 characters, but I kept
-> > the same layout as the other lines.
-> > Also lots of the clock sources are not used in linux, so I have given them
-> > a descriptive name though.
-> > 
-> >  arch/arm/mach-imx/clk-imx35.c | 21 ++++++++++++++++++++-
-> >  1 file changed, 20 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-> > index 71c86a2..acf821c 100644
-> > --- a/arch/arm/mach-imx/clk-imx35.c
-> > +++ b/arch/arm/mach-imx/clk-imx35.c
-> > @@ -49,6 +49,13 @@ static struct clk_onecell_data clk_data;
-> >  
-> >  static const char *std_sel[] = {"ppll", "arm"};
-> >  static const char *ipg_per_sel[] = {"ahb_per_div", "arm_per_div"};
-> > +static const char *clko_select[] = {"ckil", "osc", "osc_audio", "dummy",
-> > +				 "mpll_075", "mpll", "ppll", "arm",
-> > +				 "ahb", "ipg", "ipg_per", "usbdiv",
-> > +				 "esdhc1_div", "ssi1_div_post", "mlb_gate",
-> > +				 "mshc_gate", "mpll_lock", "csi_div",
-> > +				 "spdif_div_post", "uart1_gate", "asrc",
-> > +				 "dptc", "arm_ungated", "nfc_div", "hsp"};
+On Saturday 21 June 2014 08:03 AM, Jason Cooper wrote:
+> Sricharan,
 > 
-> Any new string you add here should have a corresponding clk in clock
-> framework.
-
-Ew, ok... As lots of those clocks are not (yet?) supported in the clock framework this list will contains many "dummy" entries, but well I get your point.
-
-> >  enum mx35_clks {
-> >  	ckih, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
-> > @@ -64,7 +71,7 @@ enum mx35_clks {
-> >  	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
-> >  	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
-> >  	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
-> > -	gpu2d_gate, clk_max
-> > +	gpu2d_gate, clko_sel, clko_div1, clko_div, clko_gate, clk_max
-> >  };
-> >  
-> >  static struct clk *clk[clk_max];
-> > @@ -146,6 +153,10 @@ int __init mx35_clocks_init(void)
-> >  	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
-> >  	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
-> >  
-> > +	clk[clko_sel] = imx_clk_mux("clko_sel", base + MX35_CCM_COSR, 0, 5, clko_select, ARRAY_SIZE(clko_select));
-> > +	clk[clko_div1] = imx_clk_divider("clko_div1", "clko_sel", base + MX35_CCM_COSR, 6, 1);
-> > +	clk[clko_div] = imx_clk_divider("clko_div", "clko_div1", base + MX35_CCM_COSR, 10, 6);
-> > +
-> >  	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
-> >  	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
-> >  	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
-> > @@ -200,6 +211,8 @@ int __init mx35_clocks_init(void)
-> >  	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
-> >  	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
-> >  
-> > +	clk[clko_gate] = imx_clk_gate("clko_gate", "clko_div", base + MX35_CCM_COSR,  5);
-> > +
-> >  	for (i = 0; i < ARRAY_SIZE(clk); i++)
-> >  		if (IS_ERR(clk[i]))
-> >  			pr_err("i.MX35 clk %d: register failed with %ld\n",
-> > @@ -260,6 +273,7 @@ int __init mx35_clocks_init(void)
-> >  	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
-> >  	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
-> >  	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
-> > +	clk_register_clkdev(clk[clko_gate], NULL, "clko.0");
+> Your subject line seems truncated:
 > 
-> Will this lookup be used somewhere?
+>   "irqchip: crossbar: introduce ti,irqs-skip to skip"
+> 
+> maybe "... Introduce DT property to skip hardwired irqs" ?
+> 
+> Also note that you need to correct the subject line for *every* patch in
+> the series wrt capitalization.
+> 
+> I don't mind correcting it when I apply it, provided that:
+> 
+ha, i think this got truncated unintentionally. Sorry will fix this.
+>  - the patch is otherwise ready
+>  - I only have to do it once or twice for the series
+>  - I never had a chance to ask since you created a rockstar patch series
+>    the first time out of the gate (except for capitalization).
+> 
+> Once I've looked over the whole series, please resend with the subject
+> lines corrected.
+> 
+Ok. I will look for your comments on the rest of the patches and
+resend with capitalization fix said above.
 
-Well, as this is a pretty customizable output clock signal, I think this will only be used in custom board implementation. Or is there any generic driver to configure an arbitrary programmable clock?
+> On Mon, Jun 16, 2014 at 04:53:03PM +0530, Sricharan R wrote:
+>> From: Nishanth Menon <nm@ti.com>
+>>
+>> When, in the system due to varied reasons, interrupts might be unusable
+>> due to hardware behavior, but register maps do exist, then those interrupts
+>> should be skipped while mapping irq to crossbars.
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>> ---
+>> [V3] introduced ti,irqs-skip dt property to list the
+>>      irqs to be skipped.
+>>
+>>  .../devicetree/bindings/arm/omap/crossbar.txt      |    4 ++++
+>>  drivers/irqchip/irq-crossbar.c                     |   20 ++++++++++++++++++++
+>>  2 files changed, 24 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>> index fb88585..cfcbd52 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>> @@ -17,6 +17,10 @@ Required properties:
+>>  		 so crossbar bar driver should not consider them as free
+>>  		 lines.
+>>  
+>> +Optional properties:
+>> +- ti,irqs-skip: This is similar to "ti,irqs-reserved", but are irq mappings
+>> +  which are not supposed to be used for errata or other reasons(virtualization).
+> 
+> I would specifically mention SoC-specific hard-wiring of irqs here.
+> Also the fact that the hardwiring unexpectedly bypasses the crossbar.
+ok, that will be more easily understandable and will add that.
+> 
+>> +
+>>  Examples:
+>>  		crossbar_mpu: @4a020000 {
+>>  			compatible = "ti,irq-crossbar";
+> 
+> Please include a ti,irqs-skip example here.
+> 
+ok.
+>> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+>> index 51d4b87..27049de 100644
+>> --- a/drivers/irqchip/irq-crossbar.c
+>> +++ b/drivers/irqchip/irq-crossbar.c
+>> @@ -18,6 +18,7 @@
+>>  
+>>  #define IRQ_FREE	-1
+>>  #define IRQ_RESERVED	-2
+>> +#define IRQ_SKIP	-3
+>>  #define GIC_IRQ_START	32
+>>  
+>>  /*
+>> @@ -160,6 +161,25 @@ static int __init crossbar_of_init(struct device_node *node)
+>>  		}
+>>  	}
+>>  
+>> +	/* Skip the ones marked as skip */
+> 
+> This comment is redundant, perhaps "Skip irqs hardwired to bypass the
+> crossbar."?
+ok, will change this.
 
-Alexander
+Regards,
+ Sricharan
