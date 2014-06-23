@@ -1,46 +1,47 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 23 Jun 2014 09:48:09 +0900
-Subject: [PATCH v2] ARM: dts: exynos4: fix pwm-cells in pwm node
-In-Reply-To: <CAK5sBcFJpSvpwXGPckDcUoZP_Xqqo3Bm6p5qjF_mnZg6b7+T3g@mail.gmail.com>
-References: <1403143414-6242-1-git-send-email-jaewon02.kim@samsung.com>
- <CAK5sBcFJpSvpwXGPckDcUoZP_Xqqo3Bm6p5qjF_mnZg6b7+T3g@mail.gmail.com>
-Message-ID: <023101cf8e7c$cdffdc60$69ff9520$@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 23 Jun 2014 10:57:41 +1000
+Subject: linux-next: manual merge of the mvebu tree with Linus' tree
+Message-ID: <20140623105741.70094961@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
-> 
-> Hi Jaewon,
-> 
-> On Thu, Jun 19, 2014 at 7:33 AM, Jaewon Kim <jaewon02.kim@samsung.com> wrote:
-> > pwm-cells should be 3. Third cell is optional PWM flags. And This flag
-> > supported by this binding is PWM_POLARITY_INVERTED.
-> >
-> > Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> > ---
-> >
-> > Changes in v2:
-> >  - Remove unnecessary handle.
-> >
-> >  arch/arm/boot/dts/exynos4.dtsi |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> > index b8ece4b..e118356 100644
-> > --- a/arch/arm/boot/dts/exynos4.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4.dtsi
-> > @@ -554,7 +554,7 @@
-> >                 interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
-> >                 clocks = <&clock CLK_PWM>;
-> >                 clock-names = "timers";
-> > -               #pwm-cells = <2>;
-> > +               #pwm-cells = <3>;
-> >                 status = "disabled";
-> >         };
-> 
-> I think I had already reviewed this patch. Anyway,
-> Reviewed-by: Sachin Kamat <sachin.kamat@samsung.com>
+Hi all,
 
-Applied, thanks.
+Today's linux-next merge of the mvebu tree got a conflict in
+arch/arm/mach-mvebu/Kconfig between commit 21278aeafbfa ("ARM: use
+menuconfig for sub-arch menus") from Linus' tree and commit
+55fc83023212 ("ARM: Kirkwood: Add setup file for netxbig LEDs") from
+the mvebu tree.
 
-- Kukjin
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-mvebu/Kconfig
+index 4a7c250c9a30,8e3b5f12cd7c..000000000000
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@@ -94,4 -99,13 +96,11 @@@ config MACH_KIRKWOO
+  	  Say 'Y' here if you want your kernel to support boards based
+  	  on the Marvell Kirkwood device tree.
+  
++ config MACH_NETXBIG
++ 	bool "LaCie 2Big and 5Big Network v2"
++ 	depends on MACH_KIRKWOOD
++ 	help
++ 	  Say 'Y' here if you want your kernel to support the
++ 	  LaCie 2Big and 5Big Network v2
++ 
+ -endmenu
+ -
+  endif
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/cd9098b3/attachment.sig>
