@@ -1,36 +1,134 @@
 From: vbridgers2013@gmail.com (Vince Bridgers)
-Date: Sun, 22 Jun 2014 19:31:02 -0500
-Subject: [PATCH 2/2] ARM: socfpga: Add missing #reset-cells to socfpga device
- tree
+Date: Sun, 22 Jun 2014 19:31:01 -0500
+Subject: [PATCH 1/2] ARM: socfpga: Update socfpga_defconfig
 In-Reply-To: <1403483462-21082-1-git-send-email-vbridgers2013@gmail.com>
 References: <1403483462-21082-1-git-send-email-vbridgers2013@gmail.com>
-Message-ID: <1403483462-21082-3-git-send-email-vbridgers2013@gmail.com>
+Message-ID: <1403483462-21082-2-git-send-email-vbridgers2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add #reset-cells to socfpga.dtsi. This was missing from the
-latest updates and caused the socfpga reset controller to fail
-to load like so:
-
-ffd05000.rstmgr: /soc/rstmgr at ffd05000 missing #reset-cells property
-probe of ffd05000.rstmgr failed with error -22
+CONFIG_PM=y
+CONFIG_SUSPEND=y
+CONFIG_MMC_UNSAFE_RESUME=y
+CONFIG_DWMAC_SOCFPGA=y
+CONFIG_USB=y
+CONFIG_USB_DWC2=y
+CONFIG_USB_DWC2_HOST=y
+CONFIG_USB_DWC2_PLATFORM=y
+CONFIG_FHANDLE=y
+CONFIG_I2C=y
+CONFIG_I2C_DESIGNWARE_CORE=y
+CONFIG_I2C_DESIGNWARE_PLATFORM=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_CAN=y
+CONFIG_CAN_RAW=y
+CONFIG_CAN_BCM=y
+CONFIG_CAN_GW=y
+CONFIG_CAN_DEV=y
+CONFIG_CAN_CALC_BITTIMING=y
+CONFIG_CAN_C_CAN=y
+CONFIG_CAN_C_CAN_PLATFORM=y
+CONFIG_WATCHDOG=y
+CONFIG_DW_WATCHDOG=y
+CONFIG_GPIOLIB=y
+CONFIG_GPIO_SYSFS=y
+CONFIG_GPIO_DWAPB=y
+CONFIG_PPS=y
+CONFIG_NETWORK_PHY_TIMESTAMPING=y
+CONFIG_PTP_1588_CLOCK=y
+CONFIG_VLAN_8021Q=y
+CONFIG_VLAN_8021Q_GVRP=y
+CONFIG_GARP=y
+CONFIG_IPV6=y
+CONFIG_HOTPLUG=y
 
 Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
+Signed-off-by: Alan Tull <atull@altera.com>
+Signed-off-by: Thor Thayer <tthayer@altera.com>
 ---
- arch/arm/boot/dts/socfpga.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/socfpga_defconfig |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 4676f25..0a66d8a 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -683,6 +683,7 @@
- 		};
- 
- 		rst: rstmgr at ffd05000 {
-+			#reset-cells = <1>;
- 			compatible = "altr,rst-mgr";
- 			reg = <0xffd05000 0x1000>;
- 		};
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index e3a05e8..d7a5855 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -11,6 +11,7 @@ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
++CONFIG_HOTPLUG=y
+ # CONFIG_LBDAF is not set
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+@@ -40,6 +41,15 @@ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+ CONFIG_IP_PNP_BOOTP=y
+ CONFIG_IP_PNP_RARP=y
++CONFIG_CAN=y
++CONFIG_CAN_RAW=y
++CONFIG_CAN_BCM=y
++CONFIG_CAN_GW=y
++CONFIG_CAN_DEV=y
++CONFIG_CAN_CALC_BITTIMING=y
++CONFIG_CAN_C_CAN=y
++CONFIG_CAN_C_CAN_PLATFORM=y
++CONFIG_CAN_DEBUG_DEVICES=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_PROC_DEVICETREE=y
+@@ -55,6 +65,14 @@ CONFIG_STMMAC_ETH=y
+ CONFIG_MICREL_PHY=y
+ # CONFIG_STMMAC_PHY_ID_ZERO_WORKAROUND is not set
+ CONFIG_INPUT_EVDEV=y
++CONFIG_DWMAC_SOCFPGA=y
++CONFIG_PPS=y
++CONFIG_NETWORK_PHY_TIMESTAMPING=y
++CONFIG_PTP_1588_CLOCK=y
++CONFIG_VLAN_8021Q=y
++CONFIG_VLAN_8021Q_GVRP=y
++CONFIG_GARP=y
++CONFIG_IPV6=y
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_LEGACY_PTY_COUNT=16
+@@ -63,7 +81,12 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=2
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
+ CONFIG_SERIAL_8250_DW=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_DWAPB=y
+ # CONFIG_RTC_HCTOSYS is not set
++CONFIG_WATCHDOG=y
++CONFIG_DW_WATCHDOG=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+@@ -72,6 +95,7 @@ CONFIG_NFS_FS=y
+ CONFIG_ROOT_NFS=y
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY_USER is not set
++CONFIG_FHANDLE=y
+ CONFIG_VFAT_FS=y
+ CONFIG_NTFS_FS=y
+ CONFIG_NTFS_RW=y
+@@ -86,5 +110,16 @@ CONFIG_DEBUG_INFO=y
+ CONFIG_ENABLE_DEFAULT_TRACERS=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_XZ_DEC=y
++CONFIG_I2C=y
++CONFIG_I2C_DESIGNWARE_CORE=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_CHARDEV=y
+ CONFIG_MMC=y
+ CONFIG_MMC_DW=y
++CONFIG_PM=y
++CONFIG_SUSPEND=y
++CONFIG_MMC_UNSAFE_RESUME=y
++CONFIG_USB=y
++CONFIG_USB_DWC2=y
++CONFIG_USB_DWC2_HOST=y
++CONFIG_USB_DWC2_PLATFORM=y
 -- 
 1.7.9.5
