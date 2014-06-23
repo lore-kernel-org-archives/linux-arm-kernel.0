@@ -1,116 +1,73 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 23 Jun 2014 10:43:02 -0500
-Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1403532837.3804.29.camel@hornet>
-References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
- <20140620170901.GA12059@leverpostej> <1403532837.3804.29.camel@hornet>
-Message-ID: <CAL_Jsq+6SveWhzWPrtziTJ-tDOFaJV4sXO+r_CEhAZf=tQE6FA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Jun 2014 17:49:34 +0200
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <53A83A20.6090800@roeck-us.net>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140507213318.GA2105@roeck-us.net>
+ <20140515091123.GQ29258@lukather> <20140519150422.GA27329@lukather>
+ <20140522203444.GE27329@lukather>
+ <20140522211207.GA28704@roeck-us.net>
+ <20140623103142.GB19730@lukather> <53A83A20.6090800@roeck-us.net>
+Message-ID: <20140623154934.GG19730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 9:13 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Fri, 2014-06-20 at 18:09 +0100, Mark Rutland wrote:
->> > +- clocks-names: should contain "clcdclk" and "apb_pclk"
->>
->> s/clocks-names/clock-names/
->
-> Haha - it took quite a few patch revisions to spot this one, thanks!
+On Mon, Jun 23, 2014 at 07:30:56AM -0700, Guenter Roeck wrote:
+> >>The patches _are_ in my watchdog-next branch and get some coverage from
+> >>both my auto-builders and from Fenguang's build robots, so while they are
+> >>not in linux-next, they are not completely in the dark either.
+> >
+> >So, this patch finally didn't make it into 3.16. Great. Now, we can't
+> >even reboot the boards.
+> >
+> >Given how it's just impossible to get something merged reliably
+> >through the watchdog tree, I guess I should just start merging the
+> >patches through mine?
+> >
+> 
+> You can not really blame Wim here.
+> 
+> In this case, I suspect the major reason for not accepting the patch
+> is that I tried to provide a clean method / API for "reset through watchdog
+> subsystem", which went nowhere, in my understanding because someone objected
+> that it would be the wrong thing to do [1] and it didn't get approval /
+> acceptance from the arm maintainers. If it is wrong to reset the board
+> from the watchdog subsystem in a clean way, it is for sure even more wrong
+> to do it as you proposed in your patch.
+> 
+> My conclusion therefore is that all board reset code should move back out
+> of the watchdog subsystem, and that we should not accept such code in the
+> future. This is not my personal preference, but I do believe that we should
+> do it in a clean way or not at all.
 
-Was this tested?
+Well, considering that this patch isn't depending on your reboot API
+set, and that Wim never either commented on this patch, your reboot
+API patchset or your pull request to say that he was not willing to
+merge this, there's still a huge failure to communicate.
 
->> > +- clocks: contains phandle and clock specifier pairs for the entries
->> > +   in the clock-names property. See
->> > +   Documentation/devicetree/binding/clock/clock-bindings.txt
->> > +
->> > +Optional properties:
->> > +
->> > +- arm,pl11x,framebuffer-base: a pair of two 32-bit values, address and size,
->> > +   defining the framebuffer that must be used; if not present, the
->> > +   framebuffer may be located anywhere in the memory
->>
->> The name is confusing: this is a base _and_ size.
->
-> True. Can split it into two -base and -size or rename it into
-> framebuffer or video-memory.
->
->> When should this be used, and what is valid to point it at?
->
-> When the hardware design determines the address the memory transactions
-> must be issued at. This is aimed at a situation (allegedly not
-> impossible) when the memory map from the CLCD's point of view is
-> different from the CPU's one (eg. the video memory is mapped at xxx for
-> the CPU and yyy for the CLCD).
+I'm fine with any technical reason, let's debate on that. But the
+point is there has been no debate at all, only silence from his side.
 
-Humm, that sounds like what dma-ranges is for.
+I have been told some patches would be merged and I merged through my
+tree some patches that were depending on this one based on that
+assumption.
 
->
->> How does this play with memory carveouts (CMA, reserved-memory)?
->
-> It doesn't, and wasn't intended to (the original version of the binding
-> was trying to do something like reserved-memory before it was defined),
-> but someone managed to convince me not to do this, if it's a "low level"
-> feature.
->
-> I guess I can be re-convinced (again).
+And now, we have a regression.
 
-NAK on this property. Convinced?
+Anyway... I guess I should just revert some commits now.
 
-If this is only theoretical, then just drop it for now.
+Maxime
 
->> > +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
->> > +   cell's memory interface can handle
->>
->> When should I set this, given it is optional?
->
-> When there is a (significant) limitation of the bandwidth available for
-> the cell's memory interface. One will either be told by the soc guys or
-> will figure it out in the hard way, as we did :-(
-
-What are you going to do with this information? b/w is a function of
-screen size and pixel depth. Are you going to refuse certain configs
-based on that? Seems like someone doing their own modes should know
-what they are doing and the limitations.
-
-Again, drop it until there is a defined need for this.
-
->
->> > +
->> > +Required sub-nodes:
->> > +
->> > +- port: describes LCD panel signals, following the common binding
->> > +   for video transmitter interfaces; see
->> > +   Documentation/devicetree/bindings/media/video-interfaces.txt;
->> > +   when it is a TFT panel, the port's endpoint must define the
->> > +   following property:
->> > +
->> > +   - arm,pl11x,tft-r0g0b0-pads: an array of three 32-bit values,
->> > +           defining the way CLD pads are wired up; this implicitly
->> > +           defines available color modes, for example:
->> > +           - PL111 TFT 4:4:4 panel:
->> > +                   arm,pl11x,tft-r0g0b0-pads = <4 15 20>;
->> > +           - PL110 TFT (1:)5:5:5 panel:
->> > +                   arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
->> > +           - PL111 TFT (1:)5:5:5 panel:
->> > +                   arm,pl11x,tft-r0g0b0-pads = <3 11 19>;
->> > +           - PL111 TFT 5:6:5 panel:
->> > +                   arm,pl11x,tft-r0g0b0-pads = <3 10 19>;
->> > +           - PL110 and PL111 TFT 8:8:8 panel:
->> > +                   arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
->> > +           - PL110 and PL111 TFT 8:8:8 panel, R & B components swapped:
->> > +                   arm,pl11x,tft-r0g0b0-pads = <16 8 0>;
->>
->> I'm somewhat lost trying to figure out this mapping. Am I not looking at
->> this in the right way, or is there any documentation which makes this
->> clearer?
->
-> Yeah, looking at this now, it definitely needs some more explanation.
-> Something like this?
->
->         First value contains index of the "CLD" external pin (pad)
->         used as R0 (first bit of the red component), second value
->         index of the pad used as G0, third value index of the pad
->         used as B0, see also "LCD panel signal multiplexing details"
->         paragraph in the PL11x Technical Reference Manuals.
->
-> Pawel
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/ef626a28/attachment.sig>
