@@ -1,113 +1,105 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Jun 2014 19:17:03 +0200
-Subject: Regression on Integrator after commit 07e461cd7
-Message-ID: <CACRpkdZ_4xcfAjuOY7izwMvYg+zqA4stJ3gv_EdTiALmc1go3w@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 23 Jun 2014 13:50:41 -0400
+Subject: [PATCH v3 1/7] genirq: generic chip: export
+ irq_map_generic_chip function
+In-Reply-To: <53A842C3.6060606@free-electrons.com>
+References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140621235108.GJ21711@titan.lakedaemon.net>
+ <53A68CF0.8040303@free-electrons.com>
+ <20140623130705.GM21711@titan.lakedaemon.net>
+ <53A842C3.6060606@free-electrons.com>
+Message-ID: <20140623175041.GB10202@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Mon, Jun 23, 2014 at 05:07:47PM +0200, Boris BREZILLON wrote:
+> 
+> On 23/06/2014 15:07, Jason Cooper wrote:
+> > On Sun, Jun 22, 2014 at 09:59:44AM +0200, Boris BREZILLON wrote:
+> >> On 22/06/2014 01:51, Jason Cooper wrote:
+> >>> On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
+> >>>> Export the generic irq map function in order to provide irq_domain ops with
+> >>>> generic mapping and specific of xlate function (needed by the new atmel
+> >>>> AIC driver).
+> >>>>
+> >>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >>>> ---
+> >>>>  include/linux/irq.h       | 2 ++
+> >>>>  kernel/irq/generic-chip.c | 5 +++--
+> >>>>  2 files changed, 5 insertions(+), 2 deletions(-)
+> >>>>
+> >>>> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> >>>> index 0d998d8..62af592 100644
+> >>>> --- a/include/linux/irq.h
+> >>>> +++ b/include/linux/irq.h
+> >>>> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
+> >>>>  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
+> >>>>  
+> >>>>  /* Setup functions for irq_chip_generic */
+> >>>> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >>>> +			 irq_hw_number_t hw_irq);
+> >>>>  struct irq_chip_generic *
+> >>>>  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
+> >>>>  		       void __iomem *reg_base, irq_flow_handler_t handler);
+> >>>> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+> >>>> index 452d6f2..cf80e7b 100644
+> >>>> --- a/kernel/irq/generic-chip.c
+> >>>> +++ b/kernel/irq/generic-chip.c
+> >>>> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
+> >>>>  /*
+> >>>>   * irq_map_generic_chip - Map a generic chip for an irq domain
+> >>>>   */
+> >>>> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >>>> -				irq_hw_number_t hw_irq)
+> >>>> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >>>> +			 irq_hw_number_t hw_irq)
+> >>>>  {
+> >>>>  	struct irq_data *data = irq_get_irq_data(virq);
+> >>>>  	struct irq_domain_chip_generic *dgc = d->gc;
+> >>>> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+> >>>>  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+> >>>>  	return 0;
+> >>>>  }
+> >>>> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
+> >>>>  
+> >>>>  struct irq_domain_ops irq_generic_chip_ops = {
+> >>>>  	.map	= irq_map_generic_chip,
+> >>> Why can't you use irq_generic_chip_ops.map in your code and avoid this
+> > s/code/declaration/, sorry for the misunderstanding.
+> >
+> >>> patch entirely?
+> >> Because in this case I'll have to remove constness from my
+> >> irq_domain_ops struct and initialize it in my init function.
+> >> This is not a big concern, but in general I tend to declare ops struct
+> >> with a const constraint.
+> > /*
+> >  * We're the only user of irq_map_generic_chip() who
+> >  * doesn't also use irq_domain_xlate_onetwocell()
+> >  */
+> > static const struct irq_domain_ops aic_irq_ops = {
+> > 	.map    = irq_generic_chip_ops.map,
+> >         .xlate  = aic_irq_domain_xlate,
+> > };
+> >
+> > Wouldn't work?
+> 
+> No, it fails  with :
+> 
+> "error: initializer element is not constant"
 
-The Integrators are not booting after commit
-07e461cd7e73a84f0e3757932b93cc80976fd749
-"of: Ensure unique names without sacrificing determinism"
+Gah!  Of course.  That's what I get for pseudo-coding without sufficient
+coffee. :)
 
-i.e. these device trees:
-arch/arm/boot/dts/integratorap.dts
-arch/arm/boot/dts/integratorcp.dts
+I won't have a chance to dig deeper into this until tonight or the next
+few days.  But my primary concern is that they chose to export the
+struct for a reason.  I'd like to dig through the history and find out
+why.
 
-It hangs very early boot at one time with the message:
-Error: unrecognized/unsupported processor variant (0x41069262).
+Assuming there's no big reason not to export the function(s) directly,
+I'm fine with exporting them.  But it would be nice to get Thomas' Ack
+before I take the original patch since it touches core code.
 
-Reverting that patch (manually) makes the platform boot again,
-so it's definately caused by that.
+thx,
 
-Can you see what is wrong with these device trees, like if it's
-something obvious that the code is not expecting? It's like
-it cannot build the tree or something.
-
-My revert does not look very nice but looks like this:
-
-commit be15147f12a72b7bc63a8e18a2edd74123bcb5f0
-Author: Linus Walleij <linus.walleij@linaro.org>
-Date:   Mon Jun 23 18:59:58 2014 +0200
-
-    Revert "of: Ensure unique names without sacrificing determinism"
-
-    This reverts commit 07e461cd7e73a84f0e3757932b93cc80976fd749.
-
-    Conflicts:
-        drivers/of/platform.c
-
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 6c48d73a7fd7..71581921c1f3 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -64,35 +64,37 @@ EXPORT_SYMBOL(of_find_device_by_node);
-  * of_device_make_bus_id - Use the device node data to assign a unique name
-  * @dev: pointer to device structure that is linked to a device tree node
-  *
-- * This routine will first try using the translated bus address to
-- * derive a unique name. If it cannot, then it will prepend names from
-- * parent nodes until a unique name can be derived.
-+ * This routine will first try using either the dcr-reg or the reg property
-+ * value to derive a unique name.  As a last resort it will use the node
-+ * name followed by a unique number.
-  */
- void of_device_make_bus_id(struct device *dev)
- {
-+       static atomic_t bus_no_reg_magic;
-        struct device_node *node = dev->of_node;
-        const __be32 *reg;
-        u64 addr;
-+       int magic;
-
--       /* Construct the name, using parent nodes if necessary to
-ensure uniqueness */
--       while (node->parent) {
--               /*
--                * If the address can be translated, then that is as much
--                * uniqueness as we need. Make it the first component and return
--                */
--               reg = of_get_property(node, "reg", NULL);
--               if (reg && (addr = of_translate_address(node, reg)) !=
-OF_BAD_ADDR) {
--                       dev_set_name(dev, dev_name(dev) ? "%llx.%s:%s"
-: "%llx.%s",
--                                    (unsigned long long)addr, node->name,
--                                    dev_name(dev));
-+       /*
-+        * For MMIO, get the physical address
-+        */
-+       reg = of_get_property(node, "reg", NULL);
-+       if (reg) {
-+               addr = of_translate_address(node, reg);
-+               if (addr != OF_BAD_ADDR) {
-+                       dev_set_name(dev, "%llx.%s",
-+                                    (unsigned long long)addr, node->name);
-                        return;
-                }
--
--               /* format arguments only used if dev_name() resolves to NULL */
--               dev_set_name(dev, dev_name(dev) ? "%s:%s" : "%s",
--                            strrchr(node->full_name, '/') + 1, dev_name(dev));
--               node = node->parent;
-        }
-+
-+       /*
-+        * No BusID, use the node name and add a globally incremented
-+        * counter (and pray...)
-+        */
-+       magic = atomic_add_return(1, &bus_no_reg_magic);
-+       dev_set_name(dev, "%s.%d", node->name, magic - 1);
- }
-
- /**
-
-
-I have no real idea of how the OF core works so I'm a bit in the blue
-here :-/
-
-Any help appreciated!
-
-Yours,
-Linus Walleij
+Jason.
