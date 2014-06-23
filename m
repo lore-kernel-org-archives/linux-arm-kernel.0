@@ -1,90 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:25:19 +0900
-Subject: [PATCH] ARM: shmobile: Fix device node reference leakage in
- shmobile_init_delay
-In-Reply-To: <cover.1403487071.git.horms+renesas@verge.net.au>
-References: <cover.1403487071.git.horms+renesas@verge.net.au>
-Message-ID: <edc8fb1d6ebdfc4efa009073586d3567c3368475.1403487071.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Jun 2014 11:25:25 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Cpufreq Updates for v3.17
+Message-ID: <cover.1403487159.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The of_find_compatible_node() function returns a new reference to the
-found node. Instead of just adding of_node_put() calls, simplify the
-code by moving the CPU identification logic inside the loop over cpu
-nodes, in order to lower complexity from O(n) to O(1) by replacing
-of_find_compatible_node() calls with of_device_is_compatible().
+Please consider this Renesas ARM based SoC cpufreq update for v3.17.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/timer.c | 50 ++++++++++++++++++++++++------------------
- 1 file changed, 29 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-index 68bc0b8..942efdc 100644
---- a/arch/arm/mach-shmobile/timer.c
-+++ b/arch/arm/mach-shmobile/timer.c
-@@ -59,29 +59,37 @@ void __init shmobile_setup_delay(unsigned int max_cpu_core_mhz,
- 
- void __init shmobile_init_delay(void)
- {
--	struct device_node *np, *parent;
--	u32 max_freq, freq;
--
--	max_freq = 0;
--
--	parent = of_find_node_by_path("/cpus");
--	if (parent) {
--		for_each_child_of_node(parent, np) {
--			if (!of_property_read_u32(np, "clock-frequency", &freq))
--				max_freq = max(max_freq, freq);
--		}
--		of_node_put(parent);
--	}
-+	struct device_node *np, *cpus;
-+	bool is_a8_a9 = false;
-+	bool is_a15 = false;
-+	u32 max_freq = 0;
-+
-+	cpus = of_find_node_by_path("/cpus");
-+	if (!cpus)
-+		return;
-+
-+	for_each_child_of_node(cpus, np) {
-+		u32 freq;
-+
-+		if (!of_property_read_u32(np, "clock-frequency", &freq))
-+			max_freq = max(max_freq, freq);
- 
--	if (max_freq) {
--		if (of_find_compatible_node(NULL, NULL, "arm,cortex-a8"))
--			shmobile_setup_delay_hz(max_freq, 1, 3);
--		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
--			shmobile_setup_delay_hz(max_freq, 1, 3);
--		else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a15"))
--			if (!IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
--				shmobile_setup_delay_hz(max_freq, 2, 4);
-+		if (of_device_is_compatible(np, "arm,cortex-a8") ||
-+		    of_device_is_compatible(np, "arm,cortex-a9"))
-+			is_a8_a9 = true;
-+		else if (of_device_is_compatible(np, "arm,cortex-a15"))
-+			is_a15 = true;
- 	}
-+
-+	of_node_put(cpus);
-+
-+	if (!max_freq)
-+		return;
-+
-+	if (is_a8_a9)
-+		shmobile_setup_delay_hz(max_freq, 1, 3);
-+	else if (is_a15 && !IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
-+		shmobile_setup_delay_hz(max_freq, 2, 4);
- }
- 
- static void __init shmobile_late_time_init(void)
--- 
-2.0.0.rc2
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-cpufreq-for-v3.17
+
+for you to fetch changes up to 06e32c91dbce3c24ccbe84e3af2a35199662bca0:
+
+  ARM: shmobile: add cpufreq-cpu0 driver for common SH-Mobile (2014-06-16 19:50:54 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Cpufreq Updates for v3.17
+
+* Add cpufreq-cpu0 driver
+
+----------------------------------------------------------------
+Gaku Inami (1):
+      ARM: shmobile: add cpufreq-cpu0 driver for common SH-Mobile
+
+ arch/arm/mach-shmobile/Makefile              |  1 +
+ arch/arm/mach-shmobile/cpufreq.c             | 31 ++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |  7 +++++++
+ 3 files changed, 39 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/cpufreq.c
