@@ -1,77 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:16 +0900
-Subject: [PATCH 07/29] ARM: shmobile: r8a7790/lager dts: Add DVFS parameters
- into cpu0 node for r8a7790
+Date: Mon, 23 Jun 2014 11:28:21 +0900
+Subject: [PATCH 12/29] ARM: shmobile: lager: Move i2c[12]_pins nodes to pfc
+ node
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <b989e1386385466761f703b8a91e00468bb5ca2a.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <d90bf60ceaf453b59c8cd5dbfa59538e27255706.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <bcousson@baylibre.com>
+Due to an error when resolving conflicts df40f256b18300e1 ("ARM: shmobile:
+lager: add i2c1, i2c2 pins") added the i2c[12]_pins nodes to the wrong
+node.
 
-Add needed information inside CPU0 for the generic cpufreq-cpu0 driver.
+This patch moves them to their correct location in the pfc node.
 
-- voltage-tolerance = 1%
-  It reflects the tolerance for the CPU voltage defined inside the OPP
-  table. Due to the lack of proper OPP definition, use an arbitrary safe
-  value.
-- clock-latency = 300 us
-  Approximate worst-case latency to do a full DVFS transition for every
-  OPPs. Due to the lack of HW information, use an arbitrary safe value.
-  Note: The term transition-latency will be more accurate to define this
-  value since the clock transition latency is not the only parameter that
-  will define the overall DVFS transition.
-- operating-points = < kHz - uV >
-  List of 6 operating points. All of them are using the same voltage
-  since the valid Vmin voltage is not documented in the HW spec.
-- clocks
-  phandle to the CPU clock source. This clock source is used for all the
-  4 CortexA15 located inside the same cluster.
-
-Signed-off-by: Benoit Cousson <bcousson+renesas@baylibre.com>
-[gaku.inami.xw at bp.renesas.com: Change the setting of OPPs for ES2.0]
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts |  4 ++++
- arch/arm/boot/dts/r8a7790.dtsi      | 11 +++++++++++
- 2 files changed, 15 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 6472cf0..cc65e3f 100644
+index 3297b86a..b68ff56 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -338,3 +338,7 @@
- 		regulator-always-on;
+@@ -144,16 +144,6 @@
+ 		states = <3300000 1
+ 			  1800000 0>;
  	};
+-
+-	i2c1_pins: i2c1 {
+-		renesas,groups = "i2c1";
+-		renesas,function = "i2c1";
+-	};
+-
+-	i2c2_pins: i2c2 {
+-		renesas,groups = "i2c2";
+-		renesas,function = "i2c2";
+-	};
  };
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_dvfs>;
-+};
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index e2c7d6d..e990d3c 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -44,6 +44,17 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1300000000>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clocks = <&cpg_clocks R8A7790_CLK_Z>;
-+			clock-latency = <300000>; /* 300 us */
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1400000 1000000>,
-+					   <1225000 1000000>,
-+					   <1050000 1000000>,
-+					   < 875000 1000000>,
-+					   < 700000 1000000>,
-+					   < 350000 1000000>;
- 		};
  
- 		cpu1: cpu at 1 {
+ &extal_clk {
+@@ -215,6 +205,16 @@
+ 		renesas,function = "msiof1";
+ 	};
+ 
++	i2c1_pins: i2c1 {
++		renesas,groups = "i2c1";
++		renesas,function = "i2c1";
++	};
++
++	i2c2_pins: i2c2 {
++		renesas,groups = "i2c2";
++		renesas,function = "i2c2";
++	};
++
+ 	i2c3_pins: i2c3 {
+ 		renesas,groups = "i2c3";
+ 		renesas,function = "i2c3";
 -- 
 2.0.0.rc2
