@@ -1,73 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 23 Jun 2014 22:25:15 +0200
-Subject: [PATCH] ARM: dts: kirkwood: fix phy-connection-type for Guruplug
-Message-ID: <1403555115-13111-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 23 Jun 2014 23:29:09 +0300
+Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
+Message-ID: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit eeb845459a72e792a959278b858f9c417e9995bd
- ("ARM: dts: kirkwood: set Guruplug phy-connection-type to rgmii-id")
-added phy-connection-type properties to ethernet PHY nodes.
+There's a several typos in a driver: 2410 instead of S3C2410
+and wrong argument to ARRAY_SIZE(). They prevent s3c2410
+from properly booting.
 
-Actually, the property has to be set for the ethernet port node instead.
-Fix it by moving the corresponding properties to the correct nodes.
-
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
-Jason,
-
-this should go in as a fix for v3.16 where above commit appeared first.
-
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts | 4 ++--
+ drivers/clk/samsung/clk-s3c2410.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-index c5a1fc75c7a3..b2d9834bf458 100644
---- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-+++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
-@@ -105,7 +105,6 @@
- 		compatible = "ethernet-phy-id0141.0cb0",
- 		             "ethernet-phy-ieee802.3-c22";
- 		reg = <0>;
--		phy-connection-type = "rgmii-id";
- 	};
+diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
+index ba07168..bd9a873 100644
+--- a/drivers/clk/samsung/clk-s3c2410.c
++++ b/drivers/clk/samsung/clk-s3c2410.c
+@@ -378,7 +378,7 @@ void __init s3c2410_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 	if (!np)
+ 		s3c2410_common_clk_register_fixed_ext(ctx, xti_f);
  
- 	ethphy1: ethernet-phy at 1 {
-@@ -113,7 +112,6 @@
- 		compatible = "ethernet-phy-id0141.0cb0",
- 		             "ethernet-phy-ieee802.3-c22";
- 		reg = <1>;
--		phy-connection-type = "rgmii-id";
- 	};
- };
- 
-@@ -121,6 +119,7 @@
- 	status = "okay";
- 	ethernet0-port at 0 {
- 		phy-handle = <&ethphy0>;
-+		phy-connection-type = "rgmii-id";
- 	};
- };
- 
-@@ -128,5 +127,6 @@
- 	status = "okay";
- 	ethernet1-port at 0 {
- 		phy-handle = <&ethphy1>;
-+		phy-connection-type = "rgmii-id";
- 	};
- };
+-	if (current_soc == 2410) {
++	if (current_soc == S3C2410) {
+ 		if (_get_rate("xti") == 12 * MHZ) {
+ 			s3c2410_plls[mpll].rate_table = pll_s3c2410_12mhz_tbl;
+ 			s3c2410_plls[upll].rate_table = pll_s3c2410_12mhz_tbl;
+@@ -432,7 +432,7 @@ void __init s3c2410_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 		samsung_clk_register_fixed_factor(ctx, s3c2410_ffactor,
+ 				ARRAY_SIZE(s3c2410_ffactor));
+ 		samsung_clk_register_alias(ctx, s3c2410_aliases,
+-			ARRAY_SIZE(s3c2410_common_aliases));
++			ARRAY_SIZE(s3c2410_aliases));
+ 		break;
+ 	case S3C2440:
+ 		samsung_clk_register_mux(ctx, s3c2440_muxes,
 -- 
 2.0.0
