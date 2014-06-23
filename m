@@ -1,9 +1,9 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 23 Jun 2014 15:19:11 -0700
+Date: Mon, 23 Jun 2014 15:23:47 -0700
 Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
  suspend/resume
-In-Reply-To: <CAD=FV=VkxA01eEFiXSp+c+GDuVJi7TctAdnyrMggk1gRw6BStQ@mail.gmail.com>
- (Doug Anderson's message of "Mon, 23 Jun 2014 15:01:39 -0700")
+In-Reply-To: <CAD=FV=VmPMf6tCNmKJ1o5J7PyAXoU8fb6+s+Fkv18FH2WaQp7A@mail.gmail.com>
+ (Doug Anderson's message of "Fri, 20 Jun 2014 16:53:09 -0700")
 References: <1403155273-1057-1-git-send-email-dianders@chromium.org>
  <7h8uosyc3k.fsf@paris.lan>
  <CAD=FV=XxNVmF+N5HF4SnZoJRJvkSUkpEx6ct4v2gtmAQ9n28-Q@mail.gmail.com>
@@ -11,44 +11,140 @@ References: <1403155273-1057-1-git-send-email-dianders@chromium.org>
  <CAD=FV=Uz9O0i2gmuk2+BHa-Tksvyxv0+MTi2UEjVREAMNCK7Ug@mail.gmail.com>
  <7h7g4brx6w.fsf@paris.lan>
  <CAD=FV=VmPMf6tCNmKJ1o5J7PyAXoU8fb6+s+Fkv18FH2WaQp7A@mail.gmail.com>
- <53A4CADA.4030002@gmail.com>
- <CAD=FV=VkxA01eEFiXSp+c+GDuVJi7TctAdnyrMggk1gRw6BStQ@mail.gmail.com>
-Message-ID: <7ha993p8v4.fsf@paris.lan>
+Message-ID: <7h38evp8ng.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Doug Anderson <dianders@chromium.org> writes:
 
-[...]
-
-> On Fri, Jun 20, 2014 at 4:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Kevin,
+>
+> On Fri, Jun 20, 2014 at 4:13 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Doug Anderson <dianders@chromium.org> writes:
 >>
->> I'm not sure noirq is going to work correctly, at least not with current
->> callbacks. I can see a call to clk_prepare_enable() there which needs to
->> acquire a mutex.
+>>> Kevin,
+>>>
+>>> On Fri, Jun 20, 2014 at 2:48 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>>>> Hi Doug,
+>>>>
+>>>> Doug Anderson <dianders@chromium.org> writes:
+>>>>
+>>>>> On Thu, Jun 19, 2014 at 11:43 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>>>>>> Doug Anderson <dianders@chromium.org> writes:
+>>>>>>
+>>>>>>> The original code for the exynos i2c controller registered for the
+>>>>>>> "noirq" variants.  However during review feedback it was moved to
+>>>>>>> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
+>>>>>>> longer actually "noirq" (despite functions named
+>>>>>>> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
+>>>>>>>
+>>>>>>> i2c controllers that might have wakeup sources on them seem to need to
+>>>>>>> resume at noirq time so that the individual drivers can actually read
+>>>>>>> the i2c bus to handle their wakeup.
+>>>>>>
+>>>>>> I suspect usage of the noirq variants pre-dates the existence of the
+>>>>>> late/early callbacks in the PM core, but based on the description above,
+>>>>>> I suspect what you actually want is the late/early callbacks.
+>>>>>
+>>>>> I think it actually really needs noirq.  ;)
+>>>>
+>>>> Yes, it appears it does.   Objection withdrawn.
+>>>>
+>>>> I just wanted to be sure because since the introduction of late/early,
+>>>> the need for noirq should be pretty rare, but there certainly are needs.
+>>>>
+>>>> <tangent>
+>>>> In this case though, the need for it has more to do with the
+>>>> lack of a way for us to describe non parent-child device dependencies
+>>>> than whether or not IRQs are enabled or not.
+>>>> </tangent>
+>>>
+>>> Actually, I'm not sure that's true, but I'll talk through it and you
+>>> can point to where I'm wrong (I often am!)
+>>>
+>>> If you're a wakeup device then you need to be ready to handle
+>>> interrupts as soon as the "noirq" phase of resume is done, right?
+>>
+>> As soon as the noirq phase of your own driver is done, correct.
+>>
+>>> Said another way: you need to be ready to handle interrupts _before_
+>>> the normal resume code is called and be ready to handle interrupts
+>>> even _before_ the early resume code is called.
+>>
+>> Correct.
+>>
+>>> That means if you are implementing a bus that's needed by any devices
+>>> with wakeup interrupts then it's your responsibility to also be
+>>> prepared to run this early.
+>>>
+>>> In this particular case the max77686 driver doesn't need to do
+>>> anything at all to be ready to handle interrupts.  It's suspend and
+>>> resume code is just boilerplate "enable wakeups / disable wakeups" and
+>>> it has no "noirq" code.  The max77686 driver doesn't have any "noirq"
+>>> wake call because it would just be empty.
+>>>
+>>> Said another way: the problem isn't that the max77686 wakeup gets
+>>> called before the i2c wakeup.  The problem is that i2c is needed ASAP
+>>> once IRQs are enabled and thus needs to be run noirq.
+>>>
+>>> Does that sound semi-correct?
+>>
+>> Yes that's correct.
+>>
+>> My point above was (trying to be) that ultimately this is an ordering
+>> issue.  e.g. the bus device needs to be "ready" before wakeup devices on
+>> that bus can handle wakeup interrupts etc.  The way we're handling that
+>> ordering is by the implied ordering of noirq, late/early and "normal"
+>> callbacks.  That's convenient, but not exactly obvious.
+>>
+>> It works because we dont' typically need too many layers here, but it
+>> would be much more understandable if we could describe this kind of
+>> dependency in a way that the suspend/resume code would suspend/resume
+>> things in the right order rather than by tinkering with callback levels
+>> (since otherwise suspend/resume ordering just depends on probe order.)
+>>
+>> This issue then usually gets me headed down my usual rant path about how
+>> I think runtime PM is much better suited for handling ordering and
+>> dependencies becuase it automatically handles parent/child dependencies
+>> and non parent/child dependencies can be handled by taking advantage of
+>> the get/put APIs which are refcounted, ect etc. but that's another can
+>> worms.
 >
-> Nice catch, thanks!  :)
+> Ah, I gotcha.  Yes, I'm a fan of having explicit dependency orderings too.
 >
-> OK, looking at that now.  Interestingly this doesn't seem to cause us
-> problems in our ChromeOS 3.8 tree.  I just tried enabling:
->   CONFIG_DEBUG_ATOMIC_SLEEP=y
+> So I guess in this case the truly correct way to handle it is:
 >
-> ...and confirmed that I got it on right:
+> 1. i2c controller should have Runtime PM even though (as per the code
+> now) there's nothing you can do to it to save power under normal
+> circumstances.  So the runtime "suspend" code would be a no-op.
 >
-> # zgrep -i atomic /proc/config.gz
-> CONFIG_DEBUG_ATOMIC_SLEEP=y
+> 2. When the i2c controller is told to runtime resume, it should
+> double-check if a full SoC poweroff has happened since the last time
+> it checked.  In this case it should reinit its hardware.
 >
-> I can suspend/resume with no problems.  My bet is that it works fine because:
+> 3. If the i2c controller gets a full "resume" callback then it should
+> also reinit the hardware just so it's not sitting in a half-configured
+> state until the first peripheral uses it.
 >
-> * resume_noirq is not considered "atomic" in the sense enforced by
-> CONFIG_DEBUG_ATOMIC_SLEEP (at least not in 3.8--I haven't tried on
-> ToT)
+> If later someone finds a way to power gate the i2c controller when no
+> active transfers are going (and we actually save non-trivial power
+> doing this) then we've got a nice place to put that code.
+>
+> NOTE: Unless we can actually save power by power gating the i2c
+> peripheral when there are no active transfers, we would also just have
+> the i2c_xfer() init the hardware if needed.  Maybe that's kinda gross,
+> though.
 
-The reason is because "noirq" in the suspend/resume path actually means
-no *device* IRQs for that specific device.
+Yes, this is how we manage the i2c controller on OMAP.
 
-It's often assumed that the "noirq" callbacks are called with *all*
-interrupts disabled, but that's not the case.  Only the IRQs for that
-specific device are disabled when its noirq callbacks run.
+Essentially, between every xfer, the hw is disabled and can potentially
+lose context, so eveery xfer requires a hw init.  We use the runtime PM
+"autosuspend" feature so that it stays alive for X milliseconds so
+bursty i2c xfers are not punished.   
+
+Have a look at drivers/i2c/busses/i2c-omap.c.
+
+You'll notice there are not callbacks for system suspend/resume, it's
+only doing runtime PM.
 
 Kevin
