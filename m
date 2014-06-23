@@ -1,42 +1,105 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Mon, 23 Jun 2014 10:40:39 +0100
-Subject: [PATCH V2 0/2] Sound support for Exynos4412 Odroid X2, U3 board
-In-Reply-To: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
-References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAD8Lp44h6zc2Rt2MGLjhmNG-YB0kYCWf5G7hX5JmdmBfc1PvKg@mail.gmail.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 23 Jun 2014 09:45:21 +0000
+Subject: [PATCH 1/5] regulator: act8865: fix parsing of platform data
+In-Reply-To: <1403451105-31929-2-git-send-email-b.galvani@gmail.com>
+References: <1403451105-31929-1-git-send-email-b.galvani@gmail.com>
+ <1403451105-31929-2-git-send-email-b.galvani@gmail.com>
+Message-ID: <B256D81BAE5131468A838E5D7A2436419D1B5CA4@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 5:22 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> This series adds basic sound support for the Odroid X2/U3 boards.
-> It relies on specific Exynos Audio Subsystem clock parent and
-> frequencies being pre-configured.
->
-> My full testing git branch has been pushed to:
-> git://linuxtv.org/snawrocki/samsung.git v3.16-rc1-odroid-sound-clk
 
-Thanks for this! I tested these patches plus the ones in your branch
-to integrate with the ODROID.
-I tested ODROID-U2's 3.5mm analog headphone jack output with:
+> -----Original Message-----
+> From: Beniamino Galvani [mailto:b.galvani at gmail.com]
+> Sent: Sunday, June 22, 2014 11:32 PM
+> To: Liam Girdwood; Mark Brown
+> Cc: Yang, Wenyou; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell;
+> Kumar Gala; Heiko Stuebner; devicetree at vger.kernel.org; linux-
+> doc at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Beniamino Galvani
+> Subject: [PATCH 1/5] regulator: act8865: fix parsing of platform data
+> 
+> The driver loops through all available regulators (ACT8865_REG_NUM) and
+> accesses pdata->regulators[i].platform_data without checking the actual
+> value of num_regulators in platform data, potentially causing a invalid
+> memory access.
+> 
+> Fix this and look up the regulator init_data by id in platform data.
+> 
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> ---
+>  drivers/regulator/act8865-regulator.c |   29 +++++++++++++++++++++----
+> ----
+>  1 file changed, 21 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/regulator/act8865-regulator.c
+> b/drivers/regulator/act8865-regulator.c
+> index b92d7dd..fe2c038 100644
+> --- a/drivers/regulator/act8865-regulator.c
+> +++ b/drivers/regulator/act8865-regulator.c
+> @@ -252,6 +252,22 @@ static inline int act8865_pdata_from_dt(struct
+> device *dev,  }  #endif
+> 
+> +static struct regulator_init_data
+> +*act8865_get_init_data(int id, struct act8865_platform_data *pdata) {
+> +	int i;
+> +
+> +	if (!pdata)
+> +		return NULL;
+> +
+> +	for (i = 0; i < pdata->num_regulators; i++) {
+> +		if (pdata->regulators[i].id == id)
+> +			return pdata->regulators[i].platform_data;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+>  static int act8865_pmic_probe(struct i2c_client *client,
+>  			   const struct i2c_device_id *i2c_id)  { @@ -261,7
+> +277,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
+>  	struct regulator_config config = { };
+>  	struct act8865 *act8865;
+>  	struct device_node *of_node[ACT8865_REG_NUM];
+> -	int i, id;
+> +	int i;
+>  	int ret = -EINVAL;
+>  	int error;
+> 
+> @@ -299,20 +315,17 @@ static int act8865_pmic_probe(struct i2c_client
+> *client,
+> 
+>  	/* Finally register devices */
+>  	for (i = 0; i < ACT8865_REG_NUM; i++) {
+> -
+> -		id = pdata->regulators[i].id;
+> +		const struct regulator_desc *desc = &act8865_reg[i];
+> 
+>  		config.dev = dev;
+> -		config.init_data = pdata->regulators[i].platform_data;
+> +		config.init_data = act8865_get_init_data(desc->id, pdata);
+>  		config.of_node = of_node[i];
+>  		config.driver_data = act8865;
+>  		config.regmap = act8865->regmap;
+> 
+> -		rdev = devm_regulator_register(&client->dev,
+> &act8865_reg[i],
+> -					       &config);
+> +		rdev = devm_regulator_register(&client->dev, desc, &config);
+>  		if (IS_ERR(rdev)) {
+> -			dev_err(dev, "failed to register %s\n",
+> -				act8865_reg[id].name);
+> +			dev_err(dev, "failed to register %s\n", desc->name);
+>  			return PTR_ERR(rdev);
+>  		}
+>  	}
+> --
+> 1.7.10.4
 
-# speaker-test -c 2 -t wav -l 2
 
-On my x86 laptop this command takes ~6 seconds and produces audible output:
-"Front left, front right, front left, front right"
+Tested on at91-sama5d3_xplained with ACT8865
 
-When those words are reproduced over the speakers, there is a
-corresponding message printed to stdout which synchronizes nicely.
+Tested-by Wenyou.Yang <wenyou.yang@atmel.com>
 
-On ODROID-U2 the same command doesn't work quite right - execution
-takes only 3.5 seconds and the audible output is truncated:
-"Front left, front right, front"
-and the stdout messages do not really coincide with the audio being
-reproduced at that time.
-
-No pulseaudio or anything like that.
-
-Can you reproduce this?
-
-Thanks
-Daniel
+Best Regards,
+Wenyou Yang
