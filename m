@@ -1,128 +1,101 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 23 Jun 2014 11:53:46 +0200
-Subject: [PATCHv4 2/4] ARM: Kirkwood: Add DT descriptions for net2big and
- net5big.
-In-Reply-To: <20140621192846.GG21711@titan.lakedaemon.net>
-References: <1401132591-26305-1-git-send-email-andrew@lunn.ch>
- <1401132591-26305-3-git-send-email-andrew@lunn.ch>
- <20140620233718.GV20207@kw.sim.vm.gnt>
- <20140621095001.GW20207@kw.sim.vm.gnt>
- <20140621192846.GG21711@titan.lakedaemon.net>
-Message-ID: <20140623095346.GC19224@kw.sim.vm.gnt>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 23 Jun 2014 11:54:43 +0200
+Subject: [PATCH 0/7] ARM: dts: ssi device node updates
+In-Reply-To: <20140620123337.GI28225@dragon>
+References: <1402995995-15098-1-git-send-email-mpa@pengutronix.de>
+ <20140620123337.GI28225@dragon>
+Message-ID: <20140623095443.GE32450@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 21, 2014 at 03:28:46PM -0400, Jason Cooper wrote:
-> On Sat, Jun 21, 2014 at 11:50:02AM +0200, Simon Guinot wrote:
-> > On Sat, Jun 21, 2014 at 01:37:18AM +0200, Simon Guinot wrote:
-> > > On Mon, May 26, 2014 at 09:29:49PM +0200, Andrew Lunn wrote:
-> ...
-> > > > +&regulators {
-> > > > +	regulator at 3 {
-> > > > +		compatible = "regulator-fixed";
-> > > > +		reg = <3>;
-> > > > +		regulator-name = "hdd2power";
-> > > > +		regulator-min-microvolt = <5000000>;
-> > > > +		regulator-max-microvolt = <5000000>;
-> > > > +		enable-active-high;
-> > > > +		regulator-always-on;
-> > > > +		regulator-boot-on;
-> > > > +		gpio = <&gpio0 19 GPIO_ACTIVE_HIGH>;
-> > > 
-> > > 19 must be replaced with 9.
-> > 
-> > And gpio0 must replaced with gpio1.
-> > 
-> > > 
-> > > > +	};
-> > > > +
-> > > > +	regulator at 4 {
-> > > > +		compatible = "regulator-fixed";
-> > > > +		reg = <4>;
-> > > > +		regulator-name = "hdd3power";
-> > > > +		regulator-min-microvolt = <5000000>;
-> > > > +		regulator-max-microvolt = <5000000>;
-> > > > +		enable-active-high;
-> > > > +		regulator-always-on;
-> > > > +		regulator-boot-on;
-> > > > +		gpio = <&gpio0 20 GPIO_ACTIVE_HIGH>;
-> > > 
-> > > 20 must be replaced with 10.
-> > 
-> > Here too.
-> > 
-> > > 
-> > > > +	};
-> > > > +
-> > > > +	regulator at 5 {
-> > > > +		compatible = "regulator-fixed";
-> > > > +		reg = <5>;
-> > > > +		regulator-name = "hdd4power";
-> > > > +		regulator-min-microvolt = <5000000>;
-> > > > +		regulator-max-microvolt = <5000000>;
-> > > > +		enable-active-high;
-> > > > +		regulator-always-on;
-> > > > +		regulator-boot-on;
-> > > > +		gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-> > > 
-> > > 21 must be replaced with 11.
-> > 
-> > And here too.
-> > 
-> 
-> I've pushed the following to mvebu/dt:
-> 
-> --------->8--------------
-> commit d854fa8a1500bec982ed9cb26b82d96bd5ae8dab
-> Author: Jason Cooper <jason@lakedaemon.net>
-> Date:   Sat Jun 21 19:21:13 2014 +0000
-> 
->     ARM: kirkwood: fix net5big regulator gpio assignments
->     
->     Late correction from Simon's testing.
->     
->     Reported-by: Simon Guinot <simon.guinot@sequanux.org>
->     Link: https://lkml.kernel.org/r/20140621095001.GW20207 at kw.sim.vm.gnt
->     Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-net5big.dts b/arch/arm/boot/dts/kirkwood-net5big.dts
-> index 51c56a9490b3..d2887ed493f2 100644
-> --- a/arch/arm/boot/dts/kirkwood-net5big.dts
-> +++ b/arch/arm/boot/dts/kirkwood-net5big.dts
-> @@ -40,7 +40,7 @@
->  		enable-active-high;
->  		regulator-always-on;
->  		regulator-boot-on;
-> -		gpio = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-> +		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
->  	};
->  
->  	regulator at 4 {
-> @@ -52,7 +52,7 @@
->  		enable-active-high;
->  		regulator-always-on;
->  		regulator-boot-on;
-> -		gpio = <&gpio0 10 GPIO_ACTIVE_HIGH>;
-> +		gpio = <&gpio1 10 GPIO_ACTIVE_HIGH>;
->  	};
->  
->  	regulator at 5 {
-> @@ -64,7 +64,7 @@
->  		enable-active-high;
->  		regulator-always-on;
->  		regulator-boot-on;
-> -		gpio = <&gpio0 11 GPIO_ACTIVE_HIGH>;
-> +		gpio = <&gpio1 11 GPIO_ACTIVE_HIGH>;
->  	};
->  };
+Hi Shawn,
 
-Thanks.
+On Fri, Jun 20, 2014 at 08:33:38PM +0800, Shawn Guo wrote:
+> On Tue, Jun 17, 2014 at 11:06:28AM +0200, Markus Pargmann wrote:
+> > This series cleans up some old or unnecessary properties from the dts files.
+> > 
+> > Patch 1 removes an enabled ssi unit that is not used.
+> 
+> Instead of holding the whole series by waiting ACK from ventana board
+> maintainer on the first patch, I choose to keep the ssi node and remove
+> fsl,mode property.  The ssi node can be removed later in another patch
+> after board maintainer confirms.
+> 
+> > 
+> > Patch 2 adds ssi DMA properties based on the previous definiton of
+> > fsl,ssi-dma-events for imx50.
+> > 
+> > Patches 3 and 4 remove the old non-generic fsl,ssi-dma-events property. The
+> > generic dmas property is still present and used.
+> > 
+> > Patch 5,6 and 7 remove the fsl,mode properties for ssi units that are
+> > connected with sgtl5000 cards. The sgtl5000 already configures the connection
+> > between codec and CPU DAI correctly, so we don't need fsl,mode here.
+> 
+> There are some a number of new boards on my imx/dt branch across
+> different i.MX series.  Since the last 3 patches are all about board
+> level files, I just squashed them and made the same change for those
+> new boards in there.
 
-Simon
+Okay thanks.
+
+> 
+> Also, I updated the patch subject a little bit, primarily on prefix.
+> And the last one should be about audio cards, not only sgtl5000.  So in
+> all, the new summary looks like the following.
+
+Oh right, I overlooked that I also changed it for another sound card.
+
+Thanks,
+
+Markus
+
+> 
+> Markus Pargmann (4):
+>   ARM: dts: imx50: add ssi dma properties
+>   ARM: dts: imx5: remove fsl,ssi-dma-events
+>   ARM: dts: imx6qdl: remove fsl,ssi-dma-events
+>   ARM: dts: imx: remove ssi fsl,mode for audio cards
+> 
+>  arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts | 1 -
+>  arch/arm/boot/dts/imx25-pdk.dts                        | 1 -
+>  arch/arm/boot/dts/imx27-eukrea-mbimxsd27-baseboard.dts | 1 -
+>  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi        | 1 -
+>  arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts | 1 -
+>  arch/arm/boot/dts/imx50.dtsi                           | 8 ++++++--
+>  arch/arm/boot/dts/imx51-babbage.dts                    | 1 -
+>  arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts | 1 -
+>  arch/arm/boot/dts/imx51.dtsi                           | 3 ---
+>  arch/arm/boot/dts/imx53-m53evk.dts                     | 1 -
+>  arch/arm/boot/dts/imx53-mba53.dts                      | 1 -
+>  arch/arm/boot/dts/imx53-qsb-common.dtsi                | 1 -
+>  arch/arm/boot/dts/imx53-tx53.dtsi                      | 1 -
+>  arch/arm/boot/dts/imx53-voipac-bsb.dts                 | 1 -
+>  arch/arm/boot/dts/imx53.dtsi                           | 3 ---
+>  arch/arm/boot/dts/imx6dl-riotboard.dts                 | 1 -
+>  arch/arm/boot/dts/imx6q-gw5400-a.dts                   | 1 -
+>  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi                  | 1 -
+>  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi                  | 1 -
+>  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi                  | 2 --
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi              | 1 -
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi               | 1 -
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi                 | 1 -
+>  arch/arm/boot/dts/imx6qdl-tx6.dtsi                     | 1 -
+>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi               | 1 -
+>  arch/arm/boot/dts/imx6qdl.dtsi                         | 3 ---
+>  arch/arm/boot/dts/imx6sl-evk.dts                       | 1 -
+>  27 files changed, 6 insertions(+), 35 deletions(-)
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
+Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/fa524dcf/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/fea53e1a/attachment.sig>
