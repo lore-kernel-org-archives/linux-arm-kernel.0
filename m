@@ -1,54 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:25 +0900
-Subject: [PATCH 16/29] ARM: shmobile: henninger: add I2C2 DT support
+Date: Mon, 23 Jun 2014 11:28:34 +0900
+Subject: [PATCH 25/29] ARM: shmobile: r8a7791: Add default PCIe bus clock
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <29a647c396a054b087b124372ffb261f40ee9856.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <66c405e72bf332e59ab29461e33a4e94cb8bdd7a.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Phil Edworthy <phil.edworthy@renesas.com>
 
-Define the Henninger board dependent part of the I2C2 device node.
+This patch adds a default PCIe bus clock node.
 
-Based on the Koelsch I2C2 device tree patch by Wolfram Sang.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+[horms+renesas at verge.net.au: resolved conflict]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-henninger.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-henninger.dts b/arch/arm/boot/dts/r8a7791-henninger.dts
-index cc6d992..c0c58ce 100644
---- a/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ b/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -110,6 +110,11 @@
- 		renesas,function = "sdhi2";
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index a15bf7a..7f7eda7 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -555,6 +555,15 @@
+ 			clock-output-names = "audio_clk_c";
+ 		};
  
-+	i2c2_pins: i2c2 {
-+		renesas,groups = "i2c2";
-+		renesas,function = "i2c2";
-+	};
++		/* External PCIe clock - can be overridden by the board */
++		pcie_bus_clk: pcie_bus_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <100000000>;
++			clock-output-names = "pcie_bus";
++			status = "disabled";
++		};
 +
- 	qspi_pins: spi0 {
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
-@@ -170,6 +175,14 @@
- 	status = "okay";
- };
- 
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
- &qspi {
- 	pinctrl-0 = <&qspi_pins>;
- 	pinctrl-names = "default";
+ 		/* Special CPG clocks */
+ 		cpg_clocks: cpg_clocks at e6150000 {
+ 			compatible = "renesas,r8a7791-cpg-clocks",
 -- 
 2.0.0.rc2
