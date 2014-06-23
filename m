@@ -1,33 +1,59 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 23 Jun 2014 15:39:40 +0200
-Subject: [PATCH v7 4/7] ata: ahci_platform: add a generic AHCI compatible
+Date: Mon, 23 Jun 2014 15:39:42 +0200
+Subject: [PATCH v7 6/7] ARM: berlin: add the AHCI node for the BG2Q
 In-Reply-To: <1403530783-17180-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1403530783-17180-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1403530783-17180-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1403530783-17180-7-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci_platform driver is a generic driver using the libahci_platform
-functions. Add a generic compatible to avoid having an endless list of
-compatibles with no differences for the same driver.
+The BG2Q has an AHCI SATA controller. Add the corresponding nodes
+(AHCI, PHY) into its device tree.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- drivers/ata/ahci_platform.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/berlin2q.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index ebe505c17763..a30cecd68609 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -78,6 +78,8 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
- 			 ahci_platform_resume);
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 635a16a64cb4..60974dabedbc 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -303,6 +303,35 @@
+ 			clock-names = "refclk";
+ 		};
  
- static const struct of_device_id ahci_of_match[] = {
-+	{ .compatible = "generic-ahci", },
-+	/* Keep the following compatibles for device tree compatibility */
- 	{ .compatible = "snps,spear-ahci", },
- 	{ .compatible = "snps,exynos5440-ahci", },
- 	{ .compatible = "ibm,476gtr-ahci", },
++		ahci: sata at e90000 {
++			compatible = "generic-ahci";
++			reg = <0xe90000 0x1000>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_SATA>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			sata0: sata-port at 0 {
++				reg = <0>;
++				phys = <&sata_phy 0>;
++				status = "disabled";
++			};
++
++			sata1: sata-port at 1 {
++				reg = <1>;
++				phys = <&sata_phy 1>;
++				status = "disabled";
++			};
++		};
++
++		sata_phy: phy at e900a0 {
++			compatible = "marvell,berlin2q-sata-phy";
++			reg = <0xe900a0 0x200>;
++			clocks = <&chip CLKID_SATA>;
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 1.9.1
