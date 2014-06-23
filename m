@@ -1,128 +1,177 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 23 Jun 2014 16:53:02 +0200
-Subject: [PATCH v2 4/5] pinctrl: sunxi: Properly handle level triggered
- gpio interrupts
-In-Reply-To: <20140617184307.GF3665@lukather>
-References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
- <1401544899-405-5-git-send-email-hdegoede@redhat.com>
- <20140603133022.GK27722@lukather> <538DE60D.5070705@redhat.com>
- <20140617184307.GF3665@lukather>
-Message-ID: <53A83F4E.9040802@redhat.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 23 Jun 2014 15:55:18 +0100
+Subject: [PATCH v2 2/2] ARM: vexpress: Add CLCD Device Tree properties
+In-Reply-To: <1403535318-19333-1-git-send-email-pawel.moll@arm.com>
+References: <1403532837.3804.29.camel@hornet>
+ <1403535318-19333-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1403535318-19333-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
+dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
 
-On 06/17/2014 08:43 PM, Maxime Ripard wrote:
-> On Tue, Jun 03, 2014 at 05:13:17PM +0200, Hans de Goede wrote:
->> Hi,
->>
->> On 06/03/2014 03:30 PM, Maxime Ripard wrote:
->>> On Sat, May 31, 2014 at 04:01:38PM +0200, Hans de Goede wrote:
->>>> For level triggered gpio interrupts we need to use handle_fasteoi_irq,
->>>> like we do with the irq-sunxi-nmi driver. This is necessary to give threaded
->>>> interrupt handlers a chance to actuall clear the source of the interrupt
->>>> (which may involve sleeping waiting for i2c / spi / mmc transfers), before
->>>> acknowledging the interrupt.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 57 +++++++++++++++++++++++++----------
->>>>  1 file changed, 41 insertions(+), 16 deletions(-)
->>>>
->>>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->>>> index 61d3246..418a430 100644
->>>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->>>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->>>> @@ -31,6 +31,11 @@
->>>>  #include "../core.h"
->>>>  #include "pinctrl-sunxi.h"
->>>>
->>>> +static void sunxi_pinctrl_irq_ack(struct irq_data *d);
->>>> +static void sunxi_pinctrl_irq_mask(struct irq_data *d);
->>>> +static void sunxi_pinctrl_irq_unmask(struct irq_data *d);
->>>> +static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type);
->>>> +
->>>>  static struct sunxi_pinctrl_group *
->>>>  sunxi_pinctrl_find_group_by_name(struct sunxi_pinctrl *pctl, const char *group)
->>>>  {
->>>> @@ -545,10 +550,29 @@ static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
->>>>  	return 0;
->>>>  }
->>>>
->>>> -static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
->>>> -				      unsigned int type)
->>>> +static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
->>>> +	.irq_ack		= sunxi_pinctrl_irq_ack,
->>>> +	.irq_mask		= sunxi_pinctrl_irq_mask,
->>>> +	.irq_unmask		= sunxi_pinctrl_irq_unmask,
->>>> +	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
->>>> +	.irq_set_type		= sunxi_pinctrl_irq_set_type,
->>>> +	.flags			= IRQCHIP_SKIP_SET_WAKE,
->>>> +};
->>>> +
->>>> +static struct irq_chip sunxi_pinctrl_level_irq_chip = {
->>>> +	.irq_eoi		= sunxi_pinctrl_irq_ack,
->>>> +	.irq_mask		= sunxi_pinctrl_irq_mask,
->>>> +	.irq_unmask		= sunxi_pinctrl_irq_unmask,
->>>> +	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
->>>> +	.irq_set_type		= sunxi_pinctrl_irq_set_type,
->>>> +	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED
->>>> +				  | IRQCHIP_EOI_IF_HANDLED,
->>>> +};
->>>
->>> Maybe we can just forward declare these two structures, instead of all
->>> their functions.
->>
->> Variables cannot be forward declared, they can be declared extern, but last
->> time I checked extern and static don't mix.
-> 
-> Actually, you can. It's called a tentative definition, see
-> http://c0x.coding-guidelines.com/6.9.2.html and
-> http://c0x.coding-guidelines.com/6.2.2.html for the definition of
-> internal linkage.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 34 ++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 34 ++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 31 ++++++++++++++++++++++++++++++
+ 3 files changed, 97 insertions(+), 2 deletions(-)
 
-Ah, I've been programming C since 1996, and I did not know about that :)
-
-Good to have learned something new today. I'll do a v3 patch-set with this
-fixed (well a v4 really as I accidentally did a second v2, but lets be
-consistent and number the next one v3).
-
-Regards,
-
-Hans
-
-> 
-> Maxime
-> 
->>
->>>
->>>> +
->>>> +static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
->>>>  {
->>>>  	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
->>>> +	struct irq_desc *desc = container_of(d, struct irq_desc, irq_data);
->>>>  	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
->>>>  	u8 index = sunxi_irq_cfg_offset(d->hwirq);
->>>>  	unsigned long flags;
->>>> @@ -575,6 +599,14 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
->>>>  		return -EINVAL;
->>>>  	}
->>>>
->>>> +	if (type & IRQ_TYPE_LEVEL_MASK) {
->>>> +		d->chip = &sunxi_pinctrl_level_irq_chip;
->>>> +		desc->handle_irq = handle_fasteoi_irq;
->>>> +	} else {
->>>> +		d->chip = &sunxi_pinctrl_edge_irq_chip;
->>>> +		desc->handle_irq = handle_edge_irq;
->>>
->>> irq_set_chip_and_handler?
->>
->> Does a lookup of the irqdata which we already have here, and
->> that lookup takes a lock which is already held here.
-> 
-> Ah, yes.
-> 
-> Thanks,
-> Maxime
-> 
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index 756c986..c14c026 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -246,9 +246,41 @@
+ 			clcd at 1f0000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f0000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++				arm,pl11x,framebuffer = <0x18000000 0x00800000>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++
++				port {
++					v2m_clcd_pads: endpoint {
++						remote-endpoint = <&v2m_clcd_panel>;
++						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++					};
++				};
++
++				panel {
++					compatible = "panel-dpi";
++
++					port {
++						v2m_clcd_panel: endpoint {
++							remote-endpoint = <&v2m_clcd_pads>;
++						};
++					};
++
++					panel-timing {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -350,7 +382,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index ba856d6..a448420 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -245,9 +245,41 @@
+ 			clcd at 1f000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++				arm,pl11x,framebuffer = <0x4c000000 0x00800000>;
++				max-memory-bandwidth = <36864000>; /* Bps, 640x480 at 60 16bpp */
++
++				port {
++					v2m_clcd_pads: endpoint {
++						remote-endpoint = <&v2m_clcd_panel>;
++						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++					};
++				};
++
++				panel {
++					compatible = "panel-dpi";
++
++					port {
++						v2m_clcd_panel: endpoint {
++							remote-endpoint = <&v2m_clcd_pads>;
++						};
++					};
++
++					panel-timing {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -349,7 +381,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 62d9b22..31107cd 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -70,9 +70,40 @@
+ 	clcd at 10020000 {
+ 		compatible = "arm,pl111", "arm,primecell";
+ 		reg = <0x10020000 0x1000>;
++		interrupt-names = "combined";
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
++		max-memory-bandwidth = <94371840>; /* Bps, 1024x768 at 60 16bpp */
++
++		port {
++			clcd_pads: endpoint {
++				remote-endpoint = <&clcd_panel>;
++				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++			};
++		};
++
++		panel {
++			compatible = "panel-dpi";
++
++			port {
++				clcd_panel: endpoint {
++					remote-endpoint = <&clcd_pads>;
++				};
++			};
++
++			panel-timing {
++				clock-frequency = <63500127>;
++				hactive = <1024>;
++				hback-porch = <152>;
++				hfront-porch = <48>;
++				hsync-len = <104>;
++				vactive = <768>;
++				vback-porch = <23>;
++				vfront-porch = <3>;
++				vsync-len = <4>;
++			};
++		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+-- 
+1.9.1
