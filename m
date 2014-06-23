@@ -1,199 +1,57 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 23 Jun 2014 15:01:39 -0700
-Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
- suspend/resume
-In-Reply-To: <53A4CADA.4030002@gmail.com>
-References: <1403155273-1057-1-git-send-email-dianders@chromium.org>
- <7h8uosyc3k.fsf@paris.lan>
- <CAD=FV=XxNVmF+N5HF4SnZoJRJvkSUkpEx6ct4v2gtmAQ9n28-Q@mail.gmail.com>
- <7hwqcbs166.fsf@paris.lan>
- <CAD=FV=Uz9O0i2gmuk2+BHa-Tksvyxv0+MTi2UEjVREAMNCK7Ug@mail.gmail.com>
- <7h7g4brx6w.fsf@paris.lan>
- <CAD=FV=VmPMf6tCNmKJ1o5J7PyAXoU8fb6+s+Fkv18FH2WaQp7A@mail.gmail.com>
- <53A4CADA.4030002@gmail.com>
-Message-ID: <CAD=FV=VkxA01eEFiXSp+c+GDuVJi7TctAdnyrMggk1gRw6BStQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 23 Jun 2014 18:03:18 -0400
+Subject: [PATCH v3] ARM: mvebu: Use system controller to get the soc id
+ when possible
+In-Reply-To: <1403538128-27859-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1403538128-27859-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140623220318.GE10202@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On Mon, Jun 23, 2014 at 05:42:08PM +0200, Gregory CLEMENT wrote:
+> On Armada 38x it is possible to get the SoC Id and the revision
+> without using the PCI register. Accessing the PCI registers implies
+> enabling its clock and, because of the initialization issue, not
+> keeping them enable. So if possible it is better to avoid it.
+> 
+> Armada 370 and Armada XP provides the SoC ID values from the system
+> controller but not the revision.
+> 
+> Armada 375 provides both but the SoC ID value looks buggy (0x6660
+> instead of 0x6720).
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+> Hi,
+> 
+> The main difference with the previous version is the use of
+> marvell,aramda380 instead of marvell,aramda38x which have been removed
+> in a previous patch.
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> Changelog:
+> 
+> v1 -> v2:
+> 
+> - Fix typo in mvebu_system_controller_get_soc_id.
+> - Use -ENODEV as return value instead of -1
+> 
+> v2 -> v3:
+> 
+> - Use marvell,aramda380 as compatible string
+> - Fix a typo
+> - Remove a white space
+> 
+>  arch/arm/mach-mvebu/common.h            |  1 +
+>  arch/arm/mach-mvebu/mvebu-soc-id.c      | 19 ++++++++++++++++++-
+>  arch/arm/mach-mvebu/system-controller.c | 19 +++++++++++++++++++
+>  3 files changed, 38 insertions(+), 1 deletion(-)
 
-On Fri, Jun 20, 2014 at 4:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 21.06.2014 01:53, Doug Anderson wrote:
->> Kevin,
->>
->> On Fri, Jun 20, 2014 at 4:13 PM, Kevin Hilman <khilman@linaro.org> wrote:
->>> Doug Anderson <dianders@chromium.org> writes:
->>>
->>>> Kevin,
->>>>
->>>> On Fri, Jun 20, 2014 at 2:48 PM, Kevin Hilman <khilman@linaro.org> wrote:
->>>>> Hi Doug,
->>>>>
->>>>> Doug Anderson <dianders@chromium.org> writes:
->>>>>
->>>>>> On Thu, Jun 19, 2014 at 11:43 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>>>>> Doug Anderson <dianders@chromium.org> writes:
->>>>>>>
->>>>>>>> The original code for the exynos i2c controller registered for the
->>>>>>>> "noirq" variants.  However during review feedback it was moved to
->>>>>>>> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
->>>>>>>> longer actually "noirq" (despite functions named
->>>>>>>> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
->>>>>>>>
->>>>>>>> i2c controllers that might have wakeup sources on them seem to need to
->>>>>>>> resume at noirq time so that the individual drivers can actually read
->>>>>>>> the i2c bus to handle their wakeup.
->>>>>>>
->>>>>>> I suspect usage of the noirq variants pre-dates the existence of the
->>>>>>> late/early callbacks in the PM core, but based on the description above,
->>>>>>> I suspect what you actually want is the late/early callbacks.
->>>>>>
->>>>>> I think it actually really needs noirq.  ;)
->>>>>
->>>>> Yes, it appears it does.   Objection withdrawn.
->>>>>
->>>>> I just wanted to be sure because since the introduction of late/early,
->>>>> the need for noirq should be pretty rare, but there certainly are needs.
->>>>>
->>>>> <tangent>
->>>>> In this case though, the need for it has more to do with the
->>>>> lack of a way for us to describe non parent-child device dependencies
->>>>> than whether or not IRQs are enabled or not.
->>>>> </tangent>
->>>>
->>>> Actually, I'm not sure that's true, but I'll talk through it and you
->>>> can point to where I'm wrong (I often am!)
->>>>
->>>> If you're a wakeup device then you need to be ready to handle
->>>> interrupts as soon as the "noirq" phase of resume is done, right?
->>>
->>> As soon as the noirq phase of your own driver is done, correct.
->>>
->>>> Said another way: you need to be ready to handle interrupts _before_
->>>> the normal resume code is called and be ready to handle interrupts
->>>> even _before_ the early resume code is called.
->>>
->>> Correct.
->>>
->>>> That means if you are implementing a bus that's needed by any devices
->>>> with wakeup interrupts then it's your responsibility to also be
->>>> prepared to run this early.
->>>>
->>>> In this particular case the max77686 driver doesn't need to do
->>>> anything at all to be ready to handle interrupts.  It's suspend and
->>>> resume code is just boilerplate "enable wakeups / disable wakeups" and
->>>> it has no "noirq" code.  The max77686 driver doesn't have any "noirq"
->>>> wake call because it would just be empty.
->>>>
->>>> Said another way: the problem isn't that the max77686 wakeup gets
->>>> called before the i2c wakeup.  The problem is that i2c is needed ASAP
->>>> once IRQs are enabled and thus needs to be run noirq.
->>>>
->>>> Does that sound semi-correct?
->>>
->>> Yes that's correct.
->>>
->>> My point above was (trying to be) that ultimately this is an ordering
->>> issue.  e.g. the bus device needs to be "ready" before wakeup devices on
->>> that bus can handle wakeup interrupts etc.  The way we're handling that
->>> ordering is by the implied ordering of noirq, late/early and "normal"
->>> callbacks.  That's convenient, but not exactly obvious.
->>>
->>> It works because we dont' typically need too many layers here, but it
->>> would be much more understandable if we could describe this kind of
->>> dependency in a way that the suspend/resume code would suspend/resume
->>> things in the right order rather than by tinkering with callback levels
->>> (since otherwise suspend/resume ordering just depends on probe order.)
->>>
->>> This issue then usually gets me headed down my usual rant path about how
->>> I think runtime PM is much better suited for handling ordering and
->>> dependencies becuase it automatically handles parent/child dependencies
->>> and non parent/child dependencies can be handled by taking advantage of
->>> the get/put APIs which are refcounted, ect etc. but that's another can
->>> worms.
->>
->> Ah, I gotcha.  Yes, I'm a fan of having explicit dependency orderings too.
->>
->> So I guess in this case the truly correct way to handle it is:
->>
->> 1. i2c controller should have Runtime PM even though (as per the code
->> now) there's nothing you can do to it to save power under normal
->> circumstances.  So the runtime "suspend" code would be a no-op.
->>
->> 2. When the i2c controller is told to runtime resume, it should
->> double-check if a full SoC poweroff has happened since the last time
->> it checked.  In this case it should reinit its hardware.
->>
->> 3. If the i2c controller gets a full "resume" callback then it should
->> also reinit the hardware just so it's not sitting in a half-configured
->> state until the first peripheral uses it.
->>
->> If later someone finds a way to power gate the i2c controller when no
->> active transfers are going (and we actually save non-trivial power
->> doing this) then we've got a nice place to put that code.
->>
->> NOTE: Unless we can actually save power by power gating the i2c
->> peripheral when there are no active transfers, we would also just have
->> the i2c_xfer() init the hardware if needed.  Maybe that's kinda gross,
->> though.
->>
->>
->> -Doug
->>
->>
->> P.S. Just to confirm: you're not opposed to landing the noirq code
->> as-is.  This discussion is about how someone could make it better in
->> the future...
->>
->
-> I'm not sure noirq is going to work correctly, at least not with current
-> callbacks. I can see a call to clk_prepare_enable() there which needs to
-> acquire a mutex.
+Applied to mvebu/soc
 
-Nice catch, thanks!  :)
+thx,
 
-OK, looking at that now.  Interestingly this doesn't seem to cause us
-problems in our ChromeOS 3.8 tree.  I just tried enabling:
-  CONFIG_DEBUG_ATOMIC_SLEEP=y
-
-...and confirmed that I got it on right:
-
-# zgrep -i atomic /proc/config.gz
-CONFIG_DEBUG_ATOMIC_SLEEP=y
-
-I can suspend/resume with no problems.  My bet is that it works fine because:
-
-* resume_noirq is not considered "atomic" in the sense enforced by
-CONFIG_DEBUG_ATOMIC_SLEEP (at least not in 3.8--I haven't tried on
-ToT)
-
-* At resume_noirq time nobody else is running so nobody else could be
-holding the mutex.  Thus: no sleep
-
-* The clock being used doesn't really have a prepare stage so it
-doesn't sleep either.
-
-That being said it doesn't seem so ideal to have a
-clk_prepare_enable() in the noirq callback.  How about I add a
-suspend/resume callback that does the prepare stage?
-
-
-> Would disabling the irq in suspend callback of your wakeup device and
-> reenabling it in resume, while keeping their wakeup capability enabled,
-> work for you? Then you could resume i2c in .resume_early callback
-> without any issues.
-
-I will do it if that's what people want and I'll bet it will work.
-...but I'm not a huge fan because:
-
-* It seems to me that it's working around the kernel and not working
-with the kernel.  The kernel's noirq stage is specifically for
-handling any wakeup that needs to happen before IRQs are enabled.
-
-* If any other i2c devices need wakeup they'll also need this workaround.
-
-* We still need to change the i2c driver to use the early/late, which
-is an implicit ordering.
-
-...all that being said if we have a goal to avoid "noirq" then this
-would accomplish that goal.
+Jason.
