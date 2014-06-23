@@ -1,75 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:18 +0900
-Subject: [PATCH 09/29] ARM: shmobile: r8a7791/koelsch dts: Add DVFS parameters
- into cpu0 node for r8a7791
+Date: Mon, 23 Jun 2014 11:28:10 +0900
+Subject: [PATCH 01/29] ARM: shmobile: armadillo800eva reference dts: Add
+ matching LED labels
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <a57004eca542428a444025847098b2af4e52a81c.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <0ba06992e8919128d0547066247de9e54a8bb992.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add needed information inside CPU0 for the generic cpufreq-cpu0 driver.
+And make the node name numbering match the label numbering.
 
-- voltage-tolerance = 1%
-  It reflects the tolerance for the CPU voltage defined inside the OPP
-  table. Due to the lack of proper OPP definition, use an arbitrary safe
-  value.
-- clock-latency = 300 us
-  Approximate worst-case latency to do a full DVFS transition for every
-  OPPs. Due to the lack of HW information, use an arbitrary safe value.
-  Note: The term transition-latency will be more accurate to define this
-  value since the clock transition latency is not the only parameter that
-  will define the overall DVFS transition.
-- operating-points = < kHz - uV >
-  List of 6 operating points. All of them are using the same voltage
-  since DVS is not supported in R-CAR Gen2.
-- clocks
-  phandle to the CPU clock source. This clock source is used for all the
-  2 CortexA15 located inside the same cluster.
-
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts |  4 ++++
- arch/arm/boot/dts/r8a7791.dtsi        | 11 +++++++++++
- 2 files changed, 15 insertions(+)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 95331d7..b2e6616 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -429,3 +429,7 @@
- 		regulator-always-on;
- 	};
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_dvfs>;
-+};
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index d683982..b639006 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -45,6 +45,17 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1500000000>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clocks = <&cpg_clocks R8A7791_CLK_Z>;
-+			clock-latency = <300000>; /* 300 us */
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1500000 1000000>,
-+					   <1312500 1000000>,
-+					   <1125000 1000000>,
-+					   < 937500 1000000>,
-+					   < 750000 1000000>,
-+					   < 375000 1000000>;
- 		};
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 486007d..f6ef73f 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -104,17 +104,21 @@
  
- 		cpu1: cpu at 1 {
+ 	leds {
+ 		compatible = "gpio-leds";
+-		led1 {
++		led3 {
+ 			gpios = <&pfc 102 GPIO_ACTIVE_HIGH>;
++			label = "LED3";
+ 		};
+-		led2 {
++		led4 {
+ 			gpios = <&pfc 111 GPIO_ACTIVE_HIGH>;
++			label = "LED4";
+ 		};
+-		led3 {
++		led5 {
+ 			gpios = <&pfc 110 GPIO_ACTIVE_HIGH>;
++			label = "LED5";
+ 		};
+-		led4 {
++		led6 {
+ 			gpios = <&pfc 177 GPIO_ACTIVE_HIGH>;
++			label = "LED6";
+ 		};
+ 	};
+ 
 -- 
 2.0.0.rc2
