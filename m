@@ -1,105 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 23 Jun 2014 13:50:41 -0400
-Subject: [PATCH v3 1/7] genirq: generic chip: export
- irq_map_generic_chip function
-In-Reply-To: <53A842C3.6060606@free-electrons.com>
-References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140621235108.GJ21711@titan.lakedaemon.net>
- <53A68CF0.8040303@free-electrons.com>
- <20140623130705.GM21711@titan.lakedaemon.net>
- <53A842C3.6060606@free-electrons.com>
-Message-ID: <20140623175041.GB10202@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 23 Jun 2014 12:56:34 -0500
+Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1403539186.3804.46.camel@hornet>
+References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
+ <20140620170901.GA12059@leverpostej> <1403532837.3804.29.camel@hornet>
+ <CAL_Jsq+6SveWhzWPrtziTJ-tDOFaJV4sXO+r_CEhAZf=tQE6FA@mail.gmail.com>
+ <1403539186.3804.46.camel@hornet>
+Message-ID: <CAL_JsqLQTT5N8D_GTDd5YVgr2SSCXtC6EcRQxW2=_-J8Wmsf0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 05:07:47PM +0200, Boris BREZILLON wrote:
-> 
-> On 23/06/2014 15:07, Jason Cooper wrote:
-> > On Sun, Jun 22, 2014 at 09:59:44AM +0200, Boris BREZILLON wrote:
-> >> On 22/06/2014 01:51, Jason Cooper wrote:
-> >>> On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
-> >>>> Export the generic irq map function in order to provide irq_domain ops with
-> >>>> generic mapping and specific of xlate function (needed by the new atmel
-> >>>> AIC driver).
-> >>>>
-> >>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> >>>> ---
-> >>>>  include/linux/irq.h       | 2 ++
-> >>>>  kernel/irq/generic-chip.c | 5 +++--
-> >>>>  2 files changed, 5 insertions(+), 2 deletions(-)
-> >>>>
-> >>>> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> >>>> index 0d998d8..62af592 100644
-> >>>> --- a/include/linux/irq.h
-> >>>> +++ b/include/linux/irq.h
-> >>>> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
-> >>>>  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
-> >>>>  
-> >>>>  /* Setup functions for irq_chip_generic */
-> >>>> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> >>>> +			 irq_hw_number_t hw_irq);
-> >>>>  struct irq_chip_generic *
-> >>>>  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
-> >>>>  		       void __iomem *reg_base, irq_flow_handler_t handler);
-> >>>> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-> >>>> index 452d6f2..cf80e7b 100644
-> >>>> --- a/kernel/irq/generic-chip.c
-> >>>> +++ b/kernel/irq/generic-chip.c
-> >>>> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
-> >>>>  /*
-> >>>>   * irq_map_generic_chip - Map a generic chip for an irq domain
-> >>>>   */
-> >>>> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> >>>> -				irq_hw_number_t hw_irq)
-> >>>> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> >>>> +			 irq_hw_number_t hw_irq)
-> >>>>  {
-> >>>>  	struct irq_data *data = irq_get_irq_data(virq);
-> >>>>  	struct irq_domain_chip_generic *dgc = d->gc;
-> >>>> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> >>>>  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
-> >>>>  	return 0;
-> >>>>  }
-> >>>> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
-> >>>>  
-> >>>>  struct irq_domain_ops irq_generic_chip_ops = {
-> >>>>  	.map	= irq_map_generic_chip,
-> >>> Why can't you use irq_generic_chip_ops.map in your code and avoid this
-> > s/code/declaration/, sorry for the misunderstanding.
-> >
-> >>> patch entirely?
-> >> Because in this case I'll have to remove constness from my
-> >> irq_domain_ops struct and initialize it in my init function.
-> >> This is not a big concern, but in general I tend to declare ops struct
-> >> with a const constraint.
-> > /*
-> >  * We're the only user of irq_map_generic_chip() who
-> >  * doesn't also use irq_domain_xlate_onetwocell()
-> >  */
-> > static const struct irq_domain_ops aic_irq_ops = {
-> > 	.map    = irq_generic_chip_ops.map,
-> >         .xlate  = aic_irq_domain_xlate,
-> > };
-> >
-> > Wouldn't work?
-> 
-> No, it fails  with :
-> 
-> "error: initializer element is not constant"
+On Mon, Jun 23, 2014 at 10:59 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Mon, 2014-06-23 at 16:43 +0100, Rob Herring wrote:
+>> On Mon, Jun 23, 2014 at 9:13 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+>> > On Fri, 2014-06-20 at 18:09 +0100, Mark Rutland wrote:
 
-Gah!  Of course.  That's what I get for pseudo-coding without sufficient
-coffee. :)
+>> >> > +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
+>> >> > +   cell's memory interface can handle
+>> >>
+>> >> When should I set this, given it is optional?
+>> >
+>> > When there is a (significant) limitation of the bandwidth available for
+>> > the cell's memory interface. One will either be told by the soc guys or
+>> > will figure it out in the hard way, as we did :-(
+>>
+>> What are you going to do with this information? b/w is a function of
+>> screen size and pixel depth. Are you going to refuse certain configs
+>> based on that? Seems like someone doing their own modes should know
+>> what they are doing and the limitations.
+>>
+>> Again, drop it until there is a defined need for this.
+>
+> Yes, there is. Use case: PL111 is wired up to a HDMI formatter, which
+> will take everything up to 1080p. This is what a DRM driver (what/if
+> it's ready) will get from the encoder driver (and rightly so). But the
+> chip interconnect limitations is make the chip being able to get 480p at
+> 60Hz tops.
+>
+> Or do you want me to add a subnode with timings for all achievable modes
+> instead?
 
-I won't have a chance to dig deeper into this until tonight or the next
-few days.  But my primary concern is that they chose to export the
-struct for a reason.  I'd like to dig through the history and find out
-why.
+I want this solved in a generic way and not something pl111 specific.
+If this is already defined then use it. If not, I would drop this for
+now and get a pl111 binding in place finally.
 
-Assuming there's no big reason not to export the function(s) directly,
-I'm fine with exporting them.  But it would be nice to get Thomas' Ack
-before I take the original patch since it touches core code.
-
-thx,
-
-Jason.
+Rob
