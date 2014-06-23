@@ -1,37 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:37 +0900
-Subject: [PATCH 24/24] ARM: shmobile: marzen: Do not use workaround for scif
- devices
+Date: Mon, 23 Jun 2014 11:26:30 +0900
+Subject: [PATCH 17/24] ARM: shmobile: marzen-reference: Use DT CPU Frequency
 In-Reply-To: <cover.1403487423.git.horms+renesas@verge.net.au>
 References: <cover.1403487423.git.horms+renesas@verge.net.au>
-Message-ID: <c1a0f9932b66b2298163c31f8ac3f2844476e1c2.1403487423.git.horms+renesas@verge.net.au>
+Message-ID: <17ed9efd8afdd8c38f19ff72f08e71c1fd2376e3.1403487423.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that SCIF devices are initialised using DT it should
-not be necessary to use the work around to provide clocks any more.
+Convert the Marzen DT reference board support to use shmobile_init_delay()
+to be able to migrate away from per-SoC delay setup functions.
 
+Based on work for the Armadillo800 EVA board by Magnus Damm.
+
+Cc: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen-reference.c | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm/mach-shmobile/board-marzen-reference.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index bb2df32..0a000b7 100644
+index 1b63686..bb2df32 100644
 --- a/arch/arm/mach-shmobile/board-marzen-reference.c
 +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -40,12 +40,6 @@ static void __init marzen_init_timer(void)
-  * devices until they get moved to DT.
-  */
- static const struct clk_name clk_names[] __initconst = {
--	{ "scif0", NULL, "sh-sci.0" },
--	{ "scif1", NULL, "sh-sci.1" },
--	{ "scif2", NULL, "sh-sci.2" },
--	{ "scif3", NULL, "sh-sci.3" },
--	{ "scif4", NULL, "sh-sci.4" },
--	{ "scif5", NULL, "sh-sci.5" },
- 	{ "tmu0", "fck", "sh-tmu.0" },
- };
- 
+@@ -66,7 +66,7 @@ static const char *marzen_boards_compat_dt[] __initdata = {
+ DT_MACHINE_START(MARZEN, "marzen")
+ 	.smp		= smp_ops(r8a7779_smp_ops),
+ 	.map_io		= r8a7779_map_io,
+-	.init_early	= r8a7779_init_delay,
++	.init_early	= shmobile_init_delay,
+ 	.init_time	= marzen_init_timer,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= r8a7779_init_irq_dt,
 -- 
 2.0.0.rc2
