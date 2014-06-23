@@ -1,34 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Jun 2014 18:01:34 +0200
-Subject: [PATCH v3 2/4] ARM: sunxi: Add earlyprintk support using R_UART
- (sun6i/sun8i)
-In-Reply-To: <1403275973-24259-3-git-send-email-wens@csie.org>
-References: <1403275973-24259-1-git-send-email-wens@csie.org>
- <1403275973-24259-3-git-send-email-wens@csie.org>
-Message-ID: <20140623160134.GI19730@lukather>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 23 Jun 2014 13:46:40 -0500
+Subject: [PATCH 0/2] ARM: socfpga: Update socfpga_defconfig and
+ socfpga.dtsi
+In-Reply-To: <1403483462-21082-1-git-send-email-vbridgers2013@gmail.com>
+References: <1403483462-21082-1-git-send-email-vbridgers2013@gmail.com>
+Message-ID: <1403549200.9081.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 10:52:51PM +0800, Chen-Yu Tsai wrote:
-> sun6i/sun8i have a UART in the RTC block group, which can be used
-> as an early console. This is most useful on sun8i as UART0 is muxed
-> with MMC0, which is not available if we boot from MMC.
+On Sun, 2014-06-22 at 19:31 -0500, Vince Bridgers wrote:
+> This patch series updates the the socfpga_defconfig with a number of options,
+> and updates the socfpga device tree with a field required for the reset
+> controller driver. 
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Vince Bridgers (2):
+>   ARM: socfpga: Update socfpga_defconfig
+>   ARM: socfpga: Add missing #reset-cells to socfpga device tree
+> 
+>  arch/arm/boot/dts/socfpga.dtsi     |    1 +
+>  arch/arm/configs/socfpga_defconfig |   35 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 36 insertions(+)
+> 
 
-Applied, thanks
+I've applied both patches to:
 
-Maxime
+git.rocketboards.org/linux-socfpga-next.git for-next.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/4c33635f/attachment.sig>
+Thanks,
+Dinh
