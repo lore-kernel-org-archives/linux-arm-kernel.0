@@ -1,49 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 23 Jun 2014 17:53:09 -0400
-Subject: [PATCH] ARM: mvebu: Fix the improper use of the compatible
- string armada38x using a wildcard
-In-Reply-To: <1403533011-21339-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1403533011-21339-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140623215309.GD10202@titan.lakedaemon.net>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 23 Jun 2014 14:58:12 -0700
+Subject: [PATCH v7 8/9] ARM: add seccomp syscall
+In-Reply-To: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+Message-ID: <1403560693-21809-9-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 04:16:51PM +0200, Gregory CLEMENT wrote:
-> Wildcards in compatible strings should be avoid. "marvell,armada38x"
-> was recently introduced but was not yet used.
-> 
-> The armada 385 SoC is a superset of the armada 380 SoC (with more CPUs
-> and more PCIe slots). So this patch replaces the use of
-> "marvell,armada38x" by the "marvell,armada380" string.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> Hi,
-> 
-> This fix should be merged in 3.16 and maybe sent as a fix for 3.15
-> too.
-> 
-> The initial patch (ARM: mvebu: Fix missing binding documentation for
-> Armada 38x) was re-written after the review about the use of the
-> wildcards here:
-> http://thread.gmane.org/gmane.linux.kernel/1728755/focus=79339 and
-> there:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/334225/focus=334311
-> 
-> 
-> Thanks,
-> Gregory
-> 
->  Documentation/devicetree/bindings/arm/armada-38x.txt | 14 ++++++++++++--
->  arch/arm/boot/dts/armada-380.dtsi                    |  2 +-
->  arch/arm/boot/dts/armada-385-db.dts                  |  2 +-
->  arch/arm/boot/dts/armada-385-rd.dts                  |  2 +-
->  arch/arm/boot/dts/armada-385.dtsi                    |  2 +-
->  arch/arm/boot/dts/armada-38x.dtsi                    |  2 +-
->  6 files changed, 17 insertions(+), 7 deletions(-)
+Wires up the new seccomp syscall.
 
-Applied to mvebu/dt with Andrew's Ack.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/include/uapi/asm/unistd.h |    1 +
+ arch/arm/kernel/calls.S            |    1 +
+ 2 files changed, 2 insertions(+)
 
-thx,
-
-Jason.
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index ba94446c72d9..e21b4a069701 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -409,6 +409,7 @@
+ #define __NR_sched_setattr		(__NR_SYSCALL_BASE+380)
+ #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
+ #define __NR_renameat2			(__NR_SYSCALL_BASE+382)
++#define __NR_seccomp			(__NR_SYSCALL_BASE+383)
+ 
+ /*
+  * This may need to be greater than __NR_last_syscall+1 in order to
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 8f51bdcdacbb..bea85f97f363 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -392,6 +392,7 @@
+ /* 380 */	CALL(sys_sched_setattr)
+ 		CALL(sys_sched_getattr)
+ 		CALL(sys_renameat2)
++		CALL(sys_seccomp)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+-- 
+1.7.9.5
