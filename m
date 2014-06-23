@@ -1,48 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:49 +0900
-Subject: [PATCH 2/9] ARM: shmobile: Use shmobile_init_delay() on EMEV2
-In-Reply-To: <cover.1403487831.git.horms+renesas@verge.net.au>
-References: <cover.1403487831.git.horms+renesas@verge.net.au>
-Message-ID: <ef9026e6879da358376b58fc63fe7a82f07404ad.1403487831.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Jun 2014 11:26:32 +0900
+Subject: [PATCH 19/24] ARM: shmobile: r8a7779 dtsi: Update unit-addresses for
+ clocks
+In-Reply-To: <cover.1403487423.git.horms+renesas@verge.net.au>
+References: <cover.1403487423.git.horms+renesas@verge.net.au>
+Message-ID: <2909b8746d6f5534aa7714d2df110b3633a59556.1403487423.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Adjust EMEV2 to use shmobile_init_delay() together with
-CPU Frequency settings from the DTS.
+  - Correct the unit-address for the "cpg_clocks" node,
+  - Add missing unit-addresses for the "mstp*_clks" nodes,
+  - Rename "cpg_clocks" and "mstp*_clks" nodes to the more generic
+    "clocks".
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-emev2.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 6e4ffa7..e10d34e 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -42,11 +42,6 @@ static void __init emev2_map_io(void)
- 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
- }
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 038c16a..27bf227 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -298,7 +298,7 @@
+ 		};
  
--static void __init emev2_init_delay(void)
--{
--	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
--}
--
- static void __init emev2_add_standard_devices_dt(void)
- {
- 	of_clk_init(NULL);
-@@ -63,7 +58,7 @@ extern struct smp_operations emev2_smp_ops;
- DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
- 	.smp		= smp_ops(emev2_smp_ops),
- 	.map_io		= emev2_map_io,
--	.init_early	= emev2_init_delay,
-+	.init_early	= shmobile_init_delay,
- 	.init_machine	= emev2_add_standard_devices_dt,
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= emev2_boards_compat_dt,
+ 		/* Special CPG clocks */
+-		cpg_clocks: cpg_clocks at 0xe6150000 {
++		cpg_clocks: clocks at ffc80000 {
+ 			compatible = "renesas,r8a7779-cpg-clocks";
+ 			reg = <0 0xffc80000 0 0x30>;
+ 			clocks = <&extal_clk>;
+@@ -342,7 +342,7 @@
+ 		};
+ 
+ 		/* Gate clocks */
+-		mstp0_clks: mstp0_clks {
++		mstp0_clks: clocks at ffc80030 {
+ 			compatible = "renesas,r8a7779-mstp-clocks",
+ 			             "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xffc80030 0 4>;
+@@ -379,7 +379,7 @@
+ 				"scif1", "scif0", "i2c3", "i2c2", "i2c1",
+ 				"i2c0";
+ 		};
+-		mstp1_clks: mstp1_clks {
++		mstp1_clks: clocks at ffc80034 {
+ 			compatible = "renesas,r8a7779-mstp-clocks",
+ 			             "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
+@@ -408,7 +408,7 @@
+ 				"ether", "sata",
+ 				"pcie", "vin3";
+ 		};
+-		mstp3_clks: mstp3_clks {
++		mstp3_clks: clocks at ffc8003c {
+ 			compatible = "renesas,r8a7779-mstp-clocks",
+ 			             "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xffc8003c 0 4>;
 -- 
 2.0.0.rc2
