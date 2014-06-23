@@ -1,74 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 23 Jun 2014 18:17:33 -0400
-Subject: [PATCH v3 1/7] genirq: generic chip: export
- irq_map_generic_chip function
-In-Reply-To: <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140623221733.GG10202@titan.lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 23 Jun 2014 15:19:11 -0700
+Subject: [PATCH] i2c: exynos5: Properly use the "noirq" variants of
+ suspend/resume
+In-Reply-To: <CAD=FV=VkxA01eEFiXSp+c+GDuVJi7TctAdnyrMggk1gRw6BStQ@mail.gmail.com>
+ (Doug Anderson's message of "Mon, 23 Jun 2014 15:01:39 -0700")
+References: <1403155273-1057-1-git-send-email-dianders@chromium.org>
+ <7h8uosyc3k.fsf@paris.lan>
+ <CAD=FV=XxNVmF+N5HF4SnZoJRJvkSUkpEx6ct4v2gtmAQ9n28-Q@mail.gmail.com>
+ <7hwqcbs166.fsf@paris.lan>
+ <CAD=FV=Uz9O0i2gmuk2+BHa-Tksvyxv0+MTi2UEjVREAMNCK7Ug@mail.gmail.com>
+ <7h7g4brx6w.fsf@paris.lan>
+ <CAD=FV=VmPMf6tCNmKJ1o5J7PyAXoU8fb6+s+Fkv18FH2WaQp7A@mail.gmail.com>
+ <53A4CADA.4030002@gmail.com>
+ <CAD=FV=VkxA01eEFiXSp+c+GDuVJi7TctAdnyrMggk1gRw6BStQ@mail.gmail.com>
+Message-ID: <7ha993p8v4.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Doug Anderson <dianders@chromium.org> writes:
 
-Would you mind Acking this and letting me know how you'd like me to
-handle it?  It's a build requirement for the rest of the series, but
-it's in core code.
+[...]
 
-I can do a separate topic branch for you or just merge it in with
-irqchip/core.  Whichever is easiest for you.
+> On Fri, Jun 20, 2014 at 4:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>
+>> I'm not sure noirq is going to work correctly, at least not with current
+>> callbacks. I can see a call to clk_prepare_enable() there which needs to
+>> acquire a mutex.
+>
+> Nice catch, thanks!  :)
+>
+> OK, looking at that now.  Interestingly this doesn't seem to cause us
+> problems in our ChromeOS 3.8 tree.  I just tried enabling:
+>   CONFIG_DEBUG_ATOMIC_SLEEP=y
+>
+> ...and confirmed that I got it on right:
+>
+> # zgrep -i atomic /proc/config.gz
+> CONFIG_DEBUG_ATOMIC_SLEEP=y
+>
+> I can suspend/resume with no problems.  My bet is that it works fine because:
+>
+> * resume_noirq is not considered "atomic" in the sense enforced by
+> CONFIG_DEBUG_ATOMIC_SLEEP (at least not in 3.8--I haven't tried on
+> ToT)
 
-On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
-> Export the generic irq map function in order to provide irq_domain ops with
-> generic mapping and specific of xlate function (needed by the new atmel
-> AIC driver).
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  include/linux/irq.h       | 2 ++
->  kernel/irq/generic-chip.c | 5 +++--
->  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> index 0d998d8..62af592 100644
-> --- a/include/linux/irq.h
-> +++ b/include/linux/irq.h
-> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
->  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
->  
->  /* Setup functions for irq_chip_generic */
-> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> +			 irq_hw_number_t hw_irq);
->  struct irq_chip_generic *
->  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
->  		       void __iomem *reg_base, irq_flow_handler_t handler);
-> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-> index 452d6f2..cf80e7b 100644
-> --- a/kernel/irq/generic-chip.c
-> +++ b/kernel/irq/generic-chip.c
-> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
->  /*
->   * irq_map_generic_chip - Map a generic chip for an irq domain
->   */
-> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> -				irq_hw_number_t hw_irq)
-> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-> +			 irq_hw_number_t hw_irq)
->  {
->  	struct irq_data *data = irq_get_irq_data(virq);
->  	struct irq_domain_chip_generic *dgc = d->gc;
-> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
->  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
->  
->  struct irq_domain_ops irq_generic_chip_ops = {
->  	.map	= irq_map_generic_chip,
-> -- 
-> 1.8.3.2
-> 
+The reason is because "noirq" in the suspend/resume path actually means
+no *device* IRQs for that specific device.
 
-thx,
+It's often assumed that the "noirq" callbacks are called with *all*
+interrupts disabled, but that's not the case.  Only the IRQs for that
+specific device are disabled when its noirq callbacks run.
 
-Jason.
+Kevin
