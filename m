@@ -1,38 +1,109 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Mon, 23 Jun 2014 15:26:24 +0530
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable USB3 support on Exynos
-In-Reply-To: <1403517384-24288-1-git-send-email-sachin.kamat@samsung.com>
-References: <1403517384-24288-1-git-send-email-sachin.kamat@samsung.com>
-Message-ID: <1403517384-24288-2-git-send-email-sachin.kamat@samsung.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 23 Jun 2014 13:14:42 +0300
+Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
+In-Reply-To: <53A3096B.1040409@wwwdotorg.org>
+References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
+ <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
+ <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
+ <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
+ <20140617215119.GC24743@mithrandir>
+ <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
+ <53A1B252.1030204@wwwdotorg.org>
+ <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
+ <53A3096B.1040409@wwwdotorg.org>
+Message-ID: <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables USB3 (XHCI) support on Exynos boards.
+On Thu, Jun 19, 2014 at 06:01:47PM +0200, Stephen Warren wrote:
+> On 06/19/2014 02:02 AM, Peter De Schrijver wrote:
+> > On Wed, Jun 18, 2014 at 05:37:54PM +0200, Stephen Warren wrote:
+> >> On 06/18/2014 06:18 AM, Peter De Schrijver wrote:
+> >>> On Tue, Jun 17, 2014 at 11:51:20PM +0200, Thierry Reding wrote:
+> >>>> * PGP Signed by an unknown key
+> >>>>
+> >>>> On Tue, Jun 17, 2014 at 05:01:46PM +0300, Peter De Schrijver wrote:
+> >>>>> On Tue, Jun 17, 2014 at 02:13:15PM +0200, Thierry Reding wrote:
+> >>>>>>> Old Signed by an unknown key
+> >>>>>>
+> >>>>>> On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
+> >>>>>>> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
+> >>>>>>>> This symbol needs to be exported to power on rails without using
+> >>>>>>>> tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
+> >>>>>>>> cannot be used in situations where the driver wants to handle clocking
+> >>>>>>>> by itself.
+> >>>>>>>
+> >>>>>>> Thierry, are you OK with this change?
+> >>>>>>
+> >>>>>> I would've preferred tegra_powergate_sequence_power_up() to be used
+> >>>>>
+> >>>>> I don't think the current tegra_powergate_sequence_power_up() API is very well
+> >>>>> defined though. I don't think the clocks and resets required by the sequence
+> >>>>> should be provided by the driver. For one, there can be several clocks and
+> >>>>> resets that need to be controlled for a single domain.
+> >>>>
+> >>>> Do you have any suggestions for what the API should look like? Even if
+> >>>> we plan to move to some different API, I think there's some advantage in
+> >>>> using it consistently if for no other reason than to make it easier to
+> >>>> replace occurrences later on.
+> >>>>
+> >>>
+> >>> I think the API should only have the domain ID as input so:
+> >>>
+> >>> int tegra_powerdomain_on(int id) 
+> >>>
+> >>> /*
+> >>>  * Prerequisites: domain is off
+> >>>  * Result: domain is on, clocks of the modules in the domain are off, modules are in reset
+> >>>  */
+> >>>
+> >>> int tegra_powerdomain_off(int id)
+> >>>
+> >>> /*
+> >>>  * Prerequisites: all clocks of the modules in the domain are off
+> >>>  * result: domain is off
+> >>>  */
+> >>
+> >> That doesn't make sense; the PMC doesn't have access to the clock and
+> >> reset IDs - that's why the API requires them to be passed in.
+> >>
+> > 
+> > We should make driver look them up by name then. It doesn't make sense to
+> > move this knowledge to the drivers as there can be several modules in 1
+> > powerdomain. So every driver would then need to have access to all clock
+> > and reset IDs of the modules of the domain?
+> 
+> Having the drivers know the clocks, resets, and power domains that
+> affect their HW module seems perfectly reasonable.
+> 
 
-Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
----
- arch/arm/configs/multi_v7_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Yes, but the problem is that you also need clocks and reset of other modules
+in the same domain to safely control the domain's status. Eg: the ISPs, VI and
+CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
+public documentation. So it's not unlikely a VI and CSI driver will upstreamed
+someday which means we would need to control the domain and therefore would
+need to tell that driver about the ISPs clocks and resets even though the
+driver doesn't know anything about the ISP hw otherwise.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index abde73eebc57..ec17e4eae28c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -289,6 +289,7 @@ CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC3=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_AB8500_USB=y
-@@ -370,6 +371,7 @@ CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_OMAP_USB2=y
- CONFIG_PHY_SUN4I_USB=y
-+CONFIG_PHY_EXYNOS5_USBDRD=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
--- 
-1.7.9.5
+> Do we actually have any case where unrelated modules are in the same
+> power domain /and/ there's some need for those drivers to manipulate the
+> power domain?
+> 
+
+According to the TRM, the reset state of the power domains is undefined. While
+that seems unlikely, I do think the kernel should not assume any domain is on
+apart from the obvious ones (like the CPU domain it is running on),
+
+> BTW, any objections here should have been raised when the initial API
+> design for powergating was created. Now that we have the current API,
+> which in turn has driven the DT bindings for at least some HW modules,
+> we're stuck with it due to DT ABIness. Well, perhaps we can introduce
+> something new, but we'll always have to support the old way, so there's
+> little point.
+
+I don't think the bindings need to be changed at all as long as the PMC driver
+can parse the relevant DT nodes to get the clock and reset information.
+
+Cheers,
+
+Peter.
