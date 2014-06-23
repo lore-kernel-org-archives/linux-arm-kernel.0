@@ -1,37 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Jun 2014 12:17:56 +0100
-Subject: [PATCH 3.10 005/103] irqchip: Gic: Support forced affinity setting
-In-Reply-To: <20140605180524.GC4121@kroah.com>
-References: <20140604232546.704156131@linuxfoundation.org>
- <20140604232547.006861681@linuxfoundation.org>
- <20140605160500.GD31564@leverpostej>
- <20140605180524.GC4121@kroah.com>
-Message-ID: <20140623111756.GY24291@sirena.org.uk>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Mon, 23 Jun 2014 16:50:20 +0530
+Subject: [PATCH] ARM: DTS: correct the capability string for mmc0
+Message-ID: <1403522420-1208-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 05, 2014 at 11:05:24AM -0700, Greg Kroah-Hartman wrote:
-> On Thu, Jun 05, 2014 at 05:05:00PM +0100, Mark Rutland wrote:
+MMC capability for HS200 is parsed in mmc/core/host.c as
+dts string "mmc-hs200-1_8v".
 
-> > This patch alone has the possiblity of breaking CPU hotplug on arm and
-> > arm64 (specifically it breaks hot unplugging CPU0 where interrupts may
-> > be left targetting the offline CPU).
+This patch corrects the dts string for Exynos5420 based peach-pit
+and Exynos5800 based peach-pi boards.
 
-...
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |    2 +-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> > Unfortunately there is not an equivalent fix for arm - Russell objected
-> > to the approach [2,3,4], and that's not yet settled.
-
-> Ok, be sure to cc: stable on the patch when it goes into the tree and
-> I'll pick it up then.
-
-Sadly that fix still hasn't materialised so stable remains broken for
-ARM.  The discussion was restarted on Friday but Russell is looking to
-Thomas for input.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/171b1286/attachment.sig>
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 7649982..7dea480 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -173,7 +173,7 @@
+ 	status = "okay";
+ 	num-slots = <1>;
+ 	broken-cd;
+-	caps2-mmc-hs200-1_8v;
++	mmc-hs200-1_8v;
+ 	supports-highspeed;
+ 	non-removable;
+ 	card-detect-delay = <200>;
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 2c2c137..bb3ee76 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -171,7 +171,7 @@
+ 	status = "okay";
+ 	num-slots = <1>;
+ 	broken-cd;
+-	caps2-mmc-hs200-1_8v;
++	mmc-hs200-1_8v;
+ 	supports-highspeed;
+ 	non-removable;
+ 	card-detect-delay = <200>;
+-- 
+1.7.9.5
