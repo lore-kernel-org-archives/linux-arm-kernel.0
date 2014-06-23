@@ -1,58 +1,48 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Sun, 22 Jun 2014 22:11:58 -0500
-Subject: [PATCH v7 9/9] ARM: add CONFIG_VDSO Kconfig and Makefile bits
-In-Reply-To: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1403493118-7597-10-git-send-email-nathan_lynch@mentor.com>
+From: sachin.kamat@samsung.com (Sachin Kamat)
+Date: Mon, 23 Jun 2014 08:48:15 +0530
+Subject: [PATCH] ARM: exynos: Fix warning by constifying 'reg' in
+ exynos_fdt_map_chipid()
+In-Reply-To: <026201cf8e80$8059f190$810dd4b0$@samsung.com>
+References: <3c6b5c1f19fcbee39a3f0a0bd2c9ddd811d5e619.1402547301.git.viresh.kumar@linaro.org>
+ <CAKohponQhitVO2zX0+=5bU76vC=+ofpqZo1F5CxyUDDD24prhw@mail.gmail.com>
+ <CAK5sBcEcvXKFypDAx2E+fGZHk-VLhfbxU4QydvQTs2nTjb47pQ@mail.gmail.com>
+ <026201cf8e80$8059f190$810dd4b0$@samsung.com>
+Message-ID: <CAK5sBcFJ73JK0iVUifCQ3_WidzUOxAW=5GLwz5Dyu0pjmhBo=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow users to enable the vdso in Kconfig; include the vdso in the
-build if CONFIG_VDSO is enabled.
+On Mon, Jun 23, 2014 at 6:44 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Sachin Kamat wrote:
+>>
+>> Hi Viresh,
+>>
+>> On Thu, Jun 12, 2014 at 10:04 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> > Fix Sachin's id, looks like he left Linaro ..
+>> >
+>> > On 12 June 2014 10:00, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> >> exynos_fdt_map_chipid() was recently added with: cbf08b9 (ARM: EXYNOS:
+>> >> Consolidate exynos4 and exynos5 machine files) and generates this warning:
+>> >>
+>> >> arch/arm/mach-exynos/exynos.c: In function ?exynos_fdt_map_chipid?:
+>> >> arch/arm/mach-exynos/exynos.c:208:6: warning: assignment discards ?const? qualifier
+>> from pointer target type [enabled by default]
+>> >>
+>> >> Constify 'reg' to fix it.
+>> >>
+>> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>
+>> I have already posted a patch [1] to fix this.
+>> Kukjin, can you please queue this up.
+>>
+>> [1] http://www.spinics.net/lists/arm-kernel/msg328216.html
+>
+> + Arnd
+>
+> If I remember correctly, it should be queued by Arnd?
+>
+> Arnd, do you want me to take it?
 
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
----
- arch/arm/kernel/Makefile |  1 +
- arch/arm/mm/Kconfig      | 15 +++++++++++++++
- 2 files changed, 16 insertions(+)
+This patch has now been merged into 3.16-rc2.
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 38ddd9f83d0e..87d4cdc3f3f9 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -86,6 +86,7 @@ obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
- obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
-+obj-$(CONFIG_VDSO)		+= vdso.o vdso/
- 
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index eda0dd0ab97b..616f46794502 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -824,6 +824,21 @@ config KUSER_HELPERS
- 	  Say N here only if you are absolutely certain that you do not
- 	  need these helpers; otherwise, the safe option is to say Y.
- 
-+config VDSO
-+	bool "Enable vDSO for acceleration of some system calls"
-+	depends on AEABI && MMU
-+	default y if ARM_ARCH_TIMER
-+	select GENERIC_TIME_VSYSCALL
-+	help
-+	  Place in the process address space an ELF shared object
-+	  providing fast implementations of several system calls,
-+	  including gettimeofday and clock_gettime.  Systems that
-+	  implement the ARM architected timer will receive maximum
-+	  benefit.
-+
-+	  You must have glibc 2.20 or later for programs to seamlessly
-+	  take advantage of this.
-+
- config DMA_CACHE_RWFO
- 	bool "Enable read/write for ownership DMA cache maintenance"
- 	depends on CPU_V6K && SMP
--- 
-1.9.3
+Regards,
+Sachin.
