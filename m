@@ -1,63 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:21 +0900
-Subject: [PATCH 12/29] ARM: shmobile: lager: Move i2c[12]_pins nodes to pfc
- node
+Date: Mon, 23 Jun 2014 11:28:35 +0900
+Subject: [PATCH 26/29] ARM: shmobile: r8a7791: Add PCIe Controller device node
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <d90bf60ceaf453b59c8cd5dbfa59538e27255706.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <811cdfae502137a21b91326ed6912a94d3dc7723.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to an error when resolving conflicts df40f256b18300e1 ("ARM: shmobile:
-lager: add i2c1, i2c2 pins") added the i2c[12]_pins nodes to the wrong
-node.
+From: Phil Edworthy <phil.edworthy@renesas.com>
 
-This patch moves them to their correct location in the pfc node.
-
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 3297b86a..b68ff56 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -144,16 +144,6 @@
- 		states = <3300000 1
- 			  1800000 0>;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 7f7eda7..43d2130 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -960,4 +960,29 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
  	};
--
--	i2c1_pins: i2c1 {
--		renesas,groups = "i2c1";
--		renesas,function = "i2c1";
--	};
--
--	i2c2_pins: i2c2 {
--		renesas,groups = "i2c2";
--		renesas,function = "i2c2";
--	};
++
++	pciec: pcie at fe000000 {
++		compatible = "renesas,pcie-r8a7791";
++		reg = <0 0xfe000000 0 0x80000>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		bus-range = <0x00 0xff>;
++		device_type = "pci";
++		ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
++			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
++			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
++			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
++		/* Map all possible DDR as inbound ranges */
++		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
++			      0x43000000 2 0x00000000 2 0x00000000 1 0x00000000>;
++		interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 117 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 118 IRQ_TYPE_LEVEL_HIGH>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7791_CLK_PCIEC>, <&pcie_bus_clk>;
++		clock-names = "pcie", "pcie_bus";
++		status = "disabled";
++	};
  };
- 
- &extal_clk {
-@@ -215,6 +205,16 @@
- 		renesas,function = "msiof1";
- 	};
- 
-+	i2c1_pins: i2c1 {
-+		renesas,groups = "i2c1";
-+		renesas,function = "i2c1";
-+	};
-+
-+	i2c2_pins: i2c2 {
-+		renesas,groups = "i2c2";
-+		renesas,function = "i2c2";
-+	};
-+
- 	i2c3_pins: i2c3 {
- 		renesas,groups = "i2c3";
- 		renesas,function = "i2c3";
 -- 
 2.0.0.rc2
