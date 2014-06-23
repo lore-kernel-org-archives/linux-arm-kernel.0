@@ -1,29 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:25:34 +0900
-Subject: [PATCH 3/4] ARM: shmobile: Enable PM_RUNTIME in defconfig
+Date: Mon, 23 Jun 2014 11:25:35 +0900
+Subject: [PATCH 4/4] ARM: shmobile: Enable CPUFREQ configuration
 In-Reply-To: <cover.1403487196.git.horms+renesas@verge.net.au>
 References: <cover.1403487196.git.horms+renesas@verge.net.au>
-Message-ID: <6e2776388a85e6b41e8cc816ece318d944fc3388.1403487196.git.horms+renesas@verge.net.au>
+Message-ID: <468c570ed078f0326745bfe85868adb925659502.1403487196.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+
+This changes of configuration is multiplatform build only for r8a7790/r8a7791.
+
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/shmobile_defconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 8cde033..94d7736 100644
+index 94d7736..c4b72aa 100644
 --- a/arch/arm/configs/shmobile_defconfig
 +++ b/arch/arm/configs/shmobile_defconfig
-@@ -35,6 +35,7 @@ CONFIG_KEXEC=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
+@@ -147,3 +147,16 @@ CONFIG_NLS_ISO8859_1=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ # CONFIG_ARM_UNWIND is not set
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_COMMON=y
++CONFIG_CPU_FREQ_STAT=y
++CONFIG_CPU_FREQ_STAT_DETAILS=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
++CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
++CONFIG_CPU_THERMAL=y
++CONFIG_GENERIC_CPUFREQ_CPU0=y
++CONFIG_REGULATOR_DA9210=y
 -- 
 2.0.0.rc2
