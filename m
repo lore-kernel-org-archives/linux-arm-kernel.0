@@ -1,86 +1,62 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:38 +0900
-Subject: [PATCH 29/29] ARM: shmobile: r8a7791: add R-Car sound support on DTSI
-In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
-References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <09abd1fd11f98d6abde9c23244234170e7e36c2f.1403487225.git.horms+renesas@verge.net.au>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Sun, 22 Jun 2014 22:11:53 -0500
+Subject: [PATCH v7 4/9] arm64: arch_timer: remove unused functions
+In-Reply-To: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1403493118-7597-5-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+The counter access and evtstream configuration are now done in common
+code, so remove the now-unused arch_counter_set_user_access and
+arch_timer_evtstrm_enable.
 
-This patch support PIO transfer only at this point
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 56 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ arch/arm64/include/asm/arch_timer.h | 31 -------------------------------
+ 1 file changed, 31 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 43d2130..1997f16 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -985,4 +985,60 @@
- 		clock-names = "pcie", "pcie_bus";
- 		status = "disabled";
- 	};
-+
-+	rcar_sound: rcar_sound at 0xec500000 {
-+		#sound-dai-cells = <1>;
-+		compatible =  "renesas,rcar_sound-r8a7791", "renesas,rcar_sound-gen2", "renesas,rcar_sound";
-+		interrupt-parent = <&gic>;
-+		reg =	<0 0xec500000 0 0x1000>, /* SCU */
-+			<0 0xec5a0000 0 0x100>,  /* ADG */
-+			<0 0xec540000 0 0x1000>, /* SSIU */
-+			<0 0xec541000 0 0x1280>; /* SSI */
-+		clocks = <&mstp10_clks R8A7791_CLK_SSI_ALL>,
-+			<&mstp10_clks R8A7791_CLK_SSI9>, <&mstp10_clks R8A7791_CLK_SSI8>,
-+			<&mstp10_clks R8A7791_CLK_SSI7>, <&mstp10_clks R8A7791_CLK_SSI6>,
-+			<&mstp10_clks R8A7791_CLK_SSI5>, <&mstp10_clks R8A7791_CLK_SSI4>,
-+			<&mstp10_clks R8A7791_CLK_SSI3>, <&mstp10_clks R8A7791_CLK_SSI2>,
-+			<&mstp10_clks R8A7791_CLK_SSI1>, <&mstp10_clks R8A7791_CLK_SSI0>,
-+			<&mstp10_clks R8A7791_CLK_SCU_SRC9>, <&mstp10_clks R8A7791_CLK_SCU_SRC8>,
-+			<&mstp10_clks R8A7791_CLK_SCU_SRC7>, <&mstp10_clks R8A7791_CLK_SCU_SRC6>,
-+			<&mstp10_clks R8A7791_CLK_SCU_SRC5>, <&mstp10_clks R8A7791_CLK_SCU_SRC4>,
-+			<&mstp10_clks R8A7791_CLK_SCU_SRC3>, <&mstp10_clks R8A7791_CLK_SCU_SRC2>,
-+			<&mstp10_clks R8A7791_CLK_SCU_SRC1>, <&mstp10_clks R8A7791_CLK_SCU_SRC0>,
-+			<&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>, <&m2_clk>;
-+		clock-names = "ssi-all",
-+				"ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
-+				"ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
-+				"src.9", "src.8", "src.7", "src.6", "src.5",
-+				"src.4", "src.3", "src.2", "src.1", "src.0",
-+				"clk_a", "clk_b", "clk_c", "clk_i";
-+
-+		status = "disabled";
-+
-+		rcar_sound,src {
-+			src0: src at 0 { };
-+			src1: src at 1 { };
-+			src2: src at 2 { };
-+			src3: src at 3 { };
-+			src4: src at 4 { };
-+			src5: src at 5 { };
-+			src6: src at 6 { };
-+			src7: src at 7 { };
-+			src8: src at 8 { };
-+			src9: src at 9 { };
-+		};
-+
-+		rcar_sound,ssi {
-+			ssi0: ssi at 0 { interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi1: ssi at 1 { interrupts = <0 371 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi2: ssi at 2 { interrupts = <0 372 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi3: ssi at 3 { interrupts = <0 373 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi4: ssi at 4 { interrupts = <0 374 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi5: ssi at 5 { interrupts = <0 375 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi6: ssi at 6 { interrupts = <0 376 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi7: ssi at 7 { interrupts = <0 377 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi8: ssi at 8 { interrupts = <0 378 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi9: ssi at 9 { interrupts = <0 379 IRQ_TYPE_LEVEL_HIGH>; };
-+		};
-+	};
- };
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 9400596a0f39..f19097134b02 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -104,37 +104,6 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+ 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+ }
+ 
+-static inline void arch_counter_set_user_access(void)
+-{
+-	u32 cntkctl = arch_timer_get_cntkctl();
+-
+-	/* Disable user access to the timers and the physical counter */
+-	/* Also disable virtual event stream */
+-	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+-			| ARCH_TIMER_USR_VT_ACCESS_EN
+-			| ARCH_TIMER_VIRT_EVT_EN
+-			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+-
+-	/* Enable user access to the virtual counter */
+-	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+-
+-	arch_timer_set_cntkctl(cntkctl);
+-}
+-
+-static inline void arch_timer_evtstrm_enable(int divider)
+-{
+-	u32 cntkctl = arch_timer_get_cntkctl();
+-	cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
+-	/* Set the divider and enable virtual event stream */
+-	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
+-			| ARCH_TIMER_VIRT_EVT_EN;
+-	arch_timer_set_cntkctl(cntkctl);
+-	elf_hwcap |= HWCAP_EVTSTRM;
+-#ifdef CONFIG_COMPAT
+-	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
+-#endif
+-}
+-
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
 -- 
-2.0.0.rc2
+1.9.3
