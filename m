@@ -1,597 +1,181 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 23 Jun 2014 03:21:22 +0200
-Subject: [RFC 4/4] ARM: dts: exynos5250: Add Spring device tree
-In-Reply-To: <1403486483-4063-1-git-send-email-afaerber@suse.de>
-References: <1403486483-4063-1-git-send-email-afaerber@suse.de>
-Message-ID: <1403486483-4063-5-git-send-email-afaerber@suse.de>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 23 Jun 2014 10:44:58 +0900
+Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
+In-Reply-To: <53A453D1.4040308@ti.com>
+References: <1402426287-31157-1-git-send-email-m-karicheri2@ti.com>
+ <CAErSpo6=vi0SR0A3u5BCLgiGxoH48N5R=e8VAnFDG=K61qLxnw@mail.gmail.com>
+ <53A453D1.4040308@ti.com>
+Message-ID: <000401cf8e84$bd72ac30$38580490$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds initial support for the HP Chromebook 11.
+On Saturday, June 21, 2014 12:31 AM, Murali Karicheri wrote:
+> On 6/17/2014 8:08 PM, Bjorn Helgaas wrote:
+> > On Tue, Jun 10, 2014 at 02:51:19PM -0400, Murali Karicheri wrote:
+> >> This patch adds a PCIe controller driver for Keystone SoCs. This
+> >> is based on v1 of the series posted to the mailing list.
+> >>
+> >> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> CC: Russell King <linux@arm.linux.org.uk>
+> >> CC: Grant Likely <grant.likely@linaro.org>
+> >> CC: Rob Herring <robh+dt@kernel.org>
+> >> CC: Mohit Kumar <mohit.kumar@st.com>
+> >> CC: Jingoo Han <jg1.han@samsung.com>
+> >> CC: Bjorn Helgaas <bhelgaas@google.com>
+> >> CC: Pratyush Anand <pratyush.anand@st.com>
+> >> CC: Richard Zhu <r65037@freescale.com>
+> >> CC: Kishon Vijay Abraham I <kishon@ti.com>
+> >> CC: Marek Vasut <marex@denx.de>
+> >> CC: Arnd Bergmann <arnd@arndb.de>
+> >> CC: Pawel Moll <pawel.moll@arm.com>
+> >> CC: Mark Rutland <mark.rutland@arm.com>
+> >> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> >> CC: Kumar Gala <galak@codeaurora.org>
+> >> CC: Randy Dunlap <rdunlap@infradead.org>
+> >> CC: Grant Likely <grant.likely@linaro.org>
+> >>
+> >>
+> >> Changelog:
+> >>
+> >> V2
+> >>   - Split the designware pcie enhancement patch to multiple
+> >>     patches based on functionality added
+> >>   - Remove the quirk code and add a patch to fix mps/mrss
+> >>     tuning for ARM. Use kernel command line parameter
+> >>     pci=pcie_bus_perf to work with Keystone PCI Controller.
+> >>     Following patch addressed this.
+> >>       [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
+> >>   - Add documentation for device tree bindings
+> >>   - Add separate interrupt controller nodes for MSI and Legacy
+> >>     IRQs and use irq map for legacy IRQ
+> >>   - Use compatibility to identify v3.65 version of the DW hardware
+> >>     and use it to customize the designware common code.
+> >>   - Use reg property for configuration space instead of range
+> >>   - Other minor updates based on code inspection.
+> >>
+> >> V1
+> >>   - Add an interrupt controller node for Legacy irq chip and use
+> >>     interrupt map/map-mask property to map legacy IRQs A/B/C/D
+> >>   - Add a Phy driver to replace the original serdes driver
+> >>   - Move common application register handling code to a separate
+> >>     file to allow re-use across other platforms that use older
+> >>     DW PCIe h/w
+> >>   - PCI quirk for maximum read request size. Check and override only
+> >>     if the maximum is higher than what controller can handle.
+> >>   - Converted to a module platform driver.
+> >>
+> >>
+> >> Murali Karicheri (8):
+> >>    PCI: designware: add rd[wr]_other_conf API
+> >>    PCI: designware: refactor host init code to re-use on v3.65 DW pci hw
+> >>    PCI: designware: update pcie core driver to work with dw hw version
+> >>      3.65
+> >>    PCI: designware: add msi controller functions for v3.65 hw
+> >>    PCI: designware: add PCI controller functions for v3.65 DW hw
+> >>    phy: Add serdes phy driver for keystone
+> >>    PCI: keystone: add pcie driver based on designware core driver
+> >>    ARM: keystone: add pcie related options
+> >>
+> >>   .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
+> >>   .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
+> >>   .../bindings/phy/phy-keystone-serdes.txt           |   25 ++
+> >>   arch/arm/mach-keystone/Kconfig                     |    1 +
+> >>   drivers/pci/host/Kconfig                           |   12 +
+> >>   drivers/pci/host/Makefile                          |    2 +
+> >>   drivers/pci/host/pci-dw-v3_65-msi.c                |  149 +++++++
+> >>   drivers/pci/host/pci-dw-v3_65.c                    |  390 ++++++++++++++++++
+> >>   drivers/pci/host/pci-dw-v3_65.h                    |   34 ++
+> >>   drivers/pci/host/pci-keystone.c                    |  418 ++++++++++++++++++++
+> >>   drivers/pci/host/pcie-designware.c                 |  175 +++++---
+> >>   drivers/pci/host/pcie-designware.h                 |   42 +-
+> >>   drivers/phy/Kconfig                                |    6 +
+> >>   drivers/phy/Makefile                               |    1 +
+> >>   drivers/phy/phy-keystone-serdes.c                  |  230 +++++++++++
+> >>   15 files changed, 1531 insertions(+), 52 deletions(-)
+> >>   create mode 100644 Documentation/devicetree/bindings/pci/pci-keystone.txt
+> >>   create mode 100644 Documentation/devicetree/bindings/phy/phy-keystone-serdes.txt
+> >>   create mode 100644 drivers/pci/host/pci-dw-v3_65-msi.c
+> >>   create mode 100644 drivers/pci/host/pci-dw-v3_65.c
+> >>   create mode 100644 drivers/pci/host/pci-dw-v3_65.h
+> >>   create mode 100644 drivers/pci/host/pci-keystone.c
+> >>   create mode 100644 drivers/phy/phy-keystone-serdes.c
+> > I'm not willing to merge phy-keystone-serdes.c because I don't
+> > maintain drivers/phy and because of the binary blob of register values
+> > it contains, but maybe somebody else will.  I assume it could be
+> > merged by itself before the rest of this.
+> >
+> > I'm looking for acks from Mohit and/or Jingoo for the pci/host
+> > changes, and from Arnd for the devicetree/bindings changes.
+> >
+> > Adding these "-dw-3_64" files is sort of ugly.  If that code is only
+> > used by keystone, maybe it could just be moved to pci-keystone.c?  But
+> > I'll defer to Mohit and Jingoo on that and the way you modify
+> > pcie-designware.c.
+> >
+> > Bjorn
+> Bjorn, Jingoo,
+> 
+> Unfortunately I lost Jingoo's email from my Inbox. So I cut-n-paste the
+> comment from
+> internet and respond.
+> 
+> Jingoo Han wrote:-
+> =============================================================================
+> I think so, too.
+> 
+> DT maintainers and arch maintainers should review the following
+> dt bindings.
+>    .../devicetree/bindings/pci/designware-pcie.txt    |   42 ++
+>    .../devicetree/bindings/pci/pci-keystone.txt       |   56 +++
+> Generic PHY maintainer (Kishon Vijay Abraham I) should review the
+> following phy driver.
+>    drivers/phy/phy-keystone-serdes.c
+> 
+>  >
+>  > I'm looking for acks from Mohit and/or Jingoo for the pci/host
+>  > changes, and from Arnd for the devicetree/bindings changes.
+>  >
+>  > Adding these "-dw-3_64" files is sort of ugly.  If that code is only
+>  > used by keystone, maybe it could just be moved to pci-keystone.c?  But
+>  > I'll defer to Mohit and Jingoo on that and the way you modify
+>  > pcie-designware.c.
+> 
+> I agree with Bjorn Helgaas's opinion. These three "-dw-3_64" files
+> look terrible! I don't have a good way to handle this; however,
+> moving this code to pci-keystone.c looks better.
+> ======================================================================
+> 
+> The original RFC I had submitted had all of the application space register
+> handling code as part of the Keystone PCI driver. As per Arnd's comment
+> (See
+> my change log against v1), the code was moved to a separate file so that
+> the next driver that has same version of the DW hw could re-use this code.
+> I agree with Arnd and moved the code to v_3_65 specific files.  What is
+> your proposal?  Do you have objection to the file name? or it's content?
 
-Cc: Vincent Palatin <vpalatin@chromium.org>
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Stephan van Schaik <stephan@synkhronix.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- arch/arm/boot/dts/Makefile              |   1 +
- arch/arm/boot/dts/exynos5250-spring.dts | 556 ++++++++++++++++++++++++++++++++
- 2 files changed, 557 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos5250-spring.dts
+I said utterly that "I agree with Bjorn Helgaas's opinion". Also, Bjorn
+said that "Adding these "-dw-3_64" files is sort of ugly".
+Thus, the point is the file name, not the content, as Santosh Shilimkar
+said.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5986ff6..dc2c5aa 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -74,6 +74,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos5250-arndale.dtb \
- 	exynos5250-smdk5250.dtb \
- 	exynos5250-snow.dtb \
-+	exynos5250-spring.dtb \
- 	exynos5260-xyref5260.dtb \
- 	exynos5410-smdk5410.dtb \
- 	exynos5420-arndale-octa.dtb \
-diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
-new file mode 100644
-index 0000000..e857d44
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5250-spring.dts
-@@ -0,0 +1,556 @@
-+/*
-+ * Google Spring board device tree source
-+ *
-+ * Copyright (c) 2013 Google, Inc
-+ * Copyright (c) 2014 SUSE LINUX Products GmbH
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+#include "exynos5250.dtsi"
-+#include "exynos5250-cros-common.dtsi"
-+
-+/ {
-+	model = "Google Spring";
-+	compatible = "google,spring", "samsung,exynos5250", "samsung,exynos5";
-+
-+	pinctrl at 11400000 {
-+		s5m8767_dvs: s5m8767-dvs {
-+			samsung,pins = "gpd1-0", "gpd1-1", "gpd1-2";
-+			samsung,pin-function = <0>;
-+			samsung,pin-pud = <1>;
-+			samsung,pin-drv = <0>;
-+		};
-+
-+		s5m8767_ds: s5m8767-ds {
-+			samsung,pins = "gpx2-3", "gpx2-4", "gpx2-5";
-+			samsung,pin-function = <0>;
-+			samsung,pin-pud = <1>;
-+			samsung,pin-drv = <0>;
-+		};
-+
-+		tps65090_irq: tps65090-irq {
-+			samsung,pins = "gpx2-6";
-+			samsung,pin-function = <0>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
-+
-+		s5m8767_irq: s5m8767-irq {
-+			samsung,pins = "gpx3-2";
-+			samsung,pin-function = <0>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
-+
-+		hdmi_hpd_irq: hdmi-hpd-irq {
-+			samsung,pins = "gpx3-7";
-+			samsung,pin-function = <0>;
-+			samsung,pin-pud = <1>;
-+			samsung,pin-drv = <0>;
-+		};
-+	};
-+
-+	pinctrl at 13400000 {
-+		hsic_reset: hsic-reset {
-+			samsung,pins = "gpe1-0";
-+			samsung,pin-function = <1>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
-+	};
-+
-+	vbat: vbat-fixed-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbat-supply";
-+		regulator-boot-on;
-+	};
-+
-+	usb at 12000000 {
-+		status = "okay";
-+	};
-+
-+	usb3_vbus_reg: regulator-usb3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "P5.0V_USB3CON";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpe1 0 1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hsic_reset>;
-+		enable-active-high;
-+	};
-+
-+	phy at 12100000 {
-+		vbus-supply = <&usb3_vbus_reg>;
-+	};
-+
-+	usb at 12110000 {
-+		samsung,vbus-gpio = <&gpx1 1 0>;
-+		status = "okay";
-+	};
-+
-+	usb at 12120000 {
-+		status = "okay";
-+	};
-+
-+	mmc at 12220000 {
-+		/* MMC2 pins are used as GPIO for eDP bridge control. */
-+		status = "disabled";
-+	};
-+
-+	mmc at 12230000 {
-+		status = "disabled";
-+	};
-+
-+	i2c at 12C60000 {
-+		max77686 at 09 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			rtc {
-+				reg = <0x6>;
-+			};
-+		};
-+
-+		s5m8767_pmic at 66 {
-+			compatible = "samsung,s5m8767-pmic";
-+			reg = <0x66>;
-+			interrupt-parent = <&gpx3>;
-+			interrupts = <2 0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&s5m8767_irq &s5m8767_dvs &s5m8767_ds>;
-+			wakeup-source;
-+
-+			s5m8767,pmic-buck-dvs-gpios = <&gpd1 0 1>, /* DVS1 */
-+			                              <&gpd1 1 1>, /* DVS2 */
-+			                              <&gpd1 2 1>; /* DVS3 */
-+
-+			s5m8767,pmic-buck-ds-gpios = <&gpx2 3 1>, /* SET1 */
-+			                             <&gpx2 4 1>, /* SET2 */
-+			                             <&gpx2 5 1>; /* SET3 */
-+
-+			/*
-+			 * The following arrays of DVS voltages are not used, since we are
-+			 * not using GPIOs to control PMIC bucks, but they must be defined
-+			 * to please the driver.
-+			 */
-+			s5m8767,pmic-buck2-dvs-voltage = <1350000>, <1300000>,
-+			                                 <1250000>, <1200000>,
-+			                                 <1150000>, <1100000>,
-+			                                 <1000000>, <950000>;
-+
-+			s5m8767,pmic-buck3-dvs-voltage = <1100000>, <1100000>,
-+			                                 <1100000>, <1100000>,
-+			                                 <1000000>, <1000000>,
-+			                                 <1000000>, <1000000>;
-+
-+			s5m8767,pmic-buck4-dvs-voltage = <1200000>, <1200000>,
-+			                                 <1200000>, <1200000>,
-+			                                 <1200000>, <1200000>,
-+			                                 <1200000>, <1200000>;
-+
-+			clocks {
-+				compatible = "samsung,s5m8767-clk";
-+				#clock-cells = <1>;
-+				clock-output-names = "en32khz_ap",
-+				                     "en32khz_cp",
-+				                     "en32khz_bt";
-+			};
-+
-+			regulators {
-+				s5m_ldo4_reg: LDO4 {
-+					regulator-name = "P1.0V_LDO_OUT4";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+					op_mode = <0>;
-+				};
-+
-+				s5m_ldo5_reg: LDO5 {
-+					regulator-name = "P1.0V_LDO_OUT5";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+					op_mode = <0>;
-+				};
-+
-+				s5m_ldo6_reg: LDO6 {
-+					regulator-name = "vdd_mydp";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo7_reg: LDO7 {
-+					regulator-name = "P1.1V_LDO_OUT7";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo8_reg: LDO8 {
-+					regulator-name = "P1.0V_LDO_OUT8";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo10_reg: LDO10 {
-+					regulator-name = "P1.8V_LDO_OUT10";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo11_reg: LDO11 {
-+					regulator-name = "P1.8V_LDO_OUT11";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					op_mode = <0>;
-+				};
-+
-+				s5m_ldo12_reg: LDO12 {
-+					regulator-name = "P3.0V_LDO_OUT12";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo13_reg: LDO13 {
-+					regulator-name = "P1.8V_LDO_OUT13";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					op_mode = <0>;
-+				};
-+
-+				s5m_ldo14_reg: LDO14 {
-+					regulator-name = "P1.8V_LDO_OUT14";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo15_reg: LDO15 {
-+					regulator-name = "P1.0V_LDO_OUT15";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo16_reg: LDO16 {
-+					regulator-name = "P1.8V_LDO_OUT16";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					op_mode = <3>;
-+				};
-+
-+				s5m_ldo17_reg: LDO17 {
-+					regulator-name = "P2.8V_LDO_OUT17";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+					op_mode = <0>;
-+				};
-+
-+				s5m_ldo25_reg: LDO25 {
-+					regulator-name = "vdd_bridge";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+					op_mode = <1>;
-+				};
-+
-+				BUCK1 {
-+					regulator-name = "vdd_mif";
-+					regulator-min-microvolt = <950000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+					op_mode = <3>;
-+				};
-+
-+				BUCK2 {
-+					regulator-name = "vdd_arm";
-+					regulator-min-microvolt = <850000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+					op_mode = <3>;
-+				};
-+
-+				BUCK3 {
-+					regulator-name = "vdd_int";
-+					regulator-min-microvolt = <900000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+					op_mode = <3>;
-+				};
-+
-+				BUCK4 {
-+					regulator-name = "vdd_g3d";
-+					regulator-min-microvolt = <850000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-boot-on;
-+					op_mode = <3>;
-+				};
-+
-+				BUCK5 {
-+					regulator-name = "P1.8V_BUCK_OUT5";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+					op_mode = <1>;
-+				};
-+
-+				BUCK6 {
-+					regulator-name = "P1.2V_BUCK_OUT6";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+					op_mode = <0>;
-+				};
-+
-+				BUCK9 {
-+					regulator-name = "vdd_ummc";
-+					regulator-min-microvolt = <950000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+					op_mode = <3>;
-+				};
-+			};
-+		};
-+	};
-+
-+	i2c at 12C70000 {
-+		trackpad {
-+			status = "disabled";
-+		};
-+	};
-+
-+	i2c at 12CA0000 {
-+		embedded-controller {
-+			compatible = "google,cros-ec-i2c";
-+			reg = <0x1e>;
-+			interrupts = <6 0>;
-+			interrupt-parent = <&gpx1>;
-+			wakeup-source;
-+
-+			keyboard-controller {
-+				compatible = "google,cros-ec-keyb";
-+				keypad,num-rows = <8>;
-+				keypad,num-columns = <13>;
-+				google,needs-ghost-filter;
-+				linux,keymap = <
-+					0x0001007d	/* L_META */
-+					0x0002003b	/* F1 */
-+					0x00030030	/* B */
-+					0x00040044	/* F10 */
-+					0x00060031	/* N */
-+					0x0008000d	/* = */
-+					0x000a0064	/* R_ALT */
-+
-+					0x01010001	/* ESC */
-+					0x0102003e	/* F4 */
-+					0x01030022	/* G */
-+					0x01040041	/* F7 */
-+					0x01060023	/* H */
-+					0x01080028	/* ' */
-+					0x01090043	/* F9 */
-+					0x010b000e	/* BKSPACE */
-+
-+					0x0200001d	/* L_CTRL */
-+					0x0201000f	/* TAB */
-+					0x0202003d	/* F3 */
-+					0x02030014	/* T */
-+					0x02040040	/* F6 */
-+					0x0205001b	/* ] */
-+					0x02060015	/* Y */
-+					0x02070056	/* 102ND */
-+					0x0208001a	/* [ */
-+					0x02090042	/* F8 */
-+
-+					0x03010029	/* GRAVE */
-+					0x0302003c	/* F2 */
-+					0x03030006	/* 5 */
-+					0x0304003f	/* F5 */
-+					0x03060007	/* 6 */
-+					0x0308000c	/* - */
-+					0x030b002b	/* \ */
-+
-+					0x04000061	/* R_CTRL */
-+					0x0401001e	/* A */
-+					0x04020020	/* D */
-+					0x04030021	/* F */
-+					0x0404001f	/* S */
-+					0x04050025	/* K */
-+					0x04060024	/* J */
-+					0x04080027	/* ; */
-+					0x04090026	/* L */
-+					0x040a002b	/* \ */
-+					0x040b001c	/* ENTER */
-+
-+					0x0501002c	/* Z */
-+					0x0502002e	/* C */
-+					0x0503002f	/* V */
-+					0x0504002d	/* X */
-+					0x05050033	/* , */
-+					0x05060032	/* M */
-+					0x0507002a	/* L_SHIFT */
-+					0x05080035	/* / */
-+					0x05090034	/* . */
-+					0x050B0039	/* SPACE */
-+
-+					0x06010002	/* 1 */
-+					0x06020004	/* 3 */
-+					0x06030005	/* 4 */
-+					0x06040003	/* 2 */
-+					0x06050009	/* 8 */
-+					0x06060008	/* 7 */
-+					0x0608000b	/* 0 */
-+					0x0609000a	/* 9 */
-+					0x060a0038	/* L_ALT */
-+					0x060b006c	/* DOWN */
-+					0x060c006a	/* RIGHT */
-+
-+					0x07010010	/* Q */
-+					0x07020012	/* E */
-+					0x07030013	/* R */
-+					0x07040011	/* W */
-+					0x07050017	/* I */
-+					0x07060016	/* U */
-+					0x07070036	/* R_SHIFT */
-+					0x07080019	/* P */
-+					0x07090018	/* O */
-+					0x070b0067	/* UP */
-+					0x070c0069	/* LEFT */
-+				>;
-+			};
-+		};
-+
-+		power-regulator {
-+			compatible = "ti,tps65090";
-+			reg = <0x48>;
-+
-+			/*
-+			 * Config irq to disable internal pulls
-+			 * even though we run in polling mode.
-+			 */
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&tps65090_irq>;
-+
-+			vsys1-supply = <&vbat>;
-+			vsys2-supply = <&vbat>;
-+			vsys3-supply = <&vbat>;
-+			infet1-supply = <&vbat>;
-+			infet2-supply = <&vbat>;
-+			infet3-supply = <&vbat>;
-+			infet4-supply = <&vbat>;
-+			infet5-supply = <&vbat>;
-+			infet6-supply = <&vbat>;
-+			infet7-supply = <&vbat>;
-+			vsys-l1-supply = <&vbat>;
-+			vsys-l2-supply = <&vbat>;
-+
-+			regulators {
-+				fet1 {
-+					regulator-name = "vcd_led";
-+					regulator-min-microvolt = <12000000>;
-+					regulator-max-microvolt = <12000000>;
-+				};
-+				fet3 {
-+					regulator-name = "wwan_r";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+				fet5 {
-+					regulator-name = "cam";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+				fet6 {
-+					regulator-name = "lcd_vdd";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+				fet7 {
-+					regulator-name = "ts";
-+					regulator-min-microvolt = <5000000>;
-+					regulator-max-microvolt = <5000000>;
-+				};
-+			};
-+
-+			charger {
-+				compatible = "ti,tps65090-charger";
-+			};
-+		};
-+	};
-+
-+	hdmi {
-+		hdmi-en-supply = <&s5m_ldo8_reg>;
-+		vdd-supply = <&s5m_ldo8_reg>;
-+		vdd_osc-supply = <&s5m_ldo10_reg>;
-+		vdd_pll-supply = <&s5m_ldo8_reg>;
-+	};
-+
-+	fimd at 14400000 {
-+		status = "okay";
-+		samsung,invert-vclk;
-+	};
-+
-+	dp-controller at 145B0000 {
-+		status = "okay";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&dp_hpd>;
-+		samsung,color-space = <0>;
-+		samsung,dynamic-range = <0>;
-+		samsung,ycbcr-coeff = <0>;
-+		samsung,color-depth = <1>;
-+		samsung,link-rate = <0x0a>;
-+		samsung,lane-count = <1>;
-+		samsung,hpd-gpio = <&gpc3 0 0>;
-+
-+		display-timings {
-+			native-mode = <&timing1>;
-+
-+			timing1: timing at 1 {
-+				clock-frequency = <70589280>;
-+				hactive = <1366>;
-+				vactive = <768>;
-+				hfront-porch = <40>;
-+				hback-porch = <40>;
-+				hsync-len = <32>;
-+				vback-porch = <10>;
-+				vfront-porch = <12>;
-+				vsync-len = <6>;
-+			};
-+		};
-+	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+};
--- 
-1.9.3
+> 
+> If objection is on the file name,  please suggest alternate names. If you
+> are okay with the file name, and doesn't like the code, it will be helpful
+> to review the code and provide specific comments against the patch itself
+> so that I can address the same.
+
+I say again that "I have no idea about the alternate file names".
+However, if you want to add v_3_65 specific files, please don't
+split the files. Please make these three files as 1 file.
+
+   drivers/pci/host/pci-dw-v3_65-msi.c
+   drivers/pci/host/pci-dw-v3_65.c
+   drivers/pci/host/pci-dw-v3_65.h
+   --> drivers/pci/host/pci-dw-v3-65.c
+        (I don't have no idea about the name)
+
+Best regards,
+Jingoo Han
+
+> 
+> Murali
