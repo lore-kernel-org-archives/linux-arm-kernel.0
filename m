@@ -1,49 +1,40 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Mon, 23 Jun 2014 15:05:19 +0200
-Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <53A0861E.90400@gmail.com>
-References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
- <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
- <53A0861E.90400@gmail.com>
-Message-ID: <20140623130519.GA23540@kwain>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon, 23 Jun 2014 15:07:18 +0200
+Subject: [PATCH v2 1/2] video: imxfb: Fix unbalanced regulators
+Message-ID: <1403528839-31901-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+Both regulator_enable and regulator_disable's comments
+say that they must be balanced with its counterpart
+enable/disable function.
 
-On Tue, Jun 17, 2014 at 08:17:02PM +0200, Sebastian Hesselbarth wrote:
-> On 06/16/2014 12:26 PM, Antoine T?nart wrote:
-> > +
-> > +#define PHY_BASE		0x200
-> 
-> Antoine,
-> 
-> I gave your Berlin AHCI patches a try on BG2. I finally got it working
-> but BG2 has a different PHY_BASE and need some register fixups.
-> 
-> Please update this patch and the DT bindings to reflect the difference
-> of BG2Q with respect to BG2 as below.
-> 
-> [...]
-> > +
-> > +static const struct of_device_id phy_berlin_sata_of_match[] = {
-> > +	{ .compatible = "marvell,berlin-sata-phy" },
-> 
-> s/marvell,berlin-sata-phy/marvell,berlin2-sata-phy/
-> 
-> and add
-> 
-> marvell,berlin2q-sata-phy
-> 
-> That way it can be applied now without proper support for BG2
-> and I can send patches later.
+Not doing it result in kernel warnings each time
+the lcd is powered off twice, for instance trough sysfs.
 
-Sure. I'll just s/marvell,berlin-sata-phy/marvell,berlin2q-sata-phy/ so
-we don't have a non working compatible.
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+Changelog v1->v2:
+ - None
+---
+ drivers/video/fbdev/imxfb.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Antoine
-
+diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+index f6e6216..121cbd7 100644
+--- a/drivers/video/fbdev/imxfb.c
++++ b/drivers/video/fbdev/imxfb.c
+@@ -769,9 +769,9 @@ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
+ 	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+ 
+ 	if (!IS_ERR(fbi->lcd_pwr)) {
+-		if (power)
++		if (power && !regulator_is_enabled(fbi->lcd_pwr))
+ 			return regulator_enable(fbi->lcd_pwr);
+-		else
++		else if (regulator_is_enabled(fbi->lcd_pwr))
+ 			return regulator_disable(fbi->lcd_pwr);
+ 	}
+ 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
