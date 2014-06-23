@@ -1,78 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:33 +0900
-Subject: [PATCH 20/24] ARM: shmobile: r8a7779 dtsi: Correct
- #address-cells/#size-cells for clocks
-In-Reply-To: <cover.1403487423.git.horms+renesas@verge.net.au>
-References: <cover.1403487423.git.horms+renesas@verge.net.au>
-Message-ID: <5cc8afcbc47c5f33732fb1a4b37a35841e7494e8.1403487423.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Jun 2014 11:26:49 +0900
+Subject: [PATCH 2/9] ARM: shmobile: Use shmobile_init_delay() on EMEV2
+In-Reply-To: <cover.1403487831.git.horms+renesas@verge.net.au>
+References: <cover.1403487831.git.horms+renesas@verge.net.au>
+Message-ID: <ef9026e6879da358376b58fc63fe7a82f07404ad.1403487831.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Warning (ranges_format): /clocks has empty "ranges" property but its #address-cells (2) differs from / (1)
-Warning (ranges_format): /clocks has empty "ranges" property but its #size-cells (2) differs from / (1)
+Adjust EMEV2 to use shmobile_init_delay() together with
+CPU Frequency settings from the DTS.
 
-As r8a7779 doesn't support LPAE, change #address-cells and #size-cells from
-"<2>" to "<1>", and update the affected "reg" properties to fix this.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/setup-emev2.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 27bf227..61d08f4 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -284,8 +284,8 @@
- 	};
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index 6e4ffa7..e10d34e 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -42,11 +42,6 @@ static void __init emev2_map_io(void)
+ 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
+ }
  
- 	clocks {
--		#address-cells = <2>;
--		#size-cells = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
- 		ranges;
- 
- 		/* External root clock */
-@@ -300,7 +300,7 @@
- 		/* Special CPG clocks */
- 		cpg_clocks: clocks at ffc80000 {
- 			compatible = "renesas,r8a7779-cpg-clocks";
--			reg = <0 0xffc80000 0 0x30>;
-+			reg = <0xffc80000 0x30>;
- 			clocks = <&extal_clk>;
- 			#clock-cells = <1>;
- 			clock-output-names = "plla", "z", "zs", "s",
-@@ -345,7 +345,7 @@
- 		mstp0_clks: clocks at ffc80030 {
- 			compatible = "renesas,r8a7779-mstp-clocks",
- 			             "renesas,cpg-mstp-clocks";
--			reg = <0 0xffc80030 0 4>;
-+			reg = <0xffc80030 4>;
- 			clocks = <&cpg_clocks R8A7779_CLK_S>,
- 			         <&cpg_clocks R8A7779_CLK_P>,
- 				 <&cpg_clocks R8A7779_CLK_P>,
-@@ -382,7 +382,7 @@
- 		mstp1_clks: clocks at ffc80034 {
- 			compatible = "renesas,r8a7779-mstp-clocks",
- 			             "renesas,cpg-mstp-clocks";
--			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
-+			reg = <0xffc80034 4>, <0xffc80044 4>;
- 			clocks = <&cpg_clocks R8A7779_CLK_P>,
- 				 <&cpg_clocks R8A7779_CLK_P>,
- 				 <&cpg_clocks R8A7779_CLK_S>,
-@@ -411,7 +411,7 @@
- 		mstp3_clks: clocks at ffc8003c {
- 			compatible = "renesas,r8a7779-mstp-clocks",
- 			             "renesas,cpg-mstp-clocks";
--			reg = <0 0xffc8003c 0 4>;
-+			reg = <0xffc8003c 4>;
- 			clocks = <&s4_clk>, <&s4_clk>, <&s4_clk>, <&s4_clk>,
- 				 <&s4_clk>, <&s4_clk>;
- 			#clock-cells = <1>;
+-static void __init emev2_init_delay(void)
+-{
+-	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
+-}
+-
+ static void __init emev2_add_standard_devices_dt(void)
+ {
+ 	of_clk_init(NULL);
+@@ -63,7 +58,7 @@ extern struct smp_operations emev2_smp_ops;
+ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+-	.init_early	= emev2_init_delay,
++	.init_early	= shmobile_init_delay,
+ 	.init_machine	= emev2_add_standard_devices_dt,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= emev2_boards_compat_dt,
 -- 
 2.0.0.rc2
