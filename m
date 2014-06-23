@@ -1,78 +1,181 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:36 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC r8a7779-multiplatform Updates for
- v3.17
-Message-ID: <cover.1403487423.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Jun 2014 11:26:14 +0900
+Subject: [PATCH 01/24] ARM: shmobile: r8a7779: Add clocks
+In-Reply-To: <cover.1403487423.git.horms+renesas@verge.net.au>
+References: <cover.1403487423.git.horms+renesas@verge.net.au>
+Message-ID: <1e8515384bfa5efa5803a38c5ba7fecd6514c527.1403487423.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+Declare all core and MSTP clocks currently used by r8a7779-based boards.
 
-Please consider these Renesas ARM based SoC r8a7779-multiplatform updates
-for v3.17.
+Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
 
-This pull request is based on 'Renesas ARM Based SoC Header Cleanup for v3.17',
-tagged as header-cleanup-for-v3.17, which I have already sent a
-pull-request for.
+Acked-by: Laurent Pinchart <laurent.pinchart at ideasonboard.com
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7779.dtsi | 144 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 144 insertions(+)
 
-
-The following changes since commit 62872989bdbf1245d7239b9f4c05a8ee7c775ed5:
-
-  ARM: shmobile: Move rcar-gen2.h, cleanup r8a7790 case (2014-06-17 17:09:40 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-r8a7779-multiplatform-for-v3.17
-
-for you to fetch changes up to c1a0f9932b66b2298163c31f8ac3f2844476e1c2:
-
-  ARM: shmobile: marzen: Do not use workaround for scif devices (2014-06-17 19:56:37 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC r8a7779-multiplatform Updates for v3.17
-
-Move r8a7779 SoC and its Marzen board to use common clocks,
-multiplatform and initialise SCIF (serial) devices using DT.
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      ARM: shmobile: r8a7779 dtsi: Update unit-addresses for clocks
-      ARM: shmobile: r8a7779 dtsi: Correct #address-cells/#size-cells for clocks
-
-Simon Horman (22):
-      ARM: shmobile: r8a7779: Add clocks
-      ARM: shmobile: Sync Marzen DTS with Marzen reference DTS
-      ARM: shmobile: marzen: Specify external clock frequency in DT
-      ARM: shmobile: r8a7779: Reference clocks
-      ARM: shmobile: r8a7779: Add helper to read mode pins
-      ARM: shmobile: r8a7779: Move r8a7779_earlytimer_init to clock-r8a7779.c
-      ARM: shmobile: marzen-reference: Move clock and OF device initialisation into board code
-      ARM: shmobile: r8a7779: Initial multiplatform support
-      ARM: shmobile: marzen-reference: Initialize CPG device
-      ARM: shmobile: marzen-reference: Instantiate clkdevs for SCIF and TMU
-      ARM: shmobile: Remove non-multiplatform Marzen reference support
-      ARM: shmobile: Let Marzen multiplatform boot with Marzen DTB
-      ARM: shmobile: Remove Marzen reference DTS
-      ARM: shmobile: marzen-reference: Remove legacy clock support
-      ARM: shmobile: r8a7779: Add Maximum CPU Frequency to DTS
-      ARM: shmobile: r8a7779: Use DT CPU Frequency in common case
-      ARM: shmobile: marzen-reference: Use DT CPU Frequency
-      ARM: shmobile: r8a7779: Remove unused r8a7779_init_delay()
-      ARM: shmobile: r8a7779: Add scif nodes to dtsi
-      ARM: shmobile: marzen: Remove early_printk from command line
-      ARM: shmobile: marzen: Initialise SCIF devices using DT
-      ARM: shmobile: marzen: Do not use workaround for scif devices
-
- arch/arm/boot/dts/Makefile                      |   4 +-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts  | 121 -------------
- arch/arm/boot/dts/r8a7779-marzen.dts            | 116 ++++++++++++-
- arch/arm/boot/dts/r8a7779.dtsi                  | 220 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig                  |  23 ++-
- arch/arm/mach-shmobile/Makefile                 |   2 +-
- arch/arm/mach-shmobile/Makefile.boot            |   1 -
- arch/arm/mach-shmobile/board-marzen-reference.c |  24 ++-
- arch/arm/mach-shmobile/clock-r8a7779.c          |  22 ++-
- arch/arm/mach-shmobile/include/mach/r8a7779.h   |   2 +-
- arch/arm/mach-shmobile/setup-r8a7779.c          |  45 +++--
- 11 files changed, 407 insertions(+), 173 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index b517c8e..5a62970 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -11,6 +11,7 @@
+ 
+ /include/ "skeleton.dtsi"
+ 
++#include <dt-bindings/clock/r8a7779-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+@@ -265,4 +266,147 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
++
++	clocks {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/* External root clock */
++		extal_clk: extal_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			/* This value must be overriden by the board. */
++			clock-frequency = <0>;
++			clock-output-names = "extal";
++		};
++
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at 0xe6150000 {
++			compatible = "renesas,r8a7779-cpg-clocks";
++			reg = <0 0xffc80000 0 0x30>;
++			clocks = <&extal_clk>;
++			#clock-cells = <1>;
++			clock-output-names = "plla", "z", "zs", "s",
++					     "s1", "p", "b", "out";
++		};
++
++		/* Fixed factor clocks */
++		i_clk: i_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clock-output-names = "i";
++		};
++		s3_clk: s3_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <8>;
++			clock-mult = <1>;
++			clock-output-names = "s3";
++		};
++		s4_clk: s4_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <16>;
++			clock-mult = <1>;
++			clock-output-names = "s4";
++		};
++		g_clk: g_clk {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
++			#clock-cells = <0>;
++			clock-div = <24>;
++			clock-mult = <1>;
++			clock-output-names = "g";
++		};
++
++		/* Gate clocks */
++		mstp0_clks: mstp0_clks {
++			compatible = "renesas,r8a7779-mstp-clocks",
++			             "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc80030 0 4>;
++			clocks = <&cpg_clocks R8A7779_CLK_S>,
++			         <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_HSPI R8A7779_CLK_TMU2
++				R8A7779_CLK_TMU1 R8A7779_CLK_TMU0
++				R8A7779_CLK_HSCIF1 R8A7779_CLK_HSCIF0
++				R8A7779_CLK_SCIF5 R8A7779_CLK_SCIF4
++				R8A7779_CLK_SCIF3 R8A7779_CLK_SCIF2
++				R8A7779_CLK_SCIF1 R8A7779_CLK_SCIF0
++				R8A7779_CLK_I2C3 R8A7779_CLK_I2C2
++				R8A7779_CLK_I2C1 R8A7779_CLK_I2C0
++			>;
++			clock-output-names =
++				"hspi", "tmu2", "tmu1", "tmu0", "hscif1",
++				"hscif0", "scif5", "scif4", "scif3", "scif2",
++				"scif1", "scif0", "i2c3", "i2c2", "i2c1",
++				"i2c0";
++		};
++		mstp1_clks: mstp1_clks {
++			compatible = "renesas,r8a7779-mstp-clocks",
++			             "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
++			clocks = <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_S>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_S>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_USB01 R8A7779_CLK_USB2
++				R8A7779_CLK_DU R8A7779_CLK_VIN2
++				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
++				R8A7779_CLK_ETHER R8A7779_CLK_SATA
++				R8A7779_CLK_PCIE R8A7779_CLK_VIN3
++			>;
++			clock-output-names =
++				"usb01", "usb2",
++				"du", "vin2",
++				"vin1", "vin0",
++				"ether", "sata",
++				"pcie", "vin3";
++		};
++		mstp3_clks: mstp3_clks {
++			compatible = "renesas,r8a7779-mstp-clocks",
++			             "renesas,cpg-mstp-clocks";
++			reg = <0 0xffc8003c 0 4>;
++			clocks = <&s4_clk>, <&s4_clk>, <&s4_clk>, <&s4_clk>,
++				 <&s4_clk>, <&s4_clk>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R8A7779_CLK_SDHI3 R8A7779_CLK_SDHI2
++				R8A7779_CLK_SDHI1 R8A7779_CLK_SDHI0
++				R8A7779_CLK_MMC1 R8A7779_CLK_MMC0
++			>;
++			clock-output-names =
++				"sdhi3", "sdhi2", "sdhi1", "sdhi0",
++				"mmc1", "mmc0";
++		};
++	};
+ };
+-- 
+2.0.0.rc2
