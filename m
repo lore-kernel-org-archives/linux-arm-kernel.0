@@ -1,741 +1,362 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Tue, 24 Jun 2014 00:46:36 +0200
-Subject: [RFC 4/4] ARM: dts: exynos5250: Add Spring device tree
-In-Reply-To: <CAD=FV=WHAqASC+bp8mGVnhfr79F5LapJCTLtSfgUG8XuRUSCqw@mail.gmail.com>
-References: <1403486483-4063-1-git-send-email-afaerber@suse.de>	<1403486483-4063-5-git-send-email-afaerber@suse.de>
- <CAD=FV=WHAqASC+bp8mGVnhfr79F5LapJCTLtSfgUG8XuRUSCqw@mail.gmail.com>
-Message-ID: <53A8AE4C.6080702@suse.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 23 Jun 2014 15:01:50 -0700
+Subject: [PATCH v7 1/1] man-pages: seccomp.2: document syscall
+In-Reply-To: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+Message-ID: <20140623220150.GM5412@outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Combines documentation from prctl, and in-kernel seccomp_filter.txt,
+along with new details specific to the new syscall.
 
-Am 23.06.2014 21:47, schrieb Doug Anderson:
-> Thanks for posting!  A first pass on this is below...
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ man2/seccomp.2 |  333 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 333 insertions(+)
+ create mode 100644 man2/seccomp.2
 
-Thanks a lot for your quick review! My first big .dts patch, and no
-datasheets for the hardware at hand as a user.
+diff --git a/man2/seccomp.2 b/man2/seccomp.2
+new file mode 100644
+index 0000000..de7fbf7
+--- /dev/null
++++ b/man2/seccomp.2
+@@ -0,0 +1,333 @@
++.\" Copyright (C) 2014 Kees Cook <keescook@chromium.org>
++.\" and Copyright (C) 2012 Will Drewry <wad@chromium.org>
++.\" and Copyright (C) 2008 Michael Kerrisk <mtk.manpages@gmail.com>
++.\"
++.\" %%%LICENSE_START(VERBATIM)
++.\" Permission is granted to make and distribute verbatim copies of this
++.\" manual provided the copyright notice and this permission notice are
++.\" preserved on all copies.
++.\"
++.\" Permission is granted to copy and distribute modified versions of this
++.\" manual under the conditions for verbatim copying, provided that the
++.\" entire resulting derived work is distributed under the terms of a
++.\" permission notice identical to this one.
++.\"
++.\" Since the Linux kernel and libraries are constantly changing, this
++.\" manual page may be incorrect or out-of-date.  The author(s) assume no
++.\" responsibility for errors or omissions, or for damages resulting from
++.\" the use of the information contained herein.  The author(s) may not
++.\" have taken the same level of care in the production of this manual,
++.\" which is licensed free of charge, as they might when working
++.\" professionally.
++.\"
++.\" Formatted or processed versions of this manual, if unaccompanied by
++.\" the source, must acknowledge the copyright and authors of this work.
++.\" %%%LICENSE_END
++.\"
++.TH SECCOMP 2 2014-06-23 "Linux" "Linux Programmer's Manual"
++.SH NAME
++seccomp \-
++operate on Secure Computing state of the process
++.SH SYNOPSIS
++.nf
++.B #include <linux/seccomp.h>
++.B #include <linux/filter.h>
++.B #include <linux/audit.h>
++.B #include <linux/signal.h>
++.B #include <sys/ptrace.h>
++
++.BI "int seccomp(unsigned int " operation ", unsigned int " flags ,
++.BI "            unsigned char *" args );
++.fi
++.SH DESCRIPTION
++The
++.BR seccomp ()
++system call operates on the Secure Computing (seccomp) state of the
++current process.
++
++Currently, Linux supports the following
++.IR operation
++values:
++.TP
++.BR SECCOMP_SET_MODE_STRICT
++Only system calls that the thread is permitted to make are
++.BR read (2),
++.BR write (2),
++.BR _exit (2),
++and
++.BR sigreturn (2).
++Other system calls result in the delivery of a
++.BR SIGKILL
++signal. Strict secure computing mode is useful for number-crunching
++applications that may need to execute untrusted byte code, perhaps
++obtained by reading from a pipe or socket.
++
++This operation is available only if the kernel is configured with
++.BR CONFIG_SECCOMP
++enabled.
++
++The value of
++.IR flags
++must be 0, and
++.IR args
++must be NULL.
++
++This operation is functionally identical to calling
++.IR "prctl(PR_SET_SECCOMP,\ SECCOMP_MODE_STRICT)" .
++.TP
++.BR SECCOMP_SET_MODE_FILTER
++The system calls allowed are defined by a pointer to a Berkeley Packet
++Filter (BPF) passed via
++.IR args .
++This argument is a pointer to
++.IR "struct\ sock_fprog" ;
++it can be designed to filter arbitrary system calls and system call
++arguments. If the filter is invalid, the call will fail, returning
++.BR EACCESS
++in
++.IR errno .
++
++If
++.BR fork (2),
++.BR clone (2),
++or
++.BR execve (2)
++are allowed by the filter, any child processes will be constrained to
++the same filters and system calls as the parent.
++
++Prior to using this operation, the process must call
++.IR "prctl(PR_SET_NO_NEW_PRIVS,\ 1)"
++or run with
++.BR CAP_SYS_ADMIN
++privileges in its namespace. If these are not true, the call will fail
++and return
++.BR EACCES
++in
++.IR errno .
++This requirement ensures that filter programs cannot be applied to child
++processes with greater privileges than the process that installed them.
++
++Additionally, if
++.BR prctl (2)
++or
++.BR seccomp (2)
++is allowed by the attached filter, additional filters may be layered on
++which will increase evaluation time, but allow for further reduction of
++the attack surface during execution of a process.
++
++This operation is available only if the kernel is configured with
++.BR CONFIG_SECCOMP_FILTER
++enabled.
++
++When
++.IR flags
++are 0, this operation is functionally identical to calling
++.IR "prctl(PR_SET_SECCOMP,\ SECCOMP_MODE_FILTER,\ args)" .
++
++The recognized
++.IR flags
++are:
++.RS
++.TP
++.BR SECCOMP_FILTER_FLAG_TSYNC
++When adding a new filter, synchronize all other threads of the current
++process to the same seccomp filter tree. If any thread cannot do this,
++the call will not attach the new seccomp filter, and will fail returning
++the first thread ID found that cannot synchronize.  Synchronization will
++fail if another thread is in
++.BR SECCOMP_MODE_STRICT
++or if it has attached new seccomp filters to itself, diverging from the
++calling thread's filter tree.
++.RE
++.SH FILTERS
++When adding filters via
++.BR SECCOMP_SET_MODE_FILTER ,
++.IR args
++points to a filter program:
++
++.in +4n
++.nf
++struct sock_fprog {
++    unsigned short      len;    /* Number of filter blocks */
++    struct sock_filter *filter;
++};
++.fi
++.in
++
++Each program must contain one or more BPF instructions:
++
++.in +4n
++.nf
++struct sock_filter {    /* Filter block */
++    __u16   code;       /* Actual filter code */
++    __u8    jt;         /* Jump true */
++    __u8    jf;         /* Jump false */
++    __u32   k;          /* Generic multiuse field */
++};
++.fi
++.in
++
++When executing the instructions, the BPF program executes over the
++syscall information made available via:
++
++.in +4n
++.nf
++struct seccomp_data {
++    int nr;                     /* system call number */
++    __u32 arch;                 /* AUDIT_ARCH_* value */
++    __u64 instruction_pointer;  /* CPU instruction pointer */
++    __u64 args[6];              /* up to 6 system call arguments */
++};
++.fi
++.in
++
++A seccomp filter may return any of the following values. If multiple
++filters exist, the return value for the evaluation of a given system
++call will always use the highest precedent value. (For example,
++.BR SECCOMP_RET_KILL
++will always take precedence.)
++
++In precedence order, they are:
++.TP
++.BR SECCOMP_RET_KILL
++Results in the task exiting immediately without executing the
++system call.  The exit status of the task (status & 0x7f) will
++be
++.BR SIGSYS ,
++not
++.BR SIGKILL .
++.TP
++.BR SECCOMP_RET_TRAP
++Results in the kernel sending a
++.BR SIGSYS
++signal to the triggering task without executing the system call.
++.IR siginfo\->si_call_addr
++will show the address of the system call instruction, and
++.IR siginfo\->si_syscall
++and
++.IR siginfo\->si_arch
++will indicate which syscall was attempted.  The program counter will be
++as though the syscall happened (i.e. it will not point to the syscall
++instruction).  The return value register will contain an arch\-dependent
++value; if resuming execution, set it to something sensible.
++(The architecture dependency is because replacing it with
++.BR ENOSYS
++could overwrite some useful information.)
++
++The
++.BR SECCOMP_RET_DATA
++portion of the return value will be passed as
++.IR si_errno .
++
++.BR SIGSYS
++triggered by seccomp will have a
++.IR si_code
++of
++.BR SYS_SECCOMP .
++.TP
++.BR SECCOMP_RET_ERRNO
++Results in the lower 16-bits of the return value being passed
++to userland as the
++.IR errno
++without executing the system call.
++.TP
++.BR SECCOMP_RET_TRACE
++When returned, this value will cause the kernel to attempt to
++notify a ptrace()-based tracer prior to executing the system
++call.  If there is no tracer present,
++.BR ENOSYS
++is returned to userland and the system call is not executed.
++
++A tracer will be notified if it requests
++.BR PTRACE_O_TRACESECCOMP
++using
++.IR ptrace(PTRACE_SETOPTIONS) .
++The tracer will be notified of a
++.BR PTRACE_EVENT_SECCOMP
++and the
++.BR SECCOMP_RET_DATA
++portion of the BPF program return value will be available to the tracer
++via
++.BR PTRACE_GETEVENTMSG .
++
++The tracer can skip the system call by changing the syscall number
++to \-1.  Alternatively, the tracer can change the system call
++requested by changing the system call to a valid syscall number.  If
++the tracer asks to skip the system call, then the system call will
++appear to return the value that the tracer puts in the return value
++register.
++
++The seccomp check will not be run again after the tracer is
++notified.  (This means that seccomp-based sandboxes MUST NOT
++allow use of ptrace, even of other sandboxed processes, without
++extreme care; ptracers can use this mechanism to escape.)
++.TP
++.BR SECCOMP_RET_ALLOW
++Results in the system call being executed.
++
++If multiple filters exist, the return value for the evaluation of a
++given system call will always use the highest precedent value.
++
++Precedence is only determined using the
++.BR SECCOMP_RET_ACTION
++mask.  When multiple filters return values of the same precedence,
++only the
++.BR SECCOMP_RET_DATA
++from the most recently installed filter will be returned.
++.SH RETURN VALUE
++On success,
++.BR seccomp ()
++returns 0.
++On error, if
++.BR SECCOMP_FILTER_FLAG_TSYNC
++was used, the return value is the thread ID that caused the
++synchronization failure. On other errors, \-1 is returned, and
++.IR errno
++is set to indicate the cause of the error.
++.SH ERRORS
++.BR seccomp ()
++can fail for the following reasons:
++.TP
++.BR EACCESS
++the caller did not have the
++.BR CAP_SYS_ADMIN
++capability, or had not set
++.IR no_new_privs
++before using
++.BR SECCOMP_SET_MODE_FILTER .
++.TP
++.BR EFAULT
++.IR args
++was required to be a valid address.
++.TP
++.BR EINVAL
++.IR operation
++is unknown; or
++.IR flags
++are invalid for the given
++.IR operation
++.TP
++.BR ESRCH
++Another thread caused a failure during thread sync, but its ID could not
++be determined.
++.SH VERSIONS
++This system call first appeared in Linux 3.16.
++.\" FIXME Add glibc version
++.SH CONFORMING TO
++This system call is a nonstandard Linux extensions.
++.SH NOTES
++.BR seccomp ()
++provides a superset of the functionality provided by
++.IR PR_SET_SECCOMP
++of
++.BR prctl (2) .
++(Which does not support
++.IR flags .)
++.SH SEE ALSO
++.ad l
++.nh
++.BR prctl (2),
++.BR ptrace (2),
++.BR signal (7)
++.BR socket (7)
++.ad
+-- 
+1.7.9.5
 
-A first pass of replies to my defense. ;)
-
-> On Sun, Jun 22, 2014 at 6:21 PM, Andreas F?rber <afaerber@suse.de> wrote:
-[...]
->> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
->> new file mode 100644
->> index 0000000..e857d44
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
->> @@ -0,0 +1,556 @@
->> +/*
->> + * Google Spring board device tree source
->> + *
->> + * Copyright (c) 2013 Google, Inc
->> + * Copyright (c) 2014 SUSE LINUX Products GmbH
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/dts-v1/;
->> +#include "exynos5250.dtsi"
->> +#include "exynos5250-cros-common.dtsi"
-> 
-> It is possible we may want to backpedal on the use of
-> "exynos5250-cros-common.dtsi".  I know that Olof (now CCed) said he
-> wasn't a fan of how it turned out.
-> 
-> The original idea was that it should include the arbitrary set of
-> things that are common between a chunk of Chrome OS boards.  As more
-> boards were introduced things would need to migrate from the "common"
-> file to the board files.
-> 
-> At the moment the current conventional wisdom is that some duplication
-> is better than the confusing movement of everything back and forth.
-> See exynos5420-peach-pit and exynos5800-peach-pi in ToT linux-next.
-> 
-> 
->> +/ {
->> +       model = "Google Spring";
->> +       compatible = "google,spring", "samsung,exynos5250", "samsung,exynos5";
->> +
->> +       pinctrl at 11400000 {
-> 
-> The new best way to do things is to put this down at the bottom.  See
-> exynos5420-peach-pit as an example:
-> 
-> &pinctrl_0 {
->   ...
-> }
-> 
-> Note that I believe it was decided that top-level references like that
-> should be sorted alphabetically.
-
-Thanks for the hint. (My chosen sort order here was by address.)
-
-> If you wanted to apply that run to exynos5250-snow I don't think it
-> would be a terrible idea.
-
-I can of course apply changes to Snow, but I cannot test them myself.
-
->> +               s5m8767_dvs: s5m8767-dvs {
->> +                       samsung,pins = "gpd1-0", "gpd1-1", "gpd1-2";
->> +                       samsung,pin-function = <0>;
->> +                       samsung,pin-pud = <1>;
->> +                       samsung,pin-drv = <0>;
->> +               };
->> +
->> +               s5m8767_ds: s5m8767-ds {
->> +                       samsung,pins = "gpx2-3", "gpx2-4", "gpx2-5";
->> +                       samsung,pin-function = <0>;
->> +                       samsung,pin-pud = <1>;
->> +                       samsung,pin-drv = <0>;
->> +               };
->> +
->> +               tps65090_irq: tps65090-irq {
->> +                       samsung,pins = "gpx2-6";
->> +                       samsung,pin-function = <0>;
->> +                       samsung,pin-pud = <0>;
->> +                       samsung,pin-drv = <0>;
->> +               };
->> +
->> +               s5m8767_irq: s5m8767-irq {
->> +                       samsung,pins = "gpx3-2";
->> +                       samsung,pin-function = <0>;
->> +                       samsung,pin-pud = <0>;
->> +                       samsung,pin-drv = <0>;
->> +               };
->> +
->> +               hdmi_hpd_irq: hdmi-hpd-irq {
->> +                       samsung,pins = "gpx3-7";
->> +                       samsung,pin-function = <0>;
->> +                       samsung,pin-pud = <1>;
->> +                       samsung,pin-drv = <0>;
->> +               };
->> +       };
->> +
->> +       pinctrl at 13400000 {
->> +               hsic_reset: hsic-reset {
->> +                       samsung,pins = "gpe1-0";
->> +                       samsung,pin-function = <1>;
->> +                       samsung,pin-pud = <0>;
->> +                       samsung,pin-drv = <0>;
->> +               };
-> 
-> I'm pretty sure that the HSIC reset needed some funky code to make it
-> work and I'm not sure what the status of that is upstream
-
-Yeah, you mentioned something along those lines. However it's the
-equivalent of the usb3-vbus-en in -snow.dts. Rename or drop?
-
->> +       };
->> +
->> +       vbat: vbat-fixed-regulator {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "vbat-supply";
->> +               regulator-boot-on;
->> +       };
->> +
->> +       usb at 12000000 {
->> +               status = "okay";
->> +       };
->> +
->> +       usb3_vbus_reg: regulator-usb3 {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "P5.0V_USB3CON";
->> +               regulator-min-microvolt = <5000000>;
->> +               regulator-max-microvolt = <5000000>;
->> +               gpio = <&gpe1 0 1>;
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&hsic_reset>;
->> +               enable-active-high;
->> +       };
->> +
->> +       phy at 12100000 {
->> +               vbus-supply = <&usb3_vbus_reg>;
->> +       };
->> +
->> +       usb at 12110000 {
->> +               samsung,vbus-gpio = <&gpx1 1 0>;
->> +               status = "okay";
->> +       };
->> +
->> +       usb at 12120000 {
->> +               status = "okay";
->> +       };
->> +
->> +       mmc at 12220000 {
->> +               /* MMC2 pins are used as GPIO for eDP bridge control. */
->> +               status = "disabled";
->> +       };
->> +
->> +       mmc at 12230000 {
->> +               status = "disabled";
->> +       };
->> +
->> +       i2c at 12C60000 {
->> +               max77686 at 09 {
-> 
-> There is no max77686 on spring.  It uses s5m8767 in the place of max77686.
-> 
-> ...you've got "status = disabled", just remove it.
-
-That's because it's inherited from exynos5250-cros-common.dtsi.
-
-The rtc that the system successfully uses is "s5m-rtc", which I guess is
-on the s5m8767 then? (Confusing that 3.8 Spring had this rtc node
-despite Snow's max77686 not having it.)
-
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       status = "disabled";
->> +
->> +                       rtc {
->> +                               reg = <0x6>;
->> +                       };
->> +               };
->> +
->> +               s5m8767_pmic at 66 {
->> +                       compatible = "samsung,s5m8767-pmic";
->> +                       reg = <0x66>;
->> +                       interrupt-parent = <&gpx3>;
->> +                       interrupts = <2 0>;
->> +                       pinctrl-names = "default";
->> +                       pinctrl-0 = <&s5m8767_irq &s5m8767_dvs &s5m8767_ds>;
->> +                       wakeup-source;
->> +
->> +                       s5m8767,pmic-buck-dvs-gpios = <&gpd1 0 1>, /* DVS1 */
->> +                                                     <&gpd1 1 1>, /* DVS2 */
->> +                                                     <&gpd1 2 1>; /* DVS3 */
->> +
->> +                       s5m8767,pmic-buck-ds-gpios = <&gpx2 3 1>, /* SET1 */
->> +                                                    <&gpx2 4 1>, /* SET2 */
->> +                                                    <&gpx2 5 1>; /* SET3 */
-> 
-> The final "1" in each of the GPIO specifiers above should be GPIO_ACTIVE_LOW.
-> 
-> 
->> +
->> +                       /*
->> +                        * The following arrays of DVS voltages are not used, since we are
->> +                        * not using GPIOs to control PMIC bucks, but they must be defined
->> +                        * to please the driver.
->> +                        */
->> +                       s5m8767,pmic-buck2-dvs-voltage = <1350000>, <1300000>,
->> +                                                        <1250000>, <1200000>,
->> +                                                        <1150000>, <1100000>,
->> +                                                        <1000000>, <950000>;
->> +
->> +                       s5m8767,pmic-buck3-dvs-voltage = <1100000>, <1100000>,
->> +                                                        <1100000>, <1100000>,
->> +                                                        <1000000>, <1000000>,
->> +                                                        <1000000>, <1000000>;
->> +
->> +                       s5m8767,pmic-buck4-dvs-voltage = <1200000>, <1200000>,
->> +                                                        <1200000>, <1200000>,
->> +                                                        <1200000>, <1200000>,
->> +                                                        <1200000>, <1200000>;
->> +
->> +                       clocks {
->> +                               compatible = "samsung,s5m8767-clk";
->> +                               #clock-cells = <1>;
->> +                               clock-output-names = "en32khz_ap",
->> +                                                    "en32khz_cp",
->> +                                                    "en32khz_bt";
->> +                       };
->> +
->> +                       regulators {
->> +                               s5m_ldo4_reg: LDO4 {
->> +                                       regulator-name = "P1.0V_LDO_OUT4";
->> +                                       regulator-min-microvolt = <1000000>;
->> +                                       regulator-max-microvolt = <1000000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <0>;
-> 
-> I think that "op_mode" here is questionable.  Adding Javier to the
-> thread who was looking at this for max77802 and possibly max77686.
-
-Confirming that this op_mode is present in the original 3.8 device tree.
-
-(I used dtc to compile my /proc/device-tree tarball back to .dts, so it
-has hexadecimal <0x0> but that shouldn't matter to dtc AFAIU.)
-
->> +                               };
->> +
->> +                               s5m_ldo5_reg: LDO5 {
->> +                                       regulator-name = "P1.0V_LDO_OUT5";
->> +                                       regulator-min-microvolt = <1000000>;
->> +                                       regulator-max-microvolt = <1000000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <0>;
->> +                               };
->> +
->> +                               s5m_ldo6_reg: LDO6 {
->> +                                       regulator-name = "vdd_mydp";
->> +                                       regulator-min-microvolt = <1000000>;
->> +                                       regulator-max-microvolt = <1000000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo7_reg: LDO7 {
->> +                                       regulator-name = "P1.1V_LDO_OUT7";
->> +                                       regulator-min-microvolt = <1100000>;
->> +                                       regulator-max-microvolt = <1100000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo8_reg: LDO8 {
->> +                                       regulator-name = "P1.0V_LDO_OUT8";
->> +                                       regulator-min-microvolt = <1000000>;
->> +                                       regulator-max-microvolt = <1000000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo10_reg: LDO10 {
->> +                                       regulator-name = "P1.8V_LDO_OUT10";
->> +                                       regulator-min-microvolt = <1800000>;
->> +                                       regulator-max-microvolt = <1800000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo11_reg: LDO11 {
->> +                                       regulator-name = "P1.8V_LDO_OUT11";
->> +                                       regulator-min-microvolt = <1800000>;
->> +                                       regulator-max-microvolt = <1800000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <0>;
->> +                               };
->> +
->> +                               s5m_ldo12_reg: LDO12 {
->> +                                       regulator-name = "P3.0V_LDO_OUT12";
->> +                                       regulator-min-microvolt = <3000000>;
->> +                                       regulator-max-microvolt = <3000000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo13_reg: LDO13 {
->> +                                       regulator-name = "P1.8V_LDO_OUT13";
->> +                                       regulator-min-microvolt = <1800000>;
->> +                                       regulator-max-microvolt = <1800000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <0>;
->> +                               };
->> +
->> +                               s5m_ldo14_reg: LDO14 {
->> +                                       regulator-name = "P1.8V_LDO_OUT14";
->> +                                       regulator-min-microvolt = <1800000>;
->> +                                       regulator-max-microvolt = <1800000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo15_reg: LDO15 {
->> +                                       regulator-name = "P1.0V_LDO_OUT15";
->> +                                       regulator-min-microvolt = <1000000>;
->> +                                       regulator-max-microvolt = <1000000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo16_reg: LDO16 {
->> +                                       regulator-name = "P1.8V_LDO_OUT16";
->> +                                       regulator-min-microvolt = <1800000>;
->> +                                       regulator-max-microvolt = <1800000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               s5m_ldo17_reg: LDO17 {
->> +                                       regulator-name = "P2.8V_LDO_OUT17";
->> +                                       regulator-min-microvolt = <2800000>;
->> +                                       regulator-max-microvolt = <2800000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <0>;
->> +                               };
->> +
->> +                               s5m_ldo25_reg: LDO25 {
->> +                                       regulator-name = "vdd_bridge";
->> +                                       regulator-min-microvolt = <1200000>;
->> +                                       regulator-max-microvolt = <1200000>;
->> +                                       regulator-always-on;
->> +                                       op_mode = <1>;
->> +                               };
->> +
->> +                               BUCK1 {
->> +                                       regulator-name = "vdd_mif";
->> +                                       regulator-min-microvolt = <950000>;
->> +                                       regulator-max-microvolt = <1300000>;
->> +                                       regulator-always-on;
->> +                                       regulator-boot-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               BUCK2 {
->> +                                       regulator-name = "vdd_arm";
->> +                                       regulator-min-microvolt = <850000>;
->> +                                       regulator-max-microvolt = <1350000>;
->> +                                       regulator-always-on;
->> +                                       regulator-boot-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               BUCK3 {
->> +                                       regulator-name = "vdd_int";
->> +                                       regulator-min-microvolt = <900000>;
->> +                                       regulator-max-microvolt = <1200000>;
->> +                                       regulator-always-on;
->> +                                       regulator-boot-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               BUCK4 {
->> +                                       regulator-name = "vdd_g3d";
->> +                                       regulator-min-microvolt = <850000>;
->> +                                       regulator-max-microvolt = <1300000>;
->> +                                       regulator-boot-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +
->> +                               BUCK5 {
->> +                                       regulator-name = "P1.8V_BUCK_OUT5";
->> +                                       regulator-min-microvolt = <1800000>;
->> +                                       regulator-max-microvolt = <1800000>;
->> +                                       regulator-always-on;
->> +                                       regulator-boot-on;
->> +                                       op_mode = <1>;
->> +                               };
->> +
->> +                               BUCK6 {
->> +                                       regulator-name = "P1.2V_BUCK_OUT6";
->> +                                       regulator-min-microvolt = <1200000>;
->> +                                       regulator-max-microvolt = <1200000>;
->> +                                       regulator-always-on;
->> +                                       regulator-boot> 
-> 
--on;
->> +                                       op_mode = <0>;
->> +                               };
->> +
->> +                               BUCK9 {
->> +                                       regulator-name = "vdd_ummc";
->> +                                       regulator-min-microvolt = <950000>;
->> +                                       regulator-max-microvolt = <3000000>;
->> +                                       regulator-always-on;
->> +                                       regulator-boot-on;
->> +                                       op_mode = <3>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       i2c at 12C70000 {
->> +               trackpad {
->> +                       status = "disabled";
-> 
-> Having this bogus entry here doesn't add anything.  Remove it until
-> the trackpad should be added.  See http://crbug.com/371114 for a
-> slightly stale bug about trackpad.
-
-You misunderstand: This resolves an error about the cypress,cyapa
-inherited from -cros-common.dtsi. Spring uses a different device and two
-different I2C addresses.
-
-Nodes named trackpad-bootloader and trackpad-alt are prepared here:
-https://github.com/afaerber/linux/commits/spring-next
-
->> +               };
->> +       };
->> +
->> +       i2c at 12CA0000 {
->> +               embedded-controller {
-> 
-> Add "cros_ec" alias like snow.
-> 
-> 
->> +                       compatible = "google,cros-ec-i2c";
->> +                       reg = <0x1e>;
->> +                       interrupts = <6 0>;
->> +                       interrupt-parent = <&gpx1>;
->> +                       wakeup-source;
->> +
->> +                       keyboard-controller {
-> 
-> Don't include keyboard-controller here.  Add:
-> 
-> #include "cros-ec-keyboard.dtsi"
-> 
-> ...at the bottom.  Note that I think that the spring EC has a special
-> "charger" key that it uses to indicate when a charger was plugged in
-> and unplugged.  I'm not sure how that will end up getting supported
-> upstream but you could just leave it out for now.
-
-Is there such a pending patch for snow? That's what I modeled after.
-
-Where is cros-ec-keyboard.dtsi? Don't see it in
-http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/arch/arm/boot/dts?h=for-next
-or
-http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/include/dt-bindings?h=for-next
-
-Are you proposing I factor it out?
-
->> +                               compatible = "google,cros-ec-keyb";
->> +                               keypad,num-rows = <8>;
->> +                               keypad,num-columns = <13>;
-> 
-> Don't you need pinctrl here?
-
-The keyboard is usable; what would pinctrl be needed for? There's none
-in the 3.8 device tree.
-
->> +                               google,needs-ghost-filter;
->> +                               linux,keymap = <
->> +                                       0x0001007d      /* L_META */
->> +                                       0x0002003b      /* F1 */
->> +                                       0x00030030      /* B */
->> +                                       0x00040044      /* F10 */
->> +                                       0x00060031      /* N */
->> +                                       0x0008000d      /* = */
->> +                                       0x000a0064      /* R_ALT */
->> +
->> +                                       0x01010001      /* ESC */
->> +                                       0x0102003e      /* F4 */
->> +                                       0x01030022      /* G */
->> +                                       0x01040041      /* F7 */
->> +                                       0x01060023      /* H */
->> +                                       0x01080028      /* ' */
->> +                                       0x01090043      /* F9 */
->> +                                       0x010b000e      /* BKSPACE */
->> +
->> +                                       0x0200001d      /* L_CTRL */
->> +                                       0x0201000f      /* TAB */
->> +                                       0x0202003d      /* F3 */
->> +                                       0x02030014      /* T */
->> +                                       0x02040040      /* F6 */
->> +                                       0x0205001b      /* ] */
->> +                                       0x02060015      /* Y */
->> +                                       0x02070056      /* 102ND */
->> +                                       0x0208001a      /* [ */
->> +                                       0x02090042      /* F8 */
->> +
->> +                                       0x03010029      /* GRAVE */
->> +                                       0x0302003c      /* F2 */
->> +                                       0x03030006      /* 5 */
->> +                                       0x0304003f      /* F5 */
->> +                                       0x03060007      /* 6 */
->> +                                       0x0308000c      /* - */
->> +                                       0x030b002b      /* \ */
->> +
->> +                                       0x04000061      /* R_CTRL */
->> +                                       0x0401001e      /* A */
->> +                                       0x04020020      /* D */
->> +                                       0x04030021      /* F */
->> +                                       0x0404001f      /* S */
->> +                                       0x04050025      /* K */
->> +                                       0x04060024      /* J */
->> +                                       0x04080027      /* ; */
->> +                                       0x04090026      /* L */
->> +                                       0x040a002b      /* \ */
->> +                                       0x040b001c      /* ENTER */
->> +
->> +                                       0x0501002c      /* Z */
->> +                                       0x0502002e      /* C */
->> +                                       0x0503002f      /* V */
->> +                                       0x0504002d      /* X */
->> +                                       0x05050033      /* , */
->> +                                       0x05060032      /* M */
->> +                                       0x0507002a      /* L_SHIFT */
->> +                                       0x05080035      /* / */
->> +                                       0x05090034      /* . */
->> +                                       0x050B0039      /* SPACE */
->> +
->> +                                       0x06010002      /* 1 */
->> +                                       0x06020004      /* 3 */
->> +                                       0x06030005      /* 4 */
->> +                                       0x06040003      /* 2 */
->> +                                       0x06050009      /* 8 */
->> +                                       0x06060008      /* 7 */
->> +                                       0x0608000b      /* 0 */
->> +                                       0x0609000a      /* 9 */
->> +                                       0x060a0038      /* L_ALT */
->> +                                       0x060b006c      /* DOWN */
->> +                                       0x060c006a      /* RIGHT */
->> +
->> +                                       0x07010010      /* Q */
->> +                                       0x07020012      /* E */
->> +                                       0x07030013      /* R */
->> +                                       0x07040011      /* W */
->> +                                       0x07050017      /* I */
->> +                                       0x07060016      /* U */
->> +                                       0x07070036      /* R_SHIFT */
->> +                                       0x07080019      /* P */
->> +                                       0x07090018      /* O */
->> +                                       0x070b0067      /* UP */
->> +                                       0x070c0069      /* LEFT */
->> +                               >;
->> +                       };
->> +               };
->> +
->> +               power-regulator {
->> +                       compatible = "ti,tps65090";
-> 
-> I doubt tps65090 will "just work".  Does it?
-
-Good question. How to tell? :) Not familiar with clocks and regulators.
-I don't see the nodes referenced anywhere, so I could just try to drop
-(as I would, as per my cover letter, propose for anything non-essential
-that turns controversial).
-
-If we drop tps65090, can we safely drop vbat-fixed-regulator as well?
-
-> On spring the tps65090 is not directly on the same i2c bus as the EC.
-> It's actually hidden behind the EC.
-> 
-> Locally in the ChromeOS tree there appears to be a forked copy of the
-> 65090 regulator driver that's in use just for spring.  See this from
-> the ChromeOS 3.8 tree:
-> 
-> ./drivers/regulator/tps65090-regulator.c
-> ./drivers/regulator/cros_ec-tps65090.c
-> 
-> The Spring version of the driver sends EC commands directly to access
-> the tps65090.
-> 
-> It is possible (untested) that you could also talk to tps65090 over an
-> i2c tunnel.  On exynos5420-peach-pit we have a full fledged i2c
-> tunnel, but you may be able to extend the tunnel to export an i2c
-> tunnel for spring using something like
-> <https://chromium-review.googlesource.com/66116>
-
-The SBS battery thingy (not in this patch) should also be behind some
-tunnel. There's none defined in -cros-common.dtsi or in my patch, and
-still it shows up in dmesg to my surprise, complaining "Couldn't read
-remote-bus property".
-
->> +                       reg = <0x48>;
->> +
->> +                       /*
->> +                        * Config irq to disable internal pulls
->> +                        * even though we run in polling mode.
->> +                        */
->> +                       pinctrl-names = "default";
->> +                       pinctrl-0 = <&tps65090_irq>;
->> +
->> +                       vsys1-supply = <&vbat>;
->> +                       vsys2-supply = <&vbat>;
->> +                       vsys3-supply = <&vbat>;
->> +                       infet1-supply = <&vbat>;
->> +                       infet2-supply = <&vbat>;
->> +                       infet3-supply = <&vbat>;
->> +                       infet4-supply = <&vbat>;
->> +                       infet5-supply = <&vbat>;
->> +                       infet6-supply = <&vbat>;
->> +                       infet7-supply = <&vbat>;
->> +                       vsys-l1-supply = <&vbat>;
->> +                       vsys-l2-supply = <&vbat>;
->> +
->> +                       regulators {
->> +                               fet1 {
->> +                                       regulator-name = "vcd_led";
->> +                                       regulator-min-microvolt = <12000000>;
->> +                                       regulator-max-microvolt = <12000000>;
->> +                               };
->> +                               fet3 {
->> +                                       regulator-name = "wwan_r";
->> +                                       regulator-min-microvolt = <3300000>;
->> +                                       regulator-max-microvolt = <3300000>;
->> +                                       regulator-always-on;
->> +                               };
->> +                               fet5 {
->> +                                       regulator-name = "cam";
->> +                                       regulator-min-microvolt = <3300000>;
->> +                                       regulator-max-microvolt = <3300000>;
->> +                                       regulator-always-on;
->> +                               };
->> +                               fet6 {
->> +                                       regulator-name = "lcd_vdd";
->> +                                       regulator-min-microvolt = <3300000>;
->> +                                       regulator-max-microvolt = <3300000>;
->> +                               };
->> +                               fet7 {
->> +                                       regulator-name = "ts";
->> +                                       regulator-min-microvolt = <5000000>;
->> +                                       regulator-max-microvolt = <5000000>;
->> +                               };
->> +                       };
->> +
->> +                       charger {
->> +                               compatible = "ti,tps65090-charger";
->> +                       };
->> +               };
->> +       };
->> +
->> +       hdmi {
->> +               hdmi-en-supply = <&s5m_ldo8_reg>;
->> +               vdd-supply = <&s5m_ldo8_reg>;
->> +               vdd_osc-supply = <&s5m_ldo10_reg>;
->> +               vdd_pll-supply = <&s5m_ldo8_reg>;
->> +       };
->> +
->> +       fimd at 14400000 {
->> +               status = "okay";
->> +               samsung,invert-vclk;
->> +       };
->> +
->> +       dp-controller at 145B0000 {
->> +               status = "okay";
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&dp_hpd>;
-> 
-> This is probably not right.  It looks as if spring uses gpc3-0 for
-> display port HPD (as a GPIO).  The upstream has this in the
-> exynos5250-pinctrl.dtsi as a different pin.
-> 
-> I think you'll need to define your own pinctrl here.
-> 
-> 
->> +               samsung,color-space = <0>;
->> +               samsung,dynamic-range = <0>;
->> +               samsung,ycbcr-coeff = <0>;
->> +               samsung,color-depth = <1>;
->> +               samsung,link-rate = <0x0a>;
->> +               samsung,lane-count = <1>;
->> +               samsung,hpd-gpio = <&gpc3 0 0>;
->> +
->> +               display-timings {
->> +                       native-mode = <&timing1>;
->> +
->> +                       timing1: timing at 1 {
->> +                               clock-frequency = <70589280>;
->> +                               hactive = <1366>;
->> +                               vactive = <768>;
->> +                               hfront-porch = <40>;
->> +                               hback-porch = <40>;
->> +                               hsync-len = <32>;
->> +                               vback-porch = <10>;
->> +                               vfront-porch = <12>;
->> +                               vsync-len = <6>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       fixed-rate-clocks {
->> +               xxti {
->> +                       compatible = "samsung,clock-xxti";
->> +                       clock-frequency = <24000000>;
->> +               };
->> +       };
->> +};
-
-Will check on the other suggestions.
-
-Thanks,
-Andreas
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Kees Cook                                            @outflux.net
