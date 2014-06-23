@@ -1,66 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:22 +0900
-Subject: [PATCH 09/24] ARM: shmobile: marzen-reference: Initialize CPG device
+Date: Mon, 23 Jun 2014 11:26:19 +0900
+Subject: [PATCH 06/24] ARM: shmobile: r8a7779: Move r8a7779_earlytimer_init to
+ clock-r8a7779.c
 In-Reply-To: <cover.1403487423.git.horms+renesas@verge.net.au>
 References: <cover.1403487423.git.horms+renesas@verge.net.au>
-Message-ID: <a92fbd077bbfbe98e4dee84081d84c44ae99538b.1403487423.git.horms+renesas@verge.net.au>
+Message-ID: <f48039a3da40f0c193122c83ad582913f2daf29d.1403487423.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On multiplatform kernels clocks are handled by the CCF CPG driver. It
-must be explicitly initialized by a call to r8a7779_clocks_init() with
-the value of the boot mode pins.
+r8a7779_earlytimer_init() calls r8a7779_clock_init() and
+r8a7779_clock_init() is defined in clock-r8a7779.c.
 
-Based on similar work for the Koelsch board by Laurent Pinchart.
+If both CONFIG_COMMON_CLK and CONFIG_ARCH_R8A7779 are enabled,
+as will be the case when marzen-reference moves to use
+the common clock framework, then setup-r8a7779.c is compiled
+but clock-r8a7779.c is not.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+As r8a7779_earlytimer_init() is not used by marzen-reference
+simply move it to clock-r8a7779.c.
+
+[horms+renesas at verge.net.au: rebase]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen-reference.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7779.c | 11 +++++++++++
+ arch/arm/mach-shmobile/setup-r8a7779.c | 10 ----------
+ 2 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index d90843b..f642819 100644
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -19,7 +19,8 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
--#include <linux/clk-provider.h>
-+#include <linux/clk/shmobile.h>
-+#include <linux/clocksource.h>
- #include <linux/of_platform.h>
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 5dd66a2..e690927 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
++#include <linux/sh_timer.h>
  #include <mach/r8a7779.h>
- #include <asm/irq.h>
-@@ -27,11 +28,17 @@
+ #include "clock.h"
  #include "common.h"
- #include "irqs.h"
- 
--static void __init marzen_init(void)
-+static void __init marzen_init_timer(void)
- {
- #ifdef CONFIG_COMMON_CLK
--	of_clk_init(NULL);
--#else
-+	r8a7779_clocks_init(r8a7779_read_mode_pins());
-+#endif
-+	clocksource_of_init();
-+}
+@@ -261,3 +262,13 @@ void __init r8a7779_clock_init(void)
+ 	else
+ 		panic("failed to setup r8a7779 clocks\n");
+ }
 +
-+static void __init marzen_init(void)
++/* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
++void __init __weak r8a7779_register_twd(void) { }
++
++void __init r8a7779_earlytimer_init(void)
 +{
-+#ifndef CONFIG_COMMON_CLK
- 	r8a7779_clock_init();
- #endif
- 	r8a7779_add_standard_devices_dt();
-@@ -48,6 +55,7 @@ DT_MACHINE_START(MARZEN, "marzen")
- 	.smp		= smp_ops(r8a7779_smp_ops),
- 	.map_io		= r8a7779_map_io,
- 	.init_early	= r8a7779_init_delay,
-+	.init_time	= marzen_init_timer,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= r8a7779_init_irq_dt,
- 	.init_machine	= marzen_init,
++	r8a7779_clock_init();
++	r8a7779_register_twd();
++	shmobile_earlytimer_init();
++}
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 25e1d0b..23122f6 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -674,16 +674,6 @@ void __init r8a7779_add_standard_devices(void)
+ 	r8a7779_register_hpb_dmae();
+ }
+ 
+-/* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
+-void __init __weak r8a7779_register_twd(void) { }
+-
+-void __init r8a7779_earlytimer_init(void)
+-{
+-	r8a7779_clock_init();
+-	r8a7779_register_twd();
+-	shmobile_earlytimer_init();
+-}
+-
+ void __init r8a7779_add_early_devices(void)
+ {
+ 	early_platform_add_devices(r8a7779_devices_dt,
 -- 
 2.0.0.rc2
