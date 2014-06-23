@@ -1,78 +1,35 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 23 Jun 2014 12:52:44 +0530
-Subject: [PATCH V3 16/16] irqchip: crossbar: allow for quirky hardware
- with direct hardwiring of GIC
-In-Reply-To: <20140621025723.GF21711@titan.lakedaemon.net>
-References: <1402917796-31574-1-git-send-email-r.sricharan@ti.com>
- <1402917796-31574-17-git-send-email-r.sricharan@ti.com>
- <20140621025723.GF21711@titan.lakedaemon.net>
-Message-ID: <53A7D5C4.6090201@ti.com>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Mon, 23 Jun 2014 11:53:28 +0400
+Subject: [PATCH] ARM: dts: exynos5410: Fill in CPU clock-frequency
+In-Reply-To: <1403466596-3347-1-git-send-email-afaerber@suse.de>
+References: <1403466596-3347-1-git-send-email-afaerber@suse.de>
+Message-ID: <53A7DCF8.4090108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On 06/22/2014 11:49 PM, Andreas F?rber wrote:
+> It's 1.6 GHz for the Cortex-A15.
+>
+> Avoids warnings like "/cpus/cpu at 0 missing clock-frequency property".
+>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>   arch/arm/boot/dts/exynos5410.dtsi | 4 ++++
+>   1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> index 3839c26..9d0b8cc 100644
+> --- a/arch/arm/boot/dts/exynos5410.dtsi
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -28,24 +28,28 @@
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a15";
+>   			reg = <0x0>;
+> +			clock-frequency = <1600000000>;
+>   
 
-On Saturday 21 June 2014 08:27 AM, Jason Cooper wrote:
-> On Mon, Jun 16, 2014 at 04:53:16PM +0530, Sricharan R wrote:
->> From: Nishanth Menon <nm@ti.com>
->>
->> On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10, 131,
->> 132, 133 are direct wired to hardware blocks bypassing crossbar.
->> This quirky implementation is *NOT* supposed to be the expectation
->> of crossbar hardware usage. However, these are already marked in our
->> description of the hardware with SKIP and RESERVED where appropriate.
->>
->> Unfortunately, we need to be able to refer to these hardwired IRQs.
->> So, to request these, crossbar driver can use the existing information
->> from it's table that these SKIP/RESERVED maps are direct wired sources
->> and generic allocation/programming of crossbar should be avoided.
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->> ---
->>  .../devicetree/bindings/arm/omap/crossbar.txt      |   12 ++++++++++--
->>  drivers/irqchip/irq-crossbar.c                     |   20 ++++++++++++++++++--
->>  2 files changed, 28 insertions(+), 4 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
->> index 8210ea4..438ccab 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
->> @@ -42,8 +42,10 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
->>  
->>  An interrupt consumer on an SoC using crossbar will use:
->>  	interrupts = <GIC_SPI request_number interrupt_level>
->> -request number shall be between 0 to that described by
->> -"ti,max-crossbar-sources"
->> +When the request number is between 0 to that described by
->> +"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
->> +request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
->> +quirky hardware mapping direct to GIC.
->>  
->>  Example:
->>  	device_x at 0x4a023000 {
->> @@ -51,3 +53,9 @@ Example:
->>  		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
->>  		...
->>  	};
->> +
->> +	device_y at 0x4a033000 {
->> +		/* Direct mapped GIC SPI 1 used */
->> +		interrupts = <GIC_SPI 401 IRQ_TYPE_LEVEL_HIGH>;
-> 
-> Ideally, I'd like to see a macro here so that it's clear that we crossed
-> a magic threshold. eg:
-> 
-> #define MAX_SOURCES     400
-> #define DIRECT_IRQ(irq) (MAX_SOURCES + irq)
-> ...
-> 		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
-> 
-> and, then:
-> 
-> 		ti,max-crossbar-sources = <MAX_SOURCES>;
-> 
- Ok, thats more good for readability. Will add that macro then.
+Reviewed-by: Tarek Dakhran<t.dakhran@samsung.com>
 
-Regards,
- Sricharan
+-- 
+Best regards,
+     Tarek Dakhran
