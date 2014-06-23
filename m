@@ -1,102 +1,101 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 23 Jun 2014 12:44:25 +0800
-Subject: [PATCH v2 09/20] clk: sunxi: Add sun6i MBUS clock support
-In-Reply-To: <20140618100404.GM19730@lukather>
-References: <1403016777-15121-1-git-send-email-wens@csie.org>
- <1403016777-15121-10-git-send-email-wens@csie.org>
- <20140618100404.GM19730@lukather>
-Message-ID: <CAGb2v64GobnAM+J7QxbZxWretA5632Xn9=-pkrobUQWrGHn_ig@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 23 Jun 2014 01:05:24 -0400
+Subject: [PATCH] arm64: make CONFIG_ZONE_DMA user settable
+Message-ID: <1403499924-11214-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 18, 2014 at 6:04 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jun 17, 2014 at 10:52:46PM +0800, Chen-Yu Tsai wrote:
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->>  drivers/clk/sunxi/clk-sunxi.c                     | 44 +++++++++++++++++++++++
->>  2 files changed, 45 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index b9ec668..7b2ba41 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -40,6 +40,7 @@ Required properties:
->>       "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
->>       "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
->>       "allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
->> +     "allwinner,sun6i-a31-mbus-clk" - for the MBUS clocks on A31 / A23
->>       "allwinner,sun7i-a20-out-clk" - for the external output clocks
->>       "allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
->>       "allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index eca3c6e..a086b5b 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -307,6 +307,37 @@ static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
->>
->>
->>  /**
->> + * sun6i_a31_get_mbus_factors() - calculates m factor for MBUS clocks
->> + * MBUS rate is calculated as follows
->> + * rate = parent_rate / (m + 1);
->> + */
->> +
->> +static void sun6i_a31_get_mbus_factors(u32 *freq, u32 parent_rate,
->> +                                    u8 *n, u8 *k, u8 *m, u8 *p)
->> +{
->> +     u8 div;
->> +
->> +     /* These clocks can only divide, so we will never be able to achieve
->> +      * frequencies higher than the parent frequency */
->> +     if (*freq > parent_rate)
->> +             *freq = parent_rate;
->> +
->> +     div = DIV_ROUND_UP(parent_rate, *freq);
->> +
->> +     if (div > 8)
->> +             div = 8;
->> +
->> +     *freq = parent_rate / div;
->> +
->> +     /* we were called to round the frequency, we can now return */
->> +     if (n == NULL)
->
-> s/n/m/ ?
+Commit 19e7640d1f (arm64: Replace ZONE_DMA32 with ZONE_DMA)
+moves support for 32-bit DMA addressing into ZONE_DMA and renames
+CONFIG_ZONE_DMA32 to CONFIG_ZONE_DMA.
 
-The factors clk driver passes all or none pointers.
-But I will change this to avoid the confusion.
+Commit 2d5a5612bc (arm64: Limit the CMA buffer to 32-bit if ZONE_DMA)
+forces the CMA buffer to be 32-bit addressable if CONFIG_ZONE_DMA is
+defined.
 
->> +             return;
->> +
->> +     *m = div - 1;
->> +}
->> +
->> +
->> +/**
->>   * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
->>   * CLK_OUT rate is calculated as follows
->>   * rate = (parent_rate >> p) / (m + 1);
->> @@ -447,6 +478,11 @@ static struct clk_factors_config sun4i_mod0_config = {
->>       .pwidth = 2,
->>  };
->>
->> +static struct clk_factors_config sun6i_a31_mbus_config = {
->> +     .mshift = 0,
->> +     .mwidth = 3,
->
-> Actually, the A31 has an extra N factor.
->
-> So this mbus clock looks like it's only about the A23, and not the A31
-> at all.
+These two patches pose a problem for platforms which have no 32-bit
+addressable DRAM. If CONFIG_ZONE_DMA is turned on for such platforms,
+CMA is unable to reserve a buffer for allocations. CONFIG_ZONE_DMA is
+not user settable however, so there is no way to turn it off without
+editing arch/arm64/Kconfig. Even if one edits Kconfig to turn off
+CONFIG_ZONE_DMA, the kernel fails to build with such a config:
 
-I checked original sun6i code and sun6i code found in the A23 SDK.
-The original code uses the module 0 clock driver for mbus, so yes
-there's an extra N factor. The new code in the A23 SDK does not.
+  arch/arm64/mm/init.c: In function ?zone_sizes_init?:
+  arch/arm64/mm/init.c:76:13: error: ?ZONE_DMA? undeclared (first use in this function)
+     zone_size[ZONE_DMA] = max_dma - min;
+               ^
 
-Unfortunately I haven't been able to get my Hummingbird A31 up yet,
-so I can't poke around to check it.
+This patch makes CONFIG_ZONE_DMA user settable and fixes the kernel
+build when it is turned off.
 
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/Kconfig   | 11 ++++++++---
+ arch/arm64/mm/init.c |  8 ++++++--
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-ChenYu
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c8b1d0b..f669597 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -99,9 +99,6 @@ config GENERIC_CSUM
+ config GENERIC_CALIBRATE_DELAY
+ 	def_bool y
+ 
+-config ZONE_DMA
+-	def_bool y
+-
+ config ARCH_DMA_ADDR_T_64BIT
+ 	def_bool y
+ 
+@@ -211,6 +208,14 @@ config HOTPLUG_CPU
+ 	  Say Y here to experiment with turning CPUs off and on.  CPUs
+ 	  can be controlled through /sys/devices/system/cpu.
+ 
++config ZONE_DMA
++	bool "32-bit DMA memory allocation"
++	def_bool y
++	help
++	  32-bit DMA memory allocation supports devices limited to 32-bit
++	  DMA addressing to allocate within the first 4GiB of address space.
++	  Disable if no such devices will be used.
++
+ source kernel/Kconfig.preempt
+ 
+ config HZ
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index f43db8a..c5415e2 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -69,12 +69,14 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ 	memset(zone_size, 0, sizeof(zone_size));
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
+-	if (IS_ENABLED(CONFIG_ZONE_DMA)) {
++#ifdef CONFIG_ZONE_DMA
++	{
+ 		unsigned long max_dma_phys =
+ 			(unsigned long)(dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1);
+ 		max_dma = max(min, min(max, max_dma_phys >> PAGE_SHIFT));
+ 		zone_size[ZONE_DMA] = max_dma - min;
+ 	}
++#endif
+ 	zone_size[ZONE_NORMAL] = max - max_dma;
+ 
+ 	memcpy(zhole_size, zone_size, sizeof(zhole_size));
+@@ -86,10 +88,12 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ 		if (start >= max)
+ 			continue;
+ 
+-		if (IS_ENABLED(CONFIG_ZONE_DMA) && start < max_dma) {
++#ifdef CONFIG_ZONE_DMA
++		if (start < max_dma) {
+ 			unsigned long dma_end = min(end, max_dma);
+ 			zhole_size[ZONE_DMA] -= dma_end - start;
+ 		}
++#endif
+ 
+ 		if (end > max_dma) {
+ 			unsigned long normal_end = min(end, max);
+-- 
+1.8.3.1
