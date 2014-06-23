@@ -1,79 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:24 +0900
-Subject: [PATCH 15/29] ARM: shmobile: koelsch: Remove duplicate i2c6 nodes
+Date: Mon, 23 Jun 2014 11:28:30 +0900
+Subject: [PATCH 21/29] ARM: shmobile: r8a7790: Add PCIEC clock device tree node
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <897dfdbc14603d764637dea92696fef4fc66ea3e.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <ecafea8cd261833d7bb857aad76cf2e721821e88.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A second i2c6 node was a added by
-05e234a187058ee ("ARM: shmobile: koelsch dts: Add VDD MPU regulator for
-DVFS"). Merge this into the existing node.
+From: Phil Edworthy <phil.edworthy@renesas.com>
 
-Also shuffle i2c nodes so they are all together.
+This patch adds the device tree clock node for the PCIe Controller
 
-Cc: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 34 +++++++++++++++-------------------
- 1 file changed, 15 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi            | 6 +++---
+ include/dt-bindings/clock/r8a7790-clock.h | 1 +
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index b2e6616..b0cfbd4 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -215,25 +215,6 @@
- 	clock-frequency = <20000000>;
- };
- 
--&i2c2 {
--	pinctrl-0 = <&i2c2_pins>;
--	pinctrl-names = "default";
--
--	status = "okay";
--	clock-frequency = <400000>;
--
--	eeprom at 50 {
--		compatible = "renesas,24c02";
--		reg = <0x50>;
--		pagesize = <16>;
--	};
--};
--
--&i2c6 {
--	status = "okay";
--	clock-frequency = <100000>;
--};
--
- &pfc {
- 	pinctrl-0 = <&du_pins>;
- 	pinctrl-names = "default";
-@@ -414,10 +395,25 @@
- 	};
- };
- 
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	eeprom at 50 {
-+		compatible = "renesas,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+};
-+
- &i2c6 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c6_pins>;
- 	status = "okay";
-+	clock-frequency = <100000>;
- 
- 	vdd_dvfs: regulator at 68 {
- 		compatible = "diasemi,da9210";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 29907c9..9df5712 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -765,17 +765,17 @@
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+ 			clocks = <&hp_clk>, <&cp_clk>, <&mmc1_clk>, <&sd3_clk>,
+ 				 <&sd2_clk>, <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks R8A7790_CLK_SD0>, <&mmc0_clk>,
+-				 <&hp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>;
++				 <&hp_clk>, <&mp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7790_CLK_IIC2 R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+ 				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0 R8A7790_CLK_MMCIF0
+-				R8A7790_CLK_IIC0 R8A7790_CLK_IIC1 R8A7790_CLK_SSUSB R8A7790_CLK_CMT1
++				R8A7790_CLK_IIC0 R8A7790_CLK_PCIEC R8A7790_CLK_IIC1 R8A7790_CLK_SSUSB R8A7790_CLK_CMT1
+ 			>;
+ 			clock-output-names =
+ 				"iic2", "tpu0", "mmcif1", "sdhi3",
+ 				"sdhi2", "sdhi1", "sdhi0", "mmcif0",
+-				"iic0", "iic1", "ssusb", "cmt1";
++				"iic0", "pciec", "iic1", "ssusb", "cmt1";
+ 		};
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
+index a16df68..f929a79e 100644
+--- a/include/dt-bindings/clock/r8a7790-clock.h
++++ b/include/dt-bindings/clock/r8a7790-clock.h
+@@ -59,6 +59,7 @@
+ #define R8A7790_CLK_SDHI0		14
+ #define R8A7790_CLK_MMCIF0		15
+ #define R8A7790_CLK_IIC0		18
++#define R8A7790_CLK_PCIEC		19
+ #define R8A7790_CLK_IIC1		23
+ #define R8A7790_CLK_SSUSB		28
+ #define R8A7790_CLK_CMT1		29
 -- 
 2.0.0.rc2
