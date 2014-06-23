@@ -1,115 +1,117 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jun 2014 21:10:41 +0200
-Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
-In-Reply-To: <CAJ5Y-eZTmwiJViABy4MkioFYrXCoc2ho1AQ2RPThqDaUomvZ4Q@mail.gmail.com>
-References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
- <4678828.UygJelrJo5@wuerfel>
- <CAJ5Y-eZTmwiJViABy4MkioFYrXCoc2ho1AQ2RPThqDaUomvZ4Q@mail.gmail.com>
-Message-ID: <5338610.xCINKmsENX@wuerfel>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Mon, 23 Jun 2014 14:13:18 -0500
+Subject: [PATCHv6 3/3] edac: altera: Add EDAC support for SDRAM Ctlr
+In-Reply-To: <1403306523-4174-4-git-send-email-tthayer@altera.com>
+References: <1403306523-4174-2-git-send-email-tthayer@altera.com>
+ <1403306523-4174-4-git-send-email-tthayer@altera.com>
+Message-ID: <1403550798.9081.5.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 June 2014 14:25:26 Ashwin Chaugule wrote:
-> Hi Arnd,
+Hi Thor,
+
+On Fri, 2014-06-20 at 18:22 -0500, Thor Thayer wrote:
+> From: Thor Thayer <tthayer@altera.com>
 > 
-> On 21 June 2014 05:34, Arnd Bergmann <arnd@arndb.de> wrote:
-> >>
-> >> linux/mailbox_client.h
-> >>
-> >>  18  * struct mbox_client - User of a mailbox
-> >>  19  * @dev:        The client device
-> >>  20  * @chan_name:      The "controller:channel" this client wants
+> Addition of the driver to support the Altera SDRAM Controller. 
+> This patch adds support for the CycloneV and ArriaV SDRAM controllers. 
+> Correction and reporting of SBEs, Panic on DBEs.
 > 
-> Please correct me if I'm mistaken, but I think this comment in the
-> header is confusing.
-
-Yes, definitely. Thanks for pointing that out.
-
-> It gives the impression that the user is expected
-> to fill in this field as "controller name: channel id". But, looking
-> at an example of a DT based mbox client [1] , that doesnt seem to be
-> the case. And "chan_name" is compared with "mbox-names", which seems
-> to contain a list of Channel names. The mailbox is then identified by
-> a separate DT binding : "mbox", which has the mailbox name and the
-> channel id. So shouldnt this comment not say anything about the
-> "controller" and the DT binding should be changed to "channel-names",
-> instead of "mbox-names" to keep things consistent?
-
-The comment should be changed, but the property name is good the
-way it is. We follow the exact same pattern we have for registers,
-interrupts, dma-channels, etc.
-
-> > However, it seems you still make the same mistake here: The name that
-> > gets passed as chan_name in the mailbox API is a local identifier
-> > that is supposed to be interpreted for the client device and used
-> > to look up a pointer to the mailbox device and channel. If you require
-> > drivers to put global data (e.g. the mbox->name, or the channel
-> > number) in there, it's impossible to write a driver that works on
-> > both DT and ACPI. If you want to use the mbox_request_channel()
-> > interface from a driver, you need some form of lookup table in
-> > the ACPI data to do the conversion.
+> v2: Use the SDRAM controller registers to calculate memory size
+>     instead of the Device Tree. Update To & Cc list. Add maintainer
+>     information.
 > 
-> Fair point. The more I think about this, it seems that if we want to
-> use the mailbox framework for ACPI kernels, we should have a PCC
-> specific bypass, something like the one you suggested below. The ACPI
-> spec defines PCC as the only "mailbox" like mechanism. There are 3 PCC
-> clients defined as well; CPPC, MPST and RASF. Each of these have their
-> own ACPI tables and so they dont require special DSDT entries.
-
-Ok, I see. Can you describe what data is in these tables?
-
-> Moreover, these PCC client drivers will be very ACPI specific anyway.
-> So, trying to emulate DT like mbox controller-client matching in ACPI
-> at this point is rather pointless. It will require creating dummy DSDT
-> entries for the PCC mailbox controller and PCC mailbox clients which
-> have their own well defined ACPI tables (and so dont belong in the OS
-> agnostic DSDT) and then coming up with customized Device Specific
-> Methods (DSMs) for mbox clients to refer to mbox controllers.
-
-Actually you wouldn't necessarily need DSDT entries, the ACPI core could
-just call platform_device_create() to instantiate the devices based on
-the PCC tables.
-
-> The other alternative is to skip the mailbox framework altogether. One
-> thing to note is that the PCC driver and its clients should work on
-> X86, ARMv8 and any other platform that has ACPI support. Currently the
-> Mailbox framework looks platform agnostic but is tied to DT, so it may
-> not work well for everyone. But like I mentioned early on, the
-> framework provides for async notification and queuing which is useful
-> for PCC, so I'd prefer the PCC specific bypass option.
-
-The mailbox API should still work fine without DT, it would be easy
-enough to add a lookup mechanism for architectures that create their
-own platform devices from hardcoded kernel structures, or from ACPI
-tables that are meant to emulate the DT bindings on embedded x86.
-
-But treating PCC special probably does make most sense here, at
-least the lookup path.
-
-> > The alternative would be not to use mbox_request_channel() at all
-> > for now, but to add a new interface that can only be used PCC and
-> > that matches by ID but is independent of the use of ACPI or DT,
-> > something like:
-> >
-> > struct mbox_chan *pcc_mbox_get_channel(struct mbox_client *cl,
-> >                         char *name, unsigned chan_id,
-> >                         struct mbox_chan **chan)
-> > {
-> >         struct mbox_controller *mbox;
-> >         mbox = mbox_find_pcc_controller(name, ...);
-> >
-> >         *chan = &mbox->chans[chan_id];
-> >         return init_channel(*chan, cl);
-> > }
-> >
-> > This would mean that we'd have to special-case "pcc" users, which is
-> > not very nice, but at least it would work on both DT and ACPI,
-> > and a future ACPI version could still add support for the mailbox
-> > API later.
+> v3: EDAC driver cleanup based on comments from Mailing list.
 > 
-> I'll play around with this idea a bit and see how it looks.
+> v4: Panic on DBE. Add macro around inject-error reads to prevent
+>     them from being optimized out. Remove of_match_ptr since this
+>     will always use Device Tree.
 > 
+> v5: Addition of printk to trigger function to ensure read vars
+>     are not optimized out.
+> 
+> v6: Changes to split out shared SDRAM controller reg (offset 0x00)
+>     as a syscon device and allocate ECC specific SDRAM registers
+>     to EDAC.
+> 
+> Signed-off-by: Thor Thayer <tthayer@altera.com>
+> ---
 
-Ok, thanks for looking into this.
+For future patch submissions, please add your version history after the
+"---".
 
-	Arnd
+>  drivers/edac/Kconfig       |    9 +
+>  drivers/edac/Makefile      |    2 +
+>  drivers/edac/altera_edac.c |  448 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 459 insertions(+)
+>  create mode 100644 drivers/edac/altera_edac.c
+> 
+> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+> index 878f090..4f4d379 100644
+> --- a/drivers/edac/Kconfig
+> +++ b/drivers/edac/Kconfig
+> @@ -368,4 +368,13 @@ config EDAC_OCTEON_PCI
+>  	  Support for error detection and correction on the
+>  	  Cavium Octeon family of SOCs.
+>  
+> +config EDAC_ALTERA_MC
+> +	bool "Altera SDRAM Memory Controller EDAC"
+> +	depends on EDAC_MM_EDAC && ARCH_SOCFPGA
+> +	help
+> +	  Support for error detection and correction on the
+> +	  Altera SDRAM memory controller. Note that the
+> +	  preloader must initialize the SDRAM before loading
+> +	  the kernel.
+> +
+>  endif # EDAC
+> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
+> index 4154ed6..9741336 100644
+> --- a/drivers/edac/Makefile
+> +++ b/drivers/edac/Makefile
+> @@ -64,3 +64,5 @@ obj-$(CONFIG_EDAC_OCTEON_PC)		+= octeon_edac-pc.o
+>  obj-$(CONFIG_EDAC_OCTEON_L2C)		+= octeon_edac-l2c.o
+>  obj-$(CONFIG_EDAC_OCTEON_LMC)		+= octeon_edac-lmc.o
+>  obj-$(CONFIG_EDAC_OCTEON_PCI)		+= octeon_edac-pci.o
+> +
+> +obj-$(CONFIG_EDAC_ALTERA_MC)	        += altera_edac.o
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> new file mode 100644
+> index 0000000..e3fcd27
+> --- /dev/null
+> +++ b/drivers/edac/altera_edac.c
+> @@ -0,0 +1,448 @@
+> +/*
+> + *  Copyright Altera Corporation (C) 2014. All rights reserved.
+> + *  Copyright 2011-2012 Calxeda, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> +
+> + *
+> + * Adapted from the highbank_mc_edac driver
+> + *
+> + */
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
+> +#include <linux/ctype.h>
+> +#include <linux/edac.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/uaccess.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+
+Can you alphabetize these headers please?
+
+Dinh
