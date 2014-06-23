@@ -1,33 +1,48 @@
-From: ezequiel@vanguardiasur.com.ar (=?UTF-8?Q?Ezequiel_Garc=C3=ADa?=)
-Date: Mon, 23 Jun 2014 15:29:07 -0300
-Subject: [PATCH for v3.15] usb: musb: Fix panic upon musb_am335x module
- removal
-In-Reply-To: <20140623182300.GC5073@saruman.home>
-References: <1400371473-2053-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <20140520165510.GA28859@arch.cereza>
- <20140614125902.GA1202@arch.cereza>
- <20140623182300.GC5073@saruman.home>
-Message-ID: <CAAEAJfAH6V9BQH2adJq-FKAYrcDrw4x5Uc7S0nudL7cuJZzD0w@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 23 Jun 2014 14:29:29 -0400
+Subject: [PATCH v1 2/3] ata: Fix the link down in first attempt for the
+ APM X-Gene SoC AHCI SATA host controller driver.
+In-Reply-To: <1403518538-30697-3-git-send-email-stripathi@apm.com>
+References: <1403518538-30697-1-git-send-email-stripathi@apm.com>
+ <1403518538-30697-3-git-send-email-stripathi@apm.com>
+Message-ID: <20140623182929.GB18451@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 June 2014 15:23, Felipe Balbi <balbi@ti.com> wrote:
+Hello,
 
->>
->> Any comments on this? I don't like to remove a feature, but as
->> explained above, I don't see any other way to solve this.
->>
->> The driver is currently broken. I tried using of_platform_depopulate()
->> but failed.
->
-> yeah, I know about the problem and, frankly, there's no other way to fix
-> this. Just resend with linux-usb in Cc.
->
+On Mon, Jun 23, 2014 at 03:45:37PM +0530, Suman Tripathi wrote:
+> @@ -234,15 +237,20 @@ static int xgene_ahci_do_hardreset(struct ata_link *link,
+>  	u8 *d2h_fis = pp->rx_fis + RX_FIS_D2H_REG;
+>  	void __iomem *port_mmio = ahci_port_base(ap);
+>  	struct ata_taskfile tf;
+> +	int link_down_retry = 0;
+>  	int rc;
+>  	u32 val;
+> 
+> -	/* clear D2H reception area to properly wait for D2H FIS */
+> -	ata_tf_init(link->device, &tf);
+> -	tf.command = ATA_BUSY;
+> -	ata_tf_to_fis(&tf, 0, 0, d2h_fis);
+> -	rc = sata_link_hardreset(link, timing, deadline, online,
+> +	do {
+> +		/* clear D2H reception area to properly wait for D2H FIS */
+> +		ata_tf_init(link->device, &tf);
+> +		tf.command = ATA_BUSY;
+> +		ata_tf_to_fis(&tf, 0, 0, d2h_fis);
+> +		rc = sata_link_hardreset(link, timing, deadline, online,
+>  				 ahci_check_ready);
+> +		if (*online)
+> +			break;
+> +	} while (link_down_retry++ < MAX_LINK_DOWN_RETRY);
 
-Ouch, forgot about linux-usb on this one! I'm resending on top of
-v3.16-rc1 (although I think this one already applies).
+Hmm... so it's retrying w/o extending deadline if the link is reported
+to be offline.  This definitely needs comment explaining what's going
+on.  Wouldn't it make more sense to change @timing instead rather than
+retrying resets?  sata_sil24 already does something similar.  Does,
+f.e., using sata_deb_timing_long for @timing make the problem go away?
 
-Thanks for the feedback,
+Thanks.
+
 -- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+tejun
