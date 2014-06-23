@@ -1,56 +1,102 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:32 +0900
-Subject: [PATCH 23/29] ARM: shmobile: r8a7790: Add PCIe Controller device node
+Date: Mon, 23 Jun 2014 11:28:29 +0900
+Subject: [PATCH 20/29] ARM: shmobile: r8a7791: add MSTP10 support on DTSI
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <745329d280c8c73f00724745693658f3d4113ea8.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <ee9141522dcf13f861ed3cef6490c6cbfaafefb9.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <phil.edworthy@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-[horms+renesas at verge.net.au: resolved conflict]
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi            | 33 +++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/r8a7791-clock.h | 26 ++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 2c55c4b..994330e 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -930,6 +930,31 @@
- 		status = "disabled";
- 	};
- 
-+	pciec: pcie at fe000000 {
-+		compatible = "renesas,pcie-r8a7790";
-+		reg = <0 0xfe000000 0 0x80000>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		bus-range = <0x00 0xff>;
-+		device_type = "pci";
-+		ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
-+			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
-+			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
-+			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
-+		/* Map all possible DDR as inbound ranges */
-+		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
-+			      0x43000000 1 0x80000000 1 0x80000000 0 0x80000000>;
-+		interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 117 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 118 IRQ_TYPE_LEVEL_HIGH>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_PCIEC>, <&pcie_bus_clk>;
-+		clock-names = "pcie", "pcie_bus";
-+		status = "disabled";
-+	};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index f3b6219..380d058 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -865,6 +865,39 @@
+ 				"rcan1", "rcan0", "qspi_mod", "i2c5", "i2c6", "i2c4", "i2c3", "i2c2",
+ 				"i2c1", "i2c0";
+ 		};
++		mstp10_clks: mstp10_clks at e6150998 {
++			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
++			clocks = <&p_clk>,
++				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				<&p_clk>,
++				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>;
 +
- 	rcar_sound: rcar_sound at 0xec500000 {
- 		#sound-dai-cells = <1>;
- 		compatible =  "renesas,rcar_sound-r8a7790", "renesas,rcar_sound-gen2", "renesas,rcar_sound";
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A7791_CLK_SSI_ALL
++				R8A7791_CLK_SSI9 R8A7791_CLK_SSI8 R8A7791_CLK_SSI7 R8A7791_CLK_SSI6 R8A7791_CLK_SSI5
++				R8A7791_CLK_SSI4 R8A7791_CLK_SSI3 R8A7791_CLK_SSI2 R8A7791_CLK_SSI1 R8A7791_CLK_SSI0
++				R8A7791_CLK_SCU_ALL
++				R8A7791_CLK_SCU_DVC1 R8A7791_CLK_SCU_DVC0
++				R8A7791_CLK_SCU_SRC9 R8A7791_CLK_SCU_SRC8 R8A7791_CLK_SCU_SRC7 R8A7791_CLK_SCU_SRC6 R8A7791_CLK_SCU_SRC5
++				R8A7791_CLK_SCU_SRC4 R8A7791_CLK_SCU_SRC3 R8A7791_CLK_SCU_SRC2 R8A7791_CLK_SCU_SRC1 R8A7791_CLK_SCU_SRC0
++			>;
++			clock-output-names =
++				"ssi-all",
++				"ssi9", "ssi8", "ssi7", "ssi6", "ssi5",
++				"ssi4", "ssi3", "ssi2", "ssi1", "ssi0",
++				"scu-all",
++				"scu-dvc1", "scu-dvc0",
++				"scu-src9", "scu-src8", "scu-src7", "scu-src6", "scu-src5",
++				"scu-src4", "scu-src3", "scu-src2", "scu-src1", "scu-src0";
++		};
+ 		mstp11_clks: mstp11_clks at e615099c {
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615099c 0 4>, <0 0xe61509ac 0 4>;
+diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
+index b050d18..0410bea 100644
+--- a/include/dt-bindings/clock/r8a7791-clock.h
++++ b/include/dt-bindings/clock/r8a7791-clock.h
+@@ -107,6 +107,32 @@
+ #define R8A7791_CLK_I2C1		30
+ #define R8A7791_CLK_I2C0		31
+ 
++/* MSTP10 */
++#define R8A7791_CLK_SSI_ALL		5
++#define R8A7791_CLK_SSI9		6
++#define R8A7791_CLK_SSI8		7
++#define R8A7791_CLK_SSI7		8
++#define R8A7791_CLK_SSI6		9
++#define R8A7791_CLK_SSI5		10
++#define R8A7791_CLK_SSI4		11
++#define R8A7791_CLK_SSI3		12
++#define R8A7791_CLK_SSI2		13
++#define R8A7791_CLK_SSI1		14
++#define R8A7791_CLK_SSI0		15
++#define R8A7791_CLK_SCU_ALL		17
++#define R8A7791_CLK_SCU_DVC1		18
++#define R8A7791_CLK_SCU_DVC0		19
++#define R8A7791_CLK_SCU_SRC9		22
++#define R8A7791_CLK_SCU_SRC8		23
++#define R8A7791_CLK_SCU_SRC7		24
++#define R8A7791_CLK_SCU_SRC6		25
++#define R8A7791_CLK_SCU_SRC5		26
++#define R8A7791_CLK_SCU_SRC4		27
++#define R8A7791_CLK_SCU_SRC3		28
++#define R8A7791_CLK_SCU_SRC2		29
++#define R8A7791_CLK_SCU_SRC1		30
++#define R8A7791_CLK_SCU_SRC0		31
++
+ /* MSTP11 */
+ #define R8A7791_CLK_SCIFA3		6
+ #define R8A7791_CLK_SCIFA4		7
 -- 
 2.0.0.rc2
