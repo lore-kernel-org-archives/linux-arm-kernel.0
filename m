@@ -1,304 +1,354 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:24:58 +0900
-Subject: [PATCH 2/8] ARM: shmobile: Move dma-register.h
+Date: Mon, 23 Jun 2014 11:24:59 +0900
+Subject: [PATCH 3/8] ARM: shmobile: Move clock.h
 In-Reply-To: <cover.1403487267.git.horms+renesas@verge.net.au>
 References: <cover.1403487267.git.horms+renesas@verge.net.au>
-Message-ID: <74ac0de8b7ee41246b8d6aae1df0618a64451435.1403487267.git.horms+renesas@verge.net.au>
+Message-ID: <ad6ffa0b59dc2c81474d7642fa2188e25cce99d6.1403487267.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Change location of dma-register.h so it can be used as #include
-"dma-register.h" instead of the old style #include <mach/dma-register.h>.
+Change location of clock.h so it can be used as #include "clock.h"
+instead of the old style #include <mach/clock.h>.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/dma-register.h              | 84 ++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/dma-register.h | 84 ----------------------
- arch/arm/mach-shmobile/setup-r8a73a4.c             |  2 +-
- arch/arm/mach-shmobile/setup-r8a7740.c             |  2 +-
- arch/arm/mach-shmobile/setup-r8a7790.c             |  2 +-
- arch/arm/mach-shmobile/setup-sh7372.c              |  2 +-
- arch/arm/mach-shmobile/setup-sh73a0.c              |  2 +-
- 7 files changed, 89 insertions(+), 89 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/dma-register.h
- delete mode 100644 arch/arm/mach-shmobile/include/mach/dma-register.h
+ arch/arm/mach-shmobile/board-genmai-reference.c  |  2 +-
+ arch/arm/mach-shmobile/board-koelsch-reference.c |  2 +-
+ arch/arm/mach-shmobile/board-lager-reference.c   |  2 +-
+ arch/arm/mach-shmobile/clock-r8a73a4.c           |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7740.c           |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7778.c           |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7779.c           |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7790.c           |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7791.c           |  2 +-
+ arch/arm/mach-shmobile/clock-sh7372.c            |  2 +-
+ arch/arm/mach-shmobile/clock-sh73a0.c            |  2 +-
+ arch/arm/mach-shmobile/clock.c                   |  4 +-
+ arch/arm/mach-shmobile/clock.h                   | 56 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/clock.h      | 56 ------------------------
+ 14 files changed, 69 insertions(+), 69 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/clock.h
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/clock.h
 
-diff --git a/arch/arm/mach-shmobile/dma-register.h b/arch/arm/mach-shmobile/dma-register.h
-new file mode 100644
-index 0000000..97c40bd
---- /dev/null
-+++ b/arch/arm/mach-shmobile/dma-register.h
-@@ -0,0 +1,84 @@
-+/*
-+ * SH-ARM CPU-specific DMA definitions, used by both DMA drivers
-+ *
-+ * Copyright (C) 2012 Renesas Solutions Corp
-+ *
-+ * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ *
-+ * Based on arch/sh/include/cpu-sh4/cpu/dma-register.h
-+ * Copyright (C) 2010 Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef DMA_REGISTER_H
-+#define DMA_REGISTER_H
-+
-+/*
-+ *		Direct Memory Access Controller
-+ */
-+
-+/* Transmit sizes and respective CHCR register values */
-+enum {
-+	XMIT_SZ_8BIT		= 0,
-+	XMIT_SZ_16BIT		= 1,
-+	XMIT_SZ_32BIT		= 2,
-+	XMIT_SZ_64BIT		= 7,
-+	XMIT_SZ_128BIT		= 3,
-+	XMIT_SZ_256BIT		= 4,
-+	XMIT_SZ_512BIT		= 5,
-+};
-+
-+/* log2(size / 8) - used to calculate number of transfers */
-+static const unsigned int dma_ts_shift[] = {
-+	[XMIT_SZ_8BIT]		= 0,
-+	[XMIT_SZ_16BIT]		= 1,
-+	[XMIT_SZ_32BIT]		= 2,
-+	[XMIT_SZ_64BIT]		= 3,
-+	[XMIT_SZ_128BIT]	= 4,
-+	[XMIT_SZ_256BIT]	= 5,
-+	[XMIT_SZ_512BIT]	= 6,
-+};
-+
-+#define TS_LOW_BIT	0x3 /* --xx */
-+#define TS_HI_BIT	0xc /* xx-- */
-+
-+#define TS_LOW_SHIFT	(3)
-+#define TS_HI_SHIFT	(20 - 2)	/* 2 bits for shifted low TS */
-+
-+#define TS_INDEX2VAL(i) \
-+	((((i) & TS_LOW_BIT) << TS_LOW_SHIFT) |\
-+	 (((i) & TS_HI_BIT)  << TS_HI_SHIFT))
-+
-+#define CHCR_TX(xmit_sz) (DM_FIX | SM_INC | 0x800 | TS_INDEX2VAL((xmit_sz)))
-+#define CHCR_RX(xmit_sz) (DM_INC | SM_FIX | 0x800 | TS_INDEX2VAL((xmit_sz)))
-+
-+
-+/*
-+ *		USB High-Speed DMAC
-+ */
-+/* Transmit sizes and respective CHCR register values */
-+enum {
-+	USBTS_XMIT_SZ_8BYTE		= 0,
-+	USBTS_XMIT_SZ_16BYTE		= 1,
-+	USBTS_XMIT_SZ_32BYTE		= 2,
-+};
-+
-+/* log2(size / 8) - used to calculate number of transfers */
-+static const unsigned int dma_usbts_shift[] = {
-+	[USBTS_XMIT_SZ_8BYTE]	= 3,
-+	[USBTS_XMIT_SZ_16BYTE]	= 4,
-+	[USBTS_XMIT_SZ_32BYTE]	= 5,
-+};
-+
-+#define USBTS_LOW_BIT	0x3 /* --xx */
-+#define USBTS_HI_BIT	0x0 /* ---- */
-+
-+#define USBTS_LOW_SHIFT	6
-+#define USBTS_HI_SHIFT	0
-+
-+#define USBTS_INDEX2VAL(i) (((i) & 3) << 6)
-+
-+#endif /* DMA_REGISTER_H */
-diff --git a/arch/arm/mach-shmobile/include/mach/dma-register.h b/arch/arm/mach-shmobile/include/mach/dma-register.h
-deleted file mode 100644
-index 97c40bd..0000000
---- a/arch/arm/mach-shmobile/include/mach/dma-register.h
-+++ /dev/null
-@@ -1,84 +0,0 @@
--/*
-- * SH-ARM CPU-specific DMA definitions, used by both DMA drivers
-- *
-- * Copyright (C) 2012 Renesas Solutions Corp
-- *
-- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-- *
-- * Based on arch/sh/include/cpu-sh4/cpu/dma-register.h
-- * Copyright (C) 2010 Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef DMA_REGISTER_H
--#define DMA_REGISTER_H
--
--/*
-- *		Direct Memory Access Controller
-- */
--
--/* Transmit sizes and respective CHCR register values */
--enum {
--	XMIT_SZ_8BIT		= 0,
--	XMIT_SZ_16BIT		= 1,
--	XMIT_SZ_32BIT		= 2,
--	XMIT_SZ_64BIT		= 7,
--	XMIT_SZ_128BIT		= 3,
--	XMIT_SZ_256BIT		= 4,
--	XMIT_SZ_512BIT		= 5,
--};
--
--/* log2(size / 8) - used to calculate number of transfers */
--static const unsigned int dma_ts_shift[] = {
--	[XMIT_SZ_8BIT]		= 0,
--	[XMIT_SZ_16BIT]		= 1,
--	[XMIT_SZ_32BIT]		= 2,
--	[XMIT_SZ_64BIT]		= 3,
--	[XMIT_SZ_128BIT]	= 4,
--	[XMIT_SZ_256BIT]	= 5,
--	[XMIT_SZ_512BIT]	= 6,
--};
--
--#define TS_LOW_BIT	0x3 /* --xx */
--#define TS_HI_BIT	0xc /* xx-- */
--
--#define TS_LOW_SHIFT	(3)
--#define TS_HI_SHIFT	(20 - 2)	/* 2 bits for shifted low TS */
--
--#define TS_INDEX2VAL(i) \
--	((((i) & TS_LOW_BIT) << TS_LOW_SHIFT) |\
--	 (((i) & TS_HI_BIT)  << TS_HI_SHIFT))
--
--#define CHCR_TX(xmit_sz) (DM_FIX | SM_INC | 0x800 | TS_INDEX2VAL((xmit_sz)))
--#define CHCR_RX(xmit_sz) (DM_INC | SM_FIX | 0x800 | TS_INDEX2VAL((xmit_sz)))
--
--
--/*
-- *		USB High-Speed DMAC
-- */
--/* Transmit sizes and respective CHCR register values */
--enum {
--	USBTS_XMIT_SZ_8BYTE		= 0,
--	USBTS_XMIT_SZ_16BYTE		= 1,
--	USBTS_XMIT_SZ_32BYTE		= 2,
--};
--
--/* log2(size / 8) - used to calculate number of transfers */
--static const unsigned int dma_usbts_shift[] = {
--	[USBTS_XMIT_SZ_8BYTE]	= 3,
--	[USBTS_XMIT_SZ_16BYTE]	= 4,
--	[USBTS_XMIT_SZ_32BYTE]	= 5,
--};
--
--#define USBTS_LOW_BIT	0x3 /* --xx */
--#define USBTS_HI_BIT	0x0 /* ---- */
--
--#define USBTS_LOW_SHIFT	6
--#define USBTS_HI_SHIFT	0
--
--#define USBTS_INDEX2VAL(i) (((i) & 3) << 6)
--
--#endif /* DMA_REGISTER_H */
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 9333770..985739e 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -25,10 +25,10 @@
- #include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
- #include <mach/common.h>
--#include <mach/dma-register.h>
- #include <mach/irqs.h>
- #include <mach/r8a73a4.h>
- #include <asm/mach/arch.h>
-+#include "dma-register.h"
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+index 2ff6ad6..c353585 100644
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -20,11 +20,11 @@
  
- static const struct resource pfc_resources[] = {
- 	DEFINE_RES_MEM(0xe6050000, 0x9000),
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 35dec23..7cf4bbd 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -31,7 +31,6 @@
- #include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
- #include <linux/platform_data/sh_ipmmu.h>
--#include <mach/dma-register.h>
- #include <mach/r8a7740.h>
- #include <mach/pm-rmobile.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+-#include <mach/clock.h>
  #include <mach/common.h>
-@@ -40,6 +39,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include "dma-register.h"
- 
- static struct map_desc r8a7740_io_desc[] __initdata = {
- 	 /*
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 6bd08b1..3eed626 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -27,10 +27,10 @@
- #include <linux/sh_dma.h>
- #include <linux/sh_timer.h>
- #include <mach/common.h>
--#include <mach/dma-register.h>
- #include <mach/irqs.h>
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
-+#include "dma-register.h"
- 
- /* Audio-DMAC */
- #define AUDIO_DMAC_SLAVE(_id, _addr, t, r)			\
-diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-index 3b23ced..062929b 100644
---- a/arch/arm/mach-shmobile/setup-sh7372.c
-+++ b/arch/arm/mach-shmobile/setup-sh7372.c
-@@ -33,7 +33,6 @@
- #include <linux/pm_domain.h>
- #include <linux/dma-mapping.h>
- #include <linux/platform_data/sh_ipmmu.h>
--#include <mach/dma-register.h>
- #include <mach/irqs.h>
- #include <mach/sh7372.h>
- #include <mach/common.h>
-@@ -41,6 +40,7 @@
+ #include <mach/r7s72100.h>
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include "dma-register.h"
++#include "clock.h"
  
- static struct map_desc sh7372_io_desc[] __initdata = {
- 	/* create a 1:1 entity map for 0xe6xxxxxx
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index a758d2a..370d55c 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -32,7 +32,6 @@
- #include <linux/sh_timer.h>
- #include <linux/platform_data/sh_ipmmu.h>
- #include <linux/platform_data/irq-renesas-intc-irqpin.h>
--#include <mach/dma-register.h>
- #include <mach/irqs.h>
- #include <mach/sh73a0.h>
+ /*
+  * This is a really crude hack to provide clkdev support to platform
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index d322a16..4a6dd63 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -23,12 +23,12 @@
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_data/rcar-du.h>
+-#include <mach/clock.h>
  #include <mach/common.h>
-@@ -40,6 +39,7 @@
- #include <asm/mach/map.h>
+ #include <mach/irqs.h>
+ #include <mach/rcar-gen2.h>
+ #include <mach/r8a7791.h>
  #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include "dma-register.h"
++#include "clock.h"
  
- static struct map_desc sh73a0_io_desc[] __initdata = {
- 	/* create a 1:1 entity map for 0xe6xxxxxx
+ /* DU */
+ static struct rcar_du_encoder_data koelsch_du_encoders[] = {
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 749832e..1d198b0 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -22,12 +22,12 @@
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_data/rcar-du.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/rcar-gen2.h>
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
++#include "clock.h"
+ 
+ /* DU */
+ static struct rcar_du_encoder_data lager_du_encoders[] = {
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index b5bc22c..857b142 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -22,8 +22,8 @@
+ #include <linux/kernel.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
++#include "clock.h"
+ 
+ #define CPG_BASE 0xe6150000
+ #define CPG_LEN 0x270
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 50931e3..6986527 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -22,9 +22,9 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/r8a7740.h>
++#include "clock.h"
+ 
+ /*
+  *        |  MDx  |  XTAL1/EXTAL1   |  System   | EXTALR |
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 13f8f3a..017fa50 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -39,8 +39,8 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
++#include "clock.h"
+ 
+ #define MSTPCR0		IOMEM(0xffc80030)
+ #define MSTPCR1		IOMEM(0xffc80034)
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index a13298b..eb7b131 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -23,8 +23,8 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
++#include "clock.h"
+ 
+ /*
+  *		MD1 = 1			MD1 = 0
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 296a057..8c62446 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -22,9 +22,9 @@
+ #include <linux/kernel.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/r8a7790.h>
++#include "clock.h"
+ 
+ /*
+  *   MD		EXTAL		PLL0	PLL1	PLL3
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+index e2fdfcc..20cad4a 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ b/arch/arm/mach-shmobile/clock-r8a7791.c
+@@ -23,9 +23,9 @@
+ #include <linux/kernel.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/rcar-gen2.h>
++#include "clock.h"
+ 
+ /*
+  *   MD		EXTAL		PLL0	PLL1	PLL3
+diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
+index d16d9ca..b19bc7e 100644
+--- a/arch/arm/mach-shmobile/clock-sh7372.c
++++ b/arch/arm/mach-shmobile/clock-sh7372.c
+@@ -21,8 +21,8 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
++#include "clock.h"
+ 
+ /* SH7372 registers */
+ #define FRQCRA		IOMEM(0xe6150000)
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 0d9cd1f..3956b95 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -22,8 +22,8 @@
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+ #include <asm/processor.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
++#include "clock.h"
+ 
+ #define FRQCRA		IOMEM(0xe6150000)
+ #define FRQCRB		IOMEM(0xe6150004)
+diff --git a/arch/arm/mach-shmobile/clock.c b/arch/arm/mach-shmobile/clock.c
+index e7232a0..2a58a78 100644
+--- a/arch/arm/mach-shmobile/clock.c
++++ b/arch/arm/mach-shmobile/clock.c
+@@ -25,7 +25,7 @@
+ #ifdef CONFIG_COMMON_CLK
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/clock.h>
++#include "clock.h"
+ 
+ void __init shmobile_clk_workaround(const struct clk_name *clks,
+ 				    int nr_clks, bool enable)
+@@ -49,8 +49,8 @@ void __init shmobile_clk_workaround(const struct clk_name *clks,
+ #else /* CONFIG_COMMON_CLK */
+ #include <linux/sh_clk.h>
+ #include <linux/export.h>
+-#include <mach/clock.h>
+ #include <mach/common.h>
++#include "clock.h"
+ 
+ unsigned long shmobile_fixed_ratio_clk_recalc(struct clk *clk)
+ {
+diff --git a/arch/arm/mach-shmobile/clock.h b/arch/arm/mach-shmobile/clock.h
+new file mode 100644
+index 0000000..31b6417
+--- /dev/null
++++ b/arch/arm/mach-shmobile/clock.h
+@@ -0,0 +1,56 @@
++#ifndef CLOCK_H
++#define CLOCK_H
++
++#ifdef CONFIG_COMMON_CLK
++/* temporary clock configuration helper for platform devices */
++
++struct clk_name {
++	const char *clk;
++	const char *con_id;
++	const char *dev_id;
++};
++
++void shmobile_clk_workaround(const struct clk_name *clks, int nr_clks,
++			     bool enable);
++
++#else /* CONFIG_COMMON_CLK */
++/* legacy clock implementation */
++
++struct clk;
++unsigned long shmobile_fixed_ratio_clk_recalc(struct clk *clk);
++extern struct sh_clk_ops shmobile_fixed_ratio_clk_ops;
++
++/* clock ratio */
++struct clk_ratio {
++	int mul;
++	int div;
++};
++
++#define SH_CLK_RATIO(name, m, d)		\
++static struct clk_ratio name ##_ratio = {	\
++	.mul = m,				\
++	.div = d,				\
++}
++
++#define SH_FIXED_RATIO_CLKg(name, p, r)	\
++struct clk name = {			\
++	.parent	= &p,				\
++	.ops	= &shmobile_fixed_ratio_clk_ops,\
++	.priv	= &r ## _ratio,			\
++}
++
++#define SH_FIXED_RATIO_CLK(name, p, r)		\
++static SH_FIXED_RATIO_CLKg(name, p, r)
++
++#define SH_FIXED_RATIO_CLK_SET(name, p, m, d)	\
++	SH_CLK_RATIO(name, m, d);		\
++	SH_FIXED_RATIO_CLK(name, p, name)
++
++#define SH_CLK_SET_RATIO(p, m, d)	\
++do {			\
++	(p)->mul = m;	\
++	(p)->div = d;	\
++} while (0)
++
++#endif /* CONFIG_COMMON_CLK */
++#endif
+diff --git a/arch/arm/mach-shmobile/include/mach/clock.h b/arch/arm/mach-shmobile/include/mach/clock.h
+deleted file mode 100644
+index 31b6417..0000000
+--- a/arch/arm/mach-shmobile/include/mach/clock.h
++++ /dev/null
+@@ -1,56 +0,0 @@
+-#ifndef CLOCK_H
+-#define CLOCK_H
+-
+-#ifdef CONFIG_COMMON_CLK
+-/* temporary clock configuration helper for platform devices */
+-
+-struct clk_name {
+-	const char *clk;
+-	const char *con_id;
+-	const char *dev_id;
+-};
+-
+-void shmobile_clk_workaround(const struct clk_name *clks, int nr_clks,
+-			     bool enable);
+-
+-#else /* CONFIG_COMMON_CLK */
+-/* legacy clock implementation */
+-
+-struct clk;
+-unsigned long shmobile_fixed_ratio_clk_recalc(struct clk *clk);
+-extern struct sh_clk_ops shmobile_fixed_ratio_clk_ops;
+-
+-/* clock ratio */
+-struct clk_ratio {
+-	int mul;
+-	int div;
+-};
+-
+-#define SH_CLK_RATIO(name, m, d)		\
+-static struct clk_ratio name ##_ratio = {	\
+-	.mul = m,				\
+-	.div = d,				\
+-}
+-
+-#define SH_FIXED_RATIO_CLKg(name, p, r)	\
+-struct clk name = {			\
+-	.parent	= &p,				\
+-	.ops	= &shmobile_fixed_ratio_clk_ops,\
+-	.priv	= &r ## _ratio,			\
+-}
+-
+-#define SH_FIXED_RATIO_CLK(name, p, r)		\
+-static SH_FIXED_RATIO_CLKg(name, p, r)
+-
+-#define SH_FIXED_RATIO_CLK_SET(name, p, m, d)	\
+-	SH_CLK_RATIO(name, m, d);		\
+-	SH_FIXED_RATIO_CLK(name, p, name)
+-
+-#define SH_CLK_SET_RATIO(p, m, d)	\
+-do {			\
+-	(p)->mul = m;	\
+-	(p)->div = d;	\
+-} while (0)
+-
+-#endif /* CONFIG_COMMON_CLK */
+-#endif
 -- 
 2.0.0.rc2
