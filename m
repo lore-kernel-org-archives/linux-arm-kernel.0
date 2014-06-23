@@ -1,47 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 23 Jun 2014 10:57:41 +1000
-Subject: linux-next: manual merge of the mvebu tree with Linus' tree
-Message-ID: <20140623105741.70094961@canb.auug.org.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 23 Jun 2014 10:14:37 +0900
+Subject: [PATCH] ARM: exynos: Fix warning by constifying 'reg' in
+ exynos_fdt_map_chipid()
+In-Reply-To: <CAK5sBcEcvXKFypDAx2E+fGZHk-VLhfbxU4QydvQTs2nTjb47pQ@mail.gmail.com>
+References: <3c6b5c1f19fcbee39a3f0a0bd2c9ddd811d5e619.1402547301.git.viresh.kumar@linaro.org>
+ <CAKohponQhitVO2zX0+=5bU76vC=+ofpqZo1F5CxyUDDD24prhw@mail.gmail.com>
+ <CAK5sBcEcvXKFypDAx2E+fGZHk-VLhfbxU4QydvQTs2nTjb47pQ@mail.gmail.com>
+Message-ID: <026201cf8e80$8059f190$810dd4b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Sachin Kamat wrote:
+> 
+> Hi Viresh,
+> 
+> On Thu, Jun 12, 2014 at 10:04 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > Fix Sachin's id, looks like he left Linaro ..
+> >
+> > On 12 June 2014 10:00, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >> exynos_fdt_map_chipid() was recently added with: cbf08b9 (ARM: EXYNOS:
+> >> Consolidate exynos4 and exynos5 machine files) and generates this warning:
+> >>
+> >> arch/arm/mach-exynos/exynos.c: In function ?exynos_fdt_map_chipid?:
+> >> arch/arm/mach-exynos/exynos.c:208:6: warning: assignment discards ?const? qualifier
+> from pointer target type [enabled by default]
+> >>
+> >> Constify 'reg' to fix it.
+> >>
+> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> I have already posted a patch [1] to fix this.
+> Kukjin, can you please queue this up.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg328216.html
 
-Today's linux-next merge of the mvebu tree got a conflict in
-arch/arm/mach-mvebu/Kconfig between commit 21278aeafbfa ("ARM: use
-menuconfig for sub-arch menus") from Linus' tree and commit
-55fc83023212 ("ARM: Kirkwood: Add setup file for netxbig LEDs") from
-the mvebu tree.
++ Arnd
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+If I remember correctly, it should be queued by Arnd?
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Arnd, do you want me to take it?
 
-diff --cc arch/arm/mach-mvebu/Kconfig
-index 4a7c250c9a30,8e3b5f12cd7c..000000000000
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@@ -94,4 -99,13 +96,11 @@@ config MACH_KIRKWOO
-  	  Say 'Y' here if you want your kernel to support boards based
-  	  on the Marvell Kirkwood device tree.
-  
-+ config MACH_NETXBIG
-+ 	bool "LaCie 2Big and 5Big Network v2"
-+ 	depends on MACH_KIRKWOOD
-+ 	help
-+ 	  Say 'Y' here if you want your kernel to support the
-+ 	  LaCie 2Big and 5Big Network v2
-+ 
- -endmenu
- -
-  endif
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/cd9098b3/attachment.sig>
+- Kukjin
