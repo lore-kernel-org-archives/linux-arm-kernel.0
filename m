@@ -1,478 +1,104 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 23 Jun 2014 15:55:17 +0100
-Subject: [PATCH v8 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <1403532837.3804.29.camel@hornet>
-References: <1403532837.3804.29.camel@hornet>
-Message-ID: <1403535318-19333-1-git-send-email-pawel.moll@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 23 Jun 2014 17:07:47 +0200
+Subject: [PATCH v3 1/7] genirq: generic chip: export irq_map_generic_chip
+ function
+In-Reply-To: <20140623130705.GM21711@titan.lakedaemon.net>
+References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403276487-8792-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140621235108.GJ21711@titan.lakedaemon.net>
+ <53A68CF0.8040303@free-electrons.com>
+ <20140623130705.GM21711@titan.lakedaemon.net>
+Message-ID: <53A842C3.6060606@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic DT bindings for the PL11x CLCD cells
-and make their fbdev driver use them.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
-Changes since v7:
-- fixed typo in "clock-names" documentation
-- renamed "arm,pl11x,framebuffer-base" into "arm,pl11x,framebuffer"
-  as it is describing both base and size
-- added some more explanation for "max-memory-bandwidth" property
-- added more explanation for "arm,pl11x,tft-r0g0b0" property
+On 23/06/2014 15:07, Jason Cooper wrote:
+> On Sun, Jun 22, 2014 at 09:59:44AM +0200, Boris BREZILLON wrote:
+>> On 22/06/2014 01:51, Jason Cooper wrote:
+>>> On Fri, Jun 20, 2014 at 05:01:21PM +0200, Boris BREZILLON wrote:
+>>>> Export the generic irq map function in order to provide irq_domain ops with
+>>>> generic mapping and specific of xlate function (needed by the new atmel
+>>>> AIC driver).
+>>>>
+>>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>>> ---
+>>>>  include/linux/irq.h       | 2 ++
+>>>>  kernel/irq/generic-chip.c | 5 +++--
+>>>>  2 files changed, 5 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/include/linux/irq.h b/include/linux/irq.h
+>>>> index 0d998d8..62af592 100644
+>>>> --- a/include/linux/irq.h
+>>>> +++ b/include/linux/irq.h
+>>>> @@ -771,6 +771,8 @@ void irq_gc_eoi(struct irq_data *d);
+>>>>  int irq_gc_set_wake(struct irq_data *d, unsigned int on);
+>>>>  
+>>>>  /* Setup functions for irq_chip_generic */
+>>>> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+>>>> +			 irq_hw_number_t hw_irq);
+>>>>  struct irq_chip_generic *
+>>>>  irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
+>>>>  		       void __iomem *reg_base, irq_flow_handler_t handler);
+>>>> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+>>>> index 452d6f2..cf80e7b 100644
+>>>> --- a/kernel/irq/generic-chip.c
+>>>> +++ b/kernel/irq/generic-chip.c
+>>>> @@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
+>>>>  /*
+>>>>   * irq_map_generic_chip - Map a generic chip for an irq domain
+>>>>   */
+>>>> -static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+>>>> -				irq_hw_number_t hw_irq)
+>>>> +int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+>>>> +			 irq_hw_number_t hw_irq)
+>>>>  {
+>>>>  	struct irq_data *data = irq_get_irq_data(virq);
+>>>>  	struct irq_domain_chip_generic *dgc = d->gc;
+>>>> @@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+>>>>  	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+>>>>  	return 0;
+>>>>  }
+>>>> +EXPORT_SYMBOL_GPL(irq_map_generic_chip);
+>>>>  
+>>>>  struct irq_domain_ops irq_generic_chip_ops = {
+>>>>  	.map	= irq_map_generic_chip,
+>>> Why can't you use irq_generic_chip_ops.map in your code and avoid this
+> s/code/declaration/, sorry for the misunderstanding.
+>
+>>> patch entirely?
+>> Because in this case I'll have to remove constness from my
+>> irq_domain_ops struct and initialize it in my init function.
+>> This is not a big concern, but in general I tend to declare ops struct
+>> with a const constraint.
+> /*
+>  * We're the only user of irq_map_generic_chip() who
+>  * doesn't also use irq_domain_xlate_onetwocell()
+>  */
+> static const struct irq_domain_ops aic_irq_ops = {
+> 	.map    = irq_generic_chip_ops.map,
+>         .xlate  = aic_irq_domain_xlate,
+> };
+>
+> Wouldn't work?
 
-Changes since v6:
-- replaced in-node device-timing subnode with the standard
-  video interface bindings (as in: ports & endpoints); only
-  "panel-dpi" compatible panels are supported in the driver
+No, it fails  with :
 
-Changes since v5:
-- realised that dma_alloc_writecombine() is a arm-specific function;
-  replaced with generic dma_alloc_coherent()/dma_mmap_writecombine()
+"error: initializer element is not constant"
 
-Changes since v4:
-- simplified the pads description property and made it optional
 
-Changes since v3:
-- changed wording and order of interrupt-names and interrupts
-  properties documentation
-- changed wording of arm,pl11x,framebuffer-base property
-  documentation
-- cleaned up binding documentation indentation
+>
+>> Tell me if you still want me to drop this patch and rework my init process.
+> If the above is satisfactory for you, please do so.  If we get a few
+> more chips that need one function, but not the other, then we'll revisit
+> what we're exporting.  The comment should bring the issue up in a
+> future grep.
+>
+> thx,
+>
+> Jason.
 
-Changes since v2:
-- replaced video-ram phandle with arm,pl11x,framebuffer-base
-- replaced panel-* properties with arm,pl11x,panel-data-pads
-- replaced max-framebuffer-size with max-memory-bandwidth
-- modified clcdfb_of_init_tft_panel() to use the pads
-  data and take differences between PL110 and PL110 into
-  account
-
-Changes since v1:
-- minor code cleanups as suggested by Sylwester Nawrocki
-
- .../devicetree/bindings/video/arm,pl11x.txt        | 109 +++++++++
- drivers/video/fbdev/Kconfig                        |   1 +
- drivers/video/fbdev/amba-clcd.c                    | 267 +++++++++++++++++++++
- 3 files changed, 377 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/arm,pl11x.txt
-
-diff --git a/Documentation/devicetree/bindings/video/arm,pl11x.txt b/Documentation/devicetree/bindings/video/arm,pl11x.txt
-new file mode 100644
-index 0000000..32f3acf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/arm,pl11x.txt
-@@ -0,0 +1,109 @@
-+* ARM PrimeCell Color LCD Controller PL110/PL111
-+
-+See also Documentation/devicetree/bindings/arm/primecell.txt
-+
-+Required properties:
-+
-+- compatible: must be one of:
-+	"arm,pl110", "arm,primecell"
-+	"arm,pl111", "arm,primecell"
-+
-+- reg: base address and size of the control registers block
-+
-+- interrupt-names: either the single entry "combined" representing a
-+	combined interrupt output (CLCDINTR), or the four entries
-+	"mbe", "vcomp", "lnbu", "fuf" representing the individual
-+	CLCDMBEINTR, CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR interrupts
-+
-+- interrupts: contains an interrupt specifier for each entry in
-+	interrupt-names
-+
-+- clock-names: should contain "clcdclk" and "apb_pclk"
-+
-+- clocks: contains phandle and clock specifier pairs for the entries
-+	in the clock-names property. See
-+	Documentation/devicetree/binding/clock/clock-bindings.txt
-+
-+Optional properties:
-+
-+- arm,pl11x,framebuffer: a pair of two 32-bit values, address and size,
-+	defining the framebuffer that must be used; if not present, the
-+	framebuffer may be located anywhere in the memory
-+
-+- max-memory-bandwidth: maximum bandwidth in bytes per second that the
-+	cell's memory interface can handle; if not present, the memory
-+	interface is fast enough to handle all possible video modes
-+
-+Required sub-nodes:
-+
-+- port: describes LCD panel signals, following the common binding
-+	for video transmitter interfaces; see
-+	Documentation/devicetree/bindings/media/video-interfaces.txt;
-+	when it is a TFT panel, the port's endpoint must define the
-+	following property:
-+
-+	- arm,pl11x,tft-r0g0b0-pads: an array of three 32-bit values,
-+		defining the way CLD pads are wired up; first value
-+		contains index of the "CLD" external pin (pad) used
-+		as R0 (first bit of the red component), second value
-+	        index of the pad used as G0, third value index of the
-+		pad used as B0, see also "LCD panel signal multiplexing
-+		details" paragraphs in the PL110/PL111 Technical
-+		Reference Manuals; this implicitly defines available
-+		color modes, for example:
-+		- PL111 TFT 4:4:4 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <4 15 20>;
-+		- PL110 TFT (1:)5:5:5 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
-+		- PL111 TFT (1:)5:5:5 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <3 11 19>;
-+		- PL111 TFT 5:6:5 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <3 10 19>;
-+		- PL110 and PL111 TFT 8:8:8 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-+		- PL110 and PL111 TFT 8:8:8 panel, R & B components swapped:
-+			arm,pl11x,tft-r0g0b0-pads = <16 8 0>;
-+
-+
-+Example:
-+
-+	clcd at 1f0000 {
-+		compatible = "arm,pl111", "arm,primecell";
-+		reg = <0x1f0000 0x1000>;
-+		interrupt-names = "combined";
-+		interrupts = <14>;
-+		clock-names = "clcdclk", "apb_pclk";
-+		clocks = <&v2m_oscclk1>, <&smbclk>;
-+		arm,pl11x,framebuffer-base = <0x18000000 0x00800000>;
-+		max-memory-bandwidth = <36864000>; /* bps, 640x480 at 60 16bpp */
-+
-+		port {
-+			v2m_clcd_pads: endpoint {
-+				remote-endpoint = <&v2m_clcd_panel>;
-+				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-+			};
-+		};
-+
-+	};
-+
-+	panel {
-+		compatible = "panel-dpi";
-+
-+		port {
-+			v2m_clcd_panel: endpoint {
-+				remote-endpoint = <&v2m_clcd_pads>;
-+			};
-+		};
-+
-+		panel-timing {
-+			clock-frequency = <25175000>;
-+			hactive = <640>;
-+			hback-porch = <40>;
-+			hfront-porch = <24>;
-+			hsync-len = <96>;
-+			vactive = <480>;
-+			vback-porch = <32>;
-+			vfront-porch = <11>;
-+			vsync-len = <2>;
-+		};
-+	};
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 59c98bfd..a518fe5 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -280,6 +280,7 @@ config FB_ARMCLCD
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
-+	select VIDEOMODE_HELPERS if OF
- 	help
- 	  This framebuffer device driver is for the ARM PrimeCell PL110
- 	  Colour LCD controller.  ARM PrimeCells provide the building
-diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index 14d6b37..71492e9 100644
---- a/drivers/video/fbdev/amba-clcd.c
-+++ b/drivers/video/fbdev/amba-clcd.c
-@@ -26,6 +26,13 @@
- #include <linux/amba/clcd.h>
- #include <linux/clk.h>
- #include <linux/hardirq.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_graph.h>
-+#include <video/display_timing.h>
-+#include <video/of_display_timing.h>
-+#include <video/videomode.h>
- 
- #include <asm/sizes.h>
- 
-@@ -543,6 +550,263 @@ static int clcdfb_register(struct clcd_fb *fb)
- 	return ret;
- }
- 
-+#ifdef CONFIG_OF
-+static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
-+		struct fb_videomode *mode)
-+{
-+	int err;
-+	struct display_timing timing;
-+	struct videomode video;
-+
-+	err = of_get_display_timing(node, "panel-timing", &timing);
-+	if (err)
-+		return err;
-+
-+	videomode_from_timing(&timing, &video);
-+
-+	err = fb_videomode_from_videomode(&video, mode);
-+	if (err)
-+		return err;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_snprintf_mode(char *buf, int size, struct fb_videomode *mode)
-+{
-+	return snprintf(buf, size, "%ux%u@%u", mode->xres, mode->yres,
-+			mode->refresh);
-+}
-+
-+static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
-+		struct fb_videomode *mode)
-+{
-+	int err;
-+	struct device_node *panel;
-+	char *name;
-+	int len;
-+
-+	panel = of_graph_get_remote_port_parent(endpoint);
-+	if (!panel)
-+		return -ENODEV;
-+
-+	/* Only directly connected DPI panels supported for now */
-+	if (of_device_is_compatible(panel, "panel-dpi"))
-+		err = clcdfb_of_get_dpi_panel_mode(panel, mode);
-+	else
-+		err = -ENOENT;
-+	if (err)
-+		return err;
-+
-+	len = clcdfb_snprintf_mode(NULL, 0, mode);
-+	name = devm_kzalloc(dev, len + 1, GFP_KERNEL);
-+	clcdfb_snprintf_mode(name, len + 1, mode);
-+	mode->name = name;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
-+{
-+	static struct {
-+		unsigned int part;
-+		u32 r0, g0, b0;
-+		u32 caps;
-+	} panels[] = {
-+		{ 0x110, 1,  7, 13, CLCD_CAP_5551 },
-+		{ 0x110, 0,  8, 16, CLCD_CAP_888 },
-+		{ 0x111, 4, 14, 20, CLCD_CAP_444 },
-+		{ 0x111, 3, 11, 19, CLCD_CAP_444 | CLCD_CAP_5551 },
-+		{ 0x111, 3, 10, 19, CLCD_CAP_444 | CLCD_CAP_5551 |
-+				    CLCD_CAP_565 },
-+		{ 0x111, 0,  8, 16, CLCD_CAP_444 | CLCD_CAP_5551 |
-+				    CLCD_CAP_565 | CLCD_CAP_888 },
-+	};
-+	int i;
-+
-+	/* Bypass pixel clock divider, data output on the falling edge */
-+	fb->panel->tim2 = TIM2_BCD | TIM2_IPC;
-+
-+	/* TFT display, vert. comp. interrupt at the start of the back porch */
-+	fb->panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
-+
-+	fb->panel->caps = 0;
-+
-+	/* Match the setup with known variants */
-+	for (i = 0; i < ARRAY_SIZE(panels) && !fb->panel->caps; i++) {
-+		if (amba_part(fb->dev) != panels[i].part)
-+			continue;
-+		if (g0 != panels[i].g0)
-+			continue;
-+		if (r0 == panels[i].r0 && b0 == panels[i].b0)
-+			fb->panel->caps = panels[i].caps & CLCD_CAP_RGB;
-+		if (r0 == panels[i].b0 && b0 == panels[i].r0)
-+			fb->panel->caps = panels[i].caps & CLCD_CAP_BGR;
-+	}
-+
-+	return fb->panel->caps ? 0 : -EINVAL;
-+}
-+
-+static int clcdfb_of_init_display(struct clcd_fb *fb)
-+{
-+	struct device_node *endpoint;
-+	int err;
-+	u32 max_bandwidth;
-+	u32 tft_r0b0g0[3];
-+
-+	fb->panel = devm_kzalloc(&fb->dev->dev, sizeof(*fb->panel), GFP_KERNEL);
-+	if (!fb->panel)
-+		return -ENOMEM;
-+
-+	endpoint = of_graph_get_next_endpoint(fb->dev->dev.of_node, NULL);
-+	if (!endpoint)
-+		return -ENODEV;
-+
-+	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, &fb->panel->mode);
-+	if (err)
-+		return err;
-+
-+	err = of_property_read_u32(fb->dev->dev.of_node, "max-memory-bandwidth",
-+			&max_bandwidth);
-+	if (!err)
-+		fb->panel->bpp = 8 * max_bandwidth / (fb->panel->mode.xres *
-+				fb->panel->mode.yres * fb->panel->mode.refresh);
-+	else
-+		fb->panel->bpp = 32;
-+
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+	fb->panel->cntl |= CNTL_BEBO;
-+#endif
-+	fb->panel->width = -1;
-+	fb->panel->height = -1;
-+
-+	if (of_property_read_u32_array(endpoint,
-+			"arm,pl11x,tft-r0g0b0-pads",
-+			tft_r0b0g0, ARRAY_SIZE(tft_r0b0g0)) == 0)
-+		return clcdfb_of_init_tft_panel(fb, tft_r0b0g0[0],
-+				 tft_r0b0g0[1],  tft_r0b0g0[2]);
-+
-+	return -ENOENT;
-+}
-+
-+static int clcdfb_of_vram_setup(struct clcd_fb *fb)
-+{
-+	int err;
-+	u32 values[2];
-+	phys_addr_t phys_base;
-+	size_t size;
-+
-+	err = clcdfb_of_init_display(fb);
-+	if (err)
-+		return err;
-+
-+	err = of_property_read_u32_array(fb->dev->dev.of_node,
-+			"arm,pl11x,framebuffer", values, ARRAY_SIZE(values));
-+	if (err)
-+		return err;
-+
-+	phys_base = values[0];
-+	size = values[1];
-+
-+	fb->fb.screen_base = ioremap(phys_base, size);
-+	if (!fb->fb.screen_base)
-+		return -ENOMEM;
-+
-+	fb->fb.fix.smem_start = phys_base;
-+	fb->fb.fix.smem_len = size;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_of_vram_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
-+{
-+	unsigned long off, user_size, kernel_size;
-+
-+
-+	off = vma->vm_pgoff << PAGE_SHIFT;
-+	user_size = vma->vm_end - vma->vm_start;
-+	kernel_size = fb->fb.fix.smem_len;
-+
-+	if (off >= kernel_size || user_size > (kernel_size - off))
-+		return -ENXIO;
-+
-+	return remap_pfn_range(vma, vma->vm_start,
-+			__phys_to_pfn(fb->fb.fix.smem_start) + vma->vm_pgoff,
-+			user_size,
-+			pgprot_writecombine(vma->vm_page_prot));
-+}
-+
-+static void clcdfb_of_vram_remove(struct clcd_fb *fb)
-+{
-+	iounmap(fb->fb.screen_base);
-+}
-+
-+static int clcdfb_of_dma_setup(struct clcd_fb *fb)
-+{
-+	unsigned long framesize;
-+	dma_addr_t dma;
-+	int err;
-+
-+	err = clcdfb_of_init_display(fb);
-+	if (err)
-+		return err;
-+
-+	framesize = fb->panel->mode.xres * fb->panel->mode.yres *
-+			fb->panel->bpp / 8;
-+	fb->fb.screen_base = dma_alloc_coherent(&fb->dev->dev, framesize,
-+			&dma, GFP_KERNEL);
-+	if (!fb->fb.screen_base)
-+		return -ENOMEM;
-+
-+	fb->fb.fix.smem_start = dma;
-+	fb->fb.fix.smem_len = framesize;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_of_dma_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
-+{
-+	return dma_mmap_writecombine(&fb->dev->dev, vma, fb->fb.screen_base,
-+			fb->fb.fix.smem_start, fb->fb.fix.smem_len);
-+}
-+
-+static void clcdfb_of_dma_remove(struct clcd_fb *fb)
-+{
-+	dma_free_coherent(&fb->dev->dev, fb->fb.fix.smem_len,
-+			fb->fb.screen_base, fb->fb.fix.smem_start);
-+}
-+
-+static struct clcd_board *clcdfb_of_get_board(struct amba_device *dev)
-+{
-+	struct clcd_board *board = devm_kzalloc(&dev->dev, sizeof(*board),
-+			GFP_KERNEL);
-+	struct device_node *node = dev->dev.of_node;
-+
-+	if (!board)
-+		return NULL;
-+
-+	board->name = of_node_full_name(node);
-+	board->caps = CLCD_CAP_ALL;
-+	board->check = clcdfb_check;
-+	board->decode = clcdfb_decode;
-+	if (of_find_property(node, "arm,pl11x,framebuffer-base", NULL)) {
-+		board->setup = clcdfb_of_vram_setup;
-+		board->mmap = clcdfb_of_vram_mmap;
-+		board->remove = clcdfb_of_vram_remove;
-+	} else {
-+		board->setup = clcdfb_of_dma_setup;
-+		board->mmap = clcdfb_of_dma_mmap;
-+		board->remove = clcdfb_of_dma_remove;
-+	}
-+
-+	return board;
-+}
-+#else
-+static struct clcd_board *clcdfb_of_get_board(struct amba_dev *dev)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct clcd_board *board = dev_get_platdata(&dev->dev);
-@@ -550,6 +814,9 @@ static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
- 	int ret;
- 
- 	if (!board)
-+		board = clcdfb_of_get_board(dev);
-+
-+	if (!board)
- 		return -EINVAL;
- 
- 	ret = dma_set_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
