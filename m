@@ -1,75 +1,415 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 23 Jun 2014 13:47:55 -0700
-Subject: [PATCHv5 2/2] arm: Get rid of meminfo
-In-Reply-To: <20140623091754.GD14781@pengutronix.de>
-References: <1396544698-15596-1-git-send-email-lauraa@codeaurora.org>
- <1396544698-15596-3-git-send-email-lauraa@codeaurora.org>
- <20140623091754.GD14781@pengutronix.de>
-Message-ID: <53A8927B.3020409@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 23 Jun 2014 13:49:36 -0700
+Subject: [PATCH v2] ARM: dts: Add cros_ec to exynos5420-peach-pit and
+ exynos5800-peach-pi
+Message-ID: <1403556576-8038-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the report.
+This adds cros_ec to exynos5420-peach-pit and exynos5800-peach-pi,
+including:
+* The keyboard
+* The i2c tunnel
+* The tps65090 under the i2c tunnel
+* The battery under the i2c tunnel
 
-On 6/23/2014 2:17 AM, Uwe Kleine-K?nig wrote:
-> This patch is in 3.16-rc1 as 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
-> now.
-> 
-> Unfortunately it makes my efm32 machine unbootable.
-> 
-> With earlyprintk enabled I get the following output:
-> 
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 3.15.0-rc1-00028-g1c2f87c22566-dirty (ukleinek at perseus) (gcc version 4.7.2 (OSELAS.Toolchain-2012.12.1) ) #280 PREEMPT Mon Jun 23 11:05:34 CEST 2014
-> [    0.000000] CPU: ARMv7-M [412fc231] revision 1 (ARMv7M), cr=00000000
-> [    0.000000] CPU: unknown data cache, unknown instruction cache
-> [    0.000000] Machine model: Energy Micro Giant Gecko Development Kit
-> [    0.000000] debug: ignoring loglevel setting.
-> [    0.000000] bootconsole [earlycon0] enabled
-> [    0.000000] On node 0 totalpages: 1024
-> [    0.000000] free_area_init_node: node 0, pgdat 880208f4, node_mem_map 00000000
-> [    0.000000]   Normal zone: 3840 pages exceeds freesize 1024
+To add extra motivation, it should be noted that tps65090 is one of
+the things needed to get display-related FETs turned on for pit and
+pi.
 
-This looks off. The number of pages for the memmap exceeds the available free
-size. Working backwards, I think the wrong bounds are being calculated in
-find_limits in arch/arm/mm/init.c . max_low is now calculated via the current
-limit but nommu never sets a limit unlike the mmu case. Can you try the
-following patch and see if it fixes the issue? If this doesn't work, can
-you share working bootup logs so I can do a bit more compare and contrast?
+Note that this relies on a few outstanding changes:
+* Needs (spi: s3c64xx: fix broken "cs_gpios" usage in the driver) and
+  (spi: s3c64xx: for DT platofrms always get the chipselect info from
+  DT node) to work properly and match the documented bindings.  See
+  <https://patchwork.kernel.org/patch/4346701/> and
+  <https://patchwork.kernel.org/patch/4346711/>
 
-Thanks,
-Laura
-
----8<----
->From 9b19241d577caf91928e26e55413047d1be90feb Mon Sep 17 00:00:00 2001
-From: Laura Abbott <lauraa@codeaurora.org>
-Date: Mon, 23 Jun 2014 13:26:56 -0700
-Subject: [PATCH] arm: Set memblock limit for nommu
-
-Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) changed find_limits
-to use memblock_get_current_limit for calculating the max_low pfn.
-nommu targets never actually set a limit on memblock though which
-means memblock_get_current_limit will just return the default
-value. Set the memblock_limit to be the end of DDR to make sure
-bounds are calculated correctly.
-
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/mm/nommu.c | 1 +
- 1 file changed, 1 insertion(+)
+Changes in v2:
+- Now just one patch since mfd patch landed.
+- Rebased to ToT linux-next
 
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index da1874f..a014dfa 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -300,6 +300,7 @@ void __init sanity_check_meminfo(void)
-        sanity_check_meminfo_mpu();
-        end = memblock_end_of_DRAM();
-        high_memory = __va(end - 1) + 1;
-+       memblock_set_current_limit(end);
- }
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 145 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 145 +++++++++++++++++++++++++++++
+ 2 files changed, 290 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 7649982..581f385 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -25,6 +25,11 @@
+ 		"google,pit", "google,peach","samsung,exynos5420",
+ 		"samsung,exynos5";
  
- /*
++	aliases {
++		/* Assign 20 so we don't get confused w/ builtin ones */
++		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
++	};
++
+ 	backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 0 1000000 0>;
+@@ -87,6 +92,13 @@
+ 		pinctrl-0 = <&usb301_vbus_en>;
+ 		enable-active-high;
+ 	};
++
++	vbat: fixed-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vbat-supply";
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
+ 
+ &dp {
+@@ -231,6 +243,20 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	ec_irq: ec-irq {
++		samsung,pins = "gpx1-5";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	tps65090_irq: tps65090-irq {
++		samsung,pins = "gpx2-5";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	dp_hpd_gpio: dp_hpd_gpio {
+ 		samsung,pins = "gpx2-6";
+ 		samsung,pin-function = <0>;
+@@ -247,6 +273,19 @@
+ };
+ 
+ &pinctrl_3 {
++	/* Drive SPI lines at x2 for better integrity */
++	spi2-bus {
++		samsung,pin-drv = <2>;
++	};
++
++	/* Drive SPI chip select at x2 for better integrity */
++	ec_spi_cs: ec-spi-cs {
++		samsung,pins = "gpb1-2";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <2>;
++	};
++
+ 	usb300_vbus_en: usb300-vbus-en {
+ 		samsung,pins = "gph0-0";
+ 		samsung,pin-function = <1>;
+@@ -266,6 +305,111 @@
+ 	status = "okay";
+ };
+ 
++&spi_2 {
++	status = "okay";
++	num-cs = <1>;
++	samsung,spi-src-clk = <0>;
++	cs-gpios = <&gpb1 2 0>;
++
++	cros_ec: cros-ec at 0 {
++		compatible = "google,cros-ec-spi";
++		interrupt-parent = <&gpx1>;
++		interrupts = <5 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&ec_spi_cs &ec_irq>;
++		reg = <0>;
++		spi-max-frequency = <3125000>;
++
++		controller-data {
++			samsung,spi-feedback-delay = <1>;
++		};
++
++		i2c-tunnel {
++			compatible = "google,cros-ec-i2c-tunnel";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			google,remote-bus = <0>;
++
++			battery: sbs-battery at b {
++				compatible = "sbs,sbs-battery";
++				reg = <0xb>;
++				sbs,poll-retry-count = <1>;
++				sbs,i2c-retry-count = <2>;
++			};
++
++			power-regulator at 48 {
++				compatible = "ti,tps65090";
++				reg = <0x48>;
++
++				/*
++				 * Config irq to disable internal pulls
++				 * even though we run in polling mode.
++				 */
++				pinctrl-names = "default";
++				pinctrl-0 = <&tps65090_irq>;
++
++				vsys1-supply = <&vbat>;
++				vsys2-supply = <&vbat>;
++				vsys3-supply = <&vbat>;
++				infet1-supply = <&vbat>;
++				infet2-supply = <&vbat>;
++				infet3-supply = <&vbat>;
++				infet4-supply = <&vbat>;
++				infet5-supply = <&vbat>;
++				infet6-supply = <&vbat>;
++				infet7-supply = <&vbat>;
++				vsys-l1-supply = <&vbat>;
++				vsys-l2-supply = <&vbat>;
++
++				regulators {
++					dcdc1 {
++						ti,enable-ext-control;
++					};
++					dcdc2 {
++						ti,enable-ext-control;
++					};
++					dcdc3 {
++						ti,enable-ext-control;
++					};
++					fet1 {
++						regulator-name = "vcd_led";
++					};
++					tps65090_fet2: fet2 {
++						regulator-name = "video_mid";
++						regulator-always-on;
++					};
++					fet3 {
++						regulator-name = "wwan_r";
++						regulator-always-on;
++					};
++					fet4 {
++						regulator-name = "sdcard";
++						regulator-always-on;
++					};
++					fet5 {
++						regulator-name = "camout";
++					};
++					fet6 {
++						regulator-name = "lcd_vdd";
++					};
++					tps65090_fet7: fet7 {
++						regulator-name = "video_mid_1a";
++						regulator-always-on;
++					};
++					ldo1 {
++					};
++					ldo2 {
++					};
++				};
++
++				charger {
++					compatible = "ti,tps65090-charger";
++				};
++			};
++		};
++	};
++};
++
+ &uart_3 {
+ 	status = "okay";
+ };
+@@ -287,3 +431,4 @@
+ 	timeout-sec = <32>;
+ };
+ 
++#include "cros-ec-keyboard.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 2c2c137..b2dc290 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -23,6 +23,11 @@
+ 		"google,pi", "google,peach", "samsung,exynos5800",
+ 		"samsung,exynos5";
+ 
++	aliases {
++		/* Assign 20 so we don't get confused w/ builtin ones */
++		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
++	};
++
+ 	backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 0 1000000 0>;
+@@ -85,6 +90,13 @@
+ 		pinctrl-0 = <&usb301_vbus_en>;
+ 		enable-active-high;
+ 	};
++
++	vbat: fixed-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vbat-supply";
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
+ 
+ &dp {
+@@ -229,6 +241,20 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	ec_irq: ec-irq {
++		samsung,pins = "gpx1-5";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	tps65090_irq: tps65090-irq {
++		samsung,pins = "gpx2-5";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	dp_hpd_gpio: dp_hpd_gpio {
+ 		samsung,pins = "gpx2-6";
+ 		samsung,pin-function = <0>;
+@@ -245,6 +271,19 @@
+ };
+ 
+ &pinctrl_3 {
++	/* Drive SPI lines at x2 for better integrity */
++	spi2-bus {
++		samsung,pin-drv = <2>;
++	};
++
++	/* Drive SPI chip select at x2 for better integrity */
++	ec_spi_cs: ec-spi-cs {
++		samsung,pins = "gpb1-2";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <2>;
++	};
++
+ 	usb300_vbus_en: usb300-vbus-en {
+ 		samsung,pins = "gph0-0";
+ 		samsung,pin-function = <1>;
+@@ -264,6 +303,111 @@
+ 	status = "okay";
+ };
+ 
++&spi_2 {
++	status = "okay";
++	num-cs = <1>;
++	samsung,spi-src-clk = <0>;
++	cs-gpios = <&gpb1 2 0>;
++
++	cros_ec: cros-ec at 0 {
++		compatible = "google,cros-ec-spi";
++		interrupt-parent = <&gpx1>;
++		interrupts = <5 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&ec_spi_cs &ec_irq>;
++		reg = <0>;
++		spi-max-frequency = <3125000>;
++
++		controller-data {
++			samsung,spi-feedback-delay = <1>;
++		};
++
++		i2c-tunnel {
++			compatible = "google,cros-ec-i2c-tunnel";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			google,remote-bus = <0>;
++
++			battery: sbs-battery at b {
++				compatible = "sbs,sbs-battery";
++				reg = <0xb>;
++				sbs,poll-retry-count = <1>;
++				sbs,i2c-retry-count = <2>;
++			};
++
++			power-regulator at 48 {
++				compatible = "ti,tps65090";
++				reg = <0x48>;
++
++				/*
++				 * Config irq to disable internal pulls
++				 * even though we run in polling mode.
++				 */
++				pinctrl-names = "default";
++				pinctrl-0 = <&tps65090_irq>;
++
++				vsys1-supply = <&vbat>;
++				vsys2-supply = <&vbat>;
++				vsys3-supply = <&vbat>;
++				infet1-supply = <&vbat>;
++				infet2-supply = <&vbat>;
++				infet3-supply = <&vbat>;
++				infet4-supply = <&vbat>;
++				infet5-supply = <&vbat>;
++				infet6-supply = <&vbat>;
++				infet7-supply = <&vbat>;
++				vsys-l1-supply = <&vbat>;
++				vsys-l2-supply = <&vbat>;
++
++				regulators {
++					dcdc1 {
++						ti,enable-ext-control;
++					};
++					dcdc2 {
++						ti,enable-ext-control;
++					};
++					dcdc3 {
++						ti,enable-ext-control;
++					};
++					fet1 {
++						regulator-name = "vcd_led";
++					};
++					tps65090_fet2: fet2 {
++						regulator-name = "video_mid";
++						regulator-always-on;
++					};
++					fet3 {
++						regulator-name = "wwan_r";
++						regulator-always-on;
++					};
++					fet4 {
++						regulator-name = "sdcard";
++						regulator-always-on;
++					};
++					fet5 {
++						regulator-name = "camout";
++					};
++					fet6 {
++						regulator-name = "lcd_vdd";
++					};
++					tps65090_fet7: fet7 {
++						regulator-name = "video_mid_1a";
++						regulator-always-on;
++					};
++					ldo1 {
++					};
++					ldo2 {
++					};
++				};
++
++				charger {
++					compatible = "ti,tps65090-charger";
++				};
++			};
++		};
++	};
++};
++
+ &uart_3 {
+ 	status = "okay";
+ };
+@@ -285,3 +429,4 @@
+ 	timeout-sec = <32>;
+ };
+ 
++#include "cros-ec-keyboard.dtsi"
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+2.0.0.526.g5318336
