@@ -1,189 +1,106 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 23 Jun 2014 13:23:00 -0500
-Subject: [PATCH for v3.15] usb: musb: Fix panic upon musb_am335x module
- removal
-In-Reply-To: <20140614125902.GA1202@arch.cereza>
-References: <1400371473-2053-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <20140520165510.GA28859@arch.cereza>
- <20140614125902.GA1202@arch.cereza>
-Message-ID: <20140623182300.GC5073@saruman.home>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Mon, 23 Jun 2014 14:25:26 -0400
+Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
+In-Reply-To: <4678828.UygJelrJo5@wuerfel>
+References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
+ <4600246.SKVsl5kA9F@wuerfel>
+ <CAJ5Y-eYN6NfFdKAkv5yrHTdeRNWJfvgPVL61EjZdgN0DYP8zpA@mail.gmail.com>
+ <4678828.UygJelrJo5@wuerfel>
+Message-ID: <CAJ5Y-eZTmwiJViABy4MkioFYrXCoc2ho1AQ2RPThqDaUomvZ4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 14, 2014 at 09:59:02AM -0300, Ezequiel Garcia wrote:
-> Hi Felipe,
-> 
-> On 20 May 01:55 PM, Ezequiel Garcia wrote:
-> > On 17 May 09:04 PM, Ezequiel Garcia wrote:
-> > > At probe time, the musb_am335x driver register its childs by
-> > > calling of_platform_populate(), which registers all childs in
-> > > the devicetree hierarchy recursively.
-> > > 
-> > > On the other side, the driver's remove() function uses of_device_unregister()
-> > > to remove each child of musb_am335x's.
-> > > 
-> > > However, when musb_dsps is loaded, its devices are attached to the musb_am335x
-> > > device as musb_am335x childs. Hence, musb_am335x remove() will attempt to
-> > > unregister the devices registered by musb_dsps, which produces a kernel panic.
-> > > 
-> > > In other words, the childs in the "struct device" hierarchy are not the same
-> > > as the childs in the "devicetree" hierarchy.
-> > > 
-> > > Ideally, we should enforce the removal of the devices registered by
-> > > musb_am335x *only*, instead of all its child devices. However, because of the
-> > > recursive nature of of_platform_populate, this doesn't seem possible.
-> > > 
-> > > Therefore, as the only solution at hand, this commit disables musb_am335x
-> > > driver removal capability, preventing it from being ever removed. This was
-> > > originally suggested by Sebastian Siewior:
-> > > 
-> > > https://www.mail-archive.com/linux-omap at vger.kernel.org/msg104946.html
-> > > 
-> > > And for reference, here's the panic upon module removal:
-> > > 
-> > > musb-hdrc musb-hdrc.0.auto: remove, state 4
-> > > usb usb1: USB disconnect, device number 1
-> > > musb-hdrc musb-hdrc.0.auto: USB bus 1 deregistered
-> > > Unable to handle kernel NULL pointer dereference at virtual address 0000008c
-> > > pgd = de11c000
-> > > [0000008c] *pgd=9e174831, *pte=00000000, *ppte=00000000
-> > > Internal error: Oops: 17 [#1] ARM
-> > > Modules linked in: musb_am335x(-) musb_dsps musb_hdrc usbcore usb_common
-> > > CPU: 0 PID: 623 Comm: modprobe Not tainted 3.15.0-rc4-00001-g24efd13 #69
-> > > task: de1b7500 ti: de122000 task.ti: de122000
-> > > PC is at am335x_shutdown+0x10/0x28
-> > > LR is at am335x_shutdown+0xc/0x28
-> > > pc : [<c0327798>]    lr : [<c0327794>]    psr: a0000013
-> > > sp : de123df8  ip : 00000004  fp : 00028f00
-> > > r10: 00000000  r9 : de122000  r8 : c000e6c4
-> > > r7 : de0e3c10  r6 : de0e3800  r5 : de624010  r4 : de1ec750
-> > > r3 : de0e3810  r2 : 00000000  r1 : 00000001  r0 : 00000000
-> > > Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> > > Control: 10c5387d  Table: 9e11c019  DAC: 00000015
-> > > Process modprobe (pid: 623, stack limit = 0xde122240)
-> > > Stack: (0xde123df8 to 0xde124000)
-> > > 3de0:                                                       de0e3810 bf054488
-> > > 3e00: bf05444c de624010 60000013 bf043650 000012fc de624010 de0e3810 bf043a20
-> > > 3e20: de0e3810 bf04b240 c0635b88 c02ca37c c02ca364 c02c8db0 de1b7500 de0e3844
-> > > 3e40: de0e3810 c02c8e28 c0635b88 de02824c de0e3810 c02c884c de0e3800 de0e3810
-> > > 3e60: de0e3818 c02c5b20 bf05417c de0e3800 de0e3800 c0635b88 de0f2410 c02ca838
-> > > 3e80: bf05417c de0e3800 bf055438 c02ca8cc de0e3c10 bf054194 de0e3c10 c02ca37c
-> > > 3ea0: c02ca364 c02c8db0 de1b7500 de0e3c44 de0e3c10 c02c8e28 c0635b88 de02824c
-> > > 3ec0: de0e3c10 c02c884c de0e3c10 de0e3c10 de0e3c18 c02c5b20 de0e3c10 de0e3c10
-> > > 3ee0: 00000000 bf059000 a0000013 c02c5bc0 00000000 bf05900c de0e3c10 c02c5c48
-> > > 3f00: de0dd0c0 de1ec970 de0f2410 bf05929c de0f2444 bf05902c de0f2410 c02ca37c
-> > > 3f20: c02ca364 c02c8db0 bf05929c de0f2410 bf05929c c02c94c8 bf05929c 00000000
-> > > 3f40: 00000800 c02c8ab4 bf0592e0 c007fc40 c00dd820 6273756d 336d615f 00783533
-> > > 3f60: c064a0ac de1b7500 de122000 de1b7500 c000e590 00000001 c000e6c4 c0060160
-> > > 3f80: 00028e70 00028e70 00028ea4 00000081 60000010 00028e70 00028e70 00028ea4
-> > > 3fa0: 00000081 c000e500 00028e70 00028e70 00028ea4 00000800 becb59f8 00027608
-> > > 3fc0: 00028e70 00028e70 00028ea4 00000081 00000001 00000001 00000000 00028f00
-> > > 3fe0: b6e6b6f0 becb59d4 000160e8 b6e6b6fc 60000010 00028ea4 00000000 00000000
-> > > [<c0327798>] (am335x_shutdown) from [<bf054488>] (dsps_musb_exit+0x3c/0x4c [musb_dsps])
-> > > [<bf054488>] (dsps_musb_exit [musb_dsps]) from [<bf043650>] (musb_shutdown+0x80/0x90 [musb_hdrc])
-> > > [<bf043650>] (musb_shutdown [musb_hdrc]) from [<bf043a20>] (musb_remove+0x24/0x68 [musb_hdrc])
-> > > [<bf043a20>] (musb_remove [musb_hdrc]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> > > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> > > [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
-> > > [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
-> > > [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
-> > > [<c02c5b20>] (device_del) from [<c02ca838>] (platform_device_del+0x14/0x9c)
-> > > [<c02ca838>] (platform_device_del) from [<c02ca8cc>] (platform_device_unregister+0xc/0x20)
-> > > [<c02ca8cc>] (platform_device_unregister) from [<bf054194>] (dsps_remove+0x18/0x38 [musb_dsps])
-> > > [<bf054194>] (dsps_remove [musb_dsps]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> > > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> > > [<c02c8db0>] (__device_release_driver) from [<c02c8e28>] (device_release_driver+0x20/0x2c)
-> > > [<c02c8e28>] (device_release_driver) from [<c02c884c>] (bus_remove_device+0xdc/0x10c)
-> > > [<c02c884c>] (bus_remove_device) from [<c02c5b20>] (device_del+0x104/0x198)
-> > > [<c02c5b20>] (device_del) from [<c02c5bc0>] (device_unregister+0xc/0x20)
-> > > [<c02c5bc0>] (device_unregister) from [<bf05900c>] (of_remove_populated_child+0xc/0x14 [musb_am335x])
-> > > [<bf05900c>] (of_remove_populated_child [musb_am335x]) from [<c02c5c48>] (device_for_each_child+0x44/0x70)
-> > > [<c02c5c48>] (device_for_each_child) from [<bf05902c>] (am335x_child_remove+0x18/0x30 [musb_am335x])
-> > > [<bf05902c>] (am335x_child_remove [musb_am335x]) from [<c02ca37c>] (platform_drv_remove+0x18/0x1c)
-> > > [<c02ca37c>] (platform_drv_remove) from [<c02c8db0>] (__device_release_driver+0x70/0xc8)
-> > > [<c02c8db0>] (__device_release_driver) from [<c02c94c8>] (driver_detach+0xb4/0xb8)
-> > > [<c02c94c8>] (driver_detach) from [<c02c8ab4>] (bus_remove_driver+0x4c/0xa0)
-> > > [<c02c8ab4>] (bus_remove_driver) from [<c007fc40>] (SyS_delete_module+0x128/0x1cc)
-> > > [<c007fc40>] (SyS_delete_module) from [<c000e500>] (ret_fast_syscall+0x0/0x48)
-> > > 
-> > > Fixes: 97238b35d5bb ("usb: musb: dsps: use proper child nodes")
-> > > Cc: <stable@vger.kernel.org> # v3.12+
-> > > Acked-by: George Cherian <george.cherian@ti.com>
-> > > Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> > > ---
-> > >  drivers/usb/musb/musb_am335x.c | 23 ++++++-----------------
-> > >  1 file changed, 6 insertions(+), 17 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/musb/musb_am335x.c b/drivers/usb/musb/musb_am335x.c
-> > > index d235378..1e58ed2 100644
-> > > --- a/drivers/usb/musb/musb_am335x.c
-> > > +++ b/drivers/usb/musb/musb_am335x.c
-> > > @@ -19,21 +19,6 @@ err:
-> > >  	return ret;
-> > >  }
-> > >  
-> > > -static int of_remove_populated_child(struct device *dev, void *d)
-> > > -{
-> > > -	struct platform_device *pdev = to_platform_device(dev);
-> > > -
-> > > -	of_device_unregister(pdev);
-> > > -	return 0;
-> > > -}
-> > > -
-> > > -static int am335x_child_remove(struct platform_device *pdev)
-> > > -{
-> > > -	device_for_each_child(&pdev->dev, NULL, of_remove_populated_child);
-> > > -	pm_runtime_disable(&pdev->dev);
-> > > -	return 0;
-> > > -}
-> > > -
-> > >  static const struct of_device_id am335x_child_of_match[] = {
-> > >  	{ .compatible = "ti,am33xx-usb" },
-> > >  	{  },
-> > > @@ -42,13 +27,17 @@ MODULE_DEVICE_TABLE(of, am335x_child_of_match);
-> > >  
-> > >  static struct platform_driver am335x_child_driver = {
-> > >  	.probe		= am335x_child_probe,
-> > > -	.remove         = am335x_child_remove,
-> > >  	.driver         = {
-> > >  		.name   = "am335x-usb-childs",
-> > >  		.of_match_table	= am335x_child_of_match,
-> > >  	},
-> > >  };
-> > >  
-> > > -module_platform_driver(am335x_child_driver);
-> > > +static int __init am335x_child_init(void)
-> > > +{
-> > > +	return platform_driver_register(&am335x_child_driver);
-> > > +}
-> > > +module_init(am335x_child_init);
-> > > +
-> > >  MODULE_DESCRIPTION("AM33xx child devices");
-> > >  MODULE_LICENSE("GPL v2");
-> > > -- 
-> > > 1.9.1
-> > > 
-> > 
-> > Felipe,
-> > 
-> > Any comments on this?
-> > 
-> 
-> Any comments on this? I don't like to remove a feature, but as
-> explained above, I don't see any other way to solve this.
-> 
-> The driver is currently broken. I tried using of_platform_depopulate()
-> but failed.
+Hi Arnd,
 
-yeah, I know about the problem and, frankly, there's no other way to fix
-this. Just resend with linux-usb in Cc.
+On 21 June 2014 05:34, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> linux/mailbox_client.h
+>>
+>>  18  * struct mbox_client - User of a mailbox
+>>  19  * @dev:        The client device
+>>  20  * @chan_name:      The "controller:channel" this client wants
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/f5184c5b/attachment.sig>
+Please correct me if I'm mistaken, but I think this comment in the
+header is confusing. It gives the impression that the user is expected
+to fill in this field as "controller name: channel id". But, looking
+at an example of a DT based mbox client [1] , that doesnt seem to be
+the case. And "chan_name" is compared with "mbox-names", which seems
+to contain a list of Channel names. The mailbox is then identified by
+a separate DT binding : "mbox", which has the mailbox name and the
+channel id. So shouldnt this comment not say anything about the
+"controller" and the DT binding should be changed to "channel-names",
+instead of "mbox-names" to keep things consistent?
+
+
+>>
+>> Instead of dev, I added a name string to the mbox controller
+>> structure. So now the client gets its channel by requesting
+>> "controller:channel" where controller should match with mbox->name and
+>> channel becomes an index into mbox->chans[].
+>>
+>
+> Right, I looked at the wrong version, sorry about that.
+
+No problem. Many thanks for the review.
+
+>
+> However, it seems you still make the same mistake here: The name that
+> gets passed as chan_name in the mailbox API is a local identifier
+> that is supposed to be interpreted for the client device and used
+> to look up a pointer to the mailbox device and channel. If you require
+> drivers to put global data (e.g. the mbox->name, or the channel
+> number) in there, it's impossible to write a driver that works on
+> both DT and ACPI. If you want to use the mbox_request_channel()
+> interface from a driver, you need some form of lookup table in
+> the ACPI data to do the conversion.
+
+Fair point. The more I think about this, it seems that if we want to
+use the mailbox framework for ACPI kernels, we should have a PCC
+specific bypass, something like the one you suggested below. The ACPI
+spec defines PCC as the only "mailbox" like mechanism. There are 3 PCC
+clients defined as well; CPPC, MPST and RASF. Each of these have their
+own ACPI tables and so they dont require special DSDT entries.
+Moreover, these PCC client drivers will be very ACPI specific anyway.
+So, trying to emulate DT like mbox controller-client matching in ACPI
+at this point is rather pointless. It will require creating dummy DSDT
+entries for the PCC mailbox controller and PCC mailbox clients which
+have their own well defined ACPI tables (and so dont belong in the OS
+agnostic DSDT) and then coming up with customized Device Specific
+Methods (DSMs) for mbox clients to refer to mbox controllers.
+
+The other alternative is to skip the mailbox framework altogether. One
+thing to note is that the PCC driver and its clients should work on
+X86, ARMv8 and any other platform that has ACPI support. Currently the
+Mailbox framework looks platform agnostic but is tied to DT, so it may
+not work well for everyone. But like I mentioned early on, the
+framework provides for async notification and queuing which is useful
+for PCC, so I'd prefer the PCC specific bypass option.
+
+>
+> The alternative would be not to use mbox_request_channel() at all
+> for now, but to add a new interface that can only be used PCC and
+> that matches by ID but is independent of the use of ACPI or DT,
+> something like:
+>
+> struct mbox_chan *pcc_mbox_get_channel(struct mbox_client *cl,
+>                         char *name, unsigned chan_id,
+>                         struct mbox_chan **chan)
+> {
+>         struct mbox_controller *mbox;
+>         mbox = mbox_find_pcc_controller(name, ...);
+>
+>         *chan = &mbox->chans[chan_id];
+>         return init_channel(*chan, cl);
+> }
+>
+> This would mean that we'd have to special-case "pcc" users, which is
+> not very nice, but at least it would work on both DT and ACPI,
+> and a future ACPI version could still add support for the mailbox
+> API later.
+
+I'll play around with this idea a bit and see how it looks.
+
+Cheers,
+Ashwin
+
+[1] - https://github.com/hackerspace/rpi-linux/commit/cd0b9584cbedf46812cfd220ba47d80e86b8b7ea
