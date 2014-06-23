@@ -1,153 +1,40 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 23 Jun 2014 12:54:36 +0200
-Subject: [PATCH 2/2] clocksource: add rockchip-specific armv7-timer setup
-In-Reply-To: <20140620105123.GH30188@leverpostej>
-References: <70167479.zcs3JF0luJ@diego> <3807304.rhf3VZXZNa@diego>
- <20140620105123.GH30188@leverpostej>
-Message-ID: <CABuKBeJ=hTuK5jv_FODBcUgL1a-zpfpeAwE=443PwHmVOyEz_g@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 23 Jun 2014 14:56:50 +0400
+Subject: [PATCH v1 3/3] arm64: Fix the APM X-Gene SoC SATA PHY clock DTS
+ node csr-mask of the SATA Host Controller 1.
+In-Reply-To: <1403518538-30697-4-git-send-email-stripathi@apm.com>
+References: <1403518538-30697-1-git-send-email-stripathi@apm.com>
+ <1403518538-30697-4-git-send-email-stripathi@apm.com>
+Message-ID: <53A807F2.4000408@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-06-20 12:51 GMT+02:00 Mark Rutland <mark.rutland@arm.com>:
-> On Fri, Jun 20, 2014 at 11:44:49AM +0100, Heiko St?bner wrote:
->> The armv7-timer on Rockchip RK3288 SoCs needs an underlying timer to run.
->> Therefore the special rockchip,rk3288-armv7-timer does this setup and
->> then initializes the architected timer using the new locally exposed
->> arch_timer_init.
->>
->> Suggested-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> ---
->>  .../bindings/arm/rockchip/armv7-timer.txt          | 22 +++++++++
->>  drivers/clocksource/Makefile                       |  1 +
->>  drivers/clocksource/rockchip_timer.c               | 57 ++++++++++++++++++++++
->>  3 files changed, 80 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt
->>  create mode 100644 drivers/clocksource/rockchip_timer.c
->>
->> diff --git a/Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt b/Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt
->> new file mode 100644
->> index 0000000..4c1950a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/rockchip/armv7-timer.txt
->> @@ -0,0 +1,22 @@
->> +Rockchip armv7-timer:
->> +---------------------
->> +
->> +The architected timer on rk3288 SoCs has special setup requirements, as
->> +the cpu-timer block needs to supply the architected timer.
->> +
->> +Required node properties:
->> +- compatible value : = "rockchip,rk3288-armv7-timer";
->> +- reg : physical base address and the size of the registers window
->> +        of the supplying timer block
->> +- CP15 Timer node properties as described in bindings/arm/arch_timer.txt
->> +
->> +Example:
->> +
->> +architected-timer {
->> +     compatible = "rockchip,rk3288-armv7-timer";
->> +     reg = <0xff810020 0x20>;
->> +     interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
->> +                  <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
->> +                  <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->> +     clock-frequency = <24000000>;
->> +};
->> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->> index 800b130..cbad225 100644
->> --- a/drivers/clocksource/Makefile
->> +++ b/drivers/clocksource/Makefile
->> @@ -20,6 +20,7 @@ obj-$(CONFIG_ARCH_MARCO)    += timer-marco.o
->>  obj-$(CONFIG_ARCH_MOXART)    += moxart_timer.o
->>  obj-$(CONFIG_ARCH_MXS)               += mxs_timer.o
->>  obj-$(CONFIG_ARCH_PRIMA2)    += timer-prima2.o
->> +obj-$(CONFIG_ARCH_ROCKCHIP)  += rockchip_timer.o
->>  obj-$(CONFIG_ARCH_U300)              += timer-u300.o
->>  obj-$(CONFIG_SUN4I_TIMER)    += sun4i_timer.o
->>  obj-$(CONFIG_SUN5I_HSTIMER)  += timer-sun5i.o
->> diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
->> new file mode 100644
->> index 0000000..46c2146
->> --- /dev/null
->> +++ b/drivers/clocksource/rockchip_timer.c
->> @@ -0,0 +1,57 @@
->> +/*
->> + * Copyright (c) 2014 MundoReader S.L.
->> + * Author: Heiko Stuebner <heiko@sntech.de>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/init.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/clockchips.h>
->> +#include "arm_arch_timer.h"
->> +
->> +#define TIMER_LOAD_COUNT0            0x00
->> +#define TIMER_LOAD_COUNT1            0x04
->> +#define TIMER_CURRENT_VALUE0         0x08
->> +#define TIMER_CURRENT_VALUE1         0x0c
->> +#define TIMER_CONTROL_REG            0x10
->> +#define TIMER_INT_STATUS             0x18
->> +
->> +#define TIMER_DISABLE                        (0 << 0)
->> +#define TIMER_ENABLE                 (1 << 0)
->> +#define TIMER_MODE_FREE_RUNNING              (0 << 1)
->> +#define TIMER_MODE_USER_DEFINED_COUNT        (1 << 1)
->> +#define TIMER_INT_MASK                       (0 << 2)
->> +#define TIMER_INT_UNMASK             (1 << 2)
->> +
->> +static __init void rk3288_arch_timer_init(struct device_node *np)
->> +{
->> +     void __iomem *reg_base;
->> +
->> +     reg_base = of_io_request_and_map(np, 0, "rk3288-armv7-timer");
->> +     if (!reg_base) {
->> +             pr_warn("%s: Can't get resource\n", __func__);
->> +             return;
->> +     }
->> +
->> +     writel(TIMER_DISABLE, reg_base + TIMER_CONTROL_REG);
->> +
->> +     writel(0xffffffff, reg_base + TIMER_LOAD_COUNT0);
->> +     writel(0xffffffff, reg_base + TIMER_LOAD_COUNT1);
->> +
->> +     writel(TIMER_ENABLE | TIMER_MODE_FREE_RUNNING,
->> +            reg_base + TIMER_CONTROL_REG);
->
-> Given that this is unconditionally set up in this way, could this not be
-> done in the fimrware/bootloader?
+Hello.
 
-IMHO this is a candidate for the init_time function of the machine
-description file until we have a bootloader that enables the arm arch
-timer properly.
+On 06/23/2014 02:15 PM, Suman Tripathi wrote:
 
->
-> That way you could also setup CNTFREQ correctly, and virtualisation can
-> just work out of the box.
+> This patch fixes the SATA PHY clock DTS node csr-mask of the SATA
+> Host controller 1. This patch also fixes the status of the PHY
+> clock node of SATA Host controller 1.
 
-Setting CNTFREQ as done in mach-shmobile [0] does not help here, right?
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   arch/arm64/boot/dts/apm-storm.dtsi | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 
-Regards,
-Matthias
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> index f8c40a6..d14bcc4 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -184,9 +184,9 @@
+>   				reg = <0x0 0x1f21c000 0x0 0x1000>;
+>   				reg-names = "csr-reg";
+>   				clock-output-names = "sataphy1clk";
+> -				status = "disabled";
+> +				status = "ok";
 
-[0] http://lxr.free-electrons.com/source/arch/arm/mach-shmobile/setup-rcar-gen2.c#L77
+    You don't need the specifically set "status to "ok" unless you're 
+overriding the "status" prop; "ok" is assumed AFAIK.
 
->
-> This looks like a clock driver in disguise...
->
-> Mark.
-
-
-
--- 
-motzblog.wordpress.com
+WBR, Sergei
