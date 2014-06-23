@@ -1,51 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Jun 2014 16:40:07 +0200
-Subject: [PATCH 0/2] efi: preserve NEON registers on UEFI services calls
-In-Reply-To: <1403533095-2611-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1403533095-2611-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_GHr=jDn_18cTRhFFWjBeWzYbPs9N+-q5euoGyGmX3eg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Jun 2014 16:42:47 +0200
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <53A83A20.6090800@roeck-us.net>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140623103142.GB19730@lukather> <53A83A20.6090800@roeck-us.net>
+Message-ID: <19870078.UBj78UMBrO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 June 2014 16:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The current UEFI implementation for arm64 fails to preserve/restore the contents
-> of the NEON register file, which may result in data corruption, especially now
-> that those contents are lazily restored for user processes.
->
-> This series proposes to fix this by wrapping all runtime services calls, and
-> adding kernel_neon_begin()/kernel_neon_end() pairs to the wrappers.
->
-> The first patch moves the existing x86 versions of those wrappers to generic
-> code, so that the second patch can easily enable them by supplying a definition
-> for  efi_call_virt and adding a call to efi_native_runtime_setup().
->
+On Monday 23 June 2014 07:30:56 Guenter Roeck wrote:
+> On 06/23/2014 03:31 AM, Maxime Ripard wrote:
+> > On Thu, May 22, 2014 at 02:12:07PM -0700, Guenter Roeck wrote:
+> >> On Thu, May 22, 2014 at 10:34:44PM +0200, Maxime Ripard wrote:
+> >>> On Mon, May 19, 2014 at 05:04:22PM +0200, Maxime Ripard wrote:
+> >>
+> >> The patches _are_ in my watchdog-next branch and get some coverage from
+> >> both my auto-builders and from Fenguang's build robots, so while they are
+> >> not in linux-next, they are not completely in the dark either.
+> >
+> > So, this patch finally didn't make it into 3.16. Great. Now, we can't
+> > even reboot the boards.
+> >
+> > Given how it's just impossible to get something merged reliably
+> > through the watchdog tree, I guess I should just start merging the
+> > patches through mine?
+> >
+> 
+> You can not really blame Wim here.
+> 
+> In this case, I suspect the major reason for not accepting the patch
+> is that I tried to provide a clean method / API for "reset through watchdog
+> subsystem", which went nowhere, in my understanding because someone objected
+> that it would be the wrong thing to do [1] and it didn't get approval /
+> acceptance from the arm maintainers. If it is wrong to reset the board
+> from the watchdog subsystem in a clean way, it is for sure even more wrong
+> to do it as you proposed in your patch.
+> 
+> My conclusion therefore is that all board reset code should move back out
+> of the watchdog subsystem, and that we should not accept such code in the
+> future. This is not my personal preference, but I do believe that we should
+> do it in a clean way or not at all.
 
-CC'ing Olivier and Mark (with correct email address this time).
+Moved to where?
 
-Also, as an additional note, the UEFI spec section 2.3.6.4 mandates
-that 'any additional execution state context' should be saved and
-restored by the callee, which would imply that doing it in the kernel
-is redundant. But current implementations of Tianocore/EDK2 don't seem
-to honor that requirement, and considering GCC's tendency to spill
-state to FPSIMD registers, we may choose to do so anyway to be on the
-safe side.
+I certainly don't want it in the platform directories, and for arm64 we
+intentionally don't have a place to put this stuff.
 
--- 
-Ard.
+drivers/power/reset would be an option, but then we have to solve the
+problem of loading two drivers for one device first.
 
-> Ard Biesheuvel (2):
->   efi/x86: move UEFI Runtime Services wrappers to generic code
->   efi/arm64: preserve NEON registers on UEFI runtime services calls
->
->  arch/arm64/include/asm/efi.h   |  21 ++++++
->  arch/arm64/kernel/efi.c        |  14 +---
->  arch/x86/platform/efi/efi.c    | 144 +----------------------------------
->  drivers/firmware/efi/Makefile  |   2 +-
->  drivers/firmware/efi/runtime.c | 167 +++++++++++++++++++++++++++++++++++++++++
->  include/linux/efi.h            |   2 +
->  6 files changed, 194 insertions(+), 156 deletions(-)
->  create mode 100644 drivers/firmware/efi/runtime.c
->
-> --
-> 1.8.3.2
->
+	Arnd
