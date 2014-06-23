@@ -1,124 +1,81 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Mon, 23 Jun 2014 16:42:44 +0800
-Subject: [PATCH 2/2] ARM: imx: add standby mode support for suspend
-In-Reply-To: <1403512964-19095-1-git-send-email-b20788@freescale.com>
-References: <1403512964-19095-1-git-send-email-b20788@freescale.com>
-Message-ID: <1403512964-19095-2-git-send-email-b20788@freescale.com>
+Date: Mon, 23 Jun 2014 16:42:43 +0800
+Subject: [PATCH 1/2] ARM: imx: mem bit must be cleared before entering DSM mode
+Message-ID: <1403512964-19095-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add standby mode support for suspend, to enter standby mode:
-
-echo standby > /sys/power/state;
-
-Use UART or RTC alarm to wake up system, when system enters
-standby mode, SOC will enter STOP mode with ARM core kept
-power on and 24M XTAL on.
+According to hardware design, mem bit must be clear before
+entering DSM mode, as ARM core will be power gated in DSM mode.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/mach-imx/common.h  |    2 +-
- arch/arm/mach-imx/gpc.c     |    5 +++--
- arch/arm/mach-imx/pm-imx6.c |   30 ++++++++++++++++++++++++++++--
- 3 files changed, 32 insertions(+), 5 deletions(-)
+ arch/arm/mach-imx/common.h        |    2 +-
+ arch/arm/mach-imx/cpuidle-imx6q.c |    2 +-
+ arch/arm/mach-imx/pm-imx6.c       |    8 ++++++--
+ 3 files changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 13a6e1f..d205f36 100644
+index 50ee9c2..13a6e1f 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -106,7 +106,7 @@ static inline void imx_scu_standby_enable(void) {}
- #endif
- void imx_src_init(void);
- void imx_gpc_init(void);
--void imx_gpc_pre_suspend(void);
-+void imx_gpc_pre_suspend(bool arm_power_off);
- void imx_gpc_post_resume(void);
- void imx_gpc_mask_all(void);
- void imx_gpc_restore_all(void);
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 586e017..82ea74e 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -27,13 +27,14 @@ static void __iomem *gpc_base;
- static u32 gpc_wake_irqs[IMR_NUM];
- static u32 gpc_saved_imrs[IMR_NUM];
+@@ -116,7 +116,7 @@ void imx_anatop_init(void);
+ void imx_anatop_pre_suspend(void);
+ void imx_anatop_post_resume(void);
+ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
+-void imx6q_set_int_mem_clk_lpm(void);
++void imx6q_set_int_mem_clk_lpm(bool enable);
+ void imx6sl_set_wait_clk(bool enter);
  
--void imx_gpc_pre_suspend(void)
-+void imx_gpc_pre_suspend(bool arm_power_off)
- {
- 	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
- 	int i;
+ void imx_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index fc0bb1e..10844d3 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -71,7 +71,7 @@ int __init imx6q_cpuidle_init(void)
+ 		imx_scu_standby_enable();
  
- 	/* Tell GPC to power off ARM core when suspend */
--	writel_relaxed(0x1, gpc_base + GPC_PGC_CPU_PDN);
-+	if (arm_power_off)
-+		writel_relaxed(0x1, gpc_base + GPC_PGC_CPU_PDN);
+ 	/* Set INT_MEM_CLK_LPM bit to get a reliable WAIT mode support */
+-	imx6q_set_int_mem_clk_lpm();
++	imx6q_set_int_mem_clk_lpm(true);
  
- 	for (i = 0; i < IMR_NUM; i++) {
- 		gpc_saved_imrs[i] = readl_relaxed(reg_imr1 + i * 4);
+ 	return cpuidle_register(&imx6q_cpuidle_driver, NULL);
+ }
 diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index b3c770d..5c3af8f 100644
+index 331055b..b3c770d 100644
 --- a/arch/arm/mach-imx/pm-imx6.c
 +++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -274,6 +274,14 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		break;
- 	case STOP_POWER_ON:
- 		val |= 0x2 << BP_CLPCR_LPM;
-+		val &= ~BM_CLPCR_VSTBY;
-+		val &= ~BM_CLPCR_SBYOS;
-+		if (cpu_is_imx6sl())
-+			val |= BM_CLPCR_BYPASS_PMIC_READY;
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx())
-+			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
-+		else
-+			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
- 		break;
- 	case WAIT_UNCLOCKED_POWER_OFF:
- 		val |= 0x1 << BP_CLPCR_LPM;
-@@ -334,6 +342,19 @@ static int imx6q_suspend_finish(unsigned long val)
- static int imx6q_pm_enter(suspend_state_t state)
+@@ -199,11 +199,13 @@ struct imx6_cpu_pm_info {
+ 	u32 mmdc_io_val[MX6_MAX_MMDC_IO_NUM][2]; /* To save offset and value */
+ } __aligned(8);
+ 
+-void imx6q_set_int_mem_clk_lpm(void)
++void imx6q_set_int_mem_clk_lpm(bool enable)
  {
- 	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		imx6q_set_lpm(STOP_POWER_ON);
-+		imx6q_set_int_mem_clk_lpm(true);
-+		imx_gpc_pre_suspend(false);
-+		if (cpu_is_imx6sl())
-+			imx6sl_set_wait_clk(true);
-+		/* Zzz ... */
-+		cpu_do_idle();
-+		if (cpu_is_imx6sl())
-+			imx6sl_set_wait_clk(false);
-+		imx_gpc_post_resume();
-+		imx6q_set_lpm(WAIT_CLOCKED);
-+		break;
- 	case PM_SUSPEND_MEM:
- 		imx6q_set_lpm(STOP_POWER_OFF);
- 		imx6q_set_int_mem_clk_lpm(false);
-@@ -344,7 +365,7 @@ static int imx6q_pm_enter(suspend_state_t state)
- 		 */
- 		if (!imx6_suspend_in_ocram_fn)
- 			imx6q_enable_rbc(true);
--		imx_gpc_pre_suspend();
-+		imx_gpc_pre_suspend(true);
- 		imx_anatop_pre_suspend();
- 		imx_set_cpu_jump(0, v7_cpu_resume);
- 		/* Zzz ... */
-@@ -365,9 +386,14 @@ static int imx6q_pm_enter(suspend_state_t state)
- 	return 0;
+ 	u32 val = readl_relaxed(ccm_base + CGPR);
+ 
+-	val |= BM_CGPR_INT_MEM_CLK_LPM;
++	val &= ~BM_CGPR_INT_MEM_CLK_LPM;
++	if (enable)
++		val |= BM_CGPR_INT_MEM_CLK_LPM;
+ 	writel_relaxed(val, ccm_base + CGPR);
  }
  
-+static int imx6q_pm_valid(suspend_state_t state)
-+{
-+	return (state == PM_SUSPEND_STANDBY || state == PM_SUSPEND_MEM);
-+}
-+
- static const struct platform_suspend_ops imx6q_pm_ops = {
- 	.enter = imx6q_pm_enter,
--	.valid = suspend_valid_only_mem,
-+	.valid = imx6q_pm_valid,
- };
- 
- void __init imx6q_pm_set_ccm_base(void __iomem *base)
+@@ -334,6 +336,7 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 	switch (state) {
+ 	case PM_SUSPEND_MEM:
+ 		imx6q_set_lpm(STOP_POWER_OFF);
++		imx6q_set_int_mem_clk_lpm(false);
+ 		imx6q_enable_wb(true);
+ 		/*
+ 		 * For suspend into ocram, asm code already take care of
+@@ -352,6 +355,7 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 		imx_gpc_post_resume();
+ 		imx6q_enable_rbc(false);
+ 		imx6q_enable_wb(false);
++		imx6q_set_int_mem_clk_lpm(true);
+ 		imx6q_set_lpm(WAIT_CLOCKED);
+ 		break;
+ 	default:
 -- 
 1.7.9.5
