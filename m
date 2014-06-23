@@ -1,98 +1,130 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 23 Jun 2014 15:13:57 +0100
-Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
-In-Reply-To: <20140620170901.GA12059@leverpostej>
-References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
- <20140620170901.GA12059@leverpostej>
-Message-ID: <1403532837.3804.29.camel@hornet>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 23 Jun 2014 16:16:51 +0200
+Subject: [PATCH] ARM: mvebu: Fix the improper use of the compatible string
+ armada38x using a wildcard
+Message-ID: <1403533011-21339-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-06-20 at 18:09 +0100, Mark Rutland wrote:
-> > +- clocks-names: should contain "clcdclk" and "apb_pclk"
-> 
-> s/clocks-names/clock-names/
+Wildcards in compatible strings should be avoid. "marvell,armada38x"
+was recently introduced but was not yet used.
 
-Haha - it took quite a few patch revisions to spot this one, thanks!
+The armada 385 SoC is a superset of the armada 380 SoC (with more CPUs
+and more PCIe slots). So this patch replaces the use of
+"marvell,armada38x" by the "marvell,armada380" string.
 
-> > +
-> > +- clocks: contains phandle and clock specifier pairs for the entries
-> > +	in the clock-names property. See
-> > +	Documentation/devicetree/binding/clock/clock-bindings.txt
-> > +
-> > +Optional properties:
-> > +
-> > +- arm,pl11x,framebuffer-base: a pair of two 32-bit values, address and size,
-> > +	defining the framebuffer that must be used; if not present, the
-> > +	framebuffer may be located anywhere in the memory
-> 
-> The name is confusing: this is a base _and_ size.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+Hi,
 
-True. Can split it into two -base and -size or rename it into
-framebuffer or video-memory.
+This fix should be merged in 3.16 and maybe sent as a fix for 3.15
+too.
 
-> When should this be used, and what is valid to point it at?
+The initial patch (ARM: mvebu: Fix missing binding documentation for
+Armada 38x) was re-written after the review about the use of the
+wildcards here:
+http://thread.gmane.org/gmane.linux.kernel/1728755/focus=79339 and
+there:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/334225/focus=334311
 
-When the hardware design determines the address the memory transactions
-must be issued at. This is aimed at a situation (allegedly not
-impossible) when the memory map from the CLCD's point of view is
-different from the CPU's one (eg. the video memory is mapped at xxx for
-the CPU and yyy for the CLCD).
 
-> How does this play with memory carveouts (CMA, reserved-memory)?
+Thanks,
+Gregory
 
-It doesn't, and wasn't intended to (the original version of the binding
-was trying to do something like reserved-memory before it was defined),
-but someone managed to convince me not to do this, if it's a "low level"
-feature.
+ Documentation/devicetree/bindings/arm/armada-38x.txt | 14 ++++++++++++--
+ arch/arm/boot/dts/armada-380.dtsi                    |  2 +-
+ arch/arm/boot/dts/armada-385-db.dts                  |  2 +-
+ arch/arm/boot/dts/armada-385-rd.dts                  |  2 +-
+ arch/arm/boot/dts/armada-385.dtsi                    |  2 +-
+ arch/arm/boot/dts/armada-38x.dtsi                    |  2 +-
+ 6 files changed, 17 insertions(+), 7 deletions(-)
 
-I guess I can be re-convinced (again).
-
-> > +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
-> > +	cell's memory interface can handle
-> 
-> When should I set this, given it is optional?
-
-When there is a (significant) limitation of the bandwidth available for
-the cell's memory interface. One will either be told by the soc guys or
-will figure it out in the hard way, as we did :-(
-
-> > +
-> > +Required sub-nodes:
-> > +
-> > +- port: describes LCD panel signals, following the common binding
-> > +	for video transmitter interfaces; see
-> > +	Documentation/devicetree/bindings/media/video-interfaces.txt;
-> > +	when it is a TFT panel, the port's endpoint must define the
-> > +	following property:
-> > +
-> > +	- arm,pl11x,tft-r0g0b0-pads: an array of three 32-bit values,
-> > +		defining the way CLD pads are wired up; this implicitly
-> > +		defines available color modes, for example:
-> > +		- PL111 TFT 4:4:4 panel:
-> > +			arm,pl11x,tft-r0g0b0-pads = <4 15 20>;
-> > +		- PL110 TFT (1:)5:5:5 panel:
-> > +			arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
-> > +		- PL111 TFT (1:)5:5:5 panel:
-> > +			arm,pl11x,tft-r0g0b0-pads = <3 11 19>;
-> > +		- PL111 TFT 5:6:5 panel:
-> > +			arm,pl11x,tft-r0g0b0-pads = <3 10 19>;
-> > +		- PL110 and PL111 TFT 8:8:8 panel:
-> > +			arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-> > +		- PL110 and PL111 TFT 8:8:8 panel, R & B components swapped:
-> > +			arm,pl11x,tft-r0g0b0-pads = <16 8 0>;
-> 
-> I'm somewhat lost trying to figure out this mapping. Am I not looking at
-> this in the right way, or is there any documentation which makes this
-> clearer?
-
-Yeah, looking at this now, it definitely needs some more explanation.
-Something like this?
-
-	First value contains index of the "CLD" external pin (pad)
-	used as R0 (first bit of the red component), second value
-	index of the pad used as G0, third value index of the pad
-	used as B0, see also "LCD panel signal multiplexing details"
-	paragraph in the PL11x Technical Reference Manuals.
-
-Pawel
+diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
+index 11f2330a6554..ad9f8ed4d9bd 100644
+--- a/Documentation/devicetree/bindings/arm/armada-38x.txt
++++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
+@@ -6,5 +6,15 @@ following property:
+ 
+ Required root node property:
+ 
+- - compatible: must contain either "marvell,armada380" or
+-   "marvell,armada385" depending on the variant of the SoC being used.
++ - compatible: must contain "marvell,armada380"
++
++In addition, boards using the Marvell Armada 385 SoC shall have the
++following property before the previous one:
++
++Required root node property:
++
++compatible: must contain "marvell,armada385"
++
++Example:
++
++compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada380";
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index e69bc6759c39..4173a8ab34e7 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
+@@ -16,7 +16,7 @@
+ 
+ / {
+ 	model = "Marvell Armada 380 family SoC";
+-	compatible = "marvell,armada380", "marvell,armada38x";
++	compatible = "marvell,armada380";
+ 
+ 	cpus {
+ 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+index ff9637dd8d0f..4be6a2838a41 100644
+--- a/arch/arm/boot/dts/armada-385-db.dts
++++ b/arch/arm/boot/dts/armada-385-db.dts
+@@ -16,7 +16,7 @@
+ 
+ / {
+ 	model = "Marvell Armada 385 Development Board";
+-	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada38x";
++	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada380";
+ 
+ 	chosen {
+ 		bootargs = "console=ttyS0,115200 earlyprintk";
+diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
+index 40893255a3f0..aaca2861dc87 100644
+--- a/arch/arm/boot/dts/armada-385-rd.dts
++++ b/arch/arm/boot/dts/armada-385-rd.dts
+@@ -17,7 +17,7 @@
+ 
+ / {
+ 	model = "Marvell Armada 385 Reference Design";
+-	compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada38x";
++	compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada380";
+ 
+ 	chosen {
+ 		bootargs = "console=ttyS0,115200 earlyprintk";
+diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+index f011009bf4cf..6283d7912f71 100644
+--- a/arch/arm/boot/dts/armada-385.dtsi
++++ b/arch/arm/boot/dts/armada-385.dtsi
+@@ -16,7 +16,7 @@
+ 
+ / {
+ 	model = "Marvell Armada 385 family SoC";
+-	compatible = "marvell,armada385", "marvell,armada38x";
++	compatible = "marvell,armada385", "marvell,armada380";
+ 
+ 	cpus {
+ 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 3de364e81b52..689fa1a46728 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -20,7 +20,7 @@
+ 
+ / {
+ 	model = "Marvell Armada 38x family SoC";
+-	compatible = "marvell,armada38x";
++	compatible = "marvell,armada380";
+ 
+ 	aliases {
+ 		gpio0 = &gpio0;
+-- 
+1.8.1.2
