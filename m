@@ -1,38 +1,63 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 23 Jun 2014 18:53:03 +0200
-Subject: [PATCH V2 0/2] Sound support for Exynos4412 Odroid X2, U3 board
-In-Reply-To: <53A856AE.1030202@samsung.com>
-References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
- <CAD8Lp44h6zc2Rt2MGLjhmNG-YB0kYCWf5G7hX5JmdmBfc1PvKg@mail.gmail.com>
- <53A856AE.1030202@samsung.com>
-Message-ID: <53A85B6F.9090809@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 23 Jun 2014 19:01:17 +0200
+Subject: [PATCHv5 1/2] pwm: Add Allwinner SoC support
+In-Reply-To: <20140617232605.GB25525@mithrandir>
+References: <1400523003-27082-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1400523003-27082-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140617232605.GB25525@mithrandir>
+Message-ID: <20140623170115.GA11436@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/14 18:32, Sylwester Nawrocki wrote:
-> On 23/06/14 11:40, Daniel Drake wrote:
->> > I tested ODROID-U2's 3.5mm analog headphone jack output with:
->> > 
->> > # speaker-test -c 2 -t wav -l 2
->> > 
->> > On my x86 laptop this command takes ~6 seconds and produces audible output:
->> > "Front left, front right, front left, front right"
->> > 
->> > When those words are reproduced over the speakers, there is a
->> > corresponding message printed to stdout which synchronizes nicely.
->> > 
->> > On ODROID-U2 the same command doesn't work quite right - execution
->> > takes only 3.5 seconds and the audible output is truncated:
->> > "Front left, front right, front"
->> > and the stdout messages do not really coincide with the audio being
->> > reproduced at that time.
+On 18/06/2014 at 01:26:06 +0200, Thierry Reding wrote :
+> On Mon, May 19, 2014 at 08:10:02PM +0200, Alexandre Belloni wrote:
+> > +	/* By default, the polarity is inversed, set it to normal */
+> > +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG,
+> > +			 BIT_CH(PWM_ACT_STATE, 0) |
+> > +			 BIT_CH(PWM_ACT_STATE, 1));
+> > +	clk_disable_unprepare(sunxi_pwm->clk);
+> 
+> Why do you need to do this here? Doesn't this potentially cause
+> transients if a bootloader had this configured with inversed polarity?
 
-Is it still wrong when you set the period manually to 1024, i.e.
 
-# speaker-test -c 2 -t wav -l 2 -p 1024
+It was done a few months ago but what I remember is the following
+happens:
 
-?
+The PWM subsystem assumes that the polarity is PWM_POLARITY_NORMAL
+because of the kzalloc pwmchip_add(). Would you prefer something like:
 
---
-Thanks,
-Sylwester
+	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+	for (i = 0; i < sunxi_pwm->chip.npwm; i++) {
+		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
+			sunxi_pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
+	}
+
+Then, you would have a race where the PWM polarity is not correct in
+sysfs between pwmchip_add() and that code.
+
+Also, if you want to preserve the state set by the bootloader, you
+actually have an issue with getting back the other members of the
+pwm_device struct (duty, period) and more importantly the PWMF_ENABLED
+flag. It now assumed that the PWM channel is not enabled when
+registering the chip. If you now say that it may be enabled before linux
+is booting and you want to keep it running, then you have an
+inconsistency between the real state of the PWM (enabled, with a duty,
+period and polarity set) and what the PWM susbsytem actually knows about
+the PWM (not enabled, duty and period == 0 and polarity is normal).
+
+I would agree that the usual use case would be that another driver will
+take the PWM and set the duty, period and polarity anyway but the issue
+with the PWMF_ENABLED flag remains.
+
+How do you want to fix this? Would you add a new callback that would be
+called by pwmchip_add(), before pwmchip_sysfs_export()?
+
+I actually find it ugly to set the pwm_device members from the probe,
+especially the flags. I would prefer they stay hidden by the API.
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
