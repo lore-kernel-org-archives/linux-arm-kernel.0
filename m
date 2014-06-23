@@ -1,50 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 21:08:16 +0900
-Subject: [PATCH] ARM: shmobile: add cpufreq-cpu0 driver for common
- SH-Mobile
-In-Reply-To: <CAOh2x=kngDNSJNLpOTcA0PqP5ZiiKXUuAHpW_ZMmEOSQEst0bA@mail.gmail.com>
-References: <cover.1403487159.git.horms+renesas@verge.net.au>
- <06e32c91dbce3c24ccbe84e3af2a35199662bca0.1403487159.git.horms+renesas@verge.net.au>
- <CAOh2x=kngDNSJNLpOTcA0PqP5ZiiKXUuAHpW_ZMmEOSQEst0bA@mail.gmail.com>
-Message-ID: <20140623120811.GA2795@verge.net.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 23 Jun 2014 08:21:00 -0400
+Subject: linux-next: manual merge of the mvebu tree with Linus' tree
+In-Reply-To: <20140623105741.70094961@canb.auug.org.au>
+References: <20140623105741.70094961@canb.auug.org.au>
+Message-ID: <20140623122100.GK21711@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 09:38:09AM +0530, Viresh Kumar wrote:
-> On Mon, Jun 23, 2014 at 7:55 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > diff --git a/arch/arm/mach-shmobile/cpufreq.c b/arch/arm/mach-shmobile/cpufreq.c
+On Mon, Jun 23, 2014 at 10:57:41AM +1000, Stephen Rothwell wrote:
+> Hi all,
 > 
-> > +int __init shmobile_cpufreq_init(void)
-> > +{
-> > +       struct device_node *np;
-> > +
-> > +       np = of_cpu_device_node_get(0);
-> > +       if (np == NULL) {
-> > +               pr_err("failed to find cpu0 node\n");
-> > +               return 0;
-> > +       }
-> > +
-> > +       if (of_get_property(np, "operating-points", NULL))
+> Today's linux-next merge of the mvebu tree got a conflict in
+> arch/arm/mach-mvebu/Kconfig between commit 21278aeafbfa ("ARM: use
+> menuconfig for sub-arch menus") from Linus' tree and commit
+> 55fc83023212 ("ARM: Kirkwood: Add setup file for netxbig LEDs") from
+> the mvebu tree.
 > 
-> Probably you don't need any of above checks as these are done from
-> cpufreq-cpu0 probe as well.. So, simply create a platform device and
-> let cpufreq-cpu0 driver decide its fate.
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-Thanks.
+Looks good.  Thanks Stephen.
 
-Inami-san, could you look into this and make an incremental
-patch as appropriate?
+thx,
 
-> 
-> > +               platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
-> > +
-> > +       of_node_put(np);
-> > +
-> > +       return 0;
-> > +}
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Jason.
