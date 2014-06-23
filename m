@@ -1,118 +1,75 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 23 Jun 2014 11:17:54 +0200
-Subject: [PATCHv5 2/2] arm: Get rid of meminfo
-In-Reply-To: <1396544698-15596-3-git-send-email-lauraa@codeaurora.org>
-References: <1396544698-15596-1-git-send-email-lauraa@codeaurora.org>
- <1396544698-15596-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140623091754.GD14781@pengutronix.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 23 Jun 2014 11:28:25 +0200
+Subject: [PATCH v2 07/10] regulator: Add driver for Maxim 77802 PMIC
+ regulators
+In-Reply-To: <20140621204026.GH22657@sirena.org.uk>
+References: <1402941758-11216-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1402941758-11216-8-git-send-email-javier.martinez@collabora.co.uk>
+ <20140616192500.GJ5099@sirena.org.uk> <53A01D54.10506@collabora.co.uk>
+ <20140617141254.GP5099@sirena.org.uk> <53A06749.1010606@collabora.co.uk>
+ <20140621204026.GH22657@sirena.org.uk>
+Message-ID: <53A7F339.7050608@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 03, 2014 at 10:04:58AM -0700, Laura Abbott wrote:
-> memblock is now fully integrated into the kernel and is the prefered
-> method for tracking memory. Rather than reinvent the wheel with
-> meminfo, migrate to using memblock directly instead of meminfo as
-> an intermediate.
-This patch is in 3.16-rc1 as 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
-now.
+Hello Mark,
 
-Unfortunately it makes my efm32 machine unbootable.
+On 06/21/2014 10:40 PM, Mark Brown wrote:
+> On Tue, Jun 17, 2014 at 06:05:29PM +0200, Javier Martinez Canillas wrote:
+>> On 06/17/2014 04:12 PM, Mark Brown wrote:
+> 
+>> >> I just looked at regulator_register() and saw that it does rdev->dev.parent =
+>> >> dev, so yes this has to be the MFD.
+> 
+>> I noticed that many drivers set config.dev = &pdev->dev. The original Chrome OS
+>> max77xxx driver and max77686 are two examples but others drivers do the same:
+> 
+> Not all drivers are DT drivers that bother specifying supplies.
+> 
+>> And also I see that mfd_add_device() calls
+>> devm_regulator_bulk_register_supply_alias(&pdev->dev,...) so I'm confused now
+>> about what the correct device should be...
+> 
+> Right, but to do that you need to set those aliases up - have you done
+> so?
+> 
+>> > Do the regulators manage to get their supplies?
+> 
+>> There are no current support in mainline for the devices that use the regulators
+>> in this PMIC so I can't tell you if consumers manage to get their supplies
+>> correctly (e.g: if regulator_dev_lookup succeeds).
+> 
+> That's not really relevant here - I'm asking if the regulators get their
+> own supplies rather than if anything uses them.
+>
 
-With earlyprintk enabled I get the following output:
+Sorry if I keep misunderstanding your question but the regulators in this PMIC
+don't have a parent supply/regulator node.
 
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 3.15.0-rc1-00028-g1c2f87c22566-dirty (ukleinek at perseus) (gcc version 4.7.2 (OSELAS.Toolchain-2012.12.1) ) #280 PREEMPT Mon Jun 23 11:05:34 CEST 2014
-[    0.000000] CPU: ARMv7-M [412fc231] revision 1 (ARMv7M), cr=00000000
-[    0.000000] CPU: unknown data cache, unknown instruction cache
-[    0.000000] Machine model: Energy Micro Giant Gecko Development Kit
-[    0.000000] debug: ignoring loglevel setting.
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] On node 0 totalpages: 1024
-[    0.000000] free_area_init_node: node 0, pgdat 880208f4, node_mem_map 00000000
-[    0.000000]   Normal zone: 3840 pages exceeds freesize 1024
-[    0.000000]   Normal zone: 0 pages reserved
-[    0.000000]   Normal zone: 1024 pages, LIFO batch:0
-[    0.000000] pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
-[    0.000000] pcpu-alloc: [0] 0 
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 1024
-[    0.000000] Kernel command line: console=ttyefm4,115200 init=/linuxrc ignore_loglevel ihash_entries=64 dhash_entries=64 earlyprintk uclinux.physaddr=0x8c400000 root=/dev/mtdblock0
-[    0.000000] PID hash table entries: 16 (order: -6, 64 bytes)
-[    0.000000] Dentry cache hash table entries: 64 (order: -4, 256 bytes)
-[    0.000000] Inode-cache hash table entries: 64 (order: -4, 256 bytes)
-[    0.000000] Memory: 0K/4096K available (1156K kernel code, 83K rwdata, 316K rodata, 56K init, 43K bss, 212K reserved)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0x00000000 - 0x00001000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xffe00000   (2048 kB)
-[    0.000000]     vmalloc : 0x00000000 - 0xffffffff   (4095 MB)
-[    0.000000]     lowmem  : 0x88000000 - 0x88400000   (   4 MB)
-[    0.000000]       .text : 0x8c000000 - 0x8c170360   (1473 kB)
-[    0.000000]       .init : 0x8800a000 - 0x8800e000   (  16 kB)
-[    0.000000]       .data : 0x88008000 - 0x88020f80   ( 100 kB)
-[    0.000000]        .bss : 0x88020f8c - 0x8802bf5c   (  44 kB)
-[    0.000000] swapper: page allocation failure: order:0, mode:0x200000
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.15.0-rc1-00028-g1c2f87c22566-dirty #280
-[    0.000000] [<8c002b95>] (unwind_backtrace) from [<8c001f0b>] (show_stack+0xb/0xc)
-[    0.000000] [<8c001f0b>] (show_stack) from [<8c02e997>] (warn_alloc_failed+0x95/0xba)
-[    0.000000] [<8c02e997>] (warn_alloc_failed) from [<8c02ff6b>] (__alloc_pages_nodemask+0x437/0x484)
-[    0.000000] [<8c02ff6b>] (__alloc_pages_nodemask) from [<8c03b7b5>] (new_slab+0x51/0x184)
-[    0.000000] [<8c03b7b5>] (new_slab) from [<8c03c1b5>] (__kmem_cache_create+0x5d/0x12c)
-[    0.000000] [<8c03c1b5>] (__kmem_cache_create) from [<8c174667>] (create_boot_cache+0x23/0x3c)
-[    0.000000] [<8c174667>] (create_boot_cache) from [<8c1751af>] (kmem_cache_init+0x23/0x88)
-[    0.000000] [<8c1751af>] (kmem_cache_init) from [<8c17078b>] (start_kernel+0xfb/0x210)
-[    0.000000] [<8c17078b>] (start_kernel) from [<8c000023>] (0x8c000023)
-[    0.000000] Mem-info:
-[    0.000000] Normal per-cpu:
-[    0.000000] CPU    0: hi:    0, btch:   1 usd:   0
-[    0.000000] active_anon:0 inactive_anon:0 isolated_anon:0
-[    0.000000]  active_file:0 inactive_file:0 isolated_file:0
-[    0.000000]  unevictable:0 dirty:0 writeback:0 unstable:0
-[    0.000000]  free:0 slab_reclaimable:0 slab_unreclaimable:0
-[    0.000000]  mapped:0 shmem:0 pagetables:0 bounce:0
-[    0.000000]  free_cma:0
-[    0.000000] Normal free:0kB min:0kB low:0kB high:0kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:4096kB managed:2776kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB shmem:0kB slab_reclaimable:0kB slab_unreclaimable:0kB kernel_stack:0kB pagetables:0kB unstable:0kB bounce:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? yes
-[    0.000000] lowmem_reserve[]: 0 0
-[    0.000000] Normal: 0*4kB 0*8kB 0*16kB 0*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB = 0kB
-[    0.000000] 0 total pagecache pages
-[    0.000000] 
-[    0.000000] Unhandled exception: IPSR = 00000003 LR = fffffff1
-[    0.000000] 
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.15.0-rc1-00028-g1c2f87c22566-dirty #280
-[    0.000000] task: 88015950 ti: 88008000 task.ti: 88008000
-[    0.000000] PC is at show_mem+0x96/0x150
-[    0.000000] LR is at 0x880251e0
-[    0.000000] pc : [<8c00359a>]    lr : [<880251e0>]    psr: 0100000b
-[    0.000000] sp : 88009e68  ip : 00088000  fp : 4100f101
-[    0.000000] r10: 00000080  r9 : f7ff0047  r8 : 00000001
-[    0.000000] r7 : 00000001  r6 : d0fb0f3f  r5 : 00000000  r4 : 00000000
-[    0.000000] r3 : 00000060  r2 : 88025238  r1 : 00000004  r0 : 8801a2e4
-[    0.000000] xPSR: 0100000b
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.15.0-rc1-00028-g1c2f87c22566-dirty #280
-[    0.000000] [<8c002b95>] (unwind_backtrace) from [<8c001f0b>] (show_stack+0xb/0xc)
-[    0.000000] [<8c001f0b>] (show_stack) from [<8c002547>] (__invalid_entry+0x4b/0x4c)
+If by own supplies you mean the regulators power outputs (voltage/current
+constraints), then yes, the regulators manage to get their own voltage output
+correctly regardless of the value set in config.dev (&pdev->dev or
+pdev->dev.parent).
 
-(The -dirty is just:
+I see in regulator_register() that config.dev is used to set the value of struct
+regulator_dev .dev.parent and that is used in two places in regulator core:
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 2b751464d6ff..9536c9ec6f43 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -92,7 +92,7 @@
-  * Fortunately, there is no reference for this in noMMU mode, for now.
-  */
- #ifndef TASK_SIZE
--#define TASK_SIZE              (CONFIG_DRAM_SIZE)
-+#define TASK_SIZE              UL(0xffffffff)
- #endif
- 
- #ifndef TASK_UNMAPPED_BASE
+1) In regulator_register() to get the regmap if config->regmap is not set.
+2) In regulator_dev_lookup() checks if r->dev.parent is set.
 
-which is needed to make nommu machines boot.)
+For 1) config.regmap is explicitly set to the MFD regmap in max77802 driver so
+config.dev is not used in this case and for 2) the value does not matter since
+it only checks that it's not NULL.
 
-Any idea?
+Having said that, when I was preparing v3 of the patch-set I noticed that
+regulator_register() does:
 
-Best regards
-Uwe
+dev = config->dev;
+...
+rdev->dev.parent = dev;
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+So I changed to use MFD device instead of &pdev->dev in the version I posted
+last week since the MFD device is the regulator parent.
+
+Best regards,
+Javier
