@@ -1,37 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:29 +0900
-Subject: [PATCH 16/24] ARM: shmobile: r8a7779: Use DT CPU Frequency in common
- case
-In-Reply-To: <cover.1403487423.git.horms+renesas@verge.net.au>
-References: <cover.1403487423.git.horms+renesas@verge.net.au>
-Message-ID: <0157b62674aa3db1fc574bb65e6b0e30bb0683d7.1403487423.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Jun 2014 11:26:50 +0900
+Subject: [PATCH 3/9] ARM: shmobile: Get rid of redundant EMEV2 mach callbacks
+In-Reply-To: <cover.1403487831.git.horms+renesas@verge.net.au>
+References: <cover.1403487831.git.horms+renesas@verge.net.au>
+Message-ID: <af164ca33dcb3c1e6a2e723f24542d1278a8bef8.1403487831.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the common C-code-less r8a7779 DT board support
-to use shmobile_init_delay() to be able to migrate away
-from per-SoC delay setup functions.
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Based on work by Magnus dam for the r8a7740 SoC.
+Update the EMEV2 specific SoC callbacks to get rid
+of the calls to of_clk_init() and of_platform_populate().
+Those calls are by default executed by the functions in
+the shared ARM code in case the SoC specific mach
+callbacks are NULL.
 
-Cc: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-emev2.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 15f533b..706832f 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -773,7 +773,7 @@ static const char *r8a7779_compat_dt[] __initdata = {
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index e10d34e..b06a9e8 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -16,10 +16,9 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+-#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/of_platform.h>
++#include <linux/mm.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -42,12 +41,6 @@ static void __init emev2_map_io(void)
+ 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
+ }
  
- DT_MACHINE_START(R8A7779_DT, "Generic R8A7779 (Flattened Device Tree)")
- 	.map_io		= r8a7779_map_io,
--	.init_early	= r8a7779_init_delay,
-+	.init_early	= shmobile_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= r8a7779_init_irq_dt,
- 	.init_machine	= r8a7779_add_standard_devices_dt,
+-static void __init emev2_add_standard_devices_dt(void)
+-{
+-	of_clk_init(NULL);
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char *emev2_boards_compat_dt[] __initconst = {
+ 	"renesas,emev2",
+ 	NULL,
+@@ -59,7 +52,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+ 	.init_early	= shmobile_init_delay,
+-	.init_machine	= emev2_add_standard_devices_dt,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
 -- 
 2.0.0.rc2
