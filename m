@@ -1,134 +1,46 @@
-From: vbridgers2013@gmail.com (Vince Bridgers)
-Date: Sun, 22 Jun 2014 19:31:01 -0500
-Subject: [PATCH 1/2] ARM: socfpga: Update socfpga_defconfig
-In-Reply-To: <1403483462-21082-1-git-send-email-vbridgers2013@gmail.com>
-References: <1403483462-21082-1-git-send-email-vbridgers2013@gmail.com>
-Message-ID: <1403483462-21082-2-git-send-email-vbridgers2013@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 23 Jun 2014 09:48:09 +0900
+Subject: [PATCH v2] ARM: dts: exynos4: fix pwm-cells in pwm node
+In-Reply-To: <CAK5sBcFJpSvpwXGPckDcUoZP_Xqqo3Bm6p5qjF_mnZg6b7+T3g@mail.gmail.com>
+References: <1403143414-6242-1-git-send-email-jaewon02.kim@samsung.com>
+ <CAK5sBcFJpSvpwXGPckDcUoZP_Xqqo3Bm6p5qjF_mnZg6b7+T3g@mail.gmail.com>
+Message-ID: <023101cf8e7c$cdffdc60$69ff9520$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_PM=y
-CONFIG_SUSPEND=y
-CONFIG_MMC_UNSAFE_RESUME=y
-CONFIG_DWMAC_SOCFPGA=y
-CONFIG_USB=y
-CONFIG_USB_DWC2=y
-CONFIG_USB_DWC2_HOST=y
-CONFIG_USB_DWC2_PLATFORM=y
-CONFIG_FHANDLE=y
-CONFIG_I2C=y
-CONFIG_I2C_DESIGNWARE_CORE=y
-CONFIG_I2C_DESIGNWARE_PLATFORM=y
-CONFIG_I2C_CHARDEV=y
-CONFIG_CAN=y
-CONFIG_CAN_RAW=y
-CONFIG_CAN_BCM=y
-CONFIG_CAN_GW=y
-CONFIG_CAN_DEV=y
-CONFIG_CAN_CALC_BITTIMING=y
-CONFIG_CAN_C_CAN=y
-CONFIG_CAN_C_CAN_PLATFORM=y
-CONFIG_WATCHDOG=y
-CONFIG_DW_WATCHDOG=y
-CONFIG_GPIOLIB=y
-CONFIG_GPIO_SYSFS=y
-CONFIG_GPIO_DWAPB=y
-CONFIG_PPS=y
-CONFIG_NETWORK_PHY_TIMESTAMPING=y
-CONFIG_PTP_1588_CLOCK=y
-CONFIG_VLAN_8021Q=y
-CONFIG_VLAN_8021Q_GVRP=y
-CONFIG_GARP=y
-CONFIG_IPV6=y
-CONFIG_HOTPLUG=y
+Sachin Kamat wrote:
+> 
+> Hi Jaewon,
+> 
+> On Thu, Jun 19, 2014 at 7:33 AM, Jaewon Kim <jaewon02.kim@samsung.com> wrote:
+> > pwm-cells should be 3. Third cell is optional PWM flags. And This flag
+> > supported by this binding is PWM_POLARITY_INVERTED.
+> >
+> > Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
+> > ---
+> >
+> > Changes in v2:
+> >  - Remove unnecessary handle.
+> >
+> >  arch/arm/boot/dts/exynos4.dtsi |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> > index b8ece4b..e118356 100644
+> > --- a/arch/arm/boot/dts/exynos4.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4.dtsi
+> > @@ -554,7 +554,7 @@
+> >                 interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
+> >                 clocks = <&clock CLK_PWM>;
+> >                 clock-names = "timers";
+> > -               #pwm-cells = <2>;
+> > +               #pwm-cells = <3>;
+> >                 status = "disabled";
+> >         };
+> 
+> I think I had already reviewed this patch. Anyway,
+> Reviewed-by: Sachin Kamat <sachin.kamat@samsung.com>
 
-Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
-Signed-off-by: Alan Tull <atull@altera.com>
-Signed-off-by: Thor Thayer <tthayer@altera.com>
----
- arch/arm/configs/socfpga_defconfig |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+Applied, thanks.
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index e3a05e8..d7a5855 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -11,6 +11,7 @@ CONFIG_PROFILING=y
- CONFIG_OPROFILE=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
-+CONFIG_HOTPLUG=y
- # CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-@@ -40,6 +41,15 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
-+CONFIG_CAN=y
-+CONFIG_CAN_RAW=y
-+CONFIG_CAN_BCM=y
-+CONFIG_CAN_GW=y
-+CONFIG_CAN_DEV=y
-+CONFIG_CAN_CALC_BITTIMING=y
-+CONFIG_CAN_C_CAN=y
-+CONFIG_CAN_C_CAN_PLATFORM=y
-+CONFIG_CAN_DEBUG_DEVICES=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_PROC_DEVICETREE=y
-@@ -55,6 +65,14 @@ CONFIG_STMMAC_ETH=y
- CONFIG_MICREL_PHY=y
- # CONFIG_STMMAC_PHY_ID_ZERO_WORKAROUND is not set
- CONFIG_INPUT_EVDEV=y
-+CONFIG_DWMAC_SOCFPGA=y
-+CONFIG_PPS=y
-+CONFIG_NETWORK_PHY_TIMESTAMPING=y
-+CONFIG_PTP_1588_CLOCK=y
-+CONFIG_VLAN_8021Q=y
-+CONFIG_VLAN_8021Q_GVRP=y
-+CONFIG_GARP=y
-+CONFIG_IPV6=y
- # CONFIG_SERIO_SERPORT is not set
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
-@@ -63,7 +81,12 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=2
- CONFIG_SERIAL_8250_RUNTIME_UARTS=2
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_DWAPB=y
- # CONFIG_RTC_HCTOSYS is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_DW_WATCHDOG=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
-@@ -72,6 +95,7 @@ CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
- # CONFIG_DNOTIFY is not set
- # CONFIG_INOTIFY_USER is not set
-+CONFIG_FHANDLE=y
- CONFIG_VFAT_FS=y
- CONFIG_NTFS_FS=y
- CONFIG_NTFS_RW=y
-@@ -86,5 +110,16 @@ CONFIG_DEBUG_INFO=y
- CONFIG_ENABLE_DEFAULT_TRACERS=y
- CONFIG_DEBUG_USER=y
- CONFIG_XZ_DEC=y
-+CONFIG_I2C=y
-+CONFIG_I2C_DESIGNWARE_CORE=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_CHARDEV=y
- CONFIG_MMC=y
- CONFIG_MMC_DW=y
-+CONFIG_PM=y
-+CONFIG_SUSPEND=y
-+CONFIG_MMC_UNSAFE_RESUME=y
-+CONFIG_USB=y
-+CONFIG_USB_DWC2=y
-+CONFIG_USB_DWC2_HOST=y
-+CONFIG_USB_DWC2_PLATFORM=y
--- 
-1.7.9.5
+- Kukjin
