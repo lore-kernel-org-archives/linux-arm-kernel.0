@@ -1,68 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:28:15 +0900
-Subject: [PATCH 06/29] ARM: shmobile: lager: Add VDD MPU regulator for DVFS
+Date: Mon, 23 Jun 2014 11:28:22 +0900
+Subject: [PATCH 13/29] ARM: shmobile: Lager memory map update
 In-Reply-To: <cover.1403487225.git.horms+renesas@verge.net.au>
 References: <cover.1403487225.git.horms+renesas@verge.net.au>
-Message-ID: <05f72e03b7553958609d1475c79491f90e6b50d3.1403487225.git.horms+renesas@verge.net.au>
+Message-ID: <7b16c61a86ce41edd5c42a87f22a0a146968b62f.1403487225.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <bcousson@baylibre.com>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-The CA15 cluster is capable of voltage scaling. Add the regulator
-in the i2c3 node, to allow the generic CPUFreq driver to use it.
+Update the Lager DTS to make use of the new unified legacy
+memory map where the legacy window on Lager and Koelsch
+have the same size.
 
-Enable the i2c3 pin mux and the device node as well since the
-da9210 is connected to that bus.
+With this change in place the code gets aligned with the
+documentation.
 
-Note: In R-CAR Gen2, each frequency is using the same voltage,
-and DVS control is not used. Therefore, this patch set the
-voltage(Vmin/Vmax) to 1000mv.
+After update the Lager board has the following map:
+Bank0: 1GiB RAM (Legacy 32-bit: 0x40000000->0x7fffffff)
+Bank1: 3GiB RAM (LPAE area: 0x140000000->0x1ffffffff)
 
-Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
-[gaku.inami.xw at bp.renesas.com: Changes Vmin for disabling DVS]
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Before the update the old map looked like this:
+Bank0: 2GiB RAM (Legacy 32-bit: 0x40000000->0xbfffffff)
+Bank1: 2GiB RAM (LPAE area: 0x180000000->0x1ffffffff)
+
+Tested with and without LPAE on r8a7790 Lager.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index dd2fe46..6472cf0 100644
+index b68ff56..b04d257 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -204,6 +204,11 @@
- 				 "msiof1_tx";
- 		renesas,function = "msiof1";
- 	};
-+
-+	i2c3_pins: i2c3 {
-+		renesas,groups = "i2c3";
-+		renesas,function = "i2c3";
-+	};
- };
+@@ -29,12 +29,12 @@
  
- &ether {
-@@ -317,3 +322,19 @@
- 	cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
-+	status = "okay";
-+
-+	vdd_dvfs: regulator at 68 {
-+		compatible = "diasemi,da9210";
-+		reg = <0x68>;
-+
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
+ 	memory at 40000000 {
+ 		device_type = "memory";
+-		reg = <0 0x40000000 0 0x80000000>;
++		reg = <0 0x40000000 0 0x40000000>;
+ 	};
+ 
+ 	memory at 180000000 {
+ 		device_type = "memory";
+-		reg = <1 0x80000000 0 0x80000000>;
++		reg = <1 0x40000000 0 0xc0000000>;
+ 	};
+ 
+ 	lbsc {
 -- 
 2.0.0.rc2
