@@ -1,109 +1,283 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 23 Jun 2014 13:14:42 +0300
-Subject: [PATCH 6/9] ARM: tegra: Export tegra_powergate_power_on
-In-Reply-To: <53A3096B.1040409@wwwdotorg.org>
-References: <1401881559-18469-1-git-send-email-mperttunen@nvidia.com>
- <1401881559-18469-7-git-send-email-mperttunen@nvidia.com>
- <539F691E.5030204@wwwdotorg.org> <20140617121313.GE18816@ulmo>
- <20140617140146.GH3407@tbergstrom-lnx.Nvidia.com>
- <20140617215119.GC24743@mithrandir>
- <20140618121806.GJ3407@tbergstrom-lnx.Nvidia.com>
- <53A1B252.1030204@wwwdotorg.org>
- <20140619080234.GK3407@tbergstrom-lnx.Nvidia.com>
- <53A3096B.1040409@wwwdotorg.org>
-Message-ID: <20140623101441.GU3407@tbergstrom-lnx.Nvidia.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 23 Jun 2014 12:18:39 +0200
+Subject: [PATCH] ARM: dts: add support for Ka-Ro TX51
+In-Reply-To: <20140618150152.GP8860@dragon>
+References: <1402578584-12640-1-git-send-email-LW@KARO-electronics.de>
+ <20140618150152.GP8860@dragon>
+Message-ID: <20140623121839.679f35ee@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 19, 2014 at 06:01:47PM +0200, Stephen Warren wrote:
-> On 06/19/2014 02:02 AM, Peter De Schrijver wrote:
-> > On Wed, Jun 18, 2014 at 05:37:54PM +0200, Stephen Warren wrote:
-> >> On 06/18/2014 06:18 AM, Peter De Schrijver wrote:
-> >>> On Tue, Jun 17, 2014 at 11:51:20PM +0200, Thierry Reding wrote:
-> >>>> * PGP Signed by an unknown key
-> >>>>
-> >>>> On Tue, Jun 17, 2014 at 05:01:46PM +0300, Peter De Schrijver wrote:
-> >>>>> On Tue, Jun 17, 2014 at 02:13:15PM +0200, Thierry Reding wrote:
-> >>>>>>> Old Signed by an unknown key
-> >>>>>>
-> >>>>>> On Mon, Jun 16, 2014 at 04:01:02PM -0600, Stephen Warren wrote:
-> >>>>>>> On 06/04/2014 05:32 AM, Mikko Perttunen wrote:
-> >>>>>>>> This symbol needs to be exported to power on rails without using
-> >>>>>>>> tegra_powergate_sequence_power_up. tegra_powergate_sequence_power_up
-> >>>>>>>> cannot be used in situations where the driver wants to handle clocking
-> >>>>>>>> by itself.
-> >>>>>>>
-> >>>>>>> Thierry, are you OK with this change?
-> >>>>>>
-> >>>>>> I would've preferred tegra_powergate_sequence_power_up() to be used
-> >>>>>
-> >>>>> I don't think the current tegra_powergate_sequence_power_up() API is very well
-> >>>>> defined though. I don't think the clocks and resets required by the sequence
-> >>>>> should be provided by the driver. For one, there can be several clocks and
-> >>>>> resets that need to be controlled for a single domain.
-> >>>>
-> >>>> Do you have any suggestions for what the API should look like? Even if
-> >>>> we plan to move to some different API, I think there's some advantage in
-> >>>> using it consistently if for no other reason than to make it easier to
-> >>>> replace occurrences later on.
-> >>>>
-> >>>
-> >>> I think the API should only have the domain ID as input so:
-> >>>
-> >>> int tegra_powerdomain_on(int id) 
-> >>>
-> >>> /*
-> >>>  * Prerequisites: domain is off
-> >>>  * Result: domain is on, clocks of the modules in the domain are off, modules are in reset
-> >>>  */
-> >>>
-> >>> int tegra_powerdomain_off(int id)
-> >>>
-> >>> /*
-> >>>  * Prerequisites: all clocks of the modules in the domain are off
-> >>>  * result: domain is off
-> >>>  */
-> >>
-> >> That doesn't make sense; the PMC doesn't have access to the clock and
-> >> reset IDs - that's why the API requires them to be passed in.
-> >>
+Hi,
+
+Shawn Guo wrote:
+> On Thu, Jun 12, 2014 at 03:09:44PM +0200, Lothar Wa?mann wrote:
+> > Add support for Ka-Ro electronics i.MX51 based TX51 modules
 > > 
-> > We should make driver look them up by name then. It doesn't make sense to
-> > move this knowledge to the drivers as there can be several modules in 1
-> > powerdomain. So every driver would then need to have access to all clock
-> > and reset IDs of the modules of the domain?
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >  arch/arm/boot/dts/Makefile       |    1 +
+> >  arch/arm/boot/dts/imx51-tx51.dts |  620 ++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 621 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx51-tx51.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 0f1e8be..8dd4dbc 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -177,6 +177,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+> >  	imx51-babbage.dtb \
+> >  	imx51-digi-connectcore-jsk.dtb \
+> >  	imx51-eukrea-mbimxsd51-baseboard.dtb \
+> > +	imx51-tx51.dtb \
+> >  	imx53-ard.dtb \
+> >  	imx53-m53evk.dtb \
+> >  	imx53-mba53.dtb \
+> > diff --git a/arch/arm/boot/dts/imx51-tx51.dts b/arch/arm/boot/dts/imx51-tx51.dts
+> > new file mode 100644
+> > index 0000000..9ae7758
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx51-tx51.dts
+> > @@ -0,0 +1,620 @@
+> > +/*
+> > + * Copyright 2012-2014 Lothar Wa?mann <LW@KARO-electronics.de>
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "imx51.dtsi"
+> > +#include <dt-bindings/gpio/gpio.h>
+> > +#include <dt-bindings/input/input.h>
 > 
-> Having the drivers know the clocks, resets, and power domains that
-> affect their HW module seems perfectly reasonable.
+> imx51.dtsi already includes them.
 > 
+OK.
 
-Yes, but the problem is that you also need clocks and reset of other modules
-in the same domain to safely control the domain's status. Eg: the ISPs, VI and
-CSI share a domain. VI and CSI are useable without ISP and the ISP lacks
-public documentation. So it's not unlikely a VI and CSI driver will upstreamed
-someday which means we would need to control the domain and therefore would
-need to tell that driver about the ISPs clocks and resets even though the
-driver doesn't know anything about the ISP hw otherwise.
-
-> Do we actually have any case where unrelated modules are in the same
-> power domain /and/ there's some need for those drivers to manipulate the
-> power domain?
+> > +#include <dt-bindings/pwm/pwm.h>
+> > +
+> > +/ {
+> > +	model = "Ka-Ro electronics TX51 module";
+> > +	compatible = "karo,tx51", "fsl,imx51";
+> > +
+> > +	aliases {
+> > +		backlight = &backlight;
+> > +		display = &display;
+> > +		i2c1 = &i2c_gpio;
+> > +		usbotg = &usbotg;
+> > +	};
+> > +
+> > +	chosen {
+> > +		stdout-path = &uart1;
+> > +	};
+> > +
+> > +	backlight: pwm-backlight {
+> > +		compatible = "pwm-backlight";
+> > +
 > 
+> Drop this new line.
+> 
+OK.
 
-According to the TRM, the reset state of the power domains is undefined. While
-that seems unlikely, I do think the kernel should not assume any domain is on
-apart from the obvious ones (like the CPU domain it is running on),
+> > +		pwms = <&pwm1 0 500000 PWM_POLARITY_INVERTED>;
+> > +		power-supply = <&reg_3v3>;
+> > +		brightness-levels = <
+> > +			  0  1  2  3  4  5  6  7  8  9
+> > +			 10 11 12 13 14 15 16 17 18 19
+> > +			 20 21 22 23 24 25 26 27 28 29
+> > +			 30 31 32 33 34 35 36 37 38 39
+> > +			 40 41 42 43 44 45 46 47 48 49
+> > +			 50 51 52 53 54 55 56 57 58 59
+> > +			 60 61 62 63 64 65 66 67 68 69
+> > +			 70 71 72 73 74 75 76 77 78 79
+> > +			 80 81 82 83 84 85 86 87 88 89
+> > +			 90 91 92 93 94 95 96 97 98 99
+> > +			100
+> > +		>;
+> > +		default-brightness-level = <50>;
+> > +	};
+> > +
+> > +	clocks {
+> > +		ckih1 {
+> > +			clock-frequency = <0>;
+> > +		};
+> > +
+> > +		mclk: clock at 0 {
+> > +			compatible = "fixed-clock";
+> > +			reg = <0>;
+> > +			#clock-cells = <0>;
+> > +			clock-frequency = <27000000>;
+> > +		};
+> > +
+> > +		clk_26M: clock at 1 {
+> 
+> When using generic name, you will need clock-output-names property.
+> Otherwise, the clocks will fail in registration except the first one,
+> because of clock name collision.
+> 
+Didn't recognize that yet.
 
-> BTW, any objections here should have been raised when the initial API
-> design for powergating was created. Now that we have the current API,
-> which in turn has driven the DT bindings for at least some HW modules,
-> we're stuck with it due to DT ABIness. Well, perhaps we can introduce
-> something new, but we'll always have to support the old way, so there's
-> little point.
+[...]
+> > +	usbphy {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		compatible = "simple-bus";
+> > +
+> > +		usbh1phy: usbh1phy at 0 {
+> 
+> The node name should be something generic like usbphy?
+> 
+OK.
 
-I don't think the bindings need to be changed at all as long as the PMC driver
-can parse the relevant DT nodes to get the clock and reset information.
+> > +			compatible = "usb-nop-xceiv";
+> > +			reg = <0>;
+> > +			clocks = <&clk_26M>;
+> > +			clock-names = "main_clk";
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&audmux {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&fec {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_fec>;
+> > +	phy-mode = "mii";
+> > +//	phy-reset-gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
+> 
+> Drop it?
+> 
+Leftover from debugging...
 
-Cheers,
+> > +	phy-handle = <&phy0>;
+> > +	mac-address = [000000000000]; /* will be set by U-Boot */
+> 
+> Shouldn't it be local-mac-address?
+> 
+probably yes, but both 'mac-address' and 'local-mac-address' are being
+set up by U-Boot anyway.
 
-Peter.
+[...]
+> > +&ipu_di0_disp0 {
+> > +	remote-endpoint = <&display0_in>;
+> > +};
+> > +
+> > +&kpp {
+> > +	status = "okay";
+> 
+> Put 'status' at the bottom of property list.
+>
+OK.
+
+> > +
+> > +	linux,keymap = <	/* sample keymap */
+> > +		MATRIX_KEY(0, 0, KEY_POWER)
+> > +		MATRIX_KEY(0, 1, KEY_KP0)
+> > +		MATRIX_KEY(0, 2, KEY_KP1)
+> > +		MATRIX_KEY(0, 3, KEY_KP2)
+> > +		MATRIX_KEY(1, 0, KEY_KP3)
+> > +		MATRIX_KEY(1, 1, KEY_KP4)
+> > +		MATRIX_KEY(1, 2, KEY_KP5)
+> > +		MATRIX_KEY(1, 3, KEY_KP6)
+> > +		MATRIX_KEY(2, 0, KEY_KP7)
+> > +		MATRIX_KEY(2, 1, KEY_KP8)
+> > +		MATRIX_KEY(2, 2, KEY_KP9)
+> > +	>;
+> > +};
+> > +
+> > +&esdhc1 {
+> > +	cd-gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
+> > +	fsl,wp-controller;
+> 
+> Does it work for you, since the driver does not support it as of today?
+> 
+What driver doesn't support what?
+AFAICT the sdhci-esdhc-imx.c driver supports both of these properties.
+
+> > +	status = "okay";
+> > +};
+> > +
+> > +&esdhc2 {
+> > +	cd-gpios = <&gpio3 6 GPIO_ACTIVE_LOW>;
+> > +	fsl,wp-controller;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&pwm1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_pwm1>;
+> > +};
+> > +
+> > +&ecspi1 {
+> > +	fsl,spi-num-chipselects = <2>;
+> > +	cs-gpios = <&gpio4 24 GPIO_ACTIVE_LOW &gpio4 25 GPIO_ACTIVE_LOW>;
+> 
+> More readable to write it like below?
+> 
+> 	cs-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>,
+> 		   <&gpio4 25 GPIO_ACTIVE_LOW>;
+> 
+OK.
+
+> > +	status = "okay";
+> > +
+> > +	spidev0: spi at 0 {
+> > +		compatible = "spidev";
+> > +		reg = <0>;
+> > +		spi-max-frequency = <54000000>;
+> > +	};
+> > +
+> > +	spidev1: spi at 1 {
+> > +		compatible = "spidev";
+> > +		reg = <1>;
+> > +		spi-max-frequency = <54000000>;
+> > +	};
+> 
+> I'm not sure we should have these two devices.
+> 
+Why not? With this the SPI bus can readily be used with the spidev
+driver from Documentation/spi/spidev_test.c (which is what most of our
+customers are asking for)!
+
+> > +};
+> > +
+> > +&ssi1 {
+> > +	fsl,mode = "i2s-slave";
+> > +	codec-handle = <&sgtl5000>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&ssi2 {
+> > +	status = "disabled";
+> > +};
+> 
+> Why is this needed, since the device is disabled in imx51.dtsi?
+> 
+That's included here as a placeholder in case someone wants to enable
+the second SSI interface so that they...
+
+> > +&nfc {
+> 
+> Please sort the nodes alphabetically.
+> 
+...won't have this problem. ;)
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
