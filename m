@@ -1,35 +1,33 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 23 Jun 2014 23:29:10 +0300
-Subject: [PATCH 2/2] clk: samsung: add more aliases for s3c24xx
-In-Reply-To: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
-References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1403555350-14895-2-git-send-email-anarsoul@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Jun 2014 22:27:34 +0200
+Subject: [linux-sunxi] Re: [PATCH v10 4/5] ARM: sunxi: Add IR controllers
+ on A20 to dtsi
+In-Reply-To: <7d7d6451-3a26-45dc-aa62-b939fc7889ce@googlegroups.com>
+References: <1403348646-31091-1-git-send-email-bay@hackerdom.ru>
+ <1403348646-31091-5-git-send-email-bay@hackerdom.ru>
+ <20140623130851.GD19730@lukather>
+ <7d7d6451-3a26-45dc-aa62-b939fc7889ce@googlegroups.com>
+Message-ID: <20140623202734.GN19730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without these aliases clock lookup fails in s3c2410fb,
-s3cmci, s3c2410-nand, s3c24xx-i2s, and i2c-s3c2410 drivers.
+On Mon, Jun 23, 2014 at 01:08:24PM -0700, ????????? ???????? wrote:
+> Thanks,
+> 
+> Should I send applied patches in the further versions of this patch set?
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/clk/samsung/clk-s3c2410.c | 5 +++++
- 1 file changed, 5 insertions(+)
+No, you don't have to.
 
-diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
-index bd9a873..140f473 100644
---- a/drivers/clk/samsung/clk-s3c2410.c
-+++ b/drivers/clk/samsung/clk-s3c2410.c
-@@ -152,6 +152,11 @@ struct samsung_clock_alias s3c2410_common_aliases[] __initdata = {
- 	ALIAS(HCLK, NULL, "hclk"),
- 	ALIAS(MPLL, NULL, "mpll"),
- 	ALIAS(FCLK, NULL, "fclk"),
-+	ALIAS(PCLK, NULL, "watchdog"),
-+	ALIAS(PCLK_SDI, NULL, "sdi"),
-+	ALIAS(HCLK_NAND, NULL, "nand"),
-+	ALIAS(PCLK_I2S, NULL, "iis"),
-+	ALIAS(PCLK_I2C, NULL, "i2c"),
- };
- 
- /* S3C2410 specific clocks */
+Maxime
+
 -- 
-2.0.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/2f658f2e/attachment.sig>
