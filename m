@@ -1,63 +1,42 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 23 Jun 2014 11:34:46 +0200
-Subject: [PATCH v2] ARM: mvebu: rename ARM_ERRATA_753970
-In-Reply-To: <20140623090714.GH32514@n2100.arm.linux.org.uk>
-References: <201404052101.19381.arnd@arndb.de>
- <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
- <53418889.2050002@free-electrons.com> <1396805315.7723.8.camel@x220>
- <1401094871.25902.20.camel@x220>
- <20140620202100.GG21711@titan.lakedaemon.net>
- <20140620205340.GX32514@n2100.arm.linux.org.uk>
- <1403514104.12982.20.camel@x220>
- <20140623090714.GH32514@n2100.arm.linux.org.uk>
-Message-ID: <1403516086.12982.35.camel@x220>
+From: drake@endlessm.com (Daniel Drake)
+Date: Mon, 23 Jun 2014 10:40:39 +0100
+Subject: [PATCH V2 0/2] Sound support for Exynos4412 Odroid X2, U3 board
+In-Reply-To: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
+References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <CAD8Lp44h6zc2Rt2MGLjhmNG-YB0kYCWf5G7hX5JmdmBfc1PvKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-06-23 at 10:07 +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 23, 2014 at 11:01:44AM +0200, Paul Bolle wrote:
-> > Dropped the "if CACHE_PL310" fragments used in v1. No need to use "if
-> > CACHE_L2X0" instead. Both CACHE_PL310 and CACHE_L2X0 will be
-> > (indirectly) selected if MACH_ARMADA_375 or MACH_ARMADA_38X are set.
-> 
-> Yes there is.  We've recently seen the selection of CACHE_L2X0 be removed
-> from platforms, while leaving the selection of the errata behind.  The
-> result is Kconfig warnings.  My commit above ensures that this doesn't
-> happen in the future by adding the proper dependencies onto those errata
-> selects.
+On Wed, Jun 18, 2014 at 5:22 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> This series adds basic sound support for the Odroid X2/U3 boards.
+> It relies on specific Exynos Audio Subsystem clock parent and
+> frequencies being pre-configured.
+>
+> My full testing git branch has been pushed to:
+> git://linuxtv.org/snawrocki/samsung.git v3.16-rc1-odroid-sound-clk
 
-The entries I touched read (in summary):
-config MACH_MVEBU_V7
-        bool
-        select CACHE_L2X0
+Thanks for this! I tested these patches plus the ones in your branch
+to integrate with the ODROID.
+I tested ODROID-U2's 3.5mm analog headphone jack output with:
 
-config MACH_ARMADA_370
-        bool "Marvell Armada 370 boards" if ARCH_MULTI_V7
-        select MACH_MVEBU_V7
-        help
-          [...].
+# speaker-test -c 2 -t wav -l 2
 
-config MACH_ARMADA_375
-        bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
-        select MACH_MVEBU_V7
-        help
-          [...].
+On my x86 laptop this command takes ~6 seconds and produces audible output:
+"Front left, front right, front left, front right"
 
-So the choice I faced was between: 
-- using "select PL310_ERRATA_753970 if CACHE_L2X0": that matches all
-  current occurrences of "select PL310_ERRATA_*" but adds a superfluous
-  dependency on CACHE_L2X0
-- using just "select PL310_ERRATA_753970": sufficient, but will break
-  if CACHE_L2X0 isn't selected through MACH_MVEBU_V7 anymore.
+When those words are reproduced over the speakers, there is a
+corresponding message printed to stdout which synchronizes nicely.
 
-I chose to just "select PL310_ERRATA_753970" but adding "if CACHE_L2X0"
-is fine with me too.
+On ODROID-U2 the same command doesn't work quite right - execution
+takes only 3.5 seconds and the audible output is truncated:
+"Front left, front right, front"
+and the stdout messages do not really coincide with the audio being
+reproduced at that time.
 
-> Please do the same.
+No pulseaudio or anything like that.
 
-Will do later today.
+Can you reproduce this?
 
-Thanks,
-
-
-Paul Bolle
+Thanks
+Daniel
