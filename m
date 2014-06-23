@@ -1,37 +1,42 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 23 Jun 2014 23:24:39 +0200
-Subject: [PATCH 2/2] clk: samsung: add more aliases for s3c24xx
-In-Reply-To: <1403555350-14895-2-git-send-email-anarsoul@gmail.com>
-References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
- <1403555350-14895-2-git-send-email-anarsoul@gmail.com>
-Message-ID: <5341183.OFCkpuLYmy@diego>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 23 Jun 2014 15:23:46 -0600
+Subject: [GIT PULL 3/3] ARM: tegra: use us counter as delay timer
+In-Reply-To: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+References: <1403558626-13422-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1403558626-13422-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 23. Juni 2014, 23:29:10 schrieb Vasily Khoruzhick:
-> Without these aliases clock lookup fails in s3c2410fb,
-> s3cmci, s3c2410-nand, s3c24xx-i2s, and i2c-s3c2410 drivers.
-> 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Tegra has a micro-second counter whose rate doesn't vary with cpufreq
+changes. Register it so it can be used as the delay timer, so delays
+aren't influenced by cpufreq.
 
-> ---
->  drivers/clk/samsung/clk-s3c2410.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/clk/samsung/clk-s3c2410.c
-> b/drivers/clk/samsung/clk-s3c2410.c index bd9a873..140f473 100644
-> --- a/drivers/clk/samsung/clk-s3c2410.c
-> +++ b/drivers/clk/samsung/clk-s3c2410.c
-> @@ -152,6 +152,11 @@ struct samsung_clock_alias s3c2410_common_aliases[]
-> __initdata = { ALIAS(HCLK, NULL, "hclk"),
->  	ALIAS(MPLL, NULL, "mpll"),
->  	ALIAS(FCLK, NULL, "fclk"),
-> +	ALIAS(PCLK, NULL, "watchdog"),
-> +	ALIAS(PCLK_SDI, NULL, "sdi"),
-> +	ALIAS(HCLK_NAND, NULL, "nand"),
-> +	ALIAS(PCLK_I2S, NULL, "iis"),
-> +	ALIAS(PCLK_I2C, NULL, "i2c"),
->  };
-> 
->  /* S3C2410 specific clocks */
+I've made this a separate branch since it touches a few files outside
+arch/arm/mach-tegra/. This can be merged anywhere that conflicts need
+to be resolved, although I know of no such places at present.
+
+----------------------------------------------------------------
+
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.17-delay-timer
+
+for you to fetch changes up to 0ff36b4f479ec8e0cd9b7a919ab877f2d553cd30:
+
+  clocksource: tegra: Use us counter as delay timer
+
+----------------------------------------------------------------
+
+Peter De Schrijver (3):
+      kernel: add calibration_delay_done()
+      ARM: choose highest resolution delay timer
+      clocksource: tegra: Use us counter as delay timer
+
+ arch/arm/lib/delay.c                | 26 ++++++++++++++++++++++----
+ drivers/clocksource/tegra20_timer.c | 13 +++++++++++++
+ init/calibrate.c                    | 11 +++++++++++
+ 3 files changed, 46 insertions(+), 4 deletions(-)
