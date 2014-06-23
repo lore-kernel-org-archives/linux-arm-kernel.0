@@ -1,46 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jun 2014 22:21:22 +0200
-Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
-In-Reply-To: <CAJ5Y-eaA6vPvhbfMjys8PeSC7B+=ZLLBYh4Wi79Nh9=pwB3+sg@mail.gmail.com>
-References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
- <5338610.xCINKmsENX@wuerfel>
- <CAJ5Y-eaA6vPvhbfMjys8PeSC7B+=ZLLBYh4Wi79Nh9=pwB3+sg@mail.gmail.com>
-Message-ID: <14353430.fIAk0MDUYn@wuerfel>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon, 23 Jun 2014 13:23:16 -0700
+Subject: [PATCH 1/7] ARM: dts: imx6: ventana, Remove unused ssi2
+In-Reply-To: <1402995995-15098-2-git-send-email-mpa@pengutronix.de>
+References: <1402995995-15098-1-git-send-email-mpa@pengutronix.de>
+ <1402995995-15098-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <CAJ+vNU26L=Ypk91wjuipR0SWrq0t-PHZiKp1iz+AUSTay6a8Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 June 2014 15:46:08 Ashwin Chaugule wrote:
-> Hello,
-> 
-> On 23 June 2014 15:10, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> Fair point. The more I think about this, it seems that if we want to
-> >> use the mailbox framework for ACPI kernels, we should have a PCC
-> >> specific bypass, something like the one you suggested below. The ACPI
-> >> spec defines PCC as the only "mailbox" like mechanism. There are 3 PCC
-> >> clients defined as well; CPPC, MPST and RASF. Each of these have their
-> >> own ACPI tables and so they dont require special DSDT entries.
-> >
-> > Ok, I see. Can you describe what data is in these tables?
-> 
-> For CPPC, its a field for version number, number of entries and then
-> followed by a bunch of PCC entries that have the following structure:
-> 
->  51 struct pcc_register_resource {
->  52     u8 descriptor;
->  53     u16 length;
->  54     u8 space_id;
->  55     u8 bit_width;
->  56     u8 bit_offset;
->  57     u8 access_size;
->  58     u64 address;
->  59 } __attribute__ ((packed));
-> 
-> These essentially describe the PCC register space to be used by the
-> respective protocol. e.g. CPPC uses these to exchange CPU performance
-> metrics between the OS and the firmware.
-> I believe MPST and RASF also follow the same format.
+On Tue, Jun 17, 2014 at 2:06 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> ssi2 is not connected to any sound card so it is unused.
+>
+> Cc: Tim Harvey <tharvey@gateworks.com>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 5 -----
+>  1 file changed, 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+> index 698d3063b295..3245ae85f12b 100644
+> --- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+> @@ -559,11 +559,6 @@
+>         status = "okay";
+>  };
+>
+> -&ssi2 {
+> -       fsl,mode = "i2s-slave";
+> -       status = "okay";
+> -};
+> -
+>  &uart1 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_uart1>;
+> --
+> 2.0.0
+>
 
-Interesting. So I guess it's one entry per client of the PCC? How
-exactly does the client know which index to use in this table?
+Acked-by: Tim Harvey <tharvey@gateworks.com>
 
-	Arnd
+Tim
