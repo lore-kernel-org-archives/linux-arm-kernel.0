@@ -1,158 +1,116 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 23 Jun 2014 17:42:08 +0200
-Subject: [PATCH v3] ARM: mvebu: Use system controller to get the soc id when
- possible
-Message-ID: <1403538128-27859-1-git-send-email-gregory.clement@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 23 Jun 2014 10:43:02 -0500
+Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <1403532837.3804.29.camel@hornet>
+References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
+ <20140620170901.GA12059@leverpostej> <1403532837.3804.29.camel@hornet>
+Message-ID: <CAL_Jsq+6SveWhzWPrtziTJ-tDOFaJV4sXO+r_CEhAZf=tQE6FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 38x it is possible to get the SoC Id and the revision
-without using the PCI register. Accessing the PCI registers implies
-enabling its clock and, because of the initialization issue, not
-keeping them enable. So if possible it is better to avoid it.
+On Mon, Jun 23, 2014 at 9:13 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> On Fri, 2014-06-20 at 18:09 +0100, Mark Rutland wrote:
+>> > +- clocks-names: should contain "clcdclk" and "apb_pclk"
+>>
+>> s/clocks-names/clock-names/
+>
+> Haha - it took quite a few patch revisions to spot this one, thanks!
 
-Armada 370 and Armada XP provides the SoC ID values from the system
-controller but not the revision.
+Was this tested?
 
-Armada 375 provides both but the SoC ID value looks buggy (0x6660
-instead of 0x6720).
+>> > +- clocks: contains phandle and clock specifier pairs for the entries
+>> > +   in the clock-names property. See
+>> > +   Documentation/devicetree/binding/clock/clock-bindings.txt
+>> > +
+>> > +Optional properties:
+>> > +
+>> > +- arm,pl11x,framebuffer-base: a pair of two 32-bit values, address and size,
+>> > +   defining the framebuffer that must be used; if not present, the
+>> > +   framebuffer may be located anywhere in the memory
+>>
+>> The name is confusing: this is a base _and_ size.
+>
+> True. Can split it into two -base and -size or rename it into
+> framebuffer or video-memory.
+>
+>> When should this be used, and what is valid to point it at?
+>
+> When the hardware design determines the address the memory transactions
+> must be issued at. This is aimed at a situation (allegedly not
+> impossible) when the memory map from the CLCD's point of view is
+> different from the CPU's one (eg. the video memory is mapped at xxx for
+> the CPU and yyy for the CLCD).
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Hi,
+Humm, that sounds like what dma-ranges is for.
 
-The main difference with the previous version is the use of
-marvell,aramda380 instead of marvell,aramda38x which have been removed
-in a previous patch.
+>
+>> How does this play with memory carveouts (CMA, reserved-memory)?
+>
+> It doesn't, and wasn't intended to (the original version of the binding
+> was trying to do something like reserved-memory before it was defined),
+> but someone managed to convince me not to do this, if it's a "low level"
+> feature.
+>
+> I guess I can be re-convinced (again).
 
-Thanks,
+NAK on this property. Convinced?
 
-Gregory
+If this is only theoretical, then just drop it for now.
 
-Changelog:
+>> > +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
+>> > +   cell's memory interface can handle
+>>
+>> When should I set this, given it is optional?
+>
+> When there is a (significant) limitation of the bandwidth available for
+> the cell's memory interface. One will either be told by the soc guys or
+> will figure it out in the hard way, as we did :-(
 
-v1 -> v2:
+What are you going to do with this information? b/w is a function of
+screen size and pixel depth. Are you going to refuse certain configs
+based on that? Seems like someone doing their own modes should know
+what they are doing and the limitations.
 
-- Fix typo in mvebu_system_controller_get_soc_id.
-- Use -ENODEV as return value instead of -1
+Again, drop it until there is a defined need for this.
 
-v2 -> v3:
-
-- Use marvell,aramda380 as compatible string
-- Fix a typo
-- Remove a white space
-
- arch/arm/mach-mvebu/common.h            |  1 +
- arch/arm/mach-mvebu/mvebu-soc-id.c      | 19 ++++++++++++++++++-
- arch/arm/mach-mvebu/system-controller.c | 19 +++++++++++++++++++
- 3 files changed, 38 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index b67fb7a10d8b..927d88627a6e 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -21,6 +21,7 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd);
- int mvebu_cpu_reset_deassert(int cpu);
- void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
- void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
-+int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev);
- 
- void armada_xp_cpu_die(unsigned int cpu);
- 
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index 12c66cac967d..a99434bcee84 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -25,6 +25,7 @@
- #include <linux/of_address.h>
- #include <linux/slab.h>
- #include <linux/sys_soc.h>
-+#include "common.h"
- #include "mvebu-soc-id.h"
- 
- #define PCIE_DEV_ID_OFF		0x0
-@@ -54,7 +55,7 @@ int mvebu_get_soc_id(u32 *dev, u32 *rev)
- 		return -ENODEV;
- }
- 
--static int __init mvebu_soc_id_init(void)
-+static int __init get_soc_id_by_pci(void)
- {
- 	struct device_node *np;
- 	int ret = 0;
-@@ -129,6 +130,22 @@ clk_err:
- 
- 	return ret;
- }
-+
-+static int __init mvebu_soc_id_init(void)
-+{
-+
-+	/*
-+	 * First try to get the ID and the revision by the system
-+	 * register and use PCI registers only if it is not possible
-+	 */
-+	if (!mvebu_system_controller_get_soc_id(&soc_dev_id, &soc_rev)) {
-+		is_id_valid = true;
-+		pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
-+		return 0;
-+	}
-+
-+	return get_soc_id_by_pci();
-+}
- early_initcall(mvebu_soc_id_init);
- 
- static int __init mvebu_soc_device(void)
-diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-index 0c5524ac75b7..b2b4e3d6558c 100644
---- a/arch/arm/mach-mvebu/system-controller.c
-+++ b/arch/arm/mach-mvebu/system-controller.c
-@@ -39,6 +39,9 @@ struct mvebu_system_controller {
- 	u32 system_soft_reset;
- 
- 	u32 resume_boot_addr;
-+
-+	u32 dev_id;
-+	u32 rev_id;
- };
- static struct mvebu_system_controller *mvebu_sc;
- 
-@@ -47,6 +50,8 @@ static const struct mvebu_system_controller armada_370_xp_system_controller = {
- 	.system_soft_reset_offset = 0x64,
- 	.rstoutn_mask_reset_out_en = 0x1,
- 	.system_soft_reset = 0x1,
-+	.dev_id = 0x38,
-+	.rev_id = 0x3c,
- };
- 
- static const struct mvebu_system_controller armada_375_system_controller = {
-@@ -55,6 +60,8 @@ static const struct mvebu_system_controller armada_375_system_controller = {
- 	.rstoutn_mask_reset_out_en = 0x1,
- 	.system_soft_reset = 0x1,
- 	.resume_boot_addr = 0xd4,
-+	.dev_id = 0x38,
-+	.rev_id = 0x3c,
- };
- 
- static const struct mvebu_system_controller orion_system_controller = {
-@@ -101,6 +108,18 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd)
- 		;
- }
- 
-+int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev)
-+{
-+	if (of_machine_is_compatible("marvell,armada380") &&
-+		system_controller_base) {
-+		*dev = readl(system_controller_base + mvebu_sc->dev_id) >> 16;
-+		*rev = (readl(system_controller_base + mvebu_sc->rev_id) >> 8)
-+			& 0xF;
-+		return 0;
-+	} else
-+		return -ENODEV;
-+}
-+
- #ifdef CONFIG_SMP
- void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
- {
--- 
-1.8.1.2
+>
+>> > +
+>> > +Required sub-nodes:
+>> > +
+>> > +- port: describes LCD panel signals, following the common binding
+>> > +   for video transmitter interfaces; see
+>> > +   Documentation/devicetree/bindings/media/video-interfaces.txt;
+>> > +   when it is a TFT panel, the port's endpoint must define the
+>> > +   following property:
+>> > +
+>> > +   - arm,pl11x,tft-r0g0b0-pads: an array of three 32-bit values,
+>> > +           defining the way CLD pads are wired up; this implicitly
+>> > +           defines available color modes, for example:
+>> > +           - PL111 TFT 4:4:4 panel:
+>> > +                   arm,pl11x,tft-r0g0b0-pads = <4 15 20>;
+>> > +           - PL110 TFT (1:)5:5:5 panel:
+>> > +                   arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
+>> > +           - PL111 TFT (1:)5:5:5 panel:
+>> > +                   arm,pl11x,tft-r0g0b0-pads = <3 11 19>;
+>> > +           - PL111 TFT 5:6:5 panel:
+>> > +                   arm,pl11x,tft-r0g0b0-pads = <3 10 19>;
+>> > +           - PL110 and PL111 TFT 8:8:8 panel:
+>> > +                   arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+>> > +           - PL110 and PL111 TFT 8:8:8 panel, R & B components swapped:
+>> > +                   arm,pl11x,tft-r0g0b0-pads = <16 8 0>;
+>>
+>> I'm somewhat lost trying to figure out this mapping. Am I not looking at
+>> this in the right way, or is there any documentation which makes this
+>> clearer?
+>
+> Yeah, looking at this now, it definitely needs some more explanation.
+> Something like this?
+>
+>         First value contains index of the "CLD" external pin (pad)
+>         used as R0 (first bit of the red component), second value
+>         index of the pad used as G0, third value index of the pad
+>         used as B0, see also "LCD panel signal multiplexing details"
+>         paragraph in the PL11x Technical Reference Manuals.
+>
+> Pawel
+>
