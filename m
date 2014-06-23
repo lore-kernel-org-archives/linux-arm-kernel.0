@@ -1,81 +1,36 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Mon, 23 Jun 2014 16:42:43 +0800
-Subject: [PATCH 1/2] ARM: imx: mem bit must be cleared before entering DSM mode
-Message-ID: <1403512964-19095-1-git-send-email-b20788@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Jun 2014 09:46:09 +0100
+Subject: [PATCH] arm: ptrace: fix syscall modification under
+ PTRACE_O_TRACESECCOMP
+In-Reply-To: <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+References: <20140618202748.GA9022@www.outflux.net>
+ <20140620102258.GA26626@arm.com>
+ <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
+ <20140620172330.GA30656@arm.com>
+ <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
+ <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
+Message-ID: <20140623084608.GA9316@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to hardware design, mem bit must be clear before
-entering DSM mode, as ARM core will be power gated in DSM mode.
+On Fri, Jun 20, 2014 at 07:10:46PM +0100, Kees Cook wrote:
+> On Fri, Jun 20, 2014 at 10:36 AM, Kees Cook <keescook@chromium.org> wrote:
+> > On Fri, Jun 20, 2014 at 10:23 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> Right, gotcha. Thanks for the explanation. I was confused, because
+> >> tracehook_report_syscall does the right thing (returns
+> >> current_thread_info()->syscall), but if we don't have TIF_SYSCALL_TRACE set,
+> >> then updates during the secure_computing callback will be ignored.
+> >>
+> >> However, my fix to this is significantly smaller than your patch, so I fear
+> >> I'm still missing something.
+> >
+> > Oh, yes, that's much smaller. Nice! I will test this and report back.
+> 
+> Yup, I can confirm this works. Thanks!
+> 
+> Tested-by: Kees Cook <keescook@chromium.org>
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/common.h        |    2 +-
- arch/arm/mach-imx/cpuidle-imx6q.c |    2 +-
- arch/arm/mach-imx/pm-imx6.c       |    8 ++++++--
- 3 files changed, 8 insertions(+), 4 deletions(-)
+Thanks, Kees. I'll post a patch shortly. I'll try and remember to keep an
+eye out for this when seccomp lands for arm64 too.
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 50ee9c2..13a6e1f 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -116,7 +116,7 @@ void imx_anatop_init(void);
- void imx_anatop_pre_suspend(void);
- void imx_anatop_post_resume(void);
- int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
--void imx6q_set_int_mem_clk_lpm(void);
-+void imx6q_set_int_mem_clk_lpm(bool enable);
- void imx6sl_set_wait_clk(bool enter);
- 
- void imx_cpu_die(unsigned int cpu);
-diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-index fc0bb1e..10844d3 100644
---- a/arch/arm/mach-imx/cpuidle-imx6q.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-@@ -71,7 +71,7 @@ int __init imx6q_cpuidle_init(void)
- 		imx_scu_standby_enable();
- 
- 	/* Set INT_MEM_CLK_LPM bit to get a reliable WAIT mode support */
--	imx6q_set_int_mem_clk_lpm();
-+	imx6q_set_int_mem_clk_lpm(true);
- 
- 	return cpuidle_register(&imx6q_cpuidle_driver, NULL);
- }
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 331055b..b3c770d 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -199,11 +199,13 @@ struct imx6_cpu_pm_info {
- 	u32 mmdc_io_val[MX6_MAX_MMDC_IO_NUM][2]; /* To save offset and value */
- } __aligned(8);
- 
--void imx6q_set_int_mem_clk_lpm(void)
-+void imx6q_set_int_mem_clk_lpm(bool enable)
- {
- 	u32 val = readl_relaxed(ccm_base + CGPR);
- 
--	val |= BM_CGPR_INT_MEM_CLK_LPM;
-+	val &= ~BM_CGPR_INT_MEM_CLK_LPM;
-+	if (enable)
-+		val |= BM_CGPR_INT_MEM_CLK_LPM;
- 	writel_relaxed(val, ccm_base + CGPR);
- }
- 
-@@ -334,6 +336,7 @@ static int imx6q_pm_enter(suspend_state_t state)
- 	switch (state) {
- 	case PM_SUSPEND_MEM:
- 		imx6q_set_lpm(STOP_POWER_OFF);
-+		imx6q_set_int_mem_clk_lpm(false);
- 		imx6q_enable_wb(true);
- 		/*
- 		 * For suspend into ocram, asm code already take care of
-@@ -352,6 +355,7 @@ static int imx6q_pm_enter(suspend_state_t state)
- 		imx_gpc_post_resume();
- 		imx6q_enable_rbc(false);
- 		imx6q_enable_wb(false);
-+		imx6q_set_int_mem_clk_lpm(true);
- 		imx6q_set_lpm(WAIT_CLOCKED);
- 		break;
- 	default:
--- 
-1.7.9.5
+Will
