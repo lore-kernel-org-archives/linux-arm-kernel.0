@@ -1,63 +1,113 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 23 Jun 2014 19:01:17 +0200
-Subject: [PATCHv5 1/2] pwm: Add Allwinner SoC support
-In-Reply-To: <20140617232605.GB25525@mithrandir>
-References: <1400523003-27082-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1400523003-27082-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20140617232605.GB25525@mithrandir>
-Message-ID: <20140623170115.GA11436@piout.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 23 Jun 2014 19:17:03 +0200
+Subject: Regression on Integrator after commit 07e461cd7
+Message-ID: <CACRpkdZ_4xcfAjuOY7izwMvYg+zqA4stJ3gv_EdTiALmc1go3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/2014 at 01:26:06 +0200, Thierry Reding wrote :
-> On Mon, May 19, 2014 at 08:10:02PM +0200, Alexandre Belloni wrote:
-> > +	/* By default, the polarity is inversed, set it to normal */
-> > +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG,
-> > +			 BIT_CH(PWM_ACT_STATE, 0) |
-> > +			 BIT_CH(PWM_ACT_STATE, 1));
-> > +	clk_disable_unprepare(sunxi_pwm->clk);
-> 
-> Why do you need to do this here? Doesn't this potentially cause
-> transients if a bootloader had this configured with inversed polarity?
+Hi Grant,
+
+The Integrators are not booting after commit
+07e461cd7e73a84f0e3757932b93cc80976fd749
+"of: Ensure unique names without sacrificing determinism"
+
+i.e. these device trees:
+arch/arm/boot/dts/integratorap.dts
+arch/arm/boot/dts/integratorcp.dts
+
+It hangs very early boot at one time with the message:
+Error: unrecognized/unsupported processor variant (0x41069262).
+
+Reverting that patch (manually) makes the platform boot again,
+so it's definately caused by that.
+
+Can you see what is wrong with these device trees, like if it's
+something obvious that the code is not expecting? It's like
+it cannot build the tree or something.
+
+My revert does not look very nice but looks like this:
+
+commit be15147f12a72b7bc63a8e18a2edd74123bcb5f0
+Author: Linus Walleij <linus.walleij@linaro.org>
+Date:   Mon Jun 23 18:59:58 2014 +0200
+
+    Revert "of: Ensure unique names without sacrificing determinism"
+
+    This reverts commit 07e461cd7e73a84f0e3757932b93cc80976fd749.
+
+    Conflicts:
+        drivers/of/platform.c
+
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 6c48d73a7fd7..71581921c1f3 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -64,35 +64,37 @@ EXPORT_SYMBOL(of_find_device_by_node);
+  * of_device_make_bus_id - Use the device node data to assign a unique name
+  * @dev: pointer to device structure that is linked to a device tree node
+  *
+- * This routine will first try using the translated bus address to
+- * derive a unique name. If it cannot, then it will prepend names from
+- * parent nodes until a unique name can be derived.
++ * This routine will first try using either the dcr-reg or the reg property
++ * value to derive a unique name.  As a last resort it will use the node
++ * name followed by a unique number.
+  */
+ void of_device_make_bus_id(struct device *dev)
+ {
++       static atomic_t bus_no_reg_magic;
+        struct device_node *node = dev->of_node;
+        const __be32 *reg;
+        u64 addr;
++       int magic;
+
+-       /* Construct the name, using parent nodes if necessary to
+ensure uniqueness */
+-       while (node->parent) {
+-               /*
+-                * If the address can be translated, then that is as much
+-                * uniqueness as we need. Make it the first component and return
+-                */
+-               reg = of_get_property(node, "reg", NULL);
+-               if (reg && (addr = of_translate_address(node, reg)) !=
+OF_BAD_ADDR) {
+-                       dev_set_name(dev, dev_name(dev) ? "%llx.%s:%s"
+: "%llx.%s",
+-                                    (unsigned long long)addr, node->name,
+-                                    dev_name(dev));
++       /*
++        * For MMIO, get the physical address
++        */
++       reg = of_get_property(node, "reg", NULL);
++       if (reg) {
++               addr = of_translate_address(node, reg);
++               if (addr != OF_BAD_ADDR) {
++                       dev_set_name(dev, "%llx.%s",
++                                    (unsigned long long)addr, node->name);
+                        return;
+                }
+-
+-               /* format arguments only used if dev_name() resolves to NULL */
+-               dev_set_name(dev, dev_name(dev) ? "%s:%s" : "%s",
+-                            strrchr(node->full_name, '/') + 1, dev_name(dev));
+-               node = node->parent;
+        }
++
++       /*
++        * No BusID, use the node name and add a globally incremented
++        * counter (and pray...)
++        */
++       magic = atomic_add_return(1, &bus_no_reg_magic);
++       dev_set_name(dev, "%s.%d", node->name, magic - 1);
+ }
+
+ /**
 
 
-It was done a few months ago but what I remember is the following
-happens:
+I have no real idea of how the OF core works so I'm a bit in the blue
+here :-/
 
-The PWM subsystem assumes that the polarity is PWM_POLARITY_NORMAL
-because of the kzalloc pwmchip_add(). Would you prefer something like:
+Any help appreciated!
 
-	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-	for (i = 0; i < sunxi_pwm->chip.npwm; i++) {
-		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
-			sunxi_pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
-	}
-
-Then, you would have a race where the PWM polarity is not correct in
-sysfs between pwmchip_add() and that code.
-
-Also, if you want to preserve the state set by the bootloader, you
-actually have an issue with getting back the other members of the
-pwm_device struct (duty, period) and more importantly the PWMF_ENABLED
-flag. It now assumed that the PWM channel is not enabled when
-registering the chip. If you now say that it may be enabled before linux
-is booting and you want to keep it running, then you have an
-inconsistency between the real state of the PWM (enabled, with a duty,
-period and polarity set) and what the PWM susbsytem actually knows about
-the PWM (not enabled, duty and period == 0 and polarity is normal).
-
-I would agree that the usual use case would be that another driver will
-take the PWM and set the duty, period and polarity anyway but the issue
-with the PWMF_ENABLED flag remains.
-
-How do you want to fix this? Would you add a new callback that would be
-called by pwmchip_add(), before pwmchip_sysfs_export()?
-
-I actually find it ugly to set the pwm_device members from the probe,
-especially the flags. I would prefer they stay hidden by the API.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
