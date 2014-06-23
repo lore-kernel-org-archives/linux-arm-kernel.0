@@ -1,47 +1,40 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Mon, 23 Jun 2014 16:50:20 +0530
-Subject: [PATCH] ARM: DTS: correct the capability string for mmc0
-Message-ID: <1403522420-1208-1-git-send-email-ch.naveen@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 23 Jun 2014 14:31:00 +0300
+Subject: [PATCH] video: move Versatile CLCD helpers
+In-Reply-To: <1401283017-15386-1-git-send-email-linus.walleij@linaro.org>
+References: <1401283017-15386-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <53A80FF4.7030909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMC capability for HS200 is parsed in mmc/core/host.c as
-dts string "mmc-hs200-1_8v".
+On 28/05/14 16:16, Linus Walleij wrote:
+> This moves the Versatile-specific helper code and panel database
+> down into the drivers/video folder next to the CLCD driver
+> itself, preserving the config symbol but also moving the header
+> to platform data.
+> 
+> This is necessary to rid the Integrator of this final <plat/*>
+> inclusion dependency and get us one less user of the
+> plat-versatile folder.
 
-This patch corrects the dts string for Exynos5420 based peach-pit
-and Exynos5800 based peach-pi boards.
+I don't like those display controller specific panel lookup tables at
+all, but... Maybe it's still better to have them in the driver itself
+instead of the arch/arm/.
 
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
----
- arch/arm/boot/dts/exynos5420-peach-pit.dts |    2 +-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+I presume it's easier to queue this via arm tree, as it touches quite
+many files there, and only adds a new file in video/.
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 7649982..7dea480 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -173,7 +173,7 @@
- 	status = "okay";
- 	num-slots = <1>;
- 	broken-cd;
--	caps2-mmc-hs200-1_8v;
-+	mmc-hs200-1_8v;
- 	supports-highspeed;
- 	non-removable;
- 	card-detect-delay = <200>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 2c2c137..bb3ee76 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -171,7 +171,7 @@
- 	status = "okay";
- 	num-slots = <1>;
- 	broken-cd;
--	caps2-mmc-hs200-1_8v;
-+	mmc-hs200-1_8v;
- 	supports-highspeed;
- 	non-removable;
- 	card-detect-delay = <200>;
--- 
-1.7.9.5
+So my (grudging) ack:
+
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/0f6ed766/attachment.sig>
