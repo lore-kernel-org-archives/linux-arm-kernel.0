@@ -1,53 +1,128 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jun 2014 16:42:47 +0200
-Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
- driver
-In-Reply-To: <53A83A20.6090800@roeck-us.net>
-References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140623103142.GB19730@lukather> <53A83A20.6090800@roeck-us.net>
-Message-ID: <19870078.UBj78UMBrO@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 23 Jun 2014 16:53:02 +0200
+Subject: [PATCH v2 4/5] pinctrl: sunxi: Properly handle level triggered
+ gpio interrupts
+In-Reply-To: <20140617184307.GF3665@lukather>
+References: <1401544899-405-1-git-send-email-hdegoede@redhat.com>
+ <1401544899-405-5-git-send-email-hdegoede@redhat.com>
+ <20140603133022.GK27722@lukather> <538DE60D.5070705@redhat.com>
+ <20140617184307.GF3665@lukather>
+Message-ID: <53A83F4E.9040802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 June 2014 07:30:56 Guenter Roeck wrote:
-> On 06/23/2014 03:31 AM, Maxime Ripard wrote:
-> > On Thu, May 22, 2014 at 02:12:07PM -0700, Guenter Roeck wrote:
-> >> On Thu, May 22, 2014 at 10:34:44PM +0200, Maxime Ripard wrote:
-> >>> On Mon, May 19, 2014 at 05:04:22PM +0200, Maxime Ripard wrote:
-> >>
-> >> The patches _are_ in my watchdog-next branch and get some coverage from
-> >> both my auto-builders and from Fenguang's build robots, so while they are
-> >> not in linux-next, they are not completely in the dark either.
-> >
-> > So, this patch finally didn't make it into 3.16. Great. Now, we can't
-> > even reboot the boards.
-> >
-> > Given how it's just impossible to get something merged reliably
-> > through the watchdog tree, I guess I should just start merging the
-> > patches through mine?
-> >
+Hi,
+
+On 06/17/2014 08:43 PM, Maxime Ripard wrote:
+> On Tue, Jun 03, 2014 at 05:13:17PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 06/03/2014 03:30 PM, Maxime Ripard wrote:
+>>> On Sat, May 31, 2014 at 04:01:38PM +0200, Hans de Goede wrote:
+>>>> For level triggered gpio interrupts we need to use handle_fasteoi_irq,
+>>>> like we do with the irq-sunxi-nmi driver. This is necessary to give threaded
+>>>> interrupt handlers a chance to actuall clear the source of the interrupt
+>>>> (which may involve sleeping waiting for i2c / spi / mmc transfers), before
+>>>> acknowledging the interrupt.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 57 +++++++++++++++++++++++++----------
+>>>>  1 file changed, 41 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>>>> index 61d3246..418a430 100644
+>>>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>>>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>>>> @@ -31,6 +31,11 @@
+>>>>  #include "../core.h"
+>>>>  #include "pinctrl-sunxi.h"
+>>>>
+>>>> +static void sunxi_pinctrl_irq_ack(struct irq_data *d);
+>>>> +static void sunxi_pinctrl_irq_mask(struct irq_data *d);
+>>>> +static void sunxi_pinctrl_irq_unmask(struct irq_data *d);
+>>>> +static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type);
+>>>> +
+>>>>  static struct sunxi_pinctrl_group *
+>>>>  sunxi_pinctrl_find_group_by_name(struct sunxi_pinctrl *pctl, const char *group)
+>>>>  {
+>>>> @@ -545,10 +550,29 @@ static int sunxi_pinctrl_irq_request_resources(struct irq_data *d)
+>>>>  	return 0;
+>>>>  }
+>>>>
+>>>> -static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+>>>> -				      unsigned int type)
+>>>> +static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
+>>>> +	.irq_ack		= sunxi_pinctrl_irq_ack,
+>>>> +	.irq_mask		= sunxi_pinctrl_irq_mask,
+>>>> +	.irq_unmask		= sunxi_pinctrl_irq_unmask,
+>>>> +	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
+>>>> +	.irq_set_type		= sunxi_pinctrl_irq_set_type,
+>>>> +	.flags			= IRQCHIP_SKIP_SET_WAKE,
+>>>> +};
+>>>> +
+>>>> +static struct irq_chip sunxi_pinctrl_level_irq_chip = {
+>>>> +	.irq_eoi		= sunxi_pinctrl_irq_ack,
+>>>> +	.irq_mask		= sunxi_pinctrl_irq_mask,
+>>>> +	.irq_unmask		= sunxi_pinctrl_irq_unmask,
+>>>> +	.irq_request_resources	= sunxi_pinctrl_irq_request_resources,
+>>>> +	.irq_set_type		= sunxi_pinctrl_irq_set_type,
+>>>> +	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_EOI_THREADED
+>>>> +				  | IRQCHIP_EOI_IF_HANDLED,
+>>>> +};
+>>>
+>>> Maybe we can just forward declare these two structures, instead of all
+>>> their functions.
+>>
+>> Variables cannot be forward declared, they can be declared extern, but last
+>> time I checked extern and static don't mix.
 > 
-> You can not really blame Wim here.
+> Actually, you can. It's called a tentative definition, see
+> http://c0x.coding-guidelines.com/6.9.2.html and
+> http://c0x.coding-guidelines.com/6.2.2.html for the definition of
+> internal linkage.
+
+Ah, I've been programming C since 1996, and I did not know about that :)
+
+Good to have learned something new today. I'll do a v3 patch-set with this
+fixed (well a v4 really as I accidentally did a second v2, but lets be
+consistent and number the next one v3).
+
+Regards,
+
+Hans
+
 > 
-> In this case, I suspect the major reason for not accepting the patch
-> is that I tried to provide a clean method / API for "reset through watchdog
-> subsystem", which went nowhere, in my understanding because someone objected
-> that it would be the wrong thing to do [1] and it didn't get approval /
-> acceptance from the arm maintainers. If it is wrong to reset the board
-> from the watchdog subsystem in a clean way, it is for sure even more wrong
-> to do it as you proposed in your patch.
+> Maxime
 > 
-> My conclusion therefore is that all board reset code should move back out
-> of the watchdog subsystem, and that we should not accept such code in the
-> future. This is not my personal preference, but I do believe that we should
-> do it in a clean way or not at all.
-
-Moved to where?
-
-I certainly don't want it in the platform directories, and for arm64 we
-intentionally don't have a place to put this stuff.
-
-drivers/power/reset would be an option, but then we have to solve the
-problem of loading two drivers for one device first.
-
-	Arnd
+>>
+>>>
+>>>> +
+>>>> +static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
+>>>>  {
+>>>>  	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+>>>> +	struct irq_desc *desc = container_of(d, struct irq_desc, irq_data);
+>>>>  	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
+>>>>  	u8 index = sunxi_irq_cfg_offset(d->hwirq);
+>>>>  	unsigned long flags;
+>>>> @@ -575,6 +599,14 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+>>>>  		return -EINVAL;
+>>>>  	}
+>>>>
+>>>> +	if (type & IRQ_TYPE_LEVEL_MASK) {
+>>>> +		d->chip = &sunxi_pinctrl_level_irq_chip;
+>>>> +		desc->handle_irq = handle_fasteoi_irq;
+>>>> +	} else {
+>>>> +		d->chip = &sunxi_pinctrl_edge_irq_chip;
+>>>> +		desc->handle_irq = handle_edge_irq;
+>>>
+>>> irq_set_chip_and_handler?
+>>
+>> Does a lookup of the irqdata which we already have here, and
+>> that lookup takes a lock which is already held here.
+> 
+> Ah, yes.
+> 
+> Thanks,
+> Maxime
+> 
