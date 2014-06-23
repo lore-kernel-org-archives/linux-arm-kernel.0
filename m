@@ -1,59 +1,151 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jun 2014 11:26:27 +0900
-Subject: [PATCH 14/24] ARM: shmobile: marzen-reference: Remove legacy clock
- support
+Date: Mon, 23 Jun 2014 11:26:26 +0900
+Subject: [PATCH 13/24] ARM: shmobile: Remove Marzen reference DTS
 In-Reply-To: <cover.1403487423.git.horms+renesas@verge.net.au>
 References: <cover.1403487423.git.horms+renesas@verge.net.au>
-Message-ID: <f0b78f8b63fe92242232b7a3e4aa951983ee1f45.1403487423.git.horms+renesas@verge.net.au>
+Message-ID: <47ad265dd443802ead3d7e1aa3ef60ff1a8da952.1403487423.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marzen DT reference is now only built for multiplatform
-which means that CCF comes with the package. Remove unused legacy
-code ifdefs to clean up the code.
+Now that the DTS file r8a7779-marzen.dts can be used with
+board-marzen.c and board-marzen-reference.c, proceed with removing
+r8a7779-marzen-reference.dts.
 
-Based on similar work for the Koelsch board by Magnus Damm.
+Based on work for the Koelsch board by Laurent Pinchart.
 
-Cc: Magnus Damm <damm@opensource.se>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen-reference.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts | 121 -------------------------
+ 1 file changed, 121 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
 
-diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index 46936ff..1b63686 100644
---- a/arch/arm/mach-shmobile/board-marzen-reference.c
-+++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -31,13 +31,10 @@
- 
- static void __init marzen_init_timer(void)
- {
--#ifdef CONFIG_COMMON_CLK
- 	r8a7779_clocks_init(r8a7779_read_mode_pins());
--#endif
- 	clocksource_of_init();
- }
- 
--#ifdef CONFIG_COMMON_CLK
- /*
-  * This is a really crude hack to provide clkdev support to platform
-  * devices until they get moved to DT.
-@@ -51,15 +48,10 @@ static const struct clk_name clk_names[] __initconst = {
- 	{ "scif5", NULL, "sh-sci.5" },
- 	{ "tmu0", "fck", "sh-tmu.0" },
- };
--#endif
- 
- static void __init marzen_init(void)
- {
--#ifdef CONFIG_COMMON_CLK
- 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
--#else
--	r8a7779_clock_init();
--#endif
- 	r8a7779_add_standard_devices_dt();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
+diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+deleted file mode 100644
+index b27c637..0000000
+--- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
++++ /dev/null
+@@ -1,121 +0,0 @@
+-/*
+- * Reference Device Tree Source for the Marzen board
+- *
+- * Copyright (C) 2013 Renesas Solutions Corp.
+- * Copyright (C) 2013 Simon Horman
+- *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
+- */
+-
+-/dts-v1/;
+-#include "r8a7779.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/interrupt-controller/irq.h>
+-
+-/ {
+-	model = "marzen";
+-	compatible = "renesas,marzen-reference", "renesas,r8a7779";
+-
+-	chosen {
+-		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on rw";
+-	};
+-
+-	memory {
+-		device_type = "memory";
+-		reg = <0x60000000 0x40000000>;
+-	};
+-
+-	fixedregulator3v3: fixedregulator at 0 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "fixed-3.3V";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+-	lan0 at 18000000 {
+-		compatible = "smsc,lan9220", "smsc,lan9115";
+-		reg = <0x18000000 0x100>;
+-		pinctrl-0 = <&lan0_pins>;
+-		pinctrl-names = "default";
+-
+-		phy-mode = "mii";
+-		interrupt-parent = <&irqpin0>;
+-		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+-		smsc,irq-push-pull;
+-		reg-io-width = <4>;
+-		vddvario-supply = <&fixedregulator3v3>;
+-		vdd33a-supply = <&fixedregulator3v3>;
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-		led2 {
+-			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
+-		};
+-		led3 {
+-			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
+-		};
+-		led4 {
+-			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
+-		};
+-	};
+-};
+-
+-&irqpin0 {
+-	status = "okay";
+-};
+-
+-&pfc {
+-	pinctrl-0 = <&scif2_pins &scif4_pins>;
+-	pinctrl-names = "default";
+-
+-	lan0_pins: lan0 {
+-		intc {
+-			renesas,groups = "intc_irq1_b";
+-			renesas,function = "intc";
+-		};
+-		lbsc {
+-			renesas,groups = "lbsc_ex_cs0";
+-			renesas,function = "lbsc";
+-		};
+-	};
+-
+-	scif2_pins: serial2 {
+-		renesas,groups = "scif2_data_c";
+-		renesas,function = "scif2";
+-	};
+-
+-	scif4_pins: serial4 {
+-		renesas,groups = "scif4_data";
+-		renesas,function = "scif4";
+-	};
+-
+-	sdhi0_pins: sd0 {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
+-		renesas,function = "sdhi0";
+-	};
+-
+-	hspi0_pins: hspi0 {
+-		renesas,groups = "hspi0";
+-		renesas,function = "hspi0";
+-	};
+-};
+-
+-&sdhi0 {
+-	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-names = "default";
+-
+-	vmmc-supply = <&fixedregulator3v3>;
+-	bus-width = <4>;
+-	status = "okay";
+-};
+-
+-&hspi0 {
+-	pinctrl-0 = <&hspi0_pins>;
+-	pinctrl-names = "default";
+-	status = "okay";
+-};
 -- 
 2.0.0.rc2
