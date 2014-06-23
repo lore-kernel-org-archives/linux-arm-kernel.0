@@ -1,37 +1,65 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 23 Jun 2014 09:38:09 +0530
-Subject: [PATCH] ARM: shmobile: add cpufreq-cpu0 driver for common
- SH-Mobile
-In-Reply-To: <06e32c91dbce3c24ccbe84e3af2a35199662bca0.1403487159.git.horms+renesas@verge.net.au>
-References: <cover.1403487159.git.horms+renesas@verge.net.au>
- <06e32c91dbce3c24ccbe84e3af2a35199662bca0.1403487159.git.horms+renesas@verge.net.au>
-Message-ID: <CAOh2x=kngDNSJNLpOTcA0PqP5ZiiKXUuAHpW_ZMmEOSQEst0bA@mail.gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Mon, 23 Jun 2014 12:10:32 +0800
+Subject: [PATCH] ARM: imx: add cpufreq support for i.mx6sx
+Message-ID: <1403496632-20308-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 7:55 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> diff --git a/arch/arm/mach-shmobile/cpufreq.c b/arch/arm/mach-shmobile/cpufreq.c
+Add cpufreq support for i.MX6SX, using common
+i.MX6Q cpufreq driver.
 
-> +int __init shmobile_cpufreq_init(void)
-> +{
-> +       struct device_node *np;
-> +
-> +       np = of_cpu_device_node_get(0);
-> +       if (np == NULL) {
-> +               pr_err("failed to find cpu0 node\n");
-> +               return 0;
-> +       }
-> +
-> +       if (of_get_property(np, "operating-points", NULL))
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/mach-imx6sx.c |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-Probably you don't need any of above checks as these are done from
-cpufreq-cpu0 probe as well.. So, simply create a platform device and
-let cpufreq-cpu0 driver decide its fate.
-
-> +               platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
-> +
-> +       of_node_put(np);
-> +
-> +       return 0;
-> +}
+diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+index 74ff7d6..be2ca52 100644
+--- a/arch/arm/mach-imx/mach-imx6sx.c
++++ b/arch/arm/mach-imx/mach-imx6sx.c
+@@ -8,6 +8,7 @@
+ 
+ #include <linux/irqchip.h>
+ #include <linux/of_platform.h>
++#include <linux/pm_opp.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+@@ -39,9 +40,35 @@ static void __init imx6sx_init_irq(void)
+ 	irqchip_init();
+ }
+ 
++static void __init imx6sx_opp_init(struct device *cpu_dev)
++{
++	struct device_node *np;
++
++	np = of_find_node_by_path("/cpus/cpu at 0");
++	if (!np) {
++		pr_warn("failed to find cpu0 node\n");
++		return;
++	}
++
++	cpu_dev->of_node = np;
++	if (of_init_opp_table(cpu_dev))
++		pr_warn("failed to init OPP table\n");
++
++	of_node_put(np);
++}
++
++static struct platform_device imx6sx_cpufreq_pdev = {
++	.name = "imx6q-cpufreq",
++};
++
+ static void __init imx6sx_init_late(void)
+ {
+ 	imx6q_cpuidle_init();
++
++	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
++		imx6sx_opp_init(&imx6sx_cpufreq_pdev.dev);
++		platform_device_register(&imx6sx_cpufreq_pdev);
++	}
+ }
+ 
+ static const char *imx6sx_dt_compat[] __initconst = {
+-- 
+1.7.9.5
