@@ -1,93 +1,44 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 23 Jun 2014 14:47:48 -0700
-Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
- driver
-In-Reply-To: <20140623213046.GR22347@spo001.leaseweb.com>
-References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140507213318.GA2105@roeck-us.net> <20140515091123.GQ29258@lukather>
- <20140519150422.GA27329@lukather> <20140522203444.GE27329@lukather>
- <20140522211207.GA28704@roeck-us.net> <20140623103142.GB19730@lukather>
- <53A83A20.6090800@roeck-us.net> <20140623154934.GG19730@lukather>
- <20140623213046.GR22347@spo001.leaseweb.com>
-Message-ID: <53A8A084.3000005@roeck-us.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 23 Jun 2014 17:50:15 -0400
+Subject: [PATCH] ARM: dts: kirkwood: fix phy-connection-type for Guruplug
+In-Reply-To: <1403555115-13111-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1403555115-13111-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140623215015.GC10202@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2014 02:30 PM, Wim Van Sebroeck wrote:
-> Hi All,
->
->> On Mon, Jun 23, 2014 at 07:30:56AM -0700, Guenter Roeck wrote:
->>>>> The patches _are_ in my watchdog-next branch and get some coverage from
->>>>> both my auto-builders and from Fenguang's build robots, so while they are
->>>>> not in linux-next, they are not completely in the dark either.
->>>>
->>>> So, this patch finally didn't make it into 3.16. Great. Now, we can't
->>>> even reboot the boards.
->>>>
->>>> Given how it's just impossible to get something merged reliably
->>>> through the watchdog tree, I guess I should just start merging the
->>>> patches through mine?
->>>>
->>>
->>> You can not really blame Wim here.
->>>
->>> In this case, I suspect the major reason for not accepting the patch
->>> is that I tried to provide a clean method / API for "reset through watchdog
->>> subsystem", which went nowhere, in my understanding because someone objected
->>> that it would be the wrong thing to do [1] and it didn't get approval /
->>> acceptance from the arm maintainers. If it is wrong to reset the board
->>> from the watchdog subsystem in a clean way, it is for sure even more wrong
->>> to do it as you proposed in your patch.
->>>
->>> My conclusion therefore is that all board reset code should move back out
->>> of the watchdog subsystem, and that we should not accept such code in the
->>> future. This is not my personal preference, but I do believe that we should
->>> do it in a clean way or not at all.
->>
->> Well, considering that this patch isn't depending on your reboot API
->> set, and that Wim never either commented on this patch, your reboot
->> API patchset or your pull request to say that he was not willing to
->> merge this, there's still a huge failure to communicate.
->>
->> I'm fine with any technical reason, let's debate on that. But the
->> point is there has been no debate at all, only silence from his side.
->>
->> I have been told some patches would be merged and I merged through my
->> tree some patches that were depending on this one based on that
->> assumption.
->>
->> And now, we have a regression.
->>
->> Anyway... I guess I should just revert some commits now.
->>
->
-> To continue the discussion: I would like to add an excerpt from drivers/watchdog/alim7101_wdt.c
-> /*
->   *      Notifier for system down
->   */
->
-> static int wdt_notify_sys(struct notifier_block *this,
->                                          unsigned long code, void *unused)
-> {
->          if (code == SYS_DOWN || code == SYS_HALT)
->                  wdt_turnoff();
->
->          if (code == SYS_RESTART) {
->                  /*
->                   * Cobalt devices have no way of rebooting themselves other
->                   * than getting the watchdog to pull reset, so we restart the
->                   * watchdog on reboot with no heartbeat
->                   */
->                  wdt_change(WDT_ENABLE);
->                  pr_info("Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second\n");
->          }
->          return NOTIFY_DONE;
-> }
->
-> For some systems the watchdog is the only way to reboot... So where we should put it, is not trivial neither...
->
+On Mon, Jun 23, 2014 at 10:25:15PM +0200, Sebastian Hesselbarth wrote:
+> Commit eeb845459a72e792a959278b858f9c417e9995bd
+>  ("ARM: dts: kirkwood: set Guruplug phy-connection-type to rgmii-id")
+> added phy-connection-type properties to ethernet PHY nodes.
+> 
+> Actually, the property has to be set for the ethernet port node instead.
+> Fix it by moving the corresponding properties to the correct nodes.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Jason,
+> 
+> this should go in as a fix for v3.16 where above commit appeared first.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Agreed. The above definitely doesn't look like a good solution to me.
+Applied to mvebu/fixes
 
-Guenter
+thx,
+
+Jason.
