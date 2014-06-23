@@ -1,29 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Jun 2014 23:15:00 +0200
-Subject: Request for Inclusion in linux-next
-Message-ID: <20140623211500.GA22471@lukather>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 23 Jun 2014 23:16:33 +0200
+Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
+In-Reply-To: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
+References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1492854.pz7FvnzIM4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Am Montag, 23. Juni 2014, 23:29:09 schrieb Vasily Khoruzhick:
+> There's a several typos in a driver: 2410 instead of S3C2410
+> and wrong argument to ARRAY_SIZE(). They prevent s3c2410
+> from properly booting.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-Would it be possible to add the sunxi tree for linux-next coverage.
+Thanks for catching these.
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git, branch sunxi/for-next
-
-It will be based on Linus' tree.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140623/4a974a29/attachment.sig>
+> ---
+>  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-s3c2410.c
+> b/drivers/clk/samsung/clk-s3c2410.c index ba07168..bd9a873 100644
+> --- a/drivers/clk/samsung/clk-s3c2410.c
+> +++ b/drivers/clk/samsung/clk-s3c2410.c
+> @@ -378,7 +378,7 @@ void __init s3c2410_common_clk_init(struct device_node
+> *np, unsigned long xti_f, if (!np)
+>  		s3c2410_common_clk_register_fixed_ext(ctx, xti_f);
+> 
+> -	if (current_soc == 2410) {
+> +	if (current_soc == S3C2410) {
+>  		if (_get_rate("xti") == 12 * MHZ) {
+>  			s3c2410_plls[mpll].rate_table = pll_s3c2410_12mhz_tbl;
+>  			s3c2410_plls[upll].rate_table = pll_s3c2410_12mhz_tbl;
+> @@ -432,7 +432,7 @@ void __init s3c2410_common_clk_init(struct device_node
+> *np, unsigned long xti_f, samsung_clk_register_fixed_factor(ctx,
+> s3c2410_ffactor,
+>  				ARRAY_SIZE(s3c2410_ffactor));
+>  		samsung_clk_register_alias(ctx, s3c2410_aliases,
+> -			ARRAY_SIZE(s3c2410_common_aliases));
+> +			ARRAY_SIZE(s3c2410_aliases));
+>  		break;
+>  	case S3C2440:
+>  		samsung_clk_register_mux(ctx, s3c2440_muxes,
