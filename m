@@ -1,27 +1,34 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 24 Jun 2014 19:33:10 +0900
-Subject: [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
-In-Reply-To: <20140624100220.GK32514@n2100.arm.linux.org.uk>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
- <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
- <20140624100220.GK32514@n2100.arm.linux.org.uk>
-Message-ID: <53A953E6.2030503@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Jun 2014 11:33:36 +0100
+Subject: [PATCH 1/2] documentation: add rockchip spi documentation
+In-Reply-To: <20140624101802.GE5856@leverpostej>
+References: <1403582324-9485-1-git-send-email-addy.ke@rock-chips.com>
+ <1403582324-9485-2-git-send-email-addy.ke@rock-chips.com>
+ <20140624101802.GE5856@leverpostej>
+Message-ID: <20140624103336.GG23300@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 07:02 PM, Russell King - ARM Linux wrote:
-> On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
->> From: Lucas Stach <dev@lynxeye.de>
->>
->> On architectures for which access to GPU memory is non-coherent,
->> caches need to be flushed and invalidated explicitly at the
->> appropriate places. Introduce two small helpers to make things
->> easy for TTM-based drivers.
->
-> Have you run this with DMA API debugging enabled?  I suspect you haven't,
-> and I recommend that you do.
+On Tue, Jun 24, 2014 at 11:18:02AM +0100, Mark Rutland wrote:
+> On Tue, Jun 24, 2014 at 04:58:43AM +0100, addy ke wrote:
 
-# cat /sys/kernel/debug/dma-api/error_count
-162621
+> > +- Board Specific Portion:
+> > +
+> > +	&spi0 {
+> > +		status = "okay";
+> > +		spi_test at 00 {
+> > +			compatible = "rockchip,spi_test";
 
-(??????? ???)
+> Huh?
+
+I expect that's just intended as an example of how to set up a device
+and they're doing something like use a driver that generates known
+patterns.  We'd normally omit such examples from the binding document
+since it's generic and covered well enough elsehwere.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140624/cb899a85/attachment-0001.sig>
