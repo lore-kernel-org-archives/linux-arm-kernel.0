@@ -1,26 +1,69 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 24 Jun 2014 12:38:43 +0200
-Subject: [PATCH v2 3/6] iio: adc: fsl,imx25-gcq driver
-In-Reply-To: <53A55EDF.4010104@kernel.org>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
- <1402672899-6995-1-git-send-email-denis@eukrea.com>
- <1402672899-6995-4-git-send-email-denis@eukrea.com>
- <53A55EDF.4010104@kernel.org>
-Message-ID: <53A95533.8090500@eukrea.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Jun 2014 11:39:41 +0100
+Subject: [PATCH 2/2] ARM: KVM: user_mem_abort: support stage 2 MMIO page
+ mapping
+In-Reply-To: <20140624102327.GA9121@arm.com>
+References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
+ <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
+ <20140506180448.GH3066@lvm> <87bnvaotei.fsf@approximate.cambridge.arm.com>
+ <20140507145557.GJ3066@lvm> <20140624102327.GA9121@arm.com>
+Message-ID: <53A9556D.3000003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2014 12:30 PM, Jonathan Cameron wrote:
->> +        .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),    \
-> No known info on converting this to real voltages?  I'd normally expect
-> a scale parameter at least with any raw channel output, but fair enough
-> if it's not obvous what this should be.
+On 24/06/14 11:23, Will Deacon wrote:
+> On Wed, May 07, 2014 at 03:55:57PM +0100, Christoffer Dall wrote:
+>> On Wed, May 07, 2014 at 10:00:21AM +0100, Marc Zyngier wrote:
+>>> On Tue, May 06 2014 at  7:04:48 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>>>> On Tue, Mar 25, 2014 at 05:08:14PM -0500, Kim Phillips wrote:
+>>>>> Use the correct memory type for device MMIO mappings: PAGE_S2_DEVICE.
+>>>>>
+>>>>> Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+>>>>> ---
+>>>>>  arch/arm/kvm/mmu.c | 11 ++++++++---
+>>>>>  1 file changed, 8 insertions(+), 3 deletions(-)
+> 
+> [...]
+> 
+>>>> I think this looks reasonable.
+>>>>
+>>>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>
+>>> I feel like I'm missing some context here, and the commit message is way
+>>> too terse for me to make sense of it.
+>>>
+>>> So far, we can only get into user_mem_abort on a Stage-2 fault
+>>> (translation or permission) for memory. How can we suddenly get here for
+>>> a *device* fault? Do we get a special kind of memslot?
+>>>
+>>> I'm not saying the patch does anything wrong, but I'd like to understand
+>>> the rationale behind it. On its own, it doesn't make much sense.
+>>>
+>> Think device passthrough.  There's nothing preventing user space from
+>> setting up a memory region to point to device memory (through VFIO or
+>> /dev/mem).  If that's done, we should enforce device memory properties
+>> so writes don't linger around in the cache to be written some time later
+>> when that device memory potentially doesn't belong to the VM anymore.
+>>
+>> This is just one tiny piece of all of them to make device passthrough
+>> work, and we could hold off with this patch until we have something more
+>> complete.  On the other hand, we need to start somewhere, and this is
+>> hardly intrusive and is functionally correct even though you don't have
+>> a full device passthrough setup.
+> 
+> Please can you queue this patch up? I need it for my VFIO work, where I'm
+> registering the PCI BARs using KVM_SET_USER_MEMORY_REGION.
+> 
+> Without this, I'd have to trap all accesses and do pread/pwrite from
+> kvmtool instead of mmaping the regions straight through.
 
-We know the internal reference voltage.
-We can also know the external reference voltage by representing it as a 
-regulator.
+I'm afraid there as been quite a bit of churn in this department, and
+the patch doesn't apply any more.
 
-Since there are many combinations should a regulator for each 
-reference(external reference, xp, yp, xn and yn) be used?
+Kim, any chance you could respin this patch on top of mainline?
 
-Denis.
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
