@@ -1,35 +1,83 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jun 2014 09:43:58 -0700
-Subject: [PATCH v7 1/1] man-pages: seccomp.2: document syscall
-In-Reply-To: <53A95187.4010805@gmail.com>
-References: <20140623220150.GM5412@outflux.net>
-	<53A95187.4010805@gmail.com>
-Message-ID: <CAGXu5j+A1WCA13rRnREh_m0kwsYfBrZSwB25NXEdpQNpgjJfyw@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 24 Jun 2014 18:52:16 +0200
+Subject: [PATCH v7 3/9] seccomp: introduce writer locking
+In-Reply-To: <1403560693-21809-4-git-send-email-keescook@chromium.org>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-4-git-send-email-keescook@chromium.org>
+Message-ID: <20140624165216.GA29272@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 3:23 AM, Michael Kerrisk (man-pages)
-<mtk.manpages@gmail.com> wrote:
-> On 06/24/2014 12:01 AM, Kees Cook wrote:
->> Combines documentation from prctl, and in-kernel seccomp_filter.txt,
->> along with new details specific to the new syscall.
+Kees,
+
+I am still trying to force myself to read and try to understand what
+this series does ;) Just a minor nit so far.
+
+On 06/23, Kees Cook wrote:
 >
-> Great work on the man page, Kees! (BTW, just looking at the complexity detailed
-> there further supports the decision to grant this functionality as a separate
-> syscall, rather than multiplexed into prctl(2).
+> @@ -1142,6 +1168,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>  {
+>  	int retval;
+>  	struct task_struct *p;
+> +	unsigned long irqflags;
+>  
+>  	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
+>  		return ERR_PTR(-EINVAL);
+> @@ -1196,7 +1223,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>  		goto fork_out;
+>  
+>  	ftrace_graph_init_task(p);
+> -	get_seccomp_filter(p);
+>  
+>  	rt_mutex_init_task(p);
+>  
+> @@ -1434,7 +1460,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>  		p->parent_exec_id = current->self_exec_id;
+>  	}
+>  
+> -	spin_lock(&current->sighand->siglock);
+> +	spin_lock_irqsave(&current->sighand->siglock, irqflags);
+> +
+> +	/*
+> +	 * Copy seccomp details explicitly here, in case they were changed
+> +	 * before holding tasklist_lock.
+> +	 */
+> +	copy_seccomp(p);
+>  
+>  	/*
+>  	 * Process group and session signals need to be delivered to just the
+> @@ -1446,7 +1478,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>  	*/
+>  	recalc_sigpending();
+>  	if (signal_pending(current)) {
+> -		spin_unlock(&current->sighand->siglock);
+> +		spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+>  		write_unlock_irq(&tasklist_lock);
+>  		retval = -ERESTARTNOINTR;
+>  		goto bad_fork_free_pid;
+> @@ -1486,7 +1518,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>  	}
+>  
+>  	total_forks++;
+> -	spin_unlock(&current->sighand->siglock);
+> +	spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+>  	write_unlock_irq(&tasklist_lock);
+>  	proc_fork_connector(p);
+>  	cgroup_post_fork(p);
 
-Great, thanks!
+It seems that the only change copy_process() needs is copy_seccomp() under the locks.
+Everythinh else (irqflags games) looks obviously unneeded?
 
-> Would there be some suitable, not too long program that we
-> could put in the man page as an example for using filters?
+> @@ -524,6 +528,9 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
+>  	}
+>  #endif
+>
+> +	if (unlikely(!lock_task_sighand(current, &irqflags)))
+> +		goto out_free;
+> +
 
-Sure thing. I can modify the "dropper" sample in samples/seccomp. I
-will resend the man-page with that added.
+Unless this task is exiting (namely, it has already called exit_notify()),
+lock_task_sighand(current) must not fail. Looks like you can simly do
+spin_lock_irq(->siglock).
 
-Thanks!
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Oleg.
