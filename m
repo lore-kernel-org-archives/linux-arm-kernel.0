@@ -1,66 +1,118 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 24 Jun 2014 12:51:43 -0700
-Subject: [PATCH v7 4/9] seccomp: move no_new_privs into seccomp
-In-Reply-To: <CAGXu5jJjuNmf=FRzUPMChvL4D_xkg034pUbRAbaK38f37GYC0A@mail.gmail.com>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-5-git-send-email-keescook@chromium.org>
- <20140624191815.GA3623@redhat.com>
- <CALCETrVgpP=zOtiQafVgcic2T95TdEM5DTvHYXWTbcZ14xBqHQ@mail.gmail.com>
- <20140624193055.GA4482@redhat.com>
- <CALCETrU9x05ADgz9JToiw_BuCPz1h0xmOh=1R3eojL9far1aEA@mail.gmail.com>
- <CAGXu5jJjuNmf=FRzUPMChvL4D_xkg034pUbRAbaK38f37GYC0A@mail.gmail.com>
-Message-ID: <CALCETrUCK0g3nTQP+Oh7-JXh-mODAC-Bemr1fCYMJyDvjFPcjQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Jun 2014 14:52:11 -0500
+Subject: [PATCH v14 08/10] drm/panel: Add Eukrea mbimxsd51 displays.
+In-Reply-To: <20140624150600.GT32514@n2100.arm.linux.org.uk>
+References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+ <1402913484-25910-8-git-send-email-denis@eukrea.com>
+ <20140624150600.GT32514@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqLbzS9Zh+NK8pfqJ=twQpz0qYfyH4xC3NnvCXBokyx+yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 12:50 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, Jun 24, 2014 at 12:34 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> On Tue, Jun 24, 2014 at 12:30 PM, Oleg Nesterov <oleg@redhat.com> wrote:
->>> On 06/24, Andy Lutomirski wrote:
->>>>
->>>> On Tue, Jun 24, 2014 at 12:18 PM, Oleg Nesterov <oleg@redhat.com> wrote:
->>>> >>
->>>> >> -struct seccomp { };
->>>> >> +struct seccomp {
->>>> >> +     unsigned long flags;
->>>> >> +};
->>>> >
->>>> > A bit messy ;)
->>>> >
->>>> > I am wondering if we can simply do
->>>> >
->>>> >         static inline bool current_no_new_privs(void)
->>>> >         {
->>>> >                 if (current->no_new_privs)
->>>> >                         return true;
->>>> >
->>>> >         #ifdef CONFIG_SECCOMP
->>>> >                 if (test_thread_flag(TIF_SECCOMP))
->>>> >                         return true;
->>>> >         #endif
->>>>
->>>> Nope -- privileged users can enable seccomp w/o nnp.
->>>
->>> Indeed, I am stupid.
->>>
->>> Still it would be nice to cleanup this somehow. The new member is only
->>> used as a previous ->no_new_privs, just it is long to allow the concurent
->>> set/get. Logically it doesn't even belong to seccomp{}.
+On Tue, Jun 24, 2014 at 10:06 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Denis,
+>
+> This patch creates binding documentation.  Any patch which does so
+> should be copied to the DT people so they can review the bindings
+> and give appropriate acks.  It would be better if you separate the
+> binding documentation updates from the other functional changes too.
+>
+> I've added them on this reply to see whether they'll feel friendly
+> enough to comment on the patch as it stands to avoid having to go
+> through two more rounds on this already-fourteen revision patch set.
+>
+> On Mon, Jun 16, 2014 at 12:11:22PM +0200, Denis Carikli wrote:
+>> Signed-off-by: Denis Carikli <denis@eukrea.com>
+>> ---
+>> ChangeLog v13->v14:
+>> - None
 >>
->> We could add an unsigned long atomic flags field to task_struct.
->
-> I thought that had gotten shot down originally, but given the current
-> state of the patch series, it would be effectively identical, since my
-> earlier attempt at keeping sizes the same (with alternate accessors)
-> was too messy. I will change this as well.
->
->> Grr.  Why isn't there an unsigned *int* atomic bitmask type?  Even u64
->> would be better.  unsigned long is useless.
->
-> Useless beyond 32 bits. ;)
+>> ChangeLog v12->v13:
+>> - Added a note explaining why the size is zero in
+>>   the eukrea_mbimxsd51_dvi(s)vga structs.
+>> ChangeLog v11->v12:
+>> - Rebased: It now uses the new DRM_MODE_FLAG_POL_DE flags defines names
+>>
+>> ChangeLog v10->v11:
+>> - New patch.
+>> ---
+>>  .../bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt   |    7 ++
+>>  .../bindings/panel/eukrea,mbimxsd51-dvi-svga.txt   |    7 ++
+>>  .../bindings/panel/eukrea,mbimxsd51-dvi-vga.txt    |    7 ++
+>>  drivers/gpu/drm/panel/panel-simple.c               |   83 ++++++++++++++++++++
+>>  4 files changed, 104 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
+>>  create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
+>>  create mode 100644 Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
+>> new file mode 100644
+>> index 0000000..03679d0
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-cmo-qvga.txt
+>> @@ -0,0 +1,7 @@
+>> +Eukrea CMO-QVGA (320x240 pixels) TFT LCD panel
+>> +
+>> +Required properties:
+>> +- compatible: should be "eukrea,mbimxsd51-cmo-qvga"
+>> +
+>> +This binding is compatible with the simple-panel binding, which is specified
+>> +in simple-panel.txt in this directory.
+>> diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
+>> new file mode 100644
+>> index 0000000..f408c9a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-svga.txt
+>> @@ -0,0 +1,7 @@
+>> +Eukrea DVI-SVGA (800x600 pixels) DVI output.
+>> +
+>> +Required properties:
+>> +- compatible: should be "eukrea,mbimxsd51-dvi-svga"
+>> +
+>> +This binding is compatible with the simple-panel binding, which is specified
+>> +in simple-panel.txt in this directory.
+>> diff --git a/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
+>> new file mode 100644
+>> index 0000000..8ea90da
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/panel/eukrea,mbimxsd51-dvi-vga.txt
+>> @@ -0,0 +1,7 @@
+>> +Eukrea DVI-VGA (640x480 pixels) DVI output.
+>> +
+>> +Required properties:
+>> +- compatible: should be "eukrea,mbimxsd51-dvi-vga"
+>> +
+>> +This binding is compatible with the simple-panel binding, which is specified
+>> +in simple-panel.txt in this directory.
 
-It basically guarantees 32 wasted bits on 64-bit systems.
+Seems like we could just have a list of compatible strings rather than
+a mostly duplicated file.
 
-I guess that unsigned long foo[64/BITS_PER_LONG] would work, bit that's hideous.
+>> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+>> index a251361..adc40a7 100644
+>> --- a/drivers/gpu/drm/panel/panel-simple.c
+>> +++ b/drivers/gpu/drm/panel/panel-simple.c
+>> @@ -403,6 +403,80 @@ static const struct panel_desc edt_etm0700g0dh6 = {
+>>       },
+>>  };
+>>
+>> +static const struct drm_display_mode eukrea_mbimxsd51_cmoqvga_mode = {
+>> +     .clock = 6500,
+>> +     .hdisplay = 320,
+>> +     .hsync_start = 320 + 38,
+>> +     .hsync_end = 320 + 38 + 20,
+>> +     .htotal = 320 + 38 + 20 + 30,
+>> +     .vdisplay = 240,
+>> +     .vsync_start = 240 + 15,
+>> +     .vsync_end = 240 + 15 + 4,
+>> +     .vtotal = 240 + 15 + 4 + 3,
+>> +     .vrefresh = 60,
+>> +     .pol_flags = DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE |
+>> +                  DRM_MODE_FLAG_POL_DE_LOW,
 
---Andy
+Why aren't you using:
+
+Documentation/devicetree/bindings/video/display-timing.txt
+
+Rob
