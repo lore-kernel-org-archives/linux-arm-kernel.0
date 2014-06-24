@@ -1,89 +1,36 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 24 Jun 2014 21:03:03 +0530
-Subject: [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
-In-Reply-To: <1403618235-19353-6-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-6-git-send-email-t.figa@samsung.com>
-Message-ID: <CAM4voanJ_auOJoauvsMOVz3nhjx3hGgpbzccMMwn2ouvjwWy2g@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 24 Jun 2014 08:35:51 -0700
+Subject: [PATCH 0/3] MCPM: clarify boot CPU situation wrt CCI
+In-Reply-To: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
+ (Nicolas Pitre's message of "Tue, 24 Jun 2014 00:11:08 -0400")
+References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <7hd2dymiaw.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Nicolas Pitre <nicolas.pitre@linaro.org> writes:
 
-On Tue, Jun 24, 2014 at 7:27 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Due to recent consolidation of Exynos suspend and cpuidle code, some
-> parts of suspend and resume sequences are executed two times, once from
-> exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
-> breaks suspend, at least on Exynos4-based boards.
+> For the background story, please see:
 >
-> This patch fixes the issue by removing exynos_pm_syscore_ops completely
-> and making the code rely only on CPU PM notifier.
+> http://news.gmane.org/group/gmane.linux.kernel.samsung-soc/thread=32807
 >
-> Tested on Exynos4210-based Trats board.
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c | 20 ++++----------------
->  1 file changed, 4 insertions(+), 16 deletions(-)
->
-A patch from me has recently gone in which converts the soc_is checks
-for A9 specific registers to  the A9 part number. This patch will
-probably have to be rebased atop it.
+> I sat on those patches for a while but they are the best I could think of
+> in terms of implementation.  To ease merging I suggest I collect all the
+> ACK's and Tested-by's and submit them all at once to RMK's patch system.
 
-Regards,
-Abhilash
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 87c0d34..98d4926 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -364,11 +364,6 @@ early_wakeup:
->         return;
->  }
->
-> -static struct syscore_ops exynos_pm_syscore_ops = {
-> -       .suspend        = exynos_pm_suspend,
-> -       .resume         = exynos_pm_resume,
-> -};
-> -
->  /*
->   * Suspend Ops
->   */
-> @@ -438,19 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->
->         switch (cmd) {
->         case CPU_PM_ENTER:
-> -               if (cpu == 0) {
-> -                       exynos_pm_central_suspend();
-> -                       exynos_cpu_save_register();
-> -               }
-> +               if (cpu == 0)
-> +                       exynos_pm_suspend();
->                 break;
->
->         case CPU_PM_EXIT:
-> -               if (cpu == 0) {
-> -                       if (!soc_is_exynos5250())
-> -                               scu_enable(S5P_VA_SCU);
-> -                       exynos_cpu_restore_register();
-> -                       exynos_pm_central_resume();
-> -               }
-> +               if (cpu == 0)
-> +                       exynos_pm_resume();
->                 break;
->         }
->
-> @@ -475,6 +464,5 @@ void __init exynos_pm_init(void)
->         tmp |= ((0xFF << 8) | (0x1F << 1));
->         __raw_writel(tmp, S5P_WAKEUP_MASK);
->
-> -       register_syscore_ops(&exynos_pm_syscore_ops);
->         suspend_set_ops(&exynos_suspend_ops);
->  }
-> --
-> 1.9.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+I tested this series on Exynos5 Peach Pi (a.k.a. 13" ARM Chromebook 2)
+and verified all 8 cores are booting up.
+
+Kevin
+
+P.S. FYI for anyone else wanting to try this on peach-pi, I still need a
+couple other out of tree clock related patches in order to boot fully.
+Until the final versions are merged, I'm using these:
+
+- Doug's aclk66 clock removal for earlyprintk support
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262225.html
+- Leave mau_epll enabled
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262259.html
