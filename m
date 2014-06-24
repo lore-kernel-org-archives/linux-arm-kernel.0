@@ -1,34 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Jun 2014 18:29:08 +0100
-Subject: [PATCH] arm: vmlinux.lds.S: drop redundant .comment
-Message-ID: <1403630948-30702-1-git-send-email-mark.rutland@arm.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 24 Jun 2014 19:27:53 +0200
+Subject: [PATCH v7 7/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <1403560693-21809-8-git-send-email-keescook@chromium.org>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-8-git-send-email-keescook@chromium.org>
+Message-ID: <20140624172753.GA31435@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 78d7530ac3 ("ARM: Clean up linker script using new linker script
-macros.") modified the arm kernel linker script to use the STABS_DEBUG
-macro, but left a .comment section definition. As STABS_DEBUG defines
-the .comment section in an identical way, the second section definition
-is redundant and can be removed.
+On 06/23, Kees Cook wrote:
+>
+> +static pid_t seccomp_can_sync_threads(void)
+> +{
+> +	struct task_struct *thread, *caller;
+> +
+> +	BUG_ON(write_can_lock(&tasklist_lock));
+> +	BUG_ON(!spin_is_locked(&current->sighand->siglock));
+> +
+> +	if (current->seccomp.mode != SECCOMP_MODE_FILTER)
+> +		return -EACCES;
+> +
+> +	/* Validate all threads being eligible for synchronization. */
+> +	thread = caller = current;
+> +	for_each_thread(caller, thread) {
+> +		pid_t failed;
+> +
+> +		if (thread->seccomp.mode == SECCOMP_MODE_DISABLED ||
+> +		    (thread->seccomp.mode == SECCOMP_MODE_FILTER &&
+> +		     is_ancestor(thread->seccomp.filter,
+> +				 caller->seccomp.filter)))
+> +			continue;
+> +
+> +		/* Return the first thread that cannot be synchronized. */
+> +		failed = task_pid_vnr(thread);
+> +		/* If the pid cannot be resolved, then return -ESRCH */
+> +		if (failed == 0)
+> +			failed = -ESRCH;
 
-This patch removes the redundant .comment section definition.
+forgot to mention, task_pid_vnr() can't fail. sighand->siglock is held,
+for_each_thread() can't see a thread which has passed unhash_process().
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm/kernel/vmlinux.lds.S | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 7bcee5c..6f57cb9 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -318,7 +318,6 @@ SECTIONS
- 	_end = .;
- 
- 	STABS_DEBUG
--	.comment 0 : { *(.comment) }
- }
- 
- /*
--- 
-1.9.1
+Oleg.
