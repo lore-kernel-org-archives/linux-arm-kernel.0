@@ -1,212 +1,135 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jun 2014 13:48:07 -0700
-Subject: [PATCH v8 3/9] seccomp: introduce writer locking
+Date: Tue, 24 Jun 2014 13:48:08 -0700
+Subject: [PATCH v8 4/9] sched: move no_new_privs into new atomic flags
 In-Reply-To: <1403642893-23107-1-git-send-email-keescook@chromium.org>
 References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
-Message-ID: <1403642893-23107-4-git-send-email-keescook@chromium.org>
+Message-ID: <1403642893-23107-5-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Normally, task_struct.seccomp.filter is only ever read or modified by
-the task that owns it (current). This property aids in fast access
-during system call filtering as read access is lockless.
-
-Updating the pointer from another task, however, opens up race
-conditions. To allow cross-thread filter pointer updates, writes to
-the seccomp fields are now protected by the sighand spinlock (which
-is unique to the thread group). Read access remains lockless because
-pointer updates themselves are atomic.  However, writes (or cloning)
-often entail additional checking (like maximum instruction counts)
-which require locking to perform safely.
-
-In the case of cloning threads, the child is invisible to the system
-until it enters the task list. To make sure a child can't be cloned from
-a thread and left in a prior state, seccomp duplication is additionally
-moved under the tasklist_lock. Then parent and child are certain have
-the same seccomp state when they exit the lock.
-
-Based on patches by Will Drewry and David Drysdale.
+Since seccomp transitions between threads requires updates to the
+no_new_privs flag to be atomic, the flag must be part of an atomic flag
+set. This moves the nnp flag into a separate task field, and introduces
+accessors.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- include/linux/seccomp.h |    6 +++---
- kernel/fork.c           |   34 +++++++++++++++++++++++++++++++++-
- kernel/seccomp.c        |   18 +++++++++++++-----
- 3 files changed, 49 insertions(+), 9 deletions(-)
+ fs/exec.c                  |    4 ++--
+ include/linux/sched.h      |   16 ++++++++++++++--
+ kernel/seccomp.c           |    2 +-
+ kernel/sys.c               |    4 ++--
+ security/apparmor/domain.c |    4 ++--
+ 5 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/include/linux/seccomp.h b/include/linux/seccomp.h
-index 4054b0994071..9ff98b4bfe2e 100644
---- a/include/linux/seccomp.h
-+++ b/include/linux/seccomp.h
-@@ -14,11 +14,11 @@ struct seccomp_filter;
-  *
-  * @mode:  indicates one of the valid values above for controlled
-  *         system calls available to a process.
-- * @filter: The metadata and ruleset for determining what system calls
-- *          are allowed for a task.
-+ * @filter: must always point to a valid seccomp-filter or NULL as it is
-+ *          accessed without locking during system call entry.
-  *
-  *          @filter must only be accessed from the context of current as there
-- *          is no locking.
-+ *          is no read locking.
-  */
- struct seccomp {
- 	int mode;
-diff --git a/kernel/fork.c b/kernel/fork.c
-index d2799d1fc952..d41bdc8700b6 100644
---- a/kernel/fork.c
-+++ b/kernel/fork.c
-@@ -315,6 +315,15 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
- 		goto free_ti;
+diff --git a/fs/exec.c b/fs/exec.c
+index a3d33fe592d6..0f5c272410f6 100644
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1234,7 +1234,7 @@ static void check_unsafe_exec(struct linux_binprm *bprm)
+ 	 * This isn't strictly necessary, but it makes it harder for LSMs to
+ 	 * mess up.
+ 	 */
+-	if (current->no_new_privs)
++	if (task_no_new_privs(current))
+ 		bprm->unsafe |= LSM_UNSAFE_NO_NEW_PRIVS;
  
- 	tsk->stack = ti;
-+#ifdef CONFIG_SECCOMP
-+	/*
-+	 * We must handle setting up seccomp filters once we're under
-+	 * the sighand lock in case orig has changed between now and
-+	 * then. Until then, filter must be NULL to avoid messing up
-+	 * the usage counts on the error path calling free_task.
-+	 */
-+	tsk->seccomp.filter = NULL;
-+#endif
+ 	t = p;
+@@ -1272,7 +1272,7 @@ int prepare_binprm(struct linux_binprm *bprm)
+ 	bprm->cred->egid = current_egid();
  
- 	setup_thread_stack(tsk, orig);
- 	clear_user_return_notifier(tsk);
-@@ -1081,6 +1090,24 @@ static int copy_signal(unsigned long clone_flags, struct task_struct *tsk)
- 	return 0;
+ 	if (!(bprm->file->f_path.mnt->mnt_flags & MNT_NOSUID) &&
+-	    !current->no_new_privs &&
++	    !task_no_new_privs(current) &&
+ 	    kuid_has_mapping(bprm->cred->user_ns, inode->i_uid) &&
+ 	    kgid_has_mapping(bprm->cred->user_ns, inode->i_gid)) {
+ 		/* Set-uid? */
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 306f4f0c987a..0c6917fbd8d4 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1307,8 +1307,7 @@ struct task_struct {
+ 				 * execve */
+ 	unsigned in_iowait:1;
+ 
+-	/* task may not gain privileges */
+-	unsigned no_new_privs:1;
++	unsigned long atomic_flags; /* Flags needing atomic access. */
+ 
+ 	/* Revert to default priority/policy when forking */
+ 	unsigned sched_reset_on_fork:1;
+@@ -1967,6 +1966,19 @@ static inline void memalloc_noio_restore(unsigned int flags)
+ 	current->flags = (current->flags & ~PF_MEMALLOC_NOIO) | flags;
  }
  
-+static void copy_seccomp(struct task_struct *p)
++/* Per-process atomic flags. */
++#define PFA_NO_NEW_PRIVS 0x00000001	/* May not gain new privileges. */
++
++static inline bool task_no_new_privs(struct task_struct *p)
 +{
-+#ifdef CONFIG_SECCOMP
-+	/*
-+	 * Must be called with sighand->lock held, which is common to
-+	 * all threads in the group. Regardless, nothing special is
-+	 * needed for the child since it is not yet in the tasklist.
-+	 */
-+	BUG_ON(!spin_is_locked(&current->sighand->siglock));
-+
-+	get_seccomp_filter(current);
-+	p->seccomp = current->seccomp;
-+
-+	if (p->seccomp.mode != SECCOMP_MODE_DISABLED)
-+		set_tsk_thread_flag(p, TIF_SECCOMP);
-+#endif
++	return test_bit(PFA_NO_NEW_PRIVS, &p->atomic_flags);
 +}
 +
- SYSCALL_DEFINE1(set_tid_address, int __user *, tidptr)
- {
- 	current->clear_child_tid = tidptr;
-@@ -1196,7 +1223,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
- 		goto fork_out;
- 
- 	ftrace_graph_init_task(p);
--	get_seccomp_filter(p);
- 
- 	rt_mutex_init_task(p);
- 
-@@ -1437,6 +1463,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
- 	spin_lock(&current->sighand->siglock);
- 
- 	/*
-+	 * Copy seccomp details explicitly here, in case they were changed
-+	 * before holding sighand lock.
-+	 */
-+	copy_seccomp(p);
++static inline void task_set_no_new_privs(struct task_struct *p)
++{
++	set_bit(PFA_NO_NEW_PRIVS, &p->atomic_flags);
++}
 +
-+	/*
- 	 * Process group and session signals need to be delivered to just the
- 	 * parent before the fork or both the parent and the child after the
- 	 * fork. Restart if a signal comes in before we add the new process to
+ /*
+  * task->jobctl flags
+  */
 diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-index edc8c79ed16d..405eb72dfe35 100644
+index 405eb72dfe35..eb8248ab045e 100644
 --- a/kernel/seccomp.c
 +++ b/kernel/seccomp.c
-@@ -172,12 +172,12 @@ static int seccomp_check_filter(struct sock_filter *filter, unsigned int flen)
-  */
- static u32 seccomp_run_filters(int syscall)
- {
--	struct seccomp_filter *f;
-+	struct seccomp_filter *f = smp_load_acquire(&current->seccomp.filter);
- 	struct seccomp_data sd;
- 	u32 ret = SECCOMP_RET_ALLOW;
- 
- 	/* Ensure unexpected behavior doesn't result in failing open. */
--	if (WARN_ON(current->seccomp.filter == NULL))
-+	if (unlikely(WARN_ON(f == NULL)))
- 		return SECCOMP_RET_KILL;
- 
- 	populate_seccomp_data(&sd);
-@@ -186,7 +186,7 @@ static u32 seccomp_run_filters(int syscall)
- 	 * All filters in the list are evaluated and the lowest BPF return
- 	 * value always takes priority (ignoring the DATA).
+@@ -218,7 +218,7 @@ static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
+ 	 * This avoids scenarios where unprivileged tasks can affect the
+ 	 * behavior of privileged children.
  	 */
--	for (f = current->seccomp.filter; f; f = f->prev) {
-+	for (; f; f = f->prev) {
- 		u32 cur_ret = SK_RUN_FILTER(f->prog, (void *)&sd);
+-	if (!current->no_new_privs &&
++	if (!task_no_new_privs(current) &&
+ 	    security_capable_noaudit(current_cred(), current_user_ns(),
+ 				     CAP_SYS_ADMIN) != 0)
+ 		return ERR_PTR(-EACCES);
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 66a751ebf9d9..ce8129192a26 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -1990,12 +1990,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+ 		if (arg2 != 1 || arg3 || arg4 || arg5)
+ 			return -EINVAL;
  
- 		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
-@@ -312,6 +312,8 @@ out:
-  * seccomp_attach_filter: validate and attach filter
-  * @filter: seccomp filter to add to the current process
-  *
-+ * Caller must be holding current->sighand->siglock lock.
-+ *
-  * Returns 0 on success, -ve on error.
-  */
- static long seccomp_attach_filter(struct seccomp_filter *filter)
-@@ -319,6 +321,8 @@ static long seccomp_attach_filter(struct seccomp_filter *filter)
- 	unsigned long total_insns;
- 	struct seccomp_filter *walker;
- 
-+	BUG_ON(!spin_is_locked(&current->sighand->siglock));
-+
- 	/* Validate resulting filter length. */
- 	total_insns = filter->prog->len;
- 	for (walker = current->seccomp.filter; walker; walker = walker->prev)
-@@ -331,7 +335,7 @@ static long seccomp_attach_filter(struct seccomp_filter *filter)
- 	 * task reference.
+-		current->no_new_privs = 1;
++		task_set_no_new_privs(current);
+ 		break;
+ 	case PR_GET_NO_NEW_PRIVS:
+ 		if (arg2 || arg3 || arg4 || arg5)
+ 			return -EINVAL;
+-		return current->no_new_privs ? 1 : 0;
++		return task_no_new_privs(current) ? 1 : 0;
+ 	case PR_GET_THP_DISABLE:
+ 		if (arg2 || arg3 || arg4 || arg5)
+ 			return -EINVAL;
+diff --git a/security/apparmor/domain.c b/security/apparmor/domain.c
+index 452567d3a08e..d97cba3e3849 100644
+--- a/security/apparmor/domain.c
++++ b/security/apparmor/domain.c
+@@ -621,7 +621,7 @@ int aa_change_hat(const char *hats[], int count, u64 token, bool permtest)
+ 	 * There is no exception for unconfined as change_hat is not
+ 	 * available.
  	 */
- 	filter->prev = current->seccomp.filter;
--	current->seccomp.filter = filter;
-+	smp_store_release(&current->seccomp.filter, filter);
+-	if (current->no_new_privs)
++	if (task_no_new_privs(current))
+ 		return -EPERM;
  
- 	return 0;
- }
-@@ -357,7 +361,7 @@ static inline void seccomp_filter_free(struct seccomp_filter *filter)
- /* put_seccomp_filter - decrements the ref count of tsk->seccomp.filter */
- void put_seccomp_filter(struct task_struct *tsk)
- {
--	struct seccomp_filter *orig = tsk->seccomp.filter;
-+	struct seccomp_filter *orig = smp_load_acquire(&tsk->seccomp.filter);
- 	/* Clean up single-reference branches iteratively. */
- 	while (orig && atomic_dec_and_test(&orig->usage)) {
- 		struct seccomp_filter *freeme = orig;
-@@ -513,6 +517,7 @@ long prctl_get_seccomp(void)
- static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
- {
- 	struct seccomp_filter *prepared = NULL;
-+	unsigned long irqflags;
- 	long ret = -EINVAL;
- 
- #ifdef CONFIG_SECCOMP_FILTER
-@@ -524,6 +529,8 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
+ 	/* released below */
+@@ -776,7 +776,7 @@ int aa_change_profile(const char *ns_name, const char *hname, bool onexec,
+ 	 * no_new_privs is set because this aways results in a reduction
+ 	 * of permissions.
+ 	 */
+-	if (current->no_new_privs && !unconfined(profile)) {
++	if (task_no_new_privs(current) && !unconfined(profile)) {
+ 		put_cred(cred);
+ 		return -EPERM;
  	}
- #endif
- 
-+	spin_lock_irqsave(&current->sighand->siglock, irqflags);
-+
- 	if (current->seccomp.mode &&
- 	    current->seccomp.mode != seccomp_mode)
- 		goto out;
-@@ -551,6 +558,7 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
- 	current->seccomp.mode = seccomp_mode;
- 	set_thread_flag(TIF_SECCOMP);
- out:
-+	spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
- 	seccomp_filter_free(prepared);
- 	return ret;
- }
 -- 
 1.7.9.5
