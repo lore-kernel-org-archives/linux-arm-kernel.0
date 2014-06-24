@@ -1,79 +1,129 @@
-From: fcooper@ti.com (Cooper Jr., Franklin)
-Date: Tue, 24 Jun 2014 18:39:40 +0000
-Subject: [PATCH v3 1/2] arm: dts: am4372: let boards access all nodes
- through phandles
-In-Reply-To: <1403547659-24558-2-git-send-email-balbi@ti.com>
-References: <1403547659-24558-1-git-send-email-balbi@ti.com>
- <1403547659-24558-2-git-send-email-balbi@ti.com>
-Message-ID: <8F29D6B095ED194EA1980491A5E029710C6D71A1@DFLE08.ent.ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 24 Jun 2014 15:42:58 -0300
+Subject: [PATCH v2] ARM: clk-imx51-imx53: Remove clk_register_clkdev() 
+Message-ID: <1403635378-17511-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Franklin Cooper Jr. <fcooper@ti.com>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> -----Original Message-----
-> From: Balbi, Felipe
-> Sent: Monday, June 23, 2014 1:21 PM
-> To: Benoit Cousson
-> Cc: robh+dt at kernel.org; galak at codeaurora.org; Tony Lindgren;
-> linux at arm.linux.org.uk; Nayak, Rajendra; Menon, Nishanth; R, Sricharan;
-> devicetree at vger.kernel.org; Linux Kernel Mailing List; Linux OMAP Mailing
-> List; Linux ARM Kernel Mailing List; Balbi, Felipe
-> Subject: [PATCH v3 1/2] arm: dts: am4372: let boards access all nodes through
-> phandles
-> 
-> by providing phandles to rtc, wdt, cpu and dispc nodes, boards can access
-> them to add board-specific data.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> Changes since v1:
-> 	- added phandles to cpu and dispc
-> 
->  arch/arm/boot/dts/am4372.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index 49fa596..8d3c163 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -30,7 +30,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		cpu at 0 {
-> +		cpu: cpu at 0 {
->  			compatible = "arm,cortex-a9";
->  			device_type = "cpu";
->  			reg = <0>;
-> @@ -270,7 +270,7 @@
->  			ti,hwmods = "counter_32k";
->  		};
-> 
-> -		rtc at 44e3e000 {
-> +		rtc: rtc at 44e3e000 {
->  			compatible = "ti,am4372-rtc","ti,da830-rtc";
->  			reg = <0x44e3e000 0x1000>;
->  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH @@ -
-> 279,7 +279,7 @@
->  			status = "disabled";
->  		};
-> 
-> -		wdt at 44e35000 {
-> +		wdt: wdt at 44e35000 {
->  			compatible = "ti,am4372-wdt","ti,omap3-wdt";
->  			reg = <0x44e35000 0x1000>;
->  			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>; @@
-> -871,7 +871,7 @@
->  			#size-cells = <1>;
->  			ranges;
-> 
-> -			dispc at 4832a400 {
-> +			dispc: dispc at 4832a400 {
->  				compatible = "ti,omap3-dispc";
->  				reg = <0x4832a400 0x400>;
->  				interrupts = <GIC_SPI 127
-> IRQ_TYPE_LEVEL_HIGH>;
-> --
-> 2.0.0.390.gcb682f8
+mx51 and mx53 are device tree only platforms, so we no longer need all these
+calls to clk_register_clkdev().
+
+Only keep cpu0 and gpc_dvfs clk_register_clkdev() calls.
+
+Tested on imx51-babbage and imx53-qsb boards.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Keep only cpu0 and gpc_dvfs clk_register_clkdev() calls.
+
+ arch/arm/mach-imx/clk-imx51-imx53.c | 76 -------------------------------------
+ 1 file changed, 76 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index cf6e630..ee57971 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -285,51 +285,8 @@ static void __init mx5_clocks_common_init(void __iomem *ccm_base)
+ 	clk[IMX5_CLK_SAHARA_IPG_GATE]	= imx_clk_gate2("sahara_ipg_gate", "ipg", MXC_CCM_CCGR4, 14);
+ 	clk[IMX5_CLK_SATA_REF]		= imx_clk_fixed_factor("sata_ref", "usb_phy1_gate", 1, 1);
+ 
+-	clk_register_clkdev(clk[IMX5_CLK_UART1_PER_GATE], "per", "imx21-uart.0");
+-	clk_register_clkdev(clk[IMX5_CLK_UART1_IPG_GATE], "ipg", "imx21-uart.0");
+-	clk_register_clkdev(clk[IMX5_CLK_UART2_PER_GATE], "per", "imx21-uart.1");
+-	clk_register_clkdev(clk[IMX5_CLK_UART2_IPG_GATE], "ipg", "imx21-uart.1");
+-	clk_register_clkdev(clk[IMX5_CLK_UART3_PER_GATE], "per", "imx21-uart.2");
+-	clk_register_clkdev(clk[IMX5_CLK_UART3_IPG_GATE], "ipg", "imx21-uart.2");
+-	clk_register_clkdev(clk[IMX5_CLK_UART4_PER_GATE], "per", "imx21-uart.3");
+-	clk_register_clkdev(clk[IMX5_CLK_UART4_IPG_GATE], "ipg", "imx21-uart.3");
+-	clk_register_clkdev(clk[IMX5_CLK_UART5_PER_GATE], "per", "imx21-uart.4");
+-	clk_register_clkdev(clk[IMX5_CLK_UART5_IPG_GATE], "ipg", "imx21-uart.4");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI1_PER_GATE], "per", "imx51-ecspi.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI1_IPG_GATE], "ipg", "imx51-ecspi.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI2_PER_GATE], "per", "imx51-ecspi.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI2_IPG_GATE], "ipg", "imx51-ecspi.1");
+-	clk_register_clkdev(clk[IMX5_CLK_CSPI_IPG_GATE], NULL, "imx35-cspi.2");
+-	clk_register_clkdev(clk[IMX5_CLK_I2C1_GATE], NULL, "imx21-i2c.0");
+-	clk_register_clkdev(clk[IMX5_CLK_I2C2_GATE], NULL, "imx21-i2c.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "mxc-ehci.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "mxc-ehci.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "mxc-ehci.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "mxc-ehci.2");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "mxc-ehci.2");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "mxc-ehci.2");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "imx-udc-mx51");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "imx-udc-mx51");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "imx-udc-mx51");
+-	clk_register_clkdev(clk[IMX5_CLK_NFC_GATE], NULL, "imx51-nand");
+-	clk_register_clkdev(clk[IMX5_CLK_SSI1_IPG_GATE], NULL, "imx-ssi.0");
+-	clk_register_clkdev(clk[IMX5_CLK_SSI2_IPG_GATE], NULL, "imx-ssi.1");
+-	clk_register_clkdev(clk[IMX5_CLK_SSI3_IPG_GATE], NULL, "imx-ssi.2");
+-	clk_register_clkdev(clk[IMX5_CLK_SDMA_GATE], NULL, "imx35-sdma");
+ 	clk_register_clkdev(clk[IMX5_CLK_CPU_PODF], NULL, "cpu0");
+-	clk_register_clkdev(clk[IMX5_CLK_IIM_GATE], "iim", NULL);
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], NULL, "imx2-wdt.0");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], NULL, "imx2-wdt.1");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], NULL, "imx-keypad");
+-	clk_register_clkdev(clk[IMX5_CLK_IPU_DI1_GATE], "di1", "imx-tve.0");
+ 	clk_register_clkdev(clk[IMX5_CLK_GPC_DVFS], "gpc_dvfs", NULL);
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT1_IPG_GATE], "ipg", "imx-epit.0");
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT1_HF_GATE], "per", "imx-epit.0");
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT2_IPG_GATE], "ipg", "imx-epit.1");
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT2_HF_GATE], "per", "imx-epit.1");
+ 
+ 	/* Set SDHC parents to be PLL2 */
+ 	clk_set_parent(clk[IMX5_CLK_ESDHC_A_SEL], clk[IMX5_CLK_PLL2_SW]);
+@@ -479,23 +436,6 @@ static void __init mx51_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	clk_register_clkdev(clk[IMX5_CLK_HSI2C_GATE], NULL, "imx21-i2c.2");
+-	clk_register_clkdev(clk[IMX5_CLK_MX51_MIPI], "mipi_hsp", NULL);
+-	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx27-fec.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USB_PHY_GATE], "phy", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_IPG_GATE], "ipg", "sdhci-esdhc-imx51.0");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_PER_GATE], "per", "sdhci-esdhc-imx51.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_IPG_GATE], "ipg", "sdhci-esdhc-imx51.1");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_PER_GATE], "per", "sdhci-esdhc-imx51.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_IPG_GATE], "ipg", "sdhci-esdhc-imx51.2");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_PER_GATE], "per", "sdhci-esdhc-imx51.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_IPG_GATE], "ipg", "sdhci-esdhc-imx51.3");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.3");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_PER_GATE], "per", "sdhci-esdhc-imx51.3");
+-
+ 	/* set the usboh3 parent to pll2_sw */
+ 	clk_set_parent(clk[IMX5_CLK_USBOH3_SEL], clk[IMX5_CLK_PLL2_SW]);
+ 
+@@ -609,22 +549,6 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	clk_register_clkdev(clk[IMX5_CLK_I2C3_GATE], NULL, "imx21-i2c.2");
+-	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx25-fec.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USB_PHY1_GATE], "usb_phy1", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_IPG_GATE], "ipg", "sdhci-esdhc-imx53.0");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_PER_GATE], "per", "sdhci-esdhc-imx53.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_IPG_GATE], "ipg", "sdhci-esdhc-imx53.1");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_PER_GATE], "per", "sdhci-esdhc-imx53.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_IPG_GATE], "ipg", "sdhci-esdhc-imx53.2");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_PER_GATE], "per", "sdhci-esdhc-imx53.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_IPG_GATE], "ipg", "sdhci-esdhc-imx53.3");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.3");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_PER_GATE], "per", "sdhci-esdhc-imx53.3");
+-
+ 	/* set SDHC root clock to 200MHZ*/
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 200000000);
+-- 
+1.8.3.2
