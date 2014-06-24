@@ -1,25 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Jun 2014 13:50:57 -0400 (EDT)
-Subject: [PATCH 3/3] ARM: exynos: activate the CCI on boot CPU/cluster
- with the MCPM loopback
-In-Reply-To: <CAD=FV=W2KK1XPQiHnxzdBs8fXxsnsuggZg_hJU0zyHcvHt3Khw@mail.gmail.com>
-References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
- <1403583071-5650-4-git-send-email-nicolas.pitre@linaro.org>
- <CAD=FV=W2KK1XPQiHnxzdBs8fXxsnsuggZg_hJU0zyHcvHt3Khw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1406241347070.16842@knanqh.ubzr>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 24 Jun 2014 19:08:00 +0200
+Subject: [PATCH v7 7/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <1403560693-21809-8-git-send-email-keescook@chromium.org>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-8-git-send-email-keescook@chromium.org>
+Message-ID: <20140624170800.GA30480@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jun 2014, Doug Anderson wrote:
+On 06/23, Kees Cook wrote:
+>
+> +static pid_t seccomp_can_sync_threads(void)
+> +{
+> +	struct task_struct *thread, *caller;
+> +
+> +	BUG_ON(write_can_lock(&tasklist_lock));
+> +	BUG_ON(!spin_is_locked(&current->sighand->siglock));
+> +
+> +	if (current->seccomp.mode != SECCOMP_MODE_FILTER)
+> +		return -EACCES;
+> +
+> +	/* Validate all threads being eligible for synchronization. */
+> +	thread = caller = current;
+> +	for_each_thread(caller, thread) {
 
-> Thank you very much for posting!  With your series I'm able to boot
-> all 8 cores on exynos5420-peach-pit and exynos5800-peach-pi sitting on
-> my desk.
-> 
-> Tested-by: Doug Anderson <dianders@chromium.org>
+You only need to initialize "caller" for for_each_thread(). Same for
+seccomp_sync_threads().
 
-Thanks to all.  I've submitted those patches, with minor nits fixed, to 
-RMK's system as patches 8081 to 8083.
+> @@ -586,6 +701,17 @@ static long seccomp_set_mode_filter(unsigned int flags,
+>  	if (IS_ERR(prepared))
+>  		return PTR_ERR(prepared);
+>
+> +	/*
+> +	 * If we're doing thread sync, we must hold tasklist_lock
+> +	 * to make sure seccomp filter changes are stable on threads
+> +	 * entering or leaving the task list. And we must take it
+> +	 * before the sighand lock to avoid deadlocking.
+> +	 */
+> +	if (flags & SECCOMP_FILTER_FLAG_TSYNC)
+> +		write_lock_irqsave(&tasklist_lock, taskflags);
+> +	else
+> +		__acquire(&tasklist_lock); /* keep sparse happy */
+> +
 
+Why? ->siglock should be enough, it seems.
 
-Nicolas
+It obviously does not protect the global process list, but *sync_threads()
+only care about current's thread group list, no?
+
+Oleg.
