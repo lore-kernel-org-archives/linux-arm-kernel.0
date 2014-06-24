@@ -1,94 +1,38 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jun 2014 12:46:01 -0700
-Subject: [PATCH v7 3/9] seccomp: introduce writer locking
-In-Reply-To: <20140624183024.GA1258@redhat.com>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-4-git-send-email-keescook@chromium.org>
- <20140624183024.GA1258@redhat.com>
-Message-ID: <CAGXu5j+Khz+HH3QvfNWa3FdUspTEf-xLchBMLyCC_QN42xpLZA@mail.gmail.com>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Tue, 24 Jun 2014 09:09:11 -0500
+Subject: [PATCH 0/2] Introduce ARM GICv2m MSI(-X) support
+In-Reply-To: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <53A98687.7090408@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 11:30 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> I am puzzled by the usage of smp_load_acquire(),
+I've been running and doing development on top of these patches.  I 
+found a problem in an earlier version that i can confirm is now fixed in 
+this current version.
 
-It was recommended by Andy Lutomirski in preference to ACCESS_ONCE().
+Reviewed-by: Joel Schopp <joel.schopp@amd.com>
 
-> On 06/23, Kees Cook wrote:
->>
->>  static u32 seccomp_run_filters(int syscall)
->>  {
->> -     struct seccomp_filter *f;
->> +     struct seccomp_filter *f = smp_load_acquire(&current->seccomp.filter);
->>       struct seccomp_data sd;
->>       u32 ret = SECCOMP_RET_ALLOW;
->>
->>       /* Ensure unexpected behavior doesn't result in failing open. */
->> -     if (WARN_ON(current->seccomp.filter == NULL))
->> +     if (WARN_ON(f == NULL))
->>               return SECCOMP_RET_KILL;
->>
->>       populate_seccomp_data(&sd);
->> @@ -186,9 +186,8 @@ static u32 seccomp_run_filters(int syscall)
->>        * All filters in the list are evaluated and the lowest BPF return
->>        * value always takes priority (ignoring the DATA).
->>        */
->> -     for (f = current->seccomp.filter; f; f = f->prev) {
->> +     for (; f; f = smp_load_acquire(&f->prev)) {
->>               u32 cur_ret = SK_RUN_FILTER(f->prog, (void *)&sd);
->> -
->>               if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
->>                       ret = cur_ret;
+On 06/23/2014 07:32 PM, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 >
-> OK, in this case the 1st one is probably fine, altgough it is not
-> clear to me why it is better than read_barrier_depends().
+> This patch set introduces support for MSI(-X) in GICv2m specification,
+> which is implemented in some variation of GIC400.
 >
-> But why do we need a 2nd one inside the loop? And if we actually need
-> it (I don't think so) then why it is safe to use f->prog without
-> load_acquire ?
-
-You're right -- it should not be possible for for any of the ->prev
-pointers to change.
-
->>  void get_seccomp_filter(struct task_struct *tsk)
->>  {
->> -     struct seccomp_filter *orig = tsk->seccomp.filter;
->> +     struct seccomp_filter *orig = smp_load_acquire(&tsk->seccomp.filter);
->>       if (!orig)
->>               return;
+> This depends on and has been tested with the V7 of "Add support for PCI in AArch64"
+> (https://lkml.org/lkml/2014/3/14/320).
 >
-> This one looks unneeded.
+> Suravee Suthikulpanit (2):
+>    arm/gic: Add binding probe for GIC400
+>    arm/gic: Add supports for GICv2m MSI(-X)
 >
-> First of all, afaics atomic_inc() should work correctly without any barriers,
-> otherwise it is buggy. But even this doesn't matter.
+>   Documentation/devicetree/bindings/arm/gic.txt |  18 +-
+>   drivers/irqchip/Kconfig                       |   6 +
+>   drivers/irqchip/Makefile                      |   1 +
+>   drivers/irqchip/gic-msi-v2m.c                 | 249 ++++++++++++++++++++++++++
+>   drivers/irqchip/gic-msi-v2m.h                 |  20 +++
+>   drivers/irqchip/irq-gic.c                     |  23 ++-
+>   6 files changed, 313 insertions(+), 4 deletions(-)
+>   create mode 100644 drivers/irqchip/gic-msi-v2m.c
+>   create mode 100644 drivers/irqchip/gic-msi-v2m.h
 >
-> With this changes get_seccomp_filter() must be called under ->siglock, it can't
-> race with add-filter and thus tsk->seccomp.filter should be stable.
-
-Excellent point, yes. I'll remove that.
-
->>       /* Reference count is bounded by the number of total processes. */
->> @@ -361,7 +364,7 @@ void put_seccomp_filter(struct task_struct *tsk)
->>       /* Clean up single-reference branches iteratively. */
->>       while (orig && atomic_dec_and_test(&orig->usage)) {
->>               struct seccomp_filter *freeme = orig;
->> -             orig = orig->prev;
->> +             orig = smp_load_acquire(&orig->prev);
->>               seccomp_filter_free(freeme);
->>       }
->
-> This one looks unneeded too. And note that this patch does not add
-> smp_load_acquire() to read tsk->seccomp.filter.
-
-Hrm, yes, that should get added.
-
-> atomic_dec_and_test() adds mb(), we do not need more barriers to access
-> ->prev ?
-
-Right, same situation as the run_filters loop. Thanks!
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
