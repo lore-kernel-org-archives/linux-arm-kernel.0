@@ -1,130 +1,65 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 24 Jun 2014 10:16:25 +0100
-Subject: Regression on Integrator after commit 07e461cd7
-In-Reply-To: <CACRpkdZ_4xcfAjuOY7izwMvYg+zqA4stJ3gv_EdTiALmc1go3w@mail.gmail.com>
-References: <CACRpkdZ_4xcfAjuOY7izwMvYg+zqA4stJ3gv_EdTiALmc1go3w@mail.gmail.com>
-Message-ID: <20140624091625.7DFF0C40973@trevor.secretlab.ca>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jun 2014 10:18:08 +0100
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <53A4C0C9.2050908@codeaurora.org>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
+ <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
+Message-ID: <20140624091808.GC26013@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jun 2014 19:17:03 +0200, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi Grant,
+On Sat, Jun 21, 2014 at 12:16:25AM +0100, Olav Haugan wrote:
+> On 5/30/2014 12:06 PM, Arnd Bergmann wrote:
+> > On Friday 30 May 2014 08:16:05 Rob Herring wrote:
+> >> Presumably the ID would be the streamID on ARM's SMMU. How would a
+> >> master with 8 streamIDs be described? This is what Calxeda midway has
+> >> for SATA and I would expect that to be somewhat common. Either you
+> >> need some ID masking or you'll have lots of duplication when you have
+> >> windows.
+> > 
+> > I don't understand the problem. If you have stream IDs 0 through 7,
+> > you would have
+> > 
+> > 	master at a {
+> > 		...
+> > 		iommus = <&smmu 0>;
+> > 	};
+> > 
+> > 	master at b {
+> > 		...
+> > 		iommus = <&smmu 1;
+> > 	};
+> > 
+> > 	...
+> > 
+> > 	master at 12 {
+> > 		...
+> > 		iommus = <&smmu 7;
+> > 	};
+> > 
+> > and you don't need a window at all. Why would you need a mask of
+> > some sort?
 > 
-> The Integrators are not booting after commit
-> 07e461cd7e73a84f0e3757932b93cc80976fd749
-> "of: Ensure unique names without sacrificing determinism"
+> We have multiple-master SMMUs and each master emits a variable number of
+> StreamIDs. However, we have to apply a mask (the ARM SMMU spec allows
+> for this) to the StreamIDs due to limited number of StreamID 2 Context
+> Bank entries in the SMMU. If my understanding is correct we would
+> represent this in the DT like this:
 > 
-> i.e. these device trees:
-> arch/arm/boot/dts/integratorap.dts
-> arch/arm/boot/dts/integratorcp.dts
+> 	iommu {
+> 		#address-cells = <2>;
+> 		#size-cells = <0>;
+> 	};
 > 
-> It hangs very early boot at one time with the message:
-> Error: unrecognized/unsupported processor variant (0x41069262).
+> 	master at a {
+> 		...
+> 		iommus = <&iommu StreamID0 MASK0>,
+> 			 <&iommu StreamID1 MASK1>,
+> 			 <&iommu StreamID2 MASK2>;
+> 	};
 
-Hmmm, how early in boot? Can you get the log buffer out? It may be failing
-on a call to of_device_make_bus_id, but I suspect that something is
-failing to match against the new device name. The error message is very
-odd though. It is coming out from the DEBUG_LL block in __error_p
-(head-common.S), but the device naming code should be anywhere near
-early initalization code. I would expect to find at least something in the
-log buffer.
+Stupid question, but why not simply describe the masked IDs? What use does
+the `raw' ID have to Linux?
 
-I doubt there is anything wrong with the .dts files. Smells like a
-kernel bug.
-
-g.
-
-> 
-> Reverting that patch (manually) makes the platform boot again,
-> so it's definately caused by that.
-> 
-> Can you see what is wrong with these device trees, like if it's
-> something obvious that the code is not expecting? It's like
-> it cannot build the tree or something.
-> 
-> My revert does not look very nice but looks like this:
-> 
-> commit be15147f12a72b7bc63a8e18a2edd74123bcb5f0
-> Author: Linus Walleij <linus.walleij@linaro.org>
-> Date:   Mon Jun 23 18:59:58 2014 +0200
-> 
->     Revert "of: Ensure unique names without sacrificing determinism"
-> 
->     This reverts commit 07e461cd7e73a84f0e3757932b93cc80976fd749.
-> 
->     Conflicts:
->         drivers/of/platform.c
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 6c48d73a7fd7..71581921c1f3 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -64,35 +64,37 @@ EXPORT_SYMBOL(of_find_device_by_node);
->   * of_device_make_bus_id - Use the device node data to assign a unique name
->   * @dev: pointer to device structure that is linked to a device tree node
->   *
-> - * This routine will first try using the translated bus address to
-> - * derive a unique name. If it cannot, then it will prepend names from
-> - * parent nodes until a unique name can be derived.
-> + * This routine will first try using either the dcr-reg or the reg property
-> + * value to derive a unique name.  As a last resort it will use the node
-> + * name followed by a unique number.
->   */
->  void of_device_make_bus_id(struct device *dev)
->  {
-> +       static atomic_t bus_no_reg_magic;
->         struct device_node *node = dev->of_node;
->         const __be32 *reg;
->         u64 addr;
-> +       int magic;
-> 
-> -       /* Construct the name, using parent nodes if necessary to
-> ensure uniqueness */
-> -       while (node->parent) {
-> -               /*
-> -                * If the address can be translated, then that is as much
-> -                * uniqueness as we need. Make it the first component and return
-> -                */
-> -               reg = of_get_property(node, "reg", NULL);
-> -               if (reg && (addr = of_translate_address(node, reg)) !=
-> OF_BAD_ADDR) {
-> -                       dev_set_name(dev, dev_name(dev) ? "%llx.%s:%s"
-> : "%llx.%s",
-> -                                    (unsigned long long)addr, node->name,
-> -                                    dev_name(dev));
-> +       /*
-> +        * For MMIO, get the physical address
-> +        */
-> +       reg = of_get_property(node, "reg", NULL);
-> +       if (reg) {
-> +               addr = of_translate_address(node, reg);
-> +               if (addr != OF_BAD_ADDR) {
-> +                       dev_set_name(dev, "%llx.%s",
-> +                                    (unsigned long long)addr, node->name);
->                         return;
->                 }
-> -
-> -               /* format arguments only used if dev_name() resolves to NULL */
-> -               dev_set_name(dev, dev_name(dev) ? "%s:%s" : "%s",
-> -                            strrchr(node->full_name, '/') + 1, dev_name(dev));
-> -               node = node->parent;
->         }
-> +
-> +       /*
-> +        * No BusID, use the node name and add a globally incremented
-> +        * counter (and pray...)
-> +        */
-> +       magic = atomic_add_return(1, &bus_no_reg_magic);
-> +       dev_set_name(dev, "%s.%d", node->name, magic - 1);
->  }
-> 
->  /**
-> 
-> 
-> I have no real idea of how the OF core works so I'm a bit in the blue
-> here :-/
-> 
-> Any help appreciated!
-> 
-> Yours,
-> Linus Walleij
+Will
