@@ -1,68 +1,115 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jun 2014 11:29:12 +0100
-Subject: [PATCH RFC 24/30] net: fec: better implementation of iMX6
- ERR006358 quirk
-In-Reply-To: <20140622084911.GD32514@n2100.arm.linux.org.uk>
-References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
- <E1WxxhR-0005YP-Q1@rmk-PC.arm.linux.org.uk>
- <316b383d2512440db51ea7c55992920d@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140622081234.GB32514@n2100.arm.linux.org.uk>
- <56f5e44adf0b41a0bbf52c38b755afbd@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140622084911.GD32514@n2100.arm.linux.org.uk>
-Message-ID: <20140624102912.GM32514@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 24 Jun 2014 12:32:21 +0200
+Subject: [PATCH 1/2] documentation: add rockchip spi documentation
+In-Reply-To: <20140624101802.GE5856@leverpostej>
+References: <1403582324-9485-1-git-send-email-addy.ke@rock-chips.com>
+ <1403582324-9485-2-git-send-email-addy.ke@rock-chips.com>
+ <20140624101802.GE5856@leverpostej>
+Message-ID: <2324491.URDIcWcjph@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 09:49:11AM +0100, Russell King - ARM Linux wrote:
-> On Sun, Jun 22, 2014 at 08:38:49AM +0000, fugang.duan at freescale.com wrote:
-> > From: Russell King - ARM Linux <linux@arm.linux.org.uk> Data: Sunday, June 22, 2014 4:13 PM
-> > >To: Duan Fugang-B38611
-> > >Cc: linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org
-> > >Subject: Re: [PATCH RFC 24/30] net: fec: better implementation of iMX6
-> > >ERR006358 quirk
-> > >
-> > >On Sun, Jun 22, 2014 at 07:49:11AM +0000, fugang.duan at freescale.com wrote:
-> > >> From: Russell King <rmk@arm.linux.org.uk> Data: Friday, June 20, 2014
-> > >> 8:14 PM
-> > >> >To: linux-arm-kernel at lists.infradead.org
-> > >> >Cc: Duan Fugang-B38611; netdev at vger.kernel.org
-> > >> >Subject: [PATCH RFC 24/30] net: fec: better implementation of iMX6
-> > >> >ERR006358 quirk
-> > >> >
-> > >> >+
-> > >> >+	/* ERR006538: Keep the transmitter going */
-> > >> >+	if (fep->dirty_tx != fep->cur_tx &&
-> > >> >+	    readl(fep->hwp + FEC_X_DES_ACTIVE) == 0)
-> > >> >+		writel(0, fep->hwp + FEC_X_DES_ACTIVE);
-> > >> > }
-> > >> >
-> ...
-> > >While I agree that we can read back to check whether the device indicates
-> > >that transmit is active, there's no point to the other tests.  If there
-> > >are entries in the transmit ring but the transmitter indicates that it is
-> > >not active, then it is obvious that the bug has been hit.  This is exactly
-> > >what my implementation above does.
-> > >
-> > The condition "fep->dirty_tx != fep->cur_tx" is not only limited for the errata. 
-> > I mean only add extra trigger TDAR for the issue.
+Am Dienstag, 24. Juni 2014, 11:18:02 schrieb Mark Rutland:
+> On Tue, Jun 24, 2014 at 04:58:43AM +0100, addy ke wrote:
+> > Signed-off-by: addy ke <addy.ke@rock-chips.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/spi/spi-rockchip.txt       | 51
+> >  ++++++++++++++++++++++ 1 file changed, 51 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> > b/Documentation/devicetree/bindings/spi/spi-rockchip.txt new file mode
+> > 100644
+> > index 0000000..ce9c881
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> > @@ -0,0 +1,51 @@
+> > +* Rockchip SPI Controller
+> > +
+> > +The Rockchip SPI controller is used to interface with various devices
+> > such as flash +and display controllers using the SPI communication
+> > interface.
+> > +
+> > +Required SoC Specific Properties:
+> > +
+> > +- compatible: should be one of the following.
+> > +    - rockchip,rk3066-spi: for rk3066, rk3188 and rk3288 platforms.
 > 
-> Yes, I agree that test is wrong (that's what comes from shuffling the
-> patches... subsequent patches modify the indexing mechanism).  It should
-> be:
+> Are you sure you don't want specifc strings for rk3188 and rk3288 (in
+> addtion to the common "rockchip,rk3066-spi")?
+
+Wasn't the convention that "later" platforms that are compatible to an earlier 
+one, reuse this compatible string instead of introducing a new one?
+
+>From what I've heard so far, the specific spi controller got introduced with 
+the rk3066 [earlier SoCs used a different implementation] and didn't change for 
+rk3188 and rk3288. Addy may be able to verify this.
+
+
+> > +- reg: physical base address of the controller and length of memory
+> > mapped
+> > +       region.
+> > +- interrupts: The interrupt number to the cpu. The interrupt specifier
+> > format +              depends on the interrupt controller.
+> > +- clocks: Must contain an entry for each entry in clock-names.
+> > +- clock-names: Shall be "spiclk" for the transfer-clock, and "apb_pclk"
+> > for +			   the peripheral clock.
+> > +
+> > +Optional properties:
+> > +- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
+> > +		Documentation/devicetree/bindings/dma/dma.txt
+> > +- dma-names: DMA request names should include "tx" and "rx" if present.
+> > +
+> > +Example:
+> > +
+> > +- SoC Specific Portion:
+> > +
+> > +	spi0: spi at ff110000 {
+> > +		compatible = "rockchip,rockchip-spi";
 > 
->         if (bdp != fep->cur_tx &&
->             readl(fep->hwp + FEC_X_DES_ACTIVE) == 0)
->                 writel(0, fep->hwp + FEC_X_DES_ACTIVE);
+> This does not match the description of the compatible property.
 > 
-> Since "bdp" is the post-incremented dirty_tx pointer, which, when it is
-> equal to fep->cur_tx means that the ring is empty.
+> > +		reg = <0xff110000 0x1000>;
+> > +		dmas = <&pdma1 11>, <&pdma1 12>;
+> > +		dma-names = "tx", "rx";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> 
+> These weren't mentioned.
+> 
+> > +		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0 &spi0_cs1>;
+> 
+> pinctrl was not mentioned.
+> 
+> > +		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
+> > +		clock-names = "spiclk", "apb_pclk";
+> > +		status = "disabled";
+> 
+> Any reason for the status?
 
-Any further comments, or do I take the silence to mean that you agree
-with the above statement?  I would like to get this settled to I can
-spin v2 of this set.
+I guess to have the spi controller only be enabled when a board is using it as 
+below. But it may be an implementation detail which could be omitted from the 
+binding doc.
 
-Thanks.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> 
+> > +	};
+> > +
+> > +- Board Specific Portion:
+> > +
+> > +	&spi0 {
+> > +		status = "okay";
+> > +		spi_test at 00 {
+> > +			compatible = "rockchip,spi_test";
+> 
+> Huh?
+
+SPI declares it's devices similar to i2c, so while the example might profit 
+from a more casual device, I'm not exactly sure what is the problem here.
+
+
+Thanks
+Heiko
