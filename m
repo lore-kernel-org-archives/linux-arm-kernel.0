@@ -1,68 +1,62 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Jun 2014 15:57:10 +0200
-Subject: [PATCH 1/6] mmc: sdhci-s3c: Fix local I/O clock gating
+Date: Tue, 24 Jun 2014 15:57:13 +0200
+Subject: [PATCH 4/6] ARM: SAMSUNG: Restore Samsung PM Debug functionality
 In-Reply-To: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
 References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403618235-19353-2-git-send-email-t.figa@samsung.com>
+Message-ID: <1403618235-19353-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For internal card detection mechanism it is required that the local I/O
-clock is always running. However while current implementation accounts
-for this, it does so incorrectly leading to race conditions and warnings
-about unbalanced clock disables.
-
-This patch fixes it by inverting the logic, which now increases local
-I/O clock enable count when internal card detect is used, instead of
-decreasing it otherwise.
+Due to recently merged patches and previous merge conflicts, the Samsung
+PM Debug functionality no longer can be enabled. This patch fixes
+incorrect dependency of SAMSUNG_PM_DEBUG on an integer symbol and adds
+missing header inclusion.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Chris Ball <chris@printf.net>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: linux-mmc at vger.kernel.org
 ---
- drivers/mmc/host/sdhci-s3c.c | 17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
+ arch/arm/plat-samsung/Kconfig    | 8 +++++++-
+ arch/arm/plat-samsung/pm-debug.c | 1 +
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index fa5954a..1795e1f 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -487,8 +487,13 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
- 		goto err_pdata_io_clk;
- 	}
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 301b892..483c959 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -412,9 +412,14 @@ config S5P_DEV_MFC
  
--	/* enable the local io clock and keep it running for the moment. */
--	clk_prepare_enable(sc->clk_io);
-+	/*
-+	 * Keep local I/O clock enabled for internal card detect pin
-+	 * or runtime PM is disabled.
-+	 */
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL
-+	    || !IS_ENABLED(CONFIG_PM_RUNTIME))
-+		clk_prepare_enable(sc->clk_io);
+ comment "Power management"
  
- 	for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
- 		char name[14];
-@@ -611,15 +616,13 @@ static int sdhci_s3c_probe(struct platform_device *pdev)
- 		goto err_req_regs;
- 	}
++config HAVE_SAMSUNG_PM_DEBUG
++	bool
++	help
++	  Allow compilation of Samsung PM debugging code.
++
+ config SAMSUNG_PM_DEBUG
+ 	bool "S3C2410 PM Suspend debug"
+-	depends on PM && DEBUG_KERNEL && DEBUG_S3C_UART
++	depends on PM && DEBUG_KERNEL && HAVE_SAMSUNG_PM_DEBUG
+ 	help
+ 	  Say Y here if you want verbose debugging from the PM Suspend and
+ 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
+@@ -484,6 +489,7 @@ config S5P_SLEEP
  
--#ifdef CONFIG_PM_RUNTIME
--	if (pdata->cd_type != S3C_SDHCI_CD_INTERNAL)
--		clk_disable_unprepare(sc->clk_io);
--#endif
- 	return 0;
+ config DEBUG_S3C_UART
+ 	depends on PLAT_SAMSUNG
++	select HAVE_SAMSUNG_PM_DEBUG
+ 	int
+ 	default "0" if DEBUG_S3C_UART0
+ 	default "1" if DEBUG_S3C_UART1
+diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
+index 8f19f66..3960960 100644
+--- a/arch/arm/plat-samsung/pm-debug.c
++++ b/arch/arm/plat-samsung/pm-debug.c
+@@ -14,6 +14,7 @@
+  */
  
-  err_req_regs:
-  err_no_busclks:
--	clk_disable_unprepare(sc->clk_io);
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL
-+	    || !IS_ENABLED(CONFIG_PM_RUNTIME))
-+		clk_disable_unprepare(sc->clk_io);
+ #include <linux/serial_core.h>
++#include <linux/serial_s3c.h>
+ #include <linux/io.h>
  
-  err_pdata_io_clk:
- 	sdhci_free_host(host);
+ #include <asm/mach/map.h>
 -- 
 1.9.3
