@@ -1,66 +1,37 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Tue, 24 Jun 2014 13:52:59 +0530
-Subject: [PATCH 3/3] ARM: exynos: activate the CCI on boot CPU/cluster
- with the MCPM loopback
-In-Reply-To: <1403583071-5650-4-git-send-email-nicolas.pitre@linaro.org>
-References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
- <1403583071-5650-4-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <53A93563.2050409@gmail.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Tue, 24 Jun 2014 09:35:51 +0100
+Subject: [PATCH V2 0/2] Sound support for Exynos4412 Odroid X2, U3 board
+In-Reply-To: <53A856AE.1030202@samsung.com>
+References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
+ <CAD8Lp44h6zc2Rt2MGLjhmNG-YB0kYCWf5G7hX5JmdmBfc1PvKg@mail.gmail.com>
+ <53A856AE.1030202@samsung.com>
+Message-ID: <CAD8Lp46gqbV9gDfrH2hbVnF7s6wK6ASBdsX7vn0L0CFAHXSemg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 09:41 AM, Nicolas Pitre wrote:
-> The Chromebook firmware doesn't enable the CCI for the boot cpu, and
-> arguably it shouldn't have to either. Let's have the kernel handle the
-> CCI on its own for the boot CPU the same way it does it for secondary CPUs
-> by using the MCPM loopback.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
+On Mon, Jun 23, 2014 at 5:32 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> I could reproduce such behaviour on the U3 board, but only with u-boot
+> which sets the MPLL clock frequency (fout_mpll) to 880 MHz, rather
+> than 800 MHz, which was the case in my original environment.
+> All fout_mpll child clocks have then different frequency values
+> in both cases.
+> It's a bit strange though, because frequencies of all the audio
+> subsystem clocks seem to be same anyway:
 
-Tested on top of next-20140623. Verified that all 8 cores are coming up
-on Exynos5800 based Peach-pi board.
+I'm using the standard uboot from hardkernel.
 
-Tested-by: Tushar Behera <tushar.b@samsung.com>
+> # cat /sys/kernel/debug/clk/clk_summary
 
->  arch/arm/mach-exynos/mcpm-exynos.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 0498d0b887..0c839f94ec 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -290,6 +290,19 @@ static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
->  	"b	cci_enable_port_for_self");
->  }
->  
-> +static void __init exynos_cache_off(void)
-> +{
-> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A15) {
-> +		/* disable L2 prefetching on the Cortex-A15 */
-> +		asm volatile(
-> +		"mcr	p15, 1, %0, c15, c0, 3\n\t"
-> +		"isb\n\t"
-> +		"dsb"
-> +		: : "r" (0x400));
-> +	}
-> +	exynos_v7_exit_coherency_flush(all);
-> +}
-> +
->  static const struct of_device_id exynos_dt_mcpm_match[] = {
->  	{ .compatible = "samsung,exynos5420" },
->  	{ .compatible = "samsung,exynos5800" },
-> @@ -333,6 +346,8 @@ static int __init exynos_mcpm_init(void)
->  	ret = mcpm_platform_register(&exynos_power_ops);
->  	if (!ret)
->  		ret = mcpm_sync_init(exynos_pm_power_up_setup);
-> +	if (!ret)
-> +		ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
->  	if (ret) {
->  		iounmap(ns_sram_base_addr);
->  		return ret;
-> 
+This command makes the kernel totally hang, weird.
 
+# speaker-test -c 2 -t wav -l 2 -p 1024
 
--- 
-Tushar Behera
+This plays back fine.
+
+Could it be a problem with the samsung-i2s driver, not correctly
+flushing at the right times?
+Or do you think the problem is more likely to be clock-related?
+
+Thanks
+Daniel
