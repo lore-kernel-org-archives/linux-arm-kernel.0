@@ -1,29 +1,27 @@
-From: dianders@google.com (Doug Anderson)
-Date: Tue, 24 Jun 2014 09:15:51 -0700
-Subject: [PATCH 3/3] ARM: exynos: activate the CCI on boot CPU/cluster
- with the MCPM loopback
-In-Reply-To: <1403583071-5650-4-git-send-email-nicolas.pitre@linaro.org>
-References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
- <1403583071-5650-4-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <CAD=FV=W2KK1XPQiHnxzdBs8fXxsnsuggZg_hJU0zyHcvHt3Khw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Jun 2014 17:20:48 +0100
+Subject: [PATCH] arm: exynos: Modify pm code to check for cortex A9
+ rather than the SoC
+In-Reply-To: <20140624161114.GW32514@n2100.arm.linux.org.uk>
+References: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voa=3zzo-2KbjDtBOca+uJeSxT2OYpi+rJuSGsDg-vo7GYA@mail.gmail.com>
+ <20140624161114.GW32514@n2100.arm.linux.org.uk>
+Message-ID: <20140624162048.GX32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+On Tue, Jun 24, 2014 at 05:11:14PM +0100, Russell King - ARM Linux wrote:
+> Another point: exynos have taken it upon themselves to add code which
+> saves various ARM core registers.  This is a bad idea, it brings us
+> back to the days where every platform did their own suspend implementations.
+> 
+> CPU level registers should be handled by CPU level code, not by platform
+> code.  Is there a reason why this can't be added to the Cortex-A9
+> support code in proc-v7.S ?
 
-On Mon, Jun 23, 2014 at 9:11 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> The Chromebook firmware doesn't enable the CCI for the boot cpu, and
-> arguably it shouldn't have to either. Let's have the kernel handle the
-> CCI on its own for the boot CPU the same way it does it for secondary CPUs
-> by using the MCPM loopback.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  arch/arm/mach-exynos/mcpm-exynos.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+BTW, Shawn Guo recently posted a patch to add the diagnostic register
+save/restore to proc-v7.S.
 
-Thank you very much for posting!  With your series I'm able to boot
-all 8 cores on exynos5420-peach-pit and exynos5800-peach-pi sitting on
-my desk.
-
-Tested-by: Doug Anderson <dianders@chromium.org>
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
