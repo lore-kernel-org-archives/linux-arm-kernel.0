@@ -1,80 +1,172 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Tue, 24 Jun 2014 14:28:13 -0500
-Subject: [PATCH v2 9/9] arm64: KVM: vgic: deal with GIC sub-page alignment
-In-Reply-To: <1403169693-13982-10-git-send-email-marc.zyngier@arm.com>
-References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
- <1403169693-13982-10-git-send-email-marc.zyngier@arm.com>
-Message-ID: <53A9D14D.2020802@amd.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 24 Jun 2014 13:26:57 -0700
+Subject: [PATCH v7 3/9] seccomp: introduce writer locking
+In-Reply-To: <20140624183550.GB1258@redhat.com>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-4-git-send-email-keescook@chromium.org>
+ <20140624165216.GA29272@redhat.com>
+ <CAGXu5j+G8qAkGD7H=3R2iw2ZTqZSrMPa2f=czoEjwSW5wKqUWQ@mail.gmail.com>
+ <20140624183550.GB1258@redhat.com>
+Message-ID: <CAGXu5jJvAhnVVLvwvC54YUWvZngQGAAhoGoqvDsHs3SK723O5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/19/2014 04:21 AM, Marc Zyngier wrote:
-> The GIC CPU interface is always 4k aligned. If the host is using
-> 64k pages, it is critical to place the guest's GICC interface at the
-> same relative alignment as the host's GICV. Failure to do so results
-> in an impossibility for the guest to deal with interrupts.
+On Tue, Jun 24, 2014 at 11:35 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> On 06/24, Kees Cook wrote:
+>> On Tue, Jun 24, 2014 at 9:52 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> >> @@ -1142,6 +1168,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>> >>  {
+>> >>       int retval;
+>> >>       struct task_struct *p;
+>> >> +     unsigned long irqflags;
+>> >>
+>> >>       if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
+>> >>               return ERR_PTR(-EINVAL);
+>> >> @@ -1196,7 +1223,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>> >>               goto fork_out;
+>> >>
+>> >>       ftrace_graph_init_task(p);
+>> >> -     get_seccomp_filter(p);
+>> >>
+>> >>       rt_mutex_init_task(p);
+>> >>
+>> >> @@ -1434,7 +1460,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>> >>               p->parent_exec_id = current->self_exec_id;
+>> >>       }
+>> >>
+>> >> -     spin_lock(&current->sighand->siglock);
+>> >> +     spin_lock_irqsave(&current->sighand->siglock, irqflags);
+>> >> +
+>> >> +     /*
+>> >> +      * Copy seccomp details explicitly here, in case they were changed
+>> >> +      * before holding tasklist_lock.
+>> >> +      */
+>> >> +     copy_seccomp(p);
+>> >>
+>> >>       /*
+>> >>        * Process group and session signals need to be delivered to just the
+>> >> @@ -1446,7 +1478,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>> >>       */
+>> >>       recalc_sigpending();
+>> >>       if (signal_pending(current)) {
+>> >> -             spin_unlock(&current->sighand->siglock);
+>> >> +             spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+>> >>               write_unlock_irq(&tasklist_lock);
+>> >>               retval = -ERESTARTNOINTR;
+>> >>               goto bad_fork_free_pid;
+>> >> @@ -1486,7 +1518,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>> >>       }
+>> >>
+>> >>       total_forks++;
+>> >> -     spin_unlock(&current->sighand->siglock);
+>> >> +     spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+>> >>       write_unlock_irq(&tasklist_lock);
+>> >>       proc_fork_connector(p);
+>> >>       cgroup_post_fork(p);
+>> >
+>> > It seems that the only change copy_process() needs is copy_seccomp() under the locks.
+>> > Everythinh else (irqflags games) looks obviously unneeded?
+>>
+>> I got irq lock dep warnings without these changes.
 >
-> Add a KVM_DEV_ARM_VGIC_GRP_ADDR_OFFSET attribute for the VGIC, allowing
-> userspace to retrieve the GICV offset in a page. It becomes then trivial
-> to adjust the GICC base address for the guest.
+> With or without your patches? Could you show the waring?
 
-Does this mean there is a corresponding patch for qemu?
+It seems it's only needed in seccomp itself (I can drop the changes in
+kernel/fork.c). I get no warnings in that case. If I also remove irq
+handling from seccomp, I see:
 
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm/include/uapi/asm/kvm.h   | 1 +
->   arch/arm64/include/uapi/asm/kvm.h | 1 +
->   virt/kvm/arm/vgic.c               | 7 +++++++
->   3 files changed, 9 insertions(+)
->
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 8b51c1a..056b782 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -174,6 +174,7 @@ struct kvm_arch_memory_slot {
->   #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
->   #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
->   #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
-> +#define KVM_DEV_ARM_VGIC_GRP_ADDR_OFFSET 4
->   
->   /* KVM_IRQ_LINE irq field index values */
->   #define KVM_ARM_IRQ_TYPE_SHIFT		24
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index b5cd6ed..5513de4 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -160,6 +160,7 @@ struct kvm_arch_memory_slot {
->   #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
->   #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
->   #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
-> +#define KVM_DEV_ARM_VGIC_GRP_ADDR_OFFSET 4
->   
->   /* KVM_IRQ_LINE irq field index values */
->   #define KVM_ARM_IRQ_TYPE_SHIFT		24
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index b0cd417..68ac9c6 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -2228,6 +2228,12 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
->   		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
->   		break;
->   	}
-> +	case KVM_DEV_ARM_VGIC_GRP_ADDR_OFFSET: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u32 val = vgic->vcpu_base & ~PAGE_MASK;
-> +		r = put_user(val, uaddr);
-> +		break;
-> +	}
->   
->   	}
->   
-> @@ -2265,6 +2271,7 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
->   		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
->   		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
->   	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-> +	case KVM_DEV_ARM_VGIC_GRP_ADDR_OFFSET:
->   		return 0;
->   	}
->   	return -ENXIO;
+[   17.444328]
+[   17.445031] =================================
+[   17.445031] [ INFO: inconsistent lock state ]
+[   17.445031] 3.16.0-rc2+ #289 Not tainted
+[   17.445031] ---------------------------------
+[   17.445031] inconsistent {IN-HARDIRQ-W} -> {HARDIRQ-ON-W} usage.
+[   17.445031] seccomp_bpf_tes/1987 [HC0[0]:SC0[0]:HE1:SE1] takes:
+[   17.445031]  (&(&sighand->siglock)->rlock){?.....}, at:
+[<ffffffff9e2fb7e5>] do_seccomp.part.7+0x25/0xc0
+[   17.445031] {IN-HARDIRQ-W} state was registered at:
+[   17.445031]   [<ffffffff9e2a422a>] mark_irqflags+0x19a/0x1b0
+[   17.445031]   [<ffffffff9e2a4542>] __lock_acquire+0x302/0x9e0
+[   17.445031]   [<ffffffff9e2a5325>] lock_acquire+0x95/0x1e0
+[   17.445031]   [<ffffffff9ebda204>] _raw_spin_lock+0x34/0x50
+[   17.445031]   [<ffffffff9e263e70>] __lock_task_sighand+0xa0/0x230
+[   17.445031]   [<ffffffff9e2652cf>] send_sigqueue+0x3f/0x280
+[   17.445031]   [<ffffffff9e2781e3>] posix_timer_event+0x83/0x140
+[   17.445031]   [<ffffffff9e2782f2>] posix_timer_fn+0x52/0xd0
+[   17.445031]   [<ffffffff9e27d3bc>] __run_hrtimer+0x7c/0x420
+[   17.445031]   [<ffffffff9e27de27>] hrtimer_interrupt+0x107/0x260
+[   17.445031]   [<ffffffff9e235aa6>] local_apic_timer_interrupt+0x36/0x60
+[   17.445031]   [<ffffffff9e235f1e>] smp_apic_timer_interrupt+0x3e/0x60
+[   17.445031]   [<ffffffff9ebdbf2f>] apic_timer_interrupt+0x6f/0x80
+[   17.445031]   [<ffffffff9e20d99a>] arch_cpu_idle+0xa/0x10
+[   17.445031]   [<ffffffff9e29d587>] cpuidle_idle_call+0x157/0x3d0
+[   17.445031]   [<ffffffff9e29d945>] cpu_idle_loop+0x145/0x370
+[   17.445031]   [<ffffffff9e29dbc6>] cpu_startup_entry+0x56/0x60
+[   17.445031]   [<ffffffff9e234544>] start_secondary+0xd4/0xe0
+[   17.445031] irq event stamp: 243
+[   17.445031] hardirqs last  enabled at (243): [<ffffffff9e2b9d00>]
+__call_rcu.constprop.63+0x70/0x120
+[   17.445031] hardirqs last disabled at (242): [<ffffffff9e2b9cd2>]
+__call_rcu.constprop.63+0x42/0x120
+[   17.445031] softirqs last  enabled at (50): [<ffffffff9e256310>]
+__do_softirq+0x1d0/0x4d0
+[   17.445031] softirqs last disabled at (21): [<ffffffff9e2568be>]
+irq_exit+0x8e/0xb0
+[   17.445031]
+[   17.445031] other info that might help us debug this:
+[   17.445031]  Possible unsafe locking scenario:
+[   17.445031]
+[   17.445031]        CPU0
+[   17.445031]        ----
+[   17.445031]   lock(&(&sighand->siglock)->rlock);
+[   17.445031]   <Interrupt>
+[   17.445031]     lock(&(&sighand->siglock)->rlock);
+[   17.445031]
+[   17.445031]  *** DEADLOCK ***
+[   17.445031]
+[   17.445031] no locks held by seccomp_bpf_tes/1987.
+[   17.445031]
+[   17.445031] stack backtrace:
+[   17.445031] CPU: 0 PID: 1987 Comm: seccomp_bpf_tes Not tainted
+3.16.0-rc2+ #289
+[   17.445031] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996),
+BIOS Bochs 01/01/2011
+[   17.445031]  ffffffff9f71dd90 ffff88007878bc48 ffffffff9ebc4fb4
+0000000000000007
+[   17.445031]  ffff880077fb3570 ffff88007878bca8 ffffffff9ebbad0d
+0000000000000000
+[   17.445031]  0000000000000001 00007fff00000001 ffff88007878bd70
+ffff88007878bd18
+[   17.445031] Call Trace:
+[   17.445031]  [<ffffffff9ebc4fb4>] dump_stack+0x4e/0x68
+[   17.445031]  [<ffffffff9ebbad0d>] print_usage_bug+0x1f1/0x202
+[   17.445031]  [<ffffffff9e2a26e0>] ? check_usage_forwards+0x150/0x150
+[   17.445031]  [<ffffffff9ebbad8a>] mark_lock_irq+0x6c/0x137
+[   17.445031]  [<ffffffff9e2a3ff5>] mark_lock+0x125/0x1c0
+[   17.445031]  [<ffffffff9e2a41c8>] mark_irqflags+0x138/0x1b0
+[   17.445031]  [<ffffffff9e2a4542>] __lock_acquire+0x302/0x9e0
+[   17.445031]  [<ffffffff9e383a0c>] ? create_object+0x21c/0x2d0
+[   17.445031]  [<ffffffff9e2a5325>] lock_acquire+0x95/0x1e0
+[   17.445031]  [<ffffffff9e2fb7e5>] ? do_seccomp.part.7+0x25/0xc0
+[   17.445031]  [<ffffffff9e2a5e55>] ? trace_hardirqs_on_caller+0x105/0x1d0
+[   17.445031]  [<ffffffff9ebda204>] _raw_spin_lock+0x34/0x50
+[   17.445031]  [<ffffffff9e2fb7e5>] ? do_seccomp.part.7+0x25/0xc0
+[   17.445031]  [<ffffffff9e27ffc5>] ? abort_creds+0x45/0x50
+[   17.445031]  [<ffffffff9e2fb7e5>] do_seccomp.part.7+0x25/0xc0
+[   17.445031]  [<ffffffff9e2fbf28>] do_seccomp+0x18/0x40
+[   17.445031]  [<ffffffff9e2fc1df>] prctl_set_seccomp+0x2f/0x40
+[   17.445031]  [<ffffffff9e26bce1>] SyS_prctl+0x141/0x4b0
+[   17.445031]  [<ffffffff9e2f306c>] ? __audit_syscall_entry+0x8c/0xe0
+[   17.445031]  [<ffffffff9e59556e>] ? trace_hardirqs_on_thunk+0x3a/0x3f
+[   17.445031]  [<ffffffff9ebdb012>] system_call_fastpath+0x16/0x1b
+
+
+I'll drop the fork.c changes, and keep the seccomp.c irqflags.
+
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
