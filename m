@@ -1,75 +1,64 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 24 Jun 2014 14:33:20 -0700
-Subject: [PATCH] ARM: DTS: correct the capability string for mmc0
-In-Reply-To: <034701cf8ed7$70c78330$52568990$@samsung.com>
-References: <1403522420-1208-1-git-send-email-ch.naveen@samsung.com>
- <034701cf8ed7$70c78330$52568990$@samsung.com>
-Message-ID: <CAD=FV=XJpx_otzW-dWNj1rnXMYab7vPGjo2KNirwyVKtEKat2w@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Tue, 24 Jun 2014 14:35:54 -0700
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140624181150.GB4067@arm.com>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
+ <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
+ <20140624091808.GC26013@arm.com> <53A9BC18.2090106@codeaurora.org>
+ <20140624181150.GB4067@arm.com>
+Message-ID: <53A9EF3A.2070704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 23, 2014 at 4:36 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Naveen Krishna Chatradhi wrote:
+On 6/24/2014 11:11 AM, Will Deacon wrote:
+> On Tue, Jun 24, 2014 at 06:57:44PM +0100, Olav Haugan wrote:
+>> On 6/24/2014 2:18 AM, Will Deacon wrote:
+>>> On Sat, Jun 21, 2014 at 12:16:25AM +0100, Olav Haugan wrote:
+>>>> We have multiple-master SMMUs and each master emits a variable number of
+>>>> StreamIDs. However, we have to apply a mask (the ARM SMMU spec allows
+>>>> for this) to the StreamIDs due to limited number of StreamID 2 Context
+>>>> Bank entries in the SMMU. If my understanding is correct we would
+>>>> represent this in the DT like this:
+>>>>
+>>>> 	iommu {
+>>>> 		#address-cells = <2>;
+>>>> 		#size-cells = <0>;
+>>>> 	};
+>>>>
+>>>> 	master at a {
+>>>> 		...
+>>>> 		iommus = <&iommu StreamID0 MASK0>,
+>>>> 			 <&iommu StreamID1 MASK1>,
+>>>> 			 <&iommu StreamID2 MASK2>;
+>>>> 	};
+>>>
+>>> Stupid question, but why not simply describe the masked IDs? What use does
+>>> the `raw' ID have to Linux?
 >>
->> MMC capability for HS200 is parsed in mmc/core/host.c as
->> dts string "mmc-hs200-1_8v".
+>> We do describe the masked StreamID (SID) but we need to specify the mask
+>> that the SMMU should apply to the incoming SIDs, right?
 >>
->> This patch corrects the dts string for Exynos5420 based peach-pit
->> and Exynos5800 based peach-pi boards.
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    2 +-
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-
->> peach-pit.dts
->> index 7649982..7dea480 100644
->> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> @@ -173,7 +173,7 @@
->>       status = "okay";
->>       num-slots = <1>;
->>       broken-cd;
->> -     caps2-mmc-hs200-1_8v;
->> +     mmc-hs200-1_8v;
->>       supports-highspeed;
->>       non-removable;
->>       card-detect-delay = <200>;
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-
->> peach-pi.dts
->> index 2c2c137..bb3ee76 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -171,7 +171,7 @@
->>       status = "okay";
->>       num-slots = <1>;
->>       broken-cd;
->> -     caps2-mmc-hs200-1_8v;
->> +     mmc-hs200-1_8v;
->>       supports-highspeed;
->>       non-removable;
->>       card-detect-delay = <200>;
->> --
->> 1.7.9.5
->
-> Applied, thanks.
+>> We have a bus master that emits 43 unique SIDs. However, we have only 40
+>> SMMU_SMRn registers in the SMMU. So we need to mask out some of the
+>> incoming SID bits so that the 43 SIDs can match one of 40 entries in the
+>> SMR.
+> 
+> Hmm, so you're talking about stream matching, right? That doesn't belong in
+> the device-tree. I appreciate that the current driver does a terrible job at
+> allocating the SMRs (it's bloody difficult!), but we should try to improve
+> the dynamic behaviour instead of moving configuration of the SMMU out into
+> device-tree, where it's inflexible at best.
 
-As an FYI: this patch (while correct) will likely cause sporadic boot
-failures until Sonny and my patches land:
+I am talking about SMMU_SMRn[MASK] register bits. This is not something
+that can be dynamically detected at run-time. It is configuration at the
+same level as the actual StreamIDs.
 
-* https://patchwork.kernel.org/patch/4323921/
-  mmc: dw_mmc: Make sure we don't get stuck when we get an error
+Thanks,
 
-* https://patchwork.kernel.org/patch/4213211/
-  mmc: dw_mmc: change to use recommended reset procedure
 
-In the very least we got sporadic boot failures locally when we
-enabled hs200 and didn't have the "don't get stuck" patch.  I will
-also note that it would have been nice had this patch title included
-the words exynos and/or pit/pi in it.
+Olav Haugan
 
--Doug
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
