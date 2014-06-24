@@ -1,42 +1,78 @@
-From: slapdau@yahoo.com.au (Craig McGeachie)
-Date: Tue, 24 Jun 2014 18:21:24 +1200
-Subject: [RFC PATCH 2/3] Enable BCM2835 mailbox support
-In-Reply-To: <1403433943.532.1.camel@goatlord.localdomain>
-References: <5232F7C2.3070408@yahoo.com.au>
- <1403433943.532.1.camel@goatlord.localdomain>
-Message-ID: <53A918E4.4080707@yahoo.com.au>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Tue, 24 Jun 2014 12:13:21 +0530
+Subject: [PATCH v2] ARM: dts: Add cros_ec to exynos5420-peach-pit and
+ exynos5800-peach-pi
+In-Reply-To: <1403556576-8038-1-git-send-email-dianders@chromium.org>
+References: <1403556576-8038-1-git-send-email-dianders@chromium.org>
+Message-ID: <53A91E09.7050603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/14 22:45, Lubomir Rintel wrote:
-> Hi Craig,
-> As the work on common mailbox framework progressed, I've updated the
-> driver to work with v7 of it (I've also ported the cpufreq and vchiq
-> drivers, which I'd like to post once the mailbox framework and your
-> drivers are in):
->
-> https://github.com/hackerspace/rpi-linux/commits/lr-vchiq-new-mailbox
->
-> I'm not sending inline patches for review, since neither the framework
-> nor your your mbox and thermal drivers are in yet, but I'm wondering if
-> you could take a look and eventually fold the changes back into your
-> drivers? (I've kept them in separate commits in my tree, so that it's
-> easy for you to keep track of the changes).
+On 06/24/2014 02:19 AM, Doug Anderson wrote:
+> This adds cros_ec to exynos5420-peach-pit and exynos5800-peach-pi,
+> including:
+> * The keyboard
+> * The i2c tunnel
+> * The tps65090 under the i2c tunnel
+> * The battery under the i2c tunnel
+> 
+> To add extra motivation, it should be noted that tps65090 is one of
+> the things needed to get display-related FETs turned on for pit and
+> pi.
+> 
+> Note that this relies on a few outstanding changes:
+> * Needs (spi: s3c64xx: fix broken "cs_gpios" usage in the driver) and
+>   (spi: s3c64xx: for DT platofrms always get the chipselect info from
+>   DT node) to work properly and match the documented bindings.  See
+>   <https://patchwork.kernel.org/patch/4346701/> and
+>   <https://patchwork.kernel.org/patch/4346711/>
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-It's been 9 months since I last looked at this.  I've been watching the 
-work on the mailbox framework, with considerable interest, over the last 
-week, but have not actively done anything with it.
+Along with the dependency patches on next-20140623, tested keyboard on
+Peach-Pi board.
 
-I have a few other projects at the moment, and given that I only do this 
-in my spare time in the evenings, it will take several days to get back 
-into it.  But I will make an effort to import, build, and try them out. 
-In the meantime I've had a brief look at the changes that you made and 
-can see nothing wrong with any of them.  The "useless gotoes" were 
-embarrassing.
+Tested-by: Tushar Behera <tushar.b@samsung.com>
 
-Although I can pull your changes back into my tree, I don't feel that 
-this will be helpful in getting them accepted into the mainline. But I'm 
-happy enough to format a patch and submit it somewhere, at some point.
+Some comments below.
 
-Cheers,
-Craig.
+> ---
+> Changes in v2:
+> - Now just one patch since mfd patch landed.
+> - Rebased to ToT linux-next
+> 
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 145 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 145 +++++++++++++++++++++++++++++
+>  2 files changed, 290 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 7649982..581f385 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+
+> +				regulators {
+> +					dcdc1 {
+> +						ti,enable-ext-control;
+> +					};
+> +					dcdc2 {
+> +						ti,enable-ext-control;
+> +					};
+> +					dcdc3 {
+> +						ti,enable-ext-control;
+> +					};
+> +					fet1 {
+
+"tps65090_fet1: fet1 {" ?
+
+> +						regulator-name = "vcd_led";
+> +					};
+> +					tps65090_fet2: fet2 {
+
+I would suggest we add similar labels to fet1, fet3, fet4, fet5 and fet6
+also. That way it would be easy to reference them in subsequent DT nodes.
+
+Same comment for Peach-Pi dts file too.
+
+-- 
+Tushar Behera
