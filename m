@@ -1,32 +1,31 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 24 Jun 2014 11:19:53 +0100
-Subject: [PATCH v3 6/8] dt-bindings: ata: document ability to disable
- spread-spectrum clock
+Date: Tue, 24 Jun 2014 11:19:58 +0100
+Subject: [PATCH v3 7/8] ARM: dts: cubox-i: add eSATA DT configuration
 In-Reply-To: <20140624101901.GL32514@n2100.arm.linux.org.uk>
 References: <20140624101901.GL32514@n2100.arm.linux.org.uk>
-Message-ID: <E1WzNpR-0005e1-0Y@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WzNpW-0005e5-41@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation of the fsl,no-spread-spectrum option.
+Add the transmit level, boost and attenuation parameters necessary for
+the eSATA interface on Cubox-i to work.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- Documentation/devicetree/bindings/ata/imx-sata.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/imx6q-cubox-i.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/imx-sata.txt b/Documentation/devicetree/bindings/ata/imx-sata.txt
-index a13f0f603776..fa511db18408 100644
---- a/Documentation/devicetree/bindings/ata/imx-sata.txt
-+++ b/Documentation/devicetree/bindings/ata/imx-sata.txt
-@@ -20,6 +20,8 @@ with some special extensions at integration level.
- - fsl,receive-eq-mdB : receive equalisation, in milli-decibels
-   Please refer to the technical documentation or the driver source code
-   for the list of legal values for these options.
-+- fsl,no-spread-spectrum : disable spread-spectrum clocking on the SATA
-+  link.
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
+index bc5f31e3e892..941365d7ee65 100644
+--- a/arch/arm/boot/dts/imx6q-cubox-i.dts
++++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
+@@ -13,4 +13,7 @@
  
- Examples:
- 
+ &sata {
+ 	status = "okay";
++	fsl,transmit-level-mV = <1104>;
++	fsl,transmit-boost-mdB = <0>;
++	fsl,transmit-atten-16ths = <9>;
+ };
 -- 
 1.8.3.1
