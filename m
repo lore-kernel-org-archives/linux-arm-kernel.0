@@ -1,78 +1,49 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Tue, 24 Jun 2014 12:13:21 +0530
-Subject: [PATCH v2] ARM: dts: Add cros_ec to exynos5420-peach-pit and
- exynos5800-peach-pi
-In-Reply-To: <1403556576-8038-1-git-send-email-dianders@chromium.org>
-References: <1403556576-8038-1-git-send-email-dianders@chromium.org>
-Message-ID: <53A91E09.7050603@gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 24 Jun 2014 15:00:20 +0800
+Subject: [PATCH 2/2] arm64: dts: Add PMU node for APM X-Gene Storm SOC
+In-Reply-To: <53A8F388.80101@redhat.com>
+References: <1395308847-16317-1-git-send-email-vkale@apm.com>
+ <1395308847-16317-3-git-send-email-vkale@apm.com>
+ <CACVXFVMiOvV=CytiaLFgEdt3_f7frJ6afjz39iLhafOhvJ0m7g@mail.gmail.com>
+ <53A8F388.80101@redhat.com>
+Message-ID: <CACVXFVNpy3PM0FYO68afs_ffBErTWAOR2u9w0VNppp7RjD-0xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 02:19 AM, Doug Anderson wrote:
-> This adds cros_ec to exynos5420-peach-pit and exynos5800-peach-pi,
-> including:
-> * The keyboard
-> * The i2c tunnel
-> * The tps65090 under the i2c tunnel
-> * The battery under the i2c tunnel
-> 
-> To add extra motivation, it should be noted that tps65090 is one of
-> the things needed to get display-related FETs turned on for pit and
-> pi.
-> 
-> Note that this relies on a few outstanding changes:
-> * Needs (spi: s3c64xx: fix broken "cs_gpios" usage in the driver) and
->   (spi: s3c64xx: for DT platofrms always get the chipselect info from
->   DT node) to work properly and match the documented bindings.  See
->   <https://patchwork.kernel.org/patch/4346701/> and
->   <https://patchwork.kernel.org/patch/4346711/>
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Hi Jon and Vinayak,
 
-Along with the dependency patches on next-20140623, tested keyboard on
-Peach-Pi board.
+On Tue, Jun 24, 2014 at 11:42 AM, Jon Masters <jcm@redhat.com> wrote:
+> On 06/23/2014 10:47 PM, Ming Lei wrote:
+>
+>> On Thu, Mar 20, 2014 at 5:47 PM, Vinayak Kale <vkale@apm.com> wrote:
+>>> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
+>>>
+>>> Please note that this patch has dependancy on a GIC driver patch [1] which is
+>>> yet to be approved by maintainers.
+>>>
+>>> [1]- https://lkml.org/lkml/2014/2/27/605
+>>> (irqchip:gic: change access of gicc_ctrl register to read modify write)
+>
+>> No matter if Feng Kan's gic patch is applied or not, perf(PMU)
+>> still can't work well with your patch, and the failure[1] will be
+>> triggered when 'perf top' is started.
+>>
+>> The failure happened during the 1st pmu overflow interrupt.
+>>
+>> I test several mustang boards, and all has the problem with
+>> upstream kernel.
+>
+> Note that the GIC bypass register config is set by the firmware and this
+> only preserves the original setting, so you could be running an older
+> firmware (such as U-Boot). On our (UEFI-enabled systems, complete with
+> correct patch) perf top runs correctly without any such problems.
 
-Tested-by: Tushar Behera <tushar.b@samsung.com>
+I am wondering if it is related with boot or firmware. We have a board
+which is running APM internal 3.12 based kernel, and perf(pmu) works
+well. But if I just replace the 3.12 based kernel with upstream kernel
+and keep others(boot, kernel parameter, fs, ....) not changed, then
+the problem still can happen.
 
-Some comments below.
-
-> ---
-> Changes in v2:
-> - Now just one patch since mfd patch landed.
-> - Rebased to ToT linux-next
-> 
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 145 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 145 +++++++++++++++++++++++++++++
->  2 files changed, 290 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 7649982..581f385 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-
-> +				regulators {
-> +					dcdc1 {
-> +						ti,enable-ext-control;
-> +					};
-> +					dcdc2 {
-> +						ti,enable-ext-control;
-> +					};
-> +					dcdc3 {
-> +						ti,enable-ext-control;
-> +					};
-> +					fet1 {
-
-"tps65090_fet1: fet1 {" ?
-
-> +						regulator-name = "vcd_led";
-> +					};
-> +					tps65090_fet2: fet2 {
-
-I would suggest we add similar labels to fet1, fet3, fet4, fet5 and fet6
-also. That way it would be easy to reference them in subsequent DT nodes.
-
-Same comment for Peach-Pi dts file too.
-
--- 
-Tushar Behera
+Thanks,
+--
+Ming Lei
