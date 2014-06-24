@@ -1,35 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 17:01:08 +0200
-Subject: VFP handling in multiplatform feroceon kernels
-In-Reply-To: <alpine.LFD.2.11.1406241050390.16842@knanqh.ubzr>
-References: <7416978.W29blLsymn@wuerfel>
- <20140624143503.GQ32514@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1406241050390.16842@knanqh.ubzr>
-Message-ID: <4861343.lqFLZvsPzW@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Jun 2014 16:01:58 +0100
+Subject: [PATCH v14 05/10] ARM: dts: imx5*, imx6*: correct
+ display-timings nodes.
+In-Reply-To: <1402913484-25910-5-git-send-email-denis@eukrea.com>
+References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+ <1402913484-25910-5-git-send-email-denis@eukrea.com>
+Message-ID: <20140624150158.GS32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 June 2014 10:56:44 Nicolas Pitre wrote:
-> On Tue, 24 Jun 2014, Russell King - ARM Linux wrote:
+On Mon, Jun 16, 2014 at 12:11:19PM +0200, Denis Carikli wrote:
+> The imx-drm driver can't use the de-active and
+> pixelclk-active display-timings properties yet.
 > 
-> > As I point out, the problem is that if we build a kernel with ARM926
-> > plus Feroceon support (thus including some of the Feroceon platforms),
-> > and omitting the plagerised ID, how do we stop the potential data
-> > corruption occuring should we boot on a Feroceon platform with the
-> > old IDs.
+> Instead the data-enable and the pixel data clock
+> polarity are hardcoded in the imx-drm driver.
 > 
-> That's a valid concern.
+> So theses properties are now set to keep
+> the same behaviour when imx-drm will start
+> using them.
 > 
-> I don't know if all the Feroceon CPU cores are buggy wrt the VFP, 
-> however only some of the Orion5x platforms had a Feroceon core using the 
-> plagerised ID.  Probably those two issues should be handled separately.
-> 
-> So for the later I'd simply forbid any Orion5x platforms from being part 
-> of a multi-platform kernel.
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 
-We should definitely allow building a multiplatform kernel with both
-Orion5x and Kirkwood, but we could make Orion5x conditional on ARM926
-being disabled. Or we add a runtime-check in the Orion code to ensure
-it only gets booted with the new CPU ID if ARM926 is enabled.
+This patch needs either an ack from the arm-soc/iMX maintainers, or
+they need to merge it.  As there's little positive agreement on the
+series, I can understand why there's reluctance to merge it.
 
-	Arnd
+So, can we start having some acks from people please, or at least
+commitments to merge this patch when the others are deemed to be
+acceptable.  If not, can we have explanations why this should not
+be merged.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
