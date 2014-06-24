@@ -1,26 +1,76 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 24 Jun 2014 15:31:57 +0200
-Subject: VFP handling in multiplatform feroceon kernels
-In-Reply-To: <7416978.W29blLsymn@wuerfel>
-References: <7416978.W29blLsymn@wuerfel>
-Message-ID: <20140624133157.GC6993@lunn.ch>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Tue, 24 Jun 2014 19:08:48 +0530
+Subject: [PATCH 1/4] devicetree: bindings: Document murata vendor prefix
+In-Reply-To: <20140624133030.GH5856@leverpostej>
+References: <1403612356-23685-1-git-send-email-ch.naveen@samsung.com>
+ <1403612356-23685-2-git-send-email-ch.naveen@samsung.com>
+ <20140624133030.GH5856@leverpostej>
+Message-ID: <CAHfPSqBf_DpXx_Ag12OxjqUPK6BKek4t=Ni4jQ4ZyAHqkh56ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 03:17:06PM +0200, Arnd Bergmann wrote:
-> Since 3.16, we have the ability to build a multiplatform kernel
-> that includes both kirkwood (feroceon) and some other ARMv5 CPU.
-> 
-> I accidentally stumbled over a bug in the VFP code that looks
-> like it will break at least ARM9 VFP support if CPU_FEROCEON
-> is also enabled, introduced by this (old) commit:
+Hello Mark,
 
-Hi Arnd
+On 24 June 2014 19:00, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Jun 24, 2014 at 01:19:13PM +0100, Naveen Krishna Chatradhi wrote:
+>> Add Murata Manufacturing Co., Ltd. to the list of device tree
+>> vendor prefixes.
+>>
+>> Murata manufactures NTC (Negative Temperature Coefficient) based
+>> Thermistors for small scale applications like Mobiles and PDAs.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> Cc: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>> This changes is needed for the following reasons
+>>
+>> 1. The vendor prefix "ntc" is not defined in vendor-prefixes.txt
+>>    Thus, giving an error when checked with scripts/checkpatch.pl
+>> 2. Murata Manufacturing Co., Ltd. Is the vendor for the
+>>    NTC (Negative Temperature Coefficient) based thermistors.
+>>    Hence, "murata" is the right vendor-prefix, Not "ntc".
+>> 3. NTC is a technology used, But the prefix "ntc" is wrongly
+>>    and heavily used in the driver and the documentation.
+>>
+>>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> index 4d7f375..a39b7d7 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -84,6 +84,7 @@ moxa        Moxa
+>>  mpl  MPL AG
+>>  mundoreader  Mundo Reader S.L.
+>>  mxicy        Macronix International Co., Ltd.
+>> +murata       Murata Manufacturing Co., Ltd.
+>
+> Nit: please keep this list in alphabetical order.
 
-CPU_FEROCEAN is currently selected by Orion5x, Kirkwood and mv78xx0.
-These are all ARMv5 machines. As far as i understand, we cannot
-combine ARMv5 with ARMv6 and above. So is this really an issue? Should
-we put in something defensive to prevent it being selected on anything
-other than ARMv5?
+Sure, Will rearrange and re-spin.
+>
+> Otherwise, this looks fine to me. With the order fixed:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-	 Andrew
+Thanks
+>
+> Mark.
+>
+>>  national     National Semiconductor
+>>  neonode              Neonode Inc.
+>>  netgear      NETGEAR
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+
+
+
+-- 
+Shine bright,
+(: Nav :)
