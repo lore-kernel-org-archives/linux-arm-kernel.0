@@ -1,41 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 15:57:23 +0200
-Subject: VFP handling in multiplatform feroceon kernels
-In-Reply-To: <20140624134249.GB4489@arm.com>
-References: <7416978.W29blLsymn@wuerfel> <20140624134249.GB4489@arm.com>
-Message-ID: <4163058.utc3hnZrND@wuerfel>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 24 Jun 2014 15:57:09 +0200
+Subject: [PATCH 0/6] Various Samsung fixes for v3.16-rc3
+Message-ID: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 June 2014 14:42:49 Catalin Marinas wrote:
-> On Tue, Jun 24, 2014 at 02:17:06PM +0100, Arnd Bergmann wrote:
-> > Since 3.16, we have the ability to build a multiplatform kernel
-> > that includes both kirkwood (feroceon) and some other ARMv5 CPU.
-> > 
-> > I accidentally stumbled over a bug in the VFP code that looks
-> > like it will break at least ARM9 VFP support if CPU_FEROCEON
-> > is also enabled, introduced by this (old) commit:
-> 
-> I would argue that the bug is in the CPU (feroceon). See the end of this
-> email:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg41460.html
-> 
-> and my follow-up. Basically you can't avoid the conditional compilation
-> as Feroceon doesn't follow the VFP sub-architecture spec and doesn't
-> present itself as a different CPU from an _ARM_ 9. Unless things have
-> changed with Marvell's hardware implementation and they got a new id, I
-> suggest you don't enable this for multi-platform.
+This series inteds to fix various issues spotted while testing v3.16-rc2.
+The patches should be reasonably independent from each other and so could be
+picked to respective trees. See descriptions of individual patches for more
+information.
 
-We only support multiplatform configurations with Feroceon variants
-that identify as Marvell-made, not the fake ARM CPU ID, and we already
-rely on detecting the correct CPU type in other places, so we can e.g.
-set up the cache correctly.
+Tested on Exynos4412-based Trats2 and Exynos4210-based Trats boards.
 
-For all I can tell, the problem now exists only if you enable the
-kirkwood platform, which does have its own ID. If this gets made
-conditional on the CPU ID, we probably still also need to leave your
-existing hack in place for the case of CONFIG_CPU_FEROCEON_OLD_ID
-on a feroceon-only kernel.
+AFAIK there is no need to backport those fixes to stable.
 
-	Arnd
+Tomasz Figa (6):
+  mmc: sdhci-s3c: Fix local I/O clock gating
+  ARM: EXYNOS: Fix core ID used by platsmp and hotplug code
+  clk: samsung: exynos4: Remove SRC_MASK_ISP gates
+  ARM: SAMSUNG: Restore Samsung PM Debug functionality
+  ARM: EXYNOS: Fix suspend/resume sequencies
+  ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
+
+ arch/arm/mach-exynos/exynos.c     |  6 ++----
+ arch/arm/mach-exynos/hotplug.c    | 10 ++++++----
+ arch/arm/mach-exynos/platsmp.c    | 34 +++++++++++++++++++---------------
+ arch/arm/mach-exynos/pm.c         | 20 ++++----------------
+ arch/arm/plat-samsung/Kconfig     |  8 +++++++-
+ arch/arm/plat-samsung/pm-debug.c  |  1 +
+ drivers/clk/samsung/clk-exynos4.c | 16 ++++------------
+ drivers/mmc/host/sdhci-s3c.c      | 17 ++++++++++-------
+ 8 files changed, 53 insertions(+), 59 deletions(-)
+
+-- 
+1.9.3
