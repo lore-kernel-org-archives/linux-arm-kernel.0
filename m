@@ -1,35 +1,84 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 24 Jun 2014 18:25:19 +0200
-Subject: [PATCH v14 04/10] imx-drm: use defines for clock polarity settings
-In-Reply-To: <20140624151323.GU32514@n2100.arm.linux.org.uk>
-References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
- <1402913484-25910-4-git-send-email-denis@eukrea.com>
- <20140624151323.GU32514@n2100.arm.linux.org.uk>
-Message-ID: <53A9A66F.20401@eukrea.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 24 Jun 2014 09:28:49 -0700
+Subject: [PATCH v2] ARM: dts: Add cros_ec to exynos5420-peach-pit and
+ exynos5800-peach-pi
+In-Reply-To: <53A91E09.7050603@gmail.com>
+References: <1403556576-8038-1-git-send-email-dianders@chromium.org>
+ <53A91E09.7050603@gmail.com>
+Message-ID: <CAD=FV=WwmjyH4Uq_SeRMf9-f6pgu+HpkZYRx_Sv-CJV-z8rkmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 05:13 PM, Russell King - ARM Linux wrote:
-[...]
-> If you'd like to send me better commit messages for
-> these patches, I'll add them to what I already have:
+Tushar,
 
-> 	imx-drm: use defines for clock polarity settings
-The comment of the clk_pol field of the ipu_di_signal_cfg struct was 
-inverted.
-Instead of merely inverting the comment, the values of clk_pol were defined.
-
-> 	imx-drm: add RGB666 support for parallel display.
-This permits to drive parallel displays that expect the RGB666 color format.
+On Mon, Jun 23, 2014 at 11:43 PM, Tushar Behera <trblinux@gmail.com> wrote:
+> On 06/24/2014 02:19 AM, Doug Anderson wrote:
+>> This adds cros_ec to exynos5420-peach-pit and exynos5800-peach-pi,
+>> including:
+>> * The keyboard
+>> * The i2c tunnel
+>> * The tps65090 under the i2c tunnel
+>> * The battery under the i2c tunnel
+>>
+>> To add extra motivation, it should be noted that tps65090 is one of
+>> the things needed to get display-related FETs turned on for pit and
+>> pi.
+>>
+>> Note that this relies on a few outstanding changes:
+>> * Needs (spi: s3c64xx: fix broken "cs_gpios" usage in the driver) and
+>>   (spi: s3c64xx: for DT platofrms always get the chipselect info from
+>>   DT node) to work properly and match the documented bindings.  See
+>>   <https://patchwork.kernel.org/patch/4346701/> and
+>>   <https://patchwork.kernel.org/patch/4346711/>
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 >
-> It may also be worth describing the RGB666 format in the commit message
-> for:
+> Along with the dependency patches on next-20140623, tested keyboard on
+> Peach-Pi board.
 >
-> 	v4l2: add new V4L2_PIX_FMT_RGB666 pixel format.
-The RGB666 color format encodes 6 bits for each color(red, green and 
-blue), linearly.
-It looks like this in memory:
-0                17
-RRRRRRGGGGGGBBBBBB
+> Tested-by: Tushar Behera <tushar.b@samsung.com>
+>
+> Some comments below.
+>
+>> ---
+>> Changes in v2:
+>> - Now just one patch since mfd patch landed.
+>> - Rebased to ToT linux-next
+>>
+>>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 145 +++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 145 +++++++++++++++++++++++++++++
+>>  2 files changed, 290 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> index 7649982..581f385 100644
+>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>
+>> +                             regulators {
+>> +                                     dcdc1 {
+>> +                                             ti,enable-ext-control;
+>> +                                     };
+>> +                                     dcdc2 {
+>> +                                             ti,enable-ext-control;
+>> +                                     };
+>> +                                     dcdc3 {
+>> +                                             ti,enable-ext-control;
+>> +                                     };
+>> +                                     fet1 {
+>
+> "tps65090_fet1: fet1 {" ?
+>
+>> +                                             regulator-name = "vcd_led";
+>> +                                     };
+>> +                                     tps65090_fet2: fet2 {
+>
+> I would suggest we add similar labels to fet1, fet3, fet4, fet5 and fet6
+> also. That way it would be easy to reference them in subsequent DT nodes.
+>
+> Same comment for Peach-Pi dts file too.
 
-Denis.
+OK.  I added it to all the regulators in tps65090.  That'll probably
+be useful for Javier in his max77802 work.
+
+-Doug
