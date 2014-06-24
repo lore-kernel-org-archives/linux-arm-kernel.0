@@ -1,48 +1,94 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Tue, 24 Jun 2014 12:35:17 +0200
-Subject: [PATCH v2 08/12] Documentation: bindings: add doc for the generic
- ChipIdea USB driver
+Date: Tue, 24 Jun 2014 12:35:19 +0200
+Subject: [PATCH v2 10/12] ARM: dts: Berlin: enable USB on the BG2Q DMP
 In-Reply-To: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1403606121-6368-9-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1403606121-6368-11-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the generic ChipIdea USB driver bindings.
+Enable the 2 available USB PHY and USB nodes on the Marvell Berlin BG2Q
+DMP.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- .../devicetree/bindings/usb/ci-hdrc-generic.txt    | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-generic.txt
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 53 ++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-generic.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-generic.txt
-new file mode 100644
-index 000000000000..4c85f9944077
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/ci-hdrc-generic.txt
-@@ -0,0 +1,22 @@
-+* Generic ChipIdea USB controller
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index 995150f93795..0d515046f5f5 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -7,6 +7,8 @@
+  */
+ 
+ /dts-v1/;
 +
-+Required properties:
-+- compatible: should be "chipidea-usb"
-+- reg: base address and length of the registers
-+- interrupts: interrupt for the USB controller
++#include <dt-bindings/gpio/gpio.h>
+ #include "berlin2q.dtsi"
+ 
+ / {
+@@ -21,6 +23,39 @@
+ 	choosen {
+ 		bootargs = "console=ttyS0,115200 earlyprintk";
+ 	};
 +
-+Optional properties:
-+- clocks: reference to the USB clock
-+- usb-phy: reference to the USB PHY
-+- vbus-supply: reference to the VBUS regulator
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+Example:
++		reg_usb0_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			regulator-name = "usb0_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&portb 8 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
 +
-+	usb at f7ed0000 {
-+		compatible = "chipidea-usb";
-+		reg = <0xf7ed0000 0x10000>;
-+		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&chip CLKID_USB0>;
-+		usb-phy = <&usb_phy0>;
-+		vbus-supply = <&reg_usb0_vbus>;
++		reg_usb1_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			regulator-name = "usb1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&portb 10 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++
++		reg_usb2_vbus: regulator at 2 {
++			compatible = "regulator-fixed";
++			regulator-name = "usb2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&portb 12 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
 +	};
+ };
+ 
+ &sdhci1 {
+@@ -37,3 +72,21 @@
+ &uart0 {
+ 	status = "okay";
+ };
++
++&usb_phy0 {
++	status = "okay";
++};
++
++&usb_phy2 {
++	status = "okay";
++};
++
++&usb0 {
++	vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&usb2 {
++	vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
 1.9.1
