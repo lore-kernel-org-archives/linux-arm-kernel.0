@@ -1,44 +1,21 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 24 Jun 2014 21:30:55 +0200
-Subject: [PATCH v7 4/9] seccomp: move no_new_privs into seccomp
-In-Reply-To: <CALCETrVgpP=zOtiQafVgcic2T95TdEM5DTvHYXWTbcZ14xBqHQ@mail.gmail.com>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-5-git-send-email-keescook@chromium.org>
- <20140624191815.GA3623@redhat.com>
- <CALCETrVgpP=zOtiQafVgcic2T95TdEM5DTvHYXWTbcZ14xBqHQ@mail.gmail.com>
-Message-ID: <20140624193055.GA4482@redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 24 Jun 2014 13:32:27 -0600
+Subject: [PATCH v2 5/7] clk: tegra: Add SATA clocks to Tegra124
+ initialization table
+In-Reply-To: <1403101406-15439-6-git-send-email-mperttunen@nvidia.com>
+References: <1403101406-15439-1-git-send-email-mperttunen@nvidia.com>
+ <1403101406-15439-6-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53A9D24B.4040301@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24, Andy Lutomirski wrote:
->
-> On Tue, Jun 24, 2014 at 12:18 PM, Oleg Nesterov <oleg@redhat.com> wrote:
-> >>
-> >> -struct seccomp { };
-> >> +struct seccomp {
-> >> +     unsigned long flags;
-> >> +};
-> >
-> > A bit messy ;)
-> >
-> > I am wondering if we can simply do
-> >
-> >         static inline bool current_no_new_privs(void)
-> >         {
-> >                 if (current->no_new_privs)
-> >                         return true;
-> >
-> >         #ifdef CONFIG_SECCOMP
-> >                 if (test_thread_flag(TIF_SECCOMP))
-> >                         return true;
-> >         #endif
->
-> Nope -- privileged users can enable seccomp w/o nnp.
+On 06/18/2014 08:23 AM, Mikko Perttunen wrote:
+> This adds two clocks, SATA and SATA_OOB, to the Tegra124 clock initialization
+> table. The clocks are needed for working SATA support.
 
-Indeed, I am stupid.
+Acked-by: Stephen Warren <swarren@nvidia.com>
+(When I wrote that for v1, it applied to both patches 4 and 5, not just
+patch 4)
 
-Still it would be nice to cleanup this somehow. The new member is only
-used as a previous ->no_new_privs, just it is long to allow the concurent
-set/get. Logically it doesn't even belong to seccomp{}.
-
-Oleg.
+Peter, can you please pick up patches 4 and 5, and get them into
+linux-next. Thanks.
