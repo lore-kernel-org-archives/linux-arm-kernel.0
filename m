@@ -1,108 +1,82 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jun 2014 11:02:04 -0700
-Subject: [PATCH v7 3/9] seccomp: introduce writer locking
-In-Reply-To: <20140624165216.GA29272@redhat.com>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-4-git-send-email-keescook@chromium.org>
- <20140624165216.GA29272@redhat.com>
-Message-ID: <CAGXu5j+G8qAkGD7H=3R2iw2ZTqZSrMPa2f=czoEjwSW5wKqUWQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 24 Jun 2014 22:02:21 +0400
+Subject: [PATCH v5 2/2] ARM: shmobile: lager: enable internal PCI
+In-Reply-To: <201406242157.05973.sergei.shtylyov@cogentembedded.com>
+References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201406242202.22807.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 9:52 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> Kees,
->
-> I am still trying to force myself to read and try to understand what
-> this series does ;) Just a minor nit so far.
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-The use-case this solves is when a userspace process does not control
-(or know) when a thread is spawned (e.g. via shared library init, or
-LD_PRELOAD) but wants to make sure seccomp filters have been applied
-to it. Specifically, Chrome, when loading some proprietary graphics
-drivers, will have those drivers spawning threads before there has
-been an ability to call seccomp. While some games can be played to get
-ahead of it, it's not always possible, or racey, depending on the
-drivers. With seccomp thread-sync, we can be certain that all threads
-have had the filter applied.
+Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
+them.
 
->
-> On 06/23, Kees Cook wrote:
->>
->> @@ -1142,6 +1168,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
->>  {
->>       int retval;
->>       struct task_struct *p;
->> +     unsigned long irqflags;
->>
->>       if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
->>               return ERR_PTR(-EINVAL);
->> @@ -1196,7 +1223,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
->>               goto fork_out;
->>
->>       ftrace_graph_init_task(p);
->> -     get_seccomp_filter(p);
->>
->>       rt_mutex_init_task(p);
->>
->> @@ -1434,7 +1460,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
->>               p->parent_exec_id = current->self_exec_id;
->>       }
->>
->> -     spin_lock(&current->sighand->siglock);
->> +     spin_lock_irqsave(&current->sighand->siglock, irqflags);
->> +
->> +     /*
->> +      * Copy seccomp details explicitly here, in case they were changed
->> +      * before holding tasklist_lock.
->> +      */
->> +     copy_seccomp(p);
->>
->>       /*
->>        * Process group and session signals need to be delivered to just the
->> @@ -1446,7 +1478,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
->>       */
->>       recalc_sigpending();
->>       if (signal_pending(current)) {
->> -             spin_unlock(&current->sighand->siglock);
->> +             spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
->>               write_unlock_irq(&tasklist_lock);
->>               retval = -ERESTARTNOINTR;
->>               goto bad_fork_free_pid;
->> @@ -1486,7 +1518,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
->>       }
->>
->>       total_forks++;
->> -     spin_unlock(&current->sighand->siglock);
->> +     spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
->>       write_unlock_irq(&tasklist_lock);
->>       proc_fork_connector(p);
->>       cgroup_post_fork(p);
->
-> It seems that the only change copy_process() needs is copy_seccomp() under the locks.
-> Everythinh else (irqflags games) looks obviously unneeded?
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+[Sergei: enabled PCI0]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-I got irq lock dep warnings without these changes. If they're
-unneeded, that's totally fine by me, but some change (either this or
-markings to keep lockdep happy) is needed.
+---
+Changes in version 4:
+- refreshed the patch.
 
->> @@ -524,6 +528,9 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
->>       }
->>  #endif
->>
->> +     if (unlikely(!lock_task_sighand(current, &irqflags)))
->> +             goto out_free;
->> +
->
-> Unless this task is exiting (namely, it has already called exit_notify()),
-> lock_task_sighand(current) must not fail. Looks like you can simply do
-> spin_lock_irq(->siglock).
+Changes in version 3:
+- refreshed the patch.
 
-Okay. I wasn't sure if I needed to be extra careful here or not. I
-opted for just using lock_task_sighand since that seemed to be the
-most used. :)
+Changes in version 2:
+- enabled PCI0 device;
+- reworded summary and changelog;
+- refreshed the patch.
 
--Kees
+ arch/arm/boot/dts/r8a7790-lager.dts |   33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
--- 
-Kees Cook
-Chrome OS Security
+Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
++++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -219,6 +219,21 @@
+ 		renesas,groups = "i2c3";
+ 		renesas,function = "i2c3";
+ 	};
++
++	usb0_pins: usb0 {
++		renesas,groups = "usb0";
++		renesas,function = "usb0";
++	};
++
++	usb1_pins: usb1 {
++		renesas,groups = "usb1";
++		renesas,function = "usb1";
++	};
++
++	usb2_pins: usb2 {
++		renesas,groups = "usb2";
++		renesas,function = "usb2";
++	};
+ };
+ 
+ &ether {
+@@ -368,3 +383,21 @@
+ 		regulator-always-on;
+ 	};
+ };
++
++&pci0 {
++	status = "okay";
++	pinctrl-0 = <&usb0_pins>;
++	pinctrl-names = "default";
++};
++
++&pci1 {
++	status = "okay";
++	pinctrl-0 = <&usb1_pins>;
++	pinctrl-names = "default";
++};
++
++&pci2 {
++	status = "okay";
++	pinctrl-0 = <&usb2_pins>;
++	pinctrl-names = "default";
++};
