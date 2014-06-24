@@ -1,55 +1,71 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Tue, 24 Jun 2014 17:19:27 +0530
-Subject: [Pull Request] Various ARM platform code fixes
-In-Reply-To: <11158643.kH5ypbGTk1@wuerfel>
-References: <CAK9yfHw=zecLHWHVZWvf3PzphYG3CDyTwMRXicUUFM4kkhT9Mw@mail.gmail.com>
- <4750577.NRz8KZsHUG@wuerfel>
- <CAK5sBcF_wAJu-bfduhvP3kHfRvUDr=rUx=gd1Oi=3C5dnrHL6Q@mail.gmail.com>
- <11158643.kH5ypbGTk1@wuerfel>
-Message-ID: <CAK5sBcHFPV0D5EzkxSkcJPBv77=NsU+k3kwKDVwOg03dSCC2PA@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 24 Jun 2014 12:54:40 +0100
+Subject: [PATCH v7 1/2] video: ARM CLCD: Add DT support
+In-Reply-To: <CAL_JsqLQTT5N8D_GTDd5YVgr2SSCXtC6EcRQxW2=_-J8Wmsf0g@mail.gmail.com>
+References: <1403018494-10264-1-git-send-email-pawel.moll@arm.com>
+ <20140620170901.GA12059@leverpostej> <1403532837.3804.29.camel@hornet>
+ <CAL_Jsq+6SveWhzWPrtziTJ-tDOFaJV4sXO+r_CEhAZf=tQE6FA@mail.gmail.com>
+ <1403539186.3804.46.camel@hornet>
+ <CAL_JsqLQTT5N8D_GTDd5YVgr2SSCXtC6EcRQxW2=_-J8Wmsf0g@mail.gmail.com>
+Message-ID: <1403610880.26821.10.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 4:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 24 June 2014 15:14:07 Sachin Kamat wrote:
->> On Tue, Jun 3, 2014 at 12:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 02 June 2014 09:42:48 Olof Johansson wrote:
->> >> On Mon, Jun 2, 2014 at 2:23 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
->> >> > Hi Arnd,
->> >> >
->> >> > As suggested by you I am sending a pull request for the below 8 patches.
->> >> > These are based on for-next branch of arm-soc tree [1].
->> >> >
->> >> > [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
->> >>
->> >> Please, don't send random pull requests to us. Some of these patches
->> >> are for platforms that have quite active maintainers and you're
->> >> messing up everyone's workflow by randomly sending them to us.
->> >>
->> >> I have no idea what you talked to Arnd about, and you give no
->> >> reference to it in your pull request.
->> >
->> > FYI, these are all trivial cleanups that no subarch maintainer has
->> > picked up since they were posted, and I offered to take them
->> > from a pull request
->> >
->> >> Besides, the merge window is open, we're not taking anything new until
->> >> after -rc1.
->> >
->> > Agreed, I didn't expect the merge window to open already, and since there
->> > is no urgency here, let's apply this into next/cleanups after the merge
->> > window.
->>
->> Arnd, I no longer have access to my Linaro git repo. Shall I re-send
->> the individual
->> patches?
->
-> Yes, please do, and send them with Cc to both linux-arm-kernel at lists.infradead.org
-> and arm at kernel.org.
+On Mon, 2014-06-23 at 18:56 +0100, Rob Herring wrote:
+> On Mon, Jun 23, 2014 at 10:59 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > On Mon, 2014-06-23 at 16:43 +0100, Rob Herring wrote:
+> >> On Mon, Jun 23, 2014 at 9:13 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> >> > On Fri, 2014-06-20 at 18:09 +0100, Mark Rutland wrote:
+> 
+> >> >> > +- max-memory-bandwidth: maximum bandwidth in bytes per second that the
+> >> >> > +   cell's memory interface can handle
+> >> >>
+> >> >> When should I set this, given it is optional?
+> >> >
+> >> > When there is a (significant) limitation of the bandwidth available for
+> >> > the cell's memory interface. One will either be told by the soc guys or
+> >> > will figure it out in the hard way, as we did :-(
+> >>
+> >> What are you going to do with this information? b/w is a function of
+> >> screen size and pixel depth. Are you going to refuse certain configs
+> >> based on that? Seems like someone doing their own modes should know
+> >> what they are doing and the limitations.
+> >>
+> >> Again, drop it until there is a defined need for this.
+> >
+> > Yes, there is. Use case: PL111 is wired up to a HDMI formatter, which
+> > will take everything up to 1080p. This is what a DRM driver (what/if
+> > it's ready) will get from the encoder driver (and rightly so). But the
+> > chip interconnect limitations is make the chip being able to get 480p at
+> > 60Hz tops.
+> >
+> > Or do you want me to add a subnode with timings for all achievable modes
+> > instead?
+> 
+> I want this solved in a generic way and not something pl111 specific.
+> If this is already defined then use it. If not, I would drop this for
+> now and get a pl111 binding in place finally.
 
-Thanks Arnd. Sent them just now.
-Forgot to mention "Resend" in the subject on patches 3-8 :(
+Hardware limitation on bandwidth available to a memory interface is
+definitely not a PL111 specific phenomenon, and I don't know how can be
+it described in a more generic way than a number of bytes per second.
+Grepping through existing bindings, it turned out that it's not the
+first time the problem is being solved. "ti,am33x-tilcdc" defines this:
 
--- 
-Regards,
-Sachin.
+ - max-bandwidth: The maximum pixels per second that the memory
+   interface / lcd controller combination can sustain
+ 
+Don't know that hardware, but in my case "pixels" doesn't cut. On
+V2P-CA9 I have a choice of 640x480 32bpp or 1024x768 16bpp, 1024x768
+32bpp won't work. The driver must know this somehow and you can't work
+out the memory color model from display timings. So, to summarize - this
+property is here to stay, or the binding is useless from my perspective.
+
+I'll post v9 in a second, replacing the pl11x-specific framebuffer
+property with the "memory-region" phandle (I don't see how "dma-regions"
+would fit here), especially as the "reserved-memory" examples cites a
+use case identical to mine. Fortunately all I had to do code-wise was
+reverting a single function to a version from September 2013 and
+changing a compatible string.
+
+Pawel
