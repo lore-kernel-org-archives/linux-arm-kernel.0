@@ -1,90 +1,94 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 24 Jun 2014 00:24:26 -0500
-Subject: [PATCH 2/3] ARM: OMAP3: PRM/CM: Add back macros used by TI DSP/Bridge
- driver
-In-Reply-To: <1403587467-59876-1-git-send-email-s-anna@ti.com>
-References: <1403587467-59876-1-git-send-email-s-anna@ti.com>
-Message-ID: <1403587467-59876-3-git-send-email-s-anna@ti.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Tue, 24 Jun 2014 11:19:08 +0530
+Subject: [PATCH v2 6/6] usb: host: ohci-exynos: Use devm_ioremap_resource
+ instead of devm_ioremap
+In-Reply-To: <20140606225246.GB22188@mithrandir>
+References: <1399723210-21569-1-git-send-email-gautam.vivek@samsung.com>
+ <1399723210-21569-7-git-send-email-gautam.vivek@samsung.com>
+ <CAFp+6iFufCh6SVEF-HQA62ZsJGJGSebDSs28eqcrMy1X8e5vjA@mail.gmail.com>
+ <20140604131306.GB28484@ulmo>
+ <CAFp+6iEe8fvxboG79=2s=oe4BkQJYAoVUPtYkPdjJHCe+bC=8Q@mail.gmail.com>
+ <20140606225246.GB22188@mithrandir>
+Message-ID: <CAFp+6iHqX+huiYJo7c38tgQZ-iE7v2nXXQHrJU6v55e8zkb7Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 7be914f {ARM: OMAP3: PRM/CM: Cleanup unused header} removed
-some of the macros used by the TI DSP/Bridge driver. This fixes the
-following build errors when trying to build DSP/Bridge driver (disabled
-at present), otherwise results in the following build errors:
+Hi,
 
-drivers/staging/tidspbridge/core/tiomap3430.c:531:31: error: 'OMAP3430_AUTO_IVA2_DPLL_SHIFT' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap3430.c:531:31: note: each undeclared identifier is reported only once for each function it appears in
-make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430.o] Error 1
-make[3]: *** Waiting for unfinished jobs....
-drivers/staging/tidspbridge/core/tiomap_io.c: In function 'sm_interrupt_dsp':
-drivers/staging/tidspbridge/core/tiomap_io.c:404:31: error: 'OMAP3430_AUTO_IVA2_DPLL_SHIFT' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap_io.c:404:31: note: each undeclared identifier is reported only once for each function it appears in
-drivers/staging/tidspbridge/core/tiomap_io.c:414:12: error: 'OMAP3430_IVA2_DPLL_FREQSEL_SHIFT' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap_io.c:415:12: error: 'OMAP3430_EN_IVA2_DPLL_SHIFT' undeclared (first use in this function)
-make[3]: *** [drivers/staging/tidspbridge/core/tiomap_io.o] Error 1
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c: In function 'dsp_clk_wakeup_event_ctrl':
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c:442:19: error: 'OMAP3430_GRPSEL_GPT5_MASK' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c:442:19: note: each undeclared identifier is reported only once for each function it appears in
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c:455:19: error: 'OMAP3430_GRPSEL_GPT6_MASK' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c:468:19: error: 'OMAP3430_GRPSEL_GPT7_MASK' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c:481:19: error: 'OMAP3430_GRPSEL_GPT8_MASK' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c:494:19: error: 'OMAP3430_GRPSEL_MCBSP1_MASK' undeclared (first use in this function)
-drivers/staging/tidspbridge/core/tiomap3430_pwr.c:546:19: error: 'OMAP3430_GRPSEL_MCBSP5_MASK' undeclared (first use in this function)
-make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430_pwr.o] Error 1
-make[2]: *** [drivers/staging/tidspbridge] Error 2
 
-Fixes: 7be914f (ARM: OMAP3: PRM/CM: Cleanup unused header)
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/mach-omap2/cm-regbits-34xx.h  | 3 +++
- arch/arm/mach-omap2/prm-regbits-34xx.h | 6 ++++++
- 2 files changed, 9 insertions(+)
+On Sat, Jun 7, 2014 at 4:22 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Fri, Jun 06, 2014 at 06:32:42PM +0530, Vivek Gautam wrote:
+>> On Wed, Jun 4, 2014 at 6:43 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
+>> > On Wed, Jun 04, 2014 at 03:41:20PM +0530, Vivek Gautam wrote:
+>> >> On Sat, May 10, 2014 at 5:30 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> [...]
+>> >> > diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+>> >> > index 9cf80cb..dec691d 100644
+>> >> > --- a/drivers/usb/host/ohci-exynos.c
+>> >> > +++ b/drivers/usb/host/ohci-exynos.c
+>> >> > @@ -120,10 +120,9 @@ skip_phy:
+>> >> >
+>> >> >         hcd->rsrc_start = res->start;
+>> >> >         hcd->rsrc_len = resource_size(res);
+>> >> > -       hcd->regs = devm_ioremap(&pdev->dev, res->start, hcd->rsrc_len);
+>> >> > -       if (!hcd->regs) {
+>> >> > -               dev_err(&pdev->dev, "Failed to remap I/O memory\n");
+>> >> > -               err = -ENOMEM;
+>> >> > +       hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+>> >>
+>> >> Here, we replaced devm_ioremap() call with devm_ioremap_resource(),
+>> >> which internally requests the memory region
+>> >
+>> > I guess this could lead to problems if drivers haven't been written to
+>> > cleanly split the register ranges that they access, since now two
+>> > overlapping regions may be requested and cause the drivers to fail.
+>>
+>> Sorry i did not understand completely. Wouldn't the request_mem_region()
+>> fail for an already busy resource ?
+>> So devm_ioremap_resource() will in fact prevent the drivers from requesting
+>> the same memory region twice until the first request frees the region.
+>> Isn't it ?
+>
+> Yes exactly. What I was trying to say is that since drivers weren't
+> requesting the resources before they may be using overlapping regions.
+> Now that this patch changes these drivers to also request the resources
+> they will fail if the regions overlap with those of other drivers.
 
-diff --git a/arch/arm/mach-omap2/cm-regbits-34xx.h b/arch/arm/mach-omap2/cm-regbits-34xx.h
-index 04dab2f..ee6c784 100644
---- a/arch/arm/mach-omap2/cm-regbits-34xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-34xx.h
-@@ -26,11 +26,14 @@
- #define OMAP3430_EN_WDT3_SHIFT				12
- #define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK		(1 << 0)
- #define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_SHIFT		0
-+#define OMAP3430_IVA2_DPLL_FREQSEL_SHIFT		4
- #define OMAP3430_IVA2_DPLL_FREQSEL_MASK			(0xf << 4)
- #define OMAP3430_EN_IVA2_DPLL_DRIFTGUARD_SHIFT		3
-+#define OMAP3430_EN_IVA2_DPLL_SHIFT			0
- #define OMAP3430_EN_IVA2_DPLL_MASK			(0x7 << 0)
- #define OMAP3430_ST_IVA2_SHIFT				0
- #define OMAP3430_ST_IVA2_CLK_MASK			(1 << 0)
-+#define OMAP3430_AUTO_IVA2_DPLL_SHIFT			0
- #define OMAP3430_AUTO_IVA2_DPLL_MASK			(0x7 << 0)
- #define OMAP3430_IVA2_CLK_SRC_SHIFT			19
- #define OMAP3430_IVA2_CLK_SRC_WIDTH			3
-diff --git a/arch/arm/mach-omap2/prm-regbits-34xx.h b/arch/arm/mach-omap2/prm-regbits-34xx.h
-index 106132d..cbefbd7 100644
---- a/arch/arm/mach-omap2/prm-regbits-34xx.h
-+++ b/arch/arm/mach-omap2/prm-regbits-34xx.h
-@@ -35,6 +35,8 @@
- #define OMAP3430_LOGICSTATEST_MASK			(1 << 2)
- #define OMAP3430_LASTLOGICSTATEENTERED_MASK		(1 << 2)
- #define OMAP3430_LASTPOWERSTATEENTERED_MASK		(0x3 << 0)
-+#define OMAP3430_GRPSEL_MCBSP5_MASK			(1 << 10)
-+#define OMAP3430_GRPSEL_MCBSP1_MASK			(1 << 9)
- #define OMAP3630_GRPSEL_UART4_MASK			(1 << 18)
- #define OMAP3430_GRPSEL_GPIO6_MASK			(1 << 17)
- #define OMAP3430_GRPSEL_GPIO5_MASK			(1 << 16)
-@@ -42,6 +44,10 @@
- #define OMAP3430_GRPSEL_GPIO3_MASK			(1 << 14)
- #define OMAP3430_GRPSEL_GPIO2_MASK			(1 << 13)
- #define OMAP3430_GRPSEL_UART3_MASK			(1 << 11)
-+#define OMAP3430_GRPSEL_GPT8_MASK			(1 << 9)
-+#define OMAP3430_GRPSEL_GPT7_MASK			(1 << 8)
-+#define OMAP3430_GRPSEL_GPT6_MASK			(1 << 7)
-+#define OMAP3430_GRPSEL_GPT5_MASK			(1 << 6)
- #define OMAP3430_GRPSEL_MCBSP4_MASK			(1 << 2)
- #define OMAP3430_GRPSEL_MCBSP3_MASK			(1 << 1)
- #define OMAP3430_GRPSEL_MCBSP2_MASK			(1 << 0)
+Thanks for explaining it further.
+I understand this fact. And i am sure this case does not arise in exynos.
+For Tegra, Stephen noted this fact about the ehci driver and the
+corresponding PHY.
+So that the PHY does a devm_ioremap() only.
+For other platforms too we did not get any concerns raised, so we
+moved ahead with the series
+for merging.
+
+>
+>> >> and then does a "devm_ioremap()" or "devm_ioremap_nocache()" based on
+>> >> the check for IORESOURCE_CACHEABLE flag.
+>> >>
+>> >> But this flag is not set for the resource of this device.
+>> >> So should we be explicitly setting the flag in driver ?
+>> >
+>> > I don't think it makes much sense to map these registers cached anyway.
+>> > Drivers will likely expect writes to this region to take effect without
+>> > needing any kind of flushing.
+>>
+>> These "hcd->regs" are going to be used by the controller, so wouldn't
+>> there be a performance difference when the requested address space is
+>> cacheable/non-cacheable ?
+>
+> The issue here is that if the region is mapped cacheable then register
+> writes may not immediately take effect and that's almost certainly not
+> what the driver will expect. I don't think it ever makes sense to map
+> registers cacheable.
+
+Ok, this explains things.
+
+
+
 -- 
-2.0.0
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
