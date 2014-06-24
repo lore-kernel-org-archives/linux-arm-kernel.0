@@ -1,135 +1,33 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 24 Jun 2014 18:54:27 +0900
-Subject: [PATCH v2 3/3] drm/nouveau: hook up cache sync functions
-In-Reply-To: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1403603667-11302-4-git-send-email-acourbot@nvidia.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 24 Jun 2014 17:59:35 +0800
+Subject: [PATCH v3 1/6] clk: sunxi: register clock gates with clkdev
+In-Reply-To: <1403603980-31101-1-git-send-email-wens@csie.org>
+References: <1403603980-31101-1-git-send-email-wens@csie.org>
+Message-ID: <1403603980-31101-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <dev@lynxeye.de>
+The new important clock protect code requires the clocks be
+registered with clkdev. This was missing for sunxi_gates
+type clocks.
 
-Use the newly-introduced TTM cache sync functions in Nouveau.
-
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
-[acourbot at nvidia.com: rearrange code, make platform-friendly]
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/nouveau/nouveau_bo.c  | 47 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/nouveau/nouveau_bo.h  |  1 +
- drivers/gpu/drm/nouveau/nouveau_gem.c | 10 +++-----
- 3 files changed, 51 insertions(+), 7 deletions(-)
+ drivers/clk/sunxi/clk-sunxi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/nouveau/nouveau_bo.c b/drivers/gpu/drm/nouveau/nouveau_bo.c
-index b6dc85c614be..74c68c16e777 100644
---- a/drivers/gpu/drm/nouveau/nouveau_bo.c
-+++ b/drivers/gpu/drm/nouveau/nouveau_bo.c
-@@ -284,6 +284,34 @@ set_placement_range(struct nouveau_bo *nvbo, uint32_t type)
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index fb2ce84..e43ed6a 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -899,6 +899,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ 						      reg + 4 * (i/32), i % 32,
+ 						      0, &clk_lock);
+ 		WARN_ON(IS_ERR(clk_data->clks[i]));
++		clk_register_clkdev(clk_data->clks[i], clk_name, NULL);
+ 
+ 		j++;
  	}
- }
- 
-+static void
-+nouveau_bo_sync_for_cpu(struct nouveau_bo *nvbo)
-+{
-+	struct nouveau_device *device;
-+	struct ttm_tt *ttm = nvbo->bo.ttm;
-+
-+	device = nouveau_dev(nouveau_bdev(ttm->bdev)->dev);
-+
-+	if (nvbo->bo.ttm && nvbo->bo.ttm->caching_state == tt_cached)
-+		ttm_dma_tt_cache_sync_for_cpu((struct ttm_dma_tt *)nvbo->bo.ttm,
-+					      nv_device_base(device));
-+}
-+
-+static void
-+nouveau_bo_sync_for_device(struct nouveau_bo *nvbo)
-+{
-+	struct ttm_tt *ttm = nvbo->bo.ttm;
-+
-+	if (ttm && ttm->caching_state == tt_cached) {
-+		struct nouveau_device *device;
-+
-+		device = nouveau_dev(nouveau_bdev(ttm->bdev)->dev);
-+
-+		ttm_dma_tt_cache_sync_for_device((struct ttm_dma_tt *)ttm,
-+						 nv_device_base(device));
-+	}
-+}
-+
- void
- nouveau_bo_placement_set(struct nouveau_bo *nvbo, uint32_t type, uint32_t busy)
- {
-@@ -407,6 +435,8 @@ nouveau_bo_validate(struct nouveau_bo *nvbo, bool interruptible,
- {
- 	int ret;
- 
-+	nouveau_bo_sync_for_device(nvbo);
-+
- 	ret = ttm_bo_validate(&nvbo->bo, &nvbo->placement,
- 			      interruptible, no_wait_gpu);
- 	if (ret)
-@@ -415,6 +445,23 @@ nouveau_bo_validate(struct nouveau_bo *nvbo, bool interruptible,
- 	return 0;
- }
- 
-+int
-+nouveau_bo_wait(struct nouveau_bo *nvbo, bool no_wait)
-+{
-+	int ret;
-+
-+	spin_lock(&nvbo->bo.bdev->fence_lock);
-+	ret = ttm_bo_wait(&nvbo->bo, true, true, no_wait);
-+	spin_unlock(&nvbo->bo.bdev->fence_lock);
-+
-+	if (ret)
-+		return ret;
-+
-+	nouveau_bo_sync_for_cpu(nvbo);
-+
-+	return 0;
-+}
-+
- u16
- nouveau_bo_rd16(struct nouveau_bo *nvbo, unsigned index)
- {
-diff --git a/drivers/gpu/drm/nouveau/nouveau_bo.h b/drivers/gpu/drm/nouveau/nouveau_bo.h
-index ff17c1f432fc..a4e9052d54fd 100644
---- a/drivers/gpu/drm/nouveau/nouveau_bo.h
-+++ b/drivers/gpu/drm/nouveau/nouveau_bo.h
-@@ -81,6 +81,7 @@ void nouveau_bo_wr32(struct nouveau_bo *, unsigned index, u32 val);
- void nouveau_bo_fence(struct nouveau_bo *, struct nouveau_fence *);
- int  nouveau_bo_validate(struct nouveau_bo *, bool interruptible,
- 			 bool no_wait_gpu);
-+int nouveau_bo_wait(struct nouveau_bo *, bool no_wait);
- 
- struct nouveau_vma *
- nouveau_bo_vma_find(struct nouveau_bo *, struct nouveau_vm *);
-diff --git a/drivers/gpu/drm/nouveau/nouveau_gem.c b/drivers/gpu/drm/nouveau/nouveau_gem.c
-index c90c0dc0afe8..916cb8ff568c 100644
---- a/drivers/gpu/drm/nouveau/nouveau_gem.c
-+++ b/drivers/gpu/drm/nouveau/nouveau_gem.c
-@@ -884,19 +884,15 @@ nouveau_gem_ioctl_cpu_prep(struct drm_device *dev, void *data,
- {
- 	struct drm_nouveau_gem_cpu_prep *req = data;
- 	struct drm_gem_object *gem;
--	struct nouveau_bo *nvbo;
- 	bool no_wait = !!(req->flags & NOUVEAU_GEM_CPU_PREP_NOWAIT);
--	int ret = -EINVAL;
-+	int ret;
- 
- 	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
- 	if (!gem)
- 		return -ENOENT;
--	nvbo = nouveau_gem_object(gem);
--
--	spin_lock(&nvbo->bo.bdev->fence_lock);
--	ret = ttm_bo_wait(&nvbo->bo, true, true, no_wait);
--	spin_unlock(&nvbo->bo.bdev->fence_lock);
-+	ret = nouveau_bo_wait(nouveau_gem_object(gem), no_wait);
- 	drm_gem_object_unreference_unlocked(gem);
-+
- 	return ret;
- }
- 
 -- 
 2.0.0
