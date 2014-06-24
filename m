@@ -1,51 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 25 Jun 2014 02:34:03 +0400
-Subject: [PATCH 2/4] usb: host: xhci-plat: Add support to get PHYs
-In-Reply-To: <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
-References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>	<1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>
- <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
-Message-ID: <53A9FCDB.6060805@cogentembedded.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 24 Jun 2014 23:28:28 +0100
+Subject: [PATCH v2 9/9] arm64: KVM: vgic: deal with GIC sub-page alignment
+In-Reply-To: <53A9D14D.2020802@amd.com>
+References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
+ <1403169693-13982-10-git-send-email-marc.zyngier@arm.com>
+ <53A9D14D.2020802@amd.com>
+Message-ID: <CAFEAcA-8vOz34NPPqkh1trU5C1irGatcJjAr1f-wWEPzhpy95w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 24 June 2014 20:28, Joel Schopp <joel.schopp@amd.com> wrote:
+>
+> On 06/19/2014 04:21 AM, Marc Zyngier wrote:
+>>
+>> The GIC CPU interface is always 4k aligned. If the host is using
+>> 64k pages, it is critical to place the guest's GICC interface at the
+>> same relative alignment as the host's GICV. Failure to do so results
+>> in an impossibility for the guest to deal with interrupts.
+>>
+>> Add a KVM_DEV_ARM_VGIC_GRP_ADDR_OFFSET attribute for the VGIC, allowing
+>> userspace to retrieve the GICV offset in a page. It becomes then trivial
+>> to adjust the GICC base address for the guest.
+>
+>
+> Does this mean there is a corresponding patch for qemu?
 
-On 06/10/2014 12:22 AM, Julius Werner wrote:
+Not as far as I know. It's a bit awkward on the QEMU end because
+we really want to provide the guest a consistent memory map
+regardless of the host CPU. So at best we'd probably use it to
+say "sorry, can't run on this CPU/host kernel".
 
->> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
->> index 9ffecd5..453d89e 100644
->> --- a/drivers/usb/host/xhci.h
->> +++ b/drivers/usb/host/xhci.h
->> @@ -1582,6 +1582,9 @@ struct xhci_hcd {
->>          u32                     port_status_u0;
->>   /* Compliance Mode Timer Triggered every 2 seconds */
->>   #define COMP_MODE_RCVRY_MSECS 2000
->> +       /* phys for the controller */
->> +       struct phy              *phy2_gen;
->> +       struct phy              *phy3_gen;
->>   };
+(That said, if you think you can make QEMU usefully use the
+information and want to write a QEMU patch I'm not averse
+to the idea.)
 
-> I don't think adding new variables here and restricting most of this
-> logic to xhci-plat.c (in the next patch) is the best way to do it.
+kvmtool is probably better placed to take advantage of it since
+it takes more of a "deal with what the host provides you"
+philosophy.
 
-    Indeed.
-
-> There's no conceptual reason why other host controllers (e.g. xhci-pci
-> or even EHCI) could not have a similar need to tune their PHY after
-> reset. PHYs are universal to all host controllers.
-
-> There is already a 'phy' member in struct usb_hcd which I think is
-> mostly unused right now. I think it would be much less
-> confusing/redundant to reuse that member for this purpose (you could
-> still set it up from xhci_plat_probe(), and then call it from
-> hcd_bus_resume() or something like that).
-
-    That member has type 'struct usb_phy *' while here we have 'struct phy *' 
--- feel the difference.
-    I have already tried adding 'struct phy *gen_phy' to 'struct usb_hcd', 
-however Greg wasn't eager to pick that up so far. Here's the last posting of 
-my patch:
-
-http://marc.info/?l=linux-usb&m=140145917506582
-
-WBR, Sergei
+thanks
+-- PMM
