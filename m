@@ -1,74 +1,41 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 24 Jun 2014 22:52:08 +0900
-Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
-In-Reply-To: <1403616338.4230.8.camel@weser.hi.pengutronix.de>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
- <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
- <20140624100220.GK32514@n2100.arm.linux.org.uk>
- <53A953E6.2030503@nvidia.com> <53A95910.20104@nvidia.com>
- <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
- <53A96EC5.3030701@canonical.com>
- <1403616338.4230.8.camel@weser.hi.pengutronix.de>
-Message-ID: <CAAVeFuLcC30BdWierY8Bg0vBmfNCaB=Qs34h790jGB=BRYvGAg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jun 2014 15:57:23 +0200
+Subject: VFP handling in multiplatform feroceon kernels
+In-Reply-To: <20140624134249.GB4489@arm.com>
+References: <7416978.W29blLsymn@wuerfel> <20140624134249.GB4489@arm.com>
+Message-ID: <4163058.utc3hnZrND@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 10:25 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Dienstag, den 24.06.2014, 14:27 +0200 schrieb Maarten Lankhorst:
->> op 24-06-14 14:23, Alexandre Courbot schreef:
->> > On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
->> >> On 06/24/2014 07:33 PM, Alexandre Courbot wrote:
->> >>> On 06/24/2014 07:02 PM, Russell King - ARM Linux wrote:
->> >>>> On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
->> >>>>> From: Lucas Stach <dev@lynxeye.de>
->> >>>>>
->> >>>>> On architectures for which access to GPU memory is non-coherent,
->> >>>>> caches need to be flushed and invalidated explicitly at the
->> >>>>> appropriate places. Introduce two small helpers to make things
->> >>>>> easy for TTM-based drivers.
->> >>>>
->> >>>> Have you run this with DMA API debugging enabled?  I suspect you haven't,
->> >>>> and I recommend that you do.
->> >>>
->> >>> # cat /sys/kernel/debug/dma-api/error_count
->> >>> 162621
->> >>>
->> >>> (??????? ???)
->> >>
->> >> *puts table back on its feet*
->> >>
->> >> So, yeah - TTM memory is not allocated using the DMA API, hence we cannot
->> >> use the DMA API to sync it. Thanks Russell for pointing it out.
->> >>
->> >> The only alternative I see here is to flush the CPU caches when syncing for
->> >> the device, and invalidate them for the other direction. Of course if the
->> >> device has caches on its side as well the opposite operation must also be
->> >> done for it. Guess the only way is to handle it all by ourselves here. :/
->> > ... and it really sucks. Basically if we cannot use the DMA API here
->> > we will lose the convenience of having a portable API that does just
->> > the right thing for the underlying platform. Without it we would have
->> > to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
->> > have support for ARM.
->> >
->> > The usage of the DMA API that we are doing might be illegal, but in
->> > essence it does exactly what we need - at least for ARM. What are the
->> > alternatives?
->> Convert TTM to use the dma api? :-)
->
-> Actually TTM already has a page alloc backend using the DMA API. It's
-> just not used for the standard case right now.
+On Tuesday 24 June 2014 14:42:49 Catalin Marinas wrote:
+> On Tue, Jun 24, 2014 at 02:17:06PM +0100, Arnd Bergmann wrote:
+> > Since 3.16, we have the ability to build a multiplatform kernel
+> > that includes both kirkwood (feroceon) and some other ARMv5 CPU.
+> > 
+> > I accidentally stumbled over a bug in the VFP code that looks
+> > like it will break at least ARM9 VFP support if CPU_FEROCEON
+> > is also enabled, introduced by this (old) commit:
+> 
+> I would argue that the bug is in the CPU (feroceon). See the end of this
+> email:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg41460.html
+> 
+> and my follow-up. Basically you can't avoid the conditional compilation
+> as Feroceon doesn't follow the VFP sub-architecture spec and doesn't
+> present itself as a different CPU from an _ARM_ 9. Unless things have
+> changed with Marvell's hardware implementation and they got a new id, I
+> suggest you don't enable this for multi-platform.
 
-Indeed, and Nouveau even already makes use of it if CONFIG_SWIOTLB is
-set apparently.
+We only support multiplatform configurations with Feroceon variants
+that identify as Marvell-made, not the fake ARM CPU ID, and we already
+rely on detecting the correct CPU type in other places, so we can e.g.
+set up the cache correctly.
 
-> I would argue that we should just use this page allocator (which has the
-> side effect of getting pages from CMA if available -> you are actually
-> free to change the caching) and do away with the other allocator in the
-> ARM case.
+For all I can tell, the problem now exists only if you enable the
+kirkwood platform, which does have its own ID. If this gets made
+conditional on the CPU ID, we probably still also need to leave your
+existing hack in place for the case of CONFIG_CPU_FEROCEON_OLD_ID
+on a feroceon-only kernel.
 
-Mm? Does it mean that CMA memory is not mapped into lowmem? That would
-certainly help in the present case, but I wonder how useful it will be
-once the iommu support is in place. Will also need to consider
-performance of such coherent memory for e.g. user-space mappings.
-
-Anyway, I will experiment a bit with this tomorrow, thanks!
+	Arnd
