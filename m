@@ -1,91 +1,122 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 24 Jun 2014 12:58:15 -0400
-Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
-In-Reply-To: <53A9A290.7020407@ti.com>
-References: <20140623053249.GD2666@pratyush-vbox> <53A85ACE.9070506@ti.com>
- <53A9A290.7020407@ti.com>
-Message-ID: <53A9AE27.2050504@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 24 Jun 2014 13:59:06 -0300
+Subject: [PATCH] ARM: clk-imx51-imx53: Remove clk_register_clkdev() 
+Message-ID: <1403629146-19245-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 12:08 PM, Murali Karicheri wrote:
-> Pratyush,
->
-> On 06/23/2014 12:50 PM, Santosh Shilimkar wrote:
->>
->>
->>
->> -------- Original Message --------
->> Subject: Re: [PATCH v2 0/8] Add Keystone PCIe controller driver
->> On Sat, Jun 21, 2014 at 03:05:30AM +0800, Arnd Bergmann wrote:
->>> On Friday 20 June 2014 13:11:37 Santosh Shilimkar wrote:
->>
->>>>>
->>>> Arnd suggestion was to have the version 3.65 code in generic place
->>>> since
->>>> its IP specific and just in case some other vendor using the same
->>>> version
->>>> can leverage the code.
->>
->> Sorry, I do not follow PCIe mailing list these days, doing something else
->> now. So coming to this topic a bit delayed.
->>
-> My Apologies for the email format as I mysteriously lost this email and
-> had to resort to a forwarded email to respond to this.
->
-> Let us have the discussion on this thread as I lost the original emails.
->>>>
->>>> Concern here seems toe really those name of the files. I can't think of
->>>> any other appropriate name.
->>>
->>> We should definitely keep the version in the DT "compatible" strings
->>> wherever we know it. Regarding a better file name, I have no idea.
->>
->> In my opinion, we do not need any of dw-v3_65 files, as code in these
->> files will not be usable by other vendors.
->>
->> Anything which is implemented in application space, will not be same
->> across all IP users. For example, MSI0_IRQ_ENABLE_SET has been defined
->> at offset 0x108 in keystone PCIe application space.Other vendor may
->> not have this register at the same offset. Moreover, other vendors are
->> not even obliged to implement MSI Enable signals in same way, so
->> internal bit definition of the register may change.
->>
->> Therefore code is not reusable if all register offset and bit
->> definitions are not same across vendors. So, in case of DW driver none
->> of the code which are accessed using va_app_base should go to common
->> area.
->>
->
-> I think based on the response far on this issue, it is best to keep
-> the Application specific code as part of Keystone driver and in
-> future if there is any driver that has similar application register
-> implemented. we can refactor the code and re-use.
->
-> My V3 will revert back to implementation similar to RFC. Also since this
-> is individual h/w specific, there is no no need for a compatibility as
-> well. Will use keystone specific compatibility string for this.
->
-> Arnd, hope this is fine. Please respond if you still think a
-> compatibility string is needed.
+mx51 and mx53 are device tree only platforms, so we no longer need all these
+calls to clk_register_clkdev().
 
-On a second thought, I think it is better to keep the compatibility
-string to differentiate the h/w and do any old h/w specific initialization.
+Tested on imx51-babbage and imx53-qsb boards.
 
-Thanks and regards,
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c | 78 -------------------------------------
+ 1 file changed, 78 deletions(-)
 
-Murali
->
-> Murali
->
->> Pratyush
->>
->>>
->>> Arnd
->>
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index cf6e630..e27ba8e 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -285,51 +285,6 @@ static void __init mx5_clocks_common_init(void __iomem *ccm_base)
+ 	clk[IMX5_CLK_SAHARA_IPG_GATE]	= imx_clk_gate2("sahara_ipg_gate", "ipg", MXC_CCM_CCGR4, 14);
+ 	clk[IMX5_CLK_SATA_REF]		= imx_clk_fixed_factor("sata_ref", "usb_phy1_gate", 1, 1);
+ 
+-	clk_register_clkdev(clk[IMX5_CLK_UART1_PER_GATE], "per", "imx21-uart.0");
+-	clk_register_clkdev(clk[IMX5_CLK_UART1_IPG_GATE], "ipg", "imx21-uart.0");
+-	clk_register_clkdev(clk[IMX5_CLK_UART2_PER_GATE], "per", "imx21-uart.1");
+-	clk_register_clkdev(clk[IMX5_CLK_UART2_IPG_GATE], "ipg", "imx21-uart.1");
+-	clk_register_clkdev(clk[IMX5_CLK_UART3_PER_GATE], "per", "imx21-uart.2");
+-	clk_register_clkdev(clk[IMX5_CLK_UART3_IPG_GATE], "ipg", "imx21-uart.2");
+-	clk_register_clkdev(clk[IMX5_CLK_UART4_PER_GATE], "per", "imx21-uart.3");
+-	clk_register_clkdev(clk[IMX5_CLK_UART4_IPG_GATE], "ipg", "imx21-uart.3");
+-	clk_register_clkdev(clk[IMX5_CLK_UART5_PER_GATE], "per", "imx21-uart.4");
+-	clk_register_clkdev(clk[IMX5_CLK_UART5_IPG_GATE], "ipg", "imx21-uart.4");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI1_PER_GATE], "per", "imx51-ecspi.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI1_IPG_GATE], "ipg", "imx51-ecspi.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI2_PER_GATE], "per", "imx51-ecspi.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ECSPI2_IPG_GATE], "ipg", "imx51-ecspi.1");
+-	clk_register_clkdev(clk[IMX5_CLK_CSPI_IPG_GATE], NULL, "imx35-cspi.2");
+-	clk_register_clkdev(clk[IMX5_CLK_I2C1_GATE], NULL, "imx21-i2c.0");
+-	clk_register_clkdev(clk[IMX5_CLK_I2C2_GATE], NULL, "imx21-i2c.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "mxc-ehci.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "mxc-ehci.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "mxc-ehci.1");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "mxc-ehci.2");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "mxc-ehci.2");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "mxc-ehci.2");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_PER_GATE], "per", "imx-udc-mx51");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ipg", "imx-udc-mx51");
+-	clk_register_clkdev(clk[IMX5_CLK_USBOH3_GATE], "ahb", "imx-udc-mx51");
+-	clk_register_clkdev(clk[IMX5_CLK_NFC_GATE], NULL, "imx51-nand");
+-	clk_register_clkdev(clk[IMX5_CLK_SSI1_IPG_GATE], NULL, "imx-ssi.0");
+-	clk_register_clkdev(clk[IMX5_CLK_SSI2_IPG_GATE], NULL, "imx-ssi.1");
+-	clk_register_clkdev(clk[IMX5_CLK_SSI3_IPG_GATE], NULL, "imx-ssi.2");
+-	clk_register_clkdev(clk[IMX5_CLK_SDMA_GATE], NULL, "imx35-sdma");
+-	clk_register_clkdev(clk[IMX5_CLK_CPU_PODF], NULL, "cpu0");
+-	clk_register_clkdev(clk[IMX5_CLK_IIM_GATE], "iim", NULL);
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], NULL, "imx2-wdt.0");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], NULL, "imx2-wdt.1");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], NULL, "imx-keypad");
+-	clk_register_clkdev(clk[IMX5_CLK_IPU_DI1_GATE], "di1", "imx-tve.0");
+-	clk_register_clkdev(clk[IMX5_CLK_GPC_DVFS], "gpc_dvfs", NULL);
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT1_IPG_GATE], "ipg", "imx-epit.0");
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT1_HF_GATE], "per", "imx-epit.0");
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT2_IPG_GATE], "ipg", "imx-epit.1");
+-	clk_register_clkdev(clk[IMX5_CLK_EPIT2_HF_GATE], "per", "imx-epit.1");
+ 
+ 	/* Set SDHC parents to be PLL2 */
+ 	clk_set_parent(clk[IMX5_CLK_ESDHC_A_SEL], clk[IMX5_CLK_PLL2_SW]);
+@@ -479,23 +434,6 @@ static void __init mx51_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	clk_register_clkdev(clk[IMX5_CLK_HSI2C_GATE], NULL, "imx21-i2c.2");
+-	clk_register_clkdev(clk[IMX5_CLK_MX51_MIPI], "mipi_hsp", NULL);
+-	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx27-fec.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USB_PHY_GATE], "phy", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_IPG_GATE], "ipg", "sdhci-esdhc-imx51.0");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_PER_GATE], "per", "sdhci-esdhc-imx51.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_IPG_GATE], "ipg", "sdhci-esdhc-imx51.1");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_PER_GATE], "per", "sdhci-esdhc-imx51.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_IPG_GATE], "ipg", "sdhci-esdhc-imx51.2");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_PER_GATE], "per", "sdhci-esdhc-imx51.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_IPG_GATE], "ipg", "sdhci-esdhc-imx51.3");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx51.3");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_PER_GATE], "per", "sdhci-esdhc-imx51.3");
+-
+ 	/* set the usboh3 parent to pll2_sw */
+ 	clk_set_parent(clk[IMX5_CLK_USBOH3_SEL], clk[IMX5_CLK_PLL2_SW]);
+ 
+@@ -609,22 +547,6 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	clk_register_clkdev(clk[IMX5_CLK_I2C3_GATE], NULL, "imx21-i2c.2");
+-	clk_register_clkdev(clk[IMX5_CLK_FEC_GATE], NULL, "imx25-fec.0");
+-	clk_register_clkdev(clk[IMX5_CLK_USB_PHY1_GATE], "usb_phy1", "mxc-ehci.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_IPG_GATE], "ipg", "sdhci-esdhc-imx53.0");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC1_PER_GATE], "per", "sdhci-esdhc-imx53.0");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_IPG_GATE], "ipg", "sdhci-esdhc-imx53.1");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC2_PER_GATE], "per", "sdhci-esdhc-imx53.1");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_IPG_GATE], "ipg", "sdhci-esdhc-imx53.2");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC3_PER_GATE], "per", "sdhci-esdhc-imx53.2");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_IPG_GATE], "ipg", "sdhci-esdhc-imx53.3");
+-	clk_register_clkdev(clk[IMX5_CLK_DUMMY], "ahb", "sdhci-esdhc-imx53.3");
+-	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_PER_GATE], "per", "sdhci-esdhc-imx53.3");
+-
+ 	/* set SDHC root clock to 200MHZ*/
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
+ 	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 200000000);
+-- 
+1.8.3.2
