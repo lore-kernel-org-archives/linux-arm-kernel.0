@@ -1,126 +1,51 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 24 Jun 2014 15:29:09 -0700
-Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
-In-Reply-To: <53A9B99F.4040806@codeaurora.org>
-References: <539fdd37.e7bc420a.76b9.ffffb583@mx.google.com>
- <CAGa+x85nqPbH-sye28ni=gUEdgjGdUDqHhv1+0pV5aO8y1+wHQ@mail.gmail.com>
- <53A106F1.10201@gmail.com>
- <CAGa+x8527FEPk6fg5kv-fbOzK3MzcFooFGE9Me12b9C_Pv=UzA@mail.gmail.com>
- <53A2AE11.2050208@gmail.com> <53A2BE94.2010308@gmail.com>
- <53A7A579.4010702@gmail.com>
- <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
- <53A9B99F.4040806@codeaurora.org>
-Message-ID: <53A9FBB5.60709@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 25 Jun 2014 02:34:03 +0400
+Subject: [PATCH 2/4] usb: host: xhci-plat: Add support to get PHYs
+In-Reply-To: <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
+References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>	<1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>
+ <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
+Message-ID: <53A9FCDB.6060805@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/24/2014 10:47 AM, Laura Abbott wrote:
-> On 6/23/2014 11:32 AM, Kevin Hilman wrote:
->> On Sun, Jun 22, 2014 at 8:56 PM, Tushar Behera <trblinux@gmail.com> wrote:
->>> Adding linux-samsung-soc and linux-arm-kernel ML for wider audience.
->>>
->>> On 06/19/2014 04:12 PM, Tushar Behera wrote:
->>>> On 06/19/2014 03:02 PM, Tushar Behera wrote:
->>>>> On 06/18/2014 09:22 AM, Kevin Hilman wrote:
->>>>>> On Tue, Jun 17, 2014 at 8:26 PM, Tushar Behera <trblinux@gmail.com> wrote:
->>>>>>> On 06/17/2014 10:23 PM, Kevin Hilman wrote:
->>>>>>>> Sachin,
->>>>>>>>
->>>>>>>> On Mon, Jun 16, 2014 at 11:16 PM, Kevin's boot bot <khilman@linaro.org> wrote:
->>>>>>>>>
->>>>>>>>> Tree/Branch: mainline
->>>>>>>>> Git describe: v3.16-rc1-2-gebe0618
->>>>>>>>> Failed boot tests (console logs at the end)
->>>>>>>>> ===========================================
->>>>>>>>>      exynos5420-arndale-octa:     FAIL:    arm-exynos_defconfig
->>>>>>>>>                 ste-snowball:     FAIL:    arm-u8500_defconfig
->>>>>>>>
->>>>>>>> FYI... these failures are getting more consistent on my octa board,
->>>>>>>> but still not failing every time.
->>>>>>>>
->>>>>>>> Kevin
->>>>>>>>
->>>>>>>
->>>>>>> Hi Kevin,
->>>>>>>
->>>>>>> Same here.
->>>>>>>
->>>>>>> Observation: If you soft-reset the board (through the jumpers) after
->>>>>>> getting this problem, the problem keeps repeating. But if you hard-reset
->>>>>>> the board (by removing the power cord), the problem doesn't occur during
->>>>>>> next iteration.
->>>>>>
->>>>>> I don't ever use the soft-reset, I only toggle the wall power.  I
->>>>>> don't ever actually remove the power cord though, I'm using a
->>>>>> USB-controlled relay to toggle the wall power.
->>>>>>
->>>>>> Kevin
->>>>>>
->>>>>
->>>>> Laura,
->>>>>
->>>>> We are getting following kernel panic [1] (not always, but quite
->>>>> regularly) while booting Arndale-Octa (based on Samsung's Exynos5420)
->>>>> board with upstream kernel. I haven't observed this issue with other
->>>>> boards yet.
->>>>>
->>>>> This issue is observed when I am booting with uImage + dtb (within
->>>>> roughly ~10 iterations).
->>>>>
->>>>
->>>> Some more information:
->>>>
->>>> The boot logs are provided in pastebin, okay[2] and failed[3].
->>>>
->>>> In case of boot failures, I am getting a higher value for vm_total_pages
->>>> (684424 in [3]). In case of successful boot on my board, it is always
->>>> 521232 [2] on my board.
->>
->> I can confirm that reverting the "Get rid of meminfo" patch gets the
->> Octa board booting reliably again for me also.
->>
->> In case it helps, some boot logs for failures from the last copule
->> linux-next build/boot cycles can be seen here:
->> http://armcloud.us/kernel-ci/next/next-20140623/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
->> http://armcloud.us/kernel-ci/next/next-20140620/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
->>
-> 
-> Sorry, I missed this yesterday. I'm going to take a look.
-> 
+Hello.
 
-Were all of 
+On 06/10/2014 12:22 AM, Julius Werner wrote:
 
-http://pastebin.com/1iLaizuL
-http://pastebin.com/5tdDt4GL
-http://armcloud.us/kernel-ci/next/next-20140623/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
-http://armcloud.us/kernel-ci/next/next-20140620/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
+>> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+>> index 9ffecd5..453d89e 100644
+>> --- a/drivers/usb/host/xhci.h
+>> +++ b/drivers/usb/host/xhci.h
+>> @@ -1582,6 +1582,9 @@ struct xhci_hcd {
+>>          u32                     port_status_u0;
+>>   /* Compliance Mode Timer Triggered every 2 seconds */
+>>   #define COMP_MODE_RCVRY_MSECS 2000
+>> +       /* phys for the controller */
+>> +       struct phy              *phy2_gen;
+>> +       struct phy              *phy3_gen;
+>>   };
 
-collected on the same type of board with the same amount of DRAM? I'm seeing a
-different amount of total pages across all those logs. All the logs have the
-same lowmem limit so it seems like the upper bound was being calculated
-incorrectly for passing to free_area_init_node. Nothing is immediately jumping
-out at me so can you boot up with a small debug patch?
+> I don't think adding new variables here and restricting most of this
+> logic to xhci-plat.c (in the next patch) is the best way to do it.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..88eac1f 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -187,6 +187,8 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
-        unsigned long zone_size[MAX_NR_ZONES], zhole_size[MAX_NR_ZONES];
-        struct memblock_region *reg;
- 
-+       pr_err("XXXXXXX min %lx max_low %lx max_high %lx\n", min, max_low, max_high);
-+       __memblock_dump_all();
-        /*
-         * initialise the zones.
-         */
+    Indeed.
 
-It would be helpful to do this across a few bootups to see if the values are
-actually consistent. I'll keep looking in the meantime.
+> There's no conceptual reason why other host controllers (e.g. xhci-pci
+> or even EHCI) could not have a similar need to tune their PHY after
+> reset. PHYs are universal to all host controllers.
 
-Thanks,
-Laura
+> There is already a 'phy' member in struct usb_hcd which I think is
+> mostly unused right now. I think it would be much less
+> confusing/redundant to reuse that member for this purpose (you could
+> still set it up from xhci_plat_probe(), and then call it from
+> hcd_bus_resume() or something like that).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+    That member has type 'struct usb_phy *' while here we have 'struct phy *' 
+-- feel the difference.
+    I have already tried adding 'struct phy *gen_phy' to 'struct usb_hcd', 
+however Greg wasn't eager to pick that up so far. Here's the last posting of 
+my patch:
+
+http://marc.info/?l=linux-usb&m=140145917506582
+
+WBR, Sergei
