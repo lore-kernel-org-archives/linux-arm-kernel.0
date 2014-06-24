@@ -1,103 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jun 2014 17:11:14 +0100
-Subject: [PATCH] arm: exynos: Modify pm code to check for cortex A9
- rather than the SoC
-In-Reply-To: <CAM4voa=3zzo-2KbjDtBOca+uJeSxT2OYpi+rJuSGsDg-vo7GYA@mail.gmail.com>
-References: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voa=3zzo-2KbjDtBOca+uJeSxT2OYpi+rJuSGsDg-vo7GYA@mail.gmail.com>
-Message-ID: <20140624161114.GW32514@n2100.arm.linux.org.uk>
+From: dianders@google.com (Doug Anderson)
+Date: Tue, 24 Jun 2014 09:12:40 -0700
+Subject: [PATCH 1/3] ARM: MCPM: provide infrastructure to allow for MCPM
+ loopback
+In-Reply-To: <1403583071-5650-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
+ <1403583071-5650-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <CAD=FV=X0mP_Vq9SSAugJfFRqchu_dkSFcL5aBAhAC073LPy6oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 09:37:14AM +0530, Abhilash Kesavan wrote:
-> Hi Kukjin,
-> 
-> On Fri, May 23, 2014 at 8:31 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> 
-> Do you have any comments on this patch ?
+Nicolas,
 
-I do.
+On Mon, Jun 23, 2014 at 9:11 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> The kernel already has the responsibility to handle resources such as the
+> CCI when hotplugging CPUs, during the booting of secondary CPUs, and when
+> resuming from suspend/idle.  It would be more coherent and less confusing
+> if the CCI for the boot CPU (or cluster)  was also initialized by the kernel rather than expecting the
 
-> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> > index d10c351..6dd4a11 100644
-> > --- a/arch/arm/mach-exynos/pm.c
-> > +++ b/arch/arm/mach-exynos/pm.c
-> > @@ -300,7 +300,7 @@ static int exynos_pm_suspend(void)
-> >         tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
-> >         __raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
-> >
-> > -       if (!soc_is_exynos5250())
-> > +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> >                 exynos_cpu_save_register();
-...
-> > @@ -334,7 +334,7 @@ static void exynos_pm_resume(void)
-> >         if (exynos_pm_central_resume())
-> >                 goto early_wakeup;
-> >
-> > -       if (!soc_is_exynos5250())
-> > +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> >                 exynos_cpu_restore_register();
+nit: wrap long line?
 
-It is invalid to check just the part number.  The part number on its
-own is meaningless without taking account of the implementor.  Both
-the implementor and the part number should be checked at each of these
-sites.
+> firmware/bootloader to do it and only in that case. After all, the kernel
+> has all the necessary code already and the bootloader shouldn't have to
+> care at all.
+>
+> The CCI may be turned on only when the cache is off. Leveraging the CPU
+> suspend code to loop back through the low-level MCPM entry point is all
+> that is needed to properly turn on the CCI from the kernel by using the
+> same code as for secondary boot.
+>
+> Let's provide a generic MCPM loopback function that can be invoked by
+> backend initialization code to set things (CCI or similar) on the boot
+> CPU just as it is done for the other CPUs.
+>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/common/mcpm_entry.c | 52 ++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/mcpm.h  | 16 ++++++++++++++
+>  2 files changed, 68 insertions(+)
 
-Another point: exynos have taken it upon themselves to add code which
-saves various ARM core registers.  This is a bad idea, it brings us
-back to the days where every platform did their own suspend implementations.
+Thank you very much for posting!  With your series I'm able to boot
+all 8 cores on exynos5420-peach-pit and exynos5800-peach-pi sitting on
+my desk.
 
-CPU level registers should be handled by CPU level code, not by platform
-code.  Is there a reason why this can't be added to the Cortex-A9
-support code in proc-v7.S ?
+Tested-by: Doug Anderson <dianders@chromium.org>
 
-> > @@ -353,7 +353,7 @@ static void exynos_pm_resume(void)
-> >
-> >         s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> >
-> > -       if (!soc_is_exynos5250())
-> > +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> >                 scu_enable(S5P_VA_SCU);
-> >
-> >  early_wakeup:
-> > @@ -440,15 +440,18 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
-> >         case CPU_PM_ENTER:
-> >                 if (cpu == 0) {
-> >                         exynos_pm_central_suspend();
-> > -                       exynos_cpu_save_register();
-> > +                       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
-> > +                               exynos_cpu_save_register();
-> >                 }
-> >                 break;
-> >
-> >         case CPU_PM_EXIT:
-> >                 if (cpu == 0) {
-> > -                       if (!soc_is_exynos5250())
-> > +                       if (read_cpuid_part_number() ==
-> > +                                       ARM_CPU_PART_CORTEX_A9) {
-> >                                 scu_enable(S5P_VA_SCU);
-> > -                       exynos_cpu_restore_register();
-> > +                               exynos_cpu_restore_register();
-> > +                       }
-> >                         exynos_pm_central_resume();
-> >                 }
-> >                 break;
 
-And presumably with the CPU level code dealing with those registers,
-you don't need the calls to save and restore these registers in this
-notifier.
+I will note that git yelled about whitespace damage on theis patch:
 
-Which, by the way, is probably illegal to run as it runs in a read-
-lock code path and with the SCU disabled.  As you're calling
-scu_enable() that means you're non-coherent with the other CPUs,
-and therefore locks don't work.
+# pwclient git-am 4406301
+Applying patch #4406301 using 'git am'
+Description: [1/3] ARM: MCPM: provide infrastructure to allow for MCPM loopback
+Applying: ARM: MCPM: provide infrastructure to allow for MCPM loopback
+/b/tip/src/third_party/kernel/3.8/.git/rebase-apply/patch:51: trailing
+whitespace.
 
-I think this code is very broken and wrongly architected, and shows
-that we're continuing to make the same mistakes that we made all
-through the 2000s with platforms doing their own crap rather than
-properly thinking about this stuff.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+/b/tip/src/third_party/kernel/3.8/.git/rebase-apply/patch:95: trailing
+whitespace.
+ * to the MCPM low-level entry code before returning to the caller.
+warning: 2 lines add whitespace errors.
