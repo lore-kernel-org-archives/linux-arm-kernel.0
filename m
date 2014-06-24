@@ -1,52 +1,42 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 24 Jun 2014 11:40:07 +0530
-Subject: [PATCH 2/4] usb: host: xhci-plat: Add support to get PHYs
-In-Reply-To: <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
-References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
- <1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>
- <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
-Message-ID: <CAFp+6iHUX0jn0xW6ijXmRpgXodp43_mBtVxnCcOb2H6duHvigQ@mail.gmail.com>
+From: slapdau@yahoo.com.au (Craig McGeachie)
+Date: Tue, 24 Jun 2014 18:21:24 +1200
+Subject: [RFC PATCH 2/3] Enable BCM2835 mailbox support
+In-Reply-To: <1403433943.532.1.camel@goatlord.localdomain>
+References: <5232F7C2.3070408@yahoo.com.au>
+ <1403433943.532.1.camel@goatlord.localdomain>
+Message-ID: <53A918E4.4080707@yahoo.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-On Tue, Jun 10, 2014 at 1:52 AM, Julius Werner <jwerner@chromium.org> wrote:
->> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
->> index 9ffecd5..453d89e 100644
->> --- a/drivers/usb/host/xhci.h
->> +++ b/drivers/usb/host/xhci.h
->> @@ -1582,6 +1582,9 @@ struct xhci_hcd {
->>         u32                     port_status_u0;
->>  /* Compliance Mode Timer Triggered every 2 seconds */
->>  #define COMP_MODE_RCVRY_MSECS 2000
->> +       /* phys for the controller */
->> +       struct phy              *phy2_gen;
->> +       struct phy              *phy3_gen;
->>  };
+On 22/06/14 22:45, Lubomir Rintel wrote:
+> Hi Craig,
+> As the work on common mailbox framework progressed, I've updated the
+> driver to work with v7 of it (I've also ported the cpufreq and vchiq
+> drivers, which I'd like to post once the mailbox framework and your
+> drivers are in):
 >
-> I don't think adding new variables here and restricting most of this
-> logic to xhci-plat.c (in the next patch) is the best way to do it.
-> There's no conceptual reason why other host controllers (e.g. xhci-pci
-> or even EHCI) could not have a similar need to tune their PHY after
-> reset. PHYs are universal to all host controllers.
+> https://github.com/hackerspace/rpi-linux/commits/lr-vchiq-new-mailbox
 >
-> There is already a 'phy' member in struct usb_hcd which I think is
-> mostly unused right now. I think it would be much less
-> confusing/redundant to reuse that member for this purpose (you could
-> still set it up from xhci_plat_probe(), and then call it from
-> hcd_bus_resume() or something like that). Since XHCI host controllers
-> already conveniently have two struct usb_hcd (one for 2.0 and one for
-> 3.0), you can cleanly store references to your two PHYs in there.
+> I'm not sending inline patches for review, since neither the framework
+> nor your your mbox and thermal drivers are in yet, but I'm wondering if
+> you could take a look and eventually fold the changes back into your
+> drivers? (I've kept them in separate commits in my tree, so that it's
+> easy for you to keep track of the changes).
 
-Ok, i will look into the suggested approach, and raise flag in case i
-have doubts.
+It's been 9 months since I last looked at this.  I've been watching the 
+work on the mailbox framework, with considerable interest, over the last 
+week, but have not actively done anything with it.
 
+I have a few other projects at the moment, and given that I only do this 
+in my spare time in the evenings, it will take several days to get back 
+into it.  But I will make an effort to import, build, and try them out. 
+In the meantime I've had a brief look at the changes that you made and 
+can see nothing wrong with any of them.  The "useless gotoes" were 
+embarrassing.
 
+Although I can pull your changes back into my tree, I don't feel that 
+this will be helpful in getting them accepted into the mainline. But I'm 
+happy enough to format a patch and submit it somewhere, at some point.
 
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Cheers,
+Craig.
