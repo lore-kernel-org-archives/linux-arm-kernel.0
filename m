@@ -1,114 +1,135 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 24 Jun 2014 18:54:26 +0900
-Subject: [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
+Date: Tue, 24 Jun 2014 18:54:27 +0900
+Subject: [PATCH v2 3/3] drm/nouveau: hook up cache sync functions
 In-Reply-To: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
 References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
+Message-ID: <1403603667-11302-4-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lucas Stach <dev@lynxeye.de>
 
-On architectures for which access to GPU memory is non-coherent,
-caches need to be flushed and invalidated explicitly at the
-appropriate places. Introduce two small helpers to make things
-easy for TTM-based drivers.
+Use the newly-introduced TTM cache sync functions in Nouveau.
 
 Signed-off-by: Lucas Stach <dev@lynxeye.de>
+[acourbot at nvidia.com: rearrange code, make platform-friendly]
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- drivers/gpu/drm/ttm/ttm_tt.c    | 25 +++++++++++++++++++++++++
- include/drm/ttm/ttm_bo_driver.h | 28 ++++++++++++++++++++++++++++
- 2 files changed, 53 insertions(+)
+ drivers/gpu/drm/nouveau/nouveau_bo.c  | 47 +++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/nouveau/nouveau_bo.h  |  1 +
+ drivers/gpu/drm/nouveau/nouveau_gem.c | 10 +++-----
+ 3 files changed, 51 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpu/drm/ttm/ttm_tt.c b/drivers/gpu/drm/ttm/ttm_tt.c
-index 75f319090043..66c16ad35f70 100644
---- a/drivers/gpu/drm/ttm/ttm_tt.c
-+++ b/drivers/gpu/drm/ttm/ttm_tt.c
-@@ -38,6 +38,7 @@
- #include <linux/swap.h>
- #include <linux/slab.h>
- #include <linux/export.h>
-+#include <linux/dma-mapping.h>
- #include <drm/drm_cache.h>
- #include <drm/drm_mem_util.h>
- #include <drm/ttm/ttm_module.h>
-@@ -248,6 +249,30 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
+diff --git a/drivers/gpu/drm/nouveau/nouveau_bo.c b/drivers/gpu/drm/nouveau/nouveau_bo.c
+index b6dc85c614be..74c68c16e777 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_bo.c
++++ b/drivers/gpu/drm/nouveau/nouveau_bo.c
+@@ -284,6 +284,34 @@ set_placement_range(struct nouveau_bo *nvbo, uint32_t type)
+ 	}
  }
- EXPORT_SYMBOL(ttm_dma_tt_fini);
  
-+void ttm_dma_tt_cache_sync_for_device(struct ttm_dma_tt *ttm_dma,
-+				      struct device *dev)
++static void
++nouveau_bo_sync_for_cpu(struct nouveau_bo *nvbo)
 +{
-+	unsigned long i;
++	struct nouveau_device *device;
++	struct ttm_tt *ttm = nvbo->bo.ttm;
 +
-+	for (i = 0; i < ttm_dma->ttm.num_pages; i++) {
-+		dma_sync_single_for_device(dev, ttm_dma->dma_address[i],
-+					   PAGE_SIZE, DMA_TO_DEVICE);
++	device = nouveau_dev(nouveau_bdev(ttm->bdev)->dev);
++
++	if (nvbo->bo.ttm && nvbo->bo.ttm->caching_state == tt_cached)
++		ttm_dma_tt_cache_sync_for_cpu((struct ttm_dma_tt *)nvbo->bo.ttm,
++					      nv_device_base(device));
++}
++
++static void
++nouveau_bo_sync_for_device(struct nouveau_bo *nvbo)
++{
++	struct ttm_tt *ttm = nvbo->bo.ttm;
++
++	if (ttm && ttm->caching_state == tt_cached) {
++		struct nouveau_device *device;
++
++		device = nouveau_dev(nouveau_bdev(ttm->bdev)->dev);
++
++		ttm_dma_tt_cache_sync_for_device((struct ttm_dma_tt *)ttm,
++						 nv_device_base(device));
 +	}
 +}
-+EXPORT_SYMBOL(ttm_dma_tt_cache_sync_for_device);
 +
-+void ttm_dma_tt_cache_sync_for_cpu(struct ttm_dma_tt *ttm_dma,
-+				   struct device *dev)
-+{
-+	unsigned long i;
-+
-+	for (i = 0; i < ttm_dma->ttm.num_pages; i++) {
-+		dma_sync_single_for_cpu(dev, ttm_dma->dma_address[i],
-+					PAGE_SIZE, DMA_FROM_DEVICE);
-+	}
-+}
-+EXPORT_SYMBOL(ttm_dma_tt_cache_sync_for_cpu);
-+
- void ttm_tt_unbind(struct ttm_tt *ttm)
+ void
+ nouveau_bo_placement_set(struct nouveau_bo *nvbo, uint32_t type, uint32_t busy)
+ {
+@@ -407,6 +435,8 @@ nouveau_bo_validate(struct nouveau_bo *nvbo, bool interruptible,
  {
  	int ret;
-diff --git a/include/drm/ttm/ttm_bo_driver.h b/include/drm/ttm/ttm_bo_driver.h
-index a5183da3ef92..52fb709568fc 100644
---- a/include/drm/ttm/ttm_bo_driver.h
-+++ b/include/drm/ttm/ttm_bo_driver.h
-@@ -41,6 +41,7 @@
- #include <linux/fs.h>
- #include <linux/spinlock.h>
- #include <linux/reservation.h>
-+#include <linux/device.h>
  
- struct ttm_backend_func {
- 	/**
-@@ -690,6 +691,33 @@ extern int ttm_tt_swapout(struct ttm_tt *ttm,
-  */
- extern void ttm_tt_unpopulate(struct ttm_tt *ttm);
++	nouveau_bo_sync_for_device(nvbo);
++
+ 	ret = ttm_bo_validate(&nvbo->bo, &nvbo->placement,
+ 			      interruptible, no_wait_gpu);
+ 	if (ret)
+@@ -415,6 +445,23 @@ nouveau_bo_validate(struct nouveau_bo *nvbo, bool interruptible,
+ 	return 0;
+ }
  
-+/**
-+ * ttm_dma_tt_cache_sync_for_device:
-+ *
-+ * @ttm A struct ttm_tt of the type returned by ttm_dma_tt_init.
-+ * @dev A struct device representing the device to which to sync.
-+ *
-+ * This function will flush the CPU caches on arches where snooping in the
-+ * TT is not available. On fully coherent arches this will turn into an (almost)
-+ * noop. This makes sure that data written by the CPU is visible to the device.
-+ */
-+extern void ttm_dma_tt_cache_sync_for_device(struct ttm_dma_tt *ttm_dma,
-+					     struct device *dev);
++int
++nouveau_bo_wait(struct nouveau_bo *nvbo, bool no_wait)
++{
++	int ret;
 +
-+/**
-+ * ttm_dma_tt_cache_sync_for_cpu:
-+ *
-+ * @ttm A struct ttm_tt of the type returned by ttm_dma_tt_init.
-+ * @dev A struct device representing the device from which to sync.
-+ *
-+ * This function will invalidate the CPU caches on arches where snooping in the
-+ * TT is not available. On fully coherent arches this will turn into an (almost)
-+ * noop. This makes sure that the CPU does not read any stale cached or
-+ * prefetched data.
-+ */
-+extern void ttm_dma_tt_cache_sync_for_cpu(struct ttm_dma_tt *ttm_dma,
-+					  struct device *dev);
++	spin_lock(&nvbo->bo.bdev->fence_lock);
++	ret = ttm_bo_wait(&nvbo->bo, true, true, no_wait);
++	spin_unlock(&nvbo->bo.bdev->fence_lock);
 +
- /*
-  * ttm_bo.c
-  */
++	if (ret)
++		return ret;
++
++	nouveau_bo_sync_for_cpu(nvbo);
++
++	return 0;
++}
++
+ u16
+ nouveau_bo_rd16(struct nouveau_bo *nvbo, unsigned index)
+ {
+diff --git a/drivers/gpu/drm/nouveau/nouveau_bo.h b/drivers/gpu/drm/nouveau/nouveau_bo.h
+index ff17c1f432fc..a4e9052d54fd 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_bo.h
++++ b/drivers/gpu/drm/nouveau/nouveau_bo.h
+@@ -81,6 +81,7 @@ void nouveau_bo_wr32(struct nouveau_bo *, unsigned index, u32 val);
+ void nouveau_bo_fence(struct nouveau_bo *, struct nouveau_fence *);
+ int  nouveau_bo_validate(struct nouveau_bo *, bool interruptible,
+ 			 bool no_wait_gpu);
++int nouveau_bo_wait(struct nouveau_bo *, bool no_wait);
+ 
+ struct nouveau_vma *
+ nouveau_bo_vma_find(struct nouveau_bo *, struct nouveau_vm *);
+diff --git a/drivers/gpu/drm/nouveau/nouveau_gem.c b/drivers/gpu/drm/nouveau/nouveau_gem.c
+index c90c0dc0afe8..916cb8ff568c 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_gem.c
++++ b/drivers/gpu/drm/nouveau/nouveau_gem.c
+@@ -884,19 +884,15 @@ nouveau_gem_ioctl_cpu_prep(struct drm_device *dev, void *data,
+ {
+ 	struct drm_nouveau_gem_cpu_prep *req = data;
+ 	struct drm_gem_object *gem;
+-	struct nouveau_bo *nvbo;
+ 	bool no_wait = !!(req->flags & NOUVEAU_GEM_CPU_PREP_NOWAIT);
+-	int ret = -EINVAL;
++	int ret;
+ 
+ 	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
+ 	if (!gem)
+ 		return -ENOENT;
+-	nvbo = nouveau_gem_object(gem);
+-
+-	spin_lock(&nvbo->bo.bdev->fence_lock);
+-	ret = ttm_bo_wait(&nvbo->bo, true, true, no_wait);
+-	spin_unlock(&nvbo->bo.bdev->fence_lock);
++	ret = nouveau_bo_wait(nouveau_gem_object(gem), no_wait);
+ 	drm_gem_object_unreference_unlocked(gem);
++
+ 	return ret;
+ }
+ 
 -- 
 2.0.0
