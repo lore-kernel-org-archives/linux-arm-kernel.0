@@ -1,108 +1,52 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Jun 2014 16:51:33 +0100
-Subject: [PATCHv4 0/4] arm64: simplify restrictions on bootloaders
-Message-ID: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
+Date: Tue, 24 Jun 2014 16:51:34 +0100
+Subject: [PATCHv4 1/4] arm64: head.S: remove unnecessary function alignment
+In-Reply-To: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
+References: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403625097-18235-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Currently __turn_mmu_on is aligned to 64 bytes to ensure that it doesn't
+span any page boundary, which simplifies the idmap and spares us
+requiring an additional page table to map half of the function. In
+keeping with other important requirements in architecture code, this
+fact is undocumented.
 
-This is the fourth (and hopefully final) version of the boot simplification
-series I've posted previously [1,4,5]. Many thanks to those who reviewed and/or
-tested the prior postings.
+Additionally, as the function consists of three instructions totalling
+12 bytes with no literal pool data, a smaller alignment of 16 bytes
+would be sufficient.
 
-Changes since v3 [5]
-* Rebased to v3.16-rc2 to fix another conflict in arch/arm64/mm/init.c.
-* Applied menuconfig changes suggested by Will.
-* Moved image.h out of include/asm, as suggested by Geoff.
-Changes since v2 [4]
-* Rebased to v3.16-rc1 now that the EFI changes have been merged. Fixed
-  conflicts in arch/arm64/mm/init.c.
-* Added flags field to export kernel endianness.
-* Moved the linker script macros to image.h, to hide the magic behind a new
-  HEAD_SYMBOLS macro.
-* Fixed up the documentation, including some cleanups for the EFI changes. It
-  now refers to v3.17, but I can update if this is delayed further.
-* Renamed patch 3 as it has absorbed several Image header changes.
-Changes since v1 [1]:
-* Rebased to Matt Fleming's arm64-efi branch [2] to resolve conflict with the
-  EFI stub series in head.S.
-* Fixed random TEXT_OFFSET generation to be mawk compatible.
-* Removed option to set TEXT_OFFSET explicitly per Catalin's request.
-* Remove (invalid) recommendation of 1MB for dynamically initialised data.
+This patch reduces the alignment to 16 bytes and documents the
+underlying reason for the alignment. This reduces the required alignment
+of the entire .head.text section from 64 bytes to 16 bytes, though it
+may still be aligned to a larger value depending on TEXT_OFFSET.
 
-For those who have not seen v1 or v2, a rationale and description of the series
-follows:
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Laura Abbott <lauraa@codeaurora.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/head.S | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Currently bootloaders have an extremely difficult time protecting memory from
-the kernel, as the kernel may clobber memory below TEXT_OFFSET with pagetables,
-and above the end of the kernel binary with the BSS.
-
-This series attempts to ameliorate matters by adding a mechanism for bootloaders
-to discover the minimum runtime footprint of the kernel image, including the BSS
-and any other dynamically initialised data, and moving the initial page tables
-into this region.
-
-The currently ill-described image load offset variable is coerced to always be
-little-endian. This means that bootloader can actually make use of the field for
-any kernel (wither LE or BE), and as the field does not yet seem to be used
-anywhere taking endianness into account I hope this is not problematic.
-Documentation is updated with recommendations on handling the field. To aid in
-encouraging bootloader authors to respect the field, an option is added to
-randomize the text_offset field at link time, which may be used in test and/or
-distribution kernels. So as to not break existing (but arguably broken) loaders
-immediately, this option is hidden under kernel hacking and disabled by default.
-
-The documentation is updated to cover how to use the new image_size field and
-what to do if it is zero, and how to use the image_size field to determine
-whether the text_offset field is guaranteed to be little-endian. In the absence
-of an image_size field, it's not possible to provide a reasonable sensible
-value due to configuration-dependent variation -- a recent defconfg kernel had
-a ~190KB BSS, while an allyesconfig build (with some features disabled due to
-build breakages) had a ~13MB BSS.
-
-A new macro HEAD_SYMBOLS is defined in image.h which outputs data via the
-linker such that it always appears little-endian when the header is read. All
-the related magic is held in the new image.h file. The endianness swapping is
-performed by the linker in vmlinux.lds.S as this is the only place we can
-endianness swap a value calculated from two symbols known only at link time.
-There are several existing headers that do almost the same thing but due to use
-of C prototypes and/or casts are not suitable for use in a linker script. A
-separate series may be able to unify that.
-
-I've given some light testing to text_offset fuzzing with an updated bootwrapper
-[3] which reads the text_offset field at build time to ensure the kernel gets
-loaded at the right address. Nothing else is yet moved however, so this may
-explode if this location happens to overlap the bootwrapper code, DTB, or
-spin-table mbox. I'll try to teach the bootwrapper how to deal with that
-shortly. I've verified that fields look correct for LE and BE kernels with the
-aid of a hex editor.
-
-Cheers,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257141.html
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git arm64-efi
-[3] http://linux-arm.org/git?p=boot-wrapper-aarch64.git;a=shortlog;h=refs/heads/unstable/text-offset
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/260076.html
-[5] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264898.html
-
-Mark Rutland (4):
-  arm64: head.S: remove unnecessary function alignment
-  arm64: place initial page tables above the kernel
-  arm64: Update the Image header
-  arm64: Enable TEXT_OFFSET fuzzing
-
- Documentation/arm64/booting.txt | 43 ++++++++++++++++++++++------
- arch/arm64/Kconfig.debug        | 15 ++++++++++
- arch/arm64/Makefile             |  4 +++
- arch/arm64/include/asm/page.h   |  9 ++++++
- arch/arm64/kernel/head.S        | 49 +++++++++++++++-----------------
- arch/arm64/kernel/image.h       | 62 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/vmlinux.lds.S | 16 +++++++++++
- arch/arm64/mm/init.c            | 12 +++-----
- 8 files changed, 168 insertions(+), 42 deletions(-)
- create mode 100644 arch/arm64/kernel/image.h
-
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index a96d3a6..7ec7817 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -456,8 +456,13 @@ ENDPROC(__enable_mmu)
+  *  x27 = *virtual* address to jump to upon completion
+  *
+  * other registers depend on the function called upon completion
++ *
++ * We align the entire function to the smallest power of two larger than it to
++ * ensure it fits within a single block map entry. Otherwise were PHYS_OFFSET
++ * close to the end of a 512MB or 1GB block we might require an additional
++ * table to map the entire function.
+  */
+-	.align	6
++	.align	4
+ __turn_mmu_on:
+ 	msr	sctlr_el1, x0
+ 	isb
 -- 
 1.9.1
