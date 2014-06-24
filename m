@@ -1,58 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 15:17:06 +0200
-Subject: VFP handling in multiplatform feroceon kernels
-Message-ID: <7416978.W29blLsymn@wuerfel>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Tue, 24 Jun 2014 10:19:15 -0300
+Subject: [PATCH 02/10] serial: 8250_dw: support DMA on the OF case
+In-Reply-To: <CAGb2v676GgfHnR-XWdQCa-ecYtYRxePS1dgGL6QqbntUkBvi_g@mail.gmail.com>
+References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
+ <1402890635-12342-3-git-send-email-emilio@elopez.com.ar>
+ <CAGb2v676GgfHnR-XWdQCa-ecYtYRxePS1dgGL6QqbntUkBvi_g@mail.gmail.com>
+Message-ID: <53A97AD3.6060804@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 3.16, we have the ability to build a multiplatform kernel
-that includes both kirkwood (feroceon) and some other ARMv5 CPU.
+Hi,
 
-I accidentally stumbled over a bug in the VFP code that looks
-like it will break at least ARM9 VFP support if CPU_FEROCEON
-is also enabled, introduced by this (old) commit:
+El 21/06/14 10:56, Chen-Yu Tsai escribi?:
+> On Mon, Jun 16, 2014 at 11:50 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>> Currently, DMA properties on the DT are ignored when using the 8250_dw
+>> driver. With this patch, DMA will be used when available.
+>>
+>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> ---
+>>   drivers/tty/serial/8250/8250_dw.c | 7 ++++++-
+>>   1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+>> index ed31135..f75c0bf 100644
+>> --- a/drivers/tty/serial/8250/8250_dw.c
+>> +++ b/drivers/tty/serial/8250/8250_dw.c
+>> @@ -222,6 +222,8 @@ static int dw8250_probe_of(struct uart_port *p,
+>>                             struct dw8250_data *data)
+>>   {
+>>          struct device_node      *np = p->dev->of_node;
+>> +       struct uart_8250_port   *up = container_of(p, struct uart_8250_port,
+>> +                                                  port);
+>>          u32                     val;
+>>          bool has_ucv = true;
+>>
+>> @@ -254,11 +256,14 @@ static int dw8250_probe_of(struct uart_port *p,
+>>                  }
+>>          }
+>>          if (has_ucv)
+>> -               dw8250_setup_port(container_of(p, struct uart_8250_port, port));
+>> +               dw8250_setup_port(up);
+>>
+>>          if (!of_property_read_u32(np, "reg-shift", &val))
+>>                  p->regshift = val;
+>>
+>> +       if (of_get_property(np, "dmas", NULL))
+>> +               up->dma = &data->dma;
+>> +
+>
+> I suggest adding a comment here. Looking just at the patch,
+> it's not very intuitive. But otherwise the patch looks good.
 
-commit 85d6943af50537d3aec58b967ffbd3fec88453e9
-Author: Catalin Marinas <catalin.marinas@arm.com>
-Date:   Sat May 30 14:00:18 2009 +0100
+Sure, I can do that
 
-    Fix the VFP handling on the Feroceon CPU
-    
-    This CPU generates synchronous VFP exceptions in a non-standard way -
-    the FPEXC.EX bit set but without the FPSCR.IXE bit being set like in the
-    VFP subarchitecture 1 or just the FPEXC.DEX bit like in VFP
-    subarchitecture 2. The main problem is that the faulty instruction
-    (which needs to be emulated in software) will be restarted several times
-    (normally until a context switch disables the VFP). This patch ensures
-    that the VFP exception is treated as synchronous.
-    
-    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-    Cc: Nicolas Pitre <nico@cam.org>
+Thanks!
 
- diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
- index 83c4e38..1aeae38 100644 
- --- a/arch/arm/vfp/vfphw.S
- +++ b/arch/arm/vfp/vfphw.S
- @@ -100,6 +100,7 @@ ENTRY(vfp_support_entry)
-        beq     no_old_VFP_process
-        VFPFSTMIA r4, r5                @ save the working registers
-        VFPFMRX r5, FPSCR               @ current status
- +#ifndef CONFIG_CPU_FEROCEON
-        tst     r1, #FPEXC_EX           @ is there additional state to save?
-        beq     1f
-        VFPFMRX r6, FPINST              @ FPINST (only if FPEXC.EX is set)
- @@ -107,6 +108,7 @@ ENTRY(vfp_support_entry)
-        beq     1f
-        VFPFMRX r8, FPINST2             @ FPINST2 if needed (and present)
-  1:
- +#endif
-        stmia   r4, {r1, r5, r6, r8}    @ save FPEXC, FPSCR, FPINST, FPINST2
-                                        @ and point r4 at the word at the
-                                        @ start of the register dump
-   ...
-
-
-Any ideas for how this should be done better? I suppose we need a run-time
-check for feroceon of some sort.
-
-	Arnd
+Emilio
