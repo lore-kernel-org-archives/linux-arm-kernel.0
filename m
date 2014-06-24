@@ -1,56 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jun 2014 19:17:45 +0100
-Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
- suspend/resume
-In-Reply-To: <53A9B80B.7020608@samsung.com>
-References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
- <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
- <53A9B80B.7020608@samsung.com>
-Message-ID: <20140624181745.GD4067@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 24 Jun 2014 11:19:27 -0700
+Subject: [PATCH v7 7/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <20140624170800.GA30480@redhat.com>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-8-git-send-email-keescook@chromium.org>
+ <20140624170800.GA30480@redhat.com>
+Message-ID: <CAGXu5jLaYq2wncbZ=UjuteFAh=jyVDNtE7pBpx52CbHn07De+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 06:40:27PM +0100, Tomasz Figa wrote:
-> Hi Will,
+On Tue, Jun 24, 2014 at 10:08 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> On 06/23, Kees Cook wrote:
+>>
+>> +static pid_t seccomp_can_sync_threads(void)
+>> +{
+>> +     struct task_struct *thread, *caller;
+>> +
+>> +     BUG_ON(write_can_lock(&tasklist_lock));
+>> +     BUG_ON(!spin_is_locked(&current->sighand->siglock));
+>> +
+>> +     if (current->seccomp.mode != SECCOMP_MODE_FILTER)
+>> +             return -EACCES;
+>> +
+>> +     /* Validate all threads being eligible for synchronization. */
+>> +     thread = caller = current;
+>> +     for_each_thread(caller, thread) {
+>
+> You only need to initialize "caller" for for_each_thread(). Same for
+> seccomp_sync_threads().
 
-Hello,
+Thanks, I'll fix this up.
 
-> On 24.06.2014 18:33, Will Deacon wrote:
-> > On Tue, Jun 24, 2014 at 05:28:54PM +0100, Tomasz Figa wrote:
-> >> Hi Shawn,
-> >>
-> >> On 22.06.2014 12:15, Shawn Guo wrote:
-> >>> The CP15 diagnostic register holds ARM errata bits on Cortex-A9, so it
-> >>> needs to be saved/restored on suspend/resume.  Otherwise, the
-> >>> effectiveness of errata workaround gets lost together with diagnostic
-> >>> register bit across suspend/resume cycle.
-> >>>
-> >>> The patch adds a couple of Cortex-A9 specific suspend and resume
-> >>> functions to handle the diagnostic register across suspend/resume cycle.
-> >>
-> >> [snip]
-> >>
-> >>> +ENTRY(cpu_ca9mp_do_resume)
-> >>> +	ldmia	r0!, {r4}
-> >>> +	mcr	p15, 0, r4, c15, c0, 1  @ Diagnostic register
-> >>
-> >> What about platforms running in non-secure mode in which the register is
-> >> read-only?
-> > 
-> > On A9, it should be write-ignore. Are you seeing problems on a real SoC?
-> 
-> I'm observing a complete system hang on Exynos4412-based Trats2 board if
-> I try to write this register in resume from system-wide sleep.
+>> @@ -586,6 +701,17 @@ static long seccomp_set_mode_filter(unsigned int flags,
+>>       if (IS_ERR(prepared))
+>>               return PTR_ERR(prepared);
+>>
+>> +     /*
+>> +      * If we're doing thread sync, we must hold tasklist_lock
+>> +      * to make sure seccomp filter changes are stable on threads
+>> +      * entering or leaving the task list. And we must take it
+>> +      * before the sighand lock to avoid deadlocking.
+>> +      */
+>> +     if (flags & SECCOMP_FILTER_FLAG_TSYNC)
+>> +             write_lock_irqsave(&tasklist_lock, taskflags);
+>> +     else
+>> +             __acquire(&tasklist_lock); /* keep sparse happy */
+>> +
+>
+> Why? ->siglock should be enough, it seems.
+>
+> It obviously does not protect the global process list, but *sync_threads()
+> only care about current's thread group list, no?
 
-That's certainly unexpected; I just double-checked that non-secure accesses
-are treated as read-only/write-ignore.
+I think I was concerned about the exit case, but reading through those
+paths again, I can't find a race. Calls to put_seccomp_filter() should
+already be safe. Let me see what happens if I drop the tasklist_lock
+usage...
 
-> Note that the board is running under secure firmware, but there is no
-> support for suspend/resume of such boards in mainline yet, so I'm
-> testing on a work in progress (but mostly finished) series that is yet
-> to be sent.
+-Kees
 
-Maybe it could be unrelated to this register. What happens if you change
-the code to read/write a different (architected) cp15 register?
 
-Will
+-- 
+Kees Cook
+Chrome OS Security
