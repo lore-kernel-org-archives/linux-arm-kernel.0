@@ -1,79 +1,126 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 24 Jun 2014 18:14:27 +0200
-Subject: [PATCH v3 3/7] irqchip: atmel-aic: add new atmel AIC driver
-In-Reply-To: <20140624125653.GN10202@titan.lakedaemon.net>
-References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403276487-8792-4-git-send-email-boris.brezillon@free-electrons.com>
- <53A74316.5080509@free-electrons.com>
- <20140624125653.GN10202@titan.lakedaemon.net>
-Message-ID: <53A9A3E3.5020409@free-electrons.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 24 Jun 2014 18:13:55 +0200
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <20140624153559.GA5741@dragon>
+References: <20140624153559.GA5741@dragon>
+Message-ID: <1403626435.4230.17.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
+Hi Shawn,
 
-On 24/06/2014 14:56, Jason Cooper wrote:
-> Boris,
->
-> On Sun, Jun 22, 2014 at 10:56:54PM +0200, Boris BREZILLON wrote:
->> On 20/06/2014 17:01, Boris BREZILLON wrote:
->>> Add new atmel AIC (Advanced Interrupt Controller) driver based on the
->>> generic chip infrastructure.
->>>
->>> This driver is only compatible with dt enabled board and replaces the old
->>> implementation found in arch/arm/mach-at91/irq.c.
->>>
->>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>> ---
->>>  drivers/irqchip/Kconfig         |   7 +
->>>  drivers/irqchip/Makefile        |   1 +
->>>  drivers/irqchip/irq-atmel-aic.c | 700 ++++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 708 insertions(+)
->>>  create mode 100644 drivers/irqchip/irq-atmel-aic.c
->>>
->>> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
->>> index bbb746e..6a7ad81 100644
->>> --- a/drivers/irqchip/Kconfig
->>> +++ b/drivers/irqchip/Kconfig
->>> @@ -30,6 +30,13 @@ config ARM_VIC_NR
->>>  	  The maximum number of VICs available in the system, for
->>>  	  power management.
->>>  
->> [...]
->>
->>> +
->>> +static int at91_aic_common_irq_domain_xlate(struct irq_domain *d,
->> This function should be named aic_common_irq_domain_xslate to be
->> consistent with other function names.
->> I'll fix that for the next version.
-> Other than this one change, this series looks good wrt to irqchip.  When
-> you respin, please adjust the patch subject lines like so:
->
->   irqchip: atmel-aic: Add new atmel AIC driver
->
-> Note the capitalization.  Also, if you could add Thomas' Ack to the
-> first patch, that would be appreciated.
+Am Dienstag, den 24.06.2014, 23:36 +0800 schrieb Shawn Guo:
+> Hi Lucas,
+> 
+> I found that imx6q suspend/resume is broken on 3.16-rc, and it works
+> just fine if PCIe support is built out.  However the issue was not
+> exposed on 3.15, so I suspect the PCIe driver change merged in 3.16
+> is part of the cause.
+> 
+I don't yet see why any of the changes to the designware/imx6 host
+driver would cause such failures.
 
-Sure, I'll fix the commit message and add Thomas' ack.
+Which board are you doing your testing on? What devices are connected to
+the PCIe bus? In what way does it break system resume, complete hang?
 
->
-> Once you post the new series, I assume it's ok to apply patches 1-3 to
-> irqchip/core, or are there some dependency considerations?
+Regards,
+Lucas
 
-Patches 6 and 7 depend on the 3 first patches, but we should be able to
-merge them through the at91/arm-soc tree (Nicolas might have to rebase
-its tree for 3.17 on irqchip/core after you have applied patches 1-3).
-
-Anyway, I'd like to wait for at91 maintainers/developers reviews before
-posting a new version.
-
-Thanks for your support on this series.
-
-Best Regards,
-
-Boris
+> $ echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.002 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+> sd 0:0:0:0: [sda] Synchronizing SCSI cache
+> sd 0:0:0:0: [sda] Stopping disk
+> PM: suspend of devices complete after 85.695 msecs
+> PM: suspend devices took 0.100 seconds
+> PM: late suspend of devices complete after 6.786 msecs
+> PM: noirq suspend of devices complete after 6.228 msecs
+> Disabling non-boot CPUs ...
+> CPU1: shutdown
+> CPU2: shutdown
+> CPU3: shutdown
+> Enabling non-boot CPUs ...
+> CPU1: Booted secondary processor
+> CPU1 is up
+> CPU2: Booted secondary processor
+> CPU2 is up
+> CPU3: Booted secondary processor
+> CPU3 is up
+> 
+> The issue is actually with resume procedure.  I noticed that Richard
+> added the following change in FSL kernel tree, which seems to fix the
+> issue.
+> 
+> @@ -229,6 +232,22 @@ static int imx6_suspend_finish(unsigned long val)
+> 
+>  static int imx6_pm_enter(suspend_state_t state)
+>  {
+> +       struct regmap *gpr;
+> +
+> +       /*
+> +        * L2 can exit by 'reset' or Inband beacon (from remote EP)
+> +        * toggling phy_powerdown has same effect as 'inband beacon'
+> +        * So, toggle bit18 of GPR1, to fix errata
+> +        * "PCIe PCIe does not support L2 Power Down"
+> +        */
+> +       gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +       if (IS_ERR(gpr)) {
+> +               pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
+> +               return PTR_ERR(gpr);
+> +       }
+> +       regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
+> +                       IMX6Q_GPR1_PCIE_TEST_PD);
+> +
+>         switch (state) {
+>         case PM_SUSPEND_STANDBY:
+>                 imx6_set_lpm(STOP_POWER_ON);
+> @@ -258,6 +277,15 @@ static int imx6_pm_enter(suspend_state_t state)
+>                 return -EINVAL;
+>         }
+> 
+> +       /*
+> +        * L2 can exit by 'reset' or Inband beacon (from remote EP)
+> +        * toggling phy_powerdown has same effect as 'inband beacon'
+> +        * So, toggle bit18 of GPR1, to fix errata
+> +        * "PCIe PCIe does not support L2 Power Down"
+> +        */
+> +       regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
+> +                       !IMX6Q_GPR1_PCIE_TEST_PD);
+> +
+>         return 0;
+>  }
+>  
+> And I copied the details of the errata as below.
+> 
+> ERR005723 PCIe: PCIe does not support L2 power down
+> 
+> Description:
+> When PCIe works as Root Complex, it can exit L2 mode only through reset.
+> Since PCIe does not have a dedicated reset control bit, it cannot exit
+> L2 mode.
+> 
+> Projected Impact:
+> PCIe does not support L2 power down.
+> 
+> Workarounds:
+> The PCIe can be put into PDDQ mode to save PCIe PHY power and wake up
+> only by the OOB (Out of Band) wakeup signal (since wakeup by a beacon
+> from link partner is not supported) driven from the link partner (End
+> Point). This signal could be used as a GPIO interrupt to exit this mode.
+> The limitation of this workaround is that the link partner cannot be put
+> into L2 mode.
+> 
+> As I have no knowledge of how PCIe works, I provided all the info I
+> found here to kick the discussion.  Hopefully, we can find a proper fix
+> to get suspend/resume back to work.
+> 
+> Shawn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
