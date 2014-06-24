@@ -1,47 +1,93 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Jun 2014 19:40:27 +0200
-Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
- suspend/resume
-In-Reply-To: <20140624163320.GM9121@arm.com>
-References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
- <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
-Message-ID: <53A9B80B.7020608@samsung.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 24 Jun 2014 10:47:11 -0700
+Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
+In-Reply-To: <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
+References: <539fdd37.e7bc420a.76b9.ffffb583@mx.google.com>
+ <CAGa+x85nqPbH-sye28ni=gUEdgjGdUDqHhv1+0pV5aO8y1+wHQ@mail.gmail.com>
+ <53A106F1.10201@gmail.com>
+ <CAGa+x8527FEPk6fg5kv-fbOzK3MzcFooFGE9Me12b9C_Pv=UzA@mail.gmail.com>
+ <53A2AE11.2050208@gmail.com> <53A2BE94.2010308@gmail.com>
+ <53A7A579.4010702@gmail.com>
+ <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
+Message-ID: <53A9B99F.4040806@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 24.06.2014 18:33, Will Deacon wrote:
-> On Tue, Jun 24, 2014 at 05:28:54PM +0100, Tomasz Figa wrote:
->> Hi Shawn,
+On 6/23/2014 11:32 AM, Kevin Hilman wrote:
+> On Sun, Jun 22, 2014 at 8:56 PM, Tushar Behera <trblinux@gmail.com> wrote:
+>> Adding linux-samsung-soc and linux-arm-kernel ML for wider audience.
 >>
->> On 22.06.2014 12:15, Shawn Guo wrote:
->>> The CP15 diagnostic register holds ARM errata bits on Cortex-A9, so it
->>> needs to be saved/restored on suspend/resume.  Otherwise, the
->>> effectiveness of errata workaround gets lost together with diagnostic
->>> register bit across suspend/resume cycle.
+>> On 06/19/2014 04:12 PM, Tushar Behera wrote:
+>>> On 06/19/2014 03:02 PM, Tushar Behera wrote:
+>>>> On 06/18/2014 09:22 AM, Kevin Hilman wrote:
+>>>>> On Tue, Jun 17, 2014 at 8:26 PM, Tushar Behera <trblinux@gmail.com> wrote:
+>>>>>> On 06/17/2014 10:23 PM, Kevin Hilman wrote:
+>>>>>>> Sachin,
+>>>>>>>
+>>>>>>> On Mon, Jun 16, 2014 at 11:16 PM, Kevin's boot bot <khilman@linaro.org> wrote:
+>>>>>>>>
+>>>>>>>> Tree/Branch: mainline
+>>>>>>>> Git describe: v3.16-rc1-2-gebe0618
+>>>>>>>> Failed boot tests (console logs at the end)
+>>>>>>>> ===========================================
+>>>>>>>>      exynos5420-arndale-octa:     FAIL:    arm-exynos_defconfig
+>>>>>>>>                 ste-snowball:     FAIL:    arm-u8500_defconfig
+>>>>>>>
+>>>>>>> FYI... these failures are getting more consistent on my octa board,
+>>>>>>> but still not failing every time.
+>>>>>>>
+>>>>>>> Kevin
+>>>>>>>
+>>>>>>
+>>>>>> Hi Kevin,
+>>>>>>
+>>>>>> Same here.
+>>>>>>
+>>>>>> Observation: If you soft-reset the board (through the jumpers) after
+>>>>>> getting this problem, the problem keeps repeating. But if you hard-reset
+>>>>>> the board (by removing the power cord), the problem doesn't occur during
+>>>>>> next iteration.
+>>>>>
+>>>>> I don't ever use the soft-reset, I only toggle the wall power.  I
+>>>>> don't ever actually remove the power cord though, I'm using a
+>>>>> USB-controlled relay to toggle the wall power.
+>>>>>
+>>>>> Kevin
+>>>>>
+>>>>
+>>>> Laura,
+>>>>
+>>>> We are getting following kernel panic [1] (not always, but quite
+>>>> regularly) while booting Arndale-Octa (based on Samsung's Exynos5420)
+>>>> board with upstream kernel. I haven't observed this issue with other
+>>>> boards yet.
+>>>>
+>>>> This issue is observed when I am booting with uImage + dtb (within
+>>>> roughly ~10 iterations).
+>>>>
 >>>
->>> The patch adds a couple of Cortex-A9 specific suspend and resume
->>> functions to handle the diagnostic register across suspend/resume cycle.
->>
->> [snip]
->>
->>> +ENTRY(cpu_ca9mp_do_resume)
->>> +	ldmia	r0!, {r4}
->>> +	mcr	p15, 0, r4, c15, c0, 1  @ Diagnostic register
->>
->> What about platforms running in non-secure mode in which the register is
->> read-only?
+>>> Some more information:
+>>>
+>>> The boot logs are provided in pastebin, okay[2] and failed[3].
+>>>
+>>> In case of boot failures, I am getting a higher value for vm_total_pages
+>>> (684424 in [3]). In case of successful boot on my board, it is always
+>>> 521232 [2] on my board.
 > 
-> On A9, it should be write-ignore. Are you seeing problems on a real SoC?
+> I can confirm that reverting the "Get rid of meminfo" patch gets the
+> Octa board booting reliably again for me also.
+> 
+> In case it helps, some boot logs for failures from the last copule
+> linux-next build/boot cycles can be seen here:
+> http://armcloud.us/kernel-ci/next/next-20140623/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
+> http://armcloud.us/kernel-ci/next/next-20140620/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
+> 
 
-I'm observing a complete system hang on Exynos4412-based Trats2 board if
-I try to write this register in resume from system-wide sleep.
+Sorry, I missed this yesterday. I'm going to take a look.
 
-Note that the board is running under secure firmware, but there is no
-support for suspend/resume of such boards in mainline yet, so I'm
-testing on a work in progress (but mostly finished) series that is yet
-to be sent.
+Thanks,
+Laura
 
-Best regards,
-Tomasz
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
