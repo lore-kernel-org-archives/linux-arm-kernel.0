@@ -1,53 +1,55 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Tue, 24 Jun 2014 17:13:55 +0530
-Subject: [PATCH 8/8] ARM: spear: Staticize local symbols in spear1340.c
-In-Reply-To: <1403610235-22654-1-git-send-email-sachin.kamat@samsung.com>
-References: <1403610235-22654-1-git-send-email-sachin.kamat@samsung.com>
-Message-ID: <1403610235-22654-8-git-send-email-sachin.kamat@samsung.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Tue, 24 Jun 2014 17:19:27 +0530
+Subject: [Pull Request] Various ARM platform code fixes
+In-Reply-To: <11158643.kH5ypbGTk1@wuerfel>
+References: <CAK9yfHw=zecLHWHVZWvf3PzphYG3CDyTwMRXicUUFM4kkhT9Mw@mail.gmail.com>
+ <4750577.NRz8KZsHUG@wuerfel>
+ <CAK5sBcF_wAJu-bfduhvP3kHfRvUDr=rUx=gd1Oi=3C5dnrHL6Q@mail.gmail.com>
+ <11158643.kH5ypbGTk1@wuerfel>
+Message-ID: <CAK5sBcHFPV0D5EzkxSkcJPBv77=NsU+k3kwKDVwOg03dSCC2PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sachin Kamat <sachin.kamat@linaro.org>
+On Tue, Jun 24, 2014 at 4:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 24 June 2014 15:14:07 Sachin Kamat wrote:
+>> On Tue, Jun 3, 2014 at 12:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Monday 02 June 2014 09:42:48 Olof Johansson wrote:
+>> >> On Mon, Jun 2, 2014 at 2:23 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+>> >> > Hi Arnd,
+>> >> >
+>> >> > As suggested by you I am sending a pull request for the below 8 patches.
+>> >> > These are based on for-next branch of arm-soc tree [1].
+>> >> >
+>> >> > [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+>> >>
+>> >> Please, don't send random pull requests to us. Some of these patches
+>> >> are for platforms that have quite active maintainers and you're
+>> >> messing up everyone's workflow by randomly sending them to us.
+>> >>
+>> >> I have no idea what you talked to Arnd about, and you give no
+>> >> reference to it in your pull request.
+>> >
+>> > FYI, these are all trivial cleanups that no subarch maintainer has
+>> > picked up since they were posted, and I offered to take them
+>> > from a pull request
+>> >
+>> >> Besides, the merge window is open, we're not taking anything new until
+>> >> after -rc1.
+>> >
+>> > Agreed, I didn't expect the merge window to open already, and since there
+>> > is no urgency here, let's apply this into next/cleanups after the merge
+>> > window.
+>>
+>> Arnd, I no longer have access to my Linaro git repo. Shall I re-send
+>> the individual
+>> patches?
+>
+> Yes, please do, and send them with Cc to both linux-arm-kernel at lists.infradead.org
+> and arm at kernel.org.
 
-Symbols local to this file are made static.
+Thanks Arnd. Sent them just now.
+Forgot to mention "Resend" in the subject on patches 3-8 :(
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-spear/spear1340.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-index 7b6bff7154e1..c601799b4aea 100644
---- a/arch/arm/mach-spear/spear1340.c
-+++ b/arch/arm/mach-spear/spear1340.c
-@@ -93,7 +93,7 @@ static int sata_miphy_init(struct device *dev, void __iomem *addr)
- 	return 0;
- }
- 
--void sata_miphy_exit(struct device *dev)
-+static void sata_miphy_exit(struct device *dev)
- {
- 	writel(0, SPEAR1340_PCIE_SATA_CFG);
- 	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
-@@ -107,7 +107,7 @@ void sata_miphy_exit(struct device *dev)
- 	msleep(20);
- }
- 
--int sata_suspend(struct device *dev)
-+static int sata_suspend(struct device *dev)
- {
- 	if (dev->power.power_state.event == PM_EVENT_FREEZE)
- 		return 0;
-@@ -117,7 +117,7 @@ int sata_suspend(struct device *dev)
- 	return 0;
- }
- 
--int sata_resume(struct device *dev)
-+static int sata_resume(struct device *dev)
- {
- 	if (dev->power.power_state.event == PM_EVENT_THAW)
- 		return 0;
 -- 
-1.7.9.5
+Regards,
+Sachin.
