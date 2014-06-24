@@ -1,74 +1,56 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 24 Jun 2014 11:17:28 -0700
-Subject: [PATCH 3/3] mmc: dw_mmc: Support voltage changes
-In-Reply-To: <1403520321-2431-4-git-send-email-yuvaraj.cd@samsung.com>
-References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
- <1403520321-2431-4-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <CAD=FV=XV7umnSWbLh3t_euC1kpvNiiC8rYu_eXvoHbFC_GGnCQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jun 2014 19:17:45 +0100
+Subject: [PATCH v2] ARM: save/restore diagnostic register on Cortex-A9
+ suspend/resume
+In-Reply-To: <53A9B80B.7020608@samsung.com>
+References: <1403432119-1409-1-git-send-email-shawn.guo@freescale.com>
+ <53A9A746.6080200@samsung.com> <20140624163320.GM9121@arm.com>
+ <53A9B80B.7020608@samsung.com>
+Message-ID: <20140624181745.GD4067@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yuvaraj,
+On Tue, Jun 24, 2014 at 06:40:27PM +0100, Tomasz Figa wrote:
+> Hi Will,
 
-On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
-> From: Doug Anderson <dianders@chromium.org>
->
-> For UHS cards we need the ability to switch voltages from 3.3V to
-> 1.8V.  Add support to the dw_mmc driver to handle this.  Note that
-> dw_mmc needs a little bit of extra code since the interface needs a
-> special bit programmed to the CMD register while CMD11 is progressing.
-> This means adding a few extra states to the state machine to track.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->
-> ---
->  drivers/mmc/host/dw_mmc.c  |  145 +++++++++++++++++++++++++++++++++++++++++---
->  drivers/mmc/host/dw_mmc.h  |    5 +-
->  include/linux/mmc/dw_mmc.h |    2 +
->  3 files changed, 142 insertions(+), 10 deletions(-)
+Hello,
 
-I will note to other interested parties that in the ChromeOS tree we
-never actually cleaned up the MMC voltage change stuff enough to make
-use of this functionality to actually get UHS cards working (though
-the code is exercised as part of WiFi).
+> On 24.06.2014 18:33, Will Deacon wrote:
+> > On Tue, Jun 24, 2014 at 05:28:54PM +0100, Tomasz Figa wrote:
+> >> Hi Shawn,
+> >>
+> >> On 22.06.2014 12:15, Shawn Guo wrote:
+> >>> The CP15 diagnostic register holds ARM errata bits on Cortex-A9, so it
+> >>> needs to be saved/restored on suspend/resume.  Otherwise, the
+> >>> effectiveness of errata workaround gets lost together with diagnostic
+> >>> register bit across suspend/resume cycle.
+> >>>
+> >>> The patch adds a couple of Cortex-A9 specific suspend and resume
+> >>> functions to handle the diagnostic register across suspend/resume cycle.
+> >>
+> >> [snip]
+> >>
+> >>> +ENTRY(cpu_ca9mp_do_resume)
+> >>> +	ldmia	r0!, {r4}
+> >>> +	mcr	p15, 0, r4, c15, c0, 1  @ Diagnostic register
+> >>
+> >> What about platforms running in non-secure mode in which the register is
+> >> read-only?
+> > 
+> > On A9, it should be write-ignore. Are you seeing problems on a real SoC?
+> 
+> I'm observing a complete system hang on Exynos4412-based Trats2 board if
+> I try to write this register in resume from system-wide sleep.
 
+That's certainly unexpected; I just double-checked that non-secure accesses
+are treated as read-only/write-ignore.
 
-> @@ -254,6 +258,32 @@ static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
->         else if (cmd->opcode != MMC_SEND_STATUS && cmd->data)
->                 cmdr |= SDMMC_CMD_PRV_DAT_WAIT;
->
-> +       if (cmd->opcode == SD_SWITCH_VOLTAGE) {
-> +               u32 clk_en_a;
-> +
-> +               /* Special bit makes CMD11 not die */
-> +               cmdr |= SDMMC_CMD_VOLT_SWITCH;
-> +
-> +               /* Change state to continue to handle CMD11 weirdness */
-> +               WARN_ON(slot->host->state != STATE_SENDING_CMD);
-> +               slot->host->state = STATE_SENDING_CMD11;
-> +
-> +               /*
-> +                * We need to disable clock stop while doing voltage switch
-> +                * according to 7.4.1.2 Voltage Switch Normal Scenario.
+> Note that the board is running under secure firmware, but there is no
+> support for suspend/resume of such boards in mainline yet, so I'm
+> testing on a work in progress (but mostly finished) series that is yet
+> to be sent.
 
-I think upstream hasn't tended to like the chapter number references,
-though Grant really liked them locally.
+Maybe it could be unrelated to this register. What happens if you change
+the code to read/write a different (architected) cp15 register?
 
-> +static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
-> +{
-> +       struct dw_mci_slot *slot = mmc_priv(mmc);
-> +       struct dw_mci *host = slot->host;
-> +       u32 uhs;
-> +       u32 v18 = SDMMC_UHS_18V << slot->id;
-> +       int min_uv, max_uv;
-> +       int ret;
-> +
-> +       /*
-> +        * Program the voltage.  Note that some instances of dw_mmc may use
-> +        * the UHS_REG for this.  For other instances (like exynos) the UHS_REG
-> +        * does no harm but you need to set the regulator directly.  Try both.
-
-I've only worked with exynos which doesn't use UHS_REG for anything,
-so the setting of this bit was a best-guess.  If anyone actually had a
-chip that uses it then please comment / test.
+Will
