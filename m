@@ -1,24 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 20:11:16 +0200
-Subject: [PATCH v5 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
- nodes
-In-Reply-To: <201406242159.55373.sergei.shtylyov@cogentembedded.com>
-References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>
- <201406242159.55373.sergei.shtylyov@cogentembedded.com>
-Message-ID: <4473942.0JR5ujEtJi@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 24 Jun 2014 22:11:44 +0400
+Subject: [PATCH v4 2/3] ARM: shmobile: koelsch: enable internal PCI
+In-Reply-To: <201406242207.32790.sergei.shtylyov@cogentembedded.com>
+References: <201406242207.32790.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201406242211.45729.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 June 2014 21:59:54 Sergei Shtylyov wrote:
-> From: Ben Dooks <ben.dooks@codethink.co.uk>
-> 
-> Add device nodes for the R8A7790 internal PCI bridge devices.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
-> [Sergei: added several properties to the PCI bridge nodes]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
+them.
 
-Yes, looks better, thanks for the update.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+Changes in version 3:
+- refreshed the patch.
+
+Changes in version 2:
+- refreshed the patch.
+
+ arch/arm/boot/dts/r8a7791-koelsch.dts |   22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -279,6 +279,16 @@
+ 		renesas,groups = "i2c6";
+ 		renesas,function = "i2c6";
+ 	};
++
++	usb0_pins: usb0 {
++		renesas,groups = "usb0";
++		renesas,function = "usb0";
++	};
++
++	usb1_pins: usb1 {
++		renesas,groups = "usb1";
++		renesas,function = "usb1";
++	};
+ };
+ 
+ &ether {
+@@ -426,6 +436,18 @@
+ 	};
+ };
+ 
++&pci0 {
++	status = "okay";
++	pinctrl-0 = <&usb0_pins>;
++	pinctrl-names = "default";
++};
++
++&pci1 {
++	status = "okay";
++	pinctrl-0 = <&usb1_pins>;
++	pinctrl-names = "default";
++};
++
+ &pcie_bus_clk {
+ 	status = "okay";
+ };
