@@ -1,23 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 20:22:24 +0200
-Subject: [PATCH v4 0/3] Add R8A7791/Koelsch/Henninger board PCI DT support
-In-Reply-To: <201406242207.32790.sergei.shtylyov@cogentembedded.com>
-References: <201406242207.32790.sergei.shtylyov@cogentembedded.com>
-Message-ID: <9076479.78BOG4SjZ9@wuerfel>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 24 Jun 2014 20:30:24 +0200
+Subject: [PATCH v7 3/9] seccomp: introduce writer locking
+In-Reply-To: <1403560693-21809-4-git-send-email-keescook@chromium.org>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-4-git-send-email-keescook@chromium.org>
+Message-ID: <20140624183024.GA1258@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 June 2014 22:07:31 Sergei Shtylyov wrote:
-> 
->    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-v3.16-rc2-20140623' tag. Here we add PCI USB device tree support
-> for the R8A7791-based Koelsch and Henninger boards. As the 'pci-rcar-gen2'
-> driver device tree support has been merged for 3.16, this patchset can now be
-> merged too... 
-> 
-> [1/3] ARM: shmobile: r8a7791: add internal PCI bridge nodes
-> [2/3] ARM: shmobile: koelsch: enable internal PCI
-> [3/3] ARM: shmobile: henninger: enable internal PCI
-> 
+I am puzzled by the usage of smp_load_acquire(),
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+On 06/23, Kees Cook wrote:
+>
+>  static u32 seccomp_run_filters(int syscall)
+>  {
+> -	struct seccomp_filter *f;
+> +	struct seccomp_filter *f = smp_load_acquire(&current->seccomp.filter);
+>  	struct seccomp_data sd;
+>  	u32 ret = SECCOMP_RET_ALLOW;
+>  
+>  	/* Ensure unexpected behavior doesn't result in failing open. */
+> -	if (WARN_ON(current->seccomp.filter == NULL))
+> +	if (WARN_ON(f == NULL))
+>  		return SECCOMP_RET_KILL;
+>  
+>  	populate_seccomp_data(&sd);
+> @@ -186,9 +186,8 @@ static u32 seccomp_run_filters(int syscall)
+>  	 * All filters in the list are evaluated and the lowest BPF return
+>  	 * value always takes priority (ignoring the DATA).
+>  	 */
+> -	for (f = current->seccomp.filter; f; f = f->prev) {
+> +	for (; f; f = smp_load_acquire(&f->prev)) {
+>  		u32 cur_ret = SK_RUN_FILTER(f->prog, (void *)&sd);
+> -
+>  		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
+>  			ret = cur_ret;
+
+OK, in this case the 1st one is probably fine, altgough it is not
+clear to me why it is better than read_barrier_depends().
+
+But why do we need a 2nd one inside the loop? And if we actually need
+it (I don't think so) then why it is safe to use f->prog without
+load_acquire ?
+
+>  void get_seccomp_filter(struct task_struct *tsk)
+>  {
+> -	struct seccomp_filter *orig = tsk->seccomp.filter;
+> +	struct seccomp_filter *orig = smp_load_acquire(&tsk->seccomp.filter);
+>  	if (!orig)
+>  		return;
+
+This one looks unneeded.
+
+First of all, afaics atomic_inc() should work correctly without any barriers,
+otherwise it is buggy. But even this doesn't matter.
+
+With this changes get_seccomp_filter() must be called under ->siglock, it can't
+race with add-filter and thus tsk->seccomp.filter should be stable.
+
+>  	/* Reference count is bounded by the number of total processes. */
+> @@ -361,7 +364,7 @@ void put_seccomp_filter(struct task_struct *tsk)
+>  	/* Clean up single-reference branches iteratively. */
+>  	while (orig && atomic_dec_and_test(&orig->usage)) {
+>  		struct seccomp_filter *freeme = orig;
+> -		orig = orig->prev;
+> +		orig = smp_load_acquire(&orig->prev);
+>  		seccomp_filter_free(freeme);
+>  	}
+
+This one looks unneeded too. And note that this patch does not add
+smp_load_acquire() to read tsk->seccomp.filter.
+
+atomic_dec_and_test() adds mb(), we do not need more barriers to access
+->prev ?
+
+Oleg.
