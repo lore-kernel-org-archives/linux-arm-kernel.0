@@ -1,253 +1,259 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Jun 2014 17:59:39 +0800
-Subject: [PATCH v3 5/6] clk: sunxi: Add A23 clocks support
-In-Reply-To: <1403603980-31101-1-git-send-email-wens@csie.org>
-References: <1403603980-31101-1-git-send-email-wens@csie.org>
-Message-ID: <1403603980-31101-6-git-send-email-wens@csie.org>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Tue, 24 Jun 2014 10:01:14 +0000
+Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
+In-Reply-To: <53A897EF.2020804@cogentembedded.com>
+References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
+ <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
+ <53A209DA.9000000@cogentembedded.com>
+ <20a0a16226d54b0e8d6f68e41046bbf2@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <53A897EF.2020804@cogentembedded.com>
+Message-ID: <666f39dbf0f149c6946d4c2665d3d85d@HKXPR06MB168.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock control unit on the A23 is similar to the one found on the A31.
+Hi Sergei,
 
-The AHB1, APB1, APB2 gates on the A23 are almost identical to the ones
-on the A31, but some outputs are missing.
+On 23 June 2014 22:11, Sergei wrote:
+> On 06/23/2014 08:44 PM, Phil Edworthy wrote:
+> 
+>>>      I'm investigating an imprecise external abort occurring once userland is
+>>> started when I have NetMos
+> 
+>     Or is it MosChip now? Can't remember all their renames. :-)
+Do you know of somewhere I can buy a card with this chipset in the EU? I had a
+quick search but couldn't find anything.
 
-The main CPU PLL (PLL1) however is like that on older Allwinner SoCs,
-such as the A10 or A20, but the N factor starts from 1 instead of 0.
+[...]
+>>>> +static void pci_write_reg(struct rcar_pcie *pcie, unsigned long val,
+>>>> +			  unsigned long reg)
+>>>> +{
+>>>> +	writel(val, pcie->base + reg);
+>>>> +}
+>>>> +
+>>>> +static unsigned long pci_read_reg(struct rcar_pcie *pcie, unsigned long
+>>> reg)
+>>>> +{
+>>>> +	return readl(pcie->base + reg);
+>>>> +}
+> 
+>>>      As a side note, these functions are hardly needed, and risk collision
+> too...
+> 
+>> Ben mentioned this in his review and as I said then, I found them useful
+> during
+>> development, so we agreed to leave them. Since they are static, there
+> shouldn't
+>> be a collision risk.
+> 
+>     You're risking clashes even at the source level, not even at object file
+> level...
+Ah, yes you are correct. 
 
-This patch adds support for PLL1 and all the basic clock muxes and gates.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/clock/sunxi.txt |   5 ++
- drivers/clk/sunxi/clk-sunxi.c                     | 103 ++++++++++++++++++++++
- 2 files changed, 108 insertions(+)
+>>>> +static void rcar_pcie_setup_window(int win, struct resource *res,
+>>>> +				   struct rcar_pcie *pcie)
+> 
+>>>      As a side note, 'res' parameter is hardly needed here, as the function
+>>> always gets
+>>> called with the resources contained within 'struct rcar_pcie'...
+> 
+>> Either I would have to pass an index to the resource in,
+> 
+>     But you already do pass it, 'win' is the index!
+> 
+>> or as I have done, a
+>> pointer to the individual resource. I found it cleaner to pass the pointer.
+> 
+>     You're actually pass excess parameters, both the index and the pointer.
+Ha, yes I didn't notice that :)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index b9ec668..18030ce 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -9,11 +9,13 @@ Required properties:
- 	"allwinner,sun4i-a10-osc-clk" - for a gatable oscillator
- 	"allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
- 	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
-+	"allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
- 	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
- 	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
- 	"allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
- 	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
- 	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
-+	"allwinner,sun8i-a23-axi-clk" - for the AXI clock on A23
- 	"allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
- 	"allwinner,sun4i-a10-ahb-clk" - for the AHB clock
- 	"allwinner,sun4i-a10-ahb-gates-clk" - for the AHB gates on A10
-@@ -23,6 +25,7 @@ Required properties:
- 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
- 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
-+	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
- 	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
- 	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
- 	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
-@@ -37,8 +40,10 @@ Required properties:
- 	"allwinner,sun5i-a10s-apb1-gates-clk" - for the APB1 gates on A10s
- 	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
- 	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
-+	"allwinner,sun8i-a23-apb1-gates-clk" - for the APB1 gates on A23
- 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
-+	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
- 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
- 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
- 	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 6fe9492..d4832a7 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -164,6 +164,54 @@ static void sun6i_a31_get_pll1_factors(u32 *freq, u32 parent_rate,
- }
- 
- /**
-+ * sun8i_a23_get_pll1_factors() - calculates n, k, m, p factors for PLL1
-+ * PLL1 rate is calculated as follows
-+ * rate = (parent_rate * (n + 1) * (k + 1) >> p) / (m + 1);
-+ * parent_rate is always 24Mhz
-+ */
-+
-+static void sun8i_a23_get_pll1_factors(u32 *freq, u32 parent_rate,
-+				   u8 *n, u8 *k, u8 *m, u8 *p)
-+{
-+	u8 div;
-+
-+	/* Normalize value to a 6M multiple */
-+	div = *freq / 6000000;
-+	*freq = 6000000 * div;
-+
-+	/* we were called to round the frequency, we can now return */
-+	if (n == NULL)
-+		return;
-+
-+	/* m is always zero for pll1 */
-+	*m = 0;
-+
-+	/* k is 1 only on these cases */
-+	if (*freq >= 768000000 || *freq == 42000000 || *freq == 54000000)
-+		*k = 1;
-+	else
-+		*k = 0;
-+
-+	/* p will be 2 for divs under 20 and odd divs under 32 */
-+	if (div < 20 || (div < 32 && (div & 1)))
-+		*p = 2;
-+
-+	/* p will be 1 for even divs under 32, divs under 40 and odd pairs
-+	 * of divs between 40-62 */
-+	else if (div < 40 || (div < 64 && (div & 2)))
-+		*p = 1;
-+
-+	/* any other entries have p = 0 */
-+	else
-+		*p = 0;
-+
-+	/* calculate a suitable n based on k and p */
-+	div <<= *p;
-+	div /= (*k + 1);
-+	*n = div / 4 - 1;
-+}
-+
-+/**
-  * sun4i_get_pll5_factors() - calculates n, k factors for PLL5
-  * PLL5 rate is calculated as follows
-  * rate = parent_rate * n * (k + 1)
-@@ -422,6 +470,18 @@ static struct clk_factors_config sun6i_a31_pll1_config = {
- 	.mwidth = 2,
- };
- 
-+static struct clk_factors_config sun8i_a23_pll1_config = {
-+	.nshift = 8,
-+	.nwidth = 5,
-+	.kshift = 4,
-+	.kwidth = 2,
-+	.mshift = 0,
-+	.mwidth = 2,
-+	.pshift = 16,
-+	.pwidth = 2,
-+	.n_start = 1,
-+};
-+
- static struct clk_factors_config sun4i_pll5_config = {
- 	.nshift = 8,
- 	.nwidth = 5,
-@@ -471,6 +531,12 @@ static const struct factors_data sun6i_a31_pll1_data __initconst = {
- 	.getter = sun6i_a31_get_pll1_factors,
- };
- 
-+static const struct factors_data sun8i_a23_pll1_data __initconst = {
-+	.enable = 31,
-+	.table = &sun8i_a23_pll1_config,
-+	.getter = sun8i_a23_get_pll1_factors,
-+};
-+
- static const struct factors_data sun7i_a20_pll4_data __initconst = {
- 	.enable = 31,
- 	.table = &sun4i_pll5_config,
-@@ -673,6 +739,25 @@ static const struct div_data sun4i_axi_data __initconst = {
- 	.width	= 2,
- };
- 
-+static const struct clk_div_table sun8i_a23_axi_table[] __initconst = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 2 },
-+	{ .val = 2, .div = 3 },
-+	{ .val = 3, .div = 4 },
-+	{ .val = 4, .div = 4 },
-+	{ .val = 5, .div = 4 },
-+	{ .val = 6, .div = 4 },
-+	{ .val = 7, .div = 4 },
-+	{ } /* sentinel */
-+};
-+
-+static const struct div_data sun8i_a23_axi_data __initconst = {
-+	.shift	= 0,
-+	.pow	= 0,
-+	.width	= 3,
-+	.table	= sun8i_a23_axi_table,
-+};
-+
- static const struct div_data sun4i_ahb_data __initconst = {
- 	.shift	= 4,
- 	.pow	= 1,
-@@ -805,6 +890,10 @@ static const struct gates_data sun7i_a20_ahb_gates_data __initconst = {
- 	.mask = { 0x12f77fff, 0x16ff3f },
- };
- 
-+static const struct gates_data sun8i_a23_ahb1_gates_data __initconst = {
-+	.mask = {0x25386742, 0x2505111},
-+};
-+
- static const struct gates_data sun4i_apb0_gates_data __initconst = {
- 	.mask = {0x4EF},
- };
-@@ -837,6 +926,10 @@ static const struct gates_data sun6i_a31_apb1_gates_data __initconst = {
- 	.mask = {0x3031},
- };
- 
-+static const struct gates_data sun8i_a23_apb1_gates_data __initconst = {
-+	.mask = {0x3021},
-+};
-+
- static const struct gates_data sun6i_a31_apb2_gates_data __initconst = {
- 	.mask = {0x3F000F},
- };
-@@ -845,6 +938,10 @@ static const struct gates_data sun7i_a20_apb1_gates_data __initconst = {
- 	.mask = { 0xff80ff },
- };
- 
-+static const struct gates_data sun8i_a23_apb2_gates_data __initconst = {
-+	.mask = {0x1F0007},
-+};
-+
- static const struct gates_data sun4i_a10_usb_gates_data __initconst = {
- 	.mask = {0x1C0},
- 	.reset_mask = 0x07,
-@@ -1100,6 +1197,7 @@ free_clkdata:
- static const struct of_device_id clk_factors_match[] __initconst = {
- 	{.compatible = "allwinner,sun4i-a10-pll1-clk", .data = &sun4i_pll1_data,},
- 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
-+	{.compatible = "allwinner,sun8i-a23-pll1-clk", .data = &sun8i_a23_pll1_data,},
- 	{.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
- 	{.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
- 	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
-@@ -1111,6 +1209,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
- /* Matches for divider clocks */
- static const struct of_device_id clk_div_match[] __initconst = {
- 	{.compatible = "allwinner,sun4i-a10-axi-clk", .data = &sun4i_axi_data,},
-+	{.compatible = "allwinner,sun8i-a23-axi-clk", .data = &sun8i_a23_axi_data,},
- 	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
- 	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
-@@ -1140,6 +1239,7 @@ static const struct of_device_id clk_gates_match[] __initconst = {
- 	{.compatible = "allwinner,sun5i-a13-ahb-gates-clk", .data = &sun5i_a13_ahb_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-ahb1-gates-clk", .data = &sun6i_a31_ahb1_gates_data,},
- 	{.compatible = "allwinner,sun7i-a20-ahb-gates-clk", .data = &sun7i_a20_ahb_gates_data,},
-+	{.compatible = "allwinner,sun8i-a23-ahb1-gates-clk", .data = &sun8i_a23_ahb1_gates_data,},
- 	{.compatible = "allwinner,sun4i-a10-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
- 	{.compatible = "allwinner,sun5i-a10s-apb0-gates-clk", .data = &sun5i_a10s_apb0_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
-@@ -1149,7 +1249,9 @@ static const struct of_device_id clk_gates_match[] __initconst = {
- 	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
- 	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
-+	{.compatible = "allwinner,sun8i-a23-apb1-gates-clk", .data = &sun8i_a23_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
-+	{.compatible = "allwinner,sun8i-a23-apb2-gates-clk", .data = &sun8i_a23_apb2_gates_data,},
- 	{.compatible = "allwinner,sun4i-a10-usb-clk", .data = &sun4i_a10_usb_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-usb-clk", .data = &sun6i_a31_usb_gates_data,},
-@@ -1236,3 +1338,4 @@ static void __init sun6i_init_clocks(struct device_node *node)
- 			  ARRAY_SIZE(sun6i_critical_clocks));
- }
- CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
-+CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
--- 
-2.0.0
+[...]
+>>>> +
+>>>> +	/* First resource is for IO */
+>>>> +	mask = PAR_ENABLE;
+>>>> +	if (res->flags & IORESOURCE_IO)
+>>>> +		mask |= IO_SPACE;
+> 
+>>>      For the memory space this works OK as you're identity-mapping the
+>>> memory
+>>> ranges in your device trees. However, for the I/O space this means that it
+>>> won't work as the BARs in the PCIe devices get programmed with the PCI
+> bus
+>>> addresses but the PCIe window translation register is programmed with a
+>>> CPU
+>>> address which don't at all match (given your device trees) and hence one
+>>> can't
+>>> access the card's I/O mapped registers at all...
+> 
+>> Hmm, I couldn't find any cards that supported I/O, so I wasn't able to test
+>> this. Clearly this is an issue that needs looking into.
+> 
+>     Will you look into it then, or should I?
+I'll look at it.
+
+>>>> +
+>>>> +	pci_write_reg(pcie, mask, PCIEPTCTLR(win));
+>>>> +}
+>>>> +
+>>>> +static int rcar_pcie_setup(int nr, struct pci_sys_data *sys)
+>>>> +{
+>>>> +	struct rcar_pcie *pcie = sys_to_pcie(sys);
+>>>> +	struct resource *res;
+>>>> +	int i;
+>>>> +
+>>>> +	pcie->root_bus_nr = -1;
+>>>> +
+>>>> +	/* Setup PCI resources */
+>>>> +	for (i = 0; i < PCI_MAX_RESOURCES; i++) {
+>>>> +
+>>>> +		res = &pcie->res[i];
+>>>> +		if (!res->flags)
+>>>> +			continue;
+>>>> +
+>>>> +		rcar_pcie_setup_window(i, res, pcie);
+>>>> +
+>>>> +		if (res->flags & IORESOURCE_IO)
+>>>> +			pci_ioremap_io(nr * SZ_64K, res->start);
+> 
+>>>     I'm not sure why are you not calling pci_add_resource() for I/O space...
+> 
+>     Sorry, did you reply to that?
+I used the tegra driver to inform on what I should do for this. This doesn't
+call pci_add_resource() for I/O space either. However, I also see that other
+drivers do call this. I think the simplest thing is for me to get a card that
+supports I/O space and properly test it.
+
+>>> Also, this sets up only 64 KiB of I/O ports while your device tree describes
+>>> I/O space 1 MiB is size.
+> 
+>> This driver should be able to cope with multiple host controllers, so each
+>> allocated 64KiB for I/O. 64KiB is all you need for I/O, but the R-Car PCIe
+>> hardware has a 1MiB region (the smallest one) that can only be used for
+> one
+>> type of PCIe access.
+> 
+[...]
+>>>> +
+>>>> +	/* Finish initialization - establish a PCI Express link */
+>>>> +	pci_write_reg(pcie, CFINIT, PCIETCTLR);
+>>>> +
+>>>> +	/* This will timeout if we don't have a link. */
+>>>> +	err = rcar_pcie_wait_for_dl(pcie);
+>>>> +	if (err)
+>>>> +		return err;
+>>>> +
+>>>> +	/* Enable INTx interrupts */
+>>>> +	rcar_rmw32(pcie, PCIEINTXR, 0, 0xF << 8);
+>>>> +
+>>>> +	/* Enable slave Bus Mastering */
+>>>> +	rcar_rmw32(pcie, RCONF(PCI_STATUS), PCI_STATUS_DEVSEL_MASK,
+>>>> +		PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+>>> PCI_COMMAND_MASTER |
+>>>> +		PCI_STATUS_CAP_LIST | PCI_STATUS_DEVSEL_FAST);
+> 
+>>>      Hmm, you're mixing up PCI control/status registers' bits here; they're
+>>> two 16-bit registers! So you're writing to 3 reserved LSBs of the PCI status
+>>> register...
+> 
+>     ... and therefore not writing these bits to the PCI command (not control,
+> sorry) register. Perhaps because of that PCI-PCI bridge remains inactive...
+> 
+>> The mask arg should make sure that we don't write to reserved bits.
+> However,
+> 
+>     Look at rcar_rmw32() again -- it doesn't really do that.
+Yeah, that's why I said it should, not does. It only clears those bits in the
+register's current value.
+
+[...]
+>>>> +static int rcar_pcie_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +	struct rcar_pcie *pcie;
+>>>> +	unsigned int data;
+>>>> +	struct of_pci_range range;
+>>>> +	struct of_pci_range_parser parser;
+>>>> +	const struct of_device_id *of_id;
+>>>> +	int err, win = 0;
+>>>> +	int (*hw_init_fn)(struct rcar_pcie *);
+>>>> +
+>>>> +	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
+>>>> +	if (!pcie)
+>>>> +		return -ENOMEM;
+>>>> +
+>>>> +	pcie->dev = &pdev->dev;
+>>>> +	platform_set_drvdata(pdev, pcie);
+>>>> +
+>>>> +	/* Get the bus range */
+>>>> +	if (of_pci_parse_bus_range(pdev->dev.of_node, &pcie->busn)) {
+>>>> +		dev_err(&pdev->dev, "failed to parse bus-range
+>>> property\n");
+>>>> +		return -EINVAL;
+>>>> +	}
+>>>> +
+>>>> +	if (of_pci_range_parser_init(&parser, pdev->dev.of_node)) {
+>>>> +		dev_err(&pdev->dev, "missing ranges property\n");
+>>>> +		return -EINVAL;
+>>>> +	}
+>>>> +
+>>>> +	err = rcar_pcie_get_resources(pdev, pcie);
+>>>> +	if (err < 0) {
+>>>> +		dev_err(&pdev->dev, "failed to request resources: %d\n",
+>>> err);
+>>>> +		return err;
+>>>> +	}
+>>>> +
+>>>> +	for_each_of_pci_range(&parser, &range) {
+>>>> +		of_pci_range_to_resource(&range, pdev->dev.of_node,
+>>>> +						&pcie->res[win++]);
+> 
+>>>      This function call is probably no good here as it fetches into the 'start'
+>>> field of a 'struct resource' a CPU address instead of a PCI address...
+> 
+>> No, the ranges describe the CPU addresses of the PCI memory and I/O
+> regions, so
+>> this is correct.
+> 
+>     The problem actually is that you need to remember both CPU and PCI
+> addresses, so 'struct of_pci_range' looks more fitting here...
+Right, I see... this is rather a mess with all the host drivers!
+
+>>>> +
+>>>> +		if (win > PCI_MAX_RESOURCES)
+>>>> +			break;
+>>>> +	}
+>>>> +
+>>>> +	 err = rcar_pcie_parse_map_dma_ranges(pcie, pdev->dev.of_node);
+>>>> +	 if (err)
+>>>> +		return err;
+>>>> +
+>>>> +	of_id = of_match_device(rcar_pcie_of_match, pcie->dev);
+>>>> +	if (!of_id || !of_id->data)
+>>>> +		return -EINVAL;
+>>>> +	hw_init_fn = of_id->data;
+>>>> +
+>>>> +	/* Failure to get a link might just be that no cards are inserted */
+>>>> +	err = hw_init_fn(pcie);
+>>>> +	if (err) {
+>>>> +		dev_info(&pdev->dev, "PCIe link down\n");
+>>>> +		return 0;
+> 
+>>>      Not quite sure why you exit normally here without enabling the
+> hardware.
+>>> I think the internal bridge should be visible regardless of whether link is
+>>> detected or not...
+> 
+>> Why would you want to see the bridge when you can do nothing with it?
+> Aren't
+> 
+>     Because it's the way PCI works. You have the built-in devices always
+> present and seen on a PCI bus. :-)
+> 
+>> you are just wasting resources?
+> 
+>     I think it's rather you who are wasting resources. ;-) Why not just fail
+> the probe when you have no link?
+Ah, so we currently have a half-way house... not failing the probe, but not
+enabling the HW. Either all or nothing would be preferable.
+
+Thanks
+Phil
