@@ -1,73 +1,90 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Jun 2014 15:57:14 +0200
-Subject: [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
-In-Reply-To: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403618235-19353-6-git-send-email-t.figa@samsung.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 24 Jun 2014 15:58:15 +0200
+Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
+In-Reply-To: <CAAVeFuLcC30BdWierY8Bg0vBmfNCaB=Qs34h790jGB=BRYvGAg@mail.gmail.com>
+References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+ <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
+ <20140624100220.GK32514@n2100.arm.linux.org.uk>
+ <53A953E6.2030503@nvidia.com> <53A95910.20104@nvidia.com>
+ <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
+ <53A96EC5.3030701@canonical.com>
+ <1403616338.4230.8.camel@weser.hi.pengutronix.de>
+ <CAAVeFuLcC30BdWierY8Bg0vBmfNCaB=Qs34h790jGB=BRYvGAg@mail.gmail.com>
+Message-ID: <1403618295.4230.13.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to recent consolidation of Exynos suspend and cpuidle code, some
-parts of suspend and resume sequences are executed two times, once from
-exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
-breaks suspend, at least on Exynos4-based boards.
+Am Dienstag, den 24.06.2014, 22:52 +0900 schrieb Alexandre Courbot:
+> On Tue, Jun 24, 2014 at 10:25 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > Am Dienstag, den 24.06.2014, 14:27 +0200 schrieb Maarten Lankhorst:
+> >> op 24-06-14 14:23, Alexandre Courbot schreef:
+> >> > On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> >> >> On 06/24/2014 07:33 PM, Alexandre Courbot wrote:
+> >> >>> On 06/24/2014 07:02 PM, Russell King - ARM Linux wrote:
+> >> >>>> On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
+> >> >>>>> From: Lucas Stach <dev@lynxeye.de>
+> >> >>>>>
+> >> >>>>> On architectures for which access to GPU memory is non-coherent,
+> >> >>>>> caches need to be flushed and invalidated explicitly at the
+> >> >>>>> appropriate places. Introduce two small helpers to make things
+> >> >>>>> easy for TTM-based drivers.
+> >> >>>>
+> >> >>>> Have you run this with DMA API debugging enabled?  I suspect you haven't,
+> >> >>>> and I recommend that you do.
+> >> >>>
+> >> >>> # cat /sys/kernel/debug/dma-api/error_count
+> >> >>> 162621
+> >> >>>
+> >> >>> (??????? ???)
+> >> >>
+> >> >> *puts table back on its feet*
+> >> >>
+> >> >> So, yeah - TTM memory is not allocated using the DMA API, hence we cannot
+> >> >> use the DMA API to sync it. Thanks Russell for pointing it out.
+> >> >>
+> >> >> The only alternative I see here is to flush the CPU caches when syncing for
+> >> >> the device, and invalidate them for the other direction. Of course if the
+> >> >> device has caches on its side as well the opposite operation must also be
+> >> >> done for it. Guess the only way is to handle it all by ourselves here. :/
+> >> > ... and it really sucks. Basically if we cannot use the DMA API here
+> >> > we will lose the convenience of having a portable API that does just
+> >> > the right thing for the underlying platform. Without it we would have
+> >> > to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
+> >> > have support for ARM.
+> >> >
+> >> > The usage of the DMA API that we are doing might be illegal, but in
+> >> > essence it does exactly what we need - at least for ARM. What are the
+> >> > alternatives?
+> >> Convert TTM to use the dma api? :-)
+> >
+> > Actually TTM already has a page alloc backend using the DMA API. It's
+> > just not used for the standard case right now.
+> 
+> Indeed, and Nouveau even already makes use of it if CONFIG_SWIOTLB is
+> set apparently.
+> 
+> > I would argue that we should just use this page allocator (which has the
+> > side effect of getting pages from CMA if available -> you are actually
+> > free to change the caching) and do away with the other allocator in the
+> > ARM case.
+> 
+> Mm? Does it mean that CMA memory is not mapped into lowmem? That would
+> certainly help in the present case, but I wonder how useful it will be
+> once the iommu support is in place. Will also need to consider
+> performance of such coherent memory for e.g. user-space mappings.
+> 
+> Anyway, I will experiment a bit with this tomorrow, thanks!
 
-This patch fixes the issue by removing exynos_pm_syscore_ops completely
-and making the code rely only on CPU PM notifier.
+CMA memory is reserved before the lowmem section mapping is set up. It
+is then mapped with individual 4k pages before giving it back to the
+buddy allocator.
+This means CMA pages in use by the kernel are mapped into lowmem, but
+they are actually unmapped from lowmem once you allocate them as DMA
+memory.
 
-Tested on Exynos4210-based Trats board.
+Regards,
+Lucas
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/pm.c | 20 ++++----------------
- 1 file changed, 4 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 87c0d34..98d4926 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -364,11 +364,6 @@ early_wakeup:
- 	return;
- }
- 
--static struct syscore_ops exynos_pm_syscore_ops = {
--	.suspend	= exynos_pm_suspend,
--	.resume		= exynos_pm_resume,
--};
--
- /*
-  * Suspend Ops
-  */
-@@ -438,19 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
- 
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
--		if (cpu == 0) {
--			exynos_pm_central_suspend();
--			exynos_cpu_save_register();
--		}
-+		if (cpu == 0)
-+			exynos_pm_suspend();
- 		break;
- 
- 	case CPU_PM_EXIT:
--		if (cpu == 0) {
--			if (!soc_is_exynos5250())
--				scu_enable(S5P_VA_SCU);
--			exynos_cpu_restore_register();
--			exynos_pm_central_resume();
--		}
-+		if (cpu == 0)
-+			exynos_pm_resume();
- 		break;
- 	}
- 
-@@ -475,6 +464,5 @@ void __init exynos_pm_init(void)
- 	tmp |= ((0xFF << 8) | (0x1F << 1));
- 	__raw_writel(tmp, S5P_WAKEUP_MASK);
- 
--	register_syscore_ops(&exynos_pm_syscore_ops);
- 	suspend_set_ops(&exynos_suspend_ops);
- }
 -- 
-1.9.3
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
