@@ -1,82 +1,32 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 24 Jun 2014 18:54:24 +0900
-Subject: [PATCH v2 0/3] drm/ttm: nouveau: memory coherency for ARM
-Message-ID: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+Date: Tue, 24 Jun 2014 18:54:25 +0900
+Subject: [PATCH v2 1/3] drm/ttm: recognize ARM arch in ioprot handler
+In-Reply-To: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1403603667-11302-2-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For this v2 I have fixed the patches that are non-controversial (all Lucas' :))
-and am resubmitting them in the hope that they will get merged. This will
-just leave the issue of Nouveau system-memory buffers mapping to be solved.
+From: Lucas Stach <dev@lynxeye.de>
 
-This issue is quite complex, so let me summarize the situation and the data
-I have at hand. ARM caching is like a quantum world where Murphy's law
-constantly applies: sometimes things that you don't expect to work happen to
-work, but never the ones you would like to.
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ drivers/gpu/drm/ttm/ttm_bo_util.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On ARM the accepted wisdom is that all CPU mappings must share the same
-attributes, and that failure to do so results in undefined behavior. I have
-heard voices claiming that recent ARM SoCs were not affected by this, but have
-yet to see hard evidence that it is indeed the case.
-
-Most (or all) physical memory happens to be already mapped, cached, in the
-lowmem area of the virtual address space. This means that if we want to be
-safe wrt. the rule mentioned above, we must perform all subsequent memory
-mappings the same way.
-
-Nouveau currently performs its memory mappings cached, since it can rely on PCI
-to snoop and invalidate addresses written by the CPU - something that we don't
-have on ARM shared-memory systems. I had proposed a (bad) patch in the previous
-revision of this series that added a way to flush the CPU cache after each write
-(http://lists.freedesktop.org/archives/dri-devel/2014-May/059893.html ) but it
-did not trigger a lot of approval. Instead, it has been suggested to map such
-BOs write-combined.
-
-This would break the "one mapping type only" rule, but I gave it a try by
-changing the TTM_PL_TT manager's authorized caching to WC. This immediatly
-resulted in breakage of applications using the GPU. Digging a little further,
-I noticed that kernel mappings could be performed WC or uncached without any
-problem, but that user-space mappings *must* be cached under all circumstances.
-Failure to do so results in invalid pushbuffers being sent to the GPUs, messed
-up vertices, and other corruptions. Uncached mappings result in the same
-breakage.
-
-So, to summarize our options for GK20A:
-1) Keeping mappings of TTM buffers cached seems to be the safest option, as it
-is consistent with the lowmem mapping likely affecting the memory of our
-buffers. But we will have to flush kernel CPU writes to these buffers one way
-or the other.
-2) Changing the kernel mappings to WC or uncached seems to be safe. However
-user-space mappings must still be cached or inconsistencies happen. This
-double-policy for kernel and user-space mappings is not implemented in TTM
-and nothing so far suggests that it should be.
-
-And that's the state where we are. I am not considering the other possibilities
-(carving memory out of lowmem, etc.) as they have already been discussed many
-times by people much smarter than me (e.g. http://lists.linaro.org/pipermail/linaro-mm-sig/2011-April/000003.html )
-and it seems that the issue is still here nonetheless.
-
-At this point suggestions towards option 1) or 2) (or where I could have
-screwed up in my understanding of ARM mappings) are welcome. And in the
-meantime, let's try to get the 3 guys below merged!
-
-Changes since v1:
-- Removed conditional compilation for Nouveau cache sync handler
-- Refactored nouveau_gem_ioctl_cpu_prep() into a new function to keep buffer
-  cache management into nouveau_bo.c
-
-Lucas Stach (3):
-  drm/ttm: recognize ARM arch in ioprot handler
-  drm/ttm: introduce dma cache sync helpers
-  drm/nouveau: hook up cache sync functions
-
- drivers/gpu/drm/nouveau/nouveau_bo.c  | 47 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/nouveau/nouveau_bo.h  |  1 +
- drivers/gpu/drm/nouveau/nouveau_gem.c | 10 +++-----
- drivers/gpu/drm/ttm/ttm_bo_util.c     |  2 +-
- drivers/gpu/drm/ttm/ttm_tt.c          | 25 +++++++++++++++++++
- include/drm/ttm/ttm_bo_driver.h       | 28 +++++++++++++++++++++
- 6 files changed, 105 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/gpu/drm/ttm/ttm_bo_util.c b/drivers/gpu/drm/ttm/ttm_bo_util.c
+index 1df856f78568..30e5d90cb7bc 100644
+--- a/drivers/gpu/drm/ttm/ttm_bo_util.c
++++ b/drivers/gpu/drm/ttm/ttm_bo_util.c
+@@ -500,7 +500,7 @@ pgprot_t ttm_io_prot(uint32_t caching_flags, pgprot_t tmp)
+ 			pgprot_val(tmp) |= _PAGE_GUARDED;
+ 	}
+ #endif
+-#if defined(__ia64__)
++#if defined(__ia64__) || defined(__arm__)
+ 	if (caching_flags & TTM_PL_FLAG_WC)
+ 		tmp = pgprot_writecombine(tmp);
+ 	else
 -- 
 2.0.0
