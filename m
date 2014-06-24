@@ -1,94 +1,54 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Tue, 24 Jun 2014 13:55:42 -0400
-Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
-In-Reply-To: <17846485.GZEaSd7XIs@wuerfel>
-References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
- <14353430.fIAk0MDUYn@wuerfel>
- <CAJ5Y-ebS0axNd24VCW-ZJy=4WLYWJ_VAptdw6c7zNCTeJhut7Q@mail.gmail.com>
- <17846485.GZEaSd7XIs@wuerfel>
-Message-ID: <53A9BB9E.7050707@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 24 Jun 2014 11:05:22 -0700
+Subject: [PATCH v7 7/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <20140624172753.GA31435@redhat.com>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-8-git-send-email-keescook@chromium.org>
+ <20140624172753.GA31435@redhat.com>
+Message-ID: <CAGXu5jKoDEXffJqFSjhO+D=5toJOA=KAomi+LQOahPDYKFbEdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Arnd,
-
-On 06/24/2014 10:18 AM, Arnd Bergmann wrote:
-
+On Tue, Jun 24, 2014 at 10:27 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> On 06/23, Kees Cook wrote:
+>>
+>> +static pid_t seccomp_can_sync_threads(void)
+>> +{
+>> +     struct task_struct *thread, *caller;
+>> +
+>> +     BUG_ON(write_can_lock(&tasklist_lock));
+>> +     BUG_ON(!spin_is_locked(&current->sighand->siglock));
+>> +
+>> +     if (current->seccomp.mode != SECCOMP_MODE_FILTER)
+>> +             return -EACCES;
+>> +
+>> +     /* Validate all threads being eligible for synchronization. */
+>> +     thread = caller = current;
+>> +     for_each_thread(caller, thread) {
+>> +             pid_t failed;
+>> +
+>> +             if (thread->seccomp.mode == SECCOMP_MODE_DISABLED ||
+>> +                 (thread->seccomp.mode == SECCOMP_MODE_FILTER &&
+>> +                  is_ancestor(thread->seccomp.filter,
+>> +                              caller->seccomp.filter)))
+>> +                     continue;
+>> +
+>> +             /* Return the first thread that cannot be synchronized. */
+>> +             failed = task_pid_vnr(thread);
+>> +             /* If the pid cannot be resolved, then return -ESRCH */
+>> +             if (failed == 0)
+>> +                     failed = -ESRCH;
 >
-> I think a model that's closer to the mailbox subsystem would imply
-> that the common mailbox code (or the pcc driver itself) parses the
-> PCCT table, while the slave driver only passes an index.
+> forgot to mention, task_pid_vnr() can't fail. sighand->siglock is held,
+> for_each_thread() can't see a thread which has passed unhash_process().
 
-This is pretty close to what I have here:
+Certainly good to know, but I'd be much more comfortable leaving this
+check as-is. Having "failed" return with "0" would be very very bad
+(userspace would think the filter had been successfully applied, etc).
+I'd rather stay highly defensive here.
 
-The PCC mailbox version:
+-Kees
 
-https://git.linaro.org/people/ashwin.chaugule/leg-kernel.git/shortlog/refs/heads/mbox-pcc-review
-
-
-Here the pcc driver in /drivers/acpi/pcc.c is the PCC mailbox controller 
-which parses the PCCT and /drivers/acpi/pcc-test.c is a sample PCC 
-client that sends dummy PCC reads/writes.
-
-
-The PCC + CPPC non-mailbox version:
-
-https://git.linaro.org/people/ashwin.chaugule/leg-kernel.git/shortlog/refs/heads/pcc-cppc-dev
-
-Here, the CPPC is the PCC client driver which parses the CPC tables. The 
-mailbox conversion for this stuff is a WIP. But it should give an idea 
-of how PCC and PCC clients would work.
-
-> Or even better, the slave driver would only pass a device pointer,
-> from which the pcc driver can find the pcc_register_resource in
-> the corresponding ACPI table. The name of that table can be the
-> string you pass down to the mailbox API. I suspect there is some
-> issue that makes this all break down though, but that would be
-> a portable way to do this for both DT and ACPI:
->
-> If we wanted to use DT with the same driver, we would put the
-> name of the table containing pcc_register_resource into the
-> mbox-names property, and that could get used to look up a
-> reference to the pcc device, and to the other data that you
-> have in pcc_register_resource and PCCT.
-
-So I dont think we should worry about the PCC clients being used in the 
-DT case, since the PCC and its client specification is very ACPI centric 
-and platforms that want to use these drivers will need an ACPI based 
-firmware anyway. Which is why I think having a separate PCC specific 
-mbox API makes sense.
-
-Something like what you suggested should work well for ACPI based platforms.
-
-struct mbox_controller *
-mbox_find_pcc_controller(char *name)
-{
-	list_for_each_entry(mbox, &mbox_cons, node) {
-		if (mbox->name)
-			if (!strncmp(mbox->name, name))
-				return mbox;
-	}
-
-	return -ENODEV;
-}
-
-int pcc_mbox_get_channel(struct mbox_client *cl,
-		char *name, unsigned chan_id,
-		struct mbox_chan **chan)
-{
-	struct mbox_controller *mbox;
-	mbox = mbox_find_pcc_controller(name);
-
-	if (!mbox) {
-		pr_err("PCC mbox %s not found.\n", name);
-		return -ENODEV;
-	}
-
-	*chan = &mbox->chans[chan_id];
-	return init_channel(*chan, cl);
-}
-
-
-Cheers,
-Ashwin
+-- 
+Kees Cook
+Chrome OS Security
