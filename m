@@ -1,101 +1,44 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 24 Jun 2014 20:28:57 +0100
-Subject: [PATCH RFC v2 1/8] component: fix missed cleanup in case of devres
- failure
-In-Reply-To: <20140624192830.GC20555@n2100.arm.linux.org.uk>
-References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
-Message-ID: <E1WzWOn-0007zS-SI@rmk-PC.arm.linux.org.uk>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 24 Jun 2014 21:30:55 +0200
+Subject: [PATCH v7 4/9] seccomp: move no_new_privs into seccomp
+In-Reply-To: <CALCETrVgpP=zOtiQafVgcic2T95TdEM5DTvHYXWTbcZ14xBqHQ@mail.gmail.com>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-5-git-send-email-keescook@chromium.org>
+ <20140624191815.GA3623@redhat.com>
+ <CALCETrVgpP=zOtiQafVgcic2T95TdEM5DTvHYXWTbcZ14xBqHQ@mail.gmail.com>
+Message-ID: <20140624193055.GA4482@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In try_to_bring_up_master(), we tear down the master's component list
-for each error case, except for devres group failure.  Fix this
-oversight by making the code less prone to such mistakes.
+On 06/24, Andy Lutomirski wrote:
+>
+> On Tue, Jun 24, 2014 at 12:18 PM, Oleg Nesterov <oleg@redhat.com> wrote:
+> >>
+> >> -struct seccomp { };
+> >> +struct seccomp {
+> >> +     unsigned long flags;
+> >> +};
+> >
+> > A bit messy ;)
+> >
+> > I am wondering if we can simply do
+> >
+> >         static inline bool current_no_new_privs(void)
+> >         {
+> >                 if (current->no_new_privs)
+> >                         return true;
+> >
+> >         #ifdef CONFIG_SECCOMP
+> >                 if (test_thread_flag(TIF_SECCOMP))
+> >                         return true;
+> >         #endif
+>
+> Nope -- privileged users can enable seccomp w/o nnp.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/base/component.c | 62 ++++++++++++++++++++++++------------------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+Indeed, I am stupid.
 
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index c4778995cd72..d0ebd4431736 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -113,44 +113,44 @@ static void master_remove_components(struct master *master)
- static int try_to_bring_up_master(struct master *master,
- 	struct component *component)
- {
--	int ret = 0;
-+	int ret;
- 
--	if (!master->bound) {
--		/*
--		 * Search the list of components, looking for components that
--		 * belong to this master, and attach them to the master.
--		 */
--		if (master->ops->add_components(master->dev, master)) {
--			/* Failed to find all components */
--			master_remove_components(master);
--			ret = 0;
--			goto out;
--		}
-+	if (master->bound)
-+		return 0;
- 
--		if (component && component->master != master) {
--			master_remove_components(master);
--			ret = 0;
--			goto out;
--		}
-+	/*
-+	 * Search the list of components, looking for components that
-+	 * belong to this master, and attach them to the master.
-+	 */
-+	if (master->ops->add_components(master->dev, master)) {
-+		/* Failed to find all components */
-+		ret = 0;
-+		goto out;
-+	}
- 
--		if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
--			ret = -ENOMEM;
--			goto out;
--		}
-+	if (component && component->master != master) {
-+		ret = 0;
-+		goto out;
-+	}
- 
--		/* Found all components */
--		ret = master->ops->bind(master->dev);
--		if (ret < 0) {
--			devres_release_group(master->dev, NULL);
--			dev_info(master->dev, "master bind failed: %d\n", ret);
--			master_remove_components(master);
--			goto out;
--		}
-+	if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
- 
--		master->bound = true;
--		ret = 1;
-+	/* Found all components */
-+	ret = master->ops->bind(master->dev);
-+	if (ret < 0) {
-+		devres_release_group(master->dev, NULL);
-+		dev_info(master->dev, "master bind failed: %d\n", ret);
-+		goto out;
- 	}
-+
-+	master->bound = true;
-+	return 1;
-+
- out:
-+	master_remove_components(master);
- 
- 	return ret;
- }
--- 
-1.8.3.1
+Still it would be nice to cleanup this somehow. The new member is only
+used as a previous ->no_new_privs, just it is long to allow the concurent
+set/get. Logically it doesn't even belong to seccomp{}.
+
+Oleg.
