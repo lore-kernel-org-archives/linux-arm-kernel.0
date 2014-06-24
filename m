@@ -1,54 +1,62 @@
-From: maarten.lankhorst@canonical.com (Maarten Lankhorst)
-Date: Tue, 24 Jun 2014 14:27:49 +0200
-Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
-In-Reply-To: <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
- <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
- <20140624100220.GK32514@n2100.arm.linux.org.uk> <53A953E6.2030503@nvidia.com>
- <53A95910.20104@nvidia.com>
- <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
-Message-ID: <53A96EC5.3030701@canonical.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Jun 2014 13:39:33 +0100
+Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <53A96D68.8070303@gmail.com>
+References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
+ <53A9685E.9090501@ti.com> <53A96A1C.5030800@gmail.com>
+ <20140624121525.GM13803@lee--X1> <53A96D68.8070303@gmail.com>
+Message-ID: <20140624123933.GN13803@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-op 24-06-14 14:23, Alexandre Courbot schreef:
-> On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
->> On 06/24/2014 07:33 PM, Alexandre Courbot wrote:
->>> On 06/24/2014 07:02 PM, Russell King - ARM Linux wrote:
->>>> On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
->>>>> From: Lucas Stach <dev@lynxeye.de>
->>>>>
->>>>> On architectures for which access to GPU memory is non-coherent,
->>>>> caches need to be flushed and invalidated explicitly at the
->>>>> appropriate places. Introduce two small helpers to make things
->>>>> easy for TTM-based drivers.
->>>>
->>>> Have you run this with DMA API debugging enabled?  I suspect you haven't,
->>>> and I recommend that you do.
->>>
->>> # cat /sys/kernel/debug/dma-api/error_count
->>> 162621
->>>
->>> (??????? ???)
->>
->> *puts table back on its feet*
->>
->> So, yeah - TTM memory is not allocated using the DMA API, hence we cannot
->> use the DMA API to sync it. Thanks Russell for pointing it out.
->>
->> The only alternative I see here is to flush the CPU caches when syncing for
->> the device, and invalidate them for the other direction. Of course if the
->> device has caches on its side as well the opposite operation must also be
->> done for it. Guess the only way is to handle it all by ourselves here. :/
-> ... and it really sucks. Basically if we cannot use the DMA API here
-> we will lose the convenience of having a portable API that does just
-> the right thing for the underlying platform. Without it we would have
-> to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
-> have support for ARM.
->
-> The usage of the DMA API that we are doing might be illegal, but in
-> essence it does exactly what we need - at least for ARM. What are the
-> alternatives?
-Convert TTM to use the dma api? :-)
+On Tue, 24 Jun 2014, Varka Bhadram wrote:
 
-~Maarten
+> On 06/24/2014 05:45 PM, Lee Jones wrote:
+> >On Tue, 24 Jun 2014, Varka Bhadram wrote:
+> >>On 06/24/2014 05:30 PM, Kishon Vijay Abraham I wrote:
+> >>>On Monday 16 June 2014 03:56 PM, Antoine T?nart wrote:
+> >>>>The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+> >>>>
+> >>>>The mode selection can let us think this PHY can be configured to fit
+> >>>>other purposes. But there are reasons to think the SATA mode will be
+> >>>>the only one usable: the PHY registers are only accessible indirectly
+> >>>>through two registers in the SATA range, the PHY seems to be integrated
+> >>>>and no information tells us the contrary. For these reasons, make the
+> >>>>driver a SATA PHY driver.
+> >>>>
+> >>>>Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> >>>>---
+> >>>>  drivers/phy/Kconfig           |   7 ++
+> >>>>  drivers/phy/Makefile          |   1 +
+> >>>>  drivers/phy/phy-berlin-sata.c | 232 ++++++++++++++++++++++++++++++++++++++++++
+> >>>>  3 files changed, 240 insertions(+)
+> >>>>  create mode 100644 drivers/phy/phy-berlin-sata.c
+> 
+> [...]
+> 
+> >>>>+static struct platform_driver phy_berlin_sata_driver = {
+> >>>>+	.probe	= phy_berlin_sata_probe,
+> >>>>+	.driver	= {
+> >>>>+		.name		= "phy-berlin-sata",
+> >>>>+		.owner		= THIS_MODULE,
+> >>>>+		.of_match_table	= phy_berlin_sata_of_match,
+> >>use of_match_ptr for of_match_table
+> >What use is this?
+> >
+> >[...]
+> >
+> of_match_table is NULL for Non-DT based. Better to use the of_match_ptr().
+> If driver is DT based 'of_match_table	= phy_berlin_sata_of_match'
+> else 'of_match_table	= NULL'
+> 
+> This is take care by of_match_ptr() macro.
+
+This driver 'depends on OF', so it's okay to always populate
+.of_match_table.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
