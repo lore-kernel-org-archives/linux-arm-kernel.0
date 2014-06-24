@@ -1,51 +1,63 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Jun 2014 17:59:38 +0800
-Subject: [PATCH v3 4/6] clk: sunxi: Add support for table-based divider clocks
+Date: Tue, 24 Jun 2014 17:59:36 +0800
+Subject: [PATCH v3 2/6] clk: sunxi: move "ahb_sdram" to protected clock list
 In-Reply-To: <1403603980-31101-1-git-send-email-wens@csie.org>
 References: <1403603980-31101-1-git-send-email-wens@csie.org>
-Message-ID: <1403603980-31101-5-git-send-email-wens@csie.org>
+Message-ID: <1403603980-31101-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few of the clock modules have odd dividers, such as
-the 2 lowest dividers being the same (2), or have the
-same divider when the highest bit is set.
-
-This patch adds support for optional divider tables,
-so the clock framework will know about the odd values.
+With sunxi_gates clocks registered with clkdev, we can use the
+protected clocks list to enable the "ahb_sdram" clock, instead
+of looking for it and adding CLK_IGNORE_UNUSED inline in the
+clock setup code.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/clk/sunxi/clk-sunxi.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index a38c799..6fe9492 100644
+index e43ed6a..a38c799 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -664,6 +664,7 @@ struct div_data {
- 	u8	shift;
- 	u8	pow;
- 	u8	width;
-+	const struct clk_div_table *table;
+@@ -870,7 +870,6 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ 	int qty;
+ 	int i = 0;
+ 	int j = 0;
+-	int ignore;
+ 
+ 	reg = of_iomap(node, 0);
+ 
+@@ -891,11 +890,8 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ 		of_property_read_string_index(node, "clock-output-names",
+ 					      j, &clk_name);
+ 
+-		/* No driver claims this clock, but it should remain gated */
+-		ignore = !strcmp("ahb_sdram", clk_name) ? CLK_IGNORE_UNUSED : 0;
+-
+ 		clk_data->clks[i] = clk_register_gate(NULL, clk_name,
+-						      clk_parent, ignore,
++						      clk_parent, 0,
+ 						      reg + 4 * (i/32), i % 32,
+ 						      0, &clk_lock);
+ 		WARN_ON(IS_ERR(clk_data->clks[i]));
+@@ -1203,6 +1199,7 @@ static void __init sunxi_init_clocks(const char *clocks[], int nclocks)
+ 
+ static const char *sun4i_a10_critical_clocks[] __initdata = {
+ 	"pll5_ddr",
++	"ahb_sdram",
  };
  
- static const struct div_data sun4i_axi_data __initconst = {
-@@ -704,10 +705,10 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+ static void __init sun4i_a10_init_clocks(struct device_node *node)
+@@ -1215,6 +1212,7 @@ CLK_OF_DECLARE(sun4i_a10_clk_init, "allwinner,sun4i-a10", sun4i_a10_init_clocks)
+ static const char *sun5i_critical_clocks[] __initdata = {
+ 	"mbus",
+ 	"pll5_ddr",
++	"ahb_sdram",
+ };
  
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
--	clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
--				   reg, data->shift, data->width,
--				   data->pow ? CLK_DIVIDER_POWER_OF_TWO : 0,
--				   &clk_lock);
-+	clk = clk_register_divider_table(NULL, clk_name, clk_parent, 0,
-+					 reg, data->shift, data->width,
-+					 data->pow ? CLK_DIVIDER_POWER_OF_TWO : 0,
-+					 data->table, &clk_lock);
- 	if (clk) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		clk_register_clkdev(clk, clk_name, NULL);
+ static void __init sun5i_init_clocks(struct device_node *node)
 -- 
 2.0.0
