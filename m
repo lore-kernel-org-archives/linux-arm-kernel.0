@@ -1,49 +1,47 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 24 Jun 2014 15:00:20 +0800
-Subject: [PATCH 2/2] arm64: dts: Add PMU node for APM X-Gene Storm SOC
-In-Reply-To: <53A8F388.80101@redhat.com>
-References: <1395308847-16317-1-git-send-email-vkale@apm.com>
- <1395308847-16317-3-git-send-email-vkale@apm.com>
- <CACVXFVMiOvV=CytiaLFgEdt3_f7frJ6afjz39iLhafOhvJ0m7g@mail.gmail.com>
- <53A8F388.80101@redhat.com>
-Message-ID: <CACVXFVNpy3PM0FYO68afs_ffBErTWAOR2u9w0VNppp7RjD-0xg@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 24 Jun 2014 16:52:23 +0900
+Subject: [PATCH v3 -next 0/9] CMA: generalize CMA reserved area
+ management code
+In-Reply-To: <20140618135144.297c785260f9e2aebead867c@linux-foundation.org>
+References: <1402897251-23639-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <539EB4C7.3080106@samsung.com>
+ <20140617012507.GA6825@js1304-P5Q-DELUXE>
+ <20140618135144.297c785260f9e2aebead867c@linux-foundation.org>
+Message-ID: <20140624075223.GE4836@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon and Vinayak,
+On Wed, Jun 18, 2014 at 01:51:44PM -0700, Andrew Morton wrote:
+> On Tue, 17 Jun 2014 10:25:07 +0900 Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+> 
+> > > >v2:
+> > > >   - Although this patchset looks very different with v1, the end result,
+> > > >   that is, mm/cma.c is same with v1's one. So I carry Ack to patch 6-7.
+> > > >
+> > > >This patchset is based on linux-next 20140610.
+> > > 
+> > > Thanks for taking care of this. I will test it with my setup and if
+> > > everything goes well, I will take it to my -next tree. If any branch
+> > > is required for anyone to continue his works on top of those patches,
+> > > let me know, I will also prepare it.
+> > 
+> > Hello,
+> > 
+> > I'm glad to hear that. :)
+> > But, there is one concern. As you already know, I am preparing further
+> > patches (Aggressively allocate the pages on CMA reserved memory). It
+> > may be highly related to MM branch and also slightly depends on this CMA
+> > changes. In this case, what is the best strategy to merge this
+> > patchset? IMHO, Anrew's tree is more appropriate branch. If there is
+> > no issue in this case, I am willing to develope further patches based
+> > on your tree.
+> 
+> That's probably easier.  Marek, I'll merge these into -mm (and hence
+> -next and git://git.kernel.org/pub/scm/linux/kernel/git/mhocko/mm.git)
+> and shall hold them pending you review/ack/test/etc, OK?
 
-On Tue, Jun 24, 2014 at 11:42 AM, Jon Masters <jcm@redhat.com> wrote:
-> On 06/23/2014 10:47 PM, Ming Lei wrote:
->
->> On Thu, Mar 20, 2014 at 5:47 PM, Vinayak Kale <vkale@apm.com> wrote:
->>> This patch adds the PMU device tree node for APM X-Gene Storm SOC.
->>>
->>> Please note that this patch has dependancy on a GIC driver patch [1] which is
->>> yet to be approved by maintainers.
->>>
->>> [1]- https://lkml.org/lkml/2014/2/27/605
->>> (irqchip:gic: change access of gicc_ctrl register to read modify write)
->
->> No matter if Feng Kan's gic patch is applied or not, perf(PMU)
->> still can't work well with your patch, and the failure[1] will be
->> triggered when 'perf top' is started.
->>
->> The failure happened during the 1st pmu overflow interrupt.
->>
->> I test several mustang boards, and all has the problem with
->> upstream kernel.
->
-> Note that the GIC bypass register config is set by the firmware and this
-> only preserves the original setting, so you could be running an older
-> firmware (such as U-Boot). On our (UEFI-enabled systems, complete with
-> correct patch) perf top runs correctly without any such problems.
+Hello, Marek.
 
-I am wondering if it is related with boot or firmware. We have a board
-which is running APM internal 3.12 based kernel, and perf(pmu) works
-well. But if I just replace the 3.12 based kernel with upstream kernel
-and keep others(boot, kernel parameter, fs, ....) not changed, then
-the problem still can happen.
+Could you share your decision about this patchset?
 
-Thanks,
---
-Ming Lei
+Thanks.
