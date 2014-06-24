@@ -1,117 +1,104 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Jun 2014 18:20:56 +0200
-Subject: [PATCH] arm: exynos: Modify pm code to check for cortex A9	rather
- than the SoC
-In-Reply-To: <20140624161114.GW32514@n2100.arm.linux.org.uk>
-References: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voa=3zzo-2KbjDtBOca+uJeSxT2OYpi+rJuSGsDg-vo7GYA@mail.gmail.com>
- <20140624161114.GW32514@n2100.arm.linux.org.uk>
-Message-ID: <53A9A568.6060108@samsung.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 24 Jun 2014 12:21:47 -0400
+Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
+In-Reply-To: <53A85AAC.4070401@ti.com>
+References: <20140623051346.GC2666@pratyush-vbox> <53A85AAC.4070401@ti.com>
+Message-ID: <53A9A59B.9000709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Mohit,
 
-On 24.06.2014 18:11, Russell King - ARM Linux wrote:
-> On Mon, Jun 16, 2014 at 09:37:14AM +0530, Abhilash Kesavan wrote:
->> Hi Kukjin,
+On 06/23/2014 12:49 PM, Santosh Shilimkar wrote:
+>
+>
+>
+> -------- Original Message --------
+> Subject: Re: [PATCH v2 0/8] Add Keystone PCIe controller driver
+> Date: Mon, 23 Jun 2014 10:43:46 +0530
+> From: Pratyush Anand<pratyush.anand@st.com>
+> To: Murali Karicheri<m-karicheri2@ti.com>
+>
+> On Sat, Jun 21, 2014 at 05:17:07AM +0800, Murali Karicheri wrote:
 >>
->> On Fri, May 23, 2014 at 8:31 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
->>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> Sorry, my previous response was in html and not sure it has made to the
+>> list. I did
+>> get an error as well. So resending my response.
 >>
->> Do you have any comments on this patch ?
-> 
-> I do.
-> 
->>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->>> index d10c351..6dd4a11 100644
->>> --- a/arch/arm/mach-exynos/pm.c
->>> +++ b/arch/arm/mach-exynos/pm.c
->>> @@ -300,7 +300,7 @@ static int exynos_pm_suspend(void)
->>>         tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
->>>         __raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
+>> On 6/18/2014 6:14 AM, Mohit KUMAR DCG wrote:
+>>> Hello Murali,
 >>>
->>> -       if (!soc_is_exynos5250())
->>> +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->>>                 exynos_cpu_save_register();
-> ...
->>> @@ -334,7 +334,7 @@ static void exynos_pm_resume(void)
->>>         if (exynos_pm_central_resume())
->>>                 goto early_wakeup;
+>>
+>
+> [...]
+>
+>> *pos = pos0;
+>>
+>> @@ -349,7 +353,10 @@ static int dw_msi_setup_irq(struct msi_chip *chip,
+>> struct pci_dev *pdev,
+>>
+>> */
+>>
+>> desc->msi_attrib.multiple = msgvec;
+>>
+>> -msg.address_lo = virt_to_phys((void *)pp->msi_data);
+>>
+>> +if (pp->ops->get_msi_data)
+>>
+>> +msg.address_lo = pp->ops->get_msi_data(pp);
+>>
+>> +else
+>>
+>> +msg.address_lo = virt_to_phys((void *)pp->msi_data);
+>>
+>> msg.address_hi = 0x0;
+>>
+>> msg.data = pos;
+>>
+>>
+>> What about this code? This requires get_msi_data() as well
+>
+> pp->msi_data is set in dw_pcie_msi_init, which is a global function
+> called from vendor specific code. You can have your own
+> keystone_pcie_msi_init and then you do not need above changes.
+>
+My Apologies for the email format as I lost the original email and had
+to respond using a forwarded email.
+
+If you look at my original patch, keystone driver was not calling
+dw_pcie_msi_init(). However the issue is msi_chip of DW core is
+re-used as most of the code is platform independent. However
+code that sends write_msi_msg() can be re-used on keystone by
+adding this get_msi_data() API as the only difference IMO is the
+address EP writes to raise an MSI IRQ event. I don't see any
+reason why the entire code needs to be duplicated on Keystone.
+BTW, currently I have not tested the MSI IRQ and tested my driver
+only with Legacy IRQ. I plan to test this before sending my
+v3 of the patch.
+
+Murali
+
+>>
+>>> -- 3rd to use pp->ops->msi_set/clear if defined.
+>> Why not API enhancement and refactor the code in a single patch?
+>
+> Yes, can be. You can send changes in 2 or 3 patches as you wish, but I
+> believe that should be able to solve problem in best way.
+>
+> Regards
+> Pratyush
+>>
+>> Murali
+>>> Pls let us know for any issue or have different opinion.
 >>>
->>> -       if (!soc_is_exynos5250())
->>> +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->>>                 exynos_cpu_restore_register();
-> 
-> It is invalid to check just the part number.  The part number on its
-> own is meaningless without taking account of the implementor.  Both
-> the implementor and the part number should be checked at each of these
-> sites.
-
-Just out of curiosity, are you aware of more than one implementor of
-Cortex A9 on Exynos SoCs that would differ in having the need for save
-and restore of those registers?
-
-> 
-> Another point: exynos have taken it upon themselves to add code which
-> saves various ARM core registers.  This is a bad idea, it brings us
-> back to the days where every platform did their own suspend implementations.
-> 
-> CPU level registers should be handled by CPU level code, not by platform
-> code.  Is there a reason why this can't be added to the Cortex-A9
-> support code in proc-v7.S ?
-
-I agree that there is nothing platform specific in saving and restoring
-those registers and that this should be probably handled by generic code.
-
-However, when running in non-secure world, the only way to restore this
-is to call a firmware operation, which is platform specific. Is there a
-way to do something like this from proc-v7.S?
-
-> 
->>> @@ -353,7 +353,7 @@ static void exynos_pm_resume(void)
+>>> Regards
+>>> Mohit
 >>>
->>>         s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
 >>>
->>> -       if (!soc_is_exynos5250())
->>> +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->>>                 scu_enable(S5P_VA_SCU);
 >>>
->>>  early_wakeup:
->>> @@ -440,15 +440,18 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->>>         case CPU_PM_ENTER:
->>>                 if (cpu == 0) {
->>>                         exynos_pm_central_suspend();
->>> -                       exynos_cpu_save_register();
->>> +                       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->>> +                               exynos_cpu_save_register();
->>>                 }
->>>                 break;
 >>>
->>>         case CPU_PM_EXIT:
->>>                 if (cpu == 0) {
->>> -                       if (!soc_is_exynos5250())
->>> +                       if (read_cpuid_part_number() ==
->>> +                                       ARM_CPU_PART_CORTEX_A9) {
->>>                                 scu_enable(S5P_VA_SCU);
->>> -                       exynos_cpu_restore_register();
->>> +                               exynos_cpu_restore_register();
->>> +                       }
->>>                         exynos_pm_central_resume();
->>>                 }
->>>                 break;
-> 
-> And presumably with the CPU level code dealing with those registers,
-> you don't need the calls to save and restore these registers in this
-> notifier.
-> 
-> Which, by the way, is probably illegal to run as it runs in a read-
-> lock code path and with the SCU disabled.  As you're calling
-> scu_enable() that means you're non-coherent with the other CPUs,
-> and therefore locks don't work.
-
-I don't see the read lock code path you mention. Could you elaborate on
-this? By the way, other CPUs are still offline at this point.
-
-Best regards,
-Tomasz
+>>>> --
+>>>> 1.7.9.5
+>>
+>
+>
