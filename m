@@ -1,34 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jun 2014 15:08:22 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Jun 2014 15:10:56 +0100
 Subject: VFP handling in multiplatform feroceon kernels
-In-Reply-To: <7416978.W29blLsymn@wuerfel>
-References: <7416978.W29blLsymn@wuerfel>
-Message-ID: <20140624140822.GO32514@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.LFD.2.11.1406240956540.16842@knanqh.ubzr>
+References: <7416978.W29blLsymn@wuerfel> <20140624134249.GB4489@arm.com>
+ <alpine.LFD.2.11.1406240956540.16842@knanqh.ubzr>
+Message-ID: <20140624141056.GD4489@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 03:17:06PM +0200, Arnd Bergmann wrote:
-> Since 3.16, we have the ability to build a multiplatform kernel
-> that includes both kirkwood (feroceon) and some other ARMv5 CPU.
+On Tue, Jun 24, 2014 at 03:04:14PM +0100, Nicolas Pitre wrote:
+> On Tue, 24 Jun 2014, Catalin Marinas wrote:
 > 
-> I accidentally stumbled over a bug in the VFP code that looks
-> like it will break at least ARM9 VFP support if CPU_FEROCEON
-> is also enabled, introduced by this (old) commit:
+> > On Tue, Jun 24, 2014 at 02:17:06PM +0100, Arnd Bergmann wrote:
+> > > Since 3.16, we have the ability to build a multiplatform kernel
+> > > that includes both kirkwood (feroceon) and some other ARMv5 CPU.
+> > > 
+> > > I accidentally stumbled over a bug in the VFP code that looks
+> > > like it will break at least ARM9 VFP support if CPU_FEROCEON
+> > > is also enabled, introduced by this (old) commit:
+> > 
+> > I would argue that the bug is in the CPU (feroceon). See the end of this
+> > email:
+> > 
+> > http://www.spinics.net/lists/arm-kernel/msg41460.html
+> > 
+> > and my follow-up. Basically you can't avoid the conditional compilation
+> > as Feroceon doesn't follow the VFP sub-architecture spec and doesn't
+> > present itself as a different CPU from an _ARM_ 9. Unless things have
+> > changed with Marvell's hardware implementation and they got a new id, I
+> > suggest you don't enable this for multi-platform.
+> 
+> Only the early revision did hijack the ARM9 ID but still. We certainly 
+> can determine at run time if the platform being booted is equiped with a 
+> Feroceon before user space is started.  In that case I'd suggest some 
+> runtime code patching to branch to some out-of-line assembly code for 
+> Feroceon.
 
-This is down confusion in the ID registers, and is something we've
-known about for a very long time.
-
-There is nothing that can be done about this: Marvell specifically
-designed this variant of the Feroceon to look 100% identical to an
-ARM926 in every respect, so it could in theory run anything that
-checked for an ARM926 CPU.  However, the implementation is soo buggy
-that the result is that software written for ARM926 can't run on it.
-
-The net result is that the Feroceon is indistinguishable from an
-ARM926 in every respect, except you need the work-arounds for
-Feroceon to work.  This makes Feroceon fundamentally incompatible
-with a single zImage.
+You don't even need to branch to out of line assembly, just branch over
+the imprecise VFP abort handling in arch/arm/vfp/vfphw.S.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Catalin
