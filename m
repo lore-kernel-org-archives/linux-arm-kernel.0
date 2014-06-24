@@ -1,827 +1,958 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 23 Jun 2014 21:05:20 -0700
-Subject: [RFC 4/4] ARM: dts: exynos5250: Add Spring device tree
-In-Reply-To: <53A8AE4C.6080702@suse.de>
-References: <1403486483-4063-1-git-send-email-afaerber@suse.de>
- <1403486483-4063-5-git-send-email-afaerber@suse.de>
- <CAD=FV=WHAqASC+bp8mGVnhfr79F5LapJCTLtSfgUG8XuRUSCqw@mail.gmail.com>
- <53A8AE4C.6080702@suse.de>
-Message-ID: <CAD=FV=W96QpDhh1NSaVwrXYjL6Jr-v4sq1-eRSfT=tErw_KCOQ@mail.gmail.com>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Tue, 24 Jun 2014 12:07:32 +0800
+Subject: [PATCH 2/2] spi: add driver for Rockchip RK3xxx SoCs integrated SPI
+In-Reply-To: <1403582324-9485-1-git-send-email-addy.ke@rock-chips.com>
+References: <1403582324-9485-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1403582852-9751-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas,
+In order to facilitate understanding,rockchip SPI controller IP design looks
+similar in its registers to designware. But IC implementation is different from
+designware, such as dma request line, register offset, register configuration,
+and so on.So we need a dedicated driver for Rockchip RK3XXX SoCs integrated SPI.
 
-On Mon, Jun 23, 2014 at 3:46 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Doug,
->
-> Am 23.06.2014 21:47, schrieb Doug Anderson:
->> Thanks for posting!  A first pass on this is below...
->
-> Thanks a lot for your quick review! My first big .dts patch, and no
-> datasheets for the hardware at hand as a user.
->
-> A first pass of replies to my defense. ;)
->
->> On Sun, Jun 22, 2014 at 6:21 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> [...]
->>> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
->>> new file mode 100644
->>> index 0000000..e857d44
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
->>> @@ -0,0 +1,556 @@
->>> +/*
->>> + * Google Spring board device tree source
->>> + *
->>> + * Copyright (c) 2013 Google, Inc
->>> + * Copyright (c) 2014 SUSE LINUX Products GmbH
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +#include "exynos5250.dtsi"
->>> +#include "exynos5250-cros-common.dtsi"
->>
->> It is possible we may want to backpedal on the use of
->> "exynos5250-cros-common.dtsi".  I know that Olof (now CCed) said he
->> wasn't a fan of how it turned out.
->>
->> The original idea was that it should include the arbitrary set of
->> things that are common between a chunk of Chrome OS boards.  As more
->> boards were introduced things would need to migrate from the "common"
->> file to the board files.
->>
->> At the moment the current conventional wisdom is that some duplication
->> is better than the confusing movement of everything back and forth.
->> See exynos5420-peach-pit and exynos5800-peach-pi in ToT linux-next.
->>
->>
->>> +/ {
->>> +       model = "Google Spring";
->>> +       compatible = "google,spring", "samsung,exynos5250", "samsung,exynos5";
->>> +
->>> +       pinctrl at 11400000 {
->>
->> The new best way to do things is to put this down at the bottom.  See
->> exynos5420-peach-pit as an example:
->>
->> &pinctrl_0 {
->>   ...
->> }
->>
->> Note that I believe it was decided that top-level references like that
->> should be sorted alphabetically.
->
-> Thanks for the hint. (My chosen sort order here was by address.)
->
->> If you wanted to apply that run to exynos5250-snow I don't think it
->> would be a terrible idea.
->
-> I can of course apply changes to Snow, but I cannot test them myself.
+Signed-off-by: addy ke <addy.ke@rock-chips.com>
+---
+ drivers/spi/Kconfig        |  11 +
+ drivers/spi/Makefile       |   1 +
+ drivers/spi/spi-rockchip.c | 894 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 906 insertions(+)
+ create mode 100644 drivers/spi/spi-rockchip.c
 
-If you want to send up a patch like that I'm happy to give it a once
-over and also to test it.  ...but don't feel obligated
-
-
->>> +               s5m8767_dvs: s5m8767-dvs {
->>> +                       samsung,pins = "gpd1-0", "gpd1-1", "gpd1-2";
->>> +                       samsung,pin-function = <0>;
->>> +                       samsung,pin-pud = <1>;
->>> +                       samsung,pin-drv = <0>;
->>> +               };
->>> +
->>> +               s5m8767_ds: s5m8767-ds {
->>> +                       samsung,pins = "gpx2-3", "gpx2-4", "gpx2-5";
->>> +                       samsung,pin-function = <0>;
->>> +                       samsung,pin-pud = <1>;
->>> +                       samsung,pin-drv = <0>;
->>> +               };
->>> +
->>> +               tps65090_irq: tps65090-irq {
->>> +                       samsung,pins = "gpx2-6";
->>> +                       samsung,pin-function = <0>;
->>> +                       samsung,pin-pud = <0>;
->>> +                       samsung,pin-drv = <0>;
->>> +               };
->>> +
->>> +               s5m8767_irq: s5m8767-irq {
->>> +                       samsung,pins = "gpx3-2";
->>> +                       samsung,pin-function = <0>;
->>> +                       samsung,pin-pud = <0>;
->>> +                       samsung,pin-drv = <0>;
->>> +               };
->>> +
->>> +               hdmi_hpd_irq: hdmi-hpd-irq {
->>> +                       samsung,pins = "gpx3-7";
->>> +                       samsung,pin-function = <0>;
->>> +                       samsung,pin-pud = <1>;
->>> +                       samsung,pin-drv = <0>;
->>> +               };
->>> +       };
->>> +
->>> +       pinctrl at 13400000 {
->>> +               hsic_reset: hsic-reset {
->>> +                       samsung,pins = "gpe1-0";
->>> +                       samsung,pin-function = <1>;
->>> +                       samsung,pin-pud = <0>;
->>> +                       samsung,pin-drv = <0>;
->>> +               };
->>
->> I'm pretty sure that the HSIC reset needed some funky code to make it
->> work and I'm not sure what the status of that is upstream
->
-> Yeah, you mentioned something along those lines. However it's the
-> equivalent of the usb3-vbus-en in -snow.dts. Rename or drop?
-
-On snow locally I see USB2 vbus is gpx1-1 and USB3 vbus is gpx2-7.  I
-don't see that in spring.
-
-This will take more time than I have right now to track down.  I added
-Julius to the thread in case he has time to answer and can suggest
-what to do for upstream purposes.  I may be able to look more
-tomorrow.
-
-You can always send up the next version and include this and we'll
-look at it again.
-
-
->>> +       };
->>> +
->>> +       vbat: vbat-fixed-regulator {
->>> +               compatible = "regulator-fixed";
->>> +               regulator-name = "vbat-supply";
->>> +               regulator-boot-on;
->>> +       };
->>> +
->>> +       usb at 12000000 {
->>> +               status = "okay";
->>> +       };
->>> +
->>> +       usb3_vbus_reg: regulator-usb3 {
->>> +               compatible = "regulator-fixed";
->>> +               regulator-name = "P5.0V_USB3CON";
->>> +               regulator-min-microvolt = <5000000>;
->>> +               regulator-max-microvolt = <5000000>;
->>> +               gpio = <&gpe1 0 1>;
->>> +               pinctrl-names = "default";
->>> +               pinctrl-0 = <&hsic_reset>;
->>> +               enable-active-high;
->>> +       };
->>> +
->>> +       phy at 12100000 {
->>> +               vbus-supply = <&usb3_vbus_reg>;
->>> +       };
->>> +
->>> +       usb at 12110000 {
->>> +               samsung,vbus-gpio = <&gpx1 1 0>;
->>> +               status = "okay";
->>> +       };
->>> +
->>> +       usb at 12120000 {
->>> +               status = "okay";
->>> +       };
->>> +
->>> +       mmc at 12220000 {
->>> +               /* MMC2 pins are used as GPIO for eDP bridge control. */
->>> +               status = "disabled";
->>> +       };
->>> +
->>> +       mmc at 12230000 {
->>> +               status = "disabled";
->>> +       };
->>> +
->>> +       i2c at 12C60000 {
->>> +               max77686 at 09 {
->>
->> There is no max77686 on spring.  It uses s5m8767 in the place of max77686.
->>
->> ...you've got "status = disabled", just remove it.
->
-> That's because it's inherited from exynos5250-cros-common.dtsi.
-
-Ah, right.  So if we're keeping cros-common the proper thing to do is
-to move it out of cros-common in a patch before this one.  ...but I
-think people might be happier if you simply don't include cros-common.
-
-
-> The rtc that the system successfully uses is "s5m-rtc", which I guess is
-> on the s5m8767 then? (Confusing that 3.8 Spring had this rtc node
-> despite Snow's max77686 not having it.)
-
-I think it's not really supposed to.  It was a bit of a hack to handle
-the fact that the RTC has two different i2c addresses on both the
-77686 and this PMIC.  The max77686 driver upstream handles it all in
-code and doesn't ask the device tree to list both addresses.
-
-I think that _upstream_ snow doesn't have the node but _downstream_
-spring might have the node (though having a child of a disabled node
-isn't particularly useful).
-
-
->>> +                       #address-cells = <1>;
->>> +                       #size-cells = <0>;
->>> +                       status = "disabled";
->>> +
->>> +                       rtc {
->>> +                               reg = <0x6>;
->>> +                       };
->>> +               };
->>> +
->>> +               s5m8767_pmic at 66 {
->>> +                       compatible = "samsung,s5m8767-pmic";
->>> +                       reg = <0x66>;
->>> +                       interrupt-parent = <&gpx3>;
->>> +                       interrupts = <2 0>;
->>> +                       pinctrl-names = "default";
->>> +                       pinctrl-0 = <&s5m8767_irq &s5m8767_dvs &s5m8767_ds>;
->>> +                       wakeup-source;
->>> +
->>> +                       s5m8767,pmic-buck-dvs-gpios = <&gpd1 0 1>, /* DVS1 */
->>> +                                                     <&gpd1 1 1>, /* DVS2 */
->>> +                                                     <&gpd1 2 1>; /* DVS3 */
->>> +
->>> +                       s5m8767,pmic-buck-ds-gpios = <&gpx2 3 1>, /* SET1 */
->>> +                                                    <&gpx2 4 1>, /* SET2 */
->>> +                                                    <&gpx2 5 1>; /* SET3 */
->>
->> The final "1" in each of the GPIO specifiers above should be GPIO_ACTIVE_LOW.
->>
->>
->>> +
->>> +                       /*
->>> +                        * The following arrays of DVS voltages are not used, since we are
->>> +                        * not using GPIOs to control PMIC bucks, but they must be defined
->>> +                        * to please the driver.
->>> +                        */
->>> +                       s5m8767,pmic-buck2-dvs-voltage = <1350000>, <1300000>,
->>> +                                                        <1250000>, <1200000>,
->>> +                                                        <1150000>, <1100000>,
->>> +                                                        <1000000>, <950000>;
->>> +
->>> +                       s5m8767,pmic-buck3-dvs-voltage = <1100000>, <1100000>,
->>> +                                                        <1100000>, <1100000>,
->>> +                                                        <1000000>, <1000000>,
->>> +                                                        <1000000>, <1000000>;
->>> +
->>> +                       s5m8767,pmic-buck4-dvs-voltage = <1200000>, <1200000>,
->>> +                                                        <1200000>, <1200000>,
->>> +                                                        <1200000>, <1200000>,
->>> +                                                        <1200000>, <1200000>;
->>> +
->>> +                       clocks {
->>> +                               compatible = "samsung,s5m8767-clk";
->>> +                               #clock-cells = <1>;
->>> +                               clock-output-names = "en32khz_ap",
->>> +                                                    "en32khz_cp",
->>> +                                                    "en32khz_bt";
->>> +                       };
->>> +
->>> +                       regulators {
->>> +                               s5m_ldo4_reg: LDO4 {
->>> +                                       regulator-name = "P1.0V_LDO_OUT4";
->>> +                                       regulator-min-microvolt = <1000000>;
->>> +                                       regulator-max-microvolt = <1000000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <0>;
->>
->> I think that "op_mode" here is questionable.  Adding Javier to the
->> thread who was looking at this for max77802 and possibly max77686.
->
-> Confirming that this op_mode is present in the original 3.8 device tree.
-
-Yes and it needs to be handled eventually.  It makes suspend/resume
-work properly.  ...but I think it needs to be thought out better.
-
-...but given that other users of this PMIC have it I guess it makes
-sense to leave it in.  Javier was going to try to think it through
-better for max77686 and max77802.
-
-
-> (I used dtc to compile my /proc/device-tree tarball back to .dts, so it
-> has hexadecimal <0x0> but that shouldn't matter to dtc AFAIU.)
->
->>> +                               };
->>> +
->>> +                               s5m_ldo5_reg: LDO5 {
->>> +                                       regulator-name = "P1.0V_LDO_OUT5";
->>> +                                       regulator-min-microvolt = <1000000>;
->>> +                                       regulator-max-microvolt = <1000000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <0>;
->>> +                               };
->>> +
->>> +                               s5m_ldo6_reg: LDO6 {
->>> +                                       regulator-name = "vdd_mydp";
->>> +                                       regulator-min-microvolt = <1000000>;
->>> +                                       regulator-max-microvolt = <1000000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo7_reg: LDO7 {
->>> +                                       regulator-name = "P1.1V_LDO_OUT7";
->>> +                                       regulator-min-microvolt = <1100000>;
->>> +                                       regulator-max-microvolt = <1100000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo8_reg: LDO8 {
->>> +                                       regulator-name = "P1.0V_LDO_OUT8";
->>> +                                       regulator-min-microvolt = <1000000>;
->>> +                                       regulator-max-microvolt = <1000000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo10_reg: LDO10 {
->>> +                                       regulator-name = "P1.8V_LDO_OUT10";
->>> +                                       regulator-min-microvolt = <1800000>;
->>> +                                       regulator-max-microvolt = <1800000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo11_reg: LDO11 {
->>> +                                       regulator-name = "P1.8V_LDO_OUT11";
->>> +                                       regulator-min-microvolt = <1800000>;
->>> +                                       regulator-max-microvolt = <1800000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <0>;
->>> +                               };
->>> +
->>> +                               s5m_ldo12_reg: LDO12 {
->>> +                                       regulator-name = "P3.0V_LDO_OUT12";
->>> +                                       regulator-min-microvolt = <3000000>;
->>> +                                       regulator-max-microvolt = <3000000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo13_reg: LDO13 {
->>> +                                       regulator-name = "P1.8V_LDO_OUT13";
->>> +                                       regulator-min-microvolt = <1800000>;
->>> +                                       regulator-max-microvolt = <1800000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <0>;
->>> +                               };
->>> +
->>> +                               s5m_ldo14_reg: LDO14 {
->>> +                                       regulator-name = "P1.8V_LDO_OUT14";
->>> +                                       regulator-min-microvolt = <1800000>;
->>> +                                       regulator-max-microvolt = <1800000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo15_reg: LDO15 {
->>> +                                       regulator-name = "P1.0V_LDO_OUT15";
->>> +                                       regulator-min-microvolt = <1000000>;
->>> +                                       regulator-max-microvolt = <1000000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo16_reg: LDO16 {
->>> +                                       regulator-name = "P1.8V_LDO_OUT16";
->>> +                                       regulator-min-microvolt = <1800000>;
->>> +                                       regulator-max-microvolt = <1800000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               s5m_ldo17_reg: LDO17 {
->>> +                                       regulator-name = "P2.8V_LDO_OUT17";
->>> +                                       regulator-min-microvolt = <2800000>;
->>> +                                       regulator-max-microvolt = <2800000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <0>;
->>> +                               };
->>> +
->>> +                               s5m_ldo25_reg: LDO25 {
->>> +                                       regulator-name = "vdd_bridge";
->>> +                                       regulator-min-microvolt = <1200000>;
->>> +                                       regulator-max-microvolt = <1200000>;
->>> +                                       regulator-always-on;
->>> +                                       op_mode = <1>;
->>> +                               };
->>> +
->>> +                               BUCK1 {
->>> +                                       regulator-name = "vdd_mif";
->>> +                                       regulator-min-microvolt = <950000>;
->>> +                                       regulator-max-microvolt = <1300000>;
->>> +                                       regulator-always-on;
->>> +                                       regulator-boot-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               BUCK2 {
->>> +                                       regulator-name = "vdd_arm";
->>> +                                       regulator-min-microvolt = <850000>;
->>> +                                       regulator-max-microvolt = <1350000>;
->>> +                                       regulator-always-on;
->>> +                                       regulator-boot-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               BUCK3 {
->>> +                                       regulator-name = "vdd_int";
->>> +                                       regulator-min-microvolt = <900000>;
->>> +                                       regulator-max-microvolt = <1200000>;
->>> +                                       regulator-always-on;
->>> +                                       regulator-boot-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               BUCK4 {
->>> +                                       regulator-name = "vdd_g3d";
->>> +                                       regulator-min-microvolt = <850000>;
->>> +                                       regulator-max-microvolt = <1300000>;
->>> +                                       regulator-boot-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +
->>> +                               BUCK5 {
->>> +                                       regulator-name = "P1.8V_BUCK_OUT5";
->>> +                                       regulator-min-microvolt = <1800000>;
->>> +                                       regulator-max-microvolt = <1800000>;
->>> +                                       regulator-always-on;
->>> +                                       regulator-boot-on;
->>> +                                       op_mode = <1>;
->>> +                               };
->>> +
->>> +                               BUCK6 {
->>> +                                       regulator-name = "P1.2V_BUCK_OUT6";
->>> +                                       regulator-min-microvolt = <1200000>;
->>> +                                       regulator-max-microvolt = <1200000>;
->>> +                                       regulator-always-on;
->>> +                                       regulator-boot>
->>
-> -on;
->>> +                                       op_mode = <0>;
->>> +                               };
->>> +
->>> +                               BUCK9 {
->>> +                                       regulator-name = "vdd_ummc";
->>> +                                       regulator-min-microvolt = <950000>;
->>> +                                       regulator-max-microvolt = <3000000>;
->>> +                                       regulator-always-on;
->>> +                                       regulator-boot-on;
->>> +                                       op_mode = <3>;
->>> +                               };
->>> +                       };
->>> +               };
->>> +       };
->>> +
->>> +       i2c at 12C70000 {
->>> +               trackpad {
->>> +                       status = "disabled";
->>
->> Having this bogus entry here doesn't add anything.  Remove it until
->> the trackpad should be added.  See http://crbug.com/371114 for a
->> slightly stale bug about trackpad.
->
-> You misunderstand: This resolves an error about the cypress,cyapa
-> inherited from -cros-common.dtsi. Spring uses a different device and two
-> different I2C addresses.
-
-Ah, right.  I forgot about cros5250-common.
-
-
-> Nodes named trackpad-bootloader and trackpad-alt are prepared here:
-> https://github.com/afaerber/linux/commits/spring-next
-
-It might work, but you run into pinctrl problems.  You need to put the
-pinctrl node _somewhere_ and if you put it with the trackpad entries
-themselves then you get conflicts.  ...and it doesn't belong in the
-i2c bus (though that's what we have locally in our tree)
-
-See <http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/30953>
-for some background.
-
-
->>> +               };
->>> +       };
->>> +
->>> +       i2c at 12CA0000 {
->>> +               embedded-controller {
->>
->> Add "cros_ec" alias like snow.
->>
->>
->>> +                       compatible = "google,cros-ec-i2c";
->>> +                       reg = <0x1e>;
->>> +                       interrupts = <6 0>;
->>> +                       interrupt-parent = <&gpx1>;
->>> +                       wakeup-source;
->>> +
->>> +                       keyboard-controller {
->>
->> Don't include keyboard-controller here.  Add:
->>
->> #include "cros-ec-keyboard.dtsi"
->>
->> ...at the bottom.  Note that I think that the spring EC has a special
->> "charger" key that it uses to indicate when a charger was plugged in
->> and unplugged.  I'm not sure how that will end up getting supported
->> upstream but you could just leave it out for now.
->
-> Is there such a pending patch for snow? That's what I modeled after.
-
-Yeah, and it appears to be in linux-next.  (1a395e3 ARM: dts: Use the
-cros-ec-keyboard fragment in exynos5250-snow).  It actually ended up
-going through the tegra tree since it was in a series with a similar
-tegra change.  I asked Kukjin to pick it up via merge but he didn't
-appear to.
-
-
-> Where is cros-ec-keyboard.dtsi? Don't see it in
-> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/arch/arm/boot/dts?h=for-next
-> or
-> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/tree/include/dt-bindings?h=for-next
->
-> Are you proposing I factor it out?
->
->>> +                               compatible = "google,cros-ec-keyb";
->>> +                               keypad,num-rows = <8>;
->>> +                               keypad,num-columns = <13>;
->>
->> Don't you need pinctrl here?
->
-> The keyboard is usable; what would pinctrl be needed for? There's none
-> in the 3.8 device tree.
-
-Generally it's good to have the pinctrl listed to configure the IRQ
-properly (get the pulls right).  It might work without it but it's a
-little less ideal I think.
-
-I see this, right?
-
-                        pinctrl-names = "default";
-                        pinctrl-0 = <&ec_irq>;
-
-...in the downstream "arch/arm/boot/dts/exynos5250-spring.dts"
-
-
->>> +                               google,needs-ghost-filter;
->>> +                               linux,keymap = <
->>> +                                       0x0001007d      /* L_META */
->>> +                                       0x0002003b      /* F1 */
->>> +                                       0x00030030      /* B */
->>> +                                       0x00040044      /* F10 */
->>> +                                       0x00060031      /* N */
->>> +                                       0x0008000d      /* = */
->>> +                                       0x000a0064      /* R_ALT */
->>> +
->>> +                                       0x01010001      /* ESC */
->>> +                                       0x0102003e      /* F4 */
->>> +                                       0x01030022      /* G */
->>> +                                       0x01040041      /* F7 */
->>> +                                       0x01060023      /* H */
->>> +                                       0x01080028      /* ' */
->>> +                                       0x01090043      /* F9 */
->>> +                                       0x010b000e      /* BKSPACE */
->>> +
->>> +                                       0x0200001d      /* L_CTRL */
->>> +                                       0x0201000f      /* TAB */
->>> +                                       0x0202003d      /* F3 */
->>> +                                       0x02030014      /* T */
->>> +                                       0x02040040      /* F6 */
->>> +                                       0x0205001b      /* ] */
->>> +                                       0x02060015      /* Y */
->>> +                                       0x02070056      /* 102ND */
->>> +                                       0x0208001a      /* [ */
->>> +                                       0x02090042      /* F8 */
->>> +
->>> +                                       0x03010029      /* GRAVE */
->>> +                                       0x0302003c      /* F2 */
->>> +                                       0x03030006      /* 5 */
->>> +                                       0x0304003f      /* F5 */
->>> +                                       0x03060007      /* 6 */
->>> +                                       0x0308000c      /* - */
->>> +                                       0x030b002b      /* \ */
->>> +
->>> +                                       0x04000061      /* R_CTRL */
->>> +                                       0x0401001e      /* A */
->>> +                                       0x04020020      /* D */
->>> +                                       0x04030021      /* F */
->>> +                                       0x0404001f      /* S */
->>> +                                       0x04050025      /* K */
->>> +                                       0x04060024      /* J */
->>> +                                       0x04080027      /* ; */
->>> +                                       0x04090026      /* L */
->>> +                                       0x040a002b      /* \ */
->>> +                                       0x040b001c      /* ENTER */
->>> +
->>> +                                       0x0501002c      /* Z */
->>> +                                       0x0502002e      /* C */
->>> +                                       0x0503002f      /* V */
->>> +                                       0x0504002d      /* X */
->>> +                                       0x05050033      /* , */
->>> +                                       0x05060032      /* M */
->>> +                                       0x0507002a      /* L_SHIFT */
->>> +                                       0x05080035      /* / */
->>> +                                       0x05090034      /* . */
->>> +                                       0x050B0039      /* SPACE */
->>> +
->>> +                                       0x06010002      /* 1 */
->>> +                                       0x06020004      /* 3 */
->>> +                                       0x06030005      /* 4 */
->>> +                                       0x06040003      /* 2 */
->>> +                                       0x06050009      /* 8 */
->>> +                                       0x06060008      /* 7 */
->>> +                                       0x0608000b      /* 0 */
->>> +                                       0x0609000a      /* 9 */
->>> +                                       0x060a0038      /* L_ALT */
->>> +                                       0x060b006c      /* DOWN */
->>> +                                       0x060c006a      /* RIGHT */
->>> +
->>> +                                       0x07010010      /* Q */
->>> +                                       0x07020012      /* E */
->>> +                                       0x07030013      /* R */
->>> +                                       0x07040011      /* W */
->>> +                                       0x07050017      /* I */
->>> +                                       0x07060016      /* U */
->>> +                                       0x07070036      /* R_SHIFT */
->>> +                                       0x07080019      /* P */
->>> +                                       0x07090018      /* O */
->>> +                                       0x070b0067      /* UP */
->>> +                                       0x070c0069      /* LEFT */
->>> +                               >;
->>> +                       };
->>> +               };
->>> +
->>> +               power-regulator {
->>> +                       compatible = "ti,tps65090";
->>
->> I doubt tps65090 will "just work".  Does it?
->
-> Good question. How to tell? :) Not familiar with clocks and regulators.
-> I don't see the nodes referenced anywhere, so I could just try to drop
-> (as I would, as per my cover letter, propose for anything non-essential
-> that turns controversial).
-
-What does "dmesg | grep tps65090" say?
-
-What does this show:
-  grep "" /sys/class/regulator/*/name
-
-
-> If we drop tps65090, can we safely drop vbat-fixed-regulator as well?
-
-Yes
-
-
->> On spring the tps65090 is not directly on the same i2c bus as the EC.
->> It's actually hidden behind the EC.
->>
->> Locally in the ChromeOS tree there appears to be a forked copy of the
->> 65090 regulator driver that's in use just for spring.  See this from
->> the ChromeOS 3.8 tree:
->>
->> ./drivers/regulator/tps65090-regulator.c
->> ./drivers/regulator/cros_ec-tps65090.c
->>
->> The Spring version of the driver sends EC commands directly to access
->> the tps65090.
->>
->> It is possible (untested) that you could also talk to tps65090 over an
->> i2c tunnel.  On exynos5420-peach-pit we have a full fledged i2c
->> tunnel, but you may be able to extend the tunnel to export an i2c
->> tunnel for spring using something like
->> <https://chromium-review.googlesource.com/66116>
->
-> The SBS battery thingy (not in this patch) should also be behind some
-> tunnel. There's none defined in -cros-common.dtsi or in my patch, and
-> still it shows up in dmesg to my surprise, complaining "Couldn't read
-> remote-bus property".
-
-Might be due to the cros5250-common.  ...but yes, the battery should
-be behind the tunnel too and the patches needed for Spring haven't
-been posted by anyone yet.  I picked up a whole bunch of cros_ec
-cleanup patches and thought that the tunnel patches for spring could
-possible go up after those land.
-
-
->>> +                       reg = <0x48>;
->>> +
->>> +                       /*
->>> +                        * Config irq to disable internal pulls
->>> +                        * even though we run in polling mode.
->>> +                        */
->>> +                       pinctrl-names = "default";
->>> +                       pinctrl-0 = <&tps65090_irq>;
->>> +
->>> +                       vsys1-supply = <&vbat>;
->>> +                       vsys2-supply = <&vbat>;
->>> +                       vsys3-supply = <&vbat>;
->>> +                       infet1-supply = <&vbat>;
->>> +                       infet2-supply = <&vbat>;
->>> +                       infet3-supply = <&vbat>;
->>> +                       infet4-supply = <&vbat>;
->>> +                       infet5-supply = <&vbat>;
->>> +                       infet6-supply = <&vbat>;
->>> +                       infet7-supply = <&vbat>;
->>> +                       vsys-l1-supply = <&vbat>;
->>> +                       vsys-l2-supply = <&vbat>;
->>> +
->>> +                       regulators {
->>> +                               fet1 {
->>> +                                       regulator-name = "vcd_led";
->>> +                                       regulator-min-microvolt = <12000000>;
->>> +                                       regulator-max-microvolt = <12000000>;
->>> +                               };
->>> +                               fet3 {
->>> +                                       regulator-name = "wwan_r";
->>> +                                       regulator-min-microvolt = <3300000>;
->>> +                                       regulator-max-microvolt = <3300000>;
->>> +                                       regulator-always-on;
->>> +                               };
->>> +                               fet5 {
->>> +                                       regulator-name = "cam";
->>> +                                       regulator-min-microvolt = <3300000>;
->>> +                                       regulator-max-microvolt = <3300000>;
->>> +                                       regulator-always-on;
->>> +                               };
->>> +                               fet6 {
->>> +                                       regulator-name = "lcd_vdd";
->>> +                                       regulator-min-microvolt = <3300000>;
->>> +                                       regulator-max-microvolt = <3300000>;
->>> +                               };
->>> +                               fet7 {
->>> +                                       regulator-name = "ts";
->>> +                                       regulator-min-microvolt = <5000000>;
->>> +                                       regulator-max-microvolt = <5000000>;
->>> +                               };
->>> +                       };
->>> +
->>> +                       charger {
->>> +                               compatible = "ti,tps65090-charger";
->>> +                       };
->>> +               };
->>> +       };
->>> +
->>> +       hdmi {
->>> +               hdmi-en-supply = <&s5m_ldo8_reg>;
->>> +               vdd-supply = <&s5m_ldo8_reg>;
->>> +               vdd_osc-supply = <&s5m_ldo10_reg>;
->>> +               vdd_pll-supply = <&s5m_ldo8_reg>;
->>> +       };
->>> +
->>> +       fimd at 14400000 {
->>> +               status = "okay";
->>> +               samsung,invert-vclk;
->>> +       };
->>> +
->>> +       dp-controller at 145B0000 {
->>> +               status = "okay";
->>> +               pinctrl-names = "default";
->>> +               pinctrl-0 = <&dp_hpd>;
->>
->> This is probably not right.  It looks as if spring uses gpc3-0 for
->> display port HPD (as a GPIO).  The upstream has this in the
->> exynos5250-pinctrl.dtsi as a different pin.
->>
->> I think you'll need to define your own pinctrl here.
->>
->>
->>> +               samsung,color-space = <0>;
->>> +               samsung,dynamic-range = <0>;
->>> +               samsung,ycbcr-coeff = <0>;
->>> +               samsung,color-depth = <1>;
->>> +               samsung,link-rate = <0x0a>;
->>> +               samsung,lane-count = <1>;
->>> +               samsung,hpd-gpio = <&gpc3 0 0>;
->>> +
->>> +               display-timings {
->>> +                       native-mode = <&timing1>;
->>> +
->>> +                       timing1: timing at 1 {
->>> +                               clock-frequency = <70589280>;
->>> +                               hactive = <1366>;
->>> +                               vactive = <768>;
->>> +                               hfront-porch = <40>;
->>> +                               hback-porch = <40>;
->>> +                               hsync-len = <32>;
->>> +                               vback-porch = <10>;
->>> +                               vfront-porch = <12>;
->>> +                               vsync-len = <6>;
->>> +                       };
->>> +               };
->>> +       };
->>> +
->>> +       fixed-rate-clocks {
->>> +               xxti {
->>> +                       compatible = "samsung,clock-xxti";
->>> +                       clock-frequency = <24000000>;
->>> +               };
->>> +       };
->>> +};
->
-> Will check on the other suggestions.
-
--Doug
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 60f2b41..5b51ab2 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -375,6 +375,17 @@ config SPI_PXA2XX
+ config SPI_PXA2XX_PCI
+ 	def_tristate SPI_PXA2XX && PCI
+ 
++config SPI_ROCKCHIP
++	tristate "Rockchip SPI controller driver"
++	help
++	  This selects a driver for Rockchip SPI controller.
++
++	  If you say yes to this option, support will be included for
++	  RK3066, RK3188 and RK3288 families of SPI controller.
++	  Rockchip SPI controller support DMA transport and PIO mode.
++	  The main usecase of this controller is to use spi flash as boot
++	  device.
++
+ config SPI_RSPI
+ 	tristate "Renesas RSPI/QSPI controller"
+ 	depends on (SUPERH && SH_DMAE_BASE) || ARCH_SHMOBILE
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index bd79266..361fbf3 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -60,6 +60,7 @@ spi-pxa2xx-platform-$(CONFIG_SPI_PXA2XX_DMA)	+= spi-pxa2xx-dma.o
+ obj-$(CONFIG_SPI_PXA2XX)		+= spi-pxa2xx-platform.o
+ obj-$(CONFIG_SPI_PXA2XX_PCI)		+= spi-pxa2xx-pci.o
+ obj-$(CONFIG_SPI_QUP)			+= spi-qup.o
++obj-$(CONFIG_SPI_ROCKCHIP)		+= spi-rockchip.o
+ obj-$(CONFIG_SPI_RSPI)			+= spi-rspi.o
+ obj-$(CONFIG_SPI_S3C24XX)		+= spi-s3c24xx-hw.o
+ spi-s3c24xx-hw-y			:= spi-s3c24xx.o
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+new file mode 100644
+index 0000000..bd7c218
+--- /dev/null
++++ b/drivers/spi/spi-rockchip.c
+@@ -0,0 +1,894 @@
++/*
++ * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
++ * Author: addy ke <addy.ke@rock-chips.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/spi/spi.h>
++#include <linux/scatterlist.h>
++#include <linux/of.h>
++#include <linux/pm_runtime.h>
++#include <linux/io.h>
++#include <linux/scatterlist.h>
++#include <linux/dmaengine.h>
++
++#define DRIVER_NAME "rockchip-spi"
++
++/* SPI register offsets */
++#define ROCKCHIP_SPI_CTRLR0			0x0000
++#define ROCKCHIP_SPI_CTRLR1			0x0004
++#define ROCKCHIP_SPI_SSIENR			0x0008
++#define ROCKCHIP_SPI_SER			0x000c
++#define ROCKCHIP_SPI_BAUDR			0x0010
++#define ROCKCHIP_SPI_TXFTLR			0x0014
++#define ROCKCHIP_SPI_RXFTLR			0x0018
++#define ROCKCHIP_SPI_TXFLR			0x001c
++#define ROCKCHIP_SPI_RXFLR			0x0020
++#define ROCKCHIP_SPI_SR				0x0024
++#define ROCKCHIP_SPI_IPR			0x0028
++#define ROCKCHIP_SPI_IMR			0x002c
++#define ROCKCHIP_SPI_ISR			0x0030
++#define ROCKCHIP_SPI_RISR			0x0034
++#define ROCKCHIP_SPI_ICR			0x0038
++#define ROCKCHIP_SPI_DMACR			0x003c
++#define ROCKCHIP_SPI_DMATDLR		0x0040
++#define ROCKCHIP_SPI_DMARDLR		0x0044
++#define ROCKCHIP_SPI_TXDR			0x0400
++#define ROCKCHIP_SPI_RXDR			0x0800
++
++/* Bit fields in CTRLR0 */
++#define CR0_DFS_OFFSET				0
++
++#define CR0_CFS_OFFSET				2
++
++#define CR0_SCPH_OFFSET				6
++
++#define CR0_SCPOL_OFFSET			7
++
++#define CR0_CSM_OFFSET				8
++#define CR0_CSM_KEEP				0x0
++/* ss_n be high for half sclk_out cycles */
++#define CR0_CSM_HALF				0X1
++/* ss_n be high for one sclk_out cycle */
++#define CR0_CSM_ONE					0x2
++
++/* ss_n to sclk_out delay */
++#define CR0_SSD_OFFSET				10
++/*
++ * The period between ss_n active and
++ * sclk_out active is half sclk_out cycles
++ */
++#define CR0_SSD_HALF				0x0
++/*
++ * The period between ss_n active and
++ * sclk_out active is one sclk_out cycle
++ */
++#define CR0_SSD_ONE					0x1
++
++#define CR0_EM_OFFSET				11
++#define CR0_EM_LITTLE				0x0
++#define CR0_EM_BIG					0x1
++
++#define CR0_FBM_OFFSET				12
++#define CR0_FBM_MSB					0x0
++#define CR0_FBM_LSB					0x1
++
++#define CR0_BHT_OFFSET				13
++#define CR0_BHT_16BIT				0x0
++#define CR0_BHT_8BIT				0x1
++
++#define CR0_RSD_OFFSET				14
++
++#define CR0_FRF_OFFSET				16
++#define CR0_FRF_SPI					0x0
++#define CR0_FRF_SSP					0x1
++#define CR0_FRF_MICROWIRE			0x2
++
++#define CR0_XFM_OFFSET				18
++#define CR0_XFM_MASK				(0x03 << SPI_XFM_OFFSET)
++#define CR0_XFM_TR					0x0
++#define CR0_XFM_TO					0x1
++#define CR0_XFM_RO					0x2
++
++#define CR0_OPM_OFFSET				20
++#define CR0_OPM_MASTER				0x0
++#define CR0_OPM_SLAVE				0x1
++
++#define CR0_MTM_OFFSET				0x21
++
++/* Bit fields in SR, 5bit */
++#define SR_MASK						0x1f
++#define SR_BUSY						(1 << 0)
++#define SR_TF_FULL					(1 << 1)
++#define SR_TF_EMPTY					(1 << 2)
++#define SR_RF_EMPTY					(1 << 3)
++#define SR_RF_FULL					(1 << 4)
++
++/* Bit fields in ISR, IMR, ISR, RISR, 5bit */
++#define INT_MASK					0x1f
++#define INT_TF_EMPTY				(1 << 0)
++#define INT_TF_OVERFLOW				(1 << 1)
++#define INT_RF_UNDERFLOW			(1 << 2)
++#define INT_RF_OVERFLOW				(1 << 3)
++#define INT_RF_FULL					(1 << 4)
++
++/* Bit fields in ICR, 4bit */
++#define ICR_MASK					0x0f
++#define ICR_ALL						(1 << 0)
++#define ICR_RF_UNDERFLOW			(1 << 1)
++#define ICR_RF_OVERFLOW				(1 << 2)
++#define ICR_TF_OVERFLOW				(1 << 3)
++
++/* Bit fields in DMACR */
++#define RF_DMA_EN					(1 << 0)
++#define TF_DMA_EN					(1 << 1)
++
++#define RXBUSY						(1<<2)
++#define TXBUSY						(1<<3)
++
++#define msecs_to_loops(t)	(loops_per_jiffy / 1000 * HZ * t)
++
++enum rockchip_ssi_type {
++	SSI_MOTO_SPI = 0,
++	SSI_TI_SSP,
++	SSI_NS_MICROWIRE,
++};
++
++struct rockchip_spi_dma_data {
++	struct dma_chan *ch;
++	enum dma_transfer_direction direction;
++	dma_addr_t addr;
++};
++
++struct rockchip_spi {
++	struct device			*dev;
++	struct spi_master		*master;
++
++	struct clk				*spiclk;
++	struct clk				*apb_pclk;
++
++	void __iomem			*regs;
++	int						irq;
++	/*depth of the FIFO buffer */
++	u32						fifo_len;
++	/* max bus freq supported */
++	u32						max_freq;
++	u16						bus_num;
++	/* supported slave numbers */
++	u16						num_cs;
++	enum rockchip_ssi_type	type;
++
++	u32						use_dma;
++
++	u8						cs;
++	u16						mode;
++
++	u8						tmode;
++
++	u8						bits_per_word;
++	u8						n_bytes;
++	unsigned				len;
++	u32						speed;
++
++	void					*tx;
++	void					*tx_end;
++	void					*rx;
++	void					*rx_end;
++
++	struct sg_table			tx_sg;
++	struct sg_table			rx_sg;
++
++	u32						state;
++
++	spinlock_t				lock;
++	struct completion		xfer_completion;
++
++	struct rockchip_spi_dma_data dma_rx;
++	struct rockchip_spi_dma_data dma_tx;
++};
++
++static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
++{
++	writel_relaxed((enable ? 1 : 0), rs->regs + ROCKCHIP_SPI_SSIENR);
++}
++
++static inline void spi_set_clk(struct rockchip_spi *rs, u16 div)
++{
++	writel_relaxed(div, rs->regs + ROCKCHIP_SPI_BAUDR);
++}
++
++static inline void spi_chip_sel(struct rockchip_spi *rs, u16 cs)
++{
++	writel_relaxed(1 << cs, rs->regs + ROCKCHIP_SPI_SER);
++}
++
++/* Disable IRQ bits */
++static inline void spi_mask_intr(struct rockchip_spi *rs, u32 mask)
++{
++	u32 new_mask;
++
++	new_mask = readl_relaxed(rs->regs + ROCKCHIP_SPI_IMR) & ~mask;
++	writel_relaxed(new_mask, rs->regs + ROCKCHIP_SPI_IMR);
++}
++
++/* Enable IRQ bits */
++static inline void spi_umask_intr(struct rockchip_spi *rs, u32 mask)
++{
++	u32 new_mask;
++
++	new_mask = readl_relaxed(rs->regs + ROCKCHIP_SPI_IMR) | mask;
++	writel_relaxed(new_mask, rs->regs + ROCKCHIP_SPI_IMR);
++}
++
++static inline void flush_fifo(struct rockchip_spi *rs)
++{
++	u32 rxflr = readl_relaxed(rs->regs + ROCKCHIP_SPI_RXFLR);
++
++	while (rxflr != 0) {
++		rxflr = readl_relaxed(rs->regs + ROCKCHIP_SPI_RXFLR);
++		cpu_relax();
++	}
++}
++
++static void rockchip_spi_hw_init(struct rockchip_spi *rs)
++{
++	u32 fifo;
++
++	spi_enable_chip(rs, 0);
++	spi_mask_intr(rs, INT_MASK);
++
++	for (fifo = 2; fifo < 32; fifo++) {
++		writel_relaxed(fifo, rs->regs + ROCKCHIP_SPI_TXFTLR);
++		if (fifo != readl_relaxed(rs->regs + ROCKCHIP_SPI_TXFTLR))
++			break;
++
++	}
++	rs->fifo_len = (fifo == 31) ? 0 : fifo;
++	writel_relaxed(0, rs->regs + ROCKCHIP_SPI_TXFTLR);
++}
++
++static int rockchip_spi_setup(struct spi_device *spi)
++{
++	struct rockchip_spi *rs;
++
++	rs = spi_master_get_devdata(spi->master);
++
++	pm_runtime_get_sync(rs->dev);
++
++	if (spi->max_speed_hz > rs->max_freq)
++		spi->max_speed_hz = rs->max_freq;
++
++	pm_runtime_put(rs->dev);
++
++	return 0;
++}
++
++static void rockchip_spi_cleanup(struct spi_device *spi)
++{
++	struct rockchip_spi *rs;
++
++	rs = spi_master_get_devdata(spi->master);
++
++	spi_set_ctldata(spi, NULL);
++}
++
++static int rockchip_spi_prepare_message(struct spi_master *master,
++		struct spi_message *msg)
++{
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++	struct spi_device *spi = msg->spi;
++
++	if (spi->chip_select >= rs->num_cs) {
++		dev_err(rs->dev, "chip_select %d is invalide, max is %d\n",
++				spi->chip_select, rs->num_cs - 1);
++		return -EINVAL;
++	}
++	rs->mode = spi->mode;
++	rs->cs = spi->chip_select;
++
++	return 0;
++}
++
++static void wait_for_not_busy(struct rockchip_spi *rs)
++{
++	u32 status;
++	unsigned long tmo;
++	int ms;
++
++	ms = rs->len * 8 * 1000 / rs->speed;
++	ms += 10;
++
++	tmo = msecs_to_loops(ms);
++	do {
++		status = readl_relaxed(rs->regs + ROCKCHIP_SPI_SR);
++	} while ((status & SR_BUSY) && tmo--);
++
++	BUG_ON(!tmo);
++}
++
++static inline u32 tx_max(struct rockchip_spi *rs)
++{
++	u32 tx_left, tx_room;
++
++	tx_left = (rs->tx_end - rs->tx) / rs->n_bytes;
++	tx_room = rs->fifo_len - readl_relaxed(rs->regs + ROCKCHIP_SPI_TXFLR);
++
++	return min(tx_left, tx_room);
++}
++
++static inline u32 rx_max(struct rockchip_spi *rs)
++{
++	u32 rx_left = (rs->rx_end - rs->rx) / rs->n_bytes;
++	u32 rx_room = (u32)readl_relaxed(rs->regs + ROCKCHIP_SPI_RXFLR);
++
++	return min(rx_left, rx_room);
++}
++
++static void rockchip_spi_pio_writer(struct rockchip_spi *rs)
++{
++	u32 max = tx_max(rs);
++	u32 txw = 0;
++
++	while (max--) {
++		if (rs->n_bytes == 1)
++			txw = *(u8 *)(rs->tx);
++		else
++			txw = *(u16 *)(rs->tx);
++
++		writel_relaxed(txw, rs->regs + ROCKCHIP_SPI_TXDR);
++		rs->tx += rs->n_bytes;
++	}
++	wait_for_not_busy(rs);
++}
++
++static int rockchip_spi_pio_reader(struct rockchip_spi *rs)
++{
++	u32 max = rx_max(rs);
++	u32 rxw;
++
++	while (max--) {
++		rxw = readl_relaxed(rs->regs + ROCKCHIP_SPI_RXDR);
++		if (rs->n_bytes == 1)
++			*(u8 *)(rs->rx) = (u8)rxw;
++		else
++			*(u16 *)(rs->rx) = (u16)rxw;
++		rs->rx += rs->n_bytes;
++	};
++
++	return 0;
++}
++
++static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
++{
++	int remain = 0;
++
++	do {
++		if (rs->tx) {
++			remain = rs->tx_end - rs->tx;
++			rockchip_spi_pio_writer(rs);
++		}
++
++		if (rs->rx) {
++			remain = rs->rx_end - rs->rx;
++			rockchip_spi_pio_reader(rs);
++		}
++
++		cpu_relax();
++	} while (remain);
++
++	return 0;
++}
++
++static int wait_for_dma(struct rockchip_spi *rs)
++{
++	unsigned long tmo;
++	int ms;
++
++	ms = rs->len * 8 * 1000 / rs->speed;
++	ms += 10;
++
++	tmo = msecs_to_jiffies(ms) + 10;
++	tmo = wait_for_completion_timeout(&rs->xfer_completion, tmo);
++
++	if (!tmo) {
++		if (rs->state & RXBUSY) {
++			dmaengine_terminate_all(rs->dma_rx.ch);
++			flush_fifo(rs);
++		}
++		if (rs->state & TXBUSY)
++			dmaengine_terminate_all(rs->dma_tx.ch);
++
++		return -ETIMEDOUT;
++	}
++
++	wait_for_not_busy(rs);
++
++	return 0;
++}
++
++static void rockchip_spi_dma_rxcb(void *data)
++{
++	unsigned long flags;
++	struct rockchip_spi *rs = data;
++
++	spin_lock_irqsave(&rs->lock, flags);
++	rs->state &= ~RXBUSY;
++	if (!(rs->state & TXBUSY))
++		complete(&rs->xfer_completion);
++	spin_unlock_irqrestore(&rs->lock, flags);
++}
++
++static void rockchip_spi_dma_txcb(void *data)
++{
++	unsigned long flags;
++	struct rockchip_spi *rs = data;
++
++	spin_lock_irqsave(&rs->lock, flags);
++	rs->state &= ~TXBUSY;
++	if (!(rs->state & RXBUSY))
++		complete(&rs->xfer_completion);
++	spin_unlock_irqrestore(&rs->lock, flags);
++}
++
++static int rockchip_spi_dma_transfer(struct rockchip_spi *rs)
++{
++	unsigned long flags;
++	struct dma_slave_config rxconf, txconf;
++	struct dma_async_tx_descriptor *rxdesc, *txdesc;
++
++
++	spin_lock_irqsave(&rs->lock, flags);
++	rs->state &= ~RXBUSY;
++	rs->state &= ~TXBUSY;
++	spin_unlock_irqrestore(&rs->lock, flags);
++
++	reinit_completion(&rs->xfer_completion);
++
++	if (rs->rx) {
++		rxconf.direction = rs->dma_rx.direction;
++		rxconf.src_addr = rs->dma_rx.addr;
++		rxconf.src_addr_width = rs->n_bytes;
++		rxconf.src_maxburst = rs->n_bytes;
++		dmaengine_slave_config(rs->dma_rx.ch, &rxconf);
++
++		rxdesc = dmaengine_prep_slave_sg(rs->dma_rx.ch,
++				rs->rx_sg.sgl, rs->rx_sg.nents,
++				rs->dma_rx.direction, DMA_PREP_INTERRUPT);
++
++		rxdesc->callback = rockchip_spi_dma_rxcb;
++		rxdesc->callback_param = rs;
++	}
++
++	if (rs->tx) {
++		txconf.direction = rs->dma_tx.direction;
++		txconf.dst_addr = rs->dma_tx.addr;
++		txconf.dst_addr_width = rs->n_bytes;
++		txconf.dst_maxburst = rs->n_bytes;
++		dmaengine_slave_config(rs->dma_tx.ch, &txconf);
++
++		txdesc = dmaengine_prep_slave_sg(rs->dma_tx.ch,
++				rs->tx_sg.sgl, rs->tx_sg.nents,
++				rs->dma_tx.direction, DMA_PREP_INTERRUPT);
++
++		txdesc->callback = rockchip_spi_dma_txcb;
++		txdesc->callback_param = rs;
++	}
++
++	/* rx must be started before tx due to spi instinct */
++	if (rs->rx) {
++		spin_lock_irqsave(&rs->lock, flags);
++		rs->state |= RXBUSY;
++		spin_unlock_irqrestore(&rs->lock, flags);
++		dmaengine_submit(rxdesc);
++		dma_async_issue_pending(rs->dma_rx.ch);
++	}
++
++	if (rs->tx) {
++		spin_lock_irqsave(&rs->lock, flags);
++		rs->state |= TXBUSY;
++		spin_unlock_irqrestore(&rs->lock, flags);
++		dmaengine_submit(txdesc);
++		dma_async_issue_pending(rs->dma_tx.ch);
++	}
++
++	return wait_for_dma(rs);
++}
++
++static void rockchip_spi_config(struct rockchip_spi *rs)
++{
++	u32 div = 0;
++	u32 dmacr = 0;
++
++	u32 cr0 = (CR0_BHT_8BIT << CR0_BHT_OFFSET)
++		| (CR0_SSD_ONE << CR0_SSD_OFFSET);
++
++	cr0 |= (rs->n_bytes << CR0_DFS_OFFSET);
++	cr0 |= ((rs->mode & 0x3) << CR0_SCPH_OFFSET);
++	cr0 |= (rs->tmode << CR0_XFM_OFFSET);
++	cr0 |= (rs->type << CR0_FRF_OFFSET);
++
++	if (rs->use_dma) {
++		if (rs->tx)
++			dmacr |= TF_DMA_EN;
++		if (rs->rx)
++			dmacr |= RF_DMA_EN;
++	}
++
++	/* div doesn't support odd number */
++	div = rs->max_freq / rs->speed;
++	div = (div + 1) & 0xfffe;
++
++	spi_enable_chip(rs, 0);
++
++	writel_relaxed(cr0, rs->regs + ROCKCHIP_SPI_CTRLR0);
++
++	writel_relaxed(rs->len - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
++	writel_relaxed(rs->fifo_len / 2 - 1, rs->regs + ROCKCHIP_SPI_TXFTLR);
++	writel_relaxed(rs->fifo_len / 2 - 1, rs->regs + ROCKCHIP_SPI_RXFTLR);
++
++	writel_relaxed(0, rs->regs + ROCKCHIP_SPI_DMATDLR);
++	writel_relaxed(0, rs->regs + ROCKCHIP_SPI_DMARDLR);
++	writel_relaxed(dmacr, rs->regs + ROCKCHIP_SPI_DMACR);
++
++	spi_mask_intr(rs, INT_MASK);
++
++	spi_chip_sel(rs, rs->cs);
++
++	spi_set_clk(rs, div);
++
++	dev_dbg(rs->dev, "cr0 0x%x, cs %d, div %d\n",
++			cr0, rs->cs, div);
++
++	spi_enable_chip(rs, 1);
++}
++
++static int rockchip_spi_transfer_one(struct spi_master *master,
++		struct spi_device *spi,
++		struct spi_transfer *xfer)
++{
++	int ret = 0;
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++
++	if (!xfer->tx_buf && !xfer->rx_buf) {
++		dev_err(rs->dev, "No buffer for transfer\n");
++		return -EINVAL;
++	}
++
++	rs->speed = xfer->speed_hz?:spi->max_speed_hz;
++	rs->bits_per_word = xfer->bits_per_word;
++	rs->n_bytes = xfer->bits_per_word >> 3;
++
++	rs->tx = (void *)xfer->tx_buf;
++	rs->tx_end = rs->tx + xfer->len;
++	rs->rx = xfer->rx_buf;
++	rs->rx_end = rs->rx + xfer->len;
++	rs->len = xfer->len;
++
++	rs->tx_sg = xfer->tx_sg;
++	rs->rx_sg = xfer->rx_sg;
++
++	if (rs->tx && rs->rx)
++		rs->tmode = CR0_XFM_TR;
++	else if (rs->tx)
++		rs->tmode = CR0_XFM_TO;
++	else if (rs->rx)
++		rs->tmode = CR0_XFM_RO;
++
++	if (master->can_dma && master->can_dma(master, spi, xfer))
++		rs->use_dma = 1;
++	else
++		rs->use_dma = 0;
++
++	rockchip_spi_config(rs);
++
++	if (rs->use_dma)
++		ret = rockchip_spi_dma_transfer(rs);
++	else
++		ret = rockchip_spi_pio_transfer(rs);
++
++	return ret;
++}
++
++static irqreturn_t rockchip_spi_irq(int irq, void *data)
++{
++	struct rockchip_spi *rs = data;
++	u32 isr = readl_relaxed(rs->regs + ROCKCHIP_SPI_ISR);
++
++	dev_dbg(rs->dev, "isr 0x%x\n", isr);
++
++	return IRQ_HANDLED;
++}
++
++static bool rockchip_spi_can_dma(struct spi_master *master,
++		struct spi_device *spi,
++		struct spi_transfer *xfer)
++{
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++
++	return (xfer->len > rs->fifo_len);
++}
++
++static int rockchip_spi_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++	struct rockchip_spi *rs;
++	struct spi_master *master;
++	struct resource *mem;
++
++	master = spi_alloc_master(&pdev->dev, sizeof(struct rockchip_spi));
++	if (!master) {
++		dev_err(&pdev->dev, "No memory for spi_master\n");
++		return -ENOMEM;
++	}
++	platform_set_drvdata(pdev, master);
++
++	rs = spi_master_get_devdata(master);
++	memset(rs, 0, sizeof(struct rockchip_spi));
++
++	/* Get basic io resource and map it */
++	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem) {
++		dev_err(&pdev->dev, "Failed to get mem resource\n");
++		ret = -EINVAL;
++		goto err_get_resource;
++	}
++
++	rs->regs = devm_ioremap_resource(&pdev->dev, mem);
++	if (IS_ERR(rs->regs)) {
++		dev_err(&pdev->dev, "Failed to map SPI region\n");
++		ret =  PTR_ERR(rs->regs);
++		goto err_get_resource;
++	}
++
++	rs->irq = platform_get_irq(pdev, 0);
++	if (rs->irq < 0) {
++		dev_err(&pdev->dev, "Failed to get irq resource\n");
++		ret = rs->irq;
++		goto err_get_resource;
++	}
++
++	rs->apb_pclk = devm_clk_get(&pdev->dev, "apb_pclk");
++	if (IS_ERR(rs->apb_pclk)) {
++		dev_err(&pdev->dev, "Failed to get apb_pclk\n");
++		ret = PTR_ERR(rs->apb_pclk);
++		goto err_get_resource;
++	}
++
++	rs->spiclk = devm_clk_get(&pdev->dev, "spiclk");
++	if (IS_ERR(rs->spiclk)) {
++		dev_err(&pdev->dev, "Failed to get spi_pclk\n");
++		ret = PTR_ERR(rs->spiclk);
++		goto err_get_resource;
++	}
++
++	ret = clk_prepare_enable(rs->apb_pclk);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to enable apb_pclk\n");
++		goto err_get_resource;
++	}
++
++	ret = clk_prepare_enable(rs->spiclk);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to enable spi_clk\n");
++		goto err_spiclk_enable;
++	}
++
++	rs->type = SSI_MOTO_SPI;
++	rs->master = master;
++	rs->dev = &pdev->dev;
++	rs->bus_num = pdev->id;
++	rs->num_cs = 2;
++	rs->max_freq = clk_get_rate(rs->spiclk);
++
++	rockchip_spi_hw_init(rs);
++
++	spin_lock_init(&rs->lock);
++	init_completion(&rs->xfer_completion);
++
++	ret = devm_request_irq(&pdev->dev, rs->irq, rockchip_spi_irq, 0,
++			DRIVER_NAME, rs);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to request IRQ %d\n", rs->irq);
++		goto err_request_irq;
++	}
++
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++
++	master->auto_runtime_pm = true;
++	master->bus_num = pdev->id;
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP;
++	master->num_chipselect = rs->num_cs;
++	master->dev.of_node = pdev->dev.of_node;
++	master->bits_per_word_mask = SPI_BPW_MASK(16) | SPI_BPW_MASK(8);
++
++	master->setup = rockchip_spi_setup;
++	master->cleanup = rockchip_spi_cleanup;
++	master->prepare_message = rockchip_spi_prepare_message;
++	master->transfer_one = rockchip_spi_transfer_one;
++
++	rs->dma_tx.ch = dma_request_slave_channel(rs->dev, "tx");
++	if (!rs->dma_tx.ch)
++		dev_warn(rs->dev, "Failed to request TX DMA channel\n");
++
++	rs->dma_rx.ch = dma_request_slave_channel(rs->dev, "rx");
++	if (!rs->dma_rx.ch) {
++		if (rs->dma_tx.ch) {
++			dma_release_channel(rs->dma_tx.ch);
++			rs->dma_tx.ch = NULL;
++		}
++		dev_warn(rs->dev, "Failed to request RX DMA channel\n");
++	}
++
++	if (rs->dma_tx.ch && rs->dma_rx.ch) {
++		rs->dma_tx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_TXDR);
++		rs->dma_rx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_RXDR);
++		rs->dma_tx.direction = DMA_MEM_TO_DEV;
++		rs->dma_tx.direction = DMA_DEV_TO_MEM;
++
++		master->can_dma = rockchip_spi_can_dma;
++		master->dma_tx = rs->dma_tx.ch;
++		master->dma_rx = rs->dma_rx.ch;
++	}
++
++	ret = devm_spi_register_master(&pdev->dev, master);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to register master\n");
++		goto err_register_master;
++	}
++
++	dev_info(&pdev->dev, "Rockchip SPI controller initialized\n");
++
++	return 0;
++
++err_register_master:
++	if (rs->dma_tx.ch)
++		dma_release_channel(rs->dma_tx.ch);
++	if (rs->dma_rx.ch)
++		dma_release_channel(rs->dma_rx.ch);
++err_request_irq:
++	clk_disable_unprepare(rs->spiclk);
++err_spiclk_enable:
++	clk_disable_unprepare(rs->apb_pclk);
++err_get_resource:
++	spi_master_put(master);
++
++	return ret;
++}
++
++static int rockchip_spi_remove(struct platform_device *pdev)
++{
++	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++
++	pm_runtime_disable(&pdev->dev);
++
++	clk_disable_unprepare(rs->spiclk);
++	clk_disable_unprepare(rs->apb_pclk);
++
++	if (rs->dma_tx.ch)
++		dma_release_channel(rs->dma_tx.ch);
++	if (rs->dma_rx.ch)
++		dma_release_channel(rs->dma_rx.ch);
++
++	spi_master_put(master);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int rockchip_spi_suspend(struct device *dev)
++{
++	int ret = 0;
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++
++	ret = spi_master_suspend(rs->master);
++	if (ret)
++		return ret;
++
++	if (!pm_runtime_suspended(dev)) {
++		clk_disable_unprepare(rs->spiclk);
++		clk_disable_unprepare(rs->apb_pclk);
++	}
++
++	return ret;
++}
++
++static int rockchip_spi_resume(struct device *dev)
++{
++	int ret = 0;
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++
++	if (!pm_runtime_suspended(dev)) {
++		ret = clk_prepare_enable(rs->apb_pclk);
++		if (ret < 0)
++			return ret;
++		ret = clk_prepare_enable(rs->spiclk);
++
++		if (ret < 0) {
++			clk_disable_unprepare(rs->apb_pclk);
++			return ret;
++		}
++	}
++
++	return spi_master_resume(rs->master);
++}
++#endif /* CONFIG_PM_SLEEP */
++
++#ifdef CONFIG_PM_RUNTIME
++static int rockchip_spi_runtime_suspend(struct device *dev)
++{
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++
++	clk_disable_unprepare(rs->spiclk);
++	clk_disable_unprepare(rs->apb_pclk);
++
++	return 0;
++}
++
++static int rockchip_spi_runtime_resume(struct device *dev)
++{
++	int ret;
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct rockchip_spi *rs = spi_master_get_devdata(master);
++
++	ret = clk_prepare_enable(rs->apb_pclk);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(rs->spiclk);
++	if (ret)
++		clk_disable_unprepare(rs->apb_pclk);
++
++	return ret;
++}
++#endif /* CONFIG_PM_RUNTIME */
++
++static const struct dev_pm_ops rockchip_spi_pm = {
++	SET_SYSTEM_SLEEP_PM_OPS(rockchip_spi_suspend, rockchip_spi_resume)
++	SET_RUNTIME_PM_OPS(rockchip_spi_runtime_suspend,
++			   rockchip_spi_runtime_resume, NULL)
++};
++
++static const struct of_device_id rockchip_spi_dt_match[] = {
++	{ .compatible = "rockchip,rk3066-spi", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, rockchip_spi_dt_match);
++
++static struct platform_driver rockchip_spi_driver = {
++	.driver = {
++		.name	= DRIVER_NAME,
++		.owner = THIS_MODULE,
++		.pm = &rockchip_spi_pm,
++		.of_match_table = of_match_ptr(rockchip_spi_dt_match),
++	},
++	.probe = rockchip_spi_probe,
++	.remove = rockchip_spi_remove,
++};
++
++module_platform_driver(rockchip_spi_driver);
++
++MODULE_AUTHOR("addy ke <addy.ke@rock-chips.com>");
++MODULE_DESCRIPTION("ROCKCHIP SPI Controller Driver");
++MODULE_LICENSE("GPL v2");
+-- 
+1.8.3.2
