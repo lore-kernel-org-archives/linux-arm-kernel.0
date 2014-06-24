@@ -1,63 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jun 2014 17:08:45 +0100
-Subject: [PATCH v6 4/4] ARM: Add KGDB/KDB FIQ debugger generic code
-In-Reply-To: <1403623097-1153-5-git-send-email-daniel.thompson@linaro.org>
-References: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
- <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
- <1403623097-1153-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140624160844.GV32514@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 24 Jun 2014 18:08:23 +0200
+Subject: [PATCH v2 0/4] Add support for Exynos clock output configuration
+Message-ID: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 04:18:17PM +0100, Daniel Thompson wrote:
-> +	.align	5
-> +__fiq_svc:
-> +	svc_entry
+On all Exynos SoCs there is a dedicated CLKOUT pin that allows many of
+internal SoC clocks to be output from the SoC. The hardware structure
+of CLKOUT related clocks looks as follows:
 
-Remember that the registers you have on the stack here are r0-r12, plus
-the SVC banked sp and lr registers.  These may not be the registers
-from the mode you took the FIQ (eg, if it was IRQ, or abort mode.)
+	CMU	|---> clock0 --------->	|	PMU	|
+		|			|		|
+    several	|---> clock1 ---------> |	mux	|
+    muxes	|			|	+	|---> CLKOUT
+    dividers	|       ...		|	gate	|
+    and gates	|			|		|
+		|---> clockN ---------> |		|
 
-Also bear in mind that svc_entry calls trace_hardirqs_off - is this
-appropriate and safe for the FIQ to call?
+Since the block responsible for handling the pin is PMU, not CMU,
+a separate driver, that binds to PMU node is required and acquires
+all input clocks by standard DT clock look-up. This way we don't need
+any cross-IP block drivers and cross-driver register sharing or
+nodes for fake devices.
 
-> +	fiq_handler
-> +	mov	r0, sp
-> +	ldmib	r0, {r1 - r14}
+To represent the PMU mux/gate clock, generic composite clock is registered.
 
-So this restores r1 to r12, and the SVC mode sp and lr registers.
-Nothing touches the SVC SPSR, so we hope that retains its value
-throughout the FIQ processing.  Note that the stack pointer at this
-point will be above state which we have not yet read, so we better
-not take any exceptions from this instruction (not even an imprecise
-abort).
+Tested on Odroid U3, with HSIC/USB hub using CLKOUT as reference clock,
+with some additional patches.
 
-> +	msr	cpsr_c, #FIQ_MODE | PSR_I_BIT | PSR_F_BIT
+Changes since v1:
+(http://www.spinics.net/lists/arm-kernel/msg333276.html)
+ - rebased onto next-20140624,
+ - fixed #clock-cells values in exynos5250.dtsi and exynos5420.dtsi,
+ - temporarily removed ISP CLKOUT clocks on Exynos4x12, until ISP clock
+   domain handling gets fixed in Exynos4 clock driver.
+Changes since RFC v1:
+(https://lkml.org/lkml/2014/5/15/506)
+ - rebased onto v5 of "Enable usbphy and hsotg for exynos4" series and
+   current HEAD of samsung-clk tree,
+ - added handling of suspend/resume in the driver,
+ - added missing CPU clocks on Exynos4,
+ - added CLK_SET_RATE_PARENT to CMU CLKOUT gates on Exynos4,
+ - fixed bit field width on Exynos4,
+ - added CLKOUT CMU registers of Exynos4 to save/restore list,
+ - added CLK_SET_RATE_PARENT and CLK_SET_RATE_NO_REPARENT to clkout clock,
+ - changed the binding to use 1-cell clock specifier to allow extension
+   with further PMU clocks in future, if needed.
 
-Here we switch to FIQ mode.  What about the PSR_A_BIT which prevents
-imprecise aborts on ARMv6+ ?
+Tomasz Figa (4):
+  clk: samsung: exynos4: Add missing CPU/DMC clock hierarchy
+  clk: samsung: exynos4: Add CLKOUT clock hierarchy
+  clk: samsung: Add driver to control CLKOUT line on Exynos SoCs
+  ARM: dts: exynos: Update PMU node with CLKOUT related data
 
-Nevertheless, I think it's safe because the A bit will be set by the
-CPU when taking the FIQ exception, and it should remain set since
-cpsr_c won't modify it.
-
-> +	add	r8, r0, #S_PC
-> +	ldr	r9, [r0, #S_PSR]
-> +	msr	spsr_cxsf, r9
-
-Here we update the FIQ SPSR with the calling mode's CPSR, ready to
-return...
-
-> +	ldr	r0, [r0, #S_R0]
-
-Load the calling mode's R0 value.
-
-> +	ldmia	r8, {pc}^
-
-And return (restoring CPSR from SPSR_fiq).
-
-This looks pretty good except for the niggles...
+ .../devicetree/bindings/arm/samsung/pmu.txt        |  30 ++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  10 ++
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   7 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   3 +
+ arch/arm/boot/dts/exynos5420.dtsi                  |   3 +
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos-clkout.c            | 153 +++++++++++++++++++
+ drivers/clk/samsung/clk-exynos4.c                  | 166 ++++++++++++++++++++-
+ include/dt-bindings/clock/exynos4.h                |   5 +
+ 9 files changed, 374 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-exynos-clkout.c
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.3
