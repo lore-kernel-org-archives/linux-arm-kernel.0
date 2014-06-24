@@ -1,20 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jun 2014 11:19:01 +0100
-Subject: [PATCH 0/8] iMX6 SATA configuration
-Message-ID: <20140624101901.GL32514@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 24 Jun 2014 11:19:32 +0100
+Subject: [PATCH v3 2/8] ata: ahci_imx: warn when disabling ahci link
+In-Reply-To: <20140624101901.GL32514@n2100.arm.linux.org.uk>
+References: <20140624101901.GL32514@n2100.arm.linux.org.uk>
+Message-ID: <E1WzNp6-0005dk-Iq@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another round of these patches.  I've integrated Shawn's patch to split
-the documentation into this series so I can add the DT documentation
-on top of it.
+When the AHCI link is disabled, it can't be re-enabled except by
+resetting the entire SoC.  Rather than doing this silently print
+some kernel messages to inform the user, along with how to avoid
+this.
 
- .../devicetree/bindings/ata/ahci-platform.txt      |   6 -
- Documentation/devicetree/bindings/ata/imx-sata.txt |  36 ++++
- arch/arm/boot/dts/imx6q-cubox-i.dts                |   4 +
- drivers/ata/ahci_imx.c                             | 184 ++++++++++++++++++++-
- 4 files changed, 216 insertions(+), 14 deletions(-)
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/ata/ahci_imx.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+index 3a901520c62b..4eba1c5279ec 100644
+--- a/drivers/ata/ahci_imx.c
++++ b/drivers/ata/ahci_imx.c
+@@ -324,6 +324,10 @@ static void ahci_imx_error_handler(struct ata_port *ap)
+ 	writel(reg_val | IMX_P0PHYCR_TEST_PDDQ, mmio + IMX_P0PHYCR);
+ 	imx_sata_disable(hpriv);
+ 	imxpriv->no_device = true;
++
++	dev_info(ap->dev, "no device found, disabling link.\n");
++	dev_info(ap->dev, "pass " MODULE_PARAM_PREFIX
++		 ".hotplug=1 to enable hotplug\n");
+ }
+ 
+ static int ahci_imx_softreset(struct ata_link *link, unsigned int *class,
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
