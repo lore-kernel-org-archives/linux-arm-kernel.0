@@ -1,58 +1,50 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jun 2014 13:48:05 -0700
-Subject: [PATCH v8 1/9] seccomp: create internal mode-setting function
-In-Reply-To: <1403642893-23107-1-git-send-email-keescook@chromium.org>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
-Message-ID: <1403642893-23107-2-git-send-email-keescook@chromium.org>
+Date: Tue, 24 Jun 2014 13:48:04 -0700
+Subject: [PATCH v8 0/9] seccomp: add thread sync ability
+Message-ID: <1403642893-23107-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for having other callers of the seccomp mode setting
-logic, split the prctl entry point away from the core logic that performs
-seccomp mode setting.
+This adds the ability for threads to request seccomp filter
+synchronization across their thread group (at filter attach time).
+For example, for Chrome to make sure graphic driver threads are fully
+confined after seccomp filters have been attached.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- kernel/seccomp.c |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+To support this, locking on seccomp changes via thread-group-shared
+sighand lock is introduced, along with refactoring of no_new_privs. Races
+with thread creation are handled via delayed duplication of the seccomp
+task struct field.
 
-diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-index 301bbc24739c..afb916c7e890 100644
---- a/kernel/seccomp.c
-+++ b/kernel/seccomp.c
-@@ -473,7 +473,7 @@ long prctl_get_seccomp(void)
- }
- 
- /**
-- * prctl_set_seccomp: configures current->seccomp.mode
-+ * seccomp_set_mode: internal function for setting seccomp mode
-  * @seccomp_mode: requested mode to use
-  * @filter: optional struct sock_fprog for use with SECCOMP_MODE_FILTER
-  *
-@@ -486,7 +486,7 @@ long prctl_get_seccomp(void)
-  *
-  * Returns 0 on success or -EINVAL on failure.
-  */
--long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
-+static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
- {
- 	long ret = -EINVAL;
- 
-@@ -517,3 +517,15 @@ long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
- out:
- 	return ret;
- }
-+
-+/**
-+ * prctl_set_seccomp: configures current->seccomp.mode
-+ * @seccomp_mode: requested mode to use
-+ * @filter: optional struct sock_fprog for use with SECCOMP_MODE_FILTER
-+ *
-+ * Returns 0 on success or -EINVAL on failure.
-+ */
-+long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
-+{
-+	return seccomp_set_mode(seccomp_mode, filter);
-+}
--- 
-1.7.9.5
+This includes a new syscall (instead of adding a new prctl option),
+as suggested by Andy Lutomirski and Michael Kerrisk.
+
+Thanks!
+
+-Kees
+
+v8:
+ - drop use of tasklist_lock, appears redundant against sighand (oleg)
+ - reduced use of smp_load_acquire to logical minimum (oleg)
+ - change nnp to a task struct held atomic flags field (oleg, luto)
+ - drop needless irqflags changes in fork.c for holding sighand lock (oleg)
+ - cleaned up use of thread for-each loop (oleg)
+ - rearranged patch order to keep syscall changes adjacent
+ - added example code to manpage (mtk)
+v7:
+ - rebase on Linus's tree (merged with network bpf changes)
+ - wrote manpage text documenting API (follows this series)
+v6:
+ - switch from seccomp-specific lock to thread-group lock to gain atomicity
+ - implement seccomp syscall across all architectures with seccomp filter
+ - clean up sparse warnings around locking
+v5:
+ - move includes around (drysdale)
+ - drop set_nnp return value (luto)
+ - use smp_load_acquire/store_release (luto)
+ - merge nnp changes to seccomp always, fewer ifdef (luto)
+v4:
+ - cleaned up locking further, as noticed by David Drysdale
+v3:
+ - added SECCOMP_EXT_ACT_FILTER for new filter install options
+v2:
+ - reworked to avoid clone races
