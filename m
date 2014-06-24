@@ -1,26 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 24 Jun 2014 08:09:14 -0300
-Subject: [PATCH] ARM: imx53: globally disable supervisor protect
-In-Reply-To: <1403605229-29623-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1403605229-29623-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <CAOMZO5AYeCGHaONawxDbepGCG_2ez810TFxc_5TzC_SNhqOn5g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jun 2014 13:12:44 +0200
+Subject: [Pull Request] Various ARM platform code fixes
+In-Reply-To: <CAK5sBcF_wAJu-bfduhvP3kHfRvUDr=rUx=gd1Oi=3C5dnrHL6Q@mail.gmail.com>
+References: <CAK9yfHw=zecLHWHVZWvf3PzphYG3CDyTwMRXicUUFM4kkhT9Mw@mail.gmail.com>
+ <4750577.NRz8KZsHUG@wuerfel>
+ <CAK5sBcF_wAJu-bfduhvP3kHfRvUDr=rUx=gd1Oi=3C5dnrHL6Q@mail.gmail.com>
+Message-ID: <11158643.kH5ypbGTk1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 7:20 AM, Steffen Trumtrar
-<s.trumtrar@pengutronix.de> wrote:
+On Tuesday 24 June 2014 15:14:07 Sachin Kamat wrote:
+> On Tue, Jun 3, 2014 at 12:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 02 June 2014 09:42:48 Olof Johansson wrote:
+> >> On Mon, Jun 2, 2014 at 2:23 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> >> > Hi Arnd,
+> >> >
+> >> > As suggested by you I am sending a pull request for the below 8 patches.
+> >> > These are based on for-next branch of arm-soc tree [1].
+> >> >
+> >> > [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+> >>
+> >> Please, don't send random pull requests to us. Some of these patches
+> >> are for platforms that have quite active maintainers and you're
+> >> messing up everyone's workflow by randomly sending them to us.
+> >>
+> >> I have no idea what you talked to Arnd about, and you give no
+> >> reference to it in your pull request.
+> >
+> > FYI, these are all trivial cleanups that no subarch maintainer has
+> > picked up since they were posted, and I offered to take them
+> > from a pull request
+> >
+> >> Besides, the merge window is open, we're not taking anything new until
+> >> after -rc1.
+> >
+> > Agreed, I didn't expect the merge window to open already, and since there
+> > is no urgency here, let's apply this into next/cleanups after the merge
+> > window.
+> 
+> Arnd, I no longer have access to my Linaro git repo. Shall I re-send
+> the individual
+> patches?
 
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index 2bad387..4d3e750 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -29,6 +29,8 @@ static void __init imx53_dt_init(void)
->         mxc_arch_reset_init_dt();
->
->         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +
-> +       imx_set_aips(MX53_IO_ADDRESS(MX53_AIPS2_BASE_ADDR));
+Yes, please do, and send them with Cc to both linux-arm-kernel at lists.infradead.org
+and arm at kernel.org.
 
-Please retrieve the base address via dt.
-
-MX53_IO_ADDRESS has gone away in linux-next.
+	Arnd
