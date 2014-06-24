@@ -1,202 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Jun 2014 11:56:25 +0100
-Subject: [PATCH 2/2] spi: add driver for Rockchip RK3xxx SoCs integrated
- SPI
-In-Reply-To: <1403582852-9751-1-git-send-email-addy.ke@rock-chips.com>
-References: <1403582324-9485-1-git-send-email-addy.ke@rock-chips.com>
- <1403582852-9751-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <20140624105625.GH23300@sirena.org.uk>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 24 Jun 2014 16:33:28 +0530
+Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
+ devices
+In-Reply-To: <20140618082653.GN21030@lee--X1>
+References: <53A05E2D.6020702@samsung.com>
+ <1403019164-12514-1-git-send-email-t.figa@samsung.com>
+ <5027740.B7iVUcUX2T@wuerfel> <53A0B27E.5010708@gmail.com>
+ <20140618082653.GN21030@lee--X1>
+Message-ID: <007901cf8f9b$fe27ae70$fa770b50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 12:07:32PM +0800, addy ke wrote:
+Hi,
 
-> In order to facilitate understanding,rockchip SPI controller IP design looks
-> similar in its registers to designware. But IC implementation is different from
-> designware, such as dma request line, register offset, register configuration,
-> and so on.So we need a dedicated driver for Rockchip RK3XXX SoCs integrated SPI.
+On Wednesday, June 18 2014, Lee Jones wrote:
+> On Tue, 17 Jun 2014, Tomasz Figa wrote:
+> > On 17.06.2014 17:42, Arnd Bergmann wrote:
+> > > On Tuesday 17 June 2014 17:32:44 Tomasz Figa wrote:
+> > >> Currently a syscon entity can be only registered directly through a
+> > >> platform device that binds to a dedicated driver. However in
+> > >> certain use cases it is desirable to make a device used with
+> > >> another driver a syscon interface provider. For example, certain
+> > >> SoCs (e.g. Exynos) contain system controller blocks which perform
+> > >> various functions such as power domain control, CPU power
+> > >> management, low power mode control, but in addition contain certain
+> > >> IP integration glue, such as various signal masks, coprocessor
+> > >> power control, etc. In such case, there is a need to have a
+> > >> dedicated driver for such system controller but also share
+> > >> registers with other drivers. The latter is where the syscon interface is helpful.
+> > >>
+> > >> This patch decouples syscon object from syscon driver, so that it
+> > >> can be registered from any driver in addition to the original
+> > >> "syscon" platform driver.
+> 
+> +1 for this approach.
+> 
+> Michal, Pankay,
+>   Does it also suit your needs?
+> 
 
-Can you be more specific about the differences please?
+Sorry for late reply. 
+I tested this patch after changing exynos PMU to be a syscon provider and it's working well.
+So if we can address Arnd's comments, this patch will be helpful in making exynos PMU a 
+complete platform driver.
 
-> +struct rockchip_spi {
-> +	struct device			*dev;
-> +	struct spi_master		*master;
-> +
-> +	struct clk				*spiclk;
-> +	struct clk				*apb_pclk;
-> +
-> +	void __iomem			*regs;
-> +	int						irq;
-> +	/*depth of the FIFO buffer */
-> +	u32						fifo_len;
-> +	/* max bus freq supported */
-> +	u32						max_freq;
-> +	u16						bus_num;
-> +	/* supported slave numbers */
-> +	u16						num_cs;
-> +	enum rockchip_ssi_type	type;
+Thanks,
+Pankaj Dubey
 
-The indentation in this struct appears to be all over the place, in
-general it's simpler and clearer to not try to align the variable names.
-
-> +static inline void spi_chip_sel(struct rockchip_spi *rs, u16 cs)
-> +{
-> +	writel_relaxed(1 << cs, rs->regs + ROCKCHIP_SPI_SER);
-> +}
-
-There's no clear operation I can see and I'm not seeing a set_cs()
-operation provided to the core as I'd expect, this means that chip
-select handling doesn't work properly.
-
-> +static void rockchip_spi_hw_init(struct rockchip_spi *rs)
-> +{
-> +	u32 fifo;
-> +
-> +	spi_enable_chip(rs, 0);
-> +	spi_mask_intr(rs, INT_MASK);
-> +
-> +	for (fifo = 2; fifo < 32; fifo++) {
-> +		writel_relaxed(fifo, rs->regs + ROCKCHIP_SPI_TXFTLR);
-> +		if (fifo != readl_relaxed(rs->regs + ROCKCHIP_SPI_TXFTLR))
-> +			break;
-> +
-> +	}
-> +	rs->fifo_len = (fifo == 31) ? 0 : fifo;
-> +	writel_relaxed(0, rs->regs + ROCKCHIP_SPI_TXFTLR);
-> +}
-
-Some more commenting would make it much clearer what this does.
-
-> +static int rockchip_spi_setup(struct spi_device *spi)
-> +{
-> +	struct rockchip_spi *rs;
-> +
-> +	rs = spi_master_get_devdata(spi->master);
-> +
-> +	pm_runtime_get_sync(rs->dev);
-> +
-> +	if (spi->max_speed_hz > rs->max_freq)
-> +		spi->max_speed_hz = rs->max_freq;
-> +
-> +	pm_runtime_put(rs->dev);
-
-I can't see any reason to runtime enable the hardware here - there's no
-interaction with it.
-
-> +static int rockchip_spi_prepare_message(struct spi_master *master,
-> +		struct spi_message *msg)
-> +{
-> +	struct rockchip_spi *rs = spi_master_get_devdata(master);
-> +	struct spi_device *spi = msg->spi;
-> +
-> +	if (spi->chip_select >= rs->num_cs) {
-> +		dev_err(rs->dev, "chip_select %d is invalide, max is %d\n",
-
-invalid.
-
-> +static void wait_for_not_busy(struct rockchip_spi *rs)
-> +{
-> +	u32 status;
-> +	unsigned long tmo;
-> +	int ms;
-> +
-> +	ms = rs->len * 8 * 1000 / rs->speed;
-> +	ms += 10;
-> +
-> +	tmo = msecs_to_loops(ms);
-> +	do {
-> +		status = readl_relaxed(rs->regs + ROCKCHIP_SPI_SR);
-> +	} while ((status & SR_BUSY) && tmo--);
-
-This is a potentially long busy wait and there's not much headroom if
-the calculations are wrong.
-
-> +
-> +	BUG_ON(!tmo);
-
-I'd expect a WARN_ON() at most here.
-
-> +static int wait_for_dma(struct rockchip_spi *rs)
-> +{
-> +	unsigned long tmo;
-> +	int ms;
-> +
-> +	ms = rs->len * 8 * 1000 / rs->speed;
-> +	ms += 10;
-
-10ms probably isn't enough headroom on a loaded system - the scheduler
-may take longer than that to run the thread.  It looks like you could
-also be using the core timeout code here, return a positive value from
-transfer_one() and then call spi_finalize_current_transfer() when done.
-
-> +static int rockchip_spi_transfer_one(struct spi_master *master,
-> +		struct spi_device *spi,
-> +		struct spi_transfer *xfer)
-> +{
-> +	int ret = 0;
-> +	struct rockchip_spi *rs = spi_master_get_devdata(master);
-> +
-> +	if (!xfer->tx_buf && !xfer->rx_buf) {
-> +		dev_err(rs->dev, "No buffer for transfer\n");
-> +		return -EINVAL;
-> +	}
-
-Let the core worry about things like this.
-
-> +	rs->speed = xfer->speed_hz?:spi->max_speed_hz;
-
-The core will ensure that the transfer will have the correct speed set.
-In general there's a lot of copy values from the transfer into the
-driver data, it seems like it'd be simpler to just refer to the original
-source of the data.
-
-> +	rs->tx = (void *)xfer->tx_buf;
-
-Why is the driver casting away const here?
-
-> +static irqreturn_t rockchip_spi_irq(int irq, void *data)
-> +{
-> +	struct rockchip_spi *rs = data;
-> +	u32 isr = readl_relaxed(rs->regs + ROCKCHIP_SPI_ISR);
-> +
-> +	dev_dbg(rs->dev, "isr 0x%x\n", isr);
-> +
-> +	return IRQ_HANDLED;
-> +}
-
-This is completely ignoring the interrupt except for logging it - it'd
-be simpler to just not have an interrupt handler, or at least log any
-errors that the controller reports.
-
-> +err_register_master:
-> +	if (rs->dma_tx.ch)
-> +		dma_release_channel(rs->dma_tx.ch);
-> +	if (rs->dma_rx.ch)
-> +		dma_release_channel(rs->dma_rx.ch);
-
-Is there no managed interface for requesting DMA channels?
-
-> +	if (!pm_runtime_suspended(dev)) {
-> +		ret = clk_prepare_enable(rs->apb_pclk);
-> +		if (ret < 0)
-> +			return ret;
-> +		ret = clk_prepare_enable(rs->spiclk);
-> +
-> +		if (ret < 0) {
-> +			clk_disable_unprepare(rs->apb_pclk);
-> +			return ret;
-> +		}
-
-Funnly line spacing here - I'd expect the second clk_prepare_enable() to
-be in the same block as the error handling.
-
-> +	return spi_master_resume(rs->master);
-
-Should disable the clocks if this fails.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140624/dc42ac0a/attachment.sig>
+> > >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > >
+> > > Hi Tomasz,
+> > >
+> > > This seems like a reasonable way of solving the problem, but I think
+> > > there is an even better one that we have about in the past: if we
+> > > promote syscon from a platform driver into a a drivers/base/ helper
+> > > that is independent of the platform device matching, we can use call
+> > > syscon_regmap_lookup_* for any device node, whether it's already
+> > > bound to a driver or not, which do what you need. It would also make
+> > > it easier to call the syscon code before the platform_device
+> > > infrastructure gets initialized, which is something a number of
+> > > people have asked for, e.g. for using regmap to do SMP bringup or
+> > > for clock registration.
+> >
+> > Basically, unless I'm missing your point, this is what my patch does,
+> > except that I don't move it to drivers/base/ and the registration
+> > function I added require a pointer to struct device. Indeed,
+> > decoupling it further from the driver model, by adding
+> > of_syscon_register() should be useful for early users.
+> 
+> If agreed by Arnd, I think this work can be completed as a subsequent patch.
+> 
+> > Should I move this to drivers/base/, even though from current location
+> > it can be used outside the platform driver anyway?
+> 
+> If I'm being honest with myself, I'd say that Syscon wasn't really an MFD driver.  I'm
+> happy to keep it in there any continue maintaining it, but wouldn't block a move
+> either.
+> 
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead Linaro.org ? Open source software
+> for ARM SoCs Follow Linaro: Facebook | Twitter | Blog
