@@ -1,91 +1,75 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Jun 2014 18:08:27 +0200
-Subject: [PATCH v2 4/4] ARM: dts: exynos: Update PMU node with CLKOUT related
- data
-In-Reply-To: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
-References: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403626107-12073-5-git-send-email-t.figa@samsung.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 24 Jun 2014 12:08:48 -0400
+Subject: [PATCH v2 0/8] Add Keystone PCIe controller driver
+In-Reply-To: <53A85ACE.9070506@ti.com>
+References: <20140623053249.GD2666@pratyush-vbox> <53A85ACE.9070506@ti.com>
+Message-ID: <53A9A290.7020407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends nodes of PMU system controller on Exynos4210, 4x12,
-5250 and 5420 SoCs with newly defined properties used by Exynos CLKOUT
-driver.
+Pratyush,
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/boot/dts/exynos4210.dtsi | 10 ++++++++++
- arch/arm/boot/dts/exynos4x12.dtsi |  7 +++++++
- arch/arm/boot/dts/exynos5250.dtsi |  3 +++
- arch/arm/boot/dts/exynos5420.dtsi |  3 +++
- 4 files changed, 23 insertions(+)
+On 06/23/2014 12:50 PM, Santosh Shilimkar wrote:
+>
+>
+>
+> -------- Original Message --------
+> Subject: Re: [PATCH v2 0/8] Add Keystone PCIe controller driver
+> On Sat, Jun 21, 2014 at 03:05:30AM +0800, Arnd Bergmann wrote:
+>> On Friday 20 June 2014 13:11:37 Santosh Shilimkar wrote:
+>
+>>>>
+>>> Arnd suggestion was to have the version 3.65 code in generic place since
+>>> its IP specific and just in case some other vendor using the same version
+>>> can leverage the code.
+>
+> Sorry, I do not follow PCIe mailing list these days, doing something else
+> now. So coming to this topic a bit delayed.
+>
+My Apologies for the email format as I mysteriously lost this email and
+had to resort to a forwarded email to respond to this.
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index ee3001f..97ea7a9 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -31,6 +31,16 @@
- 		pinctrl2 = &pinctrl_2;
- 	};
- 
-+	pmu_system_controller: system-controller at 10020000 {
-+		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
-+				"clkout4", "clkout8", "clkout9";
-+		clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
-+			<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
-+			<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
-+			<&clock CLK_XUSBXTI>;
-+		#clock-cells = <1>;
-+	};
-+
- 	sysram at 02020000 {
- 		compatible = "mmio-sram";
- 		reg = <0x02020000 0x20000>;
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index c5a943d..de1f9c7 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -139,6 +139,13 @@
- 
- 	pmu_system_controller: system-controller at 10020000 {
- 		compatible = "samsung,exynos4212-pmu", "syscon";
-+		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
-+				"clkout4", "clkout8", "clkout9";
-+		clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
-+			<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
-+			<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
-+			<&clock CLK_XUSBXTI>;
-+		#clock-cells = <1>;
- 	};
- 
- 	g2d at 10800000 {
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 834fb5a..492e1ef 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -191,6 +191,9 @@
- 	pmu_system_controller: system-controller at 10040000 {
- 		compatible = "samsung,exynos5250-pmu", "syscon";
- 		reg = <0x10040000 0x5000>;
-+		clock-names = "clkout16";
-+		clocks = <&clock CLK_FIN_PLL>;
-+		#clock-cells = <1>;
- 	};
- 
- 	sysreg_system_controller: syscon at 10050000 {
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index e385322..481beec 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -724,6 +724,9 @@
- 	pmu_system_controller: system-controller at 10040000 {
- 		compatible = "samsung,exynos5420-pmu", "syscon";
- 		reg = <0x10040000 0x5000>;
-+		clock-names = "clkout16";
-+		clocks = <&clock CLK_FIN_PLL>;
-+		#clock-cells = <1>;
- 	};
- 
- 	sysreg_system_controller: syscon at 10050000 {
--- 
-1.9.3
+Let us have the discussion on this thread as I lost the original emails.
+>>>
+>>> Concern here seems toe really those name of the files. I can't think of
+>>> any other appropriate name.
+>>
+>> We should definitely keep the version in the DT "compatible" strings
+>> wherever we know it. Regarding a better file name, I have no idea.
+>
+> In my opinion, we do not need any of dw-v3_65 files, as code in these
+> files will not be usable by other vendors.
+>
+> Anything which is implemented in application space, will not be same
+> across all IP users. For example, MSI0_IRQ_ENABLE_SET has been defined
+> at offset 0x108 in keystone PCIe application space.Other vendor may
+> not have this register at the same offset. Moreover, other vendors are
+> not even obliged to implement MSI Enable signals in same way, so
+> internal bit definition of the register may change.
+>
+> Therefore code is not reusable if all register offset and bit
+> definitions are not same across vendors. So, in case of DW driver none
+> of the code which are accessed using va_app_base should go to common
+> area.
+>
+
+I think based on the response far on this issue, it is best to keep
+the Application specific code as part of Keystone driver and in
+future if there is any driver that has similar application register
+implemented. we can refactor the code and re-use.
+
+My V3 will revert back to implementation similar to RFC. Also since this
+is individual h/w specific, there is no no need for a compatibility as
+well. Will use keystone specific compatibility string for this.
+
+Arnd, hope this is fine. Please respond if you still think a 
+compatibility string is needed.
+
+Murali
+
+> Pratyush
+>
+>>
+>> 	Arnd
+>
+>
