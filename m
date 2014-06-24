@@ -1,9 +1,7 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Jun 2014 14:03:54 -0700
-Subject: [PATCH v2 2/2] ARM: dts: msm: Add 8058 PMIC to ssbi bus
-In-Reply-To: <1403643834-4484-1-git-send-email-sboyd@codeaurora.org>
-References: <1403643834-4484-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1403643834-4484-2-git-send-email-sboyd@codeaurora.org>
+Date: Tue, 24 Jun 2014 14:03:53 -0700
+Subject: [PATCH v2 1/2] ARM: dts: msm: Add 8921 PMIC to ssbi bus
+Message-ID: <1403643834-4484-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +10,21 @@ the kernel to the DT.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8660-surf.dts | 30 +++++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8660.dtsi     | 42 +++++++++++++++++++++++++++++++++
- 2 files changed, 72 insertions(+)
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts | 15 ++++++++++++++
+ arch/arm/boot/dts/qcom-msm8960.dtsi    | 37 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-index 45180adfadf1..ff7c53f58a06 100644
---- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
-+++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+index 8f75cc4c8340..8b10812c0cda 100644
+--- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
++++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
 @@ -1,3 +1,5 @@
 +#include <dt-bindings/input/input.h>
 +
- #include "qcom-msm8660.dtsi"
+ #include "qcom-msm8960.dtsi"
  
  / {
-@@ -14,3 +16,31 @@
+@@ -14,3 +16,16 @@
  		};
  	};
  };
@@ -34,50 +32,35 @@ index 45180adfadf1..ff7c53f58a06 100644
 +&pmicintc {
 +	keypad at 148 {
 +		linux,keymap = <
-+			MATRIX_KEY(0, 0, KEY_FN_F1)
-+			MATRIX_KEY(0, 1, KEY_UP)
-+			MATRIX_KEY(0, 2, KEY_LEFT)
-+			MATRIX_KEY(0, 3, KEY_VOLUMEUP)
-+			MATRIX_KEY(1, 0, KEY_FN_F2)
-+			MATRIX_KEY(1, 1, KEY_RIGHT)
-+			MATRIX_KEY(1, 2, KEY_DOWN)
-+			MATRIX_KEY(1, 3, KEY_VOLUMEDOWN)
-+			MATRIX_KEY(2, 3, KEY_ENTER)
-+			MATRIX_KEY(4, 0, KEY_CAMERA_FOCUS)
-+			MATRIX_KEY(4, 1, KEY_UP)
-+			MATRIX_KEY(4, 2, KEY_LEFT)
-+			MATRIX_KEY(4, 3, KEY_HOME)
-+			MATRIX_KEY(4, 4, KEY_FN_F3)
-+			MATRIX_KEY(5, 0, KEY_CAMERA)
-+			MATRIX_KEY(5, 1, KEY_RIGHT)
-+			MATRIX_KEY(5, 2, KEY_DOWN)
-+			MATRIX_KEY(5, 3, KEY_BACK)
-+			MATRIX_KEY(5, 4, KEY_MENU)
++			MATRIX_KEY(0, 0, KEY_VOLUMEUP)
++			MATRIX_KEY(0, 1, KEY_VOLUMEDOWN)
++			MATRIX_KEY(0, 2, KEY_CAMERA_FOCUS)
++			MATRIX_KEY(0, 3, KEY_CAMERA)
 +			>;
-+		keypad,num-rows = <6>;
++		keypad,num-rows = <1>;
 +		keypad,num-columns = <5>;
 +	};
 +};
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 53837aaa2f72..a3fd26b8139f 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -103,6 +103,48 @@
+diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
+index 5303e53e34dc..2f677247744d 100644
+--- a/arch/arm/boot/dts/qcom-msm8960.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
+@@ -143,6 +143,43 @@
  			compatible = "qcom,ssbi";
  			reg = <0x500000 0x1000>;
  			qcom,controller-type = "pmic-arbiter";
 +
 +			pmicintc: pmic at 0 {
-+				compatible = "qcom,pm8058";
++				compatible = "qcom,pm8921";
 +				interrupt-parent = <&msmgpio>;
-+				interrupts = <88 8>;
++				interrupts = <104 8>;
 +				#interrupt-cells = <2>;
 +				interrupt-controller;
 +				#address-cells = <1>;
 +				#size-cells = <0>;
 +
 +				pwrkey at 1c {
-+					compatible = "qcom,pm8058-pwrkey";
++					compatible = "qcom,pm8921-pwrkey";
 +					reg = <0x1c>;
 +					interrupt-parent = <&pmicintc>;
 +					interrupts = <50 1>, <51 1>;
@@ -86,7 +69,7 @@ index 53837aaa2f72..a3fd26b8139f 100644
 +				};
 +
 +				keypad at 148 {
-+					compatible = "qcom,pm8058-keypad";
++					compatible = "qcom,pm8921-keypad";
 +					reg = <0x148>;
 +					interrupt-parent = <&pmicintc>;
 +					interrupts = <74 1>, <75 1>;
@@ -96,21 +79,16 @@ index 53837aaa2f72..a3fd26b8139f 100644
 +				};
 +
 +				rtc at 11d {
-+					compatible = "qcom,pm8058-rtc";
++					compatible = "qcom,pm8921-rtc";
 +					interrupt-parent = <&pmicintc>;
 +					interrupts = <39 1>;
 +					reg = <0x11d>;
 +					allow-set-time;
 +				};
-+
-+				vibrator at 4a {
-+					compatible = "qcom,pm8058-vib";
-+					reg = <0x4a>;
-+				};
 +			};
  		};
- 	};
- };
+ 
+ 		rng at 1a500000 {
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
