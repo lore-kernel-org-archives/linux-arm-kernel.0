@@ -1,83 +1,26 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 24 Jun 2014 16:33:28 +0530
-Subject: [PATCH RFC] mfd: syscon: Decouple syscon interface from syscon
- devices
-In-Reply-To: <20140618082653.GN21030@lee--X1>
-References: <53A05E2D.6020702@samsung.com>
- <1403019164-12514-1-git-send-email-t.figa@samsung.com>
- <5027740.B7iVUcUX2T@wuerfel> <53A0B27E.5010708@gmail.com>
- <20140618082653.GN21030@lee--X1>
-Message-ID: <007901cf8f9b$fe27ae70$fa770b50$@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 24 Jun 2014 08:09:14 -0300
+Subject: [PATCH] ARM: imx53: globally disable supervisor protect
+In-Reply-To: <1403605229-29623-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1403605229-29623-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <CAOMZO5AYeCGHaONawxDbepGCG_2ez810TFxc_5TzC_SNhqOn5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 24, 2014 at 7:20 AM, Steffen Trumtrar
+<s.trumtrar@pengutronix.de> wrote:
 
-On Wednesday, June 18 2014, Lee Jones wrote:
-> On Tue, 17 Jun 2014, Tomasz Figa wrote:
-> > On 17.06.2014 17:42, Arnd Bergmann wrote:
-> > > On Tuesday 17 June 2014 17:32:44 Tomasz Figa wrote:
-> > >> Currently a syscon entity can be only registered directly through a
-> > >> platform device that binds to a dedicated driver. However in
-> > >> certain use cases it is desirable to make a device used with
-> > >> another driver a syscon interface provider. For example, certain
-> > >> SoCs (e.g. Exynos) contain system controller blocks which perform
-> > >> various functions such as power domain control, CPU power
-> > >> management, low power mode control, but in addition contain certain
-> > >> IP integration glue, such as various signal masks, coprocessor
-> > >> power control, etc. In such case, there is a need to have a
-> > >> dedicated driver for such system controller but also share
-> > >> registers with other drivers. The latter is where the syscon interface is helpful.
-> > >>
-> > >> This patch decouples syscon object from syscon driver, so that it
-> > >> can be registered from any driver in addition to the original
-> > >> "syscon" platform driver.
-> 
-> +1 for this approach.
-> 
-> Michal, Pankay,
->   Does it also suit your needs?
-> 
+> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> index 2bad387..4d3e750 100644
+> --- a/arch/arm/mach-imx/mach-imx53.c
+> +++ b/arch/arm/mach-imx/mach-imx53.c
+> @@ -29,6 +29,8 @@ static void __init imx53_dt_init(void)
+>         mxc_arch_reset_init_dt();
+>
+>         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +
+> +       imx_set_aips(MX53_IO_ADDRESS(MX53_AIPS2_BASE_ADDR));
 
-Sorry for late reply. 
-I tested this patch after changing exynos PMU to be a syscon provider and it's working well.
-So if we can address Arnd's comments, this patch will be helpful in making exynos PMU a 
-complete platform driver.
+Please retrieve the base address via dt.
 
-Thanks,
-Pankaj Dubey
-
-> > >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > >
-> > > Hi Tomasz,
-> > >
-> > > This seems like a reasonable way of solving the problem, but I think
-> > > there is an even better one that we have about in the past: if we
-> > > promote syscon from a platform driver into a a drivers/base/ helper
-> > > that is independent of the platform device matching, we can use call
-> > > syscon_regmap_lookup_* for any device node, whether it's already
-> > > bound to a driver or not, which do what you need. It would also make
-> > > it easier to call the syscon code before the platform_device
-> > > infrastructure gets initialized, which is something a number of
-> > > people have asked for, e.g. for using regmap to do SMP bringup or
-> > > for clock registration.
-> >
-> > Basically, unless I'm missing your point, this is what my patch does,
-> > except that I don't move it to drivers/base/ and the registration
-> > function I added require a pointer to struct device. Indeed,
-> > decoupling it further from the driver model, by adding
-> > of_syscon_register() should be useful for early users.
-> 
-> If agreed by Arnd, I think this work can be completed as a subsequent patch.
-> 
-> > Should I move this to drivers/base/, even though from current location
-> > it can be used outside the platform driver anyway?
-> 
-> If I'm being honest with myself, I'd say that Syscon wasn't really an MFD driver.  I'm
-> happy to keep it in there any continue maintaining it, but wouldn't block a move
-> either.
-> 
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead Linaro.org ? Open source software
-> for ARM SoCs Follow Linaro: Facebook | Twitter | Blog
+MX53_IO_ADDRESS has gone away in linux-next.
