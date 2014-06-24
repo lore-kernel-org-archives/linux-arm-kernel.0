@@ -1,84 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 24 Jun 2014 16:49:54 +0200
-Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
- driver
-In-Reply-To: <20140623211323.GA28120@spo001.leaseweb.com>
-References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140507213318.GA2105@roeck-us.net>
- <20140515091123.GQ29258@lukather> <20140519150422.GA27329@lukather>
- <20140522203444.GE27329@lukather>
- <20140522211207.GA28704@roeck-us.net>
- <20140623103142.GB19730@lukather>
- <20140623211323.GA28120@spo001.leaseweb.com>
-Message-ID: <20140624144954.GP19730@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Jun 2014 15:51:53 +0100
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <4274516.nCpbjAuUJp@wuerfel>
+References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
+ <6599289.0ZjjaMbRqj@wuerfel> <20140624124634.GO13803@lee--X1>
+ <4274516.nCpbjAuUJp@wuerfel>
+Message-ID: <20140624145153.GQ13803@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 11:13:24PM +0200, Wim Van Sebroeck wrote:
-> Hi Maxime,
-> 
-> > > > Guenter, since you seem to be the only responsive, may I suggest that
-> > > > you start merging patches and do a pull request to either Wim or Linus
-> > > > directly during the merge window?
+On Tue, 24 Jun 2014, Arnd Bergmann wrote:
+> On Tuesday 24 June 2014 13:46:34 Lee Jones wrote:
+> > > > > > converting all addresses to to resources so drivers can easily pull
+> > > > > > them out using platform_get_resource() and friends.  Pushing the reg
+> > > > > 
+> > > > > right. Can't we use of_address_to_resource here?
 > > > > 
-> > > I had prepared a pull request for Wim last weekend or so, but then there
-> > > were more patches piling in and I got distracted, so I didn't have time
-> > > to actually send it. I'll try again this weekend ... the kids should be
-> > > busy learning for their finals, and I'll have Friday and Monday off
-> > > from work, so I should be able to find the time.
+> > > > We could, but that would be an extra layer.  We'd be pulling the
+> > > > address, putting it into a resource, then pulling it from the resource
+> > > > for use.  If we're going to be pulling addresses out manually, we're
+> > > > probably better off using of_get_address().  But again, we're just
+> > > > carrying out functionality which is already provided by the
+> > > > framework.
 > > > 
-> > > As for sending patches to Linus directly, well, Wim is the watchdog maintainer.
-> > > I manage to upset enough people, and would not want to add Wim to the list.
-> > > 
-> > > The patches _are_ in my watchdog-next branch and get some coverage from
-> > > both my auto-builders and from Fenguang's build robots, so while they are
-> > > not in linux-next, they are not completely in the dark either.
+> > > there is also of_ioremap().
 > > 
-> > So, this patch finally didn't make it into 3.16. Great. Now, we can't
-> > even reboot the boards.
+> > Isn't this SPARK only?  And doesn't it require a populated resource?  
+> > Which is what I'm saying is the issue here i.e. we don't have one.
 > 
-> 1) For me the discussion was not ended and needs further
-> thinking. (And I just read some good ideas about it).
-
-It would have been great for you to mention it then.
-
-> 2) You never mentioned you needed this in for 3.16 and that things
-> would break because of it.
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257690.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259109.html
-
-I thought it was pretty clear.
-
+> Sorry, I meant of_iomap(). I think it's only for historic reaons
+> that we have both. Probably of_iomap started out on powerpc with
+> the same intention as the sparc of_ioremap.
 > 
-> So based on these 2 points why would I have to have put this in allready?
-> 
-> > Given how it's just impossible to get something merged reliably
-> > through the watchdog tree, I guess I should just start merging the
-> > patches through mine?
-> 
-> I agree that I have the problem of having only 24 hours in a day and
-> that I lack time to communicate and that I am not good at
-> communicating either, but I checked all sunxi related e-mails and
-> you never mentioned the constraint to have it in for 3.16...  But I
-> do understand your frustration.
+> of_iomap does not require a resource, just an index.
 
-I totally understand the lack of time. A good way to ease your burden
-and solve this situation is usually to take a co-maintainer. And given
-that Guenter already reviews patches, maintains some branch, and is
-developping some part of the framework, he seems up to the task.
-
-Maxime
+Ah, this sounds like a better solution.  I'll have a play, thanks.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140624/65ffa770/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
