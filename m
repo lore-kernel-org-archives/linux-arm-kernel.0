@@ -1,25 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 16:56:23 +0200
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 24 Jun 2014 10:56:44 -0400 (EDT)
 Subject: VFP handling in multiplatform feroceon kernels
-In-Reply-To: <alpine.LFD.2.11.1406241016340.16842@knanqh.ubzr>
-References: <7416978.W29blLsymn@wuerfel> <20140624141056.GD4489@arm.com>
- <alpine.LFD.2.11.1406241016340.16842@knanqh.ubzr>
-Message-ID: <6810513.25mgpAfEFf@wuerfel>
+In-Reply-To: <20140624143503.GQ32514@n2100.arm.linux.org.uk>
+References: <7416978.W29blLsymn@wuerfel> <20140624134249.GB4489@arm.com>
+ <alpine.LFD.2.11.1406240956540.16842@knanqh.ubzr>
+ <20140624141056.GD4489@arm.com>
+ <20140624141423.GP32514@n2100.arm.linux.org.uk>
+ <20140624142505.GF4489@arm.com>
+ <20140624143503.GQ32514@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1406241050390.16842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 June 2014 10:49:23 Nicolas Pitre wrote:
-> > You don't even need to branch to out of line assembly, just branch over
-> > the imprecise VFP abort handling in arch/arm/vfp/vfphw.S.
-> 
-> Even better.  I looked too quickly at the patch seeing a #ifdef while it 
-> is in fact #ifndef.
-> 
-> What about something like this?
-> 
+On Tue, 24 Jun 2014, Russell King - ARM Linux wrote:
 
-I should have posted the entire original patch. There are in fact three
-#ifndef that were introduced there, two in vfphw.S and one in vfpmodule.c,
-so it needs to be slightly more verbose, but the principle seems right.
+> As I point out, the problem is that if we build a kernel with ARM926
+> plus Feroceon support (thus including some of the Feroceon platforms),
+> and omitting the plagerised ID, how do we stop the potential data
+> corruption occuring should we boot on a Feroceon platform with the
+> old IDs.
 
-	Arnd
+That's a valid concern.
+
+I don't know if all the Feroceon CPU cores are buggy wrt the VFP, 
+however only some of the Orion5x platforms had a Feroceon core using the 
+plagerised ID.  Probably those two issues should be handled separately.
+
+So for the later I'd simply forbid any Orion5x platforms from being part 
+of a multi-platform kernel.
+
+
+Nicolas
