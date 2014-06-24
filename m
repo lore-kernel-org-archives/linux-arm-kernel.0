@@ -1,32 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 15:47:51 +0200
-Subject: VFP handling in multiplatform feroceon kernels
-In-Reply-To: <20140624133157.GC6993@lunn.ch>
-References: <7416978.W29blLsymn@wuerfel> <20140624133157.GC6993@lunn.ch>
-Message-ID: <9076405.UGmihAddxu@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jun 2014 14:49:15 +0100
+Subject: [PATCHv3 3/4] arm64: Update the Image header
+In-Reply-To: <1403283810.17030.68.camel@smoke>
+References: <1403174963-10730-1-git-send-email-mark.rutland@arm.com>
+ <1403174963-10730-4-git-send-email-mark.rutland@arm.com>
+ <1403283810.17030.68.camel@smoke>
+Message-ID: <20140624134915.GK5856@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 June 2014 15:31:57 Andrew Lunn wrote:
-> On Tue, Jun 24, 2014 at 03:17:06PM +0200, Arnd Bergmann wrote:
-> > Since 3.16, we have the ability to build a multiplatform kernel
-> > that includes both kirkwood (feroceon) and some other ARMv5 CPU.
-> > 
-> > I accidentally stumbled over a bug in the VFP code that looks
-> > like it will break at least ARM9 VFP support if CPU_FEROCEON
-> > is also enabled, introduced by this (old) commit:
+On Fri, Jun 20, 2014 at 06:03:30PM +0100, Geoff Levand wrote:
+> Hi Mark,
 > 
-> Hi Arnd
+> On Thu, 2014-06-19 at 11:49 +0100, Mark Rutland wrote: 
+> > diff --git a/arch/arm64/include/asm/image.h b/arch/arm64/include/asm/image.h
+> > new file mode 100644
+> > index 0000000..8fae075
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/image.h
+> > @@ -0,0 +1,62 @@
+> > +/*
+> > + * Linker script macros to generate Image header fields.
 > 
-> CPU_FEROCEAN is currently selected by Orion5x, Kirkwood and mv78xx0.
-> These are all ARMv5 machines. As far as i understand, we cannot
-> combine ARMv5 with ARMv6 and above. So is this really an issue? Should
-> we put in something defensive to prevent it being selected on anything
-> other than ARMv5?
+> ...
+> 
+> > + */
+> > +#ifndef __ASM_IMAGE_H
+> > +#define __ASM_IMAGE_H
+> > +
+> > +#ifndef LINKER_SCRIPT
+> > +#error This file should only be included in vmlinux.lds.S
+> > +#endif
+> 
+> Since this is just used by the linker script, shouldn't it go in
+> arch/arm64/kernel/image.h?
 
-I don't think we have to worry about ARMv6 and above, we just need
-to solve it for ARM926E(J), which is the same architecture level
-as Feroceon and can now be built into the same kernel in reasonable
-configurations.
+Sure, that makes sense. I'll post a (hopefully final) v4 shortly.
 
-	Arnd
+Thanks,
+Mark.
