@@ -1,49 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jun 2014 09:54:05 +0100
-Subject: [PATCH] arm: ptrace: fix syscall modification under
- PTRACE_O_TRACESECCOMP
-In-Reply-To: <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
-References: <20140618202748.GA9022@www.outflux.net>
- <20140620102258.GA26626@arm.com>
- <CAGXu5jKJ07bXw_K+7uSAf=H_SDoeoaWPxS4rwuonbR71Svwwmw@mail.gmail.com>
- <20140620172330.GA30656@arm.com>
- <CAGXu5jKg0didhwZTUq8AbMnwD=RV=EaWiZWBWuar625JXGnL6w@mail.gmail.com>
- <CAGXu5j+bk3g0Dude8jfKM3dXxX8LE_46CMmcBCGdVMNX_Hu-6w@mail.gmail.com>
- <20140623084608.GA9316@arm.com>
- <CAGXu5jLJRU21YoBXjXRpfHW1-jwy_PV0hpH_oUfew23xLF4gYg@mail.gmail.com>
-Message-ID: <20140624085405.GA26013@arm.com>
+Date: Tue, 24 Jun 2014 09:54:56 +0100
+Subject: [PATCH] ARM: ptrace: reload syscall number after secure_computing()
+ check
+Message-ID: <1403600096-26088-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 08:46:52PM +0100, Kees Cook wrote:
-> On Mon, Jun 23, 2014 at 1:46 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jun 20, 2014 at 07:10:46PM +0100, Kees Cook wrote:
-> >> On Fri, Jun 20, 2014 at 10:36 AM, Kees Cook <keescook@chromium.org> wrote:
-> >> > On Fri, Jun 20, 2014 at 10:23 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> >> Right, gotcha. Thanks for the explanation. I was confused, because
-> >> >> tracehook_report_syscall does the right thing (returns
-> >> >> current_thread_info()->syscall), but if we don't have TIF_SYSCALL_TRACE set,
-> >> >> then updates during the secure_computing callback will be ignored.
-> >> >>
-> >> >> However, my fix to this is significantly smaller than your patch, so I fear
-> >> >> I'm still missing something.
-> >> >
-> >> > Oh, yes, that's much smaller. Nice! I will test this and report back.
-> >>
-> >> Yup, I can confirm this works. Thanks!
-> >>
-> >> Tested-by: Kees Cook <keescook@chromium.org>
-> >
-> > Thanks, Kees. I'll post a patch shortly. I'll try and remember to keep an
-> > eye out for this when seccomp lands for arm64 too.
-> 
-> Great, thanks!
-> 
-> What's the state of seccomp on arm64? I saw a series back in March,
-> but nothing since then? It looked complete, but I haven't set up a
-> test environment yet to verify.
+On the syscall tracing path, we call out to secure_computing() to allow
+seccomp to check the syscall number being attempted. As part of this, a
+SIGTRAP may be sent to the tracer and the syscall could be re-written by
+a subsequent SET_SYSCALL ptrace request. Unfortunately, this new syscall
+is ignored by the current code unless TIF_SYSCALL_TRACE is also set on
+the current thread.
 
-I think Akashi was going to repost `real soon now' so we can include them
-for 3.17. He missed the merge window last time around.
+This patch slightly reworks the enter path of the syscall tracing code
+so that we always reload the syscall number from
+current_thread_info()->syscall after the potential ptrace traps.
 
-Will
+Tested-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/ptrace.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 0dd3b79b15c3..0c27ed6f3f23 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -908,7 +908,7 @@ enum ptrace_syscall_dir {
+ 	PTRACE_SYSCALL_EXIT,
+ };
+ 
+-static int tracehook_report_syscall(struct pt_regs *regs,
++static void tracehook_report_syscall(struct pt_regs *regs,
+ 				    enum ptrace_syscall_dir dir)
+ {
+ 	unsigned long ip;
+@@ -926,7 +926,6 @@ static int tracehook_report_syscall(struct pt_regs *regs,
+ 		current_thread_info()->syscall = -1;
+ 
+ 	regs->ARM_ip = ip;
+-	return current_thread_info()->syscall;
+ }
+ 
+ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+@@ -938,7 +937,9 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+ 		return -1;
+ 
+ 	if (test_thread_flag(TIF_SYSCALL_TRACE))
+-		scno = tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
++		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
++
++	scno = current_thread_info()->syscall;
+ 
+ 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+ 		trace_sys_enter(regs, scno);
+-- 
+2.0.0
