@@ -1,94 +1,73 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Jun 2014 14:03:53 -0700
-Subject: [PATCH v2 1/2] ARM: dts: msm: Add 8921 PMIC to ssbi bus
-Message-ID: <1403643834-4484-1-git-send-email-sboyd@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Jun 2014 16:11:48 -0500
+Subject: [PATCH v3 1/2] arm: dts: am4372: let boards access all nodes
+ through phandles
+In-Reply-To: <1403547659-24558-2-git-send-email-balbi@ti.com>
+References: <1403547659-24558-1-git-send-email-balbi@ti.com>
+ <1403547659-24558-2-git-send-email-balbi@ti.com>
+Message-ID: <CAL_JsqJx_DJqxpEJebi0Etfv5g7=eYje_53vd_44GykreA-rkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the PMIC and the sub-devices that are currently supported in
-the kernel to the DT.
+On Mon, Jun 23, 2014 at 1:20 PM, Felipe Balbi <balbi@ti.com> wrote:
+> by providing phandles to rtc, wdt, cpu and dispc nodes,
+> boards can access them to add board-specific data.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8960-cdp.dts | 15 ++++++++++++++
- arch/arm/boot/dts/qcom-msm8960.dtsi    | 37 ++++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
+Strictly speaking, you are adding labels, not phandles. You can do
+phandles without using labels, but the syntax is not so obvious. I'd
+tell you what it is but offhand I don't remember. :)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-index 8f75cc4c8340..8b10812c0cda 100644
---- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-+++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-@@ -1,3 +1,5 @@
-+#include <dt-bindings/input/input.h>
-+
- #include "qcom-msm8960.dtsi"
- 
- / {
-@@ -14,3 +16,16 @@
- 		};
- 	};
- };
-+
-+&pmicintc {
-+	keypad at 148 {
-+		linux,keymap = <
-+			MATRIX_KEY(0, 0, KEY_VOLUMEUP)
-+			MATRIX_KEY(0, 1, KEY_VOLUMEDOWN)
-+			MATRIX_KEY(0, 2, KEY_CAMERA_FOCUS)
-+			MATRIX_KEY(0, 3, KEY_CAMERA)
-+			>;
-+		keypad,num-rows = <1>;
-+		keypad,num-columns = <5>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index 5303e53e34dc..2f677247744d 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -143,6 +143,43 @@
- 			compatible = "qcom,ssbi";
- 			reg = <0x500000 0x1000>;
- 			qcom,controller-type = "pmic-arbiter";
-+
-+			pmicintc: pmic at 0 {
-+				compatible = "qcom,pm8921";
-+				interrupt-parent = <&msmgpio>;
-+				interrupts = <104 8>;
-+				#interrupt-cells = <2>;
-+				interrupt-controller;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				pwrkey at 1c {
-+					compatible = "qcom,pm8921-pwrkey";
-+					reg = <0x1c>;
-+					interrupt-parent = <&pmicintc>;
-+					interrupts = <50 1>, <51 1>;
-+					debounce = <15625>;
-+					pull-up;
-+				};
-+
-+				keypad at 148 {
-+					compatible = "qcom,pm8921-keypad";
-+					reg = <0x148>;
-+					interrupt-parent = <&pmicintc>;
-+					interrupts = <74 1>, <75 1>;
-+					debounce = <15>;
-+					scan-delay = <32>;
-+					row-hold = <91500>;
-+				};
-+
-+				rtc at 11d {
-+					compatible = "qcom,pm8921-rtc";
-+					interrupt-parent = <&pmicintc>;
-+					interrupts = <39 1>;
-+					reg = <0x11d>;
-+					allow-set-time;
-+				};
-+			};
- 		};
- 
- 		rng at 1a500000 {
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Rob
+
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>
+> Changes since v1:
+>         - added phandles to cpu and dispc
+>
+>  arch/arm/boot/dts/am4372.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index 49fa596..8d3c163 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -30,7 +30,7 @@
+>         cpus {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> -               cpu at 0 {
+> +               cpu: cpu at 0 {
+>                         compatible = "arm,cortex-a9";
+>                         device_type = "cpu";
+>                         reg = <0>;
+> @@ -270,7 +270,7 @@
+>                         ti,hwmods = "counter_32k";
+>                 };
+>
+> -               rtc at 44e3e000 {
+> +               rtc: rtc at 44e3e000 {
+>                         compatible = "ti,am4372-rtc","ti,da830-rtc";
+>                         reg = <0x44e3e000 0x1000>;
+>                         interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH
+> @@ -279,7 +279,7 @@
+>                         status = "disabled";
+>                 };
+>
+> -               wdt at 44e35000 {
+> +               wdt: wdt at 44e35000 {
+>                         compatible = "ti,am4372-wdt","ti,omap3-wdt";
+>                         reg = <0x44e35000 0x1000>;
+>                         interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -871,7 +871,7 @@
+>                         #size-cells = <1>;
+>                         ranges;
+>
+> -                       dispc at 4832a400 {
+> +                       dispc: dispc at 4832a400 {
+>                                 compatible = "ti,omap3-dispc";
+>                                 reg = <0x4832a400 0x400>;
+>                                 interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
+> --
+> 2.0.0.390.gcb682f8
+>
