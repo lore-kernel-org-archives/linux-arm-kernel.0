@@ -1,68 +1,51 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jun 2014 12:08:16 -0700
-Subject: [PATCH v7 7/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <20140624183749.GC1258@redhat.com>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-8-git-send-email-keescook@chromium.org>
- <20140624172753.GA31435@redhat.com>
- <CAGXu5jKoDEXffJqFSjhO+D=5toJOA=KAomi+LQOahPDYKFbEdg@mail.gmail.com>
- <20140624183749.GC1258@redhat.com>
-Message-ID: <CAGXu5jKwF1cbc=4O5nXDKZT8HF7grCm+AaRz7v1VCdPVMRX-3A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Jun 2014 20:08:18 +0100
+Subject: [PATCH RFC 3/8] component: add support for component match array
+In-Reply-To: <20140428092131.GE19455@ulmo>
+References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+ <E1WeBba-0002Gd-9p@rmk-PC.arm.linux.org.uk> <20140428092131.GE19455@ulmo>
+Message-ID: <20140624190818.GA20555@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 11:37 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 06/24, Kees Cook wrote:
->>
->> On Tue, Jun 24, 2014 at 10:27 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->> > On 06/23, Kees Cook wrote:
->> >>
->> >> +static pid_t seccomp_can_sync_threads(void)
->> >> +{
->> >> +     struct task_struct *thread, *caller;
->> >> +
->> >> +     BUG_ON(write_can_lock(&tasklist_lock));
->> >> +     BUG_ON(!spin_is_locked(&current->sighand->siglock));
->> >> +
->> >> +     if (current->seccomp.mode != SECCOMP_MODE_FILTER)
->> >> +             return -EACCES;
->> >> +
->> >> +     /* Validate all threads being eligible for synchronization. */
->> >> +     thread = caller = current;
->> >> +     for_each_thread(caller, thread) {
->> >> +             pid_t failed;
->> >> +
->> >> +             if (thread->seccomp.mode == SECCOMP_MODE_DISABLED ||
->> >> +                 (thread->seccomp.mode == SECCOMP_MODE_FILTER &&
->> >> +                  is_ancestor(thread->seccomp.filter,
->> >> +                              caller->seccomp.filter)))
->> >> +                     continue;
->> >> +
->> >> +             /* Return the first thread that cannot be synchronized. */
->> >> +             failed = task_pid_vnr(thread);
->> >> +             /* If the pid cannot be resolved, then return -ESRCH */
->> >> +             if (failed == 0)
->> >> +                     failed = -ESRCH;
->> >
->> > forgot to mention, task_pid_vnr() can't fail. sighand->siglock is held,
->> > for_each_thread() can't see a thread which has passed unhash_process().
->>
->> Certainly good to know, but I'd be much more comfortable leaving this
->> check as-is. Having "failed" return with "0" would be very very bad
->> (userspace would think the filter had been successfully applied, etc).
->> I'd rather stay highly defensive here.
->
-> OK, agreed. Although in this case I'd suggest
->
->                 if (WARN_ON(failed == 0))
->                         failed = -ESRCH;
->
-> but I won't insist.
+On Mon, Apr 28, 2014 at 11:21:32AM +0200, Thierry Reding wrote:
+> On Sun, Apr 27, 2014 at 12:01:58AM +0100, Russell King wrote:
+> > Add support for generating a set of component matches at master probe
+> > time, and submitting them to the component layer.  This allows the
+> > component layer to perform the matches internally without needing to
+> > call into the master driver, and allows for further restructuring of
+> > the component helper.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  drivers/base/component.c  | 118 ++++++++++++++++++++++++++++++++++++++++++++--
+> >  include/linux/component.h |   7 +++
+> >  2 files changed, 122 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/base/component.c b/drivers/base/component.c
+> [...]
+> > +void component_match_add(struct device *dev, struct component_match **matchptr,
+> > +	int (*compare)(struct device *, void *), void *compare_data)
+> > +{
+> > +	struct component_match *match = *matchptr;
+> > +
+> > +	if (IS_ERR(match))
+> > +		return;
+> > +
+> > +	if (!match || ++match->num == match->alloc) {
+> > +		size_t new_size = match ? match->alloc + 16 : 15;
+> 
+> Doesn't this allocate prematurely? If component_match_add() is called on
+> the final component of a master, then match->num will be incremented to
+> it's final value. If that matches match->alloc, then things are just
+> fine, aren't they? No need to allocate another 16 entries.
 
-Excellent idea, yes! I'll include this as well.
+This code appears to be correct - `num' is actually one less than the
+number of components.
 
--Kees
+However, that makes code elsewhere wrong... v2 coming up soon with this
+fixed.  Good catch.
 
 -- 
-Kees Cook
-Chrome OS Security
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
