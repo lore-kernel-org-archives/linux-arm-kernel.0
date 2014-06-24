@@ -1,54 +1,47 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Tue, 24 Jun 2014 17:52:00 +0530
-Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <20140624121525.GM13803@lee--X1>
-References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
- <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
- <53A9685E.9090501@ti.com> <53A96A1C.5030800@gmail.com>
- <20140624121525.GM13803@lee--X1>
-Message-ID: <53A96D68.8070303@gmail.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Tue, 24 Jun 2014 17:49:12 +0530
+Subject: [PATCH 0/4] hwmon: ntc_thermistor: prepose vendor prefix change
+Message-ID: <1403612356-23685-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 05:45 PM, Lee Jones wrote:
-> On Tue, 24 Jun 2014, Varka Bhadram wrote:
->> On 06/24/2014 05:30 PM, Kishon Vijay Abraham I wrote:
->>> On Monday 16 June 2014 03:56 PM, Antoine T?nart wrote:
->>>> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
->>>>
->>>> The mode selection can let us think this PHY can be configured to fit
->>>> other purposes. But there are reasons to think the SATA mode will be
->>>> the only one usable: the PHY registers are only accessible indirectly
->>>> through two registers in the SATA range, the PHY seems to be integrated
->>>> and no information tells us the contrary. For these reasons, make the
->>>> driver a SATA PHY driver.
->>>>
->>>> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
->>>> ---
->>>>   drivers/phy/Kconfig           |   7 ++
->>>>   drivers/phy/Makefile          |   1 +
->>>>   drivers/phy/phy-berlin-sata.c | 232 ++++++++++++++++++++++++++++++++++++++++++
->>>>   3 files changed, 240 insertions(+)
->>>>   create mode 100644 drivers/phy/phy-berlin-sata.c
+As Murata is the manufacturer of the NTC (Negative Temperature coefficient)
+based Thermistors. ntc_thermistor driver extensively used the prefix "ntc".
+But, vendor-prefix should be "murata" instead of "ntc".
 
-[...]
+This patchset
+1. Updates the vendor-prefix, DT bindings and Documentation,
+   where ever necessary.
+2. Adds thermistor nodes to Exynos5420 and Exynos5800 based boards.
 
->>>> +static struct platform_driver phy_berlin_sata_driver = {
->>>> +	.probe	= phy_berlin_sata_probe,
->>>> +	.driver	= {
->>>> +		.name		= "phy-berlin-sata",
->>>> +		.owner		= THIS_MODULE,
->>>> +		.of_match_table	= phy_berlin_sata_of_match,
->> use of_match_ptr for of_match_table
-> What use is this?
->
-> [...]
->
-of_match_table is NULL for Non-DT based. Better to use the of_match_ptr().
-If driver is DT based 'of_match_table	= phy_berlin_sata_of_match'
-else 'of_match_table	= NULL'
+Patches:
+1/4. devicetree: bindings: Document murata vendor prefix
+     Adds the vendor prefix "murata" to vendor-prefixes.txt.
+2/4. hwmon: ntc_thermistor: Use the manufacturer name properly
+     Updates the driver, Kconfig, device tree bindings and Documentation
+     with the Manufacturer/vendor information.
+3/4. ARM: DTS: use new compatible string as per the documentation
+     Updates the device node in Exynos4412 based Trats2 board
+     with the new device tree bindings.
+4/4. ARM: DTS: Add NTC thermistor nodes as child nodes to ADC
+     Adds Thermistor nodes to Exynos5420 and Exynos5800 based boards.
 
-This is take care by of_match_ptr() macro.
+This patchset
+Naveen Krishna Chatradhi (4):
+  devicetree: bindings: Document murata vendor prefix
+  hwmon: ntc_thermistor: Use the manufacturer name properly
+  ARM: DTS: Add NTC thermistor nodes as child nodes to ADC
+  ARM: DTS: use new compatible string as per the documentation
 
-Thanks,
-Varka Bhadram
+ .../devicetree/bindings/arm/samsung/exynos-adc.txt |    2 +-
+ .../devicetree/bindings/hwmon/ntc_thermistor.txt   |   12 ++++----
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ Documentation/hwmon/ntc_thermistor                 |    8 ++---
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    4 +--
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |   32 ++++++++++++++++++++
+ drivers/hwmon/Kconfig                              |    5 +--
+ drivers/hwmon/ntc_thermistor.c                     |   12 ++++----
+ 8 files changed, 55 insertions(+), 21 deletions(-)
+
+-- 
+1.7.9.5
