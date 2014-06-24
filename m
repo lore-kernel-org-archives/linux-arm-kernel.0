@@ -1,44 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Jun 2014 15:51:53 +0100
-Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <4274516.nCpbjAuUJp@wuerfel>
-References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
- <6599289.0ZjjaMbRqj@wuerfel> <20140624124634.GO13803@lee--X1>
- <4274516.nCpbjAuUJp@wuerfel>
-Message-ID: <20140624145153.GQ13803@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jun 2014 16:56:23 +0200
+Subject: VFP handling in multiplatform feroceon kernels
+In-Reply-To: <alpine.LFD.2.11.1406241016340.16842@knanqh.ubzr>
+References: <7416978.W29blLsymn@wuerfel> <20140624141056.GD4489@arm.com>
+ <alpine.LFD.2.11.1406241016340.16842@knanqh.ubzr>
+Message-ID: <6810513.25mgpAfEFf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jun 2014, Arnd Bergmann wrote:
-> On Tuesday 24 June 2014 13:46:34 Lee Jones wrote:
-> > > > > > converting all addresses to to resources so drivers can easily pull
-> > > > > > them out using platform_get_resource() and friends.  Pushing the reg
-> > > > > 
-> > > > > right. Can't we use of_address_to_resource here?
-> > > > 
-> > > > We could, but that would be an extra layer.  We'd be pulling the
-> > > > address, putting it into a resource, then pulling it from the resource
-> > > > for use.  If we're going to be pulling addresses out manually, we're
-> > > > probably better off using of_get_address().  But again, we're just
-> > > > carrying out functionality which is already provided by the
-> > > > framework.
-> > > 
-> > > there is also of_ioremap().
-> > 
-> > Isn't this SPARK only?  And doesn't it require a populated resource?  
-> > Which is what I'm saying is the issue here i.e. we don't have one.
+On Tuesday 24 June 2014 10:49:23 Nicolas Pitre wrote:
+> > You don't even need to branch to out of line assembly, just branch over
+> > the imprecise VFP abort handling in arch/arm/vfp/vfphw.S.
 > 
-> Sorry, I meant of_iomap(). I think it's only for historic reaons
-> that we have both. Probably of_iomap started out on powerpc with
-> the same intention as the sparc of_ioremap.
+> Even better.  I looked too quickly at the patch seeing a #ifdef while it 
+> is in fact #ifndef.
 > 
-> of_iomap does not require a resource, just an index.
+> What about something like this?
+> 
 
-Ah, this sounds like a better solution.  I'll have a play, thanks.
+I should have posted the entire original patch. There are in fact three
+#ifndef that were introduced there, two in vfphw.S and one in vfpmodule.c,
+so it needs to be slightly more verbose, but the principle seems right.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
