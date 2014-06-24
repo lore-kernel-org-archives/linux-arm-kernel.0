@@ -1,57 +1,32 @@
 From: dianders@google.com (Doug Anderson)
-Date: Tue, 24 Jun 2014 15:59:17 -0700
-Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
- always enabled
-In-Reply-To: <CAC5m3Bwj1HEWSQd7rx6Zn5vbUPKFqeT_X0PL3mAxRw0FNkK=QQ@mail.gmail.com>
+Date: Tue, 24 Jun 2014 16:00:38 -0700
+Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
+ Exynos5420
+In-Reply-To: <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
 References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
- <7ha99jjspt.fsf@paris.lan>
- <CAC5m3Bwj1HEWSQd7rx6Zn5vbUPKFqeT_X0PL3mAxRw0FNkK=QQ@mail.gmail.com>
-Message-ID: <CAD=FV=VP4-+B6oV8Skb3rxxPRbOWmzu=6PJbWbxCU=86ZvRuYQ@mail.gmail.com>
+ <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
+Message-ID: <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tushar,
 
-On Thu, Jun 12, 2014 at 12:40 AM, Tushar Behera <tushar.b@samsung.com> wrote:
-> On Wed, Jun 11, 2014 at 10:20 PM, Kevin Hilman <khilman@linaro.org> wrote:
->> Tushar Behera <tushar.b@samsung.com> writes:
->>
->>> When the output clock of AUDSS mux is disabled, we are getting kernel
->>> oops while doing a clk_get() on other clocks provided by AUDSS.
->>>
->>> Though user manual doesn't specify this dependency, we came across
->>> this issue while disabling the parent of AUDSS mux clocks.
->>>
->>> Keeping the parents of AUDSS mux always enabled fixes this issue.
->>
->> While this patch works (and fixes the boot problem for me), it seems
->> like it's papering over the real problem.
->>
+On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
+> Currently CLK_FOUT_EPLL was set as one of the parents of AUDSS mux.
+> As per the user manual, it should be CLK_MAU_EPLL.
 >
-> Thanks for testing.
+> The problem surfaced when the bootloader in Peach-pit board set
+> the EPLL clock as the parent of AUDSS mux. While booting the kernel,
+> we used to get a system hang during late boot if CLK_MAU_EPLL was
+> disabled.
 >
->> Seems like the right fix is actually modelling the clocks properly so
->> that enabling a child clock ensures that the parent is also enabled.
->>
->
-> Patch 2/3 was to ensure we have proper clock tree defined for
-> Exynos5420. While testing with audio disabled, that patch alone fixed
-> the issue. But when audio was enabled (and hence I2S0 was trying to
-> access the clocks), we got some kernel oops during late booting, hence
-> I came up this solution.
->
-> The solution might be a little half-baked because of the urgency to
-> push the fix, but will try to dig more into the issue on Monday when I
-> resume office.
+> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> Reported-by: Kevin Hilman <khilman@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Which Monday were you referring to?  ;)
+I've tested this myself now as well.
 
-...but in all seriousness do you have an official status update on
-this patch?  It seems as if it's not needed and all you need is
-<https://patchwork.kernel.org/patch/4333581/>, but it would be nice to
-get an official confirmation.
-
-Thanks!
-
--Doug
+Tested-by: Doug Anderson <dianders@chromium.org>
