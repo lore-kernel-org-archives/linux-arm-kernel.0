@@ -1,52 +1,237 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Jun 2014 16:51:34 +0100
-Subject: [PATCHv4 1/4] arm64: head.S: remove unnecessary function alignment
+Date: Tue, 24 Jun 2014 16:51:36 +0100
+Subject: [PATCHv4 3/4] arm64: Update the Image header
 In-Reply-To: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
 References: <1403625097-18235-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1403625097-18235-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403625097-18235-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently __turn_mmu_on is aligned to 64 bytes to ensure that it doesn't
-span any page boundary, which simplifies the idmap and spares us
-requiring an additional page table to map half of the function. In
-keeping with other important requirements in architecture code, this
-fact is undocumented.
+Currently the kernel Image is stripped of everything past the initial
+stack, and at runtime the memory is initialised and used by the kernel.
+This makes the effective minimum memory footprint of the kernel larger
+than the size of the loaded binary, though bootloaders have no mechanism
+to identify how large this minimum memory footprint is. This makes it
+difficult to choose safe locations to place both the kernel and other
+binaries required at boot (DTB, initrd, etc), such that the kernel won't
+clobber said binaries or other reserved memory during initialisation.
 
-Additionally, as the function consists of three instructions totalling
-12 bytes with no literal pool data, a smaller alignment of 16 bytes
-would be sufficient.
+Additionally when big endian support was added the image load offset was
+overlooked, and is currently of an arbitrary endianness, which makes it
+difficult for bootloaders to make use of it. It seems that bootloaders
+aren't respecting the image load offset at present anyway, and are
+assuming that offset 0x80000 will always be correct.
 
-This patch reduces the alignment to 16 bytes and documents the
-underlying reason for the alignment. This reduces the required alignment
-of the entire .head.text section from 64 bytes to 16 bytes, though it
-may still be aligned to a larger value depending on TEXT_OFFSET.
+This patch adds an effective image size to the kernel header which
+describes the amount of memory from the start of the kernel Image binary
+which the kernel expects to use before detecting memory and handling any
+memory reservations. This can be used by bootloaders to choose suitable
+locations to load the kernel and/or other binaries such that the kernel
+will not clobber any memory unexpectedly. As before, memory reservations
+are required to prevent the kernel from clobbering these locations
+later.
+
+Both the image load offset and the effective image size are forced to be
+little-endian regardless of the native endianness of the kernel to
+enable bootloaders to load a kernel of arbitrary endianness. Bootloaders
+which wish to make use of the load offset can inspect the effective
+image size field for a non-zero value to determine if the offset is of a
+known endianness. To enable software to determine the endinanness of the
+kernel as may be required for certain use-cases, a new flags field (also
+little-endian) is added to the kernel header to export this information.
+
+The documentation is updated to clarify these details. To discourage
+future assumptions regarding the value of text_offset, the value at this
+point in time is removed from the main flow of the documentation (though
+kept as a compatibility note). Some minor formatting issues in the
+documentation are also corrected.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Laura Abbott <lauraa@codeaurora.org>
+Acked-by: Tom Rini <trini@ti.com>
+Cc: Geoff Levand <geoff@infradead.org>
+Cc: Kevin Hilman <kevin.hilman@linaro.org>
 Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/head.S | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ Documentation/arm64/booting.txt | 43 ++++++++++++++++++++++------
+ arch/arm64/kernel/head.S        |  6 ++--
+ arch/arm64/kernel/image.h       | 62 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S |  4 +++
+ 4 files changed, 104 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/kernel/image.h
 
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 37fc4f6..85af34d 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -72,27 +72,54 @@ The decompressed kernel image contains a 64-byte header as follows:
+ 
+   u32 code0;			/* Executable code */
+   u32 code1;			/* Executable code */
+-  u64 text_offset;		/* Image load offset */
+-  u64 res0	= 0;		/* reserved */
+-  u64 res1	= 0;		/* reserved */
++  u64 text_offset;		/* Image load offset, little endian */
++  u64 image_size;		/* Effective Image size, little endian */
++  u64 flags;			/* kernel flags, little endian */
+   u64 res2	= 0;		/* reserved */
+   u64 res3	= 0;		/* reserved */
+   u64 res4	= 0;		/* reserved */
+   u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
+-  u32 res5 = 0;      		/* reserved */
++  u32 res5;      		/* reserved (used for PE COFF offset) */
+ 
+ 
+ Header notes:
+ 
++- As of v3.17, all fields are little endian unless stated otherwise.
++
+ - code0/code1 are responsible for branching to stext.
++
+ - when booting through EFI, code0/code1 are initially skipped.
+   res5 is an offset to the PE header and the PE header has the EFI
+-  entry point (efi_stub_entry). When the stub has done its work, it
++  entry point (efi_stub_entry).  When the stub has done its work, it
+   jumps to code0 to resume the normal boot process.
+ 
+-The image must be placed at the specified offset (currently 0x80000)
+-from the start of the system RAM and called there. The start of the
+-system RAM must be aligned to 2MB.
++- Prior to v3.17, the endianness of text_offset was not specified.  In
++  these cases image_size is zero and text_offset is 0x80000 in the
++  endianness of the kernel.  Where image_size is non-zero image_size is
++  little-endian and must be respected.  Where image_size is zero,
++  text_offset can be assumed to be 0x80000.
++
++- The flags field (introduced in v3.17) is a little-endian 64-bit field
++  composed as follows:
++  Bit 0: 	Kernel endianness.  1 if BE, 0 if LE.
++  Bits 1-63:	Reserved.
++
++- When image_size is zero, a bootloader should attempt to keep as much
++  memory as possible free for use by the kernel immediately after the
++  end of the kernel image. The amount of space required will vary
++  depending on selected features, and is effectively unbound.
++
++The Image must be placed text_offset bytes from a 2MB aligned base
++address near the start of usable system RAM and called there. Memory
++below that base address is currently unusable by Linux, and therefore it
++is strongly recommended that this location is the start of system RAM.
++At least image_size bytes from the start of the image must be free for
++use by the kernel.
++
++Any memory described to the kernel (even that below the 2MB aligned base
++address) which is not marked as reserved from the kernel e.g. with a
++memreserve region in the device tree) will be considered as available to
++the kernel.
+ 
+ Before jumping into the kernel, the following conditions must be met:
+ 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index a96d3a6..7ec7817 100644
+index e048f2b..7b59c3d 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -456,8 +456,13 @@ ENDPROC(__enable_mmu)
-  *  x27 = *virtual* address to jump to upon completion
-  *
-  * other registers depend on the function called upon completion
+@@ -108,9 +108,9 @@ efi_head:
+ 	b	stext				// branch to kernel start, magic
+ 	.long	0				// reserved
+ #endif
+-	.quad	TEXT_OFFSET			// Image load offset from start of RAM
+-	.quad	0				// reserved
+-	.quad	0				// reserved
++	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
++	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
++	.quad	_kernel_flags_le		// Informative flags, little-endian
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+new file mode 100644
+index 0000000..8fae075
+--- /dev/null
++++ b/arch/arm64/kernel/image.h
+@@ -0,0 +1,62 @@
++/*
++ * Linker script macros to generate Image header fields.
 + *
-+ * We align the entire function to the smallest power of two larger than it to
-+ * ensure it fits within a single block map entry. Otherwise were PHYS_OFFSET
-+ * close to the end of a 512MB or 1GB block we might require an additional
-+ * table to map the entire function.
-  */
--	.align	6
-+	.align	4
- __turn_mmu_on:
- 	msr	sctlr_el1, x0
- 	isb
++ * Copyright (C) 2014 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_IMAGE_H
++#define __ASM_IMAGE_H
++
++#ifndef LINKER_SCRIPT
++#error This file should only be included in vmlinux.lds.S
++#endif
++
++/*
++ * There aren't any ELF relocations we can use to endian-swap values known only
++ * at link time (e.g. the subtraction of two symbol addresses), so we must get
++ * the linker to endian-swap certain values before emitting them.
++ */
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define DATA_LE64(data)					\
++	((((data) & 0x00000000000000ff) << 56) |	\
++	 (((data) & 0x000000000000ff00) << 40) |	\
++	 (((data) & 0x0000000000ff0000) << 24) |	\
++	 (((data) & 0x00000000ff000000) << 8)  |	\
++	 (((data) & 0x000000ff00000000) >> 8)  |	\
++	 (((data) & 0x0000ff0000000000) >> 24) |	\
++	 (((data) & 0x00ff000000000000) >> 40) |	\
++	 (((data) & 0xff00000000000000) >> 56))
++#else
++#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
++#endif
++
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define __HEAD_FLAG_BE	1
++#else
++#define __HEAD_FLAG_BE	0
++#endif
++
++#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
++
++/*
++ * These will output as part of the Image header, which should be little-endian
++ * regardless of the endianness of the kernel. While constant values could be
++ * endian swapped in head.S, all are done here for consistency.
++ */
++#define HEAD_SYMBOLS						\
++	_kernel_size_le		= DATA_LE64(_end - _text);	\
++	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
++	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
++
++#endif /* __ASM_IMAGE_H */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index c6648d3..a814768 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -9,6 +9,8 @@
+ #include <asm/memory.h>
+ #include <asm/page.h>
+ 
++#include "image.h"
++
+ #define ARM_EXIT_KEEP(x)
+ #define ARM_EXIT_DISCARD(x)	x
+ 
+@@ -114,6 +116,8 @@ SECTIONS
+ 	_end = .;
+ 
+ 	STABS_DEBUG
++
++	HEAD_SYMBOLS
+ }
+ 
+ /*
 -- 
 1.9.1
