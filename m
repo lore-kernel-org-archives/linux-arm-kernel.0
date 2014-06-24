@@ -1,39 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Jun 2014 10:23:09 +0100
-Subject: [RESEND PATCH 0/6] thermal: sti: Add new Thermal driver
-In-Reply-To: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
-References: <1401980819-19962-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140624092309.GD13803@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jun 2014 11:27:45 +0200
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <53A8A084.3000005@roeck-us.net>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140623213046.GR22347@spo001.leaseweb.com> <53A8A084.3000005@roeck-us.net>
+Message-ID: <20298828.cYNPnTRxWX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm re-sending this set, as one of the maintainers' email addresses
-> is incorrect in the MAINTAINERS file.
+On Monday 23 June 2014 14:47:48 Guenter Roeck wrote:
+> > To continue the discussion: I would like to add an excerpt from drivers/watchdog/alim7101_wdt.c
+> > /*
+> >   *      Notifier for system down
+> >   */
+> >
+> > static int wdt_notify_sys(struct notifier_block *this,
+> >                                          unsigned long code, void *unused)
+> > {
+> >          if (code == SYS_DOWN || code == SYS_HALT)
+> >                  wdt_turnoff();
+> >
+> >          if (code == SYS_RESTART) {
+> >                  /*
+> >                   * Cobalt devices have no way of rebooting themselves other
+> >                   * than getting the watchdog to pull reset, so we restart the
+> >                   * watchdog on reboot with no heartbeat
+> >                   */
+> >                  wdt_change(WDT_ENABLE);
+> >                  pr_info("Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second\n");
+> >          }
+> >          return NOTIFY_DONE;
+> > }
+> >
+> > For some systems the watchdog is the only way to reboot... So where we should put it, is not trivial neither...
+> >
 > 
-> This patchset adds full support for 2 types of Thermal Controllers
-> produced by STMicroelectronics.  One is a more traditional memory
-> mapped variant, the other is controlled solely by system configuration
-> registers.
-
-Any thing from the Thermal guys? Has this set fallen through the gaps?
-
->  Documentation/devicetree/bindings/thermal/st-thermal.txt |  42 ++++++++++++++++
->  arch/arm/boot/dts/stih416.dtsi                           |  18 +++++++
->  arch/arm/configs/multi_v7_defconfig                      |   2 +
->  drivers/thermal/Kconfig                                  |   5 ++
->  drivers/thermal/Makefile                                 |   1 +
->  drivers/thermal/st/Kconfig                               |  12 +++++
->  drivers/thermal/st/Makefile                              |   3 ++
->  drivers/thermal/st/st_thermal.c                          | 313 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> ++++++++++++++++++++++++++++
->  drivers/thermal/st/st_thermal.h                          | 104 ++++++++++++++++++++++++++++++++++++++
->  drivers/thermal/st/st_thermal_memmap.c                   | 209 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/thermal/st/st_thermal_syscfg.c                   | 179 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  11 files changed, 888 insertions(+)
+> Agreed. The above definitely doesn't look like a good solution to me.
 > 
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Right, at the very least, it should be a separate notifier: the existing
+reboot_notifier is meant for things that need to happen /before/ reboot,
+so adding something in there to actually trigger the reboot is by definition
+racy against the other notifiers that may or may not get called after
+this one.
+
+	Arnd
