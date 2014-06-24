@@ -1,54 +1,55 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Jun 2014 00:11:10 -0400
-Subject: [PATCH 2/3] ARM: TC2: test the MCPM loopback during boot
+Date: Tue, 24 Jun 2014 00:11:11 -0400
+Subject: [PATCH 3/3] ARM: exynos: activate the CCI on boot CPU/cluster with the
+ MCPM loopback
 In-Reply-To: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1403583071-5650-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1403583071-5650-4-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not strictly needed on TC2 but still a good thing to exercise
-that code.
+The Chromebook firmware doesn't enable the CCI for the boot cpu, and
+arguably it shouldn't have to either. Let's have the kernel handle the
+CCI on its own for the boot CPU the same way it does it for secondary CPUs
+by using the MCPM loopback.
 
-Signed-off-by: nicolas Pitre <nico@linaro.org>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mach-vexpress/tc2_pm.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/mach-exynos/mcpm-exynos.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index b743a0ae02..54a9fff77c 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -323,6 +323,21 @@ static void __naked tc2_pm_power_up_setup(unsigned int affinity_level)
- "	b	cci_enable_port_for_self ");
+diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+index 0498d0b887..0c839f94ec 100644
+--- a/arch/arm/mach-exynos/mcpm-exynos.c
++++ b/arch/arm/mach-exynos/mcpm-exynos.c
+@@ -290,6 +290,19 @@ static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+ 	"b	cci_enable_port_for_self");
  }
  
-+static void __init tc2_cache_off(void)
++static void __init exynos_cache_off(void)
 +{
-+	pr_info("TC2: disabling cache during MCPM loopback test\n");
 +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A15) {
 +		/* disable L2 prefetching on the Cortex-A15 */
 +		asm volatile(
-+		"mcr	p15, 1, %0, c15, c0, 3 \n\t"
-+		"isb	\n\t"
-+		"dsb	"
-+		: : "r" (0x400) );
++		"mcr	p15, 1, %0, c15, c0, 3\n\t"
++		"isb\n\t"
++		"dsb"
++		: : "r" (0x400));
 +	}
-+	v7_exit_coherency_flush(all);
-+	cci_disable_port_by_cpu(read_cpuid_mpidr());
++	exynos_v7_exit_coherency_flush(all);
 +}
 +
- static int __init tc2_pm_init(void)
- {
- 	int ret, irq;
-@@ -370,6 +385,8 @@ static int __init tc2_pm_init(void)
- 	ret = mcpm_platform_register(&tc2_pm_power_ops);
- 	if (!ret) {
- 		mcpm_sync_init(tc2_pm_power_up_setup);
-+		/* test if we can (re)enable the CCI on our own */
-+		BUG_ON(mcpm_loopback(tc2_cache_off) != 0);
- 		pr_info("TC2 power management initialized\n");
- 	}
- 	return ret;
+ static const struct of_device_id exynos_dt_mcpm_match[] = {
+ 	{ .compatible = "samsung,exynos5420" },
+ 	{ .compatible = "samsung,exynos5800" },
+@@ -333,6 +346,8 @@ static int __init exynos_mcpm_init(void)
+ 	ret = mcpm_platform_register(&exynos_power_ops);
+ 	if (!ret)
+ 		ret = mcpm_sync_init(exynos_pm_power_up_setup);
++	if (!ret)
++		ret = mcpm_loopback(exynos_cache_off); /* turn on the CCI */
+ 	if (ret) {
+ 		iounmap(ns_sram_base_addr);
+ 		return ret;
 -- 
 1.8.4.108.g55ea5f6
