@@ -1,162 +1,103 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 24 Jun 2014 18:08:24 +0200
-Subject: [PATCH v2 1/4] clk: samsung: exynos4: Add missing CPU/DMC clock
- hierarchy
-In-Reply-To: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
-References: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403626107-12073-2-git-send-email-t.figa@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Jun 2014 17:11:14 +0100
+Subject: [PATCH] arm: exynos: Modify pm code to check for cortex A9
+ rather than the SoC
+In-Reply-To: <CAM4voa=3zzo-2KbjDtBOca+uJeSxT2OYpi+rJuSGsDg-vo7GYA@mail.gmail.com>
+References: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voa=3zzo-2KbjDtBOca+uJeSxT2OYpi+rJuSGsDg-vo7GYA@mail.gmail.com>
+Message-ID: <20140624161114.GW32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing definitions of clocks from CPU and DMC clock
-domains, which are necessary to properly represent CLKOUT clock hierarchy
-added in further patch.
+On Mon, Jun 16, 2014 at 09:37:14AM +0530, Abhilash Kesavan wrote:
+> Hi Kukjin,
+> 
+> On Fri, May 23, 2014 at 8:31 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> 
+> Do you have any comments on this patch ?
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- drivers/clk/samsung/clk-exynos4.c | 50 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+I do.
 
-diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 4f150c9..f95ae6c 100644
---- a/drivers/clk/samsung/clk-exynos4.c
-+++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -397,10 +397,15 @@ PNAME(mout_audio2_p4210) = { "cdclk2", "none", "sclk_hdmi24m",
- 				"sclk_epll", "sclk_vpll", };
- PNAME(mout_mixer_p4210)	= { "sclk_dac", "sclk_hdmi", };
- PNAME(mout_dac_p4210)	= { "sclk_vpll", "sclk_hdmiphy", };
-+PNAME(mout_pwi_p4210) = { "xxti", "xusbxti", "sclk_hdmi24m", "sclk_usbphy0",
-+				"sclk_usbphy1", "sclk_hdmiphy", "none",
-+				"sclk_epll", "sclk_vpll" };
- 
- /* Exynos 4x12-specific parent groups */
- PNAME(mout_mpll_user_p4x12) = { "fin_pll", "sclk_mpll", };
- PNAME(mout_core_p4x12)	= { "mout_apll", "mout_mpll_user_c", };
-+PNAME(mout_gdl_p4x12)	= { "mout_mpll_user_l", "sclk_apll", };
-+PNAME(mout_gdr_p4x12)	= { "mout_mpll_user_r", "sclk_apll", };
- PNAME(sclk_ampll_p4x12)	= { "mout_mpll_user_t", "sclk_apll", };
- PNAME(group1_p4x12)	= { "xxti", "xusbxti", "sclk_hdmi24m", "sclk_usbphy0",
- 				"none",	"sclk_hdmiphy", "mout_mpll_user_t",
-@@ -418,6 +423,9 @@ PNAME(aclk_p4412)	= { "mout_mpll_user_t", "sclk_apll", };
- PNAME(mout_user_aclk400_mcuisp_p4x12) = {"fin_pll", "div_aclk400_mcuisp", };
- PNAME(mout_user_aclk200_p4x12) = {"fin_pll", "div_aclk200", };
- PNAME(mout_user_aclk266_gps_p4x12) = {"fin_pll", "div_aclk266_gps", };
-+PNAME(mout_pwi_p4x12) = { "xxti", "xusbxti", "sclk_hdmi24m", "sclk_usbphy0",
-+				"none", "sclk_hdmiphy", "sclk_mpll",
-+				"sclk_epll", "sclk_vpll" };
- 
- /* fixed rate clocks generated outside the soc */
- static struct samsung_fixed_rate_clock exynos4_fixed_rate_ext_clks[] __initdata = {
-@@ -451,6 +459,9 @@ static struct samsung_mux_clock exynos4_mux_clks[] __initdata = {
- 	MUX(0, "mout_onenand1", mout_onenand1_p, SRC_TOP0, 0, 1),
- 	MUX(CLK_SCLK_EPLL, "sclk_epll", mout_epll_p, SRC_TOP0, 4, 1),
- 	MUX(0, "mout_onenand", mout_onenand_p, SRC_TOP0, 28, 1),
-+
-+	MUX(0, "mout_dmc_bus", sclk_ampll_p4210, SRC_DMC, 4, 1),
-+	MUX(0, "mout_dphy", sclk_ampll_p4210, SRC_DMC, 8, 1),
- };
- 
- /* list of mux clocks supported in exynos4210 soc */
-@@ -459,6 +470,10 @@ static struct samsung_mux_clock exynos4210_mux_early[] __initdata = {
- };
- 
- static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
-+	MUX(0, "mout_gdl", sclk_ampll_p4210, SRC_LEFTBUS, 0, 1),
-+
-+	MUX(0, "mout_gdr", sclk_ampll_p4210, SRC_RIGHTBUS, 0, 1),
-+
- 	MUX(0, "mout_aclk200", sclk_ampll_p4210, SRC_TOP0, 12, 1),
- 	MUX(0, "mout_aclk100", sclk_ampll_p4210, SRC_TOP0, 16, 1),
- 	MUX(0, "mout_aclk160", sclk_ampll_p4210, SRC_TOP0, 20, 1),
-@@ -472,6 +487,7 @@ static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
- 	MUX(0, "mout_mipi1", group1_p4210, E4210_SRC_LCD1, 12, 4),
- 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_CPU, 8, 1),
- 	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4210, SRC_CPU, 16, 1),
-+	MUX(0, "mout_hpm", mout_core_p4210, SRC_CPU, 20, 1),
- 	MUX(CLK_SCLK_VPLL, "sclk_vpll", sclk_vpll_p4210, SRC_TOP0, 8, 1),
- 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4210, SRC_CAM, 0, 4),
- 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4210, SRC_CAM, 4, 4),
-@@ -503,10 +519,18 @@ static struct samsung_mux_clock exynos4210_mux_clks[] __initdata = {
- 	MUX(0, "mout_spi0", group1_p4210, SRC_PERIL1, 16, 4),
- 	MUX(0, "mout_spi1", group1_p4210, SRC_PERIL1, 20, 4),
- 	MUX(0, "mout_spi2", group1_p4210, SRC_PERIL1, 24, 4),
-+
-+	MUX(0, "mout_pwi", mout_pwi_p4210, SRC_DMC, 16, 4),
- };
- 
- /* list of mux clocks supported in exynos4x12 soc */
- static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
-+	MUX(0, "mout_mpll_user_l", mout_mpll_p, SRC_LEFTBUS, 4, 1),
-+	MUX(0, "mout_gdl", mout_gdl_p4x12, SRC_LEFTBUS, 0, 1),
-+
-+	MUX(0, "mout_mpll_user_r", mout_mpll_p, SRC_RIGHTBUS, 4, 1),
-+	MUX(0, "mout_gdr", mout_gdr_p4x12, SRC_RIGHTBUS, 0, 1),
-+
- 	MUX(CLK_MOUT_MPLL_USER_C, "mout_mpll_user_c", mout_mpll_user_p4x12,
- 			SRC_CPU, 24, 1),
- 	MUX(0, "mout_aclk266_gps", aclk_p4412, SRC_TOP1, 4, 1),
-@@ -531,6 +555,7 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
- 	MUX(CLK_SCLK_MPLL, "sclk_mpll", mout_mpll_p, SRC_DMC, 12, 1),
- 	MUX(CLK_SCLK_VPLL, "sclk_vpll", mout_vpll_p, SRC_TOP0, 8, 1),
- 	MUX(CLK_MOUT_CORE, "mout_core", mout_core_p4x12, SRC_CPU, 16, 1),
-+	MUX(0, "mout_hpm", mout_core_p4x12, SRC_CPU, 20, 1),
- 	MUX(CLK_MOUT_FIMC0, "mout_fimc0", group1_p4x12, SRC_CAM, 0, 4),
- 	MUX(CLK_MOUT_FIMC1, "mout_fimc1", group1_p4x12, SRC_CAM, 4, 4),
- 	MUX(CLK_MOUT_FIMC2, "mout_fimc2", group1_p4x12, SRC_CAM, 8, 4),
-@@ -565,6 +590,8 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
- 	MUX(0, "mout_spi0_isp", group1_p4x12, E4X12_SRC_ISP, 4, 4),
- 	MUX(0, "mout_spi1_isp", group1_p4x12, E4X12_SRC_ISP, 8, 4),
- 	MUX(0, "mout_uart_isp", group1_p4x12, E4X12_SRC_ISP, 12, 4),
-+	MUX(0, "mout_c2c", sclk_ampll_p4210, SRC_DMC, 0, 1),
-+	MUX(0, "mout_pwi", mout_pwi_p4x12, SRC_DMC, 16, 4),
- 	MUX(0, "mout_g2d0", sclk_ampll_p4210, SRC_DMC, 20, 1),
- 	MUX(0, "mout_g2d1", sclk_evpll_p, SRC_DMC, 24, 1),
- 	MUX(0, "mout_g2d", mout_g2d_p, SRC_DMC, 28, 1),
-@@ -572,8 +599,21 @@ static struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
- 
- /* list of divider clocks supported in all exynos4 soc's */
- static struct samsung_div_clock exynos4_div_clks[] __initdata = {
-+	DIV(0, "div_gdl", "mout_gdl", DIV_LEFTBUS, 0, 3),
-+	DIV(0, "div_gpl", "div_gdl", DIV_LEFTBUS, 4, 3),
-+
-+	DIV(0, "div_gdr", "mout_gdr", DIV_RIGHTBUS, 0, 3),
-+	DIV(0, "div_gpr", "div_gdr", DIV_RIGHTBUS, 4, 3),
-+
- 	DIV(0, "div_core", "mout_core", DIV_CPU0, 0, 3),
-+	DIV(0, "div_corem0", "div_core2", DIV_CPU0, 4, 3),
-+	DIV(0, "div_corem1", "div_core2", DIV_CPU0, 8, 3),
-+	DIV(0, "div_periph", "div_core2", DIV_CPU0, 12, 3),
-+	DIV(0, "div_atb", "mout_core", DIV_CPU0, 16, 3),
-+	DIV(0, "div_pclk_dbg", "div_atb", DIV_CPU0, 20, 3),
- 	DIV(0, "div_core2", "div_core", DIV_CPU0, 28, 3),
-+	DIV(0, "div_copy", "mout_hpm", DIV_CPU1, 0, 3),
-+	DIV(0, "div_hpm", "div_copy", DIV_CPU1, 4, 3),
- 	DIV(0, "div_fimc0", "mout_fimc0", DIV_CAM, 0, 4),
- 	DIV(0, "div_fimc1", "mout_fimc1", DIV_CAM, 4, 4),
- 	DIV(0, "div_fimc2", "mout_fimc2", DIV_CAM, 8, 4),
-@@ -631,6 +671,14 @@ static struct samsung_div_clock exynos4_div_clks[] __initdata = {
- 			CLK_SET_RATE_PARENT, 0),
- 	DIV_F(0, "div_mmc_pre3", "div_mmc3", DIV_FSYS2, 24, 8,
- 			CLK_SET_RATE_PARENT, 0),
-+
-+	DIV(0, "div_acp", "mout_dmc_bus", DIV_DMC0, 0, 3),
-+	DIV(0, "div_acp_pclk", "div_acp", DIV_DMC0, 4, 3),
-+	DIV(0, "div_dphy", "mout_dphy", DIV_DMC0, 8, 3),
-+	DIV(0, "div_dmc", "mout_dmc_bus", DIV_DMC0, 12, 3),
-+	DIV(0, "div_dmcd", "div_dmc", DIV_DMC0, 16, 3),
-+	DIV(0, "div_dmcp", "div_dmcd", DIV_DMC0, 20, 3),
-+	DIV(0, "div_pwi", "mout_pwi", DIV_DMC1, 8, 4),
- };
- 
- /* list of divider clocks supported in exynos4210 soc */
-@@ -671,6 +719,8 @@ static struct samsung_div_clock exynos4x12_div_clks[] __initdata = {
- 	DIV_F(CLK_DIV_MCUISP1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1,
- 						8, 3, CLK_GET_RATE_NOCACHE, 0),
- 	DIV(CLK_SCLK_FIMG2D, "sclk_fimg2d", "mout_g2d", DIV_DMC1, 0, 4),
-+	DIV(0, "div_c2c", "mout_c2c", DIV_DMC1, 4, 3),
-+	DIV(0, "div_c2c_aclk", "div_c2c", DIV_DMC1, 12, 3),
- };
- 
- /* list of gate clocks supported in all exynos4 soc's */
+> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> > index d10c351..6dd4a11 100644
+> > --- a/arch/arm/mach-exynos/pm.c
+> > +++ b/arch/arm/mach-exynos/pm.c
+> > @@ -300,7 +300,7 @@ static int exynos_pm_suspend(void)
+> >         tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
+> >         __raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
+> >
+> > -       if (!soc_is_exynos5250())
+> > +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+> >                 exynos_cpu_save_register();
+...
+> > @@ -334,7 +334,7 @@ static void exynos_pm_resume(void)
+> >         if (exynos_pm_central_resume())
+> >                 goto early_wakeup;
+> >
+> > -       if (!soc_is_exynos5250())
+> > +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+> >                 exynos_cpu_restore_register();
+
+It is invalid to check just the part number.  The part number on its
+own is meaningless without taking account of the implementor.  Both
+the implementor and the part number should be checked at each of these
+sites.
+
+Another point: exynos have taken it upon themselves to add code which
+saves various ARM core registers.  This is a bad idea, it brings us
+back to the days where every platform did their own suspend implementations.
+
+CPU level registers should be handled by CPU level code, not by platform
+code.  Is there a reason why this can't be added to the Cortex-A9
+support code in proc-v7.S ?
+
+> > @@ -353,7 +353,7 @@ static void exynos_pm_resume(void)
+> >
+> >         s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+> >
+> > -       if (!soc_is_exynos5250())
+> > +       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+> >                 scu_enable(S5P_VA_SCU);
+> >
+> >  early_wakeup:
+> > @@ -440,15 +440,18 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+> >         case CPU_PM_ENTER:
+> >                 if (cpu == 0) {
+> >                         exynos_pm_central_suspend();
+> > -                       exynos_cpu_save_register();
+> > +                       if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+> > +                               exynos_cpu_save_register();
+> >                 }
+> >                 break;
+> >
+> >         case CPU_PM_EXIT:
+> >                 if (cpu == 0) {
+> > -                       if (!soc_is_exynos5250())
+> > +                       if (read_cpuid_part_number() ==
+> > +                                       ARM_CPU_PART_CORTEX_A9) {
+> >                                 scu_enable(S5P_VA_SCU);
+> > -                       exynos_cpu_restore_register();
+> > +                               exynos_cpu_restore_register();
+> > +                       }
+> >                         exynos_pm_central_resume();
+> >                 }
+> >                 break;
+
+And presumably with the CPU level code dealing with those registers,
+you don't need the calls to save and restore these registers in this
+notifier.
+
+Which, by the way, is probably illegal to run as it runs in a read-
+lock code path and with the SCU disabled.  As you're calling
+scu_enable() that means you're non-coherent with the other CPUs,
+and therefore locks don't work.
+
+I think this code is very broken and wrongly architected, and shows
+that we're continuing to make the same mistakes that we made all
+through the 2000s with platforms doing their own crap rather than
+properly thinking about this stuff.
+
 -- 
-1.9.3
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
