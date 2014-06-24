@@ -1,95 +1,84 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Jun 2014 10:49:23 -0400 (EDT)
-Subject: VFP handling in multiplatform feroceon kernels
-In-Reply-To: <20140624141056.GD4489@arm.com>
-References: <7416978.W29blLsymn@wuerfel> <20140624134249.GB4489@arm.com>
- <alpine.LFD.2.11.1406240956540.16842@knanqh.ubzr>
- <20140624141056.GD4489@arm.com>
-Message-ID: <alpine.LFD.2.11.1406241016340.16842@knanqh.ubzr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 24 Jun 2014 16:49:54 +0200
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <20140623211323.GA28120@spo001.leaseweb.com>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140507213318.GA2105@roeck-us.net>
+ <20140515091123.GQ29258@lukather> <20140519150422.GA27329@lukather>
+ <20140522203444.GE27329@lukather>
+ <20140522211207.GA28704@roeck-us.net>
+ <20140623103142.GB19730@lukather>
+ <20140623211323.GA28120@spo001.leaseweb.com>
+Message-ID: <20140624144954.GP19730@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jun 2014, Catalin Marinas wrote:
-
-> On Tue, Jun 24, 2014 at 03:04:14PM +0100, Nicolas Pitre wrote:
-> > On Tue, 24 Jun 2014, Catalin Marinas wrote:
-> > 
-> > > On Tue, Jun 24, 2014 at 02:17:06PM +0100, Arnd Bergmann wrote:
-> > > > Since 3.16, we have the ability to build a multiplatform kernel
-> > > > that includes both kirkwood (feroceon) and some other ARMv5 CPU.
-> > > > 
-> > > > I accidentally stumbled over a bug in the VFP code that looks
-> > > > like it will break at least ARM9 VFP support if CPU_FEROCEON
-> > > > is also enabled, introduced by this (old) commit:
-> > > 
-> > > I would argue that the bug is in the CPU (feroceon). See the end of this
-> > > email:
-> > > 
-> > > http://www.spinics.net/lists/arm-kernel/msg41460.html
-> > > 
-> > > and my follow-up. Basically you can't avoid the conditional compilation
-> > > as Feroceon doesn't follow the VFP sub-architecture spec and doesn't
-> > > present itself as a different CPU from an _ARM_ 9. Unless things have
-> > > changed with Marvell's hardware implementation and they got a new id, I
-> > > suggest you don't enable this for multi-platform.
-> > 
-> > Only the early revision did hijack the ARM9 ID but still. We certainly 
-> > can determine at run time if the platform being booted is equiped with a 
-> > Feroceon before user space is started.  In that case I'd suggest some 
-> > runtime code patching to branch to some out-of-line assembly code for 
-> > Feroceon.
+On Mon, Jun 23, 2014 at 11:13:24PM +0200, Wim Van Sebroeck wrote:
+> Hi Maxime,
 > 
-> You don't even need to branch to out of line assembly, just branch over
-> the imprecise VFP abort handling in arch/arm/vfp/vfphw.S.
+> > > > Guenter, since you seem to be the only responsive, may I suggest that
+> > > > you start merging patches and do a pull request to either Wim or Linus
+> > > > directly during the merge window?
+> > > > 
+> > > I had prepared a pull request for Wim last weekend or so, but then there
+> > > were more patches piling in and I got distracted, so I didn't have time
+> > > to actually send it. I'll try again this weekend ... the kids should be
+> > > busy learning for their finals, and I'll have Friday and Monday off
+> > > from work, so I should be able to find the time.
+> > > 
+> > > As for sending patches to Linus directly, well, Wim is the watchdog maintainer.
+> > > I manage to upset enough people, and would not want to add Wim to the list.
+> > > 
+> > > The patches _are_ in my watchdog-next branch and get some coverage from
+> > > both my auto-builders and from Fenguang's build robots, so while they are
+> > > not in linux-next, they are not completely in the dark either.
+> > 
+> > So, this patch finally didn't make it into 3.16. Great. Now, we can't
+> > even reboot the boards.
+> 
+> 1) For me the discussion was not ended and needs further
+> thinking. (And I just read some good ideas about it).
 
-Even better.  I looked too quickly at the patch seeing a #ifdef while it 
-is in fact #ifndef.
+It would have been great for you to mention it then.
 
-What about something like this?
+> 2) You never mentioned you needed this in for 3.16 and that things
+> would break because of it.
 
-diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
-index be807625ed..d46eb84884 100644
---- a/arch/arm/vfp/vfphw.S
-+++ b/arch/arm/vfp/vfphw.S
-@@ -115,7 +115,7 @@ ENTRY(vfp_support_entry)
- 	beq	vfp_reload_hw		@ then the hw state needs reloading
- 	VFPFSTMIA r4, r5		@ save the working registers
- 	VFPFMRX	r5, FPSCR		@ current status
--#ifndef CONFIG_CPU_FEROCEON
-+vfp_extra:
- 	tst	r1, #FPEXC_EX		@ is there additional state to save?
- 	beq	1f
- 	VFPFMRX	r6, FPINST		@ FPINST (only if FPEXC.EX is set)
-@@ -123,7 +123,6 @@ ENTRY(vfp_support_entry)
- 	beq	1f
- 	VFPFMRX	r8, FPINST2		@ FPINST2 if needed (and present)
- 1:
--#endif
- 	stmia	r4, {r1, r5, r6, r8}	@ save FPEXC, FPSCR, FPINST, FPINST2
- vfp_reload_hw:
- 
-@@ -219,6 +218,19 @@ process_exception:
- 					@ retry the faulted instruction
- ENDPROC(vfp_support_entry)
- 
-+#ifdef CONFIG_CPU_FEROCEON
-+ENTRY(vfp_feroceon_quirk)
-+	/* force a skip over the imprecise VFP abort handling */
-+	adr	r0, vfp_extra
-+	ldr	r1, .L_eq_insn
-+	str	r1, [r0]
-+	add	r1, r0, #4
-+	b	feroceon_coherent_kern_range
-+.L_eq_insn:
-+	teq	r0, r0
-+ENDPROC(vfp_feroceon_quirk)
-+#endif
-+
- ENTRY(vfp_save_state)
- 	@ Save the current VFP state
- 	@ r0 - save location
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257690.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/259109.html
 
-Then suffice to call vfp_feroceon_quirk() during boot when appropriate.
+I thought it was pretty clear.
 
+> 
+> So based on these 2 points why would I have to have put this in allready?
+> 
+> > Given how it's just impossible to get something merged reliably
+> > through the watchdog tree, I guess I should just start merging the
+> > patches through mine?
+> 
+> I agree that I have the problem of having only 24 hours in a day and
+> that I lack time to communicate and that I am not good at
+> communicating either, but I checked all sunxi related e-mails and
+> you never mentioned the constraint to have it in for 3.16...  But I
+> do understand your frustration.
 
-Nicolas
+I totally understand the lack of time. A good way to ease your burden
+and solve this situation is usually to take a co-maintainer. And given
+that Guenter already reviews patches, maintains some branch, and is
+developping some part of the framework, he seems up to the task.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140624/65ffa770/attachment.sig>
