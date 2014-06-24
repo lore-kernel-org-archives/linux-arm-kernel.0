@@ -1,31 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Jun 2014 15:14:55 +0100
-Subject: [PATCH] arm64: make CONFIG_ZONE_DMA user settable
-In-Reply-To: <1403529423.755.49.camel@deneb.redhat.com>
-References: <1403499924-11214-1-git-send-email-msalter@redhat.com>
- <20140623110937.GB15907@arm.com>
- <1403529423.755.49.camel@deneb.redhat.com>
-Message-ID: <20140624141455.GE4489@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 24 Jun 2014 07:18:04 -0700
+Subject: [PATCH] ARM: ptrace: reload syscall number after
+ secure_computing() check
+In-Reply-To: <1403600096-26088-1-git-send-email-will.deacon@arm.com>
+References: <1403600096-26088-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAGXu5jLTB0JeFk4cPC7p_9Fu3ZvW55m0Xnvz4CJY-Tt8F6F6cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 02:17:03PM +0100, Mark Salter wrote:
-> On Mon, 2014-06-23 at 12:09 +0100, Catalin Marinas wrote:
-> > My proposal (in the absence of any kind of description) is to still
-> > create a ZONE_DMA if we have DMA memory below 32-bit, otherwise just add
-> > everything (>32-bit) to ZONE_DMA. Basically an extension from your CMA
-> > patch, make dma_phys_limit static in that file and set it to
-> > memblock_end_of_DRAM() if no 32-bit DMA. Re-use it in the
-> > zone_sizes_init() function for ZONE_DMA (maybe with a pr_info for no
-> > 32-bit only DMA zone).
-> 
-> There's a performance issue with all memory being in ZONE_DMA. It means
-> all normal allocations will fail on ZONE_NORMAL and then have to fall
-> back to ZONE_DMA. It would be better to put some percentage of memory
-> in ZONE_DMA.
+On Tue, Jun 24, 2014 at 1:54 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On the syscall tracing path, we call out to secure_computing() to allow
+> seccomp to check the syscall number being attempted. As part of this, a
+> SIGTRAP may be sent to the tracer and the syscall could be re-written by
+> a subsequent SET_SYSCALL ptrace request. Unfortunately, this new syscall
+> is ignored by the current code unless TIF_SYSCALL_TRACE is also set on
+> the current thread.
+>
+> This patch slightly reworks the enter path of the syscall tracing code
+> so that we always reload the syscall number from
+> current_thread_info()->syscall after the potential ptrace traps.
+>
+> Tested-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Is the performance penalty real or just theoretical? I haven't run any
-benchmarks myself.
+Acked-by: Kees Cook <keescook@chromium.org>
+
+Thanks!
+
+-Kees
+
+> ---
+>  arch/arm/kernel/ptrace.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 0dd3b79b15c3..0c27ed6f3f23 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -908,7 +908,7 @@ enum ptrace_syscall_dir {
+>         PTRACE_SYSCALL_EXIT,
+>  };
+>
+> -static int tracehook_report_syscall(struct pt_regs *regs,
+> +static void tracehook_report_syscall(struct pt_regs *regs,
+>                                     enum ptrace_syscall_dir dir)
+>  {
+>         unsigned long ip;
+> @@ -926,7 +926,6 @@ static int tracehook_report_syscall(struct pt_regs *regs,
+>                 current_thread_info()->syscall = -1;
+>
+>         regs->ARM_ip = ip;
+> -       return current_thread_info()->syscall;
+>  }
+>
+>  asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+> @@ -938,7 +937,9 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+>                 return -1;
+>
+>         if (test_thread_flag(TIF_SYSCALL_TRACE))
+> -               scno = tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+> +               tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+> +
+> +       scno = current_thread_info()->syscall;
+>
+>         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>                 trace_sys_enter(regs, scno);
+> --
+> 2.0.0
+>
+
+
 
 -- 
-Catalin
+Kees Cook
+Chrome OS Security
