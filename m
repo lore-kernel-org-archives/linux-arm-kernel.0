@@ -1,476 +1,308 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 24 Jun 2014 12:55:11 +0100
-Subject: [PATCH v9] video: ARM CLCD: Add DT support
-Message-ID: <1403610911-31491-1-git-send-email-pawel.moll@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 24 Jun 2014 17:30:30 +0530
+Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <53A9685E.9090501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic DT bindings for the PL11x CLCD cells
-and make their fbdev driver use them.
+Hi,
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
-Changes since v8:
-- removed "arm,pl11x,framebuffer" property; a "memory-region"
-  phandle is to be used instead
+On Monday 16 June 2014 03:56 PM, Antoine T?nart wrote:
+> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+> 
+> The mode selection can let us think this PHY can be configured to fit
+> other purposes. But there are reasons to think the SATA mode will be
+> the only one usable: the PHY registers are only accessible indirectly
+> through two registers in the SATA range, the PHY seems to be integrated
+> and no information tells us the contrary. For these reasons, make the
+> driver a SATA PHY driver.
+> 
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/phy/Kconfig           |   7 ++
+>  drivers/phy/Makefile          |   1 +
+>  drivers/phy/phy-berlin-sata.c | 232 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 240 insertions(+)
+>  create mode 100644 drivers/phy/phy-berlin-sata.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 16a2f067c242..365ad3651e1c 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -15,6 +15,13 @@ config GENERIC_PHY
+>  	  phy users can obtain reference to the PHY. All the users of this
+>  	  framework should select this config.
+>  
+> +config PHY_BERLIN_SATA
+> +	tristate "Marvell Berlin SATA PHY driver"
+> +	depends on ARCH_BERLIN && OF
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable this to support the SATA PHY on Marvell Berlin SoCs.
+> +
+>  config PHY_EXYNOS_MIPI_VIDEO
+>  	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
+>  	depends on HAS_IOMEM
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index b4f1d5770601..a137a2e23218 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -3,6 +3,7 @@
+>  #
+>  
+>  obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+> +obj-$(CONFIG_PHY_BERLIN_SATA)		+= phy-berlin-sata.o
+>  obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+>  obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+> diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
+> new file mode 100644
+> index 000000000000..907897a02672
+> --- /dev/null
+> +++ b/drivers/phy/phy-berlin-sata.c
+> @@ -0,0 +1,232 @@
+> +/*
+> + * Marvell Berlin SATA PHY driver
+> + *
+> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+> + *
+> + * Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/io.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define HOST_VSA_ADDR		0x0
+> +#define HOST_VSA_DATA		0x4
+> +#define PORT_VSR_ADDR		0x78
+> +#define PORT_VSR_DATA		0x7c
+> +#define PORT_SCR_CTL		0x2c
+> +
+> +#define CONTROL_REGISTER	0x0
+> +#define MBUS_SIZE_CONTROL	0x4
+> +
+> +#define POWER_DOWN_PHY0			BIT(6)
+> +#define POWER_DOWN_PHY1			BIT(14)
+> +#define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
+> +#define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
+> +
+> +#define PHY_BASE		0x200
+> +
+> +/* register 0x01 */
+> +#define REF_FREF_SEL_25		BIT(0)
+> +#define PHY_MODE_SATA		(0x0 << 5)
+> +
+> +/* register 0x02 */
+> +#define USE_MAX_PLL_RATE	BIT(12)
+> +
+> +/* register 0x23 */
+> +#define DATA_BIT_WIDTH_10	(0x0 << 10)
+> +#define DATA_BIT_WIDTH_20	(0x1 << 10)
+> +#define DATA_BIT_WIDTH_40	(0x2 << 10)
+> +
+> +/* register 0x25 */
+> +#define PHY_GEN_MAX_1_5		(0x0 << 10)
+> +#define PHY_GEN_MAX_3_0		(0x1 << 10)
+> +#define PHY_GEN_MAX_6_0		(0x2 << 10)
+> +
+> +#define BERLIN_SATA_PHY_NB	2
 
-Changes since v7:
-- fixed typo in "clock-names" documentation
-- renamed "arm,pl11x,framebuffer-base" into "arm,pl11x,framebuffer"
-  as it is describing both base and size
-- added more explanation for "max-memory-bandwidth" property
-- added more explanation for "arm,pl11x,tft-r0g0b0" property
+multi-phy PHY providers should be modelled so that each individual
+PHY is made as sub-node of the PHY provider. Please refer [1] for the
+discussion on this.
 
-Changes since v6:
-- replaced in-node device-timing subnode with the standard
-  video interface bindings (as in: ports & endpoints); only
-  "panel-dpi" compatible panels are supported in the driver
+[1] -> https://lkml.org/lkml/2014/6/24/131
 
-Changes since v5:
-- realised that dma_alloc_writecombine() is a arm-specific function;
-  replaced with generic dma_alloc_coherent()/dma_mmap_writecombine()
-
-Changes since v4:
-- simplified the pads description property and made it optional
-
-Changes since v3:
-- changed wording and order of interrupt-names and interrupts
-  properties documentation
-- changed wording of arm,pl11x,framebuffer-base property
-  documentation
-- cleaned up binding documentation indentation
-
-Changes since v2:
-- replaced video-ram phandle with arm,pl11x,framebuffer-base
-- replaced panel-* properties with arm,pl11x,panel-data-pads
-- replaced max-framebuffer-size with max-memory-bandwidth
-- modified clcdfb_of_init_tft_panel() to use the pads
-  data and take differences between PL110 and PL110 into
-  account
-
-Changes since v1:
-- minor code cleanups as suggested by Sylwester Nawrocki
-
- .../devicetree/bindings/video/arm,pl11x.txt        | 109 +++++++++
- drivers/video/fbdev/Kconfig                        |   1 +
- drivers/video/fbdev/amba-clcd.c                    | 263 +++++++++++++++++++++
- 3 files changed, 373 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/arm,pl11x.txt
-
-diff --git a/Documentation/devicetree/bindings/video/arm,pl11x.txt b/Documentation/devicetree/bindings/video/arm,pl11x.txt
-new file mode 100644
-index 0000000..3e3039a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/arm,pl11x.txt
-@@ -0,0 +1,109 @@
-+* ARM PrimeCell Color LCD Controller PL110/PL111
-+
-+See also Documentation/devicetree/bindings/arm/primecell.txt
-+
-+Required properties:
-+
-+- compatible: must be one of:
-+	"arm,pl110", "arm,primecell"
-+	"arm,pl111", "arm,primecell"
-+
-+- reg: base address and size of the control registers block
-+
-+- interrupt-names: either the single entry "combined" representing a
-+	combined interrupt output (CLCDINTR), or the four entries
-+	"mbe", "vcomp", "lnbu", "fuf" representing the individual
-+	CLCDMBEINTR, CLCDVCOMPINTR, CLCDLNBUINTR, CLCDFUFINTR interrupts
-+
-+- interrupts: contains an interrupt specifier for each entry in
-+	interrupt-names
-+
-+- clock-names: should contain "clcdclk" and "apb_pclk"
-+
-+- clocks: contains phandle and clock specifier pairs for the entries
-+	in the clock-names property. See
-+	Documentation/devicetree/binding/clock/clock-bindings.txt
-+
-+Optional properties:
-+
-+- memory-region: phandle to a node describing memory (see
-+	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt)
-+	to be used for the framebuffer; if not present, the framebuffer
-+	may be located anywhere in the memory
-+
-+- max-memory-bandwidth: maximum bandwidth in bytes per second that the
-+	cell's memory interface can handle; if not present, the memory
-+	interface is fast enough to handle all possible video modes
-+
-+Required sub-nodes:
-+
-+- port: describes LCD panel signals, following the common binding
-+	for video transmitter interfaces; see
-+	Documentation/devicetree/bindings/media/video-interfaces.txt;
-+	when it is a TFT panel, the port's endpoint must define the
-+	following property:
-+
-+	- arm,pl11x,tft-r0g0b0-pads: an array of three 32-bit values,
-+		defining the way CLD pads are wired up; first value
-+		contains index of the "CLD" external pin (pad) used
-+		as R0 (first bit of the red component), second value
-+	        index of the pad used as G0, third value index of the
-+		pad used as B0, see also "LCD panel signal multiplexing
-+		details" paragraphs in the PL110/PL111 Technical
-+		Reference Manuals; this implicitly defines available
-+		color modes, for example:
-+		- PL111 TFT 4:4:4 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <4 15 20>;
-+		- PL110 TFT (1:)5:5:5 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
-+		- PL111 TFT (1:)5:5:5 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <3 11 19>;
-+		- PL111 TFT 5:6:5 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <3 10 19>;
-+		- PL110 and PL111 TFT 8:8:8 panel:
-+			arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-+		- PL110 and PL111 TFT 8:8:8 panel, R & B components swapped:
-+			arm,pl11x,tft-r0g0b0-pads = <16 8 0>;
-+
-+
-+Example:
-+
-+	clcd at 10020000 {
-+		compatible = "arm,pl111", "arm,primecell";
-+		reg = <0x10020000 0x1000>;
-+		interrupt-names = "combined";
-+		interrupts = <0 44 4>;
-+		clocks = <&oscclk1>, <&oscclk2>;
-+		clock-names = "clcdclk", "apb_pclk";
-+		max-memory-bandwidth = <94371840>; /* Bps, 1024x768 at 60 16bpp */
-+
-+		port {
-+			clcd_pads: endpoint {
-+				remote-endpoint = <&clcd_panel>;
-+				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-+			};
-+		};
-+
-+	};
-+
-+	panel {
-+		compatible = "panel-dpi";
-+
-+		port {
-+			clcd_panel: endpoint {
-+				remote-endpoint = <&clcd_pads>;
-+			};
-+		};
-+
-+		panel-timing {
-+			clock-frequency = <25175000>;
-+			hactive = <640>;
-+			hback-porch = <40>;
-+			hfront-porch = <24>;
-+			hsync-len = <96>;
-+			vactive = <480>;
-+			vback-porch = <32>;
-+			vfront-porch = <11>;
-+			vsync-len = <2>;
-+		};
-+	};
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 59c98bfd..a518fe5 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -280,6 +280,7 @@ config FB_ARMCLCD
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
-+	select VIDEOMODE_HELPERS if OF
- 	help
- 	  This framebuffer device driver is for the ARM PrimeCell PL110
- 	  Colour LCD controller.  ARM PrimeCells provide the building
-diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index 14d6b37..23b3519 100644
---- a/drivers/video/fbdev/amba-clcd.c
-+++ b/drivers/video/fbdev/amba-clcd.c
-@@ -26,6 +26,13 @@
- #include <linux/amba/clcd.h>
- #include <linux/clk.h>
- #include <linux/hardirq.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_graph.h>
-+#include <video/display_timing.h>
-+#include <video/of_display_timing.h>
-+#include <video/videomode.h>
- 
- #include <asm/sizes.h>
- 
-@@ -543,6 +550,259 @@ static int clcdfb_register(struct clcd_fb *fb)
- 	return ret;
- }
- 
-+#ifdef CONFIG_OF
-+static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
-+		struct fb_videomode *mode)
-+{
-+	int err;
-+	struct display_timing timing;
-+	struct videomode video;
-+
-+	err = of_get_display_timing(node, "panel-timing", &timing);
-+	if (err)
-+		return err;
-+
-+	videomode_from_timing(&timing, &video);
-+
-+	err = fb_videomode_from_videomode(&video, mode);
-+	if (err)
-+		return err;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_snprintf_mode(char *buf, int size, struct fb_videomode *mode)
-+{
-+	return snprintf(buf, size, "%ux%u@%u", mode->xres, mode->yres,
-+			mode->refresh);
-+}
-+
-+static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
-+		struct fb_videomode *mode)
-+{
-+	int err;
-+	struct device_node *panel;
-+	char *name;
-+	int len;
-+
-+	panel = of_graph_get_remote_port_parent(endpoint);
-+	if (!panel)
-+		return -ENODEV;
-+
-+	/* Only directly connected DPI panels supported for now */
-+	if (of_device_is_compatible(panel, "panel-dpi"))
-+		err = clcdfb_of_get_dpi_panel_mode(panel, mode);
-+	else
-+		err = -ENOENT;
-+	if (err)
-+		return err;
-+
-+	len = clcdfb_snprintf_mode(NULL, 0, mode);
-+	name = devm_kzalloc(dev, len + 1, GFP_KERNEL);
-+	clcdfb_snprintf_mode(name, len + 1, mode);
-+	mode->name = name;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
-+{
-+	static struct {
-+		unsigned int part;
-+		u32 r0, g0, b0;
-+		u32 caps;
-+	} panels[] = {
-+		{ 0x110, 1,  7, 13, CLCD_CAP_5551 },
-+		{ 0x110, 0,  8, 16, CLCD_CAP_888 },
-+		{ 0x111, 4, 14, 20, CLCD_CAP_444 },
-+		{ 0x111, 3, 11, 19, CLCD_CAP_444 | CLCD_CAP_5551 },
-+		{ 0x111, 3, 10, 19, CLCD_CAP_444 | CLCD_CAP_5551 |
-+				    CLCD_CAP_565 },
-+		{ 0x111, 0,  8, 16, CLCD_CAP_444 | CLCD_CAP_5551 |
-+				    CLCD_CAP_565 | CLCD_CAP_888 },
-+	};
-+	int i;
-+
-+	/* Bypass pixel clock divider, data output on the falling edge */
-+	fb->panel->tim2 = TIM2_BCD | TIM2_IPC;
-+
-+	/* TFT display, vert. comp. interrupt at the start of the back porch */
-+	fb->panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
-+
-+	fb->panel->caps = 0;
-+
-+	/* Match the setup with known variants */
-+	for (i = 0; i < ARRAY_SIZE(panels) && !fb->panel->caps; i++) {
-+		if (amba_part(fb->dev) != panels[i].part)
-+			continue;
-+		if (g0 != panels[i].g0)
-+			continue;
-+		if (r0 == panels[i].r0 && b0 == panels[i].b0)
-+			fb->panel->caps = panels[i].caps & CLCD_CAP_RGB;
-+		if (r0 == panels[i].b0 && b0 == panels[i].r0)
-+			fb->panel->caps = panels[i].caps & CLCD_CAP_BGR;
-+	}
-+
-+	return fb->panel->caps ? 0 : -EINVAL;
-+}
-+
-+static int clcdfb_of_init_display(struct clcd_fb *fb)
-+{
-+	struct device_node *endpoint;
-+	int err;
-+	u32 max_bandwidth;
-+	u32 tft_r0b0g0[3];
-+
-+	fb->panel = devm_kzalloc(&fb->dev->dev, sizeof(*fb->panel), GFP_KERNEL);
-+	if (!fb->panel)
-+		return -ENOMEM;
-+
-+	endpoint = of_graph_get_next_endpoint(fb->dev->dev.of_node, NULL);
-+	if (!endpoint)
-+		return -ENODEV;
-+
-+	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, &fb->panel->mode);
-+	if (err)
-+		return err;
-+
-+	err = of_property_read_u32(fb->dev->dev.of_node, "max-memory-bandwidth",
-+			&max_bandwidth);
-+	if (!err)
-+		fb->panel->bpp = 8 * max_bandwidth / (fb->panel->mode.xres *
-+				fb->panel->mode.yres * fb->panel->mode.refresh);
-+	else
-+		fb->panel->bpp = 32;
-+
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+	fb->panel->cntl |= CNTL_BEBO;
-+#endif
-+	fb->panel->width = -1;
-+	fb->panel->height = -1;
-+
-+	if (of_property_read_u32_array(endpoint,
-+			"arm,pl11x,tft-r0g0b0-pads",
-+			tft_r0b0g0, ARRAY_SIZE(tft_r0b0g0)) == 0)
-+		return clcdfb_of_init_tft_panel(fb, tft_r0b0g0[0],
-+				 tft_r0b0g0[1],  tft_r0b0g0[2]);
-+
-+	return -ENOENT;
-+}
-+
-+static int clcdfb_of_vram_setup(struct clcd_fb *fb)
-+{
-+	int err;
-+	struct device_node *memory;
-+	u64 size;
-+
-+	err = clcdfb_of_init_display(fb);
-+	if (err)
-+		return err;
-+
-+	memory = of_parse_phandle(fb->dev->dev.of_node, "memory-region", 0);
-+	if (!memory)
-+		return -ENODEV;
-+
-+	fb->fb.screen_base = of_iomap(memory, 0);
-+	if (!fb->fb.screen_base)
-+		return -ENOMEM;
-+
-+	fb->fb.fix.smem_start = of_translate_address(memory,
-+			of_get_address(memory, 0, &size, NULL));
-+	fb->fb.fix.smem_len = size;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_of_vram_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
-+{
-+	unsigned long off, user_size, kernel_size;
-+
-+
-+	off = vma->vm_pgoff << PAGE_SHIFT;
-+	user_size = vma->vm_end - vma->vm_start;
-+	kernel_size = fb->fb.fix.smem_len;
-+
-+	if (off >= kernel_size || user_size > (kernel_size - off))
-+		return -ENXIO;
-+
-+	return remap_pfn_range(vma, vma->vm_start,
-+			__phys_to_pfn(fb->fb.fix.smem_start) + vma->vm_pgoff,
-+			user_size,
-+			pgprot_writecombine(vma->vm_page_prot));
-+}
-+
-+static void clcdfb_of_vram_remove(struct clcd_fb *fb)
-+{
-+	iounmap(fb->fb.screen_base);
-+}
-+
-+static int clcdfb_of_dma_setup(struct clcd_fb *fb)
-+{
-+	unsigned long framesize;
-+	dma_addr_t dma;
-+	int err;
-+
-+	err = clcdfb_of_init_display(fb);
-+	if (err)
-+		return err;
-+
-+	framesize = fb->panel->mode.xres * fb->panel->mode.yres *
-+			fb->panel->bpp / 8;
-+	fb->fb.screen_base = dma_alloc_coherent(&fb->dev->dev, framesize,
-+			&dma, GFP_KERNEL);
-+	if (!fb->fb.screen_base)
-+		return -ENOMEM;
-+
-+	fb->fb.fix.smem_start = dma;
-+	fb->fb.fix.smem_len = framesize;
-+
-+	return 0;
-+}
-+
-+static int clcdfb_of_dma_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
-+{
-+	return dma_mmap_writecombine(&fb->dev->dev, vma, fb->fb.screen_base,
-+			fb->fb.fix.smem_start, fb->fb.fix.smem_len);
-+}
-+
-+static void clcdfb_of_dma_remove(struct clcd_fb *fb)
-+{
-+	dma_free_coherent(&fb->dev->dev, fb->fb.fix.smem_len,
-+			fb->fb.screen_base, fb->fb.fix.smem_start);
-+}
-+
-+static struct clcd_board *clcdfb_of_get_board(struct amba_device *dev)
-+{
-+	struct clcd_board *board = devm_kzalloc(&dev->dev, sizeof(*board),
-+			GFP_KERNEL);
-+	struct device_node *node = dev->dev.of_node;
-+
-+	if (!board)
-+		return NULL;
-+
-+	board->name = of_node_full_name(node);
-+	board->caps = CLCD_CAP_ALL;
-+	board->check = clcdfb_check;
-+	board->decode = clcdfb_decode;
-+	if (of_find_property(node, "memory-region", NULL)) {
-+		board->setup = clcdfb_of_vram_setup;
-+		board->mmap = clcdfb_of_vram_mmap;
-+		board->remove = clcdfb_of_vram_remove;
-+	} else {
-+		board->setup = clcdfb_of_dma_setup;
-+		board->mmap = clcdfb_of_dma_mmap;
-+		board->remove = clcdfb_of_dma_remove;
-+	}
-+
-+	return board;
-+}
-+#else
-+static struct clcd_board *clcdfb_of_get_board(struct amba_dev *dev)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct clcd_board *board = dev_get_platdata(&dev->dev);
-@@ -550,6 +810,9 @@ static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
- 	int ret;
- 
- 	if (!board)
-+		board = clcdfb_of_get_board(dev);
-+
-+	if (!board)
- 		return -EINVAL;
- 
- 	ret = dma_set_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
--- 
-1.9.1
+Thanks
+Kishon
+> +
+> +#define to_berlin_sata_phy_priv(desc)	\
+> +	container_of((desc), struct phy_berlin_priv, phys[(desc)->index])
+> +
+> +struct phy_berlin_desc {
+> +	struct phy	*phy;
+> +	u32		val;
+> +	unsigned	index;
+> +};
+> +
+> +struct phy_berlin_priv {
+> +	void __iomem		*base;
+> +	spinlock_t		lock;
+> +	struct phy_berlin_desc	phys[BERLIN_SATA_PHY_NB];
+> +};
+> +
+> +static inline void phy_berlin_sata_reg_setbits(void __iomem *ctrl_reg, u32 reg,
+> +					       u32 mask, u32 val)
+> +{
+> +	u32 regval;
+> +
+> +	/* select register */
+> +	writel(PHY_BASE + reg, ctrl_reg + PORT_VSR_ADDR);
+> +
+> +	/* set bits */
+> +	regval = readl(ctrl_reg + PORT_VSR_DATA);
+> +	regval &= ~mask;
+> +	regval |= val;
+> +	writel(regval, ctrl_reg + PORT_VSR_DATA);
+> +}
+> +
+> +static int phy_berlin_sata_power_on(struct phy *phy)
+> +{
+> +	struct phy_berlin_desc *desc = phy_get_drvdata(phy);
+> +	struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
+> +	void __iomem *ctrl_reg = priv->base + 0x60 + (desc->index * 0x80);
+> +	int ret = 0;
+> +	u32 regval;
+> +
+> +	spin_lock(&priv->lock);
+> +
+> +	/* Power on PHY */
+> +	writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
+> +	regval = readl(priv->base + HOST_VSA_DATA);
+> +	regval &= ~(desc->val);
+> +	writel(regval, priv->base + HOST_VSA_DATA);
+> +
+> +	/* Configure MBus */
+> +	writel(MBUS_SIZE_CONTROL, priv->base + HOST_VSA_ADDR);
+> +	regval = readl(priv->base + HOST_VSA_DATA);
+> +	regval |= MBUS_WRITE_REQUEST_SIZE_128 | MBUS_READ_REQUEST_SIZE_128;
+> +	writel(regval, priv->base + HOST_VSA_DATA);
+> +
+> +	/* set PHY mode and ref freq to 25 MHz */
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, 0x1, 0xff,
+> +				    REF_FREF_SEL_25 | PHY_MODE_SATA);
+> +
+> +	/* set PHY up to 6 Gbps */
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, 0x25, 0xc00, PHY_GEN_MAX_6_0);
+> +
+> +	/* set 40 bits width */
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, 0x23,  0xc00, DATA_BIT_WIDTH_40);
+> +
+> +	/* use max pll rate */
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, 0x2, 0x0, USE_MAX_PLL_RATE);
+> +
+> +	/* set the controller speed */
+> +	writel(0x31, ctrl_reg + PORT_SCR_CTL);
+> +
+> +	spin_unlock(&priv->lock);
+> +
+> +	return ret;
+> +}
+> +
+> +static int phy_berlin_sata_power_off(struct phy *phy)
+> +{
+> +	struct phy_berlin_desc *desc = phy_get_drvdata(phy);
+> +	struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
+> +	u32 regval;
+> +
+> +	spin_lock(&priv->lock);
+> +
+> +	/* Power down PHY */
+> +	writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
+> +	regval = readl(priv->base + HOST_VSA_DATA);
+> +	regval |= desc->val;
+> +	writel(regval, priv->base + HOST_VSA_DATA);
+> +
+> +	spin_unlock(&priv->lock);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct phy *phy_berlin_sata_phy_xlate(struct device *dev,
+> +					     struct of_phandle_args *args)
+> +{
+> +	struct phy_berlin_priv *priv = dev_get_drvdata(dev);
+> +
+> +	if (WARN_ON(args->args[0] >= BERLIN_SATA_PHY_NB))
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	return priv->phys[args->args[0]].phy;
+> +}
+> +
+> +static struct phy_ops phy_berlin_sata_ops = {
+> +	.power_on	= phy_berlin_sata_power_on,
+> +	.power_off	= phy_berlin_sata_power_off,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static u32 phy_berlin_power_down_bits[] = {
+> +	POWER_DOWN_PHY0,
+> +	POWER_DOWN_PHY1,
+> +};
+> +
+> +static int phy_berlin_sata_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct phy *phy;
+> +	struct phy_provider *phy_provider;
+> +	struct phy_berlin_priv *priv;
+> +	struct resource *res;
+> +	int i;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -EINVAL;
+> +
+> +	priv->base = devm_ioremap(dev, res->start, resource_size(res));
+> +	if (!priv->base)
+> +		return -ENOMEM;
+> +
+> +	dev_set_drvdata(dev, priv);
+> +	spin_lock_init(&priv->lock);
+> +
+> +	for (i = 0; i < BERLIN_SATA_PHY_NB; i++) {
+> +		phy = devm_phy_create(dev, &phy_berlin_sata_ops, NULL);
+> +		if (IS_ERR(phy)) {
+> +			dev_err(dev, "failed to create PHY %d\n", i);
+> +			return PTR_ERR(phy);
+> +		}
+> +
+> +		priv->phys[i].phy = phy;
+> +		priv->phys[i].val = phy_berlin_power_down_bits[i];
+> +		priv->phys[i].index = i;
+> +		phy_set_drvdata(phy, &priv->phys[i]);
+> +
+> +		/* Make sure the PHY is off */
+> +		phy_berlin_sata_power_off(phy);
+> +	}
+> +
+> +	phy_provider =
+> +		devm_of_phy_provider_register(dev, phy_berlin_sata_phy_xlate);
+> +	if (IS_ERR(phy_provider))
+> +		return PTR_ERR(phy_provider);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+> +	{ .compatible = "marvell,berlin-sata-phy" },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver phy_berlin_sata_driver = {
+> +	.probe	= phy_berlin_sata_probe,
+> +	.driver	= {
+> +		.name		= "phy-berlin-sata",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= phy_berlin_sata_of_match,
+> +	},
+> +};
+> +module_platform_driver(phy_berlin_sata_driver);
+> +
+> +MODULE_DESCRIPTION("Marvell Berlin SATA PHY driver");
+> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
+> +MODULE_LICENSE("GPL v2");
+> 
