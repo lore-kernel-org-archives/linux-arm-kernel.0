@@ -1,39 +1,70 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 24 Jun 2014 16:18:27 -0300
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-Message-ID: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 24 Jun 2014 21:18:15 +0200
+Subject: [PATCH v7 4/9] seccomp: move no_new_privs into seccomp
+In-Reply-To: <1403560693-21809-5-git-send-email-keescook@chromium.org>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-5-git-send-email-keescook@chromium.org>
+Message-ID: <20140624191815.GA3623@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 06/23, Kees Cook wrote:
+>
+> --- a/include/linux/seccomp.h
+> +++ b/include/linux/seccomp.h
+> @@ -3,6 +3,8 @@
+>
+>  #include <uapi/linux/seccomp.h>
+>
+> +#define SECCOMP_FLAG_NO_NEW_PRIVS	0	/* task may not gain privs */
+> +
+>  #ifdef CONFIG_SECCOMP
+>
+>  #include <linux/thread_info.h>
+> @@ -16,6 +18,7 @@ struct seccomp_filter;
+>   *         system calls available to a process.
+>   * @filter: must always point to a valid seccomp-filter or NULL as it is
+>   *          accessed without locking during system call entry.
+> + * @flags: flags under task->sighand->siglock lock
+>   *
+>   *          @filter must only be accessed from the context of current as there
+>   *          is no read locking.
+> @@ -23,6 +26,7 @@ struct seccomp_filter;
+>  struct seccomp {
+>  	int mode;
+>  	struct seccomp_filter *filter;
+> +	unsigned long flags;
+>  };
+>
+>  extern int __secure_computing(int);
+> @@ -51,7 +55,9 @@ static inline int seccomp_mode(struct seccomp *s)
+>
+>  #include <linux/errno.h>
+>
+> -struct seccomp { };
+> +struct seccomp {
+> +	unsigned long flags;
+> +};
 
-When the mx6 PCI conctroller is initialized in the bootloader we see a kernel 
-hang inside imx6_add_pcie_port().
+A bit messy ;)
 
-Adding a 30ms delay allows the kernel to boot.
+I am wondering if we can simply do
 
-Suggested-by: David M?ller <d.mueller@elsoft.ch>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-I am happy to get feedback on how to properly fix this.
+	static inline bool current_no_new_privs(void)
+	{
+		if (current->no_new_privs)
+			return true;
 
-Thanks
+	#ifdef CONFIG_SECCOMP
+		if (test_thread_flag(TIF_SECCOMP))
+			return true;
+	#endif
 
- drivers/pci/host/pci-imx6.c | 2 ++
- 1 file changed, 2 insertions(+)
+		return false;
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index a568efa..669f771 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -507,6 +507,8 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
- 	pp->root_bus_nr = -1;
- 	pp->ops = &imx6_pcie_host_ops;
- 
-+	usleep_range(25000, 30000);
-+
- 	ret = dw_pcie_host_init(pp);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to initialize host\n");
--- 
-1.8.3.2
+	     return test_bit(SECCOMP_FLAG_NO_NEW_PRIVS, &p->seccomp.flags);
+	}
+
+instead ?
+
+Oleg.
