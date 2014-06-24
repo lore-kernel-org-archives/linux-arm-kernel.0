@@ -1,40 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jun 2014 12:02:05 +0200
-Subject: [RFC] ARM: vt8500: cleanup start
-In-Reply-To: <CAJ3iQcqvaCbFJ0V4ZJ_cDxA1TN=JemaghUJQgVO_LkEq=DYjbg@mail.gmail.com>
-References: <CAJ3iQco9qu8Z7Gm0AtcvV3OPc6C39Hdqjq6tVKMYy5qV2=ASwA@mail.gmail.com>
- <5016910.Qn6QdqhQ4L@wuerfel>
- <CAJ3iQcqvaCbFJ0V4ZJ_cDxA1TN=JemaghUJQgVO_LkEq=DYjbg@mail.gmail.com>
-Message-ID: <4258201.EByetKsPpX@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Jun 2014 11:02:20 +0100
+Subject: [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
+In-Reply-To: <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
+References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+ <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
+Message-ID: <20140624100220.GK32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 June 2014 17:32:26 Gergely Imreh wrote:
-> > > https://github.com/viaembedded/arm-soc/tree/via-header
-> > >
-> > > Should this be part of a larger patchset later on, or is it okay just
-> > > to send any time like
-> > > this? Are these changes worth doing if the functionality itself did
-> > > not really change,
-> > > just probably the style improves?
-> >
-> > I think a good start would be to split out the reset code into a
-> > proper device driver. The register used for reset is part of the
-> > "pmc" device that is used in the clock driver, so you can
-> > add a reboot/poweroff handler there and register it with arm_pm_restart/
-> > pm_power_off.
-> >
+On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
+> From: Lucas Stach <dev@lynxeye.de>
 > 
-> I guess the examples for these that I could see are the ones in
-> drivers/power/reset? Or is there a driver that does this well that
-> you'd recommend learning from?
+> On architectures for which access to GPU memory is non-coherent,
+> caches need to be flushed and invalidated explicitly at the
+> appropriate places. Introduce two small helpers to make things
+> easy for TTM-based drivers.
 
-Most of them seem pretty reasonable actually
+Have you run this with DMA API debugging enabled?  I suspect you haven't,
+and I recommend that you do.
 
-> I've seen that in drivers/power/reset there's a bunch of X-reset.c,
-> X-poweroff.c, X-reboot.c: any actual pattern to these files/naming?
-
-I think some drivers can only reboot and some can only power off.
-No idea which name is preferred for a driver that does both.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
