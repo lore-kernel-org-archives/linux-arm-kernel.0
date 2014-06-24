@@ -1,66 +1,50 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 24 Jun 2014 00:24:27 -0500
-Subject: [PATCH 3/3] ARM: OMAP2+: create dsp device only on OMAP3 SoCs
+Date: Tue, 24 Jun 2014 00:24:25 -0500
+Subject: [PATCH 1/3] staging: tidspbridge: fix an erroneous removal of
+ parentheses
 In-Reply-To: <1403587467-59876-1-git-send-email-s-anna@ti.com>
 References: <1403587467-59876-1-git-send-email-s-anna@ti.com>
-Message-ID: <1403587467-59876-4-git-send-email-s-anna@ti.com>
+Message-ID: <1403587467-59876-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DSP platform device for TI DSP/Bridge is currently
-created unconditionally whenever CONFIG_TIDSPBRIDGE is
-enabled. This device should only be created on OMAP34xx/
-OMAP36xx SoCs, and not for other OMAP3 derived SoCs or when
-booting multi-arch images on other SoCs. So, add a check for
-the SoC family both before creating the device and allocating
-the carveout memory for the device.
+Commit 4a9fdbb (staging: core: tiomap3430.c Fix line over 80 characters.)
+erroneously removed the parentheses around the function pointer leading
+to the following build error (when enabling the build of TI DSP/Bridge
+driver):
 
+drivers/staging/tidspbridge/core/tiomap3430.c: In function 'bridge_brd_monitor':
+drivers/staging/tidspbridge/core/tiomap3430.c:283:10: error: invalid type argument of unary '*' (have 'u32')
+make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430.o] Error 1
+
+Fix this build error properly.
+
+Fixes: 4a9fdbb (staging: core: tiomap3430.c Fix line over 80 characters.)
+Cc: Aybuke Ozdemir <aybuke.147@gmail.com>
+Cc: Peter P Waskiewicz Jr <peter.p.waskiewicz.jr@intel.com>
+Cc: Omar Ramirez Luna <omar.ramirez@copitl.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/dsp.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/staging/tidspbridge/core/tiomap3430.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/dsp.c b/arch/arm/mach-omap2/dsp.c
-index b8208b4..f7492df 100644
---- a/arch/arm/mach-omap2/dsp.c
-+++ b/arch/arm/mach-omap2/dsp.c
-@@ -29,6 +29,7 @@
- #ifdef CONFIG_TIDSPBRIDGE_DVFS
- #include "omap-pm.h"
- #endif
-+#include "soc.h"
+diff --git a/drivers/staging/tidspbridge/core/tiomap3430.c b/drivers/staging/tidspbridge/core/tiomap3430.c
+index 8945b4e..cb50120 100644
+--- a/drivers/staging/tidspbridge/core/tiomap3430.c
++++ b/drivers/staging/tidspbridge/core/tiomap3430.c
+@@ -280,8 +280,10 @@ static int bridge_brd_monitor(struct bridge_dev_context *dev_ctxt)
+ 					OMAP3430_IVA2_MOD, OMAP2_CM_CLKSTCTRL);
  
- #include <linux/platform_data/dsp-omap.h>
- 
-@@ -59,6 +60,9 @@ void __init omap_dsp_reserve_sdram_memblock(void)
- 	phys_addr_t size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
- 	phys_addr_t paddr;
- 
-+	if (!cpu_is_omap34xx())
-+		return;
-+
- 	if (!size)
- 		return;
- 
-@@ -83,6 +87,9 @@ static int __init omap_dsp_init(void)
- 	int err = -ENOMEM;
- 	struct omap_dsp_platform_data *pdata = &omap_dsp_pdata;
- 
-+	if (!cpu_is_omap34xx())
-+		return 0;
-+
- 	pdata->phys_mempool_base = omap_dsp_get_mempool_base();
- 
- 	if (pdata->phys_mempool_base) {
-@@ -115,6 +122,9 @@ module_init(omap_dsp_init);
- 
- static void __exit omap_dsp_exit(void)
- {
-+	if (!cpu_is_omap34xx())
-+		return;
-+
- 	platform_device_unregister(omap_dsp_pdev);
- }
- module_exit(omap_dsp_exit);
+ 		/* Wait until the state has moved to ON */
+-		while (*pdata->dsp_prm_read(OMAP3430_IVA2_MOD, OMAP2_PM_PWSTST)&
+-					OMAP_INTRANSITION_MASK);
++		while ((*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
++					      OMAP2_PM_PWSTST) &
++						OMAP_INTRANSITION_MASK)
++			;
+ 		/* Disable Automatic transition */
+ 		(*pdata->dsp_cm_write)(OMAP34XX_CLKSTCTRL_DISABLE_AUTO,
+ 					OMAP3430_IVA2_MOD, OMAP2_CM_CLKSTCTRL);
 -- 
 2.0.0
