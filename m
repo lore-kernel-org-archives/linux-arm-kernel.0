@@ -1,73 +1,105 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 24 Jun 2014 16:11:48 -0500
-Subject: [PATCH v3 1/2] arm: dts: am4372: let boards access all nodes
- through phandles
-In-Reply-To: <1403547659-24558-2-git-send-email-balbi@ti.com>
-References: <1403547659-24558-1-git-send-email-balbi@ti.com>
- <1403547659-24558-2-git-send-email-balbi@ti.com>
-Message-ID: <CAL_JsqJx_DJqxpEJebi0Etfv5g7=eYje_53vd_44GykreA-rkQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 25 Jun 2014 01:19:27 +0400
+Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
+In-Reply-To: <666f39dbf0f149c6946d4c2665d3d85d@HKXPR06MB168.apcprd06.prod.outlook.com>
+References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
+ <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
+ <53A209DA.9000000@cogentembedded.com>
+ <20a0a16226d54b0e8d6f68e41046bbf2@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <53A897EF.2020804@cogentembedded.com>
+ <666f39dbf0f149c6946d4c2665d3d85d@HKXPR06MB168.apcprd06.prod.outlook.com>
+Message-ID: <53A9EB5F.4050708@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 1:20 PM, Felipe Balbi <balbi@ti.com> wrote:
-> by providing phandles to rtc, wdt, cpu and dispc nodes,
-> boards can access them to add board-specific data.
+Hello.
 
-Strictly speaking, you are adding labels, not phandles. You can do
-phandles without using labels, but the syntax is not so obvious. I'd
-tell you what it is but offhand I don't remember. :)
+On 06/24/2014 02:01 PM, Phil Edworthy wrote:
 
-Rob
+>>>>       I'm investigating an imprecise external abort occurring once userland is
+>>>> started when I have NetMos
 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->
-> Changes since v1:
->         - added phandles to cpu and dispc
->
->  arch/arm/boot/dts/am4372.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index 49fa596..8d3c163 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -30,7 +30,7 @@
->         cpus {
->                 #address-cells = <1>;
->                 #size-cells = <0>;
-> -               cpu at 0 {
-> +               cpu: cpu at 0 {
->                         compatible = "arm,cortex-a9";
->                         device_type = "cpu";
->                         reg = <0>;
-> @@ -270,7 +270,7 @@
->                         ti,hwmods = "counter_32k";
->                 };
->
-> -               rtc at 44e3e000 {
-> +               rtc: rtc at 44e3e000 {
->                         compatible = "ti,am4372-rtc","ti,da830-rtc";
->                         reg = <0x44e3e000 0x1000>;
->                         interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH
-> @@ -279,7 +279,7 @@
->                         status = "disabled";
->                 };
->
-> -               wdt at 44e35000 {
-> +               wdt: wdt at 44e35000 {
->                         compatible = "ti,am4372-wdt","ti,omap3-wdt";
->                         reg = <0x44e35000 0x1000>;
->                         interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -871,7 +871,7 @@
->                         #size-cells = <1>;
->                         ranges;
->
-> -                       dispc at 4832a400 {
-> +                       dispc: dispc at 4832a400 {
->                                 compatible = "ti,omap3-dispc";
->                                 reg = <0x4832a400 0x400>;
->                                 interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-> --
-> 2.0.0.390.gcb682f8
->
+>>      Or is it MosChip now? Can't remember all their renames. :-)
+
+> Do you know of somewhere I can buy a card with this chipset in the EU? I had a
+> quick search but couldn't find anything.
+
+    No. But we probably can send such card to you.
+
+[...]
+
+>>>>> +
+>>>>> +	/* First resource is for IO */
+>>>>> +	mask = PAR_ENABLE;
+>>>>> +	if (res->flags & IORESOURCE_IO)
+>>>>> +		mask |= IO_SPACE;
+
+>>>>       For the memory space this works OK as you're identity-mapping the
+>>>> memory
+>>>> ranges in your device trees. However, for the I/O space this means that it
+>>>> won't work as the BARs in the PCIe devices get programmed with the PCI bus
+>>>> addresses but the PCIe window translation register is programmed with a
+>>>> CPU
+>>>> address which don't at all match (given your device trees) and hence one
+>>>> can't
+>>>> access the card's I/O mapped registers at all...
+
+>>> Hmm, I couldn't find any cards that supported I/O, so I wasn't able to test
+>>> this. Clearly this is an issue that needs looking into.
+
+>>      Will you look into it then, or should I?
+
+> I'll look at it.
+
+    Thanks.
+
+[...]
+
+>>>>> +
+>>>>> +		if (win > PCI_MAX_RESOURCES)
+>>>>> +			break;
+>>>>> +	}
+>>>>> +
+>>>>> +	 err = rcar_pcie_parse_map_dma_ranges(pcie, pdev->dev.of_node);
+>>>>> +	 if (err)
+>>>>> +		return err;
+>>>>> +
+>>>>> +	of_id = of_match_device(rcar_pcie_of_match, pcie->dev);
+>>>>> +	if (!of_id || !of_id->data)
+>>>>> +		return -EINVAL;
+>>>>> +	hw_init_fn = of_id->data;
+>>>>> +
+>>>>> +	/* Failure to get a link might just be that no cards are inserted */
+>>>>> +	err = hw_init_fn(pcie);
+>>>>> +	if (err) {
+>>>>> +		dev_info(&pdev->dev, "PCIe link down\n");
+>>>>> +		return 0;
+
+>>>>       Not quite sure why you exit normally here without enabling the
+>>>> hardware.
+>>>> I think the internal bridge should be visible regardless of whether link is
+>>>> detected or not...
+
+>>> Why would you want to see the bridge when you can do nothing with it?
+>> Aren't
+
+>>      Because it's the way PCI works. You have the built-in devices always
+>> present and seen on a PCI bus. :-)
+
+>>> you are just wasting resources?
+
+>>      I think it's rather you who are wasting resources. ;-) Why not just fail
+>> the probe when you have no link?
+
+> Ah, so we currently have a half-way house... not failing the probe, but not
+> enabling the HW. Either all or nothing would be preferable.
+
+    Actually, I tried ignoring the link test and the kernel died horrible 
+death without any console output. :-/ Having enabled the earlyprintk support, 
+I was able to see the reason: panic("PCI: unable to scan bus!") in 
+arch/arm/kernel/bios32.c...
+
+> Thanks
+> Phil
+
+WBR, Sergei
