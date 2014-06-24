@@ -1,38 +1,64 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Tue, 24 Jun 2014 09:09:11 -0500
-Subject: [PATCH 0/2] Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <53A98687.7090408@amd.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 24 Jun 2014 12:50:02 -0700
+Subject: [PATCH v7 4/9] seccomp: move no_new_privs into seccomp
+In-Reply-To: <CALCETrU9x05ADgz9JToiw_BuCPz1h0xmOh=1R3eojL9far1aEA@mail.gmail.com>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-5-git-send-email-keescook@chromium.org>
+ <20140624191815.GA3623@redhat.com>
+ <CALCETrVgpP=zOtiQafVgcic2T95TdEM5DTvHYXWTbcZ14xBqHQ@mail.gmail.com>
+ <20140624193055.GA4482@redhat.com>
+ <CALCETrU9x05ADgz9JToiw_BuCPz1h0xmOh=1R3eojL9far1aEA@mail.gmail.com>
+Message-ID: <CAGXu5jJjuNmf=FRzUPMChvL4D_xkg034pUbRAbaK38f37GYC0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been running and doing development on top of these patches.  I 
-found a problem in an earlier version that i can confirm is now fixed in 
-this current version.
+On Tue, Jun 24, 2014 at 12:34 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Tue, Jun 24, 2014 at 12:30 PM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> On 06/24, Andy Lutomirski wrote:
+>>>
+>>> On Tue, Jun 24, 2014 at 12:18 PM, Oleg Nesterov <oleg@redhat.com> wrote:
+>>> >>
+>>> >> -struct seccomp { };
+>>> >> +struct seccomp {
+>>> >> +     unsigned long flags;
+>>> >> +};
+>>> >
+>>> > A bit messy ;)
+>>> >
+>>> > I am wondering if we can simply do
+>>> >
+>>> >         static inline bool current_no_new_privs(void)
+>>> >         {
+>>> >                 if (current->no_new_privs)
+>>> >                         return true;
+>>> >
+>>> >         #ifdef CONFIG_SECCOMP
+>>> >                 if (test_thread_flag(TIF_SECCOMP))
+>>> >                         return true;
+>>> >         #endif
+>>>
+>>> Nope -- privileged users can enable seccomp w/o nnp.
+>>
+>> Indeed, I am stupid.
+>>
+>> Still it would be nice to cleanup this somehow. The new member is only
+>> used as a previous ->no_new_privs, just it is long to allow the concurent
+>> set/get. Logically it doesn't even belong to seccomp{}.
+>
+> We could add an unsigned long atomic flags field to task_struct.
 
-Reviewed-by: Joel Schopp <joel.schopp@amd.com>
+I thought that had gotten shot down originally, but given the current
+state of the patch series, it would be effectively identical, since my
+earlier attempt at keeping sizes the same (with alternate accessors)
+was too messy. I will change this as well.
 
-On 06/23/2014 07:32 PM, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> This patch set introduces support for MSI(-X) in GICv2m specification,
-> which is implemented in some variation of GIC400.
->
-> This depends on and has been tested with the V7 of "Add support for PCI in AArch64"
-> (https://lkml.org/lkml/2014/3/14/320).
->
-> Suravee Suthikulpanit (2):
->    arm/gic: Add binding probe for GIC400
->    arm/gic: Add supports for GICv2m MSI(-X)
->
->   Documentation/devicetree/bindings/arm/gic.txt |  18 +-
->   drivers/irqchip/Kconfig                       |   6 +
->   drivers/irqchip/Makefile                      |   1 +
->   drivers/irqchip/gic-msi-v2m.c                 | 249 ++++++++++++++++++++++++++
->   drivers/irqchip/gic-msi-v2m.h                 |  20 +++
->   drivers/irqchip/irq-gic.c                     |  23 ++-
->   6 files changed, 313 insertions(+), 4 deletions(-)
->   create mode 100644 drivers/irqchip/gic-msi-v2m.c
->   create mode 100644 drivers/irqchip/gic-msi-v2m.h
->
+> Grr.  Why isn't there an unsigned *int* atomic bitmask type?  Even u64
+> would be better.  unsigned long is useless.
+
+Useless beyond 32 bits. ;)
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
