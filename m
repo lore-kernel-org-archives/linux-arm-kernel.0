@@ -1,35 +1,46 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 24 Jun 2014 10:38:34 -0400
-Subject: [PATCH] arm64: make CONFIG_ZONE_DMA user settable
-In-Reply-To: <20140624141455.GE4489@arm.com>
-References: <1403499924-11214-1-git-send-email-msalter@redhat.com>
- <20140623110937.GB15907@arm.com> <1403529423.755.49.camel@deneb.redhat.com>
- <20140624141455.GE4489@arm.com>
-Message-ID: <1403620714.755.69.camel@deneb.redhat.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 24 Jun 2014 10:45:59 -0400 (EDT)
+Subject: VFP handling in multiplatform feroceon kernels
+In-Reply-To: <5647865.08hn2WHr6u@wuerfel>
+References: <7416978.W29blLsymn@wuerfel>
+ <20140624141423.GP32514@n2100.arm.linux.org.uk>
+ <20140624142505.GF4489@arm.com> <5647865.08hn2WHr6u@wuerfel>
+Message-ID: <alpine.LFD.2.11.1406241038570.16842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-06-24 at 15:14 +0100, Catalin Marinas wrote:
-> On Mon, Jun 23, 2014 at 02:17:03PM +0100, Mark Salter wrote:
-> > On Mon, 2014-06-23 at 12:09 +0100, Catalin Marinas wrote:
-> > > My proposal (in the absence of any kind of description) is to still
-> > > create a ZONE_DMA if we have DMA memory below 32-bit, otherwise just add
-> > > everything (>32-bit) to ZONE_DMA. Basically an extension from your CMA
-> > > patch, make dma_phys_limit static in that file and set it to
-> > > memblock_end_of_DRAM() if no 32-bit DMA. Re-use it in the
-> > > zone_sizes_init() function for ZONE_DMA (maybe with a pr_info for no
-> > > 32-bit only DMA zone).
+On Tue, 24 Jun 2014, Arnd Bergmann wrote:
+
+> On Tuesday 24 June 2014 15:25:05 Catalin Marinas wrote:
+> > On Tue, Jun 24, 2014 at 03:14:23PM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Jun 24, 2014 at 03:10:56PM +0100, Catalin Marinas wrote:
+> > > > On Tue, Jun 24, 2014 at 03:04:14PM +0100, Nicolas Pitre wrote:
+> > > > > On Tue, 24 Jun 2014, Catalin Marinas wrote:
+> > > > > Only the early revision did hijack the ARM9 ID but still. We certainly 
+> > > > > can determine at run time if the platform being booted is equiped with a 
+> > > > > Feroceon before user space is started.  In that case I'd suggest some 
+> > > > > runtime code patching to branch to some out-of-line assembly code for 
+> > > > > Feroceon.
+> > > > 
+> > > > You don't even need to branch to out of line assembly, just branch over
+> > > > the imprecise VFP abort handling in arch/arm/vfp/vfphw.S.
+> > > 
+> > > This is not just about VFP - it's much bigger than that.  Feroceon can't
+> > > use proc-arm926.S (it has errata in the cache maintanence instructions)
+> > > which also need handing.  That's why we have a separate implementation
+> > > (proc-feroceon.S) so that ARM926 is not hurt by this stupidity.
 > > 
-> > There's a performance issue with all memory being in ZONE_DMA. It means
-> > all normal allocations will fail on ZONE_NORMAL and then have to fall
-> > back to ZONE_DMA. It would be better to put some percentage of memory
-> > in ZONE_DMA.
+> > As Arnd suggested, we could enable multi-platform only for newer
+> > Feroceon chips which presumably have different id, keeping
+> > CONFIG_CPU_FEROCEON_OLD_ID disabled.
 > 
-> Is the performance penalty real or just theoretical? I haven't run any
-> benchmarks myself.
-> 
-It is real insofar as you must eat cycles eliminating ZONE_NORMAL from
-consideration in the page allocation hot path. How much that really
-costs, I don't know. But it seems like it could be easily avoided by
-limiting ZONE_DMA size. Is there any reason it needs to be larger than
-4GiB?
+> Note that we do disable CONFIG_CPU_FEROCEON_OLD_ID for both
+> kirkwood_defconfig and mvebu_v5_defconfig, and we don't even
+> support multiplatform on orion5x (yet), which is the platform
+> that needs CONFIG_CPU_FEROCEON_OLD_ID. It would be good to know
+> if all Orion5x suffer from this problem, or just the older ones.
+
+Only the early revisions did suffer from this.
+
+
+Nicolas
