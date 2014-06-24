@@ -1,88 +1,95 @@
-From: imrehg@gmail.com (Gergely Imreh)
-Date: Tue, 24 Jun 2014 17:32:26 +0800
-Subject: [RFC] ARM: vt8500: cleanup start
-In-Reply-To: <5016910.Qn6QdqhQ4L@wuerfel>
-References: <CAJ3iQco9qu8Z7Gm0AtcvV3OPc6C39Hdqjq6tVKMYy5qV2=ASwA@mail.gmail.com>
- <5016910.Qn6QdqhQ4L@wuerfel>
-Message-ID: <CAJ3iQcqvaCbFJ0V4ZJ_cDxA1TN=JemaghUJQgVO_LkEq=DYjbg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jun 2014 11:38:54 +0200
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <20140618100411.GL23945@lee--X1>
+References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
+ <53A160D1.8000908@ti.com> <20140618100411.GL23945@lee--X1>
+Message-ID: <6599289.0ZjjaMbRqj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2014 00:42, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Saturday 24 May 2014 00:10:58 Gergely Imreh wrote:
-> > Hi,
-> >
-> > This is my first post on the list. I'm preparing to contribute to the
-> > Kernel some of
-> > the current SoCs and boards from VIA Embedded.
-> >
-> > That being a big task (understatement), I'm just starting off with a
-> > checking existing
-> > things out around the vt8500 areas, and other SoCs to learn the style.
->
-> Ah, very nice.
->
-> > The style of march-v8500 is not quite like the ones I've seen in e.g.
-> > Thomas Petazzoni
-> > & Free Electrons' (very cool) guides, and started off with updating
-> > things according
-> > to that a bit. I'm just not sure whether this warrant any patches on
-> > their own, hence the
-> > Request for Comments.
-> >
-> > The changes I've made (breaking out the #define sections into a
-> > header, and doing
-> > explicit typecast for the vt8500 map_desc) are in this repo with via-header tag.
->
-> Using a separate header file is only useful if the header is shared between
-> multiple .c files, which is not the case here.
->
-> The explicit typecast in other board files is used because VT8500_REGS_VIRT_BASE
-> is supposed to be of type 'void __iomem *', which is isn't here.
->
+On Wednesday 18 June 2014 11:04:11 Lee Jones wrote:
+> > On Tuesday 17 June 2014 04:53 PM, Lee Jones wrote:
+> > >>> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> > >>> devices. It has 2 ports which it can use for either; both SATA, both
+> > >>> PCIe or one of each in any configuration.
+> > >>
+> > >> I've asked others who wrote multi-phy PHY providers to model each individual
+> > >> PHY as sub-node of the PHY provider. So It's only fair I ask you the same to
+> > >> do. So in this case the dt node should look something like:
+> > >>
+> > >> 	miphy365x_phy: miphy365x at fe382000 {
+> > >> 		compatible = "st,miphy365x-phy";
+> > >> 		#phy-cells = <2>;
+> > >> 		st,syscfg = <&syscfg_rear>;
+> > >> 		channel at 0 {
+> > >> 			reg =	<0xfe382000 0x100>, <0xfe394000 0x100>;
+> > >> 			reg-names = "sata", "pcie";
+> > >> 		}
+> > >>
+> > >> 		channel at 1{
+> > >> 			reg =	<0xfe38a000 0x100>, <0xfe804000 0x100>;
+> > >> 			reg-names = "sata", "pcie";
+> > >> 		}
+> > >>
+> > >> 	};
+> > > 
+> > > I'm interested to know why you've taken this approach, as it makes the
+> > > code much more complex.  The DT framework goes to the trouble of
+> > 
+> > It looks to be much closer representation of the hardware in dt. It also
+> > enables to have more control of each individual PHYs. For example, we can have
+> > something like status="disabled" for channels which is disabled.
+> 
+> If you wanted to disable the channels in this way, you would either
+> have to A) add your own code to parse that property or B) have each
+> channel set itself up as platform device and would probe (or not if
+> status = "disabled") individually.  If you choose the later option,
+> the platform resource would also be populated.
 
-Ok, got it!
+We have of_device_is_available() and for_each_available_child_of_node()
+to check for the status property. This doesn't seem much extra overhead.
 
-> > https://github.com/viaembedded/arm-soc/tree/via-header
-> >
-> > Should this be part of a larger patchset later on, or is it okay just
-> > to send any time like
-> > this? Are these changes worth doing if the functionality itself did
-> > not really change,
-> > just probably the style improves?
->
-> I think a good start would be to split out the reset code into a
-> proper device driver. The register used for reset is part of the
-> "pmc" device that is used in the clock driver, so you can
-> add a reboot/poweroff handler there and register it with arm_pm_restart/
-> pm_power_off.
->
+> > > converting all addresses to to resources so drivers can easily pull
+> > > them out using platform_get_resource() and friends.  Pushing the reg
+> > 
+> > right. Can't we use of_address_to_resource here?
+> 
+> We could, but that would be an extra layer.  We'd be pulling the
+> address, putting it into a resource, then pulling it from the resource
+> for use.  If we're going to be pulling addresses out manually, we're
+> probably better off using of_get_address().  But again, we're just
+> carrying out functionality which is already provided by the
+> framework.
 
-I guess the examples for these that I could see are the ones in
-drivers/power/reset? Or is there a driver that does this well that
-you'd recommend learning from?
+there is also of_ioremap().
 
-I've seen that in drivers/power/reset there's a bunch of X-reset.c,
-X-poweroff.c, X-reboot.c: any actual pattern to these files/naming?
+> > > properties down into a child node means that we have to now iterate
+> > > over the sub-nodes and pull them out manually.  This will lead to a
+> > 
+> > You anyway iterate while creating PHYs based on some constant. Now you have to
+> > iterate over the sub-nodes.
+> > > pretty messy implementation IMHO.
+> 
+> This much is true.
+> 
+> > > Can you point me in the direction of previous implementations where you
+> > > have stipulated the same set of constraints please?
+> > 
+> > ah.. there isn't any. The author of the other multi-phy driver [1] also feels
+> > this will just add to the complexity of the driver.
+> 
+> =:)
+> 
+> > Maybe we should ask the opinion of others?
+> 
+> We could.  I'll CC Arnd as he likes this PHY stuff. :)
+> 
+> > [1] -> http://www.spinics.net/lists/linux-sh/msg32087.html
 
-> It would be nice to also move the VT8500_GPIO_MUX_REG handling out
-> of the mach-* code into drivers/pinctrl/vt8500/, but there may be
-> a good reason why it isn't already done that way.
+Having sub-nodes for each individual PHY managed by a controller seems
+very reasonable to me. Making them show up as separate platform devices
+seems less useful though.
 
-Ok, I'll ask!
-
-> For anything you do, please coordinate with Tony Prisk, who is
-> maintaining the platform.
-
-Yeah, sorry for the very delayed reply. I've been balancing things
-happening internally about more kernel support, and working on the
-Springboard. Been in touch with Tony, and some others from the
-linux-vtwm, very useful so far.
-
-I'm working on getting the current kernel booting on the device I have
-here, after which I'll be able to check out all the areas you
-mentioned.
-
-Cheers,
-   Greg
+	Arnd
