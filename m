@@ -1,231 +1,108 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 24 Jun 2014 11:00:38 -0700
-Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
- regulators
-In-Reply-To: <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
-References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
- <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 24 Jun 2014 11:02:04 -0700
+Subject: [PATCH v7 3/9] seccomp: introduce writer locking
+In-Reply-To: <20140624165216.GA29272@redhat.com>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-4-git-send-email-keescook@chromium.org>
+ <20140624165216.GA29272@redhat.com>
+Message-ID: <CAGXu5j+G8qAkGD7H=3R2iw2ZTqZSrMPa2f=czoEjwSW5wKqUWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yuvaraj,
-
-On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
-> This patch makes use of mmc_regulator_get_supply() to handle
-> the vmmc and vqmmc regulators.Also it moves the code handling
-> the these regulators to dw_mci_set_ios().It turned on the vmmc
-> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
-> during MMC_POWER_OFF.
+On Tue, Jun 24, 2014 at 9:52 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> Kees,
 >
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> ---
->  drivers/mmc/host/dw_mmc.c |   71 ++++++++++++++++++++++-----------------------
->  drivers/mmc/host/dw_mmc.h |    2 ++
->  2 files changed, 36 insertions(+), 37 deletions(-)
+> I am still trying to force myself to read and try to understand what
+> this series does ;) Just a minor nit so far.
 
-Perhaps you could CC me on the whole series for the next version since
-I was involved in privately reviewing previous versions?
+The use-case this solves is when a userspace process does not control
+(or know) when a thread is spawned (e.g. via shared library init, or
+LD_PRELOAD) but wants to make sure seccomp filters have been applied
+to it. Specifically, Chrome, when loading some proprietary graphics
+drivers, will have those drivers spawning threads before there has
+been an ability to call seccomp. While some games can be played to get
+ahead of it, it's not always possible, or racey, depending on the
+drivers. With seccomp thread-sync, we can be certain that all threads
+have had the filter applied.
 
-Overall caveat for my review is that I'm nowhere near an SD/MMC expert.
-
-
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 1ac227c..f5cabce 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -937,6 +937,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->         struct dw_mci_slot *slot = mmc_priv(mmc);
->         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
->         u32 regs;
-> +       int ret;
 >
->         switch (ios->bus_width) {
->         case MMC_BUS_WIDTH_4:
-> @@ -975,16 +976,41 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> On 06/23, Kees Cook wrote:
+>>
+>> @@ -1142,6 +1168,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>>  {
+>>       int retval;
+>>       struct task_struct *p;
+>> +     unsigned long irqflags;
+>>
+>>       if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
+>>               return ERR_PTR(-EINVAL);
+>> @@ -1196,7 +1223,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>>               goto fork_out;
+>>
+>>       ftrace_graph_init_task(p);
+>> -     get_seccomp_filter(p);
+>>
+>>       rt_mutex_init_task(p);
+>>
+>> @@ -1434,7 +1460,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>>               p->parent_exec_id = current->self_exec_id;
+>>       }
+>>
+>> -     spin_lock(&current->sighand->siglock);
+>> +     spin_lock_irqsave(&current->sighand->siglock, irqflags);
+>> +
+>> +     /*
+>> +      * Copy seccomp details explicitly here, in case they were changed
+>> +      * before holding tasklist_lock.
+>> +      */
+>> +     copy_seccomp(p);
+>>
+>>       /*
+>>        * Process group and session signals need to be delivered to just the
+>> @@ -1446,7 +1478,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>>       */
+>>       recalc_sigpending();
+>>       if (signal_pending(current)) {
+>> -             spin_unlock(&current->sighand->siglock);
+>> +             spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+>>               write_unlock_irq(&tasklist_lock);
+>>               retval = -ERESTARTNOINTR;
+>>               goto bad_fork_free_pid;
+>> @@ -1486,7 +1518,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+>>       }
+>>
+>>       total_forks++;
+>> -     spin_unlock(&current->sighand->siglock);
+>> +     spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+>>       write_unlock_irq(&tasklist_lock);
+>>       proc_fork_connector(p);
+>>       cgroup_post_fork(p);
 >
->         switch (ios->power_mode) {
->         case MMC_POWER_UP:
-> +               if ((!IS_ERR(mmc->supply.vmmc)) &&
-> +                               !test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
-> +                       ret = regulator_enable(mmc->supply.vmmc);
-> +                       if (!ret)
-> +                               set_bit(DW_MMC_CARD_POWERED, &slot->flags);
-> +               }
+> It seems that the only change copy_process() needs is copy_seccomp() under the locks.
+> Everythinh else (irqflags games) looks obviously unneeded?
 
-As per below, I'm not sure why you'd want to turn on vqmmc and vmmc at
-different times.
+I got irq lock dep warnings without these changes. If they're
+unneeded, that's totally fine by me, but some change (either this or
+markings to keep lockdep happy) is needed.
 
-Also: if you fail to turn on either of the regulators it feels like
-you should print a pretty nasty error message since your device will
-almost certainly not work.
-
-
->                 set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
->                 regs = mci_readl(slot->host, PWREN);
->                 regs |= (1 << slot->id);
->                 mci_writel(slot->host, PWREN, regs);
->                 break;
->         case MMC_POWER_OFF:
-> +               if (!IS_ERR(mmc->supply.vqmmc) &&
-> +                               test_bit(DW_MMC_IO_POWERED, &slot->flags)) {
-> +                       ret = regulator_disable(mmc->supply.vqmmc);
-> +                       if (!ret)
-> +                               clear_bit(DW_MMC_IO_POWERED, &slot->flags);
-> +               }
-> +               if (!IS_ERR(mmc->supply.vmmc) &&
-> +                               test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
-> +                       ret = regulator_disable(mmc->supply.vmmc);
-> +                       if (!ret)
-> +                               clear_bit(DW_MMC_CARD_POWERED, &slot->flags);
-> +               }
->                 regs = mci_readl(slot->host, PWREN);
->                 regs &= ~(1 << slot->id);
->                 mci_writel(slot->host, PWREN, regs);
->                 break;
-> +       case MMC_POWER_ON:
-> +               if (!IS_ERR(mmc->supply.vqmmc) &&
-> +                               !test_bit(DW_MMC_IO_POWERED, &slot->flags)) {
-> +                       ret = regulator_enable(mmc->supply.vqmmc);
-> +                       if (!ret)
-> +                               set_bit(DW_MMC_IO_POWERED, &slot->flags);
-> +               }
->         default:
->                 break;
->         }
-> @@ -2067,7 +2093,13 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->                 mmc->f_max = freq[1];
->         }
+>> @@ -524,6 +528,9 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
+>>       }
+>>  #endif
+>>
+>> +     if (unlikely(!lock_task_sighand(current, &irqflags)))
+>> +             goto out_free;
+>> +
 >
-> -       mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
-> +       /*if there are external regulators, get them*/
-> +       ret = mmc_regulator_get_supply(mmc);
-> +       if (ret == -EPROBE_DEFER)
-> +               goto err_setup_bus;
-> +
-> +       if (!mmc->ocr_avail)
-> +               mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
->
->         if (host->pdata->caps)
->                 mmc->caps = host->pdata->caps;
-> @@ -2133,7 +2165,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->
->  err_setup_bus:
->         mmc_free_host(mmc);
-> -       return -EINVAL;
-> +       return ret;
->  }
->
->  static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
-> @@ -2375,24 +2407,6 @@ int dw_mci_probe(struct dw_mci *host)
->                 }
->         }
->
-> -       host->vmmc = devm_regulator_get_optional(host->dev, "vmmc");
-> -       if (IS_ERR(host->vmmc)) {
-> -               ret = PTR_ERR(host->vmmc);
-> -               if (ret == -EPROBE_DEFER)
-> -                       goto err_clk_ciu;
-> -
-> -               dev_info(host->dev, "no vmmc regulator found: %d\n", ret);
-> -               host->vmmc = NULL;
-> -       } else {
-> -               ret = regulator_enable(host->vmmc);
-> -               if (ret) {
-> -                       if (ret != -EPROBE_DEFER)
-> -                               dev_err(host->dev,
-> -                                       "regulator_enable fail: %d\n", ret);
-> -                       goto err_clk_ciu;
-> -               }
-> -       }
-> -
->         host->quirks = host->pdata->quirks;
->
->         spin_lock_init(&host->lock);
-> @@ -2536,8 +2550,6 @@ err_workqueue:
->  err_dmaunmap:
->         if (host->use_dma && host->dma_ops->exit)
->                 host->dma_ops->exit(host);
-> -       if (host->vmmc)
-> -               regulator_disable(host->vmmc);
->
->  err_clk_ciu:
->         if (!IS_ERR(host->ciu_clk))
-> @@ -2573,9 +2585,6 @@ void dw_mci_remove(struct dw_mci *host)
->         if (host->use_dma && host->dma_ops->exit)
->                 host->dma_ops->exit(host);
->
-> -       if (host->vmmc)
-> -               regulator_disable(host->vmmc);
-> -
->         if (!IS_ERR(host->ciu_clk))
->                 clk_disable_unprepare(host->ciu_clk);
->
-> @@ -2592,9 +2601,6 @@ EXPORT_SYMBOL(dw_mci_remove);
->   */
->  int dw_mci_suspend(struct dw_mci *host)
->  {
-> -       if (host->vmmc)
-> -               regulator_disable(host->vmmc);
-> -
+> Unless this task is exiting (namely, it has already called exit_notify()),
+> lock_task_sighand(current) must not fail. Looks like you can simply do
+> spin_lock_irq(->siglock).
 
-Just to check: have you tested suspend/resume with the various
-combinations of "keep-power-in-suspend" and "non-removable" with your
-patch.  I remember some of the logic being a bit complicated...
+Okay. I wasn't sure if I needed to be extra careful here or not. I
+opted for just using lock_task_sighand since that seemed to be the
+most used. :)
 
+-Kees
 
->         return 0;
->  }
->  EXPORT_SYMBOL(dw_mci_suspend);
-> @@ -2603,15 +2609,6 @@ int dw_mci_resume(struct dw_mci *host)
->  {
->         int i, ret;
->
-> -       if (host->vmmc) {
-> -               ret = regulator_enable(host->vmmc);
-> -               if (ret) {
-> -                       dev_err(host->dev,
-> -                               "failed to enable regulator: %d\n", ret);
-> -                       return ret;
-> -               }
-> -       }
-> -
->         if (!dw_mci_ctrl_all_reset(host)) {
->                 ret = -ENODEV;
->                 return ret;
-> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-> index 738fa24..5c95d00 100644
-> --- a/drivers/mmc/host/dw_mmc.h
-> +++ b/drivers/mmc/host/dw_mmc.h
-
-As I mentioned in my previous review, you should be removing "struct
-regulator *vmmc; /* Power regulator */" from "struct dw_mci" since
-you're no longer populating it.
-
-
-> @@ -225,6 +225,8 @@ struct dw_mci_slot {
->         unsigned long           flags;
->  #define DW_MMC_CARD_PRESENT    0
->  #define DW_MMC_CARD_NEED_INIT  1
-> +#define DW_MMC_CARD_POWERED    2
-> +#define DW_MMC_IO_POWERED      3
-
-I don't really think you should have two bits here.  From my
-understanding of SD cards there should be very little reason to have
-vqmmc and vmmc not powered at the same time.
-
-If vqmmc is powered but vmmc is not powered then you'll get leakage
-and the card can pull power through the IO lines which is bad for the
-card.
-
-I don't think that powering vmmc without vqmmc for a short time is
-terribly bad but I can't quite see a good use case.  Essentially
-you're powering the card but not able to talk to it, right?  I'm not
-sure what the state of the IO lines would be (either driven low or
-floating) since presumably the pullups on the lines are powered by
-vqmmc too.
-
-
->         int                     id;
->         int                     last_detect_state;
->  };
+-- 
+Kees Cook
+Chrome OS Security
