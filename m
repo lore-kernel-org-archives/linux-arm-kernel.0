@@ -1,100 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Jun 2014 12:22:50 -0400 (EDT)
-Subject: [PATCH v6 4/4] ARM: Add KGDB/KDB FIQ debugger generic code
-In-Reply-To: <1403623097-1153-5-git-send-email-daniel.thompson@linaro.org>
-References: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
- <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
- <1403623097-1153-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.LFD.2.11.1406241201180.16842@knanqh.ubzr>
+From: denis@eukrea.com (Denis Carikli)
+Date: Tue, 24 Jun 2014 18:25:19 +0200
+Subject: [PATCH v14 04/10] imx-drm: use defines for clock polarity settings
+In-Reply-To: <20140624151323.GU32514@n2100.arm.linux.org.uk>
+References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+ <1402913484-25910-4-git-send-email-denis@eukrea.com>
+ <20140624151323.GU32514@n2100.arm.linux.org.uk>
+Message-ID: <53A9A66F.20401@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jun 2014, Daniel Thompson wrote:
-
-> From: Anton Vorontsov <anton.vorontsov@linaro.org>
-> 
-> The FIQ debugger may be used to debug situations when the kernel stuck
-> in uninterruptable sections, e.g. the kernel infinitely loops or
-> deadlocked in an interrupt or with interrupts disabled.
-> 
-> By default KGDB FIQ is disabled in runtime, but can be enabled with
-> kgdb_fiq.enable=1 kernel command line option.
-> 
-> Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
-> Signed-off-by: John Stultz <john.stultz@linaro.org>
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm/Kconfig                 |   2 +
->  arch/arm/Kconfig.debug           |  18 ++++++
->  arch/arm/include/asm/kgdb.h      |   7 +++
->  arch/arm/kernel/Makefile         |   1 +
->  arch/arm/kernel/kgdb_fiq.c       | 124 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/kgdb_fiq_entry.S |  87 +++++++++++++++++++++++++++
->  6 files changed, 239 insertions(+)
->  create mode 100644 arch/arm/kernel/kgdb_fiq.c
->  create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
-
+On 06/24/2014 05:13 PM, Russell King - ARM Linux wrote:
 [...]
+> If you'd like to send me better commit messages for
+> these patches, I'll add them to what I already have:
 
-> +static long kgdb_fiq_setup_stack(void *info)
-> +{
-> +	struct pt_regs regs;
-> +
-> +	regs.ARM_sp = __get_free_pages(GFP_KERNEL, THREAD_SIZE_ORDER) +
-> +			THREAD_START_SP;
-> +	WARN_ON(!regs.ARM_sp);
+> 	imx-drm: use defines for clock polarity settings
+The comment of the clk_pol field of the ipu_di_signal_cfg struct was 
+inverted.
+Instead of merely inverting the comment, the values of clk_pol were defined.
 
-Isn't this rather fatal if you can't allocate any stack? Why not using 
-BUG_ON(), or better yet propagate a proper error code back?
+> 	imx-drm: add RGB666 support for parallel display.
+This permits to drive parallel displays that expect the RGB666 color format.
+>
+> It may also be worth describing the RGB666 format in the commit message
+> for:
+>
+> 	v4l2: add new V4L2_PIX_FMT_RGB666 pixel format.
+The RGB666 color format encodes 6 bits for each color(red, green and 
+blue), linearly.
+It looks like this in memory:
+0                17
+RRRRRRGGGGGGBBBBBB
 
-> +
-> +	set_fiq_regs(&regs);
-> +	return 0;
-> +}
-> +
-> +/**
-> + * kgdb_fiq_enable_nmi - Manage NMI-triggered entry to KGDB
-> + * @on: Flag to either enable or disable an NMI
-> + *
-> + * This function manages NMIs that usually cause KGDB to enter. That is, not
-> + * all NMIs should be enabled or disabled, but only those that issue
-> + * kgdb_handle_exception().
-> + *
-> + * The call counts disable requests, and thus allows to nest disables. But
-> + * trying to enable already enabled NMI is an error.
-> + */
-> +static void kgdb_fiq_enable_nmi(bool on)
-> +{
-> +	static atomic_t cnt;
-> +	int ret;
-> +
-> +	ret = atomic_add_return(on ? 1 : -1, &cnt);
-> +	if (ret > 1 && on) {
-> +		/*
-> +		 * There should be only one instance that calls this function
-> +		 * in "enable, disable" order. All other users must call
-> +		 * disable first, then enable. If not, something is wrong.
-> +		 */
-> +		WARN_ON(1);
-> +		return;
-> +	}
-
-Minor style suggestion:
-
-	/*
-	 * There should be only one instance that calls this function
-	 * in "enable, disable" order. All other users must call
-	 * disable first, then enable. If not, something is wrong.
-	 */
-	if (WARN_ON(ret > 1 && on))
-		return;
-
-Other than that...
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+Denis.
