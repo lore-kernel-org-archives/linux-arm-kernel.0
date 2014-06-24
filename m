@@ -1,37 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jun 2014 20:28:30 +0100
-Subject: [PATCH RFC v2 0/8] component helper improvements
-Message-ID: <20140624192830.GC20555@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 24 Jun 2014 20:29:02 +0100
+Subject: [PATCH RFC v2 2/8] component: ignore multiple additions of the same
+ component
+In-Reply-To: <20140624192830.GC20555@n2100.arm.linux.org.uk>
+References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
+Message-ID: <E1WzWOs-0007zX-Vb@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A while back, Laurent raised some comments about the component helper,
-which this patch set starts to address.
+Permit masters to call component_master_add_child() and match the same
+child multiple times.  This may happen if there's multiple connections
+to a single component device from other devices.  In such scenarios,
+we should not return a failure, but instead ignore the attempt.
 
-The first point it addresses is the repeated parsing inefficiency when
-deferred probing occurs.  When DT is used, the structure of the
-component helper today means that masters end up parsing the device
-tree for each attempt to re-bind the driver.
-									        
-We remove this inefficiency by creating an array of matching data and
-functions, which the component helper can use internally to match up
-components to their master.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/base/component.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-The second point was the inefficiency of destroying the list of
-components each time we saw a failure.	We did this to ensure that
-we kept things correctly ordered: component bind order matters.
-As we have an array instead, the array is already ordered, so we
-use this array to store the component pointers instead of a list,
-and remember which are duplicates (and thus should be avoided.)
-Avoiding the right duplicates matters as we walk the array in the
-opposite direction at tear down.
-
- drivers/base/component.c               | 249 ++++++++++++++++++++++-----------
- drivers/gpu/drm/msm/msm_drv.c          |  83 +++++------
- drivers/staging/imx-drm/imx-drm-core.c |  57 +-------
- include/linux/component.h              |   8 +-
- 4 files changed, 208 insertions(+), 189 deletions(-)
-
+diff --git a/drivers/base/component.c b/drivers/base/component.c
+index d0ebd4431736..55813e91bf0d 100644
+--- a/drivers/base/component.c
++++ b/drivers/base/component.c
+@@ -69,6 +69,11 @@ static void component_detach_master(struct master *master, struct component *c)
+ 	c->master = NULL;
+ }
+ 
++/*
++ * Add a component to a master, finding the component via the compare
++ * function and compare data.  This is safe to call for duplicate matches
++ * and will not result in the same component being added multiple times.
++ */
+ int component_master_add_child(struct master *master,
+ 	int (*compare)(struct device *, void *), void *compare_data)
+ {
+@@ -76,11 +81,12 @@ int component_master_add_child(struct master *master,
+ 	int ret = -ENXIO;
+ 
+ 	list_for_each_entry(c, &component_list, node) {
+-		if (c->master)
++		if (c->master && c->master != master)
+ 			continue;
+ 
+ 		if (compare(c->dev, compare_data)) {
+-			component_attach_master(master, c);
++			if (!c->master)
++				component_attach_master(master, c);
+ 			ret = 0;
+ 			break;
+ 		}
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
