@@ -1,43 +1,28 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 24 Jun 2014 19:27:53 +0200
-Subject: [PATCH v7 7/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <1403560693-21809-8-git-send-email-keescook@chromium.org>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-8-git-send-email-keescook@chromium.org>
-Message-ID: <20140624172753.GA31435@redhat.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 24 Jun 2014 21:29:58 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBjbGstaW14NTEtaW14NTM6IFJlbW92ZSBjbGtf?=
+ =?UTF-8?B?cmVnaXN0ZXJfY2xrZGV2KCkg?=
+In-Reply-To: <1403629146-19245-1-git-send-email-fabio.estevam@freescale.com>
+References: <1403629146-19245-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1403630998.566648963@f429.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23, Kees Cook wrote:
->
-> +static pid_t seccomp_can_sync_threads(void)
-> +{
-> +	struct task_struct *thread, *caller;
-> +
-> +	BUG_ON(write_can_lock(&tasklist_lock));
-> +	BUG_ON(!spin_is_locked(&current->sighand->siglock));
-> +
-> +	if (current->seccomp.mode != SECCOMP_MODE_FILTER)
-> +		return -EACCES;
-> +
-> +	/* Validate all threads being eligible for synchronization. */
-> +	thread = caller = current;
-> +	for_each_thread(caller, thread) {
-> +		pid_t failed;
-> +
-> +		if (thread->seccomp.mode == SECCOMP_MODE_DISABLED ||
-> +		    (thread->seccomp.mode == SECCOMP_MODE_FILTER &&
-> +		     is_ancestor(thread->seccomp.filter,
-> +				 caller->seccomp.filter)))
-> +			continue;
-> +
-> +		/* Return the first thread that cannot be synchronized. */
-> +		failed = task_pid_vnr(thread);
-> +		/* If the pid cannot be resolved, then return -ESRCH */
-> +		if (failed == 0)
-> +			failed = -ESRCH;
+Tue, 24 Jun 2014 13:59:06 -0300 ?? Fabio Estevam <fabio.estevam@freescale.com>:
+> mx51 and mx53 are device tree only platforms, so we no longer need all these
+> calls to clk_register_clkdev().
+> 
+> Tested on imx51-babbage and imx53-qsb boards.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c | 78 -------------------------------------
+>  1 file changed, 78 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+...
+> -	clk_register_clkdev(clk[IMX5_CLK_CPU_PODF], NULL, "cpu0");
 
-forgot to mention, task_pid_vnr() can't fail. sighand->siglock is held,
-for_each_thread() can't see a thread which has passed unhash_process().
+This clock is used by cpufreq driver.
 
-Oleg.
+---
