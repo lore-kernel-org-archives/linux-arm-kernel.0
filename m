@@ -1,59 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jun 2014 09:54:56 +0100
-Subject: [PATCH] ARM: ptrace: reload syscall number after secure_computing()
- check
-Message-ID: <1403600096-26088-1-git-send-email-will.deacon@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 24 Jun 2014 11:02:01 +0200
+Subject: [PATCH V2 0/2] Sound support for Exynos4412 Odroid X2, U3 board
+In-Reply-To: <CAD8Lp46gqbV9gDfrH2hbVnF7s6wK6ASBdsX7vn0L0CFAHXSemg@mail.gmail.com>
+References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
+ <CAD8Lp44h6zc2Rt2MGLjhmNG-YB0kYCWf5G7hX5JmdmBfc1PvKg@mail.gmail.com>
+ <53A856AE.1030202@samsung.com>
+ <CAD8Lp46gqbV9gDfrH2hbVnF7s6wK6ASBdsX7vn0L0CFAHXSemg@mail.gmail.com>
+Message-ID: <53A93E89.2030901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the syscall tracing path, we call out to secure_computing() to allow
-seccomp to check the syscall number being attempted. As part of this, a
-SIGTRAP may be sent to the tracer and the syscall could be re-written by
-a subsequent SET_SYSCALL ptrace request. Unfortunately, this new syscall
-is ignored by the current code unless TIF_SYSCALL_TRACE is also set on
-the current thread.
+Hello,
 
-This patch slightly reworks the enter path of the syscall tracing code
-so that we always reload the syscall number from
-current_thread_info()->syscall after the potential ptrace traps.
+On 2014-06-24 10:35, Daniel Drake wrote:
+> On Mon, Jun 23, 2014 at 5:32 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> I could reproduce such behaviour on the U3 board, but only with u-boot
+>> which sets the MPLL clock frequency (fout_mpll) to 880 MHz, rather
+>> than 800 MHz, which was the case in my original environment.
+>> All fout_mpll child clocks have then different frequency values
+>> in both cases.
+>> It's a bit strange though, because frequencies of all the audio
+>> subsystem clocks seem to be same anyway:
+> I'm using the standard uboot from hardkernel.
+>
+>> # cat /sys/kernel/debug/clk/clk_summary
+> This command makes the kernel totally hang, weird.
 
-Tested-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/ptrace.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+This is known issue with clocks vs. ISP power domain. We should really 
+fix this in exynos4 clock driver.
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 0dd3b79b15c3..0c27ed6f3f23 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -908,7 +908,7 @@ enum ptrace_syscall_dir {
- 	PTRACE_SYSCALL_EXIT,
- };
- 
--static int tracehook_report_syscall(struct pt_regs *regs,
-+static void tracehook_report_syscall(struct pt_regs *regs,
- 				    enum ptrace_syscall_dir dir)
- {
- 	unsigned long ip;
-@@ -926,7 +926,6 @@ static int tracehook_report_syscall(struct pt_regs *regs,
- 		current_thread_info()->syscall = -1;
- 
- 	regs->ARM_ip = ip;
--	return current_thread_info()->syscall;
- }
- 
- asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
-@@ -938,7 +937,9 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
- 		return -1;
- 
- 	if (test_thread_flag(TIF_SYSCALL_TRACE))
--		scno = tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
-+		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
-+
-+	scno = current_thread_info()->syscall;
- 
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		trace_sys_enter(regs, scno);
+> # speaker-test -c 2 -t wav -l 2 -p 1024
+>
+> This plays back fine.
+>
+> Could it be a problem with the samsung-i2s driver, not correctly
+> flushing at the right times?
+> Or do you think the problem is more likely to be clock-related?
+
+Hard to say right now, but at least we need to test a bit more our 
+solutions with different initial clocks configuration.
+
+Best regards
 -- 
-2.0.0
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
