@@ -1,77 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Jun 2014 14:09:30 +0100
-Subject: [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
-In-Reply-To: <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
- <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
- <20140624100220.GK32514@n2100.arm.linux.org.uk> <53A953E6.2030503@nvidia.com>
- <53A95910.20104@nvidia.com>
- <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
-Message-ID: <20140624130930.GN32514@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jun 2014 15:17:06 +0200
+Subject: VFP handling in multiplatform feroceon kernels
+Message-ID: <7416978.W29blLsymn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 09:23:05PM +0900, Alexandre Courbot wrote:
-> On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> > The only alternative I see here is to flush the CPU caches when syncing for
-> > the device, and invalidate them for the other direction. Of course if the
-> > device has caches on its side as well the opposite operation must also be
-> > done for it. Guess the only way is to handle it all by ourselves here. :/
-> 
-> ... and it really sucks. Basically if we cannot use the DMA API here
-> we will lose the convenience of having a portable API that does just
-> the right thing for the underlying platform. Without it we would have
-> to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
-> have support for ARM.
-> 
-> The usage of the DMA API that we are doing might be illegal, but in
-> essence it does exactly what we need - at least for ARM. What are the
-> alternatives?
+Since 3.16, we have the ability to build a multiplatform kernel
+that includes both kirkwood (feroceon) and some other ARMv5 CPU.
 
-It may seem /to you/ as a driver developer to be the easiest thing in
-the world to abuse an API in a way that it's not supposed to be used,
-and it is easy to do that.
+I accidentally stumbled over a bug in the VFP code that looks
+like it will break at least ARM9 VFP support if CPU_FEROCEON
+is also enabled, introduced by this (old) commit:
 
-However, what you're actually saying is that you don't respect your
-fellow kernel developers who have to maintain the other side of that
-interface.  When they need to change the implementation of that
-interface, what if those changes then screw your abuse of that
-interface.
+commit 85d6943af50537d3aec58b967ffbd3fec88453e9
+Author: Catalin Marinas <catalin.marinas@arm.com>
+Date:   Sat May 30 14:00:18 2009 +0100
 
-The reason we define the behaviours and properties of APIs is to give
-both the user and the implementer of the API some degree of latitude
-in how that interface works, so that it can be maintained into the
-future.  If abuses (such as these) are allowed, then we've lost,
-because the interface can no longer be sanely maintained - especially
-if driver authors eventually end up not caring about their pile of
-abuse they've created after they've moved on to new wonderful hardware.
+    Fix the VFP handling on the Feroceon CPU
+    
+    This CPU generates synchronous VFP exceptions in a non-standard way -
+    the FPEXC.EX bit set but without the FPSCR.IXE bit being set like in the
+    VFP subarchitecture 1 or just the FPEXC.DEX bit like in VFP
+    subarchitecture 2. The main problem is that the faulty instruction
+    (which needs to be emulated in software) will be restarted several times
+    (normally until a context switch disables the VFP). This patch ensures
+    that the VFP exception is treated as synchronous.
+    
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+    Cc: Nicolas Pitre <nico@cam.org>
 
-With an API such as the DMA API, where we have hundreds, if not a
-thousand users of it, this /really/ matters.
+ diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+ index 83c4e38..1aeae38 100644 
+ --- a/arch/arm/vfp/vfphw.S
+ +++ b/arch/arm/vfp/vfphw.S
+ @@ -100,6 +100,7 @@ ENTRY(vfp_support_entry)
+        beq     no_old_VFP_process
+        VFPFSTMIA r4, r5                @ save the working registers
+        VFPFMRX r5, FPSCR               @ current status
+ +#ifndef CONFIG_CPU_FEROCEON
+        tst     r1, #FPEXC_EX           @ is there additional state to save?
+        beq     1f
+        VFPFMRX r6, FPINST              @ FPINST (only if FPEXC.EX is set)
+ @@ -107,6 +108,7 @@ ENTRY(vfp_support_entry)
+        beq     1f
+        VFPFMRX r8, FPINST2             @ FPINST2 if needed (and present)
+  1:
+ +#endif
+        stmia   r4, {r1, r5, r6, r8}    @ save FPEXC, FPSCR, FPINST, FPINST2
+                                        @ and point r4 at the word at the
+                                        @ start of the register dump
+   ...
 
-We've been here before with the DMA API on older ARM platforms, where
-we've had people abusing the API or going beneath the API because "it
-does what they need it to", which then makes stuff much harder to change
-at architecture level.
 
-Last time it happened, it was when ARMv6 came along and ARM moved away
-from VIVT caches.  The options were either to break the crap drivers
-and support ARMv6+ CPUs, or keep the crap drivers working and not
-support DMA in any shape or form on ARMv6+.
+Any ideas for how this should be done better? I suppose we need a run-time
+check for feroceon of some sort.
 
-Obviously, this was too important to for one or two abusive drivers to
-block, so I changed the architecture level /anyway/ and just said screw
-the drivers which end up being broken by their short-sightedness, they
-can either rot or someone else can fix them.
-
-I have no beef for intentionally breaking stuff when people abuse well
-defined interfaces and/or refuse to discuss their requirements when
-interfaces don't quite do what they want - or worse, refuse to listen
-to objections.
-
-As I say, it's disrespectful to your fellow kernel developers to abuse
-well defined interfaces.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+	Arnd
