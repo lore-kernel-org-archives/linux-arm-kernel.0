@@ -1,105 +1,75 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 25 Jun 2014 01:19:27 +0400
-Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <666f39dbf0f149c6946d4c2665d3d85d@HKXPR06MB168.apcprd06.prod.outlook.com>
-References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
- <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
- <53A209DA.9000000@cogentembedded.com>
- <20a0a16226d54b0e8d6f68e41046bbf2@HKXPR06MB168.apcprd06.prod.outlook.com>
- <53A897EF.2020804@cogentembedded.com>
- <666f39dbf0f149c6946d4c2665d3d85d@HKXPR06MB168.apcprd06.prod.outlook.com>
-Message-ID: <53A9EB5F.4050708@cogentembedded.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 24 Jun 2014 14:33:20 -0700
+Subject: [PATCH] ARM: DTS: correct the capability string for mmc0
+In-Reply-To: <034701cf8ed7$70c78330$52568990$@samsung.com>
+References: <1403522420-1208-1-git-send-email-ch.naveen@samsung.com>
+ <034701cf8ed7$70c78330$52568990$@samsung.com>
+Message-ID: <CAD=FV=XJpx_otzW-dWNj1rnXMYab7vPGjo2KNirwyVKtEKat2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 06/24/2014 02:01 PM, Phil Edworthy wrote:
+On Mon, Jun 23, 2014 at 4:36 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Naveen Krishna Chatradhi wrote:
+>>
+>> MMC capability for HS200 is parsed in mmc/core/host.c as
+>> dts string "mmc-hs200-1_8v".
+>>
+>> This patch corrects the dts string for Exynos5420 based peach-pit
+>> and Exynos5800 based peach-pi boards.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    2 +-
+>>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    2 +-
+>>  2 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-
+>> peach-pit.dts
+>> index 7649982..7dea480 100644
+>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> @@ -173,7 +173,7 @@
+>>       status = "okay";
+>>       num-slots = <1>;
+>>       broken-cd;
+>> -     caps2-mmc-hs200-1_8v;
+>> +     mmc-hs200-1_8v;
+>>       supports-highspeed;
+>>       non-removable;
+>>       card-detect-delay = <200>;
+>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-
+>> peach-pi.dts
+>> index 2c2c137..bb3ee76 100644
+>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> @@ -171,7 +171,7 @@
+>>       status = "okay";
+>>       num-slots = <1>;
+>>       broken-cd;
+>> -     caps2-mmc-hs200-1_8v;
+>> +     mmc-hs200-1_8v;
+>>       supports-highspeed;
+>>       non-removable;
+>>       card-detect-delay = <200>;
+>> --
+>> 1.7.9.5
+>
+> Applied, thanks.
 
->>>>       I'm investigating an imprecise external abort occurring once userland is
->>>> started when I have NetMos
+As an FYI: this patch (while correct) will likely cause sporadic boot
+failures until Sonny and my patches land:
 
->>      Or is it MosChip now? Can't remember all their renames. :-)
+* https://patchwork.kernel.org/patch/4323921/
+  mmc: dw_mmc: Make sure we don't get stuck when we get an error
 
-> Do you know of somewhere I can buy a card with this chipset in the EU? I had a
-> quick search but couldn't find anything.
+* https://patchwork.kernel.org/patch/4213211/
+  mmc: dw_mmc: change to use recommended reset procedure
 
-    No. But we probably can send such card to you.
+In the very least we got sporadic boot failures locally when we
+enabled hs200 and didn't have the "don't get stuck" patch.  I will
+also note that it would have been nice had this patch title included
+the words exynos and/or pit/pi in it.
 
-[...]
-
->>>>> +
->>>>> +	/* First resource is for IO */
->>>>> +	mask = PAR_ENABLE;
->>>>> +	if (res->flags & IORESOURCE_IO)
->>>>> +		mask |= IO_SPACE;
-
->>>>       For the memory space this works OK as you're identity-mapping the
->>>> memory
->>>> ranges in your device trees. However, for the I/O space this means that it
->>>> won't work as the BARs in the PCIe devices get programmed with the PCI bus
->>>> addresses but the PCIe window translation register is programmed with a
->>>> CPU
->>>> address which don't at all match (given your device trees) and hence one
->>>> can't
->>>> access the card's I/O mapped registers at all...
-
->>> Hmm, I couldn't find any cards that supported I/O, so I wasn't able to test
->>> this. Clearly this is an issue that needs looking into.
-
->>      Will you look into it then, or should I?
-
-> I'll look at it.
-
-    Thanks.
-
-[...]
-
->>>>> +
->>>>> +		if (win > PCI_MAX_RESOURCES)
->>>>> +			break;
->>>>> +	}
->>>>> +
->>>>> +	 err = rcar_pcie_parse_map_dma_ranges(pcie, pdev->dev.of_node);
->>>>> +	 if (err)
->>>>> +		return err;
->>>>> +
->>>>> +	of_id = of_match_device(rcar_pcie_of_match, pcie->dev);
->>>>> +	if (!of_id || !of_id->data)
->>>>> +		return -EINVAL;
->>>>> +	hw_init_fn = of_id->data;
->>>>> +
->>>>> +	/* Failure to get a link might just be that no cards are inserted */
->>>>> +	err = hw_init_fn(pcie);
->>>>> +	if (err) {
->>>>> +		dev_info(&pdev->dev, "PCIe link down\n");
->>>>> +		return 0;
-
->>>>       Not quite sure why you exit normally here without enabling the
->>>> hardware.
->>>> I think the internal bridge should be visible regardless of whether link is
->>>> detected or not...
-
->>> Why would you want to see the bridge when you can do nothing with it?
->> Aren't
-
->>      Because it's the way PCI works. You have the built-in devices always
->> present and seen on a PCI bus. :-)
-
->>> you are just wasting resources?
-
->>      I think it's rather you who are wasting resources. ;-) Why not just fail
->> the probe when you have no link?
-
-> Ah, so we currently have a half-way house... not failing the probe, but not
-> enabling the HW. Either all or nothing would be preferable.
-
-    Actually, I tried ignoring the link test and the kernel died horrible 
-death without any console output. :-/ Having enabled the earlyprintk support, 
-I was able to see the reason: panic("PCI: unable to scan bus!") in 
-arch/arm/kernel/bios32.c...
-
-> Thanks
-> Phil
-
-WBR, Sergei
+-Doug
