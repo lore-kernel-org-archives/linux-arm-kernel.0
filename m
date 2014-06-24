@@ -1,58 +1,85 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Tue, 24 Jun 2014 10:19:15 -0300
-Subject: [PATCH 02/10] serial: 8250_dw: support DMA on the OF case
-In-Reply-To: <CAGb2v676GgfHnR-XWdQCa-ecYtYRxePS1dgGL6QqbntUkBvi_g@mail.gmail.com>
-References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
- <1402890635-12342-3-git-send-email-emilio@elopez.com.ar>
- <CAGb2v676GgfHnR-XWdQCa-ecYtYRxePS1dgGL6QqbntUkBvi_g@mail.gmail.com>
-Message-ID: <53A97AD3.6060804@elopez.com.ar>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 24 Jun 2014 22:25:34 +0900
+Subject: [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
+In-Reply-To: <20140624130930.GN32514@n2100.arm.linux.org.uk>
+References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+ <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
+ <20140624100220.GK32514@n2100.arm.linux.org.uk>
+ <53A953E6.2030503@nvidia.com> <53A95910.20104@nvidia.com>
+ <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
+ <20140624130930.GN32514@n2100.arm.linux.org.uk>
+Message-ID: <CAAVeFuKah7yeTpzt+BySFGs7vSkuOw5GLWvJp5-b63HZ_G8=yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-El 21/06/14 10:56, Chen-Yu Tsai escribi?:
-> On Mon, Jun 16, 2014 at 11:50 AM, Emilio L?pez <emilio@elopez.com.ar> wrote:
->> Currently, DMA properties on the DT are ignored when using the 8250_dw
->> driver. With this patch, DMA will be used when available.
+On Tue, Jun 24, 2014 at 10:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jun 24, 2014 at 09:23:05PM +0900, Alexandre Courbot wrote:
+>> On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>> > The only alternative I see here is to flush the CPU caches when syncing for
+>> > the device, and invalidate them for the other direction. Of course if the
+>> > device has caches on its side as well the opposite operation must also be
+>> > done for it. Guess the only way is to handle it all by ourselves here. :/
 >>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
->>   drivers/tty/serial/8250/8250_dw.c | 7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
+>> ... and it really sucks. Basically if we cannot use the DMA API here
+>> we will lose the convenience of having a portable API that does just
+>> the right thing for the underlying platform. Without it we would have
+>> to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
+>> have support for ARM.
 >>
->> diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
->> index ed31135..f75c0bf 100644
->> --- a/drivers/tty/serial/8250/8250_dw.c
->> +++ b/drivers/tty/serial/8250/8250_dw.c
->> @@ -222,6 +222,8 @@ static int dw8250_probe_of(struct uart_port *p,
->>                             struct dw8250_data *data)
->>   {
->>          struct device_node      *np = p->dev->of_node;
->> +       struct uart_8250_port   *up = container_of(p, struct uart_8250_port,
->> +                                                  port);
->>          u32                     val;
->>          bool has_ucv = true;
->>
->> @@ -254,11 +256,14 @@ static int dw8250_probe_of(struct uart_port *p,
->>                  }
->>          }
->>          if (has_ucv)
->> -               dw8250_setup_port(container_of(p, struct uart_8250_port, port));
->> +               dw8250_setup_port(up);
->>
->>          if (!of_property_read_u32(np, "reg-shift", &val))
->>                  p->regshift = val;
->>
->> +       if (of_get_property(np, "dmas", NULL))
->> +               up->dma = &data->dma;
->> +
+>> The usage of the DMA API that we are doing might be illegal, but in
+>> essence it does exactly what we need - at least for ARM. What are the
+>> alternatives?
 >
-> I suggest adding a comment here. Looking just at the patch,
-> it's not very intuitive. But otherwise the patch looks good.
+> It may seem /to you/ as a driver developer to be the easiest thing in
+> the world to abuse an API in a way that it's not supposed to be used,
+> and it is easy to do that.
+>
+> However, what you're actually saying is that you don't respect your
+> fellow kernel developers who have to maintain the other side of that
+> interface.  When they need to change the implementation of that
+> interface, what if those changes then screw your abuse of that
+> interface.
+>
+> The reason we define the behaviours and properties of APIs is to give
+> both the user and the implementer of the API some degree of latitude
+> in how that interface works, so that it can be maintained into the
+> future.  If abuses (such as these) are allowed, then we've lost,
+> because the interface can no longer be sanely maintained - especially
+> if driver authors eventually end up not caring about their pile of
+> abuse they've created after they've moved on to new wonderful hardware.
+>
+> With an API such as the DMA API, where we have hundreds, if not a
+> thousand users of it, this /really/ matters.
+>
+> We've been here before with the DMA API on older ARM platforms, where
+> we've had people abusing the API or going beneath the API because "it
+> does what they need it to", which then makes stuff much harder to change
+> at architecture level.
+>
+> Last time it happened, it was when ARMv6 came along and ARM moved away
+> from VIVT caches.  The options were either to break the crap drivers
+> and support ARMv6+ CPUs, or keep the crap drivers working and not
+> support DMA in any shape or form on ARMv6+.
+>
+> Obviously, this was too important to for one or two abusive drivers to
+> block, so I changed the architecture level /anyway/ and just said screw
+> the drivers which end up being broken by their short-sightedness, they
+> can either rot or someone else can fix them.
+>
+> I have no beef for intentionally breaking stuff when people abuse well
+> defined interfaces and/or refuse to discuss their requirements when
+> interfaces don't quite do what they want - or worse, refuse to listen
+> to objections.
+>
+> As I say, it's disrespectful to your fellow kernel developers to abuse
+> well defined interfaces.
 
-Sure, I can do that
-
-Thanks!
-
-Emilio
+Apologies if I sounded that way - I wasn't suggesting that we carry on
+with this clearly illegal usage of the DMA API, but was merely noting
+that if we were to implement the intended behavior on our side it
+would look just like what the ARM implementation currently does. My
+question about alternatives wasn't rethorical, I am not so familiar
+with this part of the system (as should be obvious by now) and would
+like to know whether there aren't other solutions that would spare us
+the need to re-implement something that already exists.
