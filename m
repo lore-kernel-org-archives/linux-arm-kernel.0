@@ -1,69 +1,128 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Jun 2014 11:39:41 +0100
-Subject: [PATCH 2/2] ARM: KVM: user_mem_abort: support stage 2 MMIO page
- mapping
-In-Reply-To: <20140624102327.GA9121@arm.com>
-References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
- <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
- <20140506180448.GH3066@lvm> <87bnvaotei.fsf@approximate.cambridge.arm.com>
- <20140507145557.GJ3066@lvm> <20140624102327.GA9121@arm.com>
-Message-ID: <53A9556D.3000003@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jun 2014 11:47:14 +0100
+Subject: [PATCH 1/2] documentation: add rockchip spi documentation
+In-Reply-To: <2324491.URDIcWcjph@diego>
+References: <1403582324-9485-1-git-send-email-addy.ke@rock-chips.com>
+ <1403582324-9485-2-git-send-email-addy.ke@rock-chips.com>
+ <20140624101802.GE5856@leverpostej> <2324491.URDIcWcjph@diego>
+Message-ID: <20140624104714.GF5856@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/14 11:23, Will Deacon wrote:
-> On Wed, May 07, 2014 at 03:55:57PM +0100, Christoffer Dall wrote:
->> On Wed, May 07, 2014 at 10:00:21AM +0100, Marc Zyngier wrote:
->>> On Tue, May 06 2014 at  7:04:48 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->>>> On Tue, Mar 25, 2014 at 05:08:14PM -0500, Kim Phillips wrote:
->>>>> Use the correct memory type for device MMIO mappings: PAGE_S2_DEVICE.
->>>>>
->>>>> Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
->>>>> ---
->>>>>  arch/arm/kvm/mmu.c | 11 ++++++++---
->>>>>  1 file changed, 8 insertions(+), 3 deletions(-)
+On Tue, Jun 24, 2014 at 11:32:21AM +0100, Heiko St?bner wrote:
+> Am Dienstag, 24. Juni 2014, 11:18:02 schrieb Mark Rutland:
+> > On Tue, Jun 24, 2014 at 04:58:43AM +0100, addy ke wrote:
+> > > Signed-off-by: addy ke <addy.ke@rock-chips.com>
+> > > ---
+> > > 
+> > >  .../devicetree/bindings/spi/spi-rockchip.txt       | 51
+> > >  ++++++++++++++++++++++ 1 file changed, 51 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> > > b/Documentation/devicetree/bindings/spi/spi-rockchip.txt new file mode
+> > > 100644
+> > > index 0000000..ce9c881
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> > > @@ -0,0 +1,51 @@
+> > > +* Rockchip SPI Controller
+> > > +
+> > > +The Rockchip SPI controller is used to interface with various devices
+> > > such as flash +and display controllers using the SPI communication
+> > > interface.
+> > > +
+> > > +Required SoC Specific Properties:
+> > > +
+> > > +- compatible: should be one of the following.
+> > > +    - rockchip,rk3066-spi: for rk3066, rk3188 and rk3288 platforms.
+> > 
+> > Are you sure you don't want specifc strings for rk3188 and rk3288 (in
+> > addtion to the common "rockchip,rk3066-spi")?
 > 
-> [...]
+> Wasn't the convention that "later" platforms that are compatible to an earlier 
+> one, reuse this compatible string instead of introducing a new one?
+
+That's why I said in addition to the common one. I'd only expect the
+driver to look for "rockchip,rk3066-spi", but a DTB could have:
+
+	compatible = "rockchip,rk3188-spi", "rockchip,rk3066-spi";
+
+Seeding the DTBs with the extra strings early makes it more likely that
+we can rely on them later. If we don't happen to need them they only
+clutter some DTBs.
+
+> From what I've heard so far, the specific spi controller got introduced with 
+> the rk3066 [earlier SoCs used a different implementation] and didn't change for 
+> rk3188 and rk3288. Addy may be able to verify this.
 > 
->>>> I think this looks reasonable.
->>>>
->>>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>
->>> I feel like I'm missing some context here, and the commit message is way
->>> too terse for me to make sense of it.
->>>
->>> So far, we can only get into user_mem_abort on a Stage-2 fault
->>> (translation or permission) for memory. How can we suddenly get here for
->>> a *device* fault? Do we get a special kind of memslot?
->>>
->>> I'm not saying the patch does anything wrong, but I'd like to understand
->>> the rationale behind it. On its own, it doesn't make much sense.
->>>
->> Think device passthrough.  There's nothing preventing user space from
->> setting up a memory region to point to device memory (through VFIO or
->> /dev/mem).  If that's done, we should enforce device memory properties
->> so writes don't linger around in the cache to be written some time later
->> when that device memory potentially doesn't belong to the VM anymore.
->>
->> This is just one tiny piece of all of them to make device passthrough
->> work, and we could hold off with this patch until we have something more
->> complete.  On the other hand, we need to start somewhere, and this is
->> hardly intrusive and is functionally correct even though you don't have
->> a full device passthrough setup.
 > 
-> Please can you queue this patch up? I need it for my VFIO work, where I'm
-> registering the PCI BARs using KVM_SET_USER_MEMORY_REGION.
+> > > +- reg: physical base address of the controller and length of memory
+> > > mapped
+> > > +       region.
+> > > +- interrupts: The interrupt number to the cpu. The interrupt specifier
+> > > format +              depends on the interrupt controller.
+> > > +- clocks: Must contain an entry for each entry in clock-names.
+> > > +- clock-names: Shall be "spiclk" for the transfer-clock, and "apb_pclk"
+> > > for +			   the peripheral clock.
+> > > +
+> > > +Optional properties:
+> > > +- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
+> > > +		Documentation/devicetree/bindings/dma/dma.txt
+> > > +- dma-names: DMA request names should include "tx" and "rx" if present.
+> > > +
+> > > +Example:
+> > > +
+> > > +- SoC Specific Portion:
+> > > +
+> > > +	spi0: spi at ff110000 {
+> > > +		compatible = "rockchip,rockchip-spi";
+> > 
+> > This does not match the description of the compatible property.
+> > 
+> > > +		reg = <0xff110000 0x1000>;
+> > > +		dmas = <&pdma1 11>, <&pdma1 12>;
+> > > +		dma-names = "tx", "rx";
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <0>;
+> > 
+> > These weren't mentioned.
+> > 
+> > > +		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+> > > +		pinctrl-names = "default";
+> > > +		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0 &spi0_cs1>;
+> > 
+> > pinctrl was not mentioned.
+> > 
+> > > +		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
+> > > +		clock-names = "spiclk", "apb_pclk";
+> > > +		status = "disabled";
+> > 
+> > Any reason for the status?
 > 
-> Without this, I'd have to trap all accesses and do pread/pwrite from
-> kvmtool instead of mmaping the regions straight through.
+> I guess to have the spi controller only be enabled when a board is using it as 
+> below. But it may be an implementation detail which could be omitted from the 
+> binding doc.
 
-I'm afraid there as been quite a bit of churn in this department, and
-the patch doesn't apply any more.
+Yes please :)
 
-Kim, any chance you could respin this patch on top of mainline?
+> 
+> > 
+> > > +	};
+> > > +
+> > > +- Board Specific Portion:
+> > > +
+> > > +	&spi0 {
+> > > +		status = "okay";
+> > > +		spi_test at 00 {
+> > > +			compatible = "rockchip,spi_test";
+> > 
+> > Huh?
+> 
+> SPI declares it's devices similar to i2c, so while the example might profit 
+> from a more casual device, I'm not exactly sure what is the problem here.
 
-Thanks,
+Sure. Given that this is a known pattern for SPI controllers, do we need
+this in each binding doc?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
