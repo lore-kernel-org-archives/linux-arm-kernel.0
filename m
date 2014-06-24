@@ -1,34 +1,31 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Mon, 23 Jun 2014 19:32:59 -0500
-Subject: [PATCH 1/2] arm/gic: Add binding probe for GIC400
-In-Reply-To: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <1403569980-12913-2-git-send-email-suravee.suthikulpanit@amd.com>
+Date: Mon, 23 Jun 2014 19:32:58 -0500
+Subject: [PATCH 0/2] Introduce ARM GICv2m MSI(-X) support
+Message-ID: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Add new Irqchip declaration for GIC400. This was mentioned in
-gic binding documentation, but there is not code to support it.
+This patch set introduces support for MSI(-X) in GICv2m specification,
+which is implemented in some variation of GIC400.
 
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
----
- drivers/irqchip/irq-gic.c | 2 ++
- 1 file changed, 2 insertions(+)
+This depends on and has been tested with the V7 of "Add support for PCI in AArch64"
+(https://lkml.org/lkml/2014/3/14/320).
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 7e11c9d..adc86de 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1071,6 +1071,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- 	gic_cnt++;
- 	return 0;
- }
-+
-+IRQCHIP_DECLARE(arm_gic_400, "arm,gic-400", gic_of_init);
- IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
- IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
- IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+Suravee Suthikulpanit (2):
+  arm/gic: Add binding probe for GIC400
+  arm/gic: Add supports for GICv2m MSI(-X)
+
+ Documentation/devicetree/bindings/arm/gic.txt |  18 +-
+ drivers/irqchip/Kconfig                       |   6 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/gic-msi-v2m.c                 | 249 ++++++++++++++++++++++++++
+ drivers/irqchip/gic-msi-v2m.h                 |  20 +++
+ drivers/irqchip/irq-gic.c                     |  23 ++-
+ 6 files changed, 313 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/irqchip/gic-msi-v2m.c
+ create mode 100644 drivers/irqchip/gic-msi-v2m.h
+
 -- 
 1.9.0
