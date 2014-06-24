@@ -1,59 +1,60 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 24 Jun 2014 12:34:36 -0700
-Subject: [PATCH v7 4/9] seccomp: move no_new_privs into seccomp
-In-Reply-To: <20140624193055.GA4482@redhat.com>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-5-git-send-email-keescook@chromium.org>
- <20140624191815.GA3623@redhat.com>
- <CALCETrVgpP=zOtiQafVgcic2T95TdEM5DTvHYXWTbcZ14xBqHQ@mail.gmail.com>
- <20140624193055.GA4482@redhat.com>
-Message-ID: <CALCETrU9x05ADgz9JToiw_BuCPz1h0xmOh=1R3eojL9far1aEA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Jun 2014 14:35:18 -0500
+Subject: [GIT PULL] ARM: versatile: DT IRQ and clock support
+Message-ID: <CAL_JsqKkfDd3h+iW7UUJiUgULSma=bs=muTTyCo3HOWHi30LVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 12:30 PM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 06/24, Andy Lutomirski wrote:
->>
->> On Tue, Jun 24, 2014 at 12:18 PM, Oleg Nesterov <oleg@redhat.com> wrote:
->> >>
->> >> -struct seccomp { };
->> >> +struct seccomp {
->> >> +     unsigned long flags;
->> >> +};
->> >
->> > A bit messy ;)
->> >
->> > I am wondering if we can simply do
->> >
->> >         static inline bool current_no_new_privs(void)
->> >         {
->> >                 if (current->no_new_privs)
->> >                         return true;
->> >
->> >         #ifdef CONFIG_SECCOMP
->> >                 if (test_thread_flag(TIF_SECCOMP))
->> >                         return true;
->> >         #endif
->>
->> Nope -- privileged users can enable seccomp w/o nnp.
->
-> Indeed, I am stupid.
->
-> Still it would be nice to cleanup this somehow. The new member is only
-> used as a previous ->no_new_privs, just it is long to allow the concurent
-> set/get. Logically it doesn't even belong to seccomp{}.
+Arnd, Olof,
 
-We could add an unsigned long atomic flags field to task_struct.
+Please pull for 3.17.
 
-Grr.  Why isn't there an unsigned *int* atomic bitmask type?  Even u64
-would be better.  unsigned long is useless.
+I've tested this on qemu, but still need Linus to test on h/w. He did
+test an earlier version.
 
->
-> Oleg.
->
+Rob
 
+The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
 
+  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
 
--- 
-Andy Lutomirski
-AMA Capital Management, LLC
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+tags/versatile-for-3.17
+
+for you to fetch changes up to a54c959d8be9d057b1a192e34a378b74dd81c5f6:
+
+  clk: versatile: add versatile OSC support (2014-06-24 14:21:22 -0500)
+
+----------------------------------------------------------------
+DT IRQ and clock support for Versatile platforms
+
+----------------------------------------------------------------
+Rob Herring (11):
+      dts: versatile: add missing irq controller properties
+      irqchip: versatile-fpga: Add IRQCHIP_DECLARE support
+      irqchip: versatile-fpga: add support for arm,versatile-sic
+      ARM: integrator: convert to use irqchip_init
+      ARM: versatile: remove init_irq hook for DT boot
+      dts: versatile: add pl180 compatible strings
+      dt/bindings: arm-boards: add binding for Versatile core module
+      dt/bindings: add compatible string for versatile osc clock
+      ARM: timer-sp: allow getting timer1 clock from DT to fallback to
+legacy clock
+      dts: versatile: add clock tree
+      clk: versatile: add versatile OSC support
+
+ Documentation/devicetree/bindings/arm/arm-boards   |  6 ++
+ .../devicetree/bindings/clock/arm-integrator.txt   |  4 +-
+ arch/arm/boot/dts/versatile-ab.dts                 | 81 +++++++++++++++++++++-
+ arch/arm/boot/dts/versatile-pb.dts                 | 12 +++-
+ arch/arm/common/timer-sp.c                         |  4 +-
+ arch/arm/mach-integrator/integrator_ap.c           | 10 +--
+ arch/arm/mach-integrator/integrator_cp.c           | 10 +--
+ arch/arm/mach-versatile/versatile_dt.c             |  1 -
+ drivers/clk/versatile/Makefile                     |  3 +-
+ .../{clk-integrator.c => clk-versatile.c}          | 38 +++++++++-
+ drivers/irqchip/irq-versatile-fpga.c               | 18 ++++-
+ 11 files changed, 158 insertions(+), 29 deletions(-)
+ rename drivers/clk/versatile/{clk-integrator.c => clk-versatile.c} (63%)
