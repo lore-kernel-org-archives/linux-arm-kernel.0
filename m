@@ -1,25 +1,47 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 24 Jun 2014 18:05:48 -0400
-Subject: [PATCH v3 2/8] ata: ahci_imx: warn when disabling ahci link
-In-Reply-To: <E1WzNp6-0005dk-Iq@rmk-PC.arm.linux.org.uk>
-References: <20140624101901.GL32514@n2100.arm.linux.org.uk>
- <E1WzNp6-0005dk-Iq@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140624220548.GH14909@htj.dyndns.org>
+From: detheridge@ti.com (Darren Etheridge)
+Date: Tue, 24 Jun 2014 17:04:36 -0500
+Subject: [PATCH/RESEND 9/9] drm/tilcdc: replace late_initcall with
+ module_init
+In-Reply-To: <1403014631-18072-10-git-send-email-guido@vanguardiasur.com.ar>
+References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
+ <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
+ <1403014631-18072-10-git-send-email-guido@vanguardiasur.com.ar>
+Message-ID: <53A9F5F4.3030806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 11:19:32AM +0100, Russell King wrote:
-> When the AHCI link is disabled, it can't be re-enabled except by
-> resetting the entire SoC.  Rather than doing this silently print
-> some kernel messages to inform the user, along with how to avoid
-> this.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
+> Use module_init instead of late_initcall, as is the norm for modular
+> drivers.
+>
+> module_init was used until 6e8de0bd6a51fdeebd5d975c4fcc426f730b339b
+> ("drm/tilcdc: add encoder slave (v2)") changed it to a late_initcall,
+> but it does not explain why. Tests show it's working properly with
+> module_init.
+>
 
-The same patch from an earlier posting got applied to
-libata/for-3.16-fixes.
+If I recall, the late_initcall stuff was done to try and make sure the 
+tda998x/i2c subsystem came up before tilcdc. However it didn't always 
+work so we added commit: 39de6194131c155901f96686a063212656d80c2e to try 
+and ensure the ordering.  This might be why changing back to module_init 
+is fine (and I agree with your assessment from my testing).
 
-Thanks.
-
--- 
-tejun
+> Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
+> ---
+>   drivers/gpu/drm/tilcdc/tilcdc_drv.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> index 2c860c4..6be623b 100644
+> --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> @@ -629,7 +629,7 @@ static void __exit tilcdc_drm_fini(void)
+>   	tilcdc_tfp410_fini();
+>   }
+>
+> -late_initcall(tilcdc_drm_init);
+> +module_init(tilcdc_drm_init);
+>   module_exit(tilcdc_drm_fini);
+>
+>   MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
+>
