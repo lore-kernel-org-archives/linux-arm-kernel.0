@@ -1,52 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 24 Jun 2014 08:22:00 -0400
-Subject: [PATCH 1/2] arm/gic: Add binding probe for GIC400
-In-Reply-To: <1403569980-12913-2-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1403569980-12913-2-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20140624122200.GK10202@titan.lakedaemon.net>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Tue, 24 Jun 2014 17:52:00 +0530
+Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <20140624121525.GM13803@lee--X1>
+References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
+ <53A9685E.9090501@ti.com> <53A96A1C.5030800@gmail.com>
+ <20140624121525.GM13803@lee--X1>
+Message-ID: <53A96D68.8070303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suravee,
+On 06/24/2014 05:45 PM, Lee Jones wrote:
+> On Tue, 24 Jun 2014, Varka Bhadram wrote:
+>> On 06/24/2014 05:30 PM, Kishon Vijay Abraham I wrote:
+>>> On Monday 16 June 2014 03:56 PM, Antoine T?nart wrote:
+>>>> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+>>>>
+>>>> The mode selection can let us think this PHY can be configured to fit
+>>>> other purposes. But there are reasons to think the SATA mode will be
+>>>> the only one usable: the PHY registers are only accessible indirectly
+>>>> through two registers in the SATA range, the PHY seems to be integrated
+>>>> and no information tells us the contrary. For these reasons, make the
+>>>> driver a SATA PHY driver.
+>>>>
+>>>> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+>>>> ---
+>>>>   drivers/phy/Kconfig           |   7 ++
+>>>>   drivers/phy/Makefile          |   1 +
+>>>>   drivers/phy/phy-berlin-sata.c | 232 ++++++++++++++++++++++++++++++++++++++++++
+>>>>   3 files changed, 240 insertions(+)
+>>>>   create mode 100644 drivers/phy/phy-berlin-sata.c
 
-Please follow the convention for patch subject lines in this sub-system:
+[...]
 
-"irqchip: gic: ..."
+>>>> +static struct platform_driver phy_berlin_sata_driver = {
+>>>> +	.probe	= phy_berlin_sata_probe,
+>>>> +	.driver	= {
+>>>> +		.name		= "phy-berlin-sata",
+>>>> +		.owner		= THIS_MODULE,
+>>>> +		.of_match_table	= phy_berlin_sata_of_match,
+>> use of_match_ptr for of_match_table
+> What use is this?
+>
+> [...]
+>
+of_match_table is NULL for Non-DT based. Better to use the of_match_ptr().
+If driver is DT based 'of_match_table	= phy_berlin_sata_of_match'
+else 'of_match_table	= NULL'
 
-thx,
+This is take care by of_match_ptr() macro.
 
-Jason.
-
-On Mon, Jun 23, 2014 at 07:32:59PM -0500, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> 
-> Add new Irqchip declaration for GIC400. This was mentioned in
-> gic binding documentation, but there is not code to support it.
-> 
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
->  drivers/irqchip/irq-gic.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 7e11c9d..adc86de 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -1071,6 +1071,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  	gic_cnt++;
->  	return 0;
->  }
-> +
-> +IRQCHIP_DECLARE(arm_gic_400, "arm,gic-400", gic_of_init);
->  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
->  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
->  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
-> -- 
-> 1.9.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Varka Bhadram
