@@ -1,62 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jun 2014 11:23:27 +0100
-Subject: [PATCH 2/2] ARM: KVM: user_mem_abort: support stage 2 MMIO page
- mapping
-In-Reply-To: <20140507145557.GJ3066@lvm>
-References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
- <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
- <20140506180448.GH3066@lvm>
- <87bnvaotei.fsf@approximate.cambridge.arm.com>
- <20140507145557.GJ3066@lvm>
-Message-ID: <20140624102327.GA9121@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Jun 2014 11:26:43 +0100
+Subject: [PATCH] gpio: crystalcove: Fix implicit declaration of function
+ 'seq_printf' error
+In-Reply-To: <1403265753-25851-3-git-send-email-lee.jones@linaro.org>
+References: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
+ <1403265753-25851-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140624102643.GJ13803@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 03:55:57PM +0100, Christoffer Dall wrote:
-> On Wed, May 07, 2014 at 10:00:21AM +0100, Marc Zyngier wrote:
-> > On Tue, May 06 2014 at  7:04:48 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > > On Tue, Mar 25, 2014 at 05:08:14PM -0500, Kim Phillips wrote:
-> > >> Use the correct memory type for device MMIO mappings: PAGE_S2_DEVICE.
-> > >> 
-> > >> Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
-> > >> ---
-> > >>  arch/arm/kvm/mmu.c | 11 ++++++++---
-> > >>  1 file changed, 8 insertions(+), 3 deletions(-)
+Hmm... a leftover patch in my 'send' directory I feel!
 
-[...]
+Please ignore.
 
-> > > I think this looks reasonable.
-> > >
-> > > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > 
-> > I feel like I'm missing some context here, and the commit message is way
-> > too terse for me to make sense of it.
-> > 
-> > So far, we can only get into user_mem_abort on a Stage-2 fault
-> > (translation or permission) for memory. How can we suddenly get here for
-> > a *device* fault? Do we get a special kind of memslot?
-> > 
-> > I'm not saying the patch does anything wrong, but I'd like to understand
-> > the rationale behind it. On its own, it doesn't make much sense.
-> > 
-> Think device passthrough.  There's nothing preventing user space from
-> setting up a memory region to point to device memory (through VFIO or
-> /dev/mem).  If that's done, we should enforce device memory properties
-> so writes don't linger around in the cache to be written some time later
-> when that device memory potentially doesn't belong to the VM anymore.
+> drivers/gpio/gpio-crystalcove.c: In function 'crystalcove_gpio_dbg_show':
+> drivers/gpio/gpio-crystalcove.c:286:3: error: implicit declaration of function 'seq_printf'
+>    seq_printf(s, " gpio-%-2d %s %s %s %s ctlo=%2x,%s %s %s\n",
 > 
-> This is just one tiny piece of all of them to make device passthrough
-> work, and we could hold off with this patch until we have something more
-> complete.  On the other hand, we need to start somewhere, and this is
-> hardly intrusive and is functionally correct even though you don't have
-> a full device passthrough setup.
+> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/gpio/gpio-crystalcove.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/gpio/gpio-crystalcove.c b/drivers/gpio/gpio-crystalcove.c
+> index 5a98499..934462f 100644
+> --- a/drivers/gpio/gpio-crystalcove.c
+> +++ b/drivers/gpio/gpio-crystalcove.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/gpio.h>
+> +#include <linux/seq_file.h>
+>  #include <linux/bitops.h>
+>  #include <linux/regmap.h>
+>  #include <linux/mfd/intel_soc_pmic.h>
 
-Please can you queue this patch up? I need it for my VFIO work, where I'm
-registering the PCI BARs using KVM_SET_USER_MEMORY_REGION.
-
-Without this, I'd have to trap all accesses and do pread/pwrite from
-kvmtool instead of mmaping the regions straight through.
-
-Cheers,
-
-Will
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
