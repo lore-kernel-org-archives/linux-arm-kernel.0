@@ -1,53 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jun 2014 23:37:49 +0100
-Subject: [PATCH 9/9] ARM: kernel: add outer cache support for cacheinfo
- implementation
-In-Reply-To: <1403717444-23559-10-git-send-email-sudeep.holla@arm.com>
-References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
- <1403717444-23559-10-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20140625223748.GM32514@n2100.arm.linux.org.uk>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 25 Jun 2014 15:44:44 -0700
+Subject: [PATCHv3] arm64: Add CONFIG_CC_STACKPROTECTOR
+In-Reply-To: <20140625083823.GB6153@arm.com>
+References: <1391115944-10183-1-git-send-email-lauraa@codeaurora.org>
+ <CAGXu5jKmrpM=oCABXy-UJH6mZ22Z2r-p_R2nZKqGocHJ0vYQ2Q@mail.gmail.com>
+ <CAGXu5jLTLU-azWtyfJ38QO_vd9T+F4STqPy4LpvOeMAqPCH21A@mail.gmail.com>
+ <20140625083823.GB6153@arm.com>
+Message-ID: <53AB50DC.3010001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 06:30:44PM +0100, Sudeep Holla wrote:
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index efc5cab..30ca151 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -105,6 +105,15 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
->  	}
->  }
->  
-> +static void l2x0_getinfo(struct outer_cache_info *info)
-> +{
-> +	if (!info)
-> +		return;
+On 6/25/2014 1:38 AM, Will Deacon wrote:
+> On Wed, Jun 25, 2014 at 01:24:05AM +0100, Kees Cook wrote:
+>> On Fri, Jan 31, 2014 at 2:50 PM, Kees Cook <keescook@chromium.org> wrote:
+>>> On Thu, Jan 30, 2014 at 1:05 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>>>> arm64 currently lacks support for -fstack-protector. Add
+>>>> similar functionality to arm to detect stack corruption.
+>>>>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>>>
+>>> Thanks!
+>>>
+>>> Acked-by: Kees Cook <keescook@chromium.org>
+>>
+>> Hi again,
+>>
+>> This patch never got applied any where. Who can take this?
+> 
+> We can take this via the arm64 tree. Laura, is the patch still valid against
+> current mainline?
+> 
 
-Pointless NULL test.  If someone passes NULL to this function (which
-you never do in this file) then we want to know about it because _that_
-is a kernel bug - it is invalid to pass NULL.  Hence the kernel should
-oops.
+Apparently not. I will send out a rebased version.
 
-Please, don't go around adding stupid NULL tests for conditions which
-should _never_ happen, instead, rely on the kernel to oops if these
-invalid conditions occur.  That's why we produce a backtrace from such
-events, to allow invalid conditions to be debugged and fixed.
-
-Having stuff silently ignore in this way does not detect these bugs so
-they go by unnoticed.
-
-Take a moment to read some of the fs/ or kernel/ code, and you'll find
-a lack of NULL checks in there.  That's what gives that code performance,
-because it's not spending its time doing loads of useless NULL checks.
-
-> @@ -894,6 +903,7 @@ static void __init __l2c_init(const struct l2c_init_data *data,
->  		data->enable(l2x0_base, aux, data->num_lock);
->  
->  	outer_cache = fns;
-> +	outer_cache.get_info = l2x0_getinfo;
-
-NAK.  Think about it.
+Thanks,
+Laura
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
