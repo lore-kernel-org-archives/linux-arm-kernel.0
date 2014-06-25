@@ -1,28 +1,37 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 17:00:00 +0900
-Subject: [PATCH 0/9] ARM: shmobile: Move SoC-specific header files
-In-Reply-To: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-References: <1403283189-21688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20140625075959.GA10050@verge.net.au>
+Date: Wed, 25 Jun 2014 17:00:17 +0900
+Subject: [PATCH] ARM: shmobile: Enable genmai board in multiplatform
+ defconfig
+In-Reply-To: <1402915783-25444-1-git-send-email-horms+renesas@verge.net.au>
+References: <1402915783-25444-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140625080017.GB10050@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 06:53:00PM +0200, Geert Uytterhoeven wrote:
-> It's Friday afternoon, hence the ideal time for a no-brainer patch
-> series to move the shmobile SoC-specific header files, so they can be
-> included as "<soc>.h" instead of the old style <mach/<soc>.h>.
+On Mon, Jun 16, 2014 at 07:49:43PM +0900, Simon Horman wrote:
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/configs/shmobile_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> All build-tested. Multi-platform shmobile also boot-tested on
-> r8a7791/koelsch.
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index 291b1c2..afe8f46 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -10,9 +10,11 @@ CONFIG_PERF_EVENTS=y
+>  CONFIG_SLAB=y
+>  CONFIG_ARCH_SHMOBILE_MULTI=y
+>  CONFIG_ARCH_EMEV2=y
+> +CONFIG_ARCH_R7S72100=y
+>  CONFIG_ARCH_R8A7779=y
+>  CONFIG_ARCH_R8A7790=y
+>  CONFIG_ARCH_R8A7791=y
+> +CONFIG_MACH_GENMAI=y
+>  CONFIG_MACH_KOELSCH=y
+>  CONFIG_MACH_LAGER=y
+>  CONFIG_MACH_MARZEN=y
+> -- 
+> 2.0.0.rc2
 > 
->   [1/9] ARM: shmobile: Move r7s72100.h
->   [2/9] ARM: shmobile: Move r8a73a4.h
->   [3/9] ARM: shmobile: Move r8a7740.h
->   [4/9] ARM: shmobile: Move r8a7778.h
->   [5/9] ARM: shmobile: Move r8a7779.h
->   [6/9] ARM: shmobile: Move r8a7790.h
->   [7/9] ARM: shmobile: Move r8a7791.h
->   [8/9] ARM: shmobile: Move sh7372.h
->   [9/9] ARM: shmobile: Move sh73a0.h
 
-Thanks, I will queue these up.
+I have queued this up.
