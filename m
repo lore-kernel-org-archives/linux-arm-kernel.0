@@ -1,51 +1,63 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 25 Jun 2014 13:50:28 -0400
-Subject: [PATCH v2] ARM: virt, vexpress: Use 64-bit DMA for LPAE
-In-Reply-To: <5331B14B.7040103@codeaurora.org>
-References: <5331B14B.7040103@codeaurora.org>
-Message-ID: <1403718631-25194-1-git-send-email-cov@codeaurora.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 25 Jun 2014 19:51:36 +0200
+Subject: [PATCH v8 5/9] seccomp: split mode set routines
+In-Reply-To: <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-6-git-send-email-keescook@chromium.org>
+ <20140625135121.GB7892@redhat.com>
+ <CAGXu5jJkFxh4K=40xuh6tu3kUf4oJM8Dry+4upBdRieW3FNLgw@mail.gmail.com>
+ <CALCETrUBNmLnpa+LM91om2RSpR6SjupP-EdefzhU1Me4nv3Dfw@mail.gmail.com>
+ <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
+ <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
+ <20140625173245.GA17695@redhat.com>
+ <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
+Message-ID: <20140625175136.GA18185@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On an LPAE system, the physical addresses used by VirtIO-MMIO may be
-higher than 32 bits. For example on a Versatile Express system with
-4G RAM, the following error surfaces when trying to use a VirtIO-MMIO
-block device.
+On 06/25, Andy Lutomirski wrote:
+>
+> On Wed, Jun 25, 2014 at 10:32 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> > On 06/25, Andy Lutomirski wrote:
+> >>
+> >> Write the filter, then smp_mb (or maybe a weaker barrier is okay),
+> >> then set the bit.
+> >
+> > Yes, exactly, this is what I meant. Plas rmb() in __secure_computing().
+> >
+> > But I still can't understand the rest of your discussion about the
+> > ordering we need ;)
+>
+> Let me try again from scratch.
+>
+> Currently there are three relevant variables: TIF_SECCOMP,
+> seccomp.mode, and seccomp.filter.  __secure_computing needs
+> seccomp.mode and seccomp.filter to be in sync, and it wants (but
+> doesn't really need) TIF_SECCOMP to be in sync as well.
+>
+> My suggestion is to rearrange it a bit.  Move mode into seccomp.filter
+> (so that filter == NULL implies no seccomp) and don't check
+> TIF_SECCOMP in secure_computing.  Then turning on seccomp is entirely
+> atomic except for the fact that the seccomp hooks won't be called if
+> filter != NULL but !TIF_SECCOMP.  This removes all ordering
+> requirements.
 
-EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: : unaligned directory entry - offset=0, inode=3755990991, rec_len=57311, name_len=223
+Ah, got it, thanks. Perhaps I missed somehing, but to me this looks like
+unnecessary complication at first glance.
 
-To fix this, select ARCH_DMA_ADDR_T_64BIT when LPAE is selected
-and mach-vexpress, mach-virt, or both are being built.
+We alredy have TIF_SECCOMP, we need it anyway, and we should only care
+about the case when this bit is actually set, so that we can race with
+the 1st call of __secure_computing().
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm/Kconfig               | 1 +
- arch/arm/mach-vexpress/Kconfig | 1 +
- 2 files changed, 2 insertions(+)
+Otherwise we are fine: we can miss the new filter anyway, ->mode can't
+be changed it is already nonzero.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 245058b..8407c28 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -901,6 +901,7 @@ endmenu
- 
- config ARCH_VIRT
- 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
-+	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select ARM_PSCI
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 99c1f15..5f33e16 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -1,5 +1,6 @@
- menuconfig ARCH_VEXPRESS
- 	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
-+	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
--- 
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by the Linux Foundation.
+> Alternatively, __secure_computing could still BUG_ON(!seccomp.filter).
+> In that case, filter needs to be set before TIF_SECCOMP is set, but
+> that's straightforward.
+
+Yep. And this is how seccomp_assign_mode() already works? It is called
+after we change ->filter chain, it changes ->mode before set(TIF_SECCOMP)
+just it lacks a barrier.
+
+Oleg.
