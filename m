@@ -1,48 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jun 2014 10:17:02 +0100
+Date: Wed, 25 Jun 2014 10:18:59 +0100
 Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <4855051.rhxSrNMNLg@wuerfel>
+In-Reply-To: <53A9EF3A.2070704@codeaurora.org>
 References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <53A9BC18.2090106@codeaurora.org> <20140624181150.GB4067@arm.com>
- <4855051.rhxSrNMNLg@wuerfel>
-Message-ID: <20140625091702.GF6153@arm.com>
+ <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
+ <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
+ <20140624091808.GC26013@arm.com> <53A9BC18.2090106@codeaurora.org>
+ <20140624181150.GB4067@arm.com> <53A9EF3A.2070704@codeaurora.org>
+Message-ID: <20140625091858.GG6153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 07:20:56PM +0100, Arnd Bergmann wrote:
-> On Tuesday 24 June 2014 19:11:50 Will Deacon wrote:
+On Tue, Jun 24, 2014 at 10:35:54PM +0100, Olav Haugan wrote:
+> On 6/24/2014 11:11 AM, Will Deacon wrote:
 > > On Tue, Jun 24, 2014 at 06:57:44PM +0100, Olav Haugan wrote:
-> > > We do describe the masked StreamID (SID) but we need to specify the mask
-> > > that the SMMU should apply to the incoming SIDs, right?
-> > > 
-> > > We have a bus master that emits 43 unique SIDs. However, we have only 40
-> > > SMMU_SMRn registers in the SMMU. So we need to mask out some of the
-> > > incoming SID bits so that the 43 SIDs can match one of 40 entries in the
-> > > SMR.
+> >> On 6/24/2014 2:18 AM, Will Deacon wrote:
+> >>> On Sat, Jun 21, 2014 at 12:16:25AM +0100, Olav Haugan wrote:
+> >>>> We have multiple-master SMMUs and each master emits a variable number of
+> >>>> StreamIDs. However, we have to apply a mask (the ARM SMMU spec allows
+> >>>> for this) to the StreamIDs due to limited number of StreamID 2 Context
+> >>>> Bank entries in the SMMU. If my understanding is correct we would
+> >>>> represent this in the DT like this:
+> >>>>
+> >>>> 	iommu {
+> >>>> 		#address-cells = <2>;
+> >>>> 		#size-cells = <0>;
+> >>>> 	};
+> >>>>
+> >>>> 	master at a {
+> >>>> 		...
+> >>>> 		iommus = <&iommu StreamID0 MASK0>,
+> >>>> 			 <&iommu StreamID1 MASK1>,
+> >>>> 			 <&iommu StreamID2 MASK2>;
+> >>>> 	};
+> >>>
+> >>> Stupid question, but why not simply describe the masked IDs? What use does
+> >>> the `raw' ID have to Linux?
+> >>
+> >> We do describe the masked StreamID (SID) but we need to specify the mask
+> >> that the SMMU should apply to the incoming SIDs, right?
+> >>
+> >> We have a bus master that emits 43 unique SIDs. However, we have only 40
+> >> SMMU_SMRn registers in the SMMU. So we need to mask out some of the
+> >> incoming SID bits so that the 43 SIDs can match one of 40 entries in the
+> >> SMR.
 > > 
 > > Hmm, so you're talking about stream matching, right? That doesn't belong in
 > > the device-tree. I appreciate that the current driver does a terrible job at
 > > allocating the SMRs (it's bloody difficult!), but we should try to improve
 > > the dynamic behaviour instead of moving configuration of the SMMU out into
 > > device-tree, where it's inflexible at best.
-> > 
-> > There have been patches previously posted by Andreas Herrmann helping here.
-> > I'd be glad to see them revived.
 > 
-> Note that there are areas where we have in the past decided that dynamic
-> configuration is just too hard for the kernel to do and that we're better
-> off putting the configuration into DT. Pinctrl and clocks are at least
-> partially in that category.
-> 
-> It's always best if you can get the kernel to do things in the ideal
-> way where that is possible, but getting there may be just not worth it.
-> 
-> I have no idea where it should be for SMMU, but it's something to consider:
-> if you can take reasonable shortcuts by reading parts of the configuration
-> from DT, you may just as well do that.
+> I am talking about SMMU_SMRn[MASK] register bits. This is not something
+> that can be dynamically detected at run-time. It is configuration at the
+> same level as the actual StreamIDs.
 
-I treat this in the same manner as the topology bindings we discussed
-previously; we should do a best-effort to configure things dynamically and
-solve corner-cases and quirks as special cases.
+Why can't it be dynamically detected? Whilst the StreamIDs are fixed in
+hardware (from the SMMU architecture perspective), the SMRs are completely
+programmable. Why doesn't something like Andreas's proposal work for you?
+The idea there was to find the constant bits among the StreamIDs for a
+master and create the mask accordingly.
 
 Will
