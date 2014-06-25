@@ -1,38 +1,58 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 25 Jun 2014 13:34:23 -0700
-Subject: [PATCH v5 5/8] drivers: cpuidle: CPU idle ARM64 driver
-In-Reply-To: <1403705421-17597-6-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-6-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1403728463.11749.52.camel@smoke>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 25 Jun 2014 21:34:24 +0100
+Subject: [RFC PATCH 4/4] efi: efistub: convert into static library
+In-Reply-To: <1402931688-23597-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1402931688-23597-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1402931688-23597-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140625203424.GC15494@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Mon, 16 Jun, at 05:14:48PM, Ard Biesheuvel wrote:
+> This patch changes both x86 and arm64 efistub implementations from #including
+> shared .c files under drivers/firmware/efi to building the shared code as a
+> static library.
+> 
+> The x86 code uses a stub built into the boot executable which uncompresses the
+> kernel at boot time. In this case, the library is linked into the decompressor.
+> 
+> In the arm64 case, the stub is part of the kernel proper so the library is
+> linked into the kernel proper as well.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-On Wed, 2014-06-25 at 15:10 +0100, Lorenzo Pieralisi wrote:
-> This patch implements a generic CPU idle driver for ARM64 machines.
+Sorry for the delay in reviewing this.
 
-...
+Conceptually, this is a nice cleanup. Unfortunately, I'm seeing the
+following build error,
 
-> +typedef int (*suspend_init_fn)(struct cpuidle_driver *,
-> +			       struct device_node *[]);
-> +
-> +struct cpu_suspend_ops {
-> +	const char *id;
-> +	suspend_init_fn init_fn;
-> +};
-> +
-> +static const struct cpu_suspend_ops suspend_operations[] __initconst = {
-> +	{"arm,psci", psci_dt_register_idle_states},
-> +	{}
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o): In function `efi_printk':
+efi-stub-helper.c:(.text+0x1): undefined reference to `__fentry__'
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o): In function `efi_get_memory_map':
+efi-stub-helper.c:(.text+0x7f): undefined reference to `__fentry__'
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o): In function `efi_high_alloc':
+efi-stub-helper.c:(.text+0x1ea): undefined reference to `__fentry__'
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o): In function `efi_low_alloc':
+efi-stub-helper.c:(.text+0x3dd): undefined reference to `__fentry__'
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o): In function `efi_free':
+efi-stub-helper.c:(.text+0x59f): undefined reference to `__fentry__'
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o):efi-stub-helper.c:(.text+0x5ec): more undefined references to `__fentry__' follow
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o):(.data+0x260): undefined reference to `__gcov_merge_add'
+drivers/firmware/efi/libstub/lib.a(efi-stub-helper.o): In function `_GLOBAL__sub_I_65535_0_efi_printk':
+efi-stub-helper.c:(.text.startup+0xc): undefined reference to `__gcov_init'
+make[3]: *** [arch/x86/boot/compressed/vmlinux] Error 1
+make[2]: *** [arch/x86/boot/compressed/vmlinux] Error 2
+make[1]: *** [bzImage] Error 2
 
-With this we'll have two completely independent mechanisms for
-interacting with the cpu ops, this struct cpu_suspend_ops, and the
-struct cpu_operations.  This doesn't seem good.
+This is because we use different CFLAGS for the EFI boot stub on x86.
+Take a look at arch/x86/boot/compressed/Makefile to see what I mean.
 
-I feel we need to fix the cpu ops to include some way to operate on the
-operation method to do initialization, shutdown, etc.  At present,
-cpu_operations only has a mechanism to operate on the individual cpus.
+What I'd suggest is that you simply update the efi-stub-helper.c
+#include path in the x86 EFI boot stub in this series, and only roll out
+the awesome new libstub for arm64. I'll take care of doing the necessary
+CFLAG munging for x86 when I have some spare time. Could you do a v2?
 
--Geoff
+That is, unless you really want to make it work for x86 ;-)
+
+-- 
+Matt Fleming, Intel Open Source Technology Center
