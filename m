@@ -1,40 +1,22 @@
-From: mtk.manpages@gmail.com (Michael Kerrisk (man-pages))
-Date: Wed, 25 Jun 2014 19:54:49 +0200
-Subject: [PATCH v8 1/1] man-pages: seccomp.2: document syscall
-In-Reply-To: <CAGXu5j+99NOtJq2-TWYm8mwNw1ki0y3rRH21wX66MVM8=jz1bQ@mail.gmail.com>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <20140624205615.GW5412@outflux.net>
- <20140625140440.6870eac1@alan.etchedpixels.co.uk>
- <CAGXu5j+99NOtJq2-TWYm8mwNw1ki0y3rRH21wX66MVM8=jz1bQ@mail.gmail.com>
-Message-ID: <CAKgNAkgU+igKYKtzk3u83ZTcR-ov7kq_J9mbTeHuOt7Zkbpy6Q@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Jun 2014 14:55:36 -0300
+Subject: [PATCH v3 2/3] ARM: dts: i.MX25: Fix gpt timers clocks.
+In-Reply-To: <1403700096-13014-2-git-send-email-denis@eukrea.com>
+References: <1403700096-13014-1-git-send-email-denis@eukrea.com>
+ <1403700096-13014-2-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5BNQXCVYt1d9pML2xwrG1i=-t3c2sLbsV2VLYJvgMsEJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 5:10 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Jun 25, 2014 at 6:04 AM, One Thousand Gnomes
-> <gnomes@lxorguk.ukuu.org.uk> wrote:
->> On Tue, 24 Jun 2014 13:56:15 -0700
->> Kees Cook <keescook@chromium.org> wrote:
->>
->>> Combines documentation from prctl, in-kernel seccomp_filter.txt and
->>> dropper.c, along with details specific to the new syscall.
->>
->> What is the license on the example ? Probably you want to propogate the
->> minimal form of the text in seccomp/dropper into the document example to
->> avoid confusion ?
+On Wed, Jun 25, 2014 at 9:41 AM, Denis Carikli <denis@eukrea.com> wrote:
+> Without that fix, the board freeze during boot.
 >
-> What is the license of the other code examples in man-pages?
+> This appeared after the following commit:
+>   496f065 ARM: i.MX: Use of_clk_get_by_name() for timer clocks for DT case.
+>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Typically, just the same as the rest if the page text. Perhaps that
-should be rethought for future examples. I haven't thought about it at
-length, but, at first glance, I'm not against having separate licenses
-for the page text and the code sample.
+This allows mx25pdk to boot again, thanks:
 
-Cheers,
-
-Michael
-
--- 
-Michael Kerrisk
-Linux man-pages maintainer; http://www.kernel.org/doc/man-pages/
-Linux/UNIX System Programming Training: http://man7.org/training/
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
