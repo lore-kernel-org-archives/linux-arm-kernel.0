@@ -1,33 +1,71 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 25 Jun 2014 20:46:36 +0800
-Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
-In-Reply-To: <20140625062243.GD3242@dragon>
-References: <20140624153559.GA5741@dragon>
- <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
- <20140625062243.GD3242@dragon>
-Message-ID: <20140625124635.GA6917@dragon>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 25 Jun 2014 18:15:36 +0530
+Subject: [PATCH v5 0/6] Cleanup patches for mach-exynos
+Message-ID: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 02:22:44PM +0800, Shawn Guo wrote:
-> On Tue, Jun 24, 2014 at 04:37:19PM -0300, Fabio Estevam wrote:
-> > On Tue, Jun 24, 2014 at 12:36 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > > Hi Lucas,
-> > >
-> > > I found that imx6q suspend/resume is broken on 3.16-rc, and it works
-> > > just fine if PCIe support is built out.  However the issue was not
-> > > exposed on 3.15, so I suspect the PCIe driver change merged in 3.16
-> > > is part of the cause.
-> > 
-> > I have just tested this on linux-next and I see that suspend/resume
-> > fails even if I build a kernel without PCI support.
-> 
-> Please test against v3.16-rc1 or -rc2.  The breakage on linux-next
-> should be another issue.
+This series is doing code cleanup under arch/arm/mach-exynos.
+These patches have been separated from main exynos pmu v4 patch
+posted here [1].
 
-Yeah, the issue on linux-next is caused by commit 478850160636 (irq_work:
-Implement remote queueing).  And Stephen reported the issue as below.
+[1]: https://lkml.org/lkml/2014/5/10/29
 
-https://lkml.org/lkml/2014/6/24/765
+Changes Since v4:
+ - Rebased on latest for-next of Kukjin Kim's tree.
+ - Removing file path comment from mach-exynos/headsmp.S also.
+ - Removed signed-off-by of Young-Gun Jang <yg1004.jang@samsung.com>,
+   as this id is no more valid. Taking ownership of all his patches.
+ - Separated these patches from main exynos pmu v4 patch series as
+   suggested by Tomasz Figa.
 
-Shawn
+Changes Since v3:
+ - Addressed build fail issue in exynos.c as reported by Sachin Kamat.
+ - Rebased on top of Sysram patches by Sachin Kamat.
+
+Changes Since v2:
+ - Rebased on top of Daniel Lezcano's Exynos cpuidle refactor patches.
+ - Removed exynos_cpuidle_init and exynos_cpufreq_init code as suggested
+   by Tomasz Figa.
+
+Changes Since v1:
+ - Rebased on latest for-next of Kukjin Kim's tree.
+ - Added patch: "Make exynos machine_ops as static". 
+	For making more cleanup in "mach-exynos/common.h"
+	as suggested by Tomasz Figa.
+ - Addressed comments of Tomasz Figa for cleaning "mach-exynos/common.h".
+ - Updated patch: Remove file path from comment section
+	As suggested by Michel Simek, instead of updating file path
+	lets remove them from each file under "mach-exynos".
+	Even though Kukjin pointed out that there is similar patch pending from
+	Sachin/Tushar but since I could not find I have included this here. If
+	I have missed something please point to any existing such patch.
+ - Added patch: Remove "linux/bug.h" from pmu.c.
+ - Added patch: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
+
+Pankaj Dubey (6):
+  ARM: EXYNOS: Make exynos machine_ops as static
+  ARM: EXYNOS: Move cpufreq and cpuidle device registration to
+    init_machine
+  ARM: EXYNOS: Move SYSREG definition into sys-reg specific file
+  ARM: EXYNOS: Remove file path from comment section
+  ARM: EXYNOS: Remove regs-pmu.h header dependency from pm_domain
+  ARM: EXYNOS: Remove "linux/bug.h" from pmu.c
+
+ arch/arm/mach-exynos/common.h              |    8 --------
+ arch/arm/mach-exynos/exynos.c              |   26 ++++++++------------------
+ arch/arm/mach-exynos/headsmp.S             |    1 -
+ arch/arm/mach-exynos/hotplug.c             |    3 +--
+ arch/arm/mach-exynos/include/mach/map.h    |    3 +--
+ arch/arm/mach-exynos/include/mach/memory.h |    3 +--
+ arch/arm/mach-exynos/platsmp.c             |    3 +--
+ arch/arm/mach-exynos/pm.c                  |    1 +
+ arch/arm/mach-exynos/pm_domains.c          |    8 ++++----
+ arch/arm/mach-exynos/pmu.c                 |    1 -
+ arch/arm/mach-exynos/regs-pmu.h            |    4 ----
+ arch/arm/mach-exynos/regs-sys.h            |   22 ++++++++++++++++++++++
+ 12 files changed, 39 insertions(+), 44 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/regs-sys.h
+
+-- 
+1.7.9.5
