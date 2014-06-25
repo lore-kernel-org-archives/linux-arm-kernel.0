@@ -1,59 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 25 Jun 2014 19:14:53 +0900
-Subject: [PATCH v2] arm: exynos: Support cluster power off on
- exynos5420/5800
-In-Reply-To: <7hy4wsvdsm.fsf@paris.lan>
-References: <1403104722-14848-1-git-send-email-a.kesavan@samsung.com>
- <1403181617-19743-1-git-send-email-a.kesavan@samsung.com>
- <7hy4wsvdsm.fsf@paris.lan>
-Message-ID: <01b501cf905e$4e95cf00$ebc16d00$@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 25 Jun 2014 12:18:52 +0200
+Subject: [PATCH v3 03/14] clk: max77686: Add DT include for MAX77686 PMIC
+ clock
+In-Reply-To: <1403202040-12641-4-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403202040-12641-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403691532.22107.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman wrote:
+On czw, 2014-06-19 at 20:20 +0200, Javier Martinez Canillas wrote:
+> This patch adds a dt-binding include for Maxim 77686
+> PMIC clock IDs that can be to be shared between the
+> clk-max77686 clock driver and DeviceTree source files.
 > 
-> Abhilash Kesavan <a.kesavan@samsung.com> writes:
-> 
-Hi,
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  drivers/clk/clk-max77686.c                 |  7 +------
+>  include/dt-bindings/clock/maxim,max77686.h | 23 +++++++++++++++++++++++
+>  2 files changed, 24 insertions(+), 6 deletions(-)
+>  create mode 100644 include/dt-bindings/clock/maxim,max77686.h
 
-> > Turning off a cluster when all 4 cores of the cluster are powered off
-> > saves power significantly. Powering off the A15 L2 alone gives around
-> > 100mW in savings. Add support for powering off the A15/A7 clusters on
-> > exynos5420/5800.
-> >
-> > The patch enables specific register bits which ensure that:
-> >    - cluster L2 will be turned on before the first man is powered up.
-> >    - last man will be turned off before the cluster L2 is turned off.
-> >    - core is powered down before powering it up.
-> >
-> > Remove the exynos_cluster_power_control function completely as we can
-> > rely on the above mentioned bits rather than polling the cluster power
-> > status register.
-> >
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> > Change in v2:
-> > Added a macro for the COMMON_OPTION register and used it in the MCPM
-> > back-end.
-> >
-> > The patch is based on Linux-next 20140619. It has been tested on an
-> > exynos5420-based chromebook using the "/dev/bL_switcher" interface as
-> > well as the script provided by Nicolas Pitre and Dave Martin [1].
-> >
-> > Patch depends on:
-> > [v2] ARM: EXYNOS: mcpm: Don't rely on firmware's secondary_cpu_start
-> >
-> > [1] http://www.spinics.net/lists/linux-samsung-soc/msg31257.html
-> 
-> Tested on exynos5800/Chromebook2 along with the dependency patch and using
-> the script from Dave and Nico.
-> 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> 
-Kevin, thanks for your test on the board ;-)
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Applied into samsung tree.
+Best regards,
+Krzysztof
 
-Thanks,
-Kukjin
+> 
+> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
+> index 3d7e8dd..185b611 100644
+> --- a/drivers/clk/clk-max77686.c
+> +++ b/drivers/clk/clk-max77686.c
+> @@ -30,12 +30,7 @@
+>  #include <linux/mutex.h>
+>  #include <linux/clkdev.h>
+>  
+> -enum {
+> -	MAX77686_CLK_AP = 0,
+> -	MAX77686_CLK_CP,
+> -	MAX77686_CLK_PMIC,
+> -	MAX77686_CLKS_NUM,
+> -};
+> +#include <dt-bindings/clock/maxim,max77686.h>
+>  
+>  struct max77686_clk {
+>  	struct max77686_dev *iodev;
+> diff --git a/include/dt-bindings/clock/maxim,max77686.h b/include/dt-bindings/clock/maxim,max77686.h
+> new file mode 100644
+> index 0000000..7b28b09
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/maxim,max77686.h
+> @@ -0,0 +1,23 @@
+> +/*
+> + * Copyright (C) 2014 Google, Inc
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Device Tree binding constants clocks for the Maxim 77686 PMIC.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
+> +#define _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
+> +
+> +/* Fixed rate clocks. */
+> +
+> +#define MAX77686_CLK_AP		0
+> +#define MAX77686_CLK_CP		1
+> +#define MAX77686_CLK_PMIC	2
+> +
+> +/* Total number of clocks. */
+> +#define MAX77686_CLKS_NUM		(MAX77686_CLK_PMIC + 1)
+> +
+> +#endif /* _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H */
