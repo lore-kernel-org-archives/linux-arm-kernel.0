@@ -1,97 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jun 2014 23:33:02 +0100
-Subject: [PATCH 8/9] ARM: kernel: add support for cpu cache information
-In-Reply-To: <1403717444-23559-9-git-send-email-sudeep.holla@arm.com>
-References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
- <1403717444-23559-9-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20140625223302.GL32514@n2100.arm.linux.org.uk>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 25 Jun 2014 15:37:04 -0700
+Subject: [PATCH v1 1/9] of: Add NVIDIA Tegra XUSB mailbox binding
+In-Reply-To: <53AB422E.4040707@wwwdotorg.org>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
+ <1403072180-4944-2-git-send-email-abrestic@chromium.org>
+ <53AB422E.4040707@wwwdotorg.org>
+Message-ID: <CAL1qeaFPjq9nqA2GDZZW+=DZsddWCkUjJcnRsfPkBWj8gmFsiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 06:30:43PM +0100, Sudeep Holla wrote:
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 38ddd9f..2c5ff0e 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -29,6 +29,7 @@ obj-y		+= entry-v7m.o v7m.o
->  else
->  obj-y		+= entry-armv.o
->  endif
-> +obj-$(CONFIG_CPU_HAS_CACHE) += cacheinfo.o
->  
->  obj-$(CONFIG_OC_ETM)		+= etm.o
->  obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-> diff --git a/arch/arm/kernel/cacheinfo.c b/arch/arm/kernel/cacheinfo.c
-> new file mode 100644
-> index 0000000..ab70993
-> --- /dev/null
-> +++ b/arch/arm/kernel/cacheinfo.c
-> @@ -0,0 +1,229 @@
-> +/*
-> + *  ARM cacheinfo support
-> + *
-> + *  Copyright (C) 2014 ARM Ltd.
-> + *  All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/cacheinfo.h>
-> +#include <linux/cpu.h>
-> +#include <linux/compiler.h>
-> +#include <linux/of.h>
-> +
-> +#include <asm/cputype.h>
-> +#include <asm/processor.h>
-> +
-> +#if __LINUX_ARM_ARCH__ < 7 /* pre ARMv7 */
+On Wed, Jun 25, 2014 at 2:42 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
+>> Add device-tree bindings for the Tegra XUSB mailbox which will be used
+>> for communication between the Tegra XHCI controller and the host.
+>
+> Sorry for the slow review.
+>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+>
+>> +NVIDIA Tegra XUSB mailbox
+>> +=========================
+>> +
+>> +The Tegra XUSB mailbox is used by the Tegra XHCI controller's firmware to
+>> +communicate with the host.
+>
+> Isn't the mailbox an internal implementation detail of the XUSB controller.
+>
+> In other words, I'd naively think that there isn't a standalone generic
+> mailbox that can be used by anything, but we just happen to want to use
+> for XUSB. Rather, there's an XUSB controller, and part of the interface
+> to that controller is a mailbox.
 
-__LINUX_ARM_ARCH__ defines the minimum architecture version we are building
-for - we may support later versions than the architecture version denoted
-by this symbol.  It does not define which CPUs we are building for.  Are
-you sure that this is correct here?  What if we build a kernel supporting
-both v6 + v7, as the OMAP guys do?
+Yes, the mailbox isn't an actual piece of hardware but rather the
+interface through which the XUSB host and AP communicate.
 
-> +
-> +#define MAX_CACHE_LEVEL		1	/* Only 1 level supported */
-> +#define CTR_CTYPE_SHIFT		24
-> +#define CTR_CTYPE_MASK		(1 << CTR_CTYPE_SHIFT)
-> +
-> +struct ctr_info {
-> +	unsigned int cpuid_id;
-> +	unsigned int ctr;
-> +};
-> +
-> +static struct ctr_info cache_ctr_list[] = {
-> +};
+> As such, I don't think we want a standalone mailbox node in DT. Rather,
+> we should add the required reg and interrupt values into the XUSB DT node.
+>
+> The driver for that XUSB HW module can either:
+>
+> a) Register as both a mailbox driver and an EHCI driver.
+>
+> b) Spawn a child device to instantiate the mailbox driver.
+>
+> Perhaps (b) could be assisted by using the MFD framework?
 
-This list needs to be populated.  Early CPUs (such as StrongARM) do not
-have the CTR register.
-
-> +static int get_unimplemented_ctr(unsigned int *ctr)
-> +{
-> +	int i, cpuid_id = read_cpuid_id();
-> +
-> +	for (i = 0; i < ARRAY_SIZE(cache_ctr_list); i++)
-> +		if (cache_ctr_list[i].cpuid_id == cpuid_id) {
-> +			*ctr = cache_ctr_list[i].ctr;
-> +			return 0;
-> +		}
-> +	return -ENOENT;
-> +}
-> +
-> +static unsigned int get_ctr(void)
-> +{
-> +	unsigned int ctr;
-> +
-> +	if (get_unimplemented_ctr(&ctr))
-> +		asm volatile ("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
-
-read_cpuid_cachetype() ?
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+So in the RFC series I did something like (a) where the XUSB host
+handled the mailbox interrupt with both the PHY and host could
+registering notifiers to handle the messages.  It was suggested by
+Arnd though that I make a separate mailbox driver.  Instead of having
+a both a host and mailbox node, I could have a single XUSB host node
+and have the mailbox driver bind to that - thoughts?
