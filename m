@@ -1,45 +1,84 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 25 Jun 2014 16:21:39 -0700
-Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
- Exynos5420
-In-Reply-To: <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
- (Doug Anderson's message of "Tue, 24 Jun 2014 16:00:38 -0700")
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
- <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
-Message-ID: <7hpphwlgn0.fsf@paris.lan>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 25 Jun 2014 16:30:48 -0700
+Subject: [PATCH v1 4/9] pinctrl: tegra-xusb: Add USB PHY support
+In-Reply-To: <53AB493F.3030802@wwwdotorg.org>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
+ <1403072180-4944-5-git-send-email-abrestic@chromium.org>
+ <53AB493F.3030802@wwwdotorg.org>
+Message-ID: <CAL1qeaHhoqEPu-j+drNiRMyeutz=qqZPxSP8H+v-sgjZSfS5tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson <dianders@google.com> writes:
-
-> Tushar,
->
-> On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
->> Currently CLK_FOUT_EPLL was set as one of the parents of AUDSS mux.
->> As per the user manual, it should be CLK_MAU_EPLL.
+On Wed, Jun 25, 2014 at 3:12 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
+>> In addition to the PCIe and SATA PHYs, the XUSB pad controller also
+>> supports 3 UTMI, 2 HSIC, and 2 USB3 PHYs.  Each USB3 PHY uses a single
+>> PCIe or SATA lane and is mapped to one of the three UTMI ports.
 >>
->> The problem surfaced when the bootloader in Peach-pit board set
->> the EPLL clock as the parent of AUDSS mux. While booting the kernel,
->> we used to get a system hang during late boot if CLK_MAU_EPLL was
->> disabled.
+>
+>> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
+>
+>> @@ -372,6 +720,193 @@ static int tegra_xusb_padctl_pinconf_group_set(struct pinctrl_dev *pinctrl,
+>>                       padctl_writel(padctl, regval, lane->offset);
+>>                       break;
 >>
->> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
->> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
->> Reported-by: Kevin Hilman <khilman@linaro.org>
->> ---
->>  arch/arm/boot/dts/exynos5420.dtsi |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> +             case TEGRA_XUSB_PADCTL_USB3_PORT_NUM:
+>> +                     if (value >= TEGRA_XUSB_PADCTL_USB3_PORTS) {
+>> +                             dev_err(padctl->dev, "Invalid USB3 port: %lu\n",
+>> +                                     value);
+>> +                             return -EINVAL;
+>> +                     }
+>> +                     if (!is_pcie_sata_lane(group)) {
+>> +                             dev_err(padctl->dev,
+>> +                                     "USB3 port not applicable for pin %d\n",
+>> +                                     group);
+>> +                             return -EINVAL;
+>> +                     }
+>> +                     padctl->usb3_ports[value].lane = group;
+>> +                     break;
 >
-> I've tested this myself now as well.
+> It feels odd to use pinctrl for a SW-only purpose. In other words, that
+> chunk of code isn't writing the pinconf data to HW, but rather some
+> internal variable.
+
+Well the mapping of lanes to USB3 ports is a hardware property and we
+do use it when programming the hardware later to choose which set of
+lane registers to program given a USB3 port, but it's true that it's
+not some value we program into HW directly.
+
+> Perhaps it would make more sense for the DT binding to represent this
+> data directly in a custom property that's parsed at probe() time. That
+> way, pinctrl only touches "real" HW stuff.
+
+I'm on the fence about this.  If you or others feel strongly about
+this then I can make it a separate DT property and move it out of the
+pinctrl properties.
+
+>> +static int usb3_phy_power_on(struct phy *phy)
+>> +{
+>> +     struct tegra_xusb_padctl *padctl = phy_get_drvdata(phy);
+>> +     int port = usb3_phy_to_port(phy);
+>> +     int lane = padctl->usb3_ports[port].lane;
+>> +     u32 value, offset;
+>> +
+>> +     value = padctl_readl(padctl, XUSB_PADCTL_IOPHY_USB3_PADX_CTL2(port));
+>> +     value &= ~((XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_WANDER_MASK <<
+>> +                 XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_WANDER_SHIFT) |
+>> +                (XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_EQ_MASK <<
+>> +                 XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_EQ_SHIFT) |
+>> +                (XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_CDR_CNTL_MASK <<
+>> +                 XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_CDR_CNTL_SHIFT));
 >
-> Tested-by: Doug Anderson <dianders@chromium.org>
+> Hmm. So there is a lot of "PHY" stuff here after all.
+>
+> However, the PHYs implemented here appear to implement very low-level
+> I/O pad code, whereas the PHYs we have for our USB 2.0 controller are
+> somewhat higher-level; they're more USB-oriented than just IO pad
+> oriented. Do you know which level of abstraction a Linux PHY object is
+> supposed to be? I could never get an answer when I asked before.
 
-For me, this patch alone (on top of -next) doesn't solve the boot hang.
-I still need clk_ignore_unused for a successful boot.
-
-So, this patch might be correct, but it doesn't prevent a boot hang
-using a chain-loaded nv_uboot on peach-pi.  There's still another clock
-being disabled that causes a hang.
-
-Kevin
+The only other PHY driver I've worked with (Exynos USB2/3 PHYs) also
+mainly only did low-level pad control stuff, but looking at a couple
+of other USB PHYs (MSM, MV), there appear to be others that have
+higher-level USB stuff in the PHY driver.  Perhaps Kishon or Felipe
+could offer us some guidance?
