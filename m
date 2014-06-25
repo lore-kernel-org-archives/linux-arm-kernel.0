@@ -1,7 +1,7 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 24 Jun 2014 20:00:56 -0500
-Subject: [PATCH 0/9] 
-Message-ID: <1403658065-54614-1-git-send-email-s-anna@ti.com>
+Date: Tue, 24 Jun 2014 20:04:46 -0500
+Subject: [PATCH 0/9] OMAP Mailbox DT node/hwmod cleanup
+Message-ID: <1403658295-54766-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
