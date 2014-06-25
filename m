@@ -1,55 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 25 Jun 2014 14:33:56 +0200
-Subject: [PATCH v3 -next 0/9] CMA: generalize CMA reserved area management
- code
-In-Reply-To: <20140618135144.297c785260f9e2aebead867c@linux-foundation.org>
-References: <1402897251-23639-1-git-send-email-iamjoonsoo.kim@lge.com>
- <539EB4C7.3080106@samsung.com> <20140617012507.GA6825@js1304-P5Q-DELUXE>
- <20140618135144.297c785260f9e2aebead867c@linux-foundation.org>
-Message-ID: <53AAC1B4.5000204@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 25 Jun 2014 14:39:40 +0200
+Subject: [GIT PULL] at91: fixes for 3.16 #1 (bis)
+Message-ID: <1403699980-20797-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Arnd, Olof, Kevin,
 
-On 2014-06-18 22:51, Andrew Morton wrote:
-> On Tue, 17 Jun 2014 10:25:07 +0900 Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
->>>> v2:
->>>>    - Although this patchset looks very different with v1, the end result,
->>>>    that is, mm/cma.c is same with v1's one. So I carry Ack to patch 6-7.
->>>>
->>>> This patchset is based on linux-next 20140610.
->>> Thanks for taking care of this. I will test it with my setup and if
->>> everything goes well, I will take it to my -next tree. If any branch
->>> is required for anyone to continue his works on top of those patches,
->>> let me know, I will also prepare it.
->> Hello,
->>
->> I'm glad to hear that. :)
->> But, there is one concern. As you already know, I am preparing further
->> patches (Aggressively allocate the pages on CMA reserved memory). It
->> may be highly related to MM branch and also slightly depends on this CMA
->> changes. In this case, what is the best strategy to merge this
->> patchset? IMHO, Anrew's tree is more appropriate branch. If there is
->> no issue in this case, I am willing to develope further patches based
->> on your tree.
-> That's probably easier.  Marek, I'll merge these into -mm (and hence
-> -next and git://git.kernel.org/pub/scm/linux/kernel/git/mhocko/mm.git)
-> and shall hold them pending you review/ack/test/etc, OK?
+An AT91 fixes batch for 3.16 that collects mainly DT modifications in relation
+to the recent move to CCF on a couple of platforms.
+The recent modifications also lead us to add tiny DT corrections that enable
+available features like sound or DMA use for 9rl NAND.
 
-Ok. I've tested them and they work fine. I'm sorry that you had to wait for
-me for a few days. You can now add:
+As the previous "fixes" pull-request will be re-spin for 3.17 and shall be
+ignored, I use the same tag name "at91-fixes".
 
-Acked-and-tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Thanks, best regards,
 
-I've also rebased my pending patches onto this set (I will send them soon).
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 
-The question is now if you want to keep the discussed patches in your 
--mm tree,
-or should I take them to my -next branch. If you like to keep them, I assume
-you will also take the patches which depends on the discussed changes.
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 
-Best regards
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to fe6076a70dd7b50598a6b5ad7dad03f9322ecec9:
+
+  ARM: at91/dt: sama5d3 crystals under the clocks node (2014-06-25 13:50:47 +0200)
+
+----------------------------------------------------------------
+First AT91 fixes batch for 3.16:
+- drivers/misc fix for Kconfig PWM symbol
+- addition of DMA and DMA + nand on at91sam9rl
+- correction of several values in DT after conversion to CCF
+- addition of clock entries for sound for CCF enabled platforms
+- little defconfig update for sound in relation with previous item
+- move of crystals DT definitions to the /clocks node
+
+----------------------------------------------------------------
+Alexandre Belloni (9):
+      ARM: at91/dt: sam9x5: correct PLLA ICPLL and OUT values
+      ARM: at91/dt: sam9n12: correct PLLA ICPLL and OUT values
+      ARM: at91/dt: sam9261: correctly define mainck
+      ARM: at91/dt: define sam9261ek slow crystal frequency
+      ARM: at91/dt: sam9261 crystals under the clocks node
+      ARM: at91/dt: sam9n12 crystals under the clocks node
+      ARM: at91/dt: sam9rl crystals under the clocks node
+      ARM: at91/dt: sam9x5 crystals under the clocks node
+      ARM: at91/dt: sama5d3 crystals under the clocks node
+
+Bo Shen (4):
+      ARM: at91: sama5d3xek: switch sound to CCF
+      ARM: at91: at91sam9n12ek: switch sound to CCF
+      ARM: at91/at91_dt_defconfig: enable sound support
+      ARM: at91/sama5_defconfig: enable sound support
+
+Nicolas Ferre (3):
+      misc: atmel_pwm: fix Kconfig symbols
+      ARM: at91/dt: add DMA controller node to at91sam9rl
+      ARM: at91/dt: add NAND + DMA property for at91sam9rl
+
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 12 +++++-----
+ arch/arm/boot/dts/at91sam9261.dtsi          | 30 +++++++++++++++----------
+ arch/arm/boot/dts/at91sam9261ek.dts         | 12 ++++++----
+ arch/arm/boot/dts/at91sam9n12.dtsi          | 24 ++++++++++----------
+ arch/arm/boot/dts/at91sam9n12ek.dts         | 18 ++++++++-------
+ arch/arm/boot/dts/at91sam9rl.dtsi           | 32 +++++++++++++++++----------
+ arch/arm/boot/dts/at91sam9rlek.dts          | 17 +++++++--------
+ arch/arm/boot/dts/at91sam9x5.dtsi           | 34 +++++++++++++++--------------
+ arch/arm/boot/dts/at91sam9x5cm.dtsi         | 12 +++++-----
+ arch/arm/boot/dts/sama5d3.dtsi              | 22 +++++++++----------
+ arch/arm/boot/dts/sama5d3xcm.dtsi           | 12 +++++-----
+ arch/arm/boot/dts/sama5d3xmb.dtsi           |  2 ++
+ arch/arm/configs/at91_dt_defconfig          | 10 +++++++++
+ arch/arm/configs/sama5_defconfig            |  5 +++++
+ drivers/misc/Kconfig                        |  2 +-
+ 15 files changed, 147 insertions(+), 97 deletions(-)
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Nicolas Ferre
