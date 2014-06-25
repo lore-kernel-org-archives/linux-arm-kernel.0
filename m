@@ -1,28 +1,26 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 25 Jun 2014 14:20:18 +0800
-Subject: [PATCH v2 1/2] ARM: dts: i.MX25: Fix gpt timers clocks.
-In-Reply-To: <1403529927-13868-1-git-send-email-denis@eukrea.com>
-References: <1403529927-13868-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140625062016.GC3242@dragon>
+Date: Wed, 25 Jun 2014 14:22:44 +0800
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
+References: <20140624153559.GA5741@dragon>
+ <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
+Message-ID: <20140625062243.GD3242@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 03:25:26PM +0200, Denis Carikli wrote:
-> Without that fix, the board freeze during boot.
+On Tue, Jun 24, 2014 at 04:37:19PM -0300, Fabio Estevam wrote:
+> On Tue, Jun 24, 2014 at 12:36 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Hi Lucas,
+> >
+> > I found that imx6q suspend/resume is broken on 3.16-rc, and it works
+> > just fine if PCIe support is built out.  However the issue was not
+> > exposed on 3.15, so I suspect the PCIe driver change merged in 3.16
+> > is part of the cause.
 > 
-> This appeared after the following commit:
->   496f065 ARM: i.MX: Use of_clk_get_by_name() for timer clocks for DT case.
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> Changelog v1->v2:
-> - Also fixed the ipg clock
-> - Also fixed the ipg and per clocks for the other gpts
-> - Also fixed the ipg clock for non-dt init.
-> ---
->  arch/arm/boot/dts/imx25.dtsi  |    8 ++++----
->  arch/arm/mach-imx/clk-imx25.c |    2 +-
+> I have just tested this on linux-next and I see that suspend/resume
+> fails even if I build a kernel without PCI support.
 
-Please separate dts and kernel code changes.
+Please test against v3.16-rc1 or -rc2.  The breakage on linux-next
+should be another issue.
 
 Shawn
