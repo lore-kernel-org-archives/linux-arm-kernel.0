@@ -1,32 +1,33 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 25 Jun 2014 10:27:10 +0200
-Subject: [PATCH v14 08/10] drm/panel: Add Eukrea mbimxsd51 displays.
-In-Reply-To: <20140624220404.GA30155@mithrandir>
-References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
- <1402913484-25910-8-git-send-email-denis@eukrea.com>
- <20140624214926.GA30039@mithrandir> <20140624235639.487429ad@e6520eb>
- <20140624220404.GA30155@mithrandir>
-Message-ID: <53AA87DE.5030109@eukrea.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Jun 2014 09:38:23 +0100
+Subject: [PATCHv3] arm64: Add CONFIG_CC_STACKPROTECTOR
+In-Reply-To: <CAGXu5jLTLU-azWtyfJ38QO_vd9T+F4STqPy4LpvOeMAqPCH21A@mail.gmail.com>
+References: <1391115944-10183-1-git-send-email-lauraa@codeaurora.org>
+ <CAGXu5jKmrpM=oCABXy-UJH6mZ22Z2r-p_R2nZKqGocHJ0vYQ2Q@mail.gmail.com>
+ <CAGXu5jLTLU-azWtyfJ38QO_vd9T+F4STqPy4LpvOeMAqPCH21A@mail.gmail.com>
+Message-ID: <20140625083823.GB6153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2014 12:04 AM, Thierry Reding wrote:
->> because on this very simple display board, we only have DVI LVDS signals
->> without the I2C to detect the display.
->
-> That's unfortunate. In that case perhaps a better approach would be to
-> add a video timings node to the device that provides the DVI output?
-I've just done that.
+On Wed, Jun 25, 2014 at 01:24:05AM +0100, Kees Cook wrote:
+> On Fri, Jan 31, 2014 at 2:50 PM, Kees Cook <keescook@chromium.org> wrote:
+> > On Thu, Jan 30, 2014 at 1:05 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> >> arm64 currently lacks support for -fstack-protector. Add
+> >> similar functionality to arm to detect stack corruption.
+> >>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >
+> > Thanks!
+> >
+> > Acked-by: Kees Cook <keescook@chromium.org>
+> 
+> Hi again,
+> 
+> This patch never got applied any where. Who can take this?
 
-Should I resend now? The goal is to avoid as much as possible extra 
-versions.
+We can take this via the arm64 tree. Laura, is the patch still valid against
+current mainline?
 
-Also, as I said before in a response to "[PATCH v14 09/10] ARM: dts: 
-mbimx51sd: Add display support.", the LCD regulator was inverted, it 
-worked while inverted because of a bug which is now fixed by:
-"imx-drm: parallel-display: Fix DPMS default state."
-
-Right now, I don't have any other changes for this serie beside a simple 
-rebase of "dts: imx5*, imx6*: correct display-timings rebased".
-
-Denis.
+Will
