@@ -1,77 +1,34 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 25 Jun 2014 18:15:41 +0530
-Subject: [PATCH v5 5/6] ARM: EXYNOS: Remove regs-pmu.h header dependency from
- pm_domain
-In-Reply-To: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1403700342-9678-6-git-send-email-pankaj.dubey@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 25 Jun 2014 07:50:12 -0500
+Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
+In-Reply-To: <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_JsqLbCeiB13ajNpVQDh_Lxgn37ixJ_jYkceps07mzz5su1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current "pm_domain.c" file uses "S5P_INT_LOCAL_PWR_EN" definition from
-"regs-pmu.h" and hence needs to include this header file. As there is
-no other user of "S5P_INT_LOCAL_PWR_EN" definition other than pm_domain,
-to remove "regs-pmu.h" header file dependency from "pm_domain.c"  it's
-better we define this definition in "pm_domain.c" file itself and thus it
-will help in removing header file inclusion from "pm_domain.c".
-Also removing "S5P_" prefix from macro.
+On Wed, Jun 25, 2014 at 4:28 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> So far, GICv2 has been used in with EOImode == 0. The effect of this
+> mode is to perform the priority drop and the deactivation of the
+> interrupt at the same time.
+>
+> While this works perfectly for Linux (we only have a single priority),
+> it causes issues when an interrupt is forwarded to a guest, and when
+> we want the guest to perform the EOI itself.
+>
+> For this case, the GIC architecture provides EOImode == 1, where:
+> - A write to the EOI register drops the priority of the interrupt and leaves
+> it active. Other interrupts at the same priority level can now be taken,
+> but the active interrupt cannot be taken again
+> - A write to the DIR marks the interrupt as inactive, meaning it can
+> now be taken again.
+>
+> We only enable this feature when booted in HYP mode. Also, as most device
+> trees are broken (they report the CPU interface size to be 4kB, while
+> the GICv2 CPU interface size is 8kB), output a warning if we're booted
+> in HYP mode, and disable the feature.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/pm_domains.c |    8 ++++----
- arch/arm/mach-exynos/regs-pmu.h   |    1 -
- 2 files changed, 4 insertions(+), 5 deletions(-)
+Why not fix-up the size so the feature can be enabled?
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index fe6570e..bcd8dcf 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -22,7 +22,7 @@
- #include <linux/of_platform.h>
- #include <linux/sched.h>
- 
--#include "regs-pmu.h"
-+#define INT_LOCAL_PWR_EN       0x7
- 
- /*
-  * Exynos specific wrapper around the generic power domain
-@@ -44,13 +44,13 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
- 	pd = container_of(domain, struct exynos_pm_domain, pd);
- 	base = pd->base;
- 
--	pwr = power_on ? S5P_INT_LOCAL_PWR_EN : 0;
-+	pwr = power_on ? INT_LOCAL_PWR_EN : 0;
- 	__raw_writel(pwr, base);
- 
- 	/* Wait max 1ms */
- 	timeout = 10;
- 
--	while ((__raw_readl(base + 0x4) & S5P_INT_LOCAL_PWR_EN)	!= pwr) {
-+	while ((__raw_readl(base + 0x4) & INT_LOCAL_PWR_EN) != pwr) {
- 		if (!timeout) {
- 			op = (power_on) ? "enable" : "disable";
- 			pr_err("Power domain %s %s failed\n", domain->name, op);
-@@ -172,7 +172,7 @@ static __init int exynos4_pm_init_power_domain(void)
- 
- 		platform_set_drvdata(pdev, pd);
- 
--		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
-+		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
- 	}
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 790af14..1993e6b 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -126,7 +126,6 @@
- #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
- 
- #define S5P_CORE_LOCAL_PWR_EN			0x3
--#define S5P_INT_LOCAL_PWR_EN			0x7
- 
- /* Only for EXYNOS4210 */
- #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
--- 
-1.7.9.5
+Rob
