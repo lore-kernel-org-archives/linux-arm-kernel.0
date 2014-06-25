@@ -1,110 +1,27 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 25 Jun 2014 23:30:18 +0530
-Subject: [PATCH 8/8] ARM: dts: dra7: Add dt data for PCIe controller
-In-Reply-To: <1403719218-9484-1-git-send-email-kishon@ti.com>
-References: <1403719218-9484-1-git-send-email-kishon@ti.com>
-Message-ID: <1403719218-9484-9-git-send-email-kishon@ti.com>
+Date: Wed, 25 Jun 2014 23:32:44 +0530
+Subject: [PATCH 0/2] arm: hwmod: dra7: Add PCIe data and PCIe PHY data
+Message-ID: <1403719366-9656-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added dt data for PCIe controller. This node contains dt data for
-both the DRA7 part of designware controller and for the designware core.
-The documention for this node can be found @ ../bindings/pci/ti-pci.txt.
+[1] is split into separate series in order for individual subsystem
+Maintainers to pick up the patches. This series handles the PCIe
+hwmod data for DRA7.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi |   69 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+Please find the bootlog with these hwmod patches @ [2]
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index d196404..117288d 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -98,6 +98,75 @@
- 			};
- 		};
- 
-+		axi at 0 {
-+			compatible = "simple-bus";
-+			#size-cells = <1>;
-+			#address-cells = <1>;
-+			ranges = <0x51000000 0x51000000 0x3000
-+				  0x0	     0x20000000 0x10000000>;
-+			pcie at 51000000 {
-+				compatible = "ti,dra7-pcie";
-+				reg = <0x51000000 0x2000>, <0x51002000 0x14c>, <0x1000 0x2000>;
-+				reg-names = "rc_dbics", "ti_conf", "config";
-+				interrupts = <0 232 0x4>, <0 233 0x4>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				device_type = "pci";
-+				ranges = <0x81000000 0 0          0x03000 0 0x00010000
-+					  0x82000000 0 0x20013000 0x13000 0 0xffed000>;
-+				#interrupt-cells = <1>;
-+				num-lanes = <1>;
-+				ti,hwmods = "pcie1";
-+				phys = <&pcie1_phy>;
-+				phy-names = "pcie-phy0";
-+				interrupt-map-mask = <0 0 0 7>;
-+				interrupt-map = <0 0 0 1 &pcie1_intc 1>,
-+						<0 0 0 2 &pcie1_intc 2>,
-+						<0 0 0 3 &pcie1_intc 3>,
-+						<0 0 0 4 &pcie1_intc 4>;
-+				pcie1_intc: interrupt-controller {
-+					interrupt-controller;
-+					#address-cells = <0>;
-+					#interrupt-cells = <1>;
-+				};
-+			};
-+		};
-+
-+		axi at 1 {
-+			compatible = "simple-bus";
-+			#size-cells = <1>;
-+			#address-cells = <1>;
-+			ranges = <0x51800000 0x51800000 0x3000
-+				  0x0	     0x30000000 0x10000000>;
-+			status = "disabled";
-+			pcie at 51000000 {
-+				compatible = "ti,dra7-pcie";
-+				reg = <0x51800000 0x2000>, <0x51802000 0x14c>, <0x1000 0x2000>;
-+				reg-names = "rc_dbics", "ti_conf", "config";
-+				interrupts = <0 355 0x4>, <0 356 0x4>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				device_type = "pci";
-+				ranges = <0x81000000 0 0          0x03000 0 0x00010000
-+					  0x82000000 0 0x30013000 0x13000 0 0xffed000>;
-+				#interrupt-cells = <1>;
-+				num-lanes = <1>;
-+				ti,hwmods = "pcie2";
-+				phys = <&pcie2_phy>;
-+				phy-names = "pcie-phy0";
-+				interrupt-map-mask = <0 0 0 7>;
-+				interrupt-map = <0 0 0 1 &pcie2_intc 1>,
-+						<0 0 0 2 &pcie2_intc 2>,
-+						<0 0 0 3 &pcie2_intc 3>,
-+						<0 0 0 4 &pcie2_intc 4>;
-+				pcie2_intc: interrupt-controller {
-+					interrupt-controller;
-+					#address-cells = <0>;
-+					#interrupt-cells = <1>;
-+				};
-+			};
-+		};
-+
- 		cm_core_aon: cm_core_aon at 4a005000 {
- 			compatible = "ti,dra7-cm-core-aon";
- 			reg = <0x4a005000 0x2000>;
+[1] -> https://lkml.org/lkml/2014/5/29/258
+[2] -> http://paste.ubuntu.com/7701601/
+
+Kishon Vijay Abraham I (2):
+  arm: dra7xx: Add hwmod data for pcie1 phy and pcie2 phy
+  arm: dra7xx: Add hwmod data for pcie1 and pcie2 subsystems
+
+ arch/arm/mach-omap2/cm2_7xx.h             |    4 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  112 +++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm7xx.h              |    4 ++
+ 3 files changed, 120 insertions(+)
+
 -- 
 1.7.9.5
