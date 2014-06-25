@@ -1,35 +1,84 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:15 +0900
-Subject: [PATCH 03/14] ARM: shmobile: r8a7790: Support Core-Standby for
- Suspend to RAM
-In-Reply-To: <cover.1403681315.git.horms+renesas@verge.net.au>
-References: <cover.1403681315.git.horms+renesas@verge.net.au>
-Message-ID: <ce508d1b13d1008db570ac58e775ce36bd9c5112.1403681315.git.horms+renesas@verge.net.au>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 25 Jun 2014 15:35:34 +0800
+Subject: [PATCH 1/2] ARM: at91/dt: describe rgmii ethernet phy connected
+ to sama5d3xek boards
+In-Reply-To: <53AA7A8C.1010304@free-electrons.com>
+References: <1403649878-28242-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403649878-28242-2-git-send-email-boris.brezillon@free-electrons.com>
+ <53AA735C.7050805@atmel.com> <53AA7A8C.1010304@free-electrons.com>
+Message-ID: <53AA7BC6.3020902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: keita kobayashi <keita.kobayashi.ym@renesas.com>
+Hi Boris,
 
-Add r8a7790 Core-Standby state for Suspend to RAM support.
+On 06/25/2014 03:30 PM, Boris BREZILLON wrote:
+> Hello Bo,
+>
+> On 25/06/2014 08:59, Bo Shen wrote:
+>> Hi Boris,
+>>
+>> On 06/25/2014 06:44 AM, Boris BREZILLON wrote:
+>>> Add ethernet-phy node to specify phy address (on the MDIO bus) and phy
+>>> interrupt (connected to pin PB25).
+>>>
+>>> Define board specific delays to apply to RGMII signals.
+>>>
+>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>> ---
+>>>    arch/arm/boot/dts/sama5d3xcm.dtsi | 16 ++++++++++++++++
+>>>    1 file changed, 16 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi
+>>> b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>>> index b0b1331..2185ad8 100644
+>>> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+>>> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>>> @@ -34,6 +34,22 @@
+>>>
+>>>                macb0: ethernet at f0028000 {
+>>>                    phy-mode = "rgmii";
+>>> +                #address-cells = <1>;
+>>> +                #size-cells = <0>;
+>>> +
+>>> +                ethernet-phy at 1 {
+>>
+>> The GMAC PHY address is 0x7 while not 0x1.
+>
+> Are you sure of that ? I checked sama5d3x-ek schematics.
 
-Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/smp-r8a7790.c | 1 +
- 1 file changed, 1 insertion(+)
+On sama5d3x-ek schematic, it is EMAC PHY (ksz8051RNL, it's address is 
+0x1), while not GMAC PHY. You should check the sama5d3x-CM schematic.
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
-index a8ace58..7590e2b 100644
---- a/arch/arm/mach-shmobile/smp-r8a7790.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7790.c
-@@ -69,6 +69,7 @@ static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	/* turn on power to SCU */
- 	r8a7790_pm_init();
-+	shmobile_smp_apmu_suspend_init();
- 	rcar_sysc_power_up(&r8a7790_ca15_scu);
- 	rcar_sysc_power_up(&r8a7790_ca7_scu);
- }
--- 
-2.0.0.rc2
+> On these schematics PHYAD0 is connected to a pull up resistor and
+> PHYAD1/2 are connected to a pull down one.
+> This gives PHYAD[4:0] = 0b00001 = 0x1.
+> Is there some bootloader mechanisms that changes PHYAD[0-2] pin status
+> and reset the PHY ?
+>
+>>
+>>> +                    interrupt-parent = <&pioB>;
+>>> +                    interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
+>>> +                    reg = <1>;
+>>
+>> Nitpick: as usual, we will add "0x" prefix in reg property.
+>
+> Sure, I'll fix that.
+>
+>>
+>>> +                    txen-skew-ps = <800>;
+>>> +                    txc-skew-ps = <12000>;
+>
+> Should be 3000 (0xf * 200 ps) not 12000.
+>
+>>> +                    rxdv-skew-ps = <400>;
+>>> +                    rxc-skew-ps = <12000>;
+>
+> Ditto.
+>
+> Best Regards,
+>
+> Boris
+
+Best Regards,
+Bo Shen
