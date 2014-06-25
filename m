@@ -1,45 +1,57 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 25 Jun 2014 16:54:14 +0200
-Subject: [PATCH] ARM: perf: allow tracing with kernel tracepoints events
-In-Reply-To: <20140625090110.GD6153@arm.com>
-References: <CAFrcx1n-cPXm=w+84gQiUjZoFKi7gYnvJ0BQ+8yXKS=k3nEt3g@mail.gmail.com>
- <1403025065-18001-1-git-send-email-jean.pihet@linaro.org>
- <20140618125355.GA2186@arm.com>
- <CAFrcx1mA7kXiG9wMQqn=zYPYqrpGxDYWfoMP97RvkkrMTvNoRw@mail.gmail.com>
- <20140625090110.GD6153@arm.com>
-Message-ID: <CAFrcx1=gwRzU9heY8o9sphWUiga63NGdpN+cUh81Njr-X-OEGQ@mail.gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel =?iso-8859-1?Q?Garc=EDa?=)
+Date: Wed, 25 Jun 2014 11:53:37 -0300
+Subject: [PATCH/RESEND 8/9] drm/tilcdc: remove submodule destroy calls
+In-Reply-To: <53A9F660.8060703@ti.com>
+References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
+ <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
+ <1403014631-18072-9-git-send-email-guido@vanguardiasur.com.ar>
+ <53A9F660.8060703@ti.com>
+Message-ID: <20140625145337.GB743@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 24 Jun 05:06 PM, Darren Etheridge wrote:
+> 
+> On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
+> >The TI tilcdc driver is designed with a notion of submodules. Currently,
+> >at unload time, these submodules are iterated and destroyed.
+> >
+> >Now that the tilcdc remove order is fixed, this can be handled perfectly
+> 
+> I am not sure I understand the first part of the above sentence - did
+> something change with tilcdc ordering?
 
-On 25 June 2014 11:01, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jun 20, 2014 at 09:10:35AM +0100, Jean Pihet wrote:
->> Hi Will,
->
-> Hi Jean,
->
->> On 18 June 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Jun 17, 2014 at 06:11:05PM +0100, Jean Pihet wrote:
->> >> Tested with perf record and tracepoints filtering (-e <tracepoint>), with
->> >> unwinding using fp (--call-graph fp) and dwarf info (--call-graph dwarf).
->> >
->> > Whilst the old ACPS unwinding only needs PC, FP and SP, is this definitely
->> > true for exidx and DWARF-based unwinding? Given that libunwind ends up
->> > running a state machine for the latter, can we guarantee that we won't hit
->> > instructions that require access to other general purpose registers?
->> Yes. dwarf unwinding does not need anything extra. Once seeded all the
->> rest is extracted from the dwarf trace info.
->
-> Ok, but what if the LR isn't saved on the stack, for example? What if the
-> code you're trying to unwind is hand-written assembly annotated with CFI
-> directives?
-Then in that case the unwinding is not possible unless the
-hand-crafted asm is compatible with the requested unwinding method
-(fp, dwarf etc.). Do you expect problems there, if so can you give
-more details?
+Yes, patch [PATCH/RESEND 6/9] drm/tilcdc: fix release order on exit changes
+the tilcdc remove ordering. 
 
->
-> Will
+Currently, the tilcdc DRM is removed with this:
 
-Jean
+        tilcdc_tfp410_fini();
+        tilcdc_slave_fini();
+        tilcdc_panel_fini();
+        platform_driver_unregister(&tilcdc_platform_driver);
+
+Which is wrong as you shouldn't remove the tilcdc "modules" (panel, slave,
+tfp410) before the DRM driver itself. So the above patch fixed it to be:
+
+        platform_driver_unregister(&tilcdc_platform_driver);
+        tilcdc_panel_fini();
+        tilcdc_slave_fini();
+        tilcdc_tfp410_fini();
+
+> I think you a referring to previous
+> patches in your series which really mean tilcdc can actually unload now.  So
+> really the method this patch uses could always have been used, it just
+> wasn't for some reason?
+> 
+
+No, I believe this patch which removes the tilcdc sub-module destroy
+infrastructure can only be applied *after* the above remove order is fixed
+(iow, the 6/9 patch mentioned above).
+
+In other words, only once you have a proper remove() that releases things
+in the right order you can rely in the kernel and avoid any custom
+implementation.
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
