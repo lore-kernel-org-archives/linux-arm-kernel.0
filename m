@@ -1,100 +1,79 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 25 Jun 2014 18:15:39 +0530
-Subject: [PATCH v5 3/6] ARM: EXYNOS: Move SYSREG definition into sys-reg
- specific file
+Date: Wed, 25 Jun 2014 18:15:40 +0530
+Subject: [PATCH v5 4/6] ARM: EXYNOS: Remove file path from comment section
 In-Reply-To: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1403700342-9678-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1403700342-9678-5-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While making PMU implementation to be device tree based, there are
-few register offsets related with SYSREG present in regs-pmu.h, so
-let's make a new header file "regs-sys.h" to keep all such SYSREG
-related register offsets and remove them from "regs-pmu.h"
+Many files under "arm/mach-exynos" are having file path in file
+comment section which is invalid now.
+So for better code maintainability let's remove them.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/exynos.c   |    1 +
- arch/arm/mach-exynos/pm.c       |    1 +
- arch/arm/mach-exynos/regs-pmu.h |    3 ---
- arch/arm/mach-exynos/regs-sys.h |   22 ++++++++++++++++++++++
- 4 files changed, 24 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-exynos/regs-sys.h
+ arch/arm/mach-exynos/headsmp.S             |    1 -
+ arch/arm/mach-exynos/hotplug.c             |    3 +--
+ arch/arm/mach-exynos/include/mach/map.h    |    3 +--
+ arch/arm/mach-exynos/include/mach/memory.h |    3 +--
+ arch/arm/mach-exynos/platsmp.c             |    3 +--
+ 5 files changed, 4 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index e54d885..4a69b3f 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -29,6 +29,7 @@
- #include "common.h"
- #include "mfc.h"
- #include "regs-pmu.h"
-+#include "regs-sys.h"
- 
- static struct map_desc exynos4_iodesc[] __initdata = {
- 	{
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 202ca73..f127c0c 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -35,6 +35,7 @@
- 
- #include "common.h"
- #include "regs-pmu.h"
-+#include "regs-sys.h"
- 
- /**
-  * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 1d13b08..790af14 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -15,7 +15,6 @@
- #include <mach/map.h>
- 
- #define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
--#define S5P_SYSREG(x)				(S3C_VA_SYS + (x))
- 
- #define S5P_CENTRAL_SEQ_CONFIGURATION		S5P_PMUREG(0x0200)
- 
-@@ -188,8 +187,6 @@
- 
- /* For EXYNOS5 */
- 
--#define EXYNOS5_SYS_I2C_CFG					S5P_SYSREG(0x0234)
--
- #define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
- #define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
- 
-diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
-new file mode 100644
-index 0000000..84332b0
---- /dev/null
-+++ b/arch/arm/mach-exynos/regs-sys.h
-@@ -0,0 +1,22 @@
+diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
+index cdd9d91..b54f970 100644
+--- a/arch/arm/mach-exynos/headsmp.S
++++ b/arch/arm/mach-exynos/headsmp.S
+@@ -1,5 +1,4 @@
+ /*
+- *  linux/arch/arm/mach-exynos4/headsmp.S
+  *
+  *  Cloned from linux/arch/arm/mach-realview/headsmp.S
+  *
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 8a134d0..572f6b1 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -1,5 +1,4 @@
+-/* linux arch/arm/mach-exynos4/hotplug.c
+- *
 +/*
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *             http://www.samsung.com
-+ *
-+ * EXYNOS - system register definition
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_REGS_SYS_H
-+#define __ASM_ARCH_REGS_SYS_H __FILE__
-+
-+#include <mach/map.h>
-+
-+#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
-+
-+/* For EXYNOS5 */
-+#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
-+
-+#endif /* __ASM_ARCH_REGS_SYS_H */
+  *  Cloned from linux/arch/arm/mach-realview/hotplug.c
+  *
+  *  Copyright (C) 2002 ARM Ltd.
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 548269a..963002f 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos/include/mach/map.h
+- *
++/*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+  *
+diff --git a/arch/arm/mach-exynos/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
+index 2a4cdb7..e19df1f 100644
+--- a/arch/arm/mach-exynos/include/mach/memory.h
++++ b/arch/arm/mach-exynos/include/mach/memory.h
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/memory.h
+- *
++/*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index ec02422..f82fd8d 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/platsmp.c
+- *
++ /*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
 -- 
 1.7.9.5
