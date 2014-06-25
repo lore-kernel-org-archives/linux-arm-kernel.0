@@ -1,68 +1,31 @@
-From: gaku.inami.xw@bp.renesas.com (Gaku Inami)
-Date: Wed, 25 Jun 2014 18:01:32 +0900
-Subject: [PATCH] ARM: shmobile: Remove opps table check for cpufreq
-In-Reply-To: <CAKohpo=vEJ0chenDiPQiAMHUTmuRArQPAbG1ym94-9FN32z+DA@mail.gmail.com>
-References: <53AA8130.2020304@bp.renesas.com>
- <CAKohpo=vEJ0chenDiPQiAMHUTmuRArQPAbG1ym94-9FN32z+DA@mail.gmail.com>
-Message-ID: <53AA8FEC.6050808@bp.renesas.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 25 Jun 2014 17:10:12 +0800
+Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
+Message-ID: <1403687412-22362-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/06/25 17:04), Viresh Kumar wrote:
-> On 25 June 2014 13:28, Gaku Inami <gaku.inami.xw@bp.renesas.com> wrote:
->> This patch is based on feedback from Viresh Kumar.
->> Since cpufreq-cpu0 driver has already check opp table, there is no
->> need to same check in mach-shmobile.
->>
->> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
->> ---
->>
->> Based on : renesas-devel-v3.16-rc2-20140623
-> I hope you have tested that this doesn't break it :)
+Add cpufreq support for i.MX6SX, using common
+i.MX6Q cpufreq driver.
 
-I have already tested this patch.
-There was no problem to verify the following cases.
-  case1 : Normal case
-  case2 : Opps table is not exist
-  case3 : CONFIG_GENERIC_CPUFREQ_CPU0 is disabled
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/mach-imx6sx.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
->>  arch/arm/mach-shmobile/cpufreq.c |   16 +---------------
->>  1 file changed, 1 insertion(+), 15 deletions(-)
->>
->> diff --git a/arch/arm/mach-shmobile/cpufreq.c b/arch/arm/mach-shmobile/cpufreq.c
->> index e2c868f..8a24b2b 100644
->> --- a/arch/arm/mach-shmobile/cpufreq.c
->> +++ b/arch/arm/mach-shmobile/cpufreq.c
->> @@ -8,24 +8,10 @@
->>   * for more details.
->>   */
->>
->> -#include <linux/of.h>
->> -#include <linux/of_device.h>
->>  #include <linux/platform_device.h>
->>
->>  int __init shmobile_cpufreq_init(void)
->>  {
->> -       struct device_node *np;
->> -
->> -       np = of_cpu_device_node_get(0);
->> -       if (np == NULL) {
->> -               pr_err("failed to find cpu0 node\n");
->> -               return 0;
->> -       }
->> -
->> -       if (of_get_property(np, "operating-points", NULL))
->> -               platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
->> -
->> -       of_node_put(np);
->> -
->> +       platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
->>         return 0;
->>  }
-> Now that there is nothing else in this file, do you really need a separate
-> file for cpufreq?
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Thank you for your ack. I hope to leave this file.
-In the future, I will add a fix that depends on Renesas-SoC to this file.
+diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+index 74ff7d6..9221e1d 100644
+--- a/arch/arm/mach-imx/mach-imx6sx.c
++++ b/arch/arm/mach-imx/mach-imx6sx.c
+@@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)
+ static void __init imx6sx_init_late(void)
+ {
+ 	imx6q_cpuidle_init();
++
++	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
++		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+ }
+ 
+ static const char *imx6sx_dt_compat[] __initconst = {
+-- 
+1.7.9.5
