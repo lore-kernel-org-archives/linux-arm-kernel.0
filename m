@@ -1,31 +1,22 @@
-From: b20788@freescale.com (Anson Huang)
-Date: Wed, 25 Jun 2014 17:10:12 +0800
-Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
-Message-ID: <1403687412-22362-1-git-send-email-b20788@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Jun 2014 10:12:26 +0100
+Subject: [PATCH] arm64: mm: Fix horrendous config typo
+In-Reply-To: <1403682105-7919-1-git-send-email-steve.capper@linaro.org>
+References: <1403682105-7919-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140625091226.GE6153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpufreq support for i.MX6SX, using common
-i.MX6Q cpufreq driver.
+On Wed, Jun 25, 2014 at 08:41:45AM +0100, Steve Capper wrote:
+> The define ARM64_64K_PAGES is tested for rather than
+> CONFIG_ARM64_64K_PAGES. Correct that typo here.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
----
- arch/arm/mach-imx/mach-imx6sx.c |    3 +++
- 1 file changed, 3 insertions(+)
+Whilst I agree that this is a bad typo, the existing behaviour would
+still return false all the time for 64K-page configs, right?
 
-diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-index 74ff7d6..9221e1d 100644
---- a/arch/arm/mach-imx/mach-imx6sx.c
-+++ b/arch/arm/mach-imx/mach-imx6sx.c
-@@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)
- static void __init imx6sx_init_late(void)
- {
- 	imx6q_cpuidle_init();
-+
-+	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
-+		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
- }
- 
- static const char *imx6sx_dt_compat[] __initconst = {
--- 
-1.7.9.5
+The bigger problem here is testing the hugepage support with all the
+wonderful page sizes we've grown. Are there any targetted tests to know
+that we're actually exercising 1GB mappings with 4k granules? Certainly,
+our stress tests don't appear to be catching this at the moment.
+
+Will
