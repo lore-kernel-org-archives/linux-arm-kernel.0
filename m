@@ -1,165 +1,33 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 25 Jun 2014 18:13:55 +0530
-Subject: [PATCH v3 2/2] usb: ohci-exynos: Make provision for vdd regulators
-In-Reply-To: <1402064411-18244-2-git-send-email-gautam.vivek@samsung.com>
-References: <1402064411-18244-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1403700235-30763-1-git-send-email-gautam.vivek@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 25 Jun 2014 20:46:36 +0800
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <20140625062243.GD3242@dragon>
+References: <20140624153559.GA5741@dragon>
+ <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
+ <20140625062243.GD3242@dragon>
+Message-ID: <20140625124635.GA6917@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Facilitate getting required 3.3V and 1.0V VDD supply for
-OHCI controller on Exynos.
+On Wed, Jun 25, 2014 at 02:22:44PM +0800, Shawn Guo wrote:
+> On Tue, Jun 24, 2014 at 04:37:19PM -0300, Fabio Estevam wrote:
+> > On Tue, Jun 24, 2014 at 12:36 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > > Hi Lucas,
+> > >
+> > > I found that imx6q suspend/resume is broken on 3.16-rc, and it works
+> > > just fine if PCIe support is built out.  However the issue was not
+> > > exposed on 3.15, so I suspect the PCIe driver change merged in 3.16
+> > > is part of the cause.
+> > 
+> > I have just tested this on linux-next and I see that suspend/resume
+> > fails even if I build a kernel without PCI support.
+> 
+> Please test against v3.16-rc1 or -rc2.  The breakage on linux-next
+> should be another issue.
 
-With patches for regulators' nodes merged in 3.15:
-c8c253f ARM: dts: Add regulator entries to smdk5420
-275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
-the exynos systems turn on only minimal number of regulators.
+Yeah, the issue on linux-next is caused by commit 478850160636 (irq_work:
+Implement remote queueing).  And Stephen reported the issue as below.
 
-Until now, the VDD regulator supplies were either turned on
-by the bootloader, or the regulators were enabled by default
-in the kernel, so that the controller drivers did not need to
-care about turning on these regulators on their own.
-This was rather bad about these controller drivers.
-So ensuring now that the controller driver requests the necessary
-VDD regulators (if available, unless there are direct VDD rails),
-and enable them so as to make them working.
+https://lkml.org/lkml/2014/6/24/765
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
----
-
-Changes from v2:
- - replaced devm_regulator_get() with devm_regulator_get_optional().
- - Added Documentation for the vdd supplies for the controller.
- - Re-did the commit message.
-
- .../devicetree/bindings/usb/exynos-usb.txt         |    4 ++
- drivers/usb/host/ohci-exynos.c                     |   55 +++++++++++++++++++-
- 2 files changed, 58 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index b04b015..3991c50 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -63,6 +63,10 @@ Required properties:
- 			      port 2 is HSIC phy1
- 	- phys: from the *Generic PHY* bindings, specifying phy used by port.
- 
-+Optional properties:
-+ - vdd33-supply: handle to 3.3V Vdd supply regulator for the controller.
-+ - vdd10-supply: handle to 1.0V Vdd supply regulator for the controller.
-+
- Example:
- 	usb at 12120000 {
- 		compatible = "samsung,exynos4210-ohci";
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index 060a6a4..57c807c 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -19,6 +19,7 @@
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/phy/phy.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/samsung_usb_phy.h>
- #include <linux/usb.h>
-@@ -41,6 +42,8 @@ struct exynos_ohci_hcd {
- 	struct usb_phy *phy;
- 	struct usb_otg *otg;
- 	struct phy *phy_g[PHY_NUMBER];
-+	struct regulator *vdd33;
-+	struct regulator *vdd10;
- };
- 
- static int exynos_ohci_get_phy(struct device *dev,
-@@ -172,7 +175,27 @@ static int exynos_ohci_probe(struct platform_device *pdev)
- 
- 	err = exynos_ohci_get_phy(&pdev->dev, exynos_ohci);
- 	if (err)
--		goto fail_clk;
-+		goto fail_regulator1;
-+
-+	exynos_ohci->vdd33 = devm_regulator_get_optional(&pdev->dev, "vdd33");
-+	if (!IS_ERR(exynos_ohci->vdd33)) {
-+		err = regulator_enable(exynos_ohci->vdd33);
-+		if (err) {
-+			dev_err(&pdev->dev,
-+				"Failed to enable 3.3V Vdd supply\n");
-+			goto fail_regulator1;
-+		}
-+	}
-+
-+	exynos_ohci->vdd10 = devm_regulator_get_optional(&pdev->dev, "vdd10");
-+	if (!IS_ERR(exynos_ohci->vdd10)) {
-+		err = regulator_enable(exynos_ohci->vdd10);
-+		if (err) {
-+			dev_err(&pdev->dev,
-+				"Failed to enable 1.0V Vdd supply\n");
-+			goto fail_regulator2;
-+		}
-+	}
- 
- skip_phy:
- 	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
-@@ -233,6 +256,10 @@ fail_add_hcd:
- fail_io:
- 	clk_disable_unprepare(exynos_ohci->clk);
- fail_clk:
-+	regulator_disable(exynos_ohci->vdd10);
-+fail_regulator2:
-+	regulator_disable(exynos_ohci->vdd33);
-+fail_regulator1:
- 	usb_put_hcd(hcd);
- 	return err;
- }
-@@ -251,6 +278,11 @@ static int exynos_ohci_remove(struct platform_device *pdev)
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
-+	if (!IS_ERR(exynos_ohci->vdd33))
-+		regulator_disable(exynos_ohci->vdd33);
-+	if (!IS_ERR(exynos_ohci->vdd10))
-+		regulator_disable(exynos_ohci->vdd10);
-+
- 	usb_put_hcd(hcd);
- 
- 	return 0;
-@@ -282,6 +314,11 @@ static int exynos_ohci_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
-+	if (!IS_ERR(exynos_ohci->vdd33))
-+		regulator_disable(exynos_ohci->vdd33);
-+	if (!IS_ERR(exynos_ohci->vdd10))
-+		regulator_disable(exynos_ohci->vdd10);
-+
- 	return 0;
- }
- 
-@@ -291,6 +328,22 @@ static int exynos_ohci_resume(struct device *dev)
- 	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
- 	int ret;
- 
-+	if (!IS_ERR(exynos_ohci->vdd33)) {
-+		ret = regulator_enable(exynos_ohci->vdd33);
-+		if (ret) {
-+			dev_err(dev, "Failed to enable 3.3V Vdd supply\n");
-+			return ret;
-+		}
-+	}
-+
-+	if (!IS_ERR(exynos_ohci->vdd10)) {
-+		ret = regulator_enable(exynos_ohci->vdd10);
-+		if (ret) {
-+			dev_err(dev, "Failed to enable 1.0V Vdd supply\n");
-+			return ret;
-+		}
-+	}
-+
- 	clk_prepare_enable(exynos_ohci->clk);
- 
- 	if (exynos_ohci->otg)
--- 
-1.7.10.4
+Shawn
