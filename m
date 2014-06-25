@@ -1,153 +1,163 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 25 Jun 2014 14:41:36 +0200
-Subject: [PATCH v3 3/3] ARM: i.MX25 clk: Use of_clk_init() for DT case
-In-Reply-To: <1403700096-13014-1-git-send-email-denis@eukrea.com>
-References: <1403700096-13014-1-git-send-email-denis@eukrea.com>
-Message-ID: <1403700096-13014-3-git-send-email-denis@eukrea.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 25 Jun 2014 18:12:24 +0530
+Subject: [PATCH v3 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <CAFp+6iF9GkKWDcqZNV58Z=U3ZDQdgYr8LJBF9t-BpJW90vsHdQ@mail.gmail.com>
+References: <CAFp+6iF9GkKWDcqZNV58Z=U3ZDQdgYr8LJBF9t-BpJW90vsHdQ@mail.gmail.com>
+Message-ID: <1403700144-30720-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace .init_time() hook with of_clk_init() for DT targets.
+Facilitate getting required 3.3V and 1.0V VDD supply for
+EHCI controller on Exynos.
 
-Based on:
-  d4347ee ARM: i.MX27 clk: Use of_clk_init() for DT case
+With the patches for regulators' nodes merged in 3.15:
+c8c253f ARM: dts: Add regulator entries to smdk5420
+275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+the exynos systems turn on only minimal number of regulators.
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
+Until now, the VDD regulator supplies were either turned on
+by the bootloader, or the regulators were enabled by default
+in the kernel, so that the controller drivers did not need to
+care about turning on these regulators on their own.
+This was rather bad about these controller drivers.
+So ensuring now that the controller driver requests the necessary
+VDD regulators (if available, unless there are direct VDD rails),
+and enable them so as to make them working.
+
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
 ---
-Changelog v2->v3:
-- Reworked the patch to look way smaller.
-- Thanks to that the ccm global variable is now gone
-  (now it's local).
 
-Changelog v1->v2:
-- Rebased.
-- Removing the warning about the useless int i declaration.
----
- arch/arm/mach-imx/clk-imx25.c |   35 ++++++++++++++++++++---------------
- arch/arm/mach-imx/common.h    |    1 -
- arch/arm/mach-imx/imx25-dt.c  |    6 ------
- 3 files changed, 20 insertions(+), 22 deletions(-)
+Changes from v2:
+ - replaced devm_regulator_get() with devm_regulator_get_optional().
+ - Added Documentation for the vdd supplies for the controller.
+ - Re-did the commit message.
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index e759a6d..cab34c3 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -32,8 +32,6 @@
- #include "hardware.h"
- #include "mx25.h"
+ .../devicetree/bindings/usb/exynos-usb.txt         |    2 +
+ drivers/usb/host/ehci-exynos.c                     |   55 +++++++++++++++++++-
+ 2 files changed, 56 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+index a3b5990..b04b015 100644
+--- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
++++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+@@ -23,6 +23,8 @@ Required properties:
+ Optional properties:
+  - samsung,vbus-gpio:  if present, specifies the GPIO that
+    needs to be pulled up for the bus to be powered.
++ - vdd33-supply: handle to 3.3V Vdd supply regulator for the controller.
++ - vdd10-supply: handle to 1.0V Vdd supply regulator for the controller.
  
--#define CRM_BASE	MX25_IO_ADDRESS(MX25_CRM_BASE_ADDR)
--
- #define CCM_MPCTL	0x00
- #define CCM_UPCTL	0x04
- #define CCM_CCTL	0x08
-@@ -56,7 +54,7 @@
- #define CCM_LTR3	0x4c
- #define CCM_MCR		0x64
+ Example:
  
--#define ccm(x)	(CRM_BASE + (x))
-+#define ccm(x)	(ccm_base + (x))
- 
- static struct clk_onecell_data clk_data;
- 
-@@ -91,8 +89,11 @@ enum mx25_clks {
- 
- static struct clk *clk[clk_max];
- 
--static int __init __mx25_clocks_init(unsigned long osc_rate)
-+static int __init __mx25_clocks_init(unsigned long osc_rate,
-+				     void __iomem *ccm_base)
- {
-+	BUG_ON(!ccm_base);
-+
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
- 	clk[osc] = imx_clk_fixed("osc", osc_rate);
- 	clk[mpll] = imx_clk_pllv1("mpll", "osc", ccm(CCM_MPCTL));
-@@ -240,7 +241,11 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
- 
- int __init mx25_clocks_init(void)
- {
--	__mx25_clocks_init(24000000);
-+	void __iomem *ccm;
-+
-+	ccm = ioremap(MX25_CRM_BASE_ADDR, SZ_16K);
-+
-+	__mx25_clocks_init(24000000, ccm);
- 
- 	clk_register_clkdev(clk[gpt1_ipg], "ipg", "imx-gpt.0");
- 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
-@@ -308,29 +313,29 @@ int __init mx25_clocks_init(void)
- 	return 0;
- }
- 
--int __init mx25_clocks_init_dt(void)
-+static void __init mx25_clocks_init_dt(struct device_node *np)
- {
--	struct device_node *np;
-+	struct device_node *refnp;
- 	unsigned long osc_rate = 24000000;
-+	void __iomem *ccm;
- 
- 	/* retrieve the freqency of fixed clocks from device tree */
--	for_each_compatible_node(np, NULL, "fixed-clock") {
-+	for_each_compatible_node(refnp, NULL, "fixed-clock") {
- 		u32 rate;
--		if (of_property_read_u32(np, "clock-frequency", &rate))
-+		if (of_property_read_u32(refnp, "clock-frequency", &rate))
- 			continue;
- 
--		if (of_device_is_compatible(np, "fsl,imx-osc"))
-+		if (of_device_is_compatible(refnp, "fsl,imx-osc"))
- 			osc_rate = rate;
- 	}
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-ccm");
-+	ccm = of_iomap(np, 0);
-+	__mx25_clocks_init(osc_rate, ccm);
-+
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 
--	__mx25_clocks_init(osc_rate);
--
- 	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt"));
--
--	return 0;
- }
-+CLK_OF_DECLARE(imx25_ccm, "fsl,imx25-ccm", mx25_clocks_init_dt);
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 50ee9c2..08ab255 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -55,7 +55,6 @@ int mx25_clocks_init(void);
- int mx27_clocks_init(unsigned long fref);
- int mx31_clocks_init(unsigned long fref);
- int mx35_clocks_init(void);
--int mx25_clocks_init_dt(void);
- int mx31_clocks_init_dt(void);
- struct platform_device *mxc_register_gpio(char *name, int id,
- 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
-diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
-index 42a65e0..cf8032b 100644
---- a/arch/arm/mach-imx/imx25-dt.c
-+++ b/arch/arm/mach-imx/imx25-dt.c
-@@ -29,16 +29,10 @@ static const char * const imx25_dt_board_compat[] __initconst = {
- 	NULL
+diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+index d1c7621..b920642 100644
+--- a/drivers/usb/host/ehci-exynos.c
++++ b/drivers/usb/host/ehci-exynos.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_gpio.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/usb/phy.h>
+ #include <linux/usb/samsung_usb_phy.h>
+ #include <linux/usb.h>
+@@ -50,6 +51,8 @@ struct exynos_ehci_hcd {
+ 	struct usb_phy *phy;
+ 	struct usb_otg *otg;
+ 	struct phy *phy_g[PHY_NUMBER];
++	struct regulator *vdd33;
++	struct regulator *vdd10;
  };
  
--static void __init imx25_timer_init(void)
--{
--	mx25_clocks_init_dt();
--}
--
- DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
- 	.map_io		= mx25_map_io,
- 	.init_early	= imx25_init_early,
- 	.init_irq	= mx25_init_irq,
--	.init_time	= imx25_timer_init,
- 	.init_machine	= imx25_dt_init,
- 	.dt_compat	= imx25_dt_board_compat,
- 	.restart	= mxc_restart,
+ #define to_exynos_ehci(hcd) (struct exynos_ehci_hcd *)(hcd_to_ehci(hcd)->priv)
+@@ -193,7 +196,27 @@ static int exynos_ehci_probe(struct platform_device *pdev)
+ 
+ 	err = exynos_ehci_get_phy(&pdev->dev, exynos_ehci);
+ 	if (err)
+-		goto fail_clk;
++		goto fail_regulator1;
++
++	exynos_ehci->vdd33 = devm_regulator_get_optional(&pdev->dev, "vdd33");
++	if (!IS_ERR(exynos_ehci->vdd33)) {
++		err = regulator_enable(exynos_ehci->vdd33);
++		if (err) {
++			dev_err(&pdev->dev,
++				"Failed to enable 3.3V Vdd supply\n");
++			goto fail_regulator1;
++		}
++	}
++
++	exynos_ehci->vdd10 = devm_regulator_get_optional(&pdev->dev, "vdd10");
++	if (!IS_ERR(exynos_ehci->vdd10)) {
++		err = regulator_enable(exynos_ehci->vdd10);
++		if (err) {
++			dev_err(&pdev->dev,
++				"Failed to enable 1.0V Vdd supply\n");
++			goto fail_regulator2;
++		}
++	}
+ 
+ skip_phy:
+ 
+@@ -262,6 +285,10 @@ fail_add_hcd:
+ fail_io:
+ 	clk_disable_unprepare(exynos_ehci->clk);
+ fail_clk:
++	regulator_disable(exynos_ehci->vdd10);
++fail_regulator2:
++	regulator_disable(exynos_ehci->vdd33);
++fail_regulator1:
+ 	usb_put_hcd(hcd);
+ 	return err;
+ }
+@@ -280,6 +307,11 @@ static int exynos_ehci_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(exynos_ehci->clk);
+ 
++	if (!IS_ERR(exynos_ehci->vdd33))
++		regulator_disable(exynos_ehci->vdd33);
++	if (!IS_ERR(exynos_ehci->vdd10))
++		regulator_disable(exynos_ehci->vdd10);
++
+ 	usb_put_hcd(hcd);
+ 
+ 	return 0;
+@@ -305,6 +337,11 @@ static int exynos_ehci_suspend(struct device *dev)
+ 
+ 	clk_disable_unprepare(exynos_ehci->clk);
+ 
++	if (!IS_ERR(exynos_ehci->vdd33))
++		regulator_disable(exynos_ehci->vdd33);
++	if (!IS_ERR(exynos_ehci->vdd10))
++		regulator_disable(exynos_ehci->vdd10);
++
+ 	return rc;
+ }
+ 
+@@ -314,6 +351,22 @@ static int exynos_ehci_resume(struct device *dev)
+ 	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
+ 	int ret;
+ 
++	if (!IS_ERR(exynos_ehci->vdd33)) {
++		ret = regulator_enable(exynos_ehci->vdd33);
++		if (ret) {
++			dev_err(dev, "Failed to enable 3.3V Vdd supply\n");
++			return ret;
++		}
++	}
++
++	if (!IS_ERR(exynos_ehci->vdd10)) {
++		ret = regulator_enable(exynos_ehci->vdd10);
++		if (ret) {
++			dev_err(dev, "Failed to enable 1.0V Vdd supply\n");
++			return ret;
++		}
++	}
++
+ 	clk_prepare_enable(exynos_ehci->clk);
+ 
+ 	if (exynos_ehci->otg)
 -- 
-1.7.9.5
+1.7.10.4
