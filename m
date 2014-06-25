@@ -1,71 +1,151 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel =?iso-8859-1?Q?Garc=EDa?=)
-Date: Wed, 25 Jun 2014 11:32:46 -0300
-Subject: [PATCH/RESEND 9/9] drm/tilcdc: replace late_initcall with
- module_init
-In-Reply-To: <20140625130042.GK3705@n2100.arm.linux.org.uk>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-10-git-send-email-guido@vanguardiasur.com.ar>
- <53A9F5F4.3030806@ti.com>
- <20140625130042.GK3705@n2100.arm.linux.org.uk>
-Message-ID: <20140625143246.GA743@arch.cereza>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 25 Jun 2014 22:36:14 +0800
+Subject: [PATCH v3 6/6] ARM: sun8i: Add basic clock nodes to the DTSI
+In-Reply-To: <1403603980-31101-7-git-send-email-wens@csie.org>
+References: <1403603980-31101-1-git-send-email-wens@csie.org>
+ <1403603980-31101-7-git-send-email-wens@csie.org>
+Message-ID: <CAGb2v667uLQVs3ck2JCnRW3Ov09iHa53WjfHXxxgJCfR9TDakg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Ccing Guido back)
+On Tue, Jun 24, 2014 at 5:59 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Now that we have support for sun8i specific clocks in the driver,
+> add the corresponding clock nodes to the DTSI.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun8i-a23.dtsi | 115 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 115 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+> index ac5f69a..559ab08 100644
+> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+> @@ -64,6 +64,121 @@
+>                         clock-frequency = <32768>;
+>                         clock-output-names = "osc32k";
+>                 };
+> +
+> +               pll1: clk at 01c20000 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun8i-a23-pll1-clk";
+> +                       reg = <0x01c20000 0x4>;
+> +                       clocks = <&osc24M>;
+> +                       clock-output-names = "pll1";
+> +               };
+> +
+> +               /* dummy clock until actually implemented */
+> +               pll6: pll6_clk {
+> +                       #clock-cells = <0>;
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <600000000>;
+> +                       clock-output-names = "pll6";
+> +               };
+> +
+> +               cpu: cpu_clk at 01c20050 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-cpu-clk";
+> +                       reg = <0x01c20050 0x4>;
+> +
+> +                       /*
+> +                        * PLL1 is listed twice here.
+> +                        * While it looks suspicious, it's actually documented
+> +                        * that way both in the datasheet and in the code from
+> +                        * Allwinner.
+> +                        */
+> +                       clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll1>;
+> +                       clock-output-names = "cpu";
+> +               };
 
-Hello Russell, Darren,
+Nack on this one. I pulled the wrong files.
 
-On 25 Jun 02:00 PM, Russell King - ARM Linux wrote:
-> On Tue, Jun 24, 2014 at 05:04:36PM -0500, Darren Etheridge wrote:
-> > On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
-> >> Use module_init instead of late_initcall, as is the norm for modular
-> >> drivers.
-> >>
-> >> module_init was used until 6e8de0bd6a51fdeebd5d975c4fcc426f730b339b
-> >> ("drm/tilcdc: add encoder slave (v2)") changed it to a late_initcall,
-> >> but it does not explain why. Tests show it's working properly with
-> >> module_init.
-> >>
-> >
-> > If I recall, the late_initcall stuff was done to try and make sure the  
-> > tda998x/i2c subsystem came up before tilcdc.
-
-That doesn't make any sense. Using late_initcall for the tilcdc DRM
-driver would make the tilcdc DRM get probed before any other regular
-module_init driver, including the tda998x encoder.
-
-> > However it didn't always  
-> > work so we added commit: 39de6194131c155901f96686a063212656d80c2e to try  
-> > and ensure the ordering.  This might be why changing back to module_init  
-> > is fine (and I agree with your assessment from my testing).
-
-That commit is adds a proper probe deferal mechanism in case the
-i2c is not available. OMAP is special because it has its own nasty initcall
-to probe the i2c busses. However, that should be fixed and then i2c would be
-always probed *after* the DRM, as per the ordering in drivers/Makefile.
-
-> 
-> There's a solution to that...
-
-A solution to *what* ?
-
-> I have patches which convert the tda998x
-> driver to also register into the component helpers as well as remaining
-> as a drm slave device.  This makes it possible to transition tilcdc to
-> use the component helper to solve the initialisation ordering.
-> 
-
-AFAIK, there's no issue with the initialisation ordering, except that the
-DRM driver is currently probed before the TDA998x encoder and so the probe
-is defered. Unless I'm missing something that's very easy to fix, you just
-need to change the link order to guarantee that i2c encoders are probed
-*before* the DRM drivers that require them.
-
-I have just posted a very simple patch to fix it, but it seems Thierry wasn't
-happy with it, not sure why yet [1].
-
-[1] http://www.spinics.net/lists/dri-devel/msg61987.html
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+> +
+> +               axi: axi_clk at 01c20050 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-axi-clk";
+> +                       reg = <0x01c20050 0x4>;
+> +                       clocks = <&cpu>;
+> +                       clock-output-names = "axi";
+> +               };
+> +
+> +               ahb1_mux: ahb1_mux_clk at 01c20054 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun6i-a31-ahb1-mux-clk";
+> +                       reg = <0x01c20054 0x4>;
+> +                       clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+> +                       clock-output-names = "ahb1_mux";
+> +               };
+> +
+> +               ahb1: ahb1_clk at 01c20054 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-ahb-clk";
+> +                       reg = <0x01c20054 0x4>;
+> +                       clocks = <&ahb1_mux>;
+> +                       clock-output-names = "ahb1";
+> +               };
+> +
+> +               apb1: apb1_clk at 01c20054 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-apb0-clk";
+> +                       reg = <0x01c20054 0x4>;
+> +                       clocks = <&ahb1>;
+> +                       clock-output-names = "apb1";
+> +               };
+> +
+> +               ahb1_gates: clk at 01c20060 {
+> +                       #clock-cells = <1>;
+> +                       compatible = "allwinner,sun8i-a23-ahb1-gates-clk";
+> +                       reg = <0x01c20060 0x8>;
+> +                       clocks = <&ahb1>;
+> +                       clock-output-names = "ahb1_mipidsi", "ahb1_dma",
+> +                                       "ahb1_mmc0", "ahb1_mmc1", "ahb1_mmc2",
+> +                                       "ahb1_nand", "ahb1_sdram",
+> +                                       "ahb1_hstimer", "ahb1_spi0",
+> +                                       "ahb1_spi1", "ahb1_otg", "ahb1_ehci",
+> +                                       "ahb1_ohci", "ahb1_ve", "ahb1_lcd",
+> +                                       "ahb1_csi", "ahb1_be",  "ahb1_fe",
+> +                                       "ahb1_gpu", "ahb1_spinlock",
+> +                                       "ahb1_drc";
+> +               };
+> +
+> +               apb1_gates: clk at 01c20068 {
+> +                       #clock-cells = <1>;
+> +                       compatible = "allwinner,sun8i-a23-apb1-gates-clk";
+> +                       reg = <0x01c20068 0x4>;
+> +                       clocks = <&apb1>;
+> +                       clock-output-names = "apb1_codec", "apb1_pio",
+> +                                       "apb1_daudio0", "apb1_daudio1";
+> +               };
+> +
+> +               apb2_mux: apb2_mux_clk at 01c20058 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-apb1-mux-clk";
+> +                       reg = <0x01c20058 0x4>;
+> +                       clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
+> +                       clock-output-names = "apb2_mux";
+> +               };
+> +
+> +               apb2: apb2_clk at 01c20058 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun6i-a31-apb2-div-clk";
+> +                       reg = <0x01c20058 0x4>;
+> +                       clocks = <&apb2_mux>;
+> +                       clock-output-names = "apb2";
+> +               };
+> +
+> +               apb2_gates: clk at 01c2006c {
+> +                       #clock-cells = <1>;
+> +                       compatible = "allwinner,sun8i-a23-apb2-gates-clk";
+> +                       reg = <0x01c2006c 0x4>;
+> +                       clocks = <&apb2>;
+> +                       clock-output-names = "apb2_i2c0", "apb2_i2c1",
+> +                                       "apb2_i2c2", "apb2_uart0",
+> +                                       "apb2_uart1", "apb2_uart2",
+> +                                       "apb2_uart3", "apb2_uart4";
+> +               };
+>         };
+>
+>         soc at 01c00000 {
+> --
+> 2.0.0
+>
