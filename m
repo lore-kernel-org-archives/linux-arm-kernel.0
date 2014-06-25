@@ -1,45 +1,59 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Jun 2014 17:06:15 -0700
-Subject: [RFC/PATCH 04/12] clk: qcom: Add support for High-Frequency PLLs
- (HFPLLs)
+Date: Tue, 24 Jun 2014 17:06:20 -0700
+Subject: [RFC/PATCH 09/12] clk: qcom: Add Krait clock controller driver
 In-Reply-To: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
 References: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1403654783-7176-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1403654783-7176-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HFPLLs are the main frequency source for Krait CPU clocks. Add
-support for changing the rate of these PLLs.
+The Krait CPU clocks are made up of a primary mux and secondary
+mux for each CPU and the L2, controlled via cp15 accessors. For
+Kraits within KPSSv1 each secondary mux accepts a different aux
+source, but on KPSSv2 each secondary mux accepts the same aux
+source.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/qcom/Makefile    |   1 +
- drivers/clk/qcom/clk-hfpll.c | 260 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/qcom/clk-hfpll.h |  54 +++++++++
- 3 files changed, 315 insertions(+)
- create mode 100644 drivers/clk/qcom/clk-hfpll.c
- create mode 100644 drivers/clk/qcom/clk-hfpll.h
+ drivers/clk/qcom/Kconfig    |   9 ++
+ drivers/clk/qcom/Makefile   |   1 +
+ drivers/clk/qcom/krait-cc.c | 366 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 376 insertions(+)
+ create mode 100644 drivers/clk/qcom/krait-cc.c
 
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index 247f042dc110..6f835e406930 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -61,3 +61,12 @@ config KPSS_XCC
+ 	  Support for the Krait ACC and GCC clock controllers. Say Y
+ 	  if you want to support CPU frequency scaling on devices such
+ 	  as MSM8960, APQ8064, etc.
++
++config KRAITCC
++	tristate "Krait Clock Controller"
++	depends on COMMON_CLK_QCOM
++	depends on ARM
++	select KRAIT_L2_ACCESSORS
++	help
++	  Support for the Krait CPU clocks on Qualcomm devices.
++	  Say Y if you want to support CPU frequency scaling.
 diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-index 8684ff004be6..1a0b561bd105 100644
+index bb4666733bd9..e8c7f31916da 100644
 --- a/drivers/clk/qcom/Makefile
 +++ b/drivers/clk/qcom/Makefile
-@@ -7,6 +7,7 @@ clk-qcom-y += clk-rcg.o
- clk-qcom-y += clk-rcg2.o
- clk-qcom-y += clk-branch.o
- clk-qcom-y += clk-generic.o
-+clk-qcom-y += clk-hfpll.o
- clk-qcom-y += reset.o
- 
- obj-$(CONFIG_MSM_GCC_8660) += gcc-msm8660.o
-diff --git a/drivers/clk/qcom/clk-hfpll.c b/drivers/clk/qcom/clk-hfpll.c
+@@ -18,3 +18,4 @@ obj-$(CONFIG_MSM_MMCC_8960) += mmcc-msm8960.o
+ obj-$(CONFIG_MSM_MMCC_8974) += mmcc-msm8974.o
+ obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
+ obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
++obj-$(CONFIG_KRAITCC) += krait-cc.o
+diff --git a/drivers/clk/qcom/krait-cc.c b/drivers/clk/qcom/krait-cc.c
 new file mode 100644
-index 000000000000..f8a40a7cdf6f
+index 000000000000..4ca9589acfca
 --- /dev/null
-+++ b/drivers/clk/qcom/clk-hfpll.c
-@@ -0,0 +1,260 @@
-+/*
-+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
++++ b/drivers/clk/qcom/krait-cc.c
+@@ -0,0 +1,366 @@
++/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 and
@@ -50,314 +64,361 @@ index 000000000000..f8a40a7cdf6f
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
++
 +#include <linux/kernel.h>
-+#include <linux/module.h>
 +#include <linux/init.h>
-+#include <linux/regmap.h>
-+#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
 +#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk.h>
 +#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
++#include <linux/slab.h>
 +
-+#include "clk-regmap.h"
-+#include "clk-hfpll.h"
++#include <asm/smp_plat.h>
 +
-+#define PLL_OUTCTRL	BIT(0)
-+#define PLL_BYPASSNL	BIT(1)
-+#define PLL_RESET_N	BIT(2)
++#include "clk-krait.h"
 +
-+/* Initialize a HFPLL at a given rate and enable it. */
-+static void __clk_hfpll_init_once(struct clk_hw *hw)
++DEFINE_FIXED_DIV_CLK(acpu_aux, 2, "gpll0_vote");
++
++static u8 sec_mux_map[] = {
++	2,
++	0,
++};
++
++static u8 pri_mux_map[] = {
++	1,
++	2,
++	0,
++};
++
++static int
++krait_add_div(struct device *dev, int id, const char *s, unsigned offset)
 +{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
++	struct div_clk *div;
++	struct clk_init_data init = {
++		.num_parents = 1,
++		.ops = &clk_ops_div,
++		.flags = CLK_SET_RATE_PARENT,
++	};
++	const char *p_names[1];
++	struct clk *clk;
 +
-+	if (likely(h->init_done))
-+		return;
++	div = devm_kzalloc(dev, sizeof(*dev), GFP_KERNEL);
++	if (!div)
++		return -ENOMEM;
 +
-+	/* Configure PLL parameters for integer mode. */
-+	if (hd->config_val)
-+		regmap_write(regmap, hd->config_reg, hd->config_val);
-+	regmap_write(regmap, hd->m_reg, 0);
-+	regmap_write(regmap, hd->n_reg, 1);
++	div->data.div = 2;
++	div->data.min_div = 2;
++	div->data.max_div = 2;
++	div->ops = &clk_div_ops_kpss_div2;
++	div->mask = 0x3;
++	div->shift = 6;
++	div->priv = (void *)(id >= 0);
++	div->offset = offset;
++	div->hw.init = &init;
 +
-+	if (hd->user_reg) {
-+		u32 regval = hd->user_val;
-+		unsigned long rate;
++	init.name = kasprintf(GFP_KERNEL, "hfpll%s_div", s);
++	if (!init.name)
++		return -ENOMEM;
 +
-+		rate = __clk_get_rate(hw->clk);
-+
-+		/* Pick the right VCO. */
-+		if (hd->user_vco_mask && rate > hd->low_vco_max_rate)
-+			regval |= hd->user_vco_mask;
-+		regmap_write(regmap, hd->user_reg, regval);
++	init.parent_names = p_names;
++	p_names[0] = kasprintf(GFP_KERNEL, "hfpll%s", s);
++	if (!p_names[0]) {
++		kfree(init.name);
++		return -ENOMEM;
 +	}
 +
-+	if (hd->droop_reg)
-+		regmap_write(regmap, hd->droop_reg, hd->droop_val);
++	clk = devm_clk_register(dev, &div->hw);
++	kfree(p_names[0]);
++	kfree(init.name);
 +
-+	h->init_done = true;
++	return PTR_ERR_OR_ZERO(clk);
 +}
 +
-+static void __clk_hfpll_enable(struct clk_hw *hw)
++static int
++krait_add_sec_mux(struct device *dev, int id, const char *s, unsigned offset,
++		  bool unique_aux)
 +{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 val;
++	struct mux_clk *mux;
++	static const char *sec_mux_list[] = {
++		"acpu_aux",
++		"qsb",
++	};
++	struct clk_init_data init = {
++		.parent_names = sec_mux_list,
++		.num_parents = ARRAY_SIZE(sec_mux_list),
++		.ops = &clk_ops_gen_mux,
++		.flags = CLK_SET_RATE_PARENT,
++	};
++	struct clk *clk;
 +
-+	__clk_hfpll_init_once(hw);
++	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
++	if (!mux)
++		return -ENOMEM;
 +
-+	/* Disable PLL bypass mode. */
-+	regmap_update_bits(regmap, hd->mode_reg, PLL_BYPASSNL, PLL_BYPASSNL);
++	mux->offset = offset;
++	mux->priv = (void *)(id >= 0);
++	mux->has_safe_parent = true;
++	mux->safe_sel = 2;
++	mux->ops = &clk_mux_ops_kpss;
++	mux->mask = 0x3;
++	mux->shift = 2;
++	mux->parent_map = sec_mux_map;
++	mux->hw.init = &init;
 +
-+	/*
-+	 * H/W requires a 5us delay between disabling the bypass and
-+	 * de-asserting the reset. Delay 10us just to be safe.
-+	 */
-+	mb();
-+	udelay(10);
++	init.name = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
++	if (!init.name)
++		return -ENOMEM;
 +
-+	/* De-assert active-low PLL reset. */
-+	regmap_update_bits(regmap, hd->mode_reg, PLL_RESET_N, PLL_RESET_N);
-+
-+	/* Wait for PLL to lock. */
-+	if (hd->status_reg) {
-+		do {
-+			regmap_read(regmap, hd->status_reg, &val);
-+		} while (!(val & BIT(hd->lock_bit)));
-+	} else {
-+		mb();
-+		udelay(60);
-+	}
-+
-+	/* Enable PLL output. */
-+	regmap_update_bits(regmap, hd->mode_reg, PLL_OUTCTRL, PLL_OUTCTRL);
-+
-+	/* Make sure the enable is done before returning. */
-+	mb();
-+}
-+
-+/* Enable an already-configured HFPLL. */
-+static int clk_hfpll_enable(struct clk_hw *hw)
-+{
-+	unsigned long flags;
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 mode;
-+
-+	spin_lock_irqsave(&h->lock, flags);
-+	regmap_read(regmap, hd->mode_reg, &mode);
-+	if (!(mode & (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL)))
-+		__clk_hfpll_enable(hw);
-+	spin_unlock_irqrestore(&h->lock, flags);
-+
-+	return 0;
-+}
-+
-+static void __clk_hfpll_disable(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+
-+	/*
-+	 * Disable the PLL output, disable test mode, enable the bypass mode,
-+	 * and assert the reset.
-+	 */
-+	regmap_update_bits(regmap, hd->mode_reg,
-+			PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL, 0);
-+}
-+
-+static void clk_hfpll_disable(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&h->lock, flags);
-+	__clk_hfpll_disable(hw);
-+	spin_unlock_irqrestore(&h->lock, flags);
-+}
-+
-+static long clk_hfpll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				 unsigned long *parent_rate)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	unsigned long rrate;
-+
-+	rate = clamp(rate, hd->min_rate, hd->max_rate);
-+
-+	rrate = DIV_ROUND_UP(rate, *parent_rate) * *parent_rate;
-+	if (rrate > hd->max_rate)
-+		rrate -= *parent_rate;
-+
-+	return rrate;
-+}
-+
-+/*
-+ * For optimization reasons, assumes no downstream clocks are actively using
-+ * it.
-+ */
-+static int clk_hfpll_set_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long parent_rate)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	unsigned long flags;
-+	u32 l_val, val;
-+	bool enabled;
-+
-+	l_val = rate / parent_rate;
-+
-+	spin_lock_irqsave(&h->lock, flags);
-+
-+	enabled = __clk_is_enabled(hw->clk);
-+	if (enabled)
-+		__clk_hfpll_disable(hw);
-+
-+	/* Pick the right VCO. */
-+	if (hd->user_reg && hd->user_vco_mask) {
-+		regmap_read(regmap, hd->user_reg, &val);
-+		if (rate <= hd->low_vco_max_rate)
-+			val &= ~hd->user_vco_mask;
-+		else
-+			val |= hd->user_vco_mask;
-+		regmap_write(regmap, hd->user_reg, val);
-+	}
-+
-+	regmap_write(regmap, hd->l_reg, l_val);
-+
-+	if (enabled)
-+		__clk_hfpll_enable(hw);
-+
-+	spin_unlock_irqrestore(&h->lock, flags);
-+
-+	return 0;
-+}
-+
-+static unsigned long clk_hfpll_recalc_rate(struct clk_hw *hw,
-+					   unsigned long parent_rate)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 l_val;
-+
-+	regmap_read(regmap, hd->l_reg, &l_val);
-+
-+	return l_val * parent_rate;
-+}
-+
-+static void clk_hfpll_init(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 mode, status;
-+
-+	regmap_read(regmap, hd->mode_reg, &mode);
-+	if (mode != (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL)) {
-+		__clk_hfpll_init_once(hw);
-+		return;
-+	}
-+
-+	if (hd->status_reg) {
-+		regmap_read(regmap, hd->status_reg, &status);
-+		if (!(status & BIT(hd->lock_bit))) {
-+			WARN(1, "HFPLL %s is ON, but not locked!\n",
-+					__clk_get_name(hw->clk));
-+			clk_hfpll_disable(hw);
-+			__clk_hfpll_init_once(hw);
++	if (unique_aux) {
++		sec_mux_list[0] = kasprintf(GFP_KERNEL, "acpu%s_aux", s);
++		if (!sec_mux_list[0]) {
++			clk = ERR_PTR(-ENOMEM);
++			goto err_aux;
 +		}
++		pr_info("Parents are %s %s\n", sec_mux_list[0], sec_mux_list[1]);
 +	}
++
++	clk = devm_clk_register(dev, &mux->hw);
++
++	if (unique_aux)
++		kfree(sec_mux_list[0]);
++err_aux:
++	kfree(init.name);
++	return PTR_ERR_OR_ZERO(clk);
 +}
 +
-+static int hfpll_is_enabled(struct clk_hw *hw)
++static struct clk *
++krait_add_pri_mux(struct device *dev, int id, const char * s, unsigned offset)
 +{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 mode;
++	struct mux_clk *mux;
++	const char *p_names[3];
++	struct clk_init_data init = {
++		.parent_names = p_names,
++		.num_parents = ARRAY_SIZE(p_names),
++		.ops = &clk_ops_gen_mux,
++		.flags = CLK_SET_RATE_PARENT,
++	};
++	struct clk *clk;
 +
-+	regmap_read(regmap, hd->mode_reg, &mode);
-+	mode &= 0x7;
-+	return mode == (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL);
++	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
++	if (!mux)
++		return ERR_PTR(-ENOMEM);
++
++	mux->has_safe_parent = true;
++	mux->safe_sel = 0;
++	mux->ops = &clk_mux_ops_kpss;
++	mux->mask = 0x3;
++	mux->shift = 0;
++	mux->offset = offset;
++	mux->priv = (void *)(id >= 0);
++	mux->parent_map = pri_mux_map;
++	mux->hw.init = &init;
++
++	init.name = kasprintf(GFP_KERNEL, "krait%s_pri_mux", s);
++	if (!init.name)
++		return ERR_PTR(-ENOMEM);
++
++	p_names[0] = kasprintf(GFP_KERNEL, "hfpll%s", s);
++	if (!p_names[0]) {
++		clk = ERR_PTR(-ENOMEM);
++		goto err_p0;
++	}
++
++	p_names[1] = kasprintf(GFP_KERNEL, "hfpll%s_div", s);
++	if (!p_names[1]) {
++		clk = ERR_PTR(-ENOMEM);
++		goto err_p1;
++	}
++
++	p_names[2] = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
++	if (!p_names[2]) {
++		clk = ERR_PTR(-ENOMEM);
++		goto err_p2;
++	}
++
++	clk = devm_clk_register(dev, &mux->hw);
++
++	kfree(p_names[2]);
++err_p2:
++	kfree(p_names[1]);
++err_p1:
++	kfree(p_names[0]);
++err_p0:
++	kfree(init.name);
++	return clk;
 +}
 +
-+const struct clk_ops clk_ops_hfpll = {
-+	.enable = clk_hfpll_enable,
-+	.disable = clk_hfpll_disable,
-+	.is_enabled = hfpll_is_enabled,
-+	.round_rate = clk_hfpll_round_rate,
-+	.set_rate = clk_hfpll_set_rate,
-+	.recalc_rate = clk_hfpll_recalc_rate,
-+	.init = clk_hfpll_init,
++/* id < 0 for L2, otherwise id == physical CPU number */
++static struct clk *krait_add_clks(struct device *dev, int id, bool unique_aux)
++{
++	int ret;
++	unsigned offset;
++	const char *s;
++	struct clk *clk;
++
++	if (id >= 0) {
++		offset = 0x4501 + (0x1000 * id);
++		s = kasprintf(GFP_KERNEL, "%d", id);
++		if (!s)
++			return ERR_PTR(-ENOMEM);
++	} else {
++		offset = 0x500;
++		s = "_l2";
++	}
++
++	ret = krait_add_div(dev, id, s, offset);
++	if (ret) {
++		clk = ERR_PTR(ret);
++		goto err;
++	}
++
++	ret = krait_add_sec_mux(dev, id, s, offset, unique_aux);
++	if (ret) {
++		clk = ERR_PTR(ret);
++		goto err;
++	}
++
++	clk = krait_add_pri_mux(dev, id, s, offset);
++err:
++	if (id >= 0)
++		kfree(s);
++
++	return clk;
++}
++
++static struct clk *krait_of_get(struct of_phandle_args *clkspec, void *data)
++{
++	unsigned int idx = clkspec->args[0];
++	struct clk **clks = data;
++
++	if (idx >= 5) {
++		pr_err("%s: invalid clock index %d\n", __func__, idx);
++		return ERR_PTR(-EINVAL);
++	}
++
++	return clks[idx] ? : ERR_PTR(-ENODEV);
++}
++
++static const struct of_device_id krait_cc_match_table[] = {
++	{ .compatible = "qcom,krait-cc-v1", (void *)1UL },
++	{ .compatible = "qcom,krait-cc-v2" },
++	{}
 +};
-+EXPORT_SYMBOL_GPL(clk_ops_hfpll);
-diff --git a/drivers/clk/qcom/clk-hfpll.h b/drivers/clk/qcom/clk-hfpll.h
-new file mode 100644
-index 000000000000..48c18d664f4e
---- /dev/null
-+++ b/drivers/clk/qcom/clk-hfpll.h
-@@ -0,0 +1,54 @@
-+/*
-+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __QCOM_CLK_HFPLL_H__
-+#define __QCOM_CLK_HFPLL_H__
++MODULE_DEVICE_TABLE(of, krait_cc_match_table);
 +
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
-+#include "clk-regmap.h"
++static int krait_cc_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	const struct of_device_id *id;
++	unsigned long cur_rate, aux_rate;
++	int i, cpu;
++	struct clk *clk;
++	struct clk **clks;
++	struct clk *l2_pri_mux_clk;
 +
-+struct hfpll_data {
-+	u32 mode_reg;
-+	u32 l_reg;
-+	u32 m_reg;
-+	u32 n_reg;
-+	u32 user_reg;
-+	u32 droop_reg;
-+	u32 config_reg;
-+	u32 status_reg;
-+	u8  lock_bit;
++	id = of_match_device(krait_cc_match_table, &pdev->dev);
++	if (!id)
++		return -ENODEV;
 +
-+	u32 droop_val;
-+	u32 config_val;
-+	u32 user_val;
-+	u32 user_vco_mask;
-+	unsigned long low_vco_max_rate;
++	/* Rate is 1 because 0 causes problems for __clk_mux_determine_rate */
++	clk = clk_register_fixed_rate(dev, "qsb", NULL, CLK_IS_ROOT, 1);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
 +
-+	unsigned long min_rate;
-+	unsigned long max_rate;
++	if (!id->data) {
++		clk = devm_clk_register(dev, &acpu_aux.hw);
++		if (IS_ERR(clk))
++			return PTR_ERR(clk);
++	}
++
++	/* Krait configurations have at most 4 CPUs and one L2 */
++	clks = devm_kcalloc(dev, 5, sizeof(*clks), GFP_KERNEL);
++	if (!clks)
++		return -ENOMEM;
++
++	for_each_possible_cpu(i) {
++		cpu = cpu_logical_map(i);
++		clk = krait_add_clks(dev, cpu, id->data);
++		if (IS_ERR(clk))
++			return PTR_ERR(clk);
++		clks[cpu] = clk;
++	}
++
++	l2_pri_mux_clk = krait_add_clks(dev, -1, id->data);
++	if (IS_ERR(l2_pri_mux_clk))
++		return PTR_ERR(l2_pri_mux_clk);
++	clks[4] = l2_pri_mux_clk;
++
++	/*
++	 * We don't want the CPU or L2 clocks to be turned off at late init
++	 * if CPUFREQ or HOTPLUG configs are disabled. So, bump up the
++	 * refcount of these clocks. Any cpufreq/hotplug manager can assume
++	 * that the clocks have already been prepared and enabled by the time
++	 * they take over.
++	 */
++	for_each_online_cpu(i) {
++		cpu = cpu_logical_map(i);
++		clk_prepare_enable(l2_pri_mux_clk);
++		WARN(clk_prepare_enable(clks[cpu]),
++			"Unable to turn on CPU%d clock", cpu);
++	}
++
++	/*
++	 * Force reinit of HFPLLs and muxes to overwrite any potential
++	 * incorrect configuration of HFPLLs and muxes by the bootloader.
++	 * While at it, also make sure the cores are running at known rates
++	 * and print the current rate.
++	 *
++	 * The clocks are set to aux clock rate first to make sure the
++	 * secondary mux is not sourcing off of QSB. The rate is then set to
++	 * two different rates to force a HFPLL reinit under all
++	 * circumstances.
++	 */
++	cur_rate = clk_get_rate(l2_pri_mux_clk);
++	aux_rate = 384000000;
++	if (cur_rate == 1) {
++		pr_info("L2 @ QSB rate. Forcing new rate.\n");
++		cur_rate = aux_rate;
++	}
++	clk_set_rate(l2_pri_mux_clk, aux_rate);
++	clk_set_rate(l2_pri_mux_clk, 2);
++	clk_set_rate(l2_pri_mux_clk, cur_rate);
++	pr_info("L2 @ %lu KHz\n", clk_get_rate(l2_pri_mux_clk) / 1000);
++	for_each_possible_cpu(i) {
++		cpu = cpu_logical_map(i);
++		clk = clks[cpu];
++		cur_rate = clk_get_rate(clk);
++		if (cur_rate == 1) {
++			pr_info("CPU%d @ QSB rate. Forcing new rate.\n", i);
++			cur_rate = aux_rate;
++		}
++		clk_set_rate(clk, aux_rate);
++		clk_set_rate(clk, 2);
++		clk_set_rate(clk, cur_rate);
++		pr_info("CPU%d @ %lu KHz\n", i, clk_get_rate(clk) / 1000);
++	}
++
++	of_clk_add_provider(dev->of_node, krait_of_get, clks);
++
++	return 0;
++}
++
++static struct platform_driver krait_cc_driver = {
++	.probe = krait_cc_probe,
++	.driver = {
++		.name = "clock-krait",
++		.of_match_table = krait_cc_match_table,
++		.owner = THIS_MODULE,
++	},
 +};
++module_platform_driver(krait_cc_driver);
 +
-+struct clk_hfpll {
-+	struct hfpll_data const *d;
-+	int init_done;
-+
-+	struct clk_regmap clkr;
-+	spinlock_t lock;
-+};
-+
-+#define to_clk_hfpll(_hw) \
-+	container_of(to_clk_regmap(_hw), struct clk_hfpll, clkr)
-+
-+extern const struct clk_ops clk_ops_hfpll;
-+
-+#endif
++MODULE_DESCRIPTION("Krait CPU Clock Driver");
++MODULE_LICENSE("GPL v2");
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
