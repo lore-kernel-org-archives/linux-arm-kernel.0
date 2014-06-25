@@ -1,16 +1,18 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 25 Jun 2014 23:30:13 +0530
-Subject: [PATCH 3/8] ARM: dts: dra7xx-clocks: Add missing 32KHz clocks used
- for PHY
+Date: Wed, 25 Jun 2014 23:30:14 +0530
+Subject: [PATCH 4/8] ARM: dts: dra7xx-clocks: rename pcie clocks to
+ accommodate second PHY instance
 In-Reply-To: <1403719218-9484-1-git-send-email-kishon@ti.com>
 References: <1403719218-9484-1-git-send-email-kishon@ti.com>
-Message-ID: <1403719218-9484-4-git-send-email-kishon@ti.com>
+Message-ID: <1403719218-9484-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added missing 32KHz clock used by PCIe PHY.
-Figure 26-19. PCIe PHY Subsystem Integration in vE of DRA7xx ES1.0 TRM shows
-32KHz is used by PCIe PHY.
+There are two instances of PCIe PHY in DRA7xx. So renamed
+optfclk_pciephy_32khz, optfclk_pciephy_clk and optfclk_pciephy_div_clk to
+optfclk_pciephy1_32khz, optfclk_pciephy1_clk and optfclk_pciephy1_div_clk
+respectively. This is needed for adding the clocks for second PCIe PHY
+instance.
 
 Cc: Rajendra Nayak <rnayak@ti.com>
 Cc: Tero Kristo <t-kristo@ti.com>
@@ -20,29 +22,42 @@ Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index f5dca1f..3ff6d7c 100644
+index 3ff6d7c..fe5db55 100644
 --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
 +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1165,6 +1165,14 @@
+@@ -1165,7 +1165,7 @@
  		reg = <0x021c>, <0x0220>;
  	};
  
-+	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
-+		compatible = "ti,gate-clock";
-+		clocks = <&sys_32k_ck>;
-+		#clock-cells = <0>;
-+		reg = <0x13b0>;
-+		ti,bit-shift = <8>;
-+	};
-+
- 	optfclk_pciephy_div: optfclk_pciephy_div at 4a00821c {
- 		compatible = "ti,divider-clock";
+-	optfclk_pciephy_32khz: optfclk_pciephy_32khz at 4a0093b0 {
++	optfclk_pciephy1_32khz: optfclk_pciephy1_32khz at 4a0093b0 {
+ 		compatible = "ti,gate-clock";
+ 		clocks = <&sys_32k_ck>;
+ 		#clock-cells = <0>;
+@@ -1183,7 +1183,7 @@
+ 		ti,max-div = <2>;
+ 	};
+ 
+-	optfclk_pciephy_clk: optfclk_pciephy_clk at 4a0093b0 {
++	optfclk_pciephy1_clk: optfclk_pciephy1_clk at 4a0093b0 {
+ 		compatible = "ti,gate-clock";
  		clocks = <&apll_pcie_ck>;
+ 		#clock-cells = <0>;
+@@ -1191,7 +1191,7 @@
+ 		ti,bit-shift = <9>;
+ 	};
+ 
+-	optfclk_pciephy_div_clk: optfclk_pciephy_div_clk at 4a0093b0 {
++	optfclk_pciephy1_div_clk: optfclk_pciephy1_div_clk at 4a0093b0 {
+ 		compatible = "ti,gate-clock";
+ 		clocks = <&optfclk_pciephy_div>;
+ 		#clock-cells = <0>;
 -- 
 1.7.9.5
