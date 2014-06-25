@@ -1,57 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jun 2014 11:27:50 +0200
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140625091702.GF6153@arm.com>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <4855051.rhxSrNMNLg@wuerfel> <20140625091702.GF6153@arm.com>
-Message-ID: <4839521.56FtveYIl6@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Jun 2014 10:28:41 +0100
+Subject: [RFC PATCH 0/9] ARM: Forwarding physical interrupts to a guest VM
+Message-ID: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 June 2014 10:17:02 Will Deacon wrote:
-> On Tue, Jun 24, 2014 at 07:20:56PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 24 June 2014 19:11:50 Will Deacon wrote:
-> > > On Tue, Jun 24, 2014 at 06:57:44PM +0100, Olav Haugan wrote:
-> > > > We do describe the masked StreamID (SID) but we need to specify the mask
-> > > > that the SMMU should apply to the incoming SIDs, right?
-> > > > 
-> > > > We have a bus master that emits 43 unique SIDs. However, we have only 40
-> > > > SMMU_SMRn registers in the SMMU. So we need to mask out some of the
-> > > > incoming SID bits so that the 43 SIDs can match one of 40 entries in the
-> > > > SMR.
-> > > 
-> > > Hmm, so you're talking about stream matching, right? That doesn't belong in
-> > > the device-tree. I appreciate that the current driver does a terrible job at
-> > > allocating the SMRs (it's bloody difficult!), but we should try to improve
-> > > the dynamic behaviour instead of moving configuration of the SMMU out into
-> > > device-tree, where it's inflexible at best.
-> > > 
-> > > There have been patches previously posted by Andreas Herrmann helping here.
-> > > I'd be glad to see them revived.
-> > 
-> > Note that there are areas where we have in the past decided that dynamic
-> > configuration is just too hard for the kernel to do and that we're better
-> > off putting the configuration into DT. Pinctrl and clocks are at least
-> > partially in that category.
-> > 
-> > It's always best if you can get the kernel to do things in the ideal
-> > way where that is possible, but getting there may be just not worth it.
-> > 
-> > I have no idea where it should be for SMMU, but it's something to consider:
-> > if you can take reasonable shortcuts by reading parts of the configuration
-> > from DT, you may just as well do that.
-> 
-> I treat this in the same manner as the topology bindings we discussed
-> previously; we should do a best-effort to configure things dynamically and
-> solve corner-cases and quirks as special cases.
+The GIC architecture (ARM's Generic Interrupt Controller) allows an
+active physical interrupt to be forwarded to a guest, and the guest to
+indirectly perform the deactivation of the interrupt by performing an
+EOI on the virtual interrupt (see for example the GICv2 spec, 3.2.1).
 
-I think the situation is a bit different here: It's less about the corner
-cases for the SMMU, but about the question whether it makes more sense to
-have the kernel figure out the settings, or have them come from DT
-all the time.
+So far, Linux doesn't have this notion, which is a bit of a pain.
 
-As I said, I can't tell which approach is best here, but it sounds to
-me we should either do dynamic configuration and get it right, or
-hardcode the configuration it all the time if we can't.
+This patch series introduce two generic features:
 
-	Arnd
+- A way to mark an interrupt as "forwarded": this allows an irq_chip
+  to know that it shouldn't perform the deactivation itself
+- A way to save/restore the "state" of a "forwarded" interrupt
+
+The series then adapts both GIC drivers to switch to EOImode == 1
+(split priority drop and deactivation), to support this "forwarded"
+feature and hacks the KVM/ARM timer backend to use all of this.
+
+This requires yet another bit of surgery in the vgic code in order to
+allow a mapping between physical interrupts and virtual
+ones. Hopefully, this should plug into VFIO and the whole irqfd thing,
+but I don't understand any of that just yet (Eric?)
+
+The patches are against 3.16-rc2, plus a massive amount of GICv3
+code. They are also available in my git repo:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/irq-forward
+
+Open questions (Thomas, these are mostly targeted at you):
+
+- Are the generic features generic enough?
+- Would the "forwarded" thing be better implemented as a handler
+  rather than an irq_chip specific thing?
+- The split priority drop/deactivate also fits the threaded interrupt
+  model fairly well (no need to mask/unmask). Should we have a go at
+  this too?
+- Does it fit the VFIO+KVM model without playing the ugly mask/unmask
+  dance?
+
+Thanks,
+
+	M.
+
+Marc Zyngier (9):
+  genirq: Add IRQD_IRQ_FORWARDED flag and accessors
+  genirq: Allow the state of a  forwarded irq to be save/restored
+  irqchip: GIC: Convert to EOImode == 1
+  irqchip: GIC: add support for forwarded interrupts
+  irqchip: GICv3: Convert to EOImode == 1
+  irqchip: GICv3: add support for forwarded interrupts
+  KVM: arm: vgic: allow dynamic mapping of physical/virtual interrupts
+  arm: KVM: timer: move the timer switch into the non-preemptible
+    section
+  KVM: arm: timer: make the interrupt state part of the timer state
+
+ arch/arm/kvm/arm.c                 |   7 +--
+ drivers/irqchip/irq-gic-v3-its.c   |   2 +
+ drivers/irqchip/irq-gic-v3.c       |  33 +++++++++++-
+ drivers/irqchip/irq-gic.c          | 107 +++++++++++++++++++++++++++++++++----
+ include/kvm/arm_arch_timer.h       |   3 ++
+ include/kvm/arm_vgic.h             |  13 +++++
+ include/linux/interrupt.h          |   2 +
+ include/linux/irq.h                |  32 +++++++++++
+ include/linux/irqchip/arm-gic-v3.h |  12 +++++
+ include/linux/irqchip/arm-gic.h    |   5 ++
+ kernel/irq/manage.c                |  80 +++++++++++++++++++++++++++
+ virt/kvm/arm/arch_timer.c          |  31 ++++++++++-
+ virt/kvm/arm/vgic-v2.c             |  14 ++++-
+ virt/kvm/arm/vgic-v3.c             |  22 +++++++-
+ virt/kvm/arm/vgic.c                |  88 ++++++++++++++++++++++++++++++
+ 15 files changed, 431 insertions(+), 20 deletions(-)
+
+-- 
+1.8.3.4
