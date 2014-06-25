@@ -1,79 +1,77 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 25 Jun 2014 18:15:40 +0530
-Subject: [PATCH v5 4/6] ARM: EXYNOS: Remove file path from comment section
+Date: Wed, 25 Jun 2014 18:15:41 +0530
+Subject: [PATCH v5 5/6] ARM: EXYNOS: Remove regs-pmu.h header dependency from
+ pm_domain
 In-Reply-To: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1403700342-9678-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1403700342-9678-6-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many files under "arm/mach-exynos" are having file path in file
-comment section which is invalid now.
-So for better code maintainability let's remove them.
+Current "pm_domain.c" file uses "S5P_INT_LOCAL_PWR_EN" definition from
+"regs-pmu.h" and hence needs to include this header file. As there is
+no other user of "S5P_INT_LOCAL_PWR_EN" definition other than pm_domain,
+to remove "regs-pmu.h" header file dependency from "pm_domain.c"  it's
+better we define this definition in "pm_domain.c" file itself and thus it
+will help in removing header file inclusion from "pm_domain.c".
+Also removing "S5P_" prefix from macro.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/headsmp.S             |    1 -
- arch/arm/mach-exynos/hotplug.c             |    3 +--
- arch/arm/mach-exynos/include/mach/map.h    |    3 +--
- arch/arm/mach-exynos/include/mach/memory.h |    3 +--
- arch/arm/mach-exynos/platsmp.c             |    3 +--
- 5 files changed, 4 insertions(+), 9 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c |    8 ++++----
+ arch/arm/mach-exynos/regs-pmu.h   |    1 -
+ 2 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-index cdd9d91..b54f970 100644
---- a/arch/arm/mach-exynos/headsmp.S
-+++ b/arch/arm/mach-exynos/headsmp.S
-@@ -1,5 +1,4 @@
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fe6570e..bcd8dcf 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -22,7 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/sched.h>
+ 
+-#include "regs-pmu.h"
++#define INT_LOCAL_PWR_EN       0x7
+ 
  /*
-- *  linux/arch/arm/mach-exynos4/headsmp.S
-  *
-  *  Cloned from linux/arch/arm/mach-realview/headsmp.S
-  *
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 8a134d0..572f6b1 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -1,5 +1,4 @@
--/* linux arch/arm/mach-exynos4/hotplug.c
-- *
-+/*
-  *  Cloned from linux/arch/arm/mach-realview/hotplug.c
-  *
-  *  Copyright (C) 2002 ARM Ltd.
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 548269a..963002f 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/mach-exynos/include/mach/map.h
-- *
-+/*
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-  *
-diff --git a/arch/arm/mach-exynos/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
-index 2a4cdb7..e19df1f 100644
---- a/arch/arm/mach-exynos/include/mach/memory.h
-+++ b/arch/arm/mach-exynos/include/mach/memory.h
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/mach-exynos4/include/mach/memory.h
-- *
-+/*
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index ec02422..f82fd8d 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/mach-exynos4/platsmp.c
-- *
-+ /*
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
+  * Exynos specific wrapper around the generic power domain
+@@ -44,13 +44,13 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+ 	pd = container_of(domain, struct exynos_pm_domain, pd);
+ 	base = pd->base;
+ 
+-	pwr = power_on ? S5P_INT_LOCAL_PWR_EN : 0;
++	pwr = power_on ? INT_LOCAL_PWR_EN : 0;
+ 	__raw_writel(pwr, base);
+ 
+ 	/* Wait max 1ms */
+ 	timeout = 10;
+ 
+-	while ((__raw_readl(base + 0x4) & S5P_INT_LOCAL_PWR_EN)	!= pwr) {
++	while ((__raw_readl(base + 0x4) & INT_LOCAL_PWR_EN) != pwr) {
+ 		if (!timeout) {
+ 			op = (power_on) ? "enable" : "disable";
+ 			pr_err("Power domain %s %s failed\n", domain->name, op);
+@@ -172,7 +172,7 @@ static __init int exynos4_pm_init_power_domain(void)
+ 
+ 		platform_set_drvdata(pdev, pd);
+ 
+-		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
++		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
+ 
+ 		pm_genpd_init(&pd->pd, NULL, !on);
+ 	}
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 790af14..1993e6b 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -126,7 +126,6 @@
+ #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
+ 
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
+-#define S5P_INT_LOCAL_PWR_EN			0x7
+ 
+ /* Only for EXYNOS4210 */
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
 -- 
 1.7.9.5
