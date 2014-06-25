@@ -1,102 +1,44 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 25 Jun 2014 16:40:24 +0100
-Subject: [PATCH 6/6] arm64: mm: Enable RCU fast_gup
-In-Reply-To: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
-References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1403710824-24340-7-git-send-email-steve.capper@linaro.org>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 25 Jun 2014 15:40:28 +0000
+Subject: [PATCH v2] sched: Fix compiler warnings
+In-Reply-To: <53AAE4D2.5020104@roeck-us.net>
+References: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
+ <20140625071416.GM14781@pengutronix.de> <53AADC63.8080106@roeck-us.net>
+ <20140625144955.GP14781@pengutronix.de> <53AAE4D2.5020104@roeck-us.net>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D17265D81@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Activate the RCU fast_gup for ARM64. We also need to force THP splits
-to broadcast an IPI s.t. we block in the fast_gup page walker. As THP
-splits are comparatively rare, this should not lead to a noticeable
-performance degradation.
+From: Guenter Roeck
+> On 06/25/2014 07:49 AM, Uwe Kleine-Knig wrote:
+> > Hello Guenter,
+> >
+> > On Wed, Jun 25, 2014 at 07:27:47AM -0700, Guenter Roeck wrote:
+> >>> Maybe the author's intention was:
+> >>>
+> >>> 	static inline int cpu_corepower_flags(void) __attribute__((const));
+> >>>
+> >>> ?
+> >>> This specifies that the function has no side effects and the return value
+> >>> only depends on the (here non-existing) function arguments.
+> >>>
+> >>
+> >> Possibly, but either I am missing something or this doesn't compile.
+> > You need to do a separate declaration:
+> >
+> > 	static inline int cpu_corepower_flags(void) __attribute__((const));
+> > 	static inline int cpu_corepower_flags(void)
+> > 	{
+> > 		...
+> 
+> Actually turns out one can use __attribute_const__, and it is
+> 
+> 	static inline int __attribute_const__ cpu_corepower_flags(void)
+> 
+> which turns out to be widely used.
+> 
+> I'll change that and resubmit after testing.
 
-Some pre-requisite functions pud_write and pud_page are also added.
+You don't need to tell the compiler that for an inline function.
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
- arch/arm64/Kconfig               |  3 +++
- arch/arm64/include/asm/pgtable.h | 11 ++++++++++-
- arch/arm64/mm/flush.c            | 19 +++++++++++++++++++
- 3 files changed, 32 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e1d2eef..d6fcb8e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -102,6 +102,9 @@ config GENERIC_CALIBRATE_DELAY
- config ZONE_DMA
- 	def_bool y
- 
-+config HAVE_RCU_GUP
-+	def_bool y
-+
- config ARCH_DMA_ADDR_T_64BIT
- 	def_bool y
- 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index e0ccceb..62510f7 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -237,7 +237,13 @@ static inline pmd_t pte_pmd(pte_t pte)
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
- #define pmd_trans_splitting(pmd)	pte_special(pmd_pte(pmd))
--#endif
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+#define __HAVE_ARCH_PMDP_SPLITTING_FLUSH
-+struct vm_area_struct;
-+void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
-+			  pmd_t *pmdp);
-+#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
-+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
- 
- #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
- #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
-@@ -258,6 +264,7 @@ static inline pmd_t pte_pmd(pte_t pte)
- #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
- 
- #define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
-+#define pud_write(pud)		pmd_write(__pmd(pud_val(pud)))
- #define pud_pfn(pud)		(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
- 
- #define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd))
-@@ -345,6 +352,8 @@ static inline pmd_t *pud_page_vaddr(pud_t pud)
- 	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
- }
- 
-+#define pud_page(pud)           pmd_page(__pmd(pud_val(pud)))
-+
- #endif	/* CONFIG_ARM64_64K_PAGES */
- 
- /* to find an entry in a page-table-directory */
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index e4193e3..ddf96c1 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -103,3 +103,22 @@ EXPORT_SYMBOL(flush_dcache_page);
-  */
- EXPORT_SYMBOL(flush_cache_all);
- EXPORT_SYMBOL(flush_icache_range);
-+
-+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+static void thp_splitting_flush_sync(void *arg)
-+{
-+}
-+
-+void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
-+			  pmd_t *pmdp)
-+{
-+	pmd_t pmd = pmd_mksplitting(*pmdp);
-+	VM_BUG_ON(address & ~PMD_MASK);
-+	set_pmd_at(vma->vm_mm, address, pmdp, pmd);
-+
-+	/* dummy IPI to serialise against fast_gup */
-+	smp_call_function(thp_splitting_flush_sync, NULL, 1);
-+}
-+#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
-+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
--- 
-1.9.3
+	David
