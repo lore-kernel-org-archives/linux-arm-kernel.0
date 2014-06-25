@@ -1,102 +1,129 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Jun 2014 17:09:11 +0100
-Subject: [PATCH v5 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
- support
-In-Reply-To: <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20140625160911.GG15240@leverpostej>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 25 Jun 2014 19:10:09 +0300
+Subject: [PATCH] clk: tegra: fix vi_sensor clocks on Tegra124
+Message-ID: <1403712609-13624-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 03:10:17PM +0100, Lorenzo Pieralisi wrote:
-> This patch implements the cpu_suspend cpu operations method through
-> the PSCI CPU_SUSPEND API. The PSCI implementation translates the idle state
-> index passed by the cpu_suspend core call into a valid PSCI state according to
-> the PSCI states initialized at boot by the PSCI suspend backend.
-> 
-> Entry point is set to cpu_resume physical address, that represents the
-> default kernel execution address following a CPU reset.
-> 
-> Idle state indices missing a DT node description are initialized to power
-> state standby WFI so that if called by the idle driver they provide the
-> default behaviour.
-> 
-> Reviewed-by: Sebastian Capella <sebcape@gmail.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm64/include/asm/psci.h |   4 ++
->  arch/arm64/kernel/psci.c      | 103 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 107 insertions(+)
+vi_sensor and vi_sensor2 have a wrong hw clkid on Tegra124. Fix this by
+correcting the hw clkid for Tegra124 and creating the Tegra114 vi_sensor clock
+from its own data. Tegra124 was also using the wrong internal clock id.
 
-[...]
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-tegra-periph.c |    4 ++--
+ drivers/clk/tegra/clk-tegra114.c     |   31 ++++++++++++++++++++++++++++++-
+ drivers/clk/tegra/clk-tegra124.c     |    2 +-
+ 3 files changed, 33 insertions(+), 4 deletions(-)
 
-> +static void psci_power_state_unpack(u32 power_state,
-> +				    struct psci_power_state *state)
-> +{
-> +	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
-> +			PSCI_0_2_POWER_STATE_ID_SHIFT;
-> +	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
-> +			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
-> +	state->affinity_level =
-> +			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
-> +			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
-> +}
-
-Is this valid for PSCI versions prior to 0.2?
-
->  /*
->   * The following two functions are invoked via the invoke_psci_fn pointer
->   * and will not be inlined, allowing us to piggyback on the AAPCS.
-> @@ -199,6 +216,77 @@ static int psci_migrate_info_type(void)
->  	return err;
->  }
->  
-> +int __init psci_dt_register_idle_states(struct cpuidle_driver *drv,
-> +					struct device_node *state_nodes[])
-> +{
-> +	int cpu, i;
-
-Perhaps unsigned int? You print i with %u below.
-
-> +	for (i = 0; i < drv->state_count; i++) {
-> +		u32 psci_power_state;
-> +
-> +		if (!state_nodes[i]) {
-> +			/*
-> +			 * An index with a missing node pointer falls back to
-> +			 * simple STANDBYWFI
-> +			 */
-> +			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
-> +			continue;
-> +		}
-
-Does this make sense? Are there any limitations on which state nodes
-could be missing?
-
-> +
-> +		if (of_property_read_u32(state_nodes[i], "entry-method-param",
-> +					 &psci_power_state)) {
-> +			pr_warn(" * %s missing entry-method-param property\n",
-> +				state_nodes[i]->full_name);
-> +			/*
-> +			 * If entry-method-param property is missing, fall
-> +			 * back to STANDBYWFI state
-> +			 */
-> +			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
-> +			continue;
-
-Surely we want to throw away these states instead?
-
-Otherwise we can get into a mess like:
-
-psci_states[0] => low power state
-psci_states[1] => lower power state
-psci_states[2] => WFI / not low power
-psci_states[3] => lowest power state
-
-Where power usage and latency would jump around rather than follow
-monotonic patterns.
-
-Thanks,
-Mark.
+diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
+index adf6b81..37f32c4 100644
+--- a/drivers/clk/tegra/clk-tegra-periph.c
++++ b/drivers/clk/tegra/clk-tegra-periph.c
+@@ -469,7 +469,7 @@ static struct tegra_periph_init_data periph_clks[] = {
+ 	MUX("sata", mux_pllp_pllc_pllm_clkm, CLK_SOURCE_SATA, 124, TEGRA_PERIPH_ON_APB, tegra_clk_sata),
+ 	MUX("adx1", mux_plla_pllc_pllp_clkm, CLK_SOURCE_ADX1, 180, TEGRA_PERIPH_ON_APB, tegra_clk_adx1),
+ 	MUX("amx1", mux_plla_pllc_pllp_clkm, CLK_SOURCE_AMX1, 185, TEGRA_PERIPH_ON_APB, tegra_clk_amx1),
+-	MUX("vi_sensor2", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR2, 20, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor2),
++	MUX("vi_sensor2", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR2, 165, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor2),
+ 	MUX8("sdmmc1", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SDMMC1, 14, 0, tegra_clk_sdmmc1_8),
+ 	MUX8("sdmmc2", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SDMMC2, 9, 0, tegra_clk_sdmmc2_8),
+ 	MUX8("sdmmc3", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_SDMMC3, 69, 0, tegra_clk_sdmmc3_8),
+@@ -487,7 +487,7 @@ static struct tegra_periph_init_data periph_clks[] = {
+ 	MUX8("extern2", mux_plla_clk32_pllp_clkm_plle, CLK_SOURCE_EXTERN2, 121, 0, tegra_clk_extern2),
+ 	MUX8("extern3", mux_plla_clk32_pllp_clkm_plle, CLK_SOURCE_EXTERN3, 122, 0, tegra_clk_extern3),
+ 	MUX8("soc_therm", mux_pllm_pllc_pllp_plla, CLK_SOURCE_SOC_THERM, 78, TEGRA_PERIPH_ON_APB, tegra_clk_soc_therm),
+-	MUX8("vi_sensor", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR, 20, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor_8),
++	MUX8("vi_sensor", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR, 164, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor_8),
+ 	MUX8("isp", mux_pllm_pllc_pllp_plla_clkm_pllc4, CLK_SOURCE_ISP, 23, TEGRA_PERIPH_ON_APB, tegra_clk_isp_8),
+ 	MUX8("entropy", mux_pllp_clkm1, CLK_SOURCE_ENTROPY, 149,  0, tegra_clk_entropy),
+ 	MUX8("hdmi_audio", mux_pllp3_pllc_clkm, CLK_SOURCE_HDMI_AUDIO, 176, TEGRA_PERIPH_NO_RESET, tegra_clk_hdmi_audio),
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index b9c8ba2..f760f31 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -151,6 +151,13 @@
+ /* Tegra CPU clock and reset control regs */
+ #define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS	0x470
+ 
++#define MUX8(_name, _parents, _offset, \
++			     _clk_num, _gate_flags, _clk_id)	\
++	TEGRA_INIT_DATA_TABLE(_name, NULL, NULL, _parents, _offset,\
++			29, MASK(3), 0, 0, 8, 1, TEGRA_DIVIDER_ROUND_UP,\
++			_clk_num, _gate_flags, _clk_id, _parents##_idx, 0,\
++			NULL)
++
+ #ifdef CONFIG_PM_SLEEP
+ static struct cpu_clk_suspend_context {
+ 	u32 clk_csite_src;
+@@ -777,7 +784,6 @@ static struct tegra_clk tegra114_clks[tegra_clk_max] __initdata = {
+ 	[tegra_clk_spdif_in] = { .dt_id = TEGRA114_CLK_SPDIF_IN, .present = true },
+ 	[tegra_clk_spdif_out] = { .dt_id = TEGRA114_CLK_SPDIF_OUT, .present = true },
+ 	[tegra_clk_vi_8] = { .dt_id = TEGRA114_CLK_VI, .present = true },
+-	[tegra_clk_vi_sensor_8] = { .dt_id = TEGRA114_CLK_VI_SENSOR, .present = true },
+ 	[tegra_clk_fuse] = { .dt_id = TEGRA114_CLK_FUSE, .present = true },
+ 	[tegra_clk_fuse_burn] = { .dt_id = TEGRA114_CLK_FUSE_BURN, .present = true },
+ 	[tegra_clk_clk_32k] = { .dt_id = TEGRA114_CLK_CLK_32K, .present = true },
+@@ -923,6 +929,13 @@ static struct tegra_devclk devclks[] __initdata = {
+ 	{ .dev_id = "timer", .dt_id = TEGRA114_CLK_TIMER },
+ };
+ 
++static const char *mux_pllm_pllc2_c_c3_pllp_plla[] = {
++	"pll_m", "pll_c2", "pll_c", "pll_c3", "pll_p", "pll_a_out0"
++};
++static u32 mux_pllm_pllc2_c_c3_pllp_plla_idx[] = {
++	[0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 6,
++};
++
+ static struct clk **clks;
+ 
+ static unsigned long osc_freq;
+@@ -1178,10 +1191,18 @@ static void __init tegra114_pll_init(void __iomem *clk_base,
+ 	clks[TEGRA114_CLK_PLL_E_OUT0] = clk;
+ }
+ 
++#define CLK_SOURCE_VI_SENSOR 0x1a8
++
++static struct tegra_periph_init_data tegra_periph_clk_list[] = {
++	MUX8("vi_sensor", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR, 20, TEGRA_PERIPH_NO_RESET, TEGRA114_CLK_VI_SENSOR),
++};
++
+ static __init void tegra114_periph_clk_init(void __iomem *clk_base,
+ 					    void __iomem *pmc_base)
+ {
+ 	struct clk *clk;
++	struct tegra_periph_init_data *data;
++	int i;
+ 
+ 	/* xusb_ss_div2 */
+ 	clk = clk_register_fixed_factor(NULL, "xusb_ss_div2", "xusb_ss_src", 0,
+@@ -1209,6 +1230,14 @@ static __init void tegra114_periph_clk_init(void __iomem *clk_base,
+ 			       clk_base + CLK_SOURCE_EMC,
+ 			       29, 3, 0, NULL);
+ 
++	for (i = 0; i < ARRAY_SIZE(tegra_periph_clk_list); i++) {
++		data = &tegra_periph_clk_list[i];
++		clk = tegra_clk_register_periph(data->name,
++			data->p.parent_names, data->num_parents,
++			&data->periph, clk_base, data->offset, data->flags);
++		clks[data->clk_id] = clk;
++	}
++
+ 	tegra_periph_clk_init(clk_base, pmc_base, tegra114_clks,
+ 				&pll_p_params);
+ }
+diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+index 80efe51..d78bcb7 100644
+--- a/drivers/clk/tegra/clk-tegra124.c
++++ b/drivers/clk/tegra/clk-tegra124.c
+@@ -869,7 +869,7 @@ static struct tegra_clk tegra124_clks[tegra_clk_max] __initdata = {
+ 	[tegra_clk_spdif_in] = { .dt_id = TEGRA124_CLK_SPDIF_IN, .present = true },
+ 	[tegra_clk_spdif_out] = { .dt_id = TEGRA124_CLK_SPDIF_OUT, .present = true },
+ 	[tegra_clk_vi_9] = { .dt_id = TEGRA124_CLK_VI, .present = true },
+-	[tegra_clk_vi_sensor] = { .dt_id = TEGRA124_CLK_VI_SENSOR, .present = true },
++	[tegra_clk_vi_sensor_8] = { .dt_id = TEGRA124_CLK_VI_SENSOR, .present = true },
+ 	[tegra_clk_fuse] = { .dt_id = TEGRA124_CLK_FUSE, .present = true },
+ 	[tegra_clk_fuse_burn] = { .dt_id = TEGRA124_CLK_FUSE_BURN, .present = true },
+ 	[tegra_clk_clk_32k] = { .dt_id = TEGRA124_CLK_CLK_32K, .present = true },
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
