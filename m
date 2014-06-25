@@ -1,32 +1,59 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 25 Jun 2014 21:12:35 +0800
-Subject: [PATCH 1/1] clk-imx35: Add clko clock support
-In-Reply-To: <1857714.L0sRRUOXiN@ws-stein>
-References: <1402990063-26908-1-git-send-email-alexander.stein@systec-electronic.com>
- <2789534.qY6c0ymzGl@ws-stein> <20140625065302.GB2224@dragon>
- <1857714.L0sRRUOXiN@ws-stein>
-Message-ID: <20140625131234.GF2224@dragon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Jun 2014 14:13:33 +0100
+Subject: [PATCH/RESEND 9/9] drm/tilcdc: replace late_initcall with
+ module_init
+In-Reply-To: <20140625130042.GK3705@n2100.arm.linux.org.uk>
+References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
+ <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
+ <1403014631-18072-10-git-send-email-guido@vanguardiasur.com.ar>
+ <53A9F5F4.3030806@ti.com> <20140625130042.GK3705@n2100.arm.linux.org.uk>
+Message-ID: <20140625131333.GL3705@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 10:58:12AM +0200, Alexander Stein wrote:
-> > > > > @@ -260,6 +273,7 @@ int __init mx35_clocks_init(void)
-> > > > >  	clk_register_clkdev(clk[nfc_div], NULL, "imx25-nand.0");
-> > > > >  	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
-> > > > >  	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
-> > > > > +	clk_register_clkdev(clk[clko_gate], NULL, "clko.0");
-> > > > 
-> > > > Will this lookup be used somewhere?
-> > > 
-> > > Well, as this is a pretty customizable output clock signal, I think this will only be used in custom board implementation. Or is there any generic driver to configure an arbitrary programmable clock?
-> > > 
-> > 
-> > I prefer to add this lookup only when there is an in-tree user for it.
+On Wed, Jun 25, 2014 at 02:00:42PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 24, 2014 at 05:04:36PM -0500, Darren Etheridge wrote:
+> > On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
+> >> Use module_init instead of late_initcall, as is the norm for modular
+> >> drivers.
+> >>
+> >> module_init was used until 6e8de0bd6a51fdeebd5d975c4fcc426f730b339b
+> >> ("drm/tilcdc: add encoder slave (v2)") changed it to a late_initcall,
+> >> but it does not explain why. Tests show it's working properly with
+> >> module_init.
+> >>
+> >
+> > If I recall, the late_initcall stuff was done to try and make sure the  
+> > tda998x/i2c subsystem came up before tilcdc. However it didn't always  
+> > work so we added commit: 39de6194131c155901f96686a063212656d80c2e to try  
+> > and ensure the ordering.  This might be why changing back to module_init  
+> > is fine (and I agree with your assessment from my testing).
 > 
-> Well, the cko (cko1 and cko2) clocks on i.MX6 are also added. Though I can't find any user of that. So why addind it despite that?
+> There's a solution to that... I have patches which convert the tda998x
+> driver to also register into the component helpers as well as remaining
+> as a drm slave device.  This makes it possible to transition tilcdc to
+> use the component helper to solve the initialisation ordering.
 > 
+> I'll (re-)post them later today.
 
-To be clear, I'm not talking about the cko clock itself but the lookup
-to cko, i.e. clk_register_clkdev() of "clko.0".
+Except Daniel Mack will not be receiving any copies of them:
 
-Shawn
+  zonque at gmail.com
+    SMTP error from remote mail server after end of data:
+    host gmail-smtp-in.l.google.com [2a00:1450:400c:c03::1a]:
+    550-5.7.1 [2001:4d48:ad52:3201:214:fdff:fe10:1be6      12] Our system has
+    550-5.7.1 detected that this message is likely unsolicited mail. To reduce the
+    550-5.7.1 amount of spam sent to Gmail, this message has been blocked. Please
+    550-5.7.1 visit
+    550-5.7.1 http://support.google.com/mail/bin/answer.py?hl=en&answer=188131 for
+    550 5.7.1 more information. fs8si6627678wib.99 - gsmtp
+
+Google's anti-ham filter seems to be working perfectly, allowing spam
+through and blocking real messages... as usual.  And as usual, google
+provides no support for this crap.  Gmail has a history of increasingly
+blocking legitimate email in their alleged anti-spam fight.  Don't use
+gmail.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
