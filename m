@@ -1,39 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 25 Jun 2014 16:49:55 +0200
-Subject: [PATCH v2] sched: Fix compiler warnings
-In-Reply-To: <53AADC63.8080106@roeck-us.net>
-References: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
- <20140625071416.GM14781@pengutronix.de>
- <53AADC63.8080106@roeck-us.net>
-Message-ID: <20140625144955.GP14781@pengutronix.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 25 Jun 2014 07:51:25 -0700
+Subject: [PATCH v8 5/9] seccomp: split mode set routines
+In-Reply-To: <20140625135121.GB7892@redhat.com>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-6-git-send-email-keescook@chromium.org>
+ <20140625135121.GB7892@redhat.com>
+Message-ID: <CAGXu5jJkFxh4K=40xuh6tu3kUf4oJM8Dry+4upBdRieW3FNLgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Guenter,
+On Wed, Jun 25, 2014 at 6:51 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> On 06/24, Kees Cook wrote:
+>>
+>> +static inline void seccomp_assign_mode(struct task_struct *task,
+>> +                                    unsigned long seccomp_mode)
+>> +{
+>> +     BUG_ON(!spin_is_locked(&task->sighand->siglock));
+>> +
+>> +     task->seccomp.mode = seccomp_mode;
+>> +     set_tsk_thread_flag(task, TIF_SECCOMP);
+>> +}
+>
+> OK, but unless task == current this can race with secure_computing().
+> I think this needs smp_mb__before_atomic() and secure_computing() needs
+> rmb() after test_bit(TIF_SECCOMP).
+>
+> Otherwise, can't __secure_computing() hit BUG() if it sees the old
+> mode == SECCOMP_MODE_DISABLED ?
+>
+> Or seccomp_run_filters() can see ->filters == NULL and WARN(),
+> smp_load_acquire() only serializes that LOAD with the subsequent memory
+> operations.
 
-On Wed, Jun 25, 2014 at 07:27:47AM -0700, Guenter Roeck wrote:
-> >Maybe the author's intention was:
-> >
-> >	static inline int cpu_corepower_flags(void) __attribute__((const));
-> >
-> >?
-> >This specifies that the function has no side effects and the return value
-> >only depends on the (here non-existing) function arguments.
-> >
-> 
-> Possibly, but either I am missing something or this doesn't compile.
-You need to do a separate declaration:
+Hm, actually, now I'm worried about smp_load_acquire() being too slow
+in run_filters().
 
-	static inline int cpu_corepower_flags(void) __attribute__((const));
-	static inline int cpu_corepower_flags(void)
-	{
-		...
+The ordering must be:
+- task->seccomp.filter must be valid before
+- task->seccomp.mode is set, which must be valid before
+- TIF_SECCOMP is set
 
-Does this help?
+But I don't want to impact secure_computing(). What's the best way to
+make sure this ordering is respected?
 
-Best regards
-Uwe
+-Kees
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kees Cook
+Chrome OS Security
