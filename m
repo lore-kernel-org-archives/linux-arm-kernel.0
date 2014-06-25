@@ -1,104 +1,32 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 25 Jun 2014 23:32:46 +0530
-Subject: [PATCH 2/2] arm: dra7xx: Add hwmod data for pcie1 and pcie2 subsystems
-In-Reply-To: <1403719366-9656-1-git-send-email-kishon@ti.com>
-References: <1403719366-9656-1-git-send-email-kishon@ti.com>
-Message-ID: <1403719366-9656-3-git-send-email-kishon@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 25 Jun 2014 11:06:30 -0700
+Subject: [PATCH v3 04/14] clk: max77686: Improve Maxim 77686 PMIC clocks
+ binding
+In-Reply-To: <1403202040-12641-5-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403202040-12641-5-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=VezCMpYiD6vj_SkPYVM30GWF_YiRZVGyLHDD0-EbD+7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added hwmod data for pcie1 and pcie2 subsystem present in DRA7xx SOC.
+Javier,
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
----
-Please find the bootlog with these hwmod patches
-http://paste.ubuntu.com/7701601/
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   55 +++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+On Thu, Jun 19, 2014 at 11:20 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> @@ -33,6 +38,6 @@ Example: Clock consumer node
+>         foo at 0 {
+>                 compatible = "bar,foo";
+>                 /* ... */
+> -               clock-names = "my-clock";
+> -               clocks = <&max77686 2>;
+> +               clock-names = "32khz_pmic";
+> +               clocks = <&max77686 MAX77686_CLK_PMIC>;
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 6ff40a6..934aa9d 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1290,6 +1290,43 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
- };
- 
- /*
-+ * 'PCIE' class
-+ *
-+ */
-+
-+static struct omap_hwmod_class dra7xx_pcie_hwmod_class = {
-+	.name	= "pcie",
-+};
-+
-+/* pcie1 */
-+static struct omap_hwmod dra7xx_pcie1_hwmod = {
-+	.name		= "pcie1",
-+	.class		= &dra7xx_pcie_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs	= DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/* pcie2 */
-+static struct omap_hwmod dra7xx_pcie2_hwmod = {
-+	.name		= "pcie2",
-+	.class		= &dra7xx_pcie_hwmod_class,
-+	.clkdm_name	= "l3init_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_PCIE_CLKSTCTRL_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'PCIE PHY' class
-  *
-  */
-@@ -2448,6 +2485,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__ocp2scp1 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_cfg -> pcie1 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1 = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_pcie1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_cfg -> pcie2 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie2 = {
-+	.master		= &dra7xx_l4_cfg_hwmod,
-+	.slave		= &dra7xx_pcie2_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_cfg -> pcie1 phy */
- static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pcie1_phy = {
- 	.master		= &dra7xx_l4_cfg_hwmod,
-@@ -2813,6 +2866,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_cfg__mpu,
- 	&dra7xx_l4_cfg__ocp2scp1,
- 	&dra7xx_l4_cfg__ocp2scp3,
-+	&dra7xx_l4_cfg__pcie1,
-+	&dra7xx_l4_cfg__pcie2,
- 	&dra7xx_l4_cfg__pcie1_phy,
- 	&dra7xx_l4_cfg__pcie2_phy,
- 	&dra7xx_l3_main_1__qspi,
--- 
-1.7.9.5
+A minor comment here is that you probably shouldn't change "clock-names".
+
+The "clock-names" is the consumer's concept of the clock name and not
+the producer's concept.  If this clock were specified as going into
+the TPM, for instance, the TPM might call it "32k-reference".  Then
+the TPM would get the clock by referring to this name in its driver.
+
+-Doug
