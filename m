@@ -1,28 +1,34 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Tue, 24 Jun 2014 19:19:26 -0500
-Subject: [PATCH 0/2] Introduce ARM GICv2m MSI(-X) support
-In-Reply-To: <20140624122639.GL10202@titan.lakedaemon.net>
-References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140624122639.GL10202@titan.lakedaemon.net>
-Message-ID: <53AA158E.1040700@amd.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 24 Jun 2014 17:24:05 -0700
+Subject: [PATCHv3] arm64: Add CONFIG_CC_STACKPROTECTOR
+In-Reply-To: <CAGXu5jKmrpM=oCABXy-UJH6mZ22Z2r-p_R2nZKqGocHJ0vYQ2Q@mail.gmail.com>
+References: <1391115944-10183-1-git-send-email-lauraa@codeaurora.org>
+ <CAGXu5jKmrpM=oCABXy-UJH6mZ22Z2r-p_R2nZKqGocHJ0vYQ2Q@mail.gmail.com>
+Message-ID: <CAGXu5jLTLU-azWtyfJ38QO_vd9T+F4STqPy4LpvOeMAqPCH21A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/24/2014 7:26 AM, Jason Cooper wrote:
-> On Mon, Jun 23, 2014 at 07:32:58PM -0500, suravee.suthikulpanit at amd.com wrote:
->> This patch set introduces support for MSI(-X) in GICv2m specification,
->> which is implemented in some variation of GIC400.
+On Fri, Jan 31, 2014 at 2:50 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Thu, Jan 30, 2014 at 1:05 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> arm64 currently lacks support for -fstack-protector. Add
+>> similar functionality to arm to detect stack corruption.
 >>
->> This depends on and has been tested with the V7 of "Add support for PCI in AArch64"
->> (https://lkml.org/lkml/2014/3/14/320).
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 >
-> Is this a build, boot, or runtime dependency?
+> Thanks!
 >
-> thx,
->
-> Jason.
->
+> Acked-by: Kees Cook <keescook@chromium.org>
 
-For all of the above.
+Hi again,
 
-Suravee
+This patch never got applied any where. Who can take this?
+
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
