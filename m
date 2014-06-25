@@ -1,76 +1,41 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 25 Jun 2014 15:22:18 +0800
-Subject: [PATCH] ARM: imx: add cpufreq support for i.mx6sx
-In-Reply-To: <1403496632-20308-1-git-send-email-b20788@freescale.com>
-References: <1403496632-20308-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140625072217.GD2224@dragon>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 25 Jun 2014 15:24:34 +0800
+Subject: [RFC PATCH] phy: micrel: make phy_has_fixups attribute read correctly
+Message-ID: <1403681075-16181-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 12:10:32PM +0800, Anson Huang wrote:
-> Add cpufreq support for i.MX6SX, using common
-> i.MX6Q cpufreq driver.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  arch/arm/mach-imx/mach-imx6sx.c |   27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-> index 74ff7d6..be2ca52 100644
-> --- a/arch/arm/mach-imx/mach-imx6sx.c
-> +++ b/arch/arm/mach-imx/mach-imx6sx.c
-> @@ -8,6 +8,7 @@
->  
->  #include <linux/irqchip.h>
->  #include <linux/of_platform.h>
-> +#include <linux/pm_opp.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  
-> @@ -39,9 +40,35 @@ static void __init imx6sx_init_irq(void)
->  	irqchip_init();
->  }
->  
-> +static void __init imx6sx_opp_init(struct device *cpu_dev)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_node_by_path("/cpus/cpu at 0");
-> +	if (!np) {
-> +		pr_warn("failed to find cpu0 node\n");
-> +		return;
-> +	}
-> +
-> +	cpu_dev->of_node = np;
-> +	if (of_init_opp_table(cpu_dev))
-> +		pr_warn("failed to init OPP table\n");
-> +
-> +	of_node_put(np);
-> +}
+If the fixups parameters get from dtb, it won't set has_fixups
+parameters, so when read phy_has_fixups attribute, it always
+present as 0.
+Add this patch to make phy_has_fixups attribute read correctly.
 
-The whole function is not needed for imx6sx, because we do not need to
-tweak OPP table like what we do on imx6q.  In this case, we can just
-let imx6q-cpufreq call of_init_opp_table() on its own.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ drivers/net/phy/micrel.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Shawn
-
-> +
-> +static struct platform_device imx6sx_cpufreq_pdev = {
-> +	.name = "imx6q-cpufreq",
-> +};
-> +
->  static void __init imx6sx_init_late(void)
->  {
->  	imx6q_cpuidle_init();
-> +
-> +	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
-> +		imx6sx_opp_init(&imx6sx_cpufreq_pdev.dev);
-> +		platform_device_register(&imx6sx_cpufreq_pdev);
-> +	}
->  }
->  
->  static const char *imx6sx_dt_compat[] __initconst = {
-> -- 
-> 1.7.9.5
-> 
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index bc7c7d2..c384922 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -237,6 +237,8 @@ static int ksz9021_load_values_from_of(struct phy_device *phydev,
+ 
+ 	if (!matches)
+ 		return 0;
++	else
++		phydev->has_fixups = true;
+ 
+ 	if (matches < 4)
+ 		newval = kszphy_extended_read(phydev, reg);
+@@ -330,6 +332,8 @@ static int ksz9031_of_load_skew_values(struct phy_device *phydev,
+ 
+ 	if (!matches)
+ 		return 0;
++	else
++		phydev->has_fixups = true;
+ 
+ 	if (matches < numfields)
+ 		newval = ksz9031_extended_read(phydev, OP_DATA, 2, reg);
+-- 
+1.8.5.2
