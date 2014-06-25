@@ -1,53 +1,70 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Jun 2014 11:33:51 +0200
-Subject: [PATCH v2 1/2] video: imxfb: Fix unbalanced regulators
-In-Reply-To: <53AA8D8C.2040705@eukrea.com>
-References: <1403528839-31901-1-git-send-email-denis@eukrea.com>
- <20140625060848.GE15686@pengutronix.de>
- <53AA8D8C.2040705@eukrea.com>
-Message-ID: <20140625093351.GR15686@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Jun 2014 10:38:25 +0100
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <4839521.56FtveYIl6@wuerfel>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <4855051.rhxSrNMNLg@wuerfel> <20140625091702.GF6153@arm.com>
+ <4839521.56FtveYIl6@wuerfel>
+Message-ID: <20140625093825.GH6153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 10:51:24AM +0200, Denis Carikli wrote:
-> On 06/25/2014 08:08 AM, Sascha Hauer wrote:
-> >It's a shame that the LCD controller doesn't do the reference counting.
-> >I really think it should be fixed there and not in the drivers.If for
-> >whatever reason this is not acceptable then it should be done in the
-> >imxfb driver instead of shifting it further to the regulator core.
-> I'm not sure that doing reference counting in the LCD class would be
-> enough for the regulator case. Still it seems to be a good thing to
-> do.
+On Wed, Jun 25, 2014 at 10:27:50AM +0100, Arnd Bergmann wrote:
+> On Wednesday 25 June 2014 10:17:02 Will Deacon wrote:
+> > On Tue, Jun 24, 2014 at 07:20:56PM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 24 June 2014 19:11:50 Will Deacon wrote:
+> > > > On Tue, Jun 24, 2014 at 06:57:44PM +0100, Olav Haugan wrote:
+> > > > > We do describe the masked StreamID (SID) but we need to specify the mask
+> > > > > that the SMMU should apply to the incoming SIDs, right?
+> > > > > 
+> > > > > We have a bus master that emits 43 unique SIDs. However, we have only 40
+> > > > > SMMU_SMRn registers in the SMMU. So we need to mask out some of the
+> > > > > incoming SID bits so that the 43 SIDs can match one of 40 entries in the
+> > > > > SMR.
+> > > > 
+> > > > Hmm, so you're talking about stream matching, right? That doesn't belong in
+> > > > the device-tree. I appreciate that the current driver does a terrible job at
+> > > > allocating the SMRs (it's bloody difficult!), but we should try to improve
+> > > > the dynamic behaviour instead of moving configuration of the SMMU out into
+> > > > device-tree, where it's inflexible at best.
+> > > > 
+> > > > There have been patches previously posted by Andreas Herrmann helping here.
+> > > > I'd be glad to see them revived.
+> > > 
+> > > Note that there are areas where we have in the past decided that dynamic
+> > > configuration is just too hard for the kernel to do and that we're better
+> > > off putting the configuration into DT. Pinctrl and clocks are at least
+> > > partially in that category.
+> > > 
+> > > It's always best if you can get the kernel to do things in the ideal
+> > > way where that is possible, but getting there may be just not worth it.
+> > > 
+> > > I have no idea where it should be for SMMU, but it's something to consider:
+> > > if you can take reasonable shortcuts by reading parts of the configuration
+> > > from DT, you may just as well do that.
+> > 
+> > I treat this in the same manner as the topology bindings we discussed
+> > previously; we should do a best-effort to configure things dynamically and
+> > solve corner-cases and quirks as special cases.
 > 
-> If I understood well, that assumes that the LCD driver is the only
-> consumer and owner of that regulator.
+> I think the situation is a bit different here: It's less about the corner
+> cases for the SMMU, but about the question whether it makes more sense to
+> have the kernel figure out the settings, or have them come from DT
+> all the time.
 
-No. All consumers of a regulator must make sure the regulator enable
-count is balanced.
+But, as far as I can tell, this setting is basically `which bits are
+constant among this set of IDs'.
 
-Image that the regulator in the imxfb is used by multiple consumers.
-When you want to enable the backlight you must make sure that you
-take a reference to the regulator yourself. Otherwise it may
-happen that 'if (regulator_is_enabled())' is true because another
-consumer has enabled it and your code does nothing. Then the other
-consumer decides to disable the regulator which in this case will
-accidently disable the backlight.
+> As I said, I can't tell which approach is best here, but it sounds to
+> me we should either do dynamic configuration and get it right, or
+> hardcode the configuration it all the time if we can't.
 
-> 
-> There is also the fact that the regulator core also enables or
-> disables regulators by itself:
-> For instance at boot it tries to disable the regulators that can be
-> disabled, including this regulator.
-> 
-> So I don't see any ways to handle it correctly in the LCD.
+I disagree. If you have `sensible' StreamID allocations, doing this
+dynamically should be straight-forward and gives the driver more flexibility
+(e.g. we then have the option of combining SMR entries for different masters
+if they are in the same domain). The dynamic approach also lends itself to
+sanity-checking (it is IMPLEMENTATION DEFINED whether the SMMU detects SMR
+aliases) and helps with virtualisation (forcing QEMU to generate these masks
+in a device-tree for a guest using a virtual SMMU interface is very painful).
 
-It's simple. Add an lcd_enable flag to struct lcd_device. Make sure you
-only call into the drivers when it differs from the current state.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Will
