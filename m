@@ -1,73 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Jun 2014 16:13:33 +0100
-Subject: [PATCH v5 7/8] drivers: cpuidle: initialize Exynos driver
- through DT
-In-Reply-To: <1403705421-17597-8-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-8-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20140625151333.GE15240@leverpostej>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 25 Jun 2014 19:18:09 +0400
+Subject: [PATCH 08/14] ARM: shmobile: Add shared R-Car Gen2 CMA reservation
+ code
+In-Reply-To: <f8e819352d12f1b7d109d846e9bf1c07e006469a.1403681315.git.horms+renesas@verge.net.au>
+References: <cover.1403681315.git.horms+renesas@verge.net.au>
+ <f8e819352d12f1b7d109d846e9bf1c07e006469a.1403681315.git.horms+renesas@verge.net.au>
+Message-ID: <53AAE831.3040003@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 03:10:20PM +0100, Lorenzo Pieralisi wrote:
-> With the introduction of DT based idle states, CPUidle drivers for
-> ARM can now initialize idle states data through properties in the device
-> tree.
-> 
-> This patch adds code to the Exynos CPUidle driver to dynamically
-> initialize idle states data through the updated device tree source
-> files.
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
-> Compile tested, I am not sure I patched the right dts files, please check.
-> 
->  .../devicetree/bindings/arm/exynos/idle-states.txt | 27 ++++++++++++++++++++
->  arch/arm/boot/dts/exynos3250.dtsi                  | 16 ++++++++++++
->  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi                  | 17 +++++++++++++
->  drivers/cpuidle/Kconfig.arm                        |  1 +
->  drivers/cpuidle/cpuidle-exynos.c                   | 29 +++++++++++++---------
->  6 files changed, 93 insertions(+), 12 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/exynos/idle-states.txt b/Documentation/devicetree/bindings/arm/exynos/idle-states.txt
-> new file mode 100644
-> index 0000000..342ecb4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/exynos/idle-states.txt
-> @@ -0,0 +1,27 @@
-> +idle-states node
-> +----------------
-> +
-> +On Exynos platforms with power management capabilities, the device
-> +tree source file must contain the idle-states node[1]. As defined in [1] the
-> +idle-states node must contain an entry-method property that for Exynos
-> +platforms can be one of:
-> +
-> +	- "samsung,exynos"
+Hello.
 
-Similarly to the TC2 binding, what does this mean?
+On 06/25/2014 11:35 AM, Simon Horman wrote:
 
-What is a kernel expected to do when it sees this entry-method?
+> From: Magnus Damm <damm+renesas@opensource.se>
 
-Using "samsung,exynos" as the entry-method feels like something that's
-going to bite us; it sounds far too wide-reaching.
+> Add R-Car Gen2 CMA memory reservation code that can be
+> shared between multiple SoCs and boards. At this point
+> r8a7790 and r8a7791 are supported.
 
->  static int exynos_cpuidle_probe(struct platform_device *pdev)
->  {
-> -	int ret;
-> +	int ret, i;
-> +	struct cpuidle_driver *drv = &exynos_idle_driver;
->  
->  	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
->  
-> -	ret = cpuidle_register(&exynos_idle_driver, NULL);
-> +	drv->cpumask = (struct cpumask *) cpu_possible_mask;
+> The top 256MiB of the legacy 32-bit physical memory space
+> is assigned to a separate CMA area that may be assigned
+> to various devices later on.
 
-This assignment looks scary to me. Why do we need to do this, and why
-are we throwing away the constness of cpu_possible_mask?
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> [horms+renesas at verge.net.au: rebased]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Mark.
+[...]
+
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> index fdc714e..544b9bf 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -20,8 +20,11 @@
+>
+>   #include <linux/clk/shmobile.h>
+>   #include <linux/clocksource.h>
+> +#include <linux/device.h>
+> +#include <linux/dma-contiguous.h>
+>   #include <linux/io.h>
+>   #include <linux/kernel.h>
+> +#include <linux/of_fdt.h>
+>   #include <asm/mach/arch.h>
+>   #include "common.h"
+>   #include "rcar-gen2.h"
+
+    Hm, this part looks incomplete. I thought you were going to add CMA code here?
+
+WBR, Sergei
