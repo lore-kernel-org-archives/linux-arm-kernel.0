@@ -1,32 +1,46 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Wed, 25 Jun 2014 17:49:04 +0200
-Subject: [PATCH] pinctrl: st: add IRQCHIP_SKIP_SET_WAKE flag
-Message-ID: <1403711344-17335-1-git-send-email-patrice.chotard@st.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 25 Jun 2014 17:52:59 +0200
+Subject: [PATCH v2] sched: Fix compiler warnings
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D17265D81@AcuExch.aculab.com>
+References: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
+ <20140625071416.GM14781@pengutronix.de>
+ <53AADC63.8080106@roeck-us.net>
+ <20140625144955.GP14781@pengutronix.de>
+ <53AAE4D2.5020104@roeck-us.net>
+ <063D6719AE5E284EB5DD2968C1650D6D17265D81@AcuExch.aculab.com>
+Message-ID: <20140625155259.GQ14781@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David PARIS <david.paris@st.com>
+Hello,
 
-no .irq_set_wake API is available for pinctrl-st driver.
-Add the IRQCHIP_SKIP_SET_WAKE flag to inform irq handler
-not to call this API.
+On Wed, Jun 25, 2014 at 03:40:28PM +0000, David Laight wrote:
+> From: Guenter Roeck
+> > Actually turns out one can use __attribute_const__, and it is
+> > 
+> > 	static inline int __attribute_const__ cpu_corepower_flags(void)
+> > 
+> > which turns out to be widely used.
+> > 
+> > I'll change that and resubmit after testing.
+> 
+> You don't need to tell the compiler that for an inline function.
+I didn't check for the functions in question here, but in general your
+statement is wrong.
 
-Signed-off-by: David Paris <david.paris@st.com>
----
- drivers/pinctrl/pinctrl-st.c | 1 +
- 1 file changed, 1 insertion(+)
+For example:
 
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index fb601fe..d881406 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -1530,6 +1530,7 @@ static struct irq_chip st_gpio_irqchip = {
- 	.irq_set_type	= st_gpio_irq_set_type,
- 	.irq_startup	= st_gpio_irq_startup,
- 	.irq_shutdown	= st_gpio_irq_shutdown,
-+	.flags		= IRQCHIP_SKIP_SET_WAKE,
- };
- 
- static int st_gpio_irq_domain_map(struct irq_domain *h,
+static inline unsigned int __attribute_const__ read_cpuid_id(void)
+{
+	return readl(BASEADDR_V7M_SCB + V7M_SCB_CPUID);
+}
+
+from arch/arm/include/asm/cputype.h. The V7M_SCB_CPUID register never
+changes, but there is no way gcc can deduce that.
+
+Best regards
+Uwe
+
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
