@@ -1,61 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 26 Jun 2014 00:53:50 +0400
-Subject: [PATCH 2/4] phy: miphy365x: Add MiPHY365x header file for DT
- x Driver defines
-In-Reply-To: <1400766819-22286-3-git-send-email-lee.jones@linaro.org>
-References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
- <1400766819-22286-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <53AB36DE.7090908@cogentembedded.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Jun 2014 15:02:14 -0600
+Subject: [PATCH] clk: tegra: fix vi_sensor clocks on Tegra124
+In-Reply-To: <1403712609-13624-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1403712609-13624-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <53AB38D6.6070901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 06/25/2014 10:10 AM, Peter De Schrijver wrote:
+> vi_sensor and vi_sensor2 have a wrong hw clkid on Tegra124. Fix this by
+> correcting the hw clkid for Tegra124 and creating the Tegra114 vi_sensor clock
+> from its own data. Tegra124 was also using the wrong internal clock id.
 
-On 05/22/2014 05:53 PM, Lee Jones wrote:
+> diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
 
-> This provides the shared header file which will be reference from both
-> the MiPHY365x driver and its associated Device Tree node(s).
+> -	MUX("vi_sensor2", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR2, 20, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor2),
+> +	MUX("vi_sensor2", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR2, 165, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor2),
+...
+> -	MUX8("vi_sensor", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR, 20, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor_8),
+> +	MUX8("vi_sensor", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR, 164, TEGRA_PERIPH_NO_RESET, tegra_clk_vi_sensor_8),
 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   include/dt-bindings/phy/phy-miphy365x.h | 25 +++++++++++++++++++++++++
->   1 file changed, 25 insertions(+)
->   create mode 100644 include/dt-bindings/phy/phy-miphy365x.h
+If I'm reading the TRM right, these are CAM_MCLK/CAM_MCLK2 in the
+RST_DEV_X register. Is the TRM simply inconsistent in the naming of
+these clocks, or is there some other inconsistency?
 
-> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
-> new file mode 100644
-> index 0000000..8757c02
-> --- /dev/null
-> +++ b/include/dt-bindings/phy/phy-miphy365x.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + * This header provides constants for the phy framework
-> + * based on the STMicroelectronics miphy365x.
-> + */
-> +#ifndef _DT_BINDINGS_PHY_MIPHY
-> +#define _DT_BINDINGS_PHY_MIPHY
-> +
-> +/* Supports 16 ports without a datatype change (u8 & 0xF0). */
-> +#define MIPHY_PORT_0			0
-> +#define MIPHY_PORT_1			1
-> +#define MIPHY_PORT_2			2
-> +#define MIPHY_PORT_3			3
-> +
-> +/* Supports 16 types without a datatype change (u8 & 0x0F). */
-> +#define MIPHY_TYPE_SHIFT		4
-> +#define MIPHY_TYPE_SATA			(0 << MIPHY_TYPE_SHIFT)
-> +#define MIPHY_TYPE_PCIE			(1 << MIPHY_TYPE_SHIFT)
-> +#define MIPHY_TYPE_USB			(2 << MIPHY_TYPE_SHIFT)
-> +
-> +#define MIPHY_SATA_PORT0		(MIPHY_TYPE_SATA) | (MIPHY_PORT_0)
-> +#define MIPHY_SATA_PORT1		(MIPHY_TYPE_SATA) | (MIPHY_PORT_1)
-> +#define MIPHY_PCIE_PORT0		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_0)
-> +#define MIPHY_PCIE_PORT1		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_1)
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
 
-    No need to have parens around macros but you should instead enclose the 
-'|' operator and its arguments into parens.
+> @@ -777,7 +784,6 @@ static struct tegra_clk tegra114_clks[tegra_clk_max] __initdata = {
+>  	[tegra_clk_spdif_in] = { .dt_id = TEGRA114_CLK_SPDIF_IN, .present = true },
+>  	[tegra_clk_spdif_out] = { .dt_id = TEGRA114_CLK_SPDIF_OUT, .present = true },
+>  	[tegra_clk_vi_8] = { .dt_id = TEGRA114_CLK_VI, .present = true },
+> -	[tegra_clk_vi_sensor_8] = { .dt_id = TEGRA114_CLK_VI_SENSOR, .present = true },
 
-WBR, Sergei
+Does it make any sense to
+s/tegra_clk_vi_sensor_8/tegra_clk_vi_sensor_114/ and put the definition
+into the table in clk-tegra-periph.c instead? I suppose if this clock
+definition is specific to Tegra114 there's not much point, so this is
+probably fine. Hopefully the new tegra_clk_vi_sensor_8 lasts longer than
+just Tegra124...
+
+So overall, I think:
+Acked-by: Stephen Warren <swarren@nvidia.com>
