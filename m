@@ -1,50 +1,79 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 25 Jun 2014 13:43:54 +0200
-Subject: [PATCH v2 4/6] ARM: SAMSUNG: Restore Samsung PM Debug functionality
-In-Reply-To: <1403618235-19353-5-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-5-git-send-email-t.figa@samsung.com>
-Message-ID: <1403696634-12779-1-git-send-email-t.figa@samsung.com>
+Date: Wed, 25 Jun 2014 13:52:55 +0200
+Subject: [PATCH v2 5/6] ARM: EXYNOS: Fix suspend/resume sequences
+In-Reply-To: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1403697175-13476-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to recently merged patches and previous merge conflicts, the Samsung
-PM Debug functionality no longer can be enabled. This patch fixes
-incorrect dependency of SAMSUNG_PM_DEBUG on an integer symbol and adds
-missing header inclusion.
+Due to recent consolidation of Exynos suspend and cpuidle code, some
+parts of suspend and resume sequences are executed two times, once from
+exynos_pm_syscore_ops and then from exynos_cpu_pm_notifier() and thus it
+breaks suspend, at least on Exynos4-based boards.
+
+This patch fixes the issue by removing exynos_pm_syscore_ops completely
+and making the code rely only on CPU PM notifier.
+
+Tested on Exynos4210-based Trats board.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/plat-samsung/Kconfig    | 5 +++--
- arch/arm/plat-samsung/pm-debug.c | 1 +
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-exynos/pm.c | 23 ++++-------------------
+ 1 file changed, 4 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 301b892..ad9515f 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -413,8 +413,9 @@ config S5P_DEV_MFC
- comment "Power management"
+Changes since v1:
+ - rebased onto Kukjin's fixes branch.
+
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 202ca73..f23cc77 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -364,11 +364,6 @@ early_wakeup:
+ 	return;
+ }
  
- config SAMSUNG_PM_DEBUG
--	bool "S3C2410 PM Suspend debug"
--	depends on PM && DEBUG_KERNEL && DEBUG_S3C_UART
-+	bool "Samsung PM Suspend debug"
-+	depends on PM && DEBUG_KERNEL
-+	depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
- 	help
- 	  Say Y here if you want verbose debugging from the PM Suspend and
- 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
-diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
-index 8f19f66..3960960 100644
---- a/arch/arm/plat-samsung/pm-debug.c
-+++ b/arch/arm/plat-samsung/pm-debug.c
-@@ -14,6 +14,7 @@
+-static struct syscore_ops exynos_pm_syscore_ops = {
+-	.suspend	= exynos_pm_suspend,
+-	.resume		= exynos_pm_resume,
+-};
+-
+ /*
+  * Suspend Ops
   */
+@@ -438,22 +433,13 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
  
- #include <linux/serial_core.h>
-+#include <linux/serial_s3c.h>
- #include <linux/io.h>
+ 	switch (cmd) {
+ 	case CPU_PM_ENTER:
+-		if (cpu == 0) {
+-			exynos_pm_central_suspend();
+-			if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+-				exynos_cpu_save_register();
+-		}
++		if (cpu == 0)
++			exynos_pm_suspend();
+ 		break;
  
- #include <asm/mach/map.h>
+ 	case CPU_PM_EXIT:
+-		if (cpu == 0) {
+-			if (read_cpuid_part_number() ==
+-					ARM_CPU_PART_CORTEX_A9) {
+-				scu_enable(S5P_VA_SCU);
+-				exynos_cpu_restore_register();
+-			}
+-			exynos_pm_central_resume();
+-		}
++		if (cpu == 0)
++			exynos_pm_resume();
+ 		break;
+ 	}
+ 
+@@ -478,6 +464,5 @@ void __init exynos_pm_init(void)
+ 	tmp |= ((0xFF << 8) | (0x1F << 1));
+ 	__raw_writel(tmp, S5P_WAKEUP_MASK);
+ 
+-	register_syscore_ops(&exynos_pm_syscore_ops);
+ 	suspend_set_ops(&exynos_suspend_ops);
+ }
 -- 
 1.9.3
