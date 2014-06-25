@@ -1,23 +1,20 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 25 Jun 2014 16:01:25 -0700
+Date: Wed, 25 Jun 2014 16:02:48 -0700
 Subject: [PATCH v1 5/9] of: Add NVIDIA Tegra XHCI controller binding
-In-Reply-To: <53AB4495.1020000@wwwdotorg.org>
+In-Reply-To: <53AB4530.2050106@wwwdotorg.org>
 References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
  <1403072180-4944-6-git-send-email-abrestic@chromium.org>
- <53AB4495.1020000@wwwdotorg.org>
-Message-ID: <CAL1qeaG=nLxDHrsVuuL9c-JdKB+TrNN785+8v=hb0MAFJ=5juw@mail.gmail.com>
+ <53AB4530.2050106@wwwdotorg.org>
+Message-ID: <CAL1qeaHThKVBoY0fikFCh9X00BFNJ=XKfovOBwztEyOVjHBLjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 2:52 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Wed, Jun 25, 2014 at 2:54 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
 >> Add device-tree binding documentation for the XHCI controller present
 >> on Tegra124 and later SoCs.
 >
 >> diff --git a/Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt b/Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
->
->> +Required properties:
->> +--------------------
 >
 >> + - clock-names: Must include the following entries:
 >> +    - xusb_host
@@ -26,42 +23,20 @@ On Wed, Jun 25, 2014 at 2:52 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 >> +    - xusb_ss_src
 >> +    - xusb_hs_src
 >> +    - xusb_fs_src
+>
+> Looking at include/dt-bindings/clock/tegra124-car.h I see a few entries
+> potentially missing here:
+>
+> #define TEGRA124_CLK_XUSB_HOST_SRC 252
+> #define TEGRA124_CLK_XUSB_DEV_SRC 256
+> #define TEGRA124_CLK_XUSB_DEV 257
+> #define TEGRA124_CLK_XUSB_SS_DIV2 312
+
+The driver doesn't use them, so I didn't put them in the binding.
+
 >> +    - pll_u_480m
->> +    - clk_m
->> +    - pll_e
 >
->> + - reset-names: Must include the following entries:
->> +   - xusb_host
->> +   - xusb_ss
->
-> Usually the CAR has a reset control for each clock. So, I would expect
-> as many entries in reset-names as in clock-names. Even if the SW doesn't
-> currently touch all the reset lines, we should make sure the binding
-> requires them to be present so that any DT will contain the entries if
-> they're ever needed in the future.
+> Not just pll_u?
 
-The xusb_{falcon,host,hs,fs,ss}_src clocks all share the same reset
-bit (143), so I can add a single entry for those.
-
-> In the CAR documentation, I see "XUSB_DEV" as a clock/reset bit. Is that
-> missing from the list above?
-
-This is used when XUSB is in device mode, which the driver does not
-support.  I can add those clocks here though if you want.
-
->> +Optional properties:
->
->> + - s1p05v-supply: 1.05V supply regulator.
->> + - s1p8v-supply: 1.8V supply regulator.
->> + - s3p3v-supply: 3.3V supply regulator.
->
-> What are those supplies for? I would have expected any input to the SoC
-> to have a name that described its purpose, and the pins and DT
-> properties would be named to match.
-
-I *think* this what they are from looking at the schematic, but I'll
-have to ask around:
- - s1p05v: avddio_pex, dvddio_pex, and maybe avdd_pll_erefe
- - s1p8v: avdd_pll_utmip
- - s3p3v: avdd_usb, hvdd_pex, hvdd_pex_pll_e
-Should these be separated out as they are for PCIe?
+We specifically want pll_u_480M as that's what we use as the parent of
+xusb_ss_src when scaling it to 120Mhz.
