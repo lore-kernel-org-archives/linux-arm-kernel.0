@@ -1,79 +1,107 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 25 Jun 2014 08:08:11 -0700
-Subject: [PATCH v8 9/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <20140625142121.GD7892@redhat.com>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <1403642893-23107-10-git-send-email-keescook@chromium.org>
- <20140625142121.GD7892@redhat.com>
-Message-ID: <CAGXu5jJtLrjbobZC1FD4WV-Jm2p7cRGa1aSPK-d_isnfCZAHdA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jun 2014 17:08:06 +0200
+Subject: [Linaro-acpi] [RFC v2 1/3] Mailbox: Add support for ACPI
+In-Reply-To: <53A9BB9E.7050707@linaro.org>
+References: <1402591692-7736-1-git-send-email-ashwin.chaugule@linaro.org>
+ <17846485.GZEaSd7XIs@wuerfel> <53A9BB9E.7050707@linaro.org>
+Message-ID: <6663855.4TI1cqqRkF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 7:21 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 06/24, Kees Cook wrote:
->>
->> +static void seccomp_sync_threads(void)
->> +{
->> +     struct task_struct *thread, *caller;
->> +
->> +     BUG_ON(!spin_is_locked(&current->sighand->siglock));
->> +
->> +     /* Synchronize all threads. */
->> +     caller = current;
->> +     for_each_thread(caller, thread) {
->> +             /* Get a task reference for the new leaf node. */
->> +             get_seccomp_filter(caller);
->> +             /*
->> +              * Drop the task reference to the shared ancestor since
->> +              * current's path will hold a reference.  (This also
->> +              * allows a put before the assignment.)
->> +              */
->> +             put_seccomp_filter(thread);
->> +             thread->seccomp.filter = caller->seccomp.filter;
->> +             /* Opt the other thread into seccomp if needed.
->> +              * As threads are considered to be trust-realm
->> +              * equivalent (see ptrace_may_access), it is safe to
->> +              * allow one thread to transition the other.
->> +              */
->> +             if (thread->seccomp.mode == SECCOMP_MODE_DISABLED) {
->> +                     /*
->> +                      * Don't let an unprivileged task work around
->> +                      * the no_new_privs restriction by creating
->> +                      * a thread that sets it up, enters seccomp,
->> +                      * then dies.
->> +                      */
->> +                     if (task_no_new_privs(caller))
->> +                             task_set_no_new_privs(thread);
->> +
->> +                     seccomp_assign_mode(thread, SECCOMP_MODE_FILTER);
->> +             }
->> +     }
->> +}
->
-> OK, personally I think this all make sense. I even think that perhaps
-> SECCOMP_FILTER_FLAG_TSYNC should allow filter == NULL, a thread might
-> want to "sync" without adding the new filter, but this is minor/offtopic.
->
-> But. Doesn't this change add a new security hole?
->
-> Obviously, we should not allow to install a filter and then (say) exec
-> a suid binary, that is why we have no_new_privs/LSM_UNSAFE_NO_NEW_PRIVS.
->
-> But what if "thread->seccomp.filter = caller->seccomp.filter" races with
-> any user of task_no_new_privs() ? Say, suppose this thread has already
-> passed check_unsafe_exec/etc and it is going to exec the suid binary?
+On Tuesday 24 June 2014 13:55:42 Ashwin Chaugule wrote:
+> 
+> Hi Arnd,
+> 
+> On 06/24/2014 10:18 AM, Arnd Bergmann wrote:
+> 
+> >
+> > I think a model that's closer to the mailbox subsystem would imply
+> > that the common mailbox code (or the pcc driver itself) parses the
+> > PCCT table, while the slave driver only passes an index.
+> 
+> This is pretty close to what I have here:
+> 
+> The PCC mailbox version:
+> 
+> https://git.linaro.org/people/ashwin.chaugule/leg-kernel.git/shortlog/refs/heads/mbox-pcc-review
+> 
+> 
+> Here the pcc driver in /drivers/acpi/pcc.c is the PCC mailbox controller 
+> which parses the PCCT and /drivers/acpi/pcc-test.c is a sample PCC 
+> client that sends dummy PCC reads/writes.
+> 
+> 
+> The PCC + CPPC non-mailbox version:
+> 
+> https://git.linaro.org/people/ashwin.chaugule/leg-kernel.git/shortlog/refs/heads/pcc-cppc-dev
+> 
+> Here, the CPPC is the PCC client driver which parses the CPC tables. The 
+> mailbox conversion for this stuff is a WIP. But it should give an idea 
+> of how PCC and PCC clients would work.
 
-Oh, ew. Yeah. It looks like there's a cred lock to be held to combat this?
+Ok, but unfortunately it seems that there is no way for the CPPC to tell
+the PCC driver to pull the index out of the CPPC tables as far as I can
+tell.
 
-I wonder if changes to nnp need to "flushed" during syscall entry
-instead of getting updated externally/asynchronously? That way it
-won't be out of sync with the seccomp mode/filters.
+> > Or even better, the slave driver would only pass a device pointer,
+> > from which the pcc driver can find the pcc_register_resource in
+> > the corresponding ACPI table. The name of that table can be the
+> > string you pass down to the mailbox API. I suspect there is some
+> > issue that makes this all break down though, but that would be
+> > a portable way to do this for both DT and ACPI:
+> >
+> > If we wanted to use DT with the same driver, we would put the
+> > name of the table containing pcc_register_resource into the
+> > mbox-names property, and that could get used to look up a
+> > reference to the pcc device, and to the other data that you
+> > have in pcc_register_resource and PCCT.
+> 
+> So I dont think we should worry about the PCC clients being used in the 
+> DT case, since the PCC and its client specification is very ACPI centric 
+> and platforms that want to use these drivers will need an ACPI based 
+> firmware anyway. Which is why I think having a separate PCC specific 
+> mbox API makes sense.
 
-Perhaps secure computing needs to check some (maybe seccomp-only)
-atomic flags and flip on the "real" nnp if found?
+I think we should be prepared to add any feature that exists in ACPI
+also for DT if the need arises, even if we don't expect it to be
+necessary.
 
--Kees
+There are a number of reasons why you might want to use the drivers
+with DT, e.g. board bringup (before firmware is available), or to use
+some features of a SoC that cannot be represented in ACPI but that
+may be useful for a special-purpose appliance.
 
--- 
-Kees Cook
-Chrome OS Security
+> Something like what you suggested should work well for ACPI based platforms.
+> 
+> struct mbox_controller *
+> mbox_find_pcc_controller(char *name)
+> {
+> 	list_for_each_entry(mbox, &mbox_cons, node) {
+> 		if (mbox->name)
+> 			if (!strncmp(mbox->name, name))
+> 				return mbox;
+> 	}
+> 
+> 	return -ENODEV;
+> }
+> 
+> int pcc_mbox_get_channel(struct mbox_client *cl,
+> 		char *name, unsigned chan_id,
+> 		struct mbox_chan **chan)
+> {
+> 	struct mbox_controller *mbox;
+> 	mbox = mbox_find_pcc_controller(name);
+> 
+> 	if (!mbox) {
+> 		pr_err("PCC mbox %s not found.\n", name);
+> 		return -ENODEV;
+> 	}
+> 
+> 	*chan = &mbox->chans[chan_id];
+> 	return init_channel(*chan, cl);
+> }
+
+Yes, that seems fine, and it will just work with DT as well
+if we need that.
+
+	Arnd
