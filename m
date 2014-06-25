@@ -1,119 +1,62 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 25 Jun 2014 08:41:20 +0200
-Subject: [PATCH v2] sched: Fix compiler warnings
-In-Reply-To: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
-References: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
-Message-ID: <CAKfTPtBzpuVf7Ts0YunD=38hONg2RT3Ymr-jvFxx4woa_Qt9tQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 25 Jun 2014 14:48:43 +0800
+Subject: [PATCH] ARM: dts: add support for Ka-Ro TX51
+In-Reply-To: <20140623121839.679f35ee@ipc1.ka-ro>
+References: <1402578584-12640-1-git-send-email-LW@KARO-electronics.de>
+ <20140618150152.GP8860@dragon> <20140623121839.679f35ee@ipc1.ka-ro>
+Message-ID: <20140625064841.GA2224@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2014 03:05, Guenter Roeck <linux@roeck-us.net> wrote:
-> Commit 143e1e28cb (sched: Rework sched_domain topology definition)
-> introduced a number of functions with a return value of 'const int'.
-> gcc doesn't know what to do with that and, if the kernel is compiled
-> with W=1, complains with the following warnings whenever sched.h
-> is included.
->
-> include/linux/sched.h:875:25: warning:
->         type qualifiers ignored on function return type
-> include/linux/sched.h:882:25: warning:
->         type qualifiers ignored on function return type
-> include/linux/sched.h:889:25: warning:
->         type qualifiers ignored on function return type
-> include/linux/sched.h:1002:21: warning:
->         type qualifiers ignored on function return type
->
-> Commits fb2aa855 (sched, ARM: Create a dedicated scheduler topology table)
-> and 607b45e9a (sched, powerpc: Create a dedicated topology table) introduce
-> the same warning in the arm and powerpc code.
->
-> Drop 'const' from the function declarations to fix the problem.
->
-> The fix for all three patches has to be applied together to avoid
-> compilation failures for the affected architectures.
->
-> Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Vincent Guittot <vincent.guittot@linaro.org>
+On Mon, Jun 23, 2014 at 12:18:39PM +0200, Lothar Wa?mann wrote:
+...
+> > > +	phy-handle = <&phy0>;
+> > > +	mac-address = [000000000000]; /* will be set by U-Boot */
+> > 
+> > Shouldn't it be local-mac-address?
+> > 
+> probably yes, but both 'mac-address' and 'local-mac-address' are being
+> set up by U-Boot anyway.
 
-Acked-by Vincent Guittot <vincent.guittot@linaro.org>
+Okay, never mind.  I just realized kernel supports both properties.
 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
-> v2: Fix problem in all affected architectures with a single patch
->     to avoid compilation errors.
->
->  arch/arm/kernel/topology.c | 2 +-
->  arch/powerpc/kernel/smp.c  | 2 +-
->  include/linux/sched.h      | 8 ++++----
->  3 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 9d85318..e35d880 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -275,7 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
->                 cpu_topology[cpuid].socket_id, mpidr);
->  }
->
-> -static inline const int cpu_corepower_flags(void)
-> +static inline int cpu_corepower_flags(void)
->  {
->         return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
->  }
-> diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
-> index 51a3ff7..1007fb8 100644
-> --- a/arch/powerpc/kernel/smp.c
-> +++ b/arch/powerpc/kernel/smp.c
-> @@ -747,7 +747,7 @@ int setup_profiling_timer(unsigned int multiplier)
->
->  #ifdef CONFIG_SCHED_SMT
->  /* cpumask of CPUs with asymetric SMT dependancy */
-> -static const int powerpc_smt_flags(void)
-> +static int powerpc_smt_flags(void)
->  {
->         int flags = SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
->
-> diff --git a/include/linux/sched.h b/include/linux/sched.h
-> index 306f4f0..0376b05 100644
-> --- a/include/linux/sched.h
-> +++ b/include/linux/sched.h
-> @@ -872,21 +872,21 @@ enum cpu_idle_type {
->  #define SD_NUMA                        0x4000  /* cross-node balancing */
->
->  #ifdef CONFIG_SCHED_SMT
-> -static inline const int cpu_smt_flags(void)
-> +static inline int cpu_smt_flags(void)
->  {
->         return SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
->  }
->  #endif
->
->  #ifdef CONFIG_SCHED_MC
-> -static inline const int cpu_core_flags(void)
-> +static inline int cpu_core_flags(void)
->  {
->         return SD_SHARE_PKG_RESOURCES;
->  }
->  #endif
->
->  #ifdef CONFIG_NUMA
-> -static inline const int cpu_numa_flags(void)
-> +static inline int cpu_numa_flags(void)
->  {
->         return SD_NUMA;
->  }
-> @@ -999,7 +999,7 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms);
->  bool cpus_share_cache(int this_cpu, int that_cpu);
->
->  typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
-> -typedef const int (*sched_domain_flags_f)(void);
-> +typedef int (*sched_domain_flags_f)(void);
->
->  #define SDTL_OVERLAP   0x01
->
-> --
-> 1.9.1
->
+...
+
+> > > +&esdhc1 {
+> > > +	cd-gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
+> > > +	fsl,wp-controller;
+> > 
+> > Does it work for you, since the driver does not support it as of today?
+> > 
+> What driver doesn't support what?
+> AFAICT the sdhci-esdhc-imx.c driver supports both of these properties.
+
+That was the case before, but it's not the case since commit
+89d7e5c13122 (mmc: sdhci-esdhc-imx: add runtime pm support).
+
+http://thread.gmane.org/gmane.linux.kernel.mmc/27287
+
+...
+
+> > > +	spidev0: spi at 0 {
+> > > +		compatible = "spidev";
+> > > +		reg = <0>;
+> > > +		spi-max-frequency = <54000000>;
+> > > +	};
+> > > +
+> > > +	spidev1: spi at 1 {
+> > > +		compatible = "spidev";
+> > > +		reg = <1>;
+> > > +		spi-max-frequency = <54000000>;
+> > > +	};
+> > 
+> > I'm not sure we should have these two devices.
+> > 
+> Why not? With this the SPI bus can readily be used with the spidev
+> driver from Documentation/spi/spidev_test.c (which is what most of our
+> customers are asking for)!
+
+Is this something that has been approved by DT maintainers?  I do not
+see "spidev" documented as a compatible in any bindings doc.
+
+Shawn
