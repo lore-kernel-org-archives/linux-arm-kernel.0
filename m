@@ -1,40 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:26 +0900
-Subject: [PATCH 14/14] ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for
- shmobile
-In-Reply-To: <cover.1403681315.git.horms+renesas@verge.net.au>
-References: <cover.1403681315.git.horms+renesas@verge.net.au>
-Message-ID: <3ed66ec5ced8b801cb851b2b8548301df94f8f54.1403681315.git.horms+renesas@verge.net.au>
+Date: Wed, 25 Jun 2014 16:35:31 +0900
+Subject: [PATCH 1/5] ARM: shmobile: koelsch-reference: Remove workarounds for
+ core clock issues
+In-Reply-To: <cover.1403681531.git.horms+renesas@verge.net.au>
+References: <cover.1403681531.git.horms+renesas@verge.net.au>
+Message-ID: <d37e9b0b20dd7670946ad6034b4aa93b7e7048aa.1403681531.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The following commit has removed ARCH_HAS_CPUFREQ config:
+Now the core clock issues have been fixed by commit
+3c90c55dcde745bed81f6447f24ba96bda43d984 ("drivers: sh: compile
+drivers/sh/pm_runtime.c if ARCH_SHMOBILE_MULTI"), revert the following
+3 commits:
+  - 4dcb4c80380dfa482874b931e308fd382597feab ("ARM: shmobile: Add Koelsch
+    clock workarounds for SDHI"),
+  - 8e4f394b20a0fe474dd88204d76978191566decf ("ARM: shmobile:
+    koelsch-reference: Annotate clk_enables as __initconst"),
+  - 3d75d9ea74fee6f5a4bdcbbdf2d577661d047eef ("ARM: shmobile:
+    koelsch-reference: Work around core clock issues").
 
- Commit: e49d9b375628e67c9a718f4befaa8e45e5fad21b
- Subject: ARM: Remove ARCH_HAS_CPUFREQ config option
-
-This patch removes the code that is using ARCH_HAS_CPUFREQ
-in mach-shmobile.
-
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 15 ---------------
+ 1 file changed, 15 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index c32fa7c..cbc90f1 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -12,7 +12,6 @@ config ARCH_SHMOBILE_MULTI
- 	select NO_IOPORT_MAP
- 	select PINCTRL
- 	select ARCH_REQUIRE_GPIOLIB
--	select ARCH_HAS_CPUFREQ
- 	select ARCH_HAS_OPP
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index 1d3f67d..28e3c45 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -92,24 +92,9 @@ static const struct clk_name clk_names[] __initconst = {
+ 	{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
+ };
  
- if ARCH_SHMOBILE_MULTI
+-/*
+- * This is a really crude hack to work around core platform clock issues
+- */
+-static const struct clk_name clk_enables[] __initconst = {
+-	{ "ether", NULL, "ee700000.ethernet" },
+-	{ "i2c2", NULL, "e6530000.i2c" },
+-	{ "msiof0", NULL, "e6e20000.spi" },
+-	{ "qspi_mod", NULL, "e6b10000.spi" },
+-	{ "sdhi0", NULL, "ee100000.sd" },
+-	{ "sdhi1", NULL, "ee140000.sd" },
+-	{ "sdhi2", NULL, "ee160000.sd" },
+-	{ "thermal", NULL, "e61f0000.thermal" },
+-};
+-
+ static void __init koelsch_add_standard_devices(void)
+ {
+ 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
+-	shmobile_clk_workaround(clk_enables, ARRAY_SIZE(clk_enables), true);
+ 	r8a7791_add_dt_devices();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 
 -- 
 2.0.0.rc2
