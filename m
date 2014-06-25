@@ -1,115 +1,53 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 25 Jun 2014 19:33:52 +0530
-Subject: [PATCH v5 5/5] ARM: EXYNOS: Move PMU specific definitions from
- common.h
-In-Reply-To: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1403705032-14835-6-git-send-email-pankaj.dubey@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 25 Jun 2014 09:08:27 -0500
+Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
+In-Reply-To: <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
+Message-ID: <CAL_JsqL+L-pDr=ENJDj3Um_iMeYNmisd=BMW=SR8tie-_qDeeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves PMU specific definitions into a new file
-as exynos-pmu.h.
-This will help in reducing dependency of common.h in pmu.c.
+On Wed, Jun 25, 2014 at 8:56 AM, Anup Patel <anup@brainfault.org> wrote:
+> Hi Marc,
+>
+> On Wed, Jun 25, 2014 at 2:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> So far, GICv2 has been used in with EOImode == 0. The effect of this
+>> mode is to perform the priority drop and the deactivation of the
+>> interrupt at the same time.
+>>
+>> While this works perfectly for Linux (we only have a single priority),
+>> it causes issues when an interrupt is forwarded to a guest, and when
+>> we want the guest to perform the EOI itself.
+>>
+>> For this case, the GIC architecture provides EOImode == 1, where:
+>> - A write to the EOI register drops the priority of the interrupt and leaves
+>> it active. Other interrupts at the same priority level can now be taken,
+>> but the active interrupt cannot be taken again
+>> - A write to the DIR marks the interrupt as inactive, meaning it can
+>> now be taken again.
+>>
+>> We only enable this feature when booted in HYP mode. Also, as most device
+>> trees are broken (they report the CPU interface size to be 4kB, while
+>> the GICv2 CPU interface size is 8kB), output a warning if we're booted
+>> in HYP mode, and disable the feature.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/common.h     |   17 -----------------
- arch/arm/mach-exynos/exynos-pmu.h |   31 +++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/pm.c         |    1 +
- arch/arm/mach-exynos/pmu.c        |    2 +-
- 4 files changed, 33 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+[...]
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 296c6e1..0326ca2 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -135,23 +135,6 @@ extern struct smp_operations exynos_smp_ops;
- 
- extern void exynos_cpu_die(unsigned int cpu);
- 
--/* PMU(Power Management Unit) support */
--
--#define PMU_TABLE_END	(-1U)
--
--enum sys_powerdown {
--	SYS_AFTR,
--	SYS_LPA,
--	SYS_SLEEP,
--	NUM_SYS_POWERDOWN,
--};
--
--struct exynos_pmu_conf {
--	unsigned int offset;
--	unsigned int val[NUM_SYS_POWERDOWN];
--};
--
--extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
- extern void exynos_cpu_power_down(int cpu);
- extern void exynos_cpu_power_up(int cpu);
- extern int  exynos_cpu_power_state(int cpu);
-diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/arch/arm/mach-exynos/exynos-pmu.h
-new file mode 100644
-index 0000000..16ff036
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos-pmu.h
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Header for EXYNOS PMU Driver support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __EXYNOS_PMU_H
-+#define __EXYNOS_PMU_H
-+
-+#define PMU_TABLE_END	(-1U)
-+
-+enum sys_powerdown {
-+	SYS_AFTR,
-+	SYS_LPA,
-+	SYS_SLEEP,
-+	NUM_SYS_POWERDOWN,
-+};
-+
-+struct exynos_pmu_conf {
-+	unsigned int offset;
-+	unsigned int val[NUM_SYS_POWERDOWN];
-+};
-+
-+extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-+
-+#endif /* __EXYNOS_PMU_H */
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 519aefe..de61d48 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -34,6 +34,7 @@
- #include <mach/map.h>
- 
- #include "common.h"
-+#include "exynos-pmu.h"
- #include "regs-pmu.h"
- #include "regs-sys.h"
- 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index c80a648..ca57a54 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -17,7 +17,7 @@
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
- 
--#include "common.h"
-+#include "exynos-pmu.h"
- #include "regs-pmu.h"
- 
- struct exynos_pmu_data {
--- 
-1.7.9.5
+>> +               if (resource_size(&cpu_res) >= SZ_8K)
+>> +                       supports_deactivate = true;
+>> +               else
+>> +                       pr_warn("GIC: CPU interface size is %x, DT is probably wrong\n", (int)resource_size(&cpu_res));
+>
+> This will not work on APM X-Gene because, for
+> X-Gene first CPU page is at 0x78020000 and
+> second CPU page is at 0x78030000.
+
+Does 0x7802f000 for the cpu address not work? It should if X-Gene is
+"SBSA compliant" for whatever that is worth.
+
+Rob
