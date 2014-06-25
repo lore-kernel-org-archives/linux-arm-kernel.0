@@ -1,56 +1,56 @@
-From: rientjes@google.com (David Rientjes)
-Date: Tue, 24 Jun 2014 17:26:02 -0700 (PDT)
-Subject: [PATCH] arm64: fix CONFIG_ZONE_DMA on systems with no 32-bit
- addressable DRAM
-In-Reply-To: <1403499940-11258-1-git-send-email-msalter@redhat.com>
-References: <1403499940-11258-1-git-send-email-msalter@redhat.com>
-Message-ID: <alpine.DEB.2.02.1406241718210.22030@chino.kir.corp.google.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 24 Jun 2014 19:43:36 -0500
+Subject: [PATCH 0/7] OMAP mailbox cleanup
+Message-ID: <1403657023-53897-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jun 2014, Mark Salter wrote:
+Hi,
 
-> Commit 2d5a5612bc (arm64: Limit the CMA buffer to 32-bit if ZONE_DMA)
-> forces the CMA buffer to be 32-bit addressable if CONFIG_ZONE_DMA is
-> defined. This breaks CMA on platforms with no 32-bit addressable DRAM.
-> This patch checks to make sure there is 32-bit addressable DRAM before
-> setting the 32-bit limit. If there is none, no limit is placed on the
-> CMA buffer. This allows a single kernel (with CONFIG_ZONE_DMA defined)
-> to support platforms requiring the 32-bit limit and platforms with no
-> 32-bit limit.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  arch/arm64/mm/init.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index c5415e2..2925576 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -149,8 +149,17 @@ void __init arm64_memblock_init(void)
->  	early_init_fdt_scan_reserved_mem();
->  
->  	/* 4GB maximum for 32-bit only capable devices */
-> -	if (IS_ENABLED(CONFIG_ZONE_DMA))
-> +	if (IS_ENABLED(CONFIG_ZONE_DMA)) {
->  		dma_phys_limit = dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1;
-> +		/*
-> +		 * If platform doesn't have DRAM within the dma_phys_limit,
-> +		 * remove the limit altogether. This allows one kernel (with
-> +		 * CONFIG_ZONE_DMA defined) to support platforms with 32-bit
-> +		 * only devices and platforms with no 32-bit DRAM.
-> +		 */
-> +		if (dma_phys_limit <= memblock_start_of_DRAM())
-> +			dma_phys_limit = 0;
-> +	}
->  	dma_contiguous_reserve(dma_phys_limit);
->  
->  	memblock_allow_resize();
+This patch series is mainly a cleanup of the current OMAP mailbox drivers
+in preparation for adding DT support and adoption to the upcoming mailbox
+framework from Jassi Brar [1]. It removes the OMAP1 mailbox driver as there
+are no users for it in the kernel, and consolidates the previous OMAP
+mailbox framework and the OMAP2+ mailbox driver into a single OMAP mailbox
+driver. 
 
-It is a shame that we have very similar logic, all dependent on 
-memblock_start_of_DRAM(), in both zone_sizes_init() and 
-arm64_memblock_init() and the latter having to be called before the 
-former.  I assume there's no way to make this cleaner in the bootstrap 
-code so the dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1 limit can be handled 
-properly in a single location?
+The last patch also allows the OMAP mailbox driver to support multiple
+instances of the IP (for DRA7xx, which is the first SoC in the OMAP family
+to have more than one System Mailbox IP).
+
+The patches are based on 3.16-rc2 and do not change any of the functional
+behavior on any OMAP2+ SoCs. The boot logs on various OMAP platforms with
+these patches are at:
+  OMAP2 (SDP2430)           : http://slexy.org/view/s20rOAReeS
+  OMAP3 (BeagleXM)          : http://slexy.org/view/s2QITyvzH9
+  OMAP4 (PandaBoard)        : http://slexy.org/view/s2X9jdZ9Wh
+  OMAP5 (OMAP5 uEVM)        : http://slexy.org/view/s21hZUTYwm
+  DRA7  (DRA7 EVM)          : http://slexy.org/view/s213K7f87s
+  AM33xx (BeagleBone Black) : http://slexy.org/view/s2vB7oxbix
+  AM43xx (AM437x GP EVM)    : http://slexy.org/view/s21rMlUWMg
+
+[1] https://lkml.org/lkml/2014/6/12/470
+
+Suman Anna (7):
+  mailbox/omap: use devm_* interfaces
+  mailbox/omap: remove OMAP1 mailbox driver
+  mailbox/omap: remove omap_mbox_type_t from mailbox ops
+  mailbox/omap: simplify the fifo assignment by using macros
+  mailbox/omap: consolidate OMAP mailbox driver
+  mailbox/omap: remove the private mailbox structure
+  mailbox/omap: add a parent structure for every IP instance
+
+ arch/arm/configs/omap1_defconfig |   2 -
+ drivers/mailbox/Kconfig          |  19 +-
+ drivers/mailbox/Makefile         |   6 +-
+ drivers/mailbox/mailbox-omap1.c  | 203 ------------------
+ drivers/mailbox/mailbox-omap2.c  | 357 -------------------------------
+ drivers/mailbox/omap-mailbox.c   | 444 +++++++++++++++++++++++++++++++--------
+ drivers/mailbox/omap-mbox.h      |  67 ------
+ 7 files changed, 360 insertions(+), 738 deletions(-)
+ delete mode 100644 drivers/mailbox/mailbox-omap1.c
+ delete mode 100644 drivers/mailbox/mailbox-omap2.c
+ delete mode 100644 drivers/mailbox/omap-mbox.h
+
+-- 
+2.0.0
