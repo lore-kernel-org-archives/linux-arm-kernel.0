@@ -1,32 +1,49 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 25 Jun 2014 15:00:53 +0800
-Subject: [PATCH 1/2] ARM: i.MX27: Introduce DT include for clock provider
-In-Reply-To: <1403426090-29806-1-git-send-email-shc_work@mail.ru>
-References: <1403426090-29806-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140625070052.GC2224@dragon>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 25 Jun 2014 09:06:39 +0200
+Subject: [PATCH v2 2/2] ARM: i.MX25 clk: Use of_clk_init() for DT case
+In-Reply-To: <20140625062423.GH15686@pengutronix.de>
+References: <1403529927-13868-1-git-send-email-denis@eukrea.com>
+ <1403529927-13868-2-git-send-email-denis@eukrea.com>
+ <20140625062423.GH15686@pengutronix.de>
+Message-ID: <20140625090639.7eabbf70@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 12:34:49PM +0400, Alexander Shiyan wrote:
-> Use clock defines in order to make devicetrees more human readable.
-> Additional changes included in this patch (imx27.dtsi):
-> - Fix IPG clock for UART6.
-> - Use EMI_AHB_GATE clock for WEIM.
-> - Added GPIO_IPG_GATE clock for GPIO nodes. Currently this clock is
->   not used by the driver, but it can be added in the future.
+Hi,
+
+Sascha Hauer wrote:
+> On Mon, Jun 23, 2014 at 03:25:27PM +0200, Denis Carikli wrote:
+[...]
+> > @@ -93,134 +91,136 @@ static struct clk *clk[clk_max];
+> >  
+> >  static int __init __mx25_clocks_init(unsigned long osc_rate)
+> >  {
+> > +	BUG_ON(!ccm);
+> > +
+> >  	clk[dummy] = imx_clk_fixed("dummy", 0);
+> >  	clk[osc] = imx_clk_fixed("osc", osc_rate);
+> > -	clk[mpll] = imx_clk_pllv1("mpll", "osc", ccm(CCM_MPCTL));
+> > -	clk[upll] = imx_clk_pllv1("upll", "osc", ccm(CCM_UPCTL));
+> > +	clk[mpll] = imx_clk_pllv1("mpll", "osc", CCM_MPCTL);
+> > +	clk[upll] = imx_clk_pllv1("upll", "osc", CCM_UPCTL);
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  .../devicetree/bindings/clock/imx27-clock.txt      | 127 +-------
->  arch/arm/boot/dts/imx27-pdk.dts                    |   2 +-
->  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     |   2 +-
->  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    |   2 +-
->  arch/arm/boot/dts/imx27.dtsi                       | 115 ++++---
->  arch/arm/mach-imx/clk-imx27.c                      | 347 ++++++++++-----------
->  include/dt-bindings/clock/imx27-clock.h            | 107 +++++++
->  7 files changed, 362 insertions(+), 340 deletions(-)
->  create mode 100644 include/dt-bindings/clock/imx27-clock.h
+> This huge diffstat could be avoided by doing:
+> 
+> #define ccm(x)	((ccm_base) + (x))
+> 
+> And passing ccm_base as argument to __mx25_clocks_init.
+> 
+<nit>the parens around ccm_base are useless</nit>
 
-Please split all the dts files into a second patch.
 
-Shawn
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
