@@ -1,78 +1,68 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 25 Jun 2014 21:03:26 +0200
-Subject: [PATCH v4 02/14] mfd: max77686: Allow the max77686 rtc to wakeup the
- system
+Date: Wed, 25 Jun 2014 21:03:28 +0200
+Subject: [PATCH v4 04/14] clk: max77686: Improve Maxim 77686 PMIC clocks
+ binding
 In-Reply-To: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1403723019-6212-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403723019-6212-5-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+Like most clock drivers, the Maxim 77686 PMIC clock binding
+follows the convention that the "#clock-cells" property is
+used to specify the number of cells in a clock provider.
 
-The max77686 includes an RTC that keeps power during suspend.  It's
-convenient to be able to use it as a wakeup source.
+But the binding document is not clear enough that it shall
+be set to 1 since the PMIC support multiple clocks outputs.
 
-NOTE: due to wakeup ordering problems this patch alone doesn't work so
-well on exynos5250-snow.  You also need something that brings the i2c
-bus up before the max77686 wakeup runs.
+Also, explain that the clocks identifiers are defined in a
+header file that can be included by Device Tree source with
+client nodes to avoid using magic numbers.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
 
 Changes since v3:
- - Keep the note that this patch needs another change due wakeup
-   ordering problems.
+ - Don't change clock-names property to make clear that it's
+   the consumer clock name and should not match the producer clock.
+   Suggested by Doug Anderson.
 
- drivers/rtc/rtc-max77686.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ Documentation/devicetree/bindings/clock/maxim,max77686.txt | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
-index d20a7f0..c1c6055 100644
---- a/drivers/rtc/rtc-max77686.c
-+++ b/drivers/rtc/rtc-max77686.c
-@@ -583,6 +583,33 @@ static void max77686_rtc_shutdown(struct platform_device *pdev)
- #endif /* MAX77686_RTC_WTSR_SMPL */
- }
+diff --git a/Documentation/devicetree/bindings/clock/maxim,max77686.txt b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
+index 96ce71b..48e00bb 100644
+--- a/Documentation/devicetree/bindings/clock/maxim,max77686.txt
++++ b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
+@@ -9,13 +9,18 @@ The MAX77686 contains three 32.768khz clock outputs that can be controlled
+ Following properties should be presend in main device node of the MFD chip.
  
-+#ifdef CONFIG_PM_SLEEP
-+static int max77686_rtc_suspend(struct device *dev)
-+{
-+	if (device_may_wakeup(dev)) {
-+		struct max77686_rtc_info *info = dev_get_drvdata(dev);
+ Required properties:
+-- #clock-cells: simple one-cell clock specifier format is used, where the
+-  only cell is used as an index of the clock inside the provider. Following
+-  indices are allowed:
 +
-+		return enable_irq_wake(info->virq);
-+	}
++- #clock-cells: from common clock binding; shall be set to 1.
 +
-+	return 0;
-+}
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. Following indices are allowed:
+     - 0: 32khz_ap clock,
+     - 1: 32khz_cp clock,
+     - 2: 32khz_pmic clock.
+ 
++Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77686.h
++header and can be used in device tree sources.
 +
-+static int max77686_rtc_resume(struct device *dev)
-+{
-+	if (device_may_wakeup(dev)) {
-+		struct max77686_rtc_info *info = dev_get_drvdata(dev);
-+
-+		return disable_irq_wake(info->virq);
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(max77686_rtc_pm_ops,
-+			 max77686_rtc_suspend, max77686_rtc_resume);
-+
- static const struct platform_device_id rtc_id[] = {
- 	{ "max77686-rtc", 0 },
- 	{},
-@@ -592,6 +619,7 @@ static struct platform_driver max77686_rtc_driver = {
- 	.driver		= {
- 		.name	= "max77686-rtc",
- 		.owner	= THIS_MODULE,
-+		.pm	= &max77686_rtc_pm_ops,
- 	},
- 	.probe		= max77686_rtc_probe,
- 	.shutdown	= max77686_rtc_shutdown,
+ Example: Node of the MFD chip
+ 
+ 	max77686: max77686 at 09 {
+@@ -34,5 +39,5 @@ Example: Clock consumer node
+ 		compatible = "bar,foo";
+ 		/* ... */
+ 		clock-names = "my-clock";
+-		clocks = <&max77686 2>;
++		clocks = <&max77686 MAX77686_CLK_PMIC>;
+ 	};
 -- 
 2.0.0.rc2
