@@ -1,29 +1,51 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 25 Jun 2014 23:28:11 +0200
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <1403637507-9424-1-git-send-email-festevam@gmail.com>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
-Message-ID: <201406252328.11777.marex@denx.de>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 25 Jun 2014 18:33:00 -0300
+Subject: [PATCH 09/10] ARM: sun4i: cubieboard: add an SPIdev device for
+ testing
+In-Reply-To: <20140625212238.GL19569@lukather>
+References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
+ <1402890635-12342-10-git-send-email-emilio@elopez.com.ar>
+ <20140625212238.GL19569@lukather>
+Message-ID: <53AB400C.6060007@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 24, 2014 at 09:18:27 PM, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> When the mx6 PCI conctroller is initialized in the bootloader we see a
-> kernel hang inside imx6_add_pcie_port().
-> 
-> Adding a 30ms delay allows the kernel to boot.
-> 
-> Suggested-by: David M?ller <d.mueller@elsoft.ch>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> I am happy to get feedback on how to properly fix this.
+Hi Maxime,
 
-Honestly, I have no clue. I would expect Freescale to help us in solving this as 
-they are the chip vendor, but they cannot help either :-(
+El 25/06/14 18:22, Maxime Ripard escribi?:
+> On Mon, Jun 16, 2014 at 12:50:34AM -0300, Emilio L?pez wrote:
+>> ---
+>>   arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 12 ++++++++++++
+>>   arch/arm/boot/dts/sun4i-a10.dtsi           |  7 +++++++
+>>   2 files changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> index 4684cbe..9b8d6b0 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> @@ -61,6 +61,18 @@
+>>   			status = "okay";
+>>   		};
+>>
+>> +		spi0: spi at 01c05000 {
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&spi0_pins_a>;
+>> +			status = "okay";
+>> +
+>> +			dac0: dh2228 at 2 {
+>> +				compatible = "rohm,dh2228fv";
+>
+> Nope, this is not going to happen.
+>
+> It's not even what's connected on this bus.
+>
+> spidev isn't supposed to be described in DT, because it's just not
+> hardware related at all.
 
-Apologies, I really have no idea .
+Patches 9 and 10 are not intended to be merged, I am just sending them 
+to facilitate testing. I suppose I could've been clearer on the cover 
+letter, sorry.
 
-Best regards,
-Marek Vasut
+Cheers,
+
+Emilio
