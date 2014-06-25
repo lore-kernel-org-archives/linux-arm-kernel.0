@@ -1,76 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 25 Jun 2014 09:14:16 +0200
-Subject: [PATCH v2] sched: Fix compiler warnings
-In-Reply-To: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
-References: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20140625071416.GM14781@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 25 Jun 2014 15:22:18 +0800
+Subject: [PATCH] ARM: imx: add cpufreq support for i.mx6sx
+In-Reply-To: <1403496632-20308-1-git-send-email-b20788@freescale.com>
+References: <1403496632-20308-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140625072217.GD2224@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 06:05:29PM -0700, Guenter Roeck wrote:
-> Commit 143e1e28cb (sched: Rework sched_domain topology definition)
-> introduced a number of functions with a return value of 'const int'.
-> gcc doesn't know what to do with that and, if the kernel is compiled
-> with W=1, complains with the following warnings whenever sched.h
-> is included.
+On Mon, Jun 23, 2014 at 12:10:32PM +0800, Anson Huang wrote:
+> Add cpufreq support for i.MX6SX, using common
+> i.MX6Q cpufreq driver.
 > 
-> include/linux/sched.h:875:25: warning:
-> 	type qualifiers ignored on function return type
-> include/linux/sched.h:882:25: warning:
-> 	type qualifiers ignored on function return type
-> include/linux/sched.h:889:25: warning:
-> 	type qualifiers ignored on function return type
-> include/linux/sched.h:1002:21: warning:
-> 	type qualifiers ignored on function return type
-> 
-> Commits fb2aa855 (sched, ARM: Create a dedicated scheduler topology table)
-> and 607b45e9a (sched, powerpc: Create a dedicated topology table) introduce
-> the same warning in the arm and powerpc code.
-> 
-> Drop 'const' from the function declarations to fix the problem.
-> 
-> The fix for all three patches has to be applied together to avoid
-> compilation failures for the affected architectures.
-> 
-> Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Vincent Guittot <vincent.guittot@linaro.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 > ---
-> v2: Fix problem in all affected architectures with a single patch
->     to avoid compilation errors.
+>  arch/arm/mach-imx/mach-imx6sx.c |   27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
->  arch/arm/kernel/topology.c | 2 +-
->  arch/powerpc/kernel/smp.c  | 2 +-
->  include/linux/sched.h      | 8 ++++----
->  3 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 9d85318..e35d880 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -275,7 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
->  		cpu_topology[cpuid].socket_id, mpidr);
+> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+> index 74ff7d6..be2ca52 100644
+> --- a/arch/arm/mach-imx/mach-imx6sx.c
+> +++ b/arch/arm/mach-imx/mach-imx6sx.c
+> @@ -8,6 +8,7 @@
+>  
+>  #include <linux/irqchip.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/pm_opp.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  
+> @@ -39,9 +40,35 @@ static void __init imx6sx_init_irq(void)
+>  	irqchip_init();
 >  }
 >  
-> -static inline const int cpu_corepower_flags(void)
-> +static inline int cpu_corepower_flags(void)
+> +static void __init imx6sx_opp_init(struct device *cpu_dev)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_node_by_path("/cpus/cpu at 0");
+> +	if (!np) {
+> +		pr_warn("failed to find cpu0 node\n");
+> +		return;
+> +	}
+> +
+> +	cpu_dev->of_node = np;
+> +	if (of_init_opp_table(cpu_dev))
+> +		pr_warn("failed to init OPP table\n");
+> +
+> +	of_node_put(np);
+> +}
+
+The whole function is not needed for imx6sx, because we do not need to
+tweak OPP table like what we do on imx6q.  In this case, we can just
+let imx6q-cpufreq call of_init_opp_table() on its own.
+
+Shawn
+
+> +
+> +static struct platform_device imx6sx_cpufreq_pdev = {
+> +	.name = "imx6q-cpufreq",
+> +};
+> +
+>  static void __init imx6sx_init_late(void)
 >  {
->  	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
+>  	imx6q_cpuidle_init();
+> +
+> +	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
+> +		imx6sx_opp_init(&imx6sx_cpufreq_pdev.dev);
+> +		platform_device_register(&imx6sx_cpufreq_pdev);
+> +	}
 >  }
-Maybe the author's intention was:
-
-	static inline int cpu_corepower_flags(void) __attribute__((const));
-
-?
-This specifies that the function has no side effects and the return value
-only depends on the (here non-existing) function arguments.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>  
+>  static const char *imx6sx_dt_compat[] __initconst = {
+> -- 
+> 1.7.9.5
+> 
