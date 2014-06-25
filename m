@@ -1,106 +1,134 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 25 Jun 2014 09:45:05 +0200
-Subject: [PATCH 1/2] ARM: at91/dt: describe rgmii ethernet phy connected
- to sama5d3xek boards
-In-Reply-To: <53AA7BC6.3020902@atmel.com>
-References: <1403649878-28242-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403649878-28242-2-git-send-email-boris.brezillon@free-electrons.com>
- <53AA735C.7050805@atmel.com> <53AA7A8C.1010304@free-electrons.com>
- <53AA7BC6.3020902@atmel.com>
-Message-ID: <53AA7E01.3090800@free-electrons.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Wed, 25 Jun 2014 09:57:50 +0200
+Subject: [PATCH v4 01/13] clk: composite: support determine_rate using
+ rate_ops->round_rate + mux_ops->set_parent
+In-Reply-To: <2257244.FrPXR4AKP7@diego>
+References: <1808429.dNxms7FR7U@diego>
+	<2257244.FrPXR4AKP7@diego>
+Message-ID: <CAG374jAeMKm-6D3Ai2Bzayr=jUJYMgtTuAdi6PjbCr4JUpo-zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Heiko,
 
-On 25/06/2014 09:35, Bo Shen wrote:
-> Hi Boris,
+Seems to be good, tested on stih416 board.
+
+Only small remarks below
+
+Best Regards
+
+Gabriel.
+
+
+On 22 June 2014 22:43, Heiko St?bner <heiko@sntech.de> wrote:
+> From: Boris BREZILLON <b.brezillon@overkiz.com>
 >
-> On 06/25/2014 03:30 PM, Boris BREZILLON wrote:
->> Hello Bo,
->>
->> On 25/06/2014 08:59, Bo Shen wrote:
->>> Hi Boris,
->>>
->>> On 06/25/2014 06:44 AM, Boris BREZILLON wrote:
->>>> Add ethernet-phy node to specify phy address (on the MDIO bus) and phy
->>>> interrupt (connected to pin PB25).
->>>>
->>>> Define board specific delays to apply to RGMII signals.
->>>>
->>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>>> ---
->>>> arch/arm/boot/dts/sama5d3xcm.dtsi | 16 ++++++++++++++++
->>>> 1 file changed, 16 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi
->>>> b/arch/arm/boot/dts/sama5d3xcm.dtsi
->>>> index b0b1331..2185ad8 100644
->>>> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
->>>> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
->>>> @@ -34,6 +34,22 @@
->>>>
->>>> macb0: ethernet at f0028000 {
->>>> phy-mode = "rgmii";
->>>> + #address-cells = <1>;
->>>> + #size-cells = <0>;
->>>> +
->>>> + ethernet-phy at 1 {
->>>
->>> The GMAC PHY address is 0x7 while not 0x1.
->>
->> Are you sure of that ? I checked sama5d3x-ek schematics.
+> In case the rate_hw does not implement determine_rate, but only round_rate
+> we fallback to best_parent selection if mux_hw is present and support
+> reparenting.
 >
-> On sama5d3x-ek schematic, it is EMAC PHY (ksz8051RNL, it's address is
-> 0x1), while not GMAC PHY. You should check the sama5d3x-CM schematic.
-
-I checked "Figure 5-16. RONETIX GEthernet ETH0" and "Figure 5-15. EMBEST
-GEthernet ETH0" of this document "11180A?ATARM?30-Jan-13", which,
-AFAICT, are RGMII phy schematics of CPU Modules.
-I might have an old datasheet though.
-If this is the case could you point out the new one ?
-
-Thanks,
-
-Boris
-
-
-
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 >
->> On these schematics PHYAD0 is connected to a pull up resistor and
->> PHYAD1/2 are connected to a pull down one.
->> This gives PHYAD[4:0] = 0b00001 = 0x1.
->> Is there some bootloader mechanisms that changes PHYAD[0-2] pin status
->> and reset the PHY ?
->>
->>>
->>>> + interrupt-parent = <&pioB>;
->>>> + interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
->>>> + reg = <1>;
->>>
->>> Nitpick: as usual, we will add "0x" prefix in reg property.
->>
->> Sure, I'll fix that.
->>
->>>
->>>> + txen-skew-ps = <800>;
->>>> + txc-skew-ps = <12000>;
->>
->> Should be 3000 (0xf * 200 ps) not 12000.
->>
->>>> + rxdv-skew-ps = <400>;
->>>> + rxc-skew-ps = <12000>;
->>
->> Ditto.
->>
->> Best Regards,
->>
->> Boris
+> This also fixes a rate calculation problem when using the standard div and
+> mux ops, as in this case currently only the mux->determine_rate is used
+> in the composite rate calculation.
+> So when for example the composite clock has two parents at 600 and 800MHz,
+> the requested rate is 75MHz, which the divider could provide, without this
+> change the rate would be set 600MHz ignoring the divider completely.
+> This may be way out of spec for the component.
 >
-> Best Regards,
-> Bo Shen
+> [fixed the output to actually return a rate instead of the diff]
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/clk-composite.c | 51 ++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 50 insertions(+), 1 deletion(-)
 >
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> index 57a078e..0a4cd21 100644
+> --- a/drivers/clk/clk-composite.c
+> +++ b/drivers/clk/clk-composite.c
+> @@ -64,11 +64,59 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+>         const struct clk_ops *mux_ops = composite->mux_ops;
+>         struct clk_hw *rate_hw = composite->rate_hw;
+>         struct clk_hw *mux_hw = composite->mux_hw;
+> +       struct clk *parent;
+> +       unsigned long parent_rate;
+> +       long tmp_rate, best_rate;
+> +       unsigned long rate_diff;
+> +       unsigned long best_rate_diff = ULONG_MAX;
+> +       int i;
+>
+>         if (rate_hw && rate_ops && rate_ops->determine_rate) {
+>                 rate_hw->clk = hw->clk;
+>                 return rate_ops->determine_rate(rate_hw, rate, best_parent_rate,
+>                                                 best_parent_p);
+> +       } else if (rate_hw && rate_ops && rate_ops->round_rate &&
+> +                  mux_hw && mux_ops && mux_ops->set_parent) {
+> +               *best_parent_p = NULL;
+> +
+> +               if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
+> +                       *best_parent_p = clk_get_parent(mux_hw->clk);
+> +                       *best_parent_rate = __clk_get_rate(*best_parent_p);
+> +
+> +                       return rate_ops->round_rate(rate_hw, rate,
+> +                                                   best_parent_rate);
+> +               }
+> +
+> +               for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
+> +                       parent = clk_get_parent_by_index(mux_hw->clk, i);
+> +                       if (!parent)
+> +                               continue;
+> +
+> +                       parent_rate = __clk_get_rate(parent);
+> +
+> +                       tmp_rate = rate_ops->round_rate(rate_hw, rate,
+> +                                                       &parent_rate);
+> +                       if (tmp_rate < 0)
+> +                               continue;
+> +
+> +                       if (tmp_rate < rate)
+> +                               rate_diff = rate - tmp_rate;
+> +                       else
+> +                               rate_diff = tmp_rate - rate;
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+rate_dif = abs(rate - tmp_rate) is not better ?
+
+> +
+> +                       if (!rate_diff || !*best_parent_p
+> +                                      || best_rate_diff > rate_diff) {
+> +                               *best_parent_p = parent;
+> +                               *best_parent_rate = parent_rate;
+> +                               best_rate_diff = rate_diff;
+> +                               best_rate = tmp_rate;
+> +                       }
+> +
+> +                       if (!rate_diff)
+> +                               return rate;
+> +               }
+> +
+> +               return best_rate;
+
+warning compilation: 'best_rate' may be used uninitialized in this function
+
+>         } else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+>                 mux_hw->clk = hw->clk;
+>                 return mux_ops->determine_rate(mux_hw, rate, best_parent_rate,
+> @@ -196,7 +244,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>                 composite->rate_hw = rate_hw;
+>                 composite->rate_ops = rate_ops;
+>                 clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+> -               if (rate_ops->determine_rate)
+> +               if (rate_ops->determine_rate ||
+> +                   (rate_ops->round_rate && clk_composite_ops->set_parent))
+>                         clk_composite_ops->determine_rate = clk_composite_determine_rate;
+>         }
+>
+> --
+> 1.9.0
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
