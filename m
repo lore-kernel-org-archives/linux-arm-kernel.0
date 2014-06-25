@@ -1,85 +1,75 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Wed, 25 Jun 2014 01:41:21 +0000
-Subject: [PATCH RFC 24/30] net: fec: better implementation of iMX6
- ERR006358 quirk
-In-Reply-To: <20140624102912.GM32514@n2100.arm.linux.org.uk>
-References: <20140620121118.GR32514@n2100.arm.linux.org.uk>
- <E1WxxhR-0005YP-Q1@rmk-PC.arm.linux.org.uk>
- <316b383d2512440db51ea7c55992920d@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140622081234.GB32514@n2100.arm.linux.org.uk>
- <56f5e44adf0b41a0bbf52c38b755afbd@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140622084911.GD32514@n2100.arm.linux.org.uk>
- <20140624102912.GM32514@n2100.arm.linux.org.uk>
-Message-ID: <692507cfcb2542e59703ff8f929d9a87@BLUPR03MB373.namprd03.prod.outlook.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 24 Jun 2014 20:47:52 -0500
+Subject: [PATCH 0/6] OMAP Mailbox framework adoption & DT support
+Message-ID: <1403660878-56350-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk> Data: Tuesday, June 24, 2014 6:29 PM
->To: Duan Fugang-B38611
->Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH RFC 24/30] net: fec: better implementation of iMX6
->ERR006358 quirk
->
->On Sun, Jun 22, 2014 at 09:49:11AM +0100, Russell King - ARM Linux wrote:
->> On Sun, Jun 22, 2014 at 08:38:49AM +0000, fugang.duan at freescale.com
->wrote:
->> > From: Russell King - ARM Linux <linux@arm.linux.org.uk> Data:
->> > Sunday, June 22, 2014 4:13 PM
->> > >To: Duan Fugang-B38611
->> > >Cc: linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org
->> > >Subject: Re: [PATCH RFC 24/30] net: fec: better implementation of
->> > >iMX6
->> > >ERR006358 quirk
->> > >
->> > >On Sun, Jun 22, 2014 at 07:49:11AM +0000, fugang.duan at freescale.com
->wrote:
->> > >> From: Russell King <rmk@arm.linux.org.uk> Data: Friday, June 20,
->> > >> 2014
->> > >> 8:14 PM
->> > >> >To: linux-arm-kernel at lists.infradead.org
->> > >> >Cc: Duan Fugang-B38611; netdev at vger.kernel.org
->> > >> >Subject: [PATCH RFC 24/30] net: fec: better implementation of
->> > >> >iMX6
->> > >> >ERR006358 quirk
->> > >> >
->> > >> >+
->> > >> >+	/* ERR006538: Keep the transmitter going */
->> > >> >+	if (fep->dirty_tx != fep->cur_tx &&
->> > >> >+	    readl(fep->hwp + FEC_X_DES_ACTIVE) == 0)
->> > >> >+		writel(0, fep->hwp + FEC_X_DES_ACTIVE);
->> > >> > }
->> > >> >
->> ...
->> > >While I agree that we can read back to check whether the device
->> > >indicates that transmit is active, there's no point to the other
->> > >tests.  If there are entries in the transmit ring but the
->> > >transmitter indicates that it is not active, then it is obvious
->> > >that the bug has been hit.  This is exactly what my implementation
->above does.
->> > >
->> > The condition "fep->dirty_tx != fep->cur_tx" is not only limited for
->the errata.
->> > I mean only add extra trigger TDAR for the issue.
->>
->> Yes, I agree that test is wrong (that's what comes from shuffling the
->> patches... subsequent patches modify the indexing mechanism).  It
->> should
->> be:
->>
->>         if (bdp != fep->cur_tx &&
->>             readl(fep->hwp + FEC_X_DES_ACTIVE) == 0)
->>                 writel(0, fep->hwp + FEC_X_DES_ACTIVE);
->>
->> Since "bdp" is the post-incremented dirty_tx pointer, which, when it
->> is equal to fep->cur_tx means that the ring is empty.
->
->Any further comments, or do I take the silence to mean that you agree with
->the above statement?  I would like to get this settled to I can spin v2 of
->this set.
->
->Thanks.
->
-I agree your statement.
+Hi,
 
-Thanks,
-Andy
+The first 3 patches in this series adds the DT bindings and the DT-parse
+support to the OMAP mailbox driver. The last 3 patches make the changes
+to adopt to the v7 version of mailbox framework from Jassi Brar [1]. I
+have posted all the patches together since both touch the bindings and
+dictate the usage for the OMAP mailbox clients. The current OMAP mailbox
+clients - omap remoteproc and tidspbridge have also been converted to use
+the new api.
+
+The DT-support patches incorporates feedback from the last DT adoption
+series [2], with the following main changes:
+ - Leverages more compatible strings
+ - Dropped the properties "ti,mbox-num-users" and "ti,mbox-num-fifos";
+   with these values retrieved through driver match data and compatible
+   strings
+ - Dropped the properties "ti,mbox-names" and "ti,mbox-data" that were
+   used to represent the sub-mailbox devices, which are now represented
+   as child nodes of the respective mailbox controller device node.
+
+The series depends on the OMAP mailbox cleanup series [3] and the OMAP
+mailbox DT/hwmod cleanup series [4].
+
+The following shows the boot/validation logs on various OMAP platforms:
+  OMAP2 (SDP2430)           : http://slexy.org/view/s20VHd3CIc
+  OMAP3 (BeagleXM)          : http://slexy.org/view/s204yxxE7Q
+  OMAP4 (PandaBoard)        : http://slexy.org/view/s20GDw9Lxq
+  OMAP5 (OMAP5 uEVM)        : http://slexy.org/view/s201gZlzSB
+  DRA7  (DRA7 EVM)          : http://slexy.org/view/s2CPnJ1Boz
+  AM33xx (BeagleBone Black) : http://slexy.org/view/s20WvIuITK
+  AM43xx (AM437x GP EVM)    : http://slexy.org/view/s213DqnSg5
+
+[1] https://lkml.org/lkml/2014/6/12/470
+[2] http://marc.info/?l=linux-omap&m=137582560717973&w=2
+[3] http://marc.info/?l=linux-omap&m=140365705821115&w=2
+[4] http://marc.info/?l=linux-omap&m=140365833121612&w=2
+
+Suman Anna (6):
+  Documentation: dt: add omap mailbox bindings
+  mailbox/omap: add support for parsing dt devices
+  ARM: dts: OMAP2+: Add sub mailboxes device node information
+  mailbox/omap: adapt to the new mailbox framework
+  ARM: dts: OMAP2+: Add #mbox-cells property to all mailbox nodes
+  mailbox/omap: add a custom of_xlate function
+
+ .../devicetree/bindings/mailbox/omap-mailbox.txt   | 104 ++++
+ arch/arm/boot/dts/am33xx.dtsi                      |   5 +
+ arch/arm/boot/dts/am4372.dtsi                      |   5 +
+ arch/arm/boot/dts/dra7.dtsi                        |  13 +
+ arch/arm/boot/dts/omap2420.dtsi                    |   9 +
+ arch/arm/boot/dts/omap2430.dtsi                    |   5 +
+ arch/arm/boot/dts/omap3.dtsi                       |   5 +
+ arch/arm/boot/dts/omap4.dtsi                       |   9 +
+ arch/arm/boot/dts/omap5.dtsi                       |   9 +
+ drivers/mailbox/omap-mailbox.c                     | 544 ++++++++++++++-------
+ drivers/remoteproc/omap_remoteproc.c               |  54 +-
+ drivers/staging/tidspbridge/core/_tiomap.h         |   3 +-
+ drivers/staging/tidspbridge/core/io_sm.c           |   7 +-
+ drivers/staging/tidspbridge/core/tiomap3430.c      |  22 +-
+ drivers/staging/tidspbridge/core/tiomap_io.c       |   7 +-
+ .../tidspbridge/include/dspbridge/host_os.h        |   1 +
+ .../staging/tidspbridge/include/dspbridge/io_sm.h  |   8 +-
+ include/linux/omap-mailbox.h                       |  15 +-
+ 18 files changed, 598 insertions(+), 227 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+
+-- 
+2.0.0
