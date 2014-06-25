@@ -1,29 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jun 2014 13:51:07 +0100
-Subject: [PATCH 1/1] ARM: Kconfig.debug: Update Samsung UART config options
-In-Reply-To: <03dd01cf906a$5e22b620$1a682260$@samsung.com>
-References: <1403605171-31805-1-git-send-email-sachin.kamat@samsung.com>
- <03dd01cf906a$5e22b620$1a682260$@samsung.com>
-Message-ID: <20140625125107.GJ32514@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 25 Jun 2014 20:53:08 +0800
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <1403693452.4249.1.camel@weser.hi.pengutronix.de>
+References: <20140624153559.GA5741@dragon>
+ <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
+ <20140625062243.GD3242@dragon>
+ <CAOMZO5BuOhWo7SCEPFmNRUQBi=5JhDrVv0yvBQM2d_jMyLkbyw@mail.gmail.com>
+ <1403693452.4249.1.camel@weser.hi.pengutronix.de>
+Message-ID: <20140625125306.GB6917@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 08:41:13PM +0900, Kukjin Kim wrote:
-> Sachin Kamat wrote:
+On Wed, Jun 25, 2014 at 12:50:52PM +0200, Lucas Stach wrote:
+> Am Mittwoch, den 25.06.2014, 07:50 -0300 schrieb Fabio Estevam:
+> > On Wed, Jun 25, 2014 at 3:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 > > 
-> + Russell
+> > > Please test against v3.16-rc1 or -rc2.  The breakage on linux-next
+> > > should be another issue.
+> > 
+> > Yes, I see it now. Tested on -rc2 and suspend/resume works with PCI
+> > driver removed.
 > 
-> > In a multiplatform config, the low level debug option shows several
-> > UART port entries. Improve the user visible string so that it becomes
-> > clear to the user about Samsung UART ports.
-> > While at it also remove some lines from the help text that are no
-> > longer applicable across all Samsung platforms.
-> > 
-> Looks good to me and will apply into cleanup.
+> Can you please send me a dmesg from a working boot?
 
-That's fine.  I don't have anything which clashes with this.  Thanks for
-asking.
+What do you mean by "working boot"?  Boot is always working.  What fails
+is system resuming.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Shawn
