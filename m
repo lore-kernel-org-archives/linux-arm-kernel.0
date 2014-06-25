@@ -1,351 +1,384 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Jun 2014 15:06:41 +0200
-Subject: [PATCH 09/13] AT91: PIT: (Almost) remove the global variables
+Date: Wed, 25 Jun 2014 15:06:43 +0200
+Subject: [PATCH 11/13] AT91: Convert the boards to the init_time callback
 In-Reply-To: <1403701605-26678-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1403701605-26678-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1403701605-26678-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1403701605-26678-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer driver is using some global variables to define some variables it has
-to use in most of its functions, like the base address.
-
-Use some container_of calls to have a single dynamic (and local) variable to
-hold this content.
-
-The only exception is in the !DT case, where the call chain to
-at91sam926x_ioremap_pit and then at91sam926x_pit_init as init_time makes it
-hard for the moment to pass the physical address of the timer.
+Now that we have the init_time callback in the at91_init_soc structure, convert
+all the boards and SoC to this.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam926x_time.c | 179 ++++++++++++++++++++--------------
- 1 file changed, 108 insertions(+), 71 deletions(-)
+ arch/arm/mach-at91/at91sam9260.c        | 6 ++++++
+ arch/arm/mach-at91/at91sam9261.c        | 6 ++++++
+ arch/arm/mach-at91/at91sam9263.c        | 6 ++++++
+ arch/arm/mach-at91/at91sam9g45.c        | 6 ++++++
+ arch/arm/mach-at91/at91sam9rl.c         | 6 ++++++
+ arch/arm/mach-at91/board-afeb-9260v1.c  | 2 +-
+ arch/arm/mach-at91/board-cam60.c        | 2 +-
+ arch/arm/mach-at91/board-cpu9krea.c     | 2 +-
+ arch/arm/mach-at91/board-flexibity.c    | 2 +-
+ arch/arm/mach-at91/board-foxg20.c       | 2 +-
+ arch/arm/mach-at91/board-gsia18s.c      | 2 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c | 2 +-
+ arch/arm/mach-at91/board-sam9-l9260.c   | 2 +-
+ arch/arm/mach-at91/board-sam9260ek.c    | 2 +-
+ arch/arm/mach-at91/board-sam9261ek.c    | 4 ++--
+ arch/arm/mach-at91/board-sam9263ek.c    | 2 +-
+ arch/arm/mach-at91/board-sam9g20ek.c    | 4 ++--
+ arch/arm/mach-at91/board-sam9m10g45ek.c | 2 +-
+ arch/arm/mach-at91/board-sam9rlek.c     | 2 +-
+ arch/arm/mach-at91/board-snapper9260.c  | 2 +-
+ arch/arm/mach-at91/board-stamp9g20.c    | 4 ++--
+ 21 files changed, 49 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 9678ac391a81..f2c463567beb 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -20,6 +20,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/slab.h>
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index c3d22be73b7c..d5141af1947c 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -400,6 +400,11 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller */
+ };
  
- #include <mach/hardware.h>
- 
-@@ -39,19 +40,35 @@
- #define PIT_CPIV(x)	((x) & AT91_PIT_CPIV)
- #define PIT_PICNT(x)	(((x) & AT91_PIT_PICNT) >> 20)
- 
--static u32 pit_cycle;		/* write-once */
--static u32 pit_cnt;		/* access only w/system irq blocked */
--static void __iomem *pit_base_addr __read_mostly;
--static struct clk *mck;
-+struct pit_data {
-+	struct clock_event_device	clkevt;
-+	struct clocksource		clksrc;
- 
--static inline unsigned int pit_read(unsigned int reg_offset)
-+	void __iomem	*base;
-+	u32		cycle;
-+	u32		cnt;
-+	unsigned int	irq;
-+	struct clk	*mck;
-+};
-+
-+static inline struct pit_data *clksrc_to_pit_data(struct clocksource *clksrc)
- {
--	return __raw_readl(pit_base_addr + reg_offset);
-+	return container_of(clksrc, struct pit_data, clksrc);
- }
- 
--static inline void pit_write(unsigned int reg_offset, unsigned long value)
-+static inline struct pit_data *clkevt_to_pit_data(struct clock_event_device *clkevt)
- {
--	__raw_writel(value, pit_base_addr + reg_offset);
-+	return container_of(clkevt, struct pit_data, clkevt);
-+}
-+
-+static inline unsigned int pit_read(void __iomem *base, unsigned int reg_offset)
++static void __init at91sam9260_init_time(void)
 +{
-+	return __raw_readl(base + reg_offset);
++	at91sam926x_pit_init();
 +}
 +
-+static inline void pit_write(void __iomem *base, unsigned int reg_offset, unsigned long value)
+ AT91_SOC_START(at91sam9260)
+ 	.map_io = at91sam9260_map_io,
+ 	.default_irq_priority = at91sam9260_default_irq_priority,
+@@ -408,4 +413,5 @@ AT91_SOC_START(at91sam9260)
+ 	.ioremap_registers = at91sam9260_ioremap_registers,
+ 	.register_clocks = at91sam9260_register_clocks,
+ 	.init = at91sam9260_initialize,
++	.init_time = at91sam9260_init_time,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index fb164a5d04a9..5416fe4d5a0b 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -363,6 +363,11 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller */
+ };
+ 
++static void __init at91sam9261_init_time(void)
 +{
-+	__raw_writel(value, base + reg_offset);
- }
- 
- /*
-@@ -60,40 +77,35 @@ static inline void pit_write(unsigned int reg_offset, unsigned long value)
-  */
- static cycle_t read_pit_clk(struct clocksource *cs)
- {
-+	struct pit_data *data = clksrc_to_pit_data(cs);
- 	unsigned long flags;
- 	u32 elapsed;
- 	u32 t;
- 
- 	raw_local_irq_save(flags);
--	elapsed = pit_cnt;
--	t = pit_read(AT91_PIT_PIIR);
-+	elapsed = data->cnt;
-+	t = pit_read(data->base, AT91_PIT_PIIR);
- 	raw_local_irq_restore(flags);
- 
--	elapsed += PIT_PICNT(t) * pit_cycle;
-+	elapsed += PIT_PICNT(t) * data->cycle;
- 	elapsed += PIT_CPIV(t);
- 	return elapsed;
- }
- 
--static struct clocksource pit_clk = {
--	.name		= "pit",
--	.rating		= 175,
--	.read		= read_pit_clk,
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
--
- /*
-  * Clockevent device:  interrupts every 1/HZ (== pit_cycles * MCK/16)
-  */
- static void
- pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- {
-+	struct pit_data *data = clkevt_to_pit_data(dev);
-+
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		/* update clocksource counter */
--		pit_cnt += pit_cycle * PIT_PICNT(pit_read(AT91_PIT_PIVR));
--		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN
--				| AT91_PIT_PITIEN);
-+		data->cnt += data->cycle * PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
-+		pit_write(data->base, AT91_PIT_MR,
-+			  (data->cycle - 1) | AT91_PIT_PITEN | AT91_PIT_PITIEN);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
- 		BUG();
-@@ -101,7 +113,8 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	case CLOCK_EVT_MODE_UNUSED:
- 		/* disable irq, leaving the clocksource active */
--		pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
-+		pit_write(data->base, AT91_PIT_MR,
-+			  (data->cycle - 1) | AT91_PIT_PITEN);
- 		break;
- 	case CLOCK_EVT_MODE_RESUME:
- 		break;
-@@ -110,44 +123,40 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- 
- static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
- {
-+	struct pit_data *data = clkevt_to_pit_data(cedev);
-+
- 	/* Disable timer */
--	pit_write(AT91_PIT_MR, 0);
-+	pit_write(data->base, AT91_PIT_MR, 0);
- }
- 
--static void at91sam926x_pit_reset(void)
-+static void at91sam926x_pit_reset(struct pit_data *data)
- {
- 	/* Disable timer and irqs */
--	pit_write(AT91_PIT_MR, 0);
-+	pit_write(data->base, AT91_PIT_MR, 0);
- 
- 	/* Clear any pending interrupts, wait for PIT to stop counting */
--	while (PIT_CPIV(pit_read(AT91_PIT_PIVR)) != 0)
-+	while (PIT_CPIV(pit_read(data->base, AT91_PIT_PIVR)) != 0)
- 		cpu_relax();
- 
- 	/* Start PIT but don't enable IRQ */
--	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
-+	pit_write(data->base, AT91_PIT_MR,
-+		  (data->cycle - 1) | AT91_PIT_PITEN);
- }
- 
- static void at91sam926x_pit_resume(struct clock_event_device *cedev)
- {
--	at91sam926x_pit_reset();
--}
--
--static struct clock_event_device pit_clkevt = {
--	.name		= "pit",
--	.features	= CLOCK_EVT_FEAT_PERIODIC,
--	.shift		= 32,
--	.rating		= 100,
--	.set_mode	= pit_clkevt_mode,
--	.suspend	= at91sam926x_pit_suspend,
--	.resume		= at91sam926x_pit_resume,
--};
-+	struct pit_data *data = clkevt_to_pit_data(cedev);
- 
-+	at91sam926x_pit_reset(data);
++	at91sam926x_pit_init();
 +}
- 
- /*
-  * IRQ handler for the timer.
-  */
- static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- {
-+	struct pit_data *data = dev_id;
 +
- 	/*
- 	 * irqs should be disabled here, but as the irq is shared they are only
- 	 * guaranteed to be off if the timer irq is registered first.
-@@ -155,15 +164,15 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- 	WARN_ON_ONCE(!irqs_disabled());
+ AT91_SOC_START(at91sam9261)
+ 	.map_io = at91sam9261_map_io,
+ 	.default_irq_priority = at91sam9261_default_irq_priority,
+@@ -371,4 +376,5 @@ AT91_SOC_START(at91sam9261)
+ 	.ioremap_registers = at91sam9261_ioremap_registers,
+ 	.register_clocks = at91sam9261_register_clocks,
+ 	.init = at91sam9261_initialize,
++	.init_time = at91sam9261_init_time,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index f30290572293..20b46118338c 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -381,6 +381,11 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller (IRQ1) */
+ };
  
- 	/* The PIT interrupt may be disabled, and is shared */
--	if ((pit_clkevt.mode == CLOCK_EVT_MODE_PERIODIC)
--			&& (pit_read(AT91_PIT_SR) & AT91_PIT_PITS)) {
-+	if ((data->clkevt.mode == CLOCK_EVT_MODE_PERIODIC) &&
-+	    (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS)) {
- 		unsigned nr_ticks;
- 
- 		/* Get number of ticks performed before irq, and ack it */
--		nr_ticks = PIT_PICNT(pit_read(AT91_PIT_PIVR));
-+		nr_ticks = PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
- 		do {
--			pit_cnt += pit_cycle;
--			pit_clkevt.event_handler(&pit_clkevt);
-+			data->cnt += data->cycle;
-+			data->clkevt.event_handler(&data->clkevt);
- 			nr_ticks--;
- 		} while (nr_ticks);
- 
-@@ -176,7 +185,7 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- /*
-  * Set up both clocksource and clockevent support.
-  */
--static void __init at91sam926x_pit_common_init(unsigned int pit_irq)
-+static void __init at91sam926x_pit_common_init(struct pit_data *data)
- {
- 	unsigned long	pit_rate;
- 	unsigned	bits;
-@@ -186,67 +195,95 @@ static void __init at91sam926x_pit_common_init(unsigned int pit_irq)
- 	 * Use our actual MCK to figure out how many MCK/16 ticks per
- 	 * 1/HZ period (instead of a compile-time constant LATCH).
- 	 */
--	pit_rate = clk_get_rate(mck) / 16;
--	pit_cycle = (pit_rate + HZ/2) / HZ;
--	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
-+	pit_rate = clk_get_rate(data->mck) / 16;
-+	data->cycle = (pit_rate + HZ/2) / HZ;
-+	WARN_ON(((data->cycle - 1) & ~AT91_PIT_PIV) != 0);
- 
- 	/* Initialize and enable the timer */
--	at91sam926x_pit_reset();
-+	at91sam926x_pit_reset(data);
- 
- 	/*
- 	 * Register clocksource.  The high order bits of PIV are unused,
- 	 * so this isn't a 32-bit counter unless we get clockevent irqs.
- 	 */
--	bits = 12 /* PICNT */ + ilog2(pit_cycle) /* PIV */;
--	pit_clk.mask = CLOCKSOURCE_MASK(bits);
--	clocksource_register_hz(&pit_clk, pit_rate);
-+	bits = 12 /* PICNT */ + ilog2(data->cycle) /* PIV */;
-+	data->clksrc.mask = CLOCKSOURCE_MASK(bits);
-+	data->clksrc.name = "pit";
-+	data->clksrc.rating = 175;
-+	data->clksrc.read = read_pit_clk,
-+	data->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS,
-+	clocksource_register_hz(&data->clksrc, pit_rate);
- 
- 	/* Set up irq handler */
--	ret = request_irq(pit_irq, at91sam926x_pit_interrupt,
-+	ret = request_irq(data->irq, at91sam926x_pit_interrupt,
- 			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
--			  "at91_tick", pit_base_addr);
-+			  "at91_tick", data);
- 	if (ret)
- 		panic(pr_fmt("Unable to setup IRQ\n"));
- 
- 	/* Set up and register clockevents */
--	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
--	pit_clkevt.cpumask = cpumask_of(0);
--	clockevents_register_device(&pit_clkevt);
-+	data->clkevt.name = "pit";
-+	data->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
-+	data->clkevt.shift = 32;
-+	data->clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, data->clkevt.shift);
-+	data->clkevt.rating = 100;
-+	data->clkevt.cpumask = cpumask_of(0);
++static void __init at91sam9263_init_time(void)
++{
++	at91sam926x_pit_init();
++}
 +
-+	data->clkevt.set_mode = pit_clkevt_mode;
-+	data->clkevt.resume = at91sam926x_pit_resume;
-+	data->clkevt.suspend = at91sam926x_pit_suspend;
-+	clockevents_register_device(&data->clkevt);
+ AT91_SOC_START(at91sam9263)
+ 	.map_io = at91sam9263_map_io,
+ 	.default_irq_priority = at91sam9263_default_irq_priority,
+@@ -388,4 +393,5 @@ AT91_SOC_START(at91sam9263)
+ 	.ioremap_registers = at91sam9263_ioremap_registers,
+ 	.register_clocks = at91sam9263_register_clocks,
+ 	.init = at91sam9263_initialize,
++	.init_time = at91sam9263_init_time,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 9d3d544ac19c..924d362121ef 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -430,6 +430,11 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller (IRQ0) */
+ };
+ 
++static void __init at91sam9g45_init_time(void)
++{
++	at91sam926x_pit_init();
++}
++
+ AT91_SOC_START(at91sam9g45)
+ 	.map_io = at91sam9g45_map_io,
+ 	.default_irq_priority = at91sam9g45_default_irq_priority,
+@@ -437,4 +442,5 @@ AT91_SOC_START(at91sam9g45)
+ 	.ioremap_registers = at91sam9g45_ioremap_registers,
+ 	.register_clocks = at91sam9g45_register_clocks,
+ 	.init = at91sam9g45_initialize,
++	.init_time = at91sam9g45_init_time,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index a79960f57e6a..dd4a8deb5b36 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -373,6 +373,11 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ 	0,	/* Advanced Interrupt Controller */
+ };
+ 
++static void __init at91sam9rl_init_time(void)
++{
++	at91sam926x_pit_init();
++}
++
+ AT91_SOC_START(at91sam9rl)
+ 	.map_io = at91sam9rl_map_io,
+ 	.default_irq_priority = at91sam9rl_default_irq_priority,
+@@ -382,4 +387,5 @@ AT91_SOC_START(at91sam9rl)
+ 	.register_clocks = at91sam9rl_register_clocks,
+ #endif
+ 	.init = at91sam9rl_initialize,
++	.init_time = at91sam9rl_init_time,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
+index 597c649170aa..afadbcb8f45d 100644
+--- a/arch/arm/mach-at91/board-afeb-9260v1.c
++++ b/arch/arm/mach-at91/board-afeb-9260v1.c
+@@ -211,7 +211,7 @@ static void __init afeb9260_board_init(void)
+ 
+ MACHINE_START(AFEB9260, "Custom afeb9260 board")
+ 	/* Maintainer: Sergey Lapin <slapin@ossfans.org> */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= afeb9260_init_early,
+diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
+index a30502c8d379..731dcb368c3d 100644
+--- a/arch/arm/mach-at91/board-cam60.c
++++ b/arch/arm/mach-at91/board-cam60.c
+@@ -188,7 +188,7 @@ static void __init cam60_board_init(void)
+ 
+ MACHINE_START(CAM60, "KwikByte CAM60")
+ 	/* Maintainer: KwikByte */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= cam60_init_early,
+diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
+index 2037f78c84e7..1e4d221c4a74 100644
+--- a/arch/arm/mach-at91/board-cpu9krea.c
++++ b/arch/arm/mach-at91/board-cpu9krea.c
+@@ -375,7 +375,7 @@ MACHINE_START(CPUAT9260, "Eukrea CPU9260")
+ MACHINE_START(CPUAT9G20, "Eukrea CPU9G20")
+ #endif
+ 	/* Maintainer: Eric Benard - EUKREA Electromatique */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= cpu9krea_init_early,
+diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
+index 68f1ab6bd08f..6f1ca9a02697 100644
+--- a/arch/arm/mach-at91/board-flexibity.c
++++ b/arch/arm/mach-at91/board-flexibity.c
+@@ -160,7 +160,7 @@ static void __init flexibity_board_init(void)
+ 
+ MACHINE_START(FLEXIBITY, "Flexibity Connect")
+ 	/* Maintainer: Maxim Osipov */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= flexibity_init_early,
+diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
+index 8b22c60bb238..ec290b6ed9d8 100644
+--- a/arch/arm/mach-at91/board-foxg20.c
++++ b/arch/arm/mach-at91/board-foxg20.c
+@@ -263,7 +263,7 @@ static void __init foxg20_board_init(void)
+ 
+ MACHINE_START(ACMENETUSFOXG20, "Acme Systems srl FOX Board G20")
+ 	/* Maintainer: Sergio Tanzilli */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= foxg20_init_early,
+diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
+index b729dd1271bf..bf5cc55c7db6 100644
+--- a/arch/arm/mach-at91/board-gsia18s.c
++++ b/arch/arm/mach-at91/board-gsia18s.c
+@@ -576,7 +576,7 @@ static void __init gsia18s_board_init(void)
  }
  
- static void __init at91sam926x_pit_dt_init(struct device_node *node)
- {
--	unsigned int irq;
-+	struct pit_data *data;
+ MACHINE_START(GSIA18S, "GS_IA18_S")
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= gsia18s_init_early,
+diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
+index b48d95ec5152..9c26b94ce448 100644
+--- a/arch/arm/mach-at91/board-pcontrol-g20.c
++++ b/arch/arm/mach-at91/board-pcontrol-g20.c
+@@ -219,7 +219,7 @@ static void __init pcontrol_g20_board_init(void)
  
--	pit_base_addr = of_iomap(node, 0);
--	if (!pit_base_addr)
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		panic(pr_fmt("Unable to allocate memory\n"));
-+
-+	data->base = of_iomap(node, 0);
-+	if (!data->base)
- 		panic(pr_fmt("Could not map PIT address\n"));
+ MACHINE_START(PCONTROL_G20, "PControl G20")
+ 	/* Maintainer: pgsellmann at portner-elektronik.at */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= pcontrol_g20_init_early,
+diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
+index d24dda67e2d3..2d6259c947e1 100644
+--- a/arch/arm/mach-at91/board-sam9-l9260.c
++++ b/arch/arm/mach-at91/board-sam9-l9260.c
+@@ -219,7 +219,7 @@ static void __init ek_board_init(void)
  
--	mck = of_clk_get(node, 0);
--	if (IS_ERR(mck))
-+	data->mck = of_clk_get(node, 0);
-+	if (IS_ERR(data->mck))
- 		/* Fallback on clkdev for !CCF-based boards */
--		mck = clk_get(NULL, "mck");
-+		data->mck = clk_get(NULL, "mck");
+ MACHINE_START(SAM9_L9260, "Olimex SAM9-L9260")
+ 	/* Maintainer: Olimex */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
+index 65dea12d685e..3c7e278999af 100644
+--- a/arch/arm/mach-at91/board-sam9260ek.c
++++ b/arch/arm/mach-at91/board-sam9260ek.c
+@@ -344,7 +344,7 @@ static void __init ek_board_init(void)
  
--	if (IS_ERR(mck))
-+	if (IS_ERR(data->mck))
- 		panic(pr_fmt("Unable to get mck clk\n"));
+ MACHINE_START(AT91SAM9260EK, "Atmel AT91SAM9260-EK")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index 4637432de08f..52c2863124c7 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -603,7 +603,7 @@ static void __init ek_board_init(void)
  
- 	/* Get the interrupts property */
--	irq = irq_of_parse_and_map(node, 0);
--	if (!irq)
-+	data->irq = irq_of_parse_and_map(node, 0);
-+	if (!data->irq)
- 		panic(pr_fmt("Unable to get IRQ from DT\n"));
+ MACHINE_START(AT91SAM9261EK, "Atmel AT91SAM9261-EK")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+@@ -613,7 +613,7 @@ MACHINE_END
  
--	at91sam926x_pit_common_init(irq);
-+	at91sam926x_pit_common_init(data);
+ MACHINE_START(AT91SAM9G10EK, "Atmel AT91SAM9G10-EK")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
+index cd2726ee5add..4e2b6a60ce3e 100644
+--- a/arch/arm/mach-at91/board-sam9263ek.c
++++ b/arch/arm/mach-at91/board-sam9263ek.c
+@@ -444,7 +444,7 @@ static void __init ek_board_init(void)
+ 
+ MACHINE_START(AT91SAM9263EK, "Atmel AT91SAM9263-EK")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+index e1be6e25b380..49f075213451 100644
+--- a/arch/arm/mach-at91/board-sam9g20ek.c
++++ b/arch/arm/mach-at91/board-sam9g20ek.c
+@@ -410,7 +410,7 @@ static void __init ek_board_init(void)
+ 
+ MACHINE_START(AT91SAM9G20EK, "Atmel AT91SAM9G20-EK")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+@@ -420,7 +420,7 @@ MACHINE_END
+ 
+ MACHINE_START(AT91SAM9G20EK_2MMC, "Atmel AT91SAM9G20-EK 2 MMC Slot Mod")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+index 1ea61328f30d..d5ae482849b7 100644
+--- a/arch/arm/mach-at91/board-sam9m10g45ek.c
++++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+@@ -493,7 +493,7 @@ static void __init ek_board_init(void)
+ 
+ MACHINE_START(AT91SAM9M10G45EK, "Atmel AT91SAM9M10G45-EK")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
+index b64648b4a1fc..61e9c02ac798 100644
+--- a/arch/arm/mach-at91/board-sam9rlek.c
++++ b/arch/arm/mach-at91/board-sam9rlek.c
+@@ -323,7 +323,7 @@ static void __init ek_board_init(void)
+ 
+ MACHINE_START(AT91SAM9RLEK, "Atmel AT91SAM9RL-EK")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= ek_init_early,
+diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
+index 1b870e6def0c..8123cae14987 100644
+--- a/arch/arm/mach-at91/board-snapper9260.c
++++ b/arch/arm/mach-at91/board-snapper9260.c
+@@ -178,7 +178,7 @@ static void __init snapper9260_board_init(void)
  }
- CLOCKSOURCE_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
- 		       at91sam926x_pit_dt_init);
  
-+static void __iomem *pit_base_addr;
-+
- void __init at91sam926x_pit_init(void)
- {
--	mck = clk_get(NULL, "mck");
--	if (IS_ERR(mck))
-+	struct pit_data *data;
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		panic(pr_fmt("Unable to allocate memory\n"));
-+
-+	data->base = pit_base_addr;
-+
-+	data->mck = clk_get(NULL, "mck");
-+	if (IS_ERR(data->mck))
- 		panic(pr_fmt("Unable to get mck clk\n"));
+ MACHINE_START(SNAPPER_9260, "Bluewater Systems Snapper 9260/9G20 module")
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= snapper9260_init_early,
+diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
+index 3b575036ff96..e825641a1dee 100644
+--- a/arch/arm/mach-at91/board-stamp9g20.c
++++ b/arch/arm/mach-at91/board-stamp9g20.c
+@@ -275,7 +275,7 @@ static void __init stamp9g20evb_board_init(void)
  
--	at91sam926x_pit_common_init(NR_IRQS_LEGACY + AT91_ID_SYS);
-+	data->irq = NR_IRQS_LEGACY + AT91_ID_SYS;
-+
-+	at91sam926x_pit_common_init(data);
- }
+ MACHINE_START(PORTUXG20, "taskit PortuxG20")
+ 	/* Maintainer: taskit GmbH */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= stamp9g20_init_early,
+@@ -285,7 +285,7 @@ MACHINE_END
  
- void __init at91sam926x_ioremap_pit(u32 addr)
+ MACHINE_START(STAMP9G20, "taskit Stamp9G20")
+ 	/* Maintainer: taskit GmbH */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= at91_init_time,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= stamp9g20_init_early,
 -- 
 2.0.0
