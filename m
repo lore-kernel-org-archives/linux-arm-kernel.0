@@ -1,44 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 25 Jun 2014 20:43:22 +0900
-Subject: [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for
- secure mode
-In-Reply-To: <CAK5sBcETe20PWRV+z5Gb=hQNk13wE0PbmcvEmC9TM6nD2mi=ew@mail.gmail.com>
-References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
- <5388CBB9.1050003@suse.de>
- <CAK5sBcETe20PWRV+z5Gb=hQNk13wE0PbmcvEmC9TM6nD2mi=ew@mail.gmail.com>
-Message-ID: <03f301cf906a$ab25d470$01717d50$@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 25 Jun 2014 13:43:54 +0200
+Subject: [PATCH v2 4/6] ARM: SAMSUNG: Restore Samsung PM Debug functionality
+In-Reply-To: <1403618235-19353-5-git-send-email-t.figa@samsung.com>
+References: <1403618235-19353-5-git-send-email-t.figa@samsung.com>
+Message-ID: <1403696634-12779-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
-> 
-> On Fri, May 30, 2014 at 11:49 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> > Am 28.05.2014 06:13, schrieb Sachin Kamat:
-> >> Almost all Exynos-series of SoCs that run in secure mode don't need
-> >> additional offset for every CPU, with Exynos4412 being the only
-> >> exception.
-> >>
-> >> Tested on Origen-Quad (Exynos4412) and Arndale-Octa (Exynos5420).
-> >>
-> >> While at it, fix the coding style (space around *).
-> >>
-> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> >> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> >> ---
-> >>  arch/arm/mach-exynos/firmware.c |    9 +++++++--
-> >>  1 file changed, 7 insertions(+), 2 deletions(-)
-> >
-> > Fixes ODROID-XU (Exynos5410) as well - thought it had been a prereq to
-> > applying the 5410 patches...
-> >
-> > Tested-by: Andreas F?rber <afaerber@suse.de>
-> >
-> 
-> Kukjin, this patch is required to bring up 4 A15 cores on some 5410
-> and 5420 based
-> boards. Can you please queue this up for the upcoming rc as fixes?
+Due to recently merged patches and previous merge conflicts, the Samsung
+PM Debug functionality no longer can be enabled. This patch fixes
+incorrect dependency of SAMSUNG_PM_DEBUG on an integer symbol and adds
+missing header inclusion.
 
-Sure, I will take this into fixes.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/plat-samsung/Kconfig    | 5 +++--
+ arch/arm/plat-samsung/pm-debug.c | 1 +
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-Thanks,
-Kukjin
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 301b892..ad9515f 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -413,8 +413,9 @@ config S5P_DEV_MFC
+ comment "Power management"
+ 
+ config SAMSUNG_PM_DEBUG
+-	bool "S3C2410 PM Suspend debug"
+-	depends on PM && DEBUG_KERNEL && DEBUG_S3C_UART
++	bool "Samsung PM Suspend debug"
++	depends on PM && DEBUG_KERNEL
++	depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
+ 	help
+ 	  Say Y here if you want verbose debugging from the PM Suspend and
+ 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
+diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
+index 8f19f66..3960960 100644
+--- a/arch/arm/plat-samsung/pm-debug.c
++++ b/arch/arm/plat-samsung/pm-debug.c
+@@ -14,6 +14,7 @@
+  */
+ 
+ #include <linux/serial_core.h>
++#include <linux/serial_s3c.h>
+ #include <linux/io.h>
+ 
+ #include <asm/mach/map.h>
+-- 
+1.9.3
