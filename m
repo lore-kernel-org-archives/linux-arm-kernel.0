@@ -1,48 +1,42 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 25 Jun 2014 20:20:12 +0200
-Subject: [PATCH v8 9/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <CAGXu5jKkLS3++_dtWHnjWudVvaSR9DRwjNG3q00SmSy6XoCMaw@mail.gmail.com>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <1403642893-23107-10-git-send-email-keescook@chromium.org>
- <20140625142121.GD7892@redhat.com>
- <CAGXu5jJtLrjbobZC1FD4WV-Jm2p7cRGa1aSPK-d_isnfCZAHdA@mail.gmail.com>
- <20140625165209.GA14720@redhat.com>
- <CAGXu5jLHDew1fifGY_mWgwcH7evm0T8rqSnBrw4XpoAXGK+t-Q@mail.gmail.com>
- <20140625172410.GA17133@redhat.com>
- <CAGXu5jKkLS3++_dtWHnjWudVvaSR9DRwjNG3q00SmSy6XoCMaw@mail.gmail.com>
-Message-ID: <20140625182012.GA19437@redhat.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 25 Jun 2014 11:23:49 -0700
+Subject: [PATCH] clk: define and export __clk_get_debug for providers
+In-Reply-To: <44039675.8s16pHQIVH@wuerfel>
+References: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
+ <44039675.8s16pHQIVH@wuerfel>
+Message-ID: <20140625182349.32686.25931@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25, Kees Cook wrote:
->
-> On Wed, Jun 25, 2014 at 10:24 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> >
-> > However, do_execve() takes cred_guard_mutex at the start in prepare_bprm_creds()
-> > and drops it in install_exec_creds(), so it should solve the problem?
->
-> I can't tell yet. I'm still trying to understand the order of
-> operations here. It looks like de_thread() takes the sighand lock.
-> do_execve_common does:
->
-> prepare_bprm_creds (takes cred_guard_mutex)
-> check_unsafe_exec (checks nnp to set LSM_UNSAFE_NO_NEW_PRIVS)
-> prepare_binprm (handles suid escalation, checks nnp separately)
->     security_bprm_set_creds (checks LSM_UNSAFE_NO_NEW_PRIVS)
-> exec_binprm
->     load_elf_binary
->         flush_old_exec
->             de_thread (takes and releases sighand->lock)
->         install_exec_creds (releases cred_guard_mutex)
+Quoting Arnd Bergmann (2014-06-25 11:07:37)
+> On Wednesday 25 June 2014 19:26:31 Peter De Schrijver wrote:
+> > Define and export a new function __clk_get_debug which returns the debugfs
+> > directory entry pointer. This can be used by clock providers to add debugfs
+> > entries which are not related to a specific clock type. Examples include the
+> > ability to measure the rate of a clock. It can also be used by modules to
+> > create new debugfs entries. This is useful if you want to expose features
+> > for testing which can potentially cause system instability such as allowing
+> > to change a clock's rate from userspace.
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > 
+> 
+> Just an idea, but would it be better to add a pair of functions to add/remove
+> debugfs files rather than exposing the dentry itself?
 
-Yes, and note that when cred_guard_mutex is dropped all other threads
-are already killed,
+Arnd,
 
-> I don't see a way to use cred_guard_mutex during tsync (which holds
-> sighand->lock) without dead-locking. What were you considering here?
+Yes, accessor functions are much better than exposing struct clk
+internals.
 
-Just take/drop current->signal->cred_guard_mutex along with ->siglock
-in seccomp_set_mode_filter() ? Unconditionally on depending on
-SECCOMP_FILTER_FLAG_TSYNC.
+Peter,
 
-Oleg.
+Just FYI, I'm trying to reverse the trend of prepending double
+underscores for functions that are used by clock providers. That stuff
+started out small and sort of grew out of control ;-)
+
+Regards,
+Mike
+
+> 
+>         Arnd
