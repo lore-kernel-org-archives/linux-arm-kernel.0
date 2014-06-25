@@ -1,131 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:21 +0900
-Subject: [PATCH 09/14] ARM: shmobile: rcar-gen2: Update for
- of_get_flat_dt_prop() update
+Date: Wed, 25 Jun 2014 16:35:22 +0900
+Subject: [PATCH 10/14] ARM: shmobile: rcar-gen2: Use "1ULL" instead of "(u64)1"
 In-Reply-To: <cover.1403681315.git.horms+renesas@verge.net.au>
 References: <cover.1403681315.git.horms+renesas@verge.net.au>
-Message-ID: <83850b04ae7744f51681533fb7afb645e66ce8fe.1403681315.git.horms+renesas@verge.net.au>
+Message-ID: <b69f47c00f2eff19b532cf0142d81b993e587bf0.1403681315.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Commit 9d0c4dfedd96ee54fc075b16d02f82499c8cc3a6 ("of/fdt: update
-of_get_flat_dt_prop in prep for libfdt") changed the function prototypes
-of of_get_flat_dt_prop():
-  - The return type was made const,
-  - The last parameter was changed from "unsigned long *" to "int *".
-and dt_mem_next_cell():
-  - The second parameter was made const.
-
-This causes the following compiler warnings:
-
-arch/arm/mach-shmobile/setup-rcar-gen2.c: In function 'rcar_gen2_scan_mem':
-arch/arm/mach-shmobile/setup-rcar-gen2.c:125:15: warning: initialization discards 'const' qualifier from pointer target type [enabled by default]
-arch/arm/mach-shmobile/setup-rcar-gen2.c:142:2: warning: passing argument 3 of 'of_get_flat_dt_prop' from incompatible pointer type [enabled by default]
-include/linux/of_fdt.h:53:20: note: expected 'int *' but argument is of type 'long unsigned int *'
-arch/arm/mach-shmobile/setup-rcar-gen2.c:142:6: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
-arch/arm/mach-shmobile/setup-rcar-gen2.c:144:3: warning: passing argument 3 of 'of_get_flat_dt_prop' from incompatible pointer type [enabled by default]
-include/linux/of_fdt.h:53:20: note: expected 'int *' but argument is of type 'long unsigned int *'
-arch/arm/mach-shmobile/setup-rcar-gen2.c:144:7: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
-arch/arm/mach-shmobile/setup-rcar-gen2.c:152:3: warning: passing argument 2 of 'dt_mem_next_cell' from incompatible pointer type [enabled by default]
-include/linux/of_fdt.h:69:12: note: expected 'const __be32 **' but argument is of type '__be32 **'
-arch/arm/mach-shmobile/setup-rcar-gen2.c:153:3: warning: passing argument 2 of 'dt_mem_next_cell' from incompatible pointer type [enabled by default]
-include/linux/of_fdt.h:69:12: note: expected 'const __be32 **' but argument is of type '__be32 **'
-
-Update the variable types in rcar_gen2_scan_mem() to fix this.
+Casts are evil
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Magnus Damm <damm+renesas@opensource.se>
-[horms+renesas at verge.net.au: rebased]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 76 ++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 544b9bf..b0626f8 100644
+index b0626f8..51d5723 100644
 --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
 +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -113,3 +113,79 @@ void __init rcar_gen2_timer_init(void)
- #endif
- 	clocksource_of_init();
- }
-+
-+struct memory_reserve_config {
-+	u64 reserved;
-+	u64 base, size;
-+};
-+
-+static int __init rcar_gen2_scan_mem(unsigned long node, const char *uname,
-+				     int depth, void *data)
-+{
-+	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-+	const __be32 *reg, *endp;
-+	int l;
-+	struct memory_reserve_config *mrc = data;
-+	u64 lpae_start = (u64)1 << 32;
-+
-+	/* We are scanning "memory" nodes only */
-+	if (type == NULL) {
-+		/*
-+		 * The longtrail doesn't have a device_type on the
-+		 * /memory node, so look for the node called /memory at 0.
-+		 */
-+		if (depth != 1 || strcmp(uname, "memory@0") != 0)
-+			return 0;
-+	} else if (strcmp(type, "memory") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
-+	if (reg == NULL)
-+		reg = of_get_flat_dt_prop(node, "reg", &l);
-+	if (reg == NULL)
-+		return 0;
-+
-+	endp = reg + (l / sizeof(__be32));
-+	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
-+		u64 base, size;
-+
-+		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+		size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+		if (base >= lpae_start)
-+			continue;
-+
-+		if ((base + size) >= lpae_start)
-+			size = lpae_start - base;
-+
-+		if (size < mrc->reserved)
-+			continue;
-+
-+		if (base < mrc->base)
-+			continue;
-+
-+		/* keep the area at top near the 32-bit legacy limit */
-+		mrc->base = base + size - mrc->reserved;
-+		mrc->size = mrc->reserved;
-+	}
-+
-+	return 0;
-+}
-+
-+struct cma *rcar_gen2_dma_contiguous;
-+
-+void __init rcar_gen2_reserve(void)
-+{
-+	struct memory_reserve_config mrc;
-+
-+	/* reserve 256 MiB at the top of the physical legacy 32-bit space */
-+	memset(&mrc, 0, sizeof(mrc));
-+	mrc.reserved = SZ_256M;
-+
-+	of_scan_flat_dt(rcar_gen2_scan_mem, &mrc);
-+#ifdef CONFIG_DMA_CMA
-+	if (mrc.size)
-+		dma_contiguous_reserve_area(mrc.size, mrc.base, 0,
-+					    &rcar_gen2_dma_contiguous);
-+#endif
-+}
+@@ -126,7 +126,7 @@ static int __init rcar_gen2_scan_mem(unsigned long node, const char *uname,
+ 	const __be32 *reg, *endp;
+ 	int l;
+ 	struct memory_reserve_config *mrc = data;
+-	u64 lpae_start = (u64)1 << 32;
++	u64 lpae_start = 1ULL << 32;
+ 
+ 	/* We are scanning "memory" nodes only */
+ 	if (type == NULL) {
 -- 
 2.0.0.rc2
