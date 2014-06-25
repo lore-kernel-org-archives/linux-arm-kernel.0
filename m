@@ -1,32 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 25 Jun 2014 15:03:50 +0530
-Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
-In-Reply-To: <1403687412-22362-1-git-send-email-b20788@freescale.com>
-References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
-Message-ID: <CAOh2x=mgceoicULqEMXgto=F6GUNS8OLXs9i_k8FRrYyrVH8HA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Jun 2014 11:33:51 +0200
+Subject: [PATCH v2 1/2] video: imxfb: Fix unbalanced regulators
+In-Reply-To: <53AA8D8C.2040705@eukrea.com>
+References: <1403528839-31901-1-git-send-email-denis@eukrea.com>
+ <20140625060848.GE15686@pengutronix.de>
+ <53AA8D8C.2040705@eukrea.com>
+Message-ID: <20140625093351.GR15686@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 2:40 PM, Anson Huang <b20788@freescale.com> wrote:
-> Add cpufreq support for i.MX6SX, using common
-> i.MX6Q cpufreq driver.
->
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
->  arch/arm/mach-imx/mach-imx6sx.c |    3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-> index 74ff7d6..9221e1d 100644
-> --- a/arch/arm/mach-imx/mach-imx6sx.c
-> +++ b/arch/arm/mach-imx/mach-imx6sx.c
-> @@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)
->  static void __init imx6sx_init_late(void)
->  {
->         imx6q_cpuidle_init();
-> +
-> +       if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
-> +               platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
->  }
+On Wed, Jun 25, 2014 at 10:51:24AM +0200, Denis Carikli wrote:
+> On 06/25/2014 08:08 AM, Sascha Hauer wrote:
+> >It's a shame that the LCD controller doesn't do the reference counting.
+> >I really think it should be fixed there and not in the drivers.If for
+> >whatever reason this is not acceptable then it should be done in the
+> >imxfb driver instead of shifting it further to the regulator core.
+> I'm not sure that doing reference counting in the LCD class would be
+> enough for the regulator case. Still it seems to be a good thing to
+> do.
+> 
+> If I understood well, that assumes that the LCD driver is the only
+> consumer and owner of that regulator.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+No. All consumers of a regulator must make sure the regulator enable
+count is balanced.
+
+Image that the regulator in the imxfb is used by multiple consumers.
+When you want to enable the backlight you must make sure that you
+take a reference to the regulator yourself. Otherwise it may
+happen that 'if (regulator_is_enabled())' is true because another
+consumer has enabled it and your code does nothing. Then the other
+consumer decides to disable the regulator which in this case will
+accidently disable the backlight.
+
+> 
+> There is also the fact that the regulator core also enables or
+> disables regulators by itself:
+> For instance at boot it tries to disable the regulators that can be
+> disabled, including this regulator.
+> 
+> So I don't see any ways to handle it correctly in the LCD.
+
+It's simple. Add an lcd_enable flag to struct lcd_device. Make sure you
+only call into the drivers when it differs from the current state.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
