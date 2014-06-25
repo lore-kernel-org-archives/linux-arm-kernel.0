@@ -1,71 +1,153 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 25 Jun 2014 14:41:35 +0200
-Subject: [PATCH v3 2/3] ARM: dts: i.MX25: Fix gpt timers clocks.
+Date: Wed, 25 Jun 2014 14:41:36 +0200
+Subject: [PATCH v3 3/3] ARM: i.MX25 clk: Use of_clk_init() for DT case
 In-Reply-To: <1403700096-13014-1-git-send-email-denis@eukrea.com>
 References: <1403700096-13014-1-git-send-email-denis@eukrea.com>
-Message-ID: <1403700096-13014-2-git-send-email-denis@eukrea.com>
+Message-ID: <1403700096-13014-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without that fix, the board freeze during boot.
+Replace .init_time() hook with of_clk_init() for DT targets.
 
-This appeared after the following commit:
-  496f065 ARM: i.MX: Use of_clk_get_by_name() for timer clocks for DT case.
+Based on:
+  d4347ee ARM: i.MX27 clk: Use of_clk_init() for DT case
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
 Changelog v2->v3:
-- Splitted out the non-dts part.
-- Added Sascha's ack which applied on the previous non-splitted patch.
-- No code/dts changes.
+- Reworked the patch to look way smaller.
+- Thanks to that the ccm global variable is now gone
+  (now it's local).
 
 Changelog v1->v2:
-- Also fixed the ipg clock
-- Also fixed the ipg and per clocks for the other gpts
+- Rebased.
+- Removing the warning about the useless int i declaration.
 ---
- arch/arm/boot/dts/imx25.dtsi |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/clk-imx25.c |   35 ++++++++++++++++++++---------------
+ arch/arm/mach-imx/common.h    |    1 -
+ arch/arm/mach-imx/imx25-dt.c  |    6 ------
+ 3 files changed, 20 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index bb74d95..c174039 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -312,7 +312,7 @@
- 			gpt4: timer at 53f84000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f84000 0x4000>;
--				clocks = <&clks 9>, <&clks 45>;
-+				clocks = <&clks 95>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <1>;
- 			};
-@@ -320,7 +320,7 @@
- 			gpt3: timer at 53f88000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f88000 0x4000>;
--				clocks = <&clks 9>, <&clks 47>;
-+				clocks = <&clks 94>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <29>;
- 			};
-@@ -328,7 +328,7 @@
- 			gpt2: timer at 53f8c000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f8c000 0x4000>;
--				clocks = <&clks 9>, <&clks 47>;
-+				clocks = <&clks 93>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <53>;
- 			};
-@@ -336,7 +336,7 @@
- 			gpt1: timer at 53f90000 {
- 				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
- 				reg = <0x53f90000 0x4000>;
--				clocks = <&clks 9>, <&clks 47>;
-+				clocks = <&clks 92>, <&clks 47>;
- 				clock-names = "ipg", "per";
- 				interrupts = <54>;
- 			};
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index e759a6d..cab34c3 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -32,8 +32,6 @@
+ #include "hardware.h"
+ #include "mx25.h"
+ 
+-#define CRM_BASE	MX25_IO_ADDRESS(MX25_CRM_BASE_ADDR)
+-
+ #define CCM_MPCTL	0x00
+ #define CCM_UPCTL	0x04
+ #define CCM_CCTL	0x08
+@@ -56,7 +54,7 @@
+ #define CCM_LTR3	0x4c
+ #define CCM_MCR		0x64
+ 
+-#define ccm(x)	(CRM_BASE + (x))
++#define ccm(x)	(ccm_base + (x))
+ 
+ static struct clk_onecell_data clk_data;
+ 
+@@ -91,8 +89,11 @@ enum mx25_clks {
+ 
+ static struct clk *clk[clk_max];
+ 
+-static int __init __mx25_clocks_init(unsigned long osc_rate)
++static int __init __mx25_clocks_init(unsigned long osc_rate,
++				     void __iomem *ccm_base)
+ {
++	BUG_ON(!ccm_base);
++
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+ 	clk[osc] = imx_clk_fixed("osc", osc_rate);
+ 	clk[mpll] = imx_clk_pllv1("mpll", "osc", ccm(CCM_MPCTL));
+@@ -240,7 +241,11 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
+ 
+ int __init mx25_clocks_init(void)
+ {
+-	__mx25_clocks_init(24000000);
++	void __iomem *ccm;
++
++	ccm = ioremap(MX25_CRM_BASE_ADDR, SZ_16K);
++
++	__mx25_clocks_init(24000000, ccm);
+ 
+ 	clk_register_clkdev(clk[gpt1_ipg], "ipg", "imx-gpt.0");
+ 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+@@ -308,29 +313,29 @@ int __init mx25_clocks_init(void)
+ 	return 0;
+ }
+ 
+-int __init mx25_clocks_init_dt(void)
++static void __init mx25_clocks_init_dt(struct device_node *np)
+ {
+-	struct device_node *np;
++	struct device_node *refnp;
+ 	unsigned long osc_rate = 24000000;
++	void __iomem *ccm;
+ 
+ 	/* retrieve the freqency of fixed clocks from device tree */
+-	for_each_compatible_node(np, NULL, "fixed-clock") {
++	for_each_compatible_node(refnp, NULL, "fixed-clock") {
+ 		u32 rate;
+-		if (of_property_read_u32(np, "clock-frequency", &rate))
++		if (of_property_read_u32(refnp, "clock-frequency", &rate))
+ 			continue;
+ 
+-		if (of_device_is_compatible(np, "fsl,imx-osc"))
++		if (of_device_is_compatible(refnp, "fsl,imx-osc"))
+ 			osc_rate = rate;
+ 	}
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-ccm");
++	ccm = of_iomap(np, 0);
++	__mx25_clocks_init(osc_rate, ccm);
++
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+-	__mx25_clocks_init(osc_rate);
+-
+ 	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt"));
+-
+-	return 0;
+ }
++CLK_OF_DECLARE(imx25_ccm, "fsl,imx25-ccm", mx25_clocks_init_dt);
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 50ee9c2..08ab255 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -55,7 +55,6 @@ int mx25_clocks_init(void);
+ int mx27_clocks_init(unsigned long fref);
+ int mx31_clocks_init(unsigned long fref);
+ int mx35_clocks_init(void);
+-int mx25_clocks_init_dt(void);
+ int mx31_clocks_init_dt(void);
+ struct platform_device *mxc_register_gpio(char *name, int id,
+ 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
+diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
+index 42a65e0..cf8032b 100644
+--- a/arch/arm/mach-imx/imx25-dt.c
++++ b/arch/arm/mach-imx/imx25-dt.c
+@@ -29,16 +29,10 @@ static const char * const imx25_dt_board_compat[] __initconst = {
+ 	NULL
+ };
+ 
+-static void __init imx25_timer_init(void)
+-{
+-	mx25_clocks_init_dt();
+-}
+-
+ DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
+ 	.map_io		= mx25_map_io,
+ 	.init_early	= imx25_init_early,
+ 	.init_irq	= mx25_init_irq,
+-	.init_time	= imx25_timer_init,
+ 	.init_machine	= imx25_dt_init,
+ 	.dt_compat	= imx25_dt_board_compat,
+ 	.restart	= mxc_restart,
 -- 
 1.7.9.5
