@@ -1,97 +1,65 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 25 Jun 2014 15:55:03 -0700
-Subject: [PATCHv3][REBASED] arm64: Add CONFIG_CC_STACKPROTECTOR
-Message-ID: <1403736903-25594-1-git-send-email-lauraa@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Jun 2014 17:00:03 -0600
+Subject: [PATCH v1 1/9] of: Add NVIDIA Tegra XUSB mailbox binding
+In-Reply-To: <CAL1qeaFPjq9nqA2GDZZW+=DZsddWCkUjJcnRsfPkBWj8gmFsiw@mail.gmail.com>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>	<1403072180-4944-2-git-send-email-abrestic@chromium.org>	<53AB422E.4040707@wwwdotorg.org>
+ <CAL1qeaFPjq9nqA2GDZZW+=DZsddWCkUjJcnRsfPkBWj8gmFsiw@mail.gmail.com>
+Message-ID: <53AB5473.3050204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 currently lacks support for -fstack-protector. Add
-similar functionality to arm to detect stack corruption.
+On 06/25/2014 04:37 PM, Andrew Bresticker wrote:
+> On Wed, Jun 25, 2014 at 2:42 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
+>>> Add device-tree bindings for the Tegra XUSB mailbox which will be used
+>>> for communication between the Tegra XHCI controller and the host.
+>>
+>> Sorry for the slow review.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+>>
+>>> +NVIDIA Tegra XUSB mailbox
+>>> +=========================
+>>> +
+>>> +The Tegra XUSB mailbox is used by the Tegra XHCI controller's firmware to
+>>> +communicate with the host.
+>>
+>> Isn't the mailbox an internal implementation detail of the XUSB controller.
+>>
+>> In other words, I'd naively think that there isn't a standalone generic
+>> mailbox that can be used by anything, but we just happen to want to use
+>> for XUSB. Rather, there's an XUSB controller, and part of the interface
+>> to that controller is a mailbox.
+> 
+> Yes, the mailbox isn't an actual piece of hardware but rather the
+> interface through which the XUSB host and AP communicate.
+> 
+>> As such, I don't think we want a standalone mailbox node in DT. Rather,
+>> we should add the required reg and interrupt values into the XUSB DT node.
+>>
+>> The driver for that XUSB HW module can either:
+>>
+>> a) Register as both a mailbox driver and an EHCI driver.
+>>
+>> b) Spawn a child device to instantiate the mailbox driver.
+>>
+>> Perhaps (b) could be assisted by using the MFD framework?
+> 
+> So in the RFC series I did something like (a) where the XUSB host
+> handled the mailbox interrupt with both the PHY and host could
+> registering notifiers to handle the messages.  It was suggested by
+> Arnd though that I make a separate mailbox driver.  Instead of having
+> a both a host and mailbox node, I could have a single XUSB host node
+> and have the mailbox driver bind to that - thoughts?
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/Kconfig                      |  1 +
- arch/arm64/include/asm/stackprotector.h | 38 +++++++++++++++++++++++++++++++++
- arch/arm64/kernel/process.c             |  6 ++++++
- 3 files changed, 45 insertions(+)
- create mode 100644 arch/arm64/include/asm/stackprotector.h
+Yes, that sounds like what I meant by (b) above. I don't think you can
+actually have 2 drivers bind to the same DT node though, so it'd have to
+work something like:
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a474de34..f865436 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -32,6 +32,7 @@ config ARM64
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_C_RECORDMCOUNT
-+	select HAVE_CC_STACKPROTECTOR
- 	select HAVE_DEBUG_BUGVERBOSE
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_DMA_API_DEBUG
-diff --git a/arch/arm64/include/asm/stackprotector.h b/arch/arm64/include/asm/stackprotector.h
-new file mode 100644
-index 0000000..fe5e287
---- /dev/null
-+++ b/arch/arm64/include/asm/stackprotector.h
-@@ -0,0 +1,38 @@
-+/*
-+ * GCC stack protector support.
-+ *
-+ * Stack protector works by putting predefined pattern at the start of
-+ * the stack frame and verifying that it hasn't been overwritten when
-+ * returning from the function.  The pattern is called stack canary
-+ * and gcc expects it to be defined by a global variable called
-+ * "__stack_chk_guard" on ARM.  This unfortunately means that on SMP
-+ * we cannot have a different canary value per task.
-+ */
-+
-+#ifndef __ASM_STACKPROTECTOR_H
-+#define __ASM_STACKPROTECTOR_H
-+
-+#include <linux/random.h>
-+#include <linux/version.h>
-+
-+extern unsigned long __stack_chk_guard;
-+
-+/*
-+ * Initialize the stackprotector canary value.
-+ *
-+ * NOTE: this must only be called from functions that never return,
-+ * and it must always be inlined.
-+ */
-+static __always_inline void boot_init_stack_canary(void)
-+{
-+	unsigned long canary;
-+
-+	/* Try to get a semi random initial value. */
-+	get_random_bytes(&canary, sizeof(canary));
-+	canary ^= LINUX_VERSION_CODE;
-+
-+	current->stack_canary = canary;
-+	__stack_chk_guard = current->stack_canary;
-+}
-+
-+#endif	/* _ASM_STACKPROTECTOR_H */
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 43b7c34..1309d64 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -51,6 +51,12 @@
- #include <asm/processor.h>
- #include <asm/stacktrace.h>
- 
-+#ifdef CONFIG_CC_STACKPROTECTOR
-+#include <linux/stackprotector.h>
-+unsigned long __stack_chk_guard __read_mostly;
-+EXPORT_SYMBOL(__stack_chk_guard);
-+#endif
-+
- static void setup_restart(void)
- {
- 	/*
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+* XUSB host node causes a platform device to be instantiated
+* XUSB host driver probe()s against that
+* XUSB host driver's probe() creates a platform device for the mailbox
+* XUSB mailbox driver probe()s against that.
+
+Or, perhaps go completely MFD, and have 2 child devices (XUSB host and
+XUSB mailbox) instantiated by the MFD parent, which is what is in the DT.
