@@ -1,29 +1,27 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Jun 2014 07:10:51 -0700
-Subject: [PATCH 2/4 v2] hwmon: ntc_thermistor: Use the manufacturer name
- properly
-In-Reply-To: <1403677773-21141-3-git-send-email-ch.naveen@samsung.com>
+Date: Wed, 25 Jun 2014 07:12:24 -0700
+Subject: [PATCH 0/4 v2] hwmon: ntc_thermistor: prepose vendor prefix change
+In-Reply-To: <02b501cf9064$34f16b80$9ed44280$@samsung.com>
 References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
- <1403677773-21141-3-git-send-email-ch.naveen@samsung.com>
-Message-ID: <53AAD86B.6080905@roeck-us.net>
+ <02b501cf9064$34f16b80$9ed44280$@samsung.com>
+Message-ID: <53AAD8C8.3080506@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 11:29 PM, Naveen Krishna Chatradhi wrote:
-> Murata Manufacturing Co., Ltd is the vendor for
-> NTC (Negative Temperature coefficient) based Thermistors.
-> But, the driver extensively uses "NTC" as the vendor name.
+On 06/25/2014 03:57 AM, Kukjin Kim wrote:
+> Naveen Krishna Chatradhi wrote:
+>>
+> + Jean Delvare, Guenter Roeck
 >
-> This patch corrects the vendor name also updates the
-> compatibility strings according to the vendor-prefix.txt
+> I'm adding maintainers for drivers/hwmon/ntc* but I'm not sure.
 >
-> Note: Drivers continue to support the previous compatible strings
-> but further addition of these compatible strings in device tree
-> is deprecated.
+> Hi,
 >
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
+> This series looks good to me. I will take 3/4 and 4/4 for exynos DT changes once
+> hwmon/ntc maintainer pick the others.
+>
 
-Applied.
+I applied both patches. Currently going through my test cycle.
+I'll send them to Linus Thursday or Friday.
 
 Guenter
