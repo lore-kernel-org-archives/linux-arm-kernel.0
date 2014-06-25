@@ -1,19 +1,32 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 25 Jun 2014 15:00:08 +0530
-Subject: [PATCH 05/14] ARM: shmobile: Mark all SoCs in shmobile as
- CPUFreq, capable
-In-Reply-To: <20140625092609.GC7496@verge.net.au>
-References: <cover.1403681315.git.horms+renesas@verge.net.au>
- <6596e97e054647fecb016ecb7e1935aa2b7db954.1403681315.git.horms+renesas@verge.net.au>
- <CAOh2x==C1XDjxdxpE6fYk3j6gO1X7d976Kr-Gjj_-+W6xVzOsw@mail.gmail.com>
- <20140625092609.GC7496@verge.net.au>
-Message-ID: <CAKohpokRgJt+L4pXd8j4uzOffNyxtQPdn37_aojHv02YwTsocQ@mail.gmail.com>
+Date: Wed, 25 Jun 2014 15:03:50 +0530
+Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
+In-Reply-To: <1403687412-22362-1-git-send-email-b20788@freescale.com>
+References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
+Message-ID: <CAOh2x=mgceoicULqEMXgto=F6GUNS8OLXs9i_k8FRrYyrVH8HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2014 14:56, Simon Horman <horms@verge.net.au> wrote:
-> In the case of ARCH_HAS_CPUFREQ, a subsequent patch in
-> this pull-request, "ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile",
-> removes it.
+On Wed, Jun 25, 2014 at 2:40 PM, Anson Huang <b20788@freescale.com> wrote:
+> Add cpufreq support for i.MX6SX, using common
+> i.MX6Q cpufreq driver.
+>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6sx.c |    3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+> index 74ff7d6..9221e1d 100644
+> --- a/arch/arm/mach-imx/mach-imx6sx.c
+> +++ b/arch/arm/mach-imx/mach-imx6sx.c
+> @@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)
+>  static void __init imx6sx_init_late(void)
+>  {
+>         imx6q_cpuidle_init();
+> +
+> +       if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+> +               platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
+>  }
 
-Hmm.. I fail to see why you are adding it in the first place then ?
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
