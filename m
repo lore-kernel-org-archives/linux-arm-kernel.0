@@ -1,98 +1,44 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 25 Jun 2014 10:57:15 -0700
-Subject: [PATCH v8 9/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <20140625172410.GA17133@redhat.com>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <1403642893-23107-10-git-send-email-keescook@chromium.org>
- <20140625142121.GD7892@redhat.com>
- <CAGXu5jJtLrjbobZC1FD4WV-Jm2p7cRGa1aSPK-d_isnfCZAHdA@mail.gmail.com>
- <20140625165209.GA14720@redhat.com>
- <CAGXu5jLHDew1fifGY_mWgwcH7evm0T8rqSnBrw4XpoAXGK+t-Q@mail.gmail.com>
- <20140625172410.GA17133@redhat.com>
-Message-ID: <CAGXu5jKkLS3++_dtWHnjWudVvaSR9DRwjNG3q00SmSy6XoCMaw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 25 Jun 2014 23:30:11 +0530
+Subject: [PATCH 1/8] ARM: dts: dra7xx-clocks: Add divider table to
+ optfclk_pciephy_div clock
+In-Reply-To: <1403719218-9484-1-git-send-email-kishon@ti.com>
+References: <1403719218-9484-1-git-send-email-kishon@ti.com>
+Message-ID: <1403719218-9484-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 10:24 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 06/25, Kees Cook wrote:
->>
->> On Wed, Jun 25, 2014 at 9:52 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->> >
->> > Yes, at least this should close the race with suid-exec. And there are no
->> > other users. Except apparmor, and I hope you will check it because I simply
->> > do not know what it does ;)
->> >
->> >> I wonder if changes to nnp need to "flushed" during syscall entry
->> >> instead of getting updated externally/asynchronously? That way it
->> >> won't be out of sync with the seccomp mode/filters.
->> >>
->> >> Perhaps secure computing needs to check some (maybe seccomp-only)
->> >> atomic flags and flip on the "real" nnp if found?
->> >
->> > Not sure I understand you, could you clarify?
->>
->> Instead of having TSYNC change the nnp bit, it can set a new flag, say:
->>
->>     task->seccomp.flags |= SECCOMP_NEEDS_NNP;
->>
->> This would be set along with seccomp.mode, seccomp.filter, and
->> TIF_SECCOMP. Then, during the next secure_computing() call that thread
->> makes, it would check the flag:
->>
->>     if (task->seccomp.flags & SECCOMP_NEEDS_NNP)
->>         task->nnp = 1;
->>
->> This means that nnp couldn't change in the middle of a running syscall.
->
-> Aha, so you were worried about the same thing. Not sure we need this,
-> but at least I understand you and...
->
->> Hmmm. Perhaps this doesn't solve anything, though? Perhaps my proposal
->> above would actually make things worse, since now we'd have a thread
->> with seccomp set up, and no nnp. If it was in the middle of exec,
->> we're still causing a problem.
->
-> Yes ;)
->
->> I think we'd also need a way to either delay the seccomp changes, or
->> to notice this condition during exec. Bleh.
->
-> Hmm. confused again,
+From: Keerthy <j-keerthy@ti.com>
 
-I mean to suggest that the tsync changes would be stored in each
-thread, but somewhere other than the true seccomp struct, but with
-TIF_SECCOMP set. When entering secure_computing(), current would check
-for the "changes to sync", and apply them, then start the syscall. In
-this way, we can never race a syscall (like exec).
+Add divider table to optfclk_pciephy_div clock. The 8th bit of
+CM_CLKMODE_APLL_PCIE can be programmed to either 0x0 or 0x1
+based on if the divider value is 0x2 or 0x1.
 
->> What actually happens with a multi-threaded process calls exec? I
->> assume all the other threads are destroyed?
->
-> Yes. But this is the point-of-no-return, de_thread() is called after the execing
-> thared has already passed (say) check_unsafe_exec().
->
-> However, do_execve() takes cred_guard_mutex at the start in prepare_bprm_creds()
-> and drops it in install_exec_creds(), so it should solve the problem?
+Figure 26-21. PCIe PHY Clock Generator Overview in vE of DRA7xx ES1.0 shows the
+block diagram of Clock Generator Subsystem of PCIe PHY module. The divider
+value if '1' should be programmed in order to get the correct
+PCIE_PHY_DIV_GCLK frequency (2.5GHz).
 
-I can't tell yet. I'm still trying to understand the order of
-operations here. It looks like de_thread() takes the sighand lock.
-do_execve_common does:
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra7xx-clocks.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-prepare_bprm_creds (takes cred_guard_mutex)
-check_unsafe_exec (checks nnp to set LSM_UNSAFE_NO_NEW_PRIVS)
-prepare_binprm (handles suid escalation, checks nnp separately)
-    security_bprm_set_creds (checks LSM_UNSAFE_NO_NEW_PRIVS)
-exec_binprm
-    load_elf_binary
-        flush_old_exec
-            de_thread (takes and releases sighand->lock)
-        install_exec_creds (releases cred_guard_mutex)
-
-I don't see a way to use cred_guard_mutex during tsync (which holds
-sighand->lock) without dead-locking. What were you considering here?
-
--Kees
-
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index b03cfe4..7148e7c 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -1170,6 +1170,7 @@
+ 		clocks = <&apll_pcie_ck>;
+ 		#clock-cells = <0>;
+ 		reg = <0x021c>;
++		ti,dividers = <2>, <1>;
+ 		ti,bit-shift = <8>;
+ 		ti,max-div = <2>;
+ 	};
 -- 
-Kees Cook
-Chrome OS Security
+1.7.9.5
