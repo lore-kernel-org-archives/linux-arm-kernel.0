@@ -1,45 +1,66 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 25 Jun 2014 13:01:30 +0200
-Subject: [PATCH v2 1/2] ARM: dts: i.MX53: add aipstz nodes
-Message-ID: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
+Date: Wed, 25 Jun 2014 13:01:31 +0200
+Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
+In-Reply-To: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AHB to IP bridges (AIPSTZ) allow fine grained access rights management.
-Add both bridges to the DT.
+Most peripherals on the i.MX53 have an
+	Off-Platform Peripheral Access Control Register (OPACR)
+in which the access rights (together with the MPROT registers) can be declared.
+However, this does not seem to work for example for SSI1+SDMA, because the
+supervisor bit is not set for the SDMA unit.
+It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
+works because it does NOT have an OPACR.
+
+The right solution would be to fix the access rights for the SDMA, but the unit
+responsible for this is the Central Security Unit (CSU), which of course is NOT
+documented. So, until documentation for this is openly available, turn off the
+supervisor protection because it cripples the hardware.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 6456a00..aaea979 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -260,6 +260,11 @@
- 				};
- 			};
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index 2bad387..380c7ee 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -15,6 +15,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
+@@ -24,11 +25,24 @@
+ #include "hardware.h"
+ #include "mx53.h"
  
-+			aipstz1: bridge at 53f00000 {
-+				compatible = "fsl,imx53-aipstz";
-+				reg = <0x53f00000 0x60>;
-+			};
++static const struct of_device_id aips_of_matches[] __initconst = {
++	{ .compatible = "fsl,imx53-aipstz" },
++	{ /*sentinel*/ }
++};
 +
- 			usbphy0: usbphy at 0 {
- 				compatible = "usb-nop-xceiv";
- 				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
-@@ -572,6 +577,11 @@
- 			reg = <0x60000000 0x10000000>;
- 			ranges;
+ static void __init imx53_dt_init(void)
+ {
++	void __iomem *aips_base_addr;
++	struct device_node *np;
++
+ 	mxc_arch_reset_init_dt();
  
-+			aipstz2: bridge at 63f00000 {
-+				compatible = "fsl,imx53-aipstz";
-+				reg = <0x63f00000 0x60>;
-+			};
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 +
- 			iim: iim at 63f98000 {
- 				compatible = "fsl,imx53-iim", "fsl,imx27-iim";
- 				reg = <0x63f98000 0x4000>;
++	for_each_matching_node(np, aips_of_matches) {
++		aips_base_addr = of_iomap(np, 0);
++		imx_set_aips(aips_base_addr);
++	}
+ }
+ 
+ static const char *imx53_dt_board_compat[] __initconst = {
 -- 
 2.0.0
