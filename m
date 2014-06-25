@@ -1,73 +1,130 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 25 Jun 2014 21:03:27 +0200
-Subject: [PATCH v4 03/14] clk: max77686: Add DT include for MAX77686 PMIC clock
+Date: Wed, 25 Jun 2014 21:03:32 +0200
+Subject: [PATCH v4 08/14] mfd: max77802: Add DT binding documentation
 In-Reply-To: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1403723019-6212-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403723019-6212-9-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a dt-binding include for Maxim 77686
-PMIC clock IDs that can be to be shared between the
-clk-max77686 clock driver and DeviceTree source files.
+Add Device Tree binding documentation for Maxim 77802 PMIC.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
 
 Changes since v3: None
 
- drivers/clk/clk-max77686.c                 |  7 +------
- include/dt-bindings/clock/maxim,max77686.h | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+), 6 deletions(-)
- create mode 100644 include/dt-bindings/clock/maxim,max77686.h
+Changes since v2:
+ - Explain better the Dynamic Voltage Scaling (DVS) support in some Buck
+   regulators and the max77802,pmic-buck-{dvs,selb}-gpios properties.
+   Suggested by Mark Brown.
 
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 3d7e8dd..185b611 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -30,12 +30,7 @@
- #include <linux/mutex.h>
- #include <linux/clkdev.h>
- 
--enum {
--	MAX77686_CLK_AP = 0,
--	MAX77686_CLK_CP,
--	MAX77686_CLK_PMIC,
--	MAX77686_CLKS_NUM,
--};
-+#include <dt-bindings/clock/maxim,max77686.h>
- 
- struct max77686_clk {
- 	struct max77686_dev *iodev;
-diff --git a/include/dt-bindings/clock/maxim,max77686.h b/include/dt-bindings/clock/maxim,max77686.h
+ Documentation/devicetree/bindings/mfd/max77802.txt | 97 ++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+
+diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
 new file mode 100644
-index 0000000..7b28b09
+index 0000000..f3b67c5
 --- /dev/null
-+++ b/include/dt-bindings/clock/maxim,max77686.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2014 Google, Inc
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants clocks for the Maxim 77686 PMIC.
-+ */
++++ b/Documentation/devicetree/bindings/mfd/max77802.txt
+@@ -0,0 +1,97 @@
++Maxim MAX77802 multi-function device
 +
-+#ifndef _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
-+#define _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H
++MAX77802 is a Mulitifunction device with PMIC, RTC and Charger on chip. It is
++interfaced to host controller using i2c interface. PMIC, Charger and RTC
++submodules are addressed using same i2c slave address.
 +
-+/* Fixed rate clocks. */
++Buck regulators 1, 2, 3, 4 and 6 include Dynamic Voltage Scaling (DVS) that
++allows each output voltage to change dynamically. Each Buck output voltage
++is selected using a set of external inputs: DVS1-3 and SELB1, 2, 3 and 6.
 +
-+#define MAX77686_CLK_AP		0
-+#define MAX77686_CLK_CP		1
-+#define MAX77686_CLK_PMIC	2
++There are 8 DVS registers that can be used to configure the output voltage
++for each Buck regulator and which one is active is controled by DVSx lines.
 +
-+/* Total number of clocks. */
-+#define MAX77686_CLKS_NUM		(MAX77686_CLK_PMIC + 1)
++SELBx lines are used to control if individual Buck lines are ON or OFF.
 +
-+#endif /* _DT_BINDINGS_CLOCK_MAXIM_MAX77686_CLOCK_H */
++This document describes the binding for mfd device and PMIC submodule.
++
++Binding for the built-in 32k clock generator block is defined separately
++in bindings/clk/maxim,max77802.txt file.
++
++Required properties:
++- compatible : Must be "maxim,max77802";
++- reg : Specifies the i2c slave address of PMIC block.
++- interrupts : This i2c device has an IRQ line connected to the main SoC.
++- interrupt-parent : The parent interrupt controller.
++
++Optional properties:
++- max77802,pmic-buck-default-dvs-idx: We'll always write this DVS index in the
++  PMIC for Bucks with DVS.
++  NOTE: at the moment these bindings don't include enough details for actual
++  GPIO-DVS--this just lets you choose which single slot to use.
++
++- max77802,pmic-buck-dvs-gpios: A GPIO array where each GPIO is connected to a
++  DVS line. We'll try to set these GPIOs to match pmic-buck-default-dvs-idx at
++  probe time if they are defined. If some or all of these GPIOs are not defined
++  it's assumed that the board has any missing GPIOs hardwired to match
++  pmic-buck-default-dvs-idx.
++
++- max77802,pmic-buck-selb-gpios: A GPIO array where each GPIO is connected to a
++  SELBx line. Should be five values: 1, 2, 3, 4, 6. It is strongly suggested to
++  include these GPIOs if there's any chance that changing DVS GPIOs one line at
++  a time might glitch your DVS values.
++
++Optional node:
++- regulators : The regulators of max77802 have to be instantiated
++  under subnode named "regulators" using the following format.
++
++	regulator_name {
++		standard regulator constraints....
++	};
++	refer Documentation/devicetree/bindings/regulator/regulator.txt
++
++  The regulator node name should be initialized with a string
++to get matched with their hardware counterparts as follow:
++
++	-LDOn 	:	for LDOs, where n can lie in range 1 to 35.
++			example: LDO1, LDO2, LDO35.
++	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 10.
++			example: BUCK1, BUCK5, BUCK10.
++Example:
++
++	max77802 at 09 {
++		compatible = "maxim,max77802";
++		interrupt-parent = <&wakeup_eint>;
++		interrupts = <26 0>;
++		reg = <0x09>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		max77802,pmic-buck-default-dvs-idx = <1>;
++		max77802,pmic-buck-dvs-gpios = <&gpy7 6 0>,
++					       <&gpj4 2 0>,
++					       <&gpj4 3 0>;
++		max77802,pmic-buck-selb-gpios = <&gph0 2 0>,
++						<&gph0 3 0>,
++						<&gph0 4 0>,
++						<&gph0 5 0>,
++						<&gph0 6 0>;
++
++		regulators {
++			ldo11_reg: LDO11 {
++				regulator-compatible = "LDO11";
++				regulator-name = "vdd_ldo11";
++				regulator-min-microvolt = <1900000>;
++				regulator-max-microvolt = <1900000>;
++				regulator-always-on;
++			};
++
++			buck1_reg {
++				regulator-compatible = "BUCK1";
++				regulator-name = "vdd_mif";
++				regulator-min-microvolt = <950000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++	};
 -- 
 2.0.0.rc2
