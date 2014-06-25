@@ -1,76 +1,97 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 25 Jun 2014 15:25:54 -0700
-Subject: [PATCH v1 3/9] of: Update Tegra XUSB pad controller binding for
- USB
-In-Reply-To: <53AB432A.7010400@wwwdotorg.org>
-References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
- <1403072180-4944-4-git-send-email-abrestic@chromium.org>
- <53AB432A.7010400@wwwdotorg.org>
-Message-ID: <CAL1qeaEnOEgdNp8F1YyUAeco6WVY0XffpiEDsPGdcCQL62sw3Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Jun 2014 23:33:02 +0100
+Subject: [PATCH 8/9] ARM: kernel: add support for cpu cache information
+In-Reply-To: <1403717444-23559-9-git-send-email-sudeep.holla@arm.com>
+References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
+ <1403717444-23559-9-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20140625223302.GL32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review Stephen!
+On Wed, Jun 25, 2014 at 06:30:43PM +0100, Sudeep Holla wrote:
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 38ddd9f..2c5ff0e 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -29,6 +29,7 @@ obj-y		+= entry-v7m.o v7m.o
+>  else
+>  obj-y		+= entry-armv.o
+>  endif
+> +obj-$(CONFIG_CPU_HAS_CACHE) += cacheinfo.o
+>  
+>  obj-$(CONFIG_OC_ETM)		+= etm.o
+>  obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+> diff --git a/arch/arm/kernel/cacheinfo.c b/arch/arm/kernel/cacheinfo.c
+> new file mode 100644
+> index 0000000..ab70993
+> --- /dev/null
+> +++ b/arch/arm/kernel/cacheinfo.c
+> @@ -0,0 +1,229 @@
+> +/*
+> + *  ARM cacheinfo support
+> + *
+> + *  Copyright (C) 2014 ARM Ltd.
+> + *  All Rights Reserved
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/cacheinfo.h>
+> +#include <linux/cpu.h>
+> +#include <linux/compiler.h>
+> +#include <linux/of.h>
+> +
+> +#include <asm/cputype.h>
+> +#include <asm/processor.h>
+> +
+> +#if __LINUX_ARM_ARCH__ < 7 /* pre ARMv7 */
 
-On Wed, Jun 25, 2014 at 2:46 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
->> Add new bindings used for USB support by the Tegra XUSB pad controller.
->> This includes additional PHY types, USB-specific pinconfig properties, etc.
->
->> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
->
->> @@ -21,6 +21,12 @@ Required properties:
->>    - padctl
->>  - #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
->>    See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list of valid values.
->> +- nvidia,xusb-mbox: Handle to the Tegra XUSB mailbox node.
->
-> Why does the padctrl code need access to the XUSB mailbox?
+__LINUX_ARM_ARCH__ defines the minimum architecture version we are building
+for - we may support later versions than the architecture version denoted
+by this symbol.  It does not define which CPUs we are building for.  Are
+you sure that this is correct here?  What if we build a kernel supporting
+both v6 + v7, as the OMAP guys do?
 
-The XUSB firmware sends messages which make requests of the PHY (XUSB
-pad controller), such as idling/un-idling the HSIC PHYs or saving USB3
-PHY context.
+> +
+> +#define MAX_CACHE_LEVEL		1	/* Only 1 level supported */
+> +#define CTR_CTYPE_SHIFT		24
+> +#define CTR_CTYPE_MASK		(1 << CTR_CTYPE_SHIFT)
+> +
+> +struct ctr_info {
+> +	unsigned int cpuid_id;
+> +	unsigned int ctr;
+> +};
+> +
+> +static struct ctr_info cache_ctr_list[] = {
+> +};
 
-> Isn't the padctrl HW module something that provides services to the XUSB
-> code. I would have expected the XUSB node to reference the padctrl node.
+This list needs to be populated.  Early CPUs (such as StrongARM) do not
+have the CTR register.
 
-The XUSB padctrl HW does provide services to the XUSB host in the form
-of PHYs and it is through the PHY bindings that the host references
-the padctrl node.
+> +static int get_unimplemented_ctr(unsigned int *ctr)
+> +{
+> +	int i, cpuid_id = read_cpuid_id();
+> +
+> +	for (i = 0; i < ARRAY_SIZE(cache_ctr_list); i++)
+> +		if (cache_ctr_list[i].cpuid_id == cpuid_id) {
+> +			*ctr = cache_ctr_list[i].ctr;
+> +			return 0;
+> +		}
+> +	return -ENOENT;
+> +}
+> +
+> +static unsigned int get_ctr(void)
+> +{
+> +	unsigned int ctr;
+> +
+> +	if (get_unimplemented_ctr(&ctr))
+> +		asm volatile ("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
 
-> If notifications need to be sent back from XUSB padctrl to XUSB, then that
-> seems like an internal SW detail that doesn't need to be represented in DT.
+read_cpuid_cachetype() ?
 
-I think you mean notifications need to be sent back from the XUSB host
-to the XUSB padctrl?  This is what the mailbox is for and I chose to
-have the padctrl refer to the mailbox since messages are sent from the
-mailbox which make requests to the PHY specifically and not the host
-(see above).
-
->> +Optional properties:
->> +-------------------
->> +- vbus-otg-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
->
-> Isn't VBUS something that's controlled by the USB PHY? I think the PHYs
-> are part of the XUSB controller, whereas the XUSB pad control is just
-> the low level IO pad HW.
-
-In the next patch in the series I extend the XUSB padctrl driver to
-provide USB PHY support as it already does for SATA and PCIe.  Since
-XUSB padctrl is also the PHY provider, I put the USB PHY properties
-here.
-
->> +- nvidia,usb3-port-num: USB3 port (0 or 1) to which the lane is mapped.
->> +- nvidia,usb2-port-num: USB2 port (0, 1, or 2) to which the lane is mapped.
->> +- nvidia,hsic-strobe-trim: HSIC strobe trimmer value.
->> +- nvidia,hsic-rx-strobe-trim: HSIC RX strobe trimmer value.
->> +- nvidia,hsic-rx-data-trim: HSIC RX data trimmer value.
->> +- nvidia,hsic-tx-rtune-n: HSIC TX RTUNEN value.
->> +- nvidia,hsic-tx-rtune-p: HSIC TX RTUNEP value.
->> +- nvidia,hsic-tx-slew-n: HSIC TX SLEWN value.
->> +- nvidia,hsic-tx-slew-p: HSIC TX SLEWP value.
->> +- nvidia,hsic-auto-term: Enables HSIC AUTO_TERM. (0: no, 1: yes)
->
-> I wonder if some of that isn't part of the PHY not the pads?
-
-See above.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
