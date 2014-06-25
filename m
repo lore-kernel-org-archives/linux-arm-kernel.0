@@ -1,55 +1,74 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Jun 2014 11:46:28 +0200
-Subject: [PATCH v14 04/10] imx-drm: use defines for clock polarity settings
-In-Reply-To: <20140625084327.GD32514@n2100.arm.linux.org.uk>
-References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
- <1402913484-25910-4-git-send-email-denis@eukrea.com>
- <20140625044845.GK5918@pengutronix.de>
- <20140625084327.GD32514@n2100.arm.linux.org.uk>
-Message-ID: <20140625094628.GS15686@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jun 2014 11:48:31 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140625093825.GH6153@arm.com>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <4839521.56FtveYIl6@wuerfel> <20140625093825.GH6153@arm.com>
+Message-ID: <130361958.xFghHXmZkz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 09:43:27AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 25, 2014 at 06:48:45AM +0200, Sascha Hauer wrote:
-> > On Mon, Jun 16, 2014 at 12:11:18PM +0200, Denis Carikli wrote:
-> > > +
-> > >  /*
-> > >   * Bitfield of Display Interface signal polarities.
-> > >   */
-> > > @@ -37,7 +43,7 @@ struct ipu_di_signal_cfg {
-> > >  	unsigned clksel_en:1;
-> > >  	unsigned clkidle_en:1;
-> > >  	unsigned data_pol:1;	/* true = inverted */
-> > > -	unsigned clk_pol:1;	/* true = rising edge */
-> > > +	unsigned clk_pol:1;
-> > >  	unsigned enable_pol:1;
-> > >  	unsigned Hsync_pol:1;	/* true = active high */
-> > >  	unsigned Vsync_pol:1;
+On Wednesday 25 June 2014 10:38:25 Will Deacon wrote:
+> On Wed, Jun 25, 2014 at 10:27:50AM +0100, Arnd Bergmann wrote:
+> > On Wednesday 25 June 2014 10:17:02 Will Deacon wrote:
+> > > On Tue, Jun 24, 2014 at 07:20:56PM +0100, Arnd Bergmann wrote:
+> > > > On Tuesday 24 June 2014 19:11:50 Will Deacon wrote:
+> > > > > On Tue, Jun 24, 2014 at 06:57:44PM +0100, Olav Haugan wrote:
+> > > > > > We do describe the masked StreamID (SID) but we need to specify the mask
+> > > > > > that the SMMU should apply to the incoming SIDs, right?
+> > > > > > 
+> > > > > > We have a bus master that emits 43 unique SIDs. However, we have only 40
+> > > > > > SMMU_SMRn registers in the SMMU. So we need to mask out some of the
+> > > > > > incoming SID bits so that the 43 SIDs can match one of 40 entries in the
+> > > > > > SMR.
+> > > > > 
+> > > > > Hmm, so you're talking about stream matching, right? That doesn't belong in
+> > > > > the device-tree. I appreciate that the current driver does a terrible job at
+> > > > > allocating the SMRs (it's bloody difficult!), but we should try to improve
+> > > > > the dynamic behaviour instead of moving configuration of the SMMU out into
+> > > > > device-tree, where it's inflexible at best.
+> > > > > 
+> > > > > There have been patches previously posted by Andreas Herrmann helping here.
+> > > > > I'd be glad to see them revived.
+> > > > 
+> > > > Note that there are areas where we have in the past decided that dynamic
+> > > > configuration is just too hard for the kernel to do and that we're better
+> > > > off putting the configuration into DT. Pinctrl and clocks are at least
+> > > > partially in that category.
+> > > > 
+> > > > It's always best if you can get the kernel to do things in the ideal
+> > > > way where that is possible, but getting there may be just not worth it.
+> > > > 
+> > > > I have no idea where it should be for SMMU, but it's something to consider:
+> > > > if you can take reasonable shortcuts by reading parts of the configuration
+> > > > from DT, you may just as well do that.
+> > > 
+> > > I treat this in the same manner as the topology bindings we discussed
+> > > previously; we should do a best-effort to configure things dynamically and
+> > > solve corner-cases and quirks as special cases.
 > > 
-> > ...can we rename the flags to more meaningful names instead?
-> > 
-> > 	unsigned clk_pol_rising_edge:1;
-> > 	unsigned enable_pol_high:1;
-> > 	unsigned hsync_active_high:1;
-> > 	unsigned vsync_active_high:1;
+> > I think the situation is a bit different here: It's less about the corner
+> > cases for the SMMU, but about the question whether it makes more sense to
+> > have the kernel figure out the settings, or have them come from DT
+> > all the time.
 > 
-> Now look at patch 7, where these become tri-state:
-> - don't change
-> - rising edge/active high
-> - falling edge/active low
+> But, as far as I can tell, this setting is basically `which bits are
+> constant among this set of IDs'.
 > 
-> So your suggestion is not a good idea.
+> > As I said, I can't tell which approach is best here, but it sounds to
+> > me we should either do dynamic configuration and get it right, or
+> > hardcode the configuration it all the time if we can't.
+> 
+> I disagree. If you have `sensible' StreamID allocations, doing this
+> dynamically should be straight-forward and gives the driver more flexibility
+> (e.g. we then have the option of combining SMR entries for different masters
+> if they are in the same domain). The dynamic approach also lends itself to
+> sanity-checking (it is IMPLEMENTATION DEFINED whether the SMMU detects SMR
+> aliases) and helps with virtualisation (forcing QEMU to generate these masks
+> in a device-tree for a guest using a virtual SMMU interface is very painful).
 
-Hm, you're right.
+In which case do you think hardcoding is needed then? I'm still confused
+why you think we need both, as your arguments seem to all be in favor of
+dynamic configuration.
 
-Still I think we should add a prefix to make the context of the flags
-clear.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
