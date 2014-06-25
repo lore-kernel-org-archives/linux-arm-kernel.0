@@ -1,76 +1,83 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 25 Jun 2014 09:54:01 -0700
-Subject: [PATCH v8 5/9] seccomp: split mode set routines
-In-Reply-To: <CALCETrUBNmLnpa+LM91om2RSpR6SjupP-EdefzhU1Me4nv3Dfw@mail.gmail.com>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <1403642893-23107-6-git-send-email-keescook@chromium.org>
- <20140625135121.GB7892@redhat.com>
- <CAGXu5jJkFxh4K=40xuh6tu3kUf4oJM8Dry+4upBdRieW3FNLgw@mail.gmail.com>
- <CALCETrUBNmLnpa+LM91om2RSpR6SjupP-EdefzhU1Me4nv3Dfw@mail.gmail.com>
-Message-ID: <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Jun 2014 17:58:18 +0100
+Subject: [PATCH v5 7/8] drivers: cpuidle: initialize Exynos driver
+ through DT
+In-Reply-To: <20140625151333.GE15240@leverpostej>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403705421-17597-8-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140625151333.GE15240@leverpostej>
+Message-ID: <20140625165818.GB15050@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 9:10 AM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Wed, Jun 25, 2014 at 7:51 AM, Kees Cook <keescook@chromium.org> wrote:
->> On Wed, Jun 25, 2014 at 6:51 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->>> On 06/24, Kees Cook wrote:
->>>>
->>>> +static inline void seccomp_assign_mode(struct task_struct *task,
->>>> +                                    unsigned long seccomp_mode)
->>>> +{
->>>> +     BUG_ON(!spin_is_locked(&task->sighand->siglock));
->>>> +
->>>> +     task->seccomp.mode = seccomp_mode;
->>>> +     set_tsk_thread_flag(task, TIF_SECCOMP);
->>>> +}
->>>
->>> OK, but unless task == current this can race with secure_computing().
->>> I think this needs smp_mb__before_atomic() and secure_computing() needs
->>> rmb() after test_bit(TIF_SECCOMP).
->>>
->>> Otherwise, can't __secure_computing() hit BUG() if it sees the old
->>> mode == SECCOMP_MODE_DISABLED ?
->>>
->>> Or seccomp_run_filters() can see ->filters == NULL and WARN(),
->>> smp_load_acquire() only serializes that LOAD with the subsequent memory
->>> operations.
->>
->> Hm, actually, now I'm worried about smp_load_acquire() being too slow
->> in run_filters().
->>
->> The ordering must be:
->> - task->seccomp.filter must be valid before
->> - task->seccomp.mode is set, which must be valid before
->> - TIF_SECCOMP is set
->>
->> But I don't want to impact secure_computing(). What's the best way to
->> make sure this ordering is respected?
->
-> Remove the ordering requirement, perhaps?
->
-> What if you moved mode into seccomp.filter?  Then there would be
-> little reason to check TIF_SECCOMP from secure_computing; instead, you
-> could smp_load_acquire (or read_barrier_depends, maybe) seccomp.filter
-> from secure_computing and pass the result as a parameter to
-> __secure_computing.  Or you could even remove the distinction between
-> secure_computing and __secure_computing -- it's essentially useless
-> anyway to split entry hook approaches like my x86 fastpath prototype.
+On Wed, Jun 25, 2014 at 04:13:33PM +0100, Mark Rutland wrote:
+> On Wed, Jun 25, 2014 at 03:10:20PM +0100, Lorenzo Pieralisi wrote:
+> > With the introduction of DT based idle states, CPUidle drivers for
+> > ARM can now initialize idle states data through properties in the device
+> > tree.
+> > 
+> > This patch adds code to the Exynos CPUidle driver to dynamically
+> > initialize idle states data through the updated device tree source
+> > files.
+> > 
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> > Compile tested, I am not sure I patched the right dts files, please check.
+> > 
+> >  .../devicetree/bindings/arm/exynos/idle-states.txt | 27 ++++++++++++++++++++
+> >  arch/arm/boot/dts/exynos3250.dtsi                  | 16 ++++++++++++
+> >  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++++++++
+> >  arch/arm/boot/dts/exynos5410.dtsi                  | 17 +++++++++++++
+> >  drivers/cpuidle/Kconfig.arm                        |  1 +
+> >  drivers/cpuidle/cpuidle-exynos.c                   | 29 +++++++++++++---------
+> >  6 files changed, 93 insertions(+), 12 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/exynos/idle-states.txt b/Documentation/devicetree/bindings/arm/exynos/idle-states.txt
+> > new file mode 100644
+> > index 0000000..342ecb4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/exynos/idle-states.txt
+> > @@ -0,0 +1,27 @@
+> > +idle-states node
+> > +----------------
+> > +
+> > +On Exynos platforms with power management capabilities, the device
+> > +tree source file must contain the idle-states node[1]. As defined in [1] the
+> > +idle-states node must contain an entry-method property that for Exynos
+> > +platforms can be one of:
+> > +
+> > +	- "samsung,exynos"
+> 
+> Similarly to the TC2 binding, what does this mean?
+> 
+> What is a kernel expected to do when it sees this entry-method?
+> 
+> Using "samsung,exynos" as the entry-method feels like something that's
+> going to bite us; it sounds far too wide-reaching.
 
-The TIF_SECCOMP is needed for the syscall entry path. The check in
-secure_computing() is just because the "I am being traced" trigger
-includes a call to secure_computing, which filters out tracing
-reasons.
+Same story as TC2, it adds nothing to the patch, it is just there for
+compliance with current DT bindings, but useless and will disappear.
 
-Your fast path work would clean a lot of that up, as you say. But it
-still doesn't change the ordering check here. TIF_SECCOMP indicates
-seccomp.mode must be checked, so that ordering will remain, and if
-mode == FILTER, seccomp.filter must be valid.
+> >  static int exynos_cpuidle_probe(struct platform_device *pdev)
+> >  {
+> > -	int ret;
+> > +	int ret, i;
+> > +	struct cpuidle_driver *drv = &exynos_idle_driver;
+> >  
+> >  	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
+> >  
+> > -	ret = cpuidle_register(&exynos_idle_driver, NULL);
+> > +	drv->cpumask = (struct cpumask *) cpu_possible_mask;
+> 
+> This assignment looks scary to me. Why do we need to do this, and why
+> are we throwing away the constness of cpu_possible_mask?
 
-Isn't there a way we can force the assignment ordering in seccomp_assign_mode()?
+Yes, that's how it is done in CPUidle core if the idle driver does not
+initialize cpumask pointer, I guess it is to save some bytes, but I agree
+with you, I do not like that either, I will allocate the mask and copy.
 
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Thanks,
+Lorenzo
