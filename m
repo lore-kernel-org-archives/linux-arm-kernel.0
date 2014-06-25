@@ -1,22 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jun 2014 10:12:26 +0100
-Subject: [PATCH] arm64: mm: Fix horrendous config typo
-In-Reply-To: <1403682105-7919-1-git-send-email-steve.capper@linaro.org>
-References: <1403682105-7919-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140625091226.GE6153@arm.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 25 Jun 2014 17:14:06 +0800
+Subject: [PATCH v2 0/2] phy: add hix5hd2-sata-phy driver
+Message-ID: <1403687648-29082-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 08:41:45AM +0100, Steve Capper wrote:
-> The define ARM64_64K_PAGES is tested for rather than
-> CONFIG_ARM64_64K_PAGES. Correct that typo here.
+v2:
+Suggested by Mark
+Remove hisilicon,reg-init and init the register in phy-hix5hd2-sata.c
+Change property name accordingly.
 
-Whilst I agree that this is a bad typo, the existing behaviour would
-still return false all the time for 64K-page configs, right?
+Jiancheng Xue (2):
+  Documentation: Document Hisilicon hix5hd2 sata PHY
+  phy: add hix5hd2-sata-phy driver
 
-The bigger problem here is testing the hugepage support with all the
-wonderful page sizes we've grown. Are there any targetted tests to know
-that we're actually exercising 1GB mappings with 4k granules? Certainly,
-our stress tests don't appear to be catching this at the moment.
+ .../devicetree/bindings/phy/hix5hd2-sata-phy.txt   |   22 +++
+ drivers/phy/Kconfig                                |    8 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-hix5hd2-sata.c                     |  190 ++++++++++++++++++++
+ 4 files changed, 221 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/hix5hd2-sata-phy.txt
+ create mode 100644 drivers/phy/phy-hix5hd2-sata.c
 
-Will
+-- 
+1.7.9.5
