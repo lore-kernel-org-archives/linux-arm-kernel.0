@@ -1,25 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jun 2014 20:07:37 +0200
-Subject: [PATCH] clk: define and export __clk_get_debug for providers
-In-Reply-To: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <44039675.8s16pHQIVH@wuerfel>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 25 Jun 2014 11:07:51 -0700
+Subject: [PATCH v8 5/9] seccomp: split mode set routines
+In-Reply-To: <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-6-git-send-email-keescook@chromium.org>
+ <20140625135121.GB7892@redhat.com>
+ <CAGXu5jJkFxh4K=40xuh6tu3kUf4oJM8Dry+4upBdRieW3FNLgw@mail.gmail.com>
+ <CALCETrUBNmLnpa+LM91om2RSpR6SjupP-EdefzhU1Me4nv3Dfw@mail.gmail.com>
+ <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
+ <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
+ <20140625173245.GA17695@redhat.com>
+ <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
+ <20140625175136.GA18185@redhat.com>
+ <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
+Message-ID: <CALCETrVNwhWSPNiBiZmgP1nD9zLJPTk6cH0yo=85rbxTPTYFRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 June 2014 19:26:31 Peter De Schrijver wrote:
-> Define and export a new function __clk_get_debug which returns the debugfs
-> directory entry pointer. This can be used by clock providers to add debugfs
-> entries which are not related to a specific clock type. Examples include the
-> ability to measure the rate of a clock. It can also be used by modules to
-> create new debugfs entries. This is useful if you want to expose features
-> for testing which can potentially cause system instability such as allowing
-> to change a clock's rate from userspace.
-> 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> 
+On Wed, Jun 25, 2014 at 11:00 AM, Kees Cook <keescook@chromium.org> wrote:
+> On Wed, Jun 25, 2014 at 10:51 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> On 06/25, Andy Lutomirski wrote:
+>>>
+>>> On Wed, Jun 25, 2014 at 10:32 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>>> > On 06/25, Andy Lutomirski wrote:
+>>> >>
+>>> >> Write the filter, then smp_mb (or maybe a weaker barrier is okay),
+>>> >> then set the bit.
+>>> >
+>>> > Yes, exactly, this is what I meant. Plas rmb() in __secure_computing().
+>>> >
+>>> > But I still can't understand the rest of your discussion about the
+>>> > ordering we need ;)
+>>>
+>>> Let me try again from scratch.
+>>>
+>>> Currently there are three relevant variables: TIF_SECCOMP,
+>>> seccomp.mode, and seccomp.filter.  __secure_computing needs
+>>> seccomp.mode and seccomp.filter to be in sync, and it wants (but
+>>> doesn't really need) TIF_SECCOMP to be in sync as well.
+>>>
+>>> My suggestion is to rearrange it a bit.  Move mode into seccomp.filter
+>>> (so that filter == NULL implies no seccomp) and don't check
+>
+> This would require that we reimplement mode 1 seccomp via mode 2
+> filters. Which isn't too hard, but may add complexity.
+>
+>>> TIF_SECCOMP in secure_computing.  Then turning on seccomp is entirely
+>>> atomic except for the fact that the seccomp hooks won't be called if
+>>> filter != NULL but !TIF_SECCOMP.  This removes all ordering
+>>> requirements.
+>>
+>> Ah, got it, thanks. Perhaps I missed somehing, but to me this looks like
+>> unnecessary complication at first glance.
+>>
+>> We alredy have TIF_SECCOMP, we need it anyway, and we should only care
+>> about the case when this bit is actually set, so that we can race with
+>> the 1st call of __secure_computing().
+>>
+>> Otherwise we are fine: we can miss the new filter anyway, ->mode can't
+>> be changed it is already nonzero.
+>>
+>>> Alternatively, __secure_computing could still BUG_ON(!seccomp.filter).
+>>> In that case, filter needs to be set before TIF_SECCOMP is set, but
+>>> that's straightforward.
+>>
+>> Yep. And this is how seccomp_assign_mode() already works? It is called
+>> after we change ->filter chain, it changes ->mode before set(TIF_SECCOMP)
+>> just it lacks a barrier.
+>
+> Right, I think the best solution is to add the barrier. I was
+> concerned that adding the read barrier in secure_computing would have
+> a performance impact, though.
+>
 
-Just an idea, but would it be better to add a pair of functions to add/remove
-debugfs files rather than exposing the dentry itself?
+I can't speak for ARM, but I think that all of the read barriers are
+essentially free on x86.  (smp_mb is a very different story, but that
+shouldn't be needed here.)
 
-	Arnd
+--Andy
