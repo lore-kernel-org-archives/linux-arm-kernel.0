@@ -1,22 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jun 2014 10:54:06 +0100
-Subject: [PATCH 1/1] clk-imx35: Add clko clock support
-In-Reply-To: <1857714.L0sRRUOXiN@ws-stein>
-References: <1402990063-26908-1-git-send-email-alexander.stein@systec-electronic.com>
- <2789534.qY6c0ymzGl@ws-stein> <20140625065302.GB2224@dragon>
- <1857714.L0sRRUOXiN@ws-stein>
-Message-ID: <20140625095406.GG32514@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Jun 2014 10:57:36 +0100
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <130361958.xFghHXmZkz@wuerfel>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <4839521.56FtveYIl6@wuerfel> <20140625093825.GH6153@arm.com>
+ <130361958.xFghHXmZkz@wuerfel>
+Message-ID: <20140625095735.GI6153@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 10:58:12AM +0200, Alexander Stein wrote:
-> Well, the cko (cko1 and cko2) clocks on i.MX6 are also added. Though
-> I can't find any user of that. So why addind it despite that?
+On Wed, Jun 25, 2014 at 10:48:31AM +0100, Arnd Bergmann wrote:
+> On Wednesday 25 June 2014 10:38:25 Will Deacon wrote:
+> > On Wed, Jun 25, 2014 at 10:27:50AM +0100, Arnd Bergmann wrote:
+> > > I think the situation is a bit different here: It's less about the corner
+> > > cases for the SMMU, but about the question whether it makes more sense to
+> > > have the kernel figure out the settings, or have them come from DT
+> > > all the time.
+> > 
+> > But, as far as I can tell, this setting is basically `which bits are
+> > constant among this set of IDs'.
+> > 
+> > > As I said, I can't tell which approach is best here, but it sounds to
+> > > me we should either do dynamic configuration and get it right, or
+> > > hardcode the configuration it all the time if we can't.
+> > 
+> > I disagree. If you have `sensible' StreamID allocations, doing this
+> > dynamically should be straight-forward and gives the driver more flexibility
+> > (e.g. we then have the option of combining SMR entries for different masters
+> > if they are in the same domain). The dynamic approach also lends itself to
+> > sanity-checking (it is IMPLEMENTATION DEFINED whether the SMMU detects SMR
+> > aliases) and helps with virtualisation (forcing QEMU to generate these masks
+> > in a device-tree for a guest using a virtual SMMU interface is very painful).
+> 
+> In which case do you think hardcoding is needed then? I'm still confused
+> why you think we need both, as your arguments seem to all be in favor of
+> dynamic configuration.
 
-They are definitely used, I've recently added one user to my DT config,
-and there are other users in the DT configs already present in the
-kernel tree.  Look for <&clks 201> for iMX6.
+So far, I've been avoiding the hardcoding. However, you could potentially
+build a system with a small number of SMRs (compared to the number of
+StreamIDs) and allocate the StreamIDs in such a way that I think the dynamic
+configuration would be NP complete if we require an optimal SMR allocation.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+However:
+
+  (1) I don't know of a system where this is the case
+  (2) Not much work has been done on improving the dynamic allocator yet
+
+which is why I'm still favouring dynamic configuration in the driver.
+
+The other thing I forgot to mention earlier is that we need to support
+device hotplug in the future, so some level of dynamic configuration
+will always be required.
+
+Will
