@@ -1,80 +1,105 @@
-From: dianders@google.com (Doug Anderson)
-Date: Tue, 24 Jun 2014 21:02:33 -0700
-Subject: [PATCH 1/3] clk: exynos-audss: Keep the parent of mout_audss
- always enabled
-In-Reply-To: <53AA3D71.5010000@gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-2-git-send-email-tushar.b@samsung.com>
- <7ha99jjspt.fsf@paris.lan>
- <CAC5m3Bwj1HEWSQd7rx6Zn5vbUPKFqeT_X0PL3mAxRw0FNkK=QQ@mail.gmail.com>
- <CAD=FV=VP4-+B6oV8Skb3rxxPRbOWmzu=6PJbWbxCU=86ZvRuYQ@mail.gmail.com>
- <53AA3D71.5010000@gmail.com>
-Message-ID: <CAD=FV=X2C9yTQ-OPXe+8X4c8-CErBNUhjOX6PCWEdFCr8Tn+2Q@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 25 Jun 2014 10:00:59 +0530
+Subject: [PATCH v4 10/11] ARM: EXYNOS: Add platform driver support for
+ Exynos PMU.
+In-Reply-To: <53AA13BD.9060800@gmail.com>
+References: <1399704998-13321-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399704998-13321-11-git-send-email-pankaj.dubey@samsung.com>
+ <53A07719.7050206@samsung.com> <007a01cf8f9f$7909c850$6b1d58f0$@samsung.com>
+ <53AA13BD.9060800@gmail.com>
+Message-ID: <000101cf902e$452790f0$cf76b2d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar,
+Hi,
 
-On Tue, Jun 24, 2014 at 8:09 PM, Tushar Behera <trblinux@gmail.com> wrote:
-> On 06/25/2014 04:29 AM, Doug Anderson wrote:
->> Tushar,
->>
->> On Thu, Jun 12, 2014 at 12:40 AM, Tushar Behera <tushar.b@samsung.com> wrote:
->>> On Wed, Jun 11, 2014 at 10:20 PM, Kevin Hilman <khilman@linaro.org> wrote:
->>>> Tushar Behera <tushar.b@samsung.com> writes:
->>>>
->>>>> When the output clock of AUDSS mux is disabled, we are getting kernel
->>>>> oops while doing a clk_get() on other clocks provided by AUDSS.
->>>>>
->>>>> Though user manual doesn't specify this dependency, we came across
->>>>> this issue while disabling the parent of AUDSS mux clocks.
->>>>>
->>>>> Keeping the parents of AUDSS mux always enabled fixes this issue.
->>>>
->>>> While this patch works (and fixes the boot problem for me), it seems
->>>> like it's papering over the real problem.
->>>>
->>>
->>> Thanks for testing.
->>>
->>>> Seems like the right fix is actually modelling the clocks properly so
->>>> that enabling a child clock ensures that the parent is also enabled.
->>>>
->>>
->>> Patch 2/3 was to ensure we have proper clock tree defined for
->>> Exynos5420. While testing with audio disabled, that patch alone fixed
->>> the issue. But when audio was enabled (and hence I2S0 was trying to
->>> access the clocks), we got some kernel oops during late booting, hence
->>> I came up this solution.
->>>
->>> The solution might be a little half-baked because of the urgency to
->>> push the fix, but will try to dig more into the issue on Monday when I
->>> resume office.
->>
->> Which Monday were you referring to?  ;)
->>
+On Wednesday, June 25 2014 Tomasz Figa write:
+> On 24.06.2014 13:28, Pankaj Dubey wrote:
+> > On Tuesday, June 17 2014, Tomasz Figa wrote:
+> >> On 10.05.2014 08:56, Pankaj Dubey wrote:
+> 
+> [snip]
+> 
+> >>> +
+> >>> +	ret = platform_driver_register(&exynos_pmu_driver);
+> >>> +	if (ret < 0)
+> >>> +		goto out;
+> >>> +
+> >>> +	exynos_pmu_pdev = platform_device_register_simple("exynos-pmu",
+> -1,
+> >>> +			NULL, 0);
+> >>
+> >> Hmm, I don't see the point of making this a platform driver only to
+> > register respective
+> >> platform device few lines below. If you take into account the patch
+> >> for
+> > syscon I
+> >> posted as a reply to patch 06/11, you will be able to make this a
+> >> normal
+> > platform
+> >> driver that binds to DT node directly and then register a syscon in
+> >> probe
+> > function
+> >> above.
+> >>
+> >
+> > Well I updated PMU to be a syscon provider using your patch. It worked
+well.
+> > I have following two points to mention here:
+> >
+> > 1: For making PMU a normal platform driver, other than making PMU a
+> > syscon provider we need to change PMU's DT binding. Basically we need
+> > to remove "syscon"
+> > as second compatibility string. I hope this should not be an issue.
+> 
+> I don't see the reason for this. Could you elaborate on this?
+> 
+
+Currently syscon driver is registered via postcore_initcall whereas exynos
+pmu has
+arch_initcall. So if we keep syscon as second compatibility in exynos pmu
+node,
+syscon will be registered first and hence only syscon will be probed.
+
+> I know that the way Linux currently handles multiple compatible strings is
+broken,
+> but despite this, if you just make sure your platform driver registers
+before syscon
+> platform driver, it should be fine.
 >
-> Sorry that I couldn't get deeper into this issue. Thanks for reminding
-> though.
 
-No problem.  I know how it is.  I was trying to be funny though
-sometimes that doesn't come through very well over email.
+Yes, this could be possible if I convert arch_initcall of exynos pmu to
+postcore_initcall.
 
+As after converting arch_initcall to postcore_initcall, syscon driver will
+not be probed
+for exynos pmu node. Also as exynos pmu driver will now register itself as
+syscon provider,
+I could not see any use of keeping second compatibility as "syscon" in
+exynos pmu
+node.  Do you think it is still required?
 
->> ...but in all seriousness do you have an official status update on
->> this patch?  It seems as if it's not needed and all you need is
->> <https://patchwork.kernel.org/patch/4333581/>, but it would be nice to
->> get an official confirmation.
->
-> I have tested various scenarios with only patch 2/3, which seems to be
-> sufficient for the time being. I have not encountered the older issue
-> till now. I was thinking of testing a bit further, but given that you
-> have already asked for, we can go ahead with only patch 2/3 right now.
->
-> In case any further issue comes up, I will post patch 1/3 as per the
-> review comments that I have got.
+After removing "syscon" compatibility string from exynos pmu node, I have
+tested
+S2R as well as watchdog driver functionality, which is user of regmap handle
+of exynos pmu
+and both are working fine on exynos5250.
+ 
+> >
+> > 2: I can see for your syscon patch Arnd has some comments, hopefully
+> > we can address his concern.
+> >
+> 
+> Yes. I will get to it after sorting out few other things from my queue.
+> Or you can do it if you want - the purpose of that RFC patch was just to
+> show the idea I had in my mind.
+> 
 
-Sounds like a plan.  Thanks for getting the original patch sent out so
-quickly after I reported it.
+OK, let me post exynos pmu v5, based on your patch, and then if time permits
+I will have a look in it.
 
-Hopefully Kukjin will apply pack 2/3 soon (today?)
+> Best regards,
+> Tomasz
+
+Thanks,
+Pankaj Dubey
