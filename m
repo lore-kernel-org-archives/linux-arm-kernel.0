@@ -1,83 +1,21 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Jun 2014 09:57:04 +0100
-Subject: [PATCH 2/2] arm/gic: Add supports for GICv2m MSI(-X)
-In-Reply-To: <53AA3A3A.2050401@amd.com>
-References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1403569980-12913-3-git-send-email-suravee.suthikulpanit@amd.com>
- <20140624101111.GD5856@leverpostej> <53AA3A3A.2050401@amd.com>
-Message-ID: <20140625085703.GB29789@leverpostej>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 25 Jun 2014 10:58:32 +0200
+Subject: [PATCH v2 1/2] video: imxfb: Fix unbalanced regulators
+In-Reply-To: <53AA8D8C.2040705@eukrea.com>
+References: <1403528839-31901-1-git-send-email-denis@eukrea.com>
+ <20140625060848.GE15686@pengutronix.de> <53AA8D8C.2040705@eukrea.com>
+Message-ID: <53AA8F38.80703@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 03:55:54AM +0100, Suravee Suthikulanit wrote:
-> Mark,
-> 
-> Thank you for all your comments. Please see my reply below. I have 
-> omitted the minor ones.
-
-Likewise.
-
-> >> +static void free_msi_irq(struct gicv2m_msi_data *data, unsigned int irq)
-> >> +{
-> >> +       int pos;
-> >> +
-> >> +       spin_lock(&data->msi_cnt_lock);
-> >> +
-> >> +       pos = irq - data->spi_start;
-> >> +       if (pos >= 0 && pos < data->max_spi_cnt)
-> >
-> > Should either of these cases ever happen?
-> 
-> This is to check if the irq provided is within the MSI range.
-
-Sure, but surely this should only be called for the correct set of MSI
-IRQs? Allowing this to be called for arbitrary interrupts without
-reporting an error sounds wrong.
-
+On 06/25/2014 10:51 AM, Denis Carikli wrote:
+> On 06/25/2014 08:08 AM, Sascha Hauer wrote:
+>> It's a shame that the LCD controller doesn't do the reference counting.
 [...]
+> So I don't see any ways to handle it correctly in the LCD.
+Unless if the LCD core, instead of doing reference counting, does the 
+check by itself, by using get_power().
+But I doubt that it would be a good solution (I fear that it would have 
+race conditions).
 
-> >> +static int gicv2m_setup_msi_irq(struct msi_chip *chip, struct pci_dev *pdev,
-> >> +                     struct msi_desc *desc)
-> >> +{
-> >> +       int avail, irq = 0;
-> >> +       struct msi_msg msg;
-> >> +       phys_addr_t addr;
-> >> +       struct gicv2m_msi_data *data = to_gicv2m_msi_data(chip);
-> >> +
-> >> +       if (data == NULL) {
-> >
-> > If container_of returns NULL, you have bigger problems.
-> 
-> It was just sanity check. But, if you think this is obvious, I'll remove 
-> this check then.
-
-The issue is you check for NULL _after_ you've performed some pointer
-arithmetic. Because the msi_chip is the first element of
-gicv2m_msi_data, to_gicv2m_msi_data is currently an identity function
-with some type casting, but we should rely on that here. What if the
-msi_chip were moved to later in gicv2m_msi_data?
-
-If you want to check for NULL, check chip before
-to_gicv2m_msi_data(chip).
-
-[...]
-
-> >> +       /*
-> >> +       * MSI_TYPER:
-> >> +       *     [31:26] Reserved
-> >> +       *     [25:16] lowest SPI assigned to MSI
-> >> +       *     [15:10] Reserved
-> >> +       *     [9:0]   Numer of SPIs assigned to MSI
-> >> +       */
-> >> +       val = __raw_readl(msi->base + MSI_TYPER);
-> >
-> > Are you sure you want to use __raw_readl?
-> >
-> Probably not.  I am replacing this with ioread32(msi->base + MSI_TYPER).
-
-It's probably better to use readl() or a readl_relaxed() here for
-consistency with the rest of the ARM code, but otherwise that sounds
-sane.
-
-Thanks,
-Mark.
+Denis.
