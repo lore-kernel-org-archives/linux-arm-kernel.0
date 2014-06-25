@@ -1,106 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Jun 2014 18:47:52 +0100
-Subject: [PATCH v5 8/8] arm64: boot: dts: update rtsm aemv8 dts with PSCI
- and idle states
-In-Reply-To: <20140625142714.GB15240@leverpostej>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-9-git-send-email-lorenzo.pieralisi@arm.com>
- <20140625142714.GB15240@leverpostej>
-Message-ID: <20140625174751.GD15050@e102568-lin.cambridge.arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 25 Jun 2014 13:50:28 -0400
+Subject: [PATCH v2] ARM: virt, vexpress: Use 64-bit DMA for LPAE
+In-Reply-To: <5331B14B.7040103@codeaurora.org>
+References: <5331B14B.7040103@codeaurora.org>
+Message-ID: <1403718631-25194-1-git-send-email-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 03:27:14PM +0100, Mark Rutland wrote:
-> Hi Lorenzo,
-> 
-> On Wed, Jun 25, 2014 at 03:10:21PM +0100, Lorenzo Pieralisi wrote:
-> > This patch updates the RTSM dts file with PSCI bindings and nodes
-> > describing the AEMv8 model idle states parameters.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 44 +++++++++++++++++++++++++++-------
-> >  1 file changed, 36 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> > index d79de9c..4051ffb 100644
-> > --- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> > +++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> > @@ -27,37 +27,65 @@
-> >  		serial3 = &v2m_serial3;
-> >  	};
-> >  
-> > +	psci {
-> > +		compatible = "arm,psci-0.2";
-> 
-> Where can I find a PSCI 0.2 implementation for the RTSM VE model? I
-> couldn't find a link in the cover.
-> 
-> The upstream bootwrapper is not PSCI 0.2 compliant and it does not
-> implement CPU_SUSPEND.
+On an LPAE system, the physical addresses used by VirtIO-MMIO may be
+higher than 32 bits. For example on a Versatile Express system with
+4G RAM, the following error surfaces when trying to use a VirtIO-MMIO
+block device.
 
-This patch was not meant to be merged, it was for DT bindings demonstration
-purposes, you are definitely right. I will patch the FVP model dts and
-add a link to trusted firmware that supports the FVP models power
-controller.
+EXT2-fs (vda): error: ext2_check_page: bad entry in directory #2: : unaligned directory entry - offset=0, inode=3755990991, rec_len=57311, name_len=223
 
-> > +		method = "smc";
-> > +		cpu_suspend = <0xc4000001>;
-> > +		cpu_off = <0x84000002>;
-> > +		cpu_on = <0xc4000003>;
-> 
-> Without "arm,psci" in the compatible list, these three properties are
-> meaningless.
+To fix this, select ARCH_DMA_ADDR_T_64BIT when LPAE is selected
+and mach-vexpress, mach-virt, or both are being built.
 
-Right, my bad.
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
+ arch/arm/Kconfig               | 1 +
+ arch/arm/mach-vexpress/Kconfig | 1 +
+ 2 files changed, 2 insertions(+)
 
-> > +	};
-> > +
-> >  	cpus {
-> >  		#address-cells = <2>;
-> >  		#size-cells = <0>;
-> >  
-> > +		idle-states {
-> > +			entry-method = "arm,psci";
-> > +
-> > +			CPU_SLEEP_0: cpu-sleep-0 {
-> > +				compatible = "arm,idle-state";
-> > +				entry-method-param = <0x0010000>;
-> > +				entry-latency-us = <40>;
-> > +				exit-latency-us = <100>;
-> > +				min-residency-us = <150>;
-> > +			};
-> > +
-> > +			CLUSTER_SLEEP_0: cluster-sleep-0 {
-> > +				compatible = "arm,idle-state";
-> > +				entry-method-param = <0x1010000>;
-> > +				entry-latency-us = <500>;
-> > +				exit-latency-us = <1000>;
-> > +				min-residency-us = <2500>;
-> > +			};
-> > +		};
-> > +
-> 
-> If this is going to live in the /cpus node, could it please be placed
-> after the cpu nodes?
-
-Ok.
-
-> >  		cpu at 0 {
-> >  			device_type = "cpu";
-> >  			compatible = "arm,armv8";
-> >  			reg = <0x0 0x0>;
-> > -			enable-method = "spin-table";
-> > -			cpu-release-addr = <0x0 0x8000fff8>;
-> > +			enable-method = "psci";
-> 
-> Changing the enable-method will break boot on a model when using a
-> bootwrapper without PSCI support. Really we should leave it up to the
-> bootwrapper to inject the enable method...
-
-See above, you are right, I should have made it clear that this patch
-was not meant for merging or testing and it was to provide a sample dts, will
-fix it for v6.
-
-Thanks,
-Lorenzo
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 245058b..8407c28 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -901,6 +901,7 @@ endmenu
+ 
+ config ARCH_VIRT
+ 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select ARM_PSCI
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 99c1f15..5f33e16 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -1,5 +1,6 @@
+ menuconfig ARCH_VEXPRESS
+ 	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+-- 
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by the Linux Foundation.
