@@ -1,25 +1,63 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Jun 2014 07:10:07 -0700
-Subject: [PATCH 1/4 v2] devicetree: bindings: Document murata vendor prefix
-In-Reply-To: <1403677773-21141-2-git-send-email-ch.naveen@samsung.com>
-References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
- <1403677773-21141-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <53AAD83F.5060801@roeck-us.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Jun 2014 15:10:15 +0100
+Subject: [PATCH v5 2/8] Documentation: devicetree: psci: define CPU suspend
+ parameter
+In-Reply-To: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1403705421-17597-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2014 11:29 PM, Naveen Krishna Chatradhi wrote:
-> Add Murata Manufacturing Co., Ltd. to the list of device tree
-> vendor prefixes.
->
-> Murata manufactures NTC (Negative Temperature Coefficient) based
-> Thermistors for small scale applications like Mobiles and PDAs.
->
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
+OS layers built on top of PSCI to enter low-power states require the
+power_state parameter to be passed to the PSCI CPU suspend method.
 
-Applied.
+This parameter is specific to a power state and platform specific,
+therefore must be provided by firmware to the OS in order to enable
+proper call sequence.
 
-Thanks,
-Guenter
+This patch adds a property in the PSCI bindings that describes how
+the CPU suspend power_state parameter should be defined in DT in
+all device nodes that rely on PSCI CPU suspend method usage.
+
+Reviewed-by: Sebastian Capella <sebcape@gmail.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index b4a58f3..fae3eed 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -50,6 +50,14 @@ Main node optional properties:
+ 
+  - migrate       : Function ID for MIGRATE operation
+ 
++Device tree nodes that require usage of PSCI CPU_SUSPEND function (ie idle
++states bindings[1]) must specify the following properties:
++
++- entry-method-param
++		Usage: Required for idle states bindings [1].
++		Value type: <u32>
++		Definition: power_state parameter to pass to the PSCI
++			    suspend call.
+ 
+ Example:
+ 
+@@ -64,7 +72,6 @@ Case 1: PSCI v0.1 only.
+ 		migrate		= <0x95c10003>;
+ 	};
+ 
+-
+ Case 2: PSCI v0.2 only
+ 
+ 	psci {
+@@ -88,3 +95,6 @@ Case 3: PSCI v0.2 and PSCI v0.1.
+ 
+ 		...
+ 	};
++
++[1] Kernel documentation - ARM idle states bindings
++    Documentation/devicetree/bindings/arm/idle-states.txt
+-- 
+1.9.1
