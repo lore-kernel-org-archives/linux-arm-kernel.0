@@ -1,206 +1,340 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jun 2014 20:48:29 +0200
-Subject: ARM: SoC fixes
-Message-ID: <6894576.0h2zQsBMRF@wuerfel>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 25 Jun 2014 20:48:32 +0200
+Subject: [PATCH 1/2] ARM: dts: mx5: Split M53EVK into SoM and EVK parts
+Message-ID: <1403722113-5721-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 21278aeafbfacfd62b3e613525f0c694a029dac1:
+This patch splits the M53EVK device tree file into a common SoM
+part and an EVK part. This is needed to make it easier for users
+of the SoM to put it into different, non-reference baseboard.
 
-  ARM: use menuconfig for sub-arch menus (2014-06-17 17:09:48 +0200)
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx53-m53.dtsi   | 140 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx53-m53evk.dts | 112 +----------------------------
+ 2 files changed, 143 insertions(+), 109 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx53-m53.dtsi
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 6c9d16178870315846faa1f59697b801e3fe0531:
-
-  Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes (2014-06-25 20:27:15 +0200)
-
-----------------------------------------------------------------
-
-ARM: SoC fixes for 3.16
-
-A new set of bug fixes for 3.16, containing patches for seven platforms:
-
-at91:
-    - drivers/misc fix for Kconfig PWM symbol
-    - correction of several values in DT after conversion to CCF
-    - fix at91sam9261/at91sam9261ek mistake in slow crystal vs. slow RC osc
-
-imx:
-    - Use GPIO for card CD/WP on imx51-babbage and eukrea-mbimxsd51,
-      because controller base CD/WP is not working in esdhc driver due to
-      runtime PM support
-    - A couple of random ventana gw5xxx board fixes
-    - Add IMX_IPUV3_CORE back to defconfig, which gets lost when moving
-      IPUv3 driver out of staging tree
-    - Fix enet/fec clock selection on imx6sl
-    - Fix display node on imx53-m53evk board
-    - A couple of Cubox-i updates from Russell, which were omitted from
-      the merge window due to dependency
-
-integrator:
-    - fix an OF-related regression against 3.15
-
-mvebu:
-    - mvebu (v7)
-       - Fix broken SoC ID detection
-       - Select ARM_CPU_SUSPEND for v7
-       - Remove armada38x compatible string (no users yet)
-       - Enable Dove SoC in mvebu_v7_defconfig
-    - kirkwood
-       - Fix phy-connection-type on GuruPlug board
-
-qcom:
-    - enable gsbi driver in defconfig
-    - fix section mismatch warning in serial driver
-
-samsung:
-    - use WFI macro in platform_do_lowpower because exynos cpuhotplug
-      includes a hardcoded WFI instruction and it causes compile error
-      in Thumb-2 mode.
-    - fix GIC reg sizes for exynos4 SoCs
-    - remove reset timer counter value during boot and resume for mct
-      to fix a big jump in printk timestamps
-    - fix pm code to check cortex-A9 for another exynos SoCs
-    - don't rely on firmware's secondary_cpu_start for mcpm
-
-sti:
-    - Ethernet clocks were wrongly defined for STiH415/416 platforms
-    - STiH416 B2020 revision E DTS file name contained uppercase, change to
-      lowercase.
-
-----------------------------------------------------------------
-Abhilash Kesavan (1):
-      ARM: EXYNOS: fix pm code to check for cortex A9 rather than the SoC
-
-Alexandre Belloni (5):
-      ARM: at91/dt: sam9x5: correct PLLA ICPLL and OUT values
-      ARM: at91/dt: sam9n12: correct PLLA ICPLL and OUT values
-      ARM: at91/dt: sam9261: correctly define mainck
-      ARM: at91/dt: define sam9261ek slow crystal frequency
-      ARM: at91/dt: sam9261: remove slow RC osc
-
-Arnd Bergmann (5):
-      Merge tag 'sti-fixes-for-v3.16-rc1' of git://git.stlinux.com/devel/kernel/linux-sti into fixes
-      Merge tag 'samsung-fixes-1' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'imx-fixes-3.16' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'mvebu-fixes-3.16' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
-
-Chirantan Ekbote (1):
-      clocksource: exynos_mct: Don't reset the counter during boot and resume
-
-Denis Carikli (1):
-      ARM: dts: imx51-eukrea-mbimxsd51-baseboard: unbreak esdhc.
-
-Doug Anderson (1):
-      ARM: EXYNOS: Don't rely on firmware's secondary_cpu_start for mcpm
-
-Ezequiel Garcia (2):
-      ARM: mvebu: enable Dove SoC in mvebu_v7_defconfig
-      ARM: mvebu: Fix broken SoC ID detection
-
-Fabio Estevam (1):
-      ARM: imx_v6_v7_defconfig: Enable CONFIG_IMX_IPUV3_CORE
-
-Fugang Duan (2):
-      ARM: imx6sl: add missing enet clock for imx6sl
-      ARM: dts: imx6sl: correct the fec ipg clock source
-
-Gregory CLEMENT (1):
-      ARM: mvebu: Fix the improper use of the compatible string armada38x using a wildcard
-
-Kumar Gala (1):
-      tty: serial: msm: Fix section mismatch warning
-
-Lee Jones (1):
-      ARM: stih41x: Rename stih416-b2020-revE.dts to stih416-b2020e.dts
-
-Leela Krishna Amudala (1):
-      ARM: EXYNOS: Use wfi macro in platform_do_lowpower
-
-Linus Walleij (1):
-      ARM: integrator: fix OF-related regression
-
-Marek Vasut (2):
-      ARM: dts: mx5: Fix IPU port node placement
-      ARM: dts: mx5: Move the display out of soc {} node
-
-Nicolas Ferre (1):
-      misc: atmel_pwm: fix Kconfig symbols
-
-Peter Griffin (1):
-      ARM: STi: DT: Properly define sti-ethclk & stmmaceth for stih415/6
-
-Philipp Zabel (1):
-      ARM: dts: imx6qdl-gw5xxx: Fix Linear Technology vendor prefix
-
-Russell King (2):
-      ARM: dts: cubox-i: add support for PWM-driven front panel LED
-      ARM: dts: hummingboard/cubox-i: move usb otg configuration to platform level
-
-Sascha Hauer (1):
-      ARM: dts: imx51-babbage: Fix esdhc setup
-
-Sebastian Hesselbarth (1):
-      ARM: dts: kirkwood: fix phy-connection-type for Guruplug
-
-Srinivas Kandagatla (1):
-      ARM: multi_v7_defconfig: Add QCOM GSBI driver
-
-Thomas Petazzoni (1):
-      ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7 platforms
-
-Tim Harvey (2):
-      ARM: dts: imx6: ventana: fix include typo
-      ARM: dts: imx6: ventana: correct gw52xx sgtl5000 clock source
-
-Tomasz Figa (1):
-      ARM: dts: fix reg sizes of GIC for exynos4
-
- .../devicetree/bindings/arm/armada-38x.txt         | 14 ++++++--
- arch/arm/boot/dts/Makefile                         |  2 +-
- arch/arm/boot/dts/armada-380.dtsi                  |  2 +-
- arch/arm/boot/dts/armada-385-db.dts                |  2 +-
- arch/arm/boot/dts/armada-385-rd.dts                |  2 +-
- arch/arm/boot/dts/armada-385.dtsi                  |  2 +-
- arch/arm/boot/dts/armada-38x.dtsi                  |  2 +-
- arch/arm/boot/dts/at91sam9261.dtsi                 | 21 ++++--------
- arch/arm/boot/dts/at91sam9261ek.dts                |  4 +++
- arch/arm/boot/dts/at91sam9n12.dtsi                 |  4 +--
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  4 +--
- arch/arm/boot/dts/exynos4.dtsi                     |  2 +-
- arch/arm/boot/dts/imx51-babbage.dts                | 10 +++---
- .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |  4 +--
- arch/arm/boot/dts/imx53-m53evk.dts                 | 40 ++++++++++------------
- arch/arm/boot/dts/imx6dl-hummingboard.dts          | 10 ++++++
- arch/arm/boot/dts/imx6q-gw51xx.dts                 |  2 +-
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi             | 27 +++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw51xx.dtsi              |  2 +-
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              |  4 +--
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              |  2 +-
- arch/arm/boot/dts/imx6qdl-microsom.dtsi            | 13 -------
- arch/arm/boot/dts/imx6sl.dtsi                      |  2 +-
- .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |  4 +--
- arch/arm/boot/dts/stih415.dtsi                     |  8 ++---
- .../{stih416-b2020-revE.dts => stih416-b2020e.dts} |  0
- arch/arm/boot/dts/stih416.dtsi                     |  8 ++---
- arch/arm/configs/imx_v6_v7_defconfig               |  1 +
- arch/arm/configs/multi_v7_defconfig                |  1 +
- arch/arm/configs/mvebu_v7_defconfig                |  2 ++
- arch/arm/mach-exynos/hotplug.c                     |  8 +----
- arch/arm/mach-exynos/mcpm-exynos.c                 | 11 +++---
- arch/arm/mach-exynos/pm.c                          | 15 ++++----
- arch/arm/mach-imx/clk-imx6sl.c                     |  1 +
- arch/arm/mach-integrator/integrator_ap.c           | 26 ++++----------
- arch/arm/mach-integrator/integrator_cp.c           | 23 ++++---------
- arch/arm/mach-mvebu/Kconfig                        |  2 ++
- drivers/clocksource/exynos_mct.c                   |  9 ++---
- drivers/misc/Kconfig                               |  2 +-
- drivers/tty/serial/msm_serial.c                    |  2 +-
- include/dt-bindings/clock/imx6sl-clock.h           |  3 +-
- include/dt-bindings/clock/stih415-clks.h           |  1 +
- include/dt-bindings/clock/stih416-clks.h           |  1 +
- 43 files changed, 158 insertions(+), 147 deletions(-)
+diff --git a/arch/arm/boot/dts/imx53-m53.dtsi b/arch/arm/boot/dts/imx53-m53.dtsi
+new file mode 100644
+index 0000000..87a7fc7
+--- /dev/null
++++ b/arch/arm/boot/dts/imx53-m53.dtsi
+@@ -0,0 +1,140 @@
++/*
++ * Copyright (C) 2014 Marek Vasut <marex@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include "imx53.dtsi"
++
++/ {
++	model = "DENX M53";
++	compatible = "denx,imx53-m53", "fsl,imx53";
++
++	memory {
++		reg = <0x70000000 0x20000000>,
++		      <0xb0000000 0x20000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3p2v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "3P2V";
++			regulator-min-microvolt = <3200000>;
++			regulator-max-microvolt = <3200000>;
++			regulator-always-on;
++		};
++
++		reg_backlight: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "lcd-supply";
++			regulator-min-microvolt = <3200000>;
++			regulator-max-microvolt = <3200000>;
++			regulator-always-on;
++		};
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	clock-frequency = <400000>;
++	status = "okay";
++
++	stmpe610 at 41 {
++		compatible = "st,stmpe610";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x41>;
++		id = <0>;
++		blocks = <0x5>;
++		interrupts = <6 0x0>;
++		interrupt-parent = <&gpio7>;
++		irq-trigger = <0x1>;
++
++		stmpe_touchscreen {
++			compatible = "st,stmpe-ts";
++			reg = <0>;
++			st,sample-time = <4>;
++			st,mod-12b = <1>;
++			st,ref-sel = <0>;
++			st,adc-freq = <1>;
++			st,ave-ctrl = <3>;
++			st,touch-det-delay = <3>;
++			st,settling = <4>;
++			st,fraction-z = <7>;
++			st,i-drive = <1>;
++		};
++	};
++
++	eeprom: eeprom at 50 {
++		compatible = "atmel,24c128";
++		reg = <0x50>;
++		pagesize = <32>;
++	};
++
++	rtc: rtc at 68 {
++		compatible = "stm,m41t62";
++		reg = <0x68>;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	imx53-m53evk {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x80000000
++				MX53_PAD_EIM_EB3__GPIO2_31		0x80000000
++				MX53_PAD_PATA_DA_0__GPIO7_6		0x80000000
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX53_PAD_EIM_D16__I2C2_SDA		0xc0000000
++				MX53_PAD_EIM_EB2__I2C2_SCL		0xc0000000
++			>;
++		};
++
++		pinctrl_nand: nandgrp {
++			fsl,pins = <
++				MX53_PAD_NANDF_WE_B__EMI_NANDF_WE_B	0x4
++				MX53_PAD_NANDF_RE_B__EMI_NANDF_RE_B	0x4
++				MX53_PAD_NANDF_CLE__EMI_NANDF_CLE	0x4
++				MX53_PAD_NANDF_ALE__EMI_NANDF_ALE	0x4
++				MX53_PAD_NANDF_WP_B__EMI_NANDF_WP_B	0xe0
++				MX53_PAD_NANDF_RB0__EMI_NANDF_RB_0	0xe0
++				MX53_PAD_NANDF_CS0__EMI_NANDF_CS_0	0x4
++				MX53_PAD_PATA_DATA0__EMI_NANDF_D_0	0xa4
++				MX53_PAD_PATA_DATA1__EMI_NANDF_D_1	0xa4
++				MX53_PAD_PATA_DATA2__EMI_NANDF_D_2	0xa4
++				MX53_PAD_PATA_DATA3__EMI_NANDF_D_3	0xa4
++				MX53_PAD_PATA_DATA4__EMI_NANDF_D_4	0xa4
++				MX53_PAD_PATA_DATA5__EMI_NANDF_D_5	0xa4
++				MX53_PAD_PATA_DATA6__EMI_NANDF_D_6	0xa4
++				MX53_PAD_PATA_DATA7__EMI_NANDF_D_7	0xa4
++			>;
++		};
++	};
++};
++
++&nfc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_nand>;
++	nand-bus-width = <8>;
++	nand-ecc-mode = "hw";
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index 0689c1e..1883d0d 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -10,17 +10,12 @@
+  */
+ 
+ /dts-v1/;
+-#include "imx53.dtsi"
++#include "imx53-m53.dtsi"
+ 
+ / {
+ 	model = "DENX M53EVK";
+ 	compatible = "denx,imx53-m53evk", "fsl,imx53";
+ 
+-	memory {
+-		reg = <0x70000000 0x20000000>,
+-		      <0xb0000000 0x20000000>;
+-	};
+-
+ 	display1: display at di1 {
+ 		compatible = "fsl,imx-parallel-display";
+ 		interface-pix-fmt = "bgr666";
+@@ -81,25 +76,6 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		reg_3p2v: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "3P2V";
+-			regulator-min-microvolt = <3200000>;
+-			regulator-max-microvolt = <3200000>;
+-			regulator-always-on;
+-		};
+-
+-
+-		reg_backlight: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "lcd-supply";
+-			regulator-min-microvolt = <3200000>;
+-			regulator-max-microvolt = <3200000>;
+-			regulator-always-on;
+-		};
+-
+ 		reg_usbh1_vbus: regulator at 3 {
+ 			compatible = "regulator-fixed";
+ 			reg = <3>;
+@@ -174,50 +150,6 @@
+ 	};
+ };
+ 
+-&i2c2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c2>;
+-	clock-frequency = <400000>;
+-	status = "okay";
+-
+-	stmpe610 at 41 {
+-		compatible = "st,stmpe610";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		reg = <0x41>;
+-		id = <0>;
+-		blocks = <0x5>;
+-		interrupts = <6 0x0>;
+-		interrupt-parent = <&gpio7>;
+-		irq-trigger = <0x1>;
+-
+-		stmpe_touchscreen {
+-			compatible = "st,stmpe-ts";
+-			reg = <0>;
+-			st,sample-time = <4>;
+-			st,mod-12b = <1>;
+-			st,ref-sel = <0>;
+-			st,adc-freq = <1>;
+-			st,ave-ctrl = <3>;
+-			st,touch-det-delay = <3>;
+-			st,settling = <4>;
+-			st,fraction-z = <7>;
+-			st,i-drive = <1>;
+-		};
+-	};
+-
+-	eeprom: eeprom at 50 {
+-		compatible = "atmel,24c128";
+-		reg = <0x50>;
+-		pagesize = <32>;
+-	};
+-
+-	rtc: rtc at 68 {
+-		compatible = "stm,m41t62";
+-		reg = <0x68>;
+-	};
+-};
+-
+ &i2c3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c3>;
+@@ -226,14 +158,11 @@
+ 
+ &iomuxc {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_hog>;
++	pinctrl-0 = <&pinctrl_hog &pinctrl_usb>;
+ 
+ 	imx53-m53evk {
+-		pinctrl_hog: hoggrp {
++		pinctrl_usb: usbgrp {
+ 			fsl,pins = <
+-				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x80000000
+-				MX53_PAD_EIM_EB3__GPIO2_31		0x80000000
+-				MX53_PAD_PATA_DA_0__GPIO7_6		0x80000000
+ 				MX53_PAD_GPIO_2__GPIO1_2		0x80000000
+ 				MX53_PAD_GPIO_3__USBOH3_USBH1_OC	0x80000000
+ 			>;
+@@ -302,13 +231,6 @@
+ 			>;
+ 		};
+ 
+-		pinctrl_i2c2: i2c2grp {
+-			fsl,pins = <
+-				MX53_PAD_EIM_D16__I2C2_SDA		0xc0000000
+-				MX53_PAD_EIM_EB2__I2C2_SCL		0xc0000000
+-			>;
+-		};
+-
+ 		pinctrl_i2c3: i2c3grp {
+ 			fsl,pins = <
+ 				MX53_PAD_GPIO_6__I2C3_SDA		0xc0000000
+@@ -353,26 +275,6 @@
+ 			>;
+ 		};
+ 
+-		pinctrl_nand: nandgrp {
+-			fsl,pins = <
+-				MX53_PAD_NANDF_WE_B__EMI_NANDF_WE_B	0x4
+-				MX53_PAD_NANDF_RE_B__EMI_NANDF_RE_B	0x4
+-				MX53_PAD_NANDF_CLE__EMI_NANDF_CLE	0x4
+-				MX53_PAD_NANDF_ALE__EMI_NANDF_ALE	0x4
+-				MX53_PAD_NANDF_WP_B__EMI_NANDF_WP_B	0xe0
+-				MX53_PAD_NANDF_RB0__EMI_NANDF_RB_0	0xe0
+-				MX53_PAD_NANDF_CS0__EMI_NANDF_CS_0	0x4
+-				MX53_PAD_PATA_DATA0__EMI_NANDF_D_0	0xa4
+-				MX53_PAD_PATA_DATA1__EMI_NANDF_D_1	0xa4
+-				MX53_PAD_PATA_DATA2__EMI_NANDF_D_2	0xa4
+-				MX53_PAD_PATA_DATA3__EMI_NANDF_D_3	0xa4
+-				MX53_PAD_PATA_DATA4__EMI_NANDF_D_4	0xa4
+-				MX53_PAD_PATA_DATA5__EMI_NANDF_D_5	0xa4
+-				MX53_PAD_PATA_DATA6__EMI_NANDF_D_6	0xa4
+-				MX53_PAD_PATA_DATA7__EMI_NANDF_D_7	0xa4
+-			>;
+-		};
+-
+ 		pinctrl_pwm1: pwm1grp {
+ 			fsl,pins = <
+ 				MX53_PAD_DISP0_DAT8__PWM1_PWMO		0x5
+@@ -408,14 +310,6 @@
+ 	remote-endpoint = <&display1_in>;
+ };
+ 
+-&nfc {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_nand>;
+-	nand-bus-width = <8>;
+-	nand-ecc-mode = "hw";
+-	status = "okay";
+-};
+-
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
+-- 
+2.0.0.rc2
