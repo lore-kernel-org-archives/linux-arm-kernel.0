@@ -1,82 +1,30 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 25 Jun 2014 09:37:14 +0200
-Subject: [PATCH 4/4] ARM: DTS: Add NTC thermistor nodes as child nodes to
- ADC
-In-Reply-To: <CAHfPSqAAWFtCQQrKBhLFuE2OuO_fwmUOhcOX9zKk8eMRMNSVvg@mail.gmail.com>
-References: <1403612356-23685-1-git-send-email-ch.naveen@samsung.com>
- <1403612356-23685-5-git-send-email-ch.naveen@samsung.com>
- <CAD=FV=Wmi73S4c5TPUqnNyycQ5xX5SbYy_ES-cbbJF2Hr0tqvQ@mail.gmail.com>
- <CAHfPSqAAWFtCQQrKBhLFuE2OuO_fwmUOhcOX9zKk8eMRMNSVvg@mail.gmail.com>
-Message-ID: <CABxcv=mTo9Qus+ZY-BSrcanfwvOF1KRc1rcQkq0pnBg12ftF-w@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 25 Jun 2014 08:41:45 +0100
+Subject: [PATCH] arm64: mm: Fix horrendous config typo
+Message-ID: <1403682105-7919-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Naveen,
+The define ARM64_64K_PAGES is tested for rather than
+CONFIG_ARM64_64K_PAGES. Correct that typo here.
 
-On Wed, Jun 25, 2014 at 7:04 AM, Naveen Krishna Ch
-<naveenkrishna.ch@gmail.com> wrote:
-> Doug,
->
-> On 25 June 2014 03:24, Doug Anderson <dianders@chromium.org> wrote:
->> Naveen,
->>
->> On Tue, Jun 24, 2014 at 5:19 AM, Naveen Krishna Chatradhi
->> <ch.naveen@samsung.com> wrote:
->>> Exynos5420 based Peach PIT and Exynos5800 based PI boards have
->>> 4 NTC thermistors to measure temperatures at various points on the
->>> board.
->>>
->>> IIO based ADC becomes the parent and NTC thermistors are the childs,
->>> via the HWMON interface.
->>>
->>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->>> Cc: Doug Anderson <dianders@chromium.org>
->>> ---
->>> This patch needs
->>> 1. MAX77802 PMIC device tree nodes (for ldo9)
->>>    https://www.mail-archive.com/devicetree at vger.kernel.org/msg31430.html
->>> 2. Uses the DT documentation for NTC thermistors updated with vendor-prefix
->>>
->>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   32 ++++++++++++++++++++++++++++
->>>  1 file changed, 32 insertions(+)
->>
->> * You forgot: status="okay" for the ADC.  One might question how this
->> patch was tested.
->
-> Will correct it.
->
->>
->> * Please also include this change for pi.
->
-> MAX77802 device node was not added for Peach_PI (exynos5800-peach-pi.dts).
-> I guess, Javier have a plan to send.
->
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm64/include/asm/pgtable.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-That's correct. I didn't include the changes to Peach Pi since I only
-have a Pit to test but I'll add it on the next version so you can have
-that patch as a dependency and use the MAX77802 LD9 regulator.
-
-> I will edit the commit message to remove Peach_PI for now.
->
-> Also, we have few similar nodes on Peach PI  and Peach PIT.
-> Any plans or discussion on merging the common nodes ?
->
->>
->> * We just got through the painful process of sorting this .dts file.
->> Please sort "&adc" alphabetically.  Kukjin: please confirm that you
->> will keep an eye on patches and make sure that they are sorted OK.
->>
->>
->> Other than those problems this seems to work fine to me.
->>
->> -Doug
->
-> Thanks for the Review.
->
->
-> --
-> Shine bright,
-> (: Nav :)
-
-Best regards,
-Javier
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 5797020..e0ccceb 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -292,7 +292,7 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+ 				 PMD_TYPE_SECT)
+ 
+-#ifdef ARM64_64K_PAGES
++#ifdef CONFIG_ARM64_64K_PAGES
+ #define pud_sect(pud)		(0)
+ #else
+ #define pud_sect(pud)		((pud_val(pud) & PUD_TYPE_MASK) == \
+-- 
+1.9.3
