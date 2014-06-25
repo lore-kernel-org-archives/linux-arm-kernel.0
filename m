@@ -1,69 +1,31 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 25 Jun 2014 19:24:10 +0200
-Subject: [PATCH v8 9/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
-In-Reply-To: <CAGXu5jLHDew1fifGY_mWgwcH7evm0T8rqSnBrw4XpoAXGK+t-Q@mail.gmail.com>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <1403642893-23107-10-git-send-email-keescook@chromium.org>
- <20140625142121.GD7892@redhat.com>
- <CAGXu5jJtLrjbobZC1FD4WV-Jm2p7cRGa1aSPK-d_isnfCZAHdA@mail.gmail.com>
- <20140625165209.GA14720@redhat.com>
- <CAGXu5jLHDew1fifGY_mWgwcH7evm0T8rqSnBrw4XpoAXGK+t-Q@mail.gmail.com>
-Message-ID: <20140625172410.GA17133@redhat.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 25 Jun 2014 10:28:50 -0700
+Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
+ regulators
+In-Reply-To: <001201cf9067$3c5b2070$b5116150$%jun@samsung.com>
+References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
+ <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
+ <53AA3F78.3080804@samsung.com>
+ <001201cf9067$3c5b2070$b5116150$%jun@samsung.com>
+Message-ID: <CAD=FV=UCinFuZQW+_GYFw=M046ziTLRNvvHUvsx_GQ0kjw5DfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25, Kees Cook wrote:
->
-> On Wed, Jun 25, 2014 at 9:52 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> >
-> > Yes, at least this should close the race with suid-exec. And there are no
-> > other users. Except apparmor, and I hope you will check it because I simply
-> > do not know what it does ;)
-> >
-> >> I wonder if changes to nnp need to "flushed" during syscall entry
-> >> instead of getting updated externally/asynchronously? That way it
-> >> won't be out of sync with the seccomp mode/filters.
-> >>
-> >> Perhaps secure computing needs to check some (maybe seccomp-only)
-> >> atomic flags and flip on the "real" nnp if found?
-> >
-> > Not sure I understand you, could you clarify?
->
-> Instead of having TSYNC change the nnp bit, it can set a new flag, say:
->
->     task->seccomp.flags |= SECCOMP_NEEDS_NNP;
->
-> This would be set along with seccomp.mode, seccomp.filter, and
-> TIF_SECCOMP. Then, during the next secure_computing() call that thread
-> makes, it would check the flag:
->
->     if (task->seccomp.flags & SECCOMP_NEEDS_NNP)
->         task->nnp = 1;
->
-> This means that nnp couldn't change in the middle of a running syscall.
+Seungwon,
 
-Aha, so you were worried about the same thing. Not sure we need this,
-but at least I understand you and...
+On Wed, Jun 25, 2014 at 4:18 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+>> >> +       case MMC_POWER_ON:
+>> >> +               if (!IS_ERR(mmc->supply.vqmmc) &&
+>> >> +                               !test_bit(DW_MMC_IO_POWERED, &slot->flags)) {
+> You can use regulator_is_enabled() instead of flag bit, DW_MMC_IO_POWERED.
 
-> Hmmm. Perhaps this doesn't solve anything, though? Perhaps my proposal
-> above would actually make things worse, since now we'd have a thread
-> with seccomp set up, and no nnp. If it was in the middle of exec,
-> we're still causing a problem.
+I'd be a little worried about regulator_is_enabled() since regulators
+are reference counted.  What if someone else is sharing this
+regulator?  The regulator might happen to be enabled when you check it
+but unless you add your own dw_mmc reference count they might turn it
+off.
 
-Yes ;)
+> Important thing is that if powering vmmc failed at MMC_POWER_UP, vqmmc should not be powered.
 
-> I think we'd also need a way to either delay the seccomp changes, or
-> to notice this condition during exec. Bleh.
-
-Hmm. confused again,
-
-> What actually happens with a multi-threaded process calls exec? I
-> assume all the other threads are destroyed?
-
-Yes. But this is the point-of-no-return, de_thread() is called after the execing
-thared has already passed (say) check_unsafe_exec().
-
-However, do_execve() takes cred_guard_mutex at the start in prepare_bprm_creds()
-and drops it in install_exec_creds(), so it should solve the problem?
-
-Oleg.
+Good point.
