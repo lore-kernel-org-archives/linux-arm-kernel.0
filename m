@@ -1,30 +1,21 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 25 Jun 2014 20:26:04 +0900
-Subject: [PATCH] clk/exynos5250: fix bit number for tv sysmmu clock
-In-Reply-To: <53AAB154.7010403@samsung.com>
-References: <1403156836-24421-1-git-send-email-rahul.sharma@samsung.com>
- <CAK5sBcHOCPvr2Kr0GDOyYCEAjaXcUKKPsEWKYDK9BFKtPioc4Q@mail.gmail.com>
- <CAPdUM4Nx1g=aicFYAYEd1d2VVWPdbJXCZxFAmqRK0ooR8+E=9g@mail.gmail.com>
- <53AAB154.7010403@samsung.com>
-Message-ID: <036401cf9068$40106ad0$c0314070$@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 25 Jun 2014 13:26:13 +0200
+Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
+In-Reply-To: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
+References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <53AAB1D5.1090404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Hi Rahul,
-> 
-> On 25.06.2014 13:22, Rahul Sharma wrote:
-> > Hi Kukjin,
-> >
-> > Please take this fix in your tree.
-> 
-> This is a patch for Samsung clock drivers, so I'll apply it when about
-> to send fixes pull request to Mike.
-> 
-Yes, I also checked the datasheet and this change is correct.
+Hi Vasily,
 
-If you want, please add my ack on the patch.
+On 23.06.2014 22:29, Vasily Khoruzhick wrote:
+> There's a several typos in a driver: 2410 instead of S3C2410
+> and wrong argument to ARRAY_SIZE(). They prevent s3c2410
+> from properly booting.
 
-Thanks,
-Kukjin
+Thanks for fixing this. I will apply and send to Mike with other fixes.
+Same for patch 2/2.
+
+Best regards,
+Tomasz
