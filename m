@@ -1,43 +1,57 @@
-From: sachin.kamat@samsung.com (Sachin Kamat)
-Date: Wed, 25 Jun 2014 12:04:26 +0530
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable Max77686 regulator
-In-Reply-To: <1403517384-24288-1-git-send-email-sachin.kamat@samsung.com>
-References: <1403517384-24288-1-git-send-email-sachin.kamat@samsung.com>
-Message-ID: <CAK5sBcG_FM0OAcvDh_nOxBfPDKSG+UXvvztKKyQ--Y0XNL25QQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 25 Jun 2014 15:35:52 +0900
+Subject: [PATCH 3/4 v2] ARM: DTS: use new compatible string for thermistors
+ in trats2
+In-Reply-To: <1403677773-21141-4-git-send-email-ch.naveen@samsung.com>
+References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
+ <1403677773-21141-4-git-send-email-ch.naveen@samsung.com>
+Message-ID: <53AA6DC8.8030201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 3:26 PM, Sachin Kamat <sachin.kamat@samsung.com> wrote:
-> This is used on Exynos5250 based Google Snow (chromebook).
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
+On 06/25/2014 03:29 PM, Naveen Krishna Chatradhi wrote:
+> As Murata Manufactures the NTC based thermistors. The vendor
+> name in the compatibility is preposed to change to "murata"
+> 
+> This patch uses the new compatibility string in exynos4412 based
+> Trats2 board.
+> 
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
->  arch/arm/configs/multi_v7_defconfig |    2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 9a1e7b0c3bea..abde73eebc57 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -231,6 +231,7 @@ CONFIG_SUNXI_WATCHDOG=y
->  CONFIG_MFD_AS3722=y
->  CONFIG_MFD_CROS_EC=y
->  CONFIG_MFD_CROS_EC_SPI=y
-> +CONFIG_MFD_MAX77686=y
->  CONFIG_MFD_MAX8907=y
->  CONFIG_MFD_SEC_CORE=y
->  CONFIG_MFD_PALMAS=y
-> @@ -242,6 +243,7 @@ CONFIG_REGULATOR_AB8500=y
->  CONFIG_REGULATOR_AS3722=y
->  CONFIG_REGULATOR_GPIO=y
->  CONFIG_REGULATOR_MAX8907=y
-> +CONFIG_REGULATOR_MAX77686=y
->  CONFIG_REGULATOR_PALMAS=y
->  CONFIG_REGULATOR_S2MPS11=y
->  CONFIG_REGULATOR_S5M8767=y
-> --
-> 1.7.9.5
->
+> Changes since v1:
+> None
+> 
+>  arch/arm/boot/dts/exynos4412-trats2.dts |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 11967f4..d35755a 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -771,7 +771,7 @@
+>  	};
+>  
+>  	thermistor-ap at 0 {
+> -		compatible = "ntc,ncp15wb473";
+> +		compatible = "murata,ncp15wb473";
+>  		pullup-uv = <1800000>;	 /* VCC_1.8V_AP */
+>  		pullup-ohm = <100000>;	 /* 100K */
+>  		pulldown-ohm = <100000>; /* 100K */
+> @@ -779,7 +779,7 @@
+>  	};
+>  
+>  	thermistor-battery at 1 {
+> -		compatible = "ntc,ncp15wb473";
+> +		compatible = "murata,ncp15wb473";
+>  		pullup-uv = <1800000>;	 /* VCC_1.8V_AP */
+>  		pullup-ohm = <100000>;	 /* 100K */
+>  		pulldown-ohm = <100000>; /* 100K */
+> 
 
-Please ignore this series for now. Will re-send later after adding few more
-options. Sorry for the noise.
+Looks good to me.
+
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Thanks,
+Chanwoo Choi
