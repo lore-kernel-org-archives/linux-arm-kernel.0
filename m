@@ -1,48 +1,59 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard)
-Date: Wed, 25 Jun 2014 18:41:07 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 12/20] clk: sunxi: Add A23 APB0
- support to sun6i-a31-apb0-clk
-In-Reply-To: <CAGb2v64hFc7oVdydoNzKVqjnyNUxuqMXX2AiV3aJLFizKvkOPA@mail.gmail.com>
-References: <1403016777-15121-1-git-send-email-wens@csie.org>
- <1403016777-15121-13-git-send-email-wens@csie.org>
- <20140618102623.GQ19730@lukather>
- <CAGb2v64D6qBtXGXzn25443s_oj_=Z-u_P6+-MX52Lz54+9bQyQ@mail.gmail.com>
- <20140619092847.GW19730@lukather>
- <CAGb2v64hFc7oVdydoNzKVqjnyNUxuqMXX2AiV3aJLFizKvkOPA@mail.gmail.com>
-Message-ID: <20140625164107.GA19569@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 25 Jun 2014 17:50:03 +0100
+Subject: [PATCH 6/6] arm64: mm: Enable RCU fast_gup
+In-Reply-To: <1403710824-24340-7-git-send-email-steve.capper@linaro.org>
+References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
+ <1403710824-24340-7-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140625165003.GI15240@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 20, 2014 at 02:13:58PM +0800, Chen-Yu Tsai wrote:
-> > If these two clocks are these different though, maybe it would just be
-> > easier to add a new driver. These are trivial enough anyway.
+Hi Steve,
+
+On Wed, Jun 25, 2014 at 04:40:24PM +0100, Steve Capper wrote:
+> Activate the RCU fast_gup for ARM64. We also need to force THP splits
+> to broadcast an IPI s.t. we block in the fast_gup page walker. As THP
+> splits are comparatively rare, this should not lead to a noticeable
+> performance degradation.
 > 
-> Yes it is. But it adds more of the same boilerplate code than actual
-> differences of the hardware.
+> Some pre-requisite functions pud_write and pud_page are also added.
 > 
-> I'm inclined to keep it as it is for now, unless someone strongly
-> objects.
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+>  arch/arm64/Kconfig               |  3 +++
+>  arch/arm64/include/asm/pgtable.h | 11 ++++++++++-
+>  arch/arm64/mm/flush.c            | 19 +++++++++++++++++++
+>  3 files changed, 32 insertions(+), 1 deletion(-)
 
-I'm not strongly objecting, but I'd strongly prefer to go with two
-drivers.
+[...]
 
-I don't really want to end up in the same case than with clk-sunxi.c,
-which handles a lot of weird corner case for one particular clock,
-while most of them are just a single-bit gate.
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index e4193e3..ddf96c1 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -103,3 +103,22 @@ EXPORT_SYMBOL(flush_dcache_page);
+>   */
+>  EXPORT_SYMBOL(flush_cache_all);
+>  EXPORT_SYMBOL(flush_icache_range);
+> +
+> +#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+> +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+> +static void thp_splitting_flush_sync(void *arg)
+> +{
+> +}
+> +
+> +void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
+> +			  pmd_t *pmdp)
+> +{
+> +	pmd_t pmd = pmd_mksplitting(*pmdp);
+> +	VM_BUG_ON(address & ~PMD_MASK);
+> +	set_pmd_at(vma->vm_mm, address, pmdp, pmd);
+> +
+> +	/* dummy IPI to serialise against fast_gup */
+> +	smp_call_function(thp_splitting_flush_sync, NULL, 1);
 
-Especially when they have nothing in common, which is pretty much the
-case here.
+Is there some reason we can't use kick_all_cpus_sync()?
 
-Maxime
+>From a glance it seems that powerpc does just that.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140625/d7d93676/attachment.sig>
+Mark.
