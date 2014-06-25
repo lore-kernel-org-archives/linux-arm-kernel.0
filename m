@@ -1,374 +1,152 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Jun 2014 12:02:25 -0700
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
-Message-ID: <53AB1CC1.4010907@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 25 Jun 2014 23:03:25 +0400
+Subject: [PATCH v7 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <1403530783-17180-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1403530783-17180-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403530783-17180-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <53AB1CFD.4040500@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/14 01:42, Viresh Kumar wrote:
-> cpufreq-cpu0 driver supports only platforms which have single clock line shared
-> among all CPUs.
->
-> We already have platforms where this limitation doesn't hold true.For example on
-> Qualcomm's KRAIT all CPUs have separate clock line and so have separate
-> policies.
+Hello.
 
-Krait is not all capitalized.
+On 06/23/2014 05:39 PM, Antoine T?nart wrote:
 
->
-> Instead of adding another driver for this (Stephen just tried that:
-> https://lkml.org/lkml/2014/6/24/918), we must reuse cpufreq-cpu0 driver.
->
-> cpufreq-cpu0 must be updated to break the assumption on which it is based (all
-> cores sharing clock line) and this patch tries to do exactly that.
->
-> As we don't have standard DT bindings to mention CPUs sharing clock-line, i.e.
-> affected_cpus, this patch also have few limitations. Though easy to fix once we
-> have proper bindings.
+> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
 
-It should be easy enough to read the clocks property from DT for all the
-CPU nodes and check to see if they're the same? I don't think we need an
-affected-cpus property. Also I'd like to see current DTs specifying the
-same data (clocks, regulators, opps) for each CPU node even if they all
-share the same clock, regulator, and opp. It seems that the cpu0 binding
-just wanted to save some space in the DT by consolidating them all under
-one node, but that seems misguided. Case in point, now that we have
-configurations that need more than one clock per cluster the code is
-complicated and the binding is not uniform.
+> The mode selection can let us think this PHY can be configured to fit
+> other purposes. But there are reasons to think the SATA mode will be
+> the only one usable: the PHY registers are only accessible indirectly
+> through two registers in the SATA range, the PHY seems to be integrated
+> and no information tells us the contrary. For these reasons, make the
+> driver a SATA PHY driver.
 
->
-> Limitation: We only supports two types of platforms:
-> - All CPUs sharing same clock line, existing user platforms
-> - All CPUs have separate clock lines, KRAIT
->
-> And so platforms which have multiple clusters with multiple CPUs per cluster
-> aren't supported yet. We need proper bindings for that first.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   8 +-
->  drivers/cpufreq/Kconfig                            |   5 +-
->  drivers/cpufreq/cpufreq-cpu0.c                     | 280 +++++++++++++--------
->  3 files changed, 190 insertions(+), 103 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> index f055515..fa8861e 100644
-> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> @@ -1,15 +1,17 @@
->  Generic CPU0 cpufreq driver
->  
-> -It is a generic cpufreq driver for CPU0 frequency management.  It
-> +It is a generic cpufreq driver for CPU frequency management.  It
->  supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-> -systems which share clock and voltage across all CPUs.
-> +systems which share clock and voltage across all CPUs OR have separate
-> +clock and voltage for all CPUs.
->  
->  Both required and optional properties listed below must be defined
->  under node /cpus/cpu at 0.
->  
->  Required properties:
->  - operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
-> -  for details
-> +  for details. This should either be present only in cpu at 0, if CPUs share clock
-> +  line OR should be present in all cpu nodes, if they have separate clock lines.
->  
->  Optional properties:
->  - clock-latency: Specify the possible maximum transition latency for clock,
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-> index ee1ae30..d29f6a0 100644
-> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -25,34 +25,43 @@
->  #include <linux/slab.h>
->  #include <linux/thermal.h>
->  
-> -static unsigned int transition_latency;
-> -static unsigned int voltage_tolerance; /* in percentage */
-> +struct private_data {
-> +	struct device *cpu_dev;
-> +	struct regulator *cpu_reg;
-> +	struct thermal_cooling_device *cdev;
-> +	unsigned int voltage_tolerance; /* in percentage */
-> +};
->  
-> -static struct device *cpu_dev;
-> -static struct clk *cpu_clk;
-> -static struct regulator *cpu_reg;
-> -static struct cpufreq_frequency_table *freq_table;
-> -static struct thermal_cooling_device *cdev;
-> +/*
-> + * Currently this driver supports only two types of platforms:
-> + * - All CPUs sharing same clock line, clock_per_cpu == false
-> + * - All CPUs having separate clock lines, clock_per_cpu == true
-> + *
-> + * TODO: Scan affected/related CPUs from proper DT bindings
-> + */
-> +bool clock_per_cpu = false;
->  
->  static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
->  {
->  	struct dev_pm_opp *opp;
-> +	struct private_data *priv = policy->driver_data;
->  	unsigned long volt = 0, volt_old = 0, tol = 0;
->  	unsigned int old_freq, new_freq;
->  	long freq_Hz, freq_exact;
->  	int ret;
->  
-> -	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
-> +	freq_Hz = clk_round_rate(policy->clk,
-> +				 policy->freq_table[index].frequency * 1000);
->  	if (freq_Hz <= 0)
-> -		freq_Hz = freq_table[index].frequency * 1000;
-> +		freq_Hz = policy->freq_table[index].frequency * 1000;
->  
->  	freq_exact = freq_Hz;
->  	new_freq = freq_Hz / 1000;
-> -	old_freq = clk_get_rate(cpu_clk) / 1000;
-> +	old_freq = clk_get_rate(policy->clk) / 1000;
->  
-> -	if (!IS_ERR(cpu_reg)) {
-> +	if (!IS_ERR(priv->cpu_reg)) {
->  		rcu_read_lock();
-> -		opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_Hz);
-> +		opp = dev_pm_opp_find_freq_ceil(priv->cpu_dev, &freq_Hz);
->  		if (IS_ERR(opp)) {
->  			rcu_read_unlock();
->  			pr_err("failed to find OPP for %ld\n", freq_Hz);
-> @@ -60,8 +69,8 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		}
->  		volt = dev_pm_opp_get_voltage(opp);
->  		rcu_read_unlock();
-> -		tol = volt * voltage_tolerance / 100;
-> -		volt_old = regulator_get_voltage(cpu_reg);
-> +		tol = volt * priv->voltage_tolerance / 100;
-> +		volt_old = regulator_get_voltage(priv->cpu_reg);
->  	}
->  
->  	pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
+    I'm not even sure why you want to make it a separate driver if the 
+registers are mapped to SATA controller's range.
 
-This patch would be less noisy and easier to review if we used local
-variables in this function for cpu_req, voltage_tolerance, and cpu_clk.
-Can we do that please?
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 
->
-> @@ -99,77 +108,70 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
->  
->  static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
->  {
-> -	policy->clk = cpu_clk;
-> -	return cpufreq_generic_init(policy, freq_table, transition_latency);
-> -}
-> -
-> -static struct cpufreq_driver cpu0_cpufreq_driver = {
-> -	.flags = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
-> -	.verify = cpufreq_generic_frequency_table_verify,
-> -	.target_index = cpu0_set_target,
-> -	.get = cpufreq_generic_get,
-> -	.init = cpu0_cpufreq_init,
-> -	.name = "generic_cpu0",
-> -	.attr = cpufreq_generic_attr,
-> -};
-> -
-> -static int cpu0_cpufreq_probe(struct platform_device *pdev)
-> -{
-> +	struct cpufreq_frequency_table *freq_table;
-> +	struct private_data *priv;
->  	struct device_node *np;
-> -	int ret;
-> +	char name[] = "cpuX";
-> +	int ret, cpu = policy->cpu;
->  
-> -	cpu_dev = get_cpu_device(0);
-> -	if (!cpu_dev) {
-> -		pr_err("failed to get cpu0 device\n");
-> -		return -ENODEV;
-> +	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> +	if (!priv) {
-> +		pr_err("%s: Memory allocation failed\n", __func__);
-
-Useless allocation error message.
-
-> +		return -ENOMEM;
->  	}
->  
-> -	np = of_node_get(cpu_dev->of_node);
-> -	if (!np) {
-> -		pr_err("failed to find cpu0 node\n");
-> -		return -ENOENT;
-> -	}
-> +	/* Below calls can't fail from here */
-> +	priv->cpu_dev = get_cpu_device(cpu);
-> +	np = of_node_get(priv->cpu_dev->of_node);
->  
-> -	cpu_reg = regulator_get_optional(cpu_dev, "cpu0");
-> -	if (IS_ERR(cpu_reg)) {
-> -		/*
-> -		 * If cpu0 regulator supply node is present, but regulator is
-> -		 * not yet registered, we should try defering probe.
-> -		 */
-> -		if (PTR_ERR(cpu_reg) == -EPROBE_DEFER) {
-> -			dev_err(cpu_dev, "cpu0 regulator not ready, retry\n");
-> -			ret = -EPROBE_DEFER;
-> -			goto out_put_node;
-> -		}
-> -		pr_warn("failed to get cpu0 regulator: %ld\n",
-> -			PTR_ERR(cpu_reg));
-> +	policy->clk = clk_get(priv->cpu_dev, NULL);
-> +	if (IS_ERR(policy->clk)) {
-> +		ret = PTR_ERR(policy->clk);
-> +		pr_err("%s: failed to get cpu%d clock: %d\n", __func__, cpu,
-> +		       ret);
-> +		goto out_put_node;
->  	}
-
-This won't work all the time. We need probe defer to work for the clocks
-because sometimes CPU clocks are registered after this driver probes. In
-my case this is always true unless I play games with initcall levels.
-The same is true for regulators.
-
->  
-> -	cpu_clk = clk_get(cpu_dev, NULL);
-> -	if (IS_ERR(cpu_clk)) {
-> -		ret = PTR_ERR(cpu_clk);
-> -		pr_err("failed to get cpu0 clock: %d\n", ret);
-> -		goto out_put_reg;
-> +	ret = of_init_opp_table(priv->cpu_dev);
-> +	if (ret) {
-> +		pr_err("%s: failed to init OPP table for cpu%d: %d\n", __func__,
-> +		       cpu, ret);
-> +		goto out_put_clk;
->  	}
->  
-> -	ret = of_init_opp_table(cpu_dev);
-> +	ret = dev_pm_opp_init_cpufreq_table(priv->cpu_dev, &freq_table);
->  	if (ret) {
-> -		pr_err("failed to init OPP table: %d\n", ret);
-> +		pr_err("%s: failed to init cpufreq table for cpu%d: %d\n",
-> +		       __func__, cpu, ret);
->  		goto out_put_clk;
->  	}
->  
-> -	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-> +	ret = cpufreq_table_validate_and_show(policy, freq_table);
->  	if (ret) {
-> -		pr_err("failed to init cpufreq table: %d\n", ret);
-> -		goto out_put_clk;
-> +		pr_err("%s: invalid frequency table for cpu%d: %d\n", __func__,
-> +		       cpu, ret);
-> +		goto out_put_reg;
->  	}
->  
-> -	of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
-> +	/* Set mask of CPUs sharing clock line with policy->cpu */
-> +	if (!clock_per_cpu)
-> +		cpumask_setall(policy->cpus);
->  
-> -	if (of_property_read_u32(np, "clock-latency", &transition_latency))
-> -		transition_latency = CPUFREQ_ETERNAL;
-> +	of_property_read_u32(np, "voltage-tolerance", &priv->voltage_tolerance);
->  
-> -	if (!IS_ERR(cpu_reg)) {
-> +	if (of_property_read_u32(np, "clock-latency",
-> +				 &policy->cpuinfo.transition_latency))
-> +		policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-> +
-> +	/* NOTE: Supports only 10 CPUs: 0-9 */
-> +	WARN_ONCE(cpu > 9, "cpu: %d", cpu);
-
-Why would the supply name be called cpuN-supply? Why not use cpu-supply
-in each CPU node? That way there is no limit on the number of CPUs. We
-can always check for cpu0-supply first to be compatible with older DTs
-but going forward we should be able to just use cpu-supply.
-
-> +
-> +	name[3] = '0' + cpu;
-> +	priv->cpu_reg = regulator_get_optional(priv->cpu_dev, name);
-> +	if (IS_ERR(priv->cpu_reg)) {
-> +		pr_warn("%s: failed to get cpu%d's regulator: %ld\n", __func__,
-> +			cpu, PTR_ERR(priv->cpu_reg));
-> +	} else {
->  		struct dev_pm_opp *opp;
->  		unsigned long min_uV, max_uV;
->  		int i;
 [...]
-> +
-> +static int cpu0_cpufreq_probe(struct platform_device *pdev)
+
+> diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
+> new file mode 100644
+> index 000000000000..317f62358165
+> --- /dev/null
+> +++ b/drivers/phy/phy-berlin-sata.c
+> @@ -0,0 +1,246 @@
+[...]
++#define HOST_VSA_ADDR		0x0
++#define HOST_VSA_DATA		0x4
++#define PORT_VSR_ADDR		0x78
++#define PORT_VSR_DATA		0x7c
++#define PORT_SCR_CTL		0x2c
+
+    Could you keep this list sorted?
+
+[...]
+
++struct phy_berlin_desc {
++	struct phy	*phy;
++	u32		val;
+
+    Hm, aren't these power down bits? Why not call the field accordingly?
+
+[...]
+
+> +static int phy_berlin_sata_power_on(struct phy *phy)
 > +{
-> +	const struct property *prop;
-> +	struct device *cpu_dev;
-> +	struct regulator *cpu_reg;
-> +	int ret, cpu, count = 0;
+> +	struct phy_berlin_desc *desc = phy_get_drvdata(phy);
+> +	struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
+> +	void __iomem *ctrl_reg = priv->base + 0x60 + (desc->index * 0x80);
+> +	int ret = 0;
+> +	u32 regval;
 > +
-> +	/* Optimization for regulator's -EPROBE_DEFER case */
-> +	if (unlikely(clock_per_cpu))
-> +		goto scan_regulator;
-
-Why not look for the regulator first then?
-
+> +	clk_prepare_enable(priv->clk);
 > +
-> +	/*
-> +	 * Scan all CPU nodes to set clock_per_cpu
-> +	 *
-> +	 * FIXME: Scan affected-CPUs from DT and remove this loop.
-> +	 */
-> +	for_each_possible_cpu(cpu) {
-> +		cpu_dev = get_cpu_device(cpu);
-> +		if (!cpu_dev) {
-> +			pr_err("%s: failed to get cpu%d device\n", __func__,
-> +			       cpu);
-> +			return -ENODEV;
+> +	spin_lock(&priv->lock);
+> +
+> +	/* Power on PHY */
+> +	writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
+> +	regval = readl(priv->base + HOST_VSA_DATA);
+> +	regval &= ~(desc->val);
+
+    Parens not needed here.
+
+> +	writel(regval, priv->base + HOST_VSA_DATA);
+> +
+> +	/* Configure MBus */
+> +	writel(MBUS_SIZE_CONTROL, priv->base + HOST_VSA_ADDR);
+> +	regval = readl(priv->base + HOST_VSA_DATA);
+> +	regval |= MBUS_WRITE_REQUEST_SIZE_128 | MBUS_READ_REQUEST_SIZE_128;
+> +	writel(regval, priv->base + HOST_VSA_DATA);
+
+    It probably makes sense to factor these address/data register writes into 
+a separate function like phy_berlin_sata_reg_setbits().
+
+[...]
+> +	/* set the controller speed */
+> +	writel(0x31, ctrl_reg + PORT_SCR_CTL);
+
+    Value undocumented? Or is this the SATA SControl register by chance?
+
+[...]
+
+> +static int phy_berlin_sata_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct phy *phy;
+> +	struct phy_provider *phy_provider;
+> +	struct phy_berlin_priv *priv;
+> +	struct resource *res;
+> +	int i;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -EINVAL;
+> +
+> +	priv->base = devm_ioremap(dev, res->start, resource_size(res));
+
+    Can't you use devm_ioremap_resource()?
+
+> +	if (!priv->base)
+> +		return -ENOMEM;
+> +
+> +	priv->clk = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(priv->clk))
+> +		return PTR_ERR(priv->clk);
+> +
+> +	dev_set_drvdata(dev, priv);
+> +	spin_lock_init(&priv->lock);
+> +
+> +	for (i = 0; i < BERLIN_SATA_PHY_NB; i++) {
+> +		phy = devm_phy_create(dev, &phy_berlin_sata_ops, NULL);
+> +		if (IS_ERR(phy)) {
+> +			dev_err(dev, "failed to create PHY %d\n", i);
+> +			return PTR_ERR(phy);
 > +		}
 > +
-> +		/* Count how many CPU nodes have defined operating-points */
-> +		prop = of_find_property(cpu_dev->of_node, "operating-points",
-> +					NULL);
-> +		if (prop) {
-> +			count++;
-> +		} else if (cpu == 0) {
-> +			pr_err("%s: operating-points missing: cpu%d\n",
-> +			       __func__, cpu);
-> +			return -ENOENT;
-> +		}
+> +		priv->phys[i].phy = phy;
+> +		priv->phys[i].val = phy_berlin_power_down_bits[i];
+> +		priv->phys[i].index = i;
+> +		phy_set_drvdata(phy, &priv->phys[i]);
+> +
+> +		/* Make sure the PHY is off */
+> +		phy_berlin_sata_power_off(phy);
 > +	}
 > +
-> +	/* Either one or all CPUs must have operating-points property */
-> +	if (count == cpu + 1) {
+> +	phy_provider =
+> +		devm_of_phy_provider_register(dev, phy_berlin_sata_phy_xlate);
+> +	if (IS_ERR(phy_provider))
 
-Is this supposed to be count == cpu? At this point in the code count
-equals the number of CPUs present.
+    No dev_err() here?
 
-> +		clock_per_cpu = true;
-> +	} else if (count != 1) {
-> +		pr_err("%s: operating-points missing for few CPUs\n", __func__);
-> +		return -ENOENT;
-> +	}
+> +		return PTR_ERR(phy_provider);
 > +
-> +scan_regulator:
-> +	/* Check only CPU0's regulator for EPROBE_DEFER */
-> +	cpu_dev = get_cpu_device(0); /* Can't fail now */
-> +	cpu_reg = regulator_get_optional(cpu_dev, "cpu0");
-> +	if (!IS_ERR(cpu_reg)) {
-> +		regulator_put(cpu_reg);
-> +	} else if (PTR_ERR(cpu_reg) == -EPROBE_DEFER) {
-> +		/*
-> +		 * If cpu0 regulator supply node is present, but regulator is
-> +		 * not yet registered, we should try defering probe.
-> +		 */
-> +		dev_err(cpu_dev, "cpu0 regulator not ready, retry\n");
-> +		return -EPROBE_DEFER;
-> +	}
+> +	return 0;
+> +}
 
-I don't think this driver should be using regulator_get_optional() (Mark
-B. please correct me if I'm wrong). I doubt a supply is actually
-optional for CPUs, just some DTs aren't specifying them. In those cases,
-the regulator core will insert a dummy supply and the code will work
-without having to check for probe defer and error pointers.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+WBR, Sergei
