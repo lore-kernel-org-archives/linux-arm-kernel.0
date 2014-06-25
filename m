@@ -1,13 +1,13 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Jun 2014 10:28:44 +0100
-Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
+Date: Wed, 25 Jun 2014 10:28:46 +0100
+Subject: [RFC PATCH 5/9] irqchip: GICv3: Convert to EOImode == 1
 In-Reply-To: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
 References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403688530-23273-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, GICv2 has been used in with EOImode == 0. The effect of this
+So far, GICv3 has been used in with EOImode == 0. The effect of this
 mode is to perform the priority drop and the deactivation of the
 interrupt at the same time.
 
@@ -16,203 +16,88 @@ it causes issues when an interrupt is forwarded to a guest, and when
 we want the guest to perform the EOI itself.
 
 For this case, the GIC architecture provides EOImode == 1, where:
-- A write to the EOI register drops the priority of the interrupt and leaves
+- A write to ICC_EOIR1_EL1 drops the priority of the interrupt and leaves
 it active. Other interrupts at the same priority level can now be taken,
 but the active interrupt cannot be taken again
-- A write to the DIR marks the interrupt as inactive, meaning it can
+- A write to ICC_DIR_EL1 marks the interrupt as inactive, meaning it can
 now be taken again.
 
-We only enable this feature when booted in HYP mode. Also, as most device
-trees are broken (they report the CPU interface size to be 4kB, while
-the GICv2 CPU interface size is 8kB), output a warning if we're booted
-in HYP mode, and disable the feature.
+This patch converts the driver to this new mode, without any other feature.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic.c       | 61 +++++++++++++++++++++++++++++++++++++----
- include/linux/irqchip/arm-gic.h |  4 +++
- 2 files changed, 59 insertions(+), 6 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c   | 1 +
+ drivers/irqchip/irq-gic-v3.c       | 6 ++++--
+ include/linux/irqchip/arm-gic-v3.h | 7 +++++++
+ 3 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 508b815..9295bf2 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -45,6 +45,7 @@
- #include <asm/irq.h>
- #include <asm/exception.h>
- #include <asm/smp_plat.h>
-+#include <asm/virt.h>
- 
- #include "irq-gic-common.h"
- #include "irqchip.h"
-@@ -94,6 +95,10 @@ struct irq_chip gic_arch_extn = {
- 	.irq_set_wake	= NULL,
- };
- 
-+static struct irq_chip *gic_chip;
-+
-+static bool supports_deactivate = false;
-+
- #ifndef MAX_GIC_NR
- #define MAX_GIC_NR	1
- #endif
-@@ -185,6 +190,12 @@ static void gic_eoi_irq(struct irq_data *d)
- 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 822f55e..922f228 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -616,6 +616,7 @@ static void its_unmask_irq(struct irq_data *d)
+ static void its_eoi_irq(struct irq_data *d)
+ {
+ 	gic_write_eoir(d->hwirq);
++	gic_write_dir(d->hwirq);
  }
  
-+static void gic_eoi_dir_irq(struct irq_data *d)
-+{
-+	gic_eoi_irq(d);
-+	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
-+}
-+
- static int gic_set_type(struct irq_data *d, unsigned int type)
+ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 3ae53c1..26a08ce 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -238,6 +238,7 @@ static void gic_unmask_irq(struct irq_data *d)
+ static void gic_eoi_irq(struct irq_data *d)
  {
- 	void __iomem *base = gic_dist_base(d);
-@@ -277,6 +288,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ 	gic_write_eoir(gic_irq(d));
++	gic_write_dir(gic_irq(d));
+ }
+ 
+ static int gic_set_type(struct irq_data *d, unsigned int type)
+@@ -297,6 +298,7 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
  		}
  		if (irqnr < 16) {
- 			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
-+			writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
+ 			gic_write_eoir(irqnr);
++			gic_write_dir(irqnr);
  #ifdef CONFIG_SMP
  			handle_IPI(irqnr, regs);
- #endif
-@@ -313,7 +325,7 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
+ #else
+@@ -400,8 +402,8 @@ static void gic_cpu_sys_reg_init(void)
+ 	/* Set priority mask register */
+ 	gic_write_pmr(DEFAULT_PMR_VALUE);
+ 
+-	/* EOI deactivates interrupt too (mode 0) */
+-	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
++	/* EOI drops priority only (mode 1) */
++	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop);
+ 
+ 	/* ... and let's hit the road... */
+ 	gic_write_grpen1(1);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 023b49d..a0bff2f 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -229,6 +229,7 @@
+ 
+ #define ICC_EOIR1_EL1			S3_0_C12_C12_1
+ #define ICC_IAR1_EL1			S3_0_C12_C12_0
++#define ICC_DIR_EL1			S3_0_C12_C11_1
+ #define ICC_SGI1R_EL1			S3_0_C12_C11_5
+ #define ICC_PMR_EL1			S3_0_C4_C6_0
+ #define ICC_CTLR_EL1			S3_0_C12_C12_4
+@@ -303,6 +304,12 @@ static inline void gic_write_eoir(u64 irq)
+ 	isb();
  }
  
--static struct irq_chip gic_chip = {
-+static struct irq_chip gicv1_chip = {
- 	.name			= "GIC",
- 	.irq_mask		= gic_mask_irq,
- 	.irq_unmask		= gic_unmask_irq,
-@@ -326,6 +338,19 @@ static struct irq_chip gic_chip = {
- 	.irq_set_wake		= gic_set_wake,
- };
- 
-+static struct irq_chip gicv2_chip = {
-+	.name			= "GIC",
-+	.irq_mask		= gic_mask_irq,
-+	.irq_unmask		= gic_unmask_irq,
-+	.irq_eoi		= gic_eoi_dir_irq,
-+	.irq_set_type		= gic_set_type,
-+	.irq_retrigger		= gic_retrigger,
-+#ifdef CONFIG_SMP
-+	.irq_set_affinity	= gic_set_affinity,
-+#endif
-+	.irq_set_wake		= gic_set_wake,
-+};
-+
- void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
- {
- 	if (gic_nr >= MAX_GIC_NR)
-@@ -377,6 +402,16 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	writel_relaxed(1, base + GIC_DIST_CTRL);
- }
- 
-+static void gic_cpu_if_up(void)
++static inline void gic_write_dir(u64 irq)
 +{
-+	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-+	u32 val = 0;
-+
-+	if (supports_deactivate)
-+		val = GIC_CPU_CTRL_EOImodeNS;
-+	writel_relaxed(val | 1, cpu_base + GIC_CPU_CTRL);
++	asm volatile("msr " __stringify(ICC_DIR_EL1) ", %0" : : "r" (irq));
++	isb();
 +}
 +
- static void gic_cpu_init(struct gic_chip_data *gic)
- {
- 	void __iomem *dist_base = gic_data_dist_base(gic);
-@@ -402,7 +437,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	gic_cpu_config(dist_base, NULL);
- 
- 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, base + GIC_CPU_CTRL);
-+	gic_cpu_if_up();
- }
- 
- void gic_cpu_if_down(void)
-@@ -543,7 +578,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
- 
- 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-+	gic_cpu_if_up();
- }
- 
- static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-@@ -770,11 +805,11 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
- {
- 	if (hw < 32) {
- 		irq_set_percpu_devid(irq);
--		irq_set_chip_and_handler(irq, &gic_chip,
-+		irq_set_chip_and_handler(irq, gic_chip,
- 					 handle_percpu_devid_irq);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
- 	} else {
--		irq_set_chip_and_handler(irq, &gic_chip,
-+		irq_set_chip_and_handler(irq, gic_chip,
- 					 handle_fasteoi_irq);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 
-@@ -951,6 +986,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 
- 	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
- 
-+	if (!supports_deactivate)
-+		gic_chip = &gicv1_chip;
-+	else
-+		gic_chip = &gicv2_chip;
-+
- 	if (of_property_read_u32(node, "arm,routable-irqs",
- 				 &nr_routable_irqs)) {
- 		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
-@@ -980,7 +1020,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 		set_handle_irq(gic_handle_irq);
- 	}
- 
--	gic_chip.flags |= gic_arch_extn.flags;
-+	gic_chip->flags |= gic_arch_extn.flags;
- 	gic_dist_init(gic);
- 	gic_cpu_init(gic);
- 	gic_pm_init(gic);
-@@ -994,6 +1034,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- {
- 	void __iomem *cpu_base;
- 	void __iomem *dist_base;
-+	struct resource cpu_res;
- 	u32 percpu_offset;
- 	int irq;
- 
-@@ -1006,6 +1047,14 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- 	cpu_base = of_iomap(node, 1);
- 	WARN(!cpu_base, "unable to map gic cpu registers\n");
- 
-+	of_address_to_resource(node, 1, &cpu_res);
-+	if (is_hyp_mode_available()) {
-+		if (resource_size(&cpu_res) >= SZ_8K)
-+			supports_deactivate = true;
-+		else
-+			pr_warn("GIC: CPU interface size is %x, DT is probably wrong\n", (int)resource_size(&cpu_res));
-+	}
-+
- 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
- 		percpu_offset = 0;
- 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 45e2d8c..ffe3911 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -21,6 +21,10 @@
- #define GIC_CPU_ACTIVEPRIO		0xd0
- #define GIC_CPU_IDENT			0xfc
- 
-+#define GIC_CPU_DEACTIVATE		0x1000
-+
-+#define GIC_CPU_CTRL_EOImodeNS		(1 << 9)
-+
- #define GICC_IAR_INT_ID_MASK		0x3ff
- 
- #define GIC_DIST_CTRL			0x000
+ int its_cpu_init(void);
+ struct irq_chip *its_init(struct device_node *node, struct rdist *rdist,
+ 			  struct irq_domain *domain);
 -- 
 1.8.3.4
