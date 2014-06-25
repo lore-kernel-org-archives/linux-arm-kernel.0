@@ -1,34 +1,56 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jun 2014 17:24:05 -0700
-Subject: [PATCHv3] arm64: Add CONFIG_CC_STACKPROTECTOR
-In-Reply-To: <CAGXu5jKmrpM=oCABXy-UJH6mZ22Z2r-p_R2nZKqGocHJ0vYQ2Q@mail.gmail.com>
-References: <1391115944-10183-1-git-send-email-lauraa@codeaurora.org>
- <CAGXu5jKmrpM=oCABXy-UJH6mZ22Z2r-p_R2nZKqGocHJ0vYQ2Q@mail.gmail.com>
-Message-ID: <CAGXu5jLTLU-azWtyfJ38QO_vd9T+F4STqPy4LpvOeMAqPCH21A@mail.gmail.com>
+From: rientjes@google.com (David Rientjes)
+Date: Tue, 24 Jun 2014 17:26:02 -0700 (PDT)
+Subject: [PATCH] arm64: fix CONFIG_ZONE_DMA on systems with no 32-bit
+ addressable DRAM
+In-Reply-To: <1403499940-11258-1-git-send-email-msalter@redhat.com>
+References: <1403499940-11258-1-git-send-email-msalter@redhat.com>
+Message-ID: <alpine.DEB.2.02.1406241718210.22030@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 31, 2014 at 2:50 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Thu, Jan 30, 2014 at 1:05 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
->> arm64 currently lacks support for -fstack-protector. Add
->> similar functionality to arm to detect stack corruption.
->>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->
-> Thanks!
->
-> Acked-by: Kees Cook <keescook@chromium.org>
+On Mon, 23 Jun 2014, Mark Salter wrote:
 
-Hi again,
+> Commit 2d5a5612bc (arm64: Limit the CMA buffer to 32-bit if ZONE_DMA)
+> forces the CMA buffer to be 32-bit addressable if CONFIG_ZONE_DMA is
+> defined. This breaks CMA on platforms with no 32-bit addressable DRAM.
+> This patch checks to make sure there is 32-bit addressable DRAM before
+> setting the 32-bit limit. If there is none, no limit is placed on the
+> CMA buffer. This allows a single kernel (with CONFIG_ZONE_DMA defined)
+> to support platforms requiring the 32-bit limit and platforms with no
+> 32-bit limit.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm64/mm/init.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index c5415e2..2925576 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -149,8 +149,17 @@ void __init arm64_memblock_init(void)
+>  	early_init_fdt_scan_reserved_mem();
+>  
+>  	/* 4GB maximum for 32-bit only capable devices */
+> -	if (IS_ENABLED(CONFIG_ZONE_DMA))
+> +	if (IS_ENABLED(CONFIG_ZONE_DMA)) {
+>  		dma_phys_limit = dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1;
+> +		/*
+> +		 * If platform doesn't have DRAM within the dma_phys_limit,
+> +		 * remove the limit altogether. This allows one kernel (with
+> +		 * CONFIG_ZONE_DMA defined) to support platforms with 32-bit
+> +		 * only devices and platforms with no 32-bit DRAM.
+> +		 */
+> +		if (dma_phys_limit <= memblock_start_of_DRAM())
+> +			dma_phys_limit = 0;
+> +	}
+>  	dma_contiguous_reserve(dma_phys_limit);
+>  
+>  	memblock_allow_resize();
 
-This patch never got applied any where. Who can take this?
-
-Thanks!
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+It is a shame that we have very similar logic, all dependent on 
+memblock_start_of_DRAM(), in both zone_sizes_init() and 
+arm64_memblock_init() and the latter having to be called before the 
+former.  I assume there's no way to make this cleaner in the bootstrap 
+code so the dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1 limit can be handled 
+properly in a single location?
