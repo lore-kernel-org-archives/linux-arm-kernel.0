@@ -1,70 +1,35 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:35 +0900
-Subject: [PATCH 5/5] ARM: shmobile: Enable R-Car Gen2 CMA code in board files
-In-Reply-To: <cover.1403681531.git.horms+renesas@verge.net.au>
-References: <cover.1403681531.git.horms+renesas@verge.net.au>
-Message-ID: <5f65c5bd58bf027eb2bacc2294a98e7aea81c630.1403681531.git.horms+renesas@verge.net.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 25 Jun 2014 09:36:40 +0200
+Subject: [PATCH] Exynos4: cpuidle: support dual CPUs with AFTR state
+In-Reply-To: <539B7E74.7000605@linaro.org>
+References: <1396604925-18383-1-git-send-email-daniel.lezcano@linaro.org>
+ <1402476643.32147.6.camel@AMDC1943> <539B7E74.7000605@linaro.org>
+Message-ID: <1403681800.19087.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+On sob, 2014-06-14 at 00:43 +0200, Daniel Lezcano wrote:
+> On 06/11/2014 10:50 AM, Krzysztof Kozlowski wrote:
+(...)
+> >
+> > Hi,
+> >
+> > Shouldn't the exynos_idle_barrier be initialized here?
+> 
+> As it is a static data it will be initialized to zero.
+> 
+> > I know you sent the patch almost 2 months ago but I stomped on this
+> > while testing it on Exynos3250.
+> 
+> No problem. And what results on exynos3250 ?
 
-Hook in the R-Car Gen2 CMA reservation code in the board
-files for Lager and Koelsch. Both the DT-reference code
-and the legacy code is modified.
+I had to change some of the ways for synchronization two cores (boot
+vector behaves differently) so actually the driver is different except
+the general idea. As for the results (on dual-core Exynos3250) - the
+mode (AFTR+CPU1 off) consumes about 5% less energy than idle-WFI state.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-koelsch-reference.c | 1 +
- arch/arm/mach-shmobile/board-koelsch.c           | 1 +
- arch/arm/mach-shmobile/board-lager-reference.c   | 1 +
- arch/arm/mach-shmobile/board-lager.c             | 1 +
- 4 files changed, 4 insertions(+)
+I expect there will be much more savings in deeper mode (called here
+W-AFTR).
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 28e3c45..5e0375f 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -113,5 +113,6 @@ DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= koelsch_add_standard_devices,
- 	.init_late	= shmobile_init_late,
-+	.reserve	= rcar_gen2_reserve,
- 	.dt_compat	= koelsch_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 0d44e7eb..db4b8a3 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -526,5 +526,6 @@ DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= koelsch_init,
- 	.init_late	= shmobile_init_late,
-+	.reserve	= rcar_gen2_reserve,
- 	.dt_compat	= koelsch_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 9e0624e..c5e656e 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -119,5 +119,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= lager_add_standard_devices,
- 	.init_late	= shmobile_init_late,
-+	.reserve	= rcar_gen2_reserve,
- 	.dt_compat	= lager_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 83bbb5c..a51d202 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -891,5 +891,6 @@ DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_time	= rcar_gen2_timer_init,
- 	.init_machine	= lager_init,
- 	.init_late	= shmobile_init_late,
-+	.reserve	= rcar_gen2_reserve,
- 	.dt_compat	= lager_boards_compat_dt,
- MACHINE_END
--- 
-2.0.0.rc2
+Best regards,
+Krzysztof
