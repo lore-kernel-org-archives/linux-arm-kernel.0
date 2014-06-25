@@ -1,39 +1,25 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 25 Jun 2014 14:26:24 +0530
-Subject: [PATCH 05/14] ARM: shmobile: Mark all SoCs in shmobile as
- CPUFreq, capable
-In-Reply-To: <6596e97e054647fecb016ecb7e1935aa2b7db954.1403681315.git.horms+renesas@verge.net.au>
-References: <cover.1403681315.git.horms+renesas@verge.net.au>
- <6596e97e054647fecb016ecb7e1935aa2b7db954.1403681315.git.horms+renesas@verge.net.au>
-Message-ID: <CAOh2x==C1XDjxdxpE6fYk3j6gO1X7d976Kr-Gjj_-+W6xVzOsw@mail.gmail.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Wed, 25 Jun 2014 09:56:25 +0100
+Subject: [PATCH v2 0/4] Add support for Exynos clock output configuration
+In-Reply-To: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
+References: <1403626107-12073-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CAD8Lp45r4yMq2Ew9Eijs-udLUyteZjriG_86XcQfELvdTbJVNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 1:05 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Benoit Cousson <bcousson@baylibre.com>
->
-> Mark all SoCs in shmobile as CPUFreq capable
-> on multiplatform build only.
->
-> Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
-> [gaku.inami.xw at bp.renesas.com: Move the definition of cpufreq capable]
-> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index dbd954e..c32fa7c 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -12,6 +12,8 @@ config ARCH_SHMOBILE_MULTI
->         select NO_IOPORT_MAP
->         select PINCTRL
->         select ARCH_REQUIRE_GPIOLIB
-> +       select ARCH_HAS_CPUFREQ
-> +       select ARCH_HAS_OPP
+Hi,
 
-https://lkml.org/lkml/2014/6/2/714
-http://patchwork.ozlabs.org/patch/356780/
+On Tue, Jun 24, 2014 at 5:08 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Tested on Odroid U3, with HSIC/USB hub using CLKOUT as reference clock,
+> with some additional patches.
+
+for all the patches:
+Tested-by: Daniel Drake <drake@endlessm.com>
+
+Tested on ODROID-U2 alongside
+    phy: phy-samsung-usb2: Change phy power on/power off sequence
+
+now USB is working fine.
+
+Thanks!
+Daniel
