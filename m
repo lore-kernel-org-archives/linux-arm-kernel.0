@@ -1,88 +1,56 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 25 Jun 2014 18:18:33 +0200
-Subject: [PATCH 1/2] ARM: firmware: Introduce suspend and resume operations
-In-Reply-To: <1403713114-18923-1-git-send-email-t.figa@samsung.com>
-References: <1403713114-18923-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403713114-18923-2-git-send-email-t.figa@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 25 Jun 2014 18:21:56 +0200
+Subject: [GIT PULL] at91: fixes for 3.16 #1 (ter)
+Message-ID: <1403713316-28253-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends the firmware_ops structure with two new callbacks:
-.suspend() and .resume(). The former is intended to ask the firmware to
-save all its volatile state and suspend the system, without returning
-back to the kernel in between. The latter is to be called early by
-very low level platform suspend code after waking up to restore low
-level hardware state, which can't be restored in non-secure mode.
+Arnd, Olof, Kevin,
 
-While at it, outdated version of the structure is removed from the
-documentation and replaced with a reference to the header file.
+An AT91 fixes batch for 3.16 that collects mainly DT fixes in relation
+to the recent move to CCF on a couple of platforms.
+A Kconfig symbol fix in drivers/misc is also included.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- Documentation/arm/firmware.txt  | 28 +++++-----------------------
- arch/arm/include/asm/firmware.h |  8 ++++++++
- 2 files changed, 13 insertions(+), 23 deletions(-)
+As the previous "fixes" pull-requests will be re-spin for 3.17 and shall be
+ignored, I use the same tag name "at91-fixes".
 
-diff --git a/Documentation/arm/firmware.txt b/Documentation/arm/firmware.txt
-index c2e468f..da6713a 100644
---- a/Documentation/arm/firmware.txt
-+++ b/Documentation/arm/firmware.txt
-@@ -7,32 +7,14 @@ world, which changes the way some things have to be initialized. This makes
- a need to provide an interface for such platforms to specify available firmware
- operations and call them when needed.
- 
--Firmware operations can be specified using struct firmware_ops
--
--	struct firmware_ops {
--		/*
--		* Enters CPU idle mode
--		*/
--		int (*do_idle)(void);
--		/*
--		* Sets boot address of specified physical CPU
--		*/
--		int (*set_cpu_boot_addr)(int cpu, unsigned long boot_addr);
--		/*
--		* Boots specified physical CPU
--		*/
--		int (*cpu_boot)(int cpu);
--		/*
--		* Initializes L2 cache
--		*/
--		int (*l2x0_init)(void);
--	};
--
--and then registered with register_firmware_ops function
-+Firmware operations can be specified by filling in a struct firmware_ops
-+with appropriate callbacks and then registering it with register_firmware_ops()
-+function.
- 
- 	void register_firmware_ops(const struct firmware_ops *ops)
- 
--the ops pointer must be non-NULL.
-+The ops pointer must be non-NULL. More information about struct firmware_ops
-+and its members can be found in arch/arm/include/asm/firmware.h header.
- 
- There is a default, empty set of operations provided, so there is no need to
- set anything if platform does not require firmware operations.
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index 2c9f10d..5904f59 100644
---- a/arch/arm/include/asm/firmware.h
-+++ b/arch/arm/include/asm/firmware.h
-@@ -41,6 +41,14 @@ struct firmware_ops {
- 	 * Initializes L2 cache
- 	 */
- 	int (*l2x0_init)(void);
-+	/*
-+	 * Enter system-wide suspend.
-+	 */
-+	int (*suspend)(void);
-+	/*
-+	 * Restore state of privileged hardware after system-wide suspend.
-+	 */
-+	int (*resume)(void);
- };
- 
- /* Global pointer for current firmware_ops structure, can't be NULL. */
+Thanks, best regards,
+
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to 971dc9ce106110745f246337f229013589354536:
+
+  ARM: at91/dt: sam9261: remove slow RC osc (2014-06-25 18:00:17 +0200)
+
+----------------------------------------------------------------
+First AT91 fixes batch for 3.16:
+- drivers/misc fix for Kconfig PWM symbol
+- correction of several values in DT after conversion to CCF
+- fix at91sam9261/at91sam9261ek mistake in slow crystal vs. slow RC osc
+
+----------------------------------------------------------------
+Alexandre Belloni (5):
+      ARM: at91/dt: sam9x5: correct PLLA ICPLL and OUT values
+      ARM: at91/dt: sam9n12: correct PLLA ICPLL and OUT values
+      ARM: at91/dt: sam9261: correctly define mainck
+      ARM: at91/dt: define sam9261ek slow crystal frequency
+      ARM: at91/dt: sam9261: remove slow RC osc
+
+Nicolas Ferre (1):
+      misc: atmel_pwm: fix Kconfig symbols
+
+ arch/arm/boot/dts/at91sam9261.dtsi  | 21 +++++++--------------
+ arch/arm/boot/dts/at91sam9261ek.dts |  4 ++++
+ arch/arm/boot/dts/at91sam9n12.dtsi  |  4 ++--
+ arch/arm/boot/dts/at91sam9x5.dtsi   |  4 ++--
+ drivers/misc/Kconfig                |  2 +-
+ 5 files changed, 16 insertions(+), 19 deletions(-)
+
 -- 
-1.9.3
+Nicolas Ferre
