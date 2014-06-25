@@ -1,37 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 17:00:17 +0900
-Subject: [PATCH] ARM: shmobile: Enable genmai board in multiplatform
- defconfig
-In-Reply-To: <1402915783-25444-1-git-send-email-horms+renesas@verge.net.au>
-References: <1402915783-25444-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140625080017.GB10050@verge.net.au>
+From: gaku.inami.xw@bp.renesas.com (Gaku Inami)
+Date: Wed, 25 Jun 2014 16:58:40 +0900
+Subject: [PATCH] ARM: shmobile: Remove opps table check for cpufreq
+Message-ID: <53AA8130.2020304@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 07:49:43PM +0900, Simon Horman wrote:
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/configs/shmobile_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index 291b1c2..afe8f46 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -10,9 +10,11 @@ CONFIG_PERF_EVENTS=y
->  CONFIG_SLAB=y
->  CONFIG_ARCH_SHMOBILE_MULTI=y
->  CONFIG_ARCH_EMEV2=y
-> +CONFIG_ARCH_R7S72100=y
->  CONFIG_ARCH_R8A7779=y
->  CONFIG_ARCH_R8A7790=y
->  CONFIG_ARCH_R8A7791=y
-> +CONFIG_MACH_GENMAI=y
->  CONFIG_MACH_KOELSCH=y
->  CONFIG_MACH_LAGER=y
->  CONFIG_MACH_MARZEN=y
-> -- 
-> 2.0.0.rc2
-> 
+This patch is based on feedback from Viresh Kumar.
+Since cpufreq-cpu0 driver has already check opp table, there is no
+need to same check in mach-shmobile.
 
-I have queued this up.
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+---
+
+Based on : renesas-devel-v3.16-rc2-20140623
+
+ arch/arm/mach-shmobile/cpufreq.c |   16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/cpufreq.c b/arch/arm/mach-shmobile/cpufreq.c
+index e2c868f..8a24b2b 100644
+--- a/arch/arm/mach-shmobile/cpufreq.c
++++ b/arch/arm/mach-shmobile/cpufreq.c
+@@ -8,24 +8,10 @@
+  * for more details.
+  */
+ 
+-#include <linux/of.h>
+-#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ 
+ int __init shmobile_cpufreq_init(void)
+ {
+-	struct device_node *np;
+-
+-	np = of_cpu_device_node_get(0);
+-	if (np == NULL) {
+-		pr_err("failed to find cpu0 node\n");
+-		return 0;
+-	}
+-
+-	if (of_get_property(np, "operating-points", NULL))
+-		platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+-
+-	of_node_put(np);
+-
++	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
+ 	return 0;
+ }
+-- 
+1.7.9.5
