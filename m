@@ -1,48 +1,76 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 25 Jun 2014 23:30:12 +0530
-Subject: [PATCH 2/8] ARM: dts: dra7xx-clocks: Change the parent of
- apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
-In-Reply-To: <1403719218-9484-1-git-send-email-kishon@ti.com>
-References: <1403719218-9484-1-git-send-email-kishon@ti.com>
-Message-ID: <1403719218-9484-3-git-send-email-kishon@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 25 Jun 2014 11:00:51 -0700
+Subject: [PATCH v8 5/9] seccomp: split mode set routines
+In-Reply-To: <20140625175136.GA18185@redhat.com>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-6-git-send-email-keescook@chromium.org>
+ <20140625135121.GB7892@redhat.com>
+ <CAGXu5jJkFxh4K=40xuh6tu3kUf4oJM8Dry+4upBdRieW3FNLgw@mail.gmail.com>
+ <CALCETrUBNmLnpa+LM91om2RSpR6SjupP-EdefzhU1Me4nv3Dfw@mail.gmail.com>
+ <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
+ <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
+ <20140625173245.GA17695@redhat.com>
+ <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
+ <20140625175136.GA18185@redhat.com>
+Message-ID: <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keerthy <j-keerthy@ti.com>
+On Wed, Jun 25, 2014 at 10:51 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> On 06/25, Andy Lutomirski wrote:
+>>
+>> On Wed, Jun 25, 2014 at 10:32 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> > On 06/25, Andy Lutomirski wrote:
+>> >>
+>> >> Write the filter, then smp_mb (or maybe a weaker barrier is okay),
+>> >> then set the bit.
+>> >
+>> > Yes, exactly, this is what I meant. Plas rmb() in __secure_computing().
+>> >
+>> > But I still can't understand the rest of your discussion about the
+>> > ordering we need ;)
+>>
+>> Let me try again from scratch.
+>>
+>> Currently there are three relevant variables: TIF_SECCOMP,
+>> seccomp.mode, and seccomp.filter.  __secure_computing needs
+>> seccomp.mode and seccomp.filter to be in sync, and it wants (but
+>> doesn't really need) TIF_SECCOMP to be in sync as well.
+>>
+>> My suggestion is to rearrange it a bit.  Move mode into seccomp.filter
+>> (so that filter == NULL implies no seccomp) and don't check
 
-Change the parent of apll_pcie_in_clk_mux to dpll_pcie_ref_m2ldo_ck
-from dpll_pcie_ref_ck.
+This would require that we reimplement mode 1 seccomp via mode 2
+filters. Which isn't too hard, but may add complexity.
 
-Figure 26-22. DPLL_PCIE_REF Functional Block Diagram in vE of DRA7xx ES1.0 TRM
-shows the signal name for the output of post divider (M2) is CLKOUTLDO.
+>> TIF_SECCOMP in secure_computing.  Then turning on seccomp is entirely
+>> atomic except for the fact that the seccomp hooks won't be called if
+>> filter != NULL but !TIF_SECCOMP.  This removes all ordering
+>> requirements.
+>
+> Ah, got it, thanks. Perhaps I missed somehing, but to me this looks like
+> unnecessary complication at first glance.
+>
+> We alredy have TIF_SECCOMP, we need it anyway, and we should only care
+> about the case when this bit is actually set, so that we can race with
+> the 1st call of __secure_computing().
+>
+> Otherwise we are fine: we can miss the new filter anyway, ->mode can't
+> be changed it is already nonzero.
+>
+>> Alternatively, __secure_computing could still BUG_ON(!seccomp.filter).
+>> In that case, filter needs to be set before TIF_SECCOMP is set, but
+>> that's straightforward.
+>
+> Yep. And this is how seccomp_assign_mode() already works? It is called
+> after we change ->filter chain, it changes ->mode before set(TIF_SECCOMP)
+> just it lacks a barrier.
 
-Figure 26-21. PCIe PHY Clock Generator Overview shows CLKOUTLDO is used as
-input to apll mux.
+Right, I think the best solution is to add the barrier. I was
+concerned that adding the read barrier in secure_computing would have
+a performance impact, though.
 
-So the actual output of dpll is dpll_pcie_ref_m2ldo_ck which is also the input
-of apll.
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra7xx-clocks.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 7148e7c..f5dca1f 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1152,7 +1152,7 @@
- 
- 	apll_pcie_in_clk_mux: apll_pcie_in_clk_mux at 4ae06118 {
- 		compatible = "ti,mux-clock";
--		clocks = <&dpll_pcie_ref_ck>, <&pciesref_acs_clk_ck>;
-+		clocks = <&dpll_pcie_ref_m2ldo_ck>, <&pciesref_acs_clk_ck>;
- 		#clock-cells = <0>;
- 		reg = <0x021c 0x4>;
- 		ti,bit-shift = <7>;
 -- 
-1.7.9.5
+Kees Cook
+Chrome OS Security
