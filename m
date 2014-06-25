@@ -1,51 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 25 Jun 2014 19:18:09 +0400
-Subject: [PATCH 08/14] ARM: shmobile: Add shared R-Car Gen2 CMA reservation
- code
-In-Reply-To: <f8e819352d12f1b7d109d846e9bf1c07e006469a.1403681315.git.horms+renesas@verge.net.au>
-References: <cover.1403681315.git.horms+renesas@verge.net.au>
- <f8e819352d12f1b7d109d846e9bf1c07e006469a.1403681315.git.horms+renesas@verge.net.au>
-Message-ID: <53AAE831.3040003@cogentembedded.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 25 Jun 2014 18:20:55 +0300
+Subject: [PATCH] clk: define and export __clk_get_debug for providers
+Message-ID: <1403709655-6220-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Define and export a new function __clk_get_debug which returns the debugfs
+directory entry pointer. This can be used by clock providers to add debugfs
+entries which are not related to a specific clock type. Examples include the
+ability to measure the rate of a clock. It can also be used by modules to
+create new debugfs entries. This is useful if you want to expose features
+for testing which can potentially cause system instability such as allowing
+to change a clock's rate from userspace.
 
-On 06/25/2014 11:35 AM, Simon Horman wrote:
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/clk.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-> From: Magnus Damm <damm+renesas@opensource.se>
-
-> Add R-Car Gen2 CMA memory reservation code that can be
-> shared between multiple SoCs and boards. At this point
-> r8a7790 and r8a7791 are supported.
-
-> The top 256MiB of the legacy 32-bit physical memory space
-> is assigned to a separate CMA area that may be assigned
-> to various devices later on.
-
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> [horms+renesas at verge.net.au: rebased]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-[...]
-
-> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> index fdc714e..544b9bf 100644
-> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> @@ -20,8 +20,11 @@
->
->   #include <linux/clk/shmobile.h>
->   #include <linux/clocksource.h>
-> +#include <linux/device.h>
-> +#include <linux/dma-contiguous.h>
->   #include <linux/io.h>
->   #include <linux/kernel.h>
-> +#include <linux/of_fdt.h>
->   #include <asm/mach/arch.h>
->   #include "common.h"
->   #include "rcar-gen2.h"
-
-    Hm, this part looks incomplete. I thought you were going to add CMA code here?
-
-WBR, Sergei
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 8b73ede..5fe7942 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -652,6 +652,15 @@ unsigned long __clk_get_flags(struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(__clk_get_flags);
+ 
++struct dentry *__clk_get_dentry(struct clk *clk)
++{
++	if (!clk)
++		return NULL;
++
++	return clk->dentry;
++}
++EXPORT_SYMBOL_GPL(__clk_get_dentry);
++
+ bool __clk_is_prepared(struct clk *clk)
+ {
+ 	int ret;
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
