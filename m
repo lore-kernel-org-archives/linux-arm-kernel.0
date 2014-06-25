@@ -1,112 +1,134 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 24 Jun 2014 18:05:29 -0700
-Subject: [PATCH v2] sched: Fix compiler warnings
-Message-ID: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 24 Jun 2014 20:04:50 -0500
+Subject: [PATCH 4/9] ARM: dts: DRA7: Add mailbox nodes
+In-Reply-To: <1403658295-54766-1-git-send-email-s-anna@ti.com>
+References: <1403658295-54766-1-git-send-email-s-anna@ti.com>
+Message-ID: <1403658295-54766-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 143e1e28cb (sched: Rework sched_domain topology definition)
-introduced a number of functions with a return value of 'const int'.
-gcc doesn't know what to do with that and, if the kernel is compiled
-with W=1, complains with the following warnings whenever sched.h
-is included.
+DRA7xx has 13 system mailboxes, and is present on both the
+DRA72x and DRA74x family of SoCs. Add the DT nodes for all
+these 13 mailboxes. Except for mailbox 1, all other mailboxes
+do not have interrupts mapped into the MPU GIC by default.
 
-include/linux/sched.h:875:25: warning:
-	type qualifiers ignored on function return type
-include/linux/sched.h:882:25: warning:
-	type qualifiers ignored on function return type
-include/linux/sched.h:889:25: warning:
-	type qualifiers ignored on function return type
-include/linux/sched.h:1002:21: warning:
-	type qualifiers ignored on function return type
+All the mailboxes have been disabled and the interrupts
+property information is left out intentionally for now,
+because of the dependencies against the crossbar driver.
+These mailboxes can be enabled when a usecase arises
+and the crossbar driver dependencies are met.
 
-Commits fb2aa855 (sched, ARM: Create a dedicated scheduler topology table)
-and 607b45e9a (sched, powerpc: Create a dedicated topology table) introduce
-the same warning in the arm and powerpc code.
+NOTE: The mailbox 1 is backward compatible with the mailbox
+IP on OMAP4/OMAP5 with different number of mailbox fifos
+and IP interrupts, and hence the omap4 compatibility string
+is used.
 
-Drop 'const' from the function declarations to fix the problem.
-
-The fix for all three patches has to be applied together to avoid
-compilation failures for the affected architectures.
-
-Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
-v2: Fix problem in all affected architectures with a single patch
-    to avoid compilation errors.
+ arch/arm/boot/dts/dra7.dtsi | 91 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
 
- arch/arm/kernel/topology.c | 2 +-
- arch/powerpc/kernel/smp.c  | 2 +-
- include/linux/sched.h      | 8 ++++----
- 3 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 9d85318..e35d880 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -275,7 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
- 		cpu_topology[cpuid].socket_id, mpidr);
- }
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index c29945e..8d7626f 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -338,6 +338,97 @@
+ 			status = "disabled";
+ 		};
  
--static inline const int cpu_corepower_flags(void)
-+static inline int cpu_corepower_flags(void)
- {
- 	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
- }
-diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
-index 51a3ff7..1007fb8 100644
---- a/arch/powerpc/kernel/smp.c
-+++ b/arch/powerpc/kernel/smp.c
-@@ -747,7 +747,7 @@ int setup_profiling_timer(unsigned int multiplier)
- 
- #ifdef CONFIG_SCHED_SMT
- /* cpumask of CPUs with asymetric SMT dependancy */
--static const int powerpc_smt_flags(void)
-+static int powerpc_smt_flags(void)
- {
- 	int flags = SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
- 
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 306f4f0..0376b05 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -872,21 +872,21 @@ enum cpu_idle_type {
- #define SD_NUMA			0x4000	/* cross-node balancing */
- 
- #ifdef CONFIG_SCHED_SMT
--static inline const int cpu_smt_flags(void)
-+static inline int cpu_smt_flags(void)
- {
- 	return SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
- }
- #endif
- 
- #ifdef CONFIG_SCHED_MC
--static inline const int cpu_core_flags(void)
-+static inline int cpu_core_flags(void)
- {
- 	return SD_SHARE_PKG_RESOURCES;
- }
- #endif
- 
- #ifdef CONFIG_NUMA
--static inline const int cpu_numa_flags(void)
-+static inline int cpu_numa_flags(void)
- {
- 	return SD_NUMA;
- }
-@@ -999,7 +999,7 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms);
- bool cpus_share_cache(int this_cpu, int that_cpu);
- 
- typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
--typedef const int (*sched_domain_flags_f)(void);
-+typedef int (*sched_domain_flags_f)(void);
- 
- #define SDTL_OVERLAP	0x01
- 
++		mailbox1: mailbox at 4a0f4000 {
++			compatible = "ti,omap4-mailbox";
++			reg = <0x4a0f4000 0x200>;
++			ti,hwmods = "mailbox1";
++			status = "disabled";
++		};
++
++		mailbox2: mailbox at 4883a000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x4883a000 0x200>;
++			ti,hwmods = "mailbox2";
++			status = "disabled";
++		};
++
++		mailbox3: mailbox at 4883c000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x4883c000 0x200>;
++			ti,hwmods = "mailbox3";
++			status = "disabled";
++		};
++
++		mailbox4: mailbox at 4883e000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x4883e000 0x200>;
++			ti,hwmods = "mailbox4";
++			status = "disabled";
++		};
++
++		mailbox5: mailbox at 48840000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48840000 0x200>;
++			ti,hwmods = "mailbox5";
++			status = "disabled";
++		};
++
++		mailbox6: mailbox at 48842000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48842000 0x200>;
++			ti,hwmods = "mailbox6";
++			status = "disabled";
++		};
++
++		mailbox7: mailbox at 48844000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48844000 0x200>;
++			ti,hwmods = "mailbox7";
++			status = "disabled";
++		};
++
++		mailbox8: mailbox at 48846000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48846000 0x200>;
++			ti,hwmods = "mailbox8";
++			status = "disabled";
++		};
++
++		mailbox9: mailbox at 4885e000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x4885e000 0x200>;
++			ti,hwmods = "mailbox9";
++			status = "disabled";
++		};
++
++		mailbox10: mailbox at 48860000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48860000 0x200>;
++			ti,hwmods = "mailbox10";
++			status = "disabled";
++		};
++
++		mailbox11: mailbox at 48862000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48862000 0x200>;
++			ti,hwmods = "mailbox11";
++			status = "disabled";
++		};
++
++		mailbox12: mailbox at 48864000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48864000 0x200>;
++			ti,hwmods = "mailbox12";
++			status = "disabled";
++		};
++
++		mailbox13: mailbox at 48802000 {
++			compatible = "ti,dra7-mailbox";
++			reg = <0x48802000 0x200>;
++			ti,hwmods = "mailbox13";
++			status = "disabled";
++		};
++
+ 		timer1: timer at 4ae18000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4ae18000 0x80>;
 -- 
-1.9.1
+2.0.0
