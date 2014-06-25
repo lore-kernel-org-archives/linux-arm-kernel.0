@@ -1,21 +1,25 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 25 Jun 2014 15:03:21 +0100
-Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
- <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
-Message-ID: <1403705001.18068.6.camel@kazak.uk.xensource.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 25 Jun 2014 16:03:12 +0200
+Subject: [PATCH v8 3/9] seccomp: introduce writer locking
+In-Reply-To: <1403642893-23107-4-git-send-email-keescook@chromium.org>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-4-git-send-email-keescook@chromium.org>
+Message-ID: <20140625140312.GC7892@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-06-25 at 19:26 +0530, Anup Patel wrote:
-> 
-> Ian had send-out a patch long time back to extend
-> GIC dt-bindings for addressing this issue.
-> (http://www.spinics.net/lists/arm-kernel/msg283767.html)
+On 06/24, Kees Cook wrote:
+>
+> @@ -524,6 +529,8 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
+>  	}
+>  #endif
+>
+> +	spin_lock_irqsave(&current->sighand->siglock, irqflags);
+> +
 
-I've been meaning to revisit this. Since that original patch I've been
-wondering if some sort of stride property wouldn't be better.
+Well, I won't argue if you prefer to use _irqsave "just in case".
 
-Ian.
+But irqs must be enabled in syscall paths, you could use spin_lock_irq().
+The same for seccomp_set_mode_filter() added later.
+
+Oleg.
