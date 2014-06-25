@@ -1,31 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Jun 2014 15:55:50 +0100
-Subject: [PATCH] i2c: i2c-st: Rename clock reference to something that exists
-Message-ID: <1403708150-32085-1-git-send-email-lee.jones@linaro.org>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Wed, 25 Jun 2014 09:56:28 -0500
+Subject: [PATCH v2 9/9] arm64: KVM: vgic: deal with GIC sub-page alignment
+In-Reply-To: <CAFEAcA-8vOz34NPPqkh1trU5C1irGatcJjAr1f-wWEPzhpy95w@mail.gmail.com>
+References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
+ <1403169693-13982-10-git-send-email-marc.zyngier@arm.com>
+ <53A9D14D.2020802@amd.com>
+ <CAFEAcA-8vOz34NPPqkh1trU5C1irGatcJjAr1f-wWEPzhpy95w@mail.gmail.com>
+Message-ID: <53AAE31C.2060506@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
-over a few commits, then finally removed in commit 5aa02b9 (ARM:
-STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/i2c/i2c-st.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 06/24/2014 05:28 PM, Peter Maydell wrote:
+> On 24 June 2014 20:28, Joel Schopp <joel.schopp@amd.com> wrote:
+>> On 06/19/2014 04:21 AM, Marc Zyngier wrote:
+>>> The GIC CPU interface is always 4k aligned. If the host is using
+>>> 64k pages, it is critical to place the guest's GICC interface at the
+>>> same relative alignment as the host's GICV. Failure to do so results
+>>> in an impossibility for the guest to deal with interrupts.
+>>>
+>>> Add a KVM_DEV_ARM_VGIC_GRP_ADDR_OFFSET attribute for the VGIC, allowing
+>>> userspace to retrieve the GICV offset in a page. It becomes then trivial
+>>> to adjust the GICC base address for the guest.
+>>
+>> Does this mean there is a corresponding patch for qemu?
+> Not as far as I know. It's a bit awkward on the QEMU end because
+> we really want to provide the guest a consistent memory map
+> regardless of the host CPU. So at best we'd probably use it to
+> say "sorry, can't run on this CPU/host kernel".
+I think most arm64 servers are going to run with 64k pages.  It seems 
+like a major problem to have qemu not work on these systems.
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
-index 437e0db..4c26fda 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-st.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
-@@ -31,7 +31,7 @@ i2c0: i2c at fed40000 {
- 	compatible	= "st,comms-ssc4-i2c";
- 	reg		= <0xfed40000 0x110>;
- 	interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
--	clocks		= <&CLK_S_ICN_REG_0>;
-+	clocks		= <&clk_s_a0_ls CLK_ICN_REG>;
- 	clock-names	= "ssc";
- 	clock-frequency = <400000>;
- 	pinctrl-names	= "default";
--- 
-1.8.3.2
+>
+> (That said, if you think you can make QEMU usefully use the
+> information and want to write a QEMU patch I'm not averse
+> to the idea.)
+I'll have to think about this approach some more, but I'm not opposed to 
+doing the work if I thought it was the right thing to do.
+
+>
+> kvmtool is probably better placed to take advantage of it since
+> it takes more of a "deal with what the host provides you"
+> philosophy.
+kvmtool is fun as a play toy, but in the real world nobody is building 
+clouds using kvmtool, they use kvm with qemu.
+
+>
+> thanks
+> -- PMM
