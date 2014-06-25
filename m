@@ -1,77 +1,110 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Jun 2014 17:33:15 +0100
-Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
-In-Reply-To: <53AAE632.3020806@mvista.com>
-References: <53AAE632.3020806@mvista.com>
-Message-ID: <20140625163315.GH15240@leverpostej>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 25 Jun 2014 09:33:32 -0700
+Subject: [PATCH v2] i2c: exynos5: Properly use the "noirq" variants of
+ suspend/resume
+In-Reply-To: <02e701cf9066$7332b280$59981780$@samsung.com>
+References: <1403654093-24134-1-git-send-email-dianders@chromium.org>
+ <02e701cf9066$7332b280$59981780$@samsung.com>
+Message-ID: <CAD=FV=WSuxbTg2g-Cb79fFQKV4+_Gtc4PUQ4poovNM0eUkkMeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 04:09:38PM +0100, arun chandran wrote:
-> From 85134076eb06b90e295e46b083dc180a91c61ea2 Mon Sep 17 00:00:00 2001
-> From: Arun Chandran <achandran@mvista.com>
-> Date: Wed, 25 Jun 2014 19:36:54 +0530
-> Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
-> 
-> Selecting CPU_BIG_ENDIAN and building the kernel fails just after
-> building it for little endian with the message
-> 
->   VDSOA arch/arm64/kernel/vdso/gettimeofday.o
->   VDSOL arch/arm64/kernel/vdso/vdso.so.dbg
-> /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> arch/arm64/kernel/vdso/note.o: compiled for a little endian system and
-> target is big endian
-> /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> failed to merge target specific data of file
-> arch/arm64/kernel/vdso/note.o
-> /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system
-> and target is big endian
-> /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> failed to merge target specific data of file
-> arch/arm64/kernel/vdso/sigreturn.o
-> collect2: error: ld returned 1 exit status
-> make[2]: *** [arch/arm64/kernel/vdso/vdso.so.dbg] Error 1
-> make[1]: *** [arch/arm64/kernel/vdso] Error 2
-> make: *** [arch/arm64/kernel] Error 2
-> make: *** Waiting for unfinished jobs....
+Kukjin,
+
+On Wed, Jun 25, 2014 at 4:13 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Doug Anderson wrote:
+>>
+>> The original code for the exynos i2c controller registered for the
+>> "noirq" variants.  However during review feedback it was moved to
+>> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
+>> longer actually "noirq" (despite functions named
+>> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
+>>
+>> i2c controllers that might have wakeup sources on them seem to need to
+>> resume at noirq time so that the individual drivers can actually read
+>> the i2c bus to handle their wakeup.
+>>
+>> NOTE: I took the original review feedback from Wolfram and added
+>> poweroff, thaw, freeze, restore.
+>>
+> Yeah I'm not sure except .suspend_noirq and .resume_noirq but I'm fine if
+> Wolfram suggested ;-)
+
+Sorry, I didn't mean to imply that Wolfram suggested the "noirq" versions.
+
+Specifically in <https://lkml.org/lkml/2013/9/8/133> Naveen had:
+
+> +static const struct dev_pm_ops exynos5_i2c_dev_pm_ops = {
+> + .suspend_noirq = exynos5_i2c_suspend_noirq,
+> + .resume_noirq = exynos5_i2c_resume_noirq,
+> +};
+> +
+> +#define EXYNOS5_DEV_PM_OPS (&exynos5_i2c_dev_pm_ops)
+> +#else
+> +#define EXYNOS5_DEV_PM_OPS NULL
+> +#endif
+
+And Wolfram said:
+
+> Isn't there a macro for this? SIMPLE_DEV_PM_OPS*? Not sure, I always mix
+> them up...
+
+That had the side effect of getting freeze, restore, ...
+
+Ah, I also see that Felipe Balbi was the one that gave earlier
+feedback about this also at <https://lkml.org/lkml/2012/11/27/262>.
+He said "you need to define poweroff, thaw, freeze, restore."
+
+
+>> This patch has only been compile-tested since I don't have all the
+>> patches needed to make my machine using this i2c driver actually
+>> suspend/resume.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>> Changes in v2:
+>> - Added missing CONFIG_PM_SLEEP
+>>
+>>  drivers/i2c/busses/i2c-exynos5.c | 12 ++++++++++--
+>>  1 file changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-
+>> exynos5.c
+>> index 63d2292..348b1cd 100644
+>> --- a/drivers/i2c/busses/i2c-exynos5.c
+>> +++ b/drivers/i2c/busses/i2c-exynos5.c
+>> @@ -789,8 +789,16 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+>>  }
+>>  #endif
+>>
+>> -static SIMPLE_DEV_PM_OPS(exynos5_i2c_dev_pm_ops, exynos5_i2c_suspend_noirq,
+>> -                      exynos5_i2c_resume_noirq);
+>> +const struct dev_pm_ops exynos5_i2c_dev_pm_ops = {
 >
-> Fix it by 'Forcing' the build in arch/arm64/kernel/vdso/Makefile
+> Maybe static const struct...?
 
-I see that Documentation/kbuild/makefiles.txt describes that if_changed
-requires FORCE, and forgetting FORCE is a common mistake. See "6.7
-Commands useful for building a boot image".
+Duh, right.  Fixing and will spin.
 
-It's probably worth mentioning that in the commit message.
 
-I was able to build and boot LE, BE, and LE arm64 (defconfig) kernels in
-turn with this patch applied, and I didn't receive any unexpected errors
-from gcc or ld.
-
-So FWIW:
-
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> Signed-off-by: Arun Chandran <achandran@mvista.com>
-> ---
->  arch/arm64/kernel/vdso/Makefile |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-> index 6d20b7d..a268a9a 100644
-> --- a/arch/arm64/kernel/vdso/Makefile
-> +++ b/arch/arm64/kernel/vdso/Makefile
-> @@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
->  	$(call if_changed,vdsosym)
->  
->  # Assembly rules for the .S files
-> -$(obj-vdso): %.o: %.S
-> +$(obj-vdso): %.o: %.S FORCE
->  	$(call if_changed_dep,vdsoas)
->  
->  # Actual build commands
-> -- 
-> 1.7.9.5
+>> +#ifdef CONFIG_PM_SLEEP
+>> +     .suspend_noirq = exynos5_i2c_suspend_noirq,
+>> +     .resume_noirq = exynos5_i2c_resume_noirq,
+>> +     .freeze_noirq = exynos5_i2c_suspend_noirq,
+>> +     .thaw_noirq = exynos5_i2c_resume_noirq,
+>> +     .poweroff_noirq = exynos5_i2c_suspend_noirq,
+>> +     .restore_noirq = exynos5_i2c_resume_noirq,
+>> +#endif
+>> +};
+>>
+>>  static struct platform_driver exynos5_i2c_driver = {
+>>       .probe          = exynos5_i2c_probe,
+>> --
+>> 2.0.0.526.g5318336
+>
+> Others look good to me,
+>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>
+> Thanks,
+> Kukjin
+>
