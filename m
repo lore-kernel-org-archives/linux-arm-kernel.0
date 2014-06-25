@@ -1,35 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:22 +0900
-Subject: [PATCH 10/14] ARM: shmobile: rcar-gen2: Use "1ULL" instead of "(u64)1"
+Date: Wed, 25 Jun 2014 16:35:24 +0900
+Subject: [PATCH 12/14] ARM: shmobile: rcar-gen2: correct return value of
+ shmobile_smp_apmu_suspend_init
 In-Reply-To: <cover.1403681315.git.horms+renesas@verge.net.au>
 References: <cover.1403681315.git.horms+renesas@verge.net.au>
-Message-ID: <b69f47c00f2eff19b532cf0142d81b993e587bf0.1403681315.git.horms+renesas@verge.net.au>
+Message-ID: <ecdaca48629bd99609fdc612685363330967dce2.1403681315.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+The dummy shmobile_smp_apmu_suspend_init() function provided when
+CPU_IDLE is not set should not return a value as per the signature
+of the function.
 
-Casts are evil
+This problem appears to have been introduced by
+867ba81f728f1daa ("ARM: shmobile: APMU: Add Core-Standby-state for Suspend
+to RAM").
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
+Cc: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 2 +-
+ arch/arm/mach-shmobile/common.h | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index b0626f8..51d5723 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -126,7 +126,7 @@ static int __init rcar_gen2_scan_mem(unsigned long node, const char *uname,
- 	const __be32 *reg, *endp;
- 	int l;
- 	struct memory_reserve_config *mrc = data;
--	u64 lpae_start = (u64)1 << 32;
-+	u64 lpae_start = 1ULL << 32;
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 8f0cd57..1e81199 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -38,7 +38,7 @@ int shmobile_suspend_init(void);
+ void shmobile_smp_apmu_suspend_init(void);
+ #else
+ static inline int shmobile_suspend_init(void) { return 0; }
+-static inline void shmobile_smp_apmu_suspend_init(void) { return 0; }
++static inline void shmobile_smp_apmu_suspend_init(void) { }
+ #endif
  
- 	/* We are scanning "memory" nodes only */
- 	if (type == NULL) {
+ #ifdef CONFIG_CPU_IDLE
 -- 
 2.0.0.rc2
