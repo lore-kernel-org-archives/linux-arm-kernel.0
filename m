@@ -1,66 +1,65 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 25 Jun 2014 15:37:28 +0200
-Subject: [PATCH v2 3/6] ARM: mm: cache-l2x0: Use l2c_write_sec() for
- LATENCY_CTRL registers
+Date: Wed, 25 Jun 2014 15:37:31 +0200
+Subject: [PATCH v2 6/6] ARM: dts: exynos4: Add nodes for L2 cache controller
 In-Reply-To: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
 References: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403703451-12233-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1403703451-12233-7-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the documentation, TAG_LATENCY_CTRL and DATA_LATENCY_CTRL
-registers of L2C-310 can be written only in secure mode, so
-l2c_write_sec() should be used to change them, instead of plain
-writel_relaxed().
+This patch adds device tree nodes for L2 cache controller present on
+Exynos4 SoCs.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mm/cache-l2x0.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/exynos4210.dtsi |  9 +++++++++
+ arch/arm/boot/dts/exynos4x12.dtsi | 14 ++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 478566b..6600fd9 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -622,10 +622,10 @@ static void l2c310_resume(void)
- 		unsigned revision;
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index ee3001f..99970ab 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -54,6 +54,15 @@
+ 		reg = <0x10023CA0 0x20>;
+ 	};
  
- 		/* restore pl310 setup */
--		writel_relaxed(l2x0_saved_regs.tag_latency,
--			       base + L310_TAG_LATENCY_CTRL);
--		writel_relaxed(l2x0_saved_regs.data_latency,
--			       base + L310_DATA_LATENCY_CTRL);
-+		l2c_write_sec(l2x0_saved_regs.tag_latency,
-+			       base, L310_TAG_LATENCY_CTRL);
-+		l2c_write_sec(l2x0_saved_regs.data_latency,
-+			       base, L310_DATA_LATENCY_CTRL);
- 		writel_relaxed(l2x0_saved_regs.filter_end,
- 			       base + L310_ADDR_FILTER_END);
- 		writel_relaxed(l2x0_saved_regs.filter_start,
-@@ -1024,20 +1024,20 @@ static void __init l2c310_of_parse(const struct device_node *np,
++	l2c: l2-cache-controller at 10502000 {
++		compatible = "arm,pl310-cache";
++		reg = <0x10502000 0x1000>;
++		cache-unified;
++		cache-level = <2>;
++		arm,tag-latency = <2 2 1>;
++		arm,data-latency = <2 2 1>;
++	};
++
+ 	gic: interrupt-controller at 10490000 {
+ 		cpu-offset = <0x8000>;
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index c5a943d..ddffefe 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -60,6 +60,20 @@
+ 		reg = <0x10023CA0 0x20>;
+ 	};
  
- 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
- 	if (tag[0] && tag[1] && tag[2])
--		writel_relaxed(
-+		l2c_write_sec(
- 			L310_LATENCY_CTRL_RD(tag[0] - 1) |
- 			L310_LATENCY_CTRL_WR(tag[1] - 1) |
- 			L310_LATENCY_CTRL_SETUP(tag[2] - 1),
--			l2x0_base + L310_TAG_LATENCY_CTRL);
-+			l2x0_base, L310_TAG_LATENCY_CTRL);
- 
- 	of_property_read_u32_array(np, "arm,data-latency",
- 				   data, ARRAY_SIZE(data));
- 	if (data[0] && data[1] && data[2])
--		writel_relaxed(
-+		l2c_write_sec(
- 			L310_LATENCY_CTRL_RD(data[0] - 1) |
- 			L310_LATENCY_CTRL_WR(data[1] - 1) |
- 			L310_LATENCY_CTRL_SETUP(data[2] - 1),
--			l2x0_base + L310_DATA_LATENCY_CTRL);
-+			l2x0_base, L310_DATA_LATENCY_CTRL);
- 
- 	of_property_read_u32_array(np, "arm,filter-ranges",
- 				   filter, ARRAY_SIZE(filter));
++	l2c: l2-cache-controller at 10502000 {
++		compatible = "arm,pl310-cache";
++		reg = <0x10502000 0x1000>;
++		cache-unified;
++		cache-level = <2>;
++		arm,tag-latency = <2 2 1>;
++		arm,data-latency = <3 2 1>;
++		arm,double-linefill = <1>;
++		arm,double-linefill-incr = <0>;
++		arm,double-linefill-wrap = <1>;
++		arm,prefetch-drop = <1>;
++		arm,prefetch-offset = <7>;
++	};
++
+ 	clock: clock-controller at 10030000 {
+ 		compatible = "samsung,exynos4412-clock";
+ 		reg = <0x10030000 0x20000>;
 -- 
 1.9.3
