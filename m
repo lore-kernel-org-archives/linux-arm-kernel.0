@@ -1,796 +1,127 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Jun 2014 15:10:14 +0100
-Subject: [PATCH v5 1/8] Documentation: arm: define DT idle states bindings
-In-Reply-To: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1403705421-17597-2-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed, 25 Jun 2014 15:10:13 +0100
+Subject: [PATCH v5 0/8] ARM generic idle states
+Message-ID: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM based platforms implement a variety of power management schemes that
-allow processors to enter idle states at run-time.
-The parameters defining these idle states vary on a per-platform basis forcing
-the OS to hardcode the state parameters in platform specific static tables
-whose size grows as the number of platforms supported in the kernel increases
-and hampers device drivers standardization.
+This patch is v5 of a previous posting:
 
-Therefore, this patch aims at standardizing idle state device tree bindings for
-ARM platforms. Bindings define idle state parameters inclusive of entry methods
-and state latencies, to allow operating systems to retrieve the configuration
-entries from the device tree and initialize the related power management
-drivers, paving the way for common code in the kernel to deal with idle
-states and removing the need for static data in current and previous kernel
-versions.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/263060.html
 
-Reviewed-by: Sebastian Capella <sebcape@gmail.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
+Changes in v5:
+
+- Added power-rank property to implement state sorting, following a number
+  of on/off list review comments
+- Added timer retained bool property
+- Ported TC2 big.LITTLE and Exynos drivers to DT initialization
+- Renamed s/OF/dt/ throughout the patch
+- Incorporated review comments and list discussions in the idle states
+  bindings documents
+- Rebased against 3.16-rc2
+
+Changes in v4:
+
+- States sorting using exit-latency
+- Added cosmetic review comments
+- Dropped RFC
+- Rebased against 3.15
+
+Changes in v3:
+
+- Streamlined the idle states bindings and added them to the series
+  http://www.spinics.net/lists/arm-kernel/msg316299.html
+- Sorting states through min-residency+exit-latency
+- Added debug strings formatting
+- Reworded min-residency-us idle state property
+- Removed power-domain properties from idle states waiting for code
+  examples requiring them to be defined
+
+Changes in v2:
+
+- Moved OF parsing code to drivers/cpuidle
+- Improved states detection and sorting through linked list
+- Split code in generic and ARM64 specific bits
+- Moved idle enter function into ARM64 idle driver
+- Refactored PSCI idle states register function
+- Renamed suspend operations and moved detection to ARM64 idle driver
+- Changed the way CPUIDLE_FLAG_TIMER_STOP is handled
+- Simplified idle state nodes parsing since according to the latest
+  bindings idle state nodes are a flat list, not hierarchical anymore
+- Used min-residency-us to sort the states, to be further discussed
+
+Idle states on most ARM platforms can be characterized by a set of
+parameters that are platform agnostic and describe the HW idle states
+features. So far, CPU idle drivers for ARM platforms required the definition
+of parameters through static tables, duplicating control data for different
+platforms. Moreover, the lack of standardization on firmware interfaces
+hampered any standardization effort, resulting in CPU idle drivers for ARM
+platforms containing duplicated code and platform specific power down routines.
+
+The introduction of the PSCI firmware interface, and more in general, well
+defined suspend back-ends, allows the definition of generic idle states and
+the respective kernel infrastructure to support them.
+
+Building on top of DT idle states bindings, that standardize idle states
+parameters and corresponding suspend back-ends, this patchset provides code
+that parses DT idle states nodes and builds at run-time the control data
+infrastructure required by the ARM CPU idle drivers.
+
+Idle states define an entry method (eg PSCI), that requires the respective
+ARM64 kernel back-end to be invoked to initialize idle states parameters, so
+that when the idle driver executes the back-end specific entry method a table
+look-up can be carried out to retrieve the corresponding idle state parameter.
+
+On legacy ARM platforms, the OF idle states are just used to initialize
+states data.
+
+The idle states bindings can be extended with new back-ends; the ARM64 CPUidle
+driver must be updated accordingly so that the corresponding back
+end initializer can be invoked at boot time for parameters initialization.
+
+Patchset has been tested on AEM v8 models, on top of bootwrapper PSCI CPU
+SUSPEND implementation which provides simulated core power gating.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg316299.html
+
+Lorenzo Pieralisi (8):
+  Documentation: arm: define DT idle states bindings
+  Documentation: devicetree: psci: define CPU suspend parameter
+  drivers: cpuidle: implement DT based idle states infrastructure
+  arm64: add PSCI CPU_SUSPEND based cpu_suspend support
+  drivers: cpuidle: CPU idle ARM64 driver
+  drivers: cpuidle: initialize big.LITTLE driver through DT
+  drivers: cpuidle: initialize Exynos driver through DT
+  arm64: boot: dts: update rtsm aemv8 dts with PSCI and idle states
+
  Documentation/devicetree/bindings/arm/cpus.txt     |   8 +
+ .../devicetree/bindings/arm/exynos/idle-states.txt |  27 +
  .../devicetree/bindings/arm/idle-states.txt        | 733 +++++++++++++++++++++
- 2 files changed, 741 insertions(+)
+ Documentation/devicetree/bindings/arm/psci.txt     |  12 +-
+ Documentation/devicetree/bindings/arm/vexpress.txt |  25 +
+ arch/arm/boot/dts/exynos3250.dtsi                  |  16 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |  15 +
+ arch/arm/boot/dts/exynos5410.dtsi                  |  17 +
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  25 +
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts             |  44 +-
+ arch/arm64/include/asm/psci.h                      |   4 +
+ arch/arm64/kernel/psci.c                           | 103 +++
+ drivers/cpuidle/Kconfig                            |  13 +
+ drivers/cpuidle/Kconfig.arm                        |   2 +
+ drivers/cpuidle/Kconfig.arm64                      |  13 +
+ drivers/cpuidle/Makefile                           |   5 +
+ drivers/cpuidle/cpuidle-arm64.c                    | 165 +++++
+ drivers/cpuidle/cpuidle-big_little.c               |  43 +-
+ drivers/cpuidle/cpuidle-exynos.c                   |  29 +-
+ drivers/cpuidle/dt_idle_states.c                   | 283 ++++++++
+ drivers/cpuidle/dt_idle_states.h                   |   8 +
+ 21 files changed, 1548 insertions(+), 42 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
  create mode 100644 Documentation/devicetree/bindings/arm/idle-states.txt
+ create mode 100644 drivers/cpuidle/Kconfig.arm64
+ create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+ create mode 100644 drivers/cpuidle/dt_idle_states.c
+ create mode 100644 drivers/cpuidle/dt_idle_states.h
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 1fe72a0..a44d4fd 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -215,6 +215,12 @@ nodes to be present and contain the properties described below.
- 		Value type: <phandle>
- 		Definition: Specifies the ACC[2] node associated with this CPU.
- 
-+	- cpu-idle-states
-+		Usage: Optional
-+		Value type: <prop-encoded-array>
-+		Definition:
-+			# List of phandles to idle state nodes supported
-+			  by this cpu [3].
- 
- Example 1 (dual-cluster big.LITTLE system 32-bit):
- 
-@@ -411,3 +417,5 @@ cpus {
- --
- [1] arm/msm/qcom,saw2.txt
- [2] arm/msm/qcom,kpss-acc.txt
-+[3] ARM Linux kernel documentation - idle states bindings
-+    Documentation/devicetree/bindings/arm/idle-states.txt
-diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
-new file mode 100644
-index 0000000..5efd198
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/idle-states.txt
-@@ -0,0 +1,733 @@
-+==========================================
-+ARM idle states binding description
-+==========================================
-+
-+==========================================
-+1 - Introduction
-+==========================================
-+
-+ARM systems contain HW capable of managing power consumption dynamically,
-+where cores can be put in different low-power states (ranging from simple
-+wfi to power gating) according to OS PM policies. The CPU states representing
-+the range of dynamic idle states that a processor can enter at run-time, can be
-+specified through device tree bindings representing the parameters required
-+to enter/exit specific idle states on a given processor.
-+
-+According to the Server Base System Architecture document (SBSA, [3]), the
-+power states an ARM CPU can be put into are identified by the following list:
-+
-+- Running
-+- Idle_standby
-+- Idle_retention
-+- Sleep
-+- Off
-+
-+The power states described in the SBSA document define the basic CPU states on
-+top of which ARM platforms implement power management schemes that allow an OS
-+PM implementation to put the processor in different idle states (which include
-+states listed above; "off" state is not an idle state since it does not have
-+wake-up capabilities, hence it is not considered in this document).
-+
-+Idle state parameters (eg entry latency) are platform specific and need to be
-+characterized with bindings that provide the required information to OS PM
-+code so that it can build the required tables and use them at runtime.
-+
-+The device tree binding definition for ARM idle states is the subject of this
-+document.
-+
-+===========================================
-+2 - idle-states definitions
-+===========================================
-+
-+Idle states are characterized for a specific system through a set of
-+timing and energy related properties, that underline the HW behaviour
-+triggered upon idle states entry and exit.
-+
-+The following diagram depicts the CPU execution phases and related timing
-+properties required to enter and exit an idle state:
-+
-+..__[EXEC]__|__[PREP]__|__[ENTRY]__|__[IDLE]__|__[EXIT]__|__[EXEC]__..
-+	    |          |           |          |          |
-+
-+	    |<------ entry ------->|
-+	    |       latency        |
-+					      |<- exit ->|
-+					      |  latency |
-+	    |<-------- min-residency -------->|
-+		       |<-------  wakeup-latency ------->|
-+
-+		Diagram 1: CPU idle state execution phases
-+
-+EXEC:	Normal CPU execution.
-+
-+PREP:	Preparation phase before committing the hardware to idle mode
-+	like cache flushing. This is abortable on pending wake-up
-+	event conditions. The abort latency is assumed to be negligible
-+	(i.e. less than the ENTRY + EXIT duration). If aborted, CPU
-+	goes back to EXEC. This phase is optional. If not abortable,
-+	this should be included in the ENTRY phase instead.
-+
-+ENTRY:	The hardware is committed to idle mode. This period must run
-+	to completion up to IDLE before anything else can happen.
-+
-+IDLE:	This is the actual energy-saving idle period. This may last
-+	between 0 and infinite time, until a wake-up event occurs.
-+
-+EXIT:	Period during which the CPU is brought back to operational
-+	mode (EXEC).
-+
-+entry-latency: Worst case latency required to enter the idle state. The
-+exit-latency may be guaranteed only after entry-latency has passed.
-+
-+min-residency: Minimum period, including preparation and entry, for a given
-+idle state to be worthwhile energywise.
-+
-+wakeup-latency: Maximum delay between the signaling of a wake-up event and the
-+CPU being able to execute normal code again. If not specified, this is assumed
-+to be entry-latency + exit-latency.
-+
-+These timing parameters can be used by an OS in different circumstances.
-+
-+An idle CPU requires the expected min-residency time to select the most
-+appropriate idle state based on the expected expiry time of the next IRQ
-+(ie wake-up) that causes the CPU to return to the EXEC phase.
-+
-+An operating system scheduler may need to compute the shortest wake-up delay
-+for CPUs in the system by detecting how long will it take to get a CPU out
-+of an idle state, eg:
-+
-+wakeup-delay = exit-latency + max(entry-latency - (now - entry-timestamp), 0)
-+
-+In other words, the scheduler can make its scheduling decision by selecting
-+(eg waking-up) the CPU with the shortest wake-up latency.
-+The wake-up latency must take into account the entry latency if that period
-+has not expired. The abortable nature of the PREP period can be ignored
-+if it cannot be relied upon (e.g. the PREP deadline may occur much sooner than
-+the worst case since it depends on the CPU operating conditions, ie caches
-+state).
-+
-+An OS has to reliably probe the wakeup-latency since some devices can enforce
-+latency constraints guarantees to work properly, so the OS has to detect the
-+worst case wake-up latency it can incur if a CPU is allowed to enter an
-+idle state, and possibly to prevent that to guarantee reliable device
-+functioning.
-+
-+The min-residency time parameter deserves further explanation since it is
-+expressed in time units but must factor in energy consumption coefficients.
-+
-+The energy consumption of a cpu when it enters a power state can be roughly
-+characterised by the following graph:
-+
-+               |
-+               |
-+               |
-+           e   |
-+           n   |                                      /---
-+           e   |                               /------
-+           r   |                        /------
-+           g   |                  /-----
-+           y   |           /------
-+               |       ----
-+               |      /|
-+               |     / |
-+               |    /  |
-+               |   /   |
-+               |  /    |
-+               | /     |
-+               |/      |
-+          -----|-------+----------------------------------
-+              0|       1                              time(ms)
-+
-+		Graph 1: Energy vs time example
-+
-+The graph is split in two parts delimited by time 1ms on the X-axis.
-+The graph curve with X-axis values = { x | 0 < x < 1ms } has a steep slope
-+and denotes the energy costs incurred whilst entering and leaving the idle
-+state.
-+The graph curve in the area delimited by X-axis values = {x | x > 1ms } has
-+shallower slope and essentially represents the energy consumption of the idle
-+state.
-+
-+min-residency is defined for a given idle state as the minimum expected
-+residency time for a state (inclusive of preparation and entry) after
-+which choosing that state become the most energy efficient option. A good
-+way to visualise this, is by taking the same graph above and comparing some
-+states energy consumptions plots.
-+
-+For sake of simplicity, let's consider a system with two idle states IDLE1,
-+and IDLE2:
-+
-+          |
-+          |
-+          |
-+          |                                                  /-- IDLE1
-+       e  |                                              /---
-+       n  |                                         /----
-+       e  |                                     /---
-+       r  |                                /-----/--------- IDLE2
-+       g  |                    /-------/---------
-+       y  |        ------------    /---|
-+          |       /           /----    |
-+          |      /        /---         |
-+          |     /    /----             |
-+          |    / /---                  |
-+          |   ---                      |
-+          |  /                         |
-+          | /                          |
-+          |/                           |                  time
-+       ---/----------------------------+------------------------
-+          |IDLE1-energy < IDLE2-energy | IDLE2-energy < IDLE1-energy
-+                                       |
-+                                IDLE2-min-residency
-+
-+		Graph 2: idle states min-residency example
-+
-+In graph 2 above, that takes into account idle states entry/exit energy
-+costs, it is clear that if the idle state residency time (ie time till next
-+wake-up IRQ) is less than IDLE2-min-residency, IDLE1 is the better idle state
-+choice energywise.
-+
-+This is mainly down to the fact that IDLE1 entry/exit energy costs are lower
-+than IDLE2.
-+
-+However, the lower power consumption (ie shallower energy curve slope) of idle
-+state IDLE2 implies that after a suitable time, IDLE2 becomes more energy
-+efficient.
-+
-+The time@which IDLE2 becomes more energy efficient than IDLE1 (and other
-+shallower states in a system with multiple idle states) is defined
-+IDLE2-min-residency and corresponds to the time when energy consumption of
-+IDLE1 and IDLE2 states breaks even.
-+
-+The definitions provided in this section underpin the idle states
-+properties specification that is the subject of the following sections.
-+
-+===========================================
-+3 - idle-states node
-+===========================================
-+
-+ARM processor idle states are defined within the idle-states node, which is
-+a direct child of the cpus node [1] and provides a container where the
-+processor idle states, defined as device tree nodes, are listed.
-+
-+- idle-states node
-+
-+	Usage: Optional - On ARM systems, it is a container of processor idle
-+			  states nodes. If the system does not provide CPU
-+			  power management capabilities or the processor just
-+			  supports idle_standby an idle-states node is not
-+			  required.
-+
-+	Description: idle-states node is a container node, where its
-+		     subnodes describe the CPU idle states.
-+
-+	Node name must be "idle-states".
-+
-+	The idle-states node's parent node must be the cpus node.
-+
-+	The idle-states node's child nodes can be:
-+
-+	- one or more state nodes
-+
-+	Any other configuration is considered invalid.
-+
-+	An idle-states node defines the following properties:
-+
-+	- entry-method
-+		Usage: Required
-+		Value type: <stringlist>
-+		Definition: Describes the method by which a CPU enters the
-+			    idle states. This property is required and must be
-+			    one of:
-+
-+			    - "arm,psci"
-+			      ARM PSCI firmware interface [2].
-+
-+			    - "[vendor],[method]"
-+			      An implementation dependent string with
-+			      format "vendor,method", where vendor is a string
-+			      denoting the name of the manufacturer and
-+			      method is a string specifying the mechanism
-+			      used to enter the idle state.
-+
-+The nodes describing the idle states (state) can only be defined within the
-+idle-states node, any other configuration is considered invalid and therefore
-+must be ignored.
-+
-+===========================================
-+4 - state node
-+===========================================
-+
-+A state node represents an idle state description and must be defined as
-+follows:
-+
-+- state node
-+
-+	Description: must be child of the idle-states node
-+
-+	The state node name shall follow standard device tree naming
-+	rules ([5], 2.2.1 "Node names"), in particular state nodes which
-+	are siblings within a single common parent must be given a unique name.
-+
-+	The idle state entered by executing the wfi instruction (idle_standby
-+	SBSA,[3][4]) is considered standard on all ARM platforms and therefore
-+	must not be listed.
-+
-+	With the definitions provided above, the following list represents
-+	the valid properties for a state node:
-+
-+	- compatible
-+		Usage: Required
-+		Value type: <stringlist>
-+		Definition: Must be "arm,idle-state".
-+
-+	- logic-state-retained
-+		Usage: See definition
-+		Value type: <none>
-+		Definition: if present logic is retained on state entry,
-+			    otherwise it is lost.
-+
-+	- cache-state-retained
-+		Usage: See definition
-+		Value type: <none>
-+		Definition: if present cache memory is retained on state entry,
-+			    otherwise it is lost.
-+
-+	- timer-state-retained
-+		Usage: See definition
-+		Value type: <none>
-+		Definition: if present the timer control logic is retained on
-+                            state entry, otherwise it is lost.
-+
-+	- power-rank
-+		Usage: Required
-+		Value type: <u32>
-+		Definition: It represents the idle state power-rank.
-+			    An increasing value implies less power
-+			    consumption. It must be given a sequential
-+			    value = {0, 1, ....}, starting from 0.
-+			    Phandles in the cpu nodes [1] cpu-idle-states
-+			    array property are not allowed to point at idle
-+			    state nodes having the same power-rank value.
-+
-+	- entry-method-param
-+		Usage: See definition.
-+		Value type: <u32>
-+		Definition: Depends on the idle-states node entry-method
-+			    property value. Refer to the entry-method bindings
-+			    for this property value definition.
-+
-+	- entry-latency-us
-+		Usage: Required
-+		Value type: <prop-encoded-array>
-+		Definition: u32 value representing worst case latency in
-+			    microseconds required to enter the idle state.
-+			    The exit-latency-us duration may be guaranteed
-+			    only after entry-latency-us has passed.
-+
-+	- exit-latency-us
-+		Usage: Required
-+		Value type: <prop-encoded-array>
-+		Definition: u32 value representing worst case latency
-+			    in microseconds required to exit the idle state.
-+
-+	- min-residency-us
-+		Usage: Required
-+		Value type: <prop-encoded-array>
-+		Definition: u32 value representing minimum residency duration
-+			    in microseconds, inclusive of preparation and
-+			    entry, for this idle state to be considered
-+			    worthwhile energy wise (refer to section 2 of
-+			    this document for a complete description).
-+
-+	- wakeup-latency-us:
-+		Usage: Optional
-+		Value type: <prop-encoded-array>
-+		Definition: u32 value representing maximum delay between the
-+			    signaling of a wake-up event and the CPU being
-+			    able to execute normal code again. If omitted,
-+			    this is assumed to be equal to:
-+
-+				entry-latency-us + exit-latency-us
-+
-+			    It is important to supply this value on systems
-+			    where the duration of PREP phase (see diagram 1,
-+			    section 2) is non-neglibigle.
-+			    In such systems entry-latency-us + exit-latency-us
-+			    will exceed wakeup-latency-us by this duration.
-+
-+===========================================
-+4 - Examples
-+===========================================
-+
-+Example 1 (ARM 64-bit, 16-cpu system):
-+
-+cpus {
-+	#size-cells = <0>;
-+	#address-cells = <2>;
-+
-+	idle-states {
-+		entry-method = "arm,psci";
-+
-+		CPU_RETENTION_0_0: cpu-retention-0-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <0>;
-+			logic-state-retained;
-+			cache-state-retained;
-+			entry-method-param = <0x0010000>;
-+			entry-latency-us = <20>;
-+			exit-latency-us = <40>;
-+			min-residency-us = <80>;
-+		};
-+
-+		CLUSTER_RETENTION_0: cluster-retention-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <2>;
-+			cache-state-retained;
-+			entry-method-param = <0x1010000>;
-+			entry-latency-us = <50>;
-+			exit-latency-us = <100>;
-+			min-residency-us = <250>;
-+			wakeup-latency-us = <130>;
-+		};
-+
-+		CPU_SLEEP_0_0: cpu-sleep-0-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <1>;
-+			entry-method-param = <0x0010000>;
-+			entry-latency-us = <250>;
-+			exit-latency-us = <500>;
-+			min-residency-us = <950>;
-+		};
-+
-+		CLUSTER_SLEEP_0: cluster-sleep-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <3>;
-+			entry-method-param = <0x1010000>;
-+			entry-latency-us = <600>;
-+			exit-latency-us = <1100>;
-+			min-residency-us = <2700>;
-+			wakeup-latency-us = <1500>;
-+		};
-+
-+		CPU_RETENTION_1_0: cpu-retention-1-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <0>;
-+			logic-state-retained;
-+			cache-state-retained;
-+			entry-method-param = <0x0010000>;
-+			entry-latency-us = <20>;
-+			exit-latency-us = <40>;
-+			min-residency-us = <90>;
-+		};
-+
-+		CLUSTER_RETENTION_1: cluster-retention-1 {
-+			compatible = "arm,idle-state";
-+			power-rank = <2>;
-+			cache-state-retained;
-+			entry-method-param = <0x1010000>;
-+			entry-latency-us = <50>;
-+			exit-latency-us = <100>;
-+			min-residency-us = <270>;
-+			wakeup-latency-us = <100>;
-+		};
-+
-+		CPU_SLEEP_1_0: cpu-sleep-1-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <1>;
-+			entry-method-param = <0x0010000>;
-+			entry-latency-us = <70>;
-+			exit-latency-us = <100>;
-+			min-residency-us = <300>;
-+			wakeup-latency-us = <150>;
-+		};
-+
-+		CLUSTER_SLEEP_1: cluster-sleep-1 {
-+			compatible = "arm,idle-state";
-+			power-rank = <3>;
-+			entry-method-param = <0x1010000>;
-+			entry-latency-us = <500>;
-+			exit-latency-us = <1200>;
-+			min-residency-us = <3500>;
-+			wakeup-latency-us = <1300>;
-+		};
-+	};
-+
-+	CPU0: cpu at 0 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x0>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU1: cpu at 1 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x1>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU2: cpu at 100 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x100>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU3: cpu at 101 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x101>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU4: cpu at 10000 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x10000>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU5: cpu at 10001 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x10001>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU6: cpu at 10100 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x10100>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU7: cpu at 10101 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a57";
-+		reg = <0x0 0x10101>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-+				   &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU8: cpu at 100000000 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x0>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU9: cpu at 100000001 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x1>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU10: cpu at 100000100 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x100>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU11: cpu at 100000101 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x101>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU12: cpu at 100010000 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x10000>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU13: cpu at 100010001 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x10001>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU14: cpu at 100010100 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x10100>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU15: cpu at 100010101 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a53";
-+		reg = <0x1 0x10101>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_RETENTION_1_0 &CPU_SLEEP_1_0
-+				   &CLUSTER_RETENTION_1 &CLUSTER_SLEEP_1>;
-+	};
-+};
-+
-+Example 2 (ARM 32-bit, 8-cpu system, two clusters):
-+
-+cpus {
-+	#size-cells = <0>;
-+	#address-cells = <1>;
-+
-+	idle-states {
-+		entry-method = "arm,psci";
-+
-+		CPU_SLEEP_0_0: cpu-sleep-0-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <0>;
-+			entry-method-param = <0x0010000>;
-+			entry-latency-us = <200>;
-+			exit-latency-us = <100>;
-+			min-residency-us = <400>;
-+			wakeup-latency-us = <250>;
-+		};
-+
-+		CLUSTER_SLEEP_0: cluster-sleep-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <2>;
-+			entry-method-param = <0x1010000>;
-+			entry-latency-us = <500>;
-+			exit-latency-us = <1500>;
-+			min-residency-us = <2500>;
-+			wakeup-latency-us = <1700>;
-+		};
-+
-+		CPU_SLEEP_1_0: cpu-sleep-1-0 {
-+			compatible = "arm,idle-state";
-+			power-rank = <1>;
-+			entry-method-param = <0x0010000>;
-+			entry-latency-us = <300>;
-+			exit-latency-us = <500>;
-+			min-residency-us = <900>;
-+			wakeup-latency-us = <600>;
-+		};
-+
-+		CLUSTER_SLEEP_1: cluster-sleep-1 {
-+			compatible = "arm,idle-state";
-+			power-rank = <3>;
-+			entry-method-param = <0x1010000>;
-+			entry-latency-us = <800>;
-+			exit-latency-us = <2000>;
-+			min-residency-us = <6500>;
-+			wakeup-latency-us = <2300>;
-+		};
-+	};
-+
-+	CPU0: cpu at 0 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a15";
-+		reg = <0x0>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU1: cpu at 1 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a15";
-+		reg = <0x1>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU2: cpu at 2 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a15";
-+		reg = <0x2>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU3: cpu at 3 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a15";
-+		reg = <0x3>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
-+	};
-+
-+	CPU4: cpu at 100 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x100>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_1_0 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU5: cpu at 101 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x101>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_1_0 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU6: cpu at 102 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x102>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_1_0 &CLUSTER_SLEEP_1>;
-+	};
-+
-+	CPU7: cpu at 103 {
-+		device_type = "cpu";
-+		compatible = "arm,cortex-a7";
-+		reg = <0x103>;
-+		enable-method = "psci";
-+		cpu-idle-states = <&CPU_SLEEP_1_0 &CLUSTER_SLEEP_1>;
-+	};
-+};
-+
-+===========================================
-+5 - References
-+===========================================
-+
-+[1] ARM Linux Kernel documentation - CPUs bindings
-+    Documentation/devicetree/bindings/arm/cpus.txt
-+
-+[2] ARM Linux Kernel documentation - PSCI bindings
-+    Documentation/devicetree/bindings/arm/psci.txt
-+
-+[3] ARM Server Base System Architecture (SBSA)
-+    http://infocenter.arm.com/help/index.jsp
-+
-+[4] ARM Architecture Reference Manuals
-+    http://infocenter.arm.com/help/index.jsp
-+
-+[5] ePAPR standard
-+    https://www.power.org/documentation/epapr-version-1-1/
 -- 
 1.9.1
