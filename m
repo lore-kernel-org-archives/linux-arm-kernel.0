@@ -1,159 +1,71 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 25 Jun 2014 16:03:26 -0700
-Subject: [PATCH V7 6/6] power: reset: Remove X-Gene reboot driver
-In-Reply-To: <1403737406-6474-1-git-send-email-fkan@apm.com>
-References: <1403737406-6474-1-git-send-email-fkan@apm.com>
-Message-ID: <1403737406-6474-7-git-send-email-fkan@apm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Jun 2014 00:04:50 +0100
+Subject: [PATCH v8 4/4] drivers: net: Add APM X-Gene SoC ethernet
+ driver support.
+In-Reply-To: <CALdTtnvHt5mYMC3619E4F3KK0jPOw7mCpKE6bTn0Um6fdZ4rbw@mail.gmail.com>
+References: <1403306296-26198-1-git-send-email-isubramanian@apm.com>
+ <1403306296-26198-5-git-send-email-isubramanian@apm.com>
+ <CALdTtnvHt5mYMC3619E4F3KK0jPOw7mCpKE6bTn0Um6fdZ4rbw@mail.gmail.com>
+Message-ID: <20140625230450.GO32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove X-Gene reboot driver.
+On Tue, Jun 24, 2014 at 10:29:48PM -0600, Dann Frazier wrote:
+> On Fri, Jun 20, 2014 at 5:18 PM, Iyappan Subramanian
+> <isubramanian@apm.com> wrote:
+> > +       ring->desc_addr = dma_zalloc_coherent(dev, size, &ring->dma,
+> > +                                             GFP_KERNEL);
+> 
+> Iyappan,
+> When testing this driver on a 3.16-rc2 base, I'm finding that
+> desc_addr gets assigned to NULL here, which results in an oops later
+> on (see below).
 
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- drivers/power/reset/Kconfig        |   7 ---
- drivers/power/reset/Makefile       |   1 -
- drivers/power/reset/xgene-reboot.c | 103 -------------------------------------
- 3 files changed, 111 deletions(-)
- delete mode 100644 drivers/power/reset/xgene-reboot.c
+Note that on failure here...
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 7035236..cfe444e 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -66,13 +66,6 @@ config POWER_RESET_VEXPRESS
- 	  Power off and reset support for the ARM Ltd. Versatile
- 	  Express boards.
- 
--config POWER_RESET_XGENE
--	bool "APM SoC X-Gene reset driver"
--	depends on ARM64
--	depends on POWER_RESET
--	help
--	  Reboot support for the APM SoC X-Gene Eval boards.
--
- config POWER_RESET_KEYSTONE
- 	bool "Keystone reset driver"
- 	depends on ARCH_KEYSTONE
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index b1b5ab3..62088d8 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -6,6 +6,5 @@ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
- obj-$(CONFIG_POWER_RESET_SUN6I) += sun6i-reboot.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
--obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
- obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
- obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
-diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
-deleted file mode 100644
-index ecd55f8..0000000
---- a/drivers/power/reset/xgene-reboot.c
-+++ /dev/null
-@@ -1,103 +0,0 @@
--/*
-- * AppliedMicro X-Gene SoC Reboot Driver
-- *
-- * Copyright (c) 2013, Applied Micro Circuits Corporation
-- * Author: Feng Kan <fkan@apm.com>
-- * Author: Loc Ho <lho@apm.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of
-- * the License, or (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-- * MA 02111-1307 USA
-- *
-- * This driver provides system reboot functionality for APM X-Gene SoC.
-- * For system shutdown, this is board specify. If a board designer
-- * implements GPIO shutdown, use the gpio-poweroff.c driver.
-- */
--#include <linux/io.h>
--#include <linux/of_device.h>
--#include <linux/of_address.h>
--#include <linux/platform_device.h>
--#include <linux/stat.h>
--#include <linux/slab.h>
--#include <asm/system_misc.h>
--
--struct xgene_reboot_context {
--	struct platform_device *pdev;
--	void *csr;
--	u32 mask;
--};
--
--static struct xgene_reboot_context *xgene_restart_ctx;
--
--static void xgene_restart(char str, const char *cmd)
--{
--	struct xgene_reboot_context *ctx = xgene_restart_ctx;
--	unsigned long timeout;
--
--	/* Issue the reboot */
--	if (ctx)
--		writel(ctx->mask, ctx->csr);
--
--	timeout = jiffies + HZ;
--	while (time_before(jiffies, timeout))
--		cpu_relax();
--
--	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
--}
--
--static int xgene_reboot_probe(struct platform_device *pdev)
--{
--	struct xgene_reboot_context *ctx;
--
--	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
--	if (!ctx) {
--		dev_err(&pdev->dev, "out of memory for context\n");
--		return -ENODEV;
--	}
--
--	ctx->csr = of_iomap(pdev->dev.of_node, 0);
--	if (!ctx->csr) {
--		devm_kfree(&pdev->dev, ctx);
--		dev_err(&pdev->dev, "can not map resource\n");
--		return -ENODEV;
--	}
--
--	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
--		ctx->mask = 0xFFFFFFFF;
--
--	ctx->pdev = pdev;
--	arm_pm_restart = xgene_restart;
--	xgene_restart_ctx = ctx;
--
--	return 0;
--}
--
--static struct of_device_id xgene_reboot_of_match[] = {
--	{ .compatible = "apm,xgene-reboot" },
--	{}
--};
--
--static struct platform_driver xgene_reboot_driver = {
--	.probe = xgene_reboot_probe,
--	.driver = {
--		.name = "xgene-reboot",
--		.of_match_table = xgene_reboot_of_match,
--	},
--};
--
--static int __init xgene_reboot_init(void)
--{
--	return platform_driver_register(&xgene_reboot_driver);
--}
--device_initcall(xgene_reboot_init);
+> > +       if (!ring->desc_addr)
+> > +               goto err;
+
+we jump to 'err'.
+
+> > +err:
+> > +       dma_free_coherent(dev, size, ring->desc_addr, ring->dma);
+
+which then tries to call dma_free_coherent on a NULL pointer, and
+possibly undefined ring->dma value.  That's not a nice thing to do,
+and will probably lead to problems.  I know that none of the ARM
+flavours of this function will handle this gracefully, and neither
+does x86's version either.  So this is very probably illegal.
+
+> > +static int xgene_enet_create_desc_rings(struct net_device *ndev)
+> > +{
+> > +       struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+> > +       struct device *dev = &pdata->pdev->dev;
+> > +       struct xgene_enet_desc_ring *rx_ring, *tx_ring, *cp_ring;
+> > +       struct xgene_enet_desc_ring *buf_pool = NULL;
+> > +       u8 cpu_bufnum = 0, eth_bufnum = 0;
+> > +       u8 bp_bufnum = 0x20;
+> > +       u16 ring_id, ring_num = 0;
+> > +       int ret;
+> > +
+> > +       /* allocate rx descriptor ring */
+> > +       ring_id = xgene_enet_get_ring_id(RING_OWNER_CPU, cpu_bufnum++);
+> > +       rx_ring = xgene_enet_create_desc_ring(ndev, ring_num++,
+> > +                                             RING_CFGSIZE_16KB, ring_id);
+> > +       if (IS_ERR_OR_NULL(rx_ring)) {
+> > +               ret = PTR_ERR(rx_ring);
+> > +               goto err;
+> > +       }
+> 
+> Here we test for IS_ERR_OR_NULL. In the oops I'm hitting, rx_ring is
+> NULL here - but PTR_ERR() apparently returns 0 in that case. So this
+> function ends up returning no error.
+
+Yes, IS_ERR_OR_NULL is evil for this very reason and should be avoided
+where possible.  There were discussions a while back about removing it,
+or at least deprecating it because it causes more bugs (exactly of this
+type) than it solves.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
