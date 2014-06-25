@@ -1,57 +1,35 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Jun 2014 13:11:20 +0200
-Subject: [PATCH] arm/arm64: DT: Fix GICv2 CPU interface size
-In-Reply-To: <1403692675-26503-1-git-send-email-marc.zyngier@arm.com>
-References: <1403692675-26503-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140625111119.GA21208@ulmo>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 25 Jun 2014 12:14:43 +0100
+Subject: [PATCH v3 1/2] arm: dts: am4372: let boards access all nodes
+ through phandles
+In-Reply-To: <20140625014016.GA21616@saruman.home>
+References: <1403547659-24558-1-git-send-email-balbi@ti.com>
+ <1403547659-24558-2-git-send-email-balbi@ti.com>
+ <CAL_JsqJx_DJqxpEJebi0Etfv5g7=eYje_53vd_44GykreA-rkQ@mail.gmail.com>
+ <20140625014016.GA21616@saruman.home>
+Message-ID: <20140625111443.GG14495@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 11:37:54AM +0100, Marc Zyngier wrote:
-> All the Cortex-{A7,A15} implementations are using a GICv2. Same for
-> the current arm64 platforms.
+On Wed, Jun 25, 2014 at 02:40:16AM +0100, Felipe Balbi wrote:
+> Hi,
 > 
-> Turns out that most of these platforms have described their GIC CPU
-> interface size as being 4kB. while it is actually 8kB (the GICC_DIR
-> register lives at offset 0x1000).
+> On Tue, Jun 24, 2014 at 04:11:48PM -0500, Rob Herring wrote:
+> > On Mon, Jun 23, 2014 at 1:20 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > > by providing phandles to rtc, wdt, cpu and dispc nodes,
+> > > boards can access them to add board-specific data.
+> > 
+> > Strictly speaking, you are adding labels, not phandles. You can do
 > 
-> This was found when converting the GIC driver to use EOImode==1 on
-> GICv2-based systems. It uses the GICC_DIR register, and the result
-> is a very early firework...
+> heh, fair point. Easily editable when applying, though (?)
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/boot/dts/axm55xx.dtsi              | 2 +-
->  arch/arm/boot/dts/dra7.dtsi                 | 2 +-
->  arch/arm/boot/dts/ecx-2000.dts              | 2 +-
->  arch/arm/boot/dts/exynos3250.dtsi           | 2 +-
->  arch/arm/boot/dts/exynos5.dtsi              | 2 +-
->  arch/arm/boot/dts/exynos5260.dtsi           | 2 +-
->  arch/arm/boot/dts/exynos5410.dtsi           | 2 +-
->  arch/arm/boot/dts/exynos5440.dtsi           | 2 +-
->  arch/arm/boot/dts/omap5.dtsi                | 2 +-
->  arch/arm/boot/dts/r8a73a4.dtsi              | 2 +-
->  arch/arm/boot/dts/r8a7790.dtsi              | 2 +-
->  arch/arm/boot/dts/r8a7791.dtsi              | 2 +-
->  arch/arm/boot/dts/sun6i-a31.dtsi            | 2 +-
->  arch/arm/boot/dts/sun7i-a20.dtsi            | 2 +-
->  arch/arm/boot/dts/tegra114.dtsi             | 2 +-
->  arch/arm/boot/dts/tegra124.dtsi             | 2 +-
->  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts | 2 +-
->  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  | 2 +-
->  arch/arm64/boot/dts/apm-storm.dtsi          | 2 +-
->  arch/arm64/boot/dts/foundation-v8.dts       | 2 +-
->  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts      | 2 +-
->  21 files changed, 21 insertions(+), 21 deletions(-)
+> > phandles without using labels, but the syntax is not so obvious. I'd
+> > tell you what it is but offhand I don't remember. :)
+> 
+> something along the lines of using the full path ?
 
-For the Tegra114 and Tegra124 patches:
+Yup. The full path in braces:
 
-Tested-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140625/e2c028e3/attachment-0001.sig>
+	phandle-property = <&{/full/path/to/node@0xDEAD}>;
+
+Mark.
