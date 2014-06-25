@@ -1,182 +1,367 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 Jun 2014 08:06:27 -0500
-Subject: [PATCH] ARM: integrator: fix OF-related regression
-In-Reply-To: <1403611687-23512-1-git-send-email-linus.walleij@linaro.org>
-References: <1403611687-23512-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAL_Jsq+Us51c-6+kP5Y+aML-HPV-=9SooPepD6u13xyrvDfcKw@mail.gmail.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Wed, 25 Jun 2014 22:08:54 +0900
+Subject: [PATCH 3/3] mmc: dw_mmc: Support voltage changes
+In-Reply-To: <1403520321-2431-4-git-send-email-yuvaraj.cd@samsung.com>
+References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1403520321-2431-4-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <001501cf9076$9de45000$d9acf000$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 7:08 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Commit 07e461cd7e73a84f0e3757932b93cc80976fd749
-> "of: Ensure unique names without sacrificing determinism"
-> caused a boot failure regression on the Integrator machines.
->
-> The problem is probably caused by fiddling too much with
-> the device tree population in the OF init function, such
-> as passing the SoC bus device as parent when populating
-> the device tree.
->
-> This patch fixes the problem by:
->
-> - Avoiding to explicitly look up the tree root
-> - Look up devices needed before device population from
->   the match only, passing NULL as root
-> - Passing NULL as root and parent when calling
->   of_platform_populate()
+On Mon, June 23, 2014, Yuvaraj Kumar C D wrote:
+> Subject: [PATCH 3/3] mmc: dw_mmc: Support voltage changes
+> 
+> From: Doug Anderson <dianders@chromium.org>
+> 
+> For UHS cards we need the ability to switch voltages from 3.3V to
+> 1.8V.  Add support to the dw_mmc driver to handle this.  Note that
+> dw_mmc needs a little bit of extra code since the interface needs a
+> special bit programmed to the CMD register while CMD11 is progressing.
+> This means adding a few extra states to the state machine to track.
 
-Just curious, I don't see how this fixes booting for Integrator. Where
-exactly does boot fail?
+Overall new additional states makes it complicated.
+Can we do that in other way?
 
-Rob
-
->
-> After this the Integrators boot again. Tested on
-> Integrator/AP and Integrator/CP.
->
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> 
 > ---
-> ARM SoC maintainers: if you're happy with this fix, please
-> apply it directly for fixes in the ARM SoC tree, thanks.
-> ---
->  arch/arm/mach-integrator/integrator_ap.c | 26 +++++++-------------------
->  arch/arm/mach-integrator/integrator_cp.c | 23 ++++++-----------------
->  2 files changed, 13 insertions(+), 36 deletions(-)
->
-> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-> index dd0cc677d596..660ca6feff40 100644
-> --- a/arch/arm/mach-integrator/integrator_ap.c
-> +++ b/arch/arm/mach-integrator/integrator_ap.c
-> @@ -480,25 +480,18 @@ static const struct of_device_id ebi_match[] = {
->  static void __init ap_init_of(void)
->  {
->         unsigned long sc_dec;
-> -       struct device_node *root;
->         struct device_node *syscon;
->         struct device_node *ebi;
->         struct device *parent;
->         struct soc_device *soc_dev;
->         struct soc_device_attribute *soc_dev_attr;
->         u32 ap_sc_id;
-> -       int err;
->         int i;
->
-> -       /* Here we create an SoC device for the root node */
-> -       root = of_find_node_by_path("/");
-> -       if (!root)
-> -               return;
-> -
-> -       syscon = of_find_matching_node(root, ap_syscon_match);
-> +       syscon = of_find_matching_node(NULL, ap_syscon_match);
->         if (!syscon)
->                 return;
-> -       ebi = of_find_matching_node(root, ebi_match);
-> +       ebi = of_find_matching_node(NULL, ebi_match);
->         if (!ebi)
->                 return;
->
-> @@ -509,19 +502,17 @@ static void __init ap_init_of(void)
->         if (!ebi_base)
->                 return;
->
-> +       of_platform_populate(NULL, of_default_bus_match_table,
-> +                       ap_auxdata_lookup, NULL);
-> +
->         ap_sc_id = readl(ap_syscon_base);
->
->         soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
->         if (!soc_dev_attr)
->                 return;
->
-> -       err = of_property_read_string(root, "compatible",
-> -                                     &soc_dev_attr->soc_id);
-> -       if (err)
-> -               return;
-> -       err = of_property_read_string(root, "model", &soc_dev_attr->machine);
-> -       if (err)
-> -               return;
-> +       soc_dev_attr->soc_id = "XVC";
-> +       soc_dev_attr->machine = "Integrator/AP";
->         soc_dev_attr->family = "Integrator";
->         soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c",
->                                            'A' + (ap_sc_id & 0x0f));
-> @@ -536,9 +527,6 @@ static void __init ap_init_of(void)
->         parent = soc_device_to_device(soc_dev);
->         integrator_init_sysfs(parent, ap_sc_id);
->
-> -       of_platform_populate(root, of_default_bus_match_table,
-> -                       ap_auxdata_lookup, parent);
-> -
->         sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
->         for (i = 0; i < 4; i++) {
->                 struct lm_device *lmdev;
-> diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-> index a938242b0c95..0e57f8f820a5 100644
-> --- a/arch/arm/mach-integrator/integrator_cp.c
-> +++ b/arch/arm/mach-integrator/integrator_cp.c
-> @@ -279,20 +279,13 @@ static const struct of_device_id intcp_syscon_match[] = {
->
->  static void __init intcp_init_of(void)
->  {
-> -       struct device_node *root;
->         struct device_node *cpcon;
->         struct device *parent;
->         struct soc_device *soc_dev;
->         struct soc_device_attribute *soc_dev_attr;
->         u32 intcp_sc_id;
-> -       int err;
->
-> -       /* Here we create an SoC device for the root node */
-> -       root = of_find_node_by_path("/");
-> -       if (!root)
-> -               return;
-> -
-> -       cpcon = of_find_matching_node(root, intcp_syscon_match);
-> +       cpcon = of_find_matching_node(NULL, intcp_syscon_match);
->         if (!cpcon)
->                 return;
->
-> @@ -300,19 +293,17 @@ static void __init intcp_init_of(void)
->         if (!intcp_con_base)
->                 return;
->
-> +       of_platform_populate(NULL, of_default_bus_match_table,
-> +                            intcp_auxdata_lookup, NULL);
-> +
->         intcp_sc_id = readl(intcp_con_base);
->
->         soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
->         if (!soc_dev_attr)
->                 return;
->
-> -       err = of_property_read_string(root, "compatible",
-> -                                     &soc_dev_attr->soc_id);
-> -       if (err)
-> -               return;
-> -       err = of_property_read_string(root, "model", &soc_dev_attr->machine);
-> -       if (err)
-> -               return;
-> +       soc_dev_attr->soc_id = "XCV";
-> +       soc_dev_attr->machine = "Integrator/CP";
->         soc_dev_attr->family = "Integrator";
->         soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c",
->                                            'A' + (intcp_sc_id & 0x0f));
-> @@ -326,8 +317,6 @@ static void __init intcp_init_of(void)
->
->         parent = soc_device_to_device(soc_dev);
->         integrator_init_sysfs(parent, intcp_sc_id);
-> -       of_platform_populate(root, of_default_bus_match_table,
-> -                       intcp_auxdata_lookup, parent);
+>  drivers/mmc/host/dw_mmc.c  |  145 +++++++++++++++++++++++++++++++++++++++++---
+>  drivers/mmc/host/dw_mmc.h  |    5 +-
+>  include/linux/mmc/dw_mmc.h |    2 +
+>  3 files changed, 142 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index e034bce..38eb548 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/mmc/host.h>
+>  #include <linux/mmc/mmc.h>
+> +#include <linux/mmc/sd.h>
+>  #include <linux/mmc/sdio.h>
+>  #include <linux/mmc/dw_mmc.h>
+>  #include <linux/bitops.h>
+> @@ -235,10 +236,13 @@ err:
 >  }
->
->  static const char * intcp_dt_board_compat[] = {
+>  #endif /* defined(CONFIG_DEBUG_FS) */
+> 
+> +static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg);
+> +
+>  static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
+>  {
+>  	struct mmc_data	*data;
+>  	struct dw_mci_slot *slot = mmc_priv(mmc);
+> +	struct dw_mci *host = slot->host;
+>  	const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+>  	u32 cmdr;
+>  	cmd->error = -EINPROGRESS;
+> @@ -254,6 +258,32 @@ static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
+>  	else if (cmd->opcode != MMC_SEND_STATUS && cmd->data)
+>  		cmdr |= SDMMC_CMD_PRV_DAT_WAIT;
+> 
+> +	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
+> +		u32 clk_en_a;
+> +
+> +		/* Special bit makes CMD11 not die */
+> +		cmdr |= SDMMC_CMD_VOLT_SWITCH;
+> +
+> +		/* Change state to continue to handle CMD11 weirdness */
+> +		WARN_ON(slot->host->state != STATE_SENDING_CMD);
+> +		slot->host->state = STATE_SENDING_CMD11;
+> +
+> +		/*
+> +		 * We need to disable clock stop while doing voltage switch
+> +		 * according to 7.4.1.2 Voltage Switch Normal Scenario.
+> +		 *
+> +		 * It's assumed that by the next time the CLKENA is updated
+> +		 * (when we set the clock next) that the voltage change will
+> +		 * be over, so we don't bother setting any bits to synchronize
+> +		 * with dw_mci_setup_bus().
+> +		 */
+> +		clk_en_a = mci_readl(host, CLKENA);
+> +		clk_en_a &= ~(SDMMC_CLKEN_LOW_PWR << slot->id);
+> +		mci_writel(host, CLKENA, clk_en_a);
+> +		mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
+> +			     SDMMC_CMD_PRV_DAT_WAIT, 0);
+dw_mci_disable_low_power() can be used here.
+
+> +	}
+> +
+>  	if (cmd->flags & MMC_RSP_PRESENT) {
+>  		/* We expect a response, so set this bit */
+>  		cmdr |= SDMMC_CMD_RESP_EXP;
+> @@ -776,11 +806,15 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>  	unsigned int clock = slot->clock;
+>  	u32 div;
+>  	u32 clk_en_a;
+> +	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT;
+> +
+> +	/* We must continue to set bit 28 in CMD until the change is complete */
+> +	if (host->state == STATE_WAITING_CMD11_DONE)
+> +		sdmmc_cmd_bits |= SDMMC_CMD_VOLT_SWITCH;
+I didn't get the reason SDMMC_CMD_VOLT_SWITCH is needed during clock update(enable/disable)
+Can you explain it in details?
+
+> 
+>  	if (!clock) {
+>  		mci_writel(host, CLKENA, 0);
+> -		mci_send_cmd(slot,
+> -			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
+> +		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
+>  	} else if (clock != host->current_speed || force_clkinit) {
+>  		div = host->bus_hz / clock;
+>  		if (host->bus_hz % clock && host->bus_hz > clock)
+> @@ -804,15 +838,13 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>  		mci_writel(host, CLKSRC, 0);
+> 
+>  		/* inform CIU */
+> -		mci_send_cmd(slot,
+> -			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
+> +		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
+> 
+>  		/* set clock to desired speed */
+>  		mci_writel(host, CLKDIV, div);
+> 
+>  		/* inform CIU */
+> -		mci_send_cmd(slot,
+> -			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
+> +		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
+> 
+>  		/* enable clock; only low power if no SDIO */
+>  		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
+> @@ -821,8 +853,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>  		mci_writel(host, CLKENA, clk_en_a);
+> 
+>  		/* inform CIU */
+> -		mci_send_cmd(slot,
+> -			     SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
+> +		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
+> 
+>  		/* keep the clock with reflecting clock dividor */
+>  		slot->__clk_old = clock << div;
+> @@ -898,6 +929,17 @@ static void dw_mci_queue_request(struct dw_mci *host, struct dw_mci_slot *slot,
+> 
+>  	slot->mrq = mrq;
+> 
+> +	if (host->state == STATE_WAITING_CMD11_DONE) {
+> +		dev_warn(&slot->mmc->class_dev,
+> +			 "Voltage change didn't complete\n");
+> +		/*
+> +		 * this case isn't expected to happen, so we can
+> +		 * either crash here or just try to continue on
+> +		 * in the closest possible state
+> +		 */
+> +		host->state = STATE_IDLE;
+> +	}
+> +
+>  	if (host->state == STATE_IDLE) {
+>  		host->state = STATE_SENDING_CMD;
+>  		dw_mci_start_request(host, slot);
+> @@ -993,6 +1035,9 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  	/* Slot specific timing and width adjustment */
+>  	dw_mci_setup_bus(slot, false);
+> 
+> +	if (slot->host->state == STATE_WAITING_CMD11_DONE && ios->clock != 0)
+> +		slot->host->state = STATE_IDLE;
+> +
+>  	switch (ios->power_mode) {
+>  	case MMC_POWER_UP:
+>  		if ((!IS_ERR(mmc->supply.vmmc)) &&
+> @@ -1039,6 +1084,68 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  	}
+>  }
+> 
+> +static int dw_mci_card_busy(struct mmc_host *mmc)
+> +{
+> +	struct dw_mci_slot *slot = mmc_priv(mmc);
+> +	u32 status;
+> +
+> +	/*
+> +	 * Check the busy bit which is low when DAT[3:0]
+> +	 * (the data lines) are 0000
+> +	 */
+> +	status = mci_readl(slot->host, STATUS);
+> +
+> +	return !!(status & SDMMC_STATUS_BUSY);
+> +}
+> +
+> +static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+> +{
+> +	struct dw_mci_slot *slot = mmc_priv(mmc);
+> +	struct dw_mci *host = slot->host;
+> +	u32 uhs;
+> +	u32 v18 = SDMMC_UHS_18V << slot->id;
+> +	int min_uv, max_uv;
+> +	int ret;
+> +
+> +	/*
+> +	 * Program the voltage.  Note that some instances of dw_mmc may use
+> +	 * the UHS_REG for this.  For other instances (like exynos) the UHS_REG
+> +	 * does no harm but you need to set the regulator directly.  Try both.
+> +	 */
+> +	uhs = mci_readl(host, UHS_REG);
+> +	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+> +		min_uv = 2700000;
+> +		max_uv = 3600000;
+> +		uhs &= ~v18;
+> +	} else {
+> +		min_uv = 1700000;
+> +		max_uv = 1950000;
+> +		uhs |= v18;
+> +	}
+> +	if (!IS_ERR(mmc->supply.vqmmc)) {
+> +		ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
+> +
+> +		/*
+> +		 * Only complain if regulator claims that it's not in the 1.8V
+> +		 * range.  This avoids a bunch of errors in the case that
+> +		 * we've got a fixed 1.8V regulator but the core SD code still
+> +		 * thinks it ought to try to switch to 3.3 and then back to 1.8
+> +		 */
+> +		if (ret) {
+I think if ret is error, printing message and returning error is good.
+Currently, just returning '0' though it fails.
+
+> +			int cur_voltage = 0;
+> +
+> +			cur_voltage = regulator_get_voltage(mmc->supply.vqmmc);
+> +			if (cur_voltage < 1700000 || cur_voltage > 1950000)
+> +				dev_warn(&mmc->class_dev,
+> +					 "Regulator set error %d: %d - %d\n",
+> +					 ret, min_uv, max_uv);
+> +		}
+> +	}
+> +	mci_writel(host, UHS_REG, uhs);
+> +
+> +	return 0;
+> +}
+> +
+>  static int dw_mci_get_ro(struct mmc_host *mmc)
+>  {
+>  	int read_only;
+> @@ -1180,6 +1287,9 @@ static const struct mmc_host_ops dw_mci_ops = {
+>  	.get_cd			= dw_mci_get_cd,
+>  	.enable_sdio_irq	= dw_mci_enable_sdio_irq,
+>  	.execute_tuning		= dw_mci_execute_tuning,
+> +	.card_busy		= dw_mci_card_busy,
+> +	.start_signal_voltage_switch = dw_mci_switch_voltage,
+> +
+>  };
+> 
+>  static void dw_mci_request_end(struct dw_mci *host, struct mmc_request *mrq)
+> @@ -1203,7 +1313,11 @@ static void dw_mci_request_end(struct dw_mci *host, struct mmc_request *mrq)
+>  		dw_mci_start_request(host, slot);
+>  	} else {
+>  		dev_vdbg(host->dev, "list empty\n");
+> -		host->state = STATE_IDLE;
+> +
+> +		if (host->state == STATE_SENDING_CMD11)
+> +			host->state = STATE_WAITING_CMD11_DONE;
+> +		else
+> +			host->state = STATE_IDLE;
+>  	}
+> 
+>  	spin_unlock(&host->lock);
+> @@ -1314,8 +1428,10 @@ static void dw_mci_tasklet_func(unsigned long priv)
+> 
+>  		switch (state) {
+>  		case STATE_IDLE:
+> +		case STATE_WAITING_CMD11_DONE:
+>  			break;
+> 
+> +		case STATE_SENDING_CMD11:
+>  		case STATE_SENDING_CMD:
+>  			if (!test_and_clear_bit(EVENT_CMD_COMPLETE,
+>  						&host->pending_events))
+> @@ -1870,6 +1986,15 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+>  	}
+> 
+>  	if (pending) {
+> +		/* Check volt switch first, since it can look like an error */
+> +		if ((host->state == STATE_SENDING_CMD11) &&
+> +		    (pending & SDMMC_INT_VOLT_SWITCH)) {
+> +			mci_writel(host, RINTSTS, SDMMC_INT_VOLT_SWITCH);
+> +			pending &= ~SDMMC_INT_VOLT_SWITCH;
+> +			dw_mci_cmd_interrupt(host,
+> +					     pending | SDMMC_INT_CMD_DONE);
+Artificially adding SDMMC_INT_CMD_DONE to pending is needed to complete cmd handling?
+Is there any reason?
+
+Thanks,
+Seungwon Jeon
+
+> +		}
+> +
+>  		if (pending & DW_MCI_CMD_ERROR_FLAGS) {
+>  			mci_writel(host, RINTSTS, DW_MCI_CMD_ERROR_FLAGS);
+>  			host->cmd_status = pending;
+> @@ -1975,7 +2100,9 @@ static void dw_mci_work_routine_card(struct work_struct *work)
+> 
+>  					switch (host->state) {
+>  					case STATE_IDLE:
+> +					case STATE_WAITING_CMD11_DONE:
+>  						break;
+> +					case STATE_SENDING_CMD11:
+>  					case STATE_SENDING_CMD:
+>  						mrq->cmd->error = -ENOMEDIUM;
+>  						if (!mrq->data)
+> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+> index 5c95d00..af1d35f 100644
+> --- a/drivers/mmc/host/dw_mmc.h
+> +++ b/drivers/mmc/host/dw_mmc.h
+> @@ -99,6 +99,7 @@
+>  #define SDMMC_INT_HLE			BIT(12)
+>  #define SDMMC_INT_FRUN			BIT(11)
+>  #define SDMMC_INT_HTO			BIT(10)
+> +#define SDMMC_INT_VOLT_SWITCH		BIT(10) /* overloads bit 10! */
+>  #define SDMMC_INT_DRTO			BIT(9)
+>  #define SDMMC_INT_RTO			BIT(8)
+>  #define SDMMC_INT_DCRC			BIT(7)
+> @@ -113,6 +114,7 @@
+>  /* Command register defines */
+>  #define SDMMC_CMD_START			BIT(31)
+>  #define SDMMC_CMD_USE_HOLD_REG	BIT(29)
+> +#define SDMMC_CMD_VOLT_SWITCH		BIT(28)
+>  #define SDMMC_CMD_CCS_EXP		BIT(23)
+>  #define SDMMC_CMD_CEATA_RD		BIT(22)
+>  #define SDMMC_CMD_UPD_CLK		BIT(21)
+> @@ -129,6 +131,7 @@
+>  #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
+>  /* Status register defines */
+>  #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
+> +#define SDMMC_STATUS_BUSY		BIT(9)
+>  /* FIFOTH register defines */
+>  #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
+>  					 ((r) & 0xFFF) << 16 | \
+> @@ -149,7 +152,7 @@
+>  #define SDMMC_GET_VERID(x)		((x) & 0xFFFF)
+>  /* Card read threshold */
+>  #define SDMMC_SET_RD_THLD(v, x)		(((v) & 0x1FFF) << 16 | (x))
+> -
+> +#define SDMMC_UHS_18V			BIT(0)
+>  /* Register access macros */
+>  #define mci_readl(dev, reg)			\
+>  	__raw_readl((dev)->regs + SDMMC_##reg)
+> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> index babaea9..9e31564 100644
+> --- a/include/linux/mmc/dw_mmc.h
+> +++ b/include/linux/mmc/dw_mmc.h
+> @@ -26,6 +26,8 @@ enum dw_mci_state {
+>  	STATE_DATA_BUSY,
+>  	STATE_SENDING_STOP,
+>  	STATE_DATA_ERROR,
+> +	STATE_SENDING_CMD11,
+> +	STATE_WAITING_CMD11_DONE,
+>  };
+> 
+>  enum {
 > --
-> 1.9.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
