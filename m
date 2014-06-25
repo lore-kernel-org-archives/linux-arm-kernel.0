@@ -1,22 +1,98 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 25 Jun 2014 14:55:36 -0300
-Subject: [PATCH v3 2/3] ARM: dts: i.MX25: Fix gpt timers clocks.
-In-Reply-To: <1403700096-13014-2-git-send-email-denis@eukrea.com>
-References: <1403700096-13014-1-git-send-email-denis@eukrea.com>
- <1403700096-13014-2-git-send-email-denis@eukrea.com>
-Message-ID: <CAOMZO5BNQXCVYt1d9pML2xwrG1i=-t3c2sLbsV2VLYJvgMsEJw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 25 Jun 2014 10:57:15 -0700
+Subject: [PATCH v8 9/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <20140625172410.GA17133@redhat.com>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-10-git-send-email-keescook@chromium.org>
+ <20140625142121.GD7892@redhat.com>
+ <CAGXu5jJtLrjbobZC1FD4WV-Jm2p7cRGa1aSPK-d_isnfCZAHdA@mail.gmail.com>
+ <20140625165209.GA14720@redhat.com>
+ <CAGXu5jLHDew1fifGY_mWgwcH7evm0T8rqSnBrw4XpoAXGK+t-Q@mail.gmail.com>
+ <20140625172410.GA17133@redhat.com>
+Message-ID: <CAGXu5jKkLS3++_dtWHnjWudVvaSR9DRwjNG3q00SmSy6XoCMaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 9:41 AM, Denis Carikli <denis@eukrea.com> wrote:
-> Without that fix, the board freeze during boot.
+On Wed, Jun 25, 2014 at 10:24 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+> On 06/25, Kees Cook wrote:
+>>
+>> On Wed, Jun 25, 2014 at 9:52 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> >
+>> > Yes, at least this should close the race with suid-exec. And there are no
+>> > other users. Except apparmor, and I hope you will check it because I simply
+>> > do not know what it does ;)
+>> >
+>> >> I wonder if changes to nnp need to "flushed" during syscall entry
+>> >> instead of getting updated externally/asynchronously? That way it
+>> >> won't be out of sync with the seccomp mode/filters.
+>> >>
+>> >> Perhaps secure computing needs to check some (maybe seccomp-only)
+>> >> atomic flags and flip on the "real" nnp if found?
+>> >
+>> > Not sure I understand you, could you clarify?
+>>
+>> Instead of having TSYNC change the nnp bit, it can set a new flag, say:
+>>
+>>     task->seccomp.flags |= SECCOMP_NEEDS_NNP;
+>>
+>> This would be set along with seccomp.mode, seccomp.filter, and
+>> TIF_SECCOMP. Then, during the next secure_computing() call that thread
+>> makes, it would check the flag:
+>>
+>>     if (task->seccomp.flags & SECCOMP_NEEDS_NNP)
+>>         task->nnp = 1;
+>>
+>> This means that nnp couldn't change in the middle of a running syscall.
 >
-> This appeared after the following commit:
->   496f065 ARM: i.MX: Use of_clk_get_by_name() for timer clocks for DT case.
+> Aha, so you were worried about the same thing. Not sure we need this,
+> but at least I understand you and...
 >
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> Hmmm. Perhaps this doesn't solve anything, though? Perhaps my proposal
+>> above would actually make things worse, since now we'd have a thread
+>> with seccomp set up, and no nnp. If it was in the middle of exec,
+>> we're still causing a problem.
+>
+> Yes ;)
+>
+>> I think we'd also need a way to either delay the seccomp changes, or
+>> to notice this condition during exec. Bleh.
+>
+> Hmm. confused again,
 
-This allows mx25pdk to boot again, thanks:
+I mean to suggest that the tsync changes would be stored in each
+thread, but somewhere other than the true seccomp struct, but with
+TIF_SECCOMP set. When entering secure_computing(), current would check
+for the "changes to sync", and apply them, then start the syscall. In
+this way, we can never race a syscall (like exec).
 
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> What actually happens with a multi-threaded process calls exec? I
+>> assume all the other threads are destroyed?
+>
+> Yes. But this is the point-of-no-return, de_thread() is called after the execing
+> thared has already passed (say) check_unsafe_exec().
+>
+> However, do_execve() takes cred_guard_mutex at the start in prepare_bprm_creds()
+> and drops it in install_exec_creds(), so it should solve the problem?
+
+I can't tell yet. I'm still trying to understand the order of
+operations here. It looks like de_thread() takes the sighand lock.
+do_execve_common does:
+
+prepare_bprm_creds (takes cred_guard_mutex)
+check_unsafe_exec (checks nnp to set LSM_UNSAFE_NO_NEW_PRIVS)
+prepare_binprm (handles suid escalation, checks nnp separately)
+    security_bprm_set_creds (checks LSM_UNSAFE_NO_NEW_PRIVS)
+exec_binprm
+    load_elf_binary
+        flush_old_exec
+            de_thread (takes and releases sighand->lock)
+        install_exec_creds (releases cred_guard_mutex)
+
+I don't see a way to use cred_guard_mutex during tsync (which holds
+sighand->lock) without dead-locking. What were you considering here?
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
