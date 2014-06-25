@@ -1,41 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Jun 2014 20:48:02 +0200
-Subject: [PATCH 03/10] spi: sun4i: add DMA support
-In-Reply-To: <1402890635-12342-4-git-send-email-emilio@elopez.com.ar>
-References: <1402890635-12342-1-git-send-email-emilio@elopez.com.ar>
- <1402890635-12342-4-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20140625184802.GF19569@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jun 2014 20:49:59 +0200
+Subject: [GIT PULL] at91: fixes for 3.16 #1 (ter)
+In-Reply-To: <1403713316-28253-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1403713316-28253-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4184712.OOQdXC98UK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 16, 2014 at 12:50:28AM -0300, Emilio L?pez wrote:
-> This patch adds DMA support for 64 byte transfers on the sun4i SPI
-> controller. Bigger transfers did not seem to work when tested, and if
-> the hardware actually supports those, it will need further
-> investigation as to how to issue them correctly.
-
-Since you're only using DMA with 64+ bytes transfer, I'd say your DMA
-transfers don't actually work :)
-
+On Wednesday 25 June 2014 18:21:56 Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
+> An AT91 fixes batch for 3.16 that collects mainly DT fixes in relation
+> to the recent move to CCF on a couple of platforms.
+> A Kconfig symbol fix in drivers/misc is also included.
 > 
-> This is a straight adaptation of a similar patch Maxime made for the
-> sun6i SPI driver.
+> As the previous "fixes" pull-requests will be re-spin for 3.17 and shall be
+> ignored, I use the same tag name "at91-fixes".
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+> 
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+> 
+> for you to fetch changes up to 971dc9ce106110745f246337f229013589354536:
+> 
+>   ARM: at91/dt: sam9261: remove slow RC osc (2014-06-25 18:00:17 +0200)
+> 
+> ----------------------------------------------------------------
+> First AT91 fixes batch for 3.16:
+> - drivers/misc fix for Kconfig PWM symbol
+> - correction of several values in DT after conversion to CCF
+> - fix at91sam9261/at91sam9261ek mistake in slow crystal vs. slow RC osc
 
-Which was not working either ;)
+Pulled and sent out again now. Thanks for following up so quickly.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140625/cfa2f3f3/attachment-0001.sig>
+	Arnd
