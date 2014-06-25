@@ -1,35 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Jun 2014 12:14:43 +0100
-Subject: [PATCH v3 1/2] arm: dts: am4372: let boards access all nodes
- through phandles
-In-Reply-To: <20140625014016.GA21616@saruman.home>
-References: <1403547659-24558-1-git-send-email-balbi@ti.com>
- <1403547659-24558-2-git-send-email-balbi@ti.com>
- <CAL_JsqJx_DJqxpEJebi0Etfv5g7=eYje_53vd_44GykreA-rkQ@mail.gmail.com>
- <20140625014016.GA21616@saruman.home>
-Message-ID: <20140625111443.GG14495@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Jun 2014 12:18:23 +0100
+Subject: [PATCH] arm: exynos: Modify pm code to check for cortex A9
+ rather than the SoC
+In-Reply-To: <CAM4voak4ZD0OHWoto7j2TyYBmpaWH3JH4ug3+hsxeL+WUhE9jA@mail.gmail.com>
+References: <1400814061-12813-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voa=3zzo-2KbjDtBOca+uJeSxT2OYpi+rJuSGsDg-vo7GYA@mail.gmail.com>
+ <20140624161114.GW32514@n2100.arm.linux.org.uk>
+ <CAM4voak4ZD0OHWoto7j2TyYBmpaWH3JH4ug3+hsxeL+WUhE9jA@mail.gmail.com>
+Message-ID: <20140625111823.GH32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 02:40:16AM +0100, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Jun 24, 2014 at 04:11:48PM -0500, Rob Herring wrote:
-> > On Mon, Jun 23, 2014 at 1:20 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > > by providing phandles to rtc, wdt, cpu and dispc nodes,
-> > > boards can access them to add board-specific data.
-> > 
-> > Strictly speaking, you are adding labels, not phandles. You can do
-> 
-> heh, fair point. Easily editable when applying, though (?)
-> 
-> > phandles without using labels, but the syntax is not so obvious. I'd
-> > tell you what it is but offhand I don't remember. :)
-> 
-> something along the lines of using the full path ?
+On Wed, Jun 25, 2014 at 10:30:46AM +0530, Abhilash Kesavan wrote:
+> I see that you have sent a patch out that ensures both part and
+> implementor number are checked. Currently, my patch has been applied
+> to the fixes branch of the arm-soc tree and I wanted to know how to
+> proceed (without it there is a crash on the 5420):
+> Should I request Arnd to drop it (if possible) and send out a new
+> patch using your updated function ?
 
-Yup. The full path in braces:
+I'll hold my patch off - as yours is in the fixes branch, it should end
+up in a -rc release.  Mine isn't -rc material.
 
-	phandle-property = <&{/full/path/to/node@0xDEAD}>;
-
-Mark.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
