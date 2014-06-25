@@ -1,36 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jun 2014 14:50:39 +0100
-Subject: [PATCH v2 0/6] Enable L2 cache support on Exynos4210/4x12 SoCs
-In-Reply-To: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
-References: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
-Message-ID: <20140625135039.GM3705@n2100.arm.linux.org.uk>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 25 Jun 2014 15:51:22 +0200
+Subject: [PATCH v8 5/9] seccomp: split mode set routines
+In-Reply-To: <1403642893-23107-6-git-send-email-keescook@chromium.org>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-6-git-send-email-keescook@chromium.org>
+Message-ID: <20140625135121.GB7892@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 03:37:25PM +0200, Tomasz Figa wrote:
-> This series intends to add support for L2 cache on Exynos4 SoCs on boards
-> running under secure firmware, which requires certain initialization steps
-> to be done with help of firmware, as selected registers are writable only
-> from secure mode.
+On 06/24, Kees Cook wrote:
+>
+> +static inline void seccomp_assign_mode(struct task_struct *task,
+> +				       unsigned long seccomp_mode)
+> +{
+> +	BUG_ON(!spin_is_locked(&task->sighand->siglock));
+> +
+> +	task->seccomp.mode = seccomp_mode;
+> +	set_tsk_thread_flag(task, TIF_SECCOMP);
+> +}
 
-What I said in my message on June 12th applies to this series.  I'm
-not having the virtual address exposed via the write_sec call.
+OK, but unless task == current this can race with secure_computing().
+I think this needs smp_mb__before_atomic() and secure_computing() needs
+rmb() after test_bit(TIF_SECCOMP).
 
-Yes, you need to read other registers in order to use your secure
-firmware implementation.  Let's fix that by providing a better write_sec
-interface so you don't have to read back these registers, rather than
-working around this short-coming.
+Otherwise, can't __secure_computing() hit BUG() if it sees the old
+mode == SECCOMP_MODE_DISABLED ?
 
-That's exactly what I meant when I talked on June 12th about turning
-cache-l2x0.c back into a pile of crap.  You're working around problems
-rather than fixing the underlying issue, as seems to be standard
-platform maintainer behaviour when things like core ARM code is
-concerned.  This is why things devolve over time into piles of crap,
-because platforms just hack around problems rather than fixing the
-root cause of the problem.
+Or seccomp_run_filters() can see ->filters == NULL and WARN(),
+smp_load_acquire() only serializes that LOAD with the subsequent memory
+operations.
 
-So... I'm NAKing the entire series.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Oleg.
