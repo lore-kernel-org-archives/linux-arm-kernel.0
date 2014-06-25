@@ -1,174 +1,218 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Jun 2014 10:28:43 +0100
-Subject: [RFC PATCH 2/9] genirq: Allow the state of a forwarded irq to be
- save/restored
+Date: Wed, 25 Jun 2014 10:28:44 +0100
+Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
 In-Reply-To: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
 References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403688530-23273-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a peripheral is shared between virtual machines, its interrupt
-state becomes part of the guest's state, and must be switched accordingly.
+So far, GICv2 has been used in with EOImode == 0. The effect of this
+mode is to perform the priority drop and the deactivation of the
+interrupt at the same time.
 
-Introduce a pair of accessors (irq_get_fwd_state/irq_set_fwd_state) to
-retrieve the bits that can be of interest to KVM: pending, active, and masked.
+While this works perfectly for Linux (we only have a single priority),
+it causes issues when an interrupt is forwarded to a guest, and when
+we want the guest to perform the EOI itself.
 
-- irq_get_fwd_state returns the state of the interrupt according to a mask
-containing any of the IRQ_STATE_PENDING, IRQ_STATE_ACTIVE or IRQ_STATE_MASKED
-bits.
-- irq_set_fwd_state sets the state of the interrupt according to a similar mask.
+For this case, the GIC architecture provides EOImode == 1, where:
+- A write to the EOI register drops the priority of the interrupt and leaves
+it active. Other interrupts at the same priority level can now be taken,
+but the active interrupt cannot be taken again
+- A write to the DIR marks the interrupt as inactive, meaning it can
+now be taken again.
 
-Only a forwarded interrupt can be manipulated in such a way.
+We only enable this feature when booted in HYP mode. Also, as most device
+trees are broken (they report the CPU interface size to be 4kB, while
+the GICv2 CPU interface size is 8kB), output a warning if we're booted
+in HYP mode, and disable the feature.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/interrupt.h |  2 ++
- include/linux/irq.h       | 16 ++++++++++
- kernel/irq/manage.c       | 80 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 98 insertions(+)
+ drivers/irqchip/irq-gic.c       | 61 +++++++++++++++++++++++++++++++++++++----
+ include/linux/irqchip/arm-gic.h |  4 +++
+ 2 files changed, 59 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 698ad05..cfb8006 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -361,6 +361,8 @@ static inline int disable_irq_wake(unsigned int irq)
- 	return irq_set_irq_wake(irq, 0);
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 508b815..9295bf2 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -45,6 +45,7 @@
+ #include <asm/irq.h>
+ #include <asm/exception.h>
+ #include <asm/smp_plat.h>
++#include <asm/virt.h>
+ 
+ #include "irq-gic-common.h"
+ #include "irqchip.h"
+@@ -94,6 +95,10 @@ struct irq_chip gic_arch_extn = {
+ 	.irq_set_wake	= NULL,
+ };
+ 
++static struct irq_chip *gic_chip;
++
++static bool supports_deactivate = false;
++
+ #ifndef MAX_GIC_NR
+ #define MAX_GIC_NR	1
+ #endif
+@@ -185,6 +190,12 @@ static void gic_eoi_irq(struct irq_data *d)
+ 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
  }
  
-+extern int irq_get_fwd_state(unsigned int irq, u32 *val, u32 mask);
-+extern int irq_set_fwd_state(unsigned int irq, u32 val, u32 mask);
- 
- #ifdef CONFIG_IRQ_FORCED_THREADING
- extern bool force_irqthreads;
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index b4b3120..88ecd58 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -323,6 +323,8 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
-  *				any other callback related to this irq
-  * @irq_release_resources:	optional to release resources acquired with
-  *				irq_request_resources
-+ * @irq_get_fwd_state:	return the state of a forwarded interrupt
-+ * @irq_set_fwd_state:	set the state of a forwarded interrupt
-  * @flags:		chip specific flags
-  */
- struct irq_chip {
-@@ -359,6 +361,9 @@ struct irq_chip {
- 	int		(*irq_request_resources)(struct irq_data *data);
- 	void		(*irq_release_resources)(struct irq_data *data);
- 
-+	u32		(*irq_get_fwd_state)(struct irq_data *data, u32 mask);
-+	void		(*irq_set_fwd_state)(struct irq_data *data, u32 val, u32 mask);
++static void gic_eoi_dir_irq(struct irq_data *d)
++{
++	gic_eoi_irq(d);
++	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
++}
 +
- 	unsigned long	flags;
+ static int gic_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	void __iomem *base = gic_dist_base(d);
+@@ -277,6 +288,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ 		}
+ 		if (irqnr < 16) {
+ 			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
++			writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
+ #ifdef CONFIG_SMP
+ 			handle_IPI(irqnr, regs);
+ #endif
+@@ -313,7 +325,7 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
+ 
+-static struct irq_chip gic_chip = {
++static struct irq_chip gicv1_chip = {
+ 	.name			= "GIC",
+ 	.irq_mask		= gic_mask_irq,
+ 	.irq_unmask		= gic_unmask_irq,
+@@ -326,6 +338,19 @@ static struct irq_chip gic_chip = {
+ 	.irq_set_wake		= gic_set_wake,
  };
  
-@@ -384,6 +389,17 @@ enum {
- 	IRQCHIP_EOI_THREADED		= (1 <<  6),
- };
- 
-+/*
-+ * irq_get_fwd_state/irq_set_fwd_state specific flags (used for both
-+ * state and mask). Only valid for an interrupt that has the
-+ * IRQD_IRQ_FORWARDED flag.
-+ */
-+enum {
-+	IRQ_FWD_STATE_PENDING		= (1 << 0),
-+	IRQ_FWD_STATE_ACTIVE		= (1 << 1),
-+	IRQ_FWD_STATE_MASKED		= (1 << 2),
++static struct irq_chip gicv2_chip = {
++	.name			= "GIC",
++	.irq_mask		= gic_mask_irq,
++	.irq_unmask		= gic_unmask_irq,
++	.irq_eoi		= gic_eoi_dir_irq,
++	.irq_set_type		= gic_set_type,
++	.irq_retrigger		= gic_retrigger,
++#ifdef CONFIG_SMP
++	.irq_set_affinity	= gic_set_affinity,
++#endif
++	.irq_set_wake		= gic_set_wake,
 +};
 +
- /* This include will go away once we isolated irq_desc usage to core code */
- #include <linux/irqdesc.h>
- 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 3dc6a61..c42dd73 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1770,3 +1770,83 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
- 
- 	return retval;
+ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+ {
+ 	if (gic_nr >= MAX_GIC_NR)
+@@ -377,6 +402,16 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	writel_relaxed(1, base + GIC_DIST_CTRL);
  }
-+
-+/**
-+ *	irq_get_fwd_state - return the state of a forwarded interrupt.
-+ *	@irq: Interrupt line that is forwarded to a VM
-+ *	@val: Pointer where the state is being stored
-+ *	@mask: Bitmask of IRQ_FWD_STATE_* the caller wants to know about
-+ *
-+ *	This call snapshots the state of a forwarded interrupt,
-+ *	depending on the mask which indicates the requested bits.
-+ *
-+ *	This function should be called with preemption disabled if the
-+ *	interrupt controller has per-cpu registers.
-+ */
-+int irq_get_fwd_state(unsigned int irq, u32 *val, u32 mask)
+ 
++static void gic_cpu_if_up(void)
 +{
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+	struct irq_chip *chip;
-+	unsigned long flags;
++	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
++	u32 val = 0;
 +
-+	desc = irq_to_desc(irq);
-+	if (!desc)
-+		return -EINVAL;
-+
-+	data = irq_desc_get_irq_data(desc);
-+	if (!irqd_irq_forwarded(data))
-+		return -EINVAL;
-+
-+	chip = irq_desc_get_chip(desc);
-+	if (!chip->irq_get_fwd_state)
-+		return -EINVAL;
-+
-+	chip_bus_lock(desc);
-+	raw_spin_lock_irqsave(&desc->lock, flags);
-+	*val = chip->irq_get_fwd_state(data, mask);
-+	raw_spin_unlock_irqrestore(&desc->lock, flags);
-+	chip_bus_sync_unlock(desc);
-+
-+	return 0;
++	if (supports_deactivate)
++		val = GIC_CPU_CTRL_EOImodeNS;
++	writel_relaxed(val | 1, cpu_base + GIC_CPU_CTRL);
 +}
 +
-+/**
-+ *	irq_set_fwd_state - set the state of a forwarded interrupt.
-+ *	@irq: Interrupt line that is forwarded to a VM
-+ *	@val: State to be restored
-+ *	@mask: Bitmask of IRQ_FWD_STATE_* defining the valid bits in @val
-+ *
-+ *	This call sets the state of a forwarded interrupt, depending
-+ *	on the mask which indicates the valid bits.
-+ *
-+ *	This function should be called with preemption disabled if the
-+ *	interrupt controller has per-cpu registers.
-+ */
-+int irq_set_fwd_state(unsigned int irq, u32 val, u32 mask)
-+{
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+	struct irq_chip *chip;
-+	unsigned long flags;
+ static void gic_cpu_init(struct gic_chip_data *gic)
+ {
+ 	void __iomem *dist_base = gic_data_dist_base(gic);
+@@ -402,7 +437,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 	gic_cpu_config(dist_base, NULL);
+ 
+ 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, base + GIC_CPU_CTRL);
++	gic_cpu_if_up();
+ }
+ 
+ void gic_cpu_if_down(void)
+@@ -543,7 +578,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+ 
+ 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
++	gic_cpu_if_up();
+ }
+ 
+ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+@@ -770,11 +805,11 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ {
+ 	if (hw < 32) {
+ 		irq_set_percpu_devid(irq);
+-		irq_set_chip_and_handler(irq, &gic_chip,
++		irq_set_chip_and_handler(irq, gic_chip,
+ 					 handle_percpu_devid_irq);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
+ 	} else {
+-		irq_set_chip_and_handler(irq, &gic_chip,
++		irq_set_chip_and_handler(irq, gic_chip,
+ 					 handle_fasteoi_irq);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+ 
+@@ -951,6 +986,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 
+ 	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
+ 
++	if (!supports_deactivate)
++		gic_chip = &gicv1_chip;
++	else
++		gic_chip = &gicv2_chip;
 +
-+	desc = irq_to_desc(irq);
-+	if (!desc)
-+		return -EINVAL;
+ 	if (of_property_read_u32(node, "arm,routable-irqs",
+ 				 &nr_routable_irqs)) {
+ 		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
+@@ -980,7 +1020,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 		set_handle_irq(gic_handle_irq);
+ 	}
+ 
+-	gic_chip.flags |= gic_arch_extn.flags;
++	gic_chip->flags |= gic_arch_extn.flags;
+ 	gic_dist_init(gic);
+ 	gic_cpu_init(gic);
+ 	gic_pm_init(gic);
+@@ -994,6 +1034,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *cpu_base;
+ 	void __iomem *dist_base;
++	struct resource cpu_res;
+ 	u32 percpu_offset;
+ 	int irq;
+ 
+@@ -1006,6 +1047,14 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ 	cpu_base = of_iomap(node, 1);
+ 	WARN(!cpu_base, "unable to map gic cpu registers\n");
+ 
++	of_address_to_resource(node, 1, &cpu_res);
++	if (is_hyp_mode_available()) {
++		if (resource_size(&cpu_res) >= SZ_8K)
++			supports_deactivate = true;
++		else
++			pr_warn("GIC: CPU interface size is %x, DT is probably wrong\n", (int)resource_size(&cpu_res));
++	}
 +
-+	data = irq_desc_get_irq_data(desc);
-+	if (!irqd_irq_forwarded(data))
-+		return -EINVAL;
+ 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+ 		percpu_offset = 0;
+ 
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 45e2d8c..ffe3911 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -21,6 +21,10 @@
+ #define GIC_CPU_ACTIVEPRIO		0xd0
+ #define GIC_CPU_IDENT			0xfc
+ 
++#define GIC_CPU_DEACTIVATE		0x1000
 +
-+	chip = irq_desc_get_chip(desc);
-+	if (!chip->irq_set_fwd_state)
-+		return -EINVAL;
++#define GIC_CPU_CTRL_EOImodeNS		(1 << 9)
 +
-+	chip_bus_lock(desc);
-+	raw_spin_lock_irqsave(&desc->lock, flags);
-+	chip->irq_set_fwd_state(data, val, mask);
-+	raw_spin_unlock_irqrestore(&desc->lock, flags);
-+	chip_bus_sync_unlock(desc);
-+
-+	return 0;
-+}
+ #define GICC_IAR_INT_ID_MASK		0x3ff
+ 
+ #define GIC_DIST_CTRL			0x000
 -- 
 1.8.3.4
