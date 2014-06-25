@@ -1,93 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 25 Jun 2014 20:41:13 +0900
-Subject: [PATCH 1/1] ARM: Kconfig.debug: Update Samsung UART config options
-In-Reply-To: <1403605171-31805-1-git-send-email-sachin.kamat@samsung.com>
-References: <1403605171-31805-1-git-send-email-sachin.kamat@samsung.com>
-Message-ID: <03dd01cf906a$5e22b620$1a682260$@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 25 Jun 2014 13:41:43 +0200
+Subject: [PATCH 4/6] ARM: SAMSUNG: Restore Samsung PM Debug functionality
+In-Reply-To: <CAD8Lp46GpaGzq+2bkyujRtSVYJt7PWWT47NvjifoxzJk7aKs6A@mail.gmail.com>
+References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
+ <1403618235-19353-5-git-send-email-t.figa@samsung.com>
+ <CAD8Lp46GpaGzq+2bkyujRtSVYJt7PWWT47NvjifoxzJk7aKs6A@mail.gmail.com>
+Message-ID: <53AAB577.4010009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
+On 25.06.2014 12:09, Daniel Drake wrote:
+> Hi Tomasz,
 > 
-+ Russell
+> On Tue, Jun 24, 2014 at 2:57 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Due to recently merged patches and previous merge conflicts, the Samsung
+>> PM Debug functionality no longer can be enabled. This patch fixes
+>> incorrect dependency of SAMSUNG_PM_DEBUG on an integer symbol and adds
+>> missing header inclusion.
+> 
+> Testing against 3.16-rc2, this doesn't quite work for me.
+> SAMSUNG_PM_DEBUG still doesn't appear in menuconfig.
+> 
+> HAVE_SAMSUNG_PM_DEBUG is 'n'. Looks like the select from
+> DEBUG_S3C_UART is not working, but I'm not sure why.
 
-> In a multiplatform config, the low level debug option shows several
-> UART port entries. Improve the user visible string so that it becomes
-> clear to the user about Samsung UART ports.
-> While at it also remove some lines from the help text that are no
-> longer applicable across all Samsung platforms.
-> 
-Looks good to me and will apply into cleanup.
+I hastily changed this to something simpler in last minute before
+sending without proper testing. Let me send something that works.
 
-Thanks,
-Kukjin
-
-> Signed-off-by: Sachin Kamat <sachin.kamat@samsung.com>
-> ---
->  arch/arm/Kconfig.debug |   20 ++++----------------
->  1 file changed, 4 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 3548612b0bfe..b92993e59a12 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -617,53 +617,41 @@ choice
->  		depends on PLAT_SAMSUNG
->  		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
->  		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
-> -		bool "Use S3C UART 0 for low-level debug"
-> +		bool "Use Samsung S3C UART 0 for low-level debug"
->  		help
->  		  Say Y here if you want the debug print routines to direct
->  		  their output to UART 0. The port must have been initialised
->  		  by the boot-loader before use.
-> 
-> -		  The uncompressor code port configuration is now handled
-> -		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-> -
->  	config DEBUG_S3C_UART1
->  		depends on PLAT_SAMSUNG
->  		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
->  		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
-> -		bool "Use S3C UART 1 for low-level debug"
-> +		bool "Use Samsung S3C UART 1 for low-level debug"
->  		help
->  		  Say Y here if you want the debug print routines to direct
->  		  their output to UART 1. The port must have been initialised
->  		  by the boot-loader before use.
-> 
-> -		  The uncompressor code port configuration is now handled
-> -		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-> -
->  	config DEBUG_S3C_UART2
->  		depends on PLAT_SAMSUNG
->  		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
->  		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
-> -		bool "Use S3C UART 2 for low-level debug"
-> +		bool "Use Samsung S3C UART 2 for low-level debug"
->  		help
->  		  Say Y here if you want the debug print routines to direct
->  		  their output to UART 2. The port must have been initialised
->  		  by the boot-loader before use.
-> 
-> -		  The uncompressor code port configuration is now handled
-> -		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-> -
->  	config DEBUG_S3C_UART3
->  		depends on PLAT_SAMSUNG && ARCH_EXYNOS
->  		select DEBUG_EXYNOS_UART
-> -		bool "Use S3C UART 3 for low-level debug"
-> +		bool "Use Samsung S3C UART 3 for low-level debug"
->  		help
->  		  Say Y here if you want the debug print routines to direct
->  		  their output to UART 3. The port must have been initialised
->  		  by the boot-loader before use.
-> 
-> -		  The uncompressor code port configuration is now handled
-> -		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-> -
->  	config DEBUG_S3C2410_UART0
->  		depends on ARCH_S3C24XX
->  		select DEBUG_S3C2410_UART
-> --
-> 1.7.9.5
+Best regards,
+Tomasz
