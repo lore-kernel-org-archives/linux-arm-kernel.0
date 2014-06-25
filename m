@@ -1,69 +1,52 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 25 Jun 2014 12:19:11 +0200
-Subject: [PATCH v3 04/14] clk: max77686: Improve Maxim 77686 PMIC clocks
- binding
-In-Reply-To: <1403202040-12641-5-git-send-email-javier.martinez@collabora.co.uk>
-References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403202040-12641-5-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1403691551.22107.9.camel@AMDC1943>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 25 Jun 2014 12:21:36 +0200
+Subject: [PATCH 0/6] ARM: at91: more clocks fixes for 3.16
+In-Reply-To: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <53AAA2B0.1070103@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2014-06-19 at 20:20 +0200, Javier Martinez Canillas wrote:
-> Like most clock drivers, the Maxim 77686 PMIC clock binding
-> follows the convention that the "#clock-cells" property is
-> used to specify the number of cells in a clock provider.
+On 17/06/2014 18:41, Alexandre Belloni :
+> Hi,
 > 
-> But the binding document is not clear enough that it shall
-> be set to 1 since the PMIC support multiple clocks outputs.
+> This patch set fixes more issues with the clocks on AT91:
 > 
-> Also, explain that the clocks identifiers are defined in a
-> header file that can be included by Device Tree source with
-> client nodes to avoid using magic numbers.
+> The first patch define the slow crystal on the at91sam9261ek board
 > 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  .../devicetree/bindings/clock/maxim,max77686.txt          | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
+> The next patchs are moving all the clocks that were under the root under a
+> "clocks" node to be consistent accross all architecture.
+> 
+> Alexandre Belloni (6):
+>   ARM: at91/dt: define sam9261ek slow crystal frequency
+>   ARM: at91/dt: sam9261 crystals under the clocks node
+>   ARM: at91/dt: sam9n12 crystals under the clocks node
+>   ARM: at91/dt: sam9rl crystals under the clocks node
+>   ARM: at91/dt: sam9x5 crystals under the clocks node
+>   ARM: at91/dt: sama5d3 crystals under the clocks node
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On the whole series:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+And stacked on 3.16-fixes branch.
 
 Best regards,
-Krzysztof
 
 
-> diff --git a/Documentation/devicetree/bindings/clock/maxim,max77686.txt b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-> index 96ce71b..8dea305 100644
-> --- a/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-> +++ b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
-> @@ -9,13 +9,18 @@ The MAX77686 contains three 32.768khz clock outputs that can be controlled
->  Following properties should be presend in main device node of the MFD chip.
->  
->  Required properties:
-> -- #clock-cells: simple one-cell clock specifier format is used, where the
-> -  only cell is used as an index of the clock inside the provider. Following
-> -  indices are allowed:
-> +
-> +- #clock-cells: from common clock binding; shall be set to 1.
-> +
-> +Each clock is assigned an identifier and client nodes can use this identifier
-> +to specify the clock which they consume. Following indices are allowed:
->      - 0: 32khz_ap clock,
->      - 1: 32khz_cp clock,
->      - 2: 32khz_pmic clock.
->  
-> +Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77686.h
-> +header and can be used in device tree sources.
-> +
->  Example: Node of the MFD chip
->  
->  	max77686: max77686 at 09 {
-> @@ -33,6 +38,6 @@ Example: Clock consumer node
->  	foo at 0 {
->  		compatible = "bar,foo";
->  		/* ... */
-> -		clock-names = "my-clock";
-> -		clocks = <&max77686 2>;
-> +		clock-names = "32khz_pmic";
-> +		clocks = <&max77686 MAX77686_CLK_PMIC>;
->  	};
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 12 +++++++-----
+>  arch/arm/boot/dts/at91sam9261.dtsi          | 20 ++++++++++---------
+>  arch/arm/boot/dts/at91sam9261ek.dts         | 12 ++++++++----
+>  arch/arm/boot/dts/at91sam9n12.dtsi          | 20 ++++++++++---------
+>  arch/arm/boot/dts/at91sam9n12ek.dts         | 16 +++++++--------
+>  arch/arm/boot/dts/at91sam9rl.dtsi           | 22 ++++++++++-----------
+>  arch/arm/boot/dts/at91sam9rlek.dts          | 17 ++++++++--------
+>  arch/arm/boot/dts/at91sam9x5.dtsi           | 30 +++++++++++++++--------------
+>  arch/arm/boot/dts/at91sam9x5cm.dtsi         | 12 +++++++-----
+>  arch/arm/boot/dts/sama5d3.dtsi              | 22 ++++++++++-----------
+>  arch/arm/boot/dts/sama5d3xcm.dtsi           | 12 +++++++-----
+>  11 files changed, 105 insertions(+), 90 deletions(-)
+> 
+
+
+-- 
+Nicolas Ferre
