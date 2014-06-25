@@ -1,65 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 25 Jun 2014 19:57:07 +0900
-Subject: [PATCH 0/4 v2] hwmon: ntc_thermistor: prepose vendor prefix change
-In-Reply-To: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
-References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <02b501cf9064$34f16b80$9ed44280$@samsung.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 25 Jun 2014 13:01:30 +0200
+Subject: [PATCH v2 1/2] ARM: dts: i.MX53: add aipstz nodes
+Message-ID: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen Krishna Chatradhi wrote:
-> 
-+ Jean Delvare, Guenter Roeck
+The AHB to IP bridges (AIPSTZ) allow fine grained access rights management.
+Add both bridges to the DT.
 
-I'm adding maintainers for drivers/hwmon/ntc* but I'm not sure.
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Hi,
-
-This series looks good to me. I will take 3/4 and 4/4 for exynos DT changes once
-hwmon/ntc maintainer pick the others.
-
-Thanks,
-Kukjin
-
-> As Murata is the manufacturer of the NTC (Negative Temperature coefficient)
-> based Thermistors. ntc_thermistor driver extensively used the prefix "ntc".
-> But, vendor-prefix should be "murata" instead of "ntc".
-> 
-> This patchset
-> 1. Updates the vendor-prefix, DT bindings and Documentation,
->    where ever necessary.
-> 2. Adds thermistor nodes to Exynos5420 based Peach PIT board.
-> 
-> Patches:
-> 1/4. devicetree: bindings: Document murata vendor prefix
->      Adds the vendor prefix "murata" to vendor-prefixes.txt.
-> 2/4. hwmon: ntc_thermistor: Use the manufacturer name properly
->      Updates the driver, Kconfig, device tree bindings and Documentation
->      with the Manufacturer/vendor information.
->      Keeps the old bindings marked as <DEPRECATED> in code and Documentation
-> 3/4. ARM: DTS: use new compatible string as per the documentation
->      Updates the device node in Exynos4412 based Trats2 board
->      with the new device tree bindings.
-> 4/4. ARM: DTS: Add NTC thermistor nodes as child nodes to ADC
->      Adds Thermistor nodes to Exynos5420 based Peach PIT board.
-> 
-> This patchset
-> Naveen Krishna Chatradhi (4):
->   devicetree: bindings: Document murata vendor prefix
->   hwmon: ntc_thermistor: Use the manufacturer name properly
->   ARM: DTS: use new compatible string as per the documentation
->   ARM: DTS: Add NTC thermistor nodes to Exynos5420 based Peach_PIT
-> 
->  .../devicetree/bindings/arm/samsung/exynos-adc.txt |    2 +-
->  .../devicetree/bindings/hwmon/ntc_thermistor.txt   |   20 ++++++++----
->  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
->  Documentation/hwmon/ntc_thermistor                 |    8 ++---
->  arch/arm/boot/dts/exynos4412-trats2.dts            |    4 +--
->  arch/arm/boot/dts/exynos5420-peach-pit.dts         |   34
-++++++++++++++++++++
->  drivers/hwmon/Kconfig                              |    5 +--
->  drivers/hwmon/ntc_thermistor.c                     |   14 +++++++-
->  8 files changed, 72 insertions(+), 16 deletions(-)
-> 
-> --
-> 1.7.9.5
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 6456a00..aaea979 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -260,6 +260,11 @@
+ 				};
+ 			};
+ 
++			aipstz1: bridge at 53f00000 {
++				compatible = "fsl,imx53-aipstz";
++				reg = <0x53f00000 0x60>;
++			};
++
+ 			usbphy0: usbphy at 0 {
+ 				compatible = "usb-nop-xceiv";
+ 				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
+@@ -572,6 +577,11 @@
+ 			reg = <0x60000000 0x10000000>;
+ 			ranges;
+ 
++			aipstz2: bridge at 63f00000 {
++				compatible = "fsl,imx53-aipstz";
++				reg = <0x63f00000 0x60>;
++			};
++
+ 			iim: iim at 63f98000 {
+ 				compatible = "fsl,imx53-iim", "fsl,imx27-iim";
+ 				reg = <0x63f98000 0x4000>;
+-- 
+2.0.0
