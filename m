@@ -1,51 +1,230 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 25 Jun 2014 16:13:16 +0200
-Subject: [PATCH v2 0/6] Enable L2 cache support on Exynos4210/4x12 SoCs
-In-Reply-To: <20140625135039.GM3705@n2100.arm.linux.org.uk>
-References: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
- <20140625135039.GM3705@n2100.arm.linux.org.uk>
-Message-ID: <53AAD8FC.9040306@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 25 Jun 2014 16:19:17 +0200
+Subject: [PATCH v3 05/14] clk: Add generic driver for Maxim PMIC clocks
+In-Reply-To: <1403202040-12641-6-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403202040-12641-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403705957.22107.22.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.06.2014 15:50, Russell King - ARM Linux wrote:
-> On Wed, Jun 25, 2014 at 03:37:25PM +0200, Tomasz Figa wrote:
->> This series intends to add support for L2 cache on Exynos4 SoCs on boards
->> running under secure firmware, which requires certain initialization steps
->> to be done with help of firmware, as selected registers are writable only
->> from secure mode.
+On czw, 2014-06-19 at 20:20 +0200, Javier Martinez Canillas wrote:
+> Maxim Integrated Power Management ICs are very similar with
+> regard to their clock outputs. Most of the clock drivers for
+> these chips are duplicating code and are simpler enough that
+> can be converted to use a generic driver to consolidate code
+> and avoid duplication.
 > 
-> What I said in my message on June 12th applies to this series.  I'm
-> not having the virtual address exposed via the write_sec call.
-> 
-> Yes, you need to read other registers in order to use your secure
-> firmware implementation.  Let's fix that by providing a better write_sec
-> interface so you don't have to read back these registers, rather than
-> working around this short-coming.
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Do you have anything in particular in mind? I would be glad to implement
-it and send patches.
+(...)
 
-> 
-> That's exactly what I meant when I talked on June 12th about turning
-> cache-l2x0.c back into a pile of crap.  You're working around problems
-> rather than fixing the underlying issue, as seems to be standard
-> platform maintainer behaviour when things like core ARM code is
-> concerned.  This is why things devolve over time into piles of crap,
-> because platforms just hack around problems rather than fixing the
-> root cause of the problem.
+> diff --git a/drivers/clk/clk-max-gen.c b/drivers/clk/clk-max-gen.c
+> new file mode 100644
+> index 0000000..aa9ebbe
+> --- /dev/null
+> +++ b/drivers/clk/clk-max-gen.c
+> @@ -0,0 +1,197 @@
+> +/*
+> + * clk-max-gen.c - Generic clock driver for Maxim PMICs clocks
+> + *
+> + * Copyright (C) 2012 Samsung Electornics
+> + * Jonghwa Lee <jonghwa3.lee@samsung.com>
 
-I'm not sure what part of my patches exactly is turning cache-l2x0.c
-into a pile of crap. On the contrary, I believe that working around the
-firmware brokenness on platform level, while keeping the core code
-simple does the opposite.
+You copied this from original file but '2012' and author look a little
+strange since this piece of work is actually new stuff. Maybe consider
+adding current copyright?
 
-However, I'll be happy to rework my series if you have some more
-specific suggestions.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * This driver is based on clk-max77686.c
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +#include <linux/regmap.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/mutex.h>
+> +#include <linux/clkdev.h>
+> +
+> +struct max_gen_clk {
+> +	struct regmap *regmap;
+> +	u32 mask;
+> +	u32 reg;
+> +	struct clk_hw hw;
+> +	struct clk_lookup *lookup;
+> +};
+> +
+> +static struct max_gen_clk *to_max_gen_clk(struct clk_hw *hw)
+> +{
+> +	return container_of(hw, struct max_gen_clk, hw);
+> +}
+> +
+> +static int max_gen_clk_prepare(struct clk_hw *hw)
+> +{
+> +	struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +
+> +	return regmap_update_bits(max_gen->regmap, max_gen->reg,
+> +				  max_gen->mask, max_gen->mask);
+> +}
+> +
+> +static void max_gen_clk_unprepare(struct clk_hw *hw)
+> +{
+> +	struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +
+> +	regmap_update_bits(max_gen->regmap, max_gen->reg,
+> +			   max_gen->mask, ~max_gen->mask);
+> +}
+> +
+> +static int max_gen_clk_is_prepared(struct clk_hw *hw)
+> +{
+> +	struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +	int ret;
+> +	u32 val;
+> +
+> +	ret = regmap_read(max_gen->regmap, max_gen->reg, &val);
+> +
+> +	if (ret < 0)
+> +		return -EINVAL;
+> +
+> +	return val & max_gen->mask;
+> +}
+> +
+> +static unsigned long max_gen_recalc_rate(struct clk_hw *hw,
+> +					 unsigned long parent_rate)
+> +{
+> +	return 32768;
+> +}
+> +
+> +struct clk_ops max_gen_clk_ops = {
+> +	.prepare	= max_gen_clk_prepare,
+> +	.unprepare	= max_gen_clk_unprepare,
+> +	.is_prepared	= max_gen_clk_is_prepared,
+> +	.recalc_rate	= max_gen_recalc_rate,
+> +};
+> +
+> +static struct clk *max_gen_clk_register(struct device *dev,
+> +					struct max_gen_clk *max_gen)
+> +{
+> +	struct clk *clk;
+> +	struct clk_hw *hw = &max_gen->hw;
+> +
+> +	clk = clk_register(dev, hw);
+> +	if (IS_ERR(clk))
+> +		return clk;
+> +
+> +	max_gen->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
+> +	if (!max_gen->lookup)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	max_gen->lookup->con_id = hw->init->name;
+> +	max_gen->lookup->clk = clk;
+> +
+> +	clkdev_add(max_gen->lookup);
+> +
+> +	return clk;
+> +}
+> +
+> +int max_gen_clk_probe(struct platform_device *pdev, struct regmap *regmap,
+> +		      u32 reg, struct clk_init_data *clks_init, int num_init)
+> +{
+> +	int i, ret;
+> +	struct max_gen_clk **max_gen_clks;
+> +	struct clk **clocks;
+> +	struct device *dev = &pdev->dev;
+> +
+> +	clocks = devm_kzalloc(dev, sizeof(struct clk *) * num_init, GFP_KERNEL);
+> +	if (!clocks)
+> +		return -ENOMEM;
+> +
+> +	max_gen_clks = devm_kzalloc(dev, sizeof(struct max_gen_clk *)
+> +				    * num_init, GFP_KERNEL);
+> +	if (!max_gen_clks)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < num_init; i++) {
+> +		max_gen_clks[i] = devm_kzalloc(dev, sizeof(struct max_gen_clk),
+> +					       GFP_KERNEL);
+> +		if (!max_gen_clks[i])
+> +			return -ENOMEM;
+> +	}
 
-> So... I'm NAKing the entire series.
+Why don't use only one devm_kzalloc() call for struct max_gen_clk?
+Something like:
+	max_gen_clks = devm_kzalloc(dev, sizeof(struct max_gen_clk)
+				    * num_init, GFP_KERNEL);
 
-Your opinion is always appreciated, thanks.
+This will be shorter and still readable.
+
+> +
+> +	for (i = 0; i < num_init; i++) {
+> +		max_gen_clks[i]->regmap = regmap;
+> +		max_gen_clks[i]->mask = 1 << i;
+> +		max_gen_clks[i]->reg = reg;
+> +		max_gen_clks[i]->hw.init = &clks_init[i];
+> +
+> +		clocks[i] = max_gen_clk_register(dev, max_gen_clks[i]);
+> +		if (IS_ERR(clocks[i])) {
+> +			ret = PTR_ERR(clocks[i]);
+> +			dev_err(dev, "failed to register %s\n",
+> +				max_gen_clks[i]->hw.init->name);
+> +			goto err_clocks;
+> +		}
+> +	}
+> +
+> +	platform_set_drvdata(pdev, clocks);
+> +
+> +	if (dev->of_node) {
+> +		struct clk_onecell_data *of_data;
+> +
+> +		of_data = devm_kzalloc(dev, sizeof(*of_data), GFP_KERNEL);
+> +		if (!of_data) {
+> +			ret = -ENOMEM;
+> +			goto err_clocks;
+> +		}
+> +
+> +		of_data->clks = clocks;
+> +		of_data->clk_num = num_init;
+> +		ret = of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
+> +					  of_data);
+> +
+> +		if (ret) {
+> +			dev_err(dev, "failed to register OF clock provider\n");
+> +			goto err_clocks;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +
+> +err_clocks:
+> +	for (--i; i >= 0; --i) {
+> +		clkdev_drop(max_gen_clks[i]->lookup);
+> +		clk_unregister(max_gen_clks[i]->hw.clk);
+> +	}
+> +
+> +	return ret;
+> +}
+
+Since users of this function may be compiled as modules these should be
+exported (EXPORT_SYMBOL(_GPL)):
+ERROR: "max_gen_clk_ops" [drivers/clk/clk-max77802.ko] undefined!
+ERROR: "max_gen_clk_probe" [drivers/clk/clk-max77802.ko] undefined!
+ERROR: "max_gen_clk_remove" [drivers/clk/clk-max77802.ko] undefined!
+ERROR: "max_gen_clk_ops" [drivers/clk/clk-max77686.ko] undefined!
+ERROR: "max_gen_clk_probe" [drivers/clk/clk-max77686.ko] undefined!
+ERROR: "max_gen_clk_remove" [drivers/clk/clk-max77686.ko] undefined!
 
 Best regards,
-Tomasz
+Krzysztof
