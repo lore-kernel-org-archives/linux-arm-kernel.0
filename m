@@ -1,29 +1,39 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 25 Jun 2014 10:51:24 +0200
-Subject: [PATCH v2 1/2] video: imxfb: Fix unbalanced regulators
-In-Reply-To: <20140625060848.GE15686@pengutronix.de>
-References: <1403528839-31901-1-git-send-email-denis@eukrea.com>
- <20140625060848.GE15686@pengutronix.de>
-Message-ID: <53AA8D8C.2040705@eukrea.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 25 Jun 2014 14:26:24 +0530
+Subject: [PATCH 05/14] ARM: shmobile: Mark all SoCs in shmobile as
+ CPUFreq, capable
+In-Reply-To: <6596e97e054647fecb016ecb7e1935aa2b7db954.1403681315.git.horms+renesas@verge.net.au>
+References: <cover.1403681315.git.horms+renesas@verge.net.au>
+ <6596e97e054647fecb016ecb7e1935aa2b7db954.1403681315.git.horms+renesas@verge.net.au>
+Message-ID: <CAOh2x==C1XDjxdxpE6fYk3j6gO1X7d976Kr-Gjj_-+W6xVzOsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2014 08:08 AM, Sascha Hauer wrote:
-> It's a shame that the LCD controller doesn't do the reference counting.
-> I really think it should be fixed there and not in the drivers.If for
-> whatever reason this is not acceptable then it should be done in the
-> imxfb driver instead of shifting it further to the regulator core.
-I'm not sure that doing reference counting in the LCD class would be 
-enough for the regulator case. Still it seems to be a good thing to do.
+On Wed, Jun 25, 2014 at 1:05 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Benoit Cousson <bcousson@baylibre.com>
+>
+> Mark all SoCs in shmobile as CPUFreq capable
+> on multiplatform build only.
+>
+> Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+> [gaku.inami.xw at bp.renesas.com: Move the definition of cpufreq capable]
+> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index dbd954e..c32fa7c 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -12,6 +12,8 @@ config ARCH_SHMOBILE_MULTI
+>         select NO_IOPORT_MAP
+>         select PINCTRL
+>         select ARCH_REQUIRE_GPIOLIB
+> +       select ARCH_HAS_CPUFREQ
+> +       select ARCH_HAS_OPP
 
-If I understood well, that assumes that the LCD driver is the only 
-consumer and owner of that regulator.
-
-There is also the fact that the regulator core also enables or disables 
-regulators by itself:
-For instance at boot it tries to disable the regulators that can be 
-disabled, including this regulator.
-
-So I don't see any ways to handle it correctly in the LCD.
-
-Denis.
+https://lkml.org/lkml/2014/6/2/714
+http://patchwork.ozlabs.org/patch/356780/
