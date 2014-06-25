@@ -1,59 +1,32 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 25 Jun 2014 13:34:56 +0530
-Subject: [PATCH] ARM: shmobile: Remove opps table check for cpufreq
-In-Reply-To: <53AA8130.2020304@bp.renesas.com>
-References: <53AA8130.2020304@bp.renesas.com>
-Message-ID: <CAKohpo=vEJ0chenDiPQiAMHUTmuRArQPAbG1ym94-9FN32z+DA@mail.gmail.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 25 Jun 2014 10:27:10 +0200
+Subject: [PATCH v14 08/10] drm/panel: Add Eukrea mbimxsd51 displays.
+In-Reply-To: <20140624220404.GA30155@mithrandir>
+References: <1402913484-25910-1-git-send-email-denis@eukrea.com>
+ <1402913484-25910-8-git-send-email-denis@eukrea.com>
+ <20140624214926.GA30039@mithrandir> <20140624235639.487429ad@e6520eb>
+ <20140624220404.GA30155@mithrandir>
+Message-ID: <53AA87DE.5030109@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2014 13:28, Gaku Inami <gaku.inami.xw@bp.renesas.com> wrote:
-> This patch is based on feedback from Viresh Kumar.
-> Since cpufreq-cpu0 driver has already check opp table, there is no
-> need to same check in mach-shmobile.
+On 06/25/2014 12:04 AM, Thierry Reding wrote:
+>> because on this very simple display board, we only have DVI LVDS signals
+>> without the I2C to detect the display.
 >
-> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> ---
->
-> Based on : renesas-devel-v3.16-rc2-20140623
+> That's unfortunate. In that case perhaps a better approach would be to
+> add a video timings node to the device that provides the DVI output?
+I've just done that.
 
-I hope you have tested that this doesn't break it :)
+Should I resend now? The goal is to avoid as much as possible extra 
+versions.
 
->  arch/arm/mach-shmobile/cpufreq.c |   16 +---------------
->  1 file changed, 1 insertion(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mach-shmobile/cpufreq.c b/arch/arm/mach-shmobile/cpufreq.c
-> index e2c868f..8a24b2b 100644
-> --- a/arch/arm/mach-shmobile/cpufreq.c
-> +++ b/arch/arm/mach-shmobile/cpufreq.c
-> @@ -8,24 +8,10 @@
->   * for more details.
->   */
->
-> -#include <linux/of.h>
-> -#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->
->  int __init shmobile_cpufreq_init(void)
->  {
-> -       struct device_node *np;
-> -
-> -       np = of_cpu_device_node_get(0);
-> -       if (np == NULL) {
-> -               pr_err("failed to find cpu0 node\n");
-> -               return 0;
-> -       }
-> -
-> -       if (of_get_property(np, "operating-points", NULL))
-> -               platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
-> -
-> -       of_node_put(np);
-> -
-> +       platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
->         return 0;
->  }
+Also, as I said before in a response to "[PATCH v14 09/10] ARM: dts: 
+mbimx51sd: Add display support.", the LCD regulator was inverted, it 
+worked while inverted because of a bug which is now fixed by:
+"imx-drm: parallel-display: Fix DPMS default state."
 
-Now that there is nothing else in this file, do you really need a separate
-file for cpufreq?
+Right now, I don't have any other changes for this serie beside a simple 
+rebase of "dts: imx5*, imx6*: correct display-timings rebased".
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Denis.
