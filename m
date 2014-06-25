@@ -1,69 +1,100 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 25 Jun 2014 08:48:50 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.16
-Message-ID: <20140625124850.GR10202@titan.lakedaemon.net>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 25 Jun 2014 18:15:39 +0530
+Subject: [PATCH v5 3/6] ARM: EXYNOS: Move SYSREG definition into sys-reg
+ specific file
+In-Reply-To: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1403700342-9678-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1403700342-9678-4-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+While making PMU implementation to be device tree based, there are
+few register offsets related with SYSREG present in regs-pmu.h, so
+let's make a new header file "regs-sys.h" to keep all such SYSREG
+related register offsets and remove them from "regs-pmu.h"
 
-Here's a round of fixes for v3.16.  They' been in -next for a bit and
-are based on v3.16-rc1.
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c   |    1 +
+ arch/arm/mach-exynos/pm.c       |    1 +
+ arch/arm/mach-exynos/regs-pmu.h |    3 ---
+ arch/arm/mach-exynos/regs-sys.h |   22 ++++++++++++++++++++++
+ 4 files changed, 24 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/regs-sys.h
 
-The only thing that might catch your eye is the removal of the
-'armada38x' compatible string.  There are no people with boards other
-than the free-electrons guys, so we're safe correcting it to
-'armada380' now.  Plus, the kernel it was introduced with isn't really
-usable on those SoCs, there was only basic support at that time.
-
-Please pull.
-
-thx,
-
-Jason.
-
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.16
-
-for you to fetch changes up to 8dbdb8e704db34085f5978c335c10256b0fb9629:
-
-  ARM: mvebu: Fix the improper use of the compatible string armada38x using a wildcard (2014-06-24 11:33:24 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.16
-
- - mvebu
-    - Fix broken SoC ID detection
-    - Select ARM_CPU_SUSPEND for v7
-    - Remove armada38x compatible string (no users yet)
-
- - kirkwood
-    - Fix phy-connection-type on GuruPlug board
-
-----------------------------------------------------------------
-Ezequiel Garcia (1):
-      ARM: mvebu: Fix broken SoC ID detection
-
-Gregory CLEMENT (1):
-      ARM: mvebu: Fix the improper use of the compatible string armada38x using a wildcard
-
-Sebastian Hesselbarth (1):
-      ARM: dts: kirkwood: fix phy-connection-type for Guruplug
-
-Thomas Petazzoni (1):
-      ARM: mvebu: select ARM_CPU_SUSPEND for Marvell EBU v7 platforms
-
- Documentation/devicetree/bindings/arm/armada-38x.txt | 14 ++++++++++++--
- arch/arm/boot/dts/armada-380.dtsi                    |  2 +-
- arch/arm/boot/dts/armada-385-db.dts                  |  2 +-
- arch/arm/boot/dts/armada-385-rd.dts                  |  2 +-
- arch/arm/boot/dts/armada-385.dtsi                    |  2 +-
- arch/arm/boot/dts/armada-38x.dtsi                    |  2 +-
- arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts  |  4 ++--
- arch/arm/mach-mvebu/Kconfig                          |  2 ++
- 8 files changed, 21 insertions(+), 9 deletions(-)
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index e54d885..4a69b3f 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -29,6 +29,7 @@
+ #include "common.h"
+ #include "mfc.h"
+ #include "regs-pmu.h"
++#include "regs-sys.h"
+ 
+ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	{
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 202ca73..f127c0c 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -35,6 +35,7 @@
+ 
+ #include "common.h"
+ #include "regs-pmu.h"
++#include "regs-sys.h"
+ 
+ /**
+  * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 1d13b08..790af14 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -15,7 +15,6 @@
+ #include <mach/map.h>
+ 
+ #define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
+-#define S5P_SYSREG(x)				(S3C_VA_SYS + (x))
+ 
+ #define S5P_CENTRAL_SEQ_CONFIGURATION		S5P_PMUREG(0x0200)
+ 
+@@ -188,8 +187,6 @@
+ 
+ /* For EXYNOS5 */
+ 
+-#define EXYNOS5_SYS_I2C_CFG					S5P_SYSREG(0x0234)
+-
+ #define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
+ #define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
+ 
+diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
+new file mode 100644
+index 0000000..84332b0
+--- /dev/null
++++ b/arch/arm/mach-exynos/regs-sys.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *             http://www.samsung.com
++ *
++ * EXYNOS - system register definition
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_REGS_SYS_H
++#define __ASM_ARCH_REGS_SYS_H __FILE__
++
++#include <mach/map.h>
++
++#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
++
++/* For EXYNOS5 */
++#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
++
++#endif /* __ASM_ARCH_REGS_SYS_H */
+-- 
+1.7.9.5
