@@ -1,58 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:32 +0900
-Subject: [PATCH 2/5] ARM: shmobile: lager-reference: Remove workarounds for
- core clock issues
+Date: Wed, 25 Jun 2014 16:35:33 +0900
+Subject: [PATCH 3/5] ARM: shmobile: armadillo800eva legacy: Add LED support
 In-Reply-To: <cover.1403681531.git.horms+renesas@verge.net.au>
 References: <cover.1403681531.git.horms+renesas@verge.net.au>
-Message-ID: <f47b9e1ec3a1d694f07fcc0d5ba0c2582acce099.1403681531.git.horms+renesas@verge.net.au>
+Message-ID: <111bcc1360235ad1cdab4bc27f5ccca943ca8af5.1403681531.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Now the core clock issues have been fixed by commit
-3c90c55dcde745bed81f6447f24ba96bda43d984 ("drivers: sh: compile
-drivers/sh/pm_runtime.c if ARCH_SHMOBILE_MULTI"), revert the following
-2 commits:
-  - f98b55d730492e664fb2649bd7054fec0fe81acd ("ARM: shmobile: Add Lager
-    clock workarounds for SDHI and MMCIF"),
-  - aa5de826afe747c353162bbc116c63ab5335f91c ("ARM: shmobile:
-    lager-reference: Work around core clock issues").
+Cfr. r8a7740-armadillo800eva-reference.dts
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager-reference.c | 14 --------------
- 1 file changed, 14 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 35 ++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 4f0af91..9e0624e 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -98,23 +98,9 @@ static const struct clk_name clk_names[] __initconst = {
- 	{ "lvds1", "lvds.1", "rcar-du-r8a7790" },
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 53d03e8..395638d 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -578,6 +578,40 @@ static struct platform_device hdmi_lcdc_device = {
+ 	},
  };
  
--/*
-- * This is a really crude hack to work around core platform clock issues
-- */
--static const struct clk_name clk_enables[] __initconst = {
--	{ "ether", NULL, "ee700000.ethernet" },
--	{ "msiof1", NULL, "e6e10000.spi" },
--	{ "mmcif1", NULL, "ee220000.mmc" },
--	{ "qspi_mod", NULL, "e6b10000.spi" },
--	{ "sdhi0", NULL, "ee100000.sd" },
--	{ "sdhi2", NULL, "ee140000.sd" },
--	{ "thermal", NULL, "e61f0000.thermal" },
--};
--
- static void __init lager_add_standard_devices(void)
- {
- 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
--	shmobile_clk_workaround(clk_enables, ARRAY_SIZE(clk_enables), true);
- 	r8a7790_add_dt_devices();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
++/* LEDS */
++static struct gpio_led gpio_leds[] = {
++	{
++		.name		= "LED3",
++		.gpio		= 102,
++		.default_state	= LEDS_GPIO_DEFSTATE_ON,
++	}, {
++		.name		= "LED4",
++		.gpio		= 111,
++		.default_state	= LEDS_GPIO_DEFSTATE_ON,
++	}, {
++		.name		= "LED5",
++		.gpio		= 110,
++		.default_state	= LEDS_GPIO_DEFSTATE_ON,
++	}, {
++		.name		= "LED6",
++		.gpio		= 177,
++		.default_state	= LEDS_GPIO_DEFSTATE_ON,
++	},
++};
++
++static struct gpio_led_platform_data leds_gpio_info = {
++	.leds		= gpio_leds,
++	.num_leds	= ARRAY_SIZE(gpio_leds),
++};
++
++static struct platform_device leds_gpio_device = {
++	.name   = "leds-gpio",
++	.id     = -1,
++	.dev    = {
++		.platform_data  = &leds_gpio_info,
++	},
++};
++
+ /* GPIO KEY */
+ #define GPIO_KEY(c, g, d, ...) \
+ 	{ .code = c, .gpio = g, .desc = d, .active_low = 1, __VA_ARGS__ }
+@@ -1069,6 +1103,7 @@ static struct platform_device *eva_devices[] __initdata = {
+ 	&lcdc0_device,
+ 	&pwm_device,
+ 	&pwm_backlight_device,
++	&leds_gpio_device,
+ 	&gpio_keys_device,
+ 	&sh_eth_device,
+ 	&vcc_sdhi0,
 -- 
 2.0.0.rc2
