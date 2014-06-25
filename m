@@ -1,63 +1,69 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 25 Jun 2014 12:19:14 +0200
-Subject: [PATCH] ARM: at91/dt: sam9261: remove slow RC osc
-Message-ID: <1403691554-22096-1-git-send-email-nicolas.ferre@atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 25 Jun 2014 12:19:11 +0200
+Subject: [PATCH v3 04/14] clk: max77686: Improve Maxim 77686 PMIC clocks
+ binding
+In-Reply-To: <1403202040-12641-5-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403202040-12641-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403202040-12641-5-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403691551.22107.9.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On czw, 2014-06-19 at 20:20 +0200, Javier Martinez Canillas wrote:
+> Like most clock drivers, the Maxim 77686 PMIC clock binding
+> follows the convention that the "#clock-cells" property is
+> used to specify the number of cells in a clock provider.
+> 
+> But the binding document is not clear enough that it shall
+> be set to 1 since the PMIC support multiple clocks outputs.
+> 
+> Also, explain that the clocks identifiers are defined in a
+> header file that can be included by Device Tree source with
+> client nodes to avoid using magic numbers.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  .../devicetree/bindings/clock/maxim,max77686.txt          | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
 
-The at91sam9261 doesn't actually have a slow RC oscillator, remove it from the
-dtsi.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9261.dtsi | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+Best regards,
+Krzysztof
 
-diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index c8e8b92df51b..a81aab4281a7 100644
---- a/arch/arm/boot/dts/at91sam9261.dtsi
-+++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -570,19 +570,6 @@
- 				#size-cells = <0>;
- 				#interrupt-cells = <1>;
- 
--				slow_rc_osc: slow_rc_osc {
--					compatible = "fixed-clock";
--					#clock-cells = <0>;
--					clock-frequency = <32768>;
--					clock-accuracy = <50000000>;
--				};
--
--				clk32k: slck {
--					compatible = "atmel,at91sam9260-clk-slow";
--					#clock-cells = <0>;
--					clocks = <&slow_rc_osc &slow_xtal>;
--				};
--
- 				main_osc: main_osc {
- 					compatible = "atmel,at91rm9200-clk-main-osc";
- 					#clock-cells = <0>;
-@@ -623,7 +610,7 @@
- 					compatible = "atmel,at91rm9200-clk-master";
- 					#clock-cells = <0>;
- 					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
--					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
-+					clocks = <&slow_xtal>, <&main>, <&plla>, <&pllb>;
- 					atmel,clk-output-range = <0 94000000>;
- 					atmel,clk-divisors = <1 2 4 0>;
- 				};
-@@ -640,7 +627,7 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					interrupt-parent = <&pmc>;
--					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
-+					clocks = <&slow_xtal>, <&main>, <&plla>, <&pllb>;
- 
- 					prog0: prog0 {
- 						#clock-cells = <0>;
--- 
-1.8.2.2
+
+> diff --git a/Documentation/devicetree/bindings/clock/maxim,max77686.txt b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
+> index 96ce71b..8dea305 100644
+> --- a/Documentation/devicetree/bindings/clock/maxim,max77686.txt
+> +++ b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
+> @@ -9,13 +9,18 @@ The MAX77686 contains three 32.768khz clock outputs that can be controlled
+>  Following properties should be presend in main device node of the MFD chip.
+>  
+>  Required properties:
+> -- #clock-cells: simple one-cell clock specifier format is used, where the
+> -  only cell is used as an index of the clock inside the provider. Following
+> -  indices are allowed:
+> +
+> +- #clock-cells: from common clock binding; shall be set to 1.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. Following indices are allowed:
+>      - 0: 32khz_ap clock,
+>      - 1: 32khz_cp clock,
+>      - 2: 32khz_pmic clock.
+>  
+> +Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77686.h
+> +header and can be used in device tree sources.
+> +
+>  Example: Node of the MFD chip
+>  
+>  	max77686: max77686 at 09 {
+> @@ -33,6 +38,6 @@ Example: Clock consumer node
+>  	foo at 0 {
+>  		compatible = "bar,foo";
+>  		/* ... */
+> -		clock-names = "my-clock";
+> -		clocks = <&max77686 2>;
+> +		clock-names = "32khz_pmic";
+> +		clocks = <&max77686 MAX77686_CLK_PMIC>;
+>  	};
