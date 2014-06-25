@@ -1,52 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Jun 2014 22:05:40 +0000 (UTC)
-Subject: [PATCH 9/9] ARM: AM33xx: hwmod_data: Remove legacy mailbox addrs
-In-Reply-To: <1403658295-54766-10-git-send-email-s-anna@ti.com>
-References: <1403658295-54766-1-git-send-email-s-anna@ti.com>
- <1403658295-54766-10-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1406252205330.10674@utopia.booyaka.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Jun 2014 16:12:15 -0600
+Subject: [PATCH v1 4/9] pinctrl: tegra-xusb: Add USB PHY support
+In-Reply-To: <1403072180-4944-5-git-send-email-abrestic@chromium.org>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
+ <1403072180-4944-5-git-send-email-abrestic@chromium.org>
+Message-ID: <53AB493F.3030802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jun 2014, Suman Anna wrote:
+On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
+> In addition to the PCIe and SATA PHYs, the XUSB pad controller also
+> supports 3 UTMI, 2 HSIC, and 2 USB3 PHYs.  Each USB3 PHY uses a single
+> PCIe or SATA lane and is mapped to one of the three UTMI ports.
+> 
 
-> The legacy-style definition of the hwmod addr space is no longer
-> required as AM33xx/AM43xx are DT-boot only, and the minimal mailbox
-> DT nodes have been added, so clean up this data.
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c | 10 ----------
->  1 file changed, 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
-> index e2db378..8f5989d 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
-> @@ -317,21 +317,11 @@ struct omap_hwmod_ocp_if am33xx_l4_per__i2c3 = {
->  	.user		= OCP_USER_MPU,
->  };
+> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
+
+> @@ -372,6 +720,193 @@ static int tegra_xusb_padctl_pinconf_group_set(struct pinctrl_dev *pinctrl,
+>  			padctl_writel(padctl, regval, lane->offset);
+>  			break;
 >  
-> -static struct omap_hwmod_addr_space am33xx_mailbox_addrs[] = {
-> -	{
-> -		.pa_start	= 0x480C8000,
-> -		.pa_end		= 0x480C8000 + (SZ_4K - 1),
-> -		.flags		= ADDR_TYPE_RT
-> -	},
-> -	{ }
-> -};
-> -
->  /* l4 ls -> mailbox */
->  struct omap_hwmod_ocp_if am33xx_l4_per__mailbox = {
->  	.master		= &am33xx_l4_ls_hwmod,
->  	.slave		= &am33xx_mailbox_hwmod,
->  	.clk		= "l4ls_gclk",
-> -	.addr		= am33xx_mailbox_addrs,
->  	.user		= OCP_USER_MPU,
->  };
+> +		case TEGRA_XUSB_PADCTL_USB3_PORT_NUM:
+> +			if (value >= TEGRA_XUSB_PADCTL_USB3_PORTS) {
+> +				dev_err(padctl->dev, "Invalid USB3 port: %lu\n",
+> +					value);
+> +				return -EINVAL;
+> +			}
+> +			if (!is_pcie_sata_lane(group)) {
+> +				dev_err(padctl->dev,
+> +					"USB3 port not applicable for pin %d\n",
+> +					group);
+> +				return -EINVAL;
+> +			}
+> +			padctl->usb3_ports[value].lane = group;
+> +			break;
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
+It feels odd to use pinctrl for a SW-only purpose. In other words, that
+chunk of code isn't writing the pinconf data to HW, but rather some
+internal variable.
 
+Perhaps it would make more sense for the DT binding to represent this
+data directly in a custom property that's parsed at probe() time. That
+way, pinctrl only touches "real" HW stuff.
 
-- Paul
+> +static int usb3_phy_power_on(struct phy *phy)
+> +{
+> +	struct tegra_xusb_padctl *padctl = phy_get_drvdata(phy);
+> +	int port = usb3_phy_to_port(phy);
+> +	int lane = padctl->usb3_ports[port].lane;
+> +	u32 value, offset;
+> +
+> +	value = padctl_readl(padctl, XUSB_PADCTL_IOPHY_USB3_PADX_CTL2(port));
+> +	value &= ~((XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_WANDER_MASK <<
+> +		    XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_WANDER_SHIFT) |
+> +		   (XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_EQ_MASK <<
+> +		    XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_EQ_SHIFT) |
+> +		   (XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_CDR_CNTL_MASK <<
+> +		    XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_CDR_CNTL_SHIFT));
+
+Hmm. So there is a lot of "PHY" stuff here after all.
+
+However, the PHYs implemented here appear to implement very low-level
+I/O pad code, whereas the PHYs we have for our USB 2.0 controller are
+somewhat higher-level; they're more USB-oriented than just IO pad
+oriented. Do you know which level of abstraction a Linux PHY object is
+supposed to be? I could never get an answer when I asked before.
