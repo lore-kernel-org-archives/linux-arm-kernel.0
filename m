@@ -1,269 +1,259 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Jun 2014 17:06:23 -0700
-Subject: [RFC/PATCH 12/12] ARM: dts: qcom: Add necessary DT data for Krait
- cpufreq
+Date: Tue, 24 Jun 2014 17:06:21 -0700
+Subject: [RFC/PATCH 10/12] cpufreq: Add a cpufreq-krait based on cpufreq-cpu0
 In-Reply-To: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
 References: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1403654783-7176-13-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1403654783-7176-11-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary DT nodes and data so we can probe the cpufreq
-driver on MSM devices with Krait CPUs.
+Krait processors have individual clocks for each CPU that can
+scale independently from one another. cpufreq-cpu0 is fairly
+close to this, but assumes that there is only one clock for all
+CPUs. Add a driver to support the Krait configuration.
+
+TODO: Merge into cpufreq-cpu0? Or make generic?
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8960.dtsi |  49 +++++++++++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi | 106 ++++++++++++++++++++++++++++++++++--
- 2 files changed, 151 insertions(+), 4 deletions(-)
+ drivers/cpufreq/Kconfig         |  13 +++
+ drivers/cpufreq/Makefile        |   1 +
+ drivers/cpufreq/cpufreq-krait.c | 190 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 204 insertions(+)
+ create mode 100644 drivers/cpufreq/cpufreq-krait.c
 
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index 5303e53e34dc..94eeca22986f 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -23,6 +23,24 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
- 			qcom,saw = <&saw0>;
-+			clocks = <&kraitcc 0>;
-+			clock-names = "cpu";
-+			operating-points = <
-+				/* kHz    ignored */
-+				 918000 1000000
-+				 864000 1000000
-+				 810000 1000000
-+				 756000 1000000
-+				 702000 1000000
-+				 648000 1000000
-+				 594000 1000000
-+				 540000 1000000
-+				 486000 1000000
-+				 432000 1000000
-+				 384000 1000000
-+			>;
-+			clock-latency = <100000>;
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index ffe350f86bca..e9826c85a777 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -196,6 +196,19 @@ config GENERIC_CPUFREQ_CPU0
+ 
+ 	  If in doubt, say N.
+ 
++config GENERIC_CPUFREQ_KRAIT
++	tristate "Krait cpufreq driver"
++	depends on HAVE_CLK && OF
++	# if CPU_THERMAL is on and THERMAL=m, CPU0 cannot be =y:
++	depends on !CPU_THERMAL || THERMAL
++	select PM_OPP
++	help
++	  This adds a generic cpufreq driver for CPU0 frequency management.
++	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
++	  systems which share clock and voltage across all CPUs.
 +
- 		};
- 
- 		cpu at 1 {
-@@ -33,6 +51,24 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
- 			qcom,saw = <&saw1>;
-+			clocks = <&kraitcc 1>;
-+			clock-names = "cpu";
-+			operating-points = <
-+				/* kHz    ignored */
-+				 918000 1000000
-+				 864000 1000000
-+				 810000 1000000
-+				 756000 1000000
-+				 702000 1000000
-+				 648000 1000000
-+				 594000 1000000
-+				 540000 1000000
-+				 486000 1000000
-+				 432000 1000000
-+				 384000 1000000
-+			>;
-+			clock-latency = <100000>;
++	  If in doubt, say N.
 +
- 		};
+ menu "x86 CPU frequency scaling drivers"
+ depends on X86
+ source "drivers/cpufreq/Kconfig.x86"
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 738c8b7b17dc..f5c9f68dcc0f 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
+ obj-$(CONFIG_CPU_FREQ_GOV_COMMON)		+= cpufreq_governor.o
  
- 		L2: l2-cache {
-@@ -47,6 +83,11 @@
- 		qcom,no-pc-write;
- 	};
+ obj-$(CONFIG_GENERIC_CPUFREQ_CPU0)	+= cpufreq-cpu0.o
++obj-$(CONFIG_CPUFREQ_KRAIT)		+= cpufreq-krait.o
  
-+	kraitcc: clock-controller {
-+		compatible = "qcom,krait-cc-v1";
-+		#clock-cells = <1>;
-+	};
+ ##################################################################################
+ # x86 drivers.
+diff --git a/drivers/cpufreq/cpufreq-krait.c b/drivers/cpufreq/cpufreq-krait.c
+new file mode 100644
+index 000000000000..7b38b9c948e5
+--- /dev/null
++++ b/drivers/cpufreq/cpufreq-krait.c
+@@ -0,0 +1,190 @@
++/*
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * The OPP code in function krait_set_target() is reused from
++ * drivers/cpufreq/omap-cpufreq.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -100,11 +141,19 @@
- 		acc0: clock-controller at 2088000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu0_aux";
- 		};
- 
- 		acc1: clock-controller at 2098000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu1_aux";
-+		};
++#include <linux/clk.h>
++#include <linux/cpu.h>
++#include <linux/cpu_cooling.h>
++#include <linux/cpufreq.h>
++#include <linux/cpumask.h>
++#include <linux/err.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/pm_opp.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/thermal.h>
 +
-+		l2cc: clock-controller at 2011000 {
-+			compatible = "qcom,kpss-gcc";
-+			reg = <0x2011000 0x1000>;
-+			clock-output-names = "acpu_l2_aux";
- 		};
- 
- 		saw0: regulator at 2089000 {
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 69dca2aca25a..e607063b527a 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -14,40 +14,104 @@
- 		#size-cells = <0>;
- 		interrupts = <1 9 0xf04>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <0>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
-+			clocks = <&kraitcc 0>;
-+			clock-names = "cpu";
-+			operating-points = <
-+				/* kHz    ignored */
-+				 960000 1000000
-+				 883200 1000000
-+				 806400 1000000
-+				 729600 1000000
-+				 652800 1000000
-+				 576000 1000000
-+				 499200 1000000
-+				 422400 1000000
-+				 345600 1000000
-+				 300000 1000000
-+			>;
-+			clock-latency = <100000>;
- 		};
- 
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <1>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
-+			clocks = <&kraitcc 1>;
-+			clock-names = "cpu";
-+			operating-points = <
-+				/* kHz    ignored */
-+				 960000 1000000
-+				 883200 1000000
-+				 806400 1000000
-+				 729600 1000000
-+				 652800 1000000
-+				 576000 1000000
-+				 499200 1000000
-+				 422400 1000000
-+				 345600 1000000
-+				 300000 1000000
-+			>;
-+			clock-latency = <100000>;
- 		};
- 
--		cpu at 2 {
-+		cpu2: cpu at 2 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <2>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
-+			clocks = <&kraitcc 2>;
-+			clock-names = "cpu";
-+			operating-points = <
-+				/* kHz    ignored */
-+				 960000 1000000
-+				 883200 1000000
-+				 806400 1000000
-+				 729600 1000000
-+				 652800 1000000
-+				 576000 1000000
-+				 499200 1000000
-+				 422400 1000000
-+				 345600 1000000
-+				 300000 1000000
-+			>;
-+			clock-latency = <100000>;
- 		};
- 
--		cpu at 3 {
-+		cpu3: cpu at 3 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <3>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
-+			clocks = <&kraitcc 3>;
-+			clock-names = "cpu";
-+			operating-points = <
-+				/* kHz    ignored */
-+				 960000 1000000
-+				 883200 1000000
-+				 806400 1000000
-+				 729600 1000000
-+				 652800 1000000
-+				 576000 1000000
-+				 499200 1000000
-+				 422400 1000000
-+				 345600 1000000
-+				 300000 1000000
-+			>;
-+			clock-latency = <100000>;
- 		};
- 
- 		L2: l2-cache {
-@@ -71,6 +135,10 @@
- 		clock-frequency = <19200000>;
- 	};
- 
-+	kraitcc: clock-controller {
-+		compatible = "qcom,krait-cc-v2";
-+		#clock-cells = <1>;
-+	};
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -144,6 +212,36 @@
- 			};
- 		};
- 
-+		clock-controller at f9016000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf9016000 0x30>;
-+			clock-output-names = "hfpll_l2";
-+		};
++static unsigned int transition_latency;
 +
-+		clock-controller at f908a000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf908a000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll0";
-+		};
++static struct device *cpu_dev;
++static DEFINE_PER_CPU(struct clk *, krait_cpu_clks);
++static struct cpufreq_frequency_table *freq_table;
++static struct thermal_cooling_device *cdev;
 +
-+		clock-controller at f909a000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf909a000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll1";
-+		};
++static int krait_set_target(struct cpufreq_policy *policy, unsigned int index)
++{
++	unsigned long volt = 0, volt_old = 0;
++	unsigned int old_freq, new_freq;
++	long freq_Hz, freq_exact;
++	int ret;
++	struct clk *cpu_clk;
 +
-+		clock-controller at f90aa000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf90aa000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll2";
-+		};
++	cpu_clk = per_cpu(krait_cpu_clks, policy->cpu);
 +
-+		clock-controller at f90ba000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf90ba000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll3";
-+		};
++	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
++	if (freq_Hz <= 0)
++		freq_Hz = freq_table[index].frequency * 1000;
 +
- 		saw_l2: regulator at f9012000 {
- 			compatible = "qcom,saw2";
- 			reg = <0xf9012000 0x1000>;
++	freq_exact = freq_Hz;
++	new_freq = freq_Hz / 1000;
++	old_freq = clk_get_rate(cpu_clk) / 1000;
++
++	pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
++		 old_freq / 1000, volt_old ? volt_old / 1000 : -1,
++		 new_freq / 1000, volt ? volt / 1000 : -1);
++
++	ret = clk_set_rate(cpu_clk, freq_exact);
++	if (ret)
++		pr_err("failed to set clock rate: %d\n", ret);
++
++	return ret;
++}
++
++static int krait_cpufreq_init(struct cpufreq_policy *policy)
++{
++	int ret;
++
++	policy->clk = per_cpu(krait_cpu_clks, policy->cpu);
++
++	ret = cpufreq_table_validate_and_show(policy, freq_table);
++	if (ret) {
++		pr_err("%s: invalid frequency table: %d\n", __func__, ret);
++		return ret;
++	}
++
++	policy->cpuinfo.transition_latency = transition_latency;
++
++	return 0;
++}
++
++static struct cpufreq_driver krait_cpufreq_driver = {
++	.flags = CPUFREQ_STICKY,
++	.verify = cpufreq_generic_frequency_table_verify,
++	.target_index = krait_set_target,
++	.get = cpufreq_generic_get,
++	.init = krait_cpufreq_init,
++	.name = "generic_krait",
++	.attr = cpufreq_generic_attr,
++};
++
++static int krait_cpufreq_probe(struct platform_device *pdev)
++{
++	struct device_node *np;
++	int ret;
++	unsigned int cpu;
++	struct device *dev;
++	struct clk *clk;
++
++	cpu_dev = get_cpu_device(0);
++	if (!cpu_dev) {
++		pr_err("failed to get krait device\n");
++		return -ENODEV;
++	}
++
++	np = of_node_get(cpu_dev->of_node);
++	if (!np) {
++		pr_err("failed to find krait node\n");
++		return -ENOENT;
++	}
++
++	for_each_possible_cpu(cpu) {
++		dev = get_cpu_device(cpu);
++		if (!dev) {
++			pr_err("failed to get krait device\n");
++			ret = -ENOENT;
++			goto out_put_node;
++		}
++		per_cpu(krait_cpu_clks, cpu) = clk = devm_clk_get(dev, NULL);
++		if (IS_ERR(clk)) {
++			ret = PTR_ERR(clk);
++			goto out_put_node;
++		}
++	}
++
++	ret = of_init_opp_table(cpu_dev);
++	if (ret) {
++		pr_err("failed to init OPP table: %d\n", ret);
++		goto out_put_node;
++	}
++
++	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
++	if (ret) {
++		pr_err("failed to init cpufreq table: %d\n", ret);
++		goto out_put_node;
++	}
++
++	if (of_property_read_u32(np, "clock-latency", &transition_latency))
++		transition_latency = CPUFREQ_ETERNAL;
++
++	ret = cpufreq_register_driver(&krait_cpufreq_driver);
++	if (ret) {
++		pr_err("failed register driver: %d\n", ret);
++		goto out_free_table;
++	}
++	of_node_put(np);
++
++	/*
++	 * For now, just loading the cooling device;
++	 * thermal DT code takes care of matching them.
++	 */
++	for_each_possible_cpu(cpu) {
++		dev = get_cpu_device(cpu);
++		np = of_node_get(dev->of_node);
++		if (of_find_property(np, "#cooling-cells", NULL)) {
++			cdev = of_cpufreq_cooling_register(np, cpumask_of(cpu));
++			if (IS_ERR(cdev))
++				pr_err("running cpufreq without cooling device: %ld\n",
++				       PTR_ERR(cdev));
++		}
++		of_node_put(np);
++	}
++
++	return 0;
++
++out_free_table:
++	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
++out_put_node:
++	of_node_put(np);
++	return ret;
++}
++
++static int krait_cpufreq_remove(struct platform_device *pdev)
++{
++	cpufreq_cooling_unregister(cdev);
++	cpufreq_unregister_driver(&krait_cpufreq_driver);
++	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
++
++	return 0;
++}
++
++static struct platform_driver krait_cpufreq_platdrv = {
++	.driver = {
++		.name	= "cpufreq-krait",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= krait_cpufreq_probe,
++	.remove		= krait_cpufreq_remove,
++};
++module_platform_driver(krait_cpufreq_platdrv);
++
++MODULE_DESCRIPTION("Krait CPUfreq driver");
++MODULE_LICENSE("GPL v2");
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
