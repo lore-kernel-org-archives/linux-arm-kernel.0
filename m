@@ -1,145 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:14 +0900
-Subject: [PATCH 02/14] ARM: shmobile: APMU: Add Core-Standby-state for Suspend
- to RAM
+Date: Wed, 25 Jun 2014 16:35:17 +0900
+Subject: [PATCH 05/14] ARM: shmobile: Mark all SoCs in shmobile as CPUFreq,
+ capable
 In-Reply-To: <cover.1403681315.git.horms+renesas@verge.net.au>
 References: <cover.1403681315.git.horms+renesas@verge.net.au>
-Message-ID: <d6d757c9a4e06e118fa5158fa74e03c514d862d2.1403681315.git.horms+renesas@verge.net.au>
+Message-ID: <6596e97e054647fecb016ecb7e1935aa2b7db954.1403681315.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: keita kobayashi <keita.kobayashi.ym@renesas.com>
+From: Benoit Cousson <bcousson@baylibre.com>
 
-This patch add Core-Standby-state for Suspend to RAM.
+Mark all SoCs in shmobile as CPUFreq capable
+on multiplatform build only.
 
-Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-[horms+renesas at verge.net.au: rebase]
+Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+[gaku.inami.xw at bp.renesas.com: Move the definition of cpufreq capable]
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/common.h       |  2 ++
- arch/arm/mach-shmobile/platsmp-apmu.c | 60 ++++++++++++++++++++++++++++++++---
- 2 files changed, 58 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index f7a360e..8f0cd57 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -35,8 +35,10 @@ extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index dbd954e..c32fa7c 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -12,6 +12,8 @@ config ARCH_SHMOBILE_MULTI
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
  
- #ifdef CONFIG_SUSPEND
- int shmobile_suspend_init(void);
-+void shmobile_smp_apmu_suspend_init(void);
- #else
- static inline int shmobile_suspend_init(void) { return 0; }
-+static inline void shmobile_smp_apmu_suspend_init(void) { return 0; }
- #endif
+ if ARCH_SHMOBILE_MULTI
  
- #ifdef CONFIG_CPU_IDLE
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index fe648f5..590e35c 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -7,15 +7,19 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/cpu_pm.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/of_address.h>
- #include <linux/smp.h>
-+#include <linux/suspend.h>
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
-+#include <asm/proc-fns.h>
- #include <asm/smp_plat.h>
-+#include <asm/suspend.h>
- #include "common.h"
- 
- static struct {
-@@ -141,7 +145,7 @@ int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return apmu_wrap(cpu, apmu_power_on);
- }
- 
--#ifdef CONFIG_HOTPLUG_CPU
-+#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_SUSPEND)
- /* nicked from arch/arm/mach-exynos/hotplug.c */
- static inline void cpu_enter_lowpower_a15(void)
- {
-@@ -172,16 +176,40 @@ static inline void cpu_enter_lowpower_a15(void)
- 	dsb();
- }
- 
--void shmobile_smp_apmu_cpu_die(unsigned int cpu)
-+void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
- {
--	/* For this particular CPU deregister boot vector */
--	shmobile_smp_hook(cpu, 0, 0);
- 
- 	/* Select next sleep mode using the APMU */
- 	apmu_wrap(cpu, apmu_power_off);
- 
- 	/* Do ARM specific CPU shutdown */
- 	cpu_enter_lowpower_a15();
-+}
-+
-+static inline void cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile("mrc    p15, 0, %0, c1, c0, 0\n"
-+		     "       orr     %0, %0, %1\n"
-+		     "       mcr     p15, 0, %0, c1, c0, 0\n"
-+		     "       mrc     p15, 0, %0, c1, c0, 1\n"
-+		     "       orr     %0, %0, %2\n"
-+		     "       mcr     p15, 0, %0, c1, c0, 1\n"
-+		     : "=&r" (v)
-+		     : "Ir" (CR_C), "Ir" (0x40)
-+		     : "cc");
-+}
-+#endif
-+
-+#if defined(CONFIG_HOTPLUG_CPU)
-+void shmobile_smp_apmu_cpu_die(unsigned int cpu)
-+{
-+	/* For this particular CPU deregister boot vector */
-+	shmobile_smp_hook(cpu, 0, 0);
-+
-+	/* Shutdown CPU core */
-+	shmobile_smp_apmu_cpu_shutdown(cpu);
- 
- 	/* jump to shared mach-shmobile sleep / reset code */
- 	shmobile_smp_sleep();
-@@ -192,3 +220,27 @@ int shmobile_smp_apmu_cpu_kill(unsigned int cpu)
- 	return apmu_wrap(cpu, apmu_power_off_poll);
- }
- #endif
-+
-+#if defined(CONFIG_SUSPEND)
-+static int shmobile_smp_apmu_do_suspend(unsigned long cpu)
-+{
-+	shmobile_smp_hook(cpu, virt_to_phys(cpu_resume), 0);
-+	shmobile_smp_apmu_cpu_shutdown(cpu);
-+	cpu_do_idle(); /* WFI selects Core Standby */
-+	return 1;
-+}
-+
-+static int shmobile_smp_apmu_enter_suspend(suspend_state_t state)
-+{
-+	cpu_suspend(smp_processor_id(), shmobile_smp_apmu_do_suspend);
-+	cpu_leave_lowpower();
-+	return 0;
-+}
-+
-+void shmobile_smp_apmu_suspend_init(void)
-+{
-+	shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
-+}
-+#else
-+void shmobile_smp_apmu_suspend_init(void) {}
-+#endif
 -- 
 2.0.0.rc2
