@@ -1,32 +1,42 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 25 Jun 2014 22:04:47 +0100
-Subject: [PATCH] efi/arm64: efistub: remove local copy of linux_banner
-In-Reply-To: <1402657911-7779-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1402657911-7779-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140625210447.GG15494@console-pimps.org>
+From: tthayer@altera.com (tthayer at altera.com)
+Date: Wed, 25 Jun 2014 16:15:24 -0500
+Subject: [PATCHv7 0/3] Addition of Altera SDRAM Controller Summary
+Message-ID: <1403730927-16163-1-git-send-email-tthayer@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jun, at 01:11:51PM, Ard Biesheuvel wrote:
-> The shared efistub code for ARM and arm64 contains a local copy of linux_banner,
-> allowing it to be referenced from separate executables such as the ARM
-> decompressor. However, this introduces a dependency on generated header files,
-> causing unnecessary rebuilds of the stub itself and, in case of arm64, vmlinux
-> which contains it.
-> 
-> On arm64, the copy is not actually needed since we can reference the original
-> symbol directly, and as it turns out, there may be better ways to deal with this
-> for ARM as well, so let's remove it from the shared code. If it still needs to
-> be reintroduced for ARM later, it should live under arch/arm anyway and not in
-> shared code.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi-stub.c |  2 --
->  drivers/firmware/efi/fdt.c   | 10 ----------
->  2 files changed, 12 deletions(-)
+From: Thor Thayer <tthayer@altera.com>
 
-Applied, thanks.
+This patch series adds Altera SDRAM EDAC support.
+
+The one sticky issue seems to be the use of "syscon". One register
+in the SDRAM controller shares bitfields with different functionality.
+In this series the devicetree includes the "syscon" designation
+for the SDRAM Controller [patch 1] but the bindings document does not.
+This flexibility means future generations of SDRAM controller may
+correct this sharing of bitfields without changes to the bindings.
+
+Thor Thayer (3):
+  devicetree: Addition of the Altera SDRAM Controller. 
+    Add the Altera SDRAM controller bindings and device tree 
+    changes to the Altera SoC project.
+  devicetree: Addition of the Altera SDRAM EDAC. 
+    Add the Altera SDRAM EDAC bindings and device tree changes 
+    to the Altera SoC project.
+  edac: altera: Add EDAC support for Altera SoC SDRAM Controller.    
+    This patch adds support for the CycloneV and ArriaV SDRAM    
+    controllers. Correction and reporting of SBEs, Panic on DBEs.
+
+ .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +
+ .../bindings/arm/altera/socfpga-sdram.txt          |   11 +
+ arch/arm/boot/dts/socfpga.dtsi                     |   11 +
+ drivers/edac/Kconfig                               |    9 +
+ drivers/edac/Makefile                              |    2 +
+ drivers/edac/altera_edac.c                         |  448 ++++++++++++++++++++
+ 6 files changed, 496 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+ create mode 100644 drivers/edac/altera_edac.c
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+1.7.9.5
