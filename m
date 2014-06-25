@@ -1,31 +1,38 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 25 Jun 2014 13:41:43 +0200
-Subject: [PATCH 4/6] ARM: SAMSUNG: Restore Samsung PM Debug functionality
-In-Reply-To: <CAD8Lp46GpaGzq+2bkyujRtSVYJt7PWWT47NvjifoxzJk7aKs6A@mail.gmail.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-5-git-send-email-t.figa@samsung.com>
- <CAD8Lp46GpaGzq+2bkyujRtSVYJt7PWWT47NvjifoxzJk7aKs6A@mail.gmail.com>
-Message-ID: <53AAB577.4010009@samsung.com>
+From: eballetbo@iseebcn.com (Enric Balletbo i Serra)
+Date: Wed, 25 Jun 2014 13:42:05 +0200
+Subject: [PATCH] ARM: dts: Fix TI CPSW Phy mode selection on IGEP COM AQUILA.
+Message-ID: <1403696525-10099-1-git-send-email-eballetbo@iseebcn.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.06.2014 12:09, Daniel Drake wrote:
-> Hi Tomasz,
-> 
-> On Tue, Jun 24, 2014 at 2:57 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->> Due to recently merged patches and previous merge conflicts, the Samsung
->> PM Debug functionality no longer can be enabled. This patch fixes
->> incorrect dependency of SAMSUNG_PM_DEBUG on an integer symbol and adds
->> missing header inclusion.
-> 
-> Testing against 3.16-rc2, this doesn't quite work for me.
-> SAMSUNG_PM_DEBUG still doesn't appear in menuconfig.
-> 
-> HAVE_SAMSUNG_PM_DEBUG is 'n'. Looks like the select from
-> DEBUG_S3C_UART is not working, but I'm not sure why.
+As this board use external clock for RMII interface we should specify 'rmii'
+phy mode and 'rmii-clock-ext' to make ethernet working.
 
-I hastily changed this to something simpler in last minute before
-sending without proper testing. Let me send something that works.
+Signed-off-by: Enric Balletbo i Serra <eballetbo@iseebcn.com>
+---
+ arch/arm/boot/dts/am335x-igep0033.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index 8a0a72d..a1a0cc5 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -105,10 +105,16 @@
+ 
+ &cpsw_emac0 {
+ 	phy_id = <&davinci_mdio>, <0>;
++	phy-mode = "rmii";
+ };
+ 
+ &cpsw_emac1 {
+ 	phy_id = <&davinci_mdio>, <1>;
++	phy-mode = "rmii";
++};
++
++&phy_sel {
++	rmii-clock-ext;
+ };
+ 
+ &elm {
+-- 
+1.9.1
