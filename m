@@ -1,225 +1,85 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 24 Jun 2014 20:47:57 -0500
-Subject: [PATCH 5/6] ARM: dts: OMAP2+: Add #mbox-cells property to all mailbox
- nodes
-In-Reply-To: <1403660878-56350-1-git-send-email-s-anna@ti.com>
-References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
-Message-ID: <1403660878-56350-6-git-send-email-s-anna@ti.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Wed, 25 Jun 2014 04:07:43 +0200
+Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
+In-Reply-To: <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
+References: <539fdd37.e7bc420a.76b9.ffffb583@mx.google.com>	<CAGa+x85nqPbH-sye28ni=gUEdgjGdUDqHhv1+0pV5aO8y1+wHQ@mail.gmail.com>	<53A106F1.10201@gmail.com>	<CAGa+x8527FEPk6fg5kv-fbOzK3MzcFooFGE9Me12b9C_Pv=UzA@mail.gmail.com>	<53A2AE11.2050208@gmail.com>	<53A2BE94.2010308@gmail.com>	<53A7A579.4010702@gmail.com>
+ <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
+Message-ID: <53AA2EEF.6090100@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The '#mbox-cells' property is added to all the OMAP mailbox
-nodes. This property is mandatory with the new mailbox framework.
+Am 23.06.2014 20:32, schrieb Kevin Hilman:
+> On Sun, Jun 22, 2014 at 8:56 PM, Tushar Behera <trblinux@gmail.com> wrote:
+>> Adding linux-samsung-soc and linux-arm-kernel ML for wider audience.
+>>
+>> On 06/19/2014 04:12 PM, Tushar Behera wrote:
+>>> On 06/19/2014 03:02 PM, Tushar Behera wrote:
+>>>> On 06/18/2014 09:22 AM, Kevin Hilman wrote:
+>>>>> On Tue, Jun 17, 2014 at 8:26 PM, Tushar Behera <trblinux@gmail.com> wrote:
+>>>>>> On 06/17/2014 10:23 PM, Kevin Hilman wrote:
+>>>>>>> Sachin,
+>>>>>>>
+>>>>>>> On Mon, Jun 16, 2014 at 11:16 PM, Kevin's boot bot <khilman@linaro.org> wrote:
+>>>>>>>>
+>>>>>>>> Tree/Branch: mainline
+>>>>>>>> Git describe: v3.16-rc1-2-gebe0618
+>>>>>>>> Failed boot tests (console logs at the end)
+>>>>>>>> ===========================================
+>>>>>>>>      exynos5420-arndale-octa:     FAIL:    arm-exynos_defconfig
+>>>>>>>>                 ste-snowball:     FAIL:    arm-u8500_defconfig
+>>>>>>>
+>>>>>>> FYI... these failures are getting more consistent on my octa board,
+>>>>>>> but still not failing every time.
+>>>>>>>
+>>>>>>> Kevin
+>>>>>>>
+>>>>>>
+>>>>>> Hi Kevin,
+>>>>>>
+>>>>>> Same here.
+>>>>>>
+>>>>>> Observation: If you soft-reset the board (through the jumpers) after
+>>>>>> getting this problem, the problem keeps repeating. But if you hard-reset
+>>>>>> the board (by removing the power cord), the problem doesn't occur during
+>>>>>> next iteration.
+>>>>>
+>>>>> I don't ever use the soft-reset, I only toggle the wall power.  I
+>>>>> don't ever actually remove the power cord though, I'm using a
+>>>>> USB-controlled relay to toggle the wall power.
+>>>>>
+>>>>> Kevin
+>>>>>
+>>>>
+>>>> Laura,
+>>>>
+>>>> We are getting following kernel panic [1] (not always, but quite
+>>>> regularly) while booting Arndale-Octa (based on Samsung's Exynos5420)
+>>>> board with upstream kernel. I haven't observed this issue with other
+>>>> boards yet.
+>>>>
+>>>> This issue is observed when I am booting with uImage + dtb (within
+>>>> roughly ~10 iterations).
+>>>>
+>>>
+>>> Some more information:
+>>>
+>>> The boot logs are provided in pastebin, okay[2] and failed[3].
+>>>
+>>> In case of boot failures, I am getting a higher value for vm_total_pages
+>>> (684424 in [3]). In case of successful boot on my board, it is always
+>>> 521232 [2] on my board.
+> 
+> I can confirm that reverting the "Get rid of meminfo" patch gets the
+> Octa board booting reliably again for me also.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi   |  1 +
- arch/arm/boot/dts/am4372.dtsi   |  1 +
- arch/arm/boot/dts/dra7.dtsi     | 13 +++++++++++++
- arch/arm/boot/dts/omap2420.dtsi |  1 +
- arch/arm/boot/dts/omap2430.dtsi |  1 +
- arch/arm/boot/dts/omap3.dtsi    |  1 +
- arch/arm/boot/dts/omap4.dtsi    |  1 +
- arch/arm/boot/dts/omap5.dtsi    |  1 +
- 8 files changed, 20 insertions(+)
+Confirming that the revert [1] fixes also the issue I was reporting for
+my Arndale Octa. I'm using zImage + dtb and had been resetting via J10.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 8c5abc7..6f8f7cf 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -352,6 +352,7 @@
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <77>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			mbox_wkupm3: wkup_m3 {
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <0 0 3>;
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 668b404..7c9ee39 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -166,6 +166,7 @@
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			mbox_wkupm3: wkup_m3 {
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <0 0 3>;
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 8d7626f..ec7a0f2 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -342,6 +342,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4a0f4000 0x200>;
- 			ti,hwmods = "mailbox1";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -349,6 +350,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x4883a000 0x200>;
- 			ti,hwmods = "mailbox2";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -356,6 +358,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x4883c000 0x200>;
- 			ti,hwmods = "mailbox3";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -363,6 +366,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x4883e000 0x200>;
- 			ti,hwmods = "mailbox4";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -370,6 +374,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48840000 0x200>;
- 			ti,hwmods = "mailbox5";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -377,6 +382,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48842000 0x200>;
- 			ti,hwmods = "mailbox6";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -384,6 +390,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48844000 0x200>;
- 			ti,hwmods = "mailbox7";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -391,6 +398,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48846000 0x200>;
- 			ti,hwmods = "mailbox8";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -398,6 +406,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x4885e000 0x200>;
- 			ti,hwmods = "mailbox9";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -405,6 +414,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48860000 0x200>;
- 			ti,hwmods = "mailbox10";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -412,6 +422,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48862000 0x200>;
- 			ti,hwmods = "mailbox11";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -419,6 +430,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48864000 0x200>;
- 			ti,hwmods = "mailbox12";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-@@ -426,6 +438,7 @@
- 			compatible = "ti,dra7-mailbox";
- 			reg = <0x48802000 0x200>;
- 			ti,hwmods = "mailbox13";
-+			#mbox-cells = <1>;
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index f3e6d0f..85c792c 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -157,6 +157,7 @@
- 			interrupts = <26>, <34>;
- 			interrupt-names = "dsp", "iva";
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			mbox_dsp: dsp {
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <1 0 0>;
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index 13deb71..fa966c3 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -247,6 +247,7 @@
- 			reg = <0x48094000 0x200>;
- 			interrupts = <26>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			mbox_dsp: dsp {
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <1 0 0>;
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 3524adf..9ba3eb8 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -332,6 +332,7 @@
- 			ti,hwmods = "mailbox";
- 			reg = <0x48094000 0x200>;
- 			interrupts = <26>;
-+			#mbox-cells = <1>;
- 			mbox_dsp: dsp {
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <1 0 0>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 19dc11d..f0f3d14 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -654,6 +654,7 @@
- 			reg = <0x4a0f4000 0x200>;
- 			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			mbox_ipu: mbox_ipu {
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <1 0 0>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index ce54c13..3ecc150 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -641,6 +641,7 @@
- 			reg = <0x4a0f4000 0x200>;
- 			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			mbox_ipu: mbox_ipu {
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <1 0 0>;
+Regards,
+Andreas
+
+[1] https://github.com/afaerber/linux/commits/arndale-octa-next
+
 -- 
-2.0.0
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
