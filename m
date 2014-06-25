@@ -1,58 +1,72 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 25 Jun 2014 17:37:50 +0200
-Subject: [PATCH] ARM: STi: DT: STiH41x: Convert all uppercase non-defines
- to lowercase
-In-Reply-To: <CAOesGMiR1tKZH7BeZUuiAPUsw=oRnUg6q--Nby+RROd=p6zMaA@mail.gmail.com>
-References: <1401195188-23677-1-git-send-email-lee.jones@linaro.org>	<20140625145354.GK13518@lee--X1>	<53AAE603.500@st.com>
- <CAOesGMiR1tKZH7BeZUuiAPUsw=oRnUg6q--Nby+RROd=p6zMaA@mail.gmail.com>
-Message-ID: <53AAECCE.9070408@st.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 25 Jun 2014 16:40:18 +0100
+Subject: [PATCH 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+Message-ID: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hello,
+This series implements general forms of get_user_pages_fast and
+__get_user_pages_fast and activates them for arm and arm64.
 
-On 06/25/2014 05:26 PM, Olof Johansson wrote:
-> `On Wed, Jun 25, 2014 at 8:08 AM, Maxime Coquelin 
-> <maxime.coquelin@st.com> wrote:
->> 
->> 
->> On 06/25/2014 04:53 PM, Lee Jones wrote:
->>>> Suggested-by: Olof Johansson <olof@lixom.net> Signed-off-by:
->>>> Lee Jones <lee.jones@linaro.org> --- 
->>>> arch/arm/boot/dts/stih415-pinctrl.dtsi   | 340
->>>> +++++++++++++++--------------- 
->>>> arch/arm/boot/dts/stih416-b2020-revE.dts |   6 +- 
->>>> arch/arm/boot/dts/stih416-pinctrl.dtsi   | 342
->>>> +++++++++++++++---------------- 
->>>> arch/arm/boot/dts/stih41x-b2000.dtsi     |   6 +- 
->>>> arch/arm/boot/dts/stih41x-b2020.dtsi     |   6 +- 5 files
->>>> changed, 350 insertions(+), 350 deletions(-)
->>> 
->>> What happened to this Maxime?
->>> 
->>> It was Acked by Olof, then died.  Did it slip through the net?
->>> 
->> 
->> You sent it to the ML after my last pull request for v3.16. I
->> think to take it for v3.17, but maybe you think it can go in next
->> v3.16 rc? If so, maybe Arnd or Olof can pick it directly, since
->> we only have this single patch for v3.16 fixes currently?
-> 
-> If you have only one patch, then please send it to us as a fresh
-> copy with git send-email to arm at kernel.org + the usual lists.
-> 
-> You need to apply it and test it on hardware before anyway, right?
-> We certainly can't do that for you.
+These are required for Transparent HugePages to function correctly, as
+a futex on a THP tail will otherwise result in an infinite loop (due to
+the core implementation of __get_user_pages_fast always returning 0).
 
-Sure, rebase and testing has to be done on our side.
+This series may also be beneficial for direct-IO heavy workloads and
+certain KVM workloads.
 
-I will add this patch to my queue for v3.17.
+The main changes since RFC V5 are:
+ * Rebased against 3.16-rc1.
+ * pmd_present no longer tested for by gup_huge_pmd and gup_huge_pud,
+   because the entry must be present for these leaf functions to be
+   called. 
+ * Rather than assume puds can be re-cast as pmds, a separate
+   function pud_write is instead used by the core gup.
+ * ARM activation logic changed, now it will only activate
+   RCU_TABLE_FREE and RCU_GUP when running with LPAE.
 
-Regards,
-Maxime
+The main changes since RFC V4 are:
+ * corrected the arm64 logic so it now correctly rcu-frees page
+   table backing pages.
+ * rcu free logic relaxed for pre-ARMv7 ARM as we need an IPI to
+   invalidate TLBs anyway.
+ * rebased to 3.15-rc3 (some minor changes were needed to allow it to merge).
+ * dropped Catalin's mmu_gather patch as that's been merged already.
 
-> 
-> 
-> 
-> -Olof
-> 
+This series has been tested with LTP and some custom futex tests that
+exacerbate the futex on THP tail case. Also debug counters were
+temporarily employed to ensure that the RCU_TABLE_FREE logic was
+behaving as expected.
+
+I would really appreciate any testers or comments (especially on the
+validity or otherwise of the core fast_gup implementation).
+
+Cheers,
+--
+Steve
+
+Steve Capper (6):
+  mm: Introduce a general RCU get_user_pages_fast.
+  arm: mm: Introduce special ptes for LPAE
+  arm: mm: Enable HAVE_RCU_TABLE_FREE logic
+  arm: mm: Enable RCU fast_gup
+  arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+  arm64: mm: Enable RCU fast_gup
+
+ arch/arm/Kconfig                      |   5 +
+ arch/arm/include/asm/pgtable-2level.h |   2 +
+ arch/arm/include/asm/pgtable-3level.h |  16 ++
+ arch/arm/include/asm/pgtable.h        |   6 +-
+ arch/arm/include/asm/tlb.h            |  38 ++++-
+ arch/arm/mm/flush.c                   |  19 +++
+ arch/arm64/Kconfig                    |   4 +
+ arch/arm64/include/asm/pgtable.h      |  11 +-
+ arch/arm64/include/asm/tlb.h          |  18 ++-
+ arch/arm64/mm/flush.c                 |  19 +++
+ mm/Kconfig                            |   3 +
+ mm/gup.c                              | 278 ++++++++++++++++++++++++++++++++++
+ 12 files changed, 410 insertions(+), 9 deletions(-)
+
+-- 
+1.9.3
