@@ -1,73 +1,52 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 25 Jun 2014 11:19:55 +0530
-Subject: [PATCH 2/4] usb: host: xhci-plat: Add support to get PHYs
-In-Reply-To: <53A9FCDB.6060805@cogentembedded.com>
-References: <1402056736-12674-1-git-send-email-gautam.vivek@samsung.com>
- <1402056736-12674-3-git-send-email-gautam.vivek@samsung.com>
- <CAODwPW-2tbDht8P=KsTyTyeBivFtFMiyCpxd0QFa-cUSRTpJjQ@mail.gmail.com>
- <53A9FCDB.6060805@cogentembedded.com>
-Message-ID: <CAFp+6iH_rxNpHZyFH6k5Got6YJ_RQMsm=95=pkRPitsxopsosA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Jun 2014 08:08:48 +0200
+Subject: [PATCH v2 1/2] video: imxfb: Fix unbalanced regulators
+In-Reply-To: <1403528839-31901-1-git-send-email-denis@eukrea.com>
+References: <1403528839-31901-1-git-send-email-denis@eukrea.com>
+Message-ID: <20140625060848.GE15686@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Sergei,
+On Mon, Jun 23, 2014 at 03:07:18PM +0200, Denis Carikli wrote:
+> Both regulator_enable and regulator_disable's comments
+> say that they must be balanced with its counterpart
+> enable/disable function.
+> 
+> Not doing it result in kernel warnings each time
+> the lcd is powered off twice, for instance trough sysfs.
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> Changelog v1->v2:
+>  - None
+> ---
+>  drivers/video/fbdev/imxfb.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+> index f6e6216..121cbd7 100644
+> --- a/drivers/video/fbdev/imxfb.c
+> +++ b/drivers/video/fbdev/imxfb.c
+> @@ -769,9 +769,9 @@ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
+>  	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+>  
+>  	if (!IS_ERR(fbi->lcd_pwr)) {
+> -		if (power)
+> +		if (power && !regulator_is_enabled(fbi->lcd_pwr))
+>  			return regulator_enable(fbi->lcd_pwr);
+> -		else
+> +		else if (regulator_is_enabled(fbi->lcd_pwr))
+>  			return regulator_disable(fbi->lcd_pwr);
 
+It's a shame that the LCD controller doesn't do the reference counting.
+I really think it should be fixed there and not in the drivers. If for
+whatever reason this is not acceptable then it should be done in the
+imxfb driver instead of shifting it further to the regulator core.
 
-On Wed, Jun 25, 2014 at 4:04 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
->
->
-> On 06/10/2014 12:22 AM, Julius Werner wrote:
->
->>> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
->>> index 9ffecd5..453d89e 100644
->>> --- a/drivers/usb/host/xhci.h
->>> +++ b/drivers/usb/host/xhci.h
->>> @@ -1582,6 +1582,9 @@ struct xhci_hcd {
->>>          u32                     port_status_u0;
->>>   /* Compliance Mode Timer Triggered every 2 seconds */
->>>   #define COMP_MODE_RCVRY_MSECS 2000
->>> +       /* phys for the controller */
->>> +       struct phy              *phy2_gen;
->>> +       struct phy              *phy3_gen;
->>>   };
->
->
->> I don't think adding new variables here and restricting most of this
->> logic to xhci-plat.c (in the next patch) is the best way to do it.
->
->
->    Indeed.
->
->
->> There's no conceptual reason why other host controllers (e.g. xhci-pci
->> or even EHCI) could not have a similar need to tune their PHY after
->> reset. PHYs are universal to all host controllers.
->
->
->> There is already a 'phy' member in struct usb_hcd which I think is
->> mostly unused right now. I think it would be much less
->> confusing/redundant to reuse that member for this purpose (you could
->> still set it up from xhci_plat_probe(), and then call it from
->> hcd_bus_resume() or something like that).
->
->
->    That member has type 'struct usb_phy *' while here we have 'struct phy *'
-> -- feel the difference.
->    I have already tried adding 'struct phy *gen_phy' to 'struct usb_hcd',
-> however Greg wasn't eager to pick that up so far. Here's the last posting of
-> my patch:
->
-> http://marc.info/?l=linux-usb&m=140145917506582
-
-Thanks for pointing to the patch, i have also been tracking this patch.
-I will try to rework using this patch and post the relevant patches.
-
-
+Sascha
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
