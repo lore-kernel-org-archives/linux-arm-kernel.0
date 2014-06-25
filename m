@@ -1,56 +1,59 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Wed, 25 Jun 2014 16:17:57 +0530
-Subject: [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr
- for secure mode
-In-Reply-To: <5388D226.7000706@gmail.com>
-References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
- <5388CBB9.1050003@suse.de> <5388D129.6000706@samsung.com>
- <5388D226.7000706@gmail.com>
-Message-ID: <53AAA8DD.9020805@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 25 Jun 2014 12:48:35 +0200
+Subject: [PATCH] misc: atmel_pwm: fix Kconfig symbols
+In-Reply-To: <1403689436-6664-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20140618093109.GQ19375@piout.net>
+ <1403689436-6664-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20140625104834.GA21291@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2014 12:17 AM, Tomasz Figa wrote:
-> On 30.05.2014 20:42, Kukjin Kim wrote:
->> On 05/31/14 03:19, Andreas F?rber wrote:
->>> Am 28.05.2014 06:13, schrieb Sachin Kamat:
->>>> Almost all Exynos-series of SoCs that run in secure mode don't need
->>>> additional offset for every CPU, with Exynos4412 being the only
->>>> exception.
->>>>
->>>> Tested on Origen-Quad (Exynos4412) and Arndale-Octa (Exynos5420).
->>>>
->>>> While at it, fix the coding style (space around *).
->>>>
->>>> Signed-off-by: Sachin Kamat<sachin.kamat@linaro.org>
->>>> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
->>>> ---
->>>>   arch/arm/mach-exynos/firmware.c |    9 +++++++--
->>>>   1 file changed, 7 insertions(+), 2 deletions(-)
->>>
->>> Fixes ODROID-XU (Exynos5410) as well - thought it had been a prereq to
->>> applying the 5410 patches...
->>>
->>> Tested-by: Andreas F?rber<afaerber@suse.de>
->>>
->> Andreas, thanks for your test :-)
->>
->> Sachin, How about exynos4210, 5250, 5260 and 5440?...
->> I need to check again, honestly I don't remember all of Exynos SoCs'
->> different things ;-) Then will apply into fixes for 3.16.
+On 25/06/2014 at 11:43:56 +0200, Nicolas Ferre wrote :
+> AT91 symbols AT91SAM9263, AT91SAM9RL, and AT91SAM9G45 do not exist and this
+> patch change them their correct ARCH_* version.
+> These symbols are chosen instead of the SOC_* one because this driver is not
+> converted to DT.
+> Anyway, the ATMEL_PWM symbol and the associated driver will be removed soon
+> during the move to the PWM sub-system.
 > 
-> Exynos4210 doesn't use secure firmware, at least on any board supported
-> in mainline. Not sure about those Exynos5 models, but the only boards
-> supported in mainline with firmware node in DT are based on Exynos4412
-> or Exynos5410.
-> 
-> Best regards,
-> Tomasz
-> 
+> Reported-by: Paul Bolle <pebolle@tiscali.nl>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Kukjin,
-
-Would you please pick this patch as a fix for 3.16?
+> ---
+> Guys,
+> 
+> The rework is delayed to 3.17. So, in the meantime, I send this little patch
+> as a fix for 3.16.
+> 
+> Bye,
+> 
+>  drivers/misc/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index a43d0c467274..ee9402324a23 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -54,7 +54,7 @@ config AD525X_DPOT_SPI
+>  config ATMEL_PWM
+>  	tristate "Atmel AT32/AT91 PWM support"
+>  	depends on HAVE_CLK
+> -	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
+> +	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+>  	help
+>  	  This option enables device driver support for the PWM channels
+>  	  on certain Atmel processors.  Pulse Width Modulation is used for
+> -- 
+> 1.8.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Tushar Behera
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
