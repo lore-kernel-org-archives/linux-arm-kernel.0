@@ -1,45 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jun 2014 11:14:09 +0100
-Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <6589024.32Qh7fFhXo@wuerfel>
-References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
- <130361958.xFghHXmZkz@wuerfel> <20140625095735.GI6153@arm.com>
- <6589024.32Qh7fFhXo@wuerfel>
-Message-ID: <20140625101409.GJ6153@arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 25 Jun 2014 19:14:53 +0900
+Subject: [PATCH v2] arm: exynos: Support cluster power off on
+ exynos5420/5800
+In-Reply-To: <7hy4wsvdsm.fsf@paris.lan>
+References: <1403104722-14848-1-git-send-email-a.kesavan@samsung.com>
+ <1403181617-19743-1-git-send-email-a.kesavan@samsung.com>
+ <7hy4wsvdsm.fsf@paris.lan>
+Message-ID: <01b501cf905e$4e95cf00$ebc16d00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 11:12:13AM +0100, Arnd Bergmann wrote:
-> On Wednesday 25 June 2014 10:57:36 Will Deacon wrote:
-> > So far, I've been avoiding the hardcoding. However, you could potentially
-> > build a system with a small number of SMRs (compared to the number of
-> > StreamIDs) and allocate the StreamIDs in such a way that I think the dynamic
-> > configuration would be NP complete if we require an optimal SMR allocation.
-> > 
-> > However:
-> > 
-> >   (1) I don't know of a system where this is the case
-> >   (2) Not much work has been done on improving the dynamic allocator yet
-> > 
-> > which is why I'm still favouring dynamic configuration in the driver.
-> > 
-> > The other thing I forgot to mention earlier is that we need to support
-> > device hotplug in the future, so some level of dynamic configuration
-> > will always be required.
+Kevin Hilman wrote:
 > 
-> Ok, got it. So we just hope that we can make dynamic configuration
-> work all the time, but if it all fails, then we come up with a
-> hardcoded configuration method.
+> Abhilash Kesavan <a.kesavan@samsung.com> writes:
 > 
-> I guess this could be done similarly to how we handle clocks on
-> a lot of systems: generally these are dynamic, but you have the
-> option to provide hints in the clock controller node about how
-> you expect things to be configured.
-> 
-> For the SMMU that could mean that (if we get into the situation you
-> describe), we add optional properties to the SMMU node itself
-> describing how we expect the SMRs to be used.
+Hi,
 
-That sounds good to me! Thanks for the discussion.
+> > Turning off a cluster when all 4 cores of the cluster are powered off
+> > saves power significantly. Powering off the A15 L2 alone gives around
+> > 100mW in savings. Add support for powering off the A15/A7 clusters on
+> > exynos5420/5800.
+> >
+> > The patch enables specific register bits which ensure that:
+> >    - cluster L2 will be turned on before the first man is powered up.
+> >    - last man will be turned off before the cluster L2 is turned off.
+> >    - core is powered down before powering it up.
+> >
+> > Remove the exynos_cluster_power_control function completely as we can
+> > rely on the above mentioned bits rather than polling the cluster power
+> > status register.
+> >
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> > Change in v2:
+> > Added a macro for the COMMON_OPTION register and used it in the MCPM
+> > back-end.
+> >
+> > The patch is based on Linux-next 20140619. It has been tested on an
+> > exynos5420-based chromebook using the "/dev/bL_switcher" interface as
+> > well as the script provided by Nicolas Pitre and Dave Martin [1].
+> >
+> > Patch depends on:
+> > [v2] ARM: EXYNOS: mcpm: Don't rely on firmware's secondary_cpu_start
+> >
+> > [1] http://www.spinics.net/lists/linux-samsung-soc/msg31257.html
+> 
+> Tested on exynos5800/Chromebook2 along with the dependency patch and using
+> the script from Dave and Nico.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> 
+Kevin, thanks for your test on the board ;-)
 
-Will
+Applied into samsung tree.
+
+Thanks,
+Kukjin
