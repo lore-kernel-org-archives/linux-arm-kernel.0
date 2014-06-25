@@ -1,49 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 18:26:09 +0900
-Subject: [PATCH 05/14] ARM: shmobile: Mark all SoCs in shmobile as
- CPUFreq, capable
-In-Reply-To: <CAOh2x==C1XDjxdxpE6fYk3j6gO1X7d976Kr-Gjj_-+W6xVzOsw@mail.gmail.com>
-References: <cover.1403681315.git.horms+renesas@verge.net.au>
- <6596e97e054647fecb016ecb7e1935aa2b7db954.1403681315.git.horms+renesas@verge.net.au>
- <CAOh2x==C1XDjxdxpE6fYk3j6gO1X7d976Kr-Gjj_-+W6xVzOsw@mail.gmail.com>
-Message-ID: <20140625092609.GC7496@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jun 2014 11:27:50 +0200
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140625091702.GF6153@arm.com>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <4855051.rhxSrNMNLg@wuerfel> <20140625091702.GF6153@arm.com>
+Message-ID: <4839521.56FtveYIl6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 02:26:24PM +0530, Viresh Kumar wrote:
-> On Wed, Jun 25, 2014 at 1:05 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > From: Benoit Cousson <bcousson@baylibre.com>
-> >
-> > Mark all SoCs in shmobile as CPUFreq capable
-> > on multiplatform build only.
-> >
-> > Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
-> > [gaku.inami.xw at bp.renesas.com: Move the definition of cpufreq capable]
-> > Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/mach-shmobile/Kconfig | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> > index dbd954e..c32fa7c 100644
-> > --- a/arch/arm/mach-shmobile/Kconfig
-> > +++ b/arch/arm/mach-shmobile/Kconfig
-> > @@ -12,6 +12,8 @@ config ARCH_SHMOBILE_MULTI
-> >         select NO_IOPORT_MAP
-> >         select PINCTRL
-> >         select ARCH_REQUIRE_GPIOLIB
-> > +       select ARCH_HAS_CPUFREQ
-> > +       select ARCH_HAS_OPP
+On Wednesday 25 June 2014 10:17:02 Will Deacon wrote:
+> On Tue, Jun 24, 2014 at 07:20:56PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 24 June 2014 19:11:50 Will Deacon wrote:
+> > > On Tue, Jun 24, 2014 at 06:57:44PM +0100, Olav Haugan wrote:
+> > > > We do describe the masked StreamID (SID) but we need to specify the mask
+> > > > that the SMMU should apply to the incoming SIDs, right?
+> > > > 
+> > > > We have a bus master that emits 43 unique SIDs. However, we have only 40
+> > > > SMMU_SMRn registers in the SMMU. So we need to mask out some of the
+> > > > incoming SID bits so that the 43 SIDs can match one of 40 entries in the
+> > > > SMR.
+> > > 
+> > > Hmm, so you're talking about stream matching, right? That doesn't belong in
+> > > the device-tree. I appreciate that the current driver does a terrible job at
+> > > allocating the SMRs (it's bloody difficult!), but we should try to improve
+> > > the dynamic behaviour instead of moving configuration of the SMMU out into
+> > > device-tree, where it's inflexible at best.
+> > > 
+> > > There have been patches previously posted by Andreas Herrmann helping here.
+> > > I'd be glad to see them revived.
+> > 
+> > Note that there are areas where we have in the past decided that dynamic
+> > configuration is just too hard for the kernel to do and that we're better
+> > off putting the configuration into DT. Pinctrl and clocks are at least
+> > partially in that category.
+> > 
+> > It's always best if you can get the kernel to do things in the ideal
+> > way where that is possible, but getting there may be just not worth it.
+> > 
+> > I have no idea where it should be for SMMU, but it's something to consider:
+> > if you can take reasonable shortcuts by reading parts of the configuration
+> > from DT, you may just as well do that.
 > 
-> https://lkml.org/lkml/2014/6/2/714
-> http://patchwork.ozlabs.org/patch/356780/
+> I treat this in the same manner as the topology bindings we discussed
+> previously; we should do a best-effort to configure things dynamically and
+> solve corner-cases and quirks as special cases.
 
-I believe this patch was queued up before those patches hit Linus's tree.
+I think the situation is a bit different here: It's less about the corner
+cases for the SMMU, but about the question whether it makes more sense to
+have the kernel figure out the settings, or have them come from DT
+all the time.
 
-In the case of ARCH_HAS_CPUFREQ, a subsequent patch in
-this pull-request, "ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile",
-removes it.
+As I said, I can't tell which approach is best here, but it sounds to
+me we should either do dynamic configuration and get it right, or
+hardcode the configuration it all the time if we can't.
 
-Inami-san, could you see about making a patch to remove ARCH_HAS_OPP too?
+	Arnd
