@@ -1,57 +1,31 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel =?iso-8859-1?Q?Garc=EDa?=)
-Date: Wed, 25 Jun 2014 11:53:37 -0300
-Subject: [PATCH/RESEND 8/9] drm/tilcdc: remove submodule destroy calls
-In-Reply-To: <53A9F660.8060703@ti.com>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-9-git-send-email-guido@vanguardiasur.com.ar>
- <53A9F660.8060703@ti.com>
-Message-ID: <20140625145337.GB743@arch.cereza>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 25 Jun 2014 15:55:50 +0100
+Subject: [PATCH] i2c: i2c-st: Rename clock reference to something that exists
+Message-ID: <1403708150-32085-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 Jun 05:06 PM, Darren Etheridge wrote:
-> 
-> On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
-> >The TI tilcdc driver is designed with a notion of submodules. Currently,
-> >at unload time, these submodules are iterated and destroyed.
-> >
-> >Now that the tilcdc remove order is fixed, this can be handled perfectly
-> 
-> I am not sure I understand the first part of the above sentence - did
-> something change with tilcdc ordering?
+CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
+over a few commits, then finally removed in commit 5aa02b9 (ARM:
+STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
 
-Yes, patch [PATCH/RESEND 6/9] drm/tilcdc: fix release order on exit changes
-the tilcdc remove ordering. 
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/i2c/i2c-st.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Currently, the tilcdc DRM is removed with this:
-
-        tilcdc_tfp410_fini();
-        tilcdc_slave_fini();
-        tilcdc_panel_fini();
-        platform_driver_unregister(&tilcdc_platform_driver);
-
-Which is wrong as you shouldn't remove the tilcdc "modules" (panel, slave,
-tfp410) before the DRM driver itself. So the above patch fixed it to be:
-
-        platform_driver_unregister(&tilcdc_platform_driver);
-        tilcdc_panel_fini();
-        tilcdc_slave_fini();
-        tilcdc_tfp410_fini();
-
-> I think you a referring to previous
-> patches in your series which really mean tilcdc can actually unload now.  So
-> really the method this patch uses could always have been used, it just
-> wasn't for some reason?
-> 
-
-No, I believe this patch which removes the tilcdc sub-module destroy
-infrastructure can only be applied *after* the above remove order is fixed
-(iow, the 6/9 patch mentioned above).
-
-In other words, only once you have a proper remove() that releases things
-in the right order you can rely in the kernel and avoid any custom
-implementation.
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+index 437e0db..4c26fda 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-st.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+@@ -31,7 +31,7 @@ i2c0: i2c at fed40000 {
+ 	compatible	= "st,comms-ssc4-i2c";
+ 	reg		= <0xfed40000 0x110>;
+ 	interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+-	clocks		= <&CLK_S_ICN_REG_0>;
++	clocks		= <&clk_s_a0_ls CLK_ICN_REG>;
+ 	clock-names	= "ssc";
+ 	clock-frequency = <400000>;
+ 	pinctrl-names	= "default";
 -- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+1.8.3.2
