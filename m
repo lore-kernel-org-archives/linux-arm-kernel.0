@@ -1,38 +1,66 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 25 Jun 2014 15:37:27 +0200
-Subject: [PATCH v2 2/6] ARM: Get outer cache .write_sec callback from mach_desc
- only if not NULL
+Date: Wed, 25 Jun 2014 15:37:28 +0200
+Subject: [PATCH v2 3/6] ARM: mm: cache-l2x0: Use l2c_write_sec() for
+ LATENCY_CTRL registers
 In-Reply-To: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
 References: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403703451-12233-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1403703451-12233-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain platforms (i.e. Exynos) might need to set .write_sec callback
-from firmware initialization which is happenning in .init_early callback
-of machine descriptor. However current code will overwrite the pointer
-with whatever is present in machine descriptor, even though it can be
-already set earlier. This patch fixes this by making the assignment
-conditional, depending on whether current .write_sec callback is NULL.
+According to the documentation, TAG_LATENCY_CTRL and DATA_LATENCY_CTRL
+registers of L2C-310 can be written only in secure mode, so
+l2c_write_sec() should be used to change them, instead of plain
+writel_relaxed().
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/kernel/irq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mm/cache-l2x0.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 2c42576..e7383b9 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -125,7 +125,8 @@ void __init init_IRQ(void)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 478566b..6600fd9 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -622,10 +622,10 @@ static void l2c310_resume(void)
+ 		unsigned revision;
  
- 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
- 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
--		outer_cache.write_sec = machine_desc->l2c_write_sec;
-+		if (!outer_cache.write_sec)
-+			outer_cache.write_sec = machine_desc->l2c_write_sec;
- 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
- 				   machine_desc->l2c_aux_mask);
- 		if (ret)
+ 		/* restore pl310 setup */
+-		writel_relaxed(l2x0_saved_regs.tag_latency,
+-			       base + L310_TAG_LATENCY_CTRL);
+-		writel_relaxed(l2x0_saved_regs.data_latency,
+-			       base + L310_DATA_LATENCY_CTRL);
++		l2c_write_sec(l2x0_saved_regs.tag_latency,
++			       base, L310_TAG_LATENCY_CTRL);
++		l2c_write_sec(l2x0_saved_regs.data_latency,
++			       base, L310_DATA_LATENCY_CTRL);
+ 		writel_relaxed(l2x0_saved_regs.filter_end,
+ 			       base + L310_ADDR_FILTER_END);
+ 		writel_relaxed(l2x0_saved_regs.filter_start,
+@@ -1024,20 +1024,20 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 
+ 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+ 	if (tag[0] && tag[1] && tag[2])
+-		writel_relaxed(
++		l2c_write_sec(
+ 			L310_LATENCY_CTRL_RD(tag[0] - 1) |
+ 			L310_LATENCY_CTRL_WR(tag[1] - 1) |
+ 			L310_LATENCY_CTRL_SETUP(tag[2] - 1),
+-			l2x0_base + L310_TAG_LATENCY_CTRL);
++			l2x0_base, L310_TAG_LATENCY_CTRL);
+ 
+ 	of_property_read_u32_array(np, "arm,data-latency",
+ 				   data, ARRAY_SIZE(data));
+ 	if (data[0] && data[1] && data[2])
+-		writel_relaxed(
++		l2c_write_sec(
+ 			L310_LATENCY_CTRL_RD(data[0] - 1) |
+ 			L310_LATENCY_CTRL_WR(data[1] - 1) |
+ 			L310_LATENCY_CTRL_SETUP(data[2] - 1),
+-			l2x0_base + L310_DATA_LATENCY_CTRL);
++			l2x0_base, L310_DATA_LATENCY_CTRL);
+ 
+ 	of_property_read_u32_array(np, "arm,filter-ranges",
+ 				   filter, ARRAY_SIZE(filter));
 -- 
 1.9.3
