@@ -1,61 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 25 Jun 2014 16:35:31 +0900
-Subject: [PATCH 1/5] ARM: shmobile: koelsch-reference: Remove workarounds for
- core clock issues
-In-Reply-To: <cover.1403681531.git.horms+renesas@verge.net.au>
-References: <cover.1403681531.git.horms+renesas@verge.net.au>
-Message-ID: <d37e9b0b20dd7670946ad6034b4aa93b7e7048aa.1403681531.git.horms+renesas@verge.net.au>
+Date: Wed, 25 Jun 2014 16:35:34 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Boards Updates for v3.17
+Message-ID: <cover.1403681531.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Now the core clock issues have been fixed by commit
-3c90c55dcde745bed81f6447f24ba96bda43d984 ("drivers: sh: compile
-drivers/sh/pm_runtime.c if ARCH_SHMOBILE_MULTI"), revert the following
-3 commits:
-  - 4dcb4c80380dfa482874b931e308fd382597feab ("ARM: shmobile: Add Koelsch
-    clock workarounds for SDHI"),
-  - 8e4f394b20a0fe474dd88204d76978191566decf ("ARM: shmobile:
-    koelsch-reference: Annotate clk_enables as __initconst"),
-  - 3d75d9ea74fee6f5a4bdcbbdf2d577661d047eef ("ARM: shmobile:
-    koelsch-reference: Work around core clock issues").
+Please consider these Renesas ARM based SoC boards updates for v3.17.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-koelsch-reference.c | 15 ---------------
- 1 file changed, 15 deletions(-)
+This pull request is based on commits included in 'Renesas ARM Based SoC
+Updates for v3.17", which is tagged as renesas-soc-for-v3.17 and I have
+sent a pull-request for.  That pull requests includes a few extra commits
+which were added after the board code was added on top.
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 1d3f67d..28e3c45 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -92,24 +92,9 @@ static const struct clk_name clk_names[] __initconst = {
- 	{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
- };
- 
--/*
-- * This is a really crude hack to work around core platform clock issues
-- */
--static const struct clk_name clk_enables[] __initconst = {
--	{ "ether", NULL, "ee700000.ethernet" },
--	{ "i2c2", NULL, "e6530000.i2c" },
--	{ "msiof0", NULL, "e6e20000.spi" },
--	{ "qspi_mod", NULL, "e6b10000.spi" },
--	{ "sdhi0", NULL, "ee100000.sd" },
--	{ "sdhi1", NULL, "ee140000.sd" },
--	{ "sdhi2", NULL, "ee160000.sd" },
--	{ "thermal", NULL, "e61f0000.thermal" },
--};
--
- static void __init koelsch_add_standard_devices(void)
- {
- 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
--	shmobile_clk_workaround(clk_enables, ARRAY_SIZE(clk_enables), true);
- 	r8a7791_add_dt_devices();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
--- 
-2.0.0.rc2
+
+The following changes since commit ecdaca48629bd99609fdc612685363330967dce2:
+
+  ARM: shmobile: rcar-gen2: correct return value of shmobile_smp_apmu_suspend_init (2014-06-17 19:33:22 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-boards-for-v3.17
+
+for you to fetch changes up to 5f65c5bd58bf027eb2bacc2294a98e7aea81c630:
+
+  ARM: shmobile: Enable R-Car Gen2 CMA code in board files (2014-06-17 19:35:59 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Boards Updates for v3.17
+
+* armadillo800eva LED support
+* Remove now unnecessary work arounds for c\lock issues
+* Enable R-Car Gen2 CMA code
+
+----------------------------------------------------------------
+Geert Uytterhoeven (4):
+      ARM: shmobile: koelsch-reference: Remove workarounds for core clock issues
+      ARM: shmobile: lager-reference: Remove workarounds for core clock issues
+      ARM: shmobile: armadillo800eva legacy: Add LED support
+      ARM: shmobile: armadillo800eva reference: Spelling s/ED/LED/
+
+Magnus Damm (1):
+      ARM: shmobile: Enable R-Car Gen2 CMA code in board files
+
+ .../board-armadillo800eva-reference.c              |  8 ++---
+ arch/arm/mach-shmobile/board-armadillo800eva.c     | 35 ++++++++++++++++++++++
+ arch/arm/mach-shmobile/board-koelsch-reference.c   | 16 +---------
+ arch/arm/mach-shmobile/board-koelsch.c             |  1 +
+ arch/arm/mach-shmobile/board-lager-reference.c     | 15 +---------
+ arch/arm/mach-shmobile/board-lager.c               |  1 +
+ 6 files changed, 43 insertions(+), 33 deletions(-)
