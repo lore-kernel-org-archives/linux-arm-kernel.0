@@ -1,77 +1,84 @@
-From: guido@vanguardiasur.com.ar (Guido =?iso-8859-1?Q?Mart=EDnez?=)
-Date: Wed, 25 Jun 2014 00:55:22 -0300
-Subject: [PATCH/RESEND 1/9] drm/i2c: tda998x: move
- drm_i2c_encoder_destroy call
-In-Reply-To: <20140624163813.GJ3705@n2100.arm.linux.org.uk>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-2-git-send-email-guido@vanguardiasur.com.ar>
- <20140624163813.GJ3705@n2100.arm.linux.org.uk>
-Message-ID: <20140625035522.GB9466@fox>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 24 Jun 2014 21:00:34 -0700
+Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
+ regulators
+In-Reply-To: <53AA3F78.3080804@samsung.com>
+References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
+ <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
+ <53AA3F78.3080804@samsung.com>
+Message-ID: <CAD=FV=WXWttq294yn+eB5x3N0ztoMhpwacqdLB3OfRk+UK+Abg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Jaehoon,
 
-On Tue, Jun 24, 2014 at 05:38:13PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 17, 2014 at 11:17:03AM -0300, Guido Mart?nez wrote:
-> > Currently tda998x_encoder_destroy() calls cec_write() and reg_clear(),
-> > as part of the release procedure. Such calls need to access the I2C bus
-> > and therefore, we need to call them before drm_i2c_encoder_destroy()
-> > which unregisters the I2C device.
-> > 
-> > This commit moves the latter so it's done afterwards.
-> > 
-> > Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
-> > Signed-off-by: Ezequiel Garc?a <ezequiel@vanguardiasur.com.ar>
-> > Cc: <stable@vger.kernel.org> #v3.9+
-> 
-> You really should have sent this with me in the To: header as I'm now the
-> maintainer of this driver.  Yes, this is a valid fix, and I'll apply it
-> shortly.  Thanks.
-Sorry about that, I'm still kind of new to this whole deal. I'll keep it
-mind for future patches.
+On Tue, Jun 24, 2014 at 8:18 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> On 06/25/2014 03:00 AM, Doug Anderson wrote:
+>> Yuvaraj,
+>>
+>> On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>> This patch makes use of mmc_regulator_get_supply() to handle
+>>> the vmmc and vqmmc regulators.Also it moves the code handling
+>>> the these regulators to dw_mci_set_ios().It turned on the vmmc
+>>> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
+>>> during MMC_POWER_OFF.
+>>>
+>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>> ---
+>>>  drivers/mmc/host/dw_mmc.c |   71 ++++++++++++++++++++++-----------------------
+>>>  drivers/mmc/host/dw_mmc.h |    2 ++
+>>>  2 files changed, 36 insertions(+), 37 deletions(-)
+>>
+>> Perhaps you could CC me on the whole series for the next version since
+>> I was involved in privately reviewing previous versions?
+>>
+>> Overall caveat for my review is that I'm nowhere near an SD/MMC expert.
+>>
+>>
+>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>> index 1ac227c..f5cabce 100644
+>>> --- a/drivers/mmc/host/dw_mmc.c
+>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>> @@ -937,6 +937,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>         struct dw_mci_slot *slot = mmc_priv(mmc);
+>>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+>>>         u32 regs;
+>>> +       int ret;
+>>>
+>>>         switch (ios->bus_width) {
+>>>         case MMC_BUS_WIDTH_4:
+>>> @@ -975,16 +976,41 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>
+>>>         switch (ios->power_mode) {
+>>>         case MMC_POWER_UP:
+>>> +               if ((!IS_ERR(mmc->supply.vmmc)) &&
+>>> +                               !test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
+>>> +                       ret = regulator_enable(mmc->supply.vmmc);
+>>> +                       if (!ret)
+>>> +                               set_bit(DW_MMC_CARD_POWERED, &slot->flags);
+>
+> MMC_CARD_POWERED? I didn't know why it needs.
 
-Thanks,
-Guido
+I think the idea was to make sure that regulator enables/disables were
+balanced.  ...but if the mmc core does this for us then we probably
+don't need to worry.
 
 
-> > ---
-> >  drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> > index 240c331..db9515f 100644
-> > --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> > +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> > @@ -1183,7 +1183,6 @@ static void
-> >  tda998x_encoder_destroy(struct drm_encoder *encoder)
-> >  {
-> >  	struct tda998x_priv *priv = to_tda998x_priv(encoder);
-> > -	drm_i2c_encoder_destroy(encoder);
-> >  
-> >  	/* disable all IRQs and free the IRQ handler */
-> >  	cec_write(priv, REG_CEC_RXSHPDINTENA, 0);
-> > @@ -1193,6 +1192,7 @@ tda998x_encoder_destroy(struct drm_encoder *encoder)
-> >  
-> >  	if (priv->cec)
-> >  		i2c_unregister_device(priv->cec);
-> > +	drm_i2c_encoder_destroy(encoder);
-> >  	kfree(priv);
-> >  }
-> >  
-> > -- 
-> > 2.0.0
-> > 
-> 
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> +               }
+>>
+>> As per below, I'm not sure why you'd want to turn on vqmmc and vmmc at
+>> different times.
+> In my case, in order to prevent the H/W mis-operation, it turns on vqmmc and vmmc at different times.
 
--- 
-Guido Mart?nez, VanguardiaSur
-www.vanguardiasur.com.ar
+OK!  Can you explain more?  What instance is one powered but not the other?
+
+I know that we talked to an SD Card manufacturer who told us that
+powering their IO lines without their main power rail was a bad thing
+(and we in fact saw this causing problems on SD cards).  I would guess
+that means that you're either powering vmmc before vqmmc or that vqmmc
+somehow doesn't directly enable pullups for IO lines.
+
+If you need vmmc before vqmmc then I'm curious about why...
+
+-Doug
