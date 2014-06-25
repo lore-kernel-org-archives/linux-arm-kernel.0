@@ -1,29 +1,64 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 25 Jun 2014 16:21:51 +0200
-Subject: [PATCH v3 3/3] ARM: i.MX25 clk: Use of_clk_init() for DT case
-In-Reply-To: <CAOMZO5CSARSPA2K94pQc6osC+8-4jPZsYvV2bQybCXCASmohSg@mail.gmail.com>
-References: <1403700096-13014-1-git-send-email-denis@eukrea.com>	<1403700096-13014-3-git-send-email-denis@eukrea.com>
- <CAOMZO5CSARSPA2K94pQc6osC+8-4jPZsYvV2bQybCXCASmohSg@mail.gmail.com>
-Message-ID: <53AADAFF.2000800@eukrea.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 25 Jun 2014 16:21:21 +0200
+Subject: [PATCH v8 9/9] seccomp: implement SECCOMP_FILTER_FLAG_TSYNC
+In-Reply-To: <1403642893-23107-10-git-send-email-keescook@chromium.org>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-10-git-send-email-keescook@chromium.org>
+Message-ID: <20140625142121.GD7892@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2014 04:13 PM, Fabio Estevam wrote:
+On 06/24, Kees Cook wrote:
 >
-> On Wed, Jun 25, 2014 at 9:41 AM, Denis Carikli <denis@eukrea.com> wrote:
->
->>   int __init mx25_clocks_init(void)
->>   {
->> -       __mx25_clocks_init(24000000);
->> +       void __iomem *ccm;
->> +
->> +       ccm = ioremap(MX25_CRM_BASE_ADDR, SZ_16K);
->
-> Shouldn't the ccm base address be retrieved from dt?
-Yes, it is.
+> +static void seccomp_sync_threads(void)
+> +{
+> +	struct task_struct *thread, *caller;
+> +
+> +	BUG_ON(!spin_is_locked(&current->sighand->siglock));
+> +
+> +	/* Synchronize all threads. */
+> +	caller = current;
+> +	for_each_thread(caller, thread) {
+> +		/* Get a task reference for the new leaf node. */
+> +		get_seccomp_filter(caller);
+> +		/*
+> +		 * Drop the task reference to the shared ancestor since
+> +		 * current's path will hold a reference.  (This also
+> +		 * allows a put before the assignment.)
+> +		 */
+> +		put_seccomp_filter(thread);
+> +		thread->seccomp.filter = caller->seccomp.filter;
+> +		/* Opt the other thread into seccomp if needed.
+> +		 * As threads are considered to be trust-realm
+> +		 * equivalent (see ptrace_may_access), it is safe to
+> +		 * allow one thread to transition the other.
+> +		 */
+> +		if (thread->seccomp.mode == SECCOMP_MODE_DISABLED) {
+> +			/*
+> +			 * Don't let an unprivileged task work around
+> +			 * the no_new_privs restriction by creating
+> +			 * a thread that sets it up, enters seccomp,
+> +			 * then dies.
+> +			 */
+> +			if (task_no_new_privs(caller))
+> +				task_set_no_new_privs(thread);
+> +
+> +			seccomp_assign_mode(thread, SECCOMP_MODE_FILTER);
+> +		}
+> +	}
+> +}
 
-As I understand it mx25_clocks_init is called only by the boards files 
-(mach-eukrea_cpuimx25.c and mach-mx25_3ds.c) while mx25_clocks_init_dt 
-is what is used in the case of a DT boot (in imx25-dt.c).
+OK, personally I think this all make sense. I even think that perhaps
+SECCOMP_FILTER_FLAG_TSYNC should allow filter == NULL, a thread might
+want to "sync" without adding the new filter, but this is minor/offtopic.
 
-Denis.
+But. Doesn't this change add the new security hole?
+
+Obviously, we should not allow to install a filter and then (say) exec
+a suid binary, that is why we have no_new_privs/LSM_UNSAFE_NO_NEW_PRIVS.
+
+But what if "thread->seccomp.filter = caller->seccomp.filter" races with
+any user of task_no_new_privs() ? Say, suppose this thread has already
+passed check_unsafe_exec/etc and it is going to exec the suid binary?
+
+Oleg.
