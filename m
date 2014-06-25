@@ -1,56 +1,108 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Jun 2014 10:28:42 +0100
-Subject: [RFC PATCH 1/9] genirq: Add IRQD_IRQ_FORWARDED flag and accessors
+Date: Wed, 25 Jun 2014 10:28:45 +0100
+Subject: [RFC PATCH 4/9] irqchip: GIC: add support for forwarded interrupts
 In-Reply-To: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
 References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403688530-23273-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some interrupt controllers support a split EOI behaviour, where
-an active interrupt can be forwarded to a VM, and directly EOIed
-from the guest.
+Now that we've switched to EOImode == 1, prevent a forwarded interrupt
+from being deactivated after its priority has been dropped.
 
-Allow the irq_data to carry a flag describing this setup.
+Also add support for the interrupt state to be saved/restored.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irq.h | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/irqchip/irq-gic.c | 48 +++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 0d998d8..b4b3120 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -186,6 +186,7 @@ enum {
- 	IRQD_IRQ_DISABLED		= (1 << 16),
- 	IRQD_IRQ_MASKED			= (1 << 17),
- 	IRQD_IRQ_INPROGRESS		= (1 << 18),
-+	IRQD_IRQ_FORWARDED		= (1 << 19),
- };
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 9295bf2..bde1637 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -157,12 +157,22 @@ static inline unsigned int gic_irq(struct irq_data *d)
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+  */
+-static void gic_mask_irq(struct irq_data *d)
++static void gic_poke_irq(struct irq_data *d, u32 offset)
++{
++	u32 mask = 1 << (gic_irq(d) % 32);
++	writel_relaxed(mask, gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4);
++}
++
++static int gic_peek_irq(struct irq_data *d, u32 offset)
+ {
+ 	u32 mask = 1 << (gic_irq(d) % 32);
++	return !!(readl_relaxed(gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4) & mask);
++}
  
- static inline bool irqd_is_setaffinity_pending(struct irq_data *d)
-@@ -272,6 +273,21 @@ static inline void irqd_clr_chained_irq_inprogress(struct irq_data *d)
- 	d->state_use_accessors &= ~IRQD_IRQ_INPROGRESS;
++static void gic_mask_irq(struct irq_data *d)
++{
+ 	raw_spin_lock(&irq_controller_lock);
+-	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
++	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
+ 	if (gic_arch_extn.irq_mask)
+ 		gic_arch_extn.irq_mask(d);
+ 	raw_spin_unlock(&irq_controller_lock);
+@@ -170,12 +180,10 @@ static void gic_mask_irq(struct irq_data *d)
+ 
+ static void gic_unmask_irq(struct irq_data *d)
+ {
+-	u32 mask = 1 << (gic_irq(d) % 32);
+-
+ 	raw_spin_lock(&irq_controller_lock);
+ 	if (gic_arch_extn.irq_unmask)
+ 		gic_arch_extn.irq_unmask(d);
+-	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
++	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
+ 	raw_spin_unlock(&irq_controller_lock);
  }
  
-+static inline void irqd_set_irq_forwarded(struct irq_data *d)
-+{
-+	d->state_use_accessors |= IRQD_IRQ_FORWARDED;
-+}
-+
-+static inline void irqd_clr_irq_forwarded(struct irq_data *d)
-+{
-+	d->state_use_accessors &= ~IRQD_IRQ_FORWARDED;
-+}
-+
-+static inline bool irqd_irq_forwarded(struct irq_data *d)
-+{
-+	return d->state_use_accessors & IRQD_IRQ_FORWARDED;
-+}
-+
- static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+@@ -193,7 +201,33 @@ static void gic_eoi_irq(struct irq_data *d)
+ static void gic_eoi_dir_irq(struct irq_data *d)
  {
- 	return d->hwirq;
+ 	gic_eoi_irq(d);
+-	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
++	if (!irqd_irq_forwarded(d))
++		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
++}
++
++static void gic_irq_set_fwd_state(struct irq_data *d, u32 val, u32 mask)
++{
++	if (mask & IRQ_FWD_STATE_PENDING)
++		gic_poke_irq(d, (val & IRQ_FWD_STATE_PENDING) ? GIC_DIST_ENABLE_SET : GIC_DIST_ENABLE_CLEAR);
++	if (mask & IRQ_FWD_STATE_ACTIVE)
++		gic_poke_irq(d, (val & IRQ_FWD_STATE_ACTIVE) ? GIC_DIST_ACTIVE_SET : GIC_DIST_ACTIVE_CLEAR);
++	if (mask & IRQ_FWD_STATE_MASKED)
++		gic_poke_irq(d, (val & IRQ_FWD_STATE_MASKED) ? GIC_DIST_ENABLE_CLEAR : GIC_DIST_ENABLE_SET);
++
++}
++
++static u32 gic_irq_get_fwd_state(struct irq_data *d, u32 mask)
++{
++	u32 val = 0;
++
++	if (mask & IRQ_FWD_STATE_PENDING && gic_peek_irq(d, GIC_DIST_ENABLE_SET))
++		val |= IRQ_FWD_STATE_PENDING;
++	if (mask & IRQ_FWD_STATE_ACTIVE && gic_peek_irq(d, GIC_DIST_ACTIVE_SET))
++		val |= IRQ_FWD_STATE_ACTIVE;
++	if (mask & IRQ_FWD_STATE_MASKED && !gic_peek_irq(d, GIC_DIST_ENABLE_SET))
++		val |= IRQ_FWD_STATE_MASKED;
++
++	return val;
+ }
+ 
+ static int gic_set_type(struct irq_data *d, unsigned int type)
+@@ -349,6 +383,8 @@ static struct irq_chip gicv2_chip = {
+ 	.irq_set_affinity	= gic_set_affinity,
+ #endif
+ 	.irq_set_wake		= gic_set_wake,
++	.irq_get_fwd_state	= gic_irq_get_fwd_state,
++	.irq_set_fwd_state	= gic_irq_set_fwd_state,
+ };
+ 
+ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 -- 
 1.8.3.4
