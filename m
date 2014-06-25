@@ -1,30 +1,40 @@
 From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Wed, 25 Jun 2014 16:08:16 +0530
-Subject: [PATCH 1/2] i2c: exynos5: remove an unnecessary read of FIFO_STATUS
- register
-Message-ID: <1403692697-7381-1-git-send-email-ch.naveen@samsung.com>
+Date: Wed, 25 Jun 2014 16:08:17 +0530
+Subject: [PATCH 2/2] i2c: exynos5: fix minor styling nits
+In-Reply-To: <1403692697-7381-1-git-send-email-ch.naveen@samsung.com>
+References: <1403692697-7381-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1403692697-7381-2-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes an extra read of FIFO_STATUS register in the interrrupt
-service routine. Which is read again before the actual use.
+This patch removes an extra line and fixes a styling nit
+in exynos5_i2c_message_start()
 
 Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 ---
- drivers/i2c/busses/i2c-exynos5.c |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/i2c/busses/i2c-exynos5.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
-index 63d2292..0d1a7bc 100644
+index 0d1a7bc..4c2e6f3 100644
 --- a/drivers/i2c/busses/i2c-exynos5.c
 +++ b/drivers/i2c/busses/i2c-exynos5.c
-@@ -405,7 +405,6 @@ static irqreturn_t exynos5_i2c_irq(int irqno, void *dev_id)
+@@ -525,7 +525,7 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
+ 	if (i2c->msg->flags & I2C_M_RD) {
+ 		i2c_ctl |= HSI2C_RXCHON;
  
- 	int_status = readl(i2c->regs + HSI2C_INT_STATUS);
- 	writel(int_status, i2c->regs + HSI2C_INT_STATUS);
--	fifo_status = readl(i2c->regs + HSI2C_FIFO_STATUS);
+-		i2c_auto_conf = HSI2C_READ_WRITE;
++		i2c_auto_conf |= HSI2C_READ_WRITE;
  
- 	/* handle interrupt related to the transfer status */
- 	if (int_status & HSI2C_INT_I2C) {
+ 		trig_lvl = (i2c->msg->len > i2c->variant->fifo_depth) ?
+ 			(i2c->variant->fifo_depth * 3 / 4) : i2c->msg->len;
+@@ -548,7 +548,6 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
+ 	writel(fifo_ctl, i2c->regs + HSI2C_FIFO_CTL);
+ 	writel(i2c_ctl, i2c->regs + HSI2C_CTL);
+ 
+-
+ 	/*
+ 	 * Enable interrupts before starting the transfer so that we don't
+ 	 * miss any INT_I2C interrupts.
 -- 
 1.7.9.5
