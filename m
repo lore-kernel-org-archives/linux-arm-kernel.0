@@ -1,78 +1,79 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 25 Jun 2014 21:45:27 +0100
-Subject: [PATCH v2 9/9] arm64: KVM: vgic: deal with GIC sub-page alignment
-In-Reply-To: <53AB245B.8080409@amd.com>
-References: <1403169693-13982-1-git-send-email-marc.zyngier@arm.com>
- <1403169693-13982-10-git-send-email-marc.zyngier@arm.com>
- <53A9D14D.2020802@amd.com>
- <CAFEAcA-8vOz34NPPqkh1trU5C1irGatcJjAr1f-wWEPzhpy95w@mail.gmail.com>
- <53AAE31C.2060506@amd.com>
- <CAFEAcA-5CaE6T2JkNdf7M9t3LTqv05Um-nWbWjSDVbu_Bo+a2w@mail.gmail.com>
- <53AB245B.8080409@amd.com>
-Message-ID: <CAFEAcA-bRXrnoXbpV0RbD_QX4PVxCoxAB2Lt869itQZMrSr-KA@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 25 Jun 2014 13:52:00 -0700
+Subject: [PATCH v5 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
+ support
+In-Reply-To: <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1403729520.11749.64.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2014 20:34, Joel Schopp <joel.schopp@amd.com> wrote:
-> It doesn't work for me.  Maybe I'm doing something wrong, but I can't see
-> what.  I am unique in that I'm running a gic-400 (gicv2m) on aarch64
-> hardware with 64k pages.  I'm also unique in that my hardware maps each 4K
-> gic entry to a 64K page (aliasing each 4k of gic 16 times in a 64K page, ie
-> the gic virtual ic is at 0xe1140000 and 0xe1141000 and 0xe1142000, etc).
->
-> This is inline with appendix F of the server base system architecture.  This
-> is inconvenient when the size is 0x2000 (8K).  As a result all the offsets
-> in the device tree entries are to the last 4K in the page so that an 8K read
-> will read the last 4k from one page and the first 4k from the next and
-> actually get 8k of the gic.
->
->
->         gic: interrupt-controller at e1101000 {
->                 compatible = "arm,gic-400";
->                 #interrupt-cells = <3>;
->                 #address-cells = <0>;
->                 interrupt-controller;
->                 msi-controller;
->                 reg = <0x0 0xe1110000 0 0x1000>, /* gic dist */
->                       <0x0 0xe112f000 0 0x2000>, /* gic cpu */
->                       <0x0 0xe114f000 0 0x2000>, /* gic virtual ic*/
->                       <0x0 0xe116f000 0 0x2000>, /* gic virtual cpu*/
->                       <0x0 0xe1180000 0 0x1000>; /* gic msi */
+Hi Lorenzo,
 
-Right, this is the oddball case we don't yet support for 64K pages
-(though as you say it is a permitted configuration per the SBSA).
+On Wed, 2014-06-25 at 15:10 +0100, Lorenzo Pieralisi wrote:
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
 
->                 interrupts = <1 8 0xf04>;
->         };
->
->
-> My concern here is that if userspace is going to look at 8k starting at the
-> beginning of the page, guest offset 0 in your terminology, (say 0xe1140000)
-> instead of starting at the last 4k of the page, offset 0xf000 (say
-> 0xe114f000) it is going to get the second 4k wrong by reading 0xe1141000
-> instead of 0xe1150000.
+> +	/*
+> +	 * This is belt-and-braces: make sure that if the idle
+> +	 * specified protocol is psci, the cpu_ops have been
+> +	 * initialized to psci operations. Anything else is
+> +	 * a recipe for mayhem.
+> +	 */
+> +	for_each_cpu(cpu, drv->cpumask) {
+> +		cpu_ops_ptr = cpu_ops[cpu];
+> +		if (WARN_ON(!cpu_ops_ptr || strcmp(cpu_ops_ptr->name, "psci")))
+> +			return -EOPNOTSUPP;
+> +	}
 
-Userspace doesn't actually look at anything in the GICC. It just asks
-the kernel to put the guest GICC (ie the mapping of the host GICV)
-at a particular base address which happens to be a multiple of 64K.
-In this case if the host kernel is using 64K pages then the KVM
-kernel code ought to say "sorry, can't do that" when we tell it the
-base address. (That is, it's impossible to give the guest a VM
-where the GICC it sees is at a 64K boundary on your hardware
-and host kernel config, and hopefully we report that in a not totally
-opaque fashion.)
+I'm not sure how drv->cpumask is setup, but if a system has mixed enable
+methods, say some cpus 'spin-table' and some 'psci', will this give a
+false error?
 
-If you hack QEMU's memory map for the virt board so instead of
-    [VIRT_GIC_CPU] = { 0x8010000, 0x10000 },
-we have
-    [VIRT_GIC_CPU] = { 0x801f000, 0x2000 },
+If drv->cpumask should only include 'psci' cpus, then should this be a
+BUG()?
 
-does it work? If QEMU supported this VGIC_GRP_ADDR_OFFSET
-query then all it would do would be to change that offset and size.
-It would be good to know if there are other problems beyond that...
+> +
+> +	psci_states = kcalloc(drv->state_count, sizeof(*psci_states),
+> +			      GFP_KERNEL);
+> +
+> +	if (!psci_states) {
+> +		pr_warn("psci idle state allocation failed\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	for_each_cpu(cpu, drv->cpumask) {
+> +		if (per_cpu(psci_power_state, cpu)) {
+> +			pr_warn("idle states already initialized on cpu %u\n",
+> +				cpu);
 
-(Conveniently, Linux guests won't currently try to look at the second
-4K page of their GICC...)
+This seems like an implementation problem, if so, shouldn't this be
+pr_debug()?
 
-thanks
--- PMM
+
+>  #endif
+>  
+> +#ifdef CONFIG_ARM64_CPU_SUSPEND
+> +static int cpu_psci_cpu_suspend(unsigned long index)
+> +{
+> +	struct psci_power_state *state = __get_cpu_var(psci_power_state);
+> +
+> +	if (!state)
+> +		return -EOPNOTSUPP;
+> +
+> +	return psci_ops.cpu_suspend(state[index], virt_to_phys(cpu_resume));
+> +}
+> +#endif
+
+Why not put a __maybe_unused attribute on cpu_psci_cpu_suspend() and
+remove the preprocessor conditional.  That way this code will always be
+compiled, and with therefor always get a build test.  The linker should
+strip out the unused code when CONFIG_ARM64_CPU_SUSPEND=n and the code
+below is not compiled. 
+
+> +#ifdef CONFIG_ARM64_CPU_SUSPEND
+> +	.cpu_suspend	= cpu_psci_cpu_suspend,
+> +#endif
+>  };
+
+-Geoff
