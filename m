@@ -1,115 +1,63 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Jun 2014 10:28:50 +0100
-Subject: [RFC PATCH 9/9] KVM: arm: timer: make the interrupt state part of the
- timer state
+Date: Wed, 25 Jun 2014 10:28:49 +0100
+Subject: [RFC PATCH 8/9] arm: KVM: timer: move the timer switch into the
+ non-preemptible section
 In-Reply-To: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
 References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403688530-23273-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403688530-23273-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove the crude hack where we sneak the masked bit
-into the timer's control register, make use of the forwarded
-interrupt API to save/restore the active state of the interrupt.
+In order to convert the timer code to the new interrupt save/restore API,
+make sure the timer switch is done in a non-premtible section, so that
+we save/restore the state on the right CPU.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_arch_timer.h |  3 +++
- virt/kvm/arm/arch_timer.c    | 31 ++++++++++++++++++++++++++++++-
- 2 files changed, 33 insertions(+), 1 deletion(-)
+ arch/arm/kvm/arm.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 6d9aedd..6a69f42 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -53,6 +53,9 @@ struct arch_timer_cpu {
- 	/* Background timer active */
- 	bool				armed;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index a291e63..92875b2 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -554,9 +554,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			vcpu_pause(vcpu);
  
-+	/* Is interrupt active at the distributor level */
-+	u32				irq_active;
+ 		kvm_vgic_flush_hwstate(vcpu);
+-		kvm_timer_flush_hwstate(vcpu);
+ 
+ 		local_irq_disable();
++		kvm_timer_flush_hwstate(vcpu);
+ 
+ 		/*
+ 		 * Re-check atomic conditions
+@@ -567,8 +567,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		}
+ 
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+-			local_irq_enable();
+ 			kvm_timer_sync_hwstate(vcpu);
++			local_irq_enable();
+ 			kvm_vgic_sync_hwstate(vcpu);
+ 			continue;
+ 		}
+@@ -586,6 +586,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		vcpu->arch.last_pcpu = smp_processor_id();
+ 		kvm_guest_exit();
+ 		trace_kvm_exit(*vcpu_pc(vcpu));
++		kvm_timer_sync_hwstate(vcpu);
 +
- 	/* Timer IRQ */
- 	const struct kvm_irq_level	*irq;
- #endif
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 22fa819..57817c5 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -63,7 +63,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 		/*
+ 		 * We may have taken a host interrupt in HYP mode (ie
+ 		 * while executing the guest). This interrupt is still
+@@ -602,7 +604,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * Back from guest
+ 		 *************************************************************/
  
--	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
-+	timer->irq_active = IRQ_FWD_STATE_ACTIVE;
- 	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
- 			    timer->irq->irq,
- 			    timer->irq->level);
-@@ -117,6 +117,16 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	 * populate the CPU timer again.
- 	 */
- 	timer_disarm(timer);
-+
-+	if (timer->irq_active) {
-+		int ret;
-+
-+		ret = irq_set_fwd_state(host_vtimer_irq,
-+					timer->irq_active,
-+					IRQ_FWD_STATE_ACTIVE);
-+		if (ret)
-+			kvm_err("unable to restore timer state");
-+	}
- }
+-		kvm_timer_sync_hwstate(vcpu);
+ 		kvm_vgic_sync_hwstate(vcpu);
  
- /**
-@@ -130,8 +140,16 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	cycle_t cval, now;
-+	int ret;
- 	u64 ns;
- 
-+	ret = irq_get_fwd_state(host_vtimer_irq, &timer->irq_active,
-+				IRQ_FWD_STATE_ACTIVE);
-+	if (ret)
-+		kvm_err("unable to retrieve timer state");
-+	if (timer->irq_active)
-+		irq_set_fwd_state(host_vtimer_irq, 0, IRQ_FWD_STATE_ACTIVE);
-+
- 	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
- 		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
- 		return;
-@@ -166,6 +184,12 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	 * vcpu timer irq number when the vcpu is reset.
- 	 */
- 	timer->irq = irq;
-+
-+	/*
-+	 * Tell the VGIC that the virtual interrupt is tied to a
-+	 * physical interrupt. We do that once per VCPU.
-+	 */
-+	vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
- }
- 
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
-@@ -290,6 +314,10 @@ int kvm_timer_hyp_init(void)
- 	}
- 
- 	kvm_info("%s IRQ%d\n", np->name, ppi);
-+
-+	/* Tell the GIC we're forwarding the interrupt to a guest */
-+	irqd_set_irq_forwarded(irq_get_irq_data(host_vtimer_irq));
-+
- 	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
- 
- 	goto out;
-@@ -305,6 +333,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
- 	timer_disarm(timer);
-+	vgic_unmap_phys_irq(vcpu, timer->irq->irq, host_vtimer_irq);
- }
- 
- int kvm_timer_init(struct kvm *kvm)
+ 		ret = handle_exit(vcpu, run, ret);
 -- 
 1.8.3.4
