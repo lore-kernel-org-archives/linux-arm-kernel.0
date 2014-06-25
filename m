@@ -1,84 +1,71 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 24 Jun 2014 21:00:34 -0700
-Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
- regulators
-In-Reply-To: <53AA3F78.3080804@samsung.com>
-References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
- <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
- <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
- <53AA3F78.3080804@samsung.com>
-Message-ID: <CAD=FV=WXWttq294yn+eB5x3N0ztoMhpwacqdLB3OfRk+UK+Abg@mail.gmail.com>
+From: stephane.marchesin@gmail.com (=?UTF-8?Q?St=C3=A9phane_Marchesin?=)
+Date: Tue, 24 Jun 2014 21:00:41 -0700
+Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
+In-Reply-To: <1403616338.4230.8.camel@weser.hi.pengutronix.de>
+References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+ <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
+ <20140624100220.GK32514@n2100.arm.linux.org.uk>
+ <53A953E6.2030503@nvidia.com> <53A95910.20104@nvidia.com>
+ <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
+ <53A96EC5.3030701@canonical.com>
+ <1403616338.4230.8.camel@weser.hi.pengutronix.de>
+Message-ID: <CACP_E+KECMyusuZd6hpzthL-RpfUOJpWh0EABf1DGAeaXc00aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
-
-On Tue, Jun 24, 2014 at 8:18 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> On 06/25/2014 03:00 AM, Doug Anderson wrote:
->> Yuvaraj,
->>
->> On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>> This patch makes use of mmc_regulator_get_supply() to handle
->>> the vmmc and vqmmc regulators.Also it moves the code handling
->>> the these regulators to dw_mci_set_ios().It turned on the vmmc
->>> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
->>> during MMC_POWER_OFF.
->>>
->>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->>> ---
->>>  drivers/mmc/host/dw_mmc.c |   71 ++++++++++++++++++++++-----------------------
->>>  drivers/mmc/host/dw_mmc.h |    2 ++
->>>  2 files changed, 36 insertions(+), 37 deletions(-)
->>
->> Perhaps you could CC me on the whole series for the next version since
->> I was involved in privately reviewing previous versions?
->>
->> Overall caveat for my review is that I'm nowhere near an SD/MMC expert.
->>
->>
->>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>> index 1ac227c..f5cabce 100644
->>> --- a/drivers/mmc/host/dw_mmc.c
->>> +++ b/drivers/mmc/host/dw_mmc.c
->>> @@ -937,6 +937,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>>         struct dw_mci_slot *slot = mmc_priv(mmc);
->>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
->>>         u32 regs;
->>> +       int ret;
->>>
->>>         switch (ios->bus_width) {
->>>         case MMC_BUS_WIDTH_4:
->>> @@ -975,16 +976,41 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>>
->>>         switch (ios->power_mode) {
->>>         case MMC_POWER_UP:
->>> +               if ((!IS_ERR(mmc->supply.vmmc)) &&
->>> +                               !test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
->>> +                       ret = regulator_enable(mmc->supply.vmmc);
->>> +                       if (!ret)
->>> +                               set_bit(DW_MMC_CARD_POWERED, &slot->flags);
+On Tue, Jun 24, 2014 at 6:25 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Dienstag, den 24.06.2014, 14:27 +0200 schrieb Maarten Lankhorst:
+>> op 24-06-14 14:23, Alexandre Courbot schreef:
+>> > On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>> >> On 06/24/2014 07:33 PM, Alexandre Courbot wrote:
+>> >>> On 06/24/2014 07:02 PM, Russell King - ARM Linux wrote:
+>> >>>> On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
+>> >>>>> From: Lucas Stach <dev@lynxeye.de>
+>> >>>>>
+>> >>>>> On architectures for which access to GPU memory is non-coherent,
+>> >>>>> caches need to be flushed and invalidated explicitly at the
+>> >>>>> appropriate places. Introduce two small helpers to make things
+>> >>>>> easy for TTM-based drivers.
+>> >>>>
+>> >>>> Have you run this with DMA API debugging enabled?  I suspect you haven't,
+>> >>>> and I recommend that you do.
+>> >>>
+>> >>> # cat /sys/kernel/debug/dma-api/error_count
+>> >>> 162621
+>> >>>
+>> >>> (??????? ???)
+>> >>
+>> >> *puts table back on its feet*
+>> >>
+>> >> So, yeah - TTM memory is not allocated using the DMA API, hence we cannot
+>> >> use the DMA API to sync it. Thanks Russell for pointing it out.
+>> >>
+>> >> The only alternative I see here is to flush the CPU caches when syncing for
+>> >> the device, and invalidate them for the other direction. Of course if the
+>> >> device has caches on its side as well the opposite operation must also be
+>> >> done for it. Guess the only way is to handle it all by ourselves here. :/
+>> > ... and it really sucks. Basically if we cannot use the DMA API here
+>> > we will lose the convenience of having a portable API that does just
+>> > the right thing for the underlying platform. Without it we would have
+>> > to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
+>> > have support for ARM.
+>> >
+>> > The usage of the DMA API that we are doing might be illegal, but in
+>> > essence it does exactly what we need - at least for ARM. What are the
+>> > alternatives?
+>> Convert TTM to use the dma api? :-)
 >
-> MMC_CARD_POWERED? I didn't know why it needs.
+> Actually TTM already has a page alloc backend using the DMA API. It's
+> just not used for the standard case right now.
+>
+> I would argue that we should just use this page allocator (which has the
+> side effect of getting pages from CMA if available -> you are actually
+> free to change the caching) and do away with the other allocator in the
+> ARM case.
 
-I think the idea was to make sure that regulator enables/disables were
-balanced.  ...but if the mmc core does this for us then we probably
-don't need to worry.
+CMA comes with its own set of (severe) limitations though, in
+particular it's not possible to map arbitrary CPU pages into the GPU
+without incurring a copy, you add arbitrary memory limits etc. Overall
+that's not really a good pick for the long term...
 
-
->>> +               }
->>
->> As per below, I'm not sure why you'd want to turn on vqmmc and vmmc at
->> different times.
-> In my case, in order to prevent the H/W mis-operation, it turns on vqmmc and vmmc at different times.
-
-OK!  Can you explain more?  What instance is one powered but not the other?
-
-I know that we talked to an SD Card manufacturer who told us that
-powering their IO lines without their main power rail was a bad thing
-(and we in fact saw this causing problems on SD cards).  I would guess
-that means that you're either powering vmmc before vqmmc or that vqmmc
-somehow doesn't directly enable pullups for IO lines.
-
-If you need vmmc before vqmmc then I'm curious about why...
-
--Doug
+St?phane
