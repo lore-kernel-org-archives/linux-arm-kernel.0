@@ -1,62 +1,28 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 25 Jun 2014 09:39:20 -0700
-Subject: [PATCH v3] i2c: exynos5: Properly use the "noirq" variants of
- suspend/resume
-Message-ID: <1403714360-7581-1-git-send-email-dianders@chromium.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 25 Jun 2014 12:40:45 -0400
+Subject: [PATCH v8 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <CALdTtnvHt5mYMC3619E4F3KK0jPOw7mCpKE6bTn0Um6fdZ4rbw@mail.gmail.com>
+References: <1403306296-26198-1-git-send-email-isubramanian@apm.com>
+ <1403306296-26198-5-git-send-email-isubramanian@apm.com>
+ <CALdTtnvHt5mYMC3619E4F3KK0jPOw7mCpKE6bTn0Um6fdZ4rbw@mail.gmail.com>
+Message-ID: <1403714445.755.112.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original code for the exynos i2c controller registered for the
-"noirq" variants.  However during review feedback it was moved to
-SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
-longer actually "noirq" (despite functions named
-exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
+On Tue, 2014-06-24 at 22:29 -0600, Dann Frazier wrote:
+> On Fri, Jun 20, 2014 at 5:18 PM, Iyappan Subramanian
+> > +       ring->desc_addr = dma_zalloc_coherent(dev, size, &ring->dma,
+> > +                                             GFP_KERNEL);
+> 
+> Iyappan,
+> When testing this driver on a 3.16-rc2 base, I'm finding that
+> desc_addr gets assigned to NULL here, which results in an oops later
+> on (see below).
+> 
+> I wasn't seeing this before (3.15 base), so I'm guessing something
+> changed upstream, or in my config, to change this behavior. But it
+> does illuminate a place where we could maybe use some better error
+> handling (also see below).
 
-i2c controllers that might have wakeup sources on them seem to need to
-resume at noirq time so that the individual drivers can actually read
-the i2c bus to handle their wakeup.
-
-NOTE: I took the original review feedback from Wolfram and added
-poweroff, thaw, freeze, restore.
-
-This patch has only been compile-tested since I don't have all the
-patches needed to make my machine using this i2c driver actually
-suspend/resume.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
----
-Changes in v3:
-- Made the structure static.
-
-Changes in v2:
-- Added missing CONFIG_PM_SLEEP
-
- drivers/i2c/busses/i2c-exynos5.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
-index 63d2292..f9447a4 100644
---- a/drivers/i2c/busses/i2c-exynos5.c
-+++ b/drivers/i2c/busses/i2c-exynos5.c
-@@ -789,8 +789,16 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
- }
- #endif
- 
--static SIMPLE_DEV_PM_OPS(exynos5_i2c_dev_pm_ops, exynos5_i2c_suspend_noirq,
--			 exynos5_i2c_resume_noirq);
-+static const struct dev_pm_ops exynos5_i2c_dev_pm_ops = {
-+#ifdef CONFIG_PM_SLEEP
-+	.suspend_noirq = exynos5_i2c_suspend_noirq,
-+	.resume_noirq = exynos5_i2c_resume_noirq,
-+	.freeze_noirq = exynos5_i2c_suspend_noirq,
-+	.thaw_noirq = exynos5_i2c_resume_noirq,
-+	.poweroff_noirq = exynos5_i2c_suspend_noirq,
-+	.restore_noirq = exynos5_i2c_resume_noirq,
-+#endif
-+};
- 
- static struct platform_driver exynos5_i2c_driver = {
- 	.probe		= exynos5_i2c_probe,
--- 
-2.0.0.526.g5318336
+https://lkml.org/lkml/2014/6/23/10
