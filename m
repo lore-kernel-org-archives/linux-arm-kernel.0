@@ -1,76 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 25 Jun 2014 20:13:10 +0900
-Subject: [PATCH v2] i2c: exynos5: Properly use the "noirq" variants of
- suspend/resume
-In-Reply-To: <1403654093-24134-1-git-send-email-dianders@chromium.org>
-References: <1403654093-24134-1-git-send-email-dianders@chromium.org>
-Message-ID: <02e701cf9066$7332b280$59981780$@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 25 Jun 2014 13:11:20 +0200
+Subject: [PATCH] arm/arm64: DT: Fix GICv2 CPU interface size
+In-Reply-To: <1403692675-26503-1-git-send-email-marc.zyngier@arm.com>
+References: <1403692675-26503-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140625111119.GA21208@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson wrote:
+On Wed, Jun 25, 2014 at 11:37:54AM +0100, Marc Zyngier wrote:
+> All the Cortex-{A7,A15} implementations are using a GICv2. Same for
+> the current arm64 platforms.
 > 
-> The original code for the exynos i2c controller registered for the
-> "noirq" variants.  However during review feedback it was moved to
-> SIMPLE_DEV_PM_OPS without anyone noticing that it meant we were no
-> longer actually "noirq" (despite functions named
-> exynos5_i2c_suspend_noirq and exynos5_i2c_resume_noirq).
+> Turns out that most of these platforms have described their GIC CPU
+> interface size as being 4kB. while it is actually 8kB (the GICC_DIR
+> register lives at offset 0x1000).
 > 
-> i2c controllers that might have wakeup sources on them seem to need to
-> resume at noirq time so that the individual drivers can actually read
-> the i2c bus to handle their wakeup.
+> This was found when converting the GIC driver to use EOImode==1 on
+> GICv2-based systems. It uses the GICC_DIR register, and the result
+> is a very early firework...
 > 
-> NOTE: I took the original review feedback from Wolfram and added
-> poweroff, thaw, freeze, restore.
-> 
-Yeah I'm not sure except .suspend_noirq and .resume_noirq but I'm fine if
-Wolfram suggested ;-)
-
-> This patch has only been compile-tested since I don't have all the
-> patches needed to make my machine using this i2c driver actually
-> suspend/resume.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> Changes in v2:
-> - Added missing CONFIG_PM_SLEEP
-> 
->  drivers/i2c/busses/i2c-exynos5.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-
-> exynos5.c
-> index 63d2292..348b1cd 100644
-> --- a/drivers/i2c/busses/i2c-exynos5.c
-> +++ b/drivers/i2c/busses/i2c-exynos5.c
-> @@ -789,8 +789,16 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
->  }
->  #endif
-> 
-> -static SIMPLE_DEV_PM_OPS(exynos5_i2c_dev_pm_ops, exynos5_i2c_suspend_noirq,
-> -			 exynos5_i2c_resume_noirq);
-> +const struct dev_pm_ops exynos5_i2c_dev_pm_ops = {
+>  arch/arm/boot/dts/axm55xx.dtsi              | 2 +-
+>  arch/arm/boot/dts/dra7.dtsi                 | 2 +-
+>  arch/arm/boot/dts/ecx-2000.dts              | 2 +-
+>  arch/arm/boot/dts/exynos3250.dtsi           | 2 +-
+>  arch/arm/boot/dts/exynos5.dtsi              | 2 +-
+>  arch/arm/boot/dts/exynos5260.dtsi           | 2 +-
+>  arch/arm/boot/dts/exynos5410.dtsi           | 2 +-
+>  arch/arm/boot/dts/exynos5440.dtsi           | 2 +-
+>  arch/arm/boot/dts/omap5.dtsi                | 2 +-
+>  arch/arm/boot/dts/r8a73a4.dtsi              | 2 +-
+>  arch/arm/boot/dts/r8a7790.dtsi              | 2 +-
+>  arch/arm/boot/dts/r8a7791.dtsi              | 2 +-
+>  arch/arm/boot/dts/sun6i-a31.dtsi            | 2 +-
+>  arch/arm/boot/dts/sun7i-a20.dtsi            | 2 +-
+>  arch/arm/boot/dts/tegra114.dtsi             | 2 +-
+>  arch/arm/boot/dts/tegra124.dtsi             | 2 +-
+>  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts | 2 +-
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  | 2 +-
+>  arch/arm64/boot/dts/apm-storm.dtsi          | 2 +-
+>  arch/arm64/boot/dts/foundation-v8.dts       | 2 +-
+>  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts      | 2 +-
+>  21 files changed, 21 insertions(+), 21 deletions(-)
 
-Maybe static const struct...?
+For the Tegra114 and Tegra124 patches:
 
-> +#ifdef CONFIG_PM_SLEEP
-> +	.suspend_noirq = exynos5_i2c_suspend_noirq,
-> +	.resume_noirq = exynos5_i2c_resume_noirq,
-> +	.freeze_noirq = exynos5_i2c_suspend_noirq,
-> +	.thaw_noirq = exynos5_i2c_resume_noirq,
-> +	.poweroff_noirq = exynos5_i2c_suspend_noirq,
-> +	.restore_noirq = exynos5_i2c_resume_noirq,
-> +#endif
-> +};
-> 
->  static struct platform_driver exynos5_i2c_driver = {
->  	.probe		= exynos5_i2c_probe,
-> --
-> 2.0.0.526.g5318336
-
-Others look good to me,
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks,
-Kukjin
+Tested-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140625/e2c028e3/attachment-0001.sig>
