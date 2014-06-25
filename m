@@ -1,52 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 25 Jun 2014 12:21:36 +0200
-Subject: [PATCH 0/6] ARM: at91: more clocks fixes for 3.16
-In-Reply-To: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1403023308-20533-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <53AAA2B0.1070103@atmel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 25 Jun 2014 19:24:57 +0900
+Subject: [PATCH] ARM: dts: update mmc node with hs-200 mode
+In-Reply-To: <1403689886-14573-1-git-send-email-yuvaraj.cd@samsung.com>
+References: <1403689886-14573-1-git-send-email-yuvaraj.cd@samsung.com>
+Message-ID: <01ed01cf905f$b6b21250$241636f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/2014 18:41, Alexandre Belloni :
-> Hi,
+Yuvaraj Kumar C D wrote:
 > 
-> This patch set fixes more issues with the clocks on AT91:
++ Doug
+
+Hi,
+
+> This patch updates hs-200 device tree property from
+> caps2-mmc-hs200-1.8v to mmc-hs200-1.8v for peach-pit
+> and peach-pi boards.
 > 
-> The first patch define the slow crystal on the at91sam9261ek board
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+
+Already I've queued same patch into my local but waiting for dependencies for
+push to my tree in git.kernel.org:
+
+http://www.spinics.net/lists/arm-kernel/msg341198.html
+
+Thanks,
+Kukjin
+
+> ---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    2 +-
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> The next patchs are moving all the clocks that were under the root under a
-> "clocks" node to be consistent accross all architecture.
-> 
-> Alexandre Belloni (6):
->   ARM: at91/dt: define sam9261ek slow crystal frequency
->   ARM: at91/dt: sam9261 crystals under the clocks node
->   ARM: at91/dt: sam9n12 crystals under the clocks node
->   ARM: at91/dt: sam9rl crystals under the clocks node
->   ARM: at91/dt: sam9x5 crystals under the clocks node
->   ARM: at91/dt: sama5d3 crystals under the clocks node
-
-On the whole series:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-And stacked on 3.16-fixes branch.
-
-Best regards,
-
-
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 12 +++++++-----
->  arch/arm/boot/dts/at91sam9261.dtsi          | 20 ++++++++++---------
->  arch/arm/boot/dts/at91sam9261ek.dts         | 12 ++++++++----
->  arch/arm/boot/dts/at91sam9n12.dtsi          | 20 ++++++++++---------
->  arch/arm/boot/dts/at91sam9n12ek.dts         | 16 +++++++--------
->  arch/arm/boot/dts/at91sam9rl.dtsi           | 22 ++++++++++-----------
->  arch/arm/boot/dts/at91sam9rlek.dts          | 17 ++++++++--------
->  arch/arm/boot/dts/at91sam9x5.dtsi           | 30 +++++++++++++++--------------
->  arch/arm/boot/dts/at91sam9x5cm.dtsi         | 12 +++++++-----
->  arch/arm/boot/dts/sama5d3.dtsi              | 22 ++++++++++-----------
->  arch/arm/boot/dts/sama5d3xcm.dtsi           | 12 +++++++-----
->  11 files changed, 105 insertions(+), 90 deletions(-)
-> 
-
-
--- 
-Nicolas Ferre
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-
+> peach-pit.dts
+> index 1cf9df0..056a6fa 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -186,7 +186,7 @@
+>  	status = "okay";
+>  	num-slots = <1>;
+>  	broken-cd;
+> -	caps2-mmc-hs200-1_8v;
+> +	mmc-hs200-1_8v;
+>  	supports-highspeed;
+>  	non-removable;
+>  	card-detect-delay = <200>;
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-
+> peach-pi.dts
+> index 2c2c137..bb3ee76 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -171,7 +171,7 @@
+>  	status = "okay";
+>  	num-slots = <1>;
+>  	broken-cd;
+> -	caps2-mmc-hs200-1_8v;
+> +	mmc-hs200-1_8v;
+>  	supports-highspeed;
+>  	non-removable;
+>  	card-detect-delay = <200>;
+> --
+> 1.7.10.4
