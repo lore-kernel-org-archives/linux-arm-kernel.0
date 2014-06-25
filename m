@@ -1,38 +1,44 @@
-From: eballetbo@iseebcn.com (Enric Balletbo i Serra)
-Date: Wed, 25 Jun 2014 13:42:05 +0200
-Subject: [PATCH] ARM: dts: Fix TI CPSW Phy mode selection on IGEP COM AQUILA.
-Message-ID: <1403696525-10099-1-git-send-email-eballetbo@iseebcn.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 25 Jun 2014 20:43:22 +0900
+Subject: [PATCH v2 Resend 1/2] ARM: EXYNOS: Update secondary boot addr for
+ secure mode
+In-Reply-To: <CAK5sBcETe20PWRV+z5Gb=hQNk13wE0PbmcvEmC9TM6nD2mi=ew@mail.gmail.com>
+References: <1401250382-24046-1-git-send-email-sachin.kamat@linaro.org>
+ <5388CBB9.1050003@suse.de>
+ <CAK5sBcETe20PWRV+z5Gb=hQNk13wE0PbmcvEmC9TM6nD2mi=ew@mail.gmail.com>
+Message-ID: <03f301cf906a$ab25d470$01717d50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As this board use external clock for RMII interface we should specify 'rmii'
-phy mode and 'rmii-clock-ext' to make ethernet working.
+Sachin Kamat wrote:
+> 
+> On Fri, May 30, 2014 at 11:49 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> > Am 28.05.2014 06:13, schrieb Sachin Kamat:
+> >> Almost all Exynos-series of SoCs that run in secure mode don't need
+> >> additional offset for every CPU, with Exynos4412 being the only
+> >> exception.
+> >>
+> >> Tested on Origen-Quad (Exynos4412) and Arndale-Octa (Exynos5420).
+> >>
+> >> While at it, fix the coding style (space around *).
+> >>
+> >> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> >> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> >> ---
+> >>  arch/arm/mach-exynos/firmware.c |    9 +++++++--
+> >>  1 file changed, 7 insertions(+), 2 deletions(-)
+> >
+> > Fixes ODROID-XU (Exynos5410) as well - thought it had been a prereq to
+> > applying the 5410 patches...
+> >
+> > Tested-by: Andreas F?rber <afaerber@suse.de>
+> >
+> 
+> Kukjin, this patch is required to bring up 4 A15 cores on some 5410
+> and 5420 based
+> boards. Can you please queue this up for the upcoming rc as fixes?
 
-Signed-off-by: Enric Balletbo i Serra <eballetbo@iseebcn.com>
----
- arch/arm/boot/dts/am335x-igep0033.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Sure, I will take this into fixes.
 
-diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-index 8a0a72d..a1a0cc5 100644
---- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-@@ -105,10 +105,16 @@
- 
- &cpsw_emac0 {
- 	phy_id = <&davinci_mdio>, <0>;
-+	phy-mode = "rmii";
- };
- 
- &cpsw_emac1 {
- 	phy_id = <&davinci_mdio>, <1>;
-+	phy-mode = "rmii";
-+};
-+
-+&phy_sel {
-+	rmii-clock-ext;
- };
- 
- &elm {
--- 
-1.9.1
+Thanks,
+Kukjin
