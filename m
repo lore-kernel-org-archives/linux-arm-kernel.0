@@ -1,43 +1,112 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 24 Jun 2014 20:04:49 -0500
-Subject: [PATCH 3/9] ARM: dts: AM4372: Correct mailbox node data
-In-Reply-To: <1403658295-54766-1-git-send-email-s-anna@ti.com>
-References: <1403658295-54766-1-git-send-email-s-anna@ti.com>
-Message-ID: <1403658295-54766-4-git-send-email-s-anna@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 24 Jun 2014 18:05:29 -0700
+Subject: [PATCH v2] sched: Fix compiler warnings
+Message-ID: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mailbox DT node for AM4372 has been corrected to include
-the correct compatible flag, and remove the other properties
-that have crept in by mistake.
+Commit 143e1e28cb (sched: Rework sched_domain topology definition)
+introduced a number of functions with a return value of 'const int'.
+gcc doesn't know what to do with that and, if the kernel is compiled
+with W=1, complains with the following warnings whenever sched.h
+is included.
 
-Fixes: 9e3269b (ARM: dts: AM4372: Add L2, EDMA, mailbox, MMC and SHAM nodes)
-Cc: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
+include/linux/sched.h:875:25: warning:
+	type qualifiers ignored on function return type
+include/linux/sched.h:882:25: warning:
+	type qualifiers ignored on function return type
+include/linux/sched.h:889:25: warning:
+	type qualifiers ignored on function return type
+include/linux/sched.h:1002:21: warning:
+	type qualifiers ignored on function return type
+
+Commits fb2aa855 (sched, ARM: Create a dedicated scheduler topology table)
+and 607b45e9a (sched, powerpc: Create a dedicated topology table) introduce
+the same warning in the arm and powerpc code.
+
+Drop 'const' from the function declarations to fix the problem.
+
+The fix for all three patches has to be applied together to avoid
+compilation failures for the affected architectures.
+
+Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Vincent Guittot <vincent.guittot@linaro.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/arm/boot/dts/am4372.dtsi | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+v2: Fix problem in all affected architectures with a single patch
+    to avoid compilation errors.
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 49fa596..390cbb53 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -162,15 +162,10 @@
- 		};
+ arch/arm/kernel/topology.c | 2 +-
+ arch/powerpc/kernel/smp.c  | 2 +-
+ include/linux/sched.h      | 8 ++++----
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 9d85318..e35d880 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -275,7 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
+ 		cpu_topology[cpuid].socket_id, mpidr);
+ }
  
- 		mailbox: mailbox at 480C8000 {
--			compatible = "ti,omap4-mailbox";
-+			compatible = "ti,am4372-mailbox";
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
--			ti,mbox-num-users = <4>;
--			ti,mbox-num-fifos = <8>;
--			ti,mbox-names = "wkup_m3";
--			ti,mbox-data = <0 0 0 0>;
--			status = "disabled";
- 		};
+-static inline const int cpu_corepower_flags(void)
++static inline int cpu_corepower_flags(void)
+ {
+ 	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
+ }
+diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+index 51a3ff7..1007fb8 100644
+--- a/arch/powerpc/kernel/smp.c
++++ b/arch/powerpc/kernel/smp.c
+@@ -747,7 +747,7 @@ int setup_profiling_timer(unsigned int multiplier)
  
- 		timer1: timer at 44e31000 {
+ #ifdef CONFIG_SCHED_SMT
+ /* cpumask of CPUs with asymetric SMT dependancy */
+-static const int powerpc_smt_flags(void)
++static int powerpc_smt_flags(void)
+ {
+ 	int flags = SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
+ 
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 306f4f0..0376b05 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -872,21 +872,21 @@ enum cpu_idle_type {
+ #define SD_NUMA			0x4000	/* cross-node balancing */
+ 
+ #ifdef CONFIG_SCHED_SMT
+-static inline const int cpu_smt_flags(void)
++static inline int cpu_smt_flags(void)
+ {
+ 	return SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
+ }
+ #endif
+ 
+ #ifdef CONFIG_SCHED_MC
+-static inline const int cpu_core_flags(void)
++static inline int cpu_core_flags(void)
+ {
+ 	return SD_SHARE_PKG_RESOURCES;
+ }
+ #endif
+ 
+ #ifdef CONFIG_NUMA
+-static inline const int cpu_numa_flags(void)
++static inline int cpu_numa_flags(void)
+ {
+ 	return SD_NUMA;
+ }
+@@ -999,7 +999,7 @@ void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms);
+ bool cpus_share_cache(int this_cpu, int that_cpu);
+ 
+ typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
+-typedef const int (*sched_domain_flags_f)(void);
++typedef int (*sched_domain_flags_f)(void);
+ 
+ #define SDTL_OVERLAP	0x01
+ 
 -- 
-2.0.0
+1.9.1
