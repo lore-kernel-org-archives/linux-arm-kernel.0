@@ -1,31 +1,36 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 25 Jun 2014 15:43:54 +0200
-Subject: [PATCH v8 4/9] sched: move no_new_privs into new atomic flags
-In-Reply-To: <1403642893-23107-5-git-send-email-keescook@chromium.org>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <1403642893-23107-5-git-send-email-keescook@chromium.org>
-Message-ID: <20140625134354.GA7892@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Jun 2014 14:50:39 +0100
+Subject: [PATCH v2 0/6] Enable L2 cache support on Exynos4210/4x12 SoCs
+In-Reply-To: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
+References: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
+Message-ID: <20140625135039.GM3705@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24, Kees Cook wrote:
->
-> --- a/include/linux/sched.h
-> +++ b/include/linux/sched.h
-> @@ -1307,8 +1307,7 @@ struct task_struct {
->  				 * execve */
->  	unsigned in_iowait:1;
->
-> -	/* task may not gain privileges */
-> -	unsigned no_new_privs:1;
-> +	unsigned long atomic_flags; /* Flags needing atomic access. */
->
->  	/* Revert to default priority/policy when forking */
->  	unsigned sched_reset_on_fork:1;
+On Wed, Jun 25, 2014 at 03:37:25PM +0200, Tomasz Figa wrote:
+> This series intends to add support for L2 cache on Exynos4 SoCs on boards
+> running under secure firmware, which requires certain initialization steps
+> to be done with help of firmware, as selected registers are writable only
+> from secure mode.
 
-Agreed, personally I like it more than seccomp->flags.
+What I said in my message on June 12th applies to this series.  I'm
+not having the virtual address exposed via the write_sec call.
 
-But probably it would be better to place the new member before/after
-other bitfields to save the space?
+Yes, you need to read other registers in order to use your secure
+firmware implementation.  Let's fix that by providing a better write_sec
+interface so you don't have to read back these registers, rather than
+working around this short-coming.
 
-Oleg.
+That's exactly what I meant when I talked on June 12th about turning
+cache-l2x0.c back into a pile of crap.  You're working around problems
+rather than fixing the underlying issue, as seems to be standard
+platform maintainer behaviour when things like core ARM code is
+concerned.  This is why things devolve over time into piles of crap,
+because platforms just hack around problems rather than fixing the
+root cause of the problem.
+
+So... I'm NAKing the entire series.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
