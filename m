@@ -1,44 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Jun 2014 13:32:31 +0100
-Subject: [PATCH] arm/arm64: DT: Fix GICv2 CPU interface size
-In-Reply-To: <CAL_Jsq+rS3FE8_F-4qdUUTaJ6X9XNFP2d2h7CdU9hDRG0KG9uA@mail.gmail.com>
- (Rob Herring's message of "Wed, 25 Jun 2014 13:21:17 +0100")
-References: <1403692675-26503-1-git-send-email-marc.zyngier@arm.com>
- <CAL_Jsq+rS3FE8_F-4qdUUTaJ6X9XNFP2d2h7CdU9hDRG0KG9uA@mail.gmail.com>
-Message-ID: <86simtjhk0.fsf@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 Jun 2014 14:33:56 +0200
+Subject: [PATCH v3 -next 0/9] CMA: generalize CMA reserved area management
+ code
+In-Reply-To: <20140618135144.297c785260f9e2aebead867c@linux-foundation.org>
+References: <1402897251-23639-1-git-send-email-iamjoonsoo.kim@lge.com>
+ <539EB4C7.3080106@samsung.com> <20140617012507.GA6825@js1304-P5Q-DELUXE>
+ <20140618135144.297c785260f9e2aebead867c@linux-foundation.org>
+Message-ID: <53AAC1B4.5000204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25 2014 at 01:21:17 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Wed, Jun 25, 2014 at 5:37 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> All the Cortex-{A7,A15} implementations are using a GICv2. Same for
->> the current arm64 platforms.
+Hello,
+
+On 2014-06-18 22:51, Andrew Morton wrote:
+> On Tue, 17 Jun 2014 10:25:07 +0900 Joonsoo Kim <iamjoonsoo.kim@lge.com> wrote:
+>>>> v2:
+>>>>    - Although this patchset looks very different with v1, the end result,
+>>>>    that is, mm/cma.c is same with v1's one. So I carry Ack to patch 6-7.
+>>>>
+>>>> This patchset is based on linux-next 20140610.
+>>> Thanks for taking care of this. I will test it with my setup and if
+>>> everything goes well, I will take it to my -next tree. If any branch
+>>> is required for anyone to continue his works on top of those patches,
+>>> let me know, I will also prepare it.
+>> Hello,
 >>
->> Turns out that most of these platforms have described their GIC CPU
->> interface size as being 4kB. while it is actually 8kB (the GICC_DIR
->> register lives at offset 0x1000).
->>
->> This was found when converting the GIC driver to use EOImode==1 on
->> GICv2-based systems. It uses the GICC_DIR register, and the result
->> is a very early firework...
->
-> What's your plan for making the kernel change? Updating the dts files
-> is good, but that doesn't immediately help you if you have old dtbs.
+>> I'm glad to hear that. :)
+>> But, there is one concern. As you already know, I am preparing further
+>> patches (Aggressively allocate the pages on CMA reserved memory). It
+>> may be highly related to MM branch and also slightly depends on this CMA
+>> changes. In this case, what is the best strategy to merge this
+>> patchset? IMHO, Anrew's tree is more appropriate branch. If there is
+>> no issue in this case, I am willing to develope further patches based
+>> on your tree.
+> That's probably easier.  Marek, I'll merge these into -mm (and hence
+> -next and git://git.kernel.org/pub/scm/linux/kernel/git/mhocko/mm.git)
+> and shall hold them pending you review/ack/test/etc, OK?
 
-See at the end of https://lkml.org/lkml/2014/6/25/243
+Ok. I've tested them and they work fine. I'm sorry that you had to wait for
+me for a few days. You can now add:
 
-Basically, we stay with a GICv1 behaviour if we detect the mess.
+Acked-and-tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/boot/dts/axm55xx.dtsi              | 2 +-
->>  arch/arm/boot/dts/dra7.dtsi                 | 2 +-
->>  arch/arm/boot/dts/ecx-2000.dts              | 2 +-
->
-> Acked-by: Rob Herring <robh@kernel.org>
+I've also rebased my pending patches onto this set (I will send them soon).
 
-Thanks,
+The question is now if you want to keep the discussed patches in your 
+-mm tree,
+or should I take them to my -next branch. If you like to keep them, I assume
+you will also take the patches which depends on the discussed changes.
 
-	M.
+Best regards
 -- 
-Jazz is not dead. It just smells funny.
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
