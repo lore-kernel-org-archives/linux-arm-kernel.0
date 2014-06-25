@@ -1,27 +1,20 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Jun 2014 07:12:24 -0700
-Subject: [PATCH 0/4 v2] hwmon: ntc_thermistor: prepose vendor prefix change
-In-Reply-To: <02b501cf9064$34f16b80$9ed44280$@samsung.com>
-References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
- <02b501cf9064$34f16b80$9ed44280$@samsung.com>
-Message-ID: <53AAD8C8.3080506@roeck-us.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Jun 2014 11:13:29 -0300
+Subject: [PATCH v3 3/3] ARM: i.MX25 clk: Use of_clk_init() for DT case
+In-Reply-To: <1403700096-13014-3-git-send-email-denis@eukrea.com>
+References: <1403700096-13014-1-git-send-email-denis@eukrea.com>
+ <1403700096-13014-3-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5CSARSPA2K94pQc6osC+8-4jPZsYvV2bQybCXCASmohSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2014 03:57 AM, Kukjin Kim wrote:
-> Naveen Krishna Chatradhi wrote:
->>
-> + Jean Delvare, Guenter Roeck
->
-> I'm adding maintainers for drivers/hwmon/ntc* but I'm not sure.
->
-> Hi,
->
-> This series looks good to me. I will take 3/4 and 4/4 for exynos DT changes once
-> hwmon/ntc maintainer pick the others.
->
+On Wed, Jun 25, 2014 at 9:41 AM, Denis Carikli <denis@eukrea.com> wrote:
 
-I applied both patches. Currently going through my test cycle.
-I'll send them to Linus Thursday or Friday.
+>  int __init mx25_clocks_init(void)
+>  {
+> -       __mx25_clocks_init(24000000);
+> +       void __iomem *ccm;
+> +
+> +       ccm = ioremap(MX25_CRM_BASE_ADDR, SZ_16K);
 
-Guenter
+Shouldn't the ccm base address be retrieved from dt?
