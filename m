@@ -1,72 +1,81 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 25 Jun 2014 16:40:18 +0100
-Subject: [PATCH 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-Message-ID: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
+Date: Wed, 25 Jun 2014 16:40:23 +0100
+Subject: [PATCH 5/6] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
+References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1403710824-24340-6-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-This series implements general forms of get_user_pages_fast and
-__get_user_pages_fast and activates them for arm and arm64.
+In order to implement fast_get_user_pages we need to ensure that the
+page table walker is protected from page table pages being freed from
+under it.
 
-These are required for Transparent HugePages to function correctly, as
-a futex on a THP tail will otherwise result in an infinite loop (due to
-the core implementation of __get_user_pages_fast always returning 0).
+This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
+to address spaces with multiple users will be call_rcu_sched freed.
+Meaning that disabling interrupts will block the free and protect the
+fast gup page walker.
 
-This series may also be beneficial for direct-IO heavy workloads and
-certain KVM workloads.
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm64/Kconfig           |  1 +
+ arch/arm64/include/asm/tlb.h | 18 ++++++++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
 
-The main changes since RFC V5 are:
- * Rebased against 3.16-rc1.
- * pmd_present no longer tested for by gup_huge_pmd and gup_huge_pud,
-   because the entry must be present for these leaf functions to be
-   called. 
- * Rather than assume puds can be re-cast as pmds, a separate
-   function pud_write is instead used by the core gup.
- * ARM activation logic changed, now it will only activate
-   RCU_TABLE_FREE and RCU_GUP when running with LPAE.
-
-The main changes since RFC V4 are:
- * corrected the arm64 logic so it now correctly rcu-frees page
-   table backing pages.
- * rcu free logic relaxed for pre-ARMv7 ARM as we need an IPI to
-   invalidate TLBs anyway.
- * rebased to 3.15-rc3 (some minor changes were needed to allow it to merge).
- * dropped Catalin's mmu_gather patch as that's been merged already.
-
-This series has been tested with LTP and some custom futex tests that
-exacerbate the futex on THP tail case. Also debug counters were
-temporarily employed to ensure that the RCU_TABLE_FREE logic was
-behaving as expected.
-
-I would really appreciate any testers or comments (especially on the
-validity or otherwise of the core fast_gup implementation).
-
-Cheers,
---
-Steve
-
-Steve Capper (6):
-  mm: Introduce a general RCU get_user_pages_fast.
-  arm: mm: Introduce special ptes for LPAE
-  arm: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm: mm: Enable RCU fast_gup
-  arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm64: mm: Enable RCU fast_gup
-
- arch/arm/Kconfig                      |   5 +
- arch/arm/include/asm/pgtable-2level.h |   2 +
- arch/arm/include/asm/pgtable-3level.h |  16 ++
- arch/arm/include/asm/pgtable.h        |   6 +-
- arch/arm/include/asm/tlb.h            |  38 ++++-
- arch/arm/mm/flush.c                   |  19 +++
- arch/arm64/Kconfig                    |   4 +
- arch/arm64/include/asm/pgtable.h      |  11 +-
- arch/arm64/include/asm/tlb.h          |  18 ++-
- arch/arm64/mm/flush.c                 |  19 +++
- mm/Kconfig                            |   3 +
- mm/gup.c                              | 278 ++++++++++++++++++++++++++++++++++
- 12 files changed, 410 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a474de34..e1d2eef 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -49,6 +49,7 @@ config ARM64
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
+ 	select HAVE_PERF_USER_STACK_DUMP
++	select HAVE_RCU_TABLE_FREE
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select IRQ_DOMAIN
+ 	select MODULES_USE_ELF_RELA
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 80e2c08..8e4dde5 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -23,6 +23,20 @@
+ 
+ #include <asm-generic/tlb.h>
+ 
++#include <linux/pagemap.h>
++#include <linux/swap.h>
++
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++
++#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
++static inline void __tlb_remove_table(void *_table)
++{
++	free_page_and_swap_cache((struct page *)_table);
++}
++#else
++#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
++#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
++
+ /*
+  * There's three ways the TLB shootdown code is used:
+  *  1. Unmapping a range of vmas.  See zap_page_range(), unmap_region().
+@@ -88,7 +102,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ {
+ 	pgtable_page_dtor(pte);
+ 	tlb_add_flush(tlb, addr);
+-	tlb_remove_page(tlb, pte);
++	tlb_remove_entry(tlb, pte);
+ }
+ 
+ #ifndef CONFIG_ARM64_64K_PAGES
+@@ -96,7 +110,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ 				  unsigned long addr)
+ {
+ 	tlb_add_flush(tlb, addr);
+-	tlb_remove_page(tlb, virt_to_page(pmdp));
++	tlb_remove_entry(tlb, virt_to_page(pmdp));
+ }
+ #endif
+ 
 -- 
 1.9.3
