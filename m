@@ -1,79 +1,61 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 25 Jun 2014 13:52:00 -0700
-Subject: [PATCH v5 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
- support
-In-Reply-To: <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1403729520.11749.64.camel@smoke>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 26 Jun 2014 00:53:50 +0400
+Subject: [PATCH 2/4] phy: miphy365x: Add MiPHY365x header file for DT
+ x Driver defines
+In-Reply-To: <1400766819-22286-3-git-send-email-lee.jones@linaro.org>
+References: <1400766819-22286-1-git-send-email-lee.jones@linaro.org>
+ <1400766819-22286-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <53AB36DE.7090908@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hello.
 
-On Wed, 2014-06-25 at 15:10 +0100, Lorenzo Pieralisi wrote:
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+On 05/22/2014 05:53 PM, Lee Jones wrote:
 
-> +	/*
-> +	 * This is belt-and-braces: make sure that if the idle
-> +	 * specified protocol is psci, the cpu_ops have been
-> +	 * initialized to psci operations. Anything else is
-> +	 * a recipe for mayhem.
-> +	 */
-> +	for_each_cpu(cpu, drv->cpumask) {
-> +		cpu_ops_ptr = cpu_ops[cpu];
-> +		if (WARN_ON(!cpu_ops_ptr || strcmp(cpu_ops_ptr->name, "psci")))
-> +			return -EOPNOTSUPP;
-> +	}
+> This provides the shared header file which will be reference from both
+> the MiPHY365x driver and its associated Device Tree node(s).
 
-I'm not sure how drv->cpumask is setup, but if a system has mixed enable
-methods, say some cpus 'spin-table' and some 'psci', will this give a
-false error?
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   include/dt-bindings/phy/phy-miphy365x.h | 25 +++++++++++++++++++++++++
+>   1 file changed, 25 insertions(+)
+>   create mode 100644 include/dt-bindings/phy/phy-miphy365x.h
 
-If drv->cpumask should only include 'psci' cpus, then should this be a
-BUG()?
-
+> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
+> new file mode 100644
+> index 0000000..8757c02
+> --- /dev/null
+> +++ b/include/dt-bindings/phy/phy-miphy365x.h
+> @@ -0,0 +1,25 @@
+> +/*
+> + * This header provides constants for the phy framework
+> + * based on the STMicroelectronics miphy365x.
+> + */
+> +#ifndef _DT_BINDINGS_PHY_MIPHY
+> +#define _DT_BINDINGS_PHY_MIPHY
 > +
-> +	psci_states = kcalloc(drv->state_count, sizeof(*psci_states),
-> +			      GFP_KERNEL);
+> +/* Supports 16 ports without a datatype change (u8 & 0xF0). */
+> +#define MIPHY_PORT_0			0
+> +#define MIPHY_PORT_1			1
+> +#define MIPHY_PORT_2			2
+> +#define MIPHY_PORT_3			3
 > +
-> +	if (!psci_states) {
-> +		pr_warn("psci idle state allocation failed\n");
-> +		return -ENOMEM;
-> +	}
+> +/* Supports 16 types without a datatype change (u8 & 0x0F). */
+> +#define MIPHY_TYPE_SHIFT		4
+> +#define MIPHY_TYPE_SATA			(0 << MIPHY_TYPE_SHIFT)
+> +#define MIPHY_TYPE_PCIE			(1 << MIPHY_TYPE_SHIFT)
+> +#define MIPHY_TYPE_USB			(2 << MIPHY_TYPE_SHIFT)
 > +
-> +	for_each_cpu(cpu, drv->cpumask) {
-> +		if (per_cpu(psci_power_state, cpu)) {
-> +			pr_warn("idle states already initialized on cpu %u\n",
-> +				cpu);
+> +#define MIPHY_SATA_PORT0		(MIPHY_TYPE_SATA) | (MIPHY_PORT_0)
+> +#define MIPHY_SATA_PORT1		(MIPHY_TYPE_SATA) | (MIPHY_PORT_1)
+> +#define MIPHY_PCIE_PORT0		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_0)
+> +#define MIPHY_PCIE_PORT1		(MIPHY_TYPE_PCIE) | (MIPHY_PORT_1)
 
-This seems like an implementation problem, if so, shouldn't this be
-pr_debug()?
+    No need to have parens around macros but you should instead enclose the 
+'|' operator and its arguments into parens.
 
-
->  #endif
->  
-> +#ifdef CONFIG_ARM64_CPU_SUSPEND
-> +static int cpu_psci_cpu_suspend(unsigned long index)
-> +{
-> +	struct psci_power_state *state = __get_cpu_var(psci_power_state);
-> +
-> +	if (!state)
-> +		return -EOPNOTSUPP;
-> +
-> +	return psci_ops.cpu_suspend(state[index], virt_to_phys(cpu_resume));
-> +}
-> +#endif
-
-Why not put a __maybe_unused attribute on cpu_psci_cpu_suspend() and
-remove the preprocessor conditional.  That way this code will always be
-compiled, and with therefor always get a build test.  The linker should
-strip out the unused code when CONFIG_ARM64_CPU_SUSPEND=n and the code
-below is not compiled. 
-
-> +#ifdef CONFIG_ARM64_CPU_SUSPEND
-> +	.cpu_suspend	= cpu_psci_cpu_suspend,
-> +#endif
->  };
-
--Geoff
+WBR, Sergei
