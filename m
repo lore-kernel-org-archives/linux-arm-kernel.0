@@ -1,41 +1,80 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 25 Jun 2014 15:24:34 +0800
-Subject: [RFC PATCH] phy: micrel: make phy_has_fixups attribute read correctly
-Message-ID: <1403681075-16181-1-git-send-email-voice.shen@atmel.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 25 Jun 2014 09:30:20 +0200
+Subject: [PATCH 1/2] ARM: at91/dt: describe rgmii ethernet phy connected
+ to sama5d3xek boards
+In-Reply-To: <53AA735C.7050805@atmel.com>
+References: <1403649878-28242-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403649878-28242-2-git-send-email-boris.brezillon@free-electrons.com>
+ <53AA735C.7050805@atmel.com>
+Message-ID: <53AA7A8C.1010304@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the fixups parameters get from dtb, it won't set has_fixups
-parameters, so when read phy_has_fixups attribute, it always
-present as 0.
-Add this patch to make phy_has_fixups attribute read correctly.
+Hello Bo,
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- drivers/net/phy/micrel.c | 4 ++++
- 1 file changed, 4 insertions(+)
+On 25/06/2014 08:59, Bo Shen wrote:
+> Hi Boris,
+>
+> On 06/25/2014 06:44 AM, Boris BREZILLON wrote:
+>> Add ethernet-phy node to specify phy address (on the MDIO bus) and phy
+>> interrupt (connected to pin PB25).
+>>
+>> Define board specific delays to apply to RGMII signals.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>   arch/arm/boot/dts/sama5d3xcm.dtsi | 16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> index b0b1331..2185ad8 100644
+>> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+>> @@ -34,6 +34,22 @@
+>>
+>>               macb0: ethernet at f0028000 {
+>>                   phy-mode = "rgmii";
+>> +                #address-cells = <1>;
+>> +                #size-cells = <0>;
+>> +
+>> +                ethernet-phy at 1 {
+>
+> The GMAC PHY address is 0x7 while not 0x1.
 
-diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-index bc7c7d2..c384922 100644
---- a/drivers/net/phy/micrel.c
-+++ b/drivers/net/phy/micrel.c
-@@ -237,6 +237,8 @@ static int ksz9021_load_values_from_of(struct phy_device *phydev,
- 
- 	if (!matches)
- 		return 0;
-+	else
-+		phydev->has_fixups = true;
- 
- 	if (matches < 4)
- 		newval = kszphy_extended_read(phydev, reg);
-@@ -330,6 +332,8 @@ static int ksz9031_of_load_skew_values(struct phy_device *phydev,
- 
- 	if (!matches)
- 		return 0;
-+	else
-+		phydev->has_fixups = true;
- 
- 	if (matches < numfields)
- 		newval = ksz9031_extended_read(phydev, OP_DATA, 2, reg);
+Are you sure of that ? I checked sama5d3x-ek schematics.
+On these schematics PHYAD0 is connected to a pull up resistor and
+PHYAD1/2 are connected to a pull down one.
+This gives PHYAD[4:0] = 0b00001 = 0x1.
+Is there some bootloader mechanisms that changes PHYAD[0-2] pin status
+and reset the PHY ?
+
+>
+>> +                    interrupt-parent = <&pioB>;
+>> +                    interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
+>> +                    reg = <1>;
+>
+> Nitpick: as usual, we will add "0x" prefix in reg property.
+
+Sure, I'll fix that.
+
+>
+>> +                    txen-skew-ps = <800>;
+>> +                    txc-skew-ps = <12000>;
+
+Should be 3000 (0xf * 200 ps) not 12000.
+
+>> +                    rxdv-skew-ps = <400>;
+>> +                    rxc-skew-ps = <12000>;
+
+Ditto.
+
+Best Regards,
+
+Boris
+
+
 -- 
-1.8.5.2
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
