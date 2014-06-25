@@ -1,258 +1,229 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Jun 2014 15:10:18 +0100
-Subject: [PATCH v5 5/8] drivers: cpuidle: CPU idle ARM64 driver
+Date: Wed, 25 Jun 2014 15:10:19 +0100
+Subject: [PATCH v5 6/8] drivers: cpuidle: initialize big.LITTLE driver through
+ DT
 In-Reply-To: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1403705421-17597-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1403705421-17597-7-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements a generic CPU idle driver for ARM64 machines.
+With the introduction of DT based idle states, CPUidle drivers for ARM
+can now initialize idle states data through properties in the device tree.
 
-It relies on the DT idle states infrastructure to initialize idle
-states count and respective parameters. Current code assumes the driver
-is managing idle states on all possible CPUs but can be easily
-generalized to support heterogenous systems and build cpumasks at
-runtime using MIDRs or DT cpu nodes compatible properties.
+This patch adds code to the big.LITTLE CPUidle driver to dynamically
+initialize idle states data through the updated device tree source file.
 
-Suspend back-ends (eg PSCI) must register a suspend initializer with
-the CPU idle driver so that the suspend backend call can be detected,
-and the driver code can call the back-end infrastructure to complete the
-suspend backend initialization.
-
-Idle state index 0 is always initialized as a simple wfi state, ie always
-considered present and functional on all ARM64 platforms.
-
+Cc: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/cpuidle/Kconfig         |   5 ++
- drivers/cpuidle/Kconfig.arm64   |  13 ++++
- drivers/cpuidle/Makefile        |   4 +
- drivers/cpuidle/cpuidle-arm64.c | 165 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 187 insertions(+)
- create mode 100644 drivers/cpuidle/Kconfig.arm64
- create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+ Documentation/devicetree/bindings/arm/vexpress.txt | 25 +++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         | 25 +++++++++++++
+ drivers/cpuidle/Kconfig.arm                        |  1 +
+ drivers/cpuidle/cpuidle-big_little.c               | 43 +++++++++++-----------
+ 4 files changed, 73 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index 414e7a96..ebf0c2e 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -43,6 +43,11 @@ depends on ARM
- source "drivers/cpuidle/Kconfig.arm"
- endmenu
+diff --git a/Documentation/devicetree/bindings/arm/vexpress.txt b/Documentation/devicetree/bindings/arm/vexpress.txt
+index 39844cd..7f52ac8 100644
+--- a/Documentation/devicetree/bindings/arm/vexpress.txt
++++ b/Documentation/devicetree/bindings/arm/vexpress.txt
+@@ -67,6 +67,28 @@ with device_type = "cpu" property for every available core, eg.:
+ 		};
+ 	};
  
-+menu "ARM64 CPU Idle Drivers"
-+depends on ARM64
-+source "drivers/cpuidle/Kconfig.arm64"
-+endmenu
++idle-states node
++----------------
 +
- menu "MIPS CPU Idle Drivers"
- depends on MIPS
- source "drivers/cpuidle/Kconfig.mips"
-diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
-new file mode 100644
-index 0000000..5fc5522
---- /dev/null
-+++ b/drivers/cpuidle/Kconfig.arm64
-@@ -0,0 +1,13 @@
-+#
-+# ARM64 CPU Idle drivers
-+#
++On Versatile Express platforms with power management capabilities, the device
++tree source file must contain the idle-states node[1]. As defined in [1] the
++idle-states node must contain an entry-method property that for Versatile
++Express platforms can be one of:
 +
-+config ARM64_CPUIDLE
-+	bool "Generic ARM64 CPU idle Driver"
++	- "arm,vexpress-v2p-ca15_a7"
++
++Versatile Express idle-states nodes example:
++
++	idle-states {
++		entry-method = "arm,vexpress-v2p-ca15_a7";
++
++		cluster-sleep-0 {
++			compatible = "arm,idle-state";
++			entry-latency-us = <1000>;
++			exit-latency-us = <700>;
++			min-residency-us = <3500>;
++		};
++	};
+ 
+ Configuration infrastructure
+ ----------------------------
+@@ -227,3 +249,6 @@ Example of a VE tile description (simplified)
+ 	};
+ };
+ 
++
++[1] ARM Linux Kernel documentation - Idle states bindings
++    Documentation/devicetree/bindings/arm/idle-states.txt
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index a25c262..ad28242 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -33,11 +33,32 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
++		idle-states {
++			entry-method = "arm,vexpress-v2p-ca15_a7";
++
++			CLUSTER_SLEEP_BIG: cluster-sleep-big {
++				compatible = "arm,idle-state";
++				power-rank = <0>;
++				entry-latency-us = <1000>;
++				exit-latency-us = <700>;
++				min-residency-us = <3500>;
++			};
++
++			CLUSTER_SLEEP_LITTLE: cluster-sleep-little {
++				compatible = "arm,idle-state";
++				power-rank = <0>;
++				entry-latency-us = <1000>;
++				exit-latency-us = <500>;
++				min-residency-us = <3000>;
++			};
++		};
++
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 			cci-control-port = <&cci_control1>;
++			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -45,6 +66,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <1>;
+ 			cci-control-port = <&cci_control1>;
++			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -52,6 +74,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
+ 			cci-control-port = <&cci_control2>;
++			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -59,6 +82,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x101>;
+ 			cci-control-port = <&cci_control2>;
++			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
+ 		};
+ 
+ 		cpu4: cpu at 4 {
+@@ -66,6 +90,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x102>;
+ 			cci-control-port = <&cci_control2>;
++			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
+ 		};
+ 	};
+ 
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index b6d69e8..a9b089c 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -12,6 +12,7 @@ config ARM_BIG_LITTLE_CPUIDLE
+ 	depends on ARCH_VEXPRESS_TC2_PM
+ 	select ARM_CPU_SUSPEND
+ 	select CPU_IDLE_MULTIPLE_DRIVERS
 +	select DT_IDLE_STATES
-+	help
-+	  Select this to enable generic cpuidle driver for ARM v8.
-+	  It provides a generic idle driver whose idle states are configured
-+	  at run-time through DT nodes. The CPUidle suspend backend is
-+	  initialized by the device tree parsing code on matching the entry
-+	  method to the respective CPU operations.
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index b27a062..706cb7f 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -23,6 +23,10 @@ obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
- obj-$(CONFIG_MIPS_CPS_CPUIDLE)		+= cpuidle-cps.o
+ 	help
+ 	  Select this option to enable CPU idle driver for big.LITTLE based
+ 	  ARM systems. Driver manages CPUs coordination through MCPM and
+diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
+index b45fc62..6712441 100644
+--- a/drivers/cpuidle/cpuidle-big_little.c
++++ b/drivers/cpuidle/cpuidle-big_little.c
+@@ -24,6 +24,8 @@
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
  
- ###############################################################################
-+# ARM64 drivers
-+obj-$(CONFIG_ARM64_CPUIDLE)		+= cpuidle-arm64.o
-+
-+###############################################################################
- # POWERPC drivers
- obj-$(CONFIG_PSERIES_CPUIDLE)		+= cpuidle-pseries.o
- obj-$(CONFIG_POWERNV_CPUIDLE)		+= cpuidle-powernv.o
-diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-new file mode 100644
-index 0000000..e966a40
---- /dev/null
-+++ b/drivers/cpuidle/cpuidle-arm64.c
-@@ -0,0 +1,165 @@
-+/*
-+ * ARM64 generic CPU idle driver.
-+ *
-+ * Copyright (C) 2014 ARM Ltd.
-+ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define pr_fmt(fmt) "CPUidle arm64: " fmt
-+
-+#include <linux/cpuidle.h>
-+#include <linux/cpumask.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+
-+#include <asm/psci.h>
-+#include <asm/suspend.h>
-+
 +#include "dt_idle_states.h"
 +
-+typedef int (*suspend_init_fn)(struct cpuidle_driver *,
-+			       struct device_node *[]);
-+
-+struct cpu_suspend_ops {
-+	const char *id;
-+	suspend_init_fn init_fn;
-+};
-+
-+static const struct cpu_suspend_ops suspend_operations[] __initconst = {
-+	{"arm,psci", psci_dt_register_idle_states},
-+	{}
-+};
-+
-+static __init const struct cpu_suspend_ops *get_suspend_ops(const char *str)
-+{
-+	int i;
-+
-+	if (!str)
-+		return NULL;
-+
-+	for (i = 0; suspend_operations[i].id; i++)
-+		if (!strcmp(suspend_operations[i].id, str))
-+			return &suspend_operations[i];
-+
-+	return NULL;
-+}
-+
-+/*
-+ * arm_enter_idle_state - Programs CPU to enter the specified state
-+ *
-+ * dev: cpuidle device
-+ * drv: cpuidle driver
-+ * idx: state index
-+ *
-+ * Called from the CPUidle framework to program the device to the
-+ * specified target state selected by the governor.
-+ */
-+static int arm_enter_idle_state(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv, int idx)
-+{
-+	int ret;
-+
-+	if (!idx) {
-+		cpu_do_idle();
-+		return idx;
-+	}
-+
-+	ret = cpu_pm_enter();
-+	if (!ret) {
-+		/*
-+		 * Pass idle state index to cpu_suspend which in turn will
-+		 * call the CPU ops suspend protocol with idle index as a
-+		 * parameter.
-+		 */
-+		ret = cpu_suspend(idx);
-+
-+		cpu_pm_exit();
-+	}
-+
-+	return ret ? -1 : idx;
-+}
-+
-+struct cpuidle_driver arm64_idle_driver = {
-+	.name = "arm64_idle",
-+	.owner = THIS_MODULE,
-+};
-+
-+static struct device_node *state_nodes[CPUIDLE_STATE_MAX] __initdata;
-+
-+/*
-+ * arm64_idle_init
-+ *
-+ * Registers the arm64 specific cpuidle driver with the cpuidle
-+ * framework. It relies on core code to parse the idle states
-+ * and initialize them using driver data structures accordingly.
-+ */
-+static int __init arm64_idle_init(void)
-+{
-+	int i, ret;
-+	const char *entry_method;
-+	struct device_node *idle_states_node;
-+	const struct cpu_suspend_ops *suspend_init;
-+	struct cpuidle_driver *drv = &arm64_idle_driver;
-+
-+	idle_states_node = of_find_node_by_path("/cpus/idle-states");
-+	if (!idle_states_node)
-+		return -ENOENT;
-+
-+	if (of_property_read_string(idle_states_node, "entry-method",
-+				    &entry_method)) {
-+		pr_warn(" * %s missing entry-method property\n",
-+			    idle_states_node->full_name);
-+		of_node_put(idle_states_node);
-+		ret = -EOPNOTSUPP;
-+		goto put_node;
-+	}
-+
-+	suspend_init = get_suspend_ops(entry_method);
-+	if (!suspend_init) {
-+		pr_warn("Missing suspend initializer\n");
-+		ret = -EOPNOTSUPP;
-+		goto put_node;
-+	}
-+
-+	/*
-+	 * State at index 0 is standby wfi and considered standard
-+	 * on all ARM platforms. If in some platforms simple wfi
-+	 * can't be used as "state 0", DT bindings must be implemented
-+	 * to work around this issue and allow installing a special
-+	 * handler for idle state index 0.
-+	 */
-+	drv->states[0].exit_latency = 1;
-+	drv->states[0].target_residency = 1;
-+	drv->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
-+	strncpy(drv->states[0].name, "ARM WFI", CPUIDLE_NAME_LEN);
-+	strncpy(drv->states[0].desc, "ARM WFI", CPUIDLE_DESC_LEN);
-+
-+	drv->cpumask = (struct cpumask *) cpu_possible_mask;
-+	/*
-+	 * Start at index 1, request idle state nodes to be filled
-+	 */
-+	ret = dt_init_idle_driver(drv, state_nodes, 1, true);
+ static int bl_enter_powerdown(struct cpuidle_device *dev,
+ 			      struct cpuidle_driver *drv, int idx);
+ 
+@@ -61,32 +63,12 @@ static struct cpuidle_driver bl_idle_little_driver = {
+ 	.name = "little_idle",
+ 	.owner = THIS_MODULE,
+ 	.states[0] = ARM_CPUIDLE_WFI_STATE,
+-	.states[1] = {
+-		.enter			= bl_enter_powerdown,
+-		.exit_latency		= 700,
+-		.target_residency	= 2500,
+-		.flags			= CPUIDLE_FLAG_TIME_VALID |
+-					  CPUIDLE_FLAG_TIMER_STOP,
+-		.name			= "C1",
+-		.desc			= "ARM little-cluster power down",
+-	},
+-	.state_count = 2,
+ };
+ 
+ static struct cpuidle_driver bl_idle_big_driver = {
+ 	.name = "big_idle",
+ 	.owner = THIS_MODULE,
+ 	.states[0] = ARM_CPUIDLE_WFI_STATE,
+-	.states[1] = {
+-		.enter			= bl_enter_powerdown,
+-		.exit_latency		= 500,
+-		.target_residency	= 2000,
+-		.flags			= CPUIDLE_FLAG_TIME_VALID |
+-					  CPUIDLE_FLAG_TIMER_STOP,
+-		.name			= "C1",
+-		.desc			= "ARM big-cluster power down",
+-	},
+-	.state_count = 2,
+ };
+ 
+ /*
+@@ -165,7 +147,8 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
+ 
+ static int __init bl_idle_init(void)
+ {
+-	int ret;
++	int ret, i;
++	struct cpuidle_driver *drv;
+ 
+ 	/*
+ 	 * Initialize the driver just for a compliant set of machines
+@@ -187,6 +170,24 @@ static int __init bl_idle_init(void)
+ 	if (ret)
+ 		goto out_uninit_little;
+ 
++	 /* Start at index 1, index 0 standard WFI */
++	ret = dt_init_idle_driver(&bl_idle_big_driver, NULL, 1, false);
 +	if (ret)
-+		goto put_node;
++		goto out_uninit_big;
 +
-+	if (suspend_init->init_fn(drv, state_nodes)) {
-+		ret = -EOPNOTSUPP;
-+		goto put_node;
-+	}
++	 /* Start at index 1, index 0 standard WFI */
++	ret = dt_init_idle_driver(&bl_idle_little_driver, NULL, 1, false);
++	if (ret)
++		goto out_uninit_big;
 +
-+	for (i = 0; i < drv->state_count; i++)
-+		drv->states[i].enter = arm_enter_idle_state;
++	drv = &bl_idle_big_driver;
++	for (i = 1; i < drv->state_count; i++)
++		drv->states[i].enter = bl_enter_powerdown;
 +
-+	ret = cpuidle_register(drv, NULL);
++	drv = &bl_idle_little_driver;
++	for (i = 1; i < drv->state_count; i++)
++		drv->states[i].enter = bl_enter_powerdown;
 +
-+put_node:
-+	of_node_put(idle_states_node);
-+	return ret;
-+}
-+device_initcall(arm64_idle_init);
+ 	ret = cpuidle_register(&bl_idle_little_driver, NULL);
+ 	if (ret)
+ 		goto out_uninit_big;
 -- 
 1.9.1
