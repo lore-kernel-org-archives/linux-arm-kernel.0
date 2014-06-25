@@ -1,103 +1,100 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Jun 2014 10:28:46 +0100
-Subject: [RFC PATCH 5/9] irqchip: GICv3: Convert to EOImode == 1
+Date: Wed, 25 Jun 2014 10:28:47 +0100
+Subject: [RFC PATCH 6/9] irqchip: GICv3: add support for forwarded interrupts
 In-Reply-To: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
 References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1403688530-23273-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1403688530-23273-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, GICv3 has been used in with EOImode == 0. The effect of this
-mode is to perform the priority drop and the deactivation of the
-interrupt at the same time.
+Now that we've switched to EOImode == 1, prevent a forwarded interrupt
+from being deactivated after its priority has been dropped.
 
-While this works perfectly for Linux (we only have a single priority),
-it causes issues when an interrupt is forwarded to a guest, and when
-we want the guest to perform the EOI itself.
-
-For this case, the GIC architecture provides EOImode == 1, where:
-- A write to ICC_EOIR1_EL1 drops the priority of the interrupt and leaves
-it active. Other interrupts at the same priority level can now be taken,
-but the active interrupt cannot be taken again
-- A write to ICC_DIR_EL1 marks the interrupt as inactive, meaning it can
-now be taken again.
-
-This patch converts the driver to this new mode, without any other feature.
+Also add support for the interrupt state to be saved/restored.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 1 +
- drivers/irqchip/irq-gic-v3.c       | 6 ++++--
- include/linux/irqchip/arm-gic-v3.h | 7 +++++++
- 3 files changed, 12 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c   |  3 ++-
+ drivers/irqchip/irq-gic-v3.c       | 29 ++++++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |  2 ++
+ 3 files changed, 32 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 822f55e..922f228 100644
+index 922f228..7c354ff 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -616,6 +616,7 @@ static void its_unmask_irq(struct irq_data *d)
+@@ -616,7 +616,8 @@ static void its_unmask_irq(struct irq_data *d)
  static void its_eoi_irq(struct irq_data *d)
  {
  	gic_write_eoir(d->hwirq);
-+	gic_write_dir(d->hwirq);
+-	gic_write_dir(d->hwirq);
++	if (!irqd_irq_forwarded(d))
++		gic_write_dir(d->hwirq);
  }
  
  static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 3ae53c1..26a08ce 100644
+index 26a08ce..1f080d6 100644
 --- a/drivers/irqchip/irq-gic-v3.c
 +++ b/drivers/irqchip/irq-gic-v3.c
-@@ -238,6 +238,7 @@ static void gic_unmask_irq(struct irq_data *d)
+@@ -235,10 +235,35 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	gic_poke_irq(d, GICD_ISENABLER);
+ }
+ 
++static void gic_irq_set_fwd_state(struct irq_data *d, u32 val, u32 mask)
++{
++	if (mask & IRQ_FWD_STATE_PENDING)
++		gic_poke_irq(d, (val & IRQ_FWD_STATE_PENDING) ? GICD_ISPENDR : GICD_ICPENDR);
++	if (mask & IRQ_FWD_STATE_ACTIVE)
++		gic_poke_irq(d, (val & IRQ_FWD_STATE_ACTIVE) ? GICD_ISACTIVER : GICD_ICACTIVER);
++	if (mask & IRQ_FWD_STATE_MASKED)
++		gic_poke_irq(d, (val & IRQ_FWD_STATE_MASKED) ? GICD_ICENABLER : GICD_ISENABLER);
++}
++
++static u32 gic_irq_get_fwd_state(struct irq_data *d, u32 mask)
++{
++	u32 val = 0;
++
++	if ((mask & IRQ_FWD_STATE_PENDING) && gic_peek_irq(d, GICD_ISPENDR))
++		val |= IRQ_FWD_STATE_PENDING;
++	if ((mask & IRQ_FWD_STATE_ACTIVE) && gic_peek_irq(d, GICD_ISACTIVER))
++		val |= IRQ_FWD_STATE_ACTIVE;
++	if ((mask & IRQ_FWD_STATE_MASKED) && !gic_peek_irq(d, GICD_ISENABLER))
++		val |= IRQ_FWD_STATE_MASKED;
++
++	return val;
++}
++
  static void gic_eoi_irq(struct irq_data *d)
  {
  	gic_write_eoir(gic_irq(d));
-+	gic_write_dir(gic_irq(d));
+-	gic_write_dir(gic_irq(d));
++	if (!irqd_irq_forwarded(d))
++		gic_write_dir(gic_irq(d));
  }
  
  static int gic_set_type(struct irq_data *d, unsigned int type)
-@@ -297,6 +298,7 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 		}
- 		if (irqnr < 16) {
- 			gic_write_eoir(irqnr);
-+			gic_write_dir(irqnr);
- #ifdef CONFIG_SMP
- 			handle_IPI(irqnr, regs);
- #else
-@@ -400,8 +402,8 @@ static void gic_cpu_sys_reg_init(void)
- 	/* Set priority mask register */
- 	gic_write_pmr(DEFAULT_PMR_VALUE);
+@@ -598,6 +623,8 @@ static struct irq_chip gic_chip = {
+ 	.irq_eoi		= gic_eoi_irq,
+ 	.irq_set_type		= gic_set_type,
+ 	.irq_set_affinity	= gic_set_affinity,
++	.irq_get_fwd_state	= gic_irq_get_fwd_state,
++	.irq_set_fwd_state	= gic_irq_set_fwd_state,
+ };
  
--	/* EOI deactivates interrupt too (mode 0) */
--	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
-+	/* EOI drops priority only (mode 1) */
-+	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop);
- 
- 	/* ... and let's hit the road... */
- 	gic_write_grpen1(1);
+ static struct irq_chip *its_chip;
 diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 023b49d..a0bff2f 100644
+index a0bff2f..0e74c19 100644
 --- a/include/linux/irqchip/arm-gic-v3.h
 +++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -229,6 +229,7 @@
+@@ -90,6 +90,8 @@
+ #define GICR_SYNCR			0x00C0
+ #define GICR_MOVLPIR			0x0100
+ #define GICR_MOVALLR			0x0110
++#define GICR_ISACTIVER			GICD_ISACTIVER
++#define GICR_ICACTIVER			GICD_ICACTIVER
+ #define GICR_IDREGS			GICD_IDREGS
+ #define GICR_PIDR2			GICD_PIDR2
  
- #define ICC_EOIR1_EL1			S3_0_C12_C12_1
- #define ICC_IAR1_EL1			S3_0_C12_C12_0
-+#define ICC_DIR_EL1			S3_0_C12_C11_1
- #define ICC_SGI1R_EL1			S3_0_C12_C11_5
- #define ICC_PMR_EL1			S3_0_C4_C6_0
- #define ICC_CTLR_EL1			S3_0_C12_C12_4
-@@ -303,6 +304,12 @@ static inline void gic_write_eoir(u64 irq)
- 	isb();
- }
- 
-+static inline void gic_write_dir(u64 irq)
-+{
-+	asm volatile("msr " __stringify(ICC_DIR_EL1) ", %0" : : "r" (irq));
-+	isb();
-+}
-+
- int its_cpu_init(void);
- struct irq_chip *its_init(struct device_node *node, struct rdist *rdist,
- 			  struct irq_domain *domain);
 -- 
 1.8.3.4
