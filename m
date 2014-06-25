@@ -1,67 +1,22 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 25 Jun 2014 16:12:15 -0600
-Subject: [PATCH v1 4/9] pinctrl: tegra-xusb: Add USB PHY support
-In-Reply-To: <1403072180-4944-5-git-send-email-abrestic@chromium.org>
-References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
- <1403072180-4944-5-git-send-email-abrestic@chromium.org>
-Message-ID: <53AB493F.3030802@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Jun 2014 23:23:56 +0100
+Subject: [PATCH 2/9] drivers: base: support cpu cache information
+ interface to userspace via sysfs
+In-Reply-To: <1403717444-23559-3-git-send-email-sudeep.holla@arm.com>
+References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
+ <1403717444-23559-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20140625222355.GK32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
-> In addition to the PCIe and SATA PHYs, the XUSB pad controller also
-> supports 3 UTMI, 2 HSIC, and 2 USB3 PHYs.  Each USB3 PHY uses a single
-> PCIe or SATA lane and is mapped to one of the three UTMI ports.
-> 
+On Wed, Jun 25, 2014 at 06:30:37PM +0100, Sudeep Holla wrote:
+> +		coherency_line_size: the minimum amount of data that gets transferred
 
-> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
+So, what value to do envision this taking for a CPU where the cache
+line size is 32 bytes, but each cache line has two dirty bits which
+allow it to only evict either the upper or lower 16 bytes depending
+on which are dirty?
 
-> @@ -372,6 +720,193 @@ static int tegra_xusb_padctl_pinconf_group_set(struct pinctrl_dev *pinctrl,
->  			padctl_writel(padctl, regval, lane->offset);
->  			break;
->  
-> +		case TEGRA_XUSB_PADCTL_USB3_PORT_NUM:
-> +			if (value >= TEGRA_XUSB_PADCTL_USB3_PORTS) {
-> +				dev_err(padctl->dev, "Invalid USB3 port: %lu\n",
-> +					value);
-> +				return -EINVAL;
-> +			}
-> +			if (!is_pcie_sata_lane(group)) {
-> +				dev_err(padctl->dev,
-> +					"USB3 port not applicable for pin %d\n",
-> +					group);
-> +				return -EINVAL;
-> +			}
-> +			padctl->usb3_ports[value].lane = group;
-> +			break;
-
-It feels odd to use pinctrl for a SW-only purpose. In other words, that
-chunk of code isn't writing the pinconf data to HW, but rather some
-internal variable.
-
-Perhaps it would make more sense for the DT binding to represent this
-data directly in a custom property that's parsed at probe() time. That
-way, pinctrl only touches "real" HW stuff.
-
-> +static int usb3_phy_power_on(struct phy *phy)
-> +{
-> +	struct tegra_xusb_padctl *padctl = phy_get_drvdata(phy);
-> +	int port = usb3_phy_to_port(phy);
-> +	int lane = padctl->usb3_ports[port].lane;
-> +	u32 value, offset;
-> +
-> +	value = padctl_readl(padctl, XUSB_PADCTL_IOPHY_USB3_PADX_CTL2(port));
-> +	value &= ~((XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_WANDER_MASK <<
-> +		    XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_WANDER_SHIFT) |
-> +		   (XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_EQ_MASK <<
-> +		    XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_RX_EQ_SHIFT) |
-> +		   (XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_CDR_CNTL_MASK <<
-> +		    XUSB_PADCTL_IOPHY_USB3_PAD_CTL2_CDR_CNTL_SHIFT));
-
-Hmm. So there is a lot of "PHY" stuff here after all.
-
-However, the PHYs implemented here appear to implement very low-level
-I/O pad code, whereas the PHYs we have for our USB 2.0 controller are
-somewhat higher-level; they're more USB-oriented than just IO pad
-oriented. Do you know which level of abstraction a Linux PHY object is
-supposed to be? I could never get an answer when I asked before.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
