@@ -1,259 +1,363 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Jun 2014 17:06:21 -0700
-Subject: [RFC/PATCH 10/12] cpufreq: Add a cpufreq-krait based on cpufreq-cpu0
+Date: Tue, 24 Jun 2014 17:06:15 -0700
+Subject: [RFC/PATCH 04/12] clk: qcom: Add support for High-Frequency PLLs
+ (HFPLLs)
 In-Reply-To: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
 References: <1403654783-7176-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1403654783-7176-11-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1403654783-7176-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krait processors have individual clocks for each CPU that can
-scale independently from one another. cpufreq-cpu0 is fairly
-close to this, but assumes that there is only one clock for all
-CPUs. Add a driver to support the Krait configuration.
-
-TODO: Merge into cpufreq-cpu0? Or make generic?
+HFPLLs are the main frequency source for Krait CPU clocks. Add
+support for changing the rate of these PLLs.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/cpufreq/Kconfig         |  13 +++
- drivers/cpufreq/Makefile        |   1 +
- drivers/cpufreq/cpufreq-krait.c | 190 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 204 insertions(+)
- create mode 100644 drivers/cpufreq/cpufreq-krait.c
+ drivers/clk/qcom/Makefile    |   1 +
+ drivers/clk/qcom/clk-hfpll.c | 260 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/qcom/clk-hfpll.h |  54 +++++++++
+ 3 files changed, 315 insertions(+)
+ create mode 100644 drivers/clk/qcom/clk-hfpll.c
+ create mode 100644 drivers/clk/qcom/clk-hfpll.h
 
-diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-index ffe350f86bca..e9826c85a777 100644
---- a/drivers/cpufreq/Kconfig
-+++ b/drivers/cpufreq/Kconfig
-@@ -196,6 +196,19 @@ config GENERIC_CPUFREQ_CPU0
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index 8684ff004be6..1a0b561bd105 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -7,6 +7,7 @@ clk-qcom-y += clk-rcg.o
+ clk-qcom-y += clk-rcg2.o
+ clk-qcom-y += clk-branch.o
+ clk-qcom-y += clk-generic.o
++clk-qcom-y += clk-hfpll.o
+ clk-qcom-y += reset.o
  
- 	  If in doubt, say N.
- 
-+config GENERIC_CPUFREQ_KRAIT
-+	tristate "Krait cpufreq driver"
-+	depends on HAVE_CLK && OF
-+	# if CPU_THERMAL is on and THERMAL=m, CPU0 cannot be =y:
-+	depends on !CPU_THERMAL || THERMAL
-+	select PM_OPP
-+	help
-+	  This adds a generic cpufreq driver for CPU0 frequency management.
-+	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-+	  systems which share clock and voltage across all CPUs.
-+
-+	  If in doubt, say N.
-+
- menu "x86 CPU frequency scaling drivers"
- depends on X86
- source "drivers/cpufreq/Kconfig.x86"
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 738c8b7b17dc..f5c9f68dcc0f 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -14,6 +14,7 @@ obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
- obj-$(CONFIG_CPU_FREQ_GOV_COMMON)		+= cpufreq_governor.o
- 
- obj-$(CONFIG_GENERIC_CPUFREQ_CPU0)	+= cpufreq-cpu0.o
-+obj-$(CONFIG_CPUFREQ_KRAIT)		+= cpufreq-krait.o
- 
- ##################################################################################
- # x86 drivers.
-diff --git a/drivers/cpufreq/cpufreq-krait.c b/drivers/cpufreq/cpufreq-krait.c
+ obj-$(CONFIG_MSM_GCC_8660) += gcc-msm8660.o
+diff --git a/drivers/clk/qcom/clk-hfpll.c b/drivers/clk/qcom/clk-hfpll.c
 new file mode 100644
-index 000000000000..7b38b9c948e5
+index 000000000000..f8a40a7cdf6f
 --- /dev/null
-+++ b/drivers/cpufreq/cpufreq-krait.c
-@@ -0,0 +1,190 @@
++++ b/drivers/clk/qcom/clk-hfpll.c
+@@ -0,0 +1,260 @@
 +/*
-+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * The OPP code in function krait_set_target() is reused from
-+ * drivers/cpufreq/omap-cpufreq.c
++ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/cpu_cooling.h>
-+#include <linux/cpufreq.h>
-+#include <linux/cpumask.h>
-+#include <linux/err.h>
++#include <linux/kernel.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pm_opp.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/thermal.h>
++#include <linux/init.h>
++#include <linux/regmap.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/clk-provider.h>
++#include <linux/spinlock.h>
 +
-+static unsigned int transition_latency;
++#include "clk-regmap.h"
++#include "clk-hfpll.h"
 +
-+static struct device *cpu_dev;
-+static DEFINE_PER_CPU(struct clk *, krait_cpu_clks);
-+static struct cpufreq_frequency_table *freq_table;
-+static struct thermal_cooling_device *cdev;
++#define PLL_OUTCTRL	BIT(0)
++#define PLL_BYPASSNL	BIT(1)
++#define PLL_RESET_N	BIT(2)
 +
-+static int krait_set_target(struct cpufreq_policy *policy, unsigned int index)
++/* Initialize a HFPLL at a given rate and enable it. */
++static void __clk_hfpll_init_once(struct clk_hw *hw)
 +{
-+	unsigned long volt = 0, volt_old = 0;
-+	unsigned int old_freq, new_freq;
-+	long freq_Hz, freq_exact;
-+	int ret;
-+	struct clk *cpu_clk;
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
 +
-+	cpu_clk = per_cpu(krait_cpu_clks, policy->cpu);
++	if (likely(h->init_done))
++		return;
 +
-+	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
-+	if (freq_Hz <= 0)
-+		freq_Hz = freq_table[index].frequency * 1000;
++	/* Configure PLL parameters for integer mode. */
++	if (hd->config_val)
++		regmap_write(regmap, hd->config_reg, hd->config_val);
++	regmap_write(regmap, hd->m_reg, 0);
++	regmap_write(regmap, hd->n_reg, 1);
 +
-+	freq_exact = freq_Hz;
-+	new_freq = freq_Hz / 1000;
-+	old_freq = clk_get_rate(cpu_clk) / 1000;
++	if (hd->user_reg) {
++		u32 regval = hd->user_val;
++		unsigned long rate;
 +
-+	pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
-+		 old_freq / 1000, volt_old ? volt_old / 1000 : -1,
-+		 new_freq / 1000, volt ? volt / 1000 : -1);
++		rate = __clk_get_rate(hw->clk);
 +
-+	ret = clk_set_rate(cpu_clk, freq_exact);
-+	if (ret)
-+		pr_err("failed to set clock rate: %d\n", ret);
++		/* Pick the right VCO. */
++		if (hd->user_vco_mask && rate > hd->low_vco_max_rate)
++			regval |= hd->user_vco_mask;
++		regmap_write(regmap, hd->user_reg, regval);
++	}
 +
-+	return ret;
++	if (hd->droop_reg)
++		regmap_write(regmap, hd->droop_reg, hd->droop_val);
++
++	h->init_done = true;
 +}
 +
-+static int krait_cpufreq_init(struct cpufreq_policy *policy)
++static void __clk_hfpll_enable(struct clk_hw *hw)
 +{
-+	int ret;
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
++	u32 val;
 +
-+	policy->clk = per_cpu(krait_cpu_clks, policy->cpu);
++	__clk_hfpll_init_once(hw);
 +
-+	ret = cpufreq_table_validate_and_show(policy, freq_table);
-+	if (ret) {
-+		pr_err("%s: invalid frequency table: %d\n", __func__, ret);
-+		return ret;
-+	}
-+
-+	policy->cpuinfo.transition_latency = transition_latency;
-+
-+	return 0;
-+}
-+
-+static struct cpufreq_driver krait_cpufreq_driver = {
-+	.flags = CPUFREQ_STICKY,
-+	.verify = cpufreq_generic_frequency_table_verify,
-+	.target_index = krait_set_target,
-+	.get = cpufreq_generic_get,
-+	.init = krait_cpufreq_init,
-+	.name = "generic_krait",
-+	.attr = cpufreq_generic_attr,
-+};
-+
-+static int krait_cpufreq_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np;
-+	int ret;
-+	unsigned int cpu;
-+	struct device *dev;
-+	struct clk *clk;
-+
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev) {
-+		pr_err("failed to get krait device\n");
-+		return -ENODEV;
-+	}
-+
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np) {
-+		pr_err("failed to find krait node\n");
-+		return -ENOENT;
-+	}
-+
-+	for_each_possible_cpu(cpu) {
-+		dev = get_cpu_device(cpu);
-+		if (!dev) {
-+			pr_err("failed to get krait device\n");
-+			ret = -ENOENT;
-+			goto out_put_node;
-+		}
-+		per_cpu(krait_cpu_clks, cpu) = clk = devm_clk_get(dev, NULL);
-+		if (IS_ERR(clk)) {
-+			ret = PTR_ERR(clk);
-+			goto out_put_node;
-+		}
-+	}
-+
-+	ret = of_init_opp_table(cpu_dev);
-+	if (ret) {
-+		pr_err("failed to init OPP table: %d\n", ret);
-+		goto out_put_node;
-+	}
-+
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		pr_err("failed to init cpufreq table: %d\n", ret);
-+		goto out_put_node;
-+	}
-+
-+	if (of_property_read_u32(np, "clock-latency", &transition_latency))
-+		transition_latency = CPUFREQ_ETERNAL;
-+
-+	ret = cpufreq_register_driver(&krait_cpufreq_driver);
-+	if (ret) {
-+		pr_err("failed register driver: %d\n", ret);
-+		goto out_free_table;
-+	}
-+	of_node_put(np);
++	/* Disable PLL bypass mode. */
++	regmap_update_bits(regmap, hd->mode_reg, PLL_BYPASSNL, PLL_BYPASSNL);
 +
 +	/*
-+	 * For now, just loading the cooling device;
-+	 * thermal DT code takes care of matching them.
++	 * H/W requires a 5us delay between disabling the bypass and
++	 * de-asserting the reset. Delay 10us just to be safe.
 +	 */
-+	for_each_possible_cpu(cpu) {
-+		dev = get_cpu_device(cpu);
-+		np = of_node_get(dev->of_node);
-+		if (of_find_property(np, "#cooling-cells", NULL)) {
-+			cdev = of_cpufreq_cooling_register(np, cpumask_of(cpu));
-+			if (IS_ERR(cdev))
-+				pr_err("running cpufreq without cooling device: %ld\n",
-+				       PTR_ERR(cdev));
-+		}
-+		of_node_put(np);
++	mb();
++	udelay(10);
++
++	/* De-assert active-low PLL reset. */
++	regmap_update_bits(regmap, hd->mode_reg, PLL_RESET_N, PLL_RESET_N);
++
++	/* Wait for PLL to lock. */
++	if (hd->status_reg) {
++		do {
++			regmap_read(regmap, hd->status_reg, &val);
++		} while (!(val & BIT(hd->lock_bit)));
++	} else {
++		mb();
++		udelay(60);
 +	}
 +
-+	return 0;
++	/* Enable PLL output. */
++	regmap_update_bits(regmap, hd->mode_reg, PLL_OUTCTRL, PLL_OUTCTRL);
 +
-+out_free_table:
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-+out_put_node:
-+	of_node_put(np);
-+	return ret;
++	/* Make sure the enable is done before returning. */
++	mb();
 +}
 +
-+static int krait_cpufreq_remove(struct platform_device *pdev)
++/* Enable an already-configured HFPLL. */
++static int clk_hfpll_enable(struct clk_hw *hw)
 +{
-+	cpufreq_cooling_unregister(cdev);
-+	cpufreq_unregister_driver(&krait_cpufreq_driver);
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
++	unsigned long flags;
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
++	u32 mode;
++
++	spin_lock_irqsave(&h->lock, flags);
++	regmap_read(regmap, hd->mode_reg, &mode);
++	if (!(mode & (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL)))
++		__clk_hfpll_enable(hw);
++	spin_unlock_irqrestore(&h->lock, flags);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver krait_cpufreq_platdrv = {
-+	.driver = {
-+		.name	= "cpufreq-krait",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= krait_cpufreq_probe,
-+	.remove		= krait_cpufreq_remove,
-+};
-+module_platform_driver(krait_cpufreq_platdrv);
++static void __clk_hfpll_disable(struct clk_hw *hw)
++{
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
 +
-+MODULE_DESCRIPTION("Krait CPUfreq driver");
-+MODULE_LICENSE("GPL v2");
++	/*
++	 * Disable the PLL output, disable test mode, enable the bypass mode,
++	 * and assert the reset.
++	 */
++	regmap_update_bits(regmap, hd->mode_reg,
++			PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL, 0);
++}
++
++static void clk_hfpll_disable(struct clk_hw *hw)
++{
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	unsigned long flags;
++
++	spin_lock_irqsave(&h->lock, flags);
++	__clk_hfpll_disable(hw);
++	spin_unlock_irqrestore(&h->lock, flags);
++}
++
++static long clk_hfpll_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *parent_rate)
++{
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	unsigned long rrate;
++
++	rate = clamp(rate, hd->min_rate, hd->max_rate);
++
++	rrate = DIV_ROUND_UP(rate, *parent_rate) * *parent_rate;
++	if (rrate > hd->max_rate)
++		rrate -= *parent_rate;
++
++	return rrate;
++}
++
++/*
++ * For optimization reasons, assumes no downstream clocks are actively using
++ * it.
++ */
++static int clk_hfpll_set_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
++	unsigned long flags;
++	u32 l_val, val;
++	bool enabled;
++
++	l_val = rate / parent_rate;
++
++	spin_lock_irqsave(&h->lock, flags);
++
++	enabled = __clk_is_enabled(hw->clk);
++	if (enabled)
++		__clk_hfpll_disable(hw);
++
++	/* Pick the right VCO. */
++	if (hd->user_reg && hd->user_vco_mask) {
++		regmap_read(regmap, hd->user_reg, &val);
++		if (rate <= hd->low_vco_max_rate)
++			val &= ~hd->user_vco_mask;
++		else
++			val |= hd->user_vco_mask;
++		regmap_write(regmap, hd->user_reg, val);
++	}
++
++	regmap_write(regmap, hd->l_reg, l_val);
++
++	if (enabled)
++		__clk_hfpll_enable(hw);
++
++	spin_unlock_irqrestore(&h->lock, flags);
++
++	return 0;
++}
++
++static unsigned long clk_hfpll_recalc_rate(struct clk_hw *hw,
++					   unsigned long parent_rate)
++{
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
++	u32 l_val;
++
++	regmap_read(regmap, hd->l_reg, &l_val);
++
++	return l_val * parent_rate;
++}
++
++static void clk_hfpll_init(struct clk_hw *hw)
++{
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
++	u32 mode, status;
++
++	regmap_read(regmap, hd->mode_reg, &mode);
++	if (mode != (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL)) {
++		__clk_hfpll_init_once(hw);
++		return;
++	}
++
++	if (hd->status_reg) {
++		regmap_read(regmap, hd->status_reg, &status);
++		if (!(status & BIT(hd->lock_bit))) {
++			WARN(1, "HFPLL %s is ON, but not locked!\n",
++					__clk_get_name(hw->clk));
++			clk_hfpll_disable(hw);
++			__clk_hfpll_init_once(hw);
++		}
++	}
++}
++
++static int hfpll_is_enabled(struct clk_hw *hw)
++{
++	struct clk_hfpll *h = to_clk_hfpll(hw);
++	struct hfpll_data const *hd = h->d;
++	struct regmap *regmap = h->clkr.regmap;
++	u32 mode;
++
++	regmap_read(regmap, hd->mode_reg, &mode);
++	mode &= 0x7;
++	return mode == (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL);
++}
++
++const struct clk_ops clk_ops_hfpll = {
++	.enable = clk_hfpll_enable,
++	.disable = clk_hfpll_disable,
++	.is_enabled = hfpll_is_enabled,
++	.round_rate = clk_hfpll_round_rate,
++	.set_rate = clk_hfpll_set_rate,
++	.recalc_rate = clk_hfpll_recalc_rate,
++	.init = clk_hfpll_init,
++};
++EXPORT_SYMBOL_GPL(clk_ops_hfpll);
+diff --git a/drivers/clk/qcom/clk-hfpll.h b/drivers/clk/qcom/clk-hfpll.h
+new file mode 100644
+index 000000000000..48c18d664f4e
+--- /dev/null
++++ b/drivers/clk/qcom/clk-hfpll.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __QCOM_CLK_HFPLL_H__
++#define __QCOM_CLK_HFPLL_H__
++
++#include <linux/clk-provider.h>
++#include <linux/spinlock.h>
++#include "clk-regmap.h"
++
++struct hfpll_data {
++	u32 mode_reg;
++	u32 l_reg;
++	u32 m_reg;
++	u32 n_reg;
++	u32 user_reg;
++	u32 droop_reg;
++	u32 config_reg;
++	u32 status_reg;
++	u8  lock_bit;
++
++	u32 droop_val;
++	u32 config_val;
++	u32 user_val;
++	u32 user_vco_mask;
++	unsigned long low_vco_max_rate;
++
++	unsigned long min_rate;
++	unsigned long max_rate;
++};
++
++struct clk_hfpll {
++	struct hfpll_data const *d;
++	int init_done;
++
++	struct clk_regmap clkr;
++	spinlock_t lock;
++};
++
++#define to_clk_hfpll(_hw) \
++	container_of(to_clk_regmap(_hw), struct clk_hfpll, clkr)
++
++extern const struct clk_ops clk_ops_hfpll;
++
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
