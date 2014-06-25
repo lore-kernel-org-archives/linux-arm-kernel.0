@@ -1,30 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Jun 2014 08:27:57 +0200
-Subject: [PATCH 1/2] ARM: i.MX27: Introduce DT include for clock provider
-In-Reply-To: <1403426090-29806-1-git-send-email-shc_work@mail.ru>
-References: <1403426090-29806-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140625062757.GI15686@pengutronix.de>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Wed, 25 Jun 2014 11:59:29 +0530
+Subject: [PATCH 0/4 v2] hwmon: ntc_thermistor: prepose vendor prefix change
+Message-ID: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 12:34:49PM +0400, Alexander Shiyan wrote:
-> Use clock defines in order to make devicetrees more human readable.
-> Additional changes included in this patch (imx27.dtsi):
-> - Fix IPG clock for UART6.
-> - Use EMI_AHB_GATE clock for WEIM.
-> - Added GPIO_IPG_GATE clock for GPIO nodes. Currently this clock is
->   not used by the driver, but it can be added in the future.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+As Murata is the manufacturer of the NTC (Negative Temperature coefficient)
+based Thermistors. ntc_thermistor driver extensively used the prefix "ntc".
+But, vendor-prefix should be "murata" instead of "ntc".
 
-Looks good to me. Both:
+This patchset
+1. Updates the vendor-prefix, DT bindings and Documentation,
+   where ever necessary.
+2. Adds thermistor nodes to Exynos5420 based Peach PIT board.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Patches:
+1/4. devicetree: bindings: Document murata vendor prefix
+     Adds the vendor prefix "murata" to vendor-prefixes.txt.
+2/4. hwmon: ntc_thermistor: Use the manufacturer name properly
+     Updates the driver, Kconfig, device tree bindings and Documentation
+     with the Manufacturer/vendor information.
+     Keeps the old bindings marked as <DEPRECATED> in code and Documentation
+3/4. ARM: DTS: use new compatible string as per the documentation
+     Updates the device node in Exynos4412 based Trats2 board
+     with the new device tree bindings.
+4/4. ARM: DTS: Add NTC thermistor nodes as child nodes to ADC
+     Adds Thermistor nodes to Exynos5420 based Peach PIT board.
 
-Sascha
+This patchset
+Naveen Krishna Chatradhi (4):
+  devicetree: bindings: Document murata vendor prefix
+  hwmon: ntc_thermistor: Use the manufacturer name properly
+  ARM: DTS: use new compatible string as per the documentation
+  ARM: DTS: Add NTC thermistor nodes to Exynos5420 based Peach_PIT
+
+ .../devicetree/bindings/arm/samsung/exynos-adc.txt |    2 +-
+ .../devicetree/bindings/hwmon/ntc_thermistor.txt   |   20 ++++++++----
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ Documentation/hwmon/ntc_thermistor                 |    8 ++---
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    4 +--
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |   34 ++++++++++++++++++++
+ drivers/hwmon/Kconfig                              |    5 +--
+ drivers/hwmon/ntc_thermistor.c                     |   14 +++++++-
+ 8 files changed, 72 insertions(+), 16 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
