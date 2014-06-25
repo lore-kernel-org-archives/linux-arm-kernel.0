@@ -1,52 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Jun 2014 08:08:48 +0200
-Subject: [PATCH v2 1/2] video: imxfb: Fix unbalanced regulators
-In-Reply-To: <1403528839-31901-1-git-send-email-denis@eukrea.com>
-References: <1403528839-31901-1-git-send-email-denis@eukrea.com>
-Message-ID: <20140625060848.GE15686@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 25 Jun 2014 14:12:40 +0800
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <1403626435.4230.17.camel@weser.hi.pengutronix.de>
+References: <20140624153559.GA5741@dragon>
+ <1403626435.4230.17.camel@weser.hi.pengutronix.de>
+Message-ID: <20140625061238.GA3242@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 03:07:18PM +0200, Denis Carikli wrote:
-> Both regulator_enable and regulator_disable's comments
-> say that they must be balanced with its counterpart
-> enable/disable function.
+On Tue, Jun 24, 2014 at 06:13:55PM +0200, Lucas Stach wrote:
+> Hi Shawn,
 > 
-> Not doing it result in kernel warnings each time
-> the lcd is powered off twice, for instance trough sysfs.
+> Am Dienstag, den 24.06.2014, 23:36 +0800 schrieb Shawn Guo:
+> > Hi Lucas,
+> > 
+> > I found that imx6q suspend/resume is broken on 3.16-rc, and it works
+> > just fine if PCIe support is built out.  However the issue was not
+> > exposed on 3.15, so I suspect the PCIe driver change merged in 3.16
+> > is part of the cause.
+> > 
+> I don't yet see why any of the changes to the designware/imx6 host
+> driver would cause such failures.
 > 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> Changelog v1->v2:
->  - None
-> ---
->  drivers/video/fbdev/imxfb.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
-> index f6e6216..121cbd7 100644
-> --- a/drivers/video/fbdev/imxfb.c
-> +++ b/drivers/video/fbdev/imxfb.c
-> @@ -769,9 +769,9 @@ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
->  	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
->  
->  	if (!IS_ERR(fbi->lcd_pwr)) {
-> -		if (power)
-> +		if (power && !regulator_is_enabled(fbi->lcd_pwr))
->  			return regulator_enable(fbi->lcd_pwr);
-> -		else
-> +		else if (regulator_is_enabled(fbi->lcd_pwr))
->  			return regulator_disable(fbi->lcd_pwr);
+> Which board are you doing your testing on? What devices are connected to
+> the PCIe bus? In what way does it break system resume, complete hang?
 
-It's a shame that the LCD controller doesn't do the reference counting.
-I really think it should be fixed there and not in the drivers. If for
-whatever reason this is not acceptable then it should be done in the
-imxfb driver instead of shifting it further to the regulator core.
+It's on imx6q-sabresd without any PCIe device connected.  Right, it's a
+complete hang after enabling non-boot CPUs.
 
-Sascha
+...
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+<*** hang here ***>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Shawn
