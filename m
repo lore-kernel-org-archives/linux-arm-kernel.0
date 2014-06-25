@@ -1,59 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Jun 2014 14:13:33 +0100
-Subject: [PATCH/RESEND 9/9] drm/tilcdc: replace late_initcall with
- module_init
-In-Reply-To: <20140625130042.GK3705@n2100.arm.linux.org.uk>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-10-git-send-email-guido@vanguardiasur.com.ar>
- <53A9F5F4.3030806@ti.com> <20140625130042.GK3705@n2100.arm.linux.org.uk>
-Message-ID: <20140625131333.GL3705@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 25 Jun 2014 08:18:46 -0500
+Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
+In-Reply-To: <86oaxhjg4r.fsf@arm.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+ <CAL_JsqLbCeiB13ajNpVQDh_Lxgn37ixJ_jYkceps07mzz5su1g@mail.gmail.com>
+ <86oaxhjg4r.fsf@arm.com>
+Message-ID: <CAL_JsqKA0GoNa7+EfM5WN3-jOhTvth=iAgfwbJWHP5Yw+vTqSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 02:00:42PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 24, 2014 at 05:04:36PM -0500, Darren Etheridge wrote:
-> > On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
-> >> Use module_init instead of late_initcall, as is the norm for modular
-> >> drivers.
-> >>
-> >> module_init was used until 6e8de0bd6a51fdeebd5d975c4fcc426f730b339b
-> >> ("drm/tilcdc: add encoder slave (v2)") changed it to a late_initcall,
-> >> but it does not explain why. Tests show it's working properly with
-> >> module_init.
-> >>
-> >
-> > If I recall, the late_initcall stuff was done to try and make sure the  
-> > tda998x/i2c subsystem came up before tilcdc. However it didn't always  
-> > work so we added commit: 39de6194131c155901f96686a063212656d80c2e to try  
-> > and ensure the ordering.  This might be why changing back to module_init  
-> > is fine (and I agree with your assessment from my testing).
-> 
-> There's a solution to that... I have patches which convert the tda998x
-> driver to also register into the component helpers as well as remaining
-> as a drm slave device.  This makes it possible to transition tilcdc to
-> use the component helper to solve the initialisation ordering.
-> 
-> I'll (re-)post them later today.
+On Wed, Jun 25, 2014 at 8:03 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Wed, Jun 25 2014 at 01:50:12 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On Wed, Jun 25, 2014 at 4:28 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> So far, GICv2 has been used in with EOImode == 0. The effect of this
+>>> mode is to perform the priority drop and the deactivation of the
+>>> interrupt at the same time.
+>>>
+>>> While this works perfectly for Linux (we only have a single priority),
+>>> it causes issues when an interrupt is forwarded to a guest, and when
+>>> we want the guest to perform the EOI itself.
+>>>
+>>> For this case, the GIC architecture provides EOImode == 1, where:
+>>> - A write to the EOI register drops the priority of the interrupt and leaves
+>>> it active. Other interrupts at the same priority level can now be taken,
+>>> but the active interrupt cannot be taken again
+>>> - A write to the DIR marks the interrupt as inactive, meaning it can
+>>> now be taken again.
+>>>
+>>> We only enable this feature when booted in HYP mode. Also, as most device
+>>> trees are broken (they report the CPU interface size to be 4kB, while
+>>> the GICv2 CPU interface size is 8kB), output a warning if we're booted
+>>> in HYP mode, and disable the feature.
+>>
+>> Why not fix-up the size so the feature can be enabled?
+>
+> Is it a bet we're willing to take? We'd end-up with a kernel that
+> doesn't boot if the DT was actually right. If we stay with EOImode==0,
+> we can still boot (KVM will probably be broken though).
 
-Except Daniel Mack will not be receiving any copies of them:
+I think so. Seems like your last statement answers this. Why is KVM
+not working on my system seems like a much more likely and frequent
+support issue than a potentially broken system.
 
-  zonque at gmail.com
-    SMTP error from remote mail server after end of data:
-    host gmail-smtp-in.l.google.com [2a00:1450:400c:c03::1a]:
-    550-5.7.1 [2001:4d48:ad52:3201:214:fdff:fe10:1be6      12] Our system has
-    550-5.7.1 detected that this message is likely unsolicited mail. To reduce the
-    550-5.7.1 amount of spam sent to Gmail, this message has been blocked. Please
-    550-5.7.1 visit
-    550-5.7.1 http://support.google.com/mail/bin/answer.py?hl=en&answer=188131 for
-    550 5.7.1 more information. fs8si6627678wib.99 - gsmtp
+The only place I really could see it be broken is an SBSA system doing
+the address swizzling trick with the gic-400 to get 64KB spaced
+regions but does not use the 60KB aligned cpu interface address. But
+DTBs are hardly stable for 64-bit systems and can be updated.
 
-Google's anti-ham filter seems to be working perfectly, allowing spam
-through and blocking real messages... as usual.  And as usual, google
-provides no support for this crap.  Gmail has a history of increasingly
-blocking legitimate email in their alleged anti-spam fight.  Don't use
-gmail.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Rob
