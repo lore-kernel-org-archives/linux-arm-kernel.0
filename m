@@ -1,111 +1,38 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 25 Jun 2014 15:37:26 +0200
-Subject: [PATCH v2 1/6] ARM: mm: cache-l2x0: Add base address argument to
- write_sec callback
+Date: Wed, 25 Jun 2014 15:37:27 +0200
+Subject: [PATCH v2 2/6] ARM: Get outer cache .write_sec callback from mach_desc
+ only if not NULL
 In-Reply-To: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
 References: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403703451-12233-2-git-send-email-t.figa@samsung.com>
+Message-ID: <1403703451-12233-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For certain platforms (e.g. Exynos) it is necessary to read back some
-values from registers before they can be written (i.e. SMC calls that
-set multiple registers per call), so base address of L2C controller is
-needed for .write_sec operation. This patch adds base argument to
-.write_sec callback so that its implementation can also access registers
-directly.
+Certain platforms (i.e. Exynos) might need to set .write_sec callback
+from firmware initialization which is happenning in .init_early callback
+of machine descriptor. However current code will overwrite the pointer
+with whatever is present in machine descriptor, even though it can be
+already set earlier. This patch fixes this by making the assignment
+conditional, depending on whether current .write_sec callback is NULL.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/include/asm/mach/arch.h   | 3 ++-
- arch/arm/include/asm/outercache.h  | 2 +-
- arch/arm/mach-highbank/highbank.c  | 3 ++-
- arch/arm/mach-omap2/omap4-common.c | 3 ++-
- arch/arm/mach-ux500/cache-l2x0.c   | 3 ++-
- arch/arm/mm/cache-l2x0.c           | 2 +-
- 6 files changed, 10 insertions(+), 6 deletions(-)
+ arch/arm/kernel/irq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 060a75e..fefff4d 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -46,7 +46,8 @@ struct machine_desc {
- 	enum reboot_mode	reboot_mode;	/* default restart mode	*/
- 	unsigned		l2c_aux_val;	/* L2 cache aux value	*/
- 	unsigned		l2c_aux_mask;	/* L2 cache aux mask	*/
--	void			(*l2c_write_sec)(unsigned long, unsigned);
-+	void			(*l2c_write_sec)(unsigned long,
-+						 void __iomem *, unsigned);
- 	struct smp_operations	*smp;		/* SMP operations	*/
- 	bool			(*smp_init)(void);
- 	void			(*fixup)(struct tag *, char **);
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 891a56b..25b70b5 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -35,7 +35,7 @@ struct outer_cache_fns {
- 	void (*resume)(void);
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c42576..e7383b9 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -125,7 +125,8 @@ void __init init_IRQ(void)
  
- 	/* This is an ARM L2C thing */
--	void (*write_sec)(unsigned long, unsigned);
-+	void (*write_sec)(unsigned long, void __iomem *, unsigned);
- };
- 
- extern struct outer_cache_fns outer_cache;
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 8c35ae4..20cf160 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -51,7 +51,8 @@ static void __init highbank_scu_map_io(void)
- }
- 
- 
--static void highbank_l2c310_write_sec(unsigned long val, unsigned reg)
-+static void highbank_l2c310_write_sec(unsigned long val, void __iomem *base,
-+				      unsigned reg)
- {
- 	if (reg == L2X0_CTRL)
- 		highbank_smc1(0x102, val);
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 326cd98..ce04afa 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -167,7 +167,8 @@ void __iomem *omap4_get_l2cache_base(void)
- 	return l2cache_base;
- }
- 
--static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
-+static void omap4_l2c310_write_sec(unsigned long val, void __iomem *base,
-+				   unsigned reg)
- {
- 	unsigned smc_op;
- 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 842ebed..bd87108 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -35,7 +35,8 @@ static int __init ux500_l2x0_unlock(void)
- 	return 0;
- }
- 
--static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
-+static void ux500_l2c310_write_sec(unsigned long val, void __iomem *base,
-+				   unsigned reg)
- {
- 	/*
- 	 * We can't write to secure registers as we are in non-secure
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index efc5cab..478566b 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -72,7 +72,7 @@ static void l2c_write_sec(unsigned long val, void __iomem *base, unsigned reg)
- 	if (val == readl_relaxed(base + reg))
- 		return;
- 	if (outer_cache.write_sec)
--		outer_cache.write_sec(val, reg);
-+		outer_cache.write_sec(val, base, reg);
- 	else
- 		writel_relaxed(val, base + reg);
- }
+ 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
+ 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
+-		outer_cache.write_sec = machine_desc->l2c_write_sec;
++		if (!outer_cache.write_sec)
++			outer_cache.write_sec = machine_desc->l2c_write_sec;
+ 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+ 				   machine_desc->l2c_aux_mask);
+ 		if (ret)
 -- 
 1.9.3
