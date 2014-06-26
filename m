@@ -1,101 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Jun 2014 12:09:06 +0200
-Subject: [PATCH v2 2/2] efi/arm64: preserve FP/SIMD registers on UEFI runtime
- services calls
-In-Reply-To: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1403777346-28629-3-git-send-email-ard.biesheuvel@linaro.org>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 26 Jun 2014 11:08:51 +0100
+Subject: [PATCH] drm/i2c: tda998x: add some basic mode validation
+Message-ID: <E1X06br-0002iA-8H@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the UEFI spec section 2.3.6.4, the use of FP/SIMD instructions is
-allowed, and should adhere to the AAPCS64 calling convention, which states that
-'only the bottom 64 bits of each value stored in registers v8-v15 need to be
-preserved' (section 5.1.2).
+The TDA998x can't handle modes with clocks above 150MHz, or resolutions
+larger than 8192x2048.
 
-This applies equally to UEFI Runtime Services called by the kernel, so make sure
-the FP/SIMD register file is preserved in this case.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm64/Kconfig           |  1 +
- arch/arm64/include/asm/efi.h | 21 +++++++++++++++++++++
- arch/arm64/kernel/efi.c      | 14 +-------------
- 3 files changed, 23 insertions(+), 13 deletions(-)
+David, this will be part of a pull request which I intend to send during
+the next few days.  Luckily, the mode_valid method in tda998x hasn't was
+not deleted.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a474de346be6..93e11f4d9513 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -299,6 +299,7 @@ config EFI
- 	select LIBFDT
- 	select UCS2_STRING
- 	select EFI_PARAMS_FROM_FDT
-+	select EFI_RUNTIME_WRAPPERS
- 	default y
- 	help
- 	  This option provides support for runtime services provided
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 5a46c4e7f539..375ba342dca6 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -2,6 +2,7 @@
- #define _ASM_EFI_H
+ drivers/gpu/drm/i2c/tda998x_drv.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 3ff7d0713bfb..5a738ad0c241 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -810,6 +810,12 @@ static int
+ tda998x_encoder_mode_valid(struct drm_encoder *encoder,
+ 			  struct drm_display_mode *mode)
+ {
++	if (mode->clock > 150000)
++		return MODE_CLOCK_HIGH;
++	if (mode->htotal >= BIT(13))
++		return MODE_BAD_HVALUE;
++	if (mode->vtotal >= BIT(11))
++		return MODE_BAD_VVALUE;
+ 	return MODE_OK;
+ }
  
- #include <asm/io.h>
-+#include <asm/neon.h>
- 
- #ifdef CONFIG_EFI
- extern void efi_init(void);
-@@ -11,4 +12,24 @@ extern void efi_idmap_init(void);
- #define efi_idmap_init()
- #endif
- 
-+#define efi_call_virt(f, ...)						\
-+({									\
-+	efi_##f##_t *__f = efi.systab->runtime->f;			\
-+	efi_status_t __s;						\
-+									\
-+	kernel_neon_begin();						\
-+	__s = __f(__VA_ARGS__);						\
-+	kernel_neon_end();						\
-+	__s;								\
-+})
-+
-+#define __efi_call_virt(f, ...)						\
-+({									\
-+	efi_##f##_t *__f = efi.systab->runtime->f;			\
-+									\
-+	kernel_neon_begin();						\
-+	__f(__VA_ARGS__);						\
-+	kernel_neon_end();						\
-+})
-+
- #endif /* _ASM_EFI_H */
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 14db1f6e8d7f..56c3327bbf79 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -449,19 +449,7 @@ static int __init arm64_enter_virtual_mode(void)
- 
- 	/* Set up runtime services function pointers */
- 	runtime = efi.systab->runtime;
--	efi.get_time = runtime->get_time;
--	efi.set_time = runtime->set_time;
--	efi.get_wakeup_time = runtime->get_wakeup_time;
--	efi.set_wakeup_time = runtime->set_wakeup_time;
--	efi.get_variable = runtime->get_variable;
--	efi.get_next_variable = runtime->get_next_variable;
--	efi.set_variable = runtime->set_variable;
--	efi.query_variable_info = runtime->query_variable_info;
--	efi.update_capsule = runtime->update_capsule;
--	efi.query_capsule_caps = runtime->query_capsule_caps;
--	efi.get_next_high_mono_count = runtime->get_next_high_mono_count;
--	efi.reset_system = runtime->reset_system;
--
-+	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
- 	return 0;
 -- 
-1.8.3.2
+1.8.3.1
