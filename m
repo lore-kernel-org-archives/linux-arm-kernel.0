@@ -1,75 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 26 Jun 2014 10:59:28 +1000
-Subject: [PATCH v2] sched: Fix compiler warnings
-In-Reply-To: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
-References: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20140626105928.5f375f0c@canb.auug.org.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Jun 2014 22:23:01 -0300
+Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
+In-Reply-To: <1403687412-22362-1-git-send-email-b20788@freescale.com>
+References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
+Message-ID: <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi Anson,
 
-[I know I'm a bit late to this, but ...]
-
-On Tue, 24 Jun 2014 18:05:29 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+On Wed, Jun 25, 2014 at 6:10 AM, Anson Huang <b20788@freescale.com> wrote:
+> Add cpufreq support for i.MX6SX, using common
+> i.MX6Q cpufreq driver.
 >
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 9d85318..e35d880 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -275,7 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
->  		cpu_topology[cpuid].socket_id, mpidr);
->  }
->  
-> -static inline const int cpu_corepower_flags(void)
-> +static inline int cpu_corepower_flags(void)
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6sx.c |    3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+> index 74ff7d6..9221e1d 100644
+> --- a/arch/arm/mach-imx/mach-imx6sx.c
+> +++ b/arch/arm/mach-imx/mach-imx6sx.c
+> @@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)
+>  static void __init imx6sx_init_late(void)
 >  {
->  	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
+>         imx6q_cpuidle_init();
+> +
+> +       if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+> +               platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
 >  }
 
-The only reference to this function is to take its address, so "inline"
-is useless, right?
+With this patch applied I get a flood of these messages:
 
-> diff --git a/include/linux/sched.h b/include/linux/sched.h
-> index 306f4f0..0376b05 100644
-> --- a/include/linux/sched.h
-> +++ b/include/linux/sched.h
-> @@ -872,21 +872,21 @@ enum cpu_idle_type {
->  #define SD_NUMA			0x4000	/* cross-node balancing */
->  
->  #ifdef CONFIG_SCHED_SMT
-> -static inline const int cpu_smt_flags(void)
-> +static inline int cpu_smt_flags(void)
->  {
->  	return SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
->  }
->  #endif
->  
->  #ifdef CONFIG_SCHED_MC
-> -static inline const int cpu_core_flags(void)
-> +static inline int cpu_core_flags(void)
->  {
->  	return SD_SHARE_PKG_RESOURCES;
->  }
->  #endif
->  
->  #ifdef CONFIG_NUMA
-> -static inline const int cpu_numa_flags(void)
-> +static inline int cpu_numa_flags(void)
->  {
->  	return SD_NUMA;
->  }
+cpu cpu0: failed to scale vddpu up: -22
+cpufreq: __target_index: Failed to change cpu frequency: -22
+cpu cpu0: failed to scale vddpu up: -22
+cpufreq: __target_index: Failed to change cpu frequency: -22
+cpu cpu0: failed to scale vddpu up: -22
+cpufreq: __target_index: Failed to change cpu frequency: -22
 
-The same is true of those three, but then they would have to be moved
-into a .c file and replaced with prototypes ...
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140626/d0b1ed89/attachment.sig>
+Any suggestions?
