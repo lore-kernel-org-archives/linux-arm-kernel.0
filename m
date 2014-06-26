@@ -1,247 +1,116 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
-Date: Thu, 26 Jun 2014 16:51:22 +0530
-Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
- regulators
-In-Reply-To: <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
-References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
- <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
- <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
-Message-ID: <CAKuRcO+OaknUtj9mJ+SQJPMj70hdLTMkDYCXq4L5JdwzDKdj6g@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jun 2014 12:23:35 +0100
+Subject: [PATCH v5 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
+ support
+In-Reply-To: <20140625160911.GG15240@leverpostej>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140625160911.GG15240@leverpostej>
+Message-ID: <20140626112335.GC25130@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug
+On Wed, Jun 25, 2014 at 05:09:11PM +0100, Mark Rutland wrote:
+> On Wed, Jun 25, 2014 at 03:10:17PM +0100, Lorenzo Pieralisi wrote:
+> > This patch implements the cpu_suspend cpu operations method through
+> > the PSCI CPU_SUSPEND API. The PSCI implementation translates the idle state
+> > index passed by the cpu_suspend core call into a valid PSCI state according to
+> > the PSCI states initialized at boot by the PSCI suspend backend.
+> > 
+> > Entry point is set to cpu_resume physical address, that represents the
+> > default kernel execution address following a CPU reset.
+> > 
+> > Idle state indices missing a DT node description are initialized to power
+> > state standby WFI so that if called by the idle driver they provide the
+> > default behaviour.
+> > 
+> > Reviewed-by: Sebastian Capella <sebcape@gmail.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  arch/arm64/include/asm/psci.h |   4 ++
+> >  arch/arm64/kernel/psci.c      | 103 ++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 107 insertions(+)
+> 
+> [...]
+> 
+> > +static void psci_power_state_unpack(u32 power_state,
+> > +				    struct psci_power_state *state)
+> > +{
+> > +	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
+> > +			PSCI_0_2_POWER_STATE_ID_SHIFT;
+> > +	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
+> > +			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
+> > +	state->affinity_level =
+> > +			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
+> > +			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+> > +}
+> 
+> Is this valid for PSCI versions prior to 0.2?
 
-On Tue, Jun 24, 2014 at 11:30 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Yuvaraj,
->
-> On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->> This patch makes use of mmc_regulator_get_supply() to handle
->> the vmmc and vqmmc regulators.Also it moves the code handling
->> the these regulators to dw_mci_set_ios().It turned on the vmmc
->> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
->> during MMC_POWER_OFF.
->>
->> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->> ---
->>  drivers/mmc/host/dw_mmc.c |   71 ++++++++++++++++++++++-----------------------
->>  drivers/mmc/host/dw_mmc.h |    2 ++
->>  2 files changed, 36 insertions(+), 37 deletions(-)
->
-> Perhaps you could CC me on the whole series for the next version since
-> I was involved in privately reviewing previous versions?
-It was just accidental missing you in the CC .Surely i will add you in
-CC for next versions.
->
-> Overall caveat for my review is that I'm nowhere near an SD/MMC expert.
->
->
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 1ac227c..f5cabce 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -937,6 +937,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>         struct dw_mci_slot *slot = mmc_priv(mmc);
->>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
->>         u32 regs;
->> +       int ret;
->>
->>         switch (ios->bus_width) {
->>         case MMC_BUS_WIDTH_4:
->> @@ -975,16 +976,41 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>
->>         switch (ios->power_mode) {
->>         case MMC_POWER_UP:
->> +               if ((!IS_ERR(mmc->supply.vmmc)) &&
->> +                               !test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
->> +                       ret = regulator_enable(mmc->supply.vmmc);
->> +                       if (!ret)
->> +                               set_bit(DW_MMC_CARD_POWERED, &slot->flags);
->> +               }
->
-> As per below, I'm not sure why you'd want to turn on vqmmc and vmmc at
-> different times.
-As you can see people's have different opinion on this.When i had a
-look at the other drivers in the subsystem which does in the same flow
-as above.However i will change in the next version.
->
-> Also: if you fail to turn on either of the regulators it feels like
-> you should print a pretty nasty error message since your device will
-> almost certainly not work.
-Yes. I will add a error message.
->
->
->>                 set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
->>                 regs = mci_readl(slot->host, PWREN);
->>                 regs |= (1 << slot->id);
->>                 mci_writel(slot->host, PWREN, regs);
->>                 break;
->>         case MMC_POWER_OFF:
->> +               if (!IS_ERR(mmc->supply.vqmmc) &&
->> +                               test_bit(DW_MMC_IO_POWERED, &slot->flags)) {
->> +                       ret = regulator_disable(mmc->supply.vqmmc);
->> +                       if (!ret)
->> +                               clear_bit(DW_MMC_IO_POWERED, &slot->flags);
->> +               }
->> +               if (!IS_ERR(mmc->supply.vmmc) &&
->> +                               test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
->> +                       ret = regulator_disable(mmc->supply.vmmc);
->> +                       if (!ret)
->> +                               clear_bit(DW_MMC_CARD_POWERED, &slot->flags);
->> +               }
->>                 regs = mci_readl(slot->host, PWREN);
->>                 regs &= ~(1 << slot->id);
->>                 mci_writel(slot->host, PWREN, regs);
->>                 break;
->> +       case MMC_POWER_ON:
->> +               if (!IS_ERR(mmc->supply.vqmmc) &&
->> +                               !test_bit(DW_MMC_IO_POWERED, &slot->flags)) {
->> +                       ret = regulator_enable(mmc->supply.vqmmc);
->> +                       if (!ret)
->> +                               set_bit(DW_MMC_IO_POWERED, &slot->flags);
->> +               }
->>         default:
->>                 break;
->>         }
->> @@ -2067,7 +2093,13 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->>                 mmc->f_max = freq[1];
->>         }
->>
->> -       mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
->> +       /*if there are external regulators, get them*/
->> +       ret = mmc_regulator_get_supply(mmc);
->> +       if (ret == -EPROBE_DEFER)
->> +               goto err_setup_bus;
->> +
->> +       if (!mmc->ocr_avail)
->> +               mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
->>
->>         if (host->pdata->caps)
->>                 mmc->caps = host->pdata->caps;
->> @@ -2133,7 +2165,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->>
->>  err_setup_bus:
->>         mmc_free_host(mmc);
->> -       return -EINVAL;
->> +       return ret;
->>  }
->>
->>  static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
->> @@ -2375,24 +2407,6 @@ int dw_mci_probe(struct dw_mci *host)
->>                 }
->>         }
->>
->> -       host->vmmc = devm_regulator_get_optional(host->dev, "vmmc");
->> -       if (IS_ERR(host->vmmc)) {
->> -               ret = PTR_ERR(host->vmmc);
->> -               if (ret == -EPROBE_DEFER)
->> -                       goto err_clk_ciu;
->> -
->> -               dev_info(host->dev, "no vmmc regulator found: %d\n", ret);
->> -               host->vmmc = NULL;
->> -       } else {
->> -               ret = regulator_enable(host->vmmc);
->> -               if (ret) {
->> -                       if (ret != -EPROBE_DEFER)
->> -                               dev_err(host->dev,
->> -                                       "regulator_enable fail: %d\n", ret);
->> -                       goto err_clk_ciu;
->> -               }
->> -       }
->> -
->>         host->quirks = host->pdata->quirks;
->>
->>         spin_lock_init(&host->lock);
->> @@ -2536,8 +2550,6 @@ err_workqueue:
->>  err_dmaunmap:
->>         if (host->use_dma && host->dma_ops->exit)
->>                 host->dma_ops->exit(host);
->> -       if (host->vmmc)
->> -               regulator_disable(host->vmmc);
->>
->>  err_clk_ciu:
->>         if (!IS_ERR(host->ciu_clk))
->> @@ -2573,9 +2585,6 @@ void dw_mci_remove(struct dw_mci *host)
->>         if (host->use_dma && host->dma_ops->exit)
->>                 host->dma_ops->exit(host);
->>
->> -       if (host->vmmc)
->> -               regulator_disable(host->vmmc);
->> -
->>         if (!IS_ERR(host->ciu_clk))
->>                 clk_disable_unprepare(host->ciu_clk);
->>
->> @@ -2592,9 +2601,6 @@ EXPORT_SYMBOL(dw_mci_remove);
->>   */
->>  int dw_mci_suspend(struct dw_mci *host)
->>  {
->> -       if (host->vmmc)
->> -               regulator_disable(host->vmmc);
->> -
->
-> Just to check: have you tested suspend/resume with the various
-> combinations of "keep-power-in-suspend" and "non-removable" with your
-> patch.  I remember some of the logic being a bit complicated...
-Tested suspend/resume with the non-removable.Will do more testing with
-combination of "keep-power-in-suspend" and "non-removable".
->
->
->>         return 0;
->>  }
->>  EXPORT_SYMBOL(dw_mci_suspend);
->> @@ -2603,15 +2609,6 @@ int dw_mci_resume(struct dw_mci *host)
->>  {
->>         int i, ret;
->>
->> -       if (host->vmmc) {
->> -               ret = regulator_enable(host->vmmc);
->> -               if (ret) {
->> -                       dev_err(host->dev,
->> -                               "failed to enable regulator: %d\n", ret);
->> -                       return ret;
->> -               }
->> -       }
->> -
->>         if (!dw_mci_ctrl_all_reset(host)) {
->>                 ret = -ENODEV;
->>                 return ret;
->> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
->> index 738fa24..5c95d00 100644
->> --- a/drivers/mmc/host/dw_mmc.h
->> +++ b/drivers/mmc/host/dw_mmc.h
->
-> As I mentioned in my previous review, you should be removing "struct
-> regulator *vmmc; /* Power regulator */" from "struct dw_mci" since
-> you're no longer populating it.
-ok
->
->
->> @@ -225,6 +225,8 @@ struct dw_mci_slot {
->>         unsigned long           flags;
->>  #define DW_MMC_CARD_PRESENT    0
->>  #define DW_MMC_CARD_NEED_INIT  1
->> +#define DW_MMC_CARD_POWERED    2
->> +#define DW_MMC_IO_POWERED      3
->
-> I don't really think you should have two bits here.  From my
-> understanding of SD cards there should be very little reason to have
-> vqmmc and vmmc not powered at the same time.
-I think if i can use mmc_regulator_set_ocr(), we don't need additional
-flag.But for tps65090 mmc_regulator_get_ocr() and
-mmc_regulator_set_ocr() is failing as its a fixed-regulator.
->
-> If vqmmc is powered but vmmc is not powered then you'll get leakage
-> and the card can pull power through the IO lines which is bad for the
-> card.
->
-> I don't think that powering vmmc without vqmmc for a short time is
-> terribly bad but I can't quite see a good use case.  Essentially
-> you're powering the card but not able to talk to it, right?  I'm not
-> sure what the state of the IO lines would be (either driven low or
-> floating) since presumably the pullups on the lines are powered by
-> vqmmc too.
->
->
->>         int                     id;
->>         int                     last_detect_state;
->>  };
+Yes, it should, as for the packing function.
+
+> >  /*
+> >   * The following two functions are invoked via the invoke_psci_fn pointer
+> >   * and will not be inlined, allowing us to piggyback on the AAPCS.
+> > @@ -199,6 +216,77 @@ static int psci_migrate_info_type(void)
+> >  	return err;
+> >  }
+> >  
+> > +int __init psci_dt_register_idle_states(struct cpuidle_driver *drv,
+> > +					struct device_node *state_nodes[])
+> > +{
+> > +	int cpu, i;
+> 
+> Perhaps unsigned int? You print i with %u below.
+
+Yes.
+
+> > +	for (i = 0; i < drv->state_count; i++) {
+> > +		u32 psci_power_state;
+> > +
+> > +		if (!state_nodes[i]) {
+> > +			/*
+> > +			 * An index with a missing node pointer falls back to
+> > +			 * simple STANDBYWFI
+> > +			 */
+> > +			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
+> > +			continue;
+> > +		}
+> 
+> Does this make sense? Are there any limitations on which state nodes
+> could be missing?
+
+I think the check is overkill, you are right.
+
+> > +
+> > +		if (of_property_read_u32(state_nodes[i], "entry-method-param",
+> > +					 &psci_power_state)) {
+> > +			pr_warn(" * %s missing entry-method-param property\n",
+> > +				state_nodes[i]->full_name);
+> > +			/*
+> > +			 * If entry-method-param property is missing, fall
+> > +			 * back to STANDBYWFI state
+> > +			 */
+> > +			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
+> > +			continue;
+> 
+> Surely we want to throw away these states instead?
+> 
+> Otherwise we can get into a mess like:
+> 
+> psci_states[0] => low power state
+> psci_states[1] => lower power state
+> psci_states[2] => WFI / not low power
+> psci_states[3] => lowest power state
+> 
+> Where power usage and latency would jump around rather than follow
+> monotonic patterns.
+
+I do not think that's a problem by itself, but honestly I think you have
+a point. It is better to barf, throw away the states and avoid initializing
+CPUidle to force a firmware update than keep going with a state that is
+actually not doing what it probably was designed for, I just tried to be too
+accommodating on this.
+
+Thanks,
+Lorenzo
