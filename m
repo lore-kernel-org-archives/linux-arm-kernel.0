@@ -1,90 +1,76 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Wed, 25 Jun 2014 19:45:51 -0500
-Subject: [PATCH 2/2 v2] ARM: KVM: user_mem_abort: support stage 2 MMIO page
- mapping
-In-Reply-To: <53A9556D.3000003@arm.com>
-References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
- <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
- <20140506180448.GH3066@lvm>	<87bnvaotei.fsf@approximate.cambridge.arm.com>
- <20140507145557.GJ3066@lvm>	<20140624102327.GA9121@arm.com>
- <53A9556D.3000003@arm.com>
-Message-ID: <20140625194551.a6443252bf913023159d25fd@freescale.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 26 Jun 2014 09:57:48 +0900
+Subject: [PATCH_v4 0/2] arm64: Add seccomp support
+In-Reply-To: <1403708017.755.86.camel@deneb.redhat.com>
+References: <1394705823-12465-1-git-send-email-takahiro.akashi@linaro.org>	
+ <1394862604-29105-1-git-send-email-takahiro.akashi@linaro.org>
+ <1403708017.755.86.camel@deneb.redhat.com>
+Message-ID: <53AB700C.20808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kim Phillips <kim.phillips@linaro.org>
+On 06/25/2014 11:53 PM, Mark Salter wrote:
+> What is the current status of this patch series? Is it on track
+> for 3.17?
 
-A userspace process can map device MMIO memory via VFIO or /dev/mem,
-e.g., for platform device passthrough support in QEMU.
+I assume not as I saw no comments on this so far.
+But I will re-post a new version soon or later due to recent changes on seccomp.
 
-During early development, we found the PAGE_S2 memory type being used
-for MMIO mappings.  This patch corrects that by using the more strongly
-ordered memory type for device MMIO mappings: PAGE_S2_DEVICE.
+-Takahiro AKASHI
 
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Hi, here's a v2, upon request:
-
-- rebased onto today's mainline ToT
-- mmu.o-build tested only (ToT build doesn't complete)
-- made commit text less terse
-- added Christoffer's ack
-
-Cheers,
-
-Kim
-
- arch/arm/kvm/mmu.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 16f8049..69af021 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -748,6 +748,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
-+	pgprot_t mem_type = PAGE_S2;
- 
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -798,6 +799,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (is_error_pfn(pfn))
- 		return -EFAULT;
- 
-+	if (kvm_is_mmio_pfn(pfn))
-+		mem_type = PAGE_S2_DEVICE;
-+
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
-@@ -805,7 +809,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
- 	if (hugetlb) {
--		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
-+		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
- 		new_pmd = pmd_mkhuge(new_pmd);
- 		if (writable) {
- 			kvm_set_s2pmd_writable(&new_pmd);
-@@ -814,13 +818,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
--		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-+		pte_t new_pte = pfn_pte(pfn, mem_type);
- 		if (writable) {
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
--		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
-+		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
-+				     mem_type == PAGE_S2_DEVICE);
- 	}
- 
- 
--- 
-2.0.0
+> On Sat, 2014-03-15 at 14:50 +0900, AKASHI Takahiro wrote:
+>> (Please apply this patch after my ftrace patch and audit patch in order
+>> to avoid some conflict on arm64/Kconfig.)
+>>
+>> This patch enables secure computing (system call filtering) on arm64.
+>> System calls can be allowed or denied by loaded bpf-style rules.
+>> Architecture specific part is to run secure_computing() on syscall entry
+>> and check the result. See [2/2]
+>>
+>> Prerequisites are:
+>>   * "arm64: make a single hook to syscall_trace() for all syscall features" patch
+>>   * "arm64: split syscall_trace() into separate functions for enter/exit" patch
+>>   * "arm64: Add audit support" patch
+>>   * "arm64: is_compat_task is defined both in asm/compat.h and
+>>      linux/compat.h" patch
+>>
+>> This code is tested on ARMv8 fast model using libseccomp v2.1.1 with
+>> modifications for arm64 and verified by its "live" tests, 20, 21 and 24.
+>>
+>> Changes v3 -> v4:
+>> * removed the following patch and moved it to "arm64: prerequisites for
+>>    audit and ftrace" patchset since it is required for audit and ftrace in
+>>    case of !COMPAT, too.
+>>    "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
+>>
+>> Changes v2 -> v3:
+>> * removed unnecessary 'type cast' operations [2/3]
+>> * check for a return value (-1) of secure_computing() explicitly [2/3]
+>> * aligned with the patch, "arm64: split syscall_trace() into separate
+>>    functions for enter/exit" [2/3]
+>> * changed default of CONFIG_SECCOMP to n [2/3]
+>>
+>> Changes v1 -> v2:
+>> * added generic seccomp.h for arm64 to utilize it [1,2/3]
+>> * changed syscall_trace() to return more meaningful value (-EPERM)
+>>    on seccomp failure case [2/3]
+>> * aligned with the change in "arm64: make a single hook to syscall_trace()
+>>    for all syscall features" v2 [2/3]
+>> * removed is_compat_task() definition from compat.h [3/3]
+>>
+>> AKASHI Takahiro (2):
+>>    asm-generic: Add generic seccomp.h for secure computing mode 1
+>>    arm64: Add seccomp support
+>>
+>>   arch/arm64/Kconfig               | 14 ++++++++++++++
+>>   arch/arm64/include/asm/seccomp.h | 25 +++++++++++++++++++++++++
+>>   arch/arm64/include/asm/unistd.h  |  3 +++
+>>   arch/arm64/kernel/entry.S        |  4 ++++
+>>   arch/arm64/kernel/ptrace.c       |  6 ++++++
+>>   include/asm-generic/seccomp.h    | 28 ++++++++++++++++++++++++++++
+>>   6 files changed, 80 insertions(+)
+>>   create mode 100644 arch/arm64/include/asm/seccomp.h
+>>   create mode 100644 include/asm-generic/seccomp.h
+>>
+>
+>
