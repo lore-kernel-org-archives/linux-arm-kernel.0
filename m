@@ -1,31 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 26 Jun 2014 23:08:23 +0100
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <53AB1CC1.4010907@codeaurora.org>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
- <53AB1CC1.4010907@codeaurora.org>
-Message-ID: <20140626220823.GA23300@sirena.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 26 Jun 2014 15:11:09 -0700
+Subject: [PATCH] clk: define and export __clk_get_debug for providers
+In-Reply-To: <CAAObsKDVrXRgO1e2=SorGiNUMhGPCCUUPtsjDfnST9gFN4=qTQ@mail.gmail.com>
+References: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
+ <44039675.8s16pHQIVH@wuerfel> <20140625182349.32686.25931@quantum>
+ <CAAObsKDVrXRgO1e2=SorGiNUMhGPCCUUPtsjDfnST9gFN4=qTQ@mail.gmail.com>
+Message-ID: <CAPtuhTgp2Ubr-9CiVGeJjG91J765dYKcY3gF+i+o1MTf2ELKPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 12:02:25PM -0700, Stephen Boyd wrote:
+On Thu, Jun 26, 2014 at 12:37 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> On 25 June 2014 20:23, Mike Turquette <mturquette@linaro.org> wrote:
+>>
+>> Peter,
+>>
+>> Just FYI, I'm trying to reverse the trend of prepending double
+>> underscores for functions that are used by clock providers. That stuff
+>> started out small and sort of grew out of control ;-)
+>
+> I'm looking at rebasing Rabin's patches for per-user clks, and I have
+> had to add a few variants for providers, so they can be called with
+> clk_core instead. Have been prepending underscores for those internal
+> variants, but in some cases I had to also append a _internal suffix
+> because there were already variants without locking.
+>
+> What convention were you thinking of for distinguishing provider-only
+> variants for e.g. clk_set_rate?
 
-> I don't think this driver should be using regulator_get_optional() (Mark
-> B. please correct me if I'm wrong). I doubt a supply is actually
-> optional for CPUs, just some DTs aren't specifying them. In those cases,
-> the regulator core will insert a dummy supply and the code will work
-> without having to check for probe defer and error pointers.
+Hmm. Now we need a convention. Damn. ;-)
 
-Since the cpufreq driver is actively working with the regulator,
-changing voltages and so on it's mostly OK, it's kind of on the border
-of something that should do this but there doesn't seem to be a
-reasonable way for it to handle not being able to read the voltage
-cleanly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140626/10ec9c81/attachment.sig>
+I'm open to suggestions. I think prepending a single underscore makes
+great sense for a lock-free inner function. And some number of
+underscores (1 or 2) makes sense for static functions not exposed to
+clock providers. I kind of like using 2 underscores for the static
+functions so that it is easier to differentiate them.
+
+For any new functions you create with unique names that are exposed to
+clock providers, do not prepend any underscore at all. It's just
+another public function in clk-provider.h.
+
+If any taste makers out there have suggestions I am happy to listen.
+
+Regards,
+Mike
+
+>
+> Regards,
+>
+> Tomeu
