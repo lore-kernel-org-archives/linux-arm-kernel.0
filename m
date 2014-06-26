@@ -1,23 +1,67 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 26 Jun 2014 13:04:35 +0530
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <53AB1CC1.4010907@codeaurora.org>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
- <53AB1CC1.4010907@codeaurora.org>
-Message-ID: <CAKohpokK+2hJ=pbLsjaqE_R3yBKcP-BwmH6RYdNRv69O-4ah8Q@mail.gmail.com>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Thu, 26 Jun 2014 07:34:55 +0000
+Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
+In-Reply-To: <20140626055431.GC7859@dragon>
+References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
+ <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
+ <20140626055431.GC7859@dragon>
+Message-ID: <5d0aab099e9b450397bcc7ea7fde0fd8@BY2PR03MB315.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 June 2014 00:32, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Hi, Shawn
+	I am OK with this.
 
->> +     cpu_reg = regulator_get_optional(cpu_dev, "cpu0");
+Best Regards.
+Anson Huang
+?
+Freescale Semiconductor Shanghai
+Tel:021-28937058
 
-> I don't think this driver should be using regulator_get_optional() (Mark
-> B. please correct me if I'm wrong). I doubt a supply is actually
-> optional for CPUs, just some DTs aren't specifying them. In those cases,
-> the regulator core will insert a dummy supply and the code will work
-> without having to check for probe defer and error pointers.
 
-This is what Mark did earlier, don't know if he would like to revert it:
-7d74897 (cpufreq: cpufreq-cpu0: Use devm_regulator_get_optional()).
+>-----Original Message-----
+>From: Shawn Guo [mailto:shawn.guo at freescale.com]
+>Sent: Thursday, June 26, 2014 1:55 PM
+>To: Fabio Estevam
+>Cc: Huang Yongcai-B20788; Sascha Hauer; Russell King; linux-arm-
+>kernel at lists.infradead.org
+>Subject: Re: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
+>
+>On Wed, Jun 25, 2014 at 10:23:01PM -0300, Fabio Estevam wrote:
+>> Hi Anson,
+>>
+>> On Wed, Jun 25, 2014 at 6:10 AM, Anson Huang <b20788@freescale.com> wrote:
+>> > Add cpufreq support for i.MX6SX, using common i.MX6Q cpufreq driver.
+>> >
+>> > Signed-off-by: Anson Huang <b20788@freescale.com>
+>> > ---
+>> >  arch/arm/mach-imx/mach-imx6sx.c |    3 +++
+>> >  1 file changed, 3 insertions(+)
+>> >
+>> > diff --git a/arch/arm/mach-imx/mach-imx6sx.c
+>> > b/arch/arm/mach-imx/mach-imx6sx.c index 74ff7d6..9221e1d 100644
+>> > --- a/arch/arm/mach-imx/mach-imx6sx.c
+>> > +++ b/arch/arm/mach-imx/mach-imx6sx.c
+>> > @@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)  static
+>> > void __init imx6sx_init_late(void)  {
+>> >         imx6q_cpuidle_init();
+>> > +
+>> > +       if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+>> > +               platform_device_register_simple("imx6q-cpufreq", -1,
+>> > + NULL, 0);
+>> >  }
+>>
+>> With this patch applied I get a flood of these messages:
+>>
+>> cpu cpu0: failed to scale vddpu up: -22
+>> cpufreq: __target_index: Failed to change cpu frequency: -22 cpu cpu0:
+>> failed to scale vddpu up: -22
+>> cpufreq: __target_index: Failed to change cpu frequency: -22 cpu cpu0:
+>> failed to scale vddpu up: -22
+>> cpufreq: __target_index: Failed to change cpu frequency: -22
+>
+>So it's because the driver change for imx6sx hasn't been in place.  I just
+>dropped the patch from my branch for now, and will revisit later when driver
+>part shows up on my branch.  (Unfortunately, that will be next cycle).
+>
+>Shawn
