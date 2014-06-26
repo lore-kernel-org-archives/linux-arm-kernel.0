@@ -1,80 +1,108 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 26 Jun 2014 23:53:20 +0900
-Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
-In-Reply-To: <CACP_E+KECMyusuZd6hpzthL-RpfUOJpWh0EABf1DGAeaXc00aA@mail.gmail.com>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
- <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
- <20140624100220.GK32514@n2100.arm.linux.org.uk>
- <53A953E6.2030503@nvidia.com> <53A95910.20104@nvidia.com>
- <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
- <53A96EC5.3030701@canonical.com>
- <1403616338.4230.8.camel@weser.hi.pengutronix.de>
- <CACP_E+KECMyusuZd6hpzthL-RpfUOJpWh0EABf1DGAeaXc00aA@mail.gmail.com>
-Message-ID: <CAAVeFuLU04rk1DWMhVJV=ktVCpq4js38p1ipCr1jh1x72b=GZw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jun 2014 15:53:55 +0100
+Subject: [PATCH] ARM: EXYNOS: Restore the entry address setup code
+ post-resume
+In-Reply-To: <CAM4voa=AYDkHG49EEnr0097Dw4eS__T95oDrhswcfHEzY=PTcw@mail.gmail.com>
+References: <1403780312-22885-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voa=AYDkHG49EEnr0097Dw4eS__T95oDrhswcfHEzY=PTcw@mail.gmail.com>
+Message-ID: <20140626145355.GA27364@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 1:00 PM, St?phane Marchesin
-<stephane.marchesin@gmail.com> wrote:
-> On Tue, Jun 24, 2014 at 6:25 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
->> Am Dienstag, den 24.06.2014, 14:27 +0200 schrieb Maarten Lankhorst:
->>> op 24-06-14 14:23, Alexandre Courbot schreef:
->>> > On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
->>> >> On 06/24/2014 07:33 PM, Alexandre Courbot wrote:
->>> >>> On 06/24/2014 07:02 PM, Russell King - ARM Linux wrote:
->>> >>>> On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
->>> >>>>> From: Lucas Stach <dev@lynxeye.de>
->>> >>>>>
->>> >>>>> On architectures for which access to GPU memory is non-coherent,
->>> >>>>> caches need to be flushed and invalidated explicitly at the
->>> >>>>> appropriate places. Introduce two small helpers to make things
->>> >>>>> easy for TTM-based drivers.
->>> >>>>
->>> >>>> Have you run this with DMA API debugging enabled?  I suspect you haven't,
->>> >>>> and I recommend that you do.
->>> >>>
->>> >>> # cat /sys/kernel/debug/dma-api/error_count
->>> >>> 162621
->>> >>>
->>> >>> (??????? ???)
->>> >>
->>> >> *puts table back on its feet*
->>> >>
->>> >> So, yeah - TTM memory is not allocated using the DMA API, hence we cannot
->>> >> use the DMA API to sync it. Thanks Russell for pointing it out.
->>> >>
->>> >> The only alternative I see here is to flush the CPU caches when syncing for
->>> >> the device, and invalidate them for the other direction. Of course if the
->>> >> device has caches on its side as well the opposite operation must also be
->>> >> done for it. Guess the only way is to handle it all by ourselves here. :/
->>> > ... and it really sucks. Basically if we cannot use the DMA API here
->>> > we will lose the convenience of having a portable API that does just
->>> > the right thing for the underlying platform. Without it we would have
->>> > to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
->>> > have support for ARM.
->>> >
->>> > The usage of the DMA API that we are doing might be illegal, but in
->>> > essence it does exactly what we need - at least for ARM. What are the
->>> > alternatives?
->>> Convert TTM to use the dma api? :-)
->>
->> Actually TTM already has a page alloc backend using the DMA API. It's
->> just not used for the standard case right now.
->>
->> I would argue that we should just use this page allocator (which has the
->> side effect of getting pages from CMA if available -> you are actually
->> free to change the caching) and do away with the other allocator in the
->> ARM case.
->
-> CMA comes with its own set of (severe) limitations though, in
-> particular it's not possible to map arbitrary CPU pages into the GPU
-> without incurring a copy, you add arbitrary memory limits etc. Overall
-> that's not really a good pick for the long term...
+On Thu, Jun 26, 2014 at 01:25:30PM +0100, Abhilash Kesavan wrote:
+> Hi,
+> 
+> On Thu, Jun 26, 2014 at 4:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> > Setup the mcpm entry address again on system resume as the
+> > iRAM contents are lost across an s2r cycle.
+> >
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > ---
+> > This has been tested after applying the Exynos5420 S2R support series
+> > along with Nicolas Pitre's boot cluster CCI enablement patches on Peach
+> > Pit.
+> >
+> >  arch/arm/mach-exynos/mcpm-exynos.c | 31 +++++++++++++++++++++----------
+> >  1 file changed, 21 insertions(+), 10 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> > index 8c610e2..0bf734d 100644
+> > --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> > @@ -15,6 +15,7 @@
+> >  #include <linux/delay.h>
+> >  #include <linux/io.h>
+> >  #include <linux/of_address.h>
+> > +#include <linux/syscore_ops.h>
+> >
+> >  #include <asm/cputype.h>
+> >  #include <asm/cp15.h>
+> > @@ -26,6 +27,7 @@
+> >  #define EXYNOS5420_CPUS_PER_CLUSTER    4
+> >  #define EXYNOS5420_NR_CLUSTERS         2
+> >
+> > +static void __iomem *ns_sram_base_addr;
+> >  /*
+> >   * The common v7_exit_coherency_flush API could not be used because of the
+> >   * Erratum 799270 workaround. This macro is the same as the common one (in
+> > @@ -308,10 +310,26 @@ static const struct of_device_id exynos_dt_mcpm_match[] = {
+> >         {},
+> >  };
+> >
+> > +static void exynos_mcpm_setup_entry_point(void)
+> > +{
+> > +       /*
+> > +        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+> > +        * as part of secondary_cpu_start().  Let's redirect it to the
+> > +        * mcpm_entry_point(). This is done during both secondary boot-up as
+> > +        * well as system resume.
+> > +        */
+> > +       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+> > +       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+> > +       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
+> > +}
+> > +
+> > +static struct syscore_ops exynos_mcpm_syscore_ops = {
+> > +       .resume = exynos_mcpm_setup_entry_point,
+> > +};
+> > +
+> >  static int __init exynos_mcpm_init(void)
+> >  {
+> >         struct device_node *node;
+> > -       void __iomem *ns_sram_base_addr;
+> >         int ret;
+> >
+> >         node = of_find_matching_node(NULL, exynos_dt_mcpm_match);
+> > @@ -357,16 +375,9 @@ static int __init exynos_mcpm_init(void)
+> >
+> >         pr_info("Exynos MCPM support installed\n");
+> >
+> > -       /*
+> > -        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+> > -        * as part of secondary_cpu_start().  Let's redirect it to the
+> > -        * mcpm_entry_point().
+> > -        */
+> > -       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+> > -       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+> > -       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
+> > +       exynos_mcpm_setup_entry_point();
+> >
+> > -       iounmap(ns_sram_base_addr);
+> > +       register_syscore_ops(&exynos_mcpm_syscore_ops);
+> >
+> >         return ret;
+> >  }
+> 
+> This patch alone is not enough to bring the 8 cores back up post
+> resume on exynos5420, We need to enable the boot cluster snoops as
+> well.
+> 
+> Nicolas, if I add code to enable the boot cluster CCI in
+> mach-exynos/sleep.S, all 8 cores come up. However, if I use
+> mcpm_loopback as part of the newly added resume function to do the
+> same, I get a hang on resume.
 
-We don't plan to rely on CMA for too long. IOMMU support is on the way
-and should make our life easier, although no matter the source of
-memory, we will still have the issue of the lowmem mappings. So far it
-sounds like CMA is the only way to "undo" them, so in the end it may
-come down to whether or not the multi-mapping contraint applies to
-TK1. I will tap into our internal sources of knowledge to try and
-figure this one out.
+BTW mcpm_loopback is __init, and that's correct, so on resume if you
+call it kernel goes boom.
+
+Lorenzo
