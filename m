@@ -1,31 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 Jun 2014 08:43:34 -0300
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <201406260932.30524.jbe@pengutronix.de>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
- <20140626031247.GN2224@dragon>
- <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>
- <201406260932.30524.jbe@pengutronix.de>
-Message-ID: <CAOMZO5CJmORit5-rqkARYHtc95NKMRDf4yMFeTswr9KoxKyrwQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 26 Jun 2014 13:46:03 +0200
+Subject: [PATCH RESEND] ARM: EXYNOS: Do not calculate boot address twice
+Message-ID: <1403783163-28638-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
+Commit b3205dea8fbf ("ARM: EXYNOS: Map SYSRAM through generic DT
+bindings") introduced local variable boot_reg where boot address from
+cpu_boot_reg() call is stored. Re-use it instead calling cpu_boot_reg()
+again.
 
-On Thu, Jun 26, 2014 at 4:32 AM, Juergen Borleis <jbe@pengutronix.de> wrote:
-> Hi Fabio,
->
-> On Thursday 26 June 2014 05:43:19 Fabio Estevam wrote:
->> [...]
->> Below is the log with linux-next kernel and earlyprintk enabled:
->
-> Does it also hang when you disable "earlyprintk"? A few weeks ago we had a
-> similar issue with i.MX6/PCI and "earlyprintk" (at the end it was caused by a
-> clock change for the UART when changing from the early to the regular
-> console).
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/mach-exynos/platsmp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yes, it also hangs without earlyprintk.
-
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 1c8d31e39520..55ed2e6729c5 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -155,7 +155,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 				ret = PTR_ERR(boot_reg);
+ 				goto fail;
+ 			}
+-			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
++			__raw_writel(boot_addr, boot_reg);
+ 		}
+ 
+ 		call_firmware_op(cpu_boot, phys_cpu);
+@@ -242,7 +242,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 			if (IS_ERR(boot_reg))
+ 				break;
+-			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
++			__raw_writel(boot_addr, boot_reg);
+ 		}
+ 	}
+ }
+-- 
+1.9.1
