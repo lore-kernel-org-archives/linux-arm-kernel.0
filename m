@@ -1,49 +1,52 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Thu, 26 Jun 2014 14:34:17 +0200
-Subject: [PATCH RFC v2 3/8] component: add support for component match
- array
-In-Reply-To: <E1WzWOy-0007zc-36@rmk-PC.arm.linux.org.uk>
-References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
- <E1WzWOy-0007zc-36@rmk-PC.arm.linux.org.uk>
-Message-ID: <CA+gwMcdO5P-Yu+-FeHHGxkKwObsATL-ThVDwmEm2_cZ3enUXPQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 26 Jun 2014 16:34:59 +0400
+Subject: [PATCH v5 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
+ nodes
+In-Reply-To: <53AB9581.7090806@renesas.com>
+References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>	<201406242159.55373.sergei.shtylyov@cogentembedded.com>	<53AB89B3.9020207@renesas.com>
+ <CANqRtoSsx+NAz2W_utN-A2fx+=e_Ywt5eD=Tf9uGnEDvk3w-PQ@mail.gmail.com>
+ <53AB9581.7090806@renesas.com>
+Message-ID: <53AC1373.5010501@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hello.
 
-On Tue, Jun 24, 2014 at 9:29 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-[...]
-> +/*
-> + * Add a component to be matched.
-> + *
-> + * The match array is first created or extended if necessary.
-> + */
-> +void component_match_add(struct device *dev, struct component_match **matchptr,
-> +       int (*compare)(struct device *, void *), void *compare_data)
-> +{
-> +       struct component_match *match = *matchptr;
-> +
-> +       if (IS_ERR(match))
-> +               return;
-> +
-> +       if (!match || match->num == match->alloc) {
-> +               size_t new_size = match ? match->alloc + 16 : 15;
-> +
-> +               match = component_match_realloc(dev, match, new_size);
-> +
-> +               *matchptr = match;
-> +
-> +               if (IS_ERR(match))
-> +                       return;
-> +       }
-> +
-> +       match->compare[match->num].fn = compare;
-> +       match->compare[match->num].data = compare_data;
-> +       match->num++;
-> +}
+On 06/26/2014 07:37 AM, Yoshihiro Shimoda wrote:
 
-component_match_add should be exported.
+>>>> From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-regards
-Philipp
+>>>> Add device nodes for the R8A7790 internal PCI bridge devices.
+
+>>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>>> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+>>>> [Sergei: added several properties to the PCI bridge nodes]
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>>> Thank you for the patch!
+
+>>> I tested this patch on my lager board and a usb memory, and it works.
+
+>>> Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+
+>> Thanks for testing. Just one quick question from my side: Which USB
+>> port did you test?
+
+> I tested usb ch1 only...
+
+    Note that channel #2 also should work.
+
+>> I somehow assumed that at least the majority of the USB ports on R-Car
+>> Gen2 require a USB PHY device driver to work?
+>
+> Thank you for the point.
+> About usb ch1, a USB PHY device driver doesn't need, I think.
+> But, about ch0 and ch2, I think that they should require a USB PHY device driver.
+
+    Only channel #0 requires the PHY driver as the default routing for USB0 is 
+to USBHS; channel #2 is routed to OHCI/EHCI by default.
+
+> Best regards,
+> Yoshihiro Shimoda
+
+WBR, Sergei
