@@ -1,55 +1,69 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 26 Jun 2014 12:40:19 +0530
-Subject: [PATCH V4 01/16] irqchip: crossbar: Dont use '0' to mark reserved
- interrupts
-In-Reply-To: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
-References: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1403766634-18543-2-git-send-email-r.sricharan@ti.com>
+Date: Thu, 26 Jun 2014 12:40:18 +0530
+Subject: [PATCH V4 00/16] irqchip: crossbar: Driver fixes
+Message-ID: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+This series does some cleanups, fixes for handling two interrupts
+getting mapped twice to same crossbar and provides support for
+hardwired IRQ and crossbar definitions.
 
-Today '0' is actually reserved, but may not be the same in the future.
+On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10,
+131, 132, 133 are direct wired to hardware blocks bypassing
+crossbar. This quirky implementation is *NOT* supposed to be the
+expectation of crossbar hardware usage. This series adds support
+to represent such hard-wired irqs through DT and avoid generic
+allocation/programming of crossbar in the driver.
 
-So, use a flag to mark the GIC interrupts that are reserved.
+This way of supporting hard-wired irqs was a result of
+the below discussions.
+http://www.spinics.net/lists/arm-kernel/msg329946.html
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/irqchip/irq-crossbar.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Based on 3.16 rc2 mainline.
 
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 3d15d16..20105bc 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -17,6 +17,7 @@
- #include <linux/irqchip/arm-gic.h>
- 
- #define IRQ_FREE	-1
-+#define IRQ_RESERVED	-2
- #define GIC_IRQ_START	32
- 
- /*
-@@ -139,7 +140,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 				pr_err("Invalid reserved entry\n");
- 				goto err3;
- 			}
--			cb->irq_map[entry] = 0;
-+			cb->irq_map[entry] = IRQ_RESERVED;
- 		}
- 	}
- 
-@@ -170,7 +171,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 	 * reserved irqs. so find and store the offsets once.
- 	 */
- 	for (i = 0; i < max; i++) {
--		if (!cb->irq_map[i])
-+		if (cb->irq_map[i] == IRQ_RESERVED)
- 			continue;
- 
- 		cb->register_offsets[i] = reserved;
+All the patches are available here
+ git at github.com:Sricharanti/sricharan.git crossbar_updates
+
+The fixes series[1] earlier posted is merged in to this.
+[1] http://www.spinics.net/lists/arm-kernel/msg328273.html
+
+[V2] Merged the above series and rebased on 3.15 mainline
+
+[V3] Modified patch#3 to get irqs-skip properties from DT,
+     merged path#8 for checkpatch warning to other relevant
+     patches and fixed comments for other patches.
+
+[V4] Based on 3.16rc2 and fixed Jason's <jason@lakedaemon.net> comments.
+
+Nishanth Menon (14):
+  irqchip: crossbar: Dont use '0' to mark reserved interrupts
+  irqchip: crossbar: Check for premapped crossbar before allocating
+  irqchip: crossbar: Introduce ti,irqs-skip to skip irqs that bypass
+    crossbar
+  irqchip: crossbar: Initialise the crossbar with a safe value
+  irqchip: crossbar: Change allocation logic by reversing search for
+    free irqs
+  irqchip: crossbar: Remove IS_ERR_VALUE check
+  irqchip: crossbar: Fix sparse and checkpatch warnings
+  irqchip: crossbar: Fix kerneldoc warning
+  irqchip: crossbar: Return proper error value
+  irqchip: crossbar: Change the goto naming
+  irqchip: crossbar: Introduce ti,max-crossbar-sources to identify
+    valid crossbar mapping
+  irqchip: crossbar: Introduce centralized check for crossbar write
+  documentation: dt: omap: crossbar: Add description for interrupt
+    consumer
+  irqchip: crossbar: Allow for quirky hardware with direct hardwiring
+    of GIC
+
+Sricharan R (2):
+  irqchip: crossbar: Set cb pointer to null in case of error
+  irqchip: crossbar: Add kerneldoc for crossbar_domain_unmap callback
+
+ .../devicetree/bindings/arm/omap/crossbar.txt      |   36 +++++
+ drivers/irqchip/irq-crossbar.c                     |  168 +++++++++++++++++---
+ 2 files changed, 179 insertions(+), 25 deletions(-)
+
 -- 
 1.7.9.5
