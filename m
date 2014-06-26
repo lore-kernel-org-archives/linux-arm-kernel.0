@@ -1,34 +1,88 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 26 Jun 2014 16:22:46 +0530
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <53AB1CC1.4010907@codeaurora.org>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
- <53AB1CC1.4010907@codeaurora.org>
-Message-ID: <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Thu, 26 Jun 2014 16:28:32 +0530
+Subject: [PATCH] ARM: EXYNOS: Restore the entry address setup code post-resume
+Message-ID: <1403780312-22885-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 June 2014 00:32, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> I don't think this driver should be using regulator_get_optional() (Mark
-> B. please correct me if I'm wrong). I doubt a supply is actually
-> optional for CPUs, just some DTs aren't specifying them. In those cases,
-> the regulator core will insert a dummy supply and the code will work
-> without having to check for probe defer and error pointers.
+Setup the mcpm entry address again on system resume as the
+iRAM contents are lost across an s2r cycle.
 
-Hi Stephen,
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+This has been tested after applying the Exynos5420 S2R support series
+along with Nicolas Pitre's boot cluster CCI enablement patches on Peach
+Pit.
 
-Thanks for your comments.
+ arch/arm/mach-exynos/mcpm-exynos.c | 31 +++++++++++++++++++++----------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
 
-Leaving the above one, I have tried to fix all you mentioned. And it surely
-looks much better now.
-
-I would like to wait for a day or two before sending V2, as people might
-be reviewing it and the above issue is still wide open..
-
-But in case you wanna test it (completely changed I must say, but
-for good), its here:
-
-git://git.linaro.org/people/viresh.kumar/linux.git cpufreq/cpu0-krait-v2
-
-Let me know if you still find it childish :)
+diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+index 8c610e2..0bf734d 100644
+--- a/arch/arm/mach-exynos/mcpm-exynos.c
++++ b/arch/arm/mach-exynos/mcpm-exynos.c
+@@ -15,6 +15,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/of_address.h>
++#include <linux/syscore_ops.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/cp15.h>
+@@ -26,6 +27,7 @@
+ #define EXYNOS5420_CPUS_PER_CLUSTER	4
+ #define EXYNOS5420_NR_CLUSTERS		2
+ 
++static void __iomem *ns_sram_base_addr;
+ /*
+  * The common v7_exit_coherency_flush API could not be used because of the
+  * Erratum 799270 workaround. This macro is the same as the common one (in
+@@ -308,10 +310,26 @@ static const struct of_device_id exynos_dt_mcpm_match[] = {
+ 	{},
+ };
+ 
++static void exynos_mcpm_setup_entry_point(void)
++{
++	/*
++	 * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
++	 * as part of secondary_cpu_start().  Let's redirect it to the
++	 * mcpm_entry_point(). This is done during both secondary boot-up as
++	 * well as system resume.
++	 */
++	__raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
++	__raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
++	__raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
++}
++
++static struct syscore_ops exynos_mcpm_syscore_ops = {
++	.resume	= exynos_mcpm_setup_entry_point,
++};
++
+ static int __init exynos_mcpm_init(void)
+ {
+ 	struct device_node *node;
+-	void __iomem *ns_sram_base_addr;
+ 	int ret;
+ 
+ 	node = of_find_matching_node(NULL, exynos_dt_mcpm_match);
+@@ -357,16 +375,9 @@ static int __init exynos_mcpm_init(void)
+ 
+ 	pr_info("Exynos MCPM support installed\n");
+ 
+-	/*
+-	 * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+-	 * as part of secondary_cpu_start().  Let's redirect it to the
+-	 * mcpm_entry_point().
+-	 */
+-	__raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+-	__raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+-	__raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
++	exynos_mcpm_setup_entry_point();
+ 
+-	iounmap(ns_sram_base_addr);
++	register_syscore_ops(&exynos_mcpm_syscore_ops);
+ 
+ 	return ret;
+ }
+-- 
+1.8.3.2
