@@ -1,76 +1,79 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Thu, 26 Jun 2014 15:07:06 +0530
-Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
-In-Reply-To: <20140626092946.GL15240@leverpostej>
-References: <1403765204-17617-1-git-send-email-achandran@mvista.com>
- <20140626092946.GL15240@leverpostej>
-Message-ID: <CAFdej00F=NeOHz4OR4-NUnc9GxioUf0+JN2mjp+PDLEGjeM=ng@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Jun 2014 10:45:07 +0100
+Subject: [PATCHv7 2/3] devicetree: Addition of the Altera SDRAM EDAC.
+In-Reply-To: <1403730927-16163-3-git-send-email-tthayer@altera.com>
+References: <1403730927-16163-1-git-send-email-tthayer@altera.com>
+ <1403730927-16163-3-git-send-email-tthayer@altera.com>
+Message-ID: <20140626094507.GM15240@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 25, 2014 at 10:15:26PM +0100, tthayer at altera.com wrote:
+> From: Thor Thayer <tthayer@altera.com>
+> 
+> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
+> 
+> Signed-off-by: Thor Thayer <tthayer@altera.com>
+> ---
+> v2: Changes to SoC EDAC source code.
+> 
+> v3: Fix typo in device tree documentation.
+> 
+> v4,v5: No changes - bump version for consistency.
+> 
+> v6: Assign ECC registers in SDRAM controller to EDAC
+> 
+> v7: Fix SDRAM EDAC base address.
+> ---
+>  .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
+>  arch/arm/boot/dts/socfpga.dtsi                     |    6 ++++++
+>  2 files changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+> new file mode 100644
+> index 0000000..d68e033
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+> @@ -0,0 +1,15 @@
+> +Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
+> +
+> +Required properties:
+> +- compatible : should contain "altr,sdram-edac";
+> +- reg : should contain the ECC register range in sdram
+> +        controller (address and length).
+> +- interrupts : Should contain the SDRAM ECC IRQ in the
+> +	appropriate format for the IRQ controller.
+> +
+> +Example:
+> +	sdramedac at ffc2502c {
+> +		compatible = "altr,sdram-edac";
+> +		reg = <0xffc2502c 0x28>;
+> +		interrupts = <0 39 4>;
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 310292e..da0785d 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -687,6 +687,12 @@
+>  			reg = <0xffc25000 0x4>;
+>  		};
+>  
+> +		sdramedac at ffc2502c {
+> +			compatible = "altr,sdram-edac";
+> +			reg = <0xffc2502c 0x28>;
+> +			interrupts = <0 39 4>;
+> +		};
 
-On Thu, Jun 26, 2014 at 2:59 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jun 26, 2014 at 07:46:44AM +0100, Arun Chandran wrote:
->> Selecting CPU_BIG_ENDIAN and building the kernel fails just after
->> building it for little endian. According to Documentation/kbuild/makefiles.txt,
->> it is a common mistake to forget 'FORCE' while using 'if_changed'
->
-> This is a little confusing, because we jump from the high level problem
-> to a very specific problem detail with nothing to link the two.
->
-> How about:
->
-> Building a kernel with CPU_BIG_ENDIAN fails if there are stale objects
-> from a !CPU_BIG_ENDIAN build. Due to a missing FORCE prerequisite on an
-> if_changed rule in the VDSO Makefile, we attempt to link a stale LE
-> object into the new BE kernel. According to
-> Documentation/kbuild/makefiles.txt FORCE is required for if_changed
-> rules, and forgetting it is a common mistake.
->
+I'm not sure I understand this. The ECC register existing within the
+SDRAM controller, which we have a binding for. Why do we need a separate
+binding for a subset of registers within an IP block?
 
-Yes that is a better one. I will make the change.
+Why can we not have a single binding for the entire SDRAM controlelr and
+decompse that within Linux as it makes sense for the appropriate
+subsystyems?
 
->> So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
->>
->> arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
->> failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
->>
->> arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
->> failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
->>
->> Signed-off-by: Arun Chandran <achandran@mvista.com>
->
-> Any reason for bot picking up my Tested-by [1]? The patch seems to be
-> the same.
+Leaking Linux design into bindings is a bad idea; it makes it harder to
+change things.
 
-Sorry I missed that. Will include in my next patch
-
---Arun
-
->
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266571.html
->
->> ---
->>  arch/arm64/kernel/vdso/Makefile |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
->> index 6d20b7d..a268a9a 100644
->> --- a/arch/arm64/kernel/vdso/Makefile
->> +++ b/arch/arm64/kernel/vdso/Makefile
->> @@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
->>       $(call if_changed,vdsosym)
->>
->>  # Assembly rules for the .S files
->> -$(obj-vdso): %.o: %.S
->> +$(obj-vdso): %.o: %.S FORCE
->>       $(call if_changed_dep,vdsoas)
->>
->>  # Actual build commands
->> --
->> 1.7.9.5
->>
->>
+Mark.
