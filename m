@@ -1,40 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jun 2014 11:20:55 +0100
-Subject: [PATCH] arm64: do not force irq affinity setting
-In-Reply-To: <1403765395-16978-1-git-send-email-pgaikwad@nvidia.com>
-References: <1403765395-16978-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <20140626102055.GD376@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Jun 2014 03:26:51 -0700
+Subject: [PATCH V4 2/2] arm: dts: dra7: add crossbar device binding
+In-Reply-To: <53ABDA9A.8000108@ti.com>
+References: <1403767532-19290-1-git-send-email-r.sricharan@ti.com>
+ <1403767532-19290-3-git-send-email-r.sricharan@ti.com>
+ <20140626074417.GF28884@atomide.com> <53ABDA9A.8000108@ti.com>
+Message-ID: <20140626102650.GH28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+* Sricharan R <r.sricharan@ti.com> [140626 01:36]:
+> Hi Tony,
+> 
+> On Thursday 26 June 2014 01:14 PM, Tony Lindgren wrote:
+> > * Sricharan R <r.sricharan@ti.com> [140626 00:29]:
+> >> From: R Sricharan <r.sricharan@ti.com>
+> >>
+> >> There is a IRQ crossbar device in the soc, which
+> >> maps the irq requests from the peripherals to the
+> >> mpu interrupt controller's inputs. The Peripheral irq
+> >> requests are connected to only one crossbar
+> >> input and the output of the crossbar is connected to only one
+> >> controller's input line. The crossbar device is used to map
+> >> a peripheral input to a free mpu's interrupt controller line.
+> >>
+> >> Here, adding a new crossbar device node and replacing all the peripheral
+> >> interrupt numbers with its fixed crossbar input lines.
+> > 
+> > I think these two patches need to be a single patch to avoid
+> > breaking booting for git bisect inbetween these patches?
+>   This does not cause booting issues. irq_desc gets allocated linearly,
+>    but that does not create boot issues.
 
-On Thu, Jun 26, 2014 at 07:49:55AM +0100, Prashant Gaikwad wrote:
-> Unconditional copying cpu_online_mask to affinity
-> may result in migrating affinity to wrong CPU.
+OK
 
-We have a bug, but I don't follow your reasoning.
-
-> For example, IRQ 5 affinity mask contains CPU 4-7,
-
-Ok, so d->affinity is 0xf0...
-
-> it was affined to CPU4 and CPU 0-7 are online.
-
-...and cpu_online_mask is 0xff.
-
-> Now if we hot-unplug CPU4 then with current
-> implementation affinity mask will contain
-> CPU 0-3,5-7 and IRQ 5 will be affined to CPU0.
-
-cpumask_any_and(affinity, cpu_online_mask) will give return < nr_cpu_ids
-since there is an intersection of 0xf0. That means ret is false.
-
-The bug is that we then do affinity = cpu_online_mask; unconditionally,
-but we *won't* do the cpumask_copy, since ret is false.
-
-You can fix this by simply bringing the arm64 code into line with the arm
-code, which begs the question as to why this has to exist in the arch/
-backend@all!
-
-Will
+Tony
