@@ -1,50 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 00:43:23 +0200
-Subject: [PATCH 0/5] ARM: Centralize the access to the SCU register
-Message-ID: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 27 Jun 2014 00:43:27 +0200
+Subject: [PATCH 4/5] ARM: mvebu: Enable SCU Speculative linefills to L2 for
+ Armada 375/38x
+In-Reply-To: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403822608-31158-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Nadav Haklai <nadavh@marvell.com>
 
-Following the feedback I go on the patch "ARM: mvebu: Enable SCU
-Speculative linefills to L2 for Armada 375/38x" :
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/335961/focus=335993
+For Armada 375 and Armada 38x SoCs, enable the SCU Speculative
+linefills.
 
-I take the opportunity of adding new functions in smp_scu.c to
-centralize the other access done on the SCU register from C file in
-this file.
+This feature may improve overall system performance.
 
-The first patch is a preliminary clean-up in smp_scu.c.
+[Gregory: modify the title of the patch and no more copy the defintion
+of the bit here]
 
-The second and the third patches add functions to manipulate the SCU
-control register.
+[Gregory: use the new function scu_spec_linefills_enable instead of
+implementing SCU specific feature at board level]
 
-The forth patch use the new scu_spec_linefills_enable()
-function. Enabling SCU Speculative linefills to L2 for Armada 375/38x
-was the reason of this series.
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/board-v7.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-The last patch removed a direct access to the SCU register by an
-access through the new scu_standby_enable() function. For this one I
-have just checked that the kernel can be built using the
-imx_v6_v7_defconfig config, but I didn't test it on an imx6 hardware.
-
-Thanks,
-
-Gregory CLEMENT (4):
-  ARM: smp_scu: Used defined value instead of literal constant
-  ARM: smp_scu: Add the enable speculative linefills operation
-  ARM: smp_scu: Add the enable standby operation
-  ARM: imx6q: Use the new function scu_standby_enable()
-
-Nadav Haklai (1):
-  ARM: mvebu: Enable SCU Speculative linefills to L2 for Armada 375/38x
-
- arch/arm/include/asm/smp_scu.h |  5 ++++
- arch/arm/kernel/smp_scu.c      | 52 ++++++++++++++++++++++++++++++++++++++----
- arch/arm/mach-imx/platsmp.c    |  7 +-----
- arch/arm/mach-mvebu/board-v7.c |  1 +
- 4 files changed, 55 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 8bb742fdf5ca..a24ea105e709 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -45,6 +45,7 @@ static void __init mvebu_scu_enable(void)
+ 		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+ 	if (np) {
+ 		scu_base = of_iomap(np, 0);
++		scu_spec_linefills_enable(scu_base, true);
+ 		scu_enable(scu_base);
+ 		of_node_put(np);
+ 	}
 -- 
 1.8.1.2
