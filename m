@@ -1,43 +1,157 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 25 Jun 2014 22:23:01 -0300
-Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
-In-Reply-To: <1403687412-22362-1-git-send-email-b20788@freescale.com>
-References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
-Message-ID: <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 26 Jun 2014 09:38:41 +0800
+Subject: [PATCH V7 1/6] power: reset: Add generic SYSCON register mapped
+ reset
+In-Reply-To: <1403737406-6474-2-git-send-email-fkan@apm.com>
+References: <1403737406-6474-1-git-send-email-fkan@apm.com>
+ <1403737406-6474-2-git-send-email-fkan@apm.com>
+Message-ID: <CAGb2v65mGXDGb8Y045kehKufpMZWnfBm4dBJarJeOa8j-3g0RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
-
-On Wed, Jun 25, 2014 at 6:10 AM, Anson Huang <b20788@freescale.com> wrote:
-> Add cpufreq support for i.MX6SX, using common
-> i.MX6Q cpufreq driver.
+On Thu, Jun 26, 2014 at 7:03 AM, Feng Kan <fkan@apm.com> wrote:
+> Add a generic SYSCON register mapped reset mechanism.
 >
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
 > ---
->  arch/arm/mach-imx/mach-imx6sx.c |    3 +++
->  1 file changed, 3 insertions(+)
+>  drivers/power/reset/Kconfig         |  6 +++
+>  drivers/power/reset/Makefile        |  1 +
+>  drivers/power/reset/syscon-reboot.c | 91 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 98 insertions(+)
+>  create mode 100644 drivers/power/reset/syscon-reboot.c
 >
-> diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-> index 74ff7d6..9221e1d 100644
-> --- a/arch/arm/mach-imx/mach-imx6sx.c
-> +++ b/arch/arm/mach-imx/mach-imx6sx.c
-> @@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)
->  static void __init imx6sx_init_late(void)
->  {
->         imx6q_cpuidle_init();
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index bdcf517..7035236 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -80,3 +80,9 @@ config POWER_RESET_KEYSTONE
+>         help
+>           Reboot support for the KEYSTONE SoCs.
+>
+> +config POWER_RESET_SYSCON
+> +       bool "Generic SYSCON regmap reset driver"
+> +       depends on ARCH_XGENE
+
+If this is supposed to be generic, why are you depending on
+a certain platform?
+
+
+ChenYu
+
+> +       depends on POWER_RESET && MFD_SYSCON
+> +       help
+> +         Reboot support for generic SYSCON mapped register reset.
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> index dde2e8b..b1b5ab3 100644
+> --- a/drivers/power/reset/Makefile
+> +++ b/drivers/power/reset/Makefile
+> @@ -8,3 +8,4 @@ obj-$(CONFIG_POWER_RESET_SUN6I) += sun6i-reboot.o
+>  obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
+>  obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
+> +obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
+> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
+> new file mode 100644
+> index 0000000..9c15ba5
+> --- /dev/null
+> +++ b/drivers/power/reset/syscon-reboot.c
+> @@ -0,0 +1,91 @@
+> +/*
+> + * Generic Syscon Reboot Driver
+> + *
+> + * Copyright (c) 2013, Applied Micro Circuits Corporation
+> + * Author: Feng Kan <fkan@apm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/io.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/stat.h>
+> +#include <linux/slab.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reboot.h>
+> +#include <asm/system_misc.h>
 > +
-> +       if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
-> +               platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
->  }
-
-With this patch applied I get a flood of these messages:
-
-cpu cpu0: failed to scale vddpu up: -22
-cpufreq: __target_index: Failed to change cpu frequency: -22
-cpu cpu0: failed to scale vddpu up: -22
-cpufreq: __target_index: Failed to change cpu frequency: -22
-cpu cpu0: failed to scale vddpu up: -22
-cpufreq: __target_index: Failed to change cpu frequency: -22
-
-Any suggestions?
+> +struct syscon_reboot_context {
+> +       struct regmap *map;
+> +       u32 offset;
+> +       u32 mask;
+> +};
+> +
+> +static struct syscon_reboot_context *syscon_reboot_ctx;
+> +
+> +static void syscon_restart(enum reboot_mode reboot_mode, const char *cmd)
+> +{
+> +       struct syscon_reboot_context *ctx = syscon_reboot_ctx;
+> +       unsigned long timeout;
+> +
+> +       /* Issue the reboot */
+> +       if (ctx->map)
+> +               regmap_write(ctx->map, ctx->offset, ctx->mask);
+> +
+> +       timeout = jiffies + HZ;
+> +       while (time_before(jiffies, timeout))
+> +               cpu_relax();
+> +
+> +       pr_emerg("Unable to restart system\n");
+> +}
+> +
+> +static int syscon_reboot_probe(struct platform_device *pdev)
+> +{
+> +       struct syscon_reboot_context *ctx;
+> +       struct device *dev = &pdev->dev;
+> +
+> +       ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
+> +       if (!ctx) {
+> +               dev_err(&pdev->dev, "out of memory for context\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       ctx->map = syscon_regmap_lookup_by_phandle(dev->of_node, "regmap");
+> +       if (IS_ERR(ctx->map))
+> +               return PTR_ERR(ctx->map);
+> +
+> +       if (of_property_read_u32(pdev->dev.of_node, "offset", &ctx->offset))
+> +               return -EINVAL;
+> +
+> +       if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+> +               return -EINVAL;
+> +
+> +       arm_pm_restart = syscon_restart;
+> +       syscon_reboot_ctx = ctx;
+> +
+> +       return 0;
+> +}
+> +
+> +static struct of_device_id syscon_reboot_of_match[] = {
+> +       { .compatible = "syscon-reboot" },
+> +       {}
+> +};
+> +
+> +static struct platform_driver syscon_reboot_driver = {
+> +       .probe = syscon_reboot_probe,
+> +       .driver = {
+> +               .name = "syscon-reboot",
+> +               .of_match_table = syscon_reboot_of_match,
+> +       },
+> +};
+> +module_platform_driver(syscon_reboot_driver);
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
