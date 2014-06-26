@@ -1,100 +1,27 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 26 Jun 2014 12:40:34 +0530
-Subject: [PATCH V4 16/16] irqchip: crossbar: Allow for quirky hardware with
- direct hardwiring of GIC
-In-Reply-To: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
-References: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1403766634-18543-17-git-send-email-r.sricharan@ti.com>
+Date: Thu, 26 Jun 2014 12:55:29 +0530
+Subject: [PATCH V4 0/2] arm: dts: dra7: add crossbar dt support 
+Message-ID: <1403767532-19290-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+This series introduces DT support for crossbar device and
+changes dra7 peripherals to use crossbar number instead of irq.
 
-On certain platforms such as DRA7, SPIs 0, 1, 2, 3, 5, 6, 10, 131,
-132, 133 are direct wired to hardware blocks bypassing crossbar.
-This quirky implementation is *NOT* supposed to be the expectation
-of crossbar hardware usage. However, these are already marked in our
-description of the hardware with SKIP and RESERVED where appropriate.
+This depends on below driver fixes and cleanup series.
+http://marc.info/?l=linux-omap&m=140376708127157&w=2
 
-Unfortunately, we need to be able to refer to these hardwired IRQs.
-So, to request these, crossbar driver can use the existing information
-from it's table that these SKIP/RESERVED maps are direct wired sources
-and generic allocation/programming of crossbar should be avoided.
+[V2] Rebased on 3.15 mainline.
+[V3] Added ti,irqs-skip property and ti,irqs-safe-map property to
+     crossbar dt node.
+[V4] Introduced macros MAX_SOURCES and DIRECT_IRQ
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- .../devicetree/bindings/arm/omap/crossbar.txt      |   12 ++++++++++--
- drivers/irqchip/irq-crossbar.c                     |   20 ++++++++++++++++++--
- 2 files changed, 28 insertions(+), 4 deletions(-)
+R Sricharan (2):
+  arm: dts: dra7: add routable-irqs property for gic node
+  arm: dts: dra7: add crossbar device binding
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 35356b6..51a85c3 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -44,8 +44,10 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
- 
- An interrupt consumer on an SoC using crossbar will use:
- 	interrupts = <GIC_SPI request_number interrupt_level>
--request number shall be between 0 to that described by
--"ti,max-crossbar-sources"
-+When the request number is between 0 to that described by
-+"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
-+request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
-+quirky hardware mapping direct to GIC.
- 
- Example:
- 	device_x at 0x4a023000 {
-@@ -53,3 +55,9 @@ Example:
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		...
- 	};
-+
-+	device_y at 0x4a033000 {
-+		/* Direct mapped GIC SPI 1 used */
-+		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
-+		...
-+	};
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 83f803b..85c2985 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -86,8 +86,13 @@ static inline int allocate_free_irq(int cb_no)
- 
- static inline bool needs_crossbar_write(irq_hw_number_t hw)
- {
--	if (hw > GIC_IRQ_START)
--		return true;
-+	int cb_no;
-+
-+	if (hw > GIC_IRQ_START) {
-+		cb_no = cb->irq_map[hw - GIC_IRQ_START];
-+		if (cb_no != IRQ_RESERVED && cb_no != IRQ_SKIP)
-+			return true;
-+	}
- 
- 	return false;
- }
-@@ -130,8 +135,19 @@ static int crossbar_domain_xlate(struct irq_domain *d,
- {
- 	int ret;
- 	int req_num = intspec[1];
-+	int direct_map_num;
- 
- 	if (req_num >= cb->max_crossbar_sources) {
-+		direct_map_num = req_num - cb->max_crossbar_sources;
-+		if (direct_map_num < cb->int_max) {
-+			ret = cb->irq_map[direct_map_num];
-+			if (ret == IRQ_RESERVED || ret == IRQ_SKIP) {
-+				/* We use the interrupt num as h/w irq num */
-+				ret = direct_map_num;
-+				goto found;
-+			}
-+		}
-+
- 		pr_err("%s: requested crossbar number %d > max %d\n",
- 		       __func__, req_num, cb->max_crossbar_sources);
- 		return -EINVAL;
+ arch/arm/boot/dts/dra7.dtsi |  139 +++++++++++++++++++++++++------------------
+ 1 file changed, 81 insertions(+), 58 deletions(-)
+
 -- 
 1.7.9.5
