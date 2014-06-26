@@ -1,131 +1,100 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 26 Jun 2014 13:36:24 -0600
-Subject: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability
- IOMMU_CAP_INTR_REMAP
-In-Reply-To: <ec8dbbcb991e4d73b73f4b4f98342445@BY2PR07MB203.namprd07.prod.outlook.com>
-References: <1401987808-23596-1-git-send-email-a.motakis@virtualopensystems.com>
- <1401987808-23596-5-git-send-email-a.motakis@virtualopensystems.com>
- <20140608103129.GC3279@lvm> <20140616145344.GD18986@8bytes.org>
- <20140616151329.GQ16758@arm.com> <20140616152157.GB31771@8bytes.org>
- <20140616152526.GR16758@arm.com> <20140616153832.GC31771@8bytes.org>
- <9353770066894e85809e1e443b71d1cd@BY2PR07MB203.namprd07.prod.outlook.com>
- <748dccbbd3284521af4659ccbbb11453@BY2PR07MB203.namprd07.prod.outlook.com>
- <b085e02e72dc424d9624c3e810951087@BY2PR07MB203.namprd07.prod.outlook.com>
- <1403809223.31091.137.camel@ul30vt.home>
- <ec8dbbcb991e4d73b73f4b4f98342445@BY2PR07MB203.namprd07.prod.outlook.com>
-Message-ID: <1403811384.31091.151.camel@ul30vt.home>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 26 Jun 2014 21:39:38 +0200
+Subject: [PATCH] ARM: integrator: fix OF-related regression
+In-Reply-To: <CACRpkdZr6T65zOmxy9mQdeapMfu=nwfcXRtufb5DU5NO+vwU7A@mail.gmail.com>
+References: <1403611687-23512-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_Jsq+Us51c-6+kP5Y+aML-HPV-=9SooPepD6u13xyrvDfcKw@mail.gmail.com>
+ <CACRpkdZr6T65zOmxy9mQdeapMfu=nwfcXRtufb5DU5NO+vwU7A@mail.gmail.com>
+Message-ID: <20140626193938.GA16226@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-06-26 at 19:10 +0000, Chalamarla, Tirumalesh wrote:
-> Thanks for the clarification Alex, That?s exactly my point, why are we relying on  QEMU or something else to emulate the MSI space when we can directly give access to devices using ITS (of course with a small emulation code).
-> This way we are also benefited from all ITS services like VCPU migration etc.  
+On Thu, Jun 26, 2014 at 02:15:42PM +0200, Linus Walleij wrote:
+> On Wed, Jun 25, 2014 at 3:06 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > On Tue, Jun 24, 2014 at 7:08 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >> Commit 07e461cd7e73a84f0e3757932b93cc80976fd749
+> >> "of: Ensure unique names without sacrificing determinism"
+> >> caused a boot failure regression on the Integrator machines.
+> >>
+> >> The problem is probably caused by fiddling too much with
+> >> the device tree population in the OF init function, such
+> >> as passing the SoC bus device as parent when populating
+> >> the device tree.
+> >>
+> >> This patch fixes the problem by:
+> >>
+> >> - Avoiding to explicitly look up the tree root
+> >> - Look up devices needed before device population from
+> >>   the match only, passing NULL as root
+> >> - Passing NULL as root and parent when calling
+> >>   of_platform_populate()
+> >
+> > Just curious, I don't see how this fixes booting for Integrator. Where
+> > exactly does boot fail?
+> 
+> It fails by failing to populate the devicetree somehow. I don't
+> have the proper debugging needs, I just trial-and-horror-fixed
+> it by making the board init similar to other platforms :-/
 
-I have no idea what ITS is.
+earlyprintk doesn't work on Integrator hardware?  It does on QEMU's
+integratorcp so it's trivial to debug there.
 
-> What about non QEMU VFIO users, for example, if I wanted to use VFIO to assign a device to a user process I don't need to depend on QEMU.   I thought this is one of the main goals of vfio to make it independent of hypervisors.     
+The problem is that integrator_init_sysfs() adds a device attribute
+called "fpga" to the soc0 bus, and the soc0 bus device is also used as
+the root of the device tree, and the device tree has a node called "fpga".
 
-Where did QEMU become a requirement?  Maybe I'm missing something in the
-ARM part of the conversation that got chopped off, but this is exactly
-why we have the VFIO/QEMU split that we do.  VFIO provides basic
-virtualization for config space and restricts access to other areas that
-users shouldn't be allowed to change.  QEMU is just one example of a
-userspace VFIO driver.  QEMU takes the decomposed device exposed through
-the VFIO ABI and re-creates a PCI device out of it.  VFIO itself has no
-dependency on QEMU.  Thanks,
+Before 07e461cd7e73a84f0e3757932b93cc80976fd749 this node directory and
+attribute file had unique paths:
 
-Alex  
+	sysfs: creating file '/devices/soc0/fpga'
+	sysfs: creating dir '/devices/soc0/fpga.0'
 
-> -----Original Message-----
-> From: Alex Williamson [mailto:alex.williamson at redhat.com] 
-> Sent: Thursday, June 26, 2014 12:00 PM
-> To: Chalamarla, Tirumalesh
-> Cc: Joerg Roedel; Will Deacon; kvm at vger.kernel.org; open list; stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated list:ARM SMMU DRIVER
-> Subject: Re: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability IOMMU_CAP_INTR_REMAP
-> 
-> On Thu, 2014-06-26 at 18:41 +0000, Chalamarla, Tirumalesh wrote:
-> > Sorry there was a type,
-> > 
-> > The question is:
-> >  
-> >             How is VFIO restricting software from writing to MSI/MSI-X vectors of the device. 
-> 
-> All interrupts are configured via ioctl, not MSI config space or the MSI-X vector table in MMIO space.  VFIO protects the MSI config area by virtualizing it (you can't actually write the physical enable bit or address/data through VFIO).  The MSI-X vector table is protected by preventing read, write, or mmap access to it.  QEMU provides further virtualization above the basics provided by VFIO.  We really can't guarantee that devices don't have backdoors to configure these though.
-> See the realtek quirk in QEMU for an example of a device that has such a backdoor.  That's why we require interrupt remapping, so that a device that does this can only hurt the guest, and require the user to opt-out if they feel they have a sufficiently trusted guest.  Thanks,
-> 
-> Alex
-> 
-> > 
-> > -----Original Message-----
-> > From: Chalamarla, Tirumalesh
-> > Sent: Thursday, June 26, 2014 11:16 AM
-> > To: Chalamarla, Tirumalesh; Joerg Roedel; Will Deacon
-> > Cc: kvm at vger.kernel.org; open list; alex.williamson at redhat.com; 
-> > stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; 
-> > tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated 
-> > list:ARM SMMU DRIVER
-> > Subject: RE: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability 
-> > IOMMU_CAP_INTR_REMAP
-> > 
-> > When I say emulating ITS, I mean translating guest ITS commands to physical ITS commands  and placing them in physical queue. 
-> > 
-> > Regards,
-> > Tirumalesh.
-> > 
-> > -----Original Message-----
-> > From: kvmarm-bounces at lists.cs.columbia.edu 
-> > [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Chalamarla, 
-> > Tirumalesh
-> > Sent: Thursday, June 26, 2014 11:08 AM
-> > To: Joerg Roedel; Will Deacon
-> > Cc: kvm at vger.kernel.org; open list; alex.williamson at redhat.com; 
-> > stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; 
-> > tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated 
-> > list:ARM SMMU DRIVER
-> > Subject: RE: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability 
-> > IOMMU_CAP_INTR_REMAP
-> > 
-> > Forgive me if this discussion is not relative here, but I thought it is.  
-> > 
-> > How is VFIO restricting devices from writing  to MSI/MSI-X, Is all the vector area is mapped by VFIO to trap the accesses.  I am asking this because we might need to emulate ITS somewhere either in KVM or VFIO to provide direct access to devices.
-> > And I don't see any mentions on that.   I think this flag needs to be set by ITS emulation.
-> > 
-> > Regards,
-> > Tirumalesh.
-> > 
-> > -----Original Message-----
-> > From: kvmarm-bounces at lists.cs.columbia.edu 
-> > [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Joerg 
-> > Roedel
-> > Sent: Monday, June 16, 2014 8:39 AM
-> > To: Will Deacon
-> > Cc: stuart.yoder at freescale.com; kvm at vger.kernel.org; open list; 
-> > iommu at lists.linux-foundation.org; alex.williamson at redhat.com; 
-> > moderated list:ARM SMMU DRIVER; tech at virtualopensystems.com; 
-> > kvmarm at lists.cs.columbia.edu; Christoffer Dall
-> > Subject: Re: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability 
-> > IOMMU_CAP_INTR_REMAP
-> > 
-> > On Mon, Jun 16, 2014 at 04:25:26PM +0100, Will Deacon wrote:
-> > > Ok, thanks. In which case, I think this is really a combined 
-> > > property of the SMMU and the interrupt controller, so we might need 
-> > > some extra code so that the SMMU can check that the interrupt 
-> > > controller for the device is also capable of interrupt remapping.
-> > 
-> > Right, that this is part of IOMMU code has more or less historic reasons on x86. Interrupt remapping is purely implemented in the IOMMU there, so on ARM some clue-code between interrupt controler and smmu is needed.
-> > 
-> > 
-> > 	Joerg
-> > 
-> > 
-> > _______________________________________________
-> > kvmarm mailing list
-> > kvmarm at lists.cs.columbia.edu
-> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> > _______________________________________________
-> > kvmarm mailing list
-> > kvmarm at lists.cs.columbia.edu
-> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
-> 
-> 
+07e461cd7e73a84f0e3757932b93cc80976fd749 removed the .0 from the fpga node's
+directory, leading to that node (and its subnodes) failing to register due to a
+filename conflict with the fpga attribute's file:
+
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at /home/rabin/dev/linux/fs/sysfs/dir.c:31 sysfs_warn_dup+0x54/0x74()
+sysfs: cannot create duplicate filename '/devices/soc0/fpga'
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.15.0-rc5-00030-g244fb0a #17
+[<c000ea34>] (unwind_backtrace) from [<c000c18c>] (show_stack+0x10/0x14)
+[<c000c18c>] (show_stack) from [<c00193f0>] (warn_slowpath_common+0x64/0x84)
+[<c00193f0>] (warn_slowpath_common) from [<c0019440>] (warn_slowpath_fmt+0x30/0x40)
+[<c0019440>] (warn_slowpath_fmt) from [<c0104008>] (sysfs_warn_dup+0x54/0x74)
+[<c0104008>] (sysfs_warn_dup) from [<c01040b0>] (sysfs_create_dir_ns+0x88/0x98)
+[<c01040b0>] (sysfs_create_dir_ns) from [<c0188410>] (kobject_add_internal+0xac/0x2fc)
+[<c0188410>] (kobject_add_internal) from [<c0188820>] (kobject_add+0x4c/0x98)
+[<c0188820>] (kobject_add) from [<c01edacc>] (device_add+0xe0/0x4f0)
+[<c01edacc>] (device_add) from [<c02559b0>] (of_platform_device_create_pdata+0x6c/0x8c)
+[<c02559b0>] (of_platform_device_create_pdata) from [<c0255aac>] (of_platform_bus_create+0xd0/0x2b4)
+[<c0255aac>] (of_platform_bus_create) from [<c0255db8>] (of_platform_populate+0x5c/0xa0)
+[<c0255db8>] (of_platform_populate) from [<c0415fdc>] (customize_machine+0x20/0x44)
+[<c0415fdc>] (customize_machine) from [<c0008b6c>] (do_one_initcall+0xfc/0x160)
+[<c0008b6c>] (do_one_initcall) from [<c0413b40>] (kernel_init_freeable+0xf4/0x1ac)
+[<c0413b40>] (kernel_init_freeable) from [<c0312b60>] (kernel_init+0x8/0xec)
+[<c0312b60>] (kernel_init) from [<c0009830>] (ret_from_fork+0x14/0x24)
+---[ end trace b6f453d64d825b4b ]---
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at /home/rabin/dev/linux/lib/kobject.c:240 kobject_add_internal+0x274/0x2fc()
+kobject_add_internal failed for fpga with -EEXIST, don't try to register things with the same name in the same directory.
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Tainted: G        W     3.15.0-rc5-00030-g244fb0a #17
+[<c000ea34>] (unwind_backtrace) from [<c000c18c>] (show_stack+0x10/0x14)
+[<c000c18c>] (show_stack) from [<c00193f0>] (warn_slowpath_common+0x64/0x84)
+[<c00193f0>] (warn_slowpath_common) from [<c0019440>] (warn_slowpath_fmt+0x30/0x40)
+[<c0019440>] (warn_slowpath_fmt) from [<c01885d8>] (kobject_add_internal+0x274/0x2fc)
+[<c01885d8>] (kobject_add_internal) from [<c0188820>] (kobject_add+0x4c/0x98)
+[<c0188820>] (kobject_add) from [<c01edacc>] (device_add+0xe0/0x4f0)
+[<c01edacc>] (device_add) from [<c02559b0>] (of_platform_device_create_pdata+0x6c/0x8c)
+[<c02559b0>] (of_platform_device_create_pdata) from [<c0255aac>] (of_platform_bus_create+0xd0/0x2b4)
+[<c0255aac>] (of_platform_bus_create) from [<c0255db8>] (of_platform_populate+0x5c/0xa0)
+[<c0255db8>] (of_platform_populate) from [<c0415fdc>] (customize_machine+0x20/0x44)
+[<c0415fdc>] (customize_machine) from [<c0008b6c>] (do_one_initcall+0xfc/0x160)
+[<c0008b6c>] (do_one_initcall) from [<c0413b40>] (kernel_init_freeable+0xf4/0x1ac)
+[<c0413b40>] (kernel_init_freeable) from [<c0312b60>] (kernel_init+0x8/0xec)
+[<c0312b60>] (kernel_init) from [<c0009830>] (ret_from_fork+0x14/0x24)
+---[ end trace b6f453d64d825b4c ]---
+
+After Linus' patch, the root is no longer soc0 so the fpga node's directory
+becomes /devices/fpga while the attribute file remains at /devices/soc0/fpga.
