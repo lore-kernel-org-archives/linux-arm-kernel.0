@@ -1,23 +1,36 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Thu, 26 Jun 2014 10:24:23 +0100
-Subject: [PATCH v2 4/6] ARM: SAMSUNG: Restore Samsung PM Debug
- functionality
-In-Reply-To: <1403696634-12779-1-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-5-git-send-email-t.figa@samsung.com>
- <1403696634-12779-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAD8Lp46X_urw=ayVZNL8Af9pMUD4st7tAtuMvkrg+A6YsxpiMw@mail.gmail.com>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Thu, 26 Jun 2014 11:26:09 +0200
+Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
+In-Reply-To: <201406261117.12542.marex@denx.de>
+References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+ <201406260932.30524.jbe@pengutronix.de> <201406261117.12542.marex@denx.de>
+Message-ID: <201406261126.09235.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 12:43 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Due to recently merged patches and previous merge conflicts, the Samsung
-> PM Debug functionality no longer can be enabled. This patch fixes
-> incorrect dependency of SAMSUNG_PM_DEBUG on an integer symbol and adds
-> missing header inclusion.
+Hi Marek,
 
-I replaced the original patch with this updated version and can
-confirm that the option now appears in the menu again, and compile
-succeeds when set to yes.
+On Thursday 26 June 2014 11:17:12 Marek Vasut wrote:
+> On Thursday, June 26, 2014 at 09:32:30 AM, Juergen Borleis wrote:
+> > On Thursday 26 June 2014 05:43:19 Fabio Estevam wrote:
+> > > [...]
+> > >
+> > > Below is the log with linux-next kernel and earlyprintk enabled:
+> >
+> > Does it also hang when you disable "earlyprintk"? A few weeks ago we had
+> > a similar issue with i.MX6/PCI and "earlyprintk" (at the end it was
+> > caused by a clock change for the UART when changing from the early to the
+> > regular console).
+>
+> How can the UART clock have impact on the PCIe please ?
 
-Thanks
-Daniel
+Not to the PCIe hardware, it just hanged the kernel when the PCIe driver came 
+up (due to some of its messages it tries to output at this moment).
+
+jbe
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
+Industrial Linux Solutions               ? ? ?| Phone: +49-5121-206917-5128 |
+Peiner Str. 6-8, 31137 Hildesheim, Germany ? ?| Fax: ? +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? ? ?| http://www.pengutronix.de/ ?|
