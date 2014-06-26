@@ -1,77 +1,65 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 26 Jun 2014 12:05:42 +0800
-Subject: [PATCH v4 3/8] ARM: debug: Rename Hi3716 to HI5XHD2
+Date: Thu, 26 Jun 2014 12:05:43 +0800
+Subject: [PATCH v4 4/8] ARM: hisi: add ARCH_HISI
 In-Reply-To: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1403755547-623-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1403755547-623-5-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haifeng Yan <yanhaifeng@gmail.com>
+Since multiple ARCH configuration will be appended into mach-hisi
+directory, add ARCH_HISI as common configuration for different ARCH in
+mach-hisi.
 
-Rename Hisilicon HI3716 to HI5XHD2. And it relies on ARCH_HI5XHD2
-instead.
-
-Hi5XHD2 is a SoC with dual Cortex A9 cores.
-
-Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
-Signed-off-by: Jiancheng Xue <jchxue@gmail.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/Kconfig.debug | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/Makefile          |  2 +-
+ arch/arm/mach-hisi/Kconfig | 16 ++++++++++++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f64a6df..17caa08 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -215,14 +215,6 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on HI3620 UART.
- 
--	config DEBUG_HI3716_UART
--		bool "Hisilicon Hi3716 Debug UART"
--		depends on ARCH_HI3xxx
--		select DEBUG_UART_PL01X
--		help
--		  Say Y here if you want kernel low-level debugging support
--		  on HI3716 UART.
--
- 	config DEBUG_HIP04_UART
- 		bool "Hisilicon HiP04 Debug UART"
- 		depends on ARCH_HIP04
-@@ -231,6 +223,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on HIP04 UART.
- 
-+	config DEBUG_HIX5HD2_UART
-+		bool "Hisilicon Hix5hd2 Debug UART"
-+		depends on ARCH_HIX5HD2
-+		select DEBUG_UART_PL01X
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Hix5hd2 UART.
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 6721fab..2024f5e 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -156,7 +156,7 @@ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
+ machine-$(CONFIG_ARCH_EXYNOS)		+= exynos
+ machine-$(CONFIG_ARCH_GEMINI)		+= gemini
+ machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
+-machine-$(CONFIG_ARCH_HI3xxx)		+= hisi
++machine-$(CONFIG_ARCH_HISI)		+= hisi
+ machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
+ machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
+ machine-$(CONFIG_ARCH_IOP32X)		+= iop32x
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index feee4db..da16efd 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -1,8 +1,16 @@
+-config ARCH_HI3xxx
+-	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
++config ARCH_HISI
++	bool "Hisilicon SoC Support"
++	depends on ARCH_MULTIPLATFORM
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select ARM_TIMER_SP804
 +
- 	config DEBUG_HIGHBANK_UART
- 		bool "Kernel low-level debugging messages via Highbank UART"
- 		depends on ARCH_HIGHBANK
-@@ -1101,7 +1101,7 @@ config DEBUG_UART_PHYS
- 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
- 				ARCH_ORION5X
- 	default 0xf7fc9000 if DEBUG_BERLIN_UART
--	default 0xf8b00000 if DEBUG_HI3716_UART
-+	default 0xf8b00000 if DEBUG_HIX5HD2_UART
- 	default 0xf991e000 if DEBUG_QCOM_UARTDM
- 	default 0xfcb00000 if DEBUG_HI3620_UART
- 	default 0xfe800000 if ARCH_IOP32X
-@@ -1154,7 +1154,7 @@ config DEBUG_UART_VIRT
- 	default 0xfe230000 if DEBUG_PICOXCELL_UART
- 	default 0xfe300000 if DEBUG_BCM_KONA_UART
- 	default 0xfe800000 if ARCH_IOP32X
--	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HI3716_UART
-+	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
- 	default 0xfeb24000 if DEBUG_RK3X_UART0
- 	default 0xfeb26000 if DEBUG_RK3X_UART1
- 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
++if ARCH_HISI
++
++menu "Hisilicon platform type"
++
++config ARCH_HI3xxx
++	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
+ 	select CACHE_L2X0
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+@@ -10,3 +18,7 @@ config ARCH_HI3xxx
+ 	select PINCTRL_SINGLE
+ 	help
+ 	  Support for Hisilicon Hi36xx/Hi37xx processor family
++
++endmenu
++
++endif
 -- 
 1.9.1
