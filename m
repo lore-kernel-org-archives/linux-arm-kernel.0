@@ -1,111 +1,133 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jun 2014 14:54:19 +0200
-Subject: [PATCH 13/13] AT91: PIT: Move the driver to drivers/clocksource
-In-Reply-To: <53AC0882.3010601@free-electrons.com>
-References: <1403701605-26678-1-git-send-email-maxime.ripard@free-electrons.com>
- <1403701605-26678-14-git-send-email-maxime.ripard@free-electrons.com>
- <53ABAF1E.5030405@free-electrons.com>
- <20140626093006.GB3385@lukather>
- <53AC0882.3010601@free-electrons.com>
-Message-ID: <20140626125419.GC3385@lukather>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 26 Jun 2014 14:58:46 +0200
+Subject: [RFC PATCH 0/9] ARM: Forwarding physical interrupts to a guest VM
+In-Reply-To: <53ABE88C.1010401@arm.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <53AAE242.3060405@linaro.org> <53ABE88C.1010401@arm.com>
+Message-ID: <53AC1906.90103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 01:48:18PM +0200, Boris BREZILLON wrote:
+On 06/26/2014 11:31 AM, Marc Zyngier wrote:
+> Hi Eric,
 > 
-> On 26/06/2014 11:30, Maxime Ripard wrote:
-> > Hi Boris,
-> >
-> > On Thu, Jun 26, 2014 at 07:26:54AM +0200, Boris BREZILLON wrote:
-> >> On 25/06/2014 15:06, Maxime Ripard wrote:
-> >>> Now that we don't depend on anyting in the mach-at91 directory, we can just
-> >>> move the driver to where it belongs.
-> >>>
-> >>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>> ---
-> >>>  arch/arm/mach-at91/Kconfig                                     | 4 ----
-> >>>  arch/arm/mach-at91/Makefile                                    | 1 -
-> >>>  drivers/clocksource/Kconfig                                    | 4 ++++
-> >>>  drivers/clocksource/Makefile                                   | 1 +
-> >>>  {arch/arm/mach-at91 => drivers/clocksource}/at91sam926x_time.c | 0
-> >>>  5 files changed, 5 insertions(+), 5 deletions(-)
-> >>>  rename {arch/arm/mach-at91 => drivers/clocksource}/at91sam926x_time.c (100%)
-> >>>
-> >>> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> >>> index a64412a020d3..b10db0990999 100644
-> >>> --- a/arch/arm/mach-at91/Kconfig
-> >>> +++ b/arch/arm/mach-at91/Kconfig
-> >>> @@ -36,10 +36,6 @@ config AT91_SAM9G45_RESET
-> >>>  	bool
-> >>>  	default !ARCH_AT91X40
-> >>>  
-> >>> -config AT91_SAM9_TIME
-> >>> -	select CLKSRC_OF if OF
-> >>> -	bool
-> >>> -
-> >>>  config HAVE_AT91_SMD
-> >>>  	bool
-> >>>  
-> >>> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> >>> index 78e9cec282f4..1a916ececbfd 100644
-> >>> --- a/arch/arm/mach-at91/Makefile
-> >>> +++ b/arch/arm/mach-at91/Makefile
-> >>> @@ -10,7 +10,6 @@ obj-		:=
-> >>>  obj-$(CONFIG_OLD_CLK_AT91)	+= clock.o
-> >>>  obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
-> >>>  obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
-> >>> -obj-$(CONFIG_AT91_SAM9_TIME)	+= at91sam926x_time.o
-> >>>  obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
-> >>>  
-> >>>  # CPU-specific support
-> >>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> >>> index 065131cbfcc0..cd8b73ddbef3 100644
-> >>> --- a/drivers/clocksource/Kconfig
-> >>> +++ b/drivers/clocksource/Kconfig
-> >>> @@ -118,6 +118,10 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> >>>  	help
-> >>>  	 Use ARM global timer clock source as sched_clock
-> >>>  
-> >>> +config AT91_SAM9_TIME
-> >>> +	select CLKSRC_OF if OF
-> >>> +	bool
-> >>> +
-> >>>  config CLKSRC_METAG_GENERIC
-> >>>  	def_bool y if METAG
-> >>>  	help
-> >>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> >>> index 800b1303c236..3088928070f8 100644
-> >>> --- a/drivers/clocksource/Makefile
-> >>> +++ b/drivers/clocksource/Makefile
-> >>> @@ -1,5 +1,6 @@
-> >>>  obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
-> >>>  obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
-> >>> +obj-$(CONFIG_AT91_SAM9_TIME)	+= at91sam926x_time.o
-> >> I would rename both Kconfig and source file name into ATMEL_PIT and
-> >> atmel_pit.c (or AT91_PIT and atmel_pit.c) to cleary show that this
-> >> driver add support for the PIT block.
-> > I actually had the same idea, but older AT91 SoCs (rm9200, for
-> > example) also mention the PIT, even though the IP is different.
+> On 25/06/14 15:52, Eric Auger wrote:
+>> On 06/25/2014 11:28 AM, Marc Zyngier wrote:
+>>> The GIC architecture (ARM's Generic Interrupt Controller) allows an
+>>> active physical interrupt to be forwarded to a guest, and the guest to
+>>> indirectly perform the deactivation of the interrupt by performing an
+>>> EOI on the virtual interrupt (see for example the GICv2 spec, 3.2.1).
+>>>
+>>> So far, Linux doesn't have this notion, which is a bit of a pain.
+>>>
+>>> This patch series introduce two generic features:
+>>>
+>>> - A way to mark an interrupt as "forwarded": this allows an irq_chip
+>>>   to know that it shouldn't perform the deactivation itself
+>>> - A way to save/restore the "state" of a "forwarded" interrupt
+>>>
+>>> The series then adapts both GIC drivers to switch to EOImode == 1
+>>> (split priority drop and deactivation), to support this "forwarded"
+>>> feature and hacks the KVM/ARM timer backend to use all of this.
+>>>
+>>> This requires yet another bit of surgery in the vgic code in order to
+>>> allow a mapping between physical interrupts and virtual
+>>> ones. Hopefully, this should plug into VFIO and the whole irqfd thing,
+>>> but I don't understand any of that just yet (Eric?)
+>>
+>> Hello Marc,
+Hi Marc
+>>
+>> Thanks for the patch, it brings a very interesting capability for
+>> improving the performance of KVM device assignment.
+>>
+>> From the integration pov I understand we need to
+>> 1) call irq_set_fwd_state to tell the gic the physical IRQ is forwarded
+>> and not deactivate it
 > 
-> I checked at91rm9200 datasheet, and indeed it mention the concept of PIT
-> (Periodic Interval Timer), but the HW block is called ST (System Timer).
+> That would be irqd_set_irq_forwarded().
 > 
-> How about using the name ATMEL_PIT for this driver and later use
-> ATMEL_ST when we decide to move at91rm9200_time.c driver into
-> drivers/clocksource ?
+> irq_{g,s}et_fwd_state() are used when you're actually sharing a device
+> between guests, and need to context-switch its HW interrupt state
+> (typically, the timer). I wouldn't expect VFIO to use this, as the
+> device is exclusively assigned to a guest.
+OK
+> 
+>> 2) call vgic_map_phys_irq to the tell the vgic it must program the LRs
+>> accordingly.
+>>
+>> We currently have the vfio driver VFIO_DEVICE_SET_IRQS user API that
+>> makes possible to tell: device IRQ index #i (i=0, 1, 2 for my xgmac)
+>> shall trigger this fd.
+>> At that point it would be possible to tell the GIC the physical IRQ
+>> corresponding to i is forwarded.
+>>
+>> On the other hand we have KVM_IRQFD that enables to tell KVM: when this
+>> fd is triggered, you implement its handler in KVM irqfd framework and
+>> the handler injects the provided irchip.pin(gsi)=virtualIRQ - the famous
+>> GSI routing table - into this VM.
+>>
+>> Building the vgic map table hence requires to do some glue around vfio
+>> and irqfd info: physical IRQ ->(vfio) fd ->(irqfd) gsi.
+>>
+>> As such I would say those 2 user APIs(VFIO and IRQFD) are not fully
+>> adapted to put that in place but this may be feasible. Previous
+>> KVM_ASSIGN_DEV_IRQ was directly associated the pIRQ and vIRQ.
+>>
+>> we should be able to remove the physical IRQ mask in the vfio driver
+>> (this masking is done when triggering the fd and the IRQ is unmasked
+>> when the virtual IRQ is completed). It was there because the physical
+>> IRQ was completed and could hit again. Now with 2 stage completion the
+>> same IRQ cannot hit while guest has not not DIR'ed the IRQ so it fixes
+>> the issue I guess.
+> 
+> Yes, that's exactly the idea.
+> 
+>> Since we do not have EOI trap anymore we cannot trigger level-sensitive
+>> resamplefd in irqfd (this would be an ARM specificity)
+> 
+> For a level interrupt, we still have the EOI maintenance interrupt,
+> which we could hook into to perform whatever resampling we need.
 
-Works for me.
+Sorry I am confused by the above sentence. I thought you removed
+maintenance IRQ for both edge and level-sensitive IRQS? Thought also the
+2 features were exclusive, ie EOI maintenance IRQ (only if HW bit = 0)
+and forward with HWbit = 1, since occupying GICH_LR[19:10].Sorry if I
+misunderstood your code or the spec.
+> 
+> The thing is, I don't think we need it at all. If the IRQ line is still
+> up, we'll take another interrupt right away. So it is not so much that
+> we cannot trigger the resample mechanism, it is just that it seems to
+> become useless. What do you think?
 
-Maxime
+Yes indeed I think it becomes useless. Besides as far as I understand
+resamplefd feature is not mandatory. There is a capability associated to
+it, KVM_CAP_IRQFD_RESAMPLE. Also if we want to use it we pass the
+KVM_IRQFD_FLAG_RESAMPLE as irqfd flag.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140626/231253b6/attachment.sig>
+> 
+>> A last comment/question, wouldn't it be possible to inject the vIRQ
+>> (programming the LR) direcly in the irqchip, instead of relying on VFIO
+>> to trigger an eventfd whose handler does the job? This could be an
+>> optional capavility per forwarded IRQ. Of course this would create a
+>> relationship between gic and vgic. Do you see it as ugly - I dare to ask - ?
+> 
+> I would say that it is what the interrupt handler is for. We could
+> entirely bypass the eventfd, and inject the interrupt from the VFIO
+> interrupt handler, couldn't we?
+
+The problem is the VFIO driver currently is not meant for that. It is
+meant to trigger an eventfd and that's it. Anyway we may need to invent
+something new around existing API semantics.
+
+Best Regards
+
+Eric
+> 
+> I think that gives you the bypass you're asking for, without creating a
+> dependency between the host GIC driver, and the guest support code.
+> 
+> Thanks,
+> 
+> 	M.
+> 
