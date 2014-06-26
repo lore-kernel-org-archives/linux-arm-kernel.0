@@ -1,36 +1,51 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Thu, 26 Jun 2014 10:00:09 +0100
-Subject: [PATCH] MAINTAINERS: Update Eduardo Valentin's email address
-In-Reply-To: <20140602172800.GA5902@developer>
-References: <1401444208-6887-1-git-send-email-lee.jones@linaro.org>
- <20140602172800.GA5902@developer>
-Message-ID: <20140626090009.GB2825@e104805>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jun 2014 10:00:45 +0100
+Subject: [PATCH] ARM: perf: allow tracing with kernel tracepoints events
+In-Reply-To: <CAFrcx1=gwRzU9heY8o9sphWUiga63NGdpN+cUh81Njr-X-OEGQ@mail.gmail.com>
+References: <CAFrcx1n-cPXm=w+84gQiUjZoFKi7gYnvJ0BQ+8yXKS=k3nEt3g@mail.gmail.com>
+ <1403025065-18001-1-git-send-email-jean.pihet@linaro.org>
+ <20140618125355.GA2186@arm.com>
+ <CAFrcx1mA7kXiG9wMQqn=zYPYqrpGxDYWfoMP97RvkkrMTvNoRw@mail.gmail.com>
+ <20140625090110.GD6153@arm.com>
+ <CAFrcx1=gwRzU9heY8o9sphWUiga63NGdpN+cUh81Njr-X-OEGQ@mail.gmail.com>
+Message-ID: <20140626090045.GB376@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 02, 2014 at 06:28:00PM +0100, Eduardo Valentin wrote:
-> Hello Lee Jones,
-> 
-> On Fri, May 30, 2014 at 11:03:28AM +0100, Lee Jones wrote:
-> > Eduardo TI address is bouncing, but it looks like he's still
-> > contributing via his Gmail address.
-> > 
-> 
-> Thanks for being proactive! I actually sent the very same patch a while
-> ago:
-> 
-> 
-> https://lkml.org/lkml/2014/4/2/644
-> 
-> 
-> Maybe it's fallen into the cracks.
-> 
-> Rui, any idea what is the status of that patch?
+On Wed, Jun 25, 2014 at 03:54:14PM +0100, Jean Pihet wrote:
+> Hi Will,
 
-I've been bitten by this *again*.  This patch should've been in
-3.15-rc1, it's 3.16-rc2 and Eduardo's email is still outdated in the
-MAINTAINERS file.  The thermal tree seems to be pretty stale lately
-and patches are rotting in the list, but this update should really get
-into the kernel ASAP.
+Hello,
 
-Eduardo, can you send this to trivial at kernel.org ?
+> On 25 June 2014 11:01, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jun 20, 2014 at 09:10:35AM +0100, Jean Pihet wrote:
+> >> On 18 June 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Tue, Jun 17, 2014 at 06:11:05PM +0100, Jean Pihet wrote:
+> >> >> Tested with perf record and tracepoints filtering (-e <tracepoint>), with
+> >> >> unwinding using fp (--call-graph fp) and dwarf info (--call-graph dwarf).
+> >> >
+> >> > Whilst the old ACPS unwinding only needs PC, FP and SP, is this definitely
+> >> > true for exidx and DWARF-based unwinding? Given that libunwind ends up
+> >> > running a state machine for the latter, can we guarantee that we won't hit
+> >> > instructions that require access to other general purpose registers?
+> >> Yes. dwarf unwinding does not need anything extra. Once seeded all the
+> >> rest is extracted from the dwarf trace info.
+> >
+> > Ok, but what if the LR isn't saved on the stack, for example? What if the
+> > code you're trying to unwind is hand-written assembly annotated with CFI
+> > directives?
+> Then in that case the unwinding is not possible unless the
+> hand-crafted asm is compatible with the requested unwinding method
+> (fp, dwarf etc.). Do you expect problems there, if so can you give
+> more details?
+
+To use a readily available AArch64 example, take a look at
+__kernel_gettimeofday in arch/arm64/kernel/vdso/gettimeofday.S
+
+It starts by moving the link register into x2, so that it can later call
+__do_get_tspec without clobbering it. Furthermore, it doesn't make use of
+the stack at all.
+
+How can you unwind that using your current code?
+
+Will
