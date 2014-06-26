@@ -1,41 +1,59 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 26 Jun 2014 13:24:32 +0200
-Subject: [PATCH 0/3] Deterministic UART numbering on Samsung SoCs
-Message-ID: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
+Date: Thu, 26 Jun 2014 13:24:34 +0200
+Subject: [PATCH 2/3] serial: samsung: Consider DT alias when probing ports
+In-Reply-To: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
+References: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1403781875-5425-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current Samsung UART driver relies on probe order of particular
-samsung-uart instances, which makes it impossible to get proper
-initialization of ports when not all ports are available on board,
-not even saying of deterministic device naming.
+Current driver code relies on probe order of particular samsung-uart
+instances, which makes it impossible to get proper initialization of
+ports when not all ports are available on board, not even saying of
+deterministic device naming.
 
-This series intends to fix this situation by adding support to parse
-aliases from device tree and use them to assign instance IDs to
-particular port instances.
+This patch fixes this on DT-enabled systems by using DT aliases for
+ports as instance ID, if specified, or falling back to legacy method
+otherwise to provide backwards compatibility.
 
-Tested on Exynos4412-based Trats2 board:
- 1) without patch 3/3 adding aliases,
- 2) with patch 3/3 with all UART ports enabled,
- 3) with patch 3/3 with selected UART ports disabled.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ drivers/tty/serial/samsung.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-Tomasz Figa (3):
-  Documentation: devicetree: Update samsung UART bindings
-  serial: samsung: Consider DT alias when probing ports
-  ARM: dts: SAMSUNG: Add aliases of UART nodes
-
- .../devicetree/bindings/serial/samsung_uart.txt    | 52 +++++++++++++++++++---
- arch/arm/boot/dts/exynos3250.dtsi                  |  2 +
- arch/arm/boot/dts/exynos4.dtsi                     | 12 +++--
- arch/arm/boot/dts/exynos5.dtsi                     | 15 +++++--
- arch/arm/boot/dts/exynos5260.dtsi                  |  4 ++
- arch/arm/boot/dts/exynos5410.dtsi                  |  6 +++
- arch/arm/boot/dts/exynos5440.dtsi                  |  6 ++-
- arch/arm/boot/dts/s3c2416.dtsi                     |  6 ++-
- arch/arm/boot/dts/s3c24xx.dtsi                     |  9 ++--
- arch/arm/boot/dts/s3c64xx.dtsi                     |  4 ++
- drivers/tty/serial/samsung.c                       | 13 ++++--
- 11 files changed, 106 insertions(+), 23 deletions(-)
-
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index c1d3ebd..a9bf024 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -1275,11 +1275,18 @@ static inline struct s3c24xx_serial_drv_data *s3c24xx_get_driver_data(
+ static int s3c24xx_serial_probe(struct platform_device *pdev)
+ {
+ 	struct s3c24xx_uart_port *ourport;
++	int index = probe_index;
+ 	int ret;
+ 
+-	dbg("s3c24xx_serial_probe(%p) %d\n", pdev, probe_index);
++	if (pdev->dev.of_node) {
++		ret = of_alias_get_id(pdev->dev.of_node, "serial");
++		if (ret >= 0)
++			index = ret;
++	}
++
++	dbg("s3c24xx_serial_probe(%p) %d\n", pdev, index);
+ 
+-	ourport = &s3c24xx_serial_ports[probe_index];
++	ourport = &s3c24xx_serial_ports[index];
+ 
+ 	ourport->drv_data = s3c24xx_get_driver_data(pdev);
+ 	if (!ourport->drv_data) {
+@@ -1295,7 +1302,7 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
+ 
+ 	ourport->port.fifosize = (ourport->info->fifosize) ?
+ 		ourport->info->fifosize :
+-		ourport->drv_data->fifosize[probe_index];
++		ourport->drv_data->fifosize[index];
+ 
+ 	probe_index++;
+ 
 -- 
 1.9.3
