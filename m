@@ -1,99 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 Jun 2014 17:55:05 +0100
-Subject: [PATCH v5 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
- support
-In-Reply-To: <1403729520.11749.64.camel@smoke>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
- <1403729520.11749.64.camel@smoke>
-Message-ID: <20140626165505.GD27364@e102568-lin.cambridge.arm.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 26 Jun 2014 19:04:19 +0200
+Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
+In-Reply-To: <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
+References: <539fdd37.e7bc420a.76b9.ffffb583@mx.google.com>	<CAGa+x85nqPbH-sye28ni=gUEdgjGdUDqHhv1+0pV5aO8y1+wHQ@mail.gmail.com>	<53A106F1.10201@gmail.com>	<CAGa+x8527FEPk6fg5kv-fbOzK3MzcFooFGE9Me12b9C_Pv=UzA@mail.gmail.com>	<53A2AE11.2050208@gmail.com>	<53A2BE94.2010308@gmail.com>	<53A7A579.4010702@gmail.com>	<CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>	<53A9B99F.4040806@codeaurora.org>	<53A9FBB5.60709@codeaurora.org>	<53AABCF5.4050403@gmail.com>	<53AB45D1.90909@codeaurora.org>	<53ABC13C.8030908@gmail.com>
+ <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
+Message-ID: <53AC5293.90209@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi Kevin and Tushar,
 
-On Wed, Jun 25, 2014 at 09:52:00PM +0100, Geoff Levand wrote:
-> Hi Lorenzo,
+Am 26.06.2014 16:59, schrieb Kevin Hilman:
+>> IMO, the bug is in u-boot and we should fix that.
 > 
-> On Wed, 2014-06-25 at 15:10 +0100, Lorenzo Pieralisi wrote:
-> > diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> 
-> > +	/*
-> > +	 * This is belt-and-braces: make sure that if the idle
-> > +	 * specified protocol is psci, the cpu_ops have been
-> > +	 * initialized to psci operations. Anything else is
-> > +	 * a recipe for mayhem.
-> > +	 */
-> > +	for_each_cpu(cpu, drv->cpumask) {
-> > +		cpu_ops_ptr = cpu_ops[cpu];
-> > +		if (WARN_ON(!cpu_ops_ptr || strcmp(cpu_ops_ptr->name, "psci")))
-> > +			return -EOPNOTSUPP;
-> > +	}
-> 
-> I'm not sure how drv->cpumask is setup, but if a system has mixed enable
-> methods, say some cpus 'spin-table' and some 'psci', will this give a
-> false error?
+> I agree that the u-boot bug needs to be fixed, and FWIW, I updated my
+> u-boot and haven't seen the boot failure yet after several boots with
+> next-20140625.
 
-I do not think that's a false error. If the idle states specify an
-entry-method == psci, and cpu_ops for some cpus are not set to PSCI,
-obviously because the enable-method specified that, that's a firmware bug.
+Could you clarify your test setup: Are you using the original InSignal
+SPL [1] with just your own u-boot.bin? Or do you have access to some
+newer Samsung-signed SPL?
 
-> If drv->cpumask should only include 'psci' cpus, then should this be a
-> BUG()?
+> That being said, since it's not always feasible/practical to update
+> u-boot, and when it comes down to it, this is still a kernel
+> regression, we should also fix the kernel to sanity check the values
+> coming from u-boot, like it was doing before.
 
-Ok, if we got here, it is because the idle-states entry-method was set
-to PSCI. Now, if any of the CPUs in the driver mask has a cpu_ops
-pointer != PSCI, we have a problem and we should warn on that. I do
-not think that justifies a BUG_ON, but that's one of those things, it is
-debatable.
+Sounds good.
 
-Question is whether the check should also be carried out at cpu_ops
-initialization (ie to check for mixed cpu_ops), for certain if the
-idle states entry-method is PSCI and cpu_ops != PSCI we should
-WARN/BUG on that. Or embed this idle state parameters initialization at
-cpu_ops init (see other thread you started) so that we can kill two
-birds with one stone.
-
-> > +
-> > +	psci_states = kcalloc(drv->state_count, sizeof(*psci_states),
-> > +			      GFP_KERNEL);
-> > +
-> > +	if (!psci_states) {
-> > +		pr_warn("psci idle state allocation failed\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	for_each_cpu(cpu, drv->cpumask) {
-> > +		if (per_cpu(psci_power_state, cpu)) {
-> > +			pr_warn("idle states already initialized on cpu %u\n",
-> > +				cpu);
-> 
-> This seems like an implementation problem, if so, shouldn't this be
-> pr_debug()?
-
-Maybe, I will give it some thought.
-
-> >  #endif
-> >  
-> > +#ifdef CONFIG_ARM64_CPU_SUSPEND
-> > +static int cpu_psci_cpu_suspend(unsigned long index)
-> > +{
-> > +	struct psci_power_state *state = __get_cpu_var(psci_power_state);
-> > +
-> > +	if (!state)
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	return psci_ops.cpu_suspend(state[index], virt_to_phys(cpu_resume));
-> > +}
-> > +#endif
-> 
-> Why not put a __maybe_unused attribute on cpu_psci_cpu_suspend() and
-> remove the preprocessor conditional.  That way this code will always be
-> compiled, and with therefor always get a build test.  The linker should
-> strip out the unused code when CONFIG_ARM64_CPU_SUSPEND=n and the code
-> below is not compiled. 
-
-It can make sense, yes.
+Apart from this memory issue here, I noticed that CPUs don't appear to
+be in HYP mode for virtualization, which had required a signed SPL
+update for the ODROID-XU [2]. And to me it looks as if there's no
+Arndale Octa support in upstream U-Boot [3], no real maintenance on the
+InSignal fork [4] and a policy of not cooperating with others [5].
 
 Thanks,
-Lorenzo
+Andreas
+
+[1] http://forum.insignal.co.kr/viewtopic.php?f=6&t=3199
+[2] http://forum.odroid.com/viewtopic.php?f=64&t=2778&start=40#p32581
+[3]
+http://git.denx.de/?p=u-boot.git;a=blob;f=boards.cfg;h=947f2bc5ba2794c94b3b2cea04664f005e025f9f;hb=HEAD#l286
+[4] http://git.insignal.co.kr/insignal/arndale_octa-jb_mr1.1/u-boot/
+[5] http://forum.insignal.co.kr/viewtopic.php?f=40&t=3613
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
