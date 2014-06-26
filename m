@@ -1,37 +1,66 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 27 Jun 2014 00:24:02 +0300
-Subject: [PATCH 2/7] mailbox/omap: remove OMAP1 mailbox driver
-In-Reply-To: <20140626102814.GI28884@atomide.com>
-References: <1403657023-53897-1-git-send-email-s-anna@ti.com>
- <1403657023-53897-3-git-send-email-s-anna@ti.com>
- <20140626102814.GI28884@atomide.com>
-Message-ID: <20140626212402.GA6377@drone.musicnaut.iki.fi>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 Jun 2014 16:31:28 -0500
+Subject: [PATCH] ARM: integrator: fix OF-related regression
+In-Reply-To: <20140626193938.GA16226@debian>
+References: <1403611687-23512-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_Jsq+Us51c-6+kP5Y+aML-HPV-=9SooPepD6u13xyrvDfcKw@mail.gmail.com>
+ <CACRpkdZr6T65zOmxy9mQdeapMfu=nwfcXRtufb5DU5NO+vwU7A@mail.gmail.com>
+ <20140626193938.GA16226@debian>
+Message-ID: <CAL_Jsq+wdJu-toWixA9xq124jizj-mW3KE-osETnFj0g4vn=Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 26, 2014 at 2:39 PM, Rabin Vincent <rabin@rab.in> wrote:
+> On Thu, Jun 26, 2014 at 02:15:42PM +0200, Linus Walleij wrote:
+>> On Wed, Jun 25, 2014 at 3:06 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> > On Tue, Jun 24, 2014 at 7:08 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> >> Commit 07e461cd7e73a84f0e3757932b93cc80976fd749
+>> >> "of: Ensure unique names without sacrificing determinism"
+>> >> caused a boot failure regression on the Integrator machines.
+>> >>
+>> >> The problem is probably caused by fiddling too much with
+>> >> the device tree population in the OF init function, such
+>> >> as passing the SoC bus device as parent when populating
+>> >> the device tree.
+>> >>
+>> >> This patch fixes the problem by:
+>> >>
+>> >> - Avoiding to explicitly look up the tree root
+>> >> - Look up devices needed before device population from
+>> >>   the match only, passing NULL as root
+>> >> - Passing NULL as root and parent when calling
+>> >>   of_platform_populate()
+>> >
+>> > Just curious, I don't see how this fixes booting for Integrator. Where
+>> > exactly does boot fail?
+>>
+>> It fails by failing to populate the devicetree somehow. I don't
+>> have the proper debugging needs, I just trial-and-horror-fixed
+>> it by making the board init similar to other platforms :-/
+>
+> earlyprintk doesn't work on Integrator hardware?  It does on QEMU's
+> integratorcp so it's trivial to debug there.
 
-On Thu, Jun 26, 2014 at 03:28:14AM -0700, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [140624 17:45]:
-> > There are no existing users for OMAP1 mailbox driver
-> > in kernel. Commit ab6f775 "Removing dead OMAP_DSP"
-> > has cleaned up all the dead code related to the only
-> > possible user, including the creation of the mailbox
-> > platform device.
-> > 
-> > Remove this stale driver so that the OMAP mailbox
-> > driver can be simplified and streamlined better for
-> > converting to mailbox framework.
-> > 
-> > Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> 
-> For the omap1_defconfig change:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+I got as far as building a kernel to do that before getting distracted...
 
-I'm also OK with this change.
+> The problem is that integrator_init_sysfs() adds a device attribute
+> called "fpga" to the soc0 bus, and the soc0 bus device is also used as
+> the root of the device tree, and the device tree has a node called "fpga".
+>
+> Before 07e461cd7e73a84f0e3757932b93cc80976fd749 this node directory and
+> attribute file had unique paths:
+>
+>         sysfs: creating file '/devices/soc0/fpga'
+>         sysfs: creating dir '/devices/soc0/fpga.0'
+>
+> 07e461cd7e73a84f0e3757932b93cc80976fd749 removed the .0 from the fpga node's
+> directory, leading to that node (and its subnodes) failing to register due to a
+> filename conflict with the fpga attribute's file:
 
-Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Thanks for debugging. Now this makes sense as to why this is specific
+to Integrator. I think this is the right direction and we should not
+put devices under soc0/. That way the structure is consistent across
+SOCs and regardless of whether you decide to create an soc_device or
+not.
 
-A.
+Rob
