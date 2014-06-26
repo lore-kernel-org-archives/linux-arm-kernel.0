@@ -1,36 +1,64 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Thu, 26 Jun 2014 11:26:09 +0200
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <201406261117.12542.marex@denx.de>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
- <201406260932.30524.jbe@pengutronix.de> <201406261117.12542.marex@denx.de>
-Message-ID: <201406261126.09235.jbe@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Jun 2014 10:29:46 +0100
+Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
+In-Reply-To: <1403765204-17617-1-git-send-email-achandran@mvista.com>
+References: <1403765204-17617-1-git-send-email-achandran@mvista.com>
+Message-ID: <20140626092946.GL15240@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Thu, Jun 26, 2014 at 07:46:44AM +0100, Arun Chandran wrote:
+> Selecting CPU_BIG_ENDIAN and building the kernel fails just after
+> building it for little endian. According to Documentation/kbuild/makefiles.txt,
+> it is a common mistake to forget 'FORCE' while using 'if_changed'
 
-On Thursday 26 June 2014 11:17:12 Marek Vasut wrote:
-> On Thursday, June 26, 2014 at 09:32:30 AM, Juergen Borleis wrote:
-> > On Thursday 26 June 2014 05:43:19 Fabio Estevam wrote:
-> > > [...]
-> > >
-> > > Below is the log with linux-next kernel and earlyprintk enabled:
-> >
-> > Does it also hang when you disable "earlyprintk"? A few weeks ago we had
-> > a similar issue with i.MX6/PCI and "earlyprintk" (at the end it was
-> > caused by a clock change for the UART when changing from the early to the
-> > regular console).
->
-> How can the UART clock have impact on the PCIe please ?
+This is a little confusing, because we jump from the high level problem
+to a very specific problem detail with nothing to link the two.
 
-Not to the PCIe hardware, it just hanged the kernel when the PCIe driver came 
-up (due to some of its messages it tries to output at this moment).
+How about:
 
-jbe
+Building a kernel with CPU_BIG_ENDIAN fails if there are stale objects
+from a !CPU_BIG_ENDIAN build. Due to a missing FORCE prerequisite on an
+if_changed rule in the VDSO Makefile, we attempt to link a stale LE
+object into the new BE kernel. According to
+Documentation/kbuild/makefiles.txt FORCE is required for if_changed
+rules, and forgetting it is a common mistake.
 
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions               ? ? ?| Phone: +49-5121-206917-5128 |
-Peiner Str. 6-8, 31137 Hildesheim, Germany ? ?| Fax: ? +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? ? ?| http://www.pengutronix.de/ ?|
+> So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
+> 
+> arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
+> failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
+> 
+> arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
+> failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
+> 
+> Signed-off-by: Arun Chandran <achandran@mvista.com>
+
+Any reason for bot picking up my Tested-by [1]? The patch seems to be
+the same.
+
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266571.html
+
+> ---
+>  arch/arm64/kernel/vdso/Makefile |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+> index 6d20b7d..a268a9a 100644
+> --- a/arch/arm64/kernel/vdso/Makefile
+> +++ b/arch/arm64/kernel/vdso/Makefile
+> @@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
+>  	$(call if_changed,vdsosym)
+>  
+>  # Assembly rules for the .S files
+> -$(obj-vdso): %.o: %.S
+> +$(obj-vdso): %.o: %.S FORCE
+>  	$(call if_changed_dep,vdsoas)
+>  
+>  # Actual build commands
+> -- 
+> 1.7.9.5
+> 
+> 
