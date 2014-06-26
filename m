@@ -1,62 +1,81 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 26 Jun 2014 18:15:37 +0000
-Subject: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability
- IOMMU_CAP_INTR_REMAP
-In-Reply-To: <9353770066894e85809e1e443b71d1cd@BY2PR07MB203.namprd07.prod.outlook.com>
-References: <1401987808-23596-1-git-send-email-a.motakis@virtualopensystems.com>
- <1401987808-23596-5-git-send-email-a.motakis@virtualopensystems.com>
- <20140608103129.GC3279@lvm> <20140616145344.GD18986@8bytes.org>
- <20140616151329.GQ16758@arm.com> <20140616152157.GB31771@8bytes.org>
- <20140616152526.GR16758@arm.com> <20140616153832.GC31771@8bytes.org>
- <9353770066894e85809e1e443b71d1cd@BY2PR07MB203.namprd07.prod.outlook.com>
-Message-ID: <748dccbbd3284521af4659ccbbb11453@BY2PR07MB203.namprd07.prod.outlook.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 26 Jun 2014 11:15:13 -0700
+Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy
+ connected to sama5d3xek boards
+In-Reply-To: <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CAGVrzcbYAEMsU1SFSH761H0isQ4z1M++KK_GLf0OAbGS48YUmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When I say emulating ITS, I mean translating guest ITS commands to physical ITS commands  and placing them in physical queue. 
+Hi Boris,
 
-Regards,
-Tirumalesh.
+2014-06-26 3:13 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
+> Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
+>
+> The PHY address is not specified here because atmel have 2 different
+> designs
+> for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
+> (Embest design) and the other one is connection PHYAD0 to a pull up
+> resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
+> As a result, Ronetix design will have its PHY available at address 0x1 and
+> Embest design at 0x7.
+> Let the net PHY core automatically detect the PHY address by scanning the
+> MDIO bus.
 
------Original Message-----
-From: kvmarm-bounces@lists.cs.columbia.edu [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Chalamarla, Tirumalesh
-Sent: Thursday, June 26, 2014 11:08 AM
-To: Joerg Roedel; Will Deacon
-Cc: kvm at vger.kernel.org; open list; alex.williamson at redhat.com; stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated list:ARM SMMU DRIVER
-Subject: RE: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability IOMMU_CAP_INTR_REMAP
+I though the compatible string was listed as a required property, but
+it is not. The 'reg' property however is listed as required, although
+the of_miodbus_register() works just fine without it, although that is
+a Linux-specific implementation detail.
 
-Forgive me if this discussion is not relative here, but I thought it is.  
+>
+> Define board specific delays to apply to RGMII signals.
+>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-How is VFIO restricting devices from writing  to MSI/MSI-X, Is all the vector area is mapped by VFIO to trap the accesses.  I am asking this because we might need to emulate ITS somewhere either in KVM or VFIO to provide direct access to devices.
-And I don't see any mentions on that.   I think this flag needs to be set by ITS emulation.
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Regards,
-Tirumalesh.
+> ---
+>  arch/arm/boot/dts/sama5d3xcm.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> index b0b1331..fc68bae 100644
+> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> @@ -34,6 +34,21 @@
+>
+>                         macb0: ethernet at f0028000 {
+>                                 phy-mode = "rgmii";
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               ethernet-phy {
+> +                                       interrupt-parent = <&pioB>;
+> +                                       interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
+> +                                       txen-skew-ps = <800>;
+> +                                       txc-skew-ps = <3000>;
+> +                                       rxdv-skew-ps = <400>;
+> +                                       rxc-skew-ps = <3000>;
+> +                                       rxd0-skew-ps = <400>;
+> +                                       rxd1-skew-ps = <400>;
+> +                                       rxd2-skew-ps = <400>;
+> +                                       rxd3-skew-ps = <400>;
+> +                               };
+>                         };
+>
+>                         pmc: pmc at fffffc00 {
+> --
+> 1.8.3.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
------Original Message-----
-From: kvmarm-bounces@lists.cs.columbia.edu [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Joerg Roedel
-Sent: Monday, June 16, 2014 8:39 AM
-To: Will Deacon
-Cc: stuart.yoder at freescale.com; kvm at vger.kernel.org; open list; iommu at lists.linux-foundation.org; alex.williamson at redhat.com; moderated list:ARM SMMU DRIVER; tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; Christoffer Dall
-Subject: Re: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability IOMMU_CAP_INTR_REMAP
-
-On Mon, Jun 16, 2014 at 04:25:26PM +0100, Will Deacon wrote:
-> Ok, thanks. In which case, I think this is really a combined property 
-> of the SMMU and the interrupt controller, so we might need some extra 
-> code so that the SMMU can check that the interrupt controller for the 
-> device is also capable of interrupt remapping.
-
-Right, that this is part of IOMMU code has more or less historic reasons on x86. Interrupt remapping is purely implemented in the IOMMU there, so on ARM some clue-code between interrupt controler and smmu is needed.
 
 
-	Joerg
-
-
-_______________________________________________
-kvmarm mailing list
-kvmarm at lists.cs.columbia.edu
-https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-_______________________________________________
-kvmarm mailing list
-kvmarm at lists.cs.columbia.edu
-https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+-- 
+Florian
