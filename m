@@ -1,40 +1,309 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 26 Jun 2014 17:56:43 -0500
-Subject: [PATCH 0/5] ARM: Centralize the access to the SCU register
-In-Reply-To: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAL_JsqL9w0oxxM0zTAVioh0Uf3PNO3TfhxzOLV6KhBOoS4Fdiw@mail.gmail.com>
+From: fkan@apm.com (Feng Kan)
+Date: Thu, 26 Jun 2014 15:59:45 -0700
+Subject: [PATCH V5 1/3] gpio: Add APM X-Gene SoC GPIO controller support
+In-Reply-To: <1403823587-23404-1-git-send-email-fkan@apm.com>
+References: <1403823587-23404-1-git-send-email-fkan@apm.com>
+Message-ID: <1403823587-23404-2-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 5:43 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hello,
->
-> Following the feedback I go on the patch "ARM: mvebu: Enable SCU
-> Speculative linefills to L2 for Armada 375/38x" :
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/335961/focus=335993
->
-> I take the opportunity of adding new functions in smp_scu.c to
-> centralize the other access done on the SCU register from C file in
-> this file.
->
-> The first patch is a preliminary clean-up in smp_scu.c.
->
-> The second and the third patches add functions to manipulate the SCU
-> control register.
->
-> The forth patch use the new scu_spec_linefills_enable()
-> function. Enabling SCU Speculative linefills to L2 for Armada 375/38x
-> was the reason of this series.
->
-> The last patch removed a direct access to the SCU register by an
-> access through the new scu_standby_enable() function. For this one I
-> have just checked that the kernel can be built using the
-> imx_v6_v7_defconfig config, but I didn't test it on an imx6 hardware.
+Add APM X-Gene SoC gpio controller driver.
 
-Why would we not just turn on these 2 features unconditionally? If we
-don't know of any platform where they are broken, then we should just
-enable them. We can add these functions only if necessary later.
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ drivers/gpio/Kconfig      |   9 ++
+ drivers/gpio/Makefile     |   1 +
+ drivers/gpio/gpio-xgene.c | 250 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 260 insertions(+)
+ create mode 100644 drivers/gpio/gpio-xgene.c
 
-Rob
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 4a1b511..833996a02 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -334,6 +334,15 @@ config GPIO_TZ1090_PDC
+ 	help
+ 	  Say yes here to support Toumaz Xenif TZ1090 PDC GPIOs.
+ 
++config GPIO_XGENE
++	bool "APM X-Gene GPIO controller support"
++	depends on ARM64 && OF_GPIO
++	help
++	  This driver is to support the GPIO block within the APM X-Gene SoC
++	  platform's generic flash controller. The GPIO pins are muxed with
++	  the generic flash controller's address and data pins. Say yes
++	  here to enable the GFC GPIO functionality.
++
+ config GPIO_XILINX
+ 	bool "Xilinx GPIO support"
+ 	depends on PPC_OF || MICROBLAZE || ARCH_ZYNQ
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index d10f6a9..1bf5f82 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -98,6 +98,7 @@ obj-$(CONFIG_GPIO_VX855)	+= gpio-vx855.o
+ obj-$(CONFIG_GPIO_WM831X)	+= gpio-wm831x.o
+ obj-$(CONFIG_GPIO_WM8350)	+= gpio-wm8350.o
+ obj-$(CONFIG_GPIO_WM8994)	+= gpio-wm8994.o
++obj-$(CONFIG_GPIO_XGENE)	+= gpio-xgene.o
+ obj-$(CONFIG_GPIO_XILINX)	+= gpio-xilinx.o
+ obj-$(CONFIG_GPIO_XTENSA)	+= gpio-xtensa.o
+ obj-$(CONFIG_GPIO_ZEVIO)	+= gpio-zevio.o
+diff --git a/drivers/gpio/gpio-xgene.c b/drivers/gpio/gpio-xgene.c
+new file mode 100644
+index 0000000..e25ba14
+--- /dev/null
++++ b/drivers/gpio/gpio-xgene.c
+@@ -0,0 +1,250 @@
++/*
++ * AppliedMicro X-Gene SoC GPIO Driver
++ *
++ * Copyright (c) 2014, Applied Micro Circuits Corporation
++ * Author: Feng Kan <fkan@apm.com>.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/spinlock.h>
++#include <linux/platform_device.h>
++#include <linux/gpio/driver.h>
++#include <linux/types.h>
++#include <linux/bitops.h>
++
++#define GPIO_SET_DR_OFFSET	0x0C
++#define GPIO_DATA_OFFSET	0x14
++#define GPIO_BANK_STRIDE	0x0C
++
++#define XGENE_GPIOS_PER_BANK	16
++#define XGENE_MAX_GPIO_BANKS	3
++#define XGENE_MAX_GPIOS		(XGENE_GPIOS_PER_BANK * XGENE_MAX_GPIO_BANKS)
++
++#define GPIO_BIT_OFFSET(x)	(x % XGENE_GPIOS_PER_BANK)
++#define GPIO_BANK_OFFSET(x)	((x / XGENE_GPIOS_PER_BANK) * GPIO_BANK_STRIDE)
++
++struct xgene_gpio;
++
++struct xgene_gpio {
++	struct gpio_chip	chip;
++	void __iomem		*base;
++	spinlock_t		lock;
++#ifdef CONFIG_PM
++	u32			set_dr_val[XGENE_MAX_GPIO_BANKS];
++#endif
++};
++
++static inline struct xgene_gpio *to_xgene_gpio(struct gpio_chip *chip)
++{
++	return container_of(chip, struct xgene_gpio, chip);
++}
++
++static int xgene_gpio_get(struct gpio_chip *gc, unsigned int offset)
++{
++	struct xgene_gpio *chip = to_xgene_gpio(gc);
++	unsigned long bank_offset;
++	u32 bit_offset;
++
++	bank_offset = GPIO_DATA_OFFSET + GPIO_BANK_OFFSET(offset);
++	bit_offset = GPIO_BIT_OFFSET(offset);
++	return !!(ioread32(chip->base + bank_offset) & BIT(bit_offset));
++}
++
++static void __xgene_gpio_set(struct gpio_chip *gc, unsigned int offset, int val)
++{
++	struct xgene_gpio *chip = to_xgene_gpio(gc);
++	unsigned long bank_offset;
++	u32 setval, bit_offset;
++
++	bank_offset = GPIO_SET_DR_OFFSET + GPIO_BANK_OFFSET(offset);
++	bit_offset = GPIO_BIT_OFFSET(offset) + XGENE_GPIOS_PER_BANK;
++
++	setval = ioread32(chip->base + bank_offset);
++	if (val)
++		setval |= BIT(bit_offset);
++	else
++		setval &= ~BIT(bit_offset);
++	iowrite32(setval, chip->base + bank_offset);
++}
++
++static void xgene_gpio_set(struct gpio_chip *gc, unsigned int offset, int val)
++{
++	struct xgene_gpio *chip = to_xgene_gpio(gc);
++	unsigned long flags;
++
++	spin_lock_irqsave(&chip->lock, flags);
++	__xgene_gpio_set(gc, offset, val);
++	spin_unlock_irqrestore(&chip->lock, flags);
++}
++
++static int xgene_gpio_dir_in(struct gpio_chip *gc, unsigned int offset)
++{
++	struct xgene_gpio *chip = to_xgene_gpio(gc);
++	unsigned long flags, bank_offset;
++	u32 dirval, bit_offset;
++
++	bank_offset = GPIO_SET_DR_OFFSET + GPIO_BANK_OFFSET(offset);
++	bit_offset = GPIO_BIT_OFFSET(offset);
++
++	spin_lock_irqsave(&chip->lock, flags);
++
++	dirval = ioread32(chip->base + bank_offset);
++	dirval |= BIT(bit_offset);
++	iowrite32(dirval, chip->base + bank_offset);
++
++	spin_unlock_irqrestore(&chip->lock, flags);
++
++	return 0;
++}
++
++static int xgene_gpio_dir_out(struct gpio_chip *gc,
++					unsigned int offset, int val)
++{
++	struct xgene_gpio *chip = to_xgene_gpio(gc);
++	unsigned long flags, bank_offset;
++	u32 dirval, bit_offset;
++
++	bank_offset = GPIO_SET_DR_OFFSET + GPIO_BANK_OFFSET(offset);
++	bit_offset = GPIO_BIT_OFFSET(offset);
++
++	spin_lock_irqsave(&chip->lock, flags);
++
++	dirval = ioread32(chip->base + bank_offset);
++	dirval &= ~BIT(bit_offset);
++	iowrite32(dirval, chip->base + bank_offset);
++	__xgene_gpio_set(gc, offset, val);
++
++	spin_unlock_irqrestore(&chip->lock, flags);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int xgene_gpio_suspend(struct device *dev)
++{
++	struct xgene_gpio *gpio = dev_get_drvdata(dev);
++	unsigned long bank_offset;
++	unsigned int bank;
++
++	for (bank = 0; bank < XGENE_MAX_GPIO_BANKS; bank++) {
++		bank_offset = GPIO_SET_DR_OFFSET + bank * GPIO_BANK_STRIDE;
++		gpio->set_dr_val[bank] = ioread32(gpio->base + bank_offset);
++	}
++	return 0;
++}
++
++static int xgene_gpio_resume(struct device *dev)
++{
++	struct xgene_gpio *gpio = dev_get_drvdata(dev);
++	unsigned long bank_offset;
++	unsigned int bank;
++
++	for (bank = 0; bank < XGENE_MAX_GPIO_BANKS; bank++) {
++		bank_offset = GPIO_SET_DR_OFFSET + bank * GPIO_BANK_STRIDE;
++		iowrite32(gpio->set_dr_val[bank], gpio->base + bank_offset);
++	}
++	return 0;
++}
++
++static SIMPLE_DEV_PM_OPS(xgene_gpio_pm, xgene_gpio_suspend, xgene_gpio_resume);
++#define XGENE_GPIO_PM_OPS	(&xgene_gpio_pm)
++#else
++#define XGENE_GPIO_PM_OPS	NULL
++#endif
++
++static int xgene_gpio_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct xgene_gpio *gpio;
++	int err = 0;
++
++	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
++	if (!gpio) {
++		err = -ENOMEM;
++		goto err;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	gpio->base = devm_ioremap_nocache(&pdev->dev, res->start,
++							resource_size(res));
++	if (IS_ERR(gpio->base)) {
++		err = PTR_ERR(gpio->base);
++		goto err;
++	}
++
++	gpio->chip.ngpio = XGENE_MAX_GPIOS;
++
++	gpio->chip.dev = &pdev->dev;
++	gpio->chip.direction_input = xgene_gpio_dir_in;
++	gpio->chip.direction_output = xgene_gpio_dir_out;
++	gpio->chip.get = xgene_gpio_get;
++	gpio->chip.set = xgene_gpio_set;
++	gpio->chip.label = dev_name(&pdev->dev);
++	gpio->chip.base = -1;
++
++	platform_set_drvdata(pdev, gpio);
++
++	err = gpiochip_add(&gpio->chip);
++	if (err) {
++		dev_err(&pdev->dev,
++			"failed to register gpiochip.\n");
++		goto err;
++	}
++
++	dev_info(&pdev->dev, "X-Gene GPIO driver registered.\n");
++	return 0;
++err:
++	dev_err(&pdev->dev, "X-Gene GPIO driver registration failed.\n");
++	return err;
++}
++
++static int xgene_gpio_remove(struct platform_device *pdev)
++{
++	struct xgene_gpio *gpio = platform_get_drvdata(pdev);
++	int ret = 0;
++
++	ret = gpiochip_remove(&gpio->chip);
++	if (ret)
++		dev_err(&pdev->dev, "unable to remove gpio_chip.\n");
++	return ret;
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id xgene_gpio_of_match[] = {
++	{ .compatible = "apm,xgene-gpio", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, xgene_gpio_of_match);
++#endif
++
++static struct platform_driver xgene_gpio_driver = {
++	.driver = {
++		.name = "xgene-gpio",
++		.owner = THIS_MODULE,
++		.of_match_table = xgene_gpio_of_match,
++		.pm     = XGENE_GPIO_PM_OPS,
++	},
++	.probe = xgene_gpio_probe,
++	.remove = xgene_gpio_remove,
++};
++
++module_platform_driver(xgene_gpio_driver);
++
++MODULE_AUTHOR("Feng Kan <fkan@apm.com>");
++MODULE_DESCRIPTION("APM X-Gene GPIO driver");
++MODULE_LICENSE("GPL");
+-- 
+1.9.1
