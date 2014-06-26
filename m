@@ -1,56 +1,55 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 26 Jun 2014 12:19:55 +0530
-Subject: [PATCH] arm64: do not force irq affinity setting
-Message-ID: <1403765395-16978-1-git-send-email-pgaikwad@nvidia.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 26 Jun 2014 12:40:19 +0530
+Subject: [PATCH V4 01/16] irqchip: crossbar: Dont use '0' to mark reserved
+ interrupts
+In-Reply-To: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
+References: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1403766634-18543-2-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unconditional copying cpu_online_mask to affinity
-may result in migrating affinity to wrong CPU.
+From: Nishanth Menon <nm@ti.com>
 
-For example, IRQ 5 affinity mask contains CPU 4-7,
-it was affined to CPU4 and CPU 0-7 are online.
-Now if we hot-unplug CPU4 then with current
-implementation affinity mask will contain
-CPU 0-3,5-7 and IRQ 5 will be affined to CPU0.
+Today '0' is actually reserved, but may not be the same in the future.
 
-Instead copy cpu_online_mask to affinity only if
-no online CPU is present in affinity mask and do
-not force affinity seeting which would do the
-CPU online check.
+So, use a flag to mark the GIC interrupts that are reserved.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm64/kernel/irq.c |   12 ++++--------
- 1 files changed, 4 insertions(+), 8 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 0f08dfd..dfa6e3e 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -97,19 +97,15 @@ static bool migrate_one_irq(struct irq_desc *desc)
- 	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
- 		return false;
+diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+index 3d15d16..20105bc 100644
+--- a/drivers/irqchip/irq-crossbar.c
++++ b/drivers/irqchip/irq-crossbar.c
+@@ -17,6 +17,7 @@
+ #include <linux/irqchip/arm-gic.h>
  
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
-+	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
-+		affinity = cpu_online_mask;
- 		ret = true;
-+	}
+ #define IRQ_FREE	-1
++#define IRQ_RESERVED	-2
+ #define GIC_IRQ_START	32
  
--	/*
--	 * when using forced irq_set_affinity we must ensure that the cpu
--	 * being offlined is not present in the affinity mask, it may be
--	 * selected as the target CPU otherwise
--	 */
--	affinity = cpu_online_mask;
- 	c = irq_data_get_irq_chip(d);
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
-+	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
- 		cpumask_copy(d->affinity, affinity);
+ /*
+@@ -139,7 +140,7 @@ static int __init crossbar_of_init(struct device_node *node)
+ 				pr_err("Invalid reserved entry\n");
+ 				goto err3;
+ 			}
+-			cb->irq_map[entry] = 0;
++			cb->irq_map[entry] = IRQ_RESERVED;
+ 		}
+ 	}
  
- 	return ret;
+@@ -170,7 +171,7 @@ static int __init crossbar_of_init(struct device_node *node)
+ 	 * reserved irqs. so find and store the offsets once.
+ 	 */
+ 	for (i = 0; i < max; i++) {
+-		if (!cb->irq_map[i])
++		if (cb->irq_map[i] == IRQ_RESERVED)
+ 			continue;
+ 
+ 		cb->register_offsets[i] = reserved;
 -- 
-1.7.4.1
+1.7.9.5
