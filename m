@@ -1,28 +1,49 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Thu, 26 Jun 2014 09:32:30 +0200
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
- <20140626031247.GN2224@dragon>
- <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>
-Message-ID: <201406260932.30524.jbe@pengutronix.de>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 26 Jun 2014 09:34:32 +0200
+Subject: [PATCH] ARM: dts: add hdmi regulators for exynos5420 based
+ peach-pit board
+In-Reply-To: <1403099099-6599-1-git-send-email-rahul.sharma@samsung.com>
+References: <1403099099-6599-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CABxcv=n0Fu8c3wWsHuAbzbfaQEF0Gc-vO_TBsgf_w4Ng2yg_ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hello Rahul,
 
-On Thursday 26 June 2014 05:43:19 Fabio Estevam wrote:
-> [...]
-> Below is the log with linux-next kernel and earlyprintk enabled:
+On Wed, Jun 18, 2014 at 3:44 PM, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> Adding regulators for hdmi for peach-pit board.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> ---
+> Based on for-next branch in Kukjin's tree.
+> Dependent on:
+> 1) PMIC DT patch at http://www.gossamer-threads.com/lists/linux/kernel/1945703
+> 2) tps65090 DT patch at https://lkml.org/lkml/2014/6/13/483
+>
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 1c5b8f9..0a6a1cb 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -229,6 +229,11 @@
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&hdmi_hpd_irq>;
+>         ddc = <&i2c_2>;
+> +
+> +       hdmi-en-supply = <&tps65090_fet7>;
+> +       vdd-supply = <&ldo8_reg>;
+> +       vdd_osc-supply = <&ldo10_reg>;
+> +       vdd_pll-supply = <&ldo8_reg>;
+>  };
+>
+>  &usbdrd_phy0 {
+> --
+> 1l.7.9.5
+>
 
-Does it also hang when you disable "earlyprintk"? A few weeks ago we had a 
-similar issue with i.MX6/PCI and "earlyprintk" (at the end it was caused by a 
-clock change for the UART when changing from the early to the regular 
-console).
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Regards,
-Juergen
-
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions               ? ? ?| http://www.pengutronix.de/  |
+Best regards,
+Javier
