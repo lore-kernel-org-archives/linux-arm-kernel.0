@@ -1,49 +1,32 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 26 Jun 2014 12:44:51 +0200
-Subject: [PATCHv4 0/5] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
-References: <1402579245-13377-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140626124451.6014fde3@ipc1.ka-ro>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 26 Jun 2014 13:49:09 +0300
+Subject: [PATCH] clk: define and export __clk_get_debug for providers
+In-Reply-To: <44039675.8s16pHQIVH@wuerfel>
+References: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
+ <44039675.8s16pHQIVH@wuerfel>
+Message-ID: <20140626104909.GD3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Lothar Wa?mann wrote:
-> With a flash-based BBT there is no reason to move the Factory Bad
-> Block Marker from the data area buffer (to where it is mapped by the
-> GPMI NAND controller) to the OOB buffer. Thus, make this feature
-> configurable via DT. This is required for the Ka-Ro electronics
-> i.MX6 platforms.
+On Wed, Jun 25, 2014 at 08:07:37PM +0200, Arnd Bergmann wrote:
+> On Wednesday 25 June 2014 19:26:31 Peter De Schrijver wrote:
+> > Define and export a new function __clk_get_debug which returns the debugfs
+> > directory entry pointer. This can be used by clock providers to add debugfs
+> > entries which are not related to a specific clock type. Examples include the
+> > ability to measure the rate of a clock. It can also be used by modules to
+> > create new debugfs entries. This is useful if you want to expose features
+> > for testing which can potentially cause system instability such as allowing
+> > to change a clock's rate from userspace.
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > 
 > 
-> Changes wrt. v2:
-> - added a warning for i.MX28 to the binding documentation
-> - fixed the gpmi_ecc_read_subpage() routine which turned on blockmark
->   swapping unconditionally
-> - use !GPMI_IS_MX23() in place of this->swap_block_mark (which were
->   synonymous the original code) in gpmi_ecc_read_oob() and
->   gpmi_block_markbad()
-> - make nand-on-flash-bbt a prerequisite for this feature
+> Just an idea, but would it be better to add a pair of functions to add/remove
+> debugfs files rather than exposing the dentry itself?
 > 
-> patch added:
-> - add an additional option to turn of BB mark writing
-> 
-> Changes wrt. v3:
-> - added two code cleanup patches
-> - added a patch to turn of NAND_BBT_CREATE, if blockmark swapping is disabled
-> 
-> 
-any comments on this patchset?
 
+Ok. Will do that.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Cheers,
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Peter.
