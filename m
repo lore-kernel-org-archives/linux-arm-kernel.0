@@ -1,67 +1,30 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Thu, 26 Jun 2014 07:34:55 +0000
-Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
-In-Reply-To: <20140626055431.GC7859@dragon>
-References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
- <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
- <20140626055431.GC7859@dragon>
-Message-ID: <5d0aab099e9b450397bcc7ea7fde0fd8@BY2PR03MB315.namprd03.prod.outlook.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 26 Jun 2014 09:37:40 +0200
+Subject: [PATCH] clk: define and export __clk_get_debug for providers
+In-Reply-To: <20140625182349.32686.25931@quantum>
+References: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
+ <44039675.8s16pHQIVH@wuerfel> <20140625182349.32686.25931@quantum>
+Message-ID: <CAAObsKDVrXRgO1e2=SorGiNUMhGPCCUUPtsjDfnST9gFN4=qTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn
-	I am OK with this.
-
-Best Regards.
-Anson Huang
-?
-Freescale Semiconductor Shanghai
-Tel:021-28937058
-
-
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at freescale.com]
->Sent: Thursday, June 26, 2014 1:55 PM
->To: Fabio Estevam
->Cc: Huang Yongcai-B20788; Sascha Hauer; Russell King; linux-arm-
->kernel at lists.infradead.org
->Subject: Re: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
+On 25 June 2014 20:23, Mike Turquette <mturquette@linaro.org> wrote:
 >
->On Wed, Jun 25, 2014 at 10:23:01PM -0300, Fabio Estevam wrote:
->> Hi Anson,
->>
->> On Wed, Jun 25, 2014 at 6:10 AM, Anson Huang <b20788@freescale.com> wrote:
->> > Add cpufreq support for i.MX6SX, using common i.MX6Q cpufreq driver.
->> >
->> > Signed-off-by: Anson Huang <b20788@freescale.com>
->> > ---
->> >  arch/arm/mach-imx/mach-imx6sx.c |    3 +++
->> >  1 file changed, 3 insertions(+)
->> >
->> > diff --git a/arch/arm/mach-imx/mach-imx6sx.c
->> > b/arch/arm/mach-imx/mach-imx6sx.c index 74ff7d6..9221e1d 100644
->> > --- a/arch/arm/mach-imx/mach-imx6sx.c
->> > +++ b/arch/arm/mach-imx/mach-imx6sx.c
->> > @@ -42,6 +42,9 @@ static void __init imx6sx_init_irq(void)  static
->> > void __init imx6sx_init_late(void)  {
->> >         imx6q_cpuidle_init();
->> > +
->> > +       if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
->> > +               platform_device_register_simple("imx6q-cpufreq", -1,
->> > + NULL, 0);
->> >  }
->>
->> With this patch applied I get a flood of these messages:
->>
->> cpu cpu0: failed to scale vddpu up: -22
->> cpufreq: __target_index: Failed to change cpu frequency: -22 cpu cpu0:
->> failed to scale vddpu up: -22
->> cpufreq: __target_index: Failed to change cpu frequency: -22 cpu cpu0:
->> failed to scale vddpu up: -22
->> cpufreq: __target_index: Failed to change cpu frequency: -22
+> Peter,
 >
->So it's because the driver change for imx6sx hasn't been in place.  I just
->dropped the patch from my branch for now, and will revisit later when driver
->part shows up on my branch.  (Unfortunately, that will be next cycle).
->
->Shawn
+> Just FYI, I'm trying to reverse the trend of prepending double
+> underscores for functions that are used by clock providers. That stuff
+> started out small and sort of grew out of control ;-)
+
+I'm looking at rebasing Rabin's patches for per-user clks, and I have
+had to add a few variants for providers, so they can be called with
+clk_core instead. Have been prepending underscores for those internal
+variants, but in some cases I had to also append a _internal suffix
+because there were already variants without locking.
+
+What convention were you thinking of for distinguishing provider-only
+variants for e.g. clk_set_rate?
+
+Regards,
+
+Tomeu
