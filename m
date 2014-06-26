@@ -1,42 +1,104 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 26 Jun 2014 12:47:55 +0100
-Subject: [PATCH] pinctrl: pinctrl-st.c: Cleaning up if unsigned is less
- than zero
-In-Reply-To: <1403782369-10201-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1403782369-10201-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <53AC086B.80406@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 26 Jun 2014 13:48:18 +0200
+Subject: [PATCH 13/13] AT91: PIT: Move the driver to drivers/clocksource
+In-Reply-To: <20140626093006.GB3385@lukather>
+References: <1403701605-26678-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1403701605-26678-14-git-send-email-maxime.ripard@free-electrons.com>
+ <53ABAF1E.5030405@free-electrons.com> <20140626093006.GB3385@lukather>
+Message-ID: <53AC0882.3010601@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-On 26/06/14 12:32, Rickard Strandqvist wrote:
-> Remove checking if a unsigned is less than zero
+On 26/06/2014 11:30, Maxime Ripard wrote:
+> Hi Boris,
 >
-> This was found using a static code analysis program called cppcheck.
+> On Thu, Jun 26, 2014 at 07:26:54AM +0200, Boris BREZILLON wrote:
+>> On 25/06/2014 15:06, Maxime Ripard wrote:
+>>> Now that we don't depend on anyting in the mach-at91 directory, we can just
+>>> move the driver to where it belongs.
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> ---
+>>>  arch/arm/mach-at91/Kconfig                                     | 4 ----
+>>>  arch/arm/mach-at91/Makefile                                    | 1 -
+>>>  drivers/clocksource/Kconfig                                    | 4 ++++
+>>>  drivers/clocksource/Makefile                                   | 1 +
+>>>  {arch/arm/mach-at91 => drivers/clocksource}/at91sam926x_time.c | 0
+>>>  5 files changed, 5 insertions(+), 5 deletions(-)
+>>>  rename {arch/arm/mach-at91 => drivers/clocksource}/at91sam926x_time.c (100%)
+>>>
+>>> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+>>> index a64412a020d3..b10db0990999 100644
+>>> --- a/arch/arm/mach-at91/Kconfig
+>>> +++ b/arch/arm/mach-at91/Kconfig
+>>> @@ -36,10 +36,6 @@ config AT91_SAM9G45_RESET
+>>>  	bool
+>>>  	default !ARCH_AT91X40
+>>>  
+>>> -config AT91_SAM9_TIME
+>>> -	select CLKSRC_OF if OF
+>>> -	bool
+>>> -
+>>>  config HAVE_AT91_SMD
+>>>  	bool
+>>>  
+>>> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+>>> index 78e9cec282f4..1a916ececbfd 100644
+>>> --- a/arch/arm/mach-at91/Makefile
+>>> +++ b/arch/arm/mach-at91/Makefile
+>>> @@ -10,7 +10,6 @@ obj-		:=
+>>>  obj-$(CONFIG_OLD_CLK_AT91)	+= clock.o
+>>>  obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
+>>>  obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
+>>> -obj-$(CONFIG_AT91_SAM9_TIME)	+= at91sam926x_time.o
+>>>  obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+>>>  
+>>>  # CPU-specific support
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> index 065131cbfcc0..cd8b73ddbef3 100644
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -118,6 +118,10 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+>>>  	help
+>>>  	 Use ARM global timer clock source as sched_clock
+>>>  
+>>> +config AT91_SAM9_TIME
+>>> +	select CLKSRC_OF if OF
+>>> +	bool
+>>> +
+>>>  config CLKSRC_METAG_GENERIC
+>>>  	def_bool y if METAG
+>>>  	help
+>>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>>> index 800b1303c236..3088928070f8 100644
+>>> --- a/drivers/clocksource/Makefile
+>>> +++ b/drivers/clocksource/Makefile
+>>> @@ -1,5 +1,6 @@
+>>>  obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
+>>>  obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
+>>> +obj-$(CONFIG_AT91_SAM9_TIME)	+= at91sam926x_time.o
+>> I would rename both Kconfig and source file name into ATMEL_PIT and
+>> atmel_pit.c (or AT91_PIT and atmel_pit.c) to cleary show that this
+>> driver add support for the PIT block.
+> I actually had the same idea, but older AT91 SoCs (rm9200, for
+> example) also mention the PIT, even though the IP is different.
+
+I checked at91rm9200 datasheet, and indeed it mention the concept of PIT
+(Periodic Interval Timer), but the HW block is called ST (System Timer).
+
+How about using the name ATMEL_PIT for this driver and later use
+ATMEL_ST when we decide to move at91rm9200_time.c driver into
+drivers/clocksource ?
+
 >
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-> ---
->   drivers/pinctrl/pinctrl-st.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> Since AT91_PIT was just too generic and only added confusion, I left
+> it as is, but maybe we can find a better name.
 >
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index 1bd6363bc9..f4ee1b1 100644
-> --- a/drivers/pinctrl/pinctrl-st.c
-> +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -1256,7 +1256,7 @@ static int st_pctl_parse_functions(struct device_node *np,
->   	func = &info->functions[index];
->   	func->name = np->name;
->   	func->ngroups = of_get_child_count(np);
-> -	if (func->ngroups <= 0) {
-> +	if (func->ngroups == 0) {
-
-Makes sense
-
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-
-
->   		dev_err(info->dev, "No groups defined\n");
->   		return -EINVAL;
->   	}
+> Maxime
 >
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
