@@ -1,51 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jun 2014 10:00:45 +0100
-Subject: [PATCH] ARM: perf: allow tracing with kernel tracepoints events
-In-Reply-To: <CAFrcx1=gwRzU9heY8o9sphWUiga63NGdpN+cUh81Njr-X-OEGQ@mail.gmail.com>
-References: <CAFrcx1n-cPXm=w+84gQiUjZoFKi7gYnvJ0BQ+8yXKS=k3nEt3g@mail.gmail.com>
- <1403025065-18001-1-git-send-email-jean.pihet@linaro.org>
- <20140618125355.GA2186@arm.com>
- <CAFrcx1mA7kXiG9wMQqn=zYPYqrpGxDYWfoMP97RvkkrMTvNoRw@mail.gmail.com>
- <20140625090110.GD6153@arm.com>
- <CAFrcx1=gwRzU9heY8o9sphWUiga63NGdpN+cUh81Njr-X-OEGQ@mail.gmail.com>
-Message-ID: <20140626090045.GB376@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 26 Jun 2014 11:03:59 +0200
+Subject: [PATCH v4 02/14] mfd: max77686: Allow the max77686 rtc to wakeup
+ the system
+In-Reply-To: <1403723019-6212-3-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403723019-6212-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403773439.27156.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 03:54:14PM +0100, Jean Pihet wrote:
-> Hi Will,
+On ?ro, 2014-06-25 at 21:03 +0200, Javier Martinez Canillas wrote:
+> From: Doug Anderson <dianders@chromium.org>
+> 
+> The max77686 includes an RTC that keeps power during suspend.  It's
+> convenient to be able to use it as a wakeup source.
+> 
+> NOTE: due to wakeup ordering problems this patch alone doesn't work so
+> well on exynos5250-snow.  You also need something that brings the i2c
+> bus up before the max77686 wakeup runs.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+> 
+> Changes since v3:
+>  - Keep the note that this patch needs another change due wakeup
+>    ordering problems.
+> 
+>  drivers/rtc/rtc-max77686.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
 
-Hello,
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> On 25 June 2014 11:01, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jun 20, 2014 at 09:10:35AM +0100, Jean Pihet wrote:
-> >> On 18 June 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Tue, Jun 17, 2014 at 06:11:05PM +0100, Jean Pihet wrote:
-> >> >> Tested with perf record and tracepoints filtering (-e <tracepoint>), with
-> >> >> unwinding using fp (--call-graph fp) and dwarf info (--call-graph dwarf).
-> >> >
-> >> > Whilst the old ACPS unwinding only needs PC, FP and SP, is this definitely
-> >> > true for exidx and DWARF-based unwinding? Given that libunwind ends up
-> >> > running a state machine for the latter, can we guarantee that we won't hit
-> >> > instructions that require access to other general purpose registers?
-> >> Yes. dwarf unwinding does not need anything extra. Once seeded all the
-> >> rest is extracted from the dwarf trace info.
-> >
-> > Ok, but what if the LR isn't saved on the stack, for example? What if the
-> > code you're trying to unwind is hand-written assembly annotated with CFI
-> > directives?
-> Then in that case the unwinding is not possible unless the
-> hand-crafted asm is compatible with the requested unwinding method
-> (fp, dwarf etc.). Do you expect problems there, if so can you give
-> more details?
+Best regards,
+Krzysztof
 
-To use a readily available AArch64 example, take a look at
-__kernel_gettimeofday in arch/arm64/kernel/vdso/gettimeofday.S
 
-It starts by moving the link register into x2, so that it can later call
-__do_get_tspec without clobbering it. Furthermore, it doesn't make use of
-the stack at all.
-
-How can you unwind that using your current code?
-
-Will
+> diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
+> index d20a7f0..c1c6055 100644
+> --- a/drivers/rtc/rtc-max77686.c
+> +++ b/drivers/rtc/rtc-max77686.c
+> @@ -583,6 +583,33 @@ static void max77686_rtc_shutdown(struct platform_device *pdev)
+>  #endif /* MAX77686_RTC_WTSR_SMPL */
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int max77686_rtc_suspend(struct device *dev)
+> +{
+> +	if (device_may_wakeup(dev)) {
+> +		struct max77686_rtc_info *info = dev_get_drvdata(dev);
+> +
+> +		return enable_irq_wake(info->virq);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int max77686_rtc_resume(struct device *dev)
+> +{
+> +	if (device_may_wakeup(dev)) {
+> +		struct max77686_rtc_info *info = dev_get_drvdata(dev);
+> +
+> +		return disable_irq_wake(info->virq);
+> +	}
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(max77686_rtc_pm_ops,
+> +			 max77686_rtc_suspend, max77686_rtc_resume);
+> +
+>  static const struct platform_device_id rtc_id[] = {
+>  	{ "max77686-rtc", 0 },
+>  	{},
+> @@ -592,6 +619,7 @@ static struct platform_driver max77686_rtc_driver = {
+>  	.driver		= {
+>  		.name	= "max77686-rtc",
+>  		.owner	= THIS_MODULE,
+> +		.pm	= &max77686_rtc_pm_ops,
+>  	},
+>  	.probe		= max77686_rtc_probe,
+>  	.shutdown	= max77686_rtc_shutdown,
