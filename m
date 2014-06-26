@@ -1,19 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Jun 2014 09:52:16 -0600
-Subject: [PATCH] clk: tegra: export clock names for debugging
-In-Reply-To: <1403797705-26910-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1403797705-26910-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <53AC41B0.40307@wwwdotorg.org>
+Date: Thu, 26 Jun 2014 09:53:18 -0600
+Subject: [PATCH v2] clk: tegra124: init table updates
+In-Reply-To: <1403796403-26443-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1403796403-26443-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <53AC41EE.7090103@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2014 09:48 AM, Peter De Schrijver wrote:
-> When writing a module for testing or debugging purposes, there is no way to
-> get hold of clk handles. This patch solves this by exposing all valid clocks
-> as clkdev's for the virtual device tegra-clk-debug.
+On 06/26/2014 09:26 AM, Peter De Schrijver wrote:
+> Ensure some clocks critical for system operation are always on. Also enable
+> csite for JTAG debugging and set the tsensor clock frequency for the upcoming
+> soctherm driver.
 
-This is to support clk_get_sys()?
-
-I guess this seems fine, so feel free to apply it, but I slightly wonder
-why not just include this change as part of the presumably local and
-never-to-be-upstreamed test/dev module?
+Acked-by: Stephen Warren <swarren@nvidia.com>
