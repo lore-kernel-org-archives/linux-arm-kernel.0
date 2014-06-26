@@ -1,59 +1,56 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 26 Jun 2014 12:53:14 +0900
-Subject: [PATCH v5 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
- nodes
-In-Reply-To: <53AB9581.7090806@renesas.com>
-References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>
- <201406242159.55373.sergei.shtylyov@cogentembedded.com>
- <53AB89B3.9020207@renesas.com>
- <CANqRtoSsx+NAz2W_utN-A2fx+=e_Ywt5eD=Tf9uGnEDvk3w-PQ@mail.gmail.com>
- <53AB9581.7090806@renesas.com>
-Message-ID: <CANqRtoQnmmxN7TOjx7SN9VknkiDPNG0VO2Q2mjwjLcAa5pb1uw@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 26 Jun 2014 12:05:39 +0800
+Subject: [PATCH v4 0/8] enable hix5hd2 SoC
+Message-ID: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shimoda-san,
+Changelog:
+v4:
+  * Move CONFIG_ARCH_HISI from HiP04 SoC patch series to here.
+  * Rename x5hd2. Always use HIX5HD2 or hix5hd2 instead.
+  * Move HIP04 debug uart into this patch series.
 
-On Thu, Jun 26, 2014 at 12:37 PM, Yoshihiro Shimoda
-<yoshihiro.shimoda.uh@renesas.com> wrote:
-> Hi Magnus-san,
->
-> (2014/06/26 12:01), Magnus Damm wrote:
->> Hi Shimoda-san,
->>
->> On Thu, Jun 26, 2014 at 11:47 AM, Yoshihiro Shimoda
->> <yoshihiro.shimoda.uh@renesas.com> wrote:
->>> Hi Sergei,
->>>
->>> (2014/06/25 2:59), Sergei Shtylyov wrote:
->>>> From: Ben Dooks <ben.dooks@codethink.co.uk>
->>>>
->>>> Add device nodes for the R8A7790 internal PCI bridge devices.
->>>>
->>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->>>> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
->>>> [Sergei: added several properties to the PCI bridge nodes]
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>
->>> Thank you for the patch!
->>> I tested this patch on my lager board and a usb memory, and it works.
->>>
->>> Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->>
->> Thanks for testing. Just one quick question from my side: Which USB
->> port did you test?
->
-> I tested usb ch1 only...
->
->> I somehow assumed that at least the majority of the USB ports on R-Car
->> Gen2 require a USB PHY device driver to work?
->
-> Thank you for the point.
-> About usb ch1, a USB PHY device driver doesn't need, I think.
-> But, about ch0 and ch2, I think that they should require a USB PHY device driver.
+v3:
+  * Clean in headsmp.S.
+  * Remove CONFIG_ARCH_HIX5HD2 in Makefile for headsmp.o. Use
+    CONFIG_SMP instead.
 
-Thanks for your clarification. It all makes sense now!
+v2:
+  * Add document on DT binding.
+  * Clean DTS file.
+  * Avoid to parse DT binding in restart function.
+  * Fix the hotplug issue.
+  * Remove hardcoding in platsmp.
 
-Cheers,
+Haifeng Yan (3):
+  ARM: debug: Rename Hi3716 to HI5XHD2
+  ARM: hisi: enable hix5hd2 SoC
+  ARM: dts: Add hix5hd2-dkb dts file.
 
-/ magnus
+Haojian Zhuang (5):
+  ARM: hisi: store reboot reg in global variable
+  ARM: debug: add HiP04 debug uart
+  ARM: hisi: add ARCH_HISI
+  ARM: config: add ARCH_HIX5HD2 in hi3xxx_defconfig
+  document: add dt binding on hix5hd2 SoC
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |   9 ++
+ arch/arm/Kconfig.debug                             |  22 ++-
+ arch/arm/Makefile                                  |   2 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hix5hd2-dkb.dts                  |  52 +++++++
+ arch/arm/boot/dts/hix5hd2.dtsi                     | 171 +++++++++++++++++++++
+ arch/arm/configs/hi3xxx_defconfig                  |   2 +
+ arch/arm/mach-hisi/Kconfig                         |  27 +++-
+ arch/arm/mach-hisi/Makefile                        |   2 +-
+ arch/arm/mach-hisi/core.h                          |   5 +
+ arch/arm/mach-hisi/hisilicon.c                     |  32 +++-
+ arch/arm/mach-hisi/hotplug.c                       |  58 +++++++
+ arch/arm/mach-hisi/platsmp.c                       |  50 +++++-
+ 13 files changed, 412 insertions(+), 21 deletions(-)
+ create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
+ create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
+
+-- 
+1.9.1
