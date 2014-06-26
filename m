@@ -1,35 +1,60 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Thu, 26 Jun 2014 15:41:31 +0200
-Subject: [PATCH] pinctrl: pinctrl-at91.c: Cleaning up values that are never
- used
-Message-ID: <1403790091-11423-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Jun 2014 15:42:58 +0200
+Subject: [PATCH] ARM: mvebu: Enable SCU Speculative linefills to L2 for Armada
+ 375/38x
+Message-ID: <1403790178-23902-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove variable that are never used
+From: Nadav Haklai <nadavh@marvell.com>
 
-This was found using a static code analysis program called cppcheck.
+When set, coherent linefill requests are sent speculatively to the
+L2C-310 in parallel with the tag look-up. If the tag look-up misses,
+the confirmed linefill is sent to the L2C-310 and gets RDATA earlier
+because the data request was already initiated by the speculative
+request.
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+This feature may improve overall system performance.
+
+[Gregory: use a define for the SCU Speculative linefills enable bit,
+modify the title of the patch]
+
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/pinctrl/pinctrl-at91.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/board-v7.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 421493c..9854a29 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -793,9 +793,9 @@ static void at91_pinconf_dbg_show(struct pinctrl_dev *pctldev,
- 				   struct seq_file *s, unsigned pin_id)
- {
- 	unsigned long config;
--	int ret, val, num_conf = 0;
-+	int val, num_conf = 0;
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 8bb742fdf5ca..c9b02651e895 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -33,6 +33,10 @@
+ #include "coherency.h"
+ #include "mvebu-soc-id.h"
  
--	ret = at91_pinconf_get(pctldev, pin_id, &config);
-+	at91_pinconf_get(pctldev, pin_id, &config);
- 
- 	DBG_SHOW_FLAG(MULTI_DRIVE);
- 	DBG_SHOW_FLAG(PULL_UP);
++#define SCU_CTRL		0x00
++#define SCU_SPEC_LINEFILL_EN	    BIT(3)
++
++
+ /*
+  * Enables the SCU when available. Obviously, this is only useful on
+  * Cortex-A based SOCs, not on PJ4B based ones.
+@@ -44,7 +48,15 @@ static void __init mvebu_scu_enable(void)
+ 	struct device_node *np =
+ 		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+ 	if (np) {
++		u32 scu_ctrl;
+ 		scu_base = of_iomap(np, 0);
++		/* already enabled? */
++		scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
++		if (!(scu_ctrl & 1)) {
++			/* Enable SCU Speculative linefills to L2 */
++			scu_ctrl |= SCU_SPEC_LINEFILL_EN;
++			__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
++		}
+ 		scu_enable(scu_base);
+ 		of_node_put(np);
+ 	}
 -- 
-1.7.10.4
+1.8.1.2
