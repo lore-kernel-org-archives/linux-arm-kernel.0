@@ -1,43 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jun 2014 15:22:31 +0100
-Subject: [PATCH 0/7] Kirkwood ASoC updates
-Message-ID: <20140626142231.GR32514@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Jun 2014 16:22:44 +0200
+Subject: [PATCH v2 0/2] efi: preserve NEON registers on UEFI services calls
+In-Reply-To: <1403791087.755.120.camel@deneb.redhat.com>
+References: <1403777346-28629-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1403791087.755.120.camel@deneb.redhat.com>
+Message-ID: <CAKv+Gu-1qbn=VagWKkwkr2aJg3k6UcWEqa8EQKGocuaLxb9+Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On 26 June 2014 15:58, Mark Salter <msalter@redhat.com> wrote:
+> On Thu, 2014-06-26 at 12:09 +0200, Ard Biesheuvel wrote:
+>> The current UEFI implementation for arm64 fails to preserve/restore the contents
+>> of the NEON register file,
+>
+> Does the current implementation actually use NEON registers?
+> I know there are some at least, which build with -mgeneral-regs-only
+> to keep gcc from using NEON registers.
+>
 
-Here are a set of patches I've had for a while as part of my DPCM work.
-I think it's worth getting these merged.
+Tianocore/EDK2 does not use -mgeneral-regs-only when building for
+AArch64, and my current build shows that, for instance, GCC starts
+spilling to FP registers when compiling the LZMA decoder, and it is
+likely to do the same for the crypto bits once I start enabling them
+(although, interestingly enough, the OpenSSL SHA-1 C implementation
+runs 60% faster with -mgeneral-regs-only set)
 
-The first patch fixes a bug at ASoC level with debugfs handling - it is
-not permitted to create more than one debugfs directory with the same
-name in the same parent directory - and this can happen when the dummy
-platform and codec are used.
+> Not that that means we don't need this. Just curious.
+>
 
-The second patch adds a helper definition to handle both I2S and SPDIF
-bits in the RECCTL register in the same way that we already do with the
-PLAYCTL register.
-
-Patch 3 fixes the RECCTL enable masking - we would accumulate enable bits
-but never clear any of them.
-
-Patch 4 makes the driver's handling of the PLAYCTL register slightly more
-conformant to the documentation - which requires that the appropriate mute
-bits are set while the respective output interface is disabled.
-
-Patch 5 updates my previous attempt to properly fix this.  The previous
-attempt did stop things going wrong from the hardware perspective, but
-we are left with the occasional stuck-busy.  Although that was harmless,
-this patch stops this occuring in addition to the previous fix.
-
-Patch 6 lifts some of the driver restrictions on the period size and
-number of periods - there's no reason to restrict these values, so
-let's give userspace more flexibility.
-
-Patch 7 adds NO_PERIOD_WAKEUP support for kirkwood, permitting
-interrupt-less operation.
+The spec does not forbid it, so we will need it anyhow ...
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Ard.
