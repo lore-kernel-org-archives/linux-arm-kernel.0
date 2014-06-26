@@ -1,172 +1,65 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 26 Jun 2014 12:42:26 -0700
-Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
-In-Reply-To: <20140626151756.GU32514@n2100.arm.linux.org.uk>
-References: <53A2AE11.2050208@gmail.com> <53A2BE94.2010308@gmail.com>
- <53A7A579.4010702@gmail.com>
- <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
- <53A9B99F.4040806@codeaurora.org> <53A9FBB5.60709@codeaurora.org>
- <53AABCF5.4050403@gmail.com> <53AB45D1.90909@codeaurora.org>
- <53ABC13C.8030908@gmail.com>
- <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
- <20140626151756.GU32514@n2100.arm.linux.org.uk>
-Message-ID: <53AC77A2.4090207@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 26 Jun 2014 14:00:14 -0600
+Subject: [PATCH v1 3/9] of: Update Tegra XUSB pad controller binding for
+ USB
+In-Reply-To: <CAL1qeaEnOEgdNp8F1YyUAeco6WVY0XffpiEDsPGdcCQL62sw3Q@mail.gmail.com>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>	<1403072180-4944-4-git-send-email-abrestic@chromium.org>	<53AB432A.7010400@wwwdotorg.org>
+ <CAL1qeaEnOEgdNp8F1YyUAeco6WVY0XffpiEDsPGdcCQL62sw3Q@mail.gmail.com>
+Message-ID: <53AC7BCE.4030604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/26/2014 8:17 AM, Russell King - ARM Linux wrote:
-> On Thu, Jun 26, 2014 at 07:59:19AM -0700, Kevin Hilman wrote:
->> I agree that the u-boot bug needs to be fixed, and FWIW, I updated my
->> u-boot and haven't seen the boot failure yet after several boots with
->> next-20140625.
+On 06/25/2014 04:25 PM, Andrew Bresticker wrote:
+> Thanks for the review Stephen!
+> 
+> On Wed, Jun 25, 2014 at 2:46 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
+>>> Add new bindings used for USB support by the Tegra XUSB pad controller.
+>>> This includes additional PHY types, USB-specific pinconfig properties, etc.
 >>
->> That being said, since it's not always feasible/practical to update
->> u-boot, and when it comes down to it, this is still a kernel
->> regression, we should also fix the kernel to sanity check the values
->> coming from u-boot, like it was doing before.
+>>> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+>>
+>>> @@ -21,6 +21,12 @@ Required properties:
+>>>    - padctl
+>>>  - #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
+>>>    See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list of valid values.
+>>> +- nvidia,xusb-mbox: Handle to the Tegra XUSB mailbox node.
+>>
+>> Why does the padctrl code need access to the XUSB mailbox?
 > 
-> It wasn't sanity checking the values (there is some sanity checking,
-> but the sanity checking doesn't catch this).
+> The XUSB firmware sends messages which make requests of the PHY (XUSB
+> pad controller), such as idling/un-idling the HSIC PHYs or saving USB3
+> PHY context.
 > 
-> What caught it was that the kernel was configured to only look at the
-> first 8 of the 12 meminfo entries with ATAGs.  Since we no longer have
-> that limit, all meminfo entries are now looked at (since the kernel
-> doesn't need the limit.)
+>> Isn't the padctrl HW module something that provides services to the XUSB
+>> code. I would have expected the XUSB node to reference the padctrl node.
 > 
-> We could add back a soft-limit on the number of meminfo entries, but
-> this has to be platform specific.  Another entry to go into the
-> mach_info structures?
+> The XUSB padctrl HW does provide services to the XUSB host in the form
+> of PHYs and it is through the PHY bindings that the host references
+> the padctrl node.
 > 
+>> If notifications need to be sent back from XUSB padctrl to XUSB, then that
+>> seems like an internal SW detail that doesn't need to be represented in DT.
+> 
+> I think you mean notifications need to be sent back from the XUSB host
+> to the XUSB padctrl?  This is what the mailbox is for and I chose to
+> have the padctrl refer to the mailbox since messages are sent from the
+> mailbox which make requests to the PHY specifically and not the host
+> (see above).
 
-This is the least bad option I've come up with. It brings back
-early_init_dt_add_memory_arch so we can use arm_add_memory and stop
-adding memory if it reaches an upper threshold. I was debating setting
-the default at 12 or 8 but setting at 12 seems like it would involve the
-fewest platform changes.
+I've looked at the details of the mailbox messages a bit more now. It
+seems that the firmware running on the XUSB controller sends a variety
+of different messages, some of which are relevant to the XHCI controller
+driver and some relevant to the PHY/PAD driver. It's a pity these
+different message streams are intermixed, but I guess that's not changing.
 
-Thanks,
-Laura
+As such, I think at this stage it does make sense for the mailbox to be
+represented as a separate node, with each of the XHCI controller and USB
+PADCTL nodes referring to the mailbox node by phandle.
 
-----8<----
->From 1a5265fd178fea0da432fa9d49ce28e78bd25e04 Mon Sep 17 00:00:00 2001
-From: Laura Abbott <lauraa@codeaurora.org>
-Date: Thu, 26 Jun 2014 11:23:44 -0700
-Subject: [PATCH] arm: Add back maximum bank limit
-
-Commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
-(ARM: 8025/1: Get rid of meminfo) dropped the upper bound on
-the number of memory banks that can be added as there was no
-technical need in the kernel. It turns out though, some bootloaders
-(specifically the arndale-octa exynos boards) may pass invalid memory
-information and rely on the kernel to not parse this data. This is a
-bug in the bootloader but we still need to work around this.
-Re-introduce a maximum bank limit per board to prevent invalid banks
-from being passed to the kernel.
-
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/include/asm/mach/arch.h |  8 ++++++--
- arch/arm/kernel/devtree.c        |  4 ++++
- arch/arm/kernel/setup.c          | 16 ++++++++++++++++
- arch/arm/mach-exynos/exynos.c    |  1 +
- 4 files changed, 27 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 060a75e..2a436ac 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -40,6 +40,8 @@ struct machine_desc {
- 	unsigned int		video_start;	/* start of video RAM	*/
- 	unsigned int		video_end;	/* end of video RAM	*/
- 
-+	unsigned int		bank_limit;	/* maximum number of memory
-+						 * banks to add */
- 	unsigned char		reserve_lp0 :1;	/* never has lp0	*/
- 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
-@@ -85,7 +87,8 @@ static const struct machine_desc __mach_desc_##_type	\
-  __used							\
-  __attribute__((__section__(".arch.info.init"))) = {	\
- 	.nr		= MACH_TYPE_##_type,		\
--	.name		= _name,
-+	.name		= _name,			\
-+	.bank_limit	= 12,
- 
- #define MACHINE_END				\
- };
-@@ -95,6 +98,7 @@ static const struct machine_desc __mach_desc_##_name	\
-  __used							\
-  __attribute__((__section__(".arch.info.init"))) = {	\
- 	.nr		= ~0,				\
--	.name		= _namestr,
-+	.name		= _namestr,			\
-+	.bank_limit	= 12,
- 
- #endif
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index e94a157..ea9ce92 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -27,6 +27,10 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-+void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-+{
-+	arm_add_memory(base, size);
-+}
- 
- #ifdef CONFIG_SMP
- extern struct of_cpu_method __cpu_method_of_table[];
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 8a16ee5..3ab94d1 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -629,11 +629,26 @@ void __init dump_machine_table(void)
- 		/* can't use cpu_relax() here as it may require MMU setup */;
- }
- 
-+static unsigned int bank_cnt;
-+static unsigned int max_cnt;
-+
- int __init arm_add_memory(u64 start, u64 size)
- {
- 	u64 aligned_start;
- 
- 	/*
-+	 * Some buggy bootloaders rely on the old meminfo behavior of not adding
-+	 * more than n banks since anything past that may contain invalid data.
-+	 */
-+	if (bank_cnt >= max_cnt) {
-+		pr_crit("Max banks too low, ignoring memory at 0x%08llx\n",
-+			(long long)start);
-+		return -EINVAL;
-+	}
-+
-+	bank_cnt++;
-+
-+	/*
- 	 * Ensure that start/size are aligned to a page boundary.
- 	 * Size is appropriately rounded down, start is rounded up.
- 	 */
-@@ -879,6 +894,7 @@ void __init setup_arch(char **cmdline_p)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
-+	max_cnt = mdesc->bank_limit;
- 
- 	if (mdesc->reboot_mode != REBOOT_HARD)
- 		reboot_mode = mdesc->reboot_mode;
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index f38cf7c..91283fd 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -350,4 +350,5 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
- 	.dt_compat	= exynos_dt_compat,
- 	.restart	= exynos_restart,
- 	.reserve	= exynos_reserve,
-+	.bank_limit     = 8,
- MACHINE_END
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+I'm still not 100% sure about whether the PHY driver is the same level
+of abstraction intended by the Linux kernel's PHY layer. Pending that
+discussion's results, the "PHY" message from the firmware may not go to
+a Linux kernel PHY but some layer above which might get subsumed into
+the overall XHCI controller driver, which would change my argument above
+a bit.
