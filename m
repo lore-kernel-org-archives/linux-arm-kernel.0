@@ -1,31 +1,28 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel =?iso-8859-1?Q?Garc=EDa?=)
-Date: Thu, 26 Jun 2014 13:37:07 -0300
-Subject: [PATCH] arm: mach-omap2: gpmc: ignore non-available nodes
-In-Reply-To: <1403794923-19511-1-git-send-email-guido@vanguardiasur.com.ar>
-References: <1403794923-19511-1-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <20140626163707.GA26836@arch.cereza>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 26 Jun 2014 19:39:06 +0300
+Subject: [PATCH RESEND] clk: flatten clk tree in debugfs
+In-Reply-To: <20140613080239.GO5961@tbergstrom-lnx.Nvidia.com>
+References: <1401462237-14954-1-git-send-email-pdeschrijver@nvidia.com>
+ <20140613080239.GO5961@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140626163906.GI3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 Jun 12:02 PM, Guido Mart?nez wrote:
-> Currently, child nodes of the gpmc node are iterated and probed
-> regardless of their 'status' property. This means adding 'status =
-> "disabled";' has no effect.
+On Fri, Jun 13, 2014 at 10:02:39AM +0200, Peter De Schrijver wrote:
+> On Fri, May 30, 2014 at 05:03:57PM +0200, Peter De Schrijver wrote:
+> > This patch flattens the clk tree in CCF debugfs. Instead of representing the
+> > clocks and their hierarchy as a directory structure under
+> > /sys/kernel/debug/clk, each clock gets a single directory directly under
+> > /sys/kernel/debug/clk. The orphans directory is replaced by a file called
+> > clk_orphan_summary.
 > 
-> This patch changes the iteration to only probe nodes marked as
-> available.
+> Mike,
 > 
-> Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
+> Any problems with this? What needs to be done to make this patch go forward?
+> 
 
-Just a nit: the commit title doesn't match the recent commits. If you
-run "git log" on this file, you'll find the pattern should be something
-like:
-
-"ARM: OMAP2+: GPMC should only probe enabled devices"
-
-Other than this, the patch looks correct.
+Do you think this could be merged for the 3.17?
 
 Thanks,
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+
+Peter.
