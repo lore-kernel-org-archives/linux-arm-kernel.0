@@ -1,49 +1,32 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 26 Jun 2014 14:29:59 +0300
-Subject: [PATCH] fbdev: arm has __raw I/O accessors, use them in fb.h
-Message-ID: <1403782199-7998-1-git-send-email-tomi.valkeinen@ti.com>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Thu, 26 Jun 2014 13:32:49 +0200
+Subject: [PATCH] pinctrl: pinctrl-st.c: Cleaning up if unsigned is less than
+ zero
+Message-ID: <1403782369-10201-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Archit Taneja <archit@ti.com>
+Remove checking if a unsigned is less than zero
 
-This removes the sparse warnings on arm platforms:
+This was found using a static code analysis program called cppcheck.
 
-warning: cast removes address space of expression
-
-Signed-off-by: Archit Taneja <archit@ti.com>
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Alexander Shiyan <shc_work@mail.ru>
-Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 ---
-
-This patch was sent a few years ago, but was not applied:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/132387.html
-
-Russell asked if it has any effect on BE ARM platforms. I don't have any BE
-systems but I did some study:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/132900.html
-
-Anyone with a BE platform could test this?
-
- include/linux/fb.h | 2 +-
+ drivers/pinctrl/pinctrl-st.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index b6bfda99add3..09bb7a18d287 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -553,7 +553,7 @@ static inline struct apertures_struct *alloc_apertures(unsigned int max_num) {
- #define fb_memcpy_fromfb sbus_memcpy_fromio
- #define fb_memcpy_tofb sbus_memcpy_toio
- 
--#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__)
-+#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__) || defined(__arm__)
- 
- #define fb_readb __raw_readb
- #define fb_readw __raw_readw
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 1bd6363bc9..f4ee1b1 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1256,7 +1256,7 @@ static int st_pctl_parse_functions(struct device_node *np,
+ 	func = &info->functions[index];
+ 	func->name = np->name;
+ 	func->ngroups = of_get_child_count(np);
+-	if (func->ngroups <= 0) {
++	if (func->ngroups == 0) {
+ 		dev_err(info->dev, "No groups defined\n");
+ 		return -EINVAL;
+ 	}
 -- 
-1.9.1
+1.7.10.4
