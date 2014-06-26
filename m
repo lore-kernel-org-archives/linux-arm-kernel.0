@@ -1,116 +1,85 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 Jun 2014 12:23:35 +0100
-Subject: [PATCH v5 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
- support
-In-Reply-To: <20140625160911.GG15240@leverpostej>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
- <20140625160911.GG15240@leverpostej>
-Message-ID: <20140626112335.GC25130@e102568-lin.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 26 Jun 2014 13:24:33 +0200
+Subject: [PATCH 1/3] Documentation: devicetree: Update samsung UART bindings
+In-Reply-To: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
+References: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1403781875-5425-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 05:09:11PM +0100, Mark Rutland wrote:
-> On Wed, Jun 25, 2014 at 03:10:17PM +0100, Lorenzo Pieralisi wrote:
-> > This patch implements the cpu_suspend cpu operations method through
-> > the PSCI CPU_SUSPEND API. The PSCI implementation translates the idle state
-> > index passed by the cpu_suspend core call into a valid PSCI state according to
-> > the PSCI states initialized at boot by the PSCI suspend backend.
-> > 
-> > Entry point is set to cpu_resume physical address, that represents the
-> > default kernel execution address following a CPU reset.
-> > 
-> > Idle state indices missing a DT node description are initialized to power
-> > state standby WFI so that if called by the idle driver they provide the
-> > default behaviour.
-> > 
-> > Reviewed-by: Sebastian Capella <sebcape@gmail.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm64/include/asm/psci.h |   4 ++
-> >  arch/arm64/kernel/psci.c      | 103 ++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 107 insertions(+)
-> 
-> [...]
-> 
-> > +static void psci_power_state_unpack(u32 power_state,
-> > +				    struct psci_power_state *state)
-> > +{
-> > +	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
-> > +			PSCI_0_2_POWER_STATE_ID_SHIFT;
-> > +	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
-> > +			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
-> > +	state->affinity_level =
-> > +			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
-> > +			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
-> > +}
-> 
-> Is this valid for PSCI versions prior to 0.2?
+The primary purpose of this patch is to add information about (now
+required) aliases of UART ports. However the documentation currently is
+heavily outdated and so this patch also takes care of this.
 
-Yes, it should, as for the packing function.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ .../devicetree/bindings/serial/samsung_uart.txt    | 52 +++++++++++++++++++---
+ 1 file changed, 46 insertions(+), 6 deletions(-)
 
-> >  /*
-> >   * The following two functions are invoked via the invoke_psci_fn pointer
-> >   * and will not be inlined, allowing us to piggyback on the AAPCS.
-> > @@ -199,6 +216,77 @@ static int psci_migrate_info_type(void)
-> >  	return err;
-> >  }
-> >  
-> > +int __init psci_dt_register_idle_states(struct cpuidle_driver *drv,
-> > +					struct device_node *state_nodes[])
-> > +{
-> > +	int cpu, i;
-> 
-> Perhaps unsigned int? You print i with %u below.
-
-Yes.
-
-> > +	for (i = 0; i < drv->state_count; i++) {
-> > +		u32 psci_power_state;
-> > +
-> > +		if (!state_nodes[i]) {
-> > +			/*
-> > +			 * An index with a missing node pointer falls back to
-> > +			 * simple STANDBYWFI
-> > +			 */
-> > +			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
-> > +			continue;
-> > +		}
-> 
-> Does this make sense? Are there any limitations on which state nodes
-> could be missing?
-
-I think the check is overkill, you are right.
-
-> > +
-> > +		if (of_property_read_u32(state_nodes[i], "entry-method-param",
-> > +					 &psci_power_state)) {
-> > +			pr_warn(" * %s missing entry-method-param property\n",
-> > +				state_nodes[i]->full_name);
-> > +			/*
-> > +			 * If entry-method-param property is missing, fall
-> > +			 * back to STANDBYWFI state
-> > +			 */
-> > +			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
-> > +			continue;
-> 
-> Surely we want to throw away these states instead?
-> 
-> Otherwise we can get into a mess like:
-> 
-> psci_states[0] => low power state
-> psci_states[1] => lower power state
-> psci_states[2] => WFI / not low power
-> psci_states[3] => lowest power state
-> 
-> Where power usage and latency would jump around rather than follow
-> monotonic patterns.
-
-I do not think that's a problem by itself, but honestly I think you have
-a point. It is better to barf, throw away the states and avoid initializing
-CPUidle to force a firmware update than keep going with a state that is
-actually not doing what it probably was designed for, I just tried to be too
-accommodating on this.
-
-Thanks,
-Lorenzo
+diff --git a/Documentation/devicetree/bindings/serial/samsung_uart.txt b/Documentation/devicetree/bindings/serial/samsung_uart.txt
+index 2c8a17c..85e8ee2 100644
+--- a/Documentation/devicetree/bindings/serial/samsung_uart.txt
++++ b/Documentation/devicetree/bindings/serial/samsung_uart.txt
+@@ -1,14 +1,54 @@
+ * Samsung's UART Controller
+ 
+-The Samsung's UART controller is used for interfacing SoC with serial communicaion
+-devices.
++The Samsung's UART controller is used for interfacing SoC with serial
++communicaion devices.
+ 
+ Required properties:
+-- compatible: should be
+-  - "samsung,exynos4210-uart", for UART's compatible with Exynos4210 uart ports.
++- compatible: should be one of following:
++  - "samsung,exynos4210-uart" -  Exynos4210 SoC,
++  - "samsung,s3c2410-uart" - compatible with ports present on S3C2410 SoC,
++  - "samsung,s3c2412-uart" - compatible with ports present on S3C2412 SoC,
++  - "samsung,s3c2440-uart" - compatible with ports present on S3C2440 SoC,
++  - "samsung,s3c6400-uart" - compatible with ports present on S3C6400 SoC,
++  - "samsung,s5pv210-uart" - compatible with ports present on S5PV210 SoC.
+ 
+ - reg: base physical address of the controller and length of memory mapped
+   region.
+ 
+-- interrupts: interrupt number to the cpu. The interrupt specifier format depends
+-  on the interrupt controller parent.
++- interrupts: a single interrupt signal to SoC interrupt controller,
++  according to interrupt bindings documentation [1].
++
++- clock-names: input names of clocks used by the controller:
++  - "uart" - controller bus clock,
++  - "clk_uart_baudN" - Nth baud base clock input (N = 0, 1, ...),
++    according to SoC User's Manual (only N = 0 is allowedfor SoCs without
++    internal baud clock mux).
++- clocks: phandles and specifiers for all clocks specified in "clock-names"
++  property, in the same order, according to clock bindings documentation [2].
++
++[1] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
++[2] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Note: Each Samsung UART should have an alias correctly numbered in the
++"aliases" node, according to serialN format, where N is the port number
++(non-negative decimal integer) as specified by User's Manual of respective
++SoC.
++
++Example:
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++
++Example:
++	uart1: serial at 7f005400 {
++		compatible = "samsung,s3c6400-uart";
++		reg = <0x7f005400 0x100>;
++		interrupt-parent = <&vic1>;
++		interrupts = <6>;
++		clock-names = "uart", "clk_uart_baud2",
++				"clk_uart_baud3";
++		clocks = <&clocks PCLK_UART1>, <&clocks PCLK_UART1>,
++				<&clocks SCLK_UART>;
++	};
+-- 
+1.9.3
