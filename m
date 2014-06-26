@@ -1,125 +1,96 @@
 From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Thu, 26 Jun 2014 11:47:15 +0900
-Subject: [PATCH v5 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
- nodes
-In-Reply-To: <201406242159.55373.sergei.shtylyov@cogentembedded.com>
+Date: Thu, 26 Jun 2014 11:48:17 +0900
+Subject: [PATCH v5 2/2] ARM: shmobile: lager: enable internal PCI
+In-Reply-To: <201406242202.22807.sergei.shtylyov@cogentembedded.com>
 References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>
- <201406242159.55373.sergei.shtylyov@cogentembedded.com>
-Message-ID: <53AB89B3.9020207@renesas.com>
+ <201406242202.22807.sergei.shtylyov@cogentembedded.com>
+Message-ID: <53AB89F1.8040509@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sergei,
 
-(2014/06/25 2:59), Sergei Shtylyov wrote:
+(2014/06/25 3:02), Sergei Shtylyov wrote:
 > From: Ben Dooks <ben.dooks@codethink.co.uk>
 > 
-> Add device nodes for the R8A7790 internal PCI bridge devices.
+> Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
+> them.
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
-> [Sergei: added several properties to the PCI bridge nodes]
+> [Sergei: enabled PCI0]
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Thank you for the patch!
-I tested this patch on my lager board and a usb memory, and it works.
+I also tested this patch, and it works.
 
 Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
 Best regards,
-Yoshihiro Shimoda
+Yoshihiro shimoda
 
 > ---
-> Changes in version 5:
-> - added "device_type" and "ranges" properties to the PCI bridge nodes;
-> - removed "0x" prefix from zero values in the "reg" properties.
-> 
 > Changes in version 4:
 > - refreshed the patch.
 > 
 > Changes in version 3:
-> - added interrupt-related properties to the PCI bridge nodes;
 > - refreshed the patch.
 > 
 > Changes in version 2:
-> - reworded summary (fixing typo) and changelog;
-> - removed extra spaces before {;
+> - enabled PCI0 device;
+> - reworded summary and changelog;
 > - refreshed the patch.
 > 
->  arch/arm/boot/dts/r8a7790.dtsi |   60 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
+>  arch/arm/boot/dts/r8a7790-lager.dts |   33 +++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
 > 
-> Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+> Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
 > ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -930,6 +930,66 @@
->  		status = "disabled";
+> --- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
+> +++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
+> @@ -219,6 +219,21 @@
+>  		renesas,groups = "i2c3";
+>  		renesas,function = "i2c3";
 >  	};
+> +
+> +	usb0_pins: usb0 {
+> +		renesas,groups = "usb0";
+> +		renesas,function = "usb0";
+> +	};
+> +
+> +	usb1_pins: usb1 {
+> +		renesas,groups = "usb1";
+> +		renesas,function = "usb1";
+> +	};
+> +
+> +	usb2_pins: usb2 {
+> +		renesas,groups = "usb2";
+> +		renesas,function = "usb2";
+> +	};
+>  };
 >  
-> +	pci0: pci at ee090000 {
-> +		compatible = "renesas,pci-r8a7790";
-> +		device_type = "pci";
-> +		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
-> +		reg = <0 0xee090000 0 0xc00>,
-> +		      <0 0xee080000 0 0x1100>;
-> +		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
-> +		status = "disabled";
+>  &ether {
+> @@ -368,3 +383,21 @@
+>  		regulator-always-on;
+>  	};
+>  };
 > +
-> +		bus-range = <0 0>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		#interrupt-cells = <1>;
-> +		ranges = <0x02000000 0 0xee080000 0 0xee080000 0 0x00010000>;
-> +		interrupt-map-mask = <0xff00 0 0 0x7>;
-> +		interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
-> +			      	 0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
-> +			      	 0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
+> +&pci0 {
+> +	status = "okay";
+> +	pinctrl-0 = <&usb0_pins>;
+> +	pinctrl-names = "default";
+> +};
 > +
-> +	pci1: pci at ee0b0000 {
-> +		compatible = "renesas,pci-r8a7790";
-> +		device_type = "pci";
-> +		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
-> +		reg = <0 0xee0b0000 0 0xc00>,
-> +		      <0 0xee0a0000 0 0x1100>;
-> +		interrupts = <0 112 IRQ_TYPE_LEVEL_HIGH>;
-> +		status = "disabled";
+> +&pci1 {
+> +	status = "okay";
+> +	pinctrl-0 = <&usb1_pins>;
+> +	pinctrl-names = "default";
+> +};
 > +
-> +		bus-range = <1 1>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		#interrupt-cells = <1>;
-> +		ranges = <0x02000000 0 0xee0a0000 0 0xee0a0000 0 0x00010000>;
-> +		interrupt-map-mask = <0xff00 0 0 0x7>;
-> +		interrupt-map = <0x0000 0 0 1 &gic 0 112 IRQ_TYPE_LEVEL_HIGH
-> +			      	 0x0800 0 0 1 &gic 0 112 IRQ_TYPE_LEVEL_HIGH
-> +			      	 0x1000 0 0 2 &gic 0 112 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> +
-> +	pci2: pci at ee0d0000 {
-> +		compatible = "renesas,pci-r8a7790";
-> +		device_type = "pci";
-> +		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
-> +		reg = <0 0xee0d0000 0 0xc00>,
-> +		      <0 0xee0c0000 0 0x1100>;
-> +		interrupts = <0 113 IRQ_TYPE_LEVEL_HIGH>;
-> +		status = "disabled";
-> +
-> +		bus-range = <2 2>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		#interrupt-cells = <1>;
-> +		ranges = <0x02000000 0 0xee0c0000 0 0xee0c0000 0 0x00010000>;
-> +		interrupt-map-mask = <0xff00 0 0 0x7>;
-> +		interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
-> +			      	 0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
-> +			      	 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> +
->  	pciec: pcie at fe000000 {
->  		compatible = "renesas,pcie-r8a7790";
->  		reg = <0 0xfe000000 0 0x80000>;
+> +&pci2 {
+> +	status = "okay";
+> +	pinctrl-0 = <&usb2_pins>;
+> +	pinctrl-names = "default";
+> +};
 > --
 > To unsubscribe from this list: send the line "unsubscribe devicetree" in
 > the body of a message to majordomo at vger.kernel.org
