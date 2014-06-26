@@ -1,32 +1,127 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 25 Jun 2014 19:41:03 -0700
-Subject: [PATCH 0/3] MCPM: clarify boot CPU situation wrt CCI
-In-Reply-To: <CAD=FV=WHU0TDkjXVCCw6odBFSF7uvv3joCP+oW4cBS_tsSgF+Q@mail.gmail.com>
-References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
- <7hd2dymiaw.fsf@paris.lan>
- <CAD=FV=WHU0TDkjXVCCw6odBFSF7uvv3joCP+oW4cBS_tsSgF+Q@mail.gmail.com>
-Message-ID: <CAGa+x853xBjmb5Pe37wM9Q5jRVJExn_4xmM+bXyFspnzKb+9tw@mail.gmail.com>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Thu, 26 Jun 2014 11:47:15 +0900
+Subject: [PATCH v5 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
+ nodes
+In-Reply-To: <201406242159.55373.sergei.shtylyov@cogentembedded.com>
+References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>
+ <201406242159.55373.sergei.shtylyov@cogentembedded.com>
+Message-ID: <53AB89B3.9020207@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 3:57 PM, Doug Anderson <dianders@google.com> wrote:
-> Kevin,
->
-> On Tue, Jun 24, 2014 at 8:35 AM, Kevin Hilman <khilman@linaro.org> wrote:
->> - Leave mau_epll enabled
->>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262259.html
->
-> Can you drop your mau_epll one and instead pick just
-> <https://patchwork.kernel.org/patch/4333581/>?
->
-> I noticed that Tushar has only been pushing for that patch to be
-> applied and I'm going to guess that the "leave mau_epll enabled" isn't
-> needed.  I just tested myself and confirmed that things are happy.
+Hi Sergei,
 
-I replied on the other thread too, but just to be thorough...
+(2014/06/25 2:59), Sergei Shtylyov wrote:
+> From: Ben Dooks <ben.dooks@codethink.co.uk>
+> 
+> Add device nodes for the R8A7790 internal PCI bridge devices.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+> [Sergei: added several properties to the PCI bridge nodes]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Picking the above patch alone, I still get the boot hang.  Adding
-'clk_ignore_unused' to the command line gets things booting again,
-which suggest there's still a missing piece of the puzzle.
+Thank you for the patch!
+I tested this patch on my lager board and a usb memory, and it works.
 
-Kevin
+Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+
+Best regards,
+Yoshihiro Shimoda
+
+> ---
+> Changes in version 5:
+> - added "device_type" and "ranges" properties to the PCI bridge nodes;
+> - removed "0x" prefix from zero values in the "reg" properties.
+> 
+> Changes in version 4:
+> - refreshed the patch.
+> 
+> Changes in version 3:
+> - added interrupt-related properties to the PCI bridge nodes;
+> - refreshed the patch.
+> 
+> Changes in version 2:
+> - reworded summary (fixing typo) and changelog;
+> - removed extra spaces before {;
+> - refreshed the patch.
+> 
+>  arch/arm/boot/dts/r8a7790.dtsi |   60 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+> 
+> Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -930,6 +930,66 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	pci0: pci at ee090000 {
+> +		compatible = "renesas,pci-r8a7790";
+> +		device_type = "pci";
+> +		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
+> +		reg = <0 0xee090000 0 0xc00>,
+> +		      <0 0xee080000 0 0x1100>;
+> +		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +
+> +		bus-range = <0 0>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		#interrupt-cells = <1>;
+> +		ranges = <0x02000000 0 0xee080000 0 0xee080000 0 0x00010000>;
+> +		interrupt-map-mask = <0xff00 0 0 0x7>;
+> +		interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
+> +			      	 0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
+> +			      	 0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+> +	pci1: pci at ee0b0000 {
+> +		compatible = "renesas,pci-r8a7790";
+> +		device_type = "pci";
+> +		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
+> +		reg = <0 0xee0b0000 0 0xc00>,
+> +		      <0 0xee0a0000 0 0x1100>;
+> +		interrupts = <0 112 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +
+> +		bus-range = <1 1>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		#interrupt-cells = <1>;
+> +		ranges = <0x02000000 0 0xee0a0000 0 0xee0a0000 0 0x00010000>;
+> +		interrupt-map-mask = <0xff00 0 0 0x7>;
+> +		interrupt-map = <0x0000 0 0 1 &gic 0 112 IRQ_TYPE_LEVEL_HIGH
+> +			      	 0x0800 0 0 1 &gic 0 112 IRQ_TYPE_LEVEL_HIGH
+> +			      	 0x1000 0 0 2 &gic 0 112 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+> +	pci2: pci at ee0d0000 {
+> +		compatible = "renesas,pci-r8a7790";
+> +		device_type = "pci";
+> +		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
+> +		reg = <0 0xee0d0000 0 0xc00>,
+> +		      <0 0xee0c0000 0 0x1100>;
+> +		interrupts = <0 113 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +
+> +		bus-range = <2 2>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		#interrupt-cells = <1>;
+> +		ranges = <0x02000000 0 0xee0c0000 0 0xee0c0000 0 0x00010000>;
+> +		interrupt-map-mask = <0xff00 0 0 0x7>;
+> +		interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
+> +			      	 0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
+> +			      	 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+>  	pciec: pcie at fe000000 {
+>  		compatible = "renesas,pcie-r8a7790";
+>  		reg = <0 0xfe000000 0 0x80000>;
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
