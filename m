@@ -1,60 +1,36 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 26 Jun 2014 09:56:05 +0200
-Subject: [PATCH 6/6] arm64: mm: Enable RCU fast_gup
-In-Reply-To: <20140625165003.GI15240@leverpostej>
-References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
- <1403710824-24340-7-git-send-email-steve.capper@linaro.org>
- <20140625165003.GI15240@leverpostej>
-Message-ID: <20140626075605.GB12054@laptop.lan>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 26 Jun 2014 14:02:26 +0530
+Subject: [PATCH V4 2/2] arm: dts: dra7: add crossbar device binding
+In-Reply-To: <20140626074417.GF28884@atomide.com>
+References: <1403767532-19290-1-git-send-email-r.sricharan@ti.com>
+ <1403767532-19290-3-git-send-email-r.sricharan@ti.com>
+ <20140626074417.GF28884@atomide.com>
+Message-ID: <53ABDA9A.8000108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 05:50:03PM +0100, Mark Rutland wrote:
-> Hi Steve,
-> 
-> On Wed, Jun 25, 2014 at 04:40:24PM +0100, Steve Capper wrote:
-> > Activate the RCU fast_gup for ARM64. We also need to force THP splits
-> > to broadcast an IPI s.t. we block in the fast_gup page walker. As THP
-> > splits are comparatively rare, this should not lead to a noticeable
-> > performance degradation.
-> > 
-> > Some pre-requisite functions pud_write and pud_page are also added.
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > ---
-> >  arch/arm64/Kconfig               |  3 +++
-> >  arch/arm64/include/asm/pgtable.h | 11 ++++++++++-
-> >  arch/arm64/mm/flush.c            | 19 +++++++++++++++++++
-> >  3 files changed, 32 insertions(+), 1 deletion(-)
-> 
-> [...]
-> 
-> > diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> > index e4193e3..ddf96c1 100644
-> > --- a/arch/arm64/mm/flush.c
-> > +++ b/arch/arm64/mm/flush.c
-> > @@ -103,3 +103,22 @@ EXPORT_SYMBOL(flush_dcache_page);
-> >   */
-> >  EXPORT_SYMBOL(flush_cache_all);
-> >  EXPORT_SYMBOL(flush_icache_range);
-> > +
-> > +#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-> > +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-> > +static void thp_splitting_flush_sync(void *arg)
-> > +{
-> > +}
-> > +
-> > +void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
-> > +			  pmd_t *pmdp)
-> > +{
-> > +	pmd_t pmd = pmd_mksplitting(*pmdp);
-> > +	VM_BUG_ON(address & ~PMD_MASK);
-> > +	set_pmd_at(vma->vm_mm, address, pmdp, pmd);
-> > +
-> > +	/* dummy IPI to serialise against fast_gup */
-> > +	smp_call_function(thp_splitting_flush_sync, NULL, 1);
-> 
-> Is there some reason we can't use kick_all_cpus_sync()?
+Hi Tony,
 
-Yes that would be equivalent. But looking at that, I worry about the
-smp_mb(); archs are supposed to make sure IPIs are serializing.
+On Thursday 26 June 2014 01:14 PM, Tony Lindgren wrote:
+> * Sricharan R <r.sricharan@ti.com> [140626 00:29]:
+>> From: R Sricharan <r.sricharan@ti.com>
+>>
+>> There is a IRQ crossbar device in the soc, which
+>> maps the irq requests from the peripherals to the
+>> mpu interrupt controller's inputs. The Peripheral irq
+>> requests are connected to only one crossbar
+>> input and the output of the crossbar is connected to only one
+>> controller's input line. The crossbar device is used to map
+>> a peripheral input to a free mpu's interrupt controller line.
+>>
+>> Here, adding a new crossbar device node and replacing all the peripheral
+>> interrupt numbers with its fixed crossbar input lines.
+> 
+> I think these two patches need to be a single patch to avoid
+> breaking booting for git bisect inbetween these patches?
+  This does not cause booting issues. irq_desc gets allocated linearly,
+   but that does not create boot issues.
+
+Regards,
+ Sricharan
+  
