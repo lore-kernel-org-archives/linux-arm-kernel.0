@@ -1,37 +1,110 @@
-From: drysdale@google.com (David Drysdale)
-Date: Thu, 26 Jun 2014 13:37:10 +0100
-Subject: [PATCH v7 2/9] seccomp: split filter prep from check and apply
-In-Reply-To: <1403560693-21809-3-git-send-email-keescook@chromium.org>
-References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
- <1403560693-21809-3-git-send-email-keescook@chromium.org>
-Message-ID: <20140626123710.GA16204@google.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 26 Jun 2014 13:48:35 +0100
+Subject: [PATCH v6 4/4] ARM: Add KGDB/KDB FIQ debugger generic code
+In-Reply-To: <alpine.LFD.2.11.1406241201180.16842@knanqh.ubzr>
+References: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
+ <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
+ <1403623097-1153-5-git-send-email-daniel.thompson@linaro.org>
+ <alpine.LFD.2.11.1406241201180.16842@knanqh.ubzr>
+Message-ID: <53AC16A3.2060609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 23, 2014 at 02:58:06PM -0700, Kees Cook wrote:
-> In preparation for adding seccomp locking, move filter creation away
-> from where it is checked and applied. This will allow for locking where
-> no memory allocation is happening. The validation, filter attachment,
-> and seccomp mode setting can all happen under the future locks.
+On 24/06/14 17:22, Nicolas Pitre wrote:
+> On Tue, 24 Jun 2014, Daniel Thompson wrote:
 > 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  kernel/seccomp.c |   97 +++++++++++++++++++++++++++++++++++++-----------------
->  1 file changed, 67 insertions(+), 30 deletions(-)
+>> From: Anton Vorontsov <anton.vorontsov@linaro.org>
+>>
+>> The FIQ debugger may be used to debug situations when the kernel stuck
+>> in uninterruptable sections, e.g. the kernel infinitely loops or
+>> deadlocked in an interrupt or with interrupts disabled.
+>>
+>> By default KGDB FIQ is disabled in runtime, but can be enabled with
+>> kgdb_fiq.enable=1 kernel command line option.
+>>
+>> Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
+>> Signed-off-by: John Stultz <john.stultz@linaro.org>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+>> Cc: Dave Martin <Dave.Martin@arm.com>
+>> ---
+>>  arch/arm/Kconfig                 |   2 +
+>>  arch/arm/Kconfig.debug           |  18 ++++++
+>>  arch/arm/include/asm/kgdb.h      |   7 +++
+>>  arch/arm/kernel/Makefile         |   1 +
+>>  arch/arm/kernel/kgdb_fiq.c       | 124 +++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/kernel/kgdb_fiq_entry.S |  87 +++++++++++++++++++++++++++
+>>  6 files changed, 239 insertions(+)
+>>  create mode 100644 arch/arm/kernel/kgdb_fiq.c
+>>  create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
 > 
-> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-> index afb916c7e890..edc8c79ed16d 100644
-> --- a/kernel/seccomp.c
-> +++ b/kernel/seccomp.c
-> @@ -515,6 +551,7 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
->  	current->seccomp.mode = seccomp_mode;
->  	set_thread_flag(TIF_SECCOMP);
->  out:
-> +	seccomp_filter_free(prepared);
->  	return ret;
->  }
+> [...]
+> 
+>> +static long kgdb_fiq_setup_stack(void *info)
+>> +{
+>> +	struct pt_regs regs;
+>> +
+>> +	regs.ARM_sp = __get_free_pages(GFP_KERNEL, THREAD_SIZE_ORDER) +
+>> +			THREAD_START_SP;
+>> +	WARN_ON(!regs.ARM_sp);
+> 
+> Isn't this rather fatal if you can't allocate any stack? Why not using 
+> BUG_ON(), or better yet propagate a proper error code back?
 
-I think this needs to be inside #ifdef CONFIG_SECCOMP_FILTER to match
-the definition of seccomp_filter_free:
+Thanks for raising this.
 
-../kernel/seccomp.c:554:2: error: implicit declaration of function ?seccomp_filter_free? [-Werror=implicit-function-declaration]
+I think we can get rid of the allocation altogether. This stack is *way*
+oversized (it only needs to be 12 bytes).
+
+
+>> +
+>> +	set_fiq_regs(&regs);
+>> +	return 0;
+>> +}
+>> +
+>> +/**
+>> + * kgdb_fiq_enable_nmi - Manage NMI-triggered entry to KGDB
+>> + * @on: Flag to either enable or disable an NMI
+>> + *
+>> + * This function manages NMIs that usually cause KGDB to enter. That is, not
+>> + * all NMIs should be enabled or disabled, but only those that issue
+>> + * kgdb_handle_exception().
+>> + *
+>> + * The call counts disable requests, and thus allows to nest disables. But
+>> + * trying to enable already enabled NMI is an error.
+>> + */
+>> +static void kgdb_fiq_enable_nmi(bool on)
+>> +{
+>> +	static atomic_t cnt;
+>> +	int ret;
+>> +
+>> +	ret = atomic_add_return(on ? 1 : -1, &cnt);
+>> +	if (ret > 1 && on) {
+>> +		/*
+>> +		 * There should be only one instance that calls this function
+>> +		 * in "enable, disable" order. All other users must call
+>> +		 * disable first, then enable. If not, something is wrong.
+>> +		 */
+>> +		WARN_ON(1);
+>> +		return;
+>> +	}
+> 
+> Minor style suggestion:
+> 
+> 	/*
+> 	 * There should be only one instance that calls this function
+> 	 * in "enable, disable" order. All other users must call
+> 	 * disable first, then enable. If not, something is wrong.
+> 	 */
+> 	if (WARN_ON(ret > 1 && on))
+> 		return;
+
+Will adopt this style.
+
+
+> Other than that...
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+
+Thanks for review.
