@@ -1,31 +1,86 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 26 Jun 2014 15:30:14 -0500
-Subject: [PATCH 0/2] Add Qualcomm ADM dmaengine driver
-Message-ID: <1403814616-23917-1-git-send-email-agross@codeaurora.org>
+Date: Thu, 26 Jun 2014 15:30:16 -0500
+Subject: [PATCH 2/2] dmaengine: qcom_adm: Add device tree binding
+In-Reply-To: <1403814616-23917-1-git-send-email-agross@codeaurora.org>
+References: <1403814616-23917-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1403814616-23917-3-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set introduces the dmaengine driver for the Qualcomm Application
-Data Mover (ADM) DMA controller present on MSM8960, APQ8064, and IPQ8064
-devices.
+Add device tree binding support for the QCOM ADM DMA driver.
 
-The initial version of this driver will only support slave DMA operations
-between system memory and peripherals.  Flow control via the CRCI (client rate
-control interface) is supported and can be configured via device tree
-configuration.  Flow control usage is required for some peripheral devices.
-
-Andy Gross (2):
-  dmaengine: Add QCOM ADM DMA driver
-  dmaengine: qcom_adm: Add device tree binding
-
- Documentation/devicetree/bindings/dma/qcom_adm.txt |   60 ++
- drivers/dma/Kconfig                                |   10 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/qcom_adm.c                             |  872 ++++++++++++++++++++
- 4 files changed, 943 insertions(+)
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ Documentation/devicetree/bindings/dma/qcom_adm.txt |   60 ++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/dma/qcom_adm.txt
- create mode 100644 drivers/dma/qcom_adm.c
 
+diff --git a/Documentation/devicetree/bindings/dma/qcom_adm.txt b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+new file mode 100644
+index 0000000..7f05cb5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+@@ -0,0 +1,60 @@
++QCOM ADM DMA Controller
++
++Required properties:
++- compatible: must contain "qcom,adm" for IPQ/APQ8064 and MSM8960
++- reg: Address range for DMA registers
++- interrupts: Should contain one interrupt shared by all channels
++- #dma-cells: must be <2>.  First cell denotes the channel number.  Second cell
++  denotes CRCI (client rate control interface) flow control assignment.
++- clocks: Should contain the core clock and interface clock.
++- clock-names: Must contain "core" for the core clock and "iface" for the
++  interface clock.
++- resets: Must contain an entry for each entry in reset names.
++- reset-names: Must include the following entries:
++  - clk
++  - c0
++  - c1
++  - c2
++- qcom,ee: indicates the security domain identifier used in the secure world.
++
++Example:
++		adm_dma: dma at 18300000 {
++			compatible = "qcom,adm";
++			reg = <0x18300000 0x100000>;
++			interrupts = <0 170 0>;
++			#dma-cells = <2>;
++
++			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
++			clock-names = "core", "iface";
++
++			resets = <&gcc ADM0_RESET>,
++				<&gcc ADM0_C0_RESET>,
++				<&gcc ADM0_C1_RESET>,
++				<&gcc ADM0_C2_RESET>;
++			reset-names = "clk", "c0", "c1", "c2";
++			qcom,ee = <0>;
++		};
++
++DMA clients must use the format descripted in the dma.txt file, using a three
++cell specifier for each channel.
++
++Each dmas request consists of 3 cells:
++ 1. phandle pointing to the DMA controller
++ 2. channel number
++ 3. CRCI assignment, if applicable.  If no CRCI flow control is required, use 0.
++
++Example:
++
++	spi4: spi at 1a280000 {
++		status = "ok";
++		spi-max-frequency = <50000000>;
++
++		pinctrl-0 = <&spi_pins>;
++		pinctrl-names = "default";
++
++		cs-gpios = <&qcom_pinmux 20 0>;
++
++		dmas = <&adm_dma 6 9>,
++			<&adm_dma 5 10>;
++		dma-names = "rx", "tx";
++	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
