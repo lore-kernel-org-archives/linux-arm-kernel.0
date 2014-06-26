@@ -1,306 +1,93 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 Jun 2014 17:01:35 +0100
-Subject: [PATCH v5 3/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <20140625155949.GF15240@leverpostej>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20140625155949.GF15240@leverpostej>
-Message-ID: <20140626160135.GC27364@e102568-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 26 Jun 2014 09:08:17 -0700
+Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
+ Exynos5420
+In-Reply-To: <CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>
+ (Tushar Behera's message of "Thu, 26 Jun 2014 08:50:50 +0530")
+References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
+ <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
+ <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
+ <7hpphwlgn0.fsf@paris.lan>
+ <CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>
+Message-ID: <7h8uojk61a.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 04:59:49PM +0100, Mark Rutland wrote:
-> On Wed, Jun 25, 2014 at 03:10:16PM +0100, Lorenzo Pieralisi wrote:
+Tushar Behera <trblinux@gmail.com> writes:
 
-[...]
+> On Thu, Jun 26, 2014 at 4:51 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Doug Anderson <dianders@google.com> writes:
+>>
+>>> Tushar,
+>>>
+>>> On Tue, Jun 10, 2014 at 10:32 PM, Tushar Behera <tushar.b@samsung.com> wrote:
+>>>> Currently CLK_FOUT_EPLL was set as one of the parents of AUDSS mux.
+>>>> As per the user manual, it should be CLK_MAU_EPLL.
+>>>>
+>>>> The problem surfaced when the bootloader in Peach-pit board set
+>>>> the EPLL clock as the parent of AUDSS mux. While booting the kernel,
+>>>> we used to get a system hang during late boot if CLK_MAU_EPLL was
+>>>> disabled.
+>>>>
+>>>> Signed-off-by: Tushar Behera <tushar.b@samsung.com>
+>>>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>>>> Reported-by: Kevin Hilman <khilman@linaro.org>
+>>>> ---
+>>>>  arch/arm/boot/dts/exynos5420.dtsi |    2 +-
+>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> I've tested this myself now as well.
+>>>
+>>> Tested-by: Doug Anderson <dianders@chromium.org>
+>>
+>> For me, this patch alone (on top of -next) doesn't solve the boot hang.
+>> I still need clk_ignore_unused for a successful boot.
+>>
+>> So, this patch might be correct, but it doesn't prevent a boot hang
+>> using a chain-loaded nv_uboot on peach-pi.  There's still another clock
+>> being disabled that causes a hang.
+>>
+>> Kevin
+>
+> Kevin,
+>
+> Can you please check if adding patch 1/3 alongwith patch 2/3 fixes the
+> issue for you?
 
-> > diff --git a/drivers/cpuidle/dt_idle_states.c b/drivers/cpuidle/dt_idle_states.c
-> > new file mode 100644
-> > index 0000000..5c16001c
-> > --- /dev/null
-> > +++ b/drivers/cpuidle/dt_idle_states.c
-> > @@ -0,0 +1,283 @@
-> > +/*
-> > + * DT idle states parsing code.
-> > + *
-> > + * Copyright (C) 2014 ARM Ltd.
-> > + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#define pr_fmt(fmt) "DT idle-states: " fmt
-> > +
-> > +#include <linux/cpuidle.h>
-> > +#include <linux/cpumask.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/list.h>
-> > +#include <linux/list_sort.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/slab.h>
-> > +
-> > +#include "dt_idle_states.h"
-> > +
-> > +struct state_elem {
-> > +	struct list_head list;
-> > +	struct device_node *node;
-> > +	u32 val;
-> > +};
-> 
-> Ah. So the fixed-size entry parameter requirement is because this code
-> is in charge of allocating and freeing these structs?
+Yes, using patch 1/3 along with 2/3 fixes the issue.
 
-Nope, I use this struct to sort the states and val is the value that
-determines the order (ie power-rank) in this patch. If I used the
-phandle lists for ordering nodes, this struct would disappear completely,
-I have to check if that's feasible.
+> Also can you please confirm that setting CLK_IGNORE_UNUSED flag
+> CLK_MAU_EPLL alone fixes the issue, without any need for
+> clk_ignore_unused in u-boot bootargs?
 
-> > +
-> > +static struct list_head head __initdata = LIST_HEAD_INIT(head);
-> > +
-> > +static bool __init state_cpu_valid(struct device_node *state_node,
-> > +				   struct device_node *cpu_node)
-> > +{
-> > +	int i = 0;
-> > +	struct device_node *cpu_state;
-> > +
-> > +	while ((cpu_state = of_parse_phandle(cpu_node,
-> > +					     "cpu-idle-states", i++))) {
-> > +		if (cpu_state && state_node == cpu_state) {
-> 
-> You can drop the cpu_state NULL check, it's implicit in the while loop.
+Yes, I have this patch[1] in my local branch which fixes the issue
+alone, without clk_ignore_unused on the command line.
 
-Yep.
+Kevin
 
-> > +			of_node_put(cpu_state);
-> > +			return true;
-> > +		}
-> > +		of_node_put(cpu_state);
-> > +	}
-> > +	return false;
-> > +}
-> 
-> Is it possible to use a bool ret variable to avoid the two of_node_put
-> cases? Or does that end up making this larger?
 
-No, I think you are right.
+[1]
+>From ab1627127730ef4507ce96cbf95047d626bbb53f Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Thu, 5 Jun 2014 17:12:28 -0700
+Subject: [PATCH] KJH: leave mau_epll enabled
 
-> > +static bool __init state_cpus_valid(const cpumask_t *cpus,
-> > +				    struct device_node *state_node)
-> > +{
-> > +	int cpu;
-> > +	struct device_node *cpu_node;
-> > +
-> > +	/*
-> > +	 * Check if state is valid on driver cpumask cpus
-> > +	 */
-> > +	for_each_cpu(cpu, cpus) {
-> > +		cpu_node = of_get_cpu_node(cpu, NULL);
-> > +
-> > +		if (!cpu_node) {
-> > +			pr_err("Missing device node for CPU %d\n", cpu);
-> > +			return false;
-> > +		}
-> > +
-> > +		if (!state_cpu_valid(state_node, cpu_node))
-> > +			return false;
-> > +	}
-> > +
-> > +	return true;
-> > +}
-> 
-> Doesn't this leave all the cpu node refcounts incremented? (it's painful
-> to get device node refcounting right, I know).
-> 
-> I think you can use the similarly named of_cpu_device_node_get to find
-> the CPU node. It uses the pointer stored in cpu->dev.of_node, so it
-> doesn't have to walk the tree to find the CPU node. It also doesn't
-> increment the refcount.
-> 
-> Unless this is too early for that?
+---
+ drivers/clk/samsung/clk-exynos5420.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I think I can use of_cpu_device_node_get(...), but I should still manage
-refcount properly on that, which I am not doing here, good catch.
-
-> > +static void __init init_state_node(struct cpuidle_driver *drv,
-> > +				   struct device_node *state_node,
-> > +				   int *cnt)
-> > +{
-> > +	struct cpuidle_state *idle_state;
-> > +
-> > +	pr_debug(" * %s...\n", state_node->full_name);
-> > +
-> > +	idle_state = &drv->states[*cnt];
-> > +
-> > +	if (of_property_read_u32(state_node, "wakeup-latency-us",
-> > +				 &idle_state->exit_latency)) {
-> 
-> I'm not a fan of this construction, as the obvious reading is that we
-> take the branch if we succeeded (which obviously isn't true as
-> of_property_read_* return error codes). 
-> 
-> Could we change it to something like:
-> 
-> 	err = of_property_read_u32(state_node, "wakeup-latency-us",
-> 				   &idle_state->exit_latency);
-> 	if (err) {
-
-You are right, I will update it.
-
-> > +		u32 entry_latency, exit_latency;
-> > +
-> > +		if (of_property_read_u32(state_node, "entry-latency-us",
-> > +					 &entry_latency)) {
-> > +			pr_debug(" * %s missing entry-latency-us property\n",
-> > +				 state_node->full_name);
-> > +			return;
-> > +		}
-> 
-> Returning without error code? Do the fields have sane default values?
-> 
-> Or is this safe because we didn't increment cnt?
-
-The latter, but it isn't nice, agreed, it is just an internal interface
-though. I will make it less opaque and easier to understand.
-
-> > +
-> > +		if (of_property_read_u32(state_node, "exit-latency-us",
-> > +					 &exit_latency)) {
-> > +			pr_debug(" * %s missing exit-latency-us property\n",
-> > +				 state_node->full_name);
-> > +			return;
-> > +		}
-> > +		/*
-> > +		 * If wakeup-latency-us is missing, default to entry+exit
-> > +		 * latencies as defined in idle states bindings
-> > +		 */
-> > +		idle_state->exit_latency = entry_latency + exit_latency;
-> > +	}
-> > +
-> > +	if (of_property_read_u32(state_node, "min-residency-us",
-> > +				 &idle_state->target_residency)) {
-> > +		pr_debug(" * %s missing min-residency-us property\n",
-> > +			     state_node->full_name);
-> > +		return;
-> > +	}
-> > +
-> > +	idle_state->flags = CPUIDLE_FLAG_TIME_VALID;
-> > +	if (!of_property_read_bool(state_node, "timer-state-retained"))
-> > +		idle_state->flags |= CPUIDLE_FLAG_TIMER_STOP;
-> > + 	strncpy(idle_state->name, state_node->name, CPUIDLE_NAME_LEN);
-> > +	strncpy(idle_state->desc, state_node->name, CPUIDLE_NAME_LEN);
-> 
-> Does the name make sense as a desc? Is a desc necessary?
-> 
-> CPUIDLE_DESC_LEN seems to exist, and is double CPUIDLE_NAME_LEN.
-
-Yes, that's a copy and paste typo that I missed. BTW this code is likely
-to disappear, since the way CPUidle driver manages these strings is changing.
-
-As to is desc really needed, I need to check all existing drivers to
-provide a complete answer.
-
-> > +static void __init add_idle_states(struct cpuidle_driver *drv,
-> > +				   struct device_node *idle_states)
-> > +{
-> > +	struct device_node *state_node;
-> > +
-> > +	for_each_child_of_node(idle_states, state_node) {
-> > +		if ((!of_device_is_compatible(state_node, "arm,idle-state"))) {
-> 
-> Holy brackets batman! I think we can drop the outer ones given there's
-> no assignment we want to supress warnings for.
-
-Eheh sorry, should be a leftover, fixed.
-
-> > +			pr_warn(" * %s: children of /cpus/idle-states must be \"arm,idle-state\" compatible\n",
-> > +				     state_node->full_name);
-> 
-> Presumably the entire reason for having the compatible string is for
-> future extensibility.
-> 
-> It would probably be better to have something like:
-> 
-> 	pr_warn("Node %s has unrecognised/missing compatible string\n",
-> 		state_node->full_name);
-> 
-
-It makes sense, so I will change the pr_warn.
-
-> > +			continue;
-> > +		}
-> > +		/*
-> > +		 * If memory allocation fails, better bail out.
-> > +		 * Initialized nodes are freed at initialization
-> > +		 * completion in of_init_idle_driver().
-> > +		 */
-> > +		if ((add_state_node(drv->cpumask, state_node) == -ENOMEM))
-> > +			break;
-> 
-> Can we not return? Or is the list sort important in the error case too?
-
-Well, we might have a valid list of states that have to be sorted and I
-think that's correct to break and not just return in that case.
-
-Let's see if I can avoid the sorting altogether.
-
-> > +	}
-> > +	/*
-> > +	 * Sort the states list before initializing the CPUidle driver
-> > +	 * states array.
-> > +	 */
-> > +	list_sort(NULL, &head, state_cmp);
-> > +}
-> > +
-> > +/**
-> > + * dt_init_idle_driver() - Parse the DT idle states and initialize the
-> > + *			   idle driver states array
-> > + *
-> > + * @drv:	  Pointer to CPU idle driver to be initialized
-> > + * @state_nodes:  Array of struct device_nodes to be initialized if
-> > + *		  init_nodes == true. Must be sized CPUIDLE_STATE_MAX
-> > + * @start_idx:    First idle state index to be initialized
-> > + * @init_nodes:   Boolean to request device nodes initialization
-> > + *
-> > + * On success the states array in the cpuidle driver contains
-> > + * initialized entries in the states array, starting from index start_idx.
-> > + * If init_nodes == true, on success the state_nodes array is initialized
-> > + * with idle state DT node pointers, starting from index start_idx,
-> > + * in a 1:1 relation with the idle driver states array.
-> > + *
-> > + * Return:
-> > + *	0 on success
-> > + *	<0 on failure
-> > + */
-> > +int __init dt_init_idle_driver(struct cpuidle_driver *drv,
-> > +			       struct device_node *state_nodes[],
-> > +			       unsigned int start_idx, bool init_nodes)
-> > +{
-> > +	struct device_node *idle_states_node;
-> > +	int ret;
-> > +
-> > +	if (start_idx >= CPUIDLE_STATE_MAX) {
-> > +		pr_warn("State index exceeds static CPU idle driver states array size\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	if (WARN(init_nodes && !state_nodes,
-> > +		"Requested nodes stashing in an invalid nodes container\n"))
-> > +		return -EINVAL;
-> 
-> That warning message is somewhat confusing, and I'm not sure I
-> follow the logic.
-
-It is a belt and braces check to make sure that, if the dt init code is
-requested to fill in the state_nodes array (init_nodes == true), at least
-the array base was passed and it is not a NULL pointer. I think I'd better
-remove it and let the kernel oops if the interface is used wrongly, that would
-be a kernel bug and there is not much to WARN about.
-
-Thanks,
-Lorenzo
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 61eccf0dd72f..ed175088ee7e 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -911,7 +911,7 @@ static struct samsung_gate_clock exynos5x_gate_clks[] __initdata = {
+ 			SRC_MASK_TOP2, 24, 0, 0),
+ 
+ 	GATE(CLK_MAU_EPLL, "mau_epll", "mout_mau_epll_clk",
+-			SRC_MASK_TOP7, 20, 0, 0),
++			SRC_MASK_TOP7, 20, CLK_IGNORE_UNUSED, 0),
+ 
+ 	/* sclk */
+ 	GATE(CLK_SCLK_UART0, "sclk_uart0", "dout_uart0",
+-- 
+1.9.2
