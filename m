@@ -1,265 +1,273 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 26 Jun 2014 12:05:44 +0800
-Subject: [PATCH v4 5/8] ARM: hisi: enable hix5hd2 SoC
+Date: Thu, 26 Jun 2014 12:05:45 +0800
+Subject: [PATCH v4 6/8] ARM: dts: Add hix5hd2-dkb dts file.
 In-Reply-To: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1403755547-623-6-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1403755547-623-7-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Haifeng Yan <yanhaifeng@gmail.com>
 
-Enable Hisilicon HiX5HD2 SoC. This HiX5HD2 SoC series support both
-one core or dual cores. The core is Cortex A9.
+Add dts file for Hisilicon x5hd2 development kit board.
 
 Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
 Signed-off-by: Jiancheng Xue <jchxue@gmail.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/mach-hisi/Kconfig     | 13 ++++++++--
- arch/arm/mach-hisi/Makefile    |  2 +-
- arch/arm/mach-hisi/core.h      |  5 ++++
- arch/arm/mach-hisi/hisilicon.c | 12 +++++++++
- arch/arm/mach-hisi/hotplug.c   | 58 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-hisi/platsmp.c   | 50 +++++++++++++++++++++++++++++++++---
- 6 files changed, 134 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/hix5hd2-dkb.dts |  52 ++++++++++++
+ arch/arm/boot/dts/hix5hd2.dtsi    | 171 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 224 insertions(+)
+ create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
+ create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
 
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index da16efd..90fdbb4 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -10,15 +10,24 @@ if ARCH_HISI
- menu "Hisilicon platform type"
- 
- config ARCH_HI3xxx
--	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-+	bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
- 	select CACHE_L2X0
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select PINCTRL
- 	select PINCTRL_SINGLE
- 	help
--	  Support for Hisilicon Hi36xx/Hi37xx processor family
-+	  Support for Hisilicon Hi36xx SoC family
- 
-+config ARCH_HIX5HD2
-+	bool "Hisilicon X5HD2 family" if ARCH_MULTI_V7
-+	select CACHE_L2X0
-+	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
-+	select PINCTRL
-+	select PINCTRL_SINGLE
-+	help
-+	  Support for Hisilicon HIX5HD2 SoC family
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
-index 2ae1b59..ee2506b 100644
---- a/arch/arm/mach-hisi/Makefile
-+++ b/arch/arm/mach-hisi/Makefile
-@@ -3,4 +3,4 @@
- #
- 
- obj-y	+= hisilicon.o
--obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
-+obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o headsmp.o
-diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
-index af23ec2..88b1f48 100644
---- a/arch/arm/mach-hisi/core.h
-+++ b/arch/arm/mach-hisi/core.h
-@@ -12,4 +12,9 @@ extern void hi3xxx_cpu_die(unsigned int cpu);
- extern int hi3xxx_cpu_kill(unsigned int cpu);
- extern void hi3xxx_set_cpu(int cpu, bool enable);
- 
-+extern void hix5hd2_secondary_startup(void);
-+extern struct smp_operations hix5hd2_smp_ops;
-+extern void hix5hd2_set_cpu(int cpu, bool enable);
-+extern void hix5hd2_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5986ff6..721525e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -83,6 +83,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos5440-ssdk5440.dtb \
+ 	exynos5800-peach-pi.dtb
+ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
++dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
+ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+ 	ecx-2000.dtb
+ dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+diff --git a/arch/arm/boot/dts/hix5hd2-dkb.dts b/arch/arm/boot/dts/hix5hd2-dkb.dts
+new file mode 100644
+index 0000000..32c7fd1
+--- /dev/null
++++ b/arch/arm/boot/dts/hix5hd2-dkb.dts
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2013-2014 Linaro Ltd.
++ * Copyright (c) 2013-2014 Hisilicon Limited.
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  publishhed by the Free Software Foundation.
++ */
 +
- #endif
-diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
-index a2387bc..6f71097 100644
---- a/arch/arm/mach-hisi/hisilicon.c
-+++ b/arch/arm/mach-hisi/hisilicon.c
-@@ -94,3 +94,15 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
- 	.smp		= smp_ops(hi3xxx_smp_ops),
- 	.restart	= hi3xxx_restart,
- MACHINE_END
++/dts-v1/;
++#include "hix5hd2.dtsi"
 +
-+static const char *hix5hd2_compat[] __initconst = {
-+	"hisilicon,hix5hd2",
-+	NULL,
++/ {
++	model = "Hisilicon HIX5HD2 Development Board";
++	compatible = "hisilicon,hix5hd2";
++
++	chosen {
++		bootargs = "console=ttyAMA0,115200 earlyprintk";
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&l2>;
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&l2>;
++		};
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000>;
++	};
 +};
 +
-+DT_MACHINE_START(HIX5HD2_DT, "Hisilicon HIX5HD2 (Flattened Device Tree)")
-+	.dt_compat	= hix5hd2_compat,
-+	.init_late	= hi3xxx_init_late,
-+	.smp		= smp_ops(hix5hd2_smp_ops),
-+	.restart	= hi3xxx_restart,
-+MACHINE_END
-diff --git a/arch/arm/mach-hisi/hotplug.c b/arch/arm/mach-hisi/hotplug.c
-index abd441b..84e6919 100644
---- a/arch/arm/mach-hisi/hotplug.c
-+++ b/arch/arm/mach-hisi/hotplug.c
-@@ -57,6 +57,14 @@
- #define CPU0_NEON_SRST_REQ_EN		(1 << 4)
- #define CPU0_SRST_REQ_EN		(1 << 0)
- 
-+#define HIX5HD2_PERI_CRG20		0x50
-+#define CRG20_CPU1_RESET		(1 << 17)
++&timer0 {
++	status = "okay";
++};
 +
-+#define HIX5HD2_PERI_PMC0		0x1000
-+#define PMC0_CPU1_WAIT_MTCOMS_ACK	(1 << 8)
-+#define PMC0_CPU1_PMC_ENABLE		(1 << 7)
-+#define PMC0_CPU1_POWERDOWN		(1 << 3)
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/hix5hd2.dtsi b/arch/arm/boot/dts/hix5hd2.dtsi
+new file mode 100644
+index 0000000..73f9ac1
+--- /dev/null
++++ b/arch/arm/boot/dts/hix5hd2.dtsi
+@@ -0,0 +1,171 @@
++/*
++ * Copyright (c) 2013-2014 Linaro Ltd.
++ * Copyright (c) 2013-2014 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
 +
- enum {
- 	HI3620_CTRL,
- 	ERROR_CTRL,
-@@ -157,6 +165,50 @@ void hi3xxx_set_cpu(int cpu, bool enable)
- 		set_cpu_hi3620(cpu, enable);
- }
- 
-+static bool hix5hd2_hotplug_init(void)
-+{
-+	struct device_node *np;
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/hix5hd2-clock.h>
 +
-+	np = of_find_compatible_node(NULL, NULL, "hisilicon,cpuctrl");
-+	if (np) {
-+		ctrl_base = of_iomap(np, 0);
-+		return true;
-+	}
-+	return false;
-+}
++/ {
++	aliases {
++		serial0 = &uart0;
++	};
 +
-+void hix5hd2_set_cpu(int cpu, bool enable)
-+{
-+	u32 val = 0;
++	gic: interrupt-controller at f8a01000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		/* gic dist base, gic cpu base */
++		reg = <0xf8a01000 0x1000>, <0xf8a00100 0x100>;
++	};
 +
-+	if (!ctrl_base)
-+		if (!hix5hd2_hotplug_init())
-+			BUG();
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++		ranges = <0 0xf8000000 0x8000000>;
 +
-+	if (enable) {
-+		/* power on cpu1 */
-+		val = readl_relaxed(ctrl_base + HIX5HD2_PERI_PMC0);
-+		val &= ~(PMC0_CPU1_WAIT_MTCOMS_ACK | PMC0_CPU1_POWERDOWN);
-+		val |= PMC0_CPU1_PMC_ENABLE;
-+		writel_relaxed(val, ctrl_base + HIX5HD2_PERI_PMC0);
-+		/* unreset */
-+		val = readl_relaxed(ctrl_base + HIX5HD2_PERI_CRG20);
-+		val &= ~CRG20_CPU1_RESET;
-+		writel_relaxed(val, ctrl_base + HIX5HD2_PERI_CRG20);
-+	} else {
-+		/* power down cpu1 */
-+		val = readl_relaxed(ctrl_base + HIX5HD2_PERI_PMC0);
-+		val |= PMC0_CPU1_PMC_ENABLE | PMC0_CPU1_POWERDOWN;
-+		val &= ~PMC0_CPU1_WAIT_MTCOMS_ACK;
-+		writel_relaxed(val, ctrl_base + HIX5HD2_PERI_PMC0);
++		amba {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "arm,amba-bus";
++			ranges;
 +
-+		/* reset */
-+		val = readl_relaxed(ctrl_base + HIX5HD2_PERI_CRG20);
-+		val |= CRG20_CPU1_RESET;
-+		writel_relaxed(val, ctrl_base + HIX5HD2_PERI_CRG20);
-+	}
-+}
++			timer0: timer at 00002000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x00002000 0x1000>;
++				/* timer00 & timer01 */
++				interrupts = <0 24 4>;
++				clocks = <&clock HIX5HD2_FIXED_24M>;
++				status = "disabled";
++			};
 +
- static inline void cpu_enter_lowpower(void)
- {
- 	unsigned int v;
-@@ -199,4 +251,10 @@ int hi3xxx_cpu_kill(unsigned int cpu)
- 	hi3xxx_set_cpu(cpu, false);
- 	return 1;
- }
++			timer1: timer at 00a29000 {
++				/*
++				 * Only used in NORMAL state, not available ins
++				 * SLOW or DOZE state.
++				 * The rate is fixed in 24MHz.
++				 */
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x00a29000 0x1000>;
++				/* timer10 & timer11 */
++				interrupts = <0 25 4>;
++				clocks = <&clock HIX5HD2_FIXED_24M>;
++				status = "disabled";
++			};
 +
-+void hix5hd2_cpu_die(unsigned int cpu)
-+{
-+	flush_cache_all();
-+	hix5hd2_set_cpu(cpu, false);
-+}
- #endif
-diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
-index 471f1ee..ecf7058 100644
---- a/arch/arm/mach-hisi/platsmp.c
-+++ b/arch/arm/mach-hisi/platsmp.c
-@@ -17,6 +17,8 @@
- 
- #include "core.h"
- 
-+#define HIX5HD2_BOOT_ADDRESS		0xffff0000
++			timer2: timer at 00a2a000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x00a2a000 0x1000>;
++				/* timer20 & timer21 */
++				interrupts = <0 26 4>;
++				clocks = <&clock HIX5HD2_FIXED_24M>;
++				status = "disabled";
++			};
 +
- static void __iomem *ctrl_base;
- 
- void hi3xxx_set_cpu_jump(int cpu, void *jump_addr)
-@@ -35,11 +37,9 @@ int hi3xxx_get_cpu_jump(int cpu)
- 	return readl_relaxed(ctrl_base + ((cpu - 1) << 2));
- }
- 
--static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init hisi_enable_scu_a9(void)
- {
--	struct device_node *np = NULL;
- 	unsigned long base = 0;
--	u32 offset = 0;
- 	void __iomem *scu_base = NULL;
- 
- 	if (scu_a9_has_base()) {
-@@ -52,6 +52,14 @@ static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
- 		scu_enable(scu_base);
- 		iounmap(scu_base);
- 	}
-+}
++			timer3: timer at 00a2b000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x00a2b000 0x1000>;
++				/* timer30 & timer31 */
++				interrupts = <0 27 4>;
++				clocks = <&clock HIX5HD2_FIXED_24M>;
++				status = "disabled";
++			};
 +
-+static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *np = NULL;
-+	u32 offset = 0;
++			timer4: timer at 00a81000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x00a81000 0x1000>;
++				/* timer30 & timer31 */
++				interrupts = <0 28 4>;
++				clocks = <&clock HIX5HD2_FIXED_24M>;
++				status = "disabled";
++			};
 +
-+	hisi_enable_scu_a9();
- 	if (!ctrl_base) {
- 		np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
- 		if (!np) {
-@@ -87,3 +95,39 @@ struct smp_operations hi3xxx_smp_ops __initdata = {
- 	.cpu_kill		= hi3xxx_cpu_kill,
- #endif
- };
++			uart0: uart at 00b00000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x00b00000 0x1000>;
++				interrupts = <0 49 4>;
++				clocks = <&clock HIX5HD2_FIXED_83M>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
 +
-+static void __init hix5hd2_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	hisi_enable_scu_a9();
-+}
++			uart1: uart at 00006000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x00006000 0x1000>;
++				interrupts = <0 50 4>;
++				clocks = <&clock HIX5HD2_FIXED_83M>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
 +
-+void hix5hd2_set_scu_boot_addr(phys_addr_t start_addr, phys_addr_t jump_addr)
-+{
-+	void __iomem *virt;
++			uart2: uart at 00b02000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x00b02000 0x1000>;
++				interrupts = <0 51 4>;
++				clocks = <&clock HIX5HD2_FIXED_83M>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
 +
-+	virt = ioremap(start_addr, PAGE_SIZE);
++			uart3: uart at 00b03000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x00b03000 0x1000>;
++				interrupts = <0 52 4>;
++				clocks = <&clock HIX5HD2_FIXED_83M>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
 +
-+	writel_relaxed(0xe51ff004, virt);	/* ldr pc, [rc, #-4] */
-+	writel_relaxed(jump_addr, virt + 4);	/* pc jump phy address */
-+	iounmap(virt);
-+}
++			uart4: uart at 00b04000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0xb04000 0x1000>;
++				interrupts = <0 53 4>;
++				clocks = <&clock HIX5HD2_FIXED_83M>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++		};
 +
-+static int hix5hd2_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	phys_addr_t jumpaddr;
++		local_timer at 00a00600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0x00a00600 0x20>;
++			interrupts = <1 13 0xf01>;
++		};
 +
-+	jumpaddr = virt_to_phys(hix5hd2_secondary_startup);
-+	hix5hd2_set_scu_boot_addr(HIX5HD2_BOOT_ADDRESS, jumpaddr);
-+	hix5hd2_set_cpu(cpu, true);
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+	return 0;
-+}
++		l2: l2-cache {
++			compatible = "arm,pl310-cache";
++			reg = <0x00a10000 0x100000>;
++			interrupts = <0 15 4>;
++			cache-unified;
++			cache-level = <2>;
++			hisilicon,l2cache-aux = <0x00050000 0xfff0ffff>;
++		};
 +
++		sysctrl: system-controller at 00000000 {
++			compatible = "hisilicon,sysctrl";
++			reg = <0x00000000 0x1000>;
++			reboot-offset = <0x4>;
++		};
 +
-+struct smp_operations hix5hd2_smp_ops __initdata = {
-+	.smp_prepare_cpus	= hix5hd2_smp_prepare_cpus,
-+	.smp_boot_secondary	= hix5hd2_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= hix5hd2_cpu_die,
-+#endif
++		cpuctrl at 00a22000 {
++			compatible = "hisilicon,cpuctrl";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x00a22000 0x2000>;
++			ranges = <0 0x00a22000 0x2000>;
++
++			clock: clock at 0 {
++				compatible = "hisilicon,hix5hd2-clock";
++				reg = <0 0x2000>;
++				#clock-cells = <1>;
++			};
++		};
++	};
 +};
 -- 
 1.9.1
