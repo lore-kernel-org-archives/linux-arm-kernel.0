@@ -1,52 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jun 2014 14:11:05 +0100
-Subject: [PATCH] arm64: do not force irq affinity setting
-In-Reply-To: <1403784024.20406.4.camel@pgaikwad-dt2>
-References: <1403765395-16978-1-git-send-email-pgaikwad@nvidia.com>
- <20140626102055.GD376@arm.com>
- <1403784024.20406.4.camel@pgaikwad-dt2>
-Message-ID: <20140626131105.GF376@arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 26 Jun 2014 16:22:01 +0300
+Subject: [PATCH] clk: define and export __clk_get_debug for providers
+Message-ID: <1403788921-7963-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 01:00:24PM +0100, Prashant Gaikwad wrote:
-> On Thu, 2014-06-26 at 15:50 +0530, Will Deacon wrote:
-> > On Thu, Jun 26, 2014 at 07:49:55AM +0100, Prashant Gaikwad wrote:
-> > > Unconditional copying cpu_online_mask to affinity
-> > > may result in migrating affinity to wrong CPU.
-> > 
-> > We have a bug, but I don't follow your reasoning.
-> > 
-> > > For example, IRQ 5 affinity mask contains CPU 4-7,
-> > 
-> > Ok, so d->affinity is 0xf0...
-> > 
-> > > it was affined to CPU4 and CPU 0-7 are online.
-> > 
-> > ...and cpu_online_mask is 0xff.
-> > 
-> > > Now if we hot-unplug CPU4 then with current
-> > > implementation affinity mask will contain
-> > > CPU 0-3,5-7 and IRQ 5 will be affined to CPU0.
-> > 
-> > cpumask_any_and(affinity, cpu_online_mask) will give return < nr_cpu_ids
-> > since there is an intersection of 0xf0. That means ret is false.
-> > 
-> > The bug is that we then do affinity = cpu_online_mask; unconditionally,
-> > but we *won't* do the cpumask_copy, since ret is false.
-> > 
-> 
-> We do not copy but the affinity mask passed to irq_set_affinity function
-> is nothing but cpu_online_mask. So in GIC it will set affinity to CPU0.
+Define and export a new function __clk_get_debug which returns the debugfs
+directory entry pointer. This can be used by clock providers to add debugfs
+entries which are not related to a specific clock type. Examples include the
+ability to measure the rate of a clock. It can also be used by modules to
+create new debugfs entries. This is useful if you want to expose features
+for testing which can potentially cause system instability such as allowing
+to change a clock's rate from userspace.
 
-Exactly, but your proposed patch changed more than that.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/clk.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-> > You can fix this by simply bringing the arm64 code into line with the arm
-> > code, which begs the question as to why this has to exist in the arch/
-> > backend at all!
-> 
-> Where can we move this code?
-
-kernel/irq/migration.c?
-
-Will
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 8b73ede..5fe7942 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -652,6 +652,15 @@ unsigned long __clk_get_flags(struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(__clk_get_flags);
+ 
++struct dentry *__clk_get_dentry(struct clk *clk)
++{
++	if (!clk)
++		return NULL;
++
++	return clk->dentry;
++}
++EXPORT_SYMBOL_GPL(__clk_get_dentry);
++
+ bool __clk_is_prepared(struct clk *clk)
+ {
+ 	int ret;
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
