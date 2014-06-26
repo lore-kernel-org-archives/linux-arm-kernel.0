@@ -1,62 +1,49 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 26 Jun 2014 07:12:06 +0200
-Subject: [PATCH 09/13] AT91: PIT: (Almost) remove the global variables
-In-Reply-To: <1403701605-26678-10-git-send-email-maxime.ripard@free-electrons.com>
-References: <1403701605-26678-1-git-send-email-maxime.ripard@free-electrons.com>
- <1403701605-26678-10-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <53ABABA6.1060205@free-electrons.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Thu, 26 Jun 2014 10:44:58 +0530
+Subject: [PATCH 2/2 v2] i2c: exynos5: remove extra line and fix an assignment
+In-Reply-To: <1403759698-15624-1-git-send-email-ch.naveen@samsung.com>
+References: <1403759698-15624-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1403759698-15624-2-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+This patch does the following in exynos5_i2c_message_start() function
+1. Fixes an assignment
+   As, "i2c_auto_conf" is initialized to '0' at the beginning of the
+   function and HSI2C_READ_WRITE is defined as (1u << 16)
 
-On 25/06/2014 15:06, Maxime Ripard wrote:
-> The timer driver is using some global variables to define some variables it has
-> to use in most of its functions, like the base address.
->
-> Use some container_of calls to have a single dynamic (and local) variable to
-> hold this content.
->
-> The only exception is in the !DT case, where the call chain to
-> at91sam926x_ioremap_pit and then at91sam926x_pit_init as init_time makes it
-> hard for the moment to pass the physical address of the timer.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/mach-at91/at91sam926x_time.c | 179 ++++++++++++++++++++--------------
->  1 file changed, 108 insertions(+), 71 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index 9678ac391a81..f2c463567beb 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -20,6 +20,7 @@
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> +#include <linux/slab.h>
->  
+   Using "|=" for the first assignment is more readable.
 
-[...]
+2. Removes an extra line 
 
->  	unsigned	bits;
-> @@ -186,67 +195,95 @@ static void __init at91sam926x_pit_common_init(unsigned int pit_irq)
->  	 * Use our actual MCK to figure out how many MCK/16 ticks per
->  	 * 1/HZ period (instead of a compile-time constant LATCH).
->  	 */
-> -	pit_rate = clk_get_rate(mck) / 16;
-> -	pit_cycle = (pit_rate + HZ/2) / HZ;
-> -	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
-> +	pit_rate = clk_get_rate(data->mck) / 16;
-> +	data->cycle = (pit_rate + HZ/2) / HZ;
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+---
+Changes since v1:
+Edited commit message for clarity
 
-You could use DIV_ROUND_CLOSEST here.
+ drivers/i2c/busses/i2c-exynos5.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Regards,
-
-Boris
-
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index 0d1a7bc..4c2e6f3 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -525,7 +525,7 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
+ 	if (i2c->msg->flags & I2C_M_RD) {
+ 		i2c_ctl |= HSI2C_RXCHON;
+ 
+-		i2c_auto_conf = HSI2C_READ_WRITE;
++		i2c_auto_conf |= HSI2C_READ_WRITE;
+ 
+ 		trig_lvl = (i2c->msg->len > i2c->variant->fifo_depth) ?
+ 			(i2c->variant->fifo_depth * 3 / 4) : i2c->msg->len;
+@@ -548,7 +548,6 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
+ 	writel(fifo_ctl, i2c->regs + HSI2C_FIFO_CTL);
+ 	writel(i2c_ctl, i2c->regs + HSI2C_CTL);
+ 
+-
+ 	/*
+ 	 * Enable interrupts before starting the transfer so that we don't
+ 	 * miss any INT_I2C interrupts.
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.9.5
