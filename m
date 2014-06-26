@@ -1,108 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 Jun 2014 15:53:55 +0100
-Subject: [PATCH] ARM: EXYNOS: Restore the entry address setup code
- post-resume
-In-Reply-To: <CAM4voa=AYDkHG49EEnr0097Dw4eS__T95oDrhswcfHEzY=PTcw@mail.gmail.com>
-References: <1403780312-22885-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voa=AYDkHG49EEnr0097Dw4eS__T95oDrhswcfHEzY=PTcw@mail.gmail.com>
-Message-ID: <20140626145355.GA27364@e102568-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 26 Jun 2014 07:59:19 -0700
+Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
+In-Reply-To: <53ABC13C.8030908@gmail.com>
+References: <539fdd37.e7bc420a.76b9.ffffb583@mx.google.com>
+ <CAGa+x85nqPbH-sye28ni=gUEdgjGdUDqHhv1+0pV5aO8y1+wHQ@mail.gmail.com>
+ <53A106F1.10201@gmail.com>
+ <CAGa+x8527FEPk6fg5kv-fbOzK3MzcFooFGE9Me12b9C_Pv=UzA@mail.gmail.com>
+ <53A2AE11.2050208@gmail.com> <53A2BE94.2010308@gmail.com>
+ <53A7A579.4010702@gmail.com>
+ <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
+ <53A9B99F.4040806@codeaurora.org> <53A9FBB5.60709@codeaurora.org>
+ <53AABCF5.4050403@gmail.com> <53AB45D1.90909@codeaurora.org>
+ <53ABC13C.8030908@gmail.com>
+Message-ID: <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 01:25:30PM +0100, Abhilash Kesavan wrote:
-> Hi,
-> 
-> On Thu, Jun 26, 2014 at 4:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> > Setup the mcpm entry address again on system resume as the
-> > iRAM contents are lost across an s2r cycle.
-> >
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > ---
-> > This has been tested after applying the Exynos5420 S2R support series
-> > along with Nicolas Pitre's boot cluster CCI enablement patches on Peach
-> > Pit.
-> >
-> >  arch/arm/mach-exynos/mcpm-exynos.c | 31 +++++++++++++++++++++----------
-> >  1 file changed, 21 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> > index 8c610e2..0bf734d 100644
-> > --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> > @@ -15,6 +15,7 @@
-> >  #include <linux/delay.h>
-> >  #include <linux/io.h>
-> >  #include <linux/of_address.h>
-> > +#include <linux/syscore_ops.h>
-> >
-> >  #include <asm/cputype.h>
-> >  #include <asm/cp15.h>
-> > @@ -26,6 +27,7 @@
-> >  #define EXYNOS5420_CPUS_PER_CLUSTER    4
-> >  #define EXYNOS5420_NR_CLUSTERS         2
-> >
-> > +static void __iomem *ns_sram_base_addr;
-> >  /*
-> >   * The common v7_exit_coherency_flush API could not be used because of the
-> >   * Erratum 799270 workaround. This macro is the same as the common one (in
-> > @@ -308,10 +310,26 @@ static const struct of_device_id exynos_dt_mcpm_match[] = {
-> >         {},
-> >  };
-> >
-> > +static void exynos_mcpm_setup_entry_point(void)
-> > +{
-> > +       /*
-> > +        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
-> > +        * as part of secondary_cpu_start().  Let's redirect it to the
-> > +        * mcpm_entry_point(). This is done during both secondary boot-up as
-> > +        * well as system resume.
-> > +        */
-> > +       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
-> > +       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
-> > +       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
-> > +}
-> > +
-> > +static struct syscore_ops exynos_mcpm_syscore_ops = {
-> > +       .resume = exynos_mcpm_setup_entry_point,
-> > +};
-> > +
-> >  static int __init exynos_mcpm_init(void)
-> >  {
-> >         struct device_node *node;
-> > -       void __iomem *ns_sram_base_addr;
-> >         int ret;
-> >
-> >         node = of_find_matching_node(NULL, exynos_dt_mcpm_match);
-> > @@ -357,16 +375,9 @@ static int __init exynos_mcpm_init(void)
-> >
-> >         pr_info("Exynos MCPM support installed\n");
-> >
-> > -       /*
-> > -        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
-> > -        * as part of secondary_cpu_start().  Let's redirect it to the
-> > -        * mcpm_entry_point().
-> > -        */
-> > -       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
-> > -       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
-> > -       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
-> > +       exynos_mcpm_setup_entry_point();
-> >
-> > -       iounmap(ns_sram_base_addr);
-> > +       register_syscore_ops(&exynos_mcpm_syscore_ops);
-> >
-> >         return ret;
-> >  }
-> 
-> This patch alone is not enough to bring the 8 cores back up post
-> resume on exynos5420, We need to enable the boot cluster snoops as
-> well.
-> 
-> Nicolas, if I add code to enable the boot cluster CCI in
-> mach-exynos/sleep.S, all 8 cores come up. However, if I use
-> mcpm_loopback as part of the newly added resume function to do the
-> same, I get a hang on resume.
+Hi Tushar,
 
-BTW mcpm_loopback is __init, and that's correct, so on resume if you
-call it kernel goes boom.
+> Here is my assessment of the current situation.
 
-Lorenzo
+Thanks for digging into this and the detailed diagnosis.
+
+> *Bug in the u-boot*
+> Current u-boot for Arndale-octa board has defined NR_BANKS as 12 and the
+> core uses a global structure (gd->bd) to maintain the start and size of
+> individual banks. Depending on the revision of SoC used on the board,
+> the board file [1] updates the start/size for either 8 or 12 banks. In
+> case of current revision of Arndale-Octa boards, the board file always
+> updates start/size for 8 banks, leaving the start/size data for
+> remaining 4 banks uninitialized.
+>
+> But the u-boot core[2] updates the value of all the 12 banks, thus
+> potentially updating invalid data for last 4 banks.
+>
+> The issue can be fixed by resetting the start/size for unused memory
+> banks to 0/0.[3]
+>
+> *Before migration to memblock*
+> The path for adding DRAM banks was done through [4]. For Exynos systems,
+> NR_BANKS was defined as 8. The initial check for rejecting any banks
+> beyond NR_BANKS was good enough for fixing this issue. The bootlog[5]
+> (with some debug messages) shows the invalid data, both in u-boot and
+> kernel. Please grep for "NR_BANKS too low, ignoring memory" in the bootlog.
+>
+> *After migration to memblock*
+> Now that the memory banks are added through [6], all the memory banks
+> are getting updated unconditionally resulting in the panic.
+>
+> IMO, the bug is in u-boot and we should fix that.
+
+I agree that the u-boot bug needs to be fixed, and FWIW, I updated my
+u-boot and haven't seen the boot failure yet after several boots with
+next-20140625.
+
+That being said, since it's not always feasible/practical to update
+u-boot, and when it comes down to it, this is still a kernel
+regression, we should also fix the kernel to sanity check the values
+coming from u-boot, like it was doing before.
+
+Could you (or Laura) come up with a way to recreate the sanity check
+that was detecting this problem before and ignoring those banks?
+
+Thanks,
+
+Kevin
