@@ -1,49 +1,100 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Thu, 26 Jun 2014 17:30:24 +0530
-Subject: [PATCH] arm64: do not force irq affinity setting
-In-Reply-To: <20140626102055.GD376@arm.com>
-References: <1403765395-16978-1-git-send-email-pgaikwad@nvidia.com>
- <20140626102055.GD376@arm.com>
-Message-ID: <1403784024.20406.4.camel@pgaikwad-dt2>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 26 Jun 2014 14:00:06 +0200
+Subject: [PATCH RESEND] clk: samsung: Make of_device_id array const
+Message-ID: <1403784006-17605-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-06-26 at 15:50 +0530, Will Deacon wrote:
-> Hello,
-> 
-> On Thu, Jun 26, 2014 at 07:49:55AM +0100, Prashant Gaikwad wrote:
-> > Unconditional copying cpu_online_mask to affinity
-> > may result in migrating affinity to wrong CPU.
-> 
-> We have a bug, but I don't follow your reasoning.
-> 
-> > For example, IRQ 5 affinity mask contains CPU 4-7,
-> 
-> Ok, so d->affinity is 0xf0...
-> 
-> > it was affined to CPU4 and CPU 0-7 are online.
-> 
-> ...and cpu_online_mask is 0xff.
-> 
-> > Now if we hot-unplug CPU4 then with current
-> > implementation affinity mask will contain
-> > CPU 0-3,5-7 and IRQ 5 will be affined to CPU0.
-> 
-> cpumask_any_and(affinity, cpu_online_mask) will give return < nr_cpu_ids
-> since there is an intersection of 0xf0. That means ret is false.
-> 
-> The bug is that we then do affinity = cpu_online_mask; unconditionally,
-> but we *won't* do the cpumask_copy, since ret is false.
-> 
+Array of struct of_device_id may be be const as expected by
+of_match_table field and of_find_matching_node_and_match() function.
 
-We do not copy but the affinity mask passed to irq_set_affinity function
-is nothing but cpu_online_mask. So in GIC it will set affinity to CPU0.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c    | 2 +-
+ drivers/clk/samsung/clk-exynos5250.c | 2 +-
+ drivers/clk/samsung/clk-exynos5420.c | 2 +-
+ drivers/clk/samsung/clk-exynos5440.c | 2 +-
+ drivers/clk/samsung/clk.c            | 2 +-
+ drivers/clk/samsung/clk.h            | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
 
-> You can fix this by simply bringing the arm64 code into line with the arm
-> code, which begs the question as to why this has to exist in the arch/
-> backend at all!
-
-Where can we move this code?
-
-> 
-> Will
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 4f150c9dd38c..ca6688483390 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1070,7 +1070,7 @@ static void __init exynos4_clk_register_finpll(struct samsung_clk_provider *ctx)
+ 
+ }
+ 
+-static struct of_device_id ext_clk_match[] __initdata = {
++static const struct of_device_id ext_clk_match[] __initconst = {
+ 	{ .compatible = "samsung,clock-xxti", .data = (void *)0, },
+ 	{ .compatible = "samsung,clock-xusbxti", .data = (void *)1, },
+ 	{},
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 1fad4c5e3f5d..0af3e4ff0eb5 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -748,7 +748,7 @@ static struct samsung_pll_clock exynos5250_plls[nr_plls] __initdata = {
+ 		VPLL_LOCK, VPLL_CON0, NULL),
+ };
+ 
+-static struct of_device_id ext_clk_match[] __initdata = {
++static const struct of_device_id ext_clk_match[] __initconst = {
+ 	{ .compatible = "samsung,clock-xxti", .data = (void *)0, },
+ 	{ },
+ };
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 9d7d7eed03fd..007b5ef8bc1c 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -1167,7 +1167,7 @@ static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
+ 		KPLL_CON0, NULL),
+ };
+ 
+-static struct of_device_id ext_clk_match[] __initdata = {
++static const struct of_device_id ext_clk_match[] __initconst = {
+ 	{ .compatible = "samsung,exynos5420-oscclk", .data = (void *)0, },
+ 	{ },
+ };
+diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
+index 647f1440aa6a..6e8b40a3b143 100644
+--- a/drivers/clk/samsung/clk-exynos5440.c
++++ b/drivers/clk/samsung/clk-exynos5440.c
+@@ -84,7 +84,7 @@ static struct samsung_gate_clock exynos5440_gate_clks[] __initdata = {
+ 	GATE(CLK_CS250_O, "cs250_o", "cs250", CLKEN_OV_VAL, 19, 0, 0),
+ };
+ 
+-static struct of_device_id ext_clk_match[] __initdata = {
++static const struct of_device_id ext_clk_match[] __initconst = {
+ 	{ .compatible = "samsung,clock-xtal", .data = (void *)0, },
+ 	{},
+ };
+diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+index 49629c71c9e7..2413677b42fe 100644
+--- a/drivers/clk/samsung/clk.c
++++ b/drivers/clk/samsung/clk.c
+@@ -284,7 +284,7 @@ void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
+ void __init samsung_clk_of_register_fixed_ext(struct samsung_clk_provider *ctx,
+ 			struct samsung_fixed_rate_clock *fixed_rate_clk,
+ 			unsigned int nr_fixed_rate_clk,
+-			struct of_device_id *clk_matches)
++			const struct of_device_id *clk_matches)
+ {
+ 	const struct of_device_id *match;
+ 	struct device_node *clk_np;
+diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+index 9693b80d924f..150a9ebc0266 100644
+--- a/drivers/clk/samsung/clk.h
++++ b/drivers/clk/samsung/clk.h
+@@ -331,7 +331,7 @@ extern void __init samsung_clk_of_register_fixed_ext(
+ 			struct samsung_clk_provider *ctx,
+ 			struct samsung_fixed_rate_clock *fixed_rate_clk,
+ 			unsigned int nr_fixed_rate_clk,
+-			struct of_device_id *clk_matches);
++			const struct of_device_id *clk_matches);
+ 
+ extern void samsung_clk_add_lookup(struct samsung_clk_provider *ctx,
+ 			struct clk *clk, unsigned int id);
+-- 
+1.9.1
