@@ -1,77 +1,53 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 26 Jun 2014 12:05:40 +0800
-Subject: [PATCH v4 1/8] ARM: hisi: store reboot reg in global variable
+Date: Thu, 26 Jun 2014 12:05:41 +0800
+Subject: [PATCH v4 2/8] ARM: debug: add HiP04 debug uart
 In-Reply-To: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1403755547-623-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1403755547-623-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid to parse DT in restart() function. Parsing these in init_late()
-instead.
+Add the support of Hisilicon HiP04 debug uart.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/mach-hisi/hisilicon.c | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
-index 741faf3..a2387bc 100644
---- a/arch/arm/mach-hisi/hisilicon.c
-+++ b/arch/arm/mach-hisi/hisilicon.c
-@@ -45,33 +45,38 @@ static struct map_desc hi3620_io_desc[] __initdata = {
- 	},
- };
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8f90595..f64a6df 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -223,6 +223,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HI3716 UART.
  
-+static void __iomem *sysctrl_base;
-+static u32 reboot_offset;
++	config DEBUG_HIP04_UART
++		bool "Hisilicon HiP04 Debug UART"
++		depends on ARCH_HIP04
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HIP04 UART.
 +
- static void __init hi3620_map_io(void)
- {
- 	debug_ll_io_init();
- 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
- }
- 
--static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
-+static void __init hi3xxx_init_late(void)
- {
- 	struct device_node *np;
--	void __iomem *base;
--	int offset;
- 
- 	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
- 	if (!np) {
- 		pr_err("failed to find hisilicon,sysctrl node\n");
- 		return;
- 	}
--	base = of_iomap(np, 0);
--	if (!base) {
-+	sysctrl_base = of_iomap(np, 0);
-+	if (!sysctrl_base) {
- 		pr_err("failed to map address in hisilicon,sysctrl node\n");
- 		return;
- 	}
--	if (of_property_read_u32(np, "reboot-offset", &offset) < 0) {
-+	if (of_property_read_u32(np, "reboot-offset", &reboot_offset) < 0) {
- 		pr_err("failed to find reboot-offset property\n");
- 		return;
- 	}
--	writel_relaxed(0xdeadbeef, base + offset);
-+}
-+
-+static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	writel_relaxed(0xdeadbeef, sysctrl_base + reboot_offset);
- 
- 	while (1)
- 		cpu_do_idle();
-@@ -85,6 +90,7 @@ static const char *hi3xxx_compat[] __initconst = {
- DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
- 	.map_io		= hi3620_map_io,
- 	.dt_compat	= hi3xxx_compat,
-+	.init_late	= hi3xxx_init_late,
- 	.smp		= smp_ops(hi3xxx_smp_ops),
- 	.restart	= hi3xxx_restart,
- MACHINE_END
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -1087,6 +1095,7 @@ config DEBUG_UART_PHYS
+ 	default 0xd4017000 if DEBUG_MMP_UART2
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
++	default 0xe4007000 if DEBUG_HIP04_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+@@ -1128,6 +1137,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf7008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
+ 				DEBUG_S3C2410_UART2)
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
++	default 0xf8007000 if DEBUG_HIP04_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+ 	default 0xfa71e000 if DEBUG_QCOM_UARTDM
 -- 
 1.9.1
