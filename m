@@ -1,254 +1,86 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Jun 2014 16:18:43 +0100
-Subject: [PATCHv3 2/5] arm64: cpuinfo: record cpu system register values
+Date: Thu, 26 Jun 2014 16:18:44 +0100
+Subject: [PATCHv3 3/5] arm64: cpuinfo: print info for all CPUs
 In-Reply-To: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
 References: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1403795926-17139-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403795926-17139-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several kernel subsystems need to know details about CPU system register
-values, sometimes for CPUs other than that they are executing on. Rather
-than hard-coding system register accesses and cross-calls for these
-cases, this patch adds logic to record various system register values at
-boot-time. This may be used for feature reporting, firmware bug
-detection, etc.
+Currently reading /proc/cpuinfo will result in information being read
+out of the MIDR_EL1 of the current CPU, and the information is not
+associated with any particular logical CPU number.
 
-Separate hooks are added for the boot and hotplug paths to enable
-one-time intialisation and cold/warm boot value mismatch detection in
-later patches.
+This is problematic for systems with heterogeneous CPUs (i.e.
+big.LITTLE) where fields will vary across CPUs, and the output will
+differ depending on the executing CPU.
+
+This patch reorganises the code responsible for /proc/cpuinfo to print
+information per-cpu. As hwcaps are expected to be identical across all
+CPUs, this information is printed once.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/include/asm/cpu.h | 59 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile   |  3 +-
- arch/arm64/kernel/cpuinfo.c  | 75 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c    |  7 +++--
- arch/arm64/kernel/smp.c      |  6 ++++
- 5 files changed, 146 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/include/asm/cpu.h
- create mode 100644 arch/arm64/kernel/cpuinfo.c
+ arch/arm64/kernel/setup.c | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-new file mode 100644
-index 0000000..0564430
---- /dev/null
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -0,0 +1,59 @@
-+/*
-+  * Copyright (C) 2014 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_CPU_H
-+#define __ASM_CPU_H
-+
-+#include <linux/cpu.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+
-+/*
-+ * Records attributes of an individual CPU.
-+ */
-+struct cpuinfo_arm64 {
-+	struct cpu	cpu;
-+	u32		reg_ctr;
-+	u32		reg_cntfrq;
-+	u32		reg_dczid;
-+	u32		reg_midr;
-+
-+	u64		reg_id_aa64isar0;
-+	u64		reg_id_aa64isar1;
-+	u64		reg_id_aa64mmfr0;
-+	u64		reg_id_aa64mmfr1;
-+	u64		reg_id_aa64pfr0;
-+	u64		reg_id_aa64pfr1;
-+
-+	u32		reg_id_isar0;
-+	u32		reg_id_isar1;
-+	u32		reg_id_isar2;
-+	u32		reg_id_isar3;
-+	u32		reg_id_isar4;
-+	u32		reg_id_isar5;
-+	u32		reg_id_mmfr0;
-+	u32		reg_id_mmfr1;
-+	u32		reg_id_mmfr2;
-+	u32		reg_id_mmfr3;
-+	u32		reg_id_pfr0;
-+	u32		reg_id_pfr1;
-+};
-+
-+DECLARE_PER_CPU(struct cpuinfo_arm64, cpu_data);
-+
-+void cpuinfo_store_cpu(void);
-+void __init cpuinfo_store_boot_cpu(void);
-+
-+#endif /* __ASM_CPU_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index cdaedad..27c72ef 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -15,7 +15,8 @@ CFLAGS_REMOVE_return_address.o = -pg
- arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o
-+			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o	\
-+			   cpuinfo.o
- 
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-new file mode 100644
-index 0000000..65907f3
---- /dev/null
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -0,0 +1,75 @@
-+/*
-+ * Record and handle CPU attributes.
-+ *
-+ * Copyright (C) 2014 ARM Ltd.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <asm/arch_timer.h>
-+#include <asm/cachetype.h>
-+#include <asm/cpu.h>
-+#include <asm/cputype.h>
-+
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+
-+/*
-+ * In case the boot CPU is hotpluggable, we record its initial state and
-+ * current state separately. Certain system registers may contain different
-+ * values depending on configuration at or after reset.
-+ */
-+DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
-+static struct cpuinfo_arm64 boot_cpu_data;
-+
-+static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
-+{
-+	info->reg_cntfrq = arch_timer_get_cntfrq();
-+	info->reg_ctr = read_cpuid_cachetype();
-+	info->reg_dczid = read_cpuid(DCZID_EL0);
-+	info->reg_midr = read_cpuid_id();
-+
-+	info->reg_id_aa64isar0 = read_cpuid(ID_AA64ISAR0_EL1);
-+	info->reg_id_aa64isar1 = read_cpuid(ID_AA64ISAR1_EL1);
-+	info->reg_id_aa64mmfr0 = read_cpuid(ID_AA64MMFR0_EL1);
-+	info->reg_id_aa64mmfr1 = read_cpuid(ID_AA64MMFR1_EL1);
-+	info->reg_id_aa64pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-+	info->reg_id_aa64pfr1 = read_cpuid(ID_AA64PFR1_EL1);
-+
-+	info->reg_id_isar0 = read_cpuid(ID_ISAR0_EL1);
-+	info->reg_id_isar1 = read_cpuid(ID_ISAR1_EL1);
-+	info->reg_id_isar2 = read_cpuid(ID_ISAR2_EL1);
-+	info->reg_id_isar3 = read_cpuid(ID_ISAR3_EL1);
-+	info->reg_id_isar4 = read_cpuid(ID_ISAR4_EL1);
-+	info->reg_id_isar5 = read_cpuid(ID_ISAR5_EL1);
-+	info->reg_id_mmfr0 = read_cpuid(ID_MMFR0_EL1);
-+	info->reg_id_mmfr1 = read_cpuid(ID_MMFR1_EL1);
-+	info->reg_id_mmfr2 = read_cpuid(ID_MMFR2_EL1);
-+	info->reg_id_mmfr3 = read_cpuid(ID_MMFR3_EL1);
-+	info->reg_id_pfr0 = read_cpuid(ID_PFR0_EL1);
-+	info->reg_id_pfr1 = read_cpuid(ID_PFR1_EL1);
-+}
-+
-+void cpuinfo_store_cpu(void)
-+{
-+	unsigned int cpu = smp_processor_id();
-+	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
-+	__cpuinfo_store_cpu(info);
-+}
-+
-+void __init cpuinfo_store_boot_cpu(void)
-+{
-+	unsigned int cpu = smp_processor_id();
-+	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
-+	__cpuinfo_store_cpu(info);
-+
-+	boot_cpu_data = *info;
-+}
 diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 46d1125..edb146d 100644
+index edb146d..b00b7a3 100644
 --- a/arch/arm64/kernel/setup.c
 +++ b/arch/arm64/kernel/setup.c
-@@ -45,6 +45,7 @@
- #include <linux/efi.h>
+@@ -448,20 +448,30 @@ static const char *hwcap_str[] = {
  
- #include <asm/fixmap.h>
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/elf.h>
- #include <asm/cputable.h>
-@@ -219,6 +220,8 @@ static void __init setup_processor(void)
- 	sprintf(init_utsname()->machine, ELF_PLATFORM);
- 	elf_hwcap = 0;
- 
-+	cpuinfo_store_boot_cpu();
-+
- 	/*
- 	 * Check for sane CTR_EL0.CWG value.
- 	 */
-@@ -417,14 +420,12 @@ static int __init arm64_device_init(void)
- }
- arch_initcall_sync(arm64_device_init);
- 
--static DEFINE_PER_CPU(struct cpu, cpu_data);
--
- static int __init topology_init(void)
+ static int c_show(struct seq_file *m, void *v)
  {
- 	int i;
+-	int i;
++	int c, i;
  
- 	for_each_possible_cpu(i) {
--		struct cpu *cpu = &per_cpu(cpu_data, i);
-+		struct cpu *cpu = &per_cpu(cpu_data.cpu, i);
- 		cpu->hotpluggable = 1;
- 		register_cpu(cpu, i);
- 	}
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 40f38f4..3e2f5eb 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -39,6 +39,7 @@
+-	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+-		   cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
++	for_each_online_cpu(c) {
++		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, c);
++		u32 midr = cpuinfo->reg_midr;
  
- #include <asm/atomic.h>
- #include <asm/cacheflush.h>
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/cpu_ops.h>
- #include <asm/mmu_context.h>
-@@ -155,6 +156,11 @@ asmlinkage void secondary_start_kernel(void)
- 		cpu_ops[cpu]->cpu_postboot();
- 
- 	/*
-+	 * Log the CPU info before it is marked online and might get read.
-+	 */
-+	cpuinfo_store_cpu();
+-	for_each_online_cpu(i) {
+ 		/*
+ 		 * glibc reads /proc/cpuinfo to determine the number of
+ 		 * online processors, looking for lines beginning with
+ 		 * "processor".  Give glibc what it expects.
+ 		 */
+ #ifdef CONFIG_SMP
+-		seq_printf(m, "processor\t: %d\n", i);
++		seq_printf(m, "processor\t: %d\n", c);
+ #endif
++		seq_printf(m, "Type\t\t: %s rev %d (%s)\n",
++			   cpu_name, MIDR_REVISION(midr), ELF_PLATFORM);
++		seq_printf(m, "CPU implementer\t: 0x%02x\n",
++			   MIDR_IMPLEMENTOR(midr));
++		seq_printf(m, "CPU architecture: AArch64\n");
++		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
++		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
++		seq_printf(m, "CPU revision\t: %d\n", MIDR_REVISION(midr));
 +
-+	/*
- 	 * Enable GIC and timers.
- 	 */
- 	notify_cpu_starting(cpu);
++		seq_puts(m, "\n");
+ 	}
+ 
+ 	/* dump out the processor features */
+@@ -470,17 +480,8 @@ static int c_show(struct seq_file *m, void *v)
+ 	for (i = 0; hwcap_str[i]; i++)
+ 		if (elf_hwcap & (1 << i))
+ 			seq_printf(m, "%s ", hwcap_str[i]);
+-
+-	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
+-	seq_printf(m, "CPU architecture: AArch64\n");
+-	seq_printf(m, "CPU variant\t: 0x%x\n", (read_cpuid_id() >> 20) & 15);
+-	seq_printf(m, "CPU part\t: 0x%03x\n", (read_cpuid_id() >> 4) & 0xfff);
+-	seq_printf(m, "CPU revision\t: %d\n", read_cpuid_id() & 15);
+-
+ 	seq_puts(m, "\n");
+ 
+-	seq_printf(m, "Hardware\t: %s\n", machine_name);
+-
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
