@@ -1,56 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Jun 2014 23:10:00 +0200
-Subject: [PATCH] arm64: fpsimd: avoid restoring fpcr if the contents
- haven't changed
-In-Reply-To: <1403804062-22239-1-git-send-email-will.deacon@arm.com>
-References: <1403804062-22239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu8rFmURfT9PLSQE4z91q5D03aoR7UOEJFSGRrBMXGsdOQ@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 27 Jun 2014 00:24:02 +0300
+Subject: [PATCH 2/7] mailbox/omap: remove OMAP1 mailbox driver
+In-Reply-To: <20140626102814.GI28884@atomide.com>
+References: <1403657023-53897-1-git-send-email-s-anna@ti.com>
+ <1403657023-53897-3-git-send-email-s-anna@ti.com>
+ <20140626102814.GI28884@atomide.com>
+Message-ID: <20140626212402.GA6377@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Will,
+Hi,
 
-On 26 June 2014 19:34, Will Deacon <will.deacon@arm.com> wrote:
-> Writing to the FPCR is commonly implemented as a self-synchronising
-> operation in the CPU, so avoid writing to the register when the saved
-> value matches that in the hardware already.
->
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/fpsimdmacros.h | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-> index 768414d55e64..137c0f45b0a8 100644
-> --- a/arch/arm64/include/asm/fpsimdmacros.h
-> +++ b/arch/arm64/include/asm/fpsimdmacros.h
-> @@ -40,6 +40,7 @@
->         str     w\tmpnr, [\state, #16 * 2 + 4]
->  .endm
->
-> +/* Clobbers \state */
->  .macro fpsimd_restore state, tmpnr
->         ldp     q0, q1, [\state, #16 * 0]
->         ldp     q2, q3, [\state, #16 * 2]
-> @@ -60,7 +61,15 @@
->         ldr     w\tmpnr, [\state, #16 * 2]
->         msr     fpsr, x\tmpnr
->         ldr     w\tmpnr, [\state, #16 * 2 + 4]
-> +       /*
-> +        * Writes to fpcr may be self-synchronising, so avoid restoring
-> +        * the register if it hasn't changed.
-> +        */
-> +       mrs     \state, fpcr
-> +       cmp     x\tmpnr, \state
-> +       b.eq    9999f
->         msr     fpcr, x\tmpnr
-> +9999:
->  .endm
->
+On Thu, Jun 26, 2014 at 03:28:14AM -0700, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [140624 17:45]:
+> > There are no existing users for OMAP1 mailbox driver
+> > in kernel. Commit ab6f775 "Removing dead OMAP_DSP"
+> > has cleaned up all the dead code related to the only
+> > possible user, including the creation of the mailbox
+> > platform device.
+> > 
+> > Remove this stale driver so that the OMAP mailbox
+> > driver can be simplified and streamlined better for
+> > converting to mailbox framework.
+> > 
+> > Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> > Signed-off-by: Suman Anna <s-anna@ti.com>
+> 
+> For the omap1_defconfig change:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-I would assume the same would apply to the partial restore that was
-merged during the last window?
+I'm also OK with this change.
 
--- 
-Ard.
+Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+
+A.
