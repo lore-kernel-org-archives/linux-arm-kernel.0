@@ -1,71 +1,68 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 26 Jun 2014 15:22:50 +0100
-Subject: [PATCH 1/7] ASoC: fix debugfs directory creation bug
+Date: Thu, 26 Jun 2014 15:22:55 +0100
+Subject: [PATCH 2/7] ASoC: kirkwood-i2s: provide helper
+ KIRKWOOD_RECCTL_ENABLE_MASK definition
 In-Reply-To: <20140626142231.GR32514@n2100.arm.linux.org.uk>
 References: <20140626142231.GR32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X0AZe-0003i7-0z@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X0AZj-0003iB-4N@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid creating duplicate directories by prefixing codecs and platforms
-with their separate identifiers.  This avoids snd-soc-dummy (which can
-appear both as a dummy platform and a dummy codec on the same card)
-from clashing.
+Add a KIRKWOOD_RECCTL_ENABLE_MASK definition to complement the existing
+PLAYCTL definition, and make use of it where we wish to clear both
+enable bits.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- sound/soc/soc-core.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+ sound/soc/kirkwood/kirkwood-i2s.c | 7 +++----
+ sound/soc/kirkwood/kirkwood.h     | 3 +++
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index b87d7d882e6d..91120b8e283e 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -270,12 +270,32 @@ static const struct file_operations codec_reg_fops = {
- 	.llseek = default_llseek,
- };
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index 9f842222e798..55af6c8e4603 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -322,8 +322,7 @@ static int kirkwood_i2s_rec_trigger(struct snd_pcm_substream *substream,
+ 		else
+ 			ctl &= ~KIRKWOOD_RECCTL_I2S_EN;		/* spdif */
  
-+static struct dentry *soc_debugfs_create_dir(struct dentry *parent,
-+	const char *fmt, ...)
-+{
-+	struct dentry *de;
-+	va_list ap;
-+	char *s;
-+
-+	va_start(ap, fmt);
-+	s = kvasprintf(GFP_KERNEL, fmt, ap);
-+	va_end(ap);
-+
-+	if (!s)
-+		return NULL;
-+
-+	de = debugfs_create_dir(s, parent);
-+	kfree(s);
-+
-+	return de;
-+}
-+
- static void soc_init_codec_debugfs(struct snd_soc_codec *codec)
- {
- 	struct dentry *debugfs_card_root = codec->card->debugfs_card_root;
+-		value = ctl & ~(KIRKWOOD_RECCTL_I2S_EN |
+-				KIRKWOOD_RECCTL_SPDIF_EN);
++		value = ctl & ~KIRKWOOD_RECCTL_ENABLE_MASK;
+ 		writel(value, priv->io + KIRKWOOD_RECCTL);
  
--	codec->debugfs_codec_root = debugfs_create_dir(codec->name,
--						       debugfs_card_root);
-+	codec->debugfs_codec_root = soc_debugfs_create_dir(debugfs_card_root,
-+						"codec:%s", codec->name);
- 	if (!codec->debugfs_codec_root) {
- 		dev_warn(codec->dev,
- 			"ASoC: Failed to create codec debugfs directory\n");
-@@ -306,8 +326,8 @@ static void soc_init_platform_debugfs(struct snd_soc_platform *platform)
- {
- 	struct dentry *debugfs_card_root = platform->card->debugfs_card_root;
+ 		/* enable interrupts */
+@@ -347,7 +346,7 @@ static int kirkwood_i2s_rec_trigger(struct snd_pcm_substream *substream,
  
--	platform->debugfs_platform_root = debugfs_create_dir(platform->name,
--						       debugfs_card_root);
-+	platform->debugfs_platform_root = soc_debugfs_create_dir(debugfs_card_root,
-+						"platform:%s", platform->name);
- 	if (!platform->debugfs_platform_root) {
- 		dev_warn(platform->dev,
- 			"ASoC: Failed to create platform debugfs directory\n");
+ 		/* disable all records */
+ 		value = readl(priv->io + KIRKWOOD_RECCTL);
+-		value &= ~(KIRKWOOD_RECCTL_I2S_EN | KIRKWOOD_RECCTL_SPDIF_EN);
++		value &= ~KIRKWOOD_RECCTL_ENABLE_MASK;
+ 		writel(value, priv->io + KIRKWOOD_RECCTL);
+ 		break;
+ 
+@@ -411,7 +410,7 @@ static int kirkwood_i2s_init(struct kirkwood_dma_data *priv)
+ 	writel(value, priv->io + KIRKWOOD_PLAYCTL);
+ 
+ 	value = readl(priv->io + KIRKWOOD_RECCTL);
+-	value &= ~(KIRKWOOD_RECCTL_I2S_EN | KIRKWOOD_RECCTL_SPDIF_EN);
++	value &= ~KIRKWOOD_RECCTL_ENABLE_MASK;
+ 	writel(value, priv->io + KIRKWOOD_RECCTL);
+ 
+ 	return 0;
+diff --git a/sound/soc/kirkwood/kirkwood.h b/sound/soc/kirkwood/kirkwood.h
+index bf23afbba1d7..ab21de090938 100644
+--- a/sound/soc/kirkwood/kirkwood.h
++++ b/sound/soc/kirkwood/kirkwood.h
+@@ -38,6 +38,9 @@
+ #define KIRKWOOD_RECCTL_SIZE_24		(1<<0)
+ #define KIRKWOOD_RECCTL_SIZE_32		(0<<0)
+ 
++#define KIRKWOOD_RECCTL_ENABLE_MASK		(KIRKWOOD_RECCTL_SPDIF_EN | \
++						 KIRKWOOD_RECCTL_I2S_EN)
++
+ #define KIRKWOOD_REC_BUF_ADDR			0x1004
+ #define KIRKWOOD_REC_BUF_SIZE			0x1008
+ #define KIRKWOOD_REC_BYTE_COUNT			0x100C
 -- 
 1.8.3.1
