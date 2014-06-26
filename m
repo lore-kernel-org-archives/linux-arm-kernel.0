@@ -1,51 +1,50 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 26 Jun 2014 23:55:42 +0800
-Subject: [PATCH v4 4/6] clk: sunxi: Add support for table-based divider clocks
+Date: Thu, 26 Jun 2014 23:55:41 +0800
+Subject: [PATCH v4 3/6] clk: sunxi: Support factor clocks with N factor
+ starting not from 0
 In-Reply-To: <1403798144-32188-1-git-send-email-wens@csie.org>
 References: <1403798144-32188-1-git-send-email-wens@csie.org>
-Message-ID: <1403798144-32188-5-git-send-email-wens@csie.org>
+Message-ID: <1403798144-32188-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few of the clock modules have odd dividers, such as
-the 2 lowest dividers being the same (2), or have the
-same divider when the highest bit is set.
+The PLLs on newer Allwinner SoC's, such as the A31 and A23, have a
+N multiplier factor that starts from 1, not 0.
 
-This patch adds support for optional divider tables,
-so the clock framework will know about the odd values.
+This patch adds an option to the factor clk driver's config data
+structures to specify the base value of N.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/clk/sunxi/clk-factors.c | 2 +-
+ drivers/clk/sunxi/clk-factors.h | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index a38c799..6fe9492 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -664,6 +664,7 @@ struct div_data {
- 	u8	shift;
- 	u8	pow;
- 	u8	width;
-+	const struct clk_div_table *table;
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 3806d97..2057c8a 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -62,7 +62,7 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+ 		p = FACTOR_GET(config->pshift, config->pwidth, reg);
+ 
+ 	/* Calculate the rate */
+-	rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
++	rate = (parent_rate * (n + config->n_start) * (k + 1) >> p) / (m + 1);
+ 
+ 	return rate;
+ }
+diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+index 02e1a43..d2d0efa 100644
+--- a/drivers/clk/sunxi/clk-factors.h
++++ b/drivers/clk/sunxi/clk-factors.h
+@@ -15,6 +15,7 @@ struct clk_factors_config {
+ 	u8 mwidth;
+ 	u8 pshift;
+ 	u8 pwidth;
++	u8 n_start;
  };
  
- static const struct div_data sun4i_axi_data __initconst = {
-@@ -704,10 +705,10 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
- 
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
--	clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
--				   reg, data->shift, data->width,
--				   data->pow ? CLK_DIVIDER_POWER_OF_TWO : 0,
--				   &clk_lock);
-+	clk = clk_register_divider_table(NULL, clk_name, clk_parent, 0,
-+					 reg, data->shift, data->width,
-+					 data->pow ? CLK_DIVIDER_POWER_OF_TWO : 0,
-+					 data->table, &clk_lock);
- 	if (clk) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		clk_register_clkdev(clk, clk_name, NULL);
+ struct clk_factors {
 -- 
 2.0.0
