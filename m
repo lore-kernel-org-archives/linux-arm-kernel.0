@@ -1,105 +1,34 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 26 Jun 2014 12:40:31 +0530
-Subject: [PATCH V4 13/16] irqchip: crossbar: Introduce ti,
- max-crossbar-sources to identify valid crossbar mapping
+Date: Thu, 26 Jun 2014 12:40:29 +0530
+Subject: [PATCH V4 11/16] irqchip: crossbar: Set cb pointer to null in case of
+ error
 In-Reply-To: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
 References: <1403766634-18543-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1403766634-18543-14-git-send-email-r.sricharan@ti.com>
+Message-ID: <1403766634-18543-12-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+If crossbar_of_init returns with a error, then set the cb pointer
+to null.
 
-Currently we attempt to map any crossbar value to an IRQ, however,
-this is not correct from hardware perspective. There is a max crossbar
-event number upto which hardware supports. So describe the same in
-device tree using 'ti,max-crossbar-sources' property and use it to
-validate requests.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- .../devicetree/bindings/arm/omap/crossbar.txt      |    2 ++
- drivers/irqchip/irq-crossbar.c                     |   21 ++++++++++++++++++--
- 2 files changed, 21 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 5f45c78..6923531 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -10,6 +10,7 @@ Required properties:
- - compatible : Should be "ti,irq-crossbar"
- - reg: Base address and the size of the crossbar registers.
- - ti,max-irqs: Total number of irqs available at the interrupt controller.
-+- ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
- - ti,reg-size: Size of a individual register in bytes. Every individual
- 	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
- - ti,irqs-reserved: List of the reserved irq lines that are not muxed using
-@@ -30,6 +31,7 @@ Examples:
- 			compatible = "ti,irq-crossbar";
- 			reg = <0x4a002a48 0x130>;
- 			ti,max-irqs = <160>;
-+			ti,max-crossbar-sources = <MAX_SOURCES>;
- 			ti,reg-size = <2>;
- 			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
- 			ti,irqs-skip = <10 133 139 140>;
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 518d712..c9f068c 100644
+index afc35fd..a8c6156 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -26,6 +26,7 @@
-  * struct crossbar_device - crossbar device description
-  * @int_max: maximum number of supported interrupts
-  * @safe_map: safe default value to initialize the crossbar
-+ * @max_crossbar_sources: Maximum number of crossbar sources
-  * @irq_map: array of interrupts to crossbar number mapping
-  * @crossbar_base: crossbar base address
-  * @register_offsets: offsets for each irq number
-@@ -34,6 +35,7 @@
- struct crossbar_device {
- 	uint int_max;
- 	uint safe_map;
-+	uint max_crossbar_sources;
- 	uint *irq_map;
- 	void __iomem *crossbar_base;
- 	int *register_offsets;
-@@ -117,12 +119,19 @@ static int crossbar_domain_xlate(struct irq_domain *d,
- 				 unsigned int *out_type)
- {
- 	int ret;
-+	int req_num = intspec[1];
- 
--	ret = get_prev_map_irq(intspec[1]);
-+	if (req_num >= cb->max_crossbar_sources) {
-+		pr_err("%s: requested crossbar number %d > max %d\n",
-+		       __func__, req_num, cb->max_crossbar_sources);
-+		return -EINVAL;
-+	}
+@@ -250,6 +250,8 @@ err_base:
+ 	iounmap(cb->crossbar_base);
+ err_cb:
+ 	kfree(cb);
 +
-+	ret = get_prev_map_irq(req_num);
- 	if (ret >= 0)
- 		goto found;
++	cb = NULL;
+ 	return ret;
+ }
  
--	ret = allocate_free_irq(intspec[1]);
-+	ret = allocate_free_irq(req_num);
- 
- 	if (ret < 0)
- 		return ret;
-@@ -153,6 +162,14 @@ static int __init crossbar_of_init(struct device_node *node)
- 	if (!cb->crossbar_base)
- 		goto err_cb;
- 
-+	of_property_read_u32(node, "ti,max-crossbar-sources",
-+			     &cb->max_crossbar_sources);
-+	if (!cb->max_crossbar_sources) {
-+		pr_err("missing 'ti,max-crossbar-sources' property\n");
-+		ret = -EINVAL;
-+		goto err_base;
-+	}
-+
- 	of_property_read_u32(node, "ti,max-irqs", &max);
- 	if (!max) {
- 		pr_err("missing 'ti,max-irqs' property\n");
 -- 
 1.7.9.5
