@@ -1,24 +1,22 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 25 Jun 2014 22:55:04 -0300
-Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
-In-Reply-To: <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
-References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
- <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
-Message-ID: <CAOMZO5Cgh61wsZNPjO9JkEr0EwJWeF5A0rN0-yEg32HDkPsguA@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 26 Jun 2014 11:33:30 +0900
+Subject: [PATCH 1/2] ARM: firmware: Introduce suspend and resume operations
+In-Reply-To: <1403713114-18923-2-git-send-email-t.figa@samsung.com>
+References: <1403713114-18923-1-git-send-email-t.figa@samsung.com>
+ <1403713114-18923-2-git-send-email-t.figa@samsung.com>
+Message-ID: <53AB867A.901@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 10:23 PM, Fabio Estevam <festevam@gmail.com> wrote:
-
-> With this patch applied I get a flood of these messages:
+On 06/26/2014 01:18 AM, Tomasz Figa wrote:
+> This patch extends the firmware_ops structure with two new callbacks:
+> .suspend() and .resume(). The former is intended to ask the firmware to
+> save all its volatile state and suspend the system, without returning
+> back to the kernel in between. The latter is to be called early by
+> very low level platform suspend code after waking up to restore low
+> level hardware state, which can't be restored in non-secure mode.
 >
-> cpu cpu0: failed to scale vddpu up: -22
-> cpufreq: __target_index: Failed to change cpu frequency: -22
-> cpu cpu0: failed to scale vddpu up: -22
-> cpufreq: __target_index: Failed to change cpu frequency: -22
-> cpu cpu0: failed to scale vddpu up: -22
-> cpufreq: __target_index: Failed to change cpu frequency: -22
->
-> Any suggestions?
+> While at it, outdated version of the structure is removed from the
+> documentation and replaced with a reference to the header file.
 
-Ok, I managed to fix it. Will send the patch soon.
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
