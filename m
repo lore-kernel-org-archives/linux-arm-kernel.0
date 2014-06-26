@@ -1,162 +1,99 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 26 Jun 2014 09:51:14 -0700
-Subject: [PATCH V7 1/6] power: reset: Add generic SYSCON register mapped
- reset
-In-Reply-To: <CAGb2v65mGXDGb8Y045kehKufpMZWnfBm4dBJarJeOa8j-3g0RQ@mail.gmail.com>
-References: <1403737406-6474-1-git-send-email-fkan@apm.com>
- <1403737406-6474-2-git-send-email-fkan@apm.com>
- <CAGb2v65mGXDGb8Y045kehKufpMZWnfBm4dBJarJeOa8j-3g0RQ@mail.gmail.com>
-Message-ID: <CAL85gmCOzaT+dJf9e8Uj-w3v1nq8Qjg-EXfWDN5kdrU2k=kHJQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jun 2014 17:55:05 +0100
+Subject: [PATCH v5 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
+ support
+In-Reply-To: <1403729520.11749.64.camel@smoke>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403705421-17597-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403729520.11749.64.camel@smoke>
+Message-ID: <20140626165505.GD27364@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 6:38 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Thu, Jun 26, 2014 at 7:03 AM, Feng Kan <fkan@apm.com> wrote:
->> Add a generic SYSCON register mapped reset mechanism.
->>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->>  drivers/power/reset/Kconfig         |  6 +++
->>  drivers/power/reset/Makefile        |  1 +
->>  drivers/power/reset/syscon-reboot.c | 91 +++++++++++++++++++++++++++++++++++++
->>  3 files changed, 98 insertions(+)
->>  create mode 100644 drivers/power/reset/syscon-reboot.c
->>
->> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
->> index bdcf517..7035236 100644
->> --- a/drivers/power/reset/Kconfig
->> +++ b/drivers/power/reset/Kconfig
->> @@ -80,3 +80,9 @@ config POWER_RESET_KEYSTONE
->>         help
->>           Reboot support for the KEYSTONE SoCs.
->>
->> +config POWER_RESET_SYSCON
->> +       bool "Generic SYSCON regmap reset driver"
->> +       depends on ARCH_XGENE
->
-> If this is supposed to be generic, why are you depending on
-> a certain platform?
+Hi Geoff,
 
-Yes, the problem was that it was breaking the x86 build.
+On Wed, Jun 25, 2014 at 09:52:00PM +0100, Geoff Levand wrote:
+> Hi Lorenzo,
+> 
+> On Wed, 2014-06-25 at 15:10 +0100, Lorenzo Pieralisi wrote:
+> > diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> 
+> > +	/*
+> > +	 * This is belt-and-braces: make sure that if the idle
+> > +	 * specified protocol is psci, the cpu_ops have been
+> > +	 * initialized to psci operations. Anything else is
+> > +	 * a recipe for mayhem.
+> > +	 */
+> > +	for_each_cpu(cpu, drv->cpumask) {
+> > +		cpu_ops_ptr = cpu_ops[cpu];
+> > +		if (WARN_ON(!cpu_ops_ptr || strcmp(cpu_ops_ptr->name, "psci")))
+> > +			return -EOPNOTSUPP;
+> > +	}
+> 
+> I'm not sure how drv->cpumask is setup, but if a system has mixed enable
+> methods, say some cpus 'spin-table' and some 'psci', will this give a
+> false error?
 
->
->
-> ChenYu
->
->> +       depends on POWER_RESET && MFD_SYSCON
->> +       help
->> +         Reboot support for generic SYSCON mapped register reset.
->> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
->> index dde2e8b..b1b5ab3 100644
->> --- a/drivers/power/reset/Makefile
->> +++ b/drivers/power/reset/Makefile
->> @@ -8,3 +8,4 @@ obj-$(CONFIG_POWER_RESET_SUN6I) += sun6i-reboot.o
->>  obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
->>  obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
->>  obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
->> +obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
->> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
->> new file mode 100644
->> index 0000000..9c15ba5
->> --- /dev/null
->> +++ b/drivers/power/reset/syscon-reboot.c
->> @@ -0,0 +1,91 @@
->> +/*
->> + * Generic Syscon Reboot Driver
->> + *
->> + * Copyright (c) 2013, Applied Micro Circuits Corporation
->> + * Author: Feng Kan <fkan@apm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +#include <linux/io.h>
->> +#include <linux/of_device.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/stat.h>
->> +#include <linux/slab.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/regmap.h>
->> +#include <linux/reboot.h>
->> +#include <asm/system_misc.h>
->> +
->> +struct syscon_reboot_context {
->> +       struct regmap *map;
->> +       u32 offset;
->> +       u32 mask;
->> +};
->> +
->> +static struct syscon_reboot_context *syscon_reboot_ctx;
->> +
->> +static void syscon_restart(enum reboot_mode reboot_mode, const char *cmd)
->> +{
->> +       struct syscon_reboot_context *ctx = syscon_reboot_ctx;
->> +       unsigned long timeout;
->> +
->> +       /* Issue the reboot */
->> +       if (ctx->map)
->> +               regmap_write(ctx->map, ctx->offset, ctx->mask);
->> +
->> +       timeout = jiffies + HZ;
->> +       while (time_before(jiffies, timeout))
->> +               cpu_relax();
->> +
->> +       pr_emerg("Unable to restart system\n");
->> +}
->> +
->> +static int syscon_reboot_probe(struct platform_device *pdev)
->> +{
->> +       struct syscon_reboot_context *ctx;
->> +       struct device *dev = &pdev->dev;
->> +
->> +       ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
->> +       if (!ctx) {
->> +               dev_err(&pdev->dev, "out of memory for context\n");
->> +               return -ENOMEM;
->> +       }
->> +
->> +       ctx->map = syscon_regmap_lookup_by_phandle(dev->of_node, "regmap");
->> +       if (IS_ERR(ctx->map))
->> +               return PTR_ERR(ctx->map);
->> +
->> +       if (of_property_read_u32(pdev->dev.of_node, "offset", &ctx->offset))
->> +               return -EINVAL;
->> +
->> +       if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
->> +               return -EINVAL;
->> +
->> +       arm_pm_restart = syscon_restart;
->> +       syscon_reboot_ctx = ctx;
->> +
->> +       return 0;
->> +}
->> +
->> +static struct of_device_id syscon_reboot_of_match[] = {
->> +       { .compatible = "syscon-reboot" },
->> +       {}
->> +};
->> +
->> +static struct platform_driver syscon_reboot_driver = {
->> +       .probe = syscon_reboot_probe,
->> +       .driver = {
->> +               .name = "syscon-reboot",
->> +               .of_match_table = syscon_reboot_of_match,
->> +       },
->> +};
->> +module_platform_driver(syscon_reboot_driver);
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I do not think that's a false error. If the idle states specify an
+entry-method == psci, and cpu_ops for some cpus are not set to PSCI,
+obviously because the enable-method specified that, that's a firmware bug.
+
+> If drv->cpumask should only include 'psci' cpus, then should this be a
+> BUG()?
+
+Ok, if we got here, it is because the idle-states entry-method was set
+to PSCI. Now, if any of the CPUs in the driver mask has a cpu_ops
+pointer != PSCI, we have a problem and we should warn on that. I do
+not think that justifies a BUG_ON, but that's one of those things, it is
+debatable.
+
+Question is whether the check should also be carried out at cpu_ops
+initialization (ie to check for mixed cpu_ops), for certain if the
+idle states entry-method is PSCI and cpu_ops != PSCI we should
+WARN/BUG on that. Or embed this idle state parameters initialization at
+cpu_ops init (see other thread you started) so that we can kill two
+birds with one stone.
+
+> > +
+> > +	psci_states = kcalloc(drv->state_count, sizeof(*psci_states),
+> > +			      GFP_KERNEL);
+> > +
+> > +	if (!psci_states) {
+> > +		pr_warn("psci idle state allocation failed\n");
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	for_each_cpu(cpu, drv->cpumask) {
+> > +		if (per_cpu(psci_power_state, cpu)) {
+> > +			pr_warn("idle states already initialized on cpu %u\n",
+> > +				cpu);
+> 
+> This seems like an implementation problem, if so, shouldn't this be
+> pr_debug()?
+
+Maybe, I will give it some thought.
+
+> >  #endif
+> >  
+> > +#ifdef CONFIG_ARM64_CPU_SUSPEND
+> > +static int cpu_psci_cpu_suspend(unsigned long index)
+> > +{
+> > +	struct psci_power_state *state = __get_cpu_var(psci_power_state);
+> > +
+> > +	if (!state)
+> > +		return -EOPNOTSUPP;
+> > +
+> > +	return psci_ops.cpu_suspend(state[index], virt_to_phys(cpu_resume));
+> > +}
+> > +#endif
+> 
+> Why not put a __maybe_unused attribute on cpu_psci_cpu_suspend() and
+> remove the preprocessor conditional.  That way this code will always be
+> compiled, and with therefor always get a build test.  The linker should
+> strip out the unused code when CONFIG_ARM64_CPU_SUSPEND=n and the code
+> below is not compiled. 
+
+It can make sense, yes.
+
+Thanks,
+Lorenzo
