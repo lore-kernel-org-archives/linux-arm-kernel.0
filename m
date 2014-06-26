@@ -1,30 +1,58 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 26 Jun 2014 09:37:40 +0200
-Subject: [PATCH] clk: define and export __clk_get_debug for providers
-In-Reply-To: <20140625182349.32686.25931@quantum>
-References: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
- <44039675.8s16pHQIVH@wuerfel> <20140625182349.32686.25931@quantum>
-Message-ID: <CAAObsKDVrXRgO1e2=SorGiNUMhGPCCUUPtsjDfnST9gFN4=qTQ@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 26 Jun 2014 09:41:37 +0200
+Subject: [PATCH] ARM: dts: add hdmi regulators for exynos5800 based
+ peach-pi board
+In-Reply-To: <1403760382-12533-1-git-send-email-rahul.sharma@samsung.com>
+References: <1403760382-12533-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CABxcv=ncVTiFX+YYguyk0XJDC6WTYnvJeivzf-4wOLwETmzK9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2014 20:23, Mike Turquette <mturquette@linaro.org> wrote:
+Hello Rahul,
+
+On Thu, Jun 26, 2014 at 7:26 AM, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> Adding regulators for HDMI for exynos5800 based Peach-pi board.
 >
-> Peter,
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> ---
+> Based on Kukjin's for-next branch.
+> Depends on:
+> 1) PMIC addition to Peach-pi: http://www.spinics.net/lists/linux-samsung-soc/msg33166.html
+> 2) tps65090 addition to Peach-pi: http://www.spinics.net/lists/linux-samsung-soc/msg32464.html
 >
-> Just FYI, I'm trying to reverse the trend of prepending double
-> underscores for functions that are used by clock providers. That stuff
-> started out small and sort of grew out of control ;-)
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts |    4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index 2c2c137..30d1a26 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -127,6 +127,10 @@
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&hdmi_hpd_irq>;
+>         ddc = <&i2c_2>;
+> +       hdmi-en-supply = <&tps65090_fet7>;
+> +       vdd-supply = <&ldo8_reg>;
+> +       vdd_osc-supply = <&ldo10_reg>;
+> +       vdd_pll-supply = <&ldo8_reg>;
 
-I'm looking at rebasing Rabin's patches for per-user clks, and I have
-had to add a few variants for providers, so they can be called with
-clk_core instead. Have been prepending underscores for those internal
-variants, but in some cases I had to also append a _internal suffix
-because there were already variants without locking.
+You had a line break between the ddc and the supplies on your patch
+for Peach pit, can you please add it here as well?
 
-What convention were you thinking of for distinguishing provider-only
-variants for e.g. clk_set_rate?
+I think that is more readable and also we may later factor out common
+DTS fragments on these two boards in .dtsi include files so is better
+to keep the diff as small as possible.
 
-Regards,
+>  };
+>
+>  &hsi2c_7 {
+> --
+> 1.7.9.5
+>
 
-Tomeu
+With that trivial change:
+
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
