@@ -1,36 +1,52 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 26 Jun 2014 14:02:26 +0530
-Subject: [PATCH V4 2/2] arm: dts: dra7: add crossbar device binding
-In-Reply-To: <20140626074417.GF28884@atomide.com>
-References: <1403767532-19290-1-git-send-email-r.sricharan@ti.com>
- <1403767532-19290-3-git-send-email-r.sricharan@ti.com>
- <20140626074417.GF28884@atomide.com>
-Message-ID: <53ABDA9A.8000108@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 26 Jun 2014 10:41:25 +0200
+Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
+In-Reply-To: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+Message-ID: <1403772085.4254.1.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Fabio,
 
-On Thursday 26 June 2014 01:14 PM, Tony Lindgren wrote:
-> * Sricharan R <r.sricharan@ti.com> [140626 00:29]:
->> From: R Sricharan <r.sricharan@ti.com>
->>
->> There is a IRQ crossbar device in the soc, which
->> maps the irq requests from the peripherals to the
->> mpu interrupt controller's inputs. The Peripheral irq
->> requests are connected to only one crossbar
->> input and the output of the crossbar is connected to only one
->> controller's input line. The crossbar device is used to map
->> a peripheral input to a free mpu's interrupt controller line.
->>
->> Here, adding a new crossbar device node and replacing all the peripheral
->> interrupt numbers with its fixed crossbar input lines.
+Am Dienstag, den 24.06.2014, 16:18 -0300 schrieb Fabio Estevam:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> I think these two patches need to be a single patch to avoid
-> breaking booting for git bisect inbetween these patches?
-  This does not cause booting issues. irq_desc gets allocated linearly,
-   but that does not create boot issues.
+> When the mx6 PCI conctroller is initialized in the bootloader we see a kernel 
+> hang inside imx6_add_pcie_port().
+> 
+> Adding a 30ms delay allows the kernel to boot.
+> 
+> Suggested-by: David M?ller <d.mueller@elsoft.ch>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> I am happy to get feedback on how to properly fix this.
+> 
+> Thanks
+> 
+>  drivers/pci/host/pci-imx6.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index a568efa..669f771 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -507,6 +507,8 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+>  	pp->root_bus_nr = -1;
+>  	pp->ops = &imx6_pcie_host_ops;
+>  
+> +	usleep_range(25000, 30000);
+> +
+>  	ret = dw_pcie_host_init(pp);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "failed to initialize host\n");
+
+I would suspect the issue to be somewhere in imx6_pcie_host_init(). Can
+you move the delay there (and to different positions in this function)
+to narrow down where the hang happens?
 
 Regards,
- Sricharan
-  
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
