@@ -1,52 +1,80 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Jun 2014 16:52:30 +0200
-Subject: [PATCH] ARM: mvebu: Enable SCU Speculative linefills to L2 for
- Armada 375/38x
-In-Reply-To: <1403790178-23902-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1403790178-23902-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140626165230.374f285e@free-electrons.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 26 Jun 2014 23:53:20 +0900
+Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
+In-Reply-To: <CACP_E+KECMyusuZd6hpzthL-RpfUOJpWh0EABf1DGAeaXc00aA@mail.gmail.com>
+References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
+ <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
+ <20140624100220.GK32514@n2100.arm.linux.org.uk>
+ <53A953E6.2030503@nvidia.com> <53A95910.20104@nvidia.com>
+ <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
+ <53A96EC5.3030701@canonical.com>
+ <1403616338.4230.8.camel@weser.hi.pengutronix.de>
+ <CACP_E+KECMyusuZd6hpzthL-RpfUOJpWh0EABf1DGAeaXc00aA@mail.gmail.com>
+Message-ID: <CAAVeFuLU04rk1DWMhVJV=ktVCpq4js38p1ipCr1jh1x72b=GZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Wed, Jun 25, 2014 at 1:00 PM, St?phane Marchesin
+<stephane.marchesin@gmail.com> wrote:
+> On Tue, Jun 24, 2014 at 6:25 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+>> Am Dienstag, den 24.06.2014, 14:27 +0200 schrieb Maarten Lankhorst:
+>>> op 24-06-14 14:23, Alexandre Courbot schreef:
+>>> > On Tue, Jun 24, 2014 at 7:55 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>>> >> On 06/24/2014 07:33 PM, Alexandre Courbot wrote:
+>>> >>> On 06/24/2014 07:02 PM, Russell King - ARM Linux wrote:
+>>> >>>> On Tue, Jun 24, 2014 at 06:54:26PM +0900, Alexandre Courbot wrote:
+>>> >>>>> From: Lucas Stach <dev@lynxeye.de>
+>>> >>>>>
+>>> >>>>> On architectures for which access to GPU memory is non-coherent,
+>>> >>>>> caches need to be flushed and invalidated explicitly at the
+>>> >>>>> appropriate places. Introduce two small helpers to make things
+>>> >>>>> easy for TTM-based drivers.
+>>> >>>>
+>>> >>>> Have you run this with DMA API debugging enabled?  I suspect you haven't,
+>>> >>>> and I recommend that you do.
+>>> >>>
+>>> >>> # cat /sys/kernel/debug/dma-api/error_count
+>>> >>> 162621
+>>> >>>
+>>> >>> (??????? ???)
+>>> >>
+>>> >> *puts table back on its feet*
+>>> >>
+>>> >> So, yeah - TTM memory is not allocated using the DMA API, hence we cannot
+>>> >> use the DMA API to sync it. Thanks Russell for pointing it out.
+>>> >>
+>>> >> The only alternative I see here is to flush the CPU caches when syncing for
+>>> >> the device, and invalidate them for the other direction. Of course if the
+>>> >> device has caches on its side as well the opposite operation must also be
+>>> >> done for it. Guess the only way is to handle it all by ourselves here. :/
+>>> > ... and it really sucks. Basically if we cannot use the DMA API here
+>>> > we will lose the convenience of having a portable API that does just
+>>> > the right thing for the underlying platform. Without it we would have
+>>> > to duplicate arm_iommu_sync_single_for_cpu/device() and we would only
+>>> > have support for ARM.
+>>> >
+>>> > The usage of the DMA API that we are doing might be illegal, but in
+>>> > essence it does exactly what we need - at least for ARM. What are the
+>>> > alternatives?
+>>> Convert TTM to use the dma api? :-)
+>>
+>> Actually TTM already has a page alloc backend using the DMA API. It's
+>> just not used for the standard case right now.
+>>
+>> I would argue that we should just use this page allocator (which has the
+>> side effect of getting pages from CMA if available -> you are actually
+>> free to change the caching) and do away with the other allocator in the
+>> ARM case.
+>
+> CMA comes with its own set of (severe) limitations though, in
+> particular it's not possible to map arbitrary CPU pages into the GPU
+> without incurring a copy, you add arbitrary memory limits etc. Overall
+> that's not really a good pick for the long term...
 
-On Thu, 26 Jun 2014 15:42:58 +0200, Gregory CLEMENT wrote:
-
-> +#define SCU_CTRL		0x00
-> +#define SCU_SPEC_LINEFILL_EN	    BIT(3)
-> +
-> +
->  /*
->   * Enables the SCU when available. Obviously, this is only useful on
->   * Cortex-A based SOCs, not on PJ4B based ones.
-> @@ -44,7 +48,15 @@ static void __init mvebu_scu_enable(void)
->  	struct device_node *np =
->  		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
->  	if (np) {
-> +		u32 scu_ctrl;
->  		scu_base = of_iomap(np, 0);
-> +		/* already enabled? */
-> +		scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
-
-Unless the SCU uses the native endianess of the system, and therefore
-switches to big endian when the system is running big endian, using
-__raw_{readl,writel} is wrong here, and will break big endian
-configurations.
-
-> +		if (!(scu_ctrl & 1)) {
-
-What is this bit 0 you're checking here? How does it relate to the bit
-3 you're setting when bit 0 is not set?
-
-A broader question is: if this feature is generic to all Cortex-A9, why
-not offer a function in smp_scu.c to enable it? It seems weird to have
-the offset and bit definitions for something as generic as the SCU
-present deep into a Marvell-specific file.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+We don't plan to rely on CMA for too long. IOMMU support is on the way
+and should make our life easier, although no matter the source of
+memory, we will still have the issue of the lowmem mappings. So far it
+sounds like CMA is the only way to "undo" them, so in the end it may
+come down to whether or not the multi-mapping contraint applies to
+TK1. I will tap into our internal sources of knowledge to try and
+figure this one out.
