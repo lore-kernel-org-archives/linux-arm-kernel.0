@@ -1,51 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 26 Jun 2014 15:11:09 -0700
-Subject: [PATCH] clk: define and export __clk_get_debug for providers
-In-Reply-To: <CAAObsKDVrXRgO1e2=SorGiNUMhGPCCUUPtsjDfnST9gFN4=qTQ@mail.gmail.com>
-References: <1403713591-17179-1-git-send-email-pdeschrijver@nvidia.com>
- <44039675.8s16pHQIVH@wuerfel> <20140625182349.32686.25931@quantum>
- <CAAObsKDVrXRgO1e2=SorGiNUMhGPCCUUPtsjDfnST9gFN4=qTQ@mail.gmail.com>
-Message-ID: <CAPtuhTgp2Ubr-9CiVGeJjG91J765dYKcY3gF+i+o1MTf2ELKPA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 27 Jun 2014 00:43:24 +0200
+Subject: [PATCH 1/5] ARM: smp_scu: Used defined value instead of literal
+ constant
+In-Reply-To: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403822608-31158-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 12:37 AM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> On 25 June 2014 20:23, Mike Turquette <mturquette@linaro.org> wrote:
->>
->> Peter,
->>
->> Just FYI, I'm trying to reverse the trend of prepending double
->> underscores for functions that are used by clock providers. That stuff
->> started out small and sort of grew out of control ;-)
->
-> I'm looking at rebasing Rabin's patches for per-user clks, and I have
-> had to add a few variants for providers, so they can be called with
-> clk_core instead. Have been prepending underscores for those internal
-> variants, but in some cases I had to also append a _internal suffix
-> because there were already variants without locking.
->
-> What convention were you thinking of for distinguishing provider-only
-> variants for e.g. clk_set_rate?
+The first bit of the SCU control register is actually the enable
+it. So let's name it instead of using literal constant.
 
-Hmm. Now we need a convention. Damn. ;-)
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/kernel/smp_scu.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-I'm open to suggestions. I think prepending a single underscore makes
-great sense for a lock-free inner function. And some number of
-underscores (1 or 2) makes sense for static functions not exposed to
-clock providers. I kind of like using 2 underscores for the static
-functions so that it is easier to differentiate them.
-
-For any new functions you create with unique names that are exposed to
-clock providers, do not prepend any underscore at all. It's just
-another public function in clk-provider.h.
-
-If any taste makers out there have suggestions I am happy to listen.
-
-Regards,
-Mike
-
->
-> Regards,
->
-> Tomeu
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 1aafa0d785eb..cfea41b41ad0 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -17,6 +17,7 @@
+ #include <asm/cputype.h>
+ 
+ #define SCU_CTRL		0x00
++#define SCU_CTRL_ENABLE		    BIT(1)
+ #define SCU_CONFIG		0x04
+ #define SCU_CPU_STATUS		0x08
+ #define SCU_INVALIDATE		0x0c
+@@ -43,17 +44,18 @@ void scu_enable(void __iomem *scu_base)
+ 	/* Cortex-A9 only */
+ 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
+ 		scu_ctrl = readl_relaxed(scu_base + 0x30);
+-		if (!(scu_ctrl & 1))
+-			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
++		if (!(scu_ctrl & SCU_CTRL_ENABLE))
++			writel_relaxed(scu_ctrl | SCU_CTRL_ENABLE,
++				scu_base + 0x30);
+ 	}
+ #endif
+ 
+ 	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
+ 	/* already enabled? */
+-	if (scu_ctrl & 1)
++	if (scu_ctrl & SCU_CTRL_ENABLE)
+ 		return;
+ 
+-	scu_ctrl |= 1;
++	scu_ctrl |= SCU_CTRL_ENABLE;
+ 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 
+ 	/*
+-- 
+1.8.1.2
