@@ -1,115 +1,52 @@
-From: trini@ti.com (Tom Rini)
-Date: Thu, 26 Jun 2014 09:06:13 -0400
-Subject: Unifying cape overlays into boot .dtb for BeagleBoard.org boards
-In-Reply-To: <20140626075039.GG28884@atomide.com>
-References: <CA+T6QP==raXdWz9mezK3JxSvZjWhUZZ7aKv4CpCr0SbdaCMgDQ@mail.gmail.com>
- <CA+T6QP=jqdKij3bg3qZKT8GAKTKP94XtDWR+rcJWnDME5ZNmUg@mail.gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EAF59A7@DBDE04.ent.ti.com>
- <CA+T6QP=Q0db33NU1g=9QrOUqQhLfKg=UiHVSn=Loog_JFxtP1w@mail.gmail.com>
- <20980858CB6D3A4BAE95CA194937D5E73EAF5DD0@DBDE04.ent.ti.com>
- <20140626075039.GG28884@atomide.com>
-Message-ID: <53AC1AC5.5000103@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jun 2014 14:11:05 +0100
+Subject: [PATCH] arm64: do not force irq affinity setting
+In-Reply-To: <1403784024.20406.4.camel@pgaikwad-dt2>
+References: <1403765395-16978-1-git-send-email-pgaikwad@nvidia.com>
+ <20140626102055.GD376@arm.com>
+ <1403784024.20406.4.camel@pgaikwad-dt2>
+Message-ID: <20140626131105.GF376@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2014 03:50 AM, Tony Lindgren wrote:
-> * Gupta, Pekon <pekon@ti.com> [140618 01:52]:
->> Hi,
->>
->>> From: Jason Kridner [mailto:jkridner at gmail.com]
->>>> On Tue, Jun 17, 2014 at 3:11 AM, Gupta, Pekon <pekon@ti.com> wrote:
->>>>> From: Jason Kridner
->> [...]
->>>>>> * The devicetree sources, including the primary boot .dts files, will
->>>>>> eventually be removed from the kernel source tree. I'm not too sure if
->>>>>> and when it'll really happen, but starting up a project to maintain
->>>>>> the definitive beagleboard.org board devicetree files outside the
->>>>>> kernel seems to make sense. Given the interdependency of the boot .dtb
->>>>>> and the overlay .dtbo files, combining them into a single repository
->>>>>> where every distribution can pick them up seems like a natural and
->>>>>> obvious choice. There are of course some dependencies on kernel
->>>>>> versions, but I believe most of those have settled out by now and we
->>>>>> should be OK moving forward.
->>>>
->>>> +1
->>>> Yes, moving cape DTS out of kernel tree should help developers.
->>>> There are quite a few cape patches floating in mail-lists, but as cape
->>>> DTS is still not accepted in mainline so they get lost and forgotten.
->>>> So one place for collecting all this is a good idea.
->>>>
->>>>
->>>> However, somehow the universal I/O DTS looked seemed complicated:
->>>> (1)
->>>> All capes work standalone, but due to share pin-mux some cape
->>>> combinations cannot be used simultaneously. But most users of
->>>> BeagleBone are already well-versed with DT and kernel infrastructure,
->>>> so they need not be spoon fed to get a out-of-box working solution
->>>> for each combination. If there is proper documentation is available
->>>> about compatibility of capes with each other, then users will figure
->>>> out themselves.
->>>
->>> I think you have too much confidence in users. If this doesn't hurt
->>> power users, then why is it bad have an option to spoon feed? This
->>> doesn't prevent anyone with knowledge of DT from doing their own
->>> thing.
->>>
->> Fair enough.
->> But plz give a try to u-boot alternative below. It works at my end.
->>
->>>>
->>>> (2)
->>>> Also, there was a talk of enabling and disabling DT fragments via u-boot.
->>>> That should also be explored instead of complicating cape DTS.
->>>
->>> Link? Relevance?
->>>
->> we can modify DT from u-boot itself [1].
->> Example:  "MMC2" pin-mux conflicts with "NAND" and "NOR" capes.
->> But using following sequence of commands, you can modify DTB via
->> u-boot and make NAND cape work _without_any_hack_ in patch [2].
->>
->> /* load DTB */
->> u-boot> tftp 0x81000000 am335x-boneblack.dtb
->> u-boot> fdt addr 0x81000000
->> /* disable MMC2 node */
->> u-boot> fdt list /ocp/mmc at 481d8000
->> u-boot> fdt set  /ocp/mmc at 481d8000 status \d\i\s\a\b\l\e\d
->> u-boot> fdt list /ocp/mmc at 481d8000 status
->> /* enable GPMC node */
->> u-boot> fdt list /ocp/gpmc
->> u-boot> fdt set  /ocp/gpmc status \o\k\a\y
->> u-boot> fdt list /ocp/gpmc status
->> /* enable ELM node */
->> u-boot> fdt list /ocp/elm
->> u-boot> fdt set  /ocp/elm status \o\k\a\y
->> u-boot> fdt list /ocp/elm status
->> /* boot uImage */
->> tftp 0x82000000 uImage
->> bootm 0x82000000 - 0x81000000
->>
->> Note: "fdt set" command does not accept string literals
->> as binding values, it internally converts them to string, so
->> escape sequenced characters were used here..
->> "okay" == \o\k\a\y
->> "disabled" == \d\i\s\a\b\l\e\d"
->>
->>
->> Hope above solves the pre-requisite because of which 'Tony Lindgren <tony@atomide.com>'
->> was unable to accept cape related DTS into his tree [3]
+On Thu, Jun 26, 2014 at 01:00:24PM +0100, Prashant Gaikwad wrote:
+> On Thu, 2014-06-26 at 15:50 +0530, Will Deacon wrote:
+> > On Thu, Jun 26, 2014 at 07:49:55AM +0100, Prashant Gaikwad wrote:
+> > > Unconditional copying cpu_online_mask to affinity
+> > > may result in migrating affinity to wrong CPU.
+> > 
+> > We have a bug, but I don't follow your reasoning.
+> > 
+> > > For example, IRQ 5 affinity mask contains CPU 4-7,
+> > 
+> > Ok, so d->affinity is 0xf0...
+> > 
+> > > it was affined to CPU4 and CPU 0-7 are online.
+> > 
+> > ...and cpu_online_mask is 0xff.
+> > 
+> > > Now if we hot-unplug CPU4 then with current
+> > > implementation affinity mask will contain
+> > > CPU 0-3,5-7 and IRQ 5 will be affined to CPU0.
+> > 
+> > cpumask_any_and(affinity, cpu_online_mask) will give return < nr_cpu_ids
+> > since there is an intersection of 0xf0. That means ret is false.
+> > 
+> > The bug is that we then do affinity = cpu_online_mask; unconditionally,
+> > but we *won't* do the cpumask_copy, since ret is false.
+> > 
 > 
-> Yes. If the capes are disabled by default we can have at
-> least some of them included in the mainline kernel and
-> enabled by the bootloader as needed. I'd like to hear back
-> from the u-boot people too on this approach naturally.
+> We do not copy but the affinity mask passed to irq_set_affinity function
+> is nothing but cpu_online_mask. So in GIC it will set affinity to CPU0.
+
+Exactly, but your proposed patch changed more than that.
+
+> > You can fix this by simply bringing the arm64 code into line with the arm
+> > code, which begs the question as to why this has to exist in the arch/
+> > backend at all!
 > 
-> And some things we still cannot merge if they overlap for
-> GPMC bindings for example. So we have to carefully check
-> the generated .dtb file with dtc -I dtb -O dts.
+> Where can we move this code?
 
-This sounds really problematic to me from an end-user horror point of
-view.  And fortunately 3.17 is going to have some level of overlay
-support so we can set this problem aside (and even treat the am335x gp
-evm "profileN" trees as overlays too).
+kernel/irq/migration.c?
 
--- 
-Tom
+Will
