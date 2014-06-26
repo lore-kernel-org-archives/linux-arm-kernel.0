@@ -1,130 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 26 Jun 2014 16:06:25 -0400 (EDT)
-Subject: [PATCH] ARM: EXYNOS: Restore the entry address setup code
- post-resume
-In-Reply-To: <CAM4voa=AYDkHG49EEnr0097Dw4eS__T95oDrhswcfHEzY=PTcw@mail.gmail.com>
-References: <1403780312-22885-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voa=AYDkHG49EEnr0097Dw4eS__T95oDrhswcfHEzY=PTcw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1406261550060.16842@knanqh.ubzr>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 26 Jun 2014 22:20:24 +0200
+Subject: [PATCH v3 3/7] irqchip: atmel-aic: add new atmel AIC driver
+In-Reply-To: <1403276487-8792-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1403276487-8792-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1403276487-8792-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <53AC8088.6020905@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jun 2014, Abhilash Kesavan wrote:
 
-> Hi,
-> 
-> On Thu, Jun 26, 2014 at 4:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> > Setup the mcpm entry address again on system resume as the
-> > iRAM contents are lost across an s2r cycle.
-> >
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > ---
-> > This has been tested after applying the Exynos5420 S2R support series
-> > along with Nicolas Pitre's boot cluster CCI enablement patches on Peach
-> > Pit.
-> >
-> >  arch/arm/mach-exynos/mcpm-exynos.c | 31 +++++++++++++++++++++----------
-> >  1 file changed, 21 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> > index 8c610e2..0bf734d 100644
-> > --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> > @@ -15,6 +15,7 @@
-> >  #include <linux/delay.h>
-> >  #include <linux/io.h>
-> >  #include <linux/of_address.h>
-> > +#include <linux/syscore_ops.h>
-> >
-> >  #include <asm/cputype.h>
-> >  #include <asm/cp15.h>
-> > @@ -26,6 +27,7 @@
-> >  #define EXYNOS5420_CPUS_PER_CLUSTER    4
-> >  #define EXYNOS5420_NR_CLUSTERS         2
-> >
-> > +static void __iomem *ns_sram_base_addr;
-> >  /*
-> >   * The common v7_exit_coherency_flush API could not be used because of the
-> >   * Erratum 799270 workaround. This macro is the same as the common one (in
-> > @@ -308,10 +310,26 @@ static const struct of_device_id exynos_dt_mcpm_match[] = {
-> >         {},
-> >  };
-> >
-> > +static void exynos_mcpm_setup_entry_point(void)
-> > +{
-> > +       /*
-> > +        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
-> > +        * as part of secondary_cpu_start().  Let's redirect it to the
-> > +        * mcpm_entry_point(). This is done during both secondary boot-up as
-> > +        * well as system resume.
-> > +        */
-> > +       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
-> > +       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
-> > +       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
-> > +}
-> > +
-> > +static struct syscore_ops exynos_mcpm_syscore_ops = {
-> > +       .resume = exynos_mcpm_setup_entry_point,
-> > +};
-> > +
-> >  static int __init exynos_mcpm_init(void)
-> >  {
-> >         struct device_node *node;
-> > -       void __iomem *ns_sram_base_addr;
-> >         int ret;
-> >
-> >         node = of_find_matching_node(NULL, exynos_dt_mcpm_match);
-> > @@ -357,16 +375,9 @@ static int __init exynos_mcpm_init(void)
-> >
-> >         pr_info("Exynos MCPM support installed\n");
-> >
-> > -       /*
-> > -        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
-> > -        * as part of secondary_cpu_start().  Let's redirect it to the
-> > -        * mcpm_entry_point().
-> > -        */
-> > -       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
-> > -       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
-> > -       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
-> > +       exynos_mcpm_setup_entry_point();
-> >
-> > -       iounmap(ns_sram_base_addr);
-> > +       register_syscore_ops(&exynos_mcpm_syscore_ops);
-> >
-> >         return ret;
-> >  }
-> 
-> This patch alone is not enough to bring the 8 cores back up post
-> resume on exynos5420, We need to enable the boot cluster snoops as
-> well.
-> 
-> Nicolas, if I add code to enable the boot cluster CCI in
-> mach-exynos/sleep.S, all 8 cores come up. However, if I use
-> mcpm_loopback as part of the newly added resume function to do the
-> same, I get a hang on resume.
-> Is there anything else that I need to take care of while doing this ?
+On 20/06/2014 17:01, Boris BREZILLON wrote:
+> Add new atmel AIC (Advanced Interrupt Controller) driver based on the
+> generic chip infrastructure.
+>
+> This driver is only compatible with dt enabled board and replaces the old
+> implementation found in arch/arm/mach-at91/irq.c.
+>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/irqchip/Kconfig         |   7 +
+>  drivers/irqchip/Makefile        |   1 +
+>  drivers/irqchip/irq-atmel-aic.c | 700 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 708 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-atmel-aic.c
+>
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index bbb746e..6a7ad81 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -30,6 +30,13 @@ config ARM_VIC_NR
+>  	  The maximum number of VICs available in the system, for
+>  	  power management.
+>  
+> +config ATMEL_AIC_IRQ
+> +	bool
+> +	select GENERIC_IRQ_CHIP
+> +	select IRQ_DOMAIN
+> +	select MULTI_IRQ_HANDLER
+> +	select SPARSE_IRQ
+> +
 
-No no no.
+I just though a bit about it and it might be better to split AIC and
+AIC5 support in 2 different drivers, because the AIC is only available
+on at91sam9/at91rm9200 SoCs and AIC5 only available on sama5 SoCs, and
+AFAICT there is no combination of both controller in a singler SoC.
 
-Forget about the MCPM loopback -- that's for boot time setup of the 
-booting cluster nothing else.
+Jason, Thomas, let me know if you think this worth the trouble, and if
+so, should I keep a common implementation (in irq-atmel-aic-common.c/.h)
+for the shared functions/structures.
 
-The snoops are enabled in a ***race free way*** by the low-level MCPM 
-code.  But of course you must call it upon resume.  Nothing else than 
-MCPM should ever play with the snoops enable/disable.  Certainly not 
-mach-exynos/sleep.S.
+Best Regards,
 
-You must tell your firmware to resume execution after suspend at 
-mcpm_entry_point.  Before suspending, you tell MCPM where it should 
-branch to after it is done with its resuming business by calling 
-mcpm_set_entry_vector(), passing the address for exynos_cpu_resume for 
-example.
+Boris
 
-And of course the CPU shutdown during idle has to go through MCPM too.
-
-When resumed, you also have to call mcpm_cpu_powered_up().
-
-See how it is done in cpuidle-big_little.c for example.
-
-
-Nicolas
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
