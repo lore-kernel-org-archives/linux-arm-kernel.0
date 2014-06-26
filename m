@@ -1,78 +1,112 @@
 From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Thu, 26 Jun 2014 16:42:12 +0530
-Subject: [PATCH v5 0/3] Adds PMU and S2R support for exynos5420
-Message-ID: <1403781135-6538-1-git-send-email-vikas.sajjan@samsung.com>
+Date: Thu, 26 Jun 2014 16:42:15 +0530
+Subject: [PATCH v5 3/3] clk: samsung: exynos5420: Setup clocks before system
+ suspend
+In-Reply-To: <1403781135-6538-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1403781135-6538-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <1403781135-6538-4-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rebased on
-1] Kukjin Kim's tree, for-next branch
-https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
-2] Pankaj Dubey's v5 PMU patchset
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg671625.html
+Prior to suspending the system, we need to ensure that certain
+clock source and gate registers are unmasked.
 
-changes since v4:
-	- Adressed comments from Tomasz figa and rebased on Pankaj Dubey's v5 PMU patchset
+while at it, add these clks to save/restore list also.
 
-changes since v3:
-Addressed the following comments from Pankaj Dubey, Bartlomiej Zolnierkiewicz,
-Tomasz Figa and Alim Akhtar:
-        - Moved EXYNOS5420_USE_STANDBY_WFI_ALL define to regs-pmu.h.
-        - Merged exynos5420_set_core_flag function into powerdown_conf.
-        - Removed XXTI_DURATION3 register setting.
-        - Updated the commit message and ordered the clock registers in clock
-          patch.
-        - Removed the code for SYS_DISP1_BLK_CFG handling.
-        - Modified SoC checks to A9 specific checks in PM code.
-        - Updated some comments in the code and added macros for register offsets.
-        - Fixed code which was changing pad retention code for older SoCs.
+Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos5420.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-changes since v2:
-        - Addressed comments from Tomasz figa
-        - rebased on Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
-        - dropped patch "ARM: dts: Add node for GPIO keys on SMDK5420",
-          will be sent separately.
-
-changes since v1:
-        - Addressed comments from Tomasz figa.
-        - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
-
-Tested on Kukjin Kim's tree, for-next branch +
-	1] http://www.spinics.net/lists/arm-kernel/msg341884.html
-	2] http://www.spinics.net/lists/linux-samsung-soc/msg32923.html
-	3] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33067.html
-on Exynos5420 based chromebook (peach-pit board).
-
-NOTE: After system resume we are enabling boot cluster CCI in exynos_cpu_resume
-in sleep.S.
-
-Below procedures were followed to test S2R:
-Procedure A:
-	1. make multi_v7_defconfig 
-	2  enable MCPM for 5420
-	3. enable S3C RTC
-	4. pass "no_console_suspend" in bootargs
-	5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
-Procedure B:
-	1. make exynos_defconfig 
-	2  enable MCPM for 5420
-	3  enable CONFIG_PL330_DMA
-	4. enable CONFIG_PM_RUNTIME
-	5. pass "no_console_suspend" in bootargs
-	6. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
-
-Abhilash Kesavan (2):
-  arm: exynos5: Add PMU support for 5420
-  arm: exynos5: Add Suspend-to-RAM support for 5420
-
-Vikas Sajjan (1):
-  clk: samsung: exynos5420: Setup clocks before system suspend
-
- arch/arm/mach-exynos/pm.c            |  150 ++++++++++++++++--
- arch/arm/mach-exynos/pmu.c           |  290 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h      |  229 +++++++++++++++++++++++++++
- drivers/clk/samsung/clk-exynos5420.c |   29 ++++
- 4 files changed, 682 insertions(+), 16 deletions(-)
-
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 9d7d7ee..7e87d7c 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -28,6 +28,7 @@
+ #define GATE_BUS_CPU		0x700
+ #define GATE_SCLK_CPU		0x800
+ #define CLKOUT_CMU_CPU		0xa00
++#define SRC_MASK_CPERI		0x4300
+ #define GATE_IP_G2D		0x8800
+ #define CPLL_LOCK		0x10020
+ #define DPLL_LOCK		0x10030
+@@ -70,6 +71,8 @@
+ #define SRC_TOP11		0x10284
+ #define SRC_TOP12		0x10288
+ #define SRC_TOP13		0x1028c /* 5800 specific */
++#define SRC_MASK_TOP0		0x10300
++#define SRC_MASK_TOP1		0x10304
+ #define SRC_MASK_TOP2		0x10308
+ #define SRC_MASK_TOP7		0x1031c
+ #define SRC_MASK_DISP10		0x1032c
+@@ -77,6 +80,7 @@
+ #define SRC_MASK_FSYS		0x10340
+ #define SRC_MASK_PERIC0		0x10350
+ #define SRC_MASK_PERIC1		0x10354
++#define SRC_MASK_ISP		0x10370
+ #define DIV_TOP0		0x10500
+ #define DIV_TOP1		0x10504
+ #define DIV_TOP2		0x10508
+@@ -98,6 +102,7 @@
+ #define DIV2_RATIO0		0x10590
+ #define DIV4_RATIO		0x105a0
+ #define GATE_BUS_TOP		0x10700
++#define GATE_BUS_DISP1		0x10728
+ #define GATE_BUS_GEN		0x1073c
+ #define GATE_BUS_FSYS0		0x10740
+ #define GATE_BUS_FSYS2		0x10748
+@@ -190,6 +195,10 @@ static unsigned long exynos5x_clk_regs[] __initdata = {
+ 	SRC_MASK_FSYS,
+ 	SRC_MASK_PERIC0,
+ 	SRC_MASK_PERIC1,
++	SRC_MASK_TOP0,
++	SRC_MASK_TOP1,
++	SRC_MASK_MAU,
++	SRC_MASK_ISP,
+ 	SRC_ISP,
+ 	DIV_TOP0,
+ 	DIV_TOP1,
+@@ -208,6 +217,7 @@ static unsigned long exynos5x_clk_regs[] __initdata = {
+ 	SCLK_DIV_ISP1,
+ 	DIV2_RATIO0,
+ 	DIV4_RATIO,
++	GATE_BUS_DISP1,
+ 	GATE_BUS_TOP,
+ 	GATE_BUS_GEN,
+ 	GATE_BUS_FSYS0,
+@@ -249,6 +259,22 @@ static unsigned long exynos5800_clk_regs[] __initdata = {
+ 	GATE_IP_CAM,
+ };
+ 
++static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
++	{ .offset = SRC_MASK_CPERI,		.value = 0xffffffff, },
++	{ .offset = SRC_MASK_TOP0,		.value = 0x11111111, },
++	{ .offset = SRC_MASK_TOP1,		.value = 0x11101111, },
++	{ .offset = SRC_MASK_TOP2,		.value = 0x11111110, },
++	{ .offset = SRC_MASK_TOP7,		.value = 0x00111100, },
++	{ .offset = SRC_MASK_DISP10,		.value = 0x11111110, },
++	{ .offset = SRC_MASK_MAU,		.value = 0x10000000, },
++	{ .offset = SRC_MASK_FSYS,		.value = 0x11111110, },
++	{ .offset = SRC_MASK_PERIC0,		.value = 0x11111110, },
++	{ .offset = SRC_MASK_PERIC1,		.value = 0x11111100, },
++	{ .offset = SRC_MASK_ISP,		.value = 0x11111000, },
++	{ .offset = GATE_BUS_DISP1,		.value = 0xffffffff, },
++	{ .offset = GATE_IP_PERIC,		.value = 0xffffffff, },
++};
++
+ static int exynos5420_clk_suspend(void)
+ {
+ 	samsung_clk_save(reg_base, exynos5x_save,
+@@ -258,6 +284,9 @@ static int exynos5420_clk_suspend(void)
+ 		samsung_clk_save(reg_base, exynos5800_save,
+ 				ARRAY_SIZE(exynos5800_clk_regs));
+ 
++	samsung_clk_restore(reg_base, exynos5420_set_clksrc,
++				ARRAY_SIZE(exynos5420_set_clksrc));
++
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
