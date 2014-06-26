@@ -1,57 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 26 Jun 2014 12:13:34 +0200
-Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy connected to
- sama5d3xek boards
-In-Reply-To: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Thu, 26 Jun 2014 18:07:39 +0800
+Subject: [PATCH] ARM: kdump: 2nd kernel should use strict pfn_valid in
+ SPARSEMEM platform
+Message-ID: <1403777259-28949-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
+This patch removes an irrational limitation for crash dump kernel on ARM
+platform when SPARSEMEM enabled.
 
-The PHY address is not specified here because atmel have 2 different
-designs
-for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
-(Embest design) and the other one is connection PHYAD0 to a pull up
-resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
-As a result, Ronetix design will have its PHY available at address 0x1 and
-Embest design at 0x7.
-Let the net PHY core automatically detect the PHY address by scanning the
-MDIO bus.
+Without this patch, crash reservation area for a crash dump kernel with
+SPARSEMEM selected must occupy a full section plus 1MiB. If not,
+elfcorehdr and some memory space used by the first kernel will unable to
+get accessed. This is caused by pfn_valid: fast pfn_valid ragards any
+pfn in a valid section as valid and prevents it to be ioremapped.
 
-Define board specific delays to apply to RGMII signals.
+This limitation wastes memory, because sections are always large and
+crash dump kernel should be as small as possible.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+This patch selects HAVE_ARCH_PFN_VALID for CRASH_DUMP, makes crash dump
+kernel to use strict version of pfn_valid().
+
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Cc: Li Zefan <lizefan@huawei.com>
 ---
- arch/arm/boot/dts/sama5d3xcm.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index b0b1331..fc68bae 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -34,6 +34,21 @@
+This is the forth time I post this patch. The previous discussions can be
+retrived from:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256498.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257472.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/260322.html
+
+The second thread discusses the limitation in detail, but non of previous
+discussion reaches a conclusion.
+
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 87b63fd..aca8ee0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1725,7 +1725,7 @@ config ARCH_SELECT_MEMORY_MODEL
+ 	def_bool ARCH_SPARSEMEM_ENABLE
  
- 			macb0: ethernet at f0028000 {
- 				phy-mode = "rgmii";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ethernet-phy {
-+					interrupt-parent = <&pioB>;
-+					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-+					txen-skew-ps = <800>;
-+					txc-skew-ps = <3000>;
-+					rxdv-skew-ps = <400>;
-+					rxc-skew-ps = <3000>;
-+					rxd0-skew-ps = <400>;
-+					rxd1-skew-ps = <400>;
-+					rxd2-skew-ps = <400>;
-+					rxd3-skew-ps = <400>;
-+				};
- 			};
+ config HAVE_ARCH_PFN_VALID
+-	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
++	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM || CRASH_DUMP
  
- 			pmc: pmc at fffffc00 {
+ config HIGHMEM
+ 	bool "High Memory Support"
 -- 
-1.8.3.2
+1.8.4
