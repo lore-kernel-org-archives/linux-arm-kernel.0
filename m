@@ -1,79 +1,76 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 26 Jun 2014 09:29:51 -0700
-Subject: [PATCH v4 07/14] mfd: Add driver for Maxim 77802 Power Management
- IC
-In-Reply-To: <53AC47E3.2030306@collabora.co.uk>
-References: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403723019-6212-8-git-send-email-javier.martinez@collabora.co.uk>
- <1403775093.27156.13.camel@AMDC1943>
- <53AC003E.2010608@collabora.co.uk>
- <CAD=FV=U5sBQ4VDG65D4rTnfruo5XzQH_EMs4SMpO4BjY1UHA5Q@mail.gmail.com>
- <53AC47E3.2030306@collabora.co.uk>
-Message-ID: <CAD=FV=Xtkfa5yJSWYDcBvBycMqN-U5F-vdbJeo1h3ksCbqkqgw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Jun 2014 17:35:02 +0100
+Subject: [PATCH] ARM: make it easier to check the CPU part number correctly
+In-Reply-To: <20140626162618.GO15240@leverpostej>
+References: <20140624183908.GB32514@n2100.arm.linux.org.uk>
+ <20140626162618.GO15240@leverpostej>
+Message-ID: <20140626163501.GY32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Thu, Jun 26, 2014 at 05:26:18PM +0100, Mark Rutland wrote:
+> Hi Russell,
+> 
+> On Tue, Jun 24, 2014 at 07:39:08PM +0100, Russell King - ARM Linux wrote:
+> > Ensure that platform maintainers check the CPU part number in the right
+> > manner: the CPU part number is meaningless without also checking the
+> > CPU implement(e|o)r (choose your preferred spelling!)  Provide an
+> > interface which returns both the implementer and part number together,
+> > and update the definitions to include the implementer.
+> > 
+> > Mark the old function as being deprecated... indeed, using the old
+> > function with the definitions will now always evaluate as false, so
+> > people must update their un-merged code to the new function.  While
+> > this could be avoided by adding new definitions, we'd also have to
+> > create new names for them which would be awkward.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/include/asm/cputype.h         | 37 +++++++++++++++--------
+> >  arch/arm/include/asm/smp_scu.h         |  2 +-
+> >  arch/arm/kernel/perf_event_cpu.c       | 55 +++++++++++++++++-----------------
+> >  arch/arm/kvm/guest.c                   |  8 +----
+> >  arch/arm/mach-exynos/mcpm-exynos.c     |  2 +-
+> >  arch/arm/mach-exynos/platsmp.c         |  4 +--
+> >  arch/arm/mach-vexpress/tc2_pm.c        |  2 +-
+> >  arch/arm/mm/cache-l2x0.c               |  2 +-
+> >  arch/arm64/include/asm/cputype.h       |  5 ++++
+> >  drivers/clocksource/arm_global_timer.c |  2 +-
+> >  10 files changed, 64 insertions(+), 55 deletions(-)
+> 
+> It looks like you missed drivers/cpuidle/cpuidle-big_little.c, which has
+> a homebrew comparison in bl_idle_driver_init.
+> 
+> I'm slightly confused by the diffstat -- it shows changes to
+> arch/arm64/include/asm/cputype.h, for which I can't see the
+> corresponding diff. Did you mean to drop that?
 
-On Thu, Jun 26, 2014 at 9:18 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Doug,
->
-> On 06/26/2014 06:12 PM, Doug Anderson wrote:
->> Javier,
->>
->> On Thu, Jun 26, 2014 at 4:13 AM, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->>>>> +
->>>>> +#ifdef CONFIG_PM_SLEEP
->>>>> +static int max77802_suspend(struct device *dev)
->>>>> +{
->>>>> +    struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
->>>>> +    struct max77802_dev *max77802 = i2c_get_clientdata(i2c);
->>>>> +
->>>>> +    if (device_may_wakeup(dev))
->>>>> +            enable_irq_wake(max77802->irq);
->>>>> +
->>>>> +    disable_irq(max77802->irq);
->>>>
->>>> Can you add short comment why this is needed? I know why but just for
->>>> future generations which will wonder: "why do we need to disable the IRQ
->>>> while suspending?" :). Especially that this is rather a workaround for
->>>> issue in other driver (I2C bus).
->>>>
->>>
->>> Good idea, I'll add a comment here on next version so code archaeologists can
->>> figure out what what's going on here.
->>
->> Is the disable_irq() needed if you have
->> <https://patchwork.kernel.org/patch/4421891/>?
->>
->
-> Probably not but I added the following comment:
->
->         /*
->          * The IRQ must be disabled during suspend since due wakeup
->          * ordering issues it may be possible that the I2C controller
->          * is still suspended when the interrupt happens so the IRQ
->          * handler will fail to read the I2C bus.
->          */
->         disable_irq(max77802->irq);
->
-> since in theory this PMIC can be used in other SoCs besides
-> Exynos5420/Exynos5800 and it may be possible that the I2C controller driver for
-> these other SoCs may not resume at noirq time.
->
-> But on a second thought, this PMIC seems to be designed specially for these two
-> Exynos SoCs so I guess it's safe to assume that it is not needed?
+Yes, I don't think arm_global_timer.c is used by ARM64, so I dropped that
+change.
 
-Right, there's a close coupling between PMICs and SoCs.  The PMIC has
-special sequencing and default voltage levels that were tuned exactly
-for this SoC.
+Yes, it looks like I missed cpuidle-big_little.c, but now that you point
+it out, I have to ask whether this is really coded in an easy to understand
+way:
 
-Note: Wolfram has not actually responded to my patch much less
-accepted it.  It's entirely possible that in another month or two
-we'll hear back a big fat NAK.  In that case your solution will be the
-best one I can think of.
+                /* read cpu id part number */
+                if ((cpuid & 0xFFF0) == cpu_id)
+                        cpumask_set_cpu(cpu, cpumask);
 
+It is /very/ easy to read that as (cpuid & 0xfff0) == cpuid dropping the
+additional underscore.  It may make sense to rename cpu_id to be
+desired_id.  I'd also suggest that this test becomes:
 
--Doug
+		if (((cpuid ^ desired_id) & 0xff00fff0) == 0)
+                        cpumask_set_cpu(cpu, cpumask);
+
+or:
+
+		if ((cpuid & 0xff00fff0) == (desired_id & 0xff00fff0))
+                        cpumask_set_cpu(cpu, cpumask);
+
+as that's what we're really wanting - to check that certain bits match
+between the two IDs and not care about the rest.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
