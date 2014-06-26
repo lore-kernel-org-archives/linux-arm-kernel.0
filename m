@@ -1,64 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Jun 2014 10:29:46 +0100
-Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
-In-Reply-To: <1403765204-17617-1-git-send-email-achandran@mvista.com>
-References: <1403765204-17617-1-git-send-email-achandran@mvista.com>
-Message-ID: <20140626092946.GL15240@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jun 2014 11:28:20 +0200
+Subject: [PATCH 09/13] AT91: PIT: (Almost) remove the global variables
+In-Reply-To: <53ABABA6.1060205@free-electrons.com>
+References: <1403701605-26678-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1403701605-26678-10-git-send-email-maxime.ripard@free-electrons.com>
+ <53ABABA6.1060205@free-electrons.com>
+Message-ID: <20140626092820.GA3385@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 07:46:44AM +0100, Arun Chandran wrote:
-> Selecting CPU_BIG_ENDIAN and building the kernel fails just after
-> building it for little endian. According to Documentation/kbuild/makefiles.txt,
-> it is a common mistake to forget 'FORCE' while using 'if_changed'
+Hi Boris,
 
-This is a little confusing, because we jump from the high level problem
-to a very specific problem detail with nothing to link the two.
-
-How about:
-
-Building a kernel with CPU_BIG_ENDIAN fails if there are stale objects
-from a !CPU_BIG_ENDIAN build. Due to a missing FORCE prerequisite on an
-if_changed rule in the VDSO Makefile, we attempt to link a stale LE
-object into the new BE kernel. According to
-Documentation/kbuild/makefiles.txt FORCE is required for if_changed
-rules, and forgetting it is a common mistake.
-
-> So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
+On Thu, Jun 26, 2014 at 07:12:06AM +0200, Boris BREZILLON wrote:
+> Hello Maxime,
 > 
-> arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
-> failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
+> On 25/06/2014 15:06, Maxime Ripard wrote:
+> > The timer driver is using some global variables to define some variables it has
+> > to use in most of its functions, like the base address.
+> >
+> > Use some container_of calls to have a single dynamic (and local) variable to
+> > hold this content.
+> >
+> > The only exception is in the !DT case, where the call chain to
+> > at91sam926x_ioremap_pit and then at91sam926x_pit_init as init_time makes it
+> > hard for the moment to pass the physical address of the timer.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/mach-at91/at91sam926x_time.c | 179 ++++++++++++++++++++--------------
+> >  1 file changed, 108 insertions(+), 71 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> > index 9678ac391a81..f2c463567beb 100644
+> > --- a/arch/arm/mach-at91/at91sam926x_time.c
+> > +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> > @@ -20,6 +20,7 @@
+> >  #include <linux/of.h>
+> >  #include <linux/of_address.h>
+> >  #include <linux/of_irq.h>
+> > +#include <linux/slab.h>
+> >  
 > 
-> arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
-> failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
+> [...]
 > 
-> Signed-off-by: Arun Chandran <achandran@mvista.com>
+> >  	unsigned	bits;
+> > @@ -186,67 +195,95 @@ static void __init at91sam926x_pit_common_init(unsigned int pit_irq)
+> >  	 * Use our actual MCK to figure out how many MCK/16 ticks per
+> >  	 * 1/HZ period (instead of a compile-time constant LATCH).
+> >  	 */
+> > -	pit_rate = clk_get_rate(mck) / 16;
+> > -	pit_cycle = (pit_rate + HZ/2) / HZ;
+> > -	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
+> > +	pit_rate = clk_get_rate(data->mck) / 16;
+> > +	data->cycle = (pit_rate + HZ/2) / HZ;
+> 
+> You could use DIV_ROUND_CLOSEST here.
 
-Any reason for bot picking up my Tested-by [1]? The patch seems to be
-the same.
+I usually prefer not to introduce such changes whenever I'm just
+renaming a variable, but it's true that this change would be
+welcome. I'll do the change in a separate patch.
 
-Mark.
+Maxime
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266571.html
-
-> ---
->  arch/arm64/kernel/vdso/Makefile |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-> index 6d20b7d..a268a9a 100644
-> --- a/arch/arm64/kernel/vdso/Makefile
-> +++ b/arch/arm64/kernel/vdso/Makefile
-> @@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
->  	$(call if_changed,vdsosym)
->  
->  # Assembly rules for the .S files
-> -$(obj-vdso): %.o: %.S
-> +$(obj-vdso): %.o: %.S FORCE
->  	$(call if_changed_dep,vdsoas)
->  
->  # Actual build commands
-> -- 
-> 1.7.9.5
-> 
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140626/33fc3d8b/attachment.sig>
