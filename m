@@ -1,39 +1,37 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Thu, 26 Jun 2014 12:16:44 +0530
-Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
-Message-ID: <1403765204-17617-1-git-send-email-achandran@mvista.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Thu, 26 Jun 2014 12:18:02 +0530
+Subject: [PATCH] arm: do not force irq affinity setting
+Message-ID: <1403765282-16934-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Selecting CPU_BIG_ENDIAN and building the kernel fails just after
-building it for little endian. According to Documentation/kbuild/makefiles.txt,
-it is a common mistake to forget 'FORCE' while using 'if_changed'
+When no online CPU is present in affinity mask we
+copy cpu_online_mask to it, hence no need to force
+affinity setting.
 
-So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
+Also, when there is a online CPU present in affinity
+mask we pass the same affinity mask which contains
+the current CPU too which is going down. And with
+force == true GIC driver skips online check which
+results in keeping the affinity to offline CPU.
 
-arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
-failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
-
-arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
-failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
-
-Signed-off-by: Arun Chandran <achandran@mvista.com>
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 ---
- arch/arm64/kernel/vdso/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/irq.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-index 6d20b7d..a268a9a 100644
---- a/arch/arm64/kernel/vdso/Makefile
-+++ b/arch/arm64/kernel/vdso/Makefile
-@@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
- 	$(call if_changed,vdsosym)
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c42576..5c4d38e 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -175,7 +175,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	c = irq_data_get_irq_chip(d);
+ 	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
++	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+ 		cpumask_copy(d->affinity, affinity);
  
- # Assembly rules for the .S files
--$(obj-vdso): %.o: %.S
-+$(obj-vdso): %.o: %.S FORCE
- 	$(call if_changed_dep,vdsoas)
- 
- # Actual build commands
+ 	return ret;
 -- 
-1.7.9.5
+1.7.4.1
