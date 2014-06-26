@@ -1,42 +1,27 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 26 Jun 2014 12:05:47 +0800
-Subject: [PATCH v4 8/8] document: add dt binding on hix5hd2 SoC
-In-Reply-To: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1403755547-623-9-git-send-email-haojian.zhuang@linaro.org>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Thu, 26 Jun 2014 14:11:39 +1000 (EST)
+Subject: [PATCH 0/4] ARM randconfig fixes for SCSI
+In-Reply-To: <20140625110457.GD19181@infradead.org>
+References: <1402003789-1990031-1-git-send-email-arnd@arndb.de>
+ <20140625110457.GD19181@infradead.org>
+Message-ID: <alpine.LNX.2.00.1406261340220.6206@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT binding of basic SoC on Hisilicon HiX5HD2 SoC.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
+On Wed, 25 Jun 2014, Christoph Hellwig wrote:
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index df0a452..b0ea477 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -4,6 +4,9 @@ Hisilicon Platforms Device Tree Bindings
- Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
-+HIX5HD2 DKB Board
-+Required root node properties:
-+	- compatible = "hisilicon,hix5hd2";
- 
- Hisilicon system controller
- 
-@@ -44,3 +47,9 @@ Example:
- 		compatible = "hisilicon,pctrl";
- 		reg = <0xfca09000 0x1000>;
- 	};
-+
-+Cpu power controller:
-+
-+Required Properties:
-+- compatible: "hisilicon,cpuctrl";
-+- reg: Address and size of cpu power controller.
--- 
-1.9.1
+> Can I get another set of reviews for these?
+
+Reviewed-by: Finn Thain <fthain@telegraphics.com.au>
+
+(All four patches.)
+
+> >   [SCSI] pas16: don't call free_dma()
+> >   [SCSI] qlogicfas: don't call free_dma()
+
+BTW, I found that the suprious free_dma() calls appeared in 2.5.73 when a 
+generic release implementation was apparently added to drivers that lacked 
+any release method.
+
+--
