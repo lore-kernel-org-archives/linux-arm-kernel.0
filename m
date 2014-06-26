@@ -1,110 +1,27 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 26 Jun 2014 13:48:35 +0100
-Subject: [PATCH v6 4/4] ARM: Add KGDB/KDB FIQ debugger generic code
-In-Reply-To: <alpine.LFD.2.11.1406241201180.16842@knanqh.ubzr>
-References: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
- <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
- <1403623097-1153-5-git-send-email-daniel.thompson@linaro.org>
- <alpine.LFD.2.11.1406241201180.16842@knanqh.ubzr>
-Message-ID: <53AC16A3.2060609@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jun 2014 14:50:52 +0200
+Subject: [GIT PULL] ARM: versatile: DT IRQ and clock support
+In-Reply-To: <CAL_JsqKkfDd3h+iW7UUJiUgULSma=bs=muTTyCo3HOWHi30LVw@mail.gmail.com>
+References: <CAL_JsqKkfDd3h+iW7UUJiUgULSma=bs=muTTyCo3HOWHi30LVw@mail.gmail.com>
+Message-ID: <CACRpkdbZALhS-di99F0heHEN7ev+7mrJYrJ-hfrBK9LP+A4KNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/14 17:22, Nicolas Pitre wrote:
-> On Tue, 24 Jun 2014, Daniel Thompson wrote:
-> 
->> From: Anton Vorontsov <anton.vorontsov@linaro.org>
->>
->> The FIQ debugger may be used to debug situations when the kernel stuck
->> in uninterruptable sections, e.g. the kernel infinitely loops or
->> deadlocked in an interrupt or with interrupts disabled.
->>
->> By default KGDB FIQ is disabled in runtime, but can be enabled with
->> kgdb_fiq.enable=1 kernel command line option.
->>
->> Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
->> Signed-off-by: John Stultz <john.stultz@linaro.org>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
->> Cc: Dave Martin <Dave.Martin@arm.com>
->> ---
->>  arch/arm/Kconfig                 |   2 +
->>  arch/arm/Kconfig.debug           |  18 ++++++
->>  arch/arm/include/asm/kgdb.h      |   7 +++
->>  arch/arm/kernel/Makefile         |   1 +
->>  arch/arm/kernel/kgdb_fiq.c       | 124 +++++++++++++++++++++++++++++++++++++++
->>  arch/arm/kernel/kgdb_fiq_entry.S |  87 +++++++++++++++++++++++++++
->>  6 files changed, 239 insertions(+)
->>  create mode 100644 arch/arm/kernel/kgdb_fiq.c
->>  create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
-> 
-> [...]
-> 
->> +static long kgdb_fiq_setup_stack(void *info)
->> +{
->> +	struct pt_regs regs;
->> +
->> +	regs.ARM_sp = __get_free_pages(GFP_KERNEL, THREAD_SIZE_ORDER) +
->> +			THREAD_START_SP;
->> +	WARN_ON(!regs.ARM_sp);
-> 
-> Isn't this rather fatal if you can't allocate any stack? Why not using 
-> BUG_ON(), or better yet propagate a proper error code back?
+On Tue, Jun 24, 2014 at 9:35 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-Thanks for raising this.
+> Please pull for 3.17.
+>
+> I've tested this on qemu, but still need Linus to test on h/w. He did
+> test an earlier version.
 
-I think we can get rid of the allocation altogether. This stack is *way*
-oversized (it only needs to be 12 bytes).
+Sorry for the delay, I was swamped.
 
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
->> +
->> +	set_fiq_regs(&regs);
->> +	return 0;
->> +}
->> +
->> +/**
->> + * kgdb_fiq_enable_nmi - Manage NMI-triggered entry to KGDB
->> + * @on: Flag to either enable or disable an NMI
->> + *
->> + * This function manages NMIs that usually cause KGDB to enter. That is, not
->> + * all NMIs should be enabled or disabled, but only those that issue
->> + * kgdb_handle_exception().
->> + *
->> + * The call counts disable requests, and thus allows to nest disables. But
->> + * trying to enable already enabled NMI is an error.
->> + */
->> +static void kgdb_fiq_enable_nmi(bool on)
->> +{
->> +	static atomic_t cnt;
->> +	int ret;
->> +
->> +	ret = atomic_add_return(on ? 1 : -1, &cnt);
->> +	if (ret > 1 && on) {
->> +		/*
->> +		 * There should be only one instance that calls this function
->> +		 * in "enable, disable" order. All other users must call
->> +		 * disable first, then enable. If not, something is wrong.
->> +		 */
->> +		WARN_ON(1);
->> +		return;
->> +	}
-> 
-> Minor style suggestion:
-> 
-> 	/*
-> 	 * There should be only one instance that calls this function
-> 	 * in "enable, disable" order. All other users must call
-> 	 * disable first, then enable. If not, something is wrong.
-> 	 */
-> 	if (WARN_ON(ret > 1 && on))
-> 		return;
+Tested on the Versatile/AB and Integrator/AP as well
+(for regression check).
 
-Will adopt this style.
+Works like a charm.
 
-
-> Other than that...
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-
-Thanks for review.
+Yours,
+Linus Walleij
