@@ -1,22 +1,32 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 26 Jun 2014 11:33:30 +0900
-Subject: [PATCH 1/2] ARM: firmware: Introduce suspend and resume operations
-In-Reply-To: <1403713114-18923-2-git-send-email-t.figa@samsung.com>
-References: <1403713114-18923-1-git-send-email-t.figa@samsung.com>
- <1403713114-18923-2-git-send-email-t.figa@samsung.com>
-Message-ID: <53AB867A.901@nvidia.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 25 Jun 2014 19:41:03 -0700
+Subject: [PATCH 0/3] MCPM: clarify boot CPU situation wrt CCI
+In-Reply-To: <CAD=FV=WHU0TDkjXVCCw6odBFSF7uvv3joCP+oW4cBS_tsSgF+Q@mail.gmail.com>
+References: <1403583071-5650-1-git-send-email-nicolas.pitre@linaro.org>
+ <7hd2dymiaw.fsf@paris.lan>
+ <CAD=FV=WHU0TDkjXVCCw6odBFSF7uvv3joCP+oW4cBS_tsSgF+Q@mail.gmail.com>
+Message-ID: <CAGa+x853xBjmb5Pe37wM9Q5jRVJExn_4xmM+bXyFspnzKb+9tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2014 01:18 AM, Tomasz Figa wrote:
-> This patch extends the firmware_ops structure with two new callbacks:
-> .suspend() and .resume(). The former is intended to ask the firmware to
-> save all its volatile state and suspend the system, without returning
-> back to the kernel in between. The latter is to be called early by
-> very low level platform suspend code after waking up to restore low
-> level hardware state, which can't be restored in non-secure mode.
+On Tue, Jun 24, 2014 at 3:57 PM, Doug Anderson <dianders@google.com> wrote:
+> Kevin,
 >
-> While at it, outdated version of the structure is removed from the
-> documentation and replaced with a reference to the header file.
+> On Tue, Jun 24, 2014 at 8:35 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> - Leave mau_epll enabled
+>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262259.html
+>
+> Can you drop your mau_epll one and instead pick just
+> <https://patchwork.kernel.org/patch/4333581/>?
+>
+> I noticed that Tushar has only been pushing for that patch to be
+> applied and I'm going to guess that the "leave mau_epll enabled" isn't
+> needed.  I just tested myself and confirmed that things are happy.
 
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+I replied on the other thread too, but just to be thorough...
+
+Picking the above patch alone, I still get the boot hang.  Adding
+'clk_ignore_unused' to the command line gets things booting again,
+which suggest there's still a missing piece of the puzzle.
+
+Kevin
