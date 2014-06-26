@@ -1,63 +1,62 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Thu, 26 Jun 2014 10:28:39 +0530
-Subject: [PATCH 2/2] i2c: exynos5: fix minor styling nits
-In-Reply-To: <CAK5sBcEVHYQutEm9Lh3eGX8_6zKLV-m3XfYKtnfPs8CBExpHqg@mail.gmail.com>
-References: <1403692697-7381-1-git-send-email-ch.naveen@samsung.com>
- <1403692697-7381-2-git-send-email-ch.naveen@samsung.com>
- <CAK5sBcEVHYQutEm9Lh3eGX8_6zKLV-m3XfYKtnfPs8CBExpHqg@mail.gmail.com>
-Message-ID: <CAHfPSqBMbT=H5_3acXrRH=zJf-KkWQ-wasbMtkuDj8ewy6QpMg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 26 Jun 2014 07:12:06 +0200
+Subject: [PATCH 09/13] AT91: PIT: (Almost) remove the global variables
+In-Reply-To: <1403701605-26678-10-git-send-email-maxime.ripard@free-electrons.com>
+References: <1403701605-26678-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1403701605-26678-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <53ABABA6.1060205@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sachin,
+Hello Maxime,
 
-On 25 June 2014 16:19, Sachin Kamat <spk.linux@gmail.com> wrote:
-> Hi Naveen,
+On 25/06/2014 15:06, Maxime Ripard wrote:
+> The timer driver is using some global variables to define some variables it has
+> to use in most of its functions, like the base address.
 >
-> On Wed, Jun 25, 2014 at 4:08 PM, Naveen Krishna Chatradhi
-> <ch.naveen@samsung.com> wrote:
->> This patch removes an extra line and fixes a styling nit
->> in exynos5_i2c_message_start()
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> ---
->>  drivers/i2c/busses/i2c-exynos5.c |    3 +--
->>  1 file changed, 1 insertion(+), 2 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
->> index 0d1a7bc..4c2e6f3 100644
->> --- a/drivers/i2c/busses/i2c-exynos5.c
->> +++ b/drivers/i2c/busses/i2c-exynos5.c
->> @@ -525,7 +525,7 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
->>         if (i2c->msg->flags & I2C_M_RD) {
->>                 i2c_ctl |= HSI2C_RXCHON;
->>
->> -               i2c_auto_conf = HSI2C_READ_WRITE;
->> +               i2c_auto_conf |= HSI2C_READ_WRITE;
+> Use some container_of calls to have a single dynamic (and local) variable to
+> hold this content.
 >
-> This change looks more than just a styling nit. Please update the commit message
-> accordingly.
-
-Yea, change looks so.
-
-But, This is not an going to change the way code works.
-
-As, i2c_auto_conf is initialized to '0' at the beginning of the function
-and  HSI2C_READ_WRITE is defined as (1u << 16)
-
-This being the 1st usage, I thought using "|=" is better way of assignment.
-
-Will edit the commit message accordingly.
-
+> The only exception is in the !DT case, where the call chain to
+> at91sam926x_ioremap_pit and then at91sam926x_pit_init as init_time makes it
+> hard for the moment to pass the physical address of the timer.
 >
-> --
-> Regards,
-> Sachin.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/mach-at91/at91sam926x_time.c | 179 ++++++++++++++++++++--------------
+>  1 file changed, 108 insertions(+), 71 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> index 9678ac391a81..f2c463567beb 100644
+> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+> +#include <linux/slab.h>
+>  
 
-Thanks,
+[...]
 
+>  	unsigned	bits;
+> @@ -186,67 +195,95 @@ static void __init at91sam926x_pit_common_init(unsigned int pit_irq)
+>  	 * Use our actual MCK to figure out how many MCK/16 ticks per
+>  	 * 1/HZ period (instead of a compile-time constant LATCH).
+>  	 */
+> -	pit_rate = clk_get_rate(mck) / 16;
+> -	pit_cycle = (pit_rate + HZ/2) / HZ;
+> -	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
+> +	pit_rate = clk_get_rate(data->mck) / 16;
+> +	data->cycle = (pit_rate + HZ/2) / HZ;
 
+You could use DIV_ROUND_CLOSEST here.
+
+Regards,
+
+Boris
 
 -- 
-Shine bright,
-(: Nav :)
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
