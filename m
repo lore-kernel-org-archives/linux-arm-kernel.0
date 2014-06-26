@@ -1,53 +1,66 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 26 Jun 2014 11:13:02 +0200
-Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
-In-Reply-To: <20140626054937.GB7859@dragon>
-References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
- <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>
- <20140626054937.GB7859@dragon>
-Message-ID: <201406261113.02894.marex@denx.de>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Thu, 26 Jun 2014 14:45:27 +0530
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+Message-ID: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 26, 2014 at 07:49:38 AM, Shawn Guo wrote:
-> On Thu, Jun 26, 2014 at 12:43:19AM -0300, Fabio Estevam wrote:
-> > On Thu, Jun 26, 2014 at 12:12 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > > On Tue, Jun 24, 2014 at 04:18:27PM -0300, Fabio Estevam wrote:
-> > >> From: Fabio Estevam <fabio.estevam@freescale.com>
-> > >> 
-> > >> When the mx6 PCI conctroller is initialized in the bootloader we see a
-> > >> kernel hang inside imx6_add_pcie_port().
-> > >> 
-> > >> Adding a 30ms delay allows the kernel to boot.
-> > > 
-> > > We may not want to add a random delay into the driver before we
-> > > understand the root cause of the issue.
-> > 
-> > Yes, that's why I sent this as RFC and also explained it below the ---
-> > line that I am actually trying to get some help with this issue.
-> > 
-> > > Do you see this issue with FSL kernel?
-> > 
-> > Yes, it also hangs.
-> > 
-> > It is reproducible in 100% of the boots. Just need to use mainline
-> > U-boot (which has PCI driver enabled by default).
-> > I am using an Intel Wifi 7260 PCI card. This was also reported by
-> > other folks in the U-boot list.
-> 
-> Richard,
-> 
-> Can you schedule some time to look at this issue?  I think it will come
-> to us sooner or later if any our customer enables PCIe before launching
-> kernel?
+From: Doug Anderson <dianders@chromium.org>
 
-I have this problem on MX6DL SabreSDP as well. Apparently, this issue happens 
-more often on 6DL than it happens on 6Q. I'm clueless here.
+The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+being reset across sleep/wake.  If we don't set it to anything then
+the TPM will be reset.  U-Boot will detect this as invalid
+and will reset the system on resume time. This GPIO can always be low
+and not hurt anything.  It will get pulled back high again during a
+normal warm reset when it will default back to an input.
 
-I presume FSL won't be willing to release how the PCIe block is exactly wired 
-into the GPR registers, right ? Also, I don't think there's some magic register 
-which allows controlling the PCIe core and PCIe PHY reset lines directly (like 
-on exynos), or is there please?
+To properly preserve the TPM state across suspend/resume and to make
+the chrome U-Boot happy, properly set the GPIO to mask the
+reset to the TPM.
 
-Best regards,
-Marek Vasut
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 7649982..8fd990a 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -87,6 +87,18 @@
+ 		pinctrl-0 = <&usb301_vbus_en>;
+ 		enable-active-high;
+ 	};
++
++	/* We need GPX0_6 to be low at sleep time; just keep it low always */
++	mask_tpm_reset_regulator: mask-tpm-reset-regulator {
++	compatible = "regulator-fixed";
++	regulator-name = "mask-tpm-reset ";
++		gpio = <&gpx0 6 0>;
++		enable-active-low;
++		regulator-boot-on;
++		regulator-always-on;
++		pinctrl-names = "default";
++		pinctrl-0 = <&mask_tpm_reset>;
++	};
+ };
+ 
+ &dp {
+@@ -210,6 +222,14 @@
+ 
+ 
+ &pinctrl_0 {
++
++	mask_tpm_reset: mask-tpm-reset {
++		samsung,pins = "gpx0-6";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	max98090_irq: max98090-irq {
+ 		samsung,pins = "gpx0-2";
+ 		samsung,pin-function = <0>;
+-- 
+1.7.9.5
