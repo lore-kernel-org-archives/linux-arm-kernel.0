@@ -1,281 +1,41 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 26 Jun 2014 13:24:35 +0200
-Subject: [PATCH 3/3] ARM: dts: SAMSUNG: Add aliases of UART nodes
-In-Reply-To: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
-References: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1403781875-5425-4-git-send-email-t.figa@samsung.com>
+Date: Thu, 26 Jun 2014 13:24:32 +0200
+Subject: [PATCH 0/3] Deterministic UART numbering on Samsung SoCs
+Message-ID: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds alias entries for UART nodes of all SoCs using
-samsung-uart compatible UART controllers, so that the dependency on
-probe order is removed and deterministic device naming is assured.
+Current Samsung UART driver relies on probe order of particular
+samsung-uart instances, which makes it impossible to get proper
+initialization of ports when not all ports are available on board,
+not even saying of deterministic device naming.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi |  2 ++
- arch/arm/boot/dts/exynos4.dtsi    | 12 ++++++++----
- arch/arm/boot/dts/exynos5.dtsi    | 15 +++++++++++----
- arch/arm/boot/dts/exynos5260.dtsi |  4 ++++
- arch/arm/boot/dts/exynos5410.dtsi |  6 ++++++
- arch/arm/boot/dts/exynos5440.dtsi |  6 ++++--
- arch/arm/boot/dts/s3c2416.dtsi    |  6 +++++-
- arch/arm/boot/dts/s3c24xx.dtsi    |  9 ++++++---
- arch/arm/boot/dts/s3c64xx.dtsi    |  4 ++++
- 9 files changed, 50 insertions(+), 14 deletions(-)
+This series intends to fix this situation by adding support to parse
+aliases from device tree and use them to assign instance IDs to
+particular port instances.
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 3e678fa..f4b5411 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -39,6 +39,8 @@
- 		i2c5 = &i2c_5;
- 		i2c6 = &i2c_6;
- 		i2c7 = &i2c_7;
-+		serial0 = &serial_0;
-+		serial1 = &serial_1;
- 	};
- 
- 	cpus {
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index fbaf426..536d3c3 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -44,6 +44,10 @@
- 		fimc1 = &fimc_1;
- 		fimc2 = &fimc_2;
- 		fimc3 = &fimc_3;
-+		serial0 = &serial_0;
-+		serial1 = &serial_1;
-+		serial2 = &serial_2;
-+		serial3 = &serial_3;
- 	};
- 
- 	clock_audss: clock-controller at 03810000 {
-@@ -363,7 +367,7 @@
- 		status = "disabled";
- 	};
- 
--	serial at 13800000 {
-+	serial_0: serial at 13800000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x13800000 0x100>;
- 		interrupts = <0 52 0>;
-@@ -372,7 +376,7 @@
- 		status = "disabled";
- 	};
- 
--	serial at 13810000 {
-+	serial_1: serial at 13810000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x13810000 0x100>;
- 		interrupts = <0 53 0>;
-@@ -381,7 +385,7 @@
- 		status = "disabled";
- 	};
- 
--	serial at 13820000 {
-+	serial_2: serial at 13820000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x13820000 0x100>;
- 		interrupts = <0 54 0>;
-@@ -390,7 +394,7 @@
- 		status = "disabled";
- 	};
- 
--	serial at 13830000 {
-+	serial_3: serial at 13830000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x13830000 0x100>;
- 		interrupts = <0 55 0>;
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index 79d0608..ff2d2cb 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -18,6 +18,13 @@
- / {
- 	interrupt-parent = <&gic>;
- 
-+	aliases {
-+		serial0 = &serial_0;
-+		serial1 = &serial_1;
-+		serial2 = &serial_2;
-+		serial3 = &serial_3;
-+	};
-+
- 	chipid at 10000000 {
- 		compatible = "samsung,exynos4210-chipid";
- 		reg = <0x10000000 0x100>;
-@@ -50,25 +57,25 @@
- 		interrupts = <1 9 0xf04>;
- 	};
- 
--	serial at 12C00000 {
-+	serial_0: serial at 12C00000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x12C00000 0x100>;
- 		interrupts = <0 51 0>;
- 	};
- 
--	serial at 12C10000 {
-+	serial_1: serial at 12C10000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x12C10000 0x100>;
- 		interrupts = <0 52 0>;
- 	};
- 
--	serial at 12C20000 {
-+	serial_2: serial at 12C20000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x12C20000 0x100>;
- 		interrupts = <0 53 0>;
- 	};
- 
--	serial at 12C30000 {
-+	serial_3: serial at 12C30000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x12C30000 0x100>;
- 		interrupts = <0 54 0>;
-diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
-index 5398a60..4539a0a 100644
---- a/arch/arm/boot/dts/exynos5260.dtsi
-+++ b/arch/arm/boot/dts/exynos5260.dtsi
-@@ -21,6 +21,10 @@
- 		pinctrl0 = &pinctrl_0;
- 		pinctrl1 = &pinctrl_1;
- 		pinctrl2 = &pinctrl_2;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
- 	};
- 
- 	cpus {
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 3839c26..52070e5 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -20,6 +20,12 @@
- 	compatible = "samsung,exynos5410", "samsung,exynos5";
- 	interrupt-parent = <&gic>;
- 
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index ae3a17c..8f3373c 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -18,6 +18,8 @@
- 	interrupt-parent = <&gic>;
- 
- 	aliases {
-+		serial0 = &serial_0;
-+		serial1 = &serial_1;
- 		spi0 = &spi_0;
- 		tmuctrl0 = &tmuctrl_0;
- 		tmuctrl1 = &tmuctrl_1;
-@@ -102,7 +104,7 @@
- 		>;
- 	};
- 
--	serial at B0000 {
-+	serial_0: serial at B0000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0xB0000 0x1000>;
- 		interrupts = <0 2 0>;
-@@ -110,7 +112,7 @@
- 		clock-names = "uart", "clk_uart_baud0";
- 	};
- 
--	serial at C0000 {
-+	serial_1: serial at C0000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0xC0000 0x1000>;
- 		interrupts = <0 3 0>;
-diff --git a/arch/arm/boot/dts/s3c2416.dtsi b/arch/arm/boot/dts/s3c2416.dtsi
-index 955e4a4..30b8f7e 100644
---- a/arch/arm/boot/dts/s3c2416.dtsi
-+++ b/arch/arm/boot/dts/s3c2416.dtsi
-@@ -16,6 +16,10 @@
- 	model = "Samsung S3C2416 SoC";
- 	compatible = "samsung,s3c2416";
- 
-+	aliases {
-+		serial3 = &uart3;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -68,7 +72,7 @@
- 				<&clocks SCLK_UART>;
- 	};
- 
--	serial at 5000C000 {
-+	uart3: serial at 5000C000 {
- 		compatible = "samsung,s3c2440-uart";
- 		reg = <0x5000C000 0x4000>;
- 		interrupts = <1 18 24 4>, <1 18 25 4>;
-diff --git a/arch/arm/boot/dts/s3c24xx.dtsi b/arch/arm/boot/dts/s3c24xx.dtsi
-index 2d1d7dc..5ed43b8 100644
---- a/arch/arm/boot/dts/s3c24xx.dtsi
-+++ b/arch/arm/boot/dts/s3c24xx.dtsi
-@@ -16,6 +16,9 @@
- 
- 	aliases {
- 		pinctrl0 = &pinctrl_0;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
- 	};
- 
- 	intc:interrupt-controller at 4a000000 {
-@@ -46,21 +49,21 @@
- 		#pwm-cells = <4>;
- 	};
- 
--	serial at 50000000 {
-+	uart0: serial at 50000000 {
- 		compatible = "samsung,s3c2410-uart";
- 		reg = <0x50000000 0x4000>;
- 		interrupts = <1 28 0 4>, <1 28 1 4>;
- 		status = "disabled";
- 	};
- 
--	serial at 50004000 {
-+	uart1: serial at 50004000 {
- 		compatible = "samsung,s3c2410-uart";
- 		reg = <0x50004000 0x4000>;
- 		interrupts = <1 23 3 4>, <1 23 4 4>;
- 		status = "disabled";
- 	};
- 
--	serial at 50008000 {
-+	uart2: serial at 50008000 {
- 		compatible = "samsung,s3c2410-uart";
- 		reg = <0x50008000 0x4000>;
- 		interrupts = <1 15 6 4>, <1 15 7 4>;
-diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
-index 4e3be4d..ff5bdaa 100644
---- a/arch/arm/boot/dts/s3c64xx.dtsi
-+++ b/arch/arm/boot/dts/s3c64xx.dtsi
-@@ -23,6 +23,10 @@
- 	aliases {
- 		i2c0 = &i2c0;
- 		pinctrl0 = &pinctrl0;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
- 	};
- 
- 	cpus {
+Tested on Exynos4412-based Trats2 board:
+ 1) without patch 3/3 adding aliases,
+ 2) with patch 3/3 with all UART ports enabled,
+ 3) with patch 3/3 with selected UART ports disabled.
+
+Tomasz Figa (3):
+  Documentation: devicetree: Update samsung UART bindings
+  serial: samsung: Consider DT alias when probing ports
+  ARM: dts: SAMSUNG: Add aliases of UART nodes
+
+ .../devicetree/bindings/serial/samsung_uart.txt    | 52 +++++++++++++++++++---
+ arch/arm/boot/dts/exynos3250.dtsi                  |  2 +
+ arch/arm/boot/dts/exynos4.dtsi                     | 12 +++--
+ arch/arm/boot/dts/exynos5.dtsi                     | 15 +++++--
+ arch/arm/boot/dts/exynos5260.dtsi                  |  4 ++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  6 +++
+ arch/arm/boot/dts/exynos5440.dtsi                  |  6 ++-
+ arch/arm/boot/dts/s3c2416.dtsi                     |  6 ++-
+ arch/arm/boot/dts/s3c24xx.dtsi                     |  9 ++--
+ arch/arm/boot/dts/s3c64xx.dtsi                     |  4 ++
+ drivers/tty/serial/samsung.c                       | 13 ++++--
+ 11 files changed, 106 insertions(+), 23 deletions(-)
+
 -- 
 1.9.3
