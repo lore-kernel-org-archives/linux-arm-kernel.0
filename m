@@ -1,98 +1,91 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Jun 2014 16:18:41 +0100
-Subject: [PATCHv3 0/5] arm64: handle heterogeneous system register values
-Message-ID: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
+Date: Thu, 26 Jun 2014 16:18:42 +0100
+Subject: [PATCHv3 1/5] arm64: add MIDR_EL1 field accessors
+In-Reply-To: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
+References: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1403795926-17139-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the arm64 kernel assumes CPUs are homogeneous, which is a source of
-several potential problems as this is not always true. This series is an
-attempt to ameliorate the situation. The first posting [1] was titled as
-"arm64: extend/fix /proc/cpuinfo + runtime sanity checks", but with the
-addition of the I-cache policy fix this title was either going to become
-unwieldy or misleading.
+The MIDR_EL1 register is composed of a number of bitfields, and uses of
+the fields has so far involved open-coding of the shifts and masks
+required.
 
-Due to rework since v2 I've dropped Acks from most patches. A once-over from
-those who have reviewed this before would be much appreciated.
+This patch adds shifts and masks for each of the MIDR_EL1 subfields, and
+also provides accessors built atop of these. Existing uses within
+cputype.h are updated to use these accessors.
 
-I had a go at shrinking the set of hwcaps if features were not uniform, but
-after several false starts and realisation of further problems (What if dczid
-varies? How do we tear down kernel-side feature usage?) I decided that way
-madness lies. I now set TAINT_CPU_OUT_OF_SPEC when registers are fundamentally
-mismatched, and WARN the user. I am very tempted to panic() instead given how
-easy it is to miss the splat the sanity checks produce at boot-time, but I
-suspect that might be a little mean ;)
+The read_cpuid_part_number macro is modified to return the extracted
+bitfield rather than returning the value in-place with all other fields
+(including revision) masked out, to better match the other accessors.
+As the value is only used in comparison with the *_CPU_PART_* macros
+which are similarly updated, and these values are never exposed to
+userspace, this change should not affect any functionality.
 
-I'm still not happy with printing the hwcaps once rather than per-cpu, but
-given everyone else seems to think that's the right way to handle things I'll
-give up on that.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/cputype.h | 33 ++++++++++++++++++++++++++-------
+ 1 file changed, 26 insertions(+), 7 deletions(-)
 
-Since v2 [4]:
-* Print the hwcaps once in /proc/cpinfo, per Ard's comments.
-* Apply fixupps per Will's comments.
-* Sanity check additional registers: dczid id_aa64{isar,mmfr,pfr}1.
-* We care about GICv3 support reporting, don't mask it out.
-* Set TAINT_CPU_OUT_OF_SPEC upon sanity check failure.
-* Store boot CPU values separately.
-* Separate value stashing into new patch.
-* Rebased the branch to v3.16-rc2.
-Since v1 [1]:
-* Add fix for differing I-cache policies
-* Make read_cpuid_part_number and read_cpu_implementor return extracted fields.
-
-This series adds infrastructure to record various system registers upon the
-booting of each CPU into a new per-CPU struct cpuinfo_arm64. This data can then
-be used to solve various problems:
-
-* On arm64 /proc/cpuinfo only contains information regarding the current CPU
-  (i.e. that which issued the read), due to use of read_cpuid_id() within
-  c_show. This isn't fantastic as it doesn't match arm and x86 (which print
-  information per-cpu), and on big.LITTLE AArch64 systems it will mean we don't
-  get accurate information regarding each CPU. Using the newly recorded
-  information, we can print correct information per-CPU in /proc/cpuinfo.
-
-* Level 1 instruction cache policy can differ across CPU micro-architectures in
-  big.LITTLE configurations, which can lead to a subset of cores reporting
-  aliasing I-caches in CTR_EL0.L1Ip. If any CPUs in the system have VIPT or
-  AIVIVT I-caches, the appropriate maintenance must be performed even from those
-  CPUs whose caches are non-aliasing. We can use the newly recorded information
-  to detect when this is the case.
-
-* Sometimes CPUs are erroneously configured differently by firmware such that a
-  feature is only enabled on a subset of CPUs. Even in the presence of
-  big.LITTLE systems we do not generally expect this, and such problems can be
-  difficult to detect. To enable early detection of mismatched capabilities in
-  SMP systems, we can use the newly recorded information to compare CPUs
-  feature-wise and identify potential issues.
-
-The series is based on v3.16-rc2, and can be found in my
-arm64/heterogeneous-sysreg branch [2,3].
-
-Cheers,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255389.html
-[2] http://linux-arm.org/git?p=linux-mr.git;a=shortlog;h=refs/heads/arm64/heterogeneous-sysreg
-[3] git://linux-arm.org/linux-mr.git arm64/heterogeneous-sysreg
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264387.html
-
-Mark Rutland (5):
-  arm64: add MIDR_EL1 field accessors
-  arm64: cpuinfo: record cpu system register values
-  arm64: cpuinfo: print info for all CPUs
-  arm64: cachetype: report weakest cache policy
-  arm64: add runtime system sanity checks
-
- arch/arm64/include/asm/cachetype.h |  16 +--
- arch/arm64/include/asm/cpu.h       |  59 ++++++++++++
- arch/arm64/include/asm/cputype.h   |  33 +++++--
- arch/arm64/kernel/Makefile         |   3 +-
- arch/arm64/kernel/cpuinfo.c        | 193 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c          |  36 +++----
- arch/arm64/kernel/smp.c            |   6 ++
- 7 files changed, 315 insertions(+), 31 deletions(-)
- create mode 100644 arch/arm64/include/asm/cpu.h
- create mode 100644 arch/arm64/kernel/cpuinfo.c
-
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 27f54a7..ec5e41c 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -36,15 +36,34 @@
+ 	__val;								\
+ })
+ 
++#define MIDR_REVISION_MASK	0xf
++#define MIDR_REVISION(midr)	((midr) & MIDR_REVISION_MASK)
++#define MIDR_PARTNUM_SHIFT	4
++#define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
++#define MIDR_PARTNUM(midr)	\
++	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
++#define MIDR_ARCHITECTURE_SHIFT	16
++#define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
++#define MIDR_ARCHITECTURE(midr)	\
++	(((midr) & MIDR_ARCHITECTURE_MASK) >> MIDR_ARCHITECTURE_SHIFT)
++#define MIDR_VARIANT_SHIFT	20
++#define MIDR_VARIANT_MASK	(0xf << MIDR_VARIANT_SHIFT)
++#define MIDR_VARIANT(midr)	\
++	(((midr) & MIDR_VARIANT_MASK) >> MIDR_VARIANT_SHIFT)
++#define MIDR_IMPLEMENTOR_SHIFT	24
++#define MIDR_IMPLEMENTOR_MASK	(0xff << MIDR_IMPLEMENTOR_SHIFT)
++#define MIDR_IMPLEMENTOR(midr)	\
++	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
++
+ #define ARM_CPU_IMP_ARM		0x41
+ #define ARM_CPU_IMP_APM		0x50
+ 
+-#define ARM_CPU_PART_AEM_V8	0xD0F0
+-#define ARM_CPU_PART_FOUNDATION	0xD000
+-#define ARM_CPU_PART_CORTEX_A53	0xD030
+-#define ARM_CPU_PART_CORTEX_A57	0xD070
++#define ARM_CPU_PART_AEM_V8	0xD0F
++#define ARM_CPU_PART_FOUNDATION	0xD00
++#define ARM_CPU_PART_CORTEX_A57	0xD07
++#define ARM_CPU_PART_CORTEX_A53	0xD03
+ 
+-#define APM_CPU_PART_POTENZA	0x0000
++#define APM_CPU_PART_POTENZA	0x000
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -65,12 +84,12 @@ static inline u64 __attribute_const__ read_cpuid_mpidr(void)
+ 
+ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
+ {
+-	return (read_cpuid_id() & 0xFF000000) >> 24;
++	return MIDR_IMPLEMENTOR(read_cpuid_id());
+ }
+ 
+ static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
+ {
+-	return (read_cpuid_id() & 0xFFF0);
++	return MIDR_PARTNUM(read_cpuid_id());
+ }
+ 
+ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
 -- 
 1.9.1
