@@ -1,51 +1,62 @@
-From: scameron@beardog.cce.hp.com (scameron at beardog.cce.hp.com)
-Date: Thu, 26 Jun 2014 09:34:45 -0500
-Subject: [PATCH] [SCSI] hpsa: fix non-x86 builds
-In-Reply-To: <6003317.KPlAy1USkq@wuerfel>
-References: <6003317.KPlAy1USkq@wuerfel>
-Message-ID: <20140626143445.GO25166@beardog.cce.hp.com>
+From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
+Date: Thu, 26 Jun 2014 14:44:52 +0000
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 03:44:52PM +0200, Arnd Bergmann wrote:
-> commit 28e134464734 "[SCSI] hpsa: enable unit attention reporting"
-> turns on unit attention notifications, but got the change wrong for
-> all architectures other than x86, which now store an uninitialized
-> value into the device register.
-> 
-> Gcc helpfully warns about this:
-> 
-> ../drivers/scsi/hpsa.c: In function 'hpsa_set_driver_support_bits':
-> ../drivers/scsi/hpsa.c:6373:17: warning: 'driver_support' is used uninitialized in this function [-Wuninitialized]
->   driver_support |= ENABLE_UNIT_ATTN;
->                  ^
-> 
-> This moves the #ifdef so only the prefetch-enable is conditional
-> on x86, not also reading the initial register contents. 
-> 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 28e134464734 "[SCSI] hpsa: enable unit attention reporting"
-> Cc: Stephen M. Cameron <scameron@beardog.cce.hp.com>
-> Cc: stable at vger.kernel.org # v3.14+
-> 
-> diff --git a/drivers/scsi/hpsa.c b/drivers/scsi/hpsa.c
-> index 31184b3..d0e487c 100644
-> --- a/drivers/scsi/hpsa.c
-> +++ b/drivers/scsi/hpsa.c
-> @@ -6365,9 +6365,9 @@ static inline void hpsa_set_driver_support_bits(struct ctlr_info *h)
->  {
->  	u32 driver_support;
->  
-> -#ifdef CONFIG_X86
-> -	/* Need to enable prefetch in the SCSI core for 6400 in x86 */
->  	driver_support = readl(&(h->cfgtable->driver_support));
-> +	/* Need to enable prefetch in the SCSI core for 6400 in x86 */
-> +#ifdef CONFIG_X86
->  	driver_support |= ENABLE_SCSI_PREFETCH;
->  #endif
->  	driver_support |= ENABLE_UNIT_ATTN;
+Thank you for your reply,
 
-Thanks.
+> On Wed, Jun 25, 2014 at 01:55:05PM +0000, Mattis Lorentzon wrote:
+> > I have a similar issue with v3.16-rc2 as previously reported by Waldemar
+> Brodkorb for v3.15-rc4.
+> > https://lkml.org/lkml/2014/5/9/330
+> 
+> This URL returns no useful information.  I find that lkml.org is broken more
+> times than not in recent years.  Please use a different archive site when
+> referring to posts, thanks.
 
--- steve
+http://lkml.iu.edu/hypermail/linux/kernel/1405.1/01114.html
+
+> I have had two iMX6 platforms running root-NFS for about the last six to nine
+> months with various workloads, and have never seen this oops.
+> Unfortunately, the description above gives very little information for what
+> the mechanism to trigger this bug may be.  For example, if I wanted to
+> reproduce it, what would I need to do?
+
+We have managed to trigger the Oops by just transferring a large file over nfs
+cat /mnt/foo > /dev/null
+where foo is a file that is approximately 2 GB. There may be some packet losses
+on this network, perhaps this differs from your workload?
+
+> > The error is sporadic and it seems to occur more frequently when using
+> perf.
+> 
+> So it occurs when not using perf?
+
+Yes, certainly, see above.
+
+We have done some more investigations, please find it in this mail:
+
+http://lkml.iu.edu/hypermail/linux/kernel/1406.3/02190.html
+
+The Oops seems to have been introduced somewhere between v3.12 and v3.13:
+
+- The Oops is reproducible within seconds when running Linux 3.16-rc2.
+- We have observed the Oops on 8 different hardware units and two different chipsets (Freescale i.MX6 and Xilinx Zynq).
+- The Oops has not been seen on Linux 3.12 so it appears to be good.
+- The Oops has been seen on Linux 3.13, 3.14, 3.15, 3.16-rc2 so these appear to be bad.
+
+Configs and a couple of Oops reports are attached to the linked mail.
+
+Best regards,
+Mattis Lorentzon
+***************************************************************
+Consider the environment before printing this message.
+
+To read Autoliv's Information and Confidentiality Notice, follow this link:
+http://www.autoliv.com/disclaimer.html
+***************************************************************
