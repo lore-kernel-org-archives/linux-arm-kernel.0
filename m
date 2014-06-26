@@ -1,47 +1,54 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 26 Jun 2014 11:30:33 +0530
-Subject: Suspend/Resume support for PCI
-In-Reply-To: <CAGAs2AnPSGYhC7KkW=pFYKaoFgp7NEjf4gyoDeXZ9wQoPFPG7g@mail.gmail.com>
-References: <CAGAs2AnPSGYhC7KkW=pFYKaoFgp7NEjf4gyoDeXZ9wQoPFPG7g@mail.gmail.com>
-Message-ID: <CAKohpok9YxuQqD53A9O0MXjPhvzfv5LjbjZcWQBV_R_hTvbeTA@mail.gmail.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Thu, 26 Jun 2014 11:33:48 +0530
+Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
+In-Reply-To: <1403724500.11749.22.camel@smoke>
+References: <53AAE632.3020806@mvista.com>
+	<1403724500.11749.22.camel@smoke>
+Message-ID: <CAFdej01izSoBYTqd6dkSfE7eq4WcUTzePZFOJZLMT=VEne3+pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc'd Arnd/Ulf.
+Hi Geoff,
 
-On 26 June 2014 11:24, AYAN KUMAR HALDER <ayankumarh@gmail.com> wrote:
-> Hi,
+
 >
-> I am using a ARM based custom SOC which has a power management unit to
-> turn off/on the various power domains. When I execute a suspend
-> command(echo mem > /sys/power/state), then I turn off the power of the
-> entire SOC except my PMU( as they are in different power domains).
+> On Wed, 2014-06-25 at 20:39 +0530, arun chandran wrote:
+> > Selecting CPU_BIG_ENDIAN and building the kernel fails just after
+> > building it for little endian with the message
+> >
+> >    VDSOA arch/arm64/kernel/vdso/gettimeofday.o
+> >    VDSOL arch/arm64/kernel/vdso/vdso.so.dbg
+> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
+> > arch/arm64/kernel/vdso/note.o: compiled for a little endian system and
+> > target is big endian
+> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
+> > failed to merge target specific data of file
+> > arch/arm64/kernel/vdso/note.o
+> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
+> > arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system
+> > and target is big endian
+> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
+> > failed to merge target specific data of file
+> > arch/arm64/kernel/vdso/sigreturn.o
+> > collect2: error: ld returned 1 exit status
+> > make[2]: *** [arch/arm64/kernel/vdso/vdso.so.dbg] Error 1
+> > make[1]: *** [arch/arm64/kernel/vdso] Error 2
+> > make: *** [arch/arm64/kernel] Error 2
+> > make: *** Waiting for unfinished jobs....
+> >
+> > Fix it by 'Forcing' the build in arch/arm64/kernel/vdso/Makefile
+> >
+> > Signed-off-by: Arun Chandran <achandran@mvista.com>
 >
-> When ever the PMU receives a certain wake-up interrupt, it powers up
-> the CPU and SOC and the CPU resumes the kernel as per the Linux power
-> management framework.
+> This seems like a bit too much to put into the commit log.  What about
+> something like:
 >
-> Now I have a PCI controller which has been configured in
-> "linux/arch/arm/<mach-mysoc>/pcie.c". During suspend as the PCI
-> power(which is part of the SOC power domain) gets turned off, so the
-> controller loses its register configurations. On resume, the pci
-> driver's resume functions get called and the system hangs up(when it
-> tries to read/write to pci configuration space).
+>   Selecting CPU_BIG_ENDIAN and building the kernel fails just after
+>   building it for little endian.  Fix it by 'Forcing' the build of
+>   vdso.  Fixes build errors like these:
 >
-> As per my understanding, the pci driver has implementation of bus/
-> device power management. It does not reconfigure the pci controller.
-> So how should I make the pci controller work fine on system resume.
-> Is it so that I need to reconfigure the pcie controller's registers
-> (as it has been done in "linux/arch/arm/<mach-mysoc>/pcie.c") from the
-> resume function of pci driver. Or would that compromise the entire
-> linux pm framework.
+>     arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
+>
+Ok I will do that and resend it.
 
-AFAIR, you need to do a save/restore of registers for all peripherals
-you care about from the suspend/resume callbacks..
-
-There must be many examples of this, like: drivers/gpio/gpio-pl061.c
-
-I was involved in doing this long back and am not aware of latest
-happenings around this.
-
-People cc'd must be able to tell you better answers probably :)
+--Arun
