@@ -1,84 +1,41 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Thu, 26 Jun 2014 14:15:15 +0530
-Subject: [PATCH 4/4 v2] ARM: DTS: Add NTC thermistor nodes to Exynos5420
- based Peach_PIT
-In-Reply-To: <CAHfPSqBL9hH+r8Fy4GbbY1E_sJVCP-gpDHATDJgRHP4wKrFaiA@mail.gmail.com>
-References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
- <1403677773-21141-5-git-send-email-ch.naveen@samsung.com>
- <CAD=FV=WeuFhGK=JNEm20CT73J=c1Zc_dZGQT6bKeob895M+kQA@mail.gmail.com>
- <CAHfPSqBL9hH+r8Fy4GbbY1E_sJVCP-gpDHATDJgRHP4wKrFaiA@mail.gmail.com>
-Message-ID: <CAHfPSqBAurQtiVg8KjxJkgvdB7XUHdQkEfjRtgUCKncE2feCdA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jun 2014 09:46:26 +0100
+Subject: [PATCH 2/2 v2] ARM: KVM: user_mem_abort: support stage 2 MMIO
+ page mapping
+In-Reply-To: <20140625194551.a6443252bf913023159d25fd@freescale.com>
+References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
+ <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
+ <20140506180448.GH3066@lvm>
+ <87bnvaotei.fsf@approximate.cambridge.arm.com>
+ <20140507145557.GJ3066@lvm> <20140624102327.GA9121@arm.com>
+ <53A9556D.3000003@arm.com>
+ <20140625194551.a6443252bf913023159d25fd@freescale.com>
+Message-ID: <20140626084625.GA376@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug, Kukjin,
+On Thu, Jun 26, 2014 at 01:45:51AM +0100, Kim Phillips wrote:
+> From: Kim Phillips <kim.phillips@linaro.org>
+> 
+> A userspace process can map device MMIO memory via VFIO or /dev/mem,
+> e.g., for platform device passthrough support in QEMU.
+> 
+> During early development, we found the PAGE_S2 memory type being used
+> for MMIO mappings.  This patch corrects that by using the more strongly
+> ordered memory type for device MMIO mappings: PAGE_S2_DEVICE.
+> 
+> Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> Hi, here's a v2, upon request:
+> 
+> - rebased onto today's mainline ToT
+> - mmu.o-build tested only (ToT build doesn't complete)
+> - made commit text less terse
+> - added Christoffer's ack
 
-On 26 June 2014 11:46, Naveen Krishna Ch <naveenkrishna.ch@gmail.com> wrote:
-> Doug,
->
-> On 26 June 2014 02:10, Doug Anderson <dianders@chromium.org> wrote:
->> Naveen,
->>
->> On Tue, Jun 24, 2014 at 11:29 PM, Naveen Krishna Chatradhi
->> <ch.naveen@samsung.com> wrote:
->>> Exynos5420 based Peach PIT board has 4 NTC thermistors to measure
->>> temperatures at various points on the board.
->>>
->>> IIO based ADC becomes the parent and NTC thermistors are the childs,
->>> via the HWMON interface.
->>>
->>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->>> Cc: Doug Anderson <dianders@chromium.org>
->>> ---
->>> Changes since v1:
->>> 1. Arranged the ADC node alphabetical
->>> 2. Added "status = "okay"" to the ADC node
->>>
->>> This patch needs
->>> 1. MAX77802 PMIC device tree nodes (for ldo9)
->>>    https://www.mail-archive.com/devicetree at vger.kernel.org/msg31430.html
->>> 2. Uses the DT documentation for NTC thermistors updated with vendor-prefix
->>>
->>> This patch set is tested
->>> 1. On Peach PIT board via sysfs entry exposed by hwmon
->>> localhost ~ # cat /sys/class/hwmon/hwmon*/device/temp1_input
->>> 37436
->>> 36449
->>> 38560
->>> 38059
->>>
->>> 2. Backward compatibility is tested by replacing "murata" with "ntc"
->>>    in the dts nodes and running the above test.
->>>
->>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   34 ++++++++++++++++++++++++++++
->>>  1 file changed, 34 insertions(+)
->>
->> Now that Javier has spun his patch, perhaps you can fold the "pi"
->> version in here too?
->
-> Sure, thanks for the information.
->
-> Snow also needs the adc nodes.
-> Will try to implement an adc fragment for PIT, PI and Snow.
+Thanks for reposting this so quickly!
 
-I just found out  https://lkml.org/lkml/2013/3/27/453
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Adding ADC based Thermistor nodes to Exynos5250-snow.dts din't make it in.
-
-
->
->>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
->> Tested-by: Doug Anderson <dianders@chromium.org>
->
->
->
-> --
-> Shine bright,
-> (: Nav :)
-
-
-
--- 
-Shine bright,
-(: Nav :)
+Will
