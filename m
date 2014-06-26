@@ -1,76 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jun 2014 16:14:24 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
-Message-ID: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jun 2014 16:16:01 +0100
+Subject: [PATCH v5 7/8] drivers: cpuidle: initialize Exynos driver
+ through DT
+In-Reply-To: <5019714.S4WTdsyrXS@amdc1032>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403705421-17597-8-git-send-email-lorenzo.pieralisi@arm.com>
+ <5019714.S4WTdsyrXS@amdc1032>
+Message-ID: <20140626151601.GB27364@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 02:44:52PM +0000, Mattis Lorentzon wrote:
-> Thank you for your reply,
+On Wed, Jun 25, 2014 at 04:23:38PM +0100, Bartlomiej Zolnierkiewicz wrote:
 > 
-> > On Wed, Jun 25, 2014 at 01:55:05PM +0000, Mattis Lorentzon wrote:
-> > > I have a similar issue with v3.16-rc2 as previously reported by Waldemar
-> > Brodkorb for v3.15-rc4.
-> > > https://lkml.org/lkml/2014/5/9/330
-> >
-> > This URL returns no useful information.  I find that lkml.org is broken more
-> > times than not in recent years.  Please use a different archive site when
-> > referring to posts, thanks.
+> Hi,
 > 
-> http://lkml.iu.edu/hypermail/linux/kernel/1405.1/01114.html
-
-I remember that report, but it was never resolved as I think no one has
-any ideas what is causing these, and no one has any idea where to start
-looking.
-
-> We have managed to trigger the Oops by just transferring a large file
-> over nfs
-> cat /mnt/foo > /dev/null
-> where foo is a file that is approximately 2 GB. There may be some
-> packet losses on this network, perhaps this differs from your workload?
-
-That's a similar workload to the one which is mentioned in the previous
-report.  I've just set a similar transfer going, but this will be a 16GB
-file.
-
-> We have done some more investigations, please find it in this mail:
+> On Wednesday, June 25, 2014 03:10:20 PM Lorenzo Pieralisi wrote:
+> > With the introduction of DT based idle states, CPUidle drivers for
+> > ARM can now initialize idle states data through properties in the device
+> > tree.
+> > 
+> > This patch adds code to the Exynos CPUidle driver to dynamically
+> > initialize idle states data through the updated device tree source
+> > files.
+> > 
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> > Compile tested, I am not sure I patched the right dts files, please check.
 > 
-> http://lkml.iu.edu/hypermail/linux/kernel/1406.3/02190.html
+> cpuidle-exynos driver is currently working properly in deeper cpuidle
+> mode (AFTR) on Exynos4210 and Exynos5250 (please also see the following
+> patch from Tomasz Figa: [1]).  There is ongoing work to AFTR mode work
+> also on Exynos4x12 and Exynos3250 but it is not complete yet.  Exynos5410
+> OTOH should probably use the generic big little cpuidle driver (this SoC
+> is similar to Exynos5420 one for which Chander Kashyap has developed
+> cpuidle-big_little support [2]).
+> 
+> Making long story short, I think that your patch should depend on patch
+> [1] and update only exynos4210.dtsi and exynos5250.dtsi.  Also for your
+> patch #6 there needs to be some coordination with merging of Chander's
+> patchset ([2]).
 
-Yes, I saw that before I replied, and my reply was written with that
-message in mind.  That's what prompted this paragraph in my previous
-reply:
+Ok, thank you for the info, I will coordinate with Tomasz and Chander
+then.
 
-"Your other oops dumps also show various other functions apparantly
-returning 0xffffffff.  I can't believe that there's more than one bug
-doing this, so I doubt the problem is in these functions.  Something
-else must be going on."
+Lorenzo
 
-One of the problems is that there's soo much work going on with the
-kernel by many different parties, pulling it in various directions,
-that no one really has an overview of all the changes, and so no one
-has much of a feel what could be the cause of weird bugs like this.
-
-I don't know what to suggest - you could try using git bisect to see
-if you can track it down to a particular commit, but it sounds like
-that's going to be very time consuming.  You mentioned that 3.12
-doesn't show the bug, but 3.13 does - so start off telling git bisect
-that 3.12 is "good" and 3.13 is "bad".
-
-Hopefully there won't be too many breakages during the 3.13 merge
-window (between 3.12 and 3.13-rc1), but I don't have much faith in
-that; people seem to have a habbit of holding back fixes until -rc1,
-which makes _exactly_ this kind of bug much harder for people like
-yourselves to track down - or maybe even impossible.
-
-I'm afraid I can't offer very much help beyond this until either I can
-produce it, or someone manages to identify a particular change which
-caused this.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> [1] http://www.spinics.net/lists/arm-kernel/msg341023.html
+> [2] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg664470.html
+> 
+> >  .../devicetree/bindings/arm/exynos/idle-states.txt | 27 ++++++++++++++++++++
+> >  arch/arm/boot/dts/exynos3250.dtsi                  | 16 ++++++++++++
+> >  arch/arm/boot/dts/exynos5250.dtsi                  | 15 +++++++++++
+> >  arch/arm/boot/dts/exynos5410.dtsi                  | 17 +++++++++++++
+> >  drivers/cpuidle/Kconfig.arm                        |  1 +
+> >  drivers/cpuidle/cpuidle-exynos.c                   | 29 +++++++++++++---------
+> >  6 files changed, 93 insertions(+), 12 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/exynos/idle-states.txt
+> 
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
