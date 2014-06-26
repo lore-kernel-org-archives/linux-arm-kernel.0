@@ -1,34 +1,19 @@
-From: guido@vanguardiasur.com.ar (=?UTF-8?q?Guido=20Mart=C3=ADnez?=)
-Date: Thu, 26 Jun 2014 12:02:03 -0300
-Subject: [PATCH] arm: mach-omap2: gpmc: ignore non-available nodes
-Message-ID: <1403794923-19511-1-git-send-email-guido@vanguardiasur.com.ar>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 26 Jun 2014 18:00:33 +0300
+Subject: [PATCH] clk: define and export __clk_get_debug for providers
+In-Reply-To: <1403788921-7963-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1403788921-7963-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20140626150033.GH3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, child nodes of the gpmc node are iterated and probed
-regardless of their 'status' property. This means adding 'status =
-"disabled";' has no effect.
+On Thu, Jun 26, 2014 at 03:22:01PM +0200, Peter De Schrijver wrote:
+> Define and export a new function __clk_get_debug which returns the debugfs
+> directory entry pointer. This can be used by clock providers to add debugfs
+> entries which are not related to a specific clock type. Examples include the
+> ability to measure the rate of a clock. It can also be used by modules to
+> create new debugfs entries. This is useful if you want to expose features
+> for testing which can potentially cause system instability such as allowing
+> to change a clock's rate from userspace.
 
-This patch changes the iteration to only probe nodes marked as
-available.
-
-Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
----
- arch/arm/mach-omap2/gpmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 2c0c281..8bc1338 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1615,7 +1615,7 @@ static int gpmc_probe_dt(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	for_each_child_of_node(pdev->dev.of_node, child) {
-+	for_each_available_child_of_node(pdev->dev.of_node, child) {
- 
- 		if (!child->name)
- 			continue;
--- 
-2.0.0
+Oops. Ignore this :)
