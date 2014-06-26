@@ -1,33 +1,42 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 26 Jun 2014 12:05:46 +0800
-Subject: [PATCH v4 7/8] ARM: config: add ARCH_HIX5HD2 in hi3xxx_defconfig
+Date: Thu, 26 Jun 2014 12:05:47 +0800
+Subject: [PATCH v4 8/8] document: add dt binding on hix5hd2 SoC
 In-Reply-To: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1403755547-623-8-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1403755547-623-9-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since both ARCH_HI3xxx and ARCH_HIX5HD2 are based on Cortex A9 & they're
-using similiar kernel features, make them share the same default config.
+Add the DT binding of basic SoC on Hisilicon HiX5HD2 SoC.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/configs/hi3xxx_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/configs/hi3xxx_defconfig b/arch/arm/configs/hi3xxx_defconfig
-index f186bdf..9630687 100644
---- a/arch/arm/configs/hi3xxx_defconfig
-+++ b/arch/arm/configs/hi3xxx_defconfig
-@@ -3,7 +3,9 @@ CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_RD_LZMA=y
-+CONFIG_ARCH_HISI=y
- CONFIG_ARCH_HI3xxx=y
-+CONFIG_ARCH_HIX5HD2=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index df0a452..b0ea477 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -4,6 +4,9 @@ Hisilicon Platforms Device Tree Bindings
+ Hi4511 Board
+ Required root node properties:
+ 	- compatible = "hisilicon,hi3620-hi4511";
++HIX5HD2 DKB Board
++Required root node properties:
++	- compatible = "hisilicon,hix5hd2";
+ 
+ Hisilicon system controller
+ 
+@@ -44,3 +47,9 @@ Example:
+ 		compatible = "hisilicon,pctrl";
+ 		reg = <0xfca09000 0x1000>;
+ 	};
++
++Cpu power controller:
++
++Required Properties:
++- compatible: "hisilicon,cpuctrl";
++- reg: Address and size of cpu power controller.
 -- 
 1.9.1
