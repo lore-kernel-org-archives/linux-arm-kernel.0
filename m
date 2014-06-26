@@ -1,33 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jun 2014 12:39:39 +0100
-Subject: [PATCH 0/3] Deterministic UART numbering on Samsung SoCs
-In-Reply-To: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
-References: <1403781875-5425-1-git-send-email-t.figa@samsung.com>
-Message-ID: <20140626113939.GP32514@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 26 Jun 2014 13:43:02 +0200
+Subject: [PATCH] crypto: ux500: make interrupt mode plausible
+Message-ID: <13720857.JmA1VNKFj8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 01:24:32PM +0200, Tomasz Figa wrote:
-> Current Samsung UART driver relies on probe order of particular
-> samsung-uart instances, which makes it impossible to get proper
-> initialization of ports when not all ports are available on board,
-> not even saying of deterministic device naming.
-> 
-> This series intends to fix this situation by adding support to parse
-> aliases from device tree and use them to assign instance IDs to
-> particular port instances.
+The interrupt handler in the ux500 crypto driver has an obviously
+incorrect way to access the data buffer, which for a while has
+caused this build warning:
 
-How about instead exporting the path/id information so that userspace
-can create /dev/serial/by-{path,id}/... for internal devices instead?
+../ux500/cryp/cryp_core.c: In function 'cryp_interrupt_handler':
+../ux500/cryp/cryp_core.c:234:5: warning: passing argument 1 of '__fswab32' makes integer from pointer without a cast [enabled by default]
+     writel_relaxed(ctx->indata,
+     ^
+In file included from ../include/linux/swab.h:4:0,
+                 from ../include/uapi/linux/byteorder/big_endian.h:12,
+                 from ../include/linux/byteorder/big_endian.h:4,
+                 from ../arch/arm/include/uapi/asm/byteorder.h:19,
+                 from ../include/asm-generic/bitops/le.h:5,
+                 from ../arch/arm/include/asm/bitops.h:340,
+                 from ../include/linux/bitops.h:33,
+                 from ../include/linux/kernel.h:10,
+                 from ../include/linux/clk.h:16,
+                 from ../drivers/crypto/ux500/cryp/cryp_core.c:12:
+../include/uapi/linux/swab.h:57:119: note: expected '__u32' but argument is of type 'const u8 *'
+ static inline __attribute_const__ __u32 __fswab32(__u32 val)
 
-The problem you're raising is very much the same problem you have when
-there are multiple USB serial devices connected to the machine - you
-just get a bunch of /dev/ttyUSB* devices which are unordered (they can
-change on each boot, or change order if you disconnect and reconnect
-them.)
+There are at least two, possibly three problems here:
+a) when writing into the FIFO, we copy the pointer rather than the
+   actual data we want to give to the hardware
+b) the data pointer is an array of 8-bit values, while the FIFO
+   is 32-bit wide, so both the read and write access fail to do
+   a proper type conversion
+c) This seems incorrect for big-endian kernels, on which we need to
+   byte-swap any register access, but not normally FIFO accesses,
+   at least the DMA case doesn't do it either.
 
-/dev/serial/by-{path,id}/ allows for a much more stable path.
+This converts the bogus loop to use the same readsl/writesl pair
+that we use for the two other modes (DMA and polling). This is
+more efficient and consistent, and probably correct for endianess.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+The bug has existed since the driver was first merged, and was
+probably never detected because nobody tried to use interrupt mode.
+It might make sense to backport this fix to stable kernels, depending
+on how the crypto maintainers feel about that.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-crypto at vger.kernel.org
+Cc: Fabio Baltieri <fabio.baltieri@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: stable at vger.kernel.org
+
+diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
+index a999f53..92105f3 100644
+--- a/drivers/crypto/ux500/cryp/cryp_core.c
++++ b/drivers/crypto/ux500/cryp/cryp_core.c
+@@ -190,7 +190,7 @@ static void add_session_id(struct cryp_ctx *ctx)
+ static irqreturn_t cryp_interrupt_handler(int irq, void *param)
+ {
+ 	struct cryp_ctx *ctx;
+-	int i;
++	int count;
+ 	struct cryp_device_data *device_data;
+ 
+ 	if (param == NULL) {
+@@ -215,12 +215,11 @@ static irqreturn_t cryp_interrupt_handler(int irq, void *param)
+ 	if (cryp_pending_irq_src(device_data,
+ 				 CRYP_IRQ_SRC_OUTPUT_FIFO)) {
+ 		if (ctx->outlen / ctx->blocksize > 0) {
+-			for (i = 0; i < ctx->blocksize / 4; i++) {
+-				*(ctx->outdata) = readl_relaxed(
+-						&device_data->base->dout);
+-				ctx->outdata += 4;
+-				ctx->outlen -= 4;
+-			}
++			count = ctx->blocksize / 4;
++
++			readsl(&device_data->base->dout, ctx->outdata, count);
++			ctx->outdata += count;
++			ctx->outlen -= count;
+ 
+ 			if (ctx->outlen == 0) {
+ 				cryp_disable_irq_src(device_data,
+@@ -230,12 +229,12 @@ static irqreturn_t cryp_interrupt_handler(int irq, void *param)
+ 	} else if (cryp_pending_irq_src(device_data,
+ 					CRYP_IRQ_SRC_INPUT_FIFO)) {
+ 		if (ctx->datalen / ctx->blocksize > 0) {
+-			for (i = 0 ; i < ctx->blocksize / 4; i++) {
+-				writel_relaxed(ctx->indata,
+-						&device_data->base->din);
+-				ctx->indata += 4;
+-				ctx->datalen -= 4;
+-			}
++			count = ctx->blocksize / 4;
++
++			writesl(&device_data->base->din, ctx->indata, count);
++
++			ctx->indata += count;
++			ctx->datalen -= count;
+ 
+ 			if (ctx->datalen == 0)
+ 				cryp_disable_irq_src(device_data,
