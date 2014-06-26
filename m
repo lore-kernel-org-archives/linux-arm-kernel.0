@@ -1,59 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Jun 2014 12:08:57 -0600
-Subject: [PATCH v1 4/9] pinctrl: tegra-xusb: Add USB PHY support
-In-Reply-To: <CAL1qeaHhoqEPu-j+drNiRMyeutz=qqZPxSP8H+v-sgjZSfS5tQ@mail.gmail.com>
-References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>	<1403072180-4944-5-git-send-email-abrestic@chromium.org>	<53AB493F.3030802@wwwdotorg.org>
- <CAL1qeaHhoqEPu-j+drNiRMyeutz=qqZPxSP8H+v-sgjZSfS5tQ@mail.gmail.com>
-Message-ID: <53AC61B9.5030408@wwwdotorg.org>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Thu, 26 Jun 2014 18:08:25 +0000
+Subject: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability
+ IOMMU_CAP_INTR_REMAP
+In-Reply-To: <20140616153832.GC31771@8bytes.org>
+References: <1401987808-23596-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1401987808-23596-5-git-send-email-a.motakis@virtualopensystems.com>
+ <20140608103129.GC3279@lvm> <20140616145344.GD18986@8bytes.org>
+ <20140616151329.GQ16758@arm.com> <20140616152157.GB31771@8bytes.org>
+ <20140616152526.GR16758@arm.com> <20140616153832.GC31771@8bytes.org>
+Message-ID: <9353770066894e85809e1e443b71d1cd@BY2PR07MB203.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2014 05:30 PM, Andrew Bresticker wrote:
-> On Wed, Jun 25, 2014 at 3:12 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
->>> In addition to the PCIe and SATA PHYs, the XUSB pad controller also
->>> supports 3 UTMI, 2 HSIC, and 2 USB3 PHYs.  Each USB3 PHY uses a single
->>> PCIe or SATA lane and is mapped to one of the three UTMI ports.
->>>
->>
->>> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
->>
->>> @@ -372,6 +720,193 @@ static int tegra_xusb_padctl_pinconf_group_set(struct pinctrl_dev *pinctrl,
->>>                       padctl_writel(padctl, regval, lane->offset);
->>>                       break;
->>>
->>> +             case TEGRA_XUSB_PADCTL_USB3_PORT_NUM:
->>> +                     if (value >= TEGRA_XUSB_PADCTL_USB3_PORTS) {
->>> +                             dev_err(padctl->dev, "Invalid USB3 port: %lu\n",
->>> +                                     value);
->>> +                             return -EINVAL;
->>> +                     }
->>> +                     if (!is_pcie_sata_lane(group)) {
->>> +                             dev_err(padctl->dev,
->>> +                                     "USB3 port not applicable for pin %d\n",
->>> +                                     group);
->>> +                             return -EINVAL;
->>> +                     }
->>> +                     padctl->usb3_ports[value].lane = group;
->>> +                     break;
->>
->> It feels odd to use pinctrl for a SW-only purpose. In other words, that
->> chunk of code isn't writing the pinconf data to HW, but rather some
->> internal variable.
-> 
-> Well the mapping of lanes to USB3 ports is a hardware property and we
-> do use it when programming the hardware later to choose which set of
-> lane registers to program given a USB3 port, but it's true that it's
-> not some value we program into HW directly.
-> 
->> Perhaps it would make more sense for the DT binding to represent this
->> data directly in a custom property that's parsed at probe() time. That
->> way, pinctrl only touches "real" HW stuff.
-> 
-> I'm on the fence about this.  If you or others feel strongly about
-> this then I can make it a separate DT property and move it out of the
-> pinctrl properties.
+Forgive me if this discussion is not relative here, but I thought it is.  
 
-I'd certainly prefer to use pinctrl bindings only for things that get
-directly written into HW. Other configuration data should be easy to
-retrieve directly from properties.
+How is VFIO restricting devices from writing  to MSI/MSI-X,
+Is all the vector area is mapped by VFIO to trap the accesses.  I am asking this because we might need to emulate ITS somewhere either in KVM or VFIO to provide direct access to devices.
+And I don't see any mentions on that.   I think this flag needs to be set by ITS emulation.
+
+Regards,
+Tirumalesh.
+
+-----Original Message-----
+From: kvmarm-bounces@lists.cs.columbia.edu [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Joerg Roedel
+Sent: Monday, June 16, 2014 8:39 AM
+To: Will Deacon
+Cc: stuart.yoder at freescale.com; kvm at vger.kernel.org; open list; iommu at lists.linux-foundation.org; alex.williamson at redhat.com; moderated list:ARM SMMU DRIVER; tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; Christoffer Dall
+Subject: Re: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability IOMMU_CAP_INTR_REMAP
+
+On Mon, Jun 16, 2014 at 04:25:26PM +0100, Will Deacon wrote:
+> Ok, thanks. In which case, I think this is really a combined property 
+> of the SMMU and the interrupt controller, so we might need some extra 
+> code so that the SMMU can check that the interrupt controller for the 
+> device is also capable of interrupt remapping.
+
+Right, that this is part of IOMMU code has more or less historic reasons on x86. Interrupt remapping is purely implemented in the IOMMU there, so on ARM some clue-code between interrupt controler and smmu is needed.
+
+
+	Joerg
+
+
+_______________________________________________
+kvmarm mailing list
+kvmarm at lists.cs.columbia.edu
+https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
