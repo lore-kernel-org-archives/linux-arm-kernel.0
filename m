@@ -1,41 +1,112 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jun 2014 09:46:26 +0100
-Subject: [PATCH 2/2 v2] ARM: KVM: user_mem_abort: support stage 2 MMIO
- page mapping
-In-Reply-To: <20140625194551.a6443252bf913023159d25fd@freescale.com>
-References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
- <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
- <20140506180448.GH3066@lvm>
- <87bnvaotei.fsf@approximate.cambridge.arm.com>
- <20140507145557.GJ3066@lvm> <20140624102327.GA9121@arm.com>
- <53A9556D.3000003@arm.com>
- <20140625194551.a6443252bf913023159d25fd@freescale.com>
-Message-ID: <20140626084625.GA376@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 26 Jun 2014 10:47:59 +0200
+Subject: [alsa-devel] [PATCH V2 1/2] ASoC: samsung: Add machine driver for
+ Odroid X2/U3
+In-Reply-To: <53AA42A3.7030004@gmail.com>
+References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
+ <1403108551-25058-2-git-send-email-s.nawrocki@samsung.com>
+ <53AA42A3.7030004@gmail.com>
+Message-ID: <53ABDE3F.2070203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 01:45:51AM +0100, Kim Phillips wrote:
-> From: Kim Phillips <kim.phillips@linaro.org>
+On 25/06/14 05:31, Tushar Behera wrote:
+> On 06/18/2014 09:52 PM, Sylwester Nawrocki wrote:
+>> This patch adds the sound subsystem driver for Odroid-X2 and
+>> Odroid-U3 boards. The codec works in I2S master mode; there are
+>> 2 separate audio routing paths defined as there are differences
+>> in the signal routing between the X2 and U3 boards, i.e. U3 uses
+>> single jack for headphones and microphone.
+>>
+>> Signed-off-by: Chen Zhen <zhen1.chen@samsung.com>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> ---
+>>  sound/soc/samsung/Kconfig             |    8 ++
+>>  sound/soc/samsung/Makefile            |    2 +
+>>  sound/soc/samsung/odroidx2_max98090.c |  191 +++++++++++++++++++++++++++++++++
+>>  3 files changed, 201 insertions(+)
+>>  create mode 100644 sound/soc/samsung/odroidx2_max98090.c
+>>
 > 
-> A userspace process can map device MMIO memory via VFIO or /dev/mem,
-> e.g., for platform device passthrough support in QEMU.
+> [ ... ]
 > 
-> During early development, we found the PAGE_S2 memory type being used
-> for MMIO mappings.  This patch corrects that by using the more strongly
-> ordered memory type for device MMIO mappings: PAGE_S2_DEVICE.
+>> +static int odroidx2_hw_params(struct snd_pcm_substream *substream,
+>> +	struct snd_pcm_hw_params *params)
+>> +{
+>> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>> +	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+>> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+>> +	int ret;
+>> +
+>> +	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
+>> +						SND_SOC_CLOCK_IN);
+>> +	if (ret < 0) {
+>> +		dev_err(codec_dai->dev,
+>> +			"Unable to switch to FLL1: %d\n", ret);
+>> +		return ret;
+>> +	}
+>> +
+>> +	/* Set the cpu DAI configuration in order to use CDCLK */
+>> +	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
+>> +					0, SND_SOC_CLOCK_OUT);
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
 > 
-> Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> Hi, here's a v2, upon request:
-> 
-> - rebased onto today's mainline ToT
-> - mmu.o-build tested only (ToT build doesn't complete)
-> - made commit text less terse
-> - added Christoffer's ack
+> While upstreaming sound-card driver for Snow board, I had a comment from
+> Mark to move this to probe, if possible. That way, the clock operations
+> would be done only once and this function and odroidx2_ops can be
+> removed altogether.
 
-Thanks for reposting this so quickly!
+Thanks for the suggestion, I'll change it for the next iteration.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+>> +	dev_dbg(codec_dai->dev, "HiFi DAI %s params: channels: %d, rate: %d\n",
+>> +		snd_pcm_stream_str(substream), params_channels(params),
+>> +		params_rate(params));
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct snd_soc_ops odroidx2_ops = {
+>> +	.hw_params	= odroidx2_hw_params,
+>> +};
+>> +
+> 
+> [ ... ]
+> 
+>> +
+>> +	ret = snd_soc_register_card(card);
+> 
+> devm_snd_soc_register_card ?
 
-Will
+Could be, although snd_soc_unregister_card() wouldn't release references
+to the OF nodes, i.e. there would be no related of_node_put() calls.
+And for correctness, the of_node_put() calls should be made _after_
+a snd_soc_unregister_card() call, and I can't see how it could be possible
+if I left only of_node_put() calls in the odroidx2_audio_remove() callback.
+
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "snd_soc_register_card failed: %d\n", ret);
+>> +		goto err_put_cpu_n;
+>> +	}
+>> +
+>> +	return 0;
+>> +
+>> +err_put_cpu_n:
+>> +	of_node_put(odroidx2_dai[0].cpu_of_node);
+>> +err_put_cod_n:
+>> +	of_node_put(odroidx2_dai[0].codec_of_node);
+>> +	return ret;
+>> +}
+>> +
+>> +static int odroidx2_audio_remove(struct platform_device *pdev)
+>> +{
+>> +	struct snd_soc_card *card = platform_get_drvdata(pdev);
+>> +
+>> +	snd_soc_unregister_card(card);
+> 
+> This can be removed when devm_snd_soc_register_card is used.
+
+--
+Regards,
+Sylwester
