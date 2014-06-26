@@ -1,33 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jun 2014 17:10:55 +0100
-Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
-In-Reply-To: <CAAVeFuLU04rk1DWMhVJV=ktVCpq4js38p1ipCr1jh1x72b=GZw@mail.gmail.com>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
- <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
- <20140624100220.GK32514@n2100.arm.linux.org.uk> <53A953E6.2030503@nvidia.com>
- <53A95910.20104@nvidia.com>
- <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
- <53A96EC5.3030701@canonical.com>
- <1403616338.4230.8.camel@weser.hi.pengutronix.de>
- <CACP_E+KECMyusuZd6hpzthL-RpfUOJpWh0EABf1DGAeaXc00aA@mail.gmail.com>
- <CAAVeFuLU04rk1DWMhVJV=ktVCpq4js38p1ipCr1jh1x72b=GZw@mail.gmail.com>
-Message-ID: <20140626161055.GX32514@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 26 Jun 2014 09:12:58 -0700
+Subject: [PATCH v4 07/14] mfd: Add driver for Maxim 77802 Power Management
+ IC
+In-Reply-To: <53AC003E.2010608@collabora.co.uk>
+References: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403723019-6212-8-git-send-email-javier.martinez@collabora.co.uk>
+ <1403775093.27156.13.camel@AMDC1943>
+ <53AC003E.2010608@collabora.co.uk>
+Message-ID: <CAD=FV=U5sBQ4VDG65D4rTnfruo5XzQH_EMs4SMpO4BjY1UHA5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 11:53:20PM +0900, Alexandre Courbot wrote:
-> We don't plan to rely on CMA for too long. IOMMU support is on the way
-> and should make our life easier, although no matter the source of
-> memory, we will still have the issue of the lowmem mappings.
+Javier,
 
-When it comes to DMA memory, talking about lowmem vs highmem is utterly
-meaningless.
+On Thu, Jun 26, 2014 at 4:13 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+>>> +
+>>> +#ifdef CONFIG_PM_SLEEP
+>>> +static int max77802_suspend(struct device *dev)
+>>> +{
+>>> +    struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
+>>> +    struct max77802_dev *max77802 = i2c_get_clientdata(i2c);
+>>> +
+>>> +    if (device_may_wakeup(dev))
+>>> +            enable_irq_wake(max77802->irq);
+>>> +
+>>> +    disable_irq(max77802->irq);
+>>
+>> Can you add short comment why this is needed? I know why but just for
+>> future generations which will wonder: "why do we need to disable the IRQ
+>> while suspending?" :). Especially that this is rather a workaround for
+>> issue in other driver (I2C bus).
+>>
+>
+> Good idea, I'll add a comment here on next version so code archaeologists can
+> figure out what what's going on here.
 
-The lowmem/highmem split is entirely a software concept and is completely
-adjustable.  An extreme example is that you can boot any platform with
-more than 32MB of memory with 32MB of lowmem and the remainder as
-highmem.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Is the disable_irq() needed if you have
+<https://patchwork.kernel.org/patch/4421891/>?
