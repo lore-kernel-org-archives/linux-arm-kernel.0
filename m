@@ -1,53 +1,77 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 26 Jun 2014 12:05:41 +0800
-Subject: [PATCH v4 2/8] ARM: debug: add HiP04 debug uart
+Date: Thu, 26 Jun 2014 12:05:42 +0800
+Subject: [PATCH v4 3/8] ARM: debug: Rename Hi3716 to HI5XHD2
 In-Reply-To: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1403755547-623-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1403755547-623-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1403755547-623-4-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support of Hisilicon HiP04 debug uart.
+From: Haifeng Yan <yanhaifeng@gmail.com>
 
+Rename Hisilicon HI3716 to HI5XHD2. And it relies on ARCH_HI5XHD2
+instead.
+
+Hi5XHD2 is a SoC with dual Cortex A9 cores.
+
+Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
+Signed-off-by: Jiancheng Xue <jchxue@gmail.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/Kconfig.debug | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 8f90595..f64a6df 100644
+index f64a6df..17caa08 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -223,6 +223,14 @@ choice
+@@ -215,14 +215,6 @@ choice
  		  Say Y here if you want kernel low-level debugging support
- 		  on HI3716 UART.
+ 		  on HI3620 UART.
  
-+	config DEBUG_HIP04_UART
-+		bool "Hisilicon HiP04 Debug UART"
-+		depends on ARCH_HIP04
-+		select DEBUG_UART_8250
+-	config DEBUG_HI3716_UART
+-		bool "Hisilicon Hi3716 Debug UART"
+-		depends on ARCH_HI3xxx
+-		select DEBUG_UART_PL01X
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on HI3716 UART.
+-
+ 	config DEBUG_HIP04_UART
+ 		bool "Hisilicon HiP04 Debug UART"
+ 		depends on ARCH_HIP04
+@@ -231,6 +223,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HIP04 UART.
+ 
++	config DEBUG_HIX5HD2_UART
++		bool "Hisilicon Hix5hd2 Debug UART"
++		depends on ARCH_HIX5HD2
++		select DEBUG_UART_PL01X
 +		help
 +		  Say Y here if you want kernel low-level debugging support
-+		  on HIP04 UART.
++		  on Hix5hd2 UART.
 +
  	config DEBUG_HIGHBANK_UART
  		bool "Kernel low-level debugging messages via Highbank UART"
  		depends on ARCH_HIGHBANK
-@@ -1087,6 +1095,7 @@ config DEBUG_UART_PHYS
- 	default 0xd4017000 if DEBUG_MMP_UART2
- 	default 0xd4018000 if DEBUG_MMP_UART3
- 	default 0xe0000000 if ARCH_SPEAR13XX
-+	default 0xe4007000 if DEBUG_HIP04_UART
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+@@ -1101,7 +1101,7 @@ config DEBUG_UART_PHYS
  	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
-@@ -1128,6 +1137,7 @@ config DEBUG_UART_VIRT
- 	default 0xf7008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
- 				DEBUG_S3C2410_UART2)
+ 				ARCH_ORION5X
  	default 0xf7fc9000 if DEBUG_BERLIN_UART
-+	default 0xf8007000 if DEBUG_HIP04_UART
- 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
- 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
- 	default 0xfa71e000 if DEBUG_QCOM_UARTDM
+-	default 0xf8b00000 if DEBUG_HI3716_UART
++	default 0xf8b00000 if DEBUG_HIX5HD2_UART
+ 	default 0xf991e000 if DEBUG_QCOM_UARTDM
+ 	default 0xfcb00000 if DEBUG_HI3620_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+@@ -1154,7 +1154,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfe230000 if DEBUG_PICOXCELL_UART
+ 	default 0xfe300000 if DEBUG_BCM_KONA_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+-	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HI3716_UART
++	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
+ 	default 0xfeb24000 if DEBUG_RK3X_UART0
+ 	default 0xfeb26000 if DEBUG_RK3X_UART1
+ 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
 -- 
 1.9.1
