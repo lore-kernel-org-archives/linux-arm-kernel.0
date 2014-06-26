@@ -1,49 +1,80 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Thu, 26 Jun 2014 19:04:19 +0200
-Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
-In-Reply-To: <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
-References: <539fdd37.e7bc420a.76b9.ffffb583@mx.google.com>	<CAGa+x85nqPbH-sye28ni=gUEdgjGdUDqHhv1+0pV5aO8y1+wHQ@mail.gmail.com>	<53A106F1.10201@gmail.com>	<CAGa+x8527FEPk6fg5kv-fbOzK3MzcFooFGE9Me12b9C_Pv=UzA@mail.gmail.com>	<53A2AE11.2050208@gmail.com>	<53A2BE94.2010308@gmail.com>	<53A7A579.4010702@gmail.com>	<CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>	<53A9B99F.4040806@codeaurora.org>	<53A9FBB5.60709@codeaurora.org>	<53AABCF5.4050403@gmail.com>	<53AB45D1.90909@codeaurora.org>	<53ABC13C.8030908@gmail.com>
- <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
-Message-ID: <53AC5293.90209@suse.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jun 2014 18:11:10 +0100
+Subject: [PATCH] ARM: make it easier to check the CPU part number correctly
+In-Reply-To: <20140626163501.GY32514@n2100.arm.linux.org.uk>
+References: <20140624183908.GB32514@n2100.arm.linux.org.uk>
+ <20140626162618.GO15240@leverpostej>
+ <20140626163501.GY32514@n2100.arm.linux.org.uk>
+Message-ID: <20140626171110.GE27364@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin and Tushar,
+Hi Russell,
 
-Am 26.06.2014 16:59, schrieb Kevin Hilman:
->> IMO, the bug is in u-boot and we should fix that.
+On Thu, Jun 26, 2014 at 05:35:02PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 26, 2014 at 05:26:18PM +0100, Mark Rutland wrote:
+> > Hi Russell,
+> > 
+> > On Tue, Jun 24, 2014 at 07:39:08PM +0100, Russell King - ARM Linux wrote:
+> > > Ensure that platform maintainers check the CPU part number in the right
+> > > manner: the CPU part number is meaningless without also checking the
+> > > CPU implement(e|o)r (choose your preferred spelling!)  Provide an
+> > > interface which returns both the implementer and part number together,
+> > > and update the definitions to include the implementer.
+> > > 
+> > > Mark the old function as being deprecated... indeed, using the old
+> > > function with the definitions will now always evaluate as false, so
+> > > people must update their un-merged code to the new function.  While
+> > > this could be avoided by adding new definitions, we'd also have to
+> > > create new names for them which would be awkward.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > ---
+> > >  arch/arm/include/asm/cputype.h         | 37 +++++++++++++++--------
+> > >  arch/arm/include/asm/smp_scu.h         |  2 +-
+> > >  arch/arm/kernel/perf_event_cpu.c       | 55 +++++++++++++++++-----------------
+> > >  arch/arm/kvm/guest.c                   |  8 +----
+> > >  arch/arm/mach-exynos/mcpm-exynos.c     |  2 +-
+> > >  arch/arm/mach-exynos/platsmp.c         |  4 +--
+> > >  arch/arm/mach-vexpress/tc2_pm.c        |  2 +-
+> > >  arch/arm/mm/cache-l2x0.c               |  2 +-
+> > >  arch/arm64/include/asm/cputype.h       |  5 ++++
+> > >  drivers/clocksource/arm_global_timer.c |  2 +-
+> > >  10 files changed, 64 insertions(+), 55 deletions(-)
+> > 
+> > It looks like you missed drivers/cpuidle/cpuidle-big_little.c, which has
+> > a homebrew comparison in bl_idle_driver_init.
+> > 
+> > I'm slightly confused by the diffstat -- it shows changes to
+> > arch/arm64/include/asm/cputype.h, for which I can't see the
+> > corresponding diff. Did you mean to drop that?
 > 
-> I agree that the u-boot bug needs to be fixed, and FWIW, I updated my
-> u-boot and haven't seen the boot failure yet after several boots with
-> next-20140625.
+> Yes, I don't think arm_global_timer.c is used by ARM64, so I dropped that
+> change.
+> 
+> Yes, it looks like I missed cpuidle-big_little.c, but now that you point
+> it out, I have to ask whether this is really coded in an easy to understand
+> way:
+> 
+>                 /* read cpu id part number */
+>                 if ((cpuid & 0xFFF0) == cpu_id)
+>                         cpumask_set_cpu(cpu, cpumask);
+> 
+> It is /very/ easy to read that as (cpuid & 0xfff0) == cpuid dropping the
+> additional underscore.  It may make sense to rename cpu_id to be
+> desired_id.  I'd also suggest that this test becomes:
+> 
+> 		if (((cpuid ^ desired_id) & 0xff00fff0) == 0)
+>                         cpumask_set_cpu(cpu, cpumask);
+> 
+> or:
+> 
+> 		if ((cpuid & 0xff00fff0) == (desired_id & 0xff00fff0))
+>                         cpumask_set_cpu(cpu, cpumask);
 
-Could you clarify your test setup: Are you using the original InSignal
-SPL [1] with just your own u-boot.bin? Or do you have access to some
-newer Samsung-signed SPL?
+Both are fine to me, maybe you can s/cpu_id/match_id/ or something like
+that as you mentioned. I will test when you repost it or I can write the
+fix myself, as you prefer.
 
-> That being said, since it's not always feasible/practical to update
-> u-boot, and when it comes down to it, this is still a kernel
-> regression, we should also fix the kernel to sanity check the values
-> coming from u-boot, like it was doing before.
-
-Sounds good.
-
-Apart from this memory issue here, I noticed that CPUs don't appear to
-be in HYP mode for virtualization, which had required a signed SPL
-update for the ODROID-XU [2]. And to me it looks as if there's no
-Arndale Octa support in upstream U-Boot [3], no real maintenance on the
-InSignal fork [4] and a policy of not cooperating with others [5].
-
-Thanks,
-Andreas
-
-[1] http://forum.insignal.co.kr/viewtopic.php?f=6&t=3199
-[2] http://forum.odroid.com/viewtopic.php?f=64&t=2778&start=40#p32581
-[3]
-http://git.denx.de/?p=u-boot.git;a=blob;f=boards.cfg;h=947f2bc5ba2794c94b3b2cea04664f005e025f9f;hb=HEAD#l286
-[4] http://git.insignal.co.kr/insignal/arndale_octa-jb_mr1.1/u-boot/
-[5] http://forum.insignal.co.kr/viewtopic.php?f=40&t=3613
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Thank you very much,
+Lorenzo
