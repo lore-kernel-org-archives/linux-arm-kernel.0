@@ -1,54 +1,68 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Thu, 26 Jun 2014 11:33:48 +0530
-Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
-In-Reply-To: <1403724500.11749.22.camel@smoke>
-References: <53AAE632.3020806@mvista.com>
-	<1403724500.11749.22.camel@smoke>
-Message-ID: <CAFdej01izSoBYTqd6dkSfE7eq4WcUTzePZFOJZLMT=VEne3+pg@mail.gmail.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Thu, 26 Jun 2014 11:46:59 +0530
+Subject: [PATCH 4/4 v2] ARM: DTS: Add NTC thermistor nodes to Exynos5420
+ based Peach_PIT
+In-Reply-To: <CAD=FV=WeuFhGK=JNEm20CT73J=c1Zc_dZGQT6bKeob895M+kQA@mail.gmail.com>
+References: <1403677773-21141-1-git-send-email-ch.naveen@samsung.com>
+ <1403677773-21141-5-git-send-email-ch.naveen@samsung.com>
+ <CAD=FV=WeuFhGK=JNEm20CT73J=c1Zc_dZGQT6bKeob895M+kQA@mail.gmail.com>
+Message-ID: <CAHfPSqBL9hH+r8Fy4GbbY1E_sJVCP-gpDHATDJgRHP4wKrFaiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Doug,
+
+On 26 June 2014 02:10, Doug Anderson <dianders@chromium.org> wrote:
+> Naveen,
+>
+> On Tue, Jun 24, 2014 at 11:29 PM, Naveen Krishna Chatradhi
+> <ch.naveen@samsung.com> wrote:
+>> Exynos5420 based Peach PIT board has 4 NTC thermistors to measure
+>> temperatures at various points on the board.
+>>
+>> IIO based ADC becomes the parent and NTC thermistors are the childs,
+>> via the HWMON interface.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> ---
+>> Changes since v1:
+>> 1. Arranged the ADC node alphabetical
+>> 2. Added "status = "okay"" to the ADC node
+>>
+>> This patch needs
+>> 1. MAX77802 PMIC device tree nodes (for ldo9)
+>>    https://www.mail-archive.com/devicetree at vger.kernel.org/msg31430.html
+>> 2. Uses the DT documentation for NTC thermistors updated with vendor-prefix
+>>
+>> This patch set is tested
+>> 1. On Peach PIT board via sysfs entry exposed by hwmon
+>> localhost ~ # cat /sys/class/hwmon/hwmon*/device/temp1_input
+>> 37436
+>> 36449
+>> 38560
+>> 38059
+>>
+>> 2. Backward compatibility is tested by replacing "murata" with "ntc"
+>>    in the dts nodes and running the above test.
+>>
+>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   34 ++++++++++++++++++++++++++++
+>>  1 file changed, 34 insertions(+)
+>
+> Now that Javier has spun his patch, perhaps you can fold the "pi"
+> version in here too?
+
+Sure, thanks for the information.
+
+Snow also needs the adc nodes.
+Will try to implement an adc fragment for PIT, PI and Snow.
+
+>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
 
 
->
-> On Wed, 2014-06-25 at 20:39 +0530, arun chandran wrote:
-> > Selecting CPU_BIG_ENDIAN and building the kernel fails just after
-> > building it for little endian with the message
-> >
-> >    VDSOA arch/arm64/kernel/vdso/gettimeofday.o
-> >    VDSOL arch/arm64/kernel/vdso/vdso.so.dbg
-> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> > arch/arm64/kernel/vdso/note.o: compiled for a little endian system and
-> > target is big endian
-> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> > failed to merge target specific data of file
-> > arch/arm64/kernel/vdso/note.o
-> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> > arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system
-> > and target is big endian
-> > /gcc-linaro-aarch64_be-linux-gnu-4.9-2014.05_linux/bin/../lib/gcc/aarch64_be-linux-gnu/4.9.1/../../../../aarch64_be-linux-gnu/bin/ld:
-> > failed to merge target specific data of file
-> > arch/arm64/kernel/vdso/sigreturn.o
-> > collect2: error: ld returned 1 exit status
-> > make[2]: *** [arch/arm64/kernel/vdso/vdso.so.dbg] Error 1
-> > make[1]: *** [arch/arm64/kernel/vdso] Error 2
-> > make: *** [arch/arm64/kernel] Error 2
-> > make: *** Waiting for unfinished jobs....
-> >
-> > Fix it by 'Forcing' the build in arch/arm64/kernel/vdso/Makefile
-> >
-> > Signed-off-by: Arun Chandran <achandran@mvista.com>
->
-> This seems like a bit too much to put into the commit log.  What about
-> something like:
->
->   Selecting CPU_BIG_ENDIAN and building the kernel fails just after
->   building it for little endian.  Fix it by 'Forcing' the build of
->   vdso.  Fixes build errors like these:
->
->     arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
->
-Ok I will do that and resend it.
 
---Arun
+-- 
+Shine bright,
+(: Nav :)
