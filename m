@@ -1,47 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jun 2014 15:19:59 +0100
-Subject: [PATCH] mfd: ab8500-debugfs.c:  Cleaning up values that are
- never used
-In-Reply-To: <1403790000-11334-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1403790000-11334-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <20140626141959.GB19645@lee--X1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Jun 2014 15:22:31 +0100
+Subject: [PATCH 0/7] Kirkwood ASoC updates
+Message-ID: <20140626142231.GR32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jun 2014, Rickard Strandqvist wrote:
+Mark,
 
-> Remove variable that are never used
-> 
-> This was found using a static code analysis program called cppcheck.
-> 
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-> ---
->  drivers/mfd/ab8500-debugfs.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+Here are a set of patches I've had for a while as part of my DPCM work.
+I think it's worth getting these merged.
 
-Applied, thanks.
+The first patch fixes a bug at ASoC level with debugfs handling - it is
+not permitted to create more than one debugfs directory with the same
+name in the same parent directory - and this can happen when the dummy
+platform and codec are used.
 
-> diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-> index d1a22aa..d514e36 100644
-> --- a/drivers/mfd/ab8500-debugfs.c
-> +++ b/drivers/mfd/ab8500-debugfs.c
-> @@ -1350,12 +1350,11 @@ static int ab8500_print_all_banks(struct seq_file *s, void *p)
->  {
->  	struct device *dev = s->private;
->  	unsigned int i;
-> -	int err;
->  
->  	seq_printf(s, AB8500_NAME_STRING " register values:\n");
->  
->  	for (i = 0; i < AB8500_NUM_BANKS; i++) {
-> -		err = seq_printf(s, " bank 0x%02X:\n", i);
-> +		seq_printf(s, " bank 0x%02X:\n", i);
->  
->  		ab8500_registers_print(dev, i, s);
->  	}
+The second patch adds a helper definition to handle both I2S and SPDIF
+bits in the RECCTL register in the same way that we already do with the
+PLAYCTL register.
+
+Patch 3 fixes the RECCTL enable masking - we would accumulate enable bits
+but never clear any of them.
+
+Patch 4 makes the driver's handling of the PLAYCTL register slightly more
+conformant to the documentation - which requires that the appropriate mute
+bits are set while the respective output interface is disabled.
+
+Patch 5 updates my previous attempt to properly fix this.  The previous
+attempt did stop things going wrong from the hardware perspective, but
+we are left with the occasional stuck-busy.  Although that was harmless,
+this patch stops this occuring in addition to the previous fix.
+
+Patch 6 lifts some of the driver restrictions on the period size and
+number of periods - there's no reason to restrict these values, so
+let's give userspace more flexibility.
+
+Patch 7 adds NO_PERIOD_WAKEUP support for kirkwood, permitting
+interrupt-less operation.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
