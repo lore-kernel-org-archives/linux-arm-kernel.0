@@ -1,88 +1,304 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Jun 2014 09:59:26 +0100
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <20140405001953.GE15806@google.com>
- <20140407083120.GE17163@e106497-lin.cambridge.arm.com>
- <5183143.FxBNM0xTAV@wuerfel>
- <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
-Message-ID: <20140626085926.GB11244@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 26 Jun 2014 11:00:02 +0200
+Subject: [PATCH v4 05/14] clk: Add generic driver for Maxim PMIC clocks
+In-Reply-To: <1403723019-6212-6-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403723019-6212-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1403773202.27156.0.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(sorry for replying to a months old thread)
-
-On Mon, Apr 07, 2014 at 06:58:24PM +0100, Bjorn Helgaas wrote:
-> On Mon, Apr 7, 2014 at 5:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On ?ro, 2014-06-25 at 21:03 +0200, Javier Martinez Canillas wrote:
+> Maxim Integrated Power Management ICs are very similar with
+> regard to their clock outputs. Most of the clock drivers for
+> these chips are duplicating code and are simpler enough that
+> can be converted to use a generic driver to consolidate code
+> and avoid duplication.
 > 
-> > I think migrating other architectures to use the same code should be
-> > a separate effort from adding a generic implementation that can be
-> > used by arm64. It's probably a good idea to have patches to convert
-> > arm32 and/or microblaze.
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
 > 
-> Let me reiterate that I am 100% in favor of replacing arch-specific
-> code with more generic implementations.
+> Changes since v3:
+>  - Add current copyright information. Suggested by Krzysztof Kozlowski
+>  - Do a single allocation for struct max_gen_clk. Suggested by Krzysztof Kozlowski 
 > 
-> However, I am not 100% in favor of doing it as separate efforts
-> (although maybe I could be convinced).  The reasons I hesitate are
-> that (1) if only one architecture uses a new "generic" implementation,
-> we really don't know whether it is generic enough, (2) until I see the
-> patches to convert other architectures, I have to assume that I'm the
-> one who will write them, and (3) as soon as we add the code to
-> drivers/pci, it becomes partly my headache to maintain it, even if
-> only one arch benefits from it.
+>  drivers/clk/Kconfig       |   3 +
+>  drivers/clk/Makefile      |   1 +
+>  drivers/clk/clk-max-gen.c | 195 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/clk-max-gen.h |  32 ++++++++
+>  4 files changed, 231 insertions(+)
+>  create mode 100644 drivers/clk/clk-max-gen.c
+>  create mode 100644 drivers/clk/clk-max-gen.h
 
-I agree and understand your point.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> Please don't think I'm questioning anyone's intent or good will.  It's
-> just that I understand the business pressures, and I know how hard it
-> can be to justify this sort of work to one's management, especially
-> after the immediate problem has been solved.
+Best regards,
+Krzysztof
 
-But, unfortunately, that's something we failed to address in reasonable
-time (even though I was one of the proponents of the generic PCIe
-implementation). This work is very likely to slip further into the late
-part of this year and I am aware that several ARM partners are blocked
-on the (upstream) availability of PCIe support for the arm64 kernel.
 
-Although a bit late, I'm raising this now and hopefully we'll come to a
-conclusion soon. Delaying arm64 PCIe support even further is not a real
-option, which leaves us with:
 
-1. Someone else (with enough PCIe knowledge) volunteering to take over
-   soon or
-2. Dropping Liviu's work and going for an arm64-specific implementation
-   (most likely based on the arm32 implementation, see below)
-
-First option is ideal but there is work to do as laid out by Arnd here:
-
-http://article.gmane.org/gmane.linux.kernel/1679304
-
-The latest patches from Liviu are here (they only target arm64 and there
-are additional comments to be addressed from the above thread):
-
-http://linux-arm.org/git?p=linux-ld.git;a=shortlog;h=refs/heads/for-upstream/pci-next
-
-The main reason for the second option is timing. We could temporarily
-move Liviu's code under arch/arm64 with the hope that we generalise it
-later. However, the risk is even higher that once the code is in
-mainline, the generic implementation won't happen. In which case, I
-don't see much point in departing from the arm32 PCI API, making bios32
-clone the best second option.
-
-For the alternative implementation above, we already have a heavily cut
-down version of the arm32 PCI support but only tested in a virtual
-environment so far:
-
-https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=pci/bios32
-
-In conclusion, unless someone volunteers for the first option fairly
-soon, we'll post the alternative patches for review and take it from
-there.
-
-Thanks.
-
--- 
-Catalin
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 9f9c5ae..73f78e8 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -32,6 +32,9 @@ config COMMON_CLK_WM831X
+>  
+>  source "drivers/clk/versatile/Kconfig"
+>  
+> +config COMMON_CLK_MAX_GEN
+> +        bool
+> +
+>  config COMMON_CLK_MAX77686
+>  	tristate "Clock driver for Maxim 77686 MFD"
+>  	depends on MFD_MAX77686
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 567f102..6c1aff6 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -18,6 +18,7 @@ obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
+>  obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
+>  obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
+>  obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
+> +obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
+>  obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
+>  obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
+>  obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
+> diff --git a/drivers/clk/clk-max-gen.c b/drivers/clk/clk-max-gen.c
+> new file mode 100644
+> index 0000000..3e9fa7e
+> --- /dev/null
+> +++ b/drivers/clk/clk-max-gen.c
+> @@ -0,0 +1,195 @@
+> +/*
+> + * clk-max-gen.c - Generic clock driver for Maxim PMICs clocks
+> + *
+> + * Copyright (C) 2014 Google, Inc
+> + *
+> + * Copyright (C) 2012 Samsung Electornics
+> + * Jonghwa Lee <jonghwa3.lee@samsung.com>
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * This driver is based on clk-max77686.c
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +#include <linux/regmap.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/mutex.h>
+> +#include <linux/clkdev.h>
+> +
+> +struct max_gen_clk {
+> +	struct regmap *regmap;
+> +	u32 mask;
+> +	u32 reg;
+> +	struct clk_hw hw;
+> +	struct clk_lookup *lookup;
+> +};
+> +
+> +static struct max_gen_clk *to_max_gen_clk(struct clk_hw *hw)
+> +{
+> +	return container_of(hw, struct max_gen_clk, hw);
+> +}
+> +
+> +static int max_gen_clk_prepare(struct clk_hw *hw)
+> +{
+> +	struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +
+> +	return regmap_update_bits(max_gen->regmap, max_gen->reg,
+> +				  max_gen->mask, max_gen->mask);
+> +}
+> +
+> +static void max_gen_clk_unprepare(struct clk_hw *hw)
+> +{
+> +	struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +
+> +	regmap_update_bits(max_gen->regmap, max_gen->reg,
+> +			   max_gen->mask, ~max_gen->mask);
+> +}
+> +
+> +static int max_gen_clk_is_prepared(struct clk_hw *hw)
+> +{
+> +	struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +	int ret;
+> +	u32 val;
+> +
+> +	ret = regmap_read(max_gen->regmap, max_gen->reg, &val);
+> +
+> +	if (ret < 0)
+> +		return -EINVAL;
+> +
+> +	return val & max_gen->mask;
+> +}
+> +
+> +static unsigned long max_gen_recalc_rate(struct clk_hw *hw,
+> +					 unsigned long parent_rate)
+> +{
+> +	return 32768;
+> +}
+> +
+> +struct clk_ops max_gen_clk_ops = {
+> +	.prepare	= max_gen_clk_prepare,
+> +	.unprepare	= max_gen_clk_unprepare,
+> +	.is_prepared	= max_gen_clk_is_prepared,
+> +	.recalc_rate	= max_gen_recalc_rate,
+> +};
+> +EXPORT_SYMBOL_GPL(max_gen_clk_ops);
+> +
+> +static struct clk *max_gen_clk_register(struct device *dev,
+> +					struct max_gen_clk *max_gen)
+> +{
+> +	struct clk *clk;
+> +	struct clk_hw *hw = &max_gen->hw;
+> +
+> +	clk = clk_register(dev, hw);
+> +	if (IS_ERR(clk))
+> +		return clk;
+> +
+> +	max_gen->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
+> +	if (!max_gen->lookup)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	max_gen->lookup->con_id = hw->init->name;
+> +	max_gen->lookup->clk = clk;
+> +
+> +	clkdev_add(max_gen->lookup);
+> +
+> +	return clk;
+> +}
+> +
+> +int max_gen_clk_probe(struct platform_device *pdev, struct regmap *regmap,
+> +		      u32 reg, struct clk_init_data *clks_init, int num_init)
+> +{
+> +	int i, ret;
+> +	struct max_gen_clk *max_gen_clks;
+> +	struct clk **clocks;
+> +	struct device *dev = &pdev->dev;
+> +
+> +	clocks = devm_kzalloc(dev, sizeof(struct clk *) * num_init, GFP_KERNEL);
+> +	if (!clocks)
+> +		return -ENOMEM;
+> +
+> +	max_gen_clks = devm_kzalloc(dev, sizeof(struct max_gen_clk)
+> +				    * num_init, GFP_KERNEL);
+> +	if (!max_gen_clks)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < num_init; i++) {
+> +		max_gen_clks[i].regmap = regmap;
+> +		max_gen_clks[i].mask = 1 << i;
+> +		max_gen_clks[i].reg = reg;
+> +		max_gen_clks[i].hw.init = &clks_init[i];
+> +
+> +		clocks[i] = max_gen_clk_register(dev, &max_gen_clks[i]);
+> +		if (IS_ERR(clocks[i])) {
+> +			ret = PTR_ERR(clocks[i]);
+> +			dev_err(dev, "failed to register %s\n",
+> +				max_gen_clks[i].hw.init->name);
+> +			goto err_clocks;
+> +		}
+> +	}
+> +
+> +	platform_set_drvdata(pdev, clocks);
+> +
+> +	if (dev->of_node) {
+> +		struct clk_onecell_data *of_data;
+> +
+> +		of_data = devm_kzalloc(dev, sizeof(*of_data), GFP_KERNEL);
+> +		if (!of_data) {
+> +			ret = -ENOMEM;
+> +			goto err_clocks;
+> +		}
+> +
+> +		of_data->clks = clocks;
+> +		of_data->clk_num = num_init;
+> +		ret = of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
+> +					  of_data);
+> +
+> +		if (ret) {
+> +			dev_err(dev, "failed to register OF clock provider\n");
+> +			goto err_clocks;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +
+> +err_clocks:
+> +	for (--i; i >= 0; --i) {
+> +		clkdev_drop(max_gen_clks[i].lookup);
+> +		clk_unregister(max_gen_clks[i].hw.clk);
+> +	}
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(max_gen_clk_probe);
+> +
+> +int max_gen_clk_remove(struct platform_device *pdev, int num_init)
+> +{
+> +	struct clk **clocks = platform_get_drvdata(pdev);
+> +	struct device *dev = pdev->dev.parent;
+> +	int i;
+> +
+> +	if (dev->of_node)
+> +		of_clk_del_provider(dev->of_node);
+> +
+> +	for (i = 0; i < num_init; i++) {
+> +		struct clk_hw *hw = __clk_get_hw(clocks[i]);
+> +		struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +
+> +		clkdev_drop(max_gen->lookup);
+> +		clk_unregister(clocks[i]);
+> +	}
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(max_gen_clk_remove);
+> diff --git a/drivers/clk/clk-max-gen.h b/drivers/clk/clk-max-gen.h
+> new file mode 100644
+> index 0000000..997e86f
+> --- /dev/null
+> +++ b/drivers/clk/clk-max-gen.h
+> @@ -0,0 +1,32 @@
+> +/*
+> + * clk-max-gen.h - Generic clock driver for Maxim PMICs clocks
+> + *
+> + * Copyright (C) 2014 Google, Inc
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#ifndef __CLK_MAX_GEN_H__
+> +#define __CLK_MAX_GEN_H__
+> +
+> +#include <linux/types.h>
+> +#include <linux/device.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/regmap.h>
+> +#include <linux/platform_device.h>
+> +
+> +int max_gen_clk_probe(struct platform_device *pdev, struct regmap *regmap,
+> +		      u32 reg, struct clk_init_data *clks_init, int num_init);
+> +int max_gen_clk_remove(struct platform_device *pdev, int num_init);
+> +extern struct clk_ops max_gen_clk_ops;
+> +
+> +#endif /* __CLK_MAX_GEN_H__ */
