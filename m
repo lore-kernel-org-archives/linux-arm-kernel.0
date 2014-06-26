@@ -1,112 +1,88 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 26 Jun 2014 10:47:59 +0200
-Subject: [alsa-devel] [PATCH V2 1/2] ASoC: samsung: Add machine driver for
- Odroid X2/U3
-In-Reply-To: <53AA42A3.7030004@gmail.com>
-References: <1403108551-25058-1-git-send-email-s.nawrocki@samsung.com>
- <1403108551-25058-2-git-send-email-s.nawrocki@samsung.com>
- <53AA42A3.7030004@gmail.com>
-Message-ID: <53ABDE3F.2070203@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Jun 2014 09:59:26 +0100
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140405001953.GE15806@google.com>
+ <20140407083120.GE17163@e106497-lin.cambridge.arm.com>
+ <5183143.FxBNM0xTAV@wuerfel>
+ <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
+Message-ID: <20140626085926.GB11244@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/06/14 05:31, Tushar Behera wrote:
-> On 06/18/2014 09:52 PM, Sylwester Nawrocki wrote:
->> This patch adds the sound subsystem driver for Odroid-X2 and
->> Odroid-U3 boards. The codec works in I2S master mode; there are
->> 2 separate audio routing paths defined as there are differences
->> in the signal routing between the X2 and U3 boards, i.e. U3 uses
->> single jack for headphones and microphone.
->>
->> Signed-off-by: Chen Zhen <zhen1.chen@samsung.com>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->>  sound/soc/samsung/Kconfig             |    8 ++
->>  sound/soc/samsung/Makefile            |    2 +
->>  sound/soc/samsung/odroidx2_max98090.c |  191 +++++++++++++++++++++++++++++++++
->>  3 files changed, 201 insertions(+)
->>  create mode 100644 sound/soc/samsung/odroidx2_max98090.c
->>
-> 
-> [ ... ]
-> 
->> +static int odroidx2_hw_params(struct snd_pcm_substream *substream,
->> +	struct snd_pcm_hw_params *params)
->> +{
->> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
->> +	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
->> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
->> +	int ret;
->> +
->> +	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
->> +						SND_SOC_CLOCK_IN);
->> +	if (ret < 0) {
->> +		dev_err(codec_dai->dev,
->> +			"Unable to switch to FLL1: %d\n", ret);
->> +		return ret;
->> +	}
->> +
->> +	/* Set the cpu DAI configuration in order to use CDCLK */
->> +	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
->> +					0, SND_SOC_CLOCK_OUT);
->> +	if (ret < 0)
->> +		return ret;
->> +
-> 
-> While upstreaming sound-card driver for Snow board, I had a comment from
-> Mark to move this to probe, if possible. That way, the clock operations
-> would be done only once and this function and odroidx2_ops can be
-> removed altogether.
+(sorry for replying to a months old thread)
 
-Thanks for the suggestion, I'll change it for the next iteration.
-
->> +	dev_dbg(codec_dai->dev, "HiFi DAI %s params: channels: %d, rate: %d\n",
->> +		snd_pcm_stream_str(substream), params_channels(params),
->> +		params_rate(params));
->> +
->> +	return 0;
->> +}
->> +
->> +static struct snd_soc_ops odroidx2_ops = {
->> +	.hw_params	= odroidx2_hw_params,
->> +};
->> +
+On Mon, Apr 07, 2014 at 06:58:24PM +0100, Bjorn Helgaas wrote:
+> On Mon, Apr 7, 2014 at 5:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> [ ... ]
+> > I think migrating other architectures to use the same code should be
+> > a separate effort from adding a generic implementation that can be
+> > used by arm64. It's probably a good idea to have patches to convert
+> > arm32 and/or microblaze.
 > 
->> +
->> +	ret = snd_soc_register_card(card);
+> Let me reiterate that I am 100% in favor of replacing arch-specific
+> code with more generic implementations.
 > 
-> devm_snd_soc_register_card ?
+> However, I am not 100% in favor of doing it as separate efforts
+> (although maybe I could be convinced).  The reasons I hesitate are
+> that (1) if only one architecture uses a new "generic" implementation,
+> we really don't know whether it is generic enough, (2) until I see the
+> patches to convert other architectures, I have to assume that I'm the
+> one who will write them, and (3) as soon as we add the code to
+> drivers/pci, it becomes partly my headache to maintain it, even if
+> only one arch benefits from it.
 
-Could be, although snd_soc_unregister_card() wouldn't release references
-to the OF nodes, i.e. there would be no related of_node_put() calls.
-And for correctness, the of_node_put() calls should be made _after_
-a snd_soc_unregister_card() call, and I can't see how it could be possible
-if I left only of_node_put() calls in the odroidx2_audio_remove() callback.
+I agree and understand your point.
 
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "snd_soc_register_card failed: %d\n", ret);
->> +		goto err_put_cpu_n;
->> +	}
->> +
->> +	return 0;
->> +
->> +err_put_cpu_n:
->> +	of_node_put(odroidx2_dai[0].cpu_of_node);
->> +err_put_cod_n:
->> +	of_node_put(odroidx2_dai[0].codec_of_node);
->> +	return ret;
->> +}
->> +
->> +static int odroidx2_audio_remove(struct platform_device *pdev)
->> +{
->> +	struct snd_soc_card *card = platform_get_drvdata(pdev);
->> +
->> +	snd_soc_unregister_card(card);
-> 
-> This can be removed when devm_snd_soc_register_card is used.
+> Please don't think I'm questioning anyone's intent or good will.  It's
+> just that I understand the business pressures, and I know how hard it
+> can be to justify this sort of work to one's management, especially
+> after the immediate problem has been solved.
 
---
-Regards,
-Sylwester
+But, unfortunately, that's something we failed to address in reasonable
+time (even though I was one of the proponents of the generic PCIe
+implementation). This work is very likely to slip further into the late
+part of this year and I am aware that several ARM partners are blocked
+on the (upstream) availability of PCIe support for the arm64 kernel.
+
+Although a bit late, I'm raising this now and hopefully we'll come to a
+conclusion soon. Delaying arm64 PCIe support even further is not a real
+option, which leaves us with:
+
+1. Someone else (with enough PCIe knowledge) volunteering to take over
+   soon or
+2. Dropping Liviu's work and going for an arm64-specific implementation
+   (most likely based on the arm32 implementation, see below)
+
+First option is ideal but there is work to do as laid out by Arnd here:
+
+http://article.gmane.org/gmane.linux.kernel/1679304
+
+The latest patches from Liviu are here (they only target arm64 and there
+are additional comments to be addressed from the above thread):
+
+http://linux-arm.org/git?p=linux-ld.git;a=shortlog;h=refs/heads/for-upstream/pci-next
+
+The main reason for the second option is timing. We could temporarily
+move Liviu's code under arch/arm64 with the hope that we generalise it
+later. However, the risk is even higher that once the code is in
+mainline, the generic implementation won't happen. In which case, I
+don't see much point in departing from the arm32 PCI API, making bios32
+clone the best second option.
+
+For the alternative implementation above, we already have a heavily cut
+down version of the arm32 PCI support but only tested in a virtual
+environment so far:
+
+https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=pci/bios32
+
+In conclusion, unless someone volunteers for the first option fairly
+soon, we'll post the alternative patches for review and take it from
+there.
+
+Thanks.
+
+-- 
+Catalin
