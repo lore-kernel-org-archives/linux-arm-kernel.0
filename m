@@ -1,41 +1,42 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 26 Jun 2014 15:15:02 +0530
-Subject: [PATCH v2] ARM: dts: add hdmi regulators for exynos5800 based peach-pi
- board
-Message-ID: <1403775902-14227-1-git-send-email-rahul.sharma@samsung.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Thu, 26 Jun 2014 15:16:03 +0530
+Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
+Message-ID: <1403775963-9785-1-git-send-email-achandran@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding regulators for HDMI for Peach-pi board.
+Building a kernel with CPU_BIG_ENDIAN fails if there are stale objects
+from a !CPU_BIG_ENDIAN build. Due to a missing FORCE prerequisite on an
+if_changed rule in the VDSO Makefile, we attempt to link a stale LE
+object into the new BE kernel. According to Documentation/kbuild/makefiles.txt
+FORCE is required for if_changed rules, and forgetting it is a common mistake
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
+
+arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
+failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
+
+arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
+failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
+
+Signed-off-by: Arun Chandran <achandran@mvista.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 ---
-v2: 1) Add blank line before hdmi regulators.
+ arch/arm64/kernel/vdso/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Based on Kukjin's for-next branch.
-Depends on:
-1) PMIC addition to Peach-pi: http://www.spinics.net/lists/linux-samsung-soc/msg33166.html
-2) tps65090 addition to Peach-pi: http://www.spinics.net/lists/linux-samsung-soc/msg32464.html
-
- arch/arm/boot/dts/exynos5800-peach-pi.dts |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 2c2c137..b5a2a99 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -127,6 +127,11 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&hdmi_hpd_irq>;
- 	ddc = <&i2c_2>;
-+
-+	hdmi-en-supply = <&tps65090_fet7>;
-+	vdd-supply = <&ldo8_reg>;
-+	vdd_osc-supply = <&ldo10_reg>;
-+	vdd_pll-supply = <&ldo8_reg>;
- };
+diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+index 6d20b7d..a268a9a 100644
+--- a/arch/arm64/kernel/vdso/Makefile
++++ b/arch/arm64/kernel/vdso/Makefile
+@@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
+ 	$(call if_changed,vdsosym)
  
- &hsi2c_7 {
+ # Assembly rules for the .S files
+-$(obj-vdso): %.o: %.S
++$(obj-vdso): %.o: %.S FORCE
+ 	$(call if_changed_dep,vdsoas)
+ 
+ # Actual build commands
 -- 
 1.7.9.5
