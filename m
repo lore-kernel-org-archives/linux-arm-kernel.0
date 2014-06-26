@@ -1,52 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 26 Jun 2014 16:34:59 +0400
-Subject: [PATCH v5 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
- nodes
-In-Reply-To: <53AB9581.7090806@renesas.com>
-References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>	<201406242159.55373.sergei.shtylyov@cogentembedded.com>	<53AB89B3.9020207@renesas.com>
- <CANqRtoSsx+NAz2W_utN-A2fx+=e_Ywt5eD=Tf9uGnEDvk3w-PQ@mail.gmail.com>
- <53AB9581.7090806@renesas.com>
-Message-ID: <53AC1373.5010501@cogentembedded.com>
+From: drysdale@google.com (David Drysdale)
+Date: Thu, 26 Jun 2014 13:37:10 +0100
+Subject: [PATCH v7 2/9] seccomp: split filter prep from check and apply
+In-Reply-To: <1403560693-21809-3-git-send-email-keescook@chromium.org>
+References: <1403560693-21809-1-git-send-email-keescook@chromium.org>
+ <1403560693-21809-3-git-send-email-keescook@chromium.org>
+Message-ID: <20140626123710.GA16204@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Jun 23, 2014 at 02:58:06PM -0700, Kees Cook wrote:
+> In preparation for adding seccomp locking, move filter creation away
+> from where it is checked and applied. This will allow for locking where
+> no memory allocation is happening. The validation, filter attachment,
+> and seccomp mode setting can all happen under the future locks.
+> 
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  kernel/seccomp.c |   97 +++++++++++++++++++++++++++++++++++++-----------------
+>  1 file changed, 67 insertions(+), 30 deletions(-)
+> 
+> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+> index afb916c7e890..edc8c79ed16d 100644
+> --- a/kernel/seccomp.c
+> +++ b/kernel/seccomp.c
+> @@ -515,6 +551,7 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
+>  	current->seccomp.mode = seccomp_mode;
+>  	set_thread_flag(TIF_SECCOMP);
+>  out:
+> +	seccomp_filter_free(prepared);
+>  	return ret;
+>  }
 
-On 06/26/2014 07:37 AM, Yoshihiro Shimoda wrote:
+I think this needs to be inside #ifdef CONFIG_SECCOMP_FILTER to match
+the definition of seccomp_filter_free:
 
->>>> From: Ben Dooks <ben.dooks@codethink.co.uk>
-
->>>> Add device nodes for the R8A7790 internal PCI bridge devices.
-
->>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->>>> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
->>>> [Sergei: added several properties to the PCI bridge nodes]
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->>> Thank you for the patch!
-
->>> I tested this patch on my lager board and a usb memory, and it works.
-
->>> Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-
->> Thanks for testing. Just one quick question from my side: Which USB
->> port did you test?
-
-> I tested usb ch1 only...
-
-    Note that channel #2 also should work.
-
->> I somehow assumed that at least the majority of the USB ports on R-Car
->> Gen2 require a USB PHY device driver to work?
->
-> Thank you for the point.
-> About usb ch1, a USB PHY device driver doesn't need, I think.
-> But, about ch0 and ch2, I think that they should require a USB PHY device driver.
-
-    Only channel #0 requires the PHY driver as the default routing for USB0 is 
-to USBHS; channel #2 is routed to OHCI/EHCI by default.
-
-> Best regards,
-> Yoshihiro Shimoda
-
-WBR, Sergei
+../kernel/seccomp.c:554:2: error: implicit declaration of function ?seccomp_filter_free? [-Werror=implicit-function-declaration]
