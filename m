@@ -1,70 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 26 Jun 2014 11:00:17 -0700
-Subject: [RFC PATCH] phy: micrel: make phy_has_fixups attribute read
- correctly
-In-Reply-To: <1403681075-16181-1-git-send-email-voice.shen@atmel.com>
-References: <1403681075-16181-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <CAGVrzcaN9KKW6vN5Xy775RTBD3ODpK95-o0V+pKDcCCxetPycA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 26 Jun 2014 12:07:14 -0600
+Subject: [PATCH v1 6/9] usb: xhci: Add NVIDIA Tegra XHCI host-controller
+ driver
+In-Reply-To: <CAL1qeaFhfYdW06Md10eGVYWBrRR+f1yykVYHNp5+9-t1C9joPQ@mail.gmail.com>
+References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>	<1403072180-4944-7-git-send-email-abrestic@chromium.org>	<53AB4F2D.2060208@wwwdotorg.org>
+ <CAL1qeaFhfYdW06Md10eGVYWBrRR+f1yykVYHNp5+9-t1C9joPQ@mail.gmail.com>
+Message-ID: <53AC6152.5060908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 06/25/2014 06:06 PM, Andrew Bresticker wrote:
+> On Wed, Jun 25, 2014 at 3:37 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
+>>> Add support for the on-chip XHCI host controller present on Tegra SoCs.
+>>>
+>>> The driver is currently very basic: it loads the controller with its
+>>> firmware, starts the controller, and is able to service messages sent
+>>> by the controller's firmware.  The hardware supports device mode as
+>>> well as runtime power-gating, but support for these is not yet
+>>> implemented here.
 
-2014-06-25 0:24 GMT-07:00 Bo Shen <voice.shen@atmel.com>:
-> If the fixups parameters get from dtb, it won't set has_fixups
-> parameters, so when read phy_has_fixups attribute, it always
-> present as 0.
-> Add this patch to make phy_has_fixups attribute read correctly.
+>>> diff --git a/drivers/usb/host/xhci-tegra.c b/drivers/usb/host/xhci-tegra.c
 
-I am not entirely sure whether loading values from Device Tree should
-be considered a PHY fixup per-se. They do override the hardware reset
-default values, but I am not sure if we should consider that as a
-fixup.
+>>> +static int tegra_xhci_set_ss_clk(struct tegra_xhci_hcd *tegra,
+>>> +                              unsigned long rate)
+>>
+>>> +     switch (rate) {
+>>> +     case TEGRA_XHCI_SS_CLK_HIGH_SPEED:
+>>> +             /* Reparent to PLLU_480M. Set div first to avoid overclocking */
+>>> +             old_parent_rate = clk_get_rate(clk_get_parent(clk));
+>>> +             new_parent_rate = clk_get_rate(tegra->pll_u_480m);
+>>> +             div = new_parent_rate / rate;
+>>> +             ret = clk_set_rate(clk, old_parent_rate / div);
+>>> +             if (ret)
+>>> +                     return ret;
+>>> +             ret = clk_set_parent(clk, tegra->pll_u_480m);
+>>> +             if (ret)
+>>> +                     return ret;
+>>
+>> Don't you need to call clk_set_rate() again after reparenting, since the
+>> divisor will be different, and the rounding too.
+> 
+> Nope, the divider we set before remains in-tact after clk_set_parent().
 
-Assuming that you need to troubleshoot a given system, one of the
-first things you will surely ask for is the DTS used by that platform,
-and in that case you can quickly check whether the PHY default
-settings are changed, right?
+Oh I see, the clk_set_rate() call is setting up div so it's appropriate
+after the new parent is selected.
 
->
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> ---
->  drivers/net/phy/micrel.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-> index bc7c7d2..c384922 100644
-> --- a/drivers/net/phy/micrel.c
-> +++ b/drivers/net/phy/micrel.c
-> @@ -237,6 +237,8 @@ static int ksz9021_load_values_from_of(struct phy_device *phydev,
->
->         if (!matches)
->                 return 0;
-> +       else
-> +               phydev->has_fixups = true;
-
-There is no need for the else here
-
->
->         if (matches < 4)
->                 newval = kszphy_extended_read(phydev, reg);
-> @@ -330,6 +332,8 @@ static int ksz9031_of_load_skew_values(struct phy_device *phydev,
->
->         if (!matches)
->                 return 0;
-> +       else
-> +               phydev->has_fixups = true;
-
-Same here
-
->
->         if (matches < numfields)
->                 newval = ksz9031_extended_read(phydev, OP_DATA, 2, reg);
-> --
-> 1.8.5.2
->
-
-
-
--- 
-Florian
+Wouldn't it be better to just stop the clock, assert reset, reparent the
+clock, and then set the desired rate directly?
