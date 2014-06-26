@@ -1,23 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 Jun 2014 00:11:37 -0300
-Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
-In-Reply-To: <CAOMZO5DOGgcZbD4zPhvaxerEHspSi4eQJhNsM=dxRVYCu6-e5w@mail.gmail.com>
-References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
- <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
- <135a42da42024542b0f7a034ef1d63df@BY2PR03MB315.namprd03.prod.outlook.com>
- <CAOMZO5DOGgcZbD4zPhvaxerEHspSi4eQJhNsM=dxRVYCu6-e5w@mail.gmail.com>
-Message-ID: <CAOMZO5AzgcavwQMW=41eWJVBiZ+5onJWUyQWKwS4NJcvGA5OVw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 26 Jun 2014 11:12:49 +0800
+Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
+In-Reply-To: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140626031247.GN2224@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 12:06 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Wed, Jun 25, 2014 at 11:53 PM, Anson.Huang at freescale.com
-> <Anson.Huang@freescale.com> wrote:
->> Hi, Fabio
->>         I have already sent cpufreq driver patch for review which is supporting i.MX6SX, you may need to add it by yourself if you want to test it, I attached the patch, hope it helps.
->
-> Thanks. It works fine now.
+On Tue, Jun 24, 2014 at 04:18:27PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> When the mx6 PCI conctroller is initialized in the bootloader we see a kernel 
+> hang inside imx6_add_pcie_port().
+> 
+> Adding a 30ms delay allows the kernel to boot.
 
-Forgot to mention that this error still appears:
+We may not want to add a random delay into the driver before we
+understand the root cause of the issue.
 
-cpu cpu0: dev_pm_opp_get_opp_count: device OPP not found (-19)
+Do you see this issue with FSL kernel?
+
+Shawn
+
+> 
+> Suggested-by: David M?ller <d.mueller@elsoft.ch>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> I am happy to get feedback on how to properly fix this.
+> 
+> Thanks
+> 
+>  drivers/pci/host/pci-imx6.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index a568efa..669f771 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -507,6 +507,8 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+>  	pp->root_bus_nr = -1;
+>  	pp->ops = &imx6_pcie_host_ops;
+>  
+> +	usleep_range(25000, 30000);
+> +
+>  	ret = dw_pcie_host_init(pp);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "failed to initialize host\n");
+> -- 
+> 1.8.3.2
+> 
