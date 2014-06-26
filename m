@@ -1,76 +1,75 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 26 Jun 2014 09:57:48 +0900
-Subject: [PATCH_v4 0/2] arm64: Add seccomp support
-In-Reply-To: <1403708017.755.86.camel@deneb.redhat.com>
-References: <1394705823-12465-1-git-send-email-takahiro.akashi@linaro.org>	
- <1394862604-29105-1-git-send-email-takahiro.akashi@linaro.org>
- <1403708017.755.86.camel@deneb.redhat.com>
-Message-ID: <53AB700C.20808@linaro.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 26 Jun 2014 10:59:28 +1000
+Subject: [PATCH v2] sched: Fix compiler warnings
+In-Reply-To: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
+References: <1403658329-13196-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20140626105928.5f375f0c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2014 11:53 PM, Mark Salter wrote:
-> What is the current status of this patch series? Is it on track
-> for 3.17?
+Hi Guenter,
 
-I assume not as I saw no comments on this so far.
-But I will re-post a new version soon or later due to recent changes on seccomp.
+[I know I'm a bit late to this, but ...]
 
--Takahiro AKASHI
-
-> On Sat, 2014-03-15 at 14:50 +0900, AKASHI Takahiro wrote:
->> (Please apply this patch after my ftrace patch and audit patch in order
->> to avoid some conflict on arm64/Kconfig.)
->>
->> This patch enables secure computing (system call filtering) on arm64.
->> System calls can be allowed or denied by loaded bpf-style rules.
->> Architecture specific part is to run secure_computing() on syscall entry
->> and check the result. See [2/2]
->>
->> Prerequisites are:
->>   * "arm64: make a single hook to syscall_trace() for all syscall features" patch
->>   * "arm64: split syscall_trace() into separate functions for enter/exit" patch
->>   * "arm64: Add audit support" patch
->>   * "arm64: is_compat_task is defined both in asm/compat.h and
->>      linux/compat.h" patch
->>
->> This code is tested on ARMv8 fast model using libseccomp v2.1.1 with
->> modifications for arm64 and verified by its "live" tests, 20, 21 and 24.
->>
->> Changes v3 -> v4:
->> * removed the following patch and moved it to "arm64: prerequisites for
->>    audit and ftrace" patchset since it is required for audit and ftrace in
->>    case of !COMPAT, too.
->>    "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
->>
->> Changes v2 -> v3:
->> * removed unnecessary 'type cast' operations [2/3]
->> * check for a return value (-1) of secure_computing() explicitly [2/3]
->> * aligned with the patch, "arm64: split syscall_trace() into separate
->>    functions for enter/exit" [2/3]
->> * changed default of CONFIG_SECCOMP to n [2/3]
->>
->> Changes v1 -> v2:
->> * added generic seccomp.h for arm64 to utilize it [1,2/3]
->> * changed syscall_trace() to return more meaningful value (-EPERM)
->>    on seccomp failure case [2/3]
->> * aligned with the change in "arm64: make a single hook to syscall_trace()
->>    for all syscall features" v2 [2/3]
->> * removed is_compat_task() definition from compat.h [3/3]
->>
->> AKASHI Takahiro (2):
->>    asm-generic: Add generic seccomp.h for secure computing mode 1
->>    arm64: Add seccomp support
->>
->>   arch/arm64/Kconfig               | 14 ++++++++++++++
->>   arch/arm64/include/asm/seccomp.h | 25 +++++++++++++++++++++++++
->>   arch/arm64/include/asm/unistd.h  |  3 +++
->>   arch/arm64/kernel/entry.S        |  4 ++++
->>   arch/arm64/kernel/ptrace.c       |  6 ++++++
->>   include/asm-generic/seccomp.h    | 28 ++++++++++++++++++++++++++++
->>   6 files changed, 80 insertions(+)
->>   create mode 100644 arch/arm64/include/asm/seccomp.h
->>   create mode 100644 include/asm-generic/seccomp.h
->>
+On Tue, 24 Jun 2014 18:05:29 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
 >
->
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index 9d85318..e35d880 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -275,7 +275,7 @@ void store_cpu_topology(unsigned int cpuid)
+>  		cpu_topology[cpuid].socket_id, mpidr);
+>  }
+>  
+> -static inline const int cpu_corepower_flags(void)
+> +static inline int cpu_corepower_flags(void)
+>  {
+>  	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
+>  }
+
+The only reference to this function is to take its address, so "inline"
+is useless, right?
+
+> diff --git a/include/linux/sched.h b/include/linux/sched.h
+> index 306f4f0..0376b05 100644
+> --- a/include/linux/sched.h
+> +++ b/include/linux/sched.h
+> @@ -872,21 +872,21 @@ enum cpu_idle_type {
+>  #define SD_NUMA			0x4000	/* cross-node balancing */
+>  
+>  #ifdef CONFIG_SCHED_SMT
+> -static inline const int cpu_smt_flags(void)
+> +static inline int cpu_smt_flags(void)
+>  {
+>  	return SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
+>  }
+>  #endif
+>  
+>  #ifdef CONFIG_SCHED_MC
+> -static inline const int cpu_core_flags(void)
+> +static inline int cpu_core_flags(void)
+>  {
+>  	return SD_SHARE_PKG_RESOURCES;
+>  }
+>  #endif
+>  
+>  #ifdef CONFIG_NUMA
+> -static inline const int cpu_numa_flags(void)
+> +static inline int cpu_numa_flags(void)
+>  {
+>  	return SD_NUMA;
+>  }
+
+The same is true of those three, but then they would have to be moved
+into a .c file and replaced with prototypes ...
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140626/d0b1ed89/attachment.sig>
