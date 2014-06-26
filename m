@@ -1,42 +1,17 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 26 Jun 2014 12:01:07 +0900
-Subject: [PATCH v5 1/2] ARM: shmobile: r8a7790: add internal PCI bridge
- nodes
-In-Reply-To: <53AB89B3.9020207@renesas.com>
-References: <201406242157.05973.sergei.shtylyov@cogentembedded.com>
- <201406242159.55373.sergei.shtylyov@cogentembedded.com>
- <53AB89B3.9020207@renesas.com>
-Message-ID: <CANqRtoSsx+NAz2W_utN-A2fx+=e_Ywt5eD=Tf9uGnEDvk3w-PQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 26 Jun 2014 00:06:46 -0300
+Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
+In-Reply-To: <135a42da42024542b0f7a034ef1d63df@BY2PR03MB315.namprd03.prod.outlook.com>
+References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
+ <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
+ <135a42da42024542b0f7a034ef1d63df@BY2PR03MB315.namprd03.prod.outlook.com>
+Message-ID: <CAOMZO5DOGgcZbD4zPhvaxerEHspSi4eQJhNsM=dxRVYCu6-e5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shimoda-san,
+On Wed, Jun 25, 2014 at 11:53 PM, Anson.Huang at freescale.com
+<Anson.Huang@freescale.com> wrote:
+> Hi, Fabio
+>         I have already sent cpufreq driver patch for review which is supporting i.MX6SX, you may need to add it by yourself if you want to test it, I attached the patch, hope it helps.
 
-On Thu, Jun 26, 2014 at 11:47 AM, Yoshihiro Shimoda
-<yoshihiro.shimoda.uh@renesas.com> wrote:
-> Hi Sergei,
->
-> (2014/06/25 2:59), Sergei Shtylyov wrote:
->> From: Ben Dooks <ben.dooks@codethink.co.uk>
->>
->> Add device nodes for the R8A7790 internal PCI bridge devices.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
->> [Sergei: added several properties to the PCI bridge nodes]
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> Thank you for the patch!
-> I tested this patch on my lager board and a usb memory, and it works.
->
-> Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-
-Thanks for testing. Just one quick question from my side: Which USB
-port did you test?
-
-I somehow assumed that at least the majority of the USB ports on R-Car
-Gen2 require a USB PHY device driver to work?
-
-Cheers,
-
-/ magnus
+Thanks. It works fine now.
