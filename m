@@ -1,48 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jun 2014 18:34:22 +0100
-Subject: [PATCH] arm64: fpsimd: avoid restoring fpcr if the contents haven't
- changed
-Message-ID: <1403804062-22239-1-git-send-email-will.deacon@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 26 Jun 2014 11:00:17 -0700
+Subject: [RFC PATCH] phy: micrel: make phy_has_fixups attribute read
+ correctly
+In-Reply-To: <1403681075-16181-1-git-send-email-voice.shen@atmel.com>
+References: <1403681075-16181-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <CAGVrzcaN9KKW6vN5Xy775RTBD3ODpK95-o0V+pKDcCCxetPycA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing to the FPCR is commonly implemented as a self-synchronising
-operation in the CPU, so avoid writing to the register when the saved
-value matches that in the hardware already.
+Hello,
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/fpsimdmacros.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+2014-06-25 0:24 GMT-07:00 Bo Shen <voice.shen@atmel.com>:
+> If the fixups parameters get from dtb, it won't set has_fixups
+> parameters, so when read phy_has_fixups attribute, it always
+> present as 0.
+> Add this patch to make phy_has_fixups attribute read correctly.
 
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index 768414d55e64..137c0f45b0a8 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -40,6 +40,7 @@
- 	str	w\tmpnr, [\state, #16 * 2 + 4]
- .endm
- 
-+/* Clobbers \state */
- .macro fpsimd_restore state, tmpnr
- 	ldp	q0, q1, [\state, #16 * 0]
- 	ldp	q2, q3, [\state, #16 * 2]
-@@ -60,7 +61,15 @@
- 	ldr	w\tmpnr, [\state, #16 * 2]
- 	msr	fpsr, x\tmpnr
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
-+	/*
-+	 * Writes to fpcr may be self-synchronising, so avoid restoring
-+	 * the register if it hasn't changed.
-+	 */
-+	mrs	\state, fpcr
-+	cmp	x\tmpnr, \state
-+	b.eq	9999f
- 	msr	fpcr, x\tmpnr
-+9999:
- .endm
- 
- .altmacro
+I am not entirely sure whether loading values from Device Tree should
+be considered a PHY fixup per-se. They do override the hardware reset
+default values, but I am not sure if we should consider that as a
+fixup.
+
+Assuming that you need to troubleshoot a given system, one of the
+first things you will surely ask for is the DTS used by that platform,
+and in that case you can quickly check whether the PHY default
+settings are changed, right?
+
+>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+>  drivers/net/phy/micrel.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+> index bc7c7d2..c384922 100644
+> --- a/drivers/net/phy/micrel.c
+> +++ b/drivers/net/phy/micrel.c
+> @@ -237,6 +237,8 @@ static int ksz9021_load_values_from_of(struct phy_device *phydev,
+>
+>         if (!matches)
+>                 return 0;
+> +       else
+> +               phydev->has_fixups = true;
+
+There is no need for the else here
+
+>
+>         if (matches < 4)
+>                 newval = kszphy_extended_read(phydev, reg);
+> @@ -330,6 +332,8 @@ static int ksz9031_of_load_skew_values(struct phy_device *phydev,
+>
+>         if (!matches)
+>                 return 0;
+> +       else
+> +               phydev->has_fixups = true;
+
+Same here
+
+>
+>         if (matches < numfields)
+>                 newval = ksz9031_extended_read(phydev, OP_DATA, 2, reg);
+> --
+> 1.8.5.2
+>
+
+
+
 -- 
-2.0.0
+Florian
