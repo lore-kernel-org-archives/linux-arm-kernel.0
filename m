@@ -1,49 +1,131 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 26 Jun 2014 15:30:22 -0400 (EDT)
-Subject: [PATCH v5 1/8] Documentation: arm: define DT idle states bindings
-In-Reply-To: <20140626101707.GB25130@e102568-lin.cambridge.arm.com>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-2-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.11.1406251154500.16842@knanqh.ubzr>
- <20140626101707.GB25130@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1406261527520.16842@knanqh.ubzr>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 26 Jun 2014 13:36:24 -0600
+Subject: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability
+ IOMMU_CAP_INTR_REMAP
+In-Reply-To: <ec8dbbcb991e4d73b73f4b4f98342445@BY2PR07MB203.namprd07.prod.outlook.com>
+References: <1401987808-23596-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1401987808-23596-5-git-send-email-a.motakis@virtualopensystems.com>
+ <20140608103129.GC3279@lvm> <20140616145344.GD18986@8bytes.org>
+ <20140616151329.GQ16758@arm.com> <20140616152157.GB31771@8bytes.org>
+ <20140616152526.GR16758@arm.com> <20140616153832.GC31771@8bytes.org>
+ <9353770066894e85809e1e443b71d1cd@BY2PR07MB203.namprd07.prod.outlook.com>
+ <748dccbbd3284521af4659ccbbb11453@BY2PR07MB203.namprd07.prod.outlook.com>
+ <b085e02e72dc424d9624c3e810951087@BY2PR07MB203.namprd07.prod.outlook.com>
+ <1403809223.31091.137.camel@ul30vt.home>
+ <ec8dbbcb991e4d73b73f4b4f98342445@BY2PR07MB203.namprd07.prod.outlook.com>
+Message-ID: <1403811384.31091.151.camel@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jun 2014, Lorenzo Pieralisi wrote:
+On Thu, 2014-06-26 at 19:10 +0000, Chalamarla, Tirumalesh wrote:
+> Thanks for the clarification Alex, That?s exactly my point, why are we relying on  QEMU or something else to emulate the MSI space when we can directly give access to devices using ITS (of course with a small emulation code).
+> This way we are also benefited from all ITS services like VCPU migration etc.  
 
-> On Wed, Jun 25, 2014 at 04:56:02PM +0100, Nicolas Pitre wrote:
-> > On Wed, 25 Jun 2014, Lorenzo Pieralisi wrote:
-> > 
-> > > ARM based platforms implement a variety of power management schemes that
-> > > allow processors to enter idle states at run-time.
-> > > The parameters defining these idle states vary on a per-platform basis forcing
-> > > the OS to hardcode the state parameters in platform specific static tables
-> > > whose size grows as the number of platforms supported in the kernel increases
-> > > and hampers device drivers standardization.
-> > >
-> > > Therefore, this patch aims at standardizing idle state device tree bindings for
-> > > ARM platforms. Bindings define idle state parameters inclusive of entry methods
-> > > and state latencies, to allow operating systems to retrieve the configuration
-> > > entries from the device tree and initialize the related power management
-> > > drivers, paving the way for common code in the kernel to deal with idle
-> > > states and removing the need for static data in current and previous kernel
-> > > versions.
-> > >
-> > > Reviewed-by: Sebastian Capella <sebcape@gmail.com>
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > 
-> > Excellent.
-> > 
-> > Reviewed-by: Nicolas Pitre <nico@linaro.org>
+I have no idea what ITS is.
+
+> What about non QEMU VFIO users, for example, if I wanted to use VFIO to assign a device to a user process I don't need to depend on QEMU.   I thought this is one of the main goals of vfio to make it independent of hypervisors.     
+
+Where did QEMU become a requirement?  Maybe I'm missing something in the
+ARM part of the conversation that got chopped off, but this is exactly
+why we have the VFIO/QEMU split that we do.  VFIO provides basic
+virtualization for config space and restricts access to other areas that
+users shouldn't be allowed to change.  QEMU is just one example of a
+userspace VFIO driver.  QEMU takes the decomposed device exposed through
+the VFIO ABI and re-creates a PCI device out of it.  VFIO itself has no
+dependency on QEMU.  Thanks,
+
+Alex  
+
+> -----Original Message-----
+> From: Alex Williamson [mailto:alex.williamson at redhat.com] 
+> Sent: Thursday, June 26, 2014 12:00 PM
+> To: Chalamarla, Tirumalesh
+> Cc: Joerg Roedel; Will Deacon; kvm at vger.kernel.org; open list; stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated list:ARM SMMU DRIVER
+> Subject: Re: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability IOMMU_CAP_INTR_REMAP
 > 
-> Thanks Nico, there are still a couple of niggles to sort out (ie local
-> timer state), but the bulk of the document should be complete I hope.
+> On Thu, 2014-06-26 at 18:41 +0000, Chalamarla, Tirumalesh wrote:
+> > Sorry there was a type,
+> > 
+> > The question is:
+> >  
+> >             How is VFIO restricting software from writing to MSI/MSI-X vectors of the device. 
 > 
-> I will postpone adding your (and Seb's) Reviewed-by until we have a
-> final agreement if it is ok with you.
-
-As you wish.  The parts I care about are now well covered.  I don't 
-think I know enough about timers to comment further.
-
-Nicolas
+> All interrupts are configured via ioctl, not MSI config space or the MSI-X vector table in MMIO space.  VFIO protects the MSI config area by virtualizing it (you can't actually write the physical enable bit or address/data through VFIO).  The MSI-X vector table is protected by preventing read, write, or mmap access to it.  QEMU provides further virtualization above the basics provided by VFIO.  We really can't guarantee that devices don't have backdoors to configure these though.
+> See the realtek quirk in QEMU for an example of a device that has such a backdoor.  That's why we require interrupt remapping, so that a device that does this can only hurt the guest, and require the user to opt-out if they feel they have a sufficiently trusted guest.  Thanks,
+> 
+> Alex
+> 
+> > 
+> > -----Original Message-----
+> > From: Chalamarla, Tirumalesh
+> > Sent: Thursday, June 26, 2014 11:16 AM
+> > To: Chalamarla, Tirumalesh; Joerg Roedel; Will Deacon
+> > Cc: kvm at vger.kernel.org; open list; alex.williamson at redhat.com; 
+> > stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; 
+> > tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated 
+> > list:ARM SMMU DRIVER
+> > Subject: RE: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability 
+> > IOMMU_CAP_INTR_REMAP
+> > 
+> > When I say emulating ITS, I mean translating guest ITS commands to physical ITS commands  and placing them in physical queue. 
+> > 
+> > Regards,
+> > Tirumalesh.
+> > 
+> > -----Original Message-----
+> > From: kvmarm-bounces at lists.cs.columbia.edu 
+> > [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Chalamarla, 
+> > Tirumalesh
+> > Sent: Thursday, June 26, 2014 11:08 AM
+> > To: Joerg Roedel; Will Deacon
+> > Cc: kvm at vger.kernel.org; open list; alex.williamson at redhat.com; 
+> > stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; 
+> > tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated 
+> > list:ARM SMMU DRIVER
+> > Subject: RE: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability 
+> > IOMMU_CAP_INTR_REMAP
+> > 
+> > Forgive me if this discussion is not relative here, but I thought it is.  
+> > 
+> > How is VFIO restricting devices from writing  to MSI/MSI-X, Is all the vector area is mapped by VFIO to trap the accesses.  I am asking this because we might need to emulate ITS somewhere either in KVM or VFIO to provide direct access to devices.
+> > And I don't see any mentions on that.   I think this flag needs to be set by ITS emulation.
+> > 
+> > Regards,
+> > Tirumalesh.
+> > 
+> > -----Original Message-----
+> > From: kvmarm-bounces at lists.cs.columbia.edu 
+> > [mailto:kvmarm-bounces at lists.cs.columbia.edu] On Behalf Of Joerg 
+> > Roedel
+> > Sent: Monday, June 16, 2014 8:39 AM
+> > To: Will Deacon
+> > Cc: stuart.yoder at freescale.com; kvm at vger.kernel.org; open list; 
+> > iommu at lists.linux-foundation.org; alex.williamson at redhat.com; 
+> > moderated list:ARM SMMU DRIVER; tech at virtualopensystems.com; 
+> > kvmarm at lists.cs.columbia.edu; Christoffer Dall
+> > Subject: Re: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability 
+> > IOMMU_CAP_INTR_REMAP
+> > 
+> > On Mon, Jun 16, 2014 at 04:25:26PM +0100, Will Deacon wrote:
+> > > Ok, thanks. In which case, I think this is really a combined 
+> > > property of the SMMU and the interrupt controller, so we might need 
+> > > some extra code so that the SMMU can check that the interrupt 
+> > > controller for the device is also capable of interrupt remapping.
+> > 
+> > Right, that this is part of IOMMU code has more or less historic reasons on x86. Interrupt remapping is purely implemented in the IOMMU there, so on ARM some clue-code between interrupt controler and smmu is needed.
+> > 
+> > 
+> > 	Joerg
+> > 
+> > 
+> > _______________________________________________
+> > kvmarm mailing list
+> > kvmarm at lists.cs.columbia.edu
+> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> > _______________________________________________
+> > kvmarm mailing list
+> > kvmarm at lists.cs.columbia.edu
+> > https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
+> 
+> 
