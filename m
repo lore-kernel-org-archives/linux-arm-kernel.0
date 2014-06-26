@@ -1,70 +1,73 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 26 Jun 2014 18:00:53 +0300
-Subject: [PATCH v3] clk: define and export clk_debugs_add_file
-Message-ID: <1403794853-16928-1-git-send-email-pdeschrijver@nvidia.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Jun 2014 17:09:24 +0200
+Subject: [PATCH] ARM: mvebu: Enable SCU Speculative linefills to L2 for
+ Armada 375/38x
+In-Reply-To: <20140626165230.374f285e@free-electrons.com>
+References: <1403790178-23902-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140626165230.374f285e@free-electrons.com>
+Message-ID: <53AC37A4.8090306@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define and export a new function clk_debugs_add_file which adds a file
-to a existing clock's debugfs directory. This can be used by clock
-providers to add debugfs entries which are not related to a specific clock
-type. Examples include the ability to measure the rate of a clock. It can
-also be used by modules to create new debugfs entries. This is useful if you
-want to expose features for testing which can potentially cause system
-instability such as allowing to change a clock's rate from userspace.
+Hi Thomas,
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+On 26/06/2014 16:52, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Thu, 26 Jun 2014 15:42:58 +0200, Gregory CLEMENT wrote:
+> 
+>> +#define SCU_CTRL		0x00
+>> +#define SCU_SPEC_LINEFILL_EN	    BIT(3)
+>> +
+>> +
+>>  /*
+>>   * Enables the SCU when available. Obviously, this is only useful on
+>>   * Cortex-A based SOCs, not on PJ4B based ones.
+>> @@ -44,7 +48,15 @@ static void __init mvebu_scu_enable(void)
+>>  	struct device_node *np =
+>>  		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+>>  	if (np) {
+>> +		u32 scu_ctrl;
+>>  		scu_base = of_iomap(np, 0);
+>> +		/* already enabled? */
+>> +		scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
+> 
+> Unless the SCU uses the native endianess of the system, and therefore
+> switches to big endian when the system is running big endian, using
+> __raw_{readl,writel} is wrong here, and will break big endian
+> configurations.
 
----
-Changes in v3:
- * export a function to create a new file in a clock's debugfs directory
-   instead of exposing the clock's debugfs dentry pointer
+Yes you are right here.
 
-Changes in v2:
- * fix function name in description
- * export function in header file
----
- drivers/clk/clk.c            |   12 ++++++++++++
- include/linux/clk-provider.h |    5 +++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
+> 
+>> +		if (!(scu_ctrl & 1)) {
+> 
+> What is this bit 0 you're checking here? How does it relate to the bit
+> 3 you're setting when bit 0 is not set?
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 8b73ede..c1e2fab 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -403,6 +403,18 @@ static void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
- 				__func__, clk->name);
- }
- 
-+struct dentry *clk_debugfs_add_file(struct clk *clk, char *name, umode_t mode,
-+				void *data, const struct file_operations *fops)
-+{
-+	struct dentry *d = NULL;
-+
-+	if (clk->dentry)
-+		d = debugfs_create_file(name, mode, clk->dentry, data, fops);
-+
-+	return d;
-+}
-+EXPORT_SYMBOL_GPL(clk_debugfs_add_file);
-+
- /**
-  * clk_debug_init - lazily create the debugfs clk tree visualization
-  *
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 0c287db..411dd7e 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -619,5 +619,10 @@ static inline void clk_writel(u32 val, u32 __iomem *reg)
- 
- #endif	/* platform dependent I/O accessors */
- 
-+#ifdef CONFIG_DEBUG_FS
-+struct dentry *clk_debugfs_add_file(struct clk *clk, char *name, umode_t mode,
-+				void *data, const struct file_operations *fops);
-+#endif
-+
- #endif /* CONFIG_COMMON_CLK */
- #endif /* CLK_PROVIDER_H */
+It is related to the comment just before: we checked if the SCU
+is already enabled. So I guess we can't set the SCU Speculative linefills
+bit if the SCU is enabled.
+
+> 
+> A broader question is: if this feature is generic to all Cortex-A9, why
+> not offer a function in smp_scu.c to enable it? It seems weird to have
+> the offset and bit definitions for something as generic as the SCU
+> present deep into a Marvell-specific file.
+
+I have no strong opinion on it, and I also thoough about adding a function
+in smp_scu.c but when you are looking at the usage of SCU is the kernel
+the other SOC manipulate it directly.
+
+
+Thanks,
+
+Gregory
+
+
+
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
