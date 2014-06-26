@@ -1,193 +1,39 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Thu, 26 Jun 2014 12:14:12 +0530
-Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
-In-Reply-To: <53AB45D1.90909@codeaurora.org>
-References: <539fdd37.e7bc420a.76b9.ffffb583@mx.google.com>
- <CAGa+x85nqPbH-sye28ni=gUEdgjGdUDqHhv1+0pV5aO8y1+wHQ@mail.gmail.com>
- <53A106F1.10201@gmail.com>
- <CAGa+x8527FEPk6fg5kv-fbOzK3MzcFooFGE9Me12b9C_Pv=UzA@mail.gmail.com>
- <53A2AE11.2050208@gmail.com> <53A2BE94.2010308@gmail.com>
- <53A7A579.4010702@gmail.com>
- <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
- <53A9B99F.4040806@codeaurora.org> <53A9FBB5.60709@codeaurora.org>
- <53AABCF5.4050403@gmail.com> <53AB45D1.90909@codeaurora.org>
-Message-ID: <53ABC13C.8030908@gmail.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Thu, 26 Jun 2014 12:16:44 +0530
+Subject: [PATCH] Arm64: Fix build error while switching from LE to BE
+Message-ID: <1403765204-17617-1-git-send-email-achandran@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2014 03:27 AM, Laura Abbott wrote:
-> On 6/25/2014 5:13 AM, Tushar Behera wrote:
->> On 06/25/2014 03:59 AM, Laura Abbott wrote:
->>> On 6/24/2014 10:47 AM, Laura Abbott wrote:
->>>> On 6/23/2014 11:32 AM, Kevin Hilman wrote:
->>>>> On Sun, Jun 22, 2014 at 8:56 PM, Tushar Behera <trblinux@gmail.com> wrote:
->>>>>> Adding linux-samsung-soc and linux-arm-kernel ML for wider audience.
->>>>>>
->>>>>> On 06/19/2014 04:12 PM, Tushar Behera wrote:
->>>>>>> On 06/19/2014 03:02 PM, Tushar Behera wrote:
->>>>>>>> On 06/18/2014 09:22 AM, Kevin Hilman wrote:
->>>>>>>>> On Tue, Jun 17, 2014 at 8:26 PM, Tushar Behera <trblinux@gmail.com> wrote:
->>>>>>>>>> On 06/17/2014 10:23 PM, Kevin Hilman wrote:
->>>>>>>>>>> Sachin,
->>>>>>>>>>>
->>>>>>>>>>> On Mon, Jun 16, 2014 at 11:16 PM, Kevin's boot bot <khilman@linaro.org> wrote:
->>>>>>>>>>>>
->>>>>>>>>>>> Tree/Branch: mainline
->>>>>>>>>>>> Git describe: v3.16-rc1-2-gebe0618
->>>>>>>>>>>> Failed boot tests (console logs at the end)
->>>>>>>>>>>> ===========================================
->>>>>>>>>>>>      exynos5420-arndale-octa:     FAIL:    arm-exynos_defconfig
->>>>>>>>>>>>                 ste-snowball:     FAIL:    arm-u8500_defconfig
->>>>>>>>>>>
->>>>>>>>>>> FYI... these failures are getting more consistent on my octa board,
->>>>>>>>>>> but still not failing every time.
->>>>>>>>>>>
->>>>>>>>>>> Kevin
->>>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Hi Kevin,
->>>>>>>>>>
->>>>>>>>>> Same here.
->>>>>>>>>>
->>>>>>>>>> Observation: If you soft-reset the board (through the jumpers) after
->>>>>>>>>> getting this problem, the problem keeps repeating. But if you hard-reset
->>>>>>>>>> the board (by removing the power cord), the problem doesn't occur during
->>>>>>>>>> next iteration.
->>>>>>>>>
->>>>>>>>> I don't ever use the soft-reset, I only toggle the wall power.  I
->>>>>>>>> don't ever actually remove the power cord though, I'm using a
->>>>>>>>> USB-controlled relay to toggle the wall power.
->>>>>>>>>
->>>>>>>>> Kevin
->>>>>>>>>
->>>>>>>>
->>>>>>>> Laura,
->>>>>>>>
->>>>>>>> We are getting following kernel panic [1] (not always, but quite
->>>>>>>> regularly) while booting Arndale-Octa (based on Samsung's Exynos5420)
->>>>>>>> board with upstream kernel. I haven't observed this issue with other
->>>>>>>> boards yet.
->>>>>>>>
->>>>>>>> This issue is observed when I am booting with uImage + dtb (within
->>>>>>>> roughly ~10 iterations).
->>>>>>>>
->>>>>>>
->>>>>>> Some more information:
->>>>>>>
->>>>>>> The boot logs are provided in pastebin, okay[2] and failed[3].
->>>>>>>
->>>>>>> In case of boot failures, I am getting a higher value for vm_total_pages
->>>>>>> (684424 in [3]). In case of successful boot on my board, it is always
->>>>>>> 521232 [2] on my board.
->>>>>
->>>>> I can confirm that reverting the "Get rid of meminfo" patch gets the
->>>>> Octa board booting reliably again for me also.
->>>>>
->>>>> In case it helps, some boot logs for failures from the last copule
->>>>> linux-next build/boot cycles can be seen here:
->>>>> http://armcloud.us/kernel-ci/next/next-20140623/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
->>>>> http://armcloud.us/kernel-ci/next/next-20140620/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
->>>>>
->>>>
->>>> Sorry, I missed this yesterday. I'm going to take a look.
->>>>
->>>
->>> Were all of 
->>>
->>> http://pastebin.com/1iLaizuL
->>> http://pastebin.com/5tdDt4GL
->>> http://armcloud.us/kernel-ci/next/next-20140623/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
->>> http://armcloud.us/kernel-ci/next/next-20140620/arm-exynos_defconfig/boot-exynos5420-arndale-octa.log
->>>
->>> collected on the same type of board with the same amount of DRAM? I'm seeing a
->>> different amount of total pages across all those logs. All the logs have the
->>> same lowmem limit so it seems like the upper bound was being calculated
->>> incorrectly for passing to free_area_init_node. Nothing is immediately jumping
->>> out at me so can you boot up with a small debug patch?
->>>
->>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->>> index 659c75d..88eac1f 100644
->>> --- a/arch/arm/mm/init.c
->>> +++ b/arch/arm/mm/init.c
->>> @@ -187,6 +187,8 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
->>>         unsigned long zone_size[MAX_NR_ZONES], zhole_size[MAX_NR_ZONES];
->>>         struct memblock_region *reg;
->>>  
->>> +       pr_err("XXXXXXX min %lx max_low %lx max_high %lx\n", min, max_low, max_high);
->>> +       __memblock_dump_all();
->>>         /*
->>>          * initialise the zones.
->>>          */
->>>
->>> It would be helpful to do this across a few bootups to see if the values are
->>> actually consistent. I'll keep looking in the meantime.
->>>
->>> Thanks,
->>> Laura
->>>
->>
->> Thanks Laura for the pointer. In case of error, I am getting some random
->> memblock_add() calls from drivers/of/fdt.c:early_init_dt_scan_memory.
->>
->> The issue seems to be from u-boot, where it is not updating the memory
->> subnode properly. I have got a fix for the u-boot, which I am testing
->> right now. I will update tomorrow after I do some more test.
->>
-> 
-> I'm concerned my change can stay as is if this is exposing an issue
-> in u-boot. Asking people to change bootloaders rarely ends well. Can
-> you elaborate on what u-boot is doing that would be exposing this
-> issue?
-> 
-> Thanks,
-> Laura
-> 
-> 
+Selecting CPU_BIG_ENDIAN and building the kernel fails just after
+building it for little endian. According to Documentation/kbuild/makefiles.txt,
+it is a common mistake to forget 'FORCE' while using 'if_changed'
 
-Laura,
+So fix it by 'Forcing' the build of vdso.  Fixes build errors like these:
 
-Here is my assessment of the current situation.
+arch/arm64/kernel/vdso/note.o: compiled for a little endian system and target is big endian
+failed to merge target specific data of file arch/arm64/kernel/vdso/note.o
 
-*Bug in the u-boot*
-Current u-boot for Arndale-octa board has defined NR_BANKS as 12 and the
-core uses a global structure (gd->bd) to maintain the start and size of
-individual banks. Depending on the revision of SoC used on the board,
-the board file [1] updates the start/size for either 8 or 12 banks. In
-case of current revision of Arndale-Octa boards, the board file always
-updates start/size for 8 banks, leaving the start/size data for
-remaining 4 banks uninitialized.
+arch/arm64/kernel/vdso/sigreturn.o: compiled for a little endian system and target is big endian
+failed to merge target specific data of file arch/arm64/kernel/vdso/sigreturn.o
 
-But the u-boot core[2] updates the value of all the 12 banks, thus
-potentially updating invalid data for last 4 banks.
+Signed-off-by: Arun Chandran <achandran@mvista.com>
+---
+ arch/arm64/kernel/vdso/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The issue can be fixed by resetting the start/size for unused memory
-banks to 0/0.[3]
-
-*Before migration to memblock*
-The path for adding DRAM banks was done through [4]. For Exynos systems,
-NR_BANKS was defined as 8. The initial check for rejecting any banks
-beyond NR_BANKS was good enough for fixing this issue. The bootlog[5]
-(with some debug messages) shows the invalid data, both in u-boot and
-kernel. Please grep for "NR_BANKS too low, ignoring memory" in the bootlog.
-
-*After migration to memblock*
-Now that the memory banks are added through [6], all the memory banks
-are getting updated unconditionally resulting in the panic.
-
-IMO, the bug is in u-boot and we should fix that.
-
-[1]
-https://github.com/tusharbehera/u-boot/blob/tracking-arndale-octa-v2012.07/board/samsung/smdk5420/smdk5420.c#L158
-[2]
-https://github.com/tusharbehera/u-boot/blob/tracking-arndale-octa-v2012.07/arch/arm/lib/bootm.c#L80
-[3]
-https://github.com/tusharbehera/u-boot/commit/9be794e886603a80f2c8686a75187ae67ac2158d
-[4]
-https://github.com/tusharbehera/linux/blob/v3.15-rc1/arch/arm/kernel/setup.c#L629
-[5] http://pastebin.com/vLP2oG1mP
-[6]
-https://github.com/tusharbehera/linux/blob/v3.16-rc1/drivers/of/fdt.c#L878
-
-
+diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+index 6d20b7d..a268a9a 100644
+--- a/arch/arm64/kernel/vdso/Makefile
++++ b/arch/arm64/kernel/vdso/Makefile
+@@ -43,7 +43,7 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
+ 	$(call if_changed,vdsosym)
+ 
+ # Assembly rules for the .S files
+-$(obj-vdso): %.o: %.S
++$(obj-vdso): %.o: %.S FORCE
+ 	$(call if_changed_dep,vdsoas)
+ 
+ # Actual build commands
 -- 
-Tushar Behera
+1.7.9.5
