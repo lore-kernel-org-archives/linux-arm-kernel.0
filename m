@@ -1,81 +1,99 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 26 Jun 2014 11:15:13 -0700
-Subject: [PATCH v2 1/2] ARM: at91/dt: describe rgmii ethernet phy
- connected to sama5d3xek boards
-In-Reply-To: <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1403777615-25685-1-git-send-email-boris.brezillon@free-electrons.com>
- <1403777615-25685-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAGVrzcbYAEMsU1SFSH761H0isQ4z1M++KK_GLf0OAbGS48YUmw@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 26 Jun 2014 20:15:32 +0200
+Subject: [PATCH v5 00/14] Add Maxim 77802 PMIC support
+Message-ID: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+MAX77802 is a PMIC that contains 10 high efficiency Buck regulators,
+32 Low-dropout (LDO) regulators, two 32kHz buffered clock outputs,
+a Real-Time-Clock (RTC) and a I2C interface to program the individual
+regulators, clocks and the RTC.
 
-2014-06-26 3:13 GMT-07:00 Boris BREZILLON <boris.brezillon@free-electrons.com>:
-> Add ethernet-phy node and specify phy interrupt (connected to pin PB25).
->
-> The PHY address is not specified here because atmel have 2 different
-> designs
-> for its CPU modules: one is connecting PHYAD[0-2] pins to pull up resistors
-> (Embest design) and the other one is connection PHYAD0 to a pull up
-> resistor and PHYAD[1-2] to pull down resistors (Ronetix design).
-> As a result, Ronetix design will have its PHY available at address 0x1 and
-> Embest design at 0x7.
-> Let the net PHY core automatically detect the PHY address by scanning the
-> MDIO bus.
+This fifth version of the patch-set addresses several issues pointed
+out by Krzysztof Kozlowski and Yadwinder Singh Brar. The individual
+changes are added on each patch change log.
 
-I though the compatible string was listed as a required property, but
-it is not. The 'reg' property however is listed as required, although
-the of_miodbus_register() works just fine without it, although that is
-a Linux-specific implementation detail.
+This series are based on drivers added by Simon Glass to the Chrome OS
+kernel and adds support for the Maxim 77802 Power Management IC, their
+regulators, clocks, RTC and I2C interface.
 
->
-> Define board specific delays to apply to RGMII signals.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+NOTE: This version of the series model the real power scheme for Maxim
+77802 regulators instead of a simplistic model like in older versions.
+So these changes depend on patch:
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+"[PATCH v3] ARM: dts: Add cros_ec to exynos5420-peach-pit and exynos5800-peach-pi"
+https://patchwork.kernel.org/patch/4411351/
 
-> ---
->  arch/arm/boot/dts/sama5d3xcm.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index b0b1331..fc68bae 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -34,6 +34,21 @@
->
->                         macb0: ethernet at f0028000 {
->                                 phy-mode = "rgmii";
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +
-> +                               ethernet-phy {
-> +                                       interrupt-parent = <&pioB>;
-> +                                       interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-> +                                       txen-skew-ps = <800>;
-> +                                       txc-skew-ps = <3000>;
-> +                                       rxdv-skew-ps = <400>;
-> +                                       rxc-skew-ps = <3000>;
-> +                                       rxd0-skew-ps = <400>;
-> +                                       rxd1-skew-ps = <400>;
-> +                                       rxd2-skew-ps = <400>;
-> +                                       rxd3-skew-ps = <400>;
-> +                               };
->                         };
->
->                         pmc: pmc at fffffc00 {
-> --
-> 1.8.3.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+which adds tps65090 support to Peach boards since regulators from this
+PMIC supply power to a set of MAX77802 regulators.
 
+The patch-set has been tested on both Daisy/Snow (max77686) and Peach
+pit (max77802) Chromebooks and it's composed of the following patches:
 
+Doug Anderson (1):
+  mfd: max77686: Allow the max77686 rtc to wakeup the system
+
+Javier Martinez Canillas (13):
+  mfd: max77686: Convert to use regmap_irq
+  clk: max77686: Add DT include for MAX77686 PMIC clock
+  clk: max77686: Improve Maxim 77686 PMIC clocks binding
+  clk: Add generic driver for Maxim PMIC clocks
+  clk: max77686: Convert to the generic max clock driver
+  mfd: Add driver for Maxim 77802 Power Management IC
+  mfd: max77802: Add DT binding documentation
+  regmap: Add regmap_reg_copy function
+  regulator: Add driver for Maxim 77802 PMIC regulators
+  clk: Add driver for Maxim 77802 PMIC clocks
+  clk: max77802: Add DT binding documentation
+  rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
+  ARM: dts: Add max77802 to exynos5420-peach-pit and exynos5800-peach-pi
+
+ .../devicetree/bindings/clock/maxim,max77686.txt   |  13 +-
+ .../devicetree/bindings/clock/maxim,max77802.txt   |  42 ++
+ Documentation/devicetree/bindings/mfd/max77802.txt |  97 +++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         | 343 ++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          | 343 ++++++++++
+ drivers/base/regmap/regmap.c                       |  34 +
+ drivers/clk/Kconfig                                |  11 +
+ drivers/clk/Makefile                               |   2 +
+ drivers/clk/clk-max-gen.c                          | 198 ++++++
+ drivers/clk/clk-max-gen.h                          |  32 +
+ drivers/clk/clk-max77686.c                         | 183 +-----
+ drivers/clk/clk-max77802.c                         |  99 +++
+ drivers/mfd/Kconfig                                |  15 +
+ drivers/mfd/Makefile                               |   3 +-
+ drivers/mfd/max77686-irq.c                         | 319 ----------
+ drivers/mfd/max77686.c                             |  97 ++-
+ drivers/mfd/max77802.c                             | 372 +++++++++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/max77802.c                       | 694 +++++++++++++++++++++
+ drivers/rtc/Kconfig                                |  10 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-max77686.c                         |  55 +-
+ drivers/rtc/rtc-max77802.c                         | 637 +++++++++++++++++++
+ include/dt-bindings/clock/maxim,max77686.h         |  23 +
+ include/dt-bindings/clock/maxim,max77802.h         |  22 +
+ include/linux/mfd/max77686-private.h               |  31 +-
+ include/linux/mfd/max77686.h                       |   2 -
+ include/linux/mfd/max77802-private.h               | 304 +++++++++
+ include/linux/mfd/max77802.h                       | 121 ++++
+ include/linux/regmap.h                             |   9 +
+ 31 files changed, 3588 insertions(+), 534 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+ create mode 100644 drivers/clk/clk-max-gen.c
+ create mode 100644 drivers/clk/clk-max-gen.h
+ create mode 100644 drivers/clk/clk-max77802.c
+ delete mode 100644 drivers/mfd/max77686-irq.c
+ create mode 100644 drivers/mfd/max77802.c
+ create mode 100644 drivers/regulator/max77802.c
+ create mode 100644 drivers/rtc/rtc-max77802.c
+ create mode 100644 include/dt-bindings/clock/maxim,max77686.h
+ create mode 100644 include/dt-bindings/clock/maxim,max77802.h
+ create mode 100644 include/linux/mfd/max77802-private.h
+ create mode 100644 include/linux/mfd/max77802.h
 
 -- 
-Florian
+2.0.0.rc2
