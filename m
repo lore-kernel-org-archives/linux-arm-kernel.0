@@ -1,52 +1,41 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Thu, 26 Jun 2014 14:29:42 +0200
-Subject: Regression in 3.16-rc1 due to 1417a6b8dc (ARM: 8036/1: Enable IRQs
- before attempting to read user space in __und_usr)
-Message-ID: <53AC1236.2000504@zonque.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 26 Jun 2014 14:31:36 +0200
+Subject: [PATCH v4 05/14] clk: Add generic driver for Maxim PMIC clocks
+In-Reply-To: <CAKew6eWt-0c4gxGX7C7KtRrxR=9h9BSUmN3a2aWQtuT40cva1w@mail.gmail.com>
+References: <1403723019-6212-1-git-send-email-javier.martinez@collabora.co.uk>	<1403723019-6212-6-git-send-email-javier.martinez@collabora.co.uk>
+ <CAKew6eWt-0c4gxGX7C7KtRrxR=9h9BSUmN3a2aWQtuT40cva1w@mail.gmail.com>
+Message-ID: <53AC12A8.6040201@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hello Yadwinder,
 
-I just noticed a regression when booting up a PXA3xx board with
-3.16-rc1. I see the following warning, and the CPU is stalled afterwards:
+Thanks a lot for your feedback.
 
-[   44.600978] ------------[ cut here ]------------
-[   44.605643] WARNING: CPU: 0 PID: 2026 at kernel/sched/core.c:2489
-handle_IRQ+0x2c/0xac()
-[   44.613671] DEBUG_LOCKS_WARN_ON((preempt_count() < 0))
-[   44.618597] Modules linked in: w1_gpio wire pxamci
-[   44.623570] CPU: 0 PID: 2026 Comm: ssh-keygen Not tainted 3.15.0-rc1+
-#1192
-[   44.630527] [<c000dd70>] (unwind_backtrace) from [<c000bc78>]
-(show_stack+0x10/0x14)
-[   44.638253] [<c000bc78>] (show_stack) from [<c00175cc>]
-(warn_slowpath_common+0x60/0x80)
-[   44.646297] [<c00175cc>] (warn_slowpath_common) from [<c0017618>]
-(warn_slowpath_fmt+0x2c/0x3c)
-[   44.654943] [<c0017618>] (warn_slowpath_fmt) from [<c0009b38>]
-(handle_IRQ+0x2c/0xac)
-[   44.662729] [<c0009b38>] (handle_IRQ) from [<c000853c>]
-(ichp_handle_irq+0x24/0x2c)
-[   44.670336] [<c000853c>] (ichp_handle_irq) from [<c000c7c0>]
-(__irq_svc+0x40/0x6c)
-[   44.677848] Exception stack(0xc70e9dd8 to 0xc70e9e20)
-[   44.682864] 9dc0:
-   00000000 c70e9e30
-[   44.690987] 9de0: 00000003 ffffffff 000000a0 be954ac0 00000000
-00000000 c785b6d8 00000000
-[   44.699113] 9e00: c70e8000 00000000 00000013 c70e9e20 c000e240
-fffffffc 40000013 ffffffff
-[   44.707239] [<c000c7c0>] (__irq_svc) from [<fffffffc>] (0xfffffffc)
-[   44.713465] ---[ end trace 5257138f34695fa8 ]---
+On 06/26/2014 01:51 PM, Yadwinder Singh Brar wrote:
+> Hi Javier,
+> 
+> Sorry for jumping in late, but just one concern mentioned inline.
+> 
+> [ .. ]
+> 
+>> +
+>> +static unsigned long max_gen_recalc_rate(struct clk_hw *hw,
+>> +                                        unsigned long parent_rate)
+>> +{
+>> +       return 32768;
+>> +}
+> 
+> Isn't more safer(correct), if it check and return 0 when clk is
+> disabled(unprepared) ?
+> 
 
-git bisect shows 1417a6b8dc (ARM: 8036/1: Enable IRQs before attempting
-to read user space in __und_usr) as first bad commit. When reverting the
-changes in arch/arm/kernel/entry-armv.S that came in for 3.16c-rc1,
-everything goes back to normal. Any ideas?
+Makes sense to me. I'll add a if (__clk_is_enabled(hw->clk)) check in the next
+version.
 
-Arun - which SoC did you test this on? Did you enable CONFIG_DEBUG_PREEMPT?
+> Regards,
+> Yadwinder
+> 
 
-
-Thanks,
-Daniel
+Best regards,
+Javier
