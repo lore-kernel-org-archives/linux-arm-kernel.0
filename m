@@ -1,67 +1,90 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 26 Jun 2014 09:19:55 +0900
-Subject: [PATCH 08/14] ARM: shmobile: Add shared R-Car Gen2 CMA
- reservation code
-In-Reply-To: <20140625234708.GD7130@verge.net.au>
-References: <cover.1403681315.git.horms+renesas@verge.net.au>
- <f8e819352d12f1b7d109d846e9bf1c07e006469a.1403681315.git.horms+renesas@verge.net.au>
- <53AAE831.3040003@cogentembedded.com>
- <20140625234708.GD7130@verge.net.au>
-Message-ID: <20140626001955.GA557@verge.net.au>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Wed, 25 Jun 2014 19:45:51 -0500
+Subject: [PATCH 2/2 v2] ARM: KVM: user_mem_abort: support stage 2 MMIO page
+ mapping
+In-Reply-To: <53A9556D.3000003@arm.com>
+References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
+ <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
+ <20140506180448.GH3066@lvm>	<87bnvaotei.fsf@approximate.cambridge.arm.com>
+ <20140507145557.GJ3066@lvm>	<20140624102327.GA9121@arm.com>
+ <53A9556D.3000003@arm.com>
+Message-ID: <20140625194551.a6443252bf913023159d25fd@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc Olof]
+From: Kim Phillips <kim.phillips@linaro.org>
 
-On Thu, Jun 26, 2014 at 08:47:08AM +0900, Simon Horman wrote:
-> On Wed, Jun 25, 2014 at 07:18:09PM +0400, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> > On 06/25/2014 11:35 AM, Simon Horman wrote:
-> > 
-> > >From: Magnus Damm <damm+renesas@opensource.se>
-> > 
-> > >Add R-Car Gen2 CMA memory reservation code that can be
-> > >shared between multiple SoCs and boards. At this point
-> > >r8a7790 and r8a7791 are supported.
-> > 
-> > >The top 256MiB of the legacy 32-bit physical memory space
-> > >is assigned to a separate CMA area that may be assigned
-> > >to various devices later on.
-> > 
-> > >Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> > >[horms+renesas at verge.net.au: rebased]
-> > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > [...]
-> > 
-> > >diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> > >index fdc714e..544b9bf 100644
-> > >--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> > >+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> > >@@ -20,8 +20,11 @@
-> > >
-> > >  #include <linux/clk/shmobile.h>
-> > >  #include <linux/clocksource.h>
-> > >+#include <linux/device.h>
-> > >+#include <linux/dma-contiguous.h>
-> > >  #include <linux/io.h>
-> > >  #include <linux/kernel.h>
-> > >+#include <linux/of_fdt.h>
-> > >  #include <asm/mach/arch.h>
-> > >  #include "common.h"
-> > >  #include "rcar-gen2.h"
-> > 
-> >    Hm, this part looks incomplete. I thought you were going to add CMA code here?
-> 
-> Thanks, something does indeed seem to have gone wrong there.
+A userspace process can map device MMIO memory via VFIO or /dev/mem,
+e.g., for platform device passthrough support in QEMU.
 
-I suspect that this is the result of an error on my part when I rebased
-the code on top of v3.16-rc1 before making it available to next.
+During early development, we found the PAGE_S2 memory type being used
+for MMIO mappings.  This patch corrects that by using the more strongly
+ordered memory type for device MMIO mappings: PAGE_S2_DEVICE.
 
-The missing code appears to lie in "ARM: shmobile: rcar-gen2: Update for
-of_get_flat_dt_prop() update".
+Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Hi, here's a v2, upon request:
 
+- rebased onto today's mainline ToT
+- mmu.o-build tested only (ToT build doesn't complete)
+- made commit text less terse
+- added Christoffer's ack
 
-Olof, I'd prefer not to rebase my branches in next. But if you'd like
-me to do so to clean up this problem then let me know.
+Cheers,
+
+Kim
+
+ arch/arm/kvm/mmu.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 16f8049..69af021 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -748,6 +748,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+ 	struct vm_area_struct *vma;
+ 	pfn_t pfn;
++	pgprot_t mem_type = PAGE_S2;
+ 
+ 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -798,6 +799,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (is_error_pfn(pfn))
+ 		return -EFAULT;
+ 
++	if (kvm_is_mmio_pfn(pfn))
++		mem_type = PAGE_S2_DEVICE;
++
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
+@@ -805,7 +809,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+ 	if (hugetlb) {
+-		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
++		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+ 		new_pmd = pmd_mkhuge(new_pmd);
+ 		if (writable) {
+ 			kvm_set_s2pmd_writable(&new_pmd);
+@@ -814,13 +818,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+-		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
++		pte_t new_pte = pfn_pte(pfn, mem_type);
+ 		if (writable) {
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+ 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+-		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
++		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
++				     mem_type == PAGE_S2_DEVICE);
+ 	}
+ 
+ 
+-- 
+2.0.0
