@@ -1,56 +1,44 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Thu, 26 Jun 2014 18:07:39 +0800
-Subject: [PATCH] ARM: kdump: 2nd kernel should use strict pfn_valid in
- SPARSEMEM platform
-Message-ID: <1403777259-28949-1-git-send-email-wangnan0@huawei.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jun 2014 11:17:07 +0100
+Subject: [PATCH v5 1/8] Documentation: arm: define DT idle states bindings
+In-Reply-To: <alpine.LFD.2.11.1406251154500.16842@knanqh.ubzr>
+References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1403705421-17597-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.11.1406251154500.16842@knanqh.ubzr>
+Message-ID: <20140626101707.GB25130@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes an irrational limitation for crash dump kernel on ARM
-platform when SPARSEMEM enabled.
+On Wed, Jun 25, 2014 at 04:56:02PM +0100, Nicolas Pitre wrote:
+> On Wed, 25 Jun 2014, Lorenzo Pieralisi wrote:
+> 
+> > ARM based platforms implement a variety of power management schemes that
+> > allow processors to enter idle states at run-time.
+> > The parameters defining these idle states vary on a per-platform basis forcing
+> > the OS to hardcode the state parameters in platform specific static tables
+> > whose size grows as the number of platforms supported in the kernel increases
+> > and hampers device drivers standardization.
+> >
+> > Therefore, this patch aims at standardizing idle state device tree bindings for
+> > ARM platforms. Bindings define idle state parameters inclusive of entry methods
+> > and state latencies, to allow operating systems to retrieve the configuration
+> > entries from the device tree and initialize the related power management
+> > drivers, paving the way for common code in the kernel to deal with idle
+> > states and removing the need for static data in current and previous kernel
+> > versions.
+> >
+> > Reviewed-by: Sebastian Capella <sebcape@gmail.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> Excellent.
+> 
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-Without this patch, crash reservation area for a crash dump kernel with
-SPARSEMEM selected must occupy a full section plus 1MiB. If not,
-elfcorehdr and some memory space used by the first kernel will unable to
-get accessed. This is caused by pfn_valid: fast pfn_valid ragards any
-pfn in a valid section as valid and prevents it to be ioremapped.
+Thanks Nico, there are still a couple of niggles to sort out (ie local
+timer state), but the bulk of the document should be complete I hope.
 
-This limitation wastes memory, because sections are always large and
-crash dump kernel should be as small as possible.
+I will postpone adding your (and Seb's) Reviewed-by until we have a
+final agreement if it is ok with you.
 
-This patch selects HAVE_ARCH_PFN_VALID for CRASH_DUMP, makes crash dump
-kernel to use strict version of pfn_valid().
-
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Cc: Li Zefan <lizefan@huawei.com>
----
-
-This is the forth time I post this patch. The previous discussions can be
-retrived from:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/256498.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257472.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/260322.html
-
-The second thread discusses the limitation in detail, but non of previous
-discussion reaches a conclusion.
-
----
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 87b63fd..aca8ee0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1725,7 +1725,7 @@ config ARCH_SELECT_MEMORY_MODEL
- 	def_bool ARCH_SPARSEMEM_ENABLE
- 
- config HAVE_ARCH_PFN_VALID
--	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
-+	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM || CRASH_DUMP
- 
- config HIGHMEM
- 	bool "High Memory Support"
--- 
-1.8.4
+Thanks !
+Lorenzo
