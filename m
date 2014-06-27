@@ -1,113 +1,114 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 27 Jun 2014 12:58:15 +0200
-Subject: [RFC 09/10] drm/tegra: Add IOMMU support
-In-Reply-To: <20140627124614.050be2e406a4b9a02d9fe97c@nvidia.com>
-References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-10-git-send-email-thierry.reding@gmail.com>
- <20140627124614.050be2e406a4b9a02d9fe97c@nvidia.com>
-Message-ID: <20140627105814.GB2797@ulmo>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
+Date: Fri, 27 Jun 2014 16:29:45 +0530
+Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
+ regulators
+In-Reply-To: <CAD=FV=Vy5vRan0KEDFFwVO0omgsUMwJK6WwCsWxGYynzT-e5ig@mail.gmail.com>
+References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
+ <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
+ <CAKuRcO+OaknUtj9mJ+SQJPMj70hdLTMkDYCXq4L5JdwzDKdj6g@mail.gmail.com>
+ <CAD=FV=Vy5vRan0KEDFFwVO0omgsUMwJK6WwCsWxGYynzT-e5ig@mail.gmail.com>
+Message-ID: <CAKuRcOLDCFQnw01ReKqNNfiiCwSWwi6Rd7UZFph+JzK2CQ4T_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 12:46:14PM +0300, Hiroshi DOyu wrote:
-> Thierry Reding <thierry.reding@gmail.com> writes:
-[...]
-> > diff --git a/drivers/gpu/drm/tegra/dc.c b/drivers/gpu/drm/tegra/dc.c
-[...]
-> > +       if (tegra->domain) {
-> > +               err = iommu_attach_device(tegra->domain, dc->dev);
-> 
-> I wanted to keep device drivers iommu-free with the following:
-> 
-> http://patchwork.ozlabs.org/patch/354074/
-
-That patch only addresses the probe ordering problem that happens if the
-user of an IOMMU is probed before the IOMMU. What this patch does is a
-whole lot more.
-
-> > diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
-> > index 59736bb810cd..1d2bbafad982 100644
-> > --- a/drivers/gpu/drm/tegra/drm.c
-> > +++ b/drivers/gpu/drm/tegra/drm.c
-> > @@ -8,6 +8,7 @@
-> >   */
-> >
-> >  #include <linux/host1x.h>
-> > +#include <linux/iommu.h>
-> >
-> >  #include "drm.h"
-> >  #include "gem.h"
-> > @@ -33,6 +34,16 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
-> >         if (!tegra)
-> >                 return -ENOMEM;
-> >
-> > +       if (iommu_present(&platform_bus_type)) {
-> > +               tegra->domain = iommu_domain_alloc(&platform_bus_type);
-> 
-> Can we use "dma_iommu_mapping" instead of domain?
-> 
-> I thought that DMA API is on the top of IOMMU API so that it may be
-> cleaner to use only DMA API.
-
-Using the DMA API doesn't work for Tegra DRM because it assumes a 1:1
-mapping between a device and an IOMMU domain. For Tegra DRM we have two
-devices (two display controllers) that need to be able to access the
-same buffers, therefore they need to share one IOMMU domain. This can't
-be done using the DMA API.
-
-The DMA API is fine to be used by devices that operate on "private" DMA
-buffers (SDMMC, USB, ...).
-
-> iommu_map_sg() could be implemented as iommu_ops->map_sg() for the
-> better perf since iommu_map() needs some pagetable cache operations. If
-> we do those cache operations at once, it would bring some perf benefit.
-
-Yes, I agree that eventually this should be moved into the IOMMU core.
-We could add a .map_sg() to IOMMU ops for devices where mapping a whole
-sg_table at once would have significant performance benefits and change
-this generic implementation to be used by devices that don't implement
-.map_sg(). Then the IOMMU core's iommu_map_sg() can call into the driver
-directly or fallback to the generic implementation.
-
-> I think that we don't need unmap_sg(), instead normal iommu_unmap() for
-> a whole area could do the same at once?
-
-Yes, I suppose that's true. I'll see if it can be safely dropped. It
-might give us the same benefit as the iommu_map_sg() regarding cache
-maintenance, though.
-
-> > +static int iommu_unmap_sg(struct iommu_domain *domain, struct sg_table *sgt,
-> > +                         dma_addr_t iova)
-> > +{
-> > +       unsigned long offset = 0;
-> > +       struct scatterlist *sg;
-> > +       unsigned int i;
-> > +
-> > +       for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-> > +               dma_addr_t phys = sg_phys(sg);
-> > +               size_t length = sg->offset;
-> > +
-> > +               phys = sg_phys(sg) - sg->offset;
-> > +               length = sg->length + sg->offset;
-> > +
-> > +               iommu_unmap(domain, iova + offset, length);
-> > +               offset += length;
-> > +       }
-> > +
-> > +       return 0;
-> > +}
-> 
-> Can the rest of IOMMU API be replaced with DMA API too?
-
-As I explained above, I don't see how it could be done for this driver.
-But I don't think it has to. After all the IOMMU API does exist, so we
-shouldn't shy away from using it when appropriate.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/2760e5d8/attachment-0001.sig>
+On Thu, Jun 26, 2014 at 9:48 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Yuvaraj,
+>
+> On Thu, Jun 26, 2014 at 4:21 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+>> Doug
+>>
+>> On Tue, Jun 24, 2014 at 11:30 PM, Doug Anderson <dianders@chromium.org> wrote:
+>>> Yuvaraj,
+>>>
+>>> On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>>> This patch makes use of mmc_regulator_get_supply() to handle
+>>>> the vmmc and vqmmc regulators.Also it moves the code handling
+>>>> the these regulators to dw_mci_set_ios().It turned on the vmmc
+>>>> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
+>>>> during MMC_POWER_OFF.
+>>>>
+>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>>> ---
+>>>>  drivers/mmc/host/dw_mmc.c |   71 ++++++++++++++++++++++-----------------------
+>>>>  drivers/mmc/host/dw_mmc.h |    2 ++
+>>>>  2 files changed, 36 insertions(+), 37 deletions(-)
+>>>
+>>> Perhaps you could CC me on the whole series for the next version since
+>>> I was involved in privately reviewing previous versions?
+>> It was just accidental missing you in the CC .Surely i will add you in
+>> CC for next versions.
+>>>
+>>> Overall caveat for my review is that I'm nowhere near an SD/MMC expert.
+>>>
+>>>
+>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>>> index 1ac227c..f5cabce 100644
+>>>> --- a/drivers/mmc/host/dw_mmc.c
+>>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>>> @@ -937,6 +937,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>>         struct dw_mci_slot *slot = mmc_priv(mmc);
+>>>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+>>>>         u32 regs;
+>>>> +       int ret;
+>>>>
+>>>>         switch (ios->bus_width) {
+>>>>         case MMC_BUS_WIDTH_4:
+>>>> @@ -975,16 +976,41 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>>
+>>>>         switch (ios->power_mode) {
+>>>>         case MMC_POWER_UP:
+>>>> +               if ((!IS_ERR(mmc->supply.vmmc)) &&
+>>>> +                               !test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
+>>>> +                       ret = regulator_enable(mmc->supply.vmmc);
+>>>> +                       if (!ret)
+>>>> +                               set_bit(DW_MMC_CARD_POWERED, &slot->flags);
+>>>> +               }
+>>>
+>>> As per below, I'm not sure why you'd want to turn on vqmmc and vmmc at
+>>> different times.
+>> As you can see people's have different opinion on this.When i had a
+>> look at the other drivers in the subsystem which does in the same flow
+>> as above.However i will change in the next version.
+>
+> Given my self proclaimed lack of SD/MMC knowledge, if others have a
+> good reason for doing them separate then you should do it that way.
+> So far I haven't heard that reason but I certainly could be wrong.
+>
+>
+>>>> @@ -225,6 +225,8 @@ struct dw_mci_slot {
+>>>>         unsigned long           flags;
+>>>>  #define DW_MMC_CARD_PRESENT    0
+>>>>  #define DW_MMC_CARD_NEED_INIT  1
+>>>> +#define DW_MMC_CARD_POWERED    2
+>>>> +#define DW_MMC_IO_POWERED      3
+>>>
+>>> I don't really think you should have two bits here.  From my
+>>> understanding of SD cards there should be very little reason to have
+>>> vqmmc and vmmc not powered at the same time.
+>> I think if i can use mmc_regulator_set_ocr(), we don't need additional
+>> flag.But for tps65090 mmc_regulator_get_ocr() and
+>> mmc_regulator_set_ocr() is failing as its a fixed-regulator.
+>
+> Can you explain more about what's failing?  It sure looks like mmc
+> core is supposed to handle this given comments below
+>
+> /*
+> * If we're using a fixed/static regulator, don't call
+> * regulator_set_voltage; it would fail.
+> */
+tps65090 driver does not register through fixed regulator framework.It
+uses normal regulator framework and supports only
+enable/disable/is_enabled callbacks.Also it lacks certain callbacks
+for list_voltage, get_voltage ,set_voltage etc.
+[    2.306476] dwmmc_exynos 12220000.mmc: Failed getting OCR mask: -22
+[    2.393403] dwmmc_exynos 12220000.mmc: could not set regulator OCR (-22)
+For the above reason,regulator framework treats fet4 as unused
+regulator and disables the vmmc regulator.
+> voltage = regulator_get_voltage(supply);
+>
+> if (!regulator_can_change_voltage(supply))
+>   min_uV = max_uV = voltage;
+>
+>
+> -Doug
