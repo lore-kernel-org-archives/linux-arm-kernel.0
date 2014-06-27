@@ -1,111 +1,78 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 27 Jun 2014 15:00:47 +0900
-Subject: [RFC] mm: cma: move init_cma_reserved_pageblock to cma.c
-In-Reply-To: <1403650082-10056-1-git-send-email-mina86@mina86.com>
-References: <1403650082-10056-1-git-send-email-mina86@mina86.com>
-Message-ID: <20140627060047.GB9511@js1304-P5Q-DELUXE>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Fri, 27 Jun 2014 11:26:19 +0530
+Subject: [PATCH V5 16/20] ARM: exynos: cpuidle: Move the power sequence
+ call in the cpu_pm notifier
+In-Reply-To: <53ABEC68.7060500@samsung.com>
+References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+ <1397212815-16068-17-git-send-email-daniel.lezcano@linaro.org>
+ <CADWw7Ojjk9U95-Sh3WfK+OuKBJk4_XAJgGNrNmt7gcaAjxwVKQ@mail.gmail.com>
+ <53ABEC68.7060500@samsung.com>
+Message-ID: <CADWw7OgYYeSLVc81Yad63f4jd_YYgpY4B2GDJuf_vQezv_yU1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 12:48:02AM +0200, Michal Nazarewicz wrote:
-> With [f495d26: ?generalize CMA reserved area management
-> functionality?] patch CMA has its place under mm directory now so
-> there is no need to shoehorn a highly CMA specific functions inside of
-> page_alloc.c.
-> 
-> As such move init_cma_reserved_pageblock from mm/page_alloc.c to
-> mm/cma.c, rename it to cma_init_reserved_pageblock and refactor
-> a little.
-> 
-> Most importantly, if a !pfn_valid(pfn) is encountered, just
-> return -EINVAL instead of warning and trying to continue the
-> initialisation of the area.  It's not clear, to me at least, what good
-> is continuing the work on a PFN that is known to be invalid.
-> 
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+On Thu, Jun 26, 2014 at 3:18 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Chander,
+>
+> On 26.06.2014 11:07, Chander Kashyap wrote:
+>> On Fri, Apr 11, 2014 at 4:10 PM, Daniel Lezcano
+>> <daniel.lezcano@linaro.org> wrote:
+>
+> [snip]
+>
+>>> @@ -359,6 +373,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+>>>         switch (cmd) {
+>>>         case CPU_PM_ENTER:
+>>>                 if (cpu == 0) {
+>>> +                       exynos_pm_central_suspend();
+>>>                         exynos_cpu_save_register();
+>>>                 }
+>>>                 break;
+>>> @@ -368,6 +383,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+>>>                         if (!soc_is_exynos5250())
+>>>                                 scu_enable(S5P_VA_SCU);
+>>>                         exynos_cpu_restore_register();
+>>> +                       exynos_pm_central_resume();
+>>
+>> This notifier is called for system wide suspend and cpuidle.
+>>
+>> In case of Exynos cpuidle only AFTR and LPA state need to program
+>> central_sequencer and store/restore the registers.
+>>
+>> But in 5420 (core-power-down), this is not required, and causing the regression.
+>>
+>> Hence need to remove this notifier, or need to find a way to
+>> differentiate the cpuidle state.
+>
+> This patch is already present in v3.16. Moreover, Exynos5420 cpuidle has
+> not been merged yet. This means that this issue is not a regression and
+> I believe any further work on this should be carried out as further
+> patches on top of this change.
+>
+> Anyway, this change has introduced a regression, though, but in another
+> area - it broke suspend, at least on Exynos4-based devices, because now
+> certain steps are performed twice. I've sent a patch for 3.16-rc3 to fix
+> this by dropping custom suspend-specific syscore ops, effectively moving
+> most of the handling to CPU PM notifier, which also matches requirements
+> of AFTR and lower power states. See [1].
+>
+> [1]
+> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32935.html
+>
+> However, in this case, moving back to suspend-specific syscore_ops and
+> simply duplicating some code for lower cpuidle states might be a better
+> option. Care to send a patch (fix for 3.16, replacing mine) or I should
+> do it?
 
-Acked-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Yes need to move the common code to lower cpuildle implementation and
+removing the notifier all together.
+I will do it and send the patch.
 
-One question below.
 
-> ---
->  include/linux/gfp.h |  3 --
->  mm/cma.c            | 85 +++++++++++++++++++++++++++++++++++++++++------------
->  mm/page_alloc.c     | 31 -------------------
->  3 files changed, 66 insertions(+), 53 deletions(-)
-> 
-> diff --git a/include/linux/gfp.h b/include/linux/gfp.h
-> index 5e7219d..107793e9 100644
-> --- a/include/linux/gfp.h
-> +++ b/include/linux/gfp.h
-> @@ -415,9 +415,6 @@ extern int alloc_contig_range(unsigned long start, unsigned long end,
->  			      unsigned migratetype);
->  extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
->  
-> -/* CMA stuff */
-> -extern void init_cma_reserved_pageblock(struct page *page);
-> -
->  #endif
->  
->  #endif /* __LINUX_GFP_H */
-> diff --git a/mm/cma.c b/mm/cma.c
-> index c17751c..843b2b6 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -28,11 +28,14 @@
->  #include <linux/err.h>
->  #include <linux/mm.h>
->  #include <linux/mutex.h>
-> +#include <linux/page-isolation.h>
->  #include <linux/sizes.h>
->  #include <linux/slab.h>
->  #include <linux/log2.h>
->  #include <linux/cma.h>
->  
-> +#include "internal.h"
-> +
->  struct cma {
->  	unsigned long	base_pfn;
->  	unsigned long	count;
-> @@ -83,37 +86,81 @@ static void cma_clear_bitmap(struct cma *cma, unsigned long pfn, int count)
->  	mutex_unlock(&cma->lock);
->  }
->  
-> +/* Free whole pageblock and set its migration type to MIGRATE_CMA. */
-> +static int __init cma_init_reserved_pageblock(struct zone *zone,
-> +					      unsigned long pageblock_pfn)
-> +{
-> +	unsigned long pfn, nr_pages, i;
-> +	struct page *page, *p;
-> +	unsigned order;
-> +
-> +	pfn = pageblock_pfn;
-> +	if (!pfn_valid(pfn))
-> +		goto invalid_pfn;
-> +	page = pfn_to_page(pfn);
-> +
-> +	p = page;
-> +	i = pageblock_nr_pages;
-> +	do {
-> +		if (!pfn_valid(pfn))
-> +			goto invalid_pfn;
-> +
-> +		/*
-> +		 * alloc_contig_range requires the pfn range specified to be
-> +		 * in the same zone. Make this simple by forcing the entire
-> +		 * CMA resv range to be in the same zone.
-> +		 */
-> +		if (page_zone(p) != zone) {
-> +			pr_err("pfn %lu belongs to %s, expecting %s\n",
-> +			       pfn, page_zone(p)->name, zone->name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		__ClearPageReserved(p);
-> +		set_page_count(p, 0);
-> +	} while (++p, ++pfn, --i);
-
-So, when we meet fail condition, __ClearPageReserved, set_page_count()
-are already executed for some pages. Is that no problem?
-
-Thanks.
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
