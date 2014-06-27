@@ -1,114 +1,72 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar)
-Date: Fri, 27 Jun 2014 16:29:45 +0530
-Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
- regulators
-In-Reply-To: <CAD=FV=Vy5vRan0KEDFFwVO0omgsUMwJK6WwCsWxGYynzT-e5ig@mail.gmail.com>
-References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
- <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
- <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
- <CAKuRcO+OaknUtj9mJ+SQJPMj70hdLTMkDYCXq4L5JdwzDKdj6g@mail.gmail.com>
- <CAD=FV=Vy5vRan0KEDFFwVO0omgsUMwJK6WwCsWxGYynzT-e5ig@mail.gmail.com>
-Message-ID: <CAKuRcOLDCFQnw01ReKqNNfiiCwSWwi6Rd7UZFph+JzK2CQ4T_w@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 27 Jun 2014 13:01:10 +0200
+Subject: [RFC 10/10] mmc: sdhci-tegra: Add IOMMU support
+In-Reply-To: <20140627124602.53d046dae5d7e269815e56a0@nvidia.com>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <1403815790-8548-11-git-send-email-thierry.reding@gmail.com>
+ <20140627124602.53d046dae5d7e269815e56a0@nvidia.com>
+Message-ID: <20140627110109.GC2797@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 9:48 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Yuvaraj,
->
-> On Thu, Jun 26, 2014 at 4:21 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
->> Doug
->>
->> On Tue, Jun 24, 2014 at 11:30 PM, Doug Anderson <dianders@chromium.org> wrote:
->>> Yuvaraj,
->>>
->>> On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>>> This patch makes use of mmc_regulator_get_supply() to handle
->>>> the vmmc and vqmmc regulators.Also it moves the code handling
->>>> the these regulators to dw_mci_set_ios().It turned on the vmmc
->>>> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
->>>> during MMC_POWER_OFF.
->>>>
->>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->>>> ---
->>>>  drivers/mmc/host/dw_mmc.c |   71 ++++++++++++++++++++++-----------------------
->>>>  drivers/mmc/host/dw_mmc.h |    2 ++
->>>>  2 files changed, 36 insertions(+), 37 deletions(-)
->>>
->>> Perhaps you could CC me on the whole series for the next version since
->>> I was involved in privately reviewing previous versions?
->> It was just accidental missing you in the CC .Surely i will add you in
->> CC for next versions.
->>>
->>> Overall caveat for my review is that I'm nowhere near an SD/MMC expert.
->>>
->>>
->>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>>> index 1ac227c..f5cabce 100644
->>>> --- a/drivers/mmc/host/dw_mmc.c
->>>> +++ b/drivers/mmc/host/dw_mmc.c
->>>> @@ -937,6 +937,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>>>         struct dw_mci_slot *slot = mmc_priv(mmc);
->>>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
->>>>         u32 regs;
->>>> +       int ret;
->>>>
->>>>         switch (ios->bus_width) {
->>>>         case MMC_BUS_WIDTH_4:
->>>> @@ -975,16 +976,41 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>>>
->>>>         switch (ios->power_mode) {
->>>>         case MMC_POWER_UP:
->>>> +               if ((!IS_ERR(mmc->supply.vmmc)) &&
->>>> +                               !test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
->>>> +                       ret = regulator_enable(mmc->supply.vmmc);
->>>> +                       if (!ret)
->>>> +                               set_bit(DW_MMC_CARD_POWERED, &slot->flags);
->>>> +               }
->>>
->>> As per below, I'm not sure why you'd want to turn on vqmmc and vmmc at
->>> different times.
->> As you can see people's have different opinion on this.When i had a
->> look at the other drivers in the subsystem which does in the same flow
->> as above.However i will change in the next version.
->
-> Given my self proclaimed lack of SD/MMC knowledge, if others have a
-> good reason for doing them separate then you should do it that way.
-> So far I haven't heard that reason but I certainly could be wrong.
->
->
->>>> @@ -225,6 +225,8 @@ struct dw_mci_slot {
->>>>         unsigned long           flags;
->>>>  #define DW_MMC_CARD_PRESENT    0
->>>>  #define DW_MMC_CARD_NEED_INIT  1
->>>> +#define DW_MMC_CARD_POWERED    2
->>>> +#define DW_MMC_IO_POWERED      3
->>>
->>> I don't really think you should have two bits here.  From my
->>> understanding of SD cards there should be very little reason to have
->>> vqmmc and vmmc not powered at the same time.
->> I think if i can use mmc_regulator_set_ocr(), we don't need additional
->> flag.But for tps65090 mmc_regulator_get_ocr() and
->> mmc_regulator_set_ocr() is failing as its a fixed-regulator.
->
-> Can you explain more about what's failing?  It sure looks like mmc
-> core is supposed to handle this given comments below
->
-> /*
-> * If we're using a fixed/static regulator, don't call
-> * regulator_set_voltage; it would fail.
-> */
-tps65090 driver does not register through fixed regulator framework.It
-uses normal regulator framework and supports only
-enable/disable/is_enabled callbacks.Also it lacks certain callbacks
-for list_voltage, get_voltage ,set_voltage etc.
-[    2.306476] dwmmc_exynos 12220000.mmc: Failed getting OCR mask: -22
-[    2.393403] dwmmc_exynos 12220000.mmc: could not set regulator OCR (-22)
-For the above reason,regulator framework treats fet4 as unused
-regulator and disables the vmmc regulator.
-> voltage = regulator_get_voltage(supply);
->
-> if (!regulator_can_change_voltage(supply))
->   min_uV = max_uV = voltage;
->
->
-> -Doug
+On Fri, Jun 27, 2014 at 12:46:02PM +0300, Hiroshi DOyu wrote:
+> 
+> Thierry Reding <thierry.reding@gmail.com> writes:
+> 
+> > From: Thierry Reding <treding@nvidia.com>
+> >
+> > Attach to the device's master interface of the IOMMU at .probe() time.
+> > IOMMU support becomes available via the DMA mapping API interoperation
+> > code, but this explicit attachment is necessary to ensure proper probe
+> > order.
+> >
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  drivers/mmc/host/sdhci-tegra.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+> > index 33100d10d176..b884614fa4e6 100644
+> > --- a/drivers/mmc/host/sdhci-tegra.c
+> > +++ b/drivers/mmc/host/sdhci-tegra.c
+> > @@ -15,6 +15,7 @@
+> >  #include <linux/err.h>
+> >  #include <linux/module.h>
+> >  #include <linux/init.h>
+> > +#include <linux/iommu.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/clk.h>
+> >  #include <linux/io.h>
+> > @@ -237,6 +238,11 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
+> >  	match = of_match_device(sdhci_tegra_dt_match, &pdev->dev);
+> >  	if (!match)
+> >  		return -EINVAL;
+> > +
+> > +	rc = iommu_attach(&pdev->dev);
+> > +	if (rc < 0)
+> > +		return rc;
+> > +
+> 
+> I thought that, if we consider that ->probe() should include minimal H/W
+> probing so that DMA API call in ->probe() could be deferred after
+> ->probe() and till it's in use actually, like opening a device node. For
+> me this decision(minimal h/w probe) seemed logical but it would add a
+> new restriction. One advantage is that we could still keep all drivers
+> wihtout any IOMMU code if it doesn't call DMA API in ->probe().
+
+This isn't immediately apparent in this case, but I think that in the
+future we may need to have this kind of explicit attachment to an IOMMU
+for example once devices start to appear that have multiple master
+interfaces (possibly on different IOMMUs). For easy cases like this
+SDMMC driver we may be able to get away more easily by hooking this up
+within the driver core for example. I'd have to look into how exactly
+this would work, though.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/043068d9/attachment.sig>
