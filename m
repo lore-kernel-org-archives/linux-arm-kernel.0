@@ -1,40 +1,47 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 27 Jun 2014 07:48:48 -0700
-Subject: [PATCH 2/3] ARM: dts: Update the parent for Audss clocks in
- Exynos5420
-In-Reply-To: <CAGa+x86COQz+cYtrXWrP-sjFGz-gi2tf6GEvLiKYoQwg1zMivQ@mail.gmail.com>
-References: <1402464739-19044-1-git-send-email-tushar.b@samsung.com>
- <1402464739-19044-3-git-send-email-tushar.b@samsung.com>
- <CAD=FV=W5yh58fYTwRZxmZt=BORcZMSRV0oRe12yA74Q5h2S4YQ@mail.gmail.com>
- <7hpphwlgn0.fsf@paris.lan>
- <CAC5m3Bzey-YoPLmjAq4YNPQ13rojtVFWAbnhX6-ZFtYZwEdMWg@mail.gmail.com>
- <7h8uojk61a.fsf@paris.lan> <53ACE724.7090606@gmail.com>
- <CAGa+x86COQz+cYtrXWrP-sjFGz-gi2tf6GEvLiKYoQwg1zMivQ@mail.gmail.com>
-Message-ID: <CAGa+x87LHiYGb03=GRcZisK1=TyakW1htd1E2vOQ6ijZKw8syg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 27 Jun 2014 16:52:03 +0200
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <20140627144610.GK32514@n2100.arm.linux.org.uk>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140627130430.GH32514@n2100.arm.linux.org.uk> <53AD724D.4020704@gmail.com>
+ <20140627133933.GJ23978@titan.lakedaemon.net> <53AD7544.2060701@gmail.com>
+ <20140627135932.GI32514@n2100.arm.linux.org.uk> <53AD7C24.5090408@gmail.com>
+ <20140627144610.GK32514@n2100.arm.linux.org.uk>
+Message-ID: <53AD8513.8090009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 7:18 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> On Thu, Jun 26, 2014 at 8:38 PM, Tushar Behera <trblinux@gmail.com> wrote:
+On 06/27/2014 04:46 PM, Russell King - ARM Linux wrote:
+> On Fri, Jun 27, 2014 at 04:13:56PM +0200, Sebastian Hesselbarth wrote:
+>> On 06/27/2014 03:59 PM, Russell King - ARM Linux wrote:
+>>> This is kind'a my point - you're confirming that you can't reliably
+>>> tell which version you have by running something on the cubox itself.
+>>> As Jason points out, there are those who need to choose the correct
+>>> DT file when installing.
+>>>
+>>> So, this means that the user has to be asked.  If users have to be
+>>> asked, users need some way to identify the hardware that they're
+>>> running on.
+>>
+>> I get your point, but there is no way to automatically tell them apart.
+>> IMHO, that is why cubox-dove.dts should represent the *production*
+>> version.
 >
->> Would you please provide me the environment setting of your u-boot?
->> U-boot environment on my board has been over-written, I would like to
->> set it same as yours and try to reproduce the issue at my end. With only
->> 'sound init', I don't seem to hit this issue anymore.
->
-> Attached is a full boot log using v3.16-rc2 with my patch adding
-> CLK_IGNORE_UNUSED to mau_epll and Doug's aclk66_peric patch.  In the
-> boot log, you'll see the output of 'printenv' inside u-boot where the
-> environment is dumped.
+> That's why I'm saying maybe there shouldn't be a distinction at DT
+> level - AFAIK the GPIO-based detection also works on the production
+> version.
 
-Oops, I sent you a boot log for the octa board.  Here's the one for
-peach-pi with the same kernel (built with upstream exynos_defconfig)
+No, it doesn't.
 
-Kevin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: boot-chromebook2.log.gz
-Type: application/x-gzip
-Size: 8850 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/a95b6b32/attachment.bin>
+On Dove, mpp12 carries sdio*1* card detect.
+
+ES has sdio*0* slot card detect routed to mpp12 and cannot rely on
+SDHCI CARD_PRESENT bit. That is what the gpio workaround is for.
+
+Production uses the correct mpp pin and cannot rely on gpio pin
+value, as it is not connected to slot card detect.
+
+So, use the wrong dts on either ES or production will break sdio card
+detect.
+
+Sebastian
