@@ -1,32 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Jun 2014 09:37:18 -0400
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <20140627130430.GH32514@n2100.arm.linux.org.uk>
-References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140627130430.GH32514@n2100.arm.linux.org.uk>
-Message-ID: <20140627133718.GI23978@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Jun 2014 14:38:21 +0100
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <7528887.J1DnSBg239@wuerfel>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <6381366.2IfqZj1r0B@wuerfel> <20140627124949.GR26276@arm.com>
+ <7528887.J1DnSBg239@wuerfel>
+Message-ID: <20140627133821.GI15296@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 02:04:30PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 27, 2014 at 09:01:29AM -0400, Jason Cooper wrote:
-> > Sebastian Hesselbarth (2):
-> >       dt-binding: add vendor prefix for SolidRun
-> >       ARM: dts: mvebu: split SolidRun CuBox into variants
+On Fri, Jun 27, 2014 at 02:16:28PM +0100, Arnd Bergmann wrote:
+> On Friday 27 June 2014 13:49:49 Will Deacon wrote:
+> > On Fri, Jun 27, 2014 at 12:03:34PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 26 June 2014 19:44:21 Rob Herring wrote:
+> > > > I don't agree arm32 is harder than microblaze. Yes, converting ALL of
+> > > > arm would be, but that is not necessary. With Liviu's latest branch
+> > > > the hacks I previously needed are gone (thanks!), and this is all I
+> > > > need to get Versatile PCI working (under QEMU):
+> > > 
+> > > I meant converting all of arm32 would be harder, but I agree we don't
+> > > have to do it. It would be nice to convert all of the drivers/pci/host
+> > > drivers though, iow all multiplatform-enabled ones, and leaving the
+> > > current arm32 pci implementation for the platforms we don't want to
+> > > convert to multiplatform anyway (footbridge, iop, ixp4xx, ks8695 (?),
+> > > pxa, sa1100).
+> > 
+> > I'm more than happy to convert the generic host controller we merged
+> > recently, but I'd probably want the core changes merged first so that I
+> > know I'm not wasting my time!
 > 
-> Are we sure about this?  I mean, in order to find out whether mine is an
-> engineering sample or not, I had to ask Rabeeh, and Rabeeh had to ask
-> various questions about the exterior construction in order to identify
-> which mine was.
+> That is definitely fine with me, but it's Bjorn's decision.
 
-What were the specific details Rebeeh use to differentiate ES and
-production?  Is it something generic we could put in a comment?
+Or the changes to the generic host controller can be part of Liviu's
+patch series (maybe together with other PCI host drivers like
+designware, as time allows).
 
-Sebastian, what happens when the wrong dtb is loaded?  afaict, card
-detect won't work for the sd card.  Which isn't earth-shattering, but I
-know at least the Debian guys are going to want a programmatic way to
-determine which board they are on.
-
-thx,
-
-Jason.
+-- 
+Catalin
