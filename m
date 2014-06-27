@@ -1,37 +1,33 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 27 Jun 2014 20:22:12 +0900
-Subject: [PATCH v3 0/2] drm: nouveau: memory coherency for ARM
-Message-ID: <1403868134-31741-1-git-send-email-acourbot@nvidia.com>
+Date: Fri, 27 Jun 2014 20:22:14 +0900
+Subject: [PATCH v3 2/2] drm/nouveau: use DMA TT population method on ARM
+In-Reply-To: <1403868134-31741-1-git-send-email-acourbot@nvidia.com>
+References: <1403868134-31741-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1403868134-31741-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2 was doing some pretty nasty things with the DMA API, so I took a different
-approach for this v3.
+Cached memory accesses between the CPU and the GPU are not coherent on
+ARM. Use the DMA TTM allocator on this architecture to obtain coherent
+memory.
 
-As suggested, this version uses ttm_dma_populate() to populate BOs. The reason
-for doing this was that it would entitle us to using the DMA sync functions,
-but since the memory returned is already coherent anyway, we do not even
-need to call these functions anymore.
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ drivers/gpu/drm/nouveau/nouveau_ttm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-So this series has turned into 2 small patches:
-
-- The first attempts to make it more obvious that Nouveau can use different
-ways to populate TTs, and make it possible to choose which method to use from
-a single place.
-- The second leverages this work to select the DMA allocator to populate TTs
-on ARM.
-
-Doing this solves all our coherency problems with Nouveau on Tegra, and
-hopefully makes the code easier to read in the process.
-
-Alexandre Courbot (2):
-  drm/nouveau: cleanup TTM population logic
-  drm/nouveau: use DMA TT population method on ARM
-
- drivers/gpu/drm/nouveau/nouveau_bo.c  | 63 ++++++++++++++++++-----------------
- drivers/gpu/drm/nouveau/nouveau_drm.h | 11 ++++++
- drivers/gpu/drm/nouveau/nouveau_ttm.c | 17 ++++++++++
- 3 files changed, 61 insertions(+), 30 deletions(-)
-
+diff --git a/drivers/gpu/drm/nouveau/nouveau_ttm.c b/drivers/gpu/drm/nouveau/nouveau_ttm.c
+index 70893416d4b6..d77fc8a5167d 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_ttm.c
++++ b/drivers/gpu/drm/nouveau/nouveau_ttm.c
+@@ -385,6 +385,8 @@ nouveau_ttm_init(struct nouveau_drm *drm)
+ 	if (swiotlb_nr_tbl())
+ 		drm->ttm.populate_method = DMA;
+ #endif
++	if (IS_ENABLED(CONFIG_ARM))
++		drm->ttm.populate_method = DMA;
+ #if defined(TTM_HAS_AGP)
+ 	if (drm->agp.stat == ENABLED)
+ 		drm->ttm.populate_method = AGP;
 -- 
 2.0.0
