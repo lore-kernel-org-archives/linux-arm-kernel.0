@@ -1,98 +1,106 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Fri, 27 Jun 2014 10:43:24 -0500
-Subject: [PATCH 2/2] arm/gic: Add supports for GICv2m MSI(-X)
-In-Reply-To: <53A94A46.1010801@arm.com>
-References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1403569980-12913-3-git-send-email-suravee.suthikulpanit@amd.com>
- <53A94A46.1010801@arm.com>
-Message-ID: <53AD911C.6040301@amd.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Fri, 27 Jun 2014 21:19:29 +0530
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <CAD=FV=U3XPca_tQn4VO-b6FS4t+jUeMs9dSfsBoLYqjNb3V11w@mail.gmail.com>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+ <53ABED5B.8010506@samsung.com>
+ <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
+ <53AD60D7.4040404@gmail.com>
+ <CAD=FV=Wz5nB=fe-snzdNC-Tb50wXz9h3S5z4jAHzKxH3N66UVw@mail.gmail.com>
+ <53AD8A5E.9090904@gmail.com>
+ <CAD=FV=U3XPca_tQn4VO-b6FS4t+jUeMs9dSfsBoLYqjNb3V11w@mail.gmail.com>
+Message-ID: <CAGm_ybi6y1AyXP80S_jQv0DDM4YGZSbqhAhtHr3ZXhs27-Z2Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Doug,
 
-After looking at the GICv3 implementation and trying to understand how 
-you architect the driver, I have a couple questions below.
-
- > On 06/24/2014 04:52 AM, Marc Zyngier wrote:
-> Hi Suravee,
+On Fri, Jun 27, 2014 at 8:52 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Tomasz,
 >
-> On 24/06/14 01:33, suravee.suthikulpanit at amd.com wrote:
->> +       pr_info("GICv2m: SPI range [%d:%d]\n",
->> +               msi->spi_start, (msi->spi_start + msi->max_spi_cnt));
->> +
->> +       gic_arch_extn.irq_mask = gicv2m_mask_msi;
->> +       gic_arch_extn.irq_unmask = gicv2m_unmask_msi;
+> On Fri, Jun 27, 2014 at 8:14 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 27.06.2014 17:10, Doug Anderson wrote:
+>>> Tomasz and Vikas,
+>>>
+>>> On Fri, Jun 27, 2014 at 5:17 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>>> Hi Doug,
+>>>>
+>>>> On 26.06.2014 17:25, Doug Anderson wrote:
+>>>>> Tomasz,
+>>>>>
+>>>>> On Thu, Jun 26, 2014 at 2:52 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+>>>>>> Hi Vikas, Doug,
+>>>>>>
+>>>>>> On 26.06.2014 11:15, Vikas Sajjan wrote:
+>>>>>>> From: Doug Anderson <dianders@chromium.org>
+>>>>>>>
+>>>>>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+>>>>>>> being reset across sleep/wake.  If we don't set it to anything then
+>>>>>>> the TPM will be reset.  U-Boot will detect this as invalid
+>>>>>>> and will reset the system on resume time. This GPIO can always be low
+>>>>>>> and not hurt anything.  It will get pulled back high again during a
+>>>>>>> normal warm reset when it will default back to an input.
+>>>>>>>
+>>>>>>> To properly preserve the TPM state across suspend/resume and to make
+>>>>>>> the chrome U-Boot happy, properly set the GPIO to mask the
+>>>>>>> reset to the TPM.
+>>>>>>>
+>>>>>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>>>>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>>>>>>> ---
+>>>>>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   20 ++++++++++++++++++++
+>>>>>>>  1 file changed, 20 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>>>>>> index 7649982..8fd990a 100644
+>>>>>>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>>>>>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>>>>>> @@ -87,6 +87,18 @@
+>>>>>>>               pinctrl-0 = <&usb301_vbus_en>;
+>>>>>>>               enable-active-high;
+>>>>>>>       };
+>>>>>>> +
+>>>>>>> +     /* We need GPX0_6 to be low at sleep time; just keep it low always */
+>>>>>>> +     mask_tpm_reset_regulator: mask-tpm-reset-regulator {
+>>>>>>> +     compatible = "regulator-fixed";
+>>>>>>> +     regulator-name = "mask-tpm-reset ";
+>>>>>>> +             gpio = <&gpx0 6 0>;
+>>>>>>> +             enable-active-low;
+>>>>>>> +             regulator-boot-on;
+>>>>>>> +             regulator-always-on;
+>>>>>>> +             pinctrl-names = "default";
+>>>>>>> +             pinctrl-0 = <&mask_tpm_reset>;
+>>>>>>> +     };
+>>>>>>
+>>>>>> I don't think this pin is supposed to be a real regulator. If I'm right,
+>>>>>> you should just add a hog for it, if you don't have a proper driver to
+>>>>>> handle it.
+>>>>>
+>>>>> Yes, I agree that it shouldn't really be a regulator, but there's not
+>>>>> a whole lot of choice.  The pin needs to actually be driven low, not
+>>>>> just pulled low.  Without your proposed patch (pinctrl: samsung: Allow
+>>>>> pin value to be initialized using pinfunc) I don't think it's possible
+>>>>> to actually drive a pin low with a hog.  I could be wrong, though.
+>>>>>
+>>>>
+>>>> Uhm, I was convinced that this patch was already in. So I think your use
+>>>> case is definitely a good reason to get back to this patch and use the
+>>>> facility it provides to solve your problem.
+>>>
+>>> Thanks, that seems very reasonable to me, too.
+>>>
+>>> Are you going to pick up revitalizing this patch series or are you
+>>> hoping Vikas will?  IIRC I was in favor of your patch but it generated
+>>> a whole bunch of discussion and never actually landed.
+>>
+>> I will respin it along with few other patches for pinctrl-samsung, but
+>> obviously not before Monday.
 >
-> Right, I now see why you need to test on the MSI descriptor. Don't do
-> that. The gic_arch_extn crap should *never* *be* *used*.
+> Sounds like a plan.  Vikas: I'll assume you're going to redo this
+> patch atop Tomasz's once he posts up his.
 
-Hm, sounds like this should be removed all together then? In that case, 
-this would require changes in the irq-gic.c to call these functions 
-directly.
+Sure, will respin atop Tomasz's patch series.
 
->
-> What you want to do is do assign a different irq_chip to your MSI
-> interrupts. This will require a different integration with the main GIC
-> code though. For the GICv3 ITS, I do it when the interrupt gets mapped.
-
-Ah, that's what I was trying to avoid. Why should we need a whole 
-different irq_chip just to add the MSI register frame support on top of 
-the GICv2 which is already supported by the current irq-gic.c?
 
 >
->> +       return 0;
->> +}
->> +EXPORT_SYMBOL(gicv2m_msi_init);
->> +
->> +
->> +
->> +/**
->> + * Override arch_setup_msi_irq in drivers/pci/msi.c
->> + * since we don't want to change the chip_data
->> + */
->> +int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
->> +{
->> +       struct msi_chip *chip = pdev->bus->msi;
->> +
->> +       if (!chip || !chip->setup_irq)
->> +               return -EINVAL;
->> +
->> +       return chip->setup_irq(chip, pdev, desc);
->> +}
->> +
->> +/**
->> + * Override arch_teardown_msi_irq in drivers/pci/msi.c
->> + */
->> +void arch_teardown_msi_irq(unsigned int irq)
->> +{
->> +       struct msi_desc *desc;
->> +       struct msi_chip *chip;
->> +
->> +       desc = irq_get_msi_desc(irq);
->> +       if (!desc)
->> +               return;a
->> +
->> +       chip = desc->dev->bus->msi;
->> +       if (!chip)
->> +               return;
->> +
->> +       chip->teardown_irq(chip, irq);
->> +}
->
-> Please don't overtide those. There shouldn't be any reason for a
-> *driver* to do so. Only architecture code should do it. And nothing in
-> your code requires it (at least once you've stopped playing with the
-> silly gic extension...).
-
-The reason I need these because the __weak version of arch_setup_msi_irq 
-function in driver/pci/msi.c calls irq_set_chip_data and replace the 
-chip_data with msi_chip (originally was pointing to the gic_chip_data 
-structure). This ended up breaking the GIC.
-
-Looking at the GICv3 ITS implementation, this seems to also have similar 
-implementation. So, this was not an issue for you?
-
-Thanks,
-
-Suravee
+> -Doug
