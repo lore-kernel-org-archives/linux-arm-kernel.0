@@ -1,89 +1,104 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 16:14:15 +0200
-Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
- address of the boot register
-In-Reply-To: <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <53AD7C37.7090204@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Jun 2014 15:14:51 +0100
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140405001953.GE15806@google.com>
+ <20140407083120.GE17163@e106497-lin.cambridge.arm.com>
+ <5183143.FxBNM0xTAV@wuerfel>
+ <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
+ <20140626085926.GB11244@arm.com>
+ <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
+Message-ID: <20140627141451.GJ15296@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/2014 15:22, Gregory CLEMENT wrote:
-> In order to boot the secondary CPUs on Armada 375 Z1, we need to read
-> the boot address of these CPUs through a register part of the System
-> Controller. This done very early where MMU is not enable yet, so we
-> need to get the physical address of this register to use it.
+On Fri, Jun 27, 2014 at 01:44:21AM +0100, Rob Herring wrote:
+> On Thu, Jun 26, 2014 at 3:59 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > Although a bit late, I'm raising this now and hopefully we'll come to a
+> > conclusion soon. Delaying arm64 PCIe support even further is not a real
+> > option, which leaves us with:
+> >
+> > 1. Someone else (with enough PCIe knowledge) volunteering to take over
+> >    soon or
+> > 2. Dropping Liviu's work and going for an arm64-specific implementation
+> >    (most likely based on the arm32 implementation, see below)
 > 
-> In the previous version of this workaround the physical address were
-> hardcoded whereas depending of the Mbus configuration this address may
-> change.
+> 3. Keeping Liviu's patches leaving some of the architecture specific
+> bits. I know Arnd and I both commented on it still needing more common
+> pieces, but compared to option 2 that would be way better.
 > 
-> This commit will allow to use the generic boot workaround function
-> with the correct address.
+> Let's look at the patches in question:
+> 
+> 3e71867 pci: Introduce pci_register_io_range() helper function.
+> 6681dff pci: OF: Fix the conversion of IO ranges into IO resources.
+> 
+> Both OF patches. I'll happily merge them.
 
-I forgot my signed-off here
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+We just need to make sure they don't break other users of
+of_pci_range_to_resource() that the second patch introduces.
 
-> ---
->  arch/arm/mach-mvebu/common.h            |  1 +
->  arch/arm/mach-mvebu/system-controller.c | 11 +++++++++++
->  2 files changed, 12 insertions(+)
+> 2d5dd85 pci: Create pci_host_bridge before its associated bus in
+> pci_create_root_bus.
+> f6f2854 pci: Introduce a domain number for pci_host_bridge.
+> 524a9f5 pci: Export find_pci_host_bridge() function.
 > 
-> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-> index b67fb7a10d8b..6ad62cf8352c 100644
-> --- a/arch/arm/mach-mvebu/common.h
-> +++ b/arch/arm/mach-mvebu/common.h
-> @@ -20,6 +20,7 @@
->  void mvebu_restart(enum reboot_mode mode, const char *cmd);
->  int mvebu_cpu_reset_deassert(int cpu);
->  void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
-> +u32 mvebu_system_controller_get_phys_addr(void);
->  void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
->  
->  void armada_xp_cpu_die(unsigned int cpu);
-> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-> index 0c5524ac75b7..ae6ab543aa36 100644
-> --- a/arch/arm/mach-mvebu/system-controller.c
-> +++ b/arch/arm/mach-mvebu/system-controller.c
-> @@ -30,6 +30,7 @@
->  #include "common.h"
->  
->  static void __iomem *system_controller_base;
-> +static u32 system_controller_phys_base;
->  
->  struct mvebu_system_controller {
->  	u32 rstoutn_mask_offset;
-> @@ -109,6 +110,13 @@ void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
->  	writel(virt_to_phys(boot_addr), system_controller_base +
->  	       mvebu_sc->resume_boot_addr);
->  }
-> +
-> +u32 mvebu_system_controller_get_phys_addr(void)
-> +{
-> +	BUG_ON(system_controller_phys_base == NULL);
-> +	BUG_ON(mvebu_sc->resume_boot_addr == 0);
-> +	return system_controller_phys_base + mvebu_sc->resume_boot_addr;
-> +}
->  #endif
->  
->  static int __init mvebu_system_controller_init(void)
-> @@ -119,7 +127,10 @@ static int __init mvebu_system_controller_init(void)
->  	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
->  					     &match);
->  	if (np) {
-> +		struct resource res;
->  		system_controller_base = of_iomap(np, 0);
-> +		of_address_to_resource(np, 0, &res);
-> +		system_controller_phys_base = res.start;
->  		mvebu_sc = (struct mvebu_system_controller *)match->data;
->  		of_node_put(np);
->  	}
-> 
+> These don't seem to be too controversial.
 
+I think here there were discussions around introducing domain_nr to
+pci_host_bridge, particularly to the pci_create_root_bus_in_domain() API
+change. I don't think we reached any conclusion.
+
+> fb75718 pci: of: Parse and map the IRQ when adding the PCI device.
+> 
+> 6 LOC. Hardly controversial.
+
+I agree.
+
+> 920a685 pci: Add support for creating a generic host_bridge from device tree
+> 
+> This function could be moved to drivers/of/of_pci.c if having it in
+> drivers/pci is too much maintenance burden.
+
+I think it makes sense. Currently drivers/pci/host-bridge.c doesn't have
+anything OF related, so of_pci.c looks more appropriate.
+
+> However, nearly the same
+> code is already being duplicated in every DT enabled ARM PCI host
+> driver and will continue as more PCI hosts are added. So this isn't
+> really a question of converting other architectures to common PCI host
+> infrastructure, but converting DT based PCI hosts to common
+> infrastructure. ARM is the only arch moving host drivers to
+> drivers/pci ATM. Until other architectures start doing that,
+> converting them is pointless.
+
+I agree. It's probably more important to convert some of the
+drivers/pci/host implementations to using the common parsing rather than
+a new architecture (this way we avoid even more code duplication).
+
+> bcf5c10 Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
+> 
+> Seems like an independent fix that should be applied regardless.
+
+Indeed. But it got stuck at the top of this series and hasn't been
+pushed upstream.
+
+> 7cfde80 arm64: Add architecture support for PCI
+> 
+> What is here is really just a function of which option we pick.
+
+With Liviu's latest version (not posted) and with
+of_create_pci_host_bridge() function moved to of_pci.c, I don't think
+there is much new functionality added to drivers/pci/. What I think we
+need is clarifying the domain_nr patch (and API change) and more users
+of the new generic code. As you said, it doesn't need to be a separate
+architecture but rather existing pci host drivers under drivers/pci. Of
+course, other arch conversion should follow shortly as well but even
+without an immediate conversion, I don't see too much additional
+maintenance burden for the core PCIe code (and code sharing between new
+PCIe host drivers is even more beneficial).
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
