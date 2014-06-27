@@ -1,54 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 17:24:11 +0100
-Subject: [PATCH] spi: qup: Add DMA capabilities
-In-Reply-To: <20140627155422.GA13621@qualcomm.com>
-References: <1403816781-31008-1-git-send-email-agross@codeaurora.org>
- <20140627105057.GF23300@sirena.org.uk> <20140627155422.GA13621@qualcomm.com>
-Message-ID: <20140627162411.GO32514@n2100.arm.linux.org.uk>
+Date: Fri, 27 Jun 2014 17:31:08 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+Message-ID: <20140627163108.GP32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 10:54:22AM -0500, Andy Gross wrote:
-> On Fri, Jun 27, 2014 at 11:50:57AM +0100, Mark Brown wrote:
-> > On Thu, Jun 26, 2014 at 04:06:21PM -0500, Andy Gross wrote:
-> > 
-> > > +	if (xfer->rx_buf) {
-> > > +		rx_dma = dma_map_single(controller->dev, xfer->rx_buf,
-> > > +			xfer->len, DMA_FROM_DEVICE);
-> > 
-> > It would be better to use the core DMA mapping code rather than open
-> > coding.  This code won't work for vmalloc()ed addresses, or physically
-> > non-contiguous addresses unless there's an IOMMU fixing things up.
-> 
-> Ah, ok.  So I just need a to setup the scatter gather page list and then do a
-> dma_map_sg.  I'll resend once I have this in place.
+Hi Fredrik,
 
-Note that DMA from vmalloc'd memory is non-coherent on some platforms,
-even if you use the DMA API.
+On Fri, Jun 27, 2014 at 04:16:57PM +0000, Fredrik Noring wrote:
+> Please find below a trace that appeared once with 3.16-rc2. Perhaps it is of
+> some interest?
 
-The only thing that the DMA API guarantees is that the kernel mapping
-will be made coherent for DMA purposes.  No other mapping has this
-guarantee.
+It's not that serious... I know that the FEC ethernet driver is
+horrendously racy (I have had a patch set for about the last six months
+which fixes some of its problems) but as I've had a lot of patches to
+deal with, and it's been pushed to the back of the queue...
 
-Consider a VIVT cache (like the older ARMs).  For this cache, you need
-to find every alias of a physical page and flush it.  The DMA API doesn't
-have that information - it can only deal with the kernel's lowmem mapping.
+The races don't lead to data corruption though, merely timeouts and
+some lost packets.
 
-We have introduced a couple of helpers recently to solve the problem of
-vmalloc() (since a number of filesystems now do this trick) but the
-vmalloc() user has to deal with the problem:
+Now because things have changed during the last merge window, I've got
+an even bigger problem sorting through that patch set and getting it
+back into a submittable state.  I've just sent out v2 for it onto the
+netdev at vger.kernel.org mailing list.
 
-	flush_kernel_vmap_range()
-	invalidate_kernel_vmap_range()
-
-See the bottom of Documentation/cachetlb.txt for details.
-
-The long and the short of it is that it's better if vmalloc()'d memory
-is avoided where possible.  It's also loads better if subsystems pass
-physical references to memory for IO purposes where possible like our
-block layer does (iow, struct page + offset, length) rather than
-using randomly mapped virtual addresses, where the driver may not
-know where the memory has come from.
+The initial version (marked RFC) attracted very little interest from
+testers, or acks.  I'd very much like to have some testing of it, so
+if you want to try it out, I can provide you with a git URL, patches
+or a combined patch.
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
