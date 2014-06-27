@@ -1,70 +1,68 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 27 Jun 2014 16:40:13 -0700
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627233505.GA32514@n2100.arm.linux.org.uk>
-References: <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
- <20140627213051.GS32514@n2100.arm.linux.org.uk>
- <20140627215541.GC16724@brightrain.aerifal.cx>
- <20140627221744.GU32514@n2100.arm.linux.org.uk>
- <20140627223328.GB17988@brightrain.aerifal.cx>
- <20140627230736.GX32514@n2100.arm.linux.org.uk>
- <CALCETrVFvYNPHMozB2E2L0LWSPv=o6JHfmoz4_pBC2gQwRLpug@mail.gmail.com>
- <20140627233505.GA32514@n2100.arm.linux.org.uk>
-Message-ID: <CALCETrVOabOU=NMz-GO1L_iu5QgVYoUOrYMzDDBMxYRy4W69ag@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 28 Jun 2014 01:44:21 +0200
+Subject: [RFC 2/4] ARM: tegra: Add legacy interrupt controller nodes
+In-Reply-To: <53ADDAEF.2070805@wwwdotorg.org>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <1403888329-24755-2-git-send-email-thierry.reding@gmail.com>
+ <53ADDAEF.2070805@wwwdotorg.org>
+Message-ID: <20140627234420.GC26184@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 4:35 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jun 27, 2014 at 04:17:52PM -0700, Andy Lutomirski wrote:
->> On Fri, Jun 27, 2014 at 4:07 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > The kuser helpers can NOT be removed unless the CPU is v6k+.  Let me
->> > put that a different way: the kuser helpers can not be removed unless
->> > the ELF HWCAPs indicate TLS support.
->>
->> Why?  (This is an honest question -- there may be an excellent
->> answer.)  I understand why they're needed in the first place, but I
->> don't understand why they need to live at a fixed address.
->
-> Just very briefly - and this will be my last reply on this until Monday,
-> especially so as I've spent a solid 1h30 replying to the emails in this
-> thread, and it's past midnight here.
->
-> I referred to the problems in an earlier reply (maybe in a different
-> sub-thread of this thread.)
->
-> To answer your "why" (which I'll take as "why can't they be removed")
-> the reason for that is the lack of TLS support.  If the kuser page
-> is removed _and_ there is no hardware TLS support, then there is no way
-> for userspace to have TLS.
->
-> As for your second bit (about why they need to live at a fixed address)
-> we could have randomised it on v6 and later CPUs, but there are some
-> v6 CPUs which suffer from data cache aliasing, just like all the previous
-> CPUs.  With the data cache aliasing, it would make the TLS implementation
-> a lot more complex.
+On Fri, Jun 27, 2014 at 02:58:23PM -0600, Stephen Warren wrote:
+> On 06/27/2014 10:58 AM, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Add device tree nodes for the legacy interrupt controller so that the
+> > driver can get the register ranges from device tree rather than hard-
+> > coding them.
+> 
+> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> 
+> > +	interrupt-controller at 60004000 {
+> > +		compatible = "nvidia,tegra20-ictlr";
+> > +		reg = <0x60004000 0x40   /* primary controller */
+> > +		       0x60004100 0x40   /* secondary controller */
+> > +		       0x60004200 0x40   /* tertiary controller */
+> > +		       0x60004300 0x40   /* quaternary controller */
+> > +		       0x60004400 0x40>; /* quinary controller */
+> > +	};
+> 
+> The quinary controller doesn't exist on Tegra20.
 
-Right, got it.
+Right, I've dropped it.
 
->
-> As part of the TLS implementation for older CPUs, the TLS value is stored
-> right at the top of that page, and on every context switch, we have to
-> update that value.  If the page was at a randomised address, the kernel
-> would either have to poke directly into userspace and flush it from the
-> caches (which is error prone - what if userspace unmaps the page) or it
-> has to do cache flushing to ensure that the value is visible via the
-> user alias of the page.
->
+> > diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> 
+> > +	interrupt-controller at 60004000 {
+> > +		compatible = "nvidia,tegra20-ictlr";
+> 
+> At the least, each SoC should have an SoC-specific compatible value in
+> addition to the base Tegra20 value in case we need to differentiate them
+> in the future.
+> 
+> I'd be tempted to only include the SoC-specific value and omit the
+> Tegra20-specific value so we don't have to care whether they're really
+> 100% backwards-compatible, but it's probably safe to say they're all
+> Tegra20 compatible (or all Tegra30 compatible given the 4-vs-5
+> controllers difference).
 
-Hmm.  Maybe some day there'll be a reliable way to track a vdso.  This
-currently doesn't exist, but x86_32 will need it if CRIU will ever
-work there.
+I've looked at the register specification files and I can't see any
+differences between Tegra20, Tegra30, Tegra114 and Tegra124. Except
+for the absence of a quinary controller on Tegra20.
 
-If you ever want an ARM vdso (e.g. for timing), I'd be happy to help
-and try to share code with x86.
+I think I'll go with this:
 
---Andy
+	tegra114.dtsi: compatible = "nvidia,tegra114-ictlr", "nvidia,tegra30-ictlr";
+	tegra124.dtsi: compatible = "nvidia,tegra124-ictlr", "nvidia,tegra30-ictlr";
+	tegra20.dtsi: compatible = "nvidia,tegra20-ictlr";
+	tegra30.dtsi: compatible = "nvidia,tegra30-ictlr";
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/242118ea/attachment.sig>
