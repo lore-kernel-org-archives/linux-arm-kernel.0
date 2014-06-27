@@ -1,44 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Sat, 28 Jun 2014 01:10:27 +0200
-Subject: [RFC 5/5] clk: Add floor and ceiling constraints to clock rates
-In-Reply-To: <53ADF6E6.6090705@wwwdotorg.org>
-References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
- <1403855872-14749-6-git-send-email-tomeu.vizoso@collabora.com>
- <53ADF6E6.6090705@wwwdotorg.org>
-Message-ID: <20140627231026.GA26184@ulmo>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Jun 2014 00:12:24 +0100
+Subject: [musl] Re: Thread pointer changes
+In-Reply-To: <20140627224017.GU23102@port70.net>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627200949.GQ32514@n2100.arm.linux.org.uk>
+ <20140627210931.GT23102@port70.net>
+ <20140627213051.GS32514@n2100.arm.linux.org.uk>
+ <20140627215541.GC16724@brightrain.aerifal.cx>
+ <20140627221744.GU32514@n2100.arm.linux.org.uk>
+ <20140627224017.GU23102@port70.net>
+Message-ID: <20140627231224.GY32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 04:57:42PM -0600, Stephen Warren wrote:
-> On 06/27/2014 01:57 AM, Tomeu Vizoso wrote:
-> > Adds a way for clock consumers to set maximum and minimum rates. This can be
-> > used for thermal drivers to set ceiling rates, or by misc. drivers to set
-> > floor rates to assure a minimum performance level.
+On Sat, Jun 28, 2014 at 12:40:17AM +0200, Szabolcs Nagy wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [2014-06-27 23:17:44 +0100]:
+> > I think you're are missing one obvious solution to this which you can do:
+> > you are passed the HWCAP fields in the ELF auxinfo.  This will tell you
+> > if the CPU has TLS support or not.  If it has TLS support, then you don't
+> > need to use the kuser helpers, and you know that it is a CPU which is ARM
+> > architecture v6k or later, and it has things like the CP15 barrier
+> > instructions.  If you want to know that the CPU supports the DMB
+> > instruction rather than the CP15 barrier instruction, then you have to
+> > check the uname details, or read /proc/cpuinfo (but I'd rather you
+> > didn't.)
+> > 
 > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> 
-> > +static struct rate_constraint *__ensure_constraint(struct clk *clk_user,
-> > +						   enum constraint_type type)
-> 
-> > +	if (!found) {
-> > +		constraint = kzalloc(sizeof(*constraint), GFP_KERNEL);
-> > +		if (!constraint) {
-> > +			pr_err("%s: could not allocate constraint\n", __func__);
-> 
-> Doesn't kzalloc print an error itself if the allocation fails? I've
-> certainly seen quite a few patches ripping out custom "allocation
-> failed" errors in code.
+> but cp15 barrier is deprecated on armv7+
 
-Yes, these are unnecessary. There's even a checkpatch warning for this
-construct nowadays:
+Can you _please_ read all my replies and stop cherry picking what you
+want?  There's many of you, and only one of me - please do me the
+effort of fully reading my replies before replying on points I've
+already included.
 
-	f9a5a624f414 checkpatch: attempt to find unnecessary 'out of memory' messages
+I said just after you stopped reading the above quoted text:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/631482af/attachment.sig>
+"If you want to know that the CPU supports the DMB instruction rather
+ than the CP15 barrier instruction, then you have to check the uname
+ details"
+
+That's because it's an _instruction_ _set_ _architecture_ issue, and
+you can get that from uname.  If uname indicates v7, then you're running
+on a CPU which has deprecated the CP15 barrier operations.  If it
+indicates v6, then you're running on a CPU which has them but has no
+DMB instruction etc.  If it's earlier than v6, you have no barrier
+instructions what so ever.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
