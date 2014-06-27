@@ -1,113 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 21:48:27 +0100
-Subject: HDMI and LVDS on mx6
-In-Reply-To: <CAOMZO5C8n6tZbmoN_M_GB-Aq_1qDRensM7wi1_MSTSxJFFtwUw@mail.gmail.com>
-References: <CAOMZO5C8n6tZbmoN_M_GB-Aq_1qDRensM7wi1_MSTSxJFFtwUw@mail.gmail.com>
-Message-ID: <20140627204827.GR32514@n2100.arm.linux.org.uk>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 27 Jun 2014 13:56:46 -0700
+Subject: [PATCH v8 5/9] seccomp: split mode set routines
+In-Reply-To: <20140627195559.GA31661@redhat.com>
+References: <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
+ <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
+ <20140625173245.GA17695@redhat.com>
+ <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
+ <20140625175136.GA18185@redhat.com>
+ <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
+ <CALCETrVNwhWSPNiBiZmgP1nD9zLJPTk6cH0yo=85rbxTPTYFRg@mail.gmail.com>
+ <CAGXu5jLavA8FJD8m-1y4wO0uzh3qvvMmajAg0Lrr1Cn_Om3a3w@mail.gmail.com>
+ <20140627192753.GA30752@redhat.com>
+ <CALCETrVbJqfG6oBaZEjj7H3pPa1oVJx6QXAYc5zZ6o-niV=WKQ@mail.gmail.com>
+ <20140627195559.GA31661@redhat.com>
+Message-ID: <CAGXu5j+M+MHkxNMSaQ+RqYrty=1Fgur6_duSnL8DAZ_SazeJ7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 04:35:58PM -0300, Fabio Estevam wrote:
-> On mx6qsabresd we have LVDS and HDMI ports and with kernel 3.15 I had
-> to disconnect/connect the HDMI cable in order to get both displays
-> working.
-> 
-> I could workaround this by moving the LDB parent to a clock different
-> than pll5.
-> 
-> Now with 3.16-rc1 the situation is even worse:
-> 
-> - Boot the kernel with HDMI cable connected: only LVDS is functional
-> - Removing the HDMI cable causes LVDS to turn off
-> - Connect HDMI cable, then LVDS turns on, but still no HDMI
-> 
-> I also tried moving the LDB parent to a clock different than pll5.,
-> but it does not help in 3.16-rc1.
+On Fri, Jun 27, 2014 at 12:55 PM, Oleg Nesterov <oleg@redhat.com> wrote:
+> On 06/27, Andy Lutomirski wrote:
+>>
+>> On Fri, Jun 27, 2014 at 12:27 PM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> > On 06/27, Kees Cook wrote:
+>> >>
+>> >> It looks like SMP ARM issues dsb for rmb, which seems a bit expensive.
+>> >> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204g/CIHJFGFE.htm
+>> >>
+>> >> ...
+>> >>
+>> >> I really want to avoid adding anything to the secure_computing()
+>> >> execution path. :(
+>> >
+>> > I must have missed something but I do not understand your concerns.
+>> >
+>> > __secure_computing() is not trivial, and we are going to execute the
+>> > filters. Do you really think rmb() can add the noticeable difference?
+>> >
+>> > Not to mention that we can only get here if we take the slow syscall
+>> > enter path due to TIF_SECCOMP...
+>> >
+>>
+>> On my box, with my fancy multi-phase seccomp patches, the total
+>> seccomp overhead for a very short filter is about 13ns.  Adding a full
+>> barrier would add several ns, I think.
+>
+> I am just curious, does this 13ns overhead include the penalty from the
+> slow syscall enter path triggered by TIF_SECCOMP ?
+>
+>> Admittedly, this is x86, not ARM, so comparisons here are completely
+>> bogus.  And that read memory barrier doesn't even need an instruction
+>> on x86.  But still, let's try to keep this fast.
+>
+> Well, I am not going to insist...
+>
+> But imo it would be better to make it correct in a most simple way, then
+> we can optimize this code and see if there is a noticeable difference.
+>
+> Not only we can change the ordering, we can remove the BUG_ON's and just
+> accept the fact the __secure_computing() can race with sys_seccomp() from
+> another thread.
+>
+> If nothing else, it would be much simpler to discuss this patch if it comes
+> as a separate change.
 
-I don't know.  libdrm's modetest reports (with your patch to add lvds
-support to the HB, and changing the ldb clock to the OTG PLL):
+Yeah, the way I want to go is to add the rmb() for now (it gets us
+"correctness"), and then later deal with any potential performance
+problems on ARM at a later time. (At present, I'm unable to perform
+any timings on ARM -- maybe next week.)
 
-Encoders:
-id      crtc    type    possible crtcs  possible clones
-11      5       TMDS    0x00000003      0xffffffff
-13      9       LVDS    0x00000003      0xffffffff
+I will send the v9 series in a moment here...
 
-Connectors:
-id      encoder status          type    size (mm)       modes   encoders
-12      11      connected       HDMI-A  1280x720                21      11
-  modes:
-        name refresh (Hz) hdisp hss hse htot vdisp vss vse vtot)
-  1920x1080 50 1920 2448 2492 2640 1080 1084 1089 1125 flags: phsync, pvsync; type: preferred, driver
-  1920x1080 60 1920 2008 2052 2200 1080 1084 1089 1125 flags: phsync, pvsync; type: driver
-...
-  props:
-        1 EDID:
-                flags: immutable blob
-...
-        2 DPMS:
-                flags: enum
-                enums: On=0 Standby=1 Suspend=2 Off=3
-                value: 0
-14      13      connected       LVDS    0x0             1       13
-  modes:
-        name refresh (Hz) hdisp hss hse htot vdisp vss vse vtot)
-  1024x768 60 1024 1064 1124 1344 768 775 785 806 flags: ; type: preferred, driver
-  props:
-        1 EDID:
-                flags: immutable blob
-...
-CRTCs:
-id      fb      pos     size
-5       28      (0,0)   (1920x1080)
-  1920x1080 50 1920 2448 2492 2640 1080 1084 1089 1125 flags: phsync, pvsync; type: preferred, driver
-  props:
-9       28      (0,0)   (1024x768)
-  1024x768 60 1024 1064 1124 1344 768 775 785 806 flags: ; type: preferred, driver
-  props:
-...
-
-The extracts from clk_summary:
-
-    pll5_video                            1            1  1188000000          0
-       pll5_post_div                      1            1   297000000          0
-          pll5_video_div                  1            1   148500000          0
-             ipu2_di1_pre_sel             0            0   148500000          0
-                ipu2_di1_pre              0            0    74250000          0
-                   ipu2_di1_sel           0            0    74250000          0
-                      ipu2_di1            0            0    74250000          0
-             ipu2_di0_pre_sel             0            0   148500000          0
-                ipu2_di0_pre              0            0    49500000          0
-                   ipu2_di0_sel           0            0    49500000          0
-                      ipu2_di0            0            0    49500000          0
-             ipu1_di1_pre_sel             0            0   148500000          0
-                ipu1_di1_pre              0            0    49500000          0
-             ipu1_di0_pre_sel             1            1   148500000          0
-                ipu1_di0_pre              1            1   148500000          0
-                   ipu1_di0_sel           1            1   148500000          0
-                      ipu1_di0            1            1   148500000          0
-
-    pll3_usb_otg                          5            6   480000000          0
-       ldb_di1_sel                        1            1   480000000          0
-          ldb_di1_div_3_5                 1            1   137142857          0
-             ldb_di1_podf                 1            1    68571429          0
-                ldb_di1                   1            1    68571429          0
-                   ipu1_di1_sel           1            1    68571429          0
-                      ipu1_di1            1            1    68571429          0
-
-So it all looks as it should with your change.
-
-In order to use the modetest program in libdrm, you need to update the
-list of modules it looks for to be:
-
-        char *modules[] = { "i915", "radeon", "nouveau", "vmwgfx", "omapdrm", "exynos", "armada-drm", "imx-drm" };
-
-I'm hesitant to share my binary for that because of the numerous
-different ARM EABIs, even if I did it probably wouldn't run for you.
-
-The above dumps are after Xorg started up, and then shut down.
-Ubuntu doesn't make it easy /not/ to boot into Xorg except by
-package removal...
+-Kees
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Kees Cook
+Chrome OS Security
