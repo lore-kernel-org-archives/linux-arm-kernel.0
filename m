@@ -1,137 +1,137 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 27 Jun 2014 15:25:07 +0200
-Subject: [PATCH v2 10/14] drivers: clk: st: STiH407: Support for clockgenC0
+Date: Fri, 27 Jun 2014 15:25:00 +0200
+Subject: [PATCH v2 03/14] drivers: clk: st: use static const for
+ clkgen_pll_data tables
 In-Reply-To: <1403875511-7710-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1403875511-7710-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1403875511-7710-11-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1403875511-7710-4-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch added support for DT registration of ClockGenC0
-It includes 2 c32 type PLL and a 660 Quadfs.
+converts clkgen_pll_data tables into static const
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/clk/st/clkgen-fsyn.c | 47 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/st/clkgen-pll.c  | 32 ++++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
+ drivers/clk/st/clkgen-pll.c | 30 ++++++++++++++----------------
+ 1 file changed, 14 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index b2b73f4..0e0d5f9 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -255,6 +255,49 @@ static const struct clkgen_quadfs_data st_fs660c32_F_416 = {
- 	.get_rate	= clk_fs660c32_dig_get_rate,
- };
- 
-+static const struct clkgen_quadfs_data st_fs660c32_C_407 = {
-+	.nrst_present = true,
-+	.nrst	= { CLKGEN_FIELD(0x2f0, 0x1, 0),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 1),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 2),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 3) },
-+	.npda	= CLKGEN_FIELD(0x2f0, 0x1, 12),
-+	.nsb	= { CLKGEN_FIELD(0x2f0, 0x1, 8),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 9),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 10),
-+		    CLKGEN_FIELD(0x2f0, 0x1, 11) },
-+	.nsdiv_present = true,
-+	.nsdiv	= { CLKGEN_FIELD(0x304, 0x1, 24),
-+		    CLKGEN_FIELD(0x308, 0x1, 24),
-+		    CLKGEN_FIELD(0x30c, 0x1, 24),
-+		    CLKGEN_FIELD(0x310, 0x1, 24) },
-+	.mdiv	= { CLKGEN_FIELD(0x304, 0x1f, 15),
-+		    CLKGEN_FIELD(0x308, 0x1f, 15),
-+		    CLKGEN_FIELD(0x30c, 0x1f, 15),
-+		    CLKGEN_FIELD(0x310, 0x1f, 15) },
-+	.en	= { CLKGEN_FIELD(0x2fc, 0x1, 0),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 1),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 2),
-+		    CLKGEN_FIELD(0x2fc, 0x1, 3) },
-+	.ndiv	= CLKGEN_FIELD(0x2f4, 0x7, 16),
-+	.pe	= { CLKGEN_FIELD(0x304, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x308, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x30c, 0x7fff, 0),
-+		    CLKGEN_FIELD(0x310, 0x7fff, 0) },
-+	.sdiv	= { CLKGEN_FIELD(0x304, 0xf, 20),
-+		    CLKGEN_FIELD(0x308, 0xf, 20),
-+		    CLKGEN_FIELD(0x30c, 0xf, 20),
-+		    CLKGEN_FIELD(0x310, 0xf, 20) },
-+	.lockstatus_present = true,
-+	.lock_status = CLKGEN_FIELD(0x2A0, 0x1, 24),
-+	.powerup_polarity = 1,
-+	.standby_polarity = 1,
-+	.pll_ops	= &st_quadfs_pll_c32_ops,
-+	.rtbl		= fs660c32_rtbl,
-+	.rtbl_cnt	= ARRAY_SIZE(fs660c32_rtbl),
-+	.get_rate	= clk_fs660c32_dig_get_rate,
-+};
-+
- /**
-  * DOC: A Frequency Synthesizer that multiples its input clock by a fixed factor
-  *
-@@ -938,6 +981,10 @@ static struct of_device_id quadfs_of_match[] = {
- 		.compatible = "st,stih416-quadfs660-F",
- 		.data = (void *)&st_fs660c32_F_416
- 	},
-+	{
-+		.compatible = "st,stih407-quadfs660-C",
-+		.data = (void *)&st_fs660c32_C_407
-+	},
- 	{}
- };
- 
 diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-index d4ef4f4..5327a74 100644
+index d8b9b1a..cdf23db 100644
 --- a/drivers/clk/st/clkgen-pll.c
 +++ b/drivers/clk/st/clkgen-pll.c
-@@ -192,6 +192,30 @@ static const struct clkgen_pll_data st_pll3200c32_407_a0 = {
+@@ -59,7 +59,7 @@ static const struct clk_ops st_pll800c65_ops;
+ static const struct clk_ops stm_pll3200c32_ops;
+ static const struct clk_ops st_pll1200c32_ops;
+ 
+-static struct clkgen_pll_data st_pll1600c65_ax = {
++static const struct clkgen_pll_data st_pll1600c65_ax = {
+ 	.pdn_status	= CLKGEN_FIELD(0x0, 0x1,			19),
+ 	.locked_status	= CLKGEN_FIELD(0x0, 0x1,			31),
+ 	.mdiv		= CLKGEN_FIELD(0x0, C65_MDIV_PLL1600_MASK,	0),
+@@ -67,7 +67,7 @@ static struct clkgen_pll_data st_pll1600c65_ax = {
+ 	.ops		= &st_pll1600c65_ops
+ };
+ 
+-static struct clkgen_pll_data st_pll800c65_ax = {
++static const struct clkgen_pll_data st_pll800c65_ax = {
+ 	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			19),
+ 	.locked_status	= CLKGEN_FIELD(0x0,	0x1,			31),
+ 	.mdiv		= CLKGEN_FIELD(0x0,	C65_MDIV_PLL800_MASK,	0),
+@@ -76,7 +76,7 @@ static struct clkgen_pll_data st_pll800c65_ax = {
+ 	.ops		= &st_pll800c65_ops
+ };
+ 
+-static struct clkgen_pll_data st_pll3200c32_a1x_0 = {
++static const struct clkgen_pll_data st_pll3200c32_a1x_0 = {
+ 	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			31),
+ 	.locked_status	= CLKGEN_FIELD(0x4,	0x1,			31),
+ 	.ndiv		= CLKGEN_FIELD(0x0,	C32_NDIV_MASK,		0x0),
+@@ -93,7 +93,7 @@ static struct clkgen_pll_data st_pll3200c32_a1x_0 = {
  	.ops		= &stm_pll3200c32_ops,
  };
  
-+static const struct clkgen_pll_data st_pll3200c32_407_c0_0 = {
-+	/* 407 C0 PLL0 */
-+	.pdn_status	= CLKGEN_FIELD(0x2a0,	0x1,			8),
-+	.locked_status	= CLKGEN_FIELD(0x2a0,	0x1,			24),
-+	.ndiv		= CLKGEN_FIELD(0x2a4,	C32_NDIV_MASK,		16),
-+	.idf		= CLKGEN_FIELD(0x2a4,	C32_IDF_MASK,		0x0),
-+	.num_odfs = 1,
-+	.odf		= { CLKGEN_FIELD(0x2b4, C32_ODF_MASK,		0) },
-+	.odf_gate	= { CLKGEN_FIELD(0x2b4, 0x1,			6) },
-+	.ops		= &stm_pll3200c32_ops,
-+};
-+
-+static const struct clkgen_pll_data st_pll3200c32_407_c0_1 = {
-+	/* 407 C0 PLL1 */
-+	.pdn_status	= CLKGEN_FIELD(0x2c8,	0x1,			8),
-+	.locked_status	= CLKGEN_FIELD(0x2c8,	0x1,			24),
-+	.ndiv		= CLKGEN_FIELD(0x2cc,	C32_NDIV_MASK,		16),
-+	.idf		= CLKGEN_FIELD(0x2cc,	C32_IDF_MASK,		0x0),
-+	.num_odfs = 1,
-+	.odf		= { CLKGEN_FIELD(0x2dc, C32_ODF_MASK,		0) },
-+	.odf_gate	= { CLKGEN_FIELD(0x2dc, 0x1,			6) },
-+	.ops		= &stm_pll3200c32_ops,
-+};
-+
- /**
-  * DOC: Clock Generated by PLL, rate set and enabled by bootloader
-  *
-@@ -586,6 +610,14 @@ static struct of_device_id c32_pll_of_match[] = {
- 		.compatible = "st,stih407-plls-c32-a0",
- 		.data = &st_pll3200c32_407_a0,
- 	},
-+	{
-+		.compatible = "st,stih407-plls-c32-c0_0",
-+		.data = &st_pll3200c32_407_c0_0,
-+	},
-+	{
-+		.compatible = "st,stih407-plls-c32-c0_1",
-+		.data = &st_pll3200c32_407_c0_1,
-+	},
- 	{}
+-static struct clkgen_pll_data st_pll3200c32_a1x_1 = {
++static const struct clkgen_pll_data st_pll3200c32_a1x_1 = {
+ 	.pdn_status	= CLKGEN_FIELD(0xC,	0x1,			31),
+ 	.locked_status	= CLKGEN_FIELD(0x10,	0x1,			31),
+ 	.ndiv		= CLKGEN_FIELD(0xC,	C32_NDIV_MASK,		0x0),
+@@ -111,7 +111,7 @@ static struct clkgen_pll_data st_pll3200c32_a1x_1 = {
  };
  
+ /* 415 specific */
+-static struct clkgen_pll_data st_pll3200c32_a9_415 = {
++static const struct clkgen_pll_data st_pll3200c32_a9_415 = {
+ 	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
+ 	.locked_status	= CLKGEN_FIELD(0x6C,	0x1,			0),
+ 	.ndiv		= CLKGEN_FIELD(0x0,	C32_NDIV_MASK,		9),
+@@ -122,7 +122,7 @@ static struct clkgen_pll_data st_pll3200c32_a9_415 = {
+ 	.ops		= &stm_pll3200c32_ops,
+ };
+ 
+-static struct clkgen_pll_data st_pll3200c32_ddr_415 = {
++static const struct clkgen_pll_data st_pll3200c32_ddr_415 = {
+ 	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
+ 	.locked_status	= CLKGEN_FIELD(0x100,	0x1,			0),
+ 	.ndiv		= CLKGEN_FIELD(0x8,	C32_NDIV_MASK,		0),
+@@ -135,7 +135,7 @@ static struct clkgen_pll_data st_pll3200c32_ddr_415 = {
+ 	.ops		= &stm_pll3200c32_ops,
+ };
+ 
+-static struct clkgen_pll_data st_pll1200c32_gpu_415 = {
++static const struct clkgen_pll_data st_pll1200c32_gpu_415 = {
+ 	.pdn_status	= CLKGEN_FIELD(0x144,	0x1,			3),
+ 	.locked_status	= CLKGEN_FIELD(0x168,	0x1,			0),
+ 	.ldf		= CLKGEN_FIELD(0x0,	C32_LDF_MASK,		3),
+@@ -146,7 +146,7 @@ static struct clkgen_pll_data st_pll1200c32_gpu_415 = {
+ };
+ 
+ /* 416 specific */
+-static struct clkgen_pll_data st_pll3200c32_a9_416 = {
++static const struct clkgen_pll_data st_pll3200c32_a9_416 = {
+ 	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
+ 	.locked_status	= CLKGEN_FIELD(0x6C,	0x1,			0),
+ 	.ndiv		= CLKGEN_FIELD(0x8,	C32_NDIV_MASK,		0),
+@@ -157,7 +157,7 @@ static struct clkgen_pll_data st_pll3200c32_a9_416 = {
+ 	.ops		= &stm_pll3200c32_ops,
+ };
+ 
+-static struct clkgen_pll_data st_pll3200c32_ddr_416 = {
++static const struct clkgen_pll_data st_pll3200c32_ddr_416 = {
+ 	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
+ 	.locked_status	= CLKGEN_FIELD(0x10C,	0x1,			0),
+ 	.ndiv		= CLKGEN_FIELD(0x8,	C32_NDIV_MASK,		0),
+@@ -170,7 +170,7 @@ static struct clkgen_pll_data st_pll3200c32_ddr_416 = {
+ 	.ops		= &stm_pll3200c32_ops,
+ };
+ 
+-static struct clkgen_pll_data st_pll1200c32_gpu_416 = {
++static const struct clkgen_pll_data st_pll1200c32_gpu_416 = {
+ 	.pdn_status	= CLKGEN_FIELD(0x8E4,	0x1,			3),
+ 	.locked_status	= CLKGEN_FIELD(0x90C,	0x1,			0),
+ 	.ldf		= CLKGEN_FIELD(0x0,	C32_LDF_MASK,		3),
+@@ -450,9 +450,8 @@ static void __init clkgena_c65_pll_setup(struct device_node *np)
+ 	 * PLL0 HS (high speed) output
+ 	 */
+ 	clk_data->clks[0] = clkgen_pll_register(parent_name,
+-						&st_pll1600c65_ax,
+-						reg + CLKGENAx_PLL0_OFFSET,
+-						clk_name);
++			(struct clkgen_pll_data *) &st_pll1600c65_ax,
++			reg + CLKGENAx_PLL0_OFFSET, clk_name);
+ 
+ 	if (IS_ERR(clk_data->clks[0]))
+ 		goto err;
+@@ -480,9 +479,8 @@ static void __init clkgena_c65_pll_setup(struct device_node *np)
+ 	 * PLL1 output
+ 	 */
+ 	clk_data->clks[2] = clkgen_pll_register(parent_name,
+-						&st_pll800c65_ax,
+-						reg + CLKGENAx_PLL1_OFFSET,
+-						clk_name);
++			(struct clkgen_pll_data *) &st_pll800c65_ax,
++			reg + CLKGENAx_PLL1_OFFSET, clk_name);
+ 
+ 	if (IS_ERR(clk_data->clks[2]))
+ 		goto err;
 -- 
 1.9.1
