@@ -1,86 +1,77 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 27 Jun 2014 04:45:11 +0200
-Subject: [alsa-devel] [PATCH 1/7] ASoC: fix debugfs directory creation bug
-In-Reply-To: <E1X0AZe-0003i7-0z@rmk-PC.arm.linux.org.uk>
-References: <20140626142231.GR32514@n2100.arm.linux.org.uk>
- <E1X0AZe-0003i7-0z@rmk-PC.arm.linux.org.uk>
-Message-ID: <53ACDAB7.5080703@metafoo.de>
+From: trblinux@gmail.com (Tushar Behera)
+Date: Fri, 27 Jun 2014 08:36:42 +0530
+Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
+In-Reply-To: <53AC77A2.4090207@codeaurora.org>
+References: <53A2AE11.2050208@gmail.com> <53A2BE94.2010308@gmail.com>
+ <53A7A579.4010702@gmail.com>
+ <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
+ <53A9B99F.4040806@codeaurora.org> <53A9FBB5.60709@codeaurora.org>
+ <53AABCF5.4050403@gmail.com> <53AB45D1.90909@codeaurora.org>
+ <53ABC13C.8030908@gmail.com>
+ <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
+ <20140626151756.GU32514@n2100.arm.linux.org.uk>
+ <53AC77A2.4090207@codeaurora.org>
+Message-ID: <53ACDFC2.5020206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2014 04:22 PM, Russell King wrote:
-> Avoid creating duplicate directories by prefixing codecs and platforms
-> with their separate identifiers.  This avoids snd-soc-dummy (which can
-> appear both as a dummy platform and a dummy codec on the same card)
-> from clashing.
+On 06/27/2014 01:12 AM, Laura Abbott wrote:
 
-Do we actually want to create debugfs entries for the snd-soc-dummies? There 
-shouldn't be any meaningful information in there.
+>  
+> +static unsigned int bank_cnt;
+> +static unsigned int max_cnt;
+> +
+>  int __init arm_add_memory(u64 start, u64 size)
+>  {
+>  	u64 aligned_start;
+>  
+>  	/*
+> +	 * Some buggy bootloaders rely on the old meminfo behavior of not adding
+> +	 * more than n banks since anything past that may contain invalid data.
+> +	 */
+> +	if (bank_cnt >= max_cnt) {
+> +		pr_crit("Max banks too low, ignoring memory at 0x%08llx\n",
+> +			(long long)start);
+> +		return -EINVAL;
+> +	}
+> +
+> +	bank_cnt++;
+> +
+> +	/*
+>  	 * Ensure that start/size are aligned to a page boundary.
+>  	 * Size is appropriately rounded down, start is rounded up.
+>  	 */
+> @@ -879,6 +894,7 @@ void __init setup_arch(char **cmdline_p)
+>  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+>  	machine_desc = mdesc;
+>  	machine_name = mdesc->name;
+> +	max_cnt = mdesc->bank_limit;
 
-If we want to and if we change the naming scheme of the debugfs entries 
-anyway we should also add the component name to the entry name. This fixes a 
-issue with devices that register multiple components.
+arm_add_memory is getting called before this is being set, resulting in
+none of the memory banks getting added[1].
 
-The other thing is that we are working on generalizing the ASoC code and 
-getting rid of the distinction between CODECs and platforms. Which means 
-there won't really a way to get the prefix anymore soon.
+setup_machine_fdt -> early_init_dt_scan -> early_init_dt_scan_memory
 
-- Lars
+Would it make sense to re-introduce the config option ARM_NR_BANKS and
+replace max_cnt with NR_BANKS?
 
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->   sound/soc/soc-core.c | 28 ++++++++++++++++++++++++----
->   1 file changed, 24 insertions(+), 4 deletions(-)
->
-> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-> index b87d7d882e6d..91120b8e283e 100644
-> --- a/sound/soc/soc-core.c
-> +++ b/sound/soc/soc-core.c
-> @@ -270,12 +270,32 @@ static const struct file_operations codec_reg_fops = {
->   	.llseek = default_llseek,
->   };
->
-> +static struct dentry *soc_debugfs_create_dir(struct dentry *parent,
-> +	const char *fmt, ...)
-> +{
-> +	struct dentry *de;
-> +	va_list ap;
-> +	char *s;
-> +
-> +	va_start(ap, fmt);
-> +	s = kvasprintf(GFP_KERNEL, fmt, ap);
-> +	va_end(ap);
-> +
-> +	if (!s)
-> +		return NULL;
-> +
-> +	de = debugfs_create_dir(s, parent);
-> +	kfree(s);
-> +
-> +	return de;
-> +}
-> +
->   static void soc_init_codec_debugfs(struct snd_soc_codec *codec)
->   {
->   	struct dentry *debugfs_card_root = codec->card->debugfs_card_root;
->
-> -	codec->debugfs_codec_root = debugfs_create_dir(codec->name,
-> -						       debugfs_card_root);
-> +	codec->debugfs_codec_root = soc_debugfs_create_dir(debugfs_card_root,
-> +						"codec:%s", codec->name);
->   	if (!codec->debugfs_codec_root) {
->   		dev_warn(codec->dev,
->   			"ASoC: Failed to create codec debugfs directory\n");
-> @@ -306,8 +326,8 @@ static void soc_init_platform_debugfs(struct snd_soc_platform *platform)
->   {
->   	struct dentry *debugfs_card_root = platform->card->debugfs_card_root;
->
-> -	platform->debugfs_platform_root = debugfs_create_dir(platform->name,
-> -						       debugfs_card_root);
-> +	platform->debugfs_platform_root = soc_debugfs_create_dir(debugfs_card_root,
-> +						"platform:%s", platform->name);
->   	if (!platform->debugfs_platform_root) {
->   		dev_warn(platform->dev,
->   			"ASoC: Failed to create platform debugfs directory\n");
->
+[1] http://pastebin.com/MawYD7kb
+
+>  
+>  	if (mdesc->reboot_mode != REBOOT_HARD)
+>  		reboot_mode = mdesc->reboot_mode;
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index f38cf7c..91283fd 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -350,4 +350,5 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+>  	.dt_compat	= exynos_dt_compat,
+>  	.restart	= exynos_restart,
+>  	.reserve	= exynos_reserve,
+> +	.bank_limit     = 8,
+>  MACHINE_END
+> 
+
+
+-- 
+Tushar Behera
