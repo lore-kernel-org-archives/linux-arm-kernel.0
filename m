@@ -1,78 +1,99 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 27 Jun 2014 13:44:37 +0100
-Subject: [PATCH 2/6] arm: mm: Introduce special ptes for LPAE
-In-Reply-To: <20140627121721.GM26276@arm.com>
-References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
- <1403710824-24340-3-git-send-email-steve.capper@linaro.org>
- <20140627121721.GM26276@arm.com>
-Message-ID: <20140627124436.GC30585@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 27 Jun 2014 08:46:55 -0400
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
+Message-ID: <20140627124655.GF23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 01:17:21PM +0100, Will Deacon wrote:
-> On Wed, Jun 25, 2014 at 04:40:20PM +0100, Steve Capper wrote:
-> > We need a mechanism to tag ptes as being special, this indicates that
-> > no attempt should be made to access the underlying struct page *
-> > associated with the pte. This is used by the fast_gup when operating on
-> > ptes as it has no means to access VMAs (that also contain this
-> > information) locklessly.
-> > 
-> > The L_PTE_SPECIAL bit is already allocated for LPAE, this patch modifies
-> > pte_special and pte_mkspecial to make use of it, and defines
-> > __HAVE_ARCH_PTE_SPECIAL.
-> > 
-> > This patch also excludes special ptes from the icache/dcache sync logic.
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > ---
-> >  arch/arm/include/asm/pgtable-2level.h | 2 ++
-> >  arch/arm/include/asm/pgtable-3level.h | 8 ++++++++
-> >  arch/arm/include/asm/pgtable.h        | 6 ++----
-> >  3 files changed, 12 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-> > index 219ac88..f027941 100644
-> > --- a/arch/arm/include/asm/pgtable-2level.h
-> > +++ b/arch/arm/include/asm/pgtable-2level.h
-> > @@ -182,6 +182,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
-> >  #define pmd_addr_end(addr,end) (end)
-> >  
-> >  #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
-> > +#define pte_special(pte)	(0)
-> > +static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
-> >  
-> >  /*
-> >   * We don't have huge page support for short descriptors, for the moment
-> > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> > index 85c60ad..b286ba9 100644
-> > --- a/arch/arm/include/asm/pgtable-3level.h
-> > +++ b/arch/arm/include/asm/pgtable-3level.h
-> > @@ -207,6 +207,14 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
-> >  #define pte_huge(pte)		(pte_val(pte) && !(pte_val(pte) & PTE_TABLE_BIT))
-> >  #define pte_mkhuge(pte)		(__pte(pte_val(pte) & ~PTE_TABLE_BIT))
-> >  
-> > +#define pte_special(pte)	(!!(pte_val(pte) & L_PTE_SPECIAL))
-> 
-> Why the !!? Also, shouldn't this be rebased on your series adding the
-> pte_isset macro to ARM?
+Guys,
 
-Yes it should, I had this series logically separate to the pte_isset patch.
-I will have the pte_isset patch as a pre-requisite to the ARM fast_gup
-activation logic.
+Here's most of the SoC changes for mvebu so far.  It's looking to be a
+slow cycle for us this time around (famous last words ;-) ).
 
-> 
-> > +static inline pte_t pte_mkspecial(pte_t pte)
-> > +{
-> > +	pte_val(pte) |= L_PTE_SPECIAL;
-> > +	return pte;
-> > +}
-> 
-> If you put this in pgtable.h based on #ifdef __HAVE_ARCH_PTE_SPECIAL, then
-> you can use PTE_BIT_FUNC to avoid reinventing the wheel (or define
-> L_PTE_SPECIAL as 0 for 2-level and have one function).
+The only unusual item here is the setup file for the kirkwood netxbig
+board.  Andrew is working on a DT binding for the LEDs, but it is
+non-trivial.  By accepting this now, we can delete mach-kirkwood/, which
+is a good thing. :)  I hope to see patches from Andrew on this soon.
 
-Thanks, I'll give this a go.
+As usual, based on v3.16-rc1, no dependencies, been in -next several
+days.
 
-Cheers,
---
-Steve
+Please pull.
+
+thx,
+
+Jason.
+
+
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.17
+
+for you to fetch changes up to 65fcc462095b6f3b5a232c3ead7f49243f9aece4:
+
+  ARM: mvebu: Staticize mvebu_cpu_reset_init (2014-06-24 12:59:53 +0000)
+
+----------------------------------------------------------------
+mvebu SoC changes for v3.17
+
+ - kirkwood
+    - add setup file for netxbig LEDs (non-trivial DT binding doesn't exist yet)
+
+ - mvebu
+    - staticize where needed
+    - add CPU hotplug for Armada XP
+    - add public datasheet for Armada XP
+    - don't apply thermal quirk by default
+    - make Aramada 375 external abort logic a quirk
+    - update L2/PCIe deadlock workaround after L2CC cleanup
+    - get SoC ID from the system controller when possible
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: Add setup file for netxbig LEDs
+
+Ezequiel Garcia (1):
+      ARM: mvebu: Don't apply the thermal quirk if the SoC revision is unknown
+
+Gregory CLEMENT (2):
+      ARM: mvebu: Use the a standard errno in mvebu_get_soc_id
+      ARM: mvebu: Use system controller to get the soc id when possible
+
+Sachin Kamat (3):
+      ARM: mvebu: Staticize armada_375_smp_cpu1_enable_wa
+      ARM: mvebu: Staticize armada_370_xp_cpu_pm_init
+      ARM: mvebu: Staticize mvebu_cpu_reset_init
+
+Thomas Petazzoni (8):
+      ARM: mvebu: mark armada_370_xp_pmsu_idle_prepare() as static
+      ARM: mvebu: remove stub implementation of CPU hotplug on Armada 375/38x
+      ARM: mvebu: slightly refactor/rename PMSU idle related functions
+      ARM: mvebu: export PMSU idle enter/exit functions
+      ARM: mvebu: implement CPU hotplug support for Armada XP
+      Documentation: arm: add URLs to public datasheets for the Marvell Armada 370 SoC
+      ARM: mvebu: move Armada 375 external abort logic as a quirk
+      ARM: mvebu: update L2/PCIe deadlock workaround after L2CC cleanup
+
+ Documentation/arm/Marvell/README        |   4 +-
+ arch/arm/mach-mvebu/Kconfig             |   7 ++
+ arch/arm/mach-mvebu/Makefile            |   2 +-
+ arch/arm/mach-mvebu/armada-370-xp.h     |   3 +
+ arch/arm/mach-mvebu/board-v7.c          |  42 +++++--
+ arch/arm/mach-mvebu/board.h             |   5 +
+ arch/arm/mach-mvebu/common.h            |   3 +-
+ arch/arm/mach-mvebu/cpu-reset.c         |   2 +-
+ arch/arm/mach-mvebu/hotplug.c           |  31 ------
+ arch/arm/mach-mvebu/kirkwood.c          |   3 +
+ arch/arm/mach-mvebu/mvebu-soc-id.c      |  21 +++-
+ arch/arm/mach-mvebu/netxbig.c           | 191 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-mvebu/platsmp-a9.c        |   5 +-
+ arch/arm/mach-mvebu/platsmp.c           |  48 ++++++++
+ arch/arm/mach-mvebu/pmsu.c              |  17 +--
+ arch/arm/mach-mvebu/system-controller.c |  19 ++++
+ 16 files changed, 338 insertions(+), 65 deletions(-)
+ delete mode 100644 arch/arm/mach-mvebu/hotplug.c
+ create mode 100644 arch/arm/mach-mvebu/netxbig.c
