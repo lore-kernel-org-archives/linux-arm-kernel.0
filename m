@@ -1,84 +1,100 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 27 Jun 2014 11:30:07 -0700
-Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <53ADB5E5.10102@wwwdotorg.org>
-References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
- <53ABED5B.8010506@samsung.com>
- <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
- <53AD60D7.4040404@gmail.com> <53AD978D.8060703@wwwdotorg.org>
- <CAD=FV=UUFARvreHdWNsB1O1dEW6nX_E_C92t8Nma0vL=nAT5Rw@mail.gmail.com>
- <53ADB5E5.10102@wwwdotorg.org>
-Message-ID: <CAD=FV=XYFy_QpBtFPc-EURXmV9qMMyOkk0Ybhoy5E6r+hXGywA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 27 Jun 2014 11:33:46 -0700
+Subject: [PATCH v8 5/9] seccomp: split mode set routines
+In-Reply-To: <CALCETrVNwhWSPNiBiZmgP1nD9zLJPTk6cH0yo=85rbxTPTYFRg@mail.gmail.com>
+References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
+ <1403642893-23107-6-git-send-email-keescook@chromium.org>
+ <20140625135121.GB7892@redhat.com>
+ <CAGXu5jJkFxh4K=40xuh6tu3kUf4oJM8Dry+4upBdRieW3FNLgw@mail.gmail.com>
+ <CALCETrUBNmLnpa+LM91om2RSpR6SjupP-EdefzhU1Me4nv3Dfw@mail.gmail.com>
+ <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
+ <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
+ <20140625173245.GA17695@redhat.com>
+ <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
+ <20140625175136.GA18185@redhat.com>
+ <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
+ <CALCETrVNwhWSPNiBiZmgP1nD9zLJPTk6cH0yo=85rbxTPTYFRg@mail.gmail.com>
+Message-ID: <CAGXu5jLavA8FJD8m-1y4wO0uzh3qvvMmajAg0Lrr1Cn_Om3a3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
-
-On Fri, Jun 27, 2014 at 11:20 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/27/2014 10:45 AM, Doug Anderson wrote:
->> Stephen,
+On Wed, Jun 25, 2014 at 11:07 AM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Wed, Jun 25, 2014 at 11:00 AM, Kees Cook <keescook@chromium.org> wrote:
+>> On Wed, Jun 25, 2014 at 10:51 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>>> On 06/25, Andy Lutomirski wrote:
+>>>>
+>>>> On Wed, Jun 25, 2014 at 10:32 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>>>> > On 06/25, Andy Lutomirski wrote:
+>>>> >>
+>>>> >> Write the filter, then smp_mb (or maybe a weaker barrier is okay),
+>>>> >> then set the bit.
+>>>> >
+>>>> > Yes, exactly, this is what I meant. Plas rmb() in __secure_computing().
+>>>> >
+>>>> > But I still can't understand the rest of your discussion about the
+>>>> > ordering we need ;)
+>>>>
+>>>> Let me try again from scratch.
+>>>>
+>>>> Currently there are three relevant variables: TIF_SECCOMP,
+>>>> seccomp.mode, and seccomp.filter.  __secure_computing needs
+>>>> seccomp.mode and seccomp.filter to be in sync, and it wants (but
+>>>> doesn't really need) TIF_SECCOMP to be in sync as well.
+>>>>
+>>>> My suggestion is to rearrange it a bit.  Move mode into seccomp.filter
+>>>> (so that filter == NULL implies no seccomp) and don't check
 >>
->> On Fri, Jun 27, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> Surely there's a driver (or could be a driver) for the TPM chip, and
->>> that driver should have a reset-mask-gpios property, so the driver can
->>> call gpio_get() and gpio_set_output() on the GPIO?
+>> This would require that we reimplement mode 1 seccomp via mode 2
+>> filters. Which isn't too hard, but may add complexity.
+>>
+>>>> TIF_SECCOMP in secure_computing.  Then turning on seccomp is entirely
+>>>> atomic except for the fact that the seccomp hooks won't be called if
+>>>> filter != NULL but !TIF_SECCOMP.  This removes all ordering
+>>>> requirements.
 >>>
->>> Faking this out via a not-really-a-regulator or pinctrl hogs seems like
->>> an abuse of those features to me.
+>>> Ah, got it, thanks. Perhaps I missed somehing, but to me this looks like
+>>> unnecessary complication at first glance.
+>>>
+>>> We alredy have TIF_SECCOMP, we need it anyway, and we should only care
+>>> about the case when this bit is actually set, so that we can race with
+>>> the 1st call of __secure_computing().
+>>>
+>>> Otherwise we are fine: we can miss the new filter anyway, ->mode can't
+>>> be changed it is already nonzero.
+>>>
+>>>> Alternatively, __secure_computing could still BUG_ON(!seccomp.filter).
+>>>> In that case, filter needs to be set before TIF_SECCOMP is set, but
+>>>> that's straightforward.
+>>>
+>>> Yep. And this is how seccomp_assign_mode() already works? It is called
+>>> after we change ->filter chain, it changes ->mode before set(TIF_SECCOMP)
+>>> just it lacks a barrier.
 >>
->> This totally doesn't belong in the TPM chip driver.  This is an
->> unabashed HACK at the board level.  Without a hog we need a board
->> driver for this.
+>> Right, I think the best solution is to add the barrier. I was
+>> concerned that adding the read barrier in secure_computing would have
+>> a performance impact, though.
 >>
->> To be more specific:
->>
->> * The TPM needs to be reset when the full system gets reset.  This
->> unlocks the TPM and allows certain types of updates by the firmware.
->> The firmware then locks the TPM before jumping to the kernel.
->>
->> * The TPM is hooked up to the "reset out" line of the CPU so that when
->> the system does a warm reset it will reset the TPM.
->>
->> * Unfortunately the CPU asserts the "reset out" line when it's
->> sleeping (because, of course, sleep is a reset).  This would allow the
->> kernel to unlock the TPM which it's not supposed to be able to do.
 >
-> To me, this does sound precisely like something that should be in the
-> TPM driver. I guess an overall board driver would be reasonable too,
-> since the issue probably doesn't to all boards with the TPM.
+> I can't speak for ARM, but I think that all of the read barriers are
+> essentially free on x86.  (smp_mb is a very different story, but that
+> shouldn't be needed here.)
 
-Right.  In fact I'd be willing to bet that there are zero other boards
-(other than the ChromeOS boards with similar heritage) with this TPM
-that do this.  It does seem unfair to burden an Infineon driver with a
-board hack when it's something they didn't have anything to do with.
+It looks like SMP ARM issues dsb for rmb, which seems a bit expensive.
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204g/CIHJFGFE.html
 
-...but if that's the way it has to be then that's the way it has to be...
+If I skip the rmb in the secure_computing call before checking mode,
+it sounds like I run the risk of racing an out-of-order TIF_SECCOMP vs
+mode and filter. This seems unlikely to me, given an addition of the
+smp_mb__before_atomic() during the seccomp_assign_mode()? I guess I
+don't have a sense of how aggressively ARM might do data caching in
+this area. Could the other thread actually see TIF_SECCOMP get set but
+still have an out of date copy of seccomp.mode?
 
-If consensus is a board driver that's fine too.  It's really all about
-coming up with some solution that will make folks happy.
+I really want to avoid adding anything to the secure_computing()
+execution path. :(
 
+-Kees
 
-> This kind of thing is *exactly* the kind of thing that's been discussed
-> in the past re: doing it in pinmux hogs, or GPIO initialization tables
-> that aren't specific to a driver, and has been rejected. I guess if
-> people want to change the decisions that's fine, but doing so will open
-> up the door to all the previously rejected similar use-cases. I'm not
-> sure how much I care either way, but we really should be consistent
-> instead of flip-flopping on this kind of issue.
->
-> As an aside, why do we even care about this? The kernel clearly can
-> unlock the TPM simply by failing to set the GPIO up correctly, so at
-> best this is security through obscurity. If someone actively wanted to
-> do something bad to the TPM, they'd simply comment out this piece of
-> code in the kernel. At least that's true with usptream kernels which
-> aren't validated at all during boot. For a downstream signed kernel,
-> perhaps this patch makes sense (although I haven't thought about all the
-> security angles), but then it'd make sense to keep this patch downstream.
-
-Check out the bullet point about the firmware checking for kernel
-cheats.  At resume time the chip actually re-loads read only firmware
-out of SPI flash (no choice about this).  This read only firmware can
-check the state of the mask pin (which is preserved across sleep wake)
-to see if the kernel cheated.
-
--Doug
+-- 
+Kees Cook
+Chrome OS Security
