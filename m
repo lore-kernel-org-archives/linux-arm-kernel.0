@@ -1,51 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 23:17:44 +0100
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627215541.GC16724@brightrain.aerifal.cx>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
- <20140627213051.GS32514@n2100.arm.linux.org.uk>
- <20140627215541.GC16724@brightrain.aerifal.cx>
-Message-ID: <20140627221744.GU32514@n2100.arm.linux.org.uk>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Fri, 27 Jun 2014 15:23:27 -0700
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140625091858.GG6153@arm.com>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
+ <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
+ <20140624091808.GC26013@arm.com> <53A9BC18.2090106@codeaurora.org>
+ <20140624181150.GB4067@arm.com> <53A9EF3A.2070704@codeaurora.org>
+ <20140625091858.GG6153@arm.com>
+Message-ID: <53ADEEDF.7060902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 05:55:41PM -0400, Rich Felker wrote:
-> I think you're assuming that libc is used only as a shared library and
-> that the user installs one appropriate for their kernel. This
-> precludes the use of static-linked binaries which are an extremely
-> important usage case for us, especially on ARM where, for example, we
-> want users to be able to make binaries that have a fully-working libc
-> but that can be run on Android, where neither musl nor any other
-> remotely-working libc is installed by default.
+On 6/25/2014 2:18 AM, Will Deacon wrote:
+> On Tue, Jun 24, 2014 at 10:35:54PM +0100, Olav Haugan wrote:
+>> On 6/24/2014 11:11 AM, Will Deacon wrote:
+>>> On Tue, Jun 24, 2014 at 06:57:44PM +0100, Olav Haugan wrote:
+>>>> On 6/24/2014 2:18 AM, Will Deacon wrote:
+>>>>> On Sat, Jun 21, 2014 at 12:16:25AM +0100, Olav Haugan wrote:
+>>>>>> We have multiple-master SMMUs and each master emits a variable number of
+>>>>>> StreamIDs. However, we have to apply a mask (the ARM SMMU spec allows
+>>>>>> for this) to the StreamIDs due to limited number of StreamID 2 Context
+>>>>>> Bank entries in the SMMU. If my understanding is correct we would
+>>>>>> represent this in the DT like this:
+>>>>>>
+>>>>>> 	iommu {
+>>>>>> 		#address-cells = <2>;
+>>>>>> 		#size-cells = <0>;
+>>>>>> 	};
+>>>>>>
+>>>>>> 	master at a {
+>>>>>> 		...
+>>>>>> 		iommus = <&iommu StreamID0 MASK0>,
+>>>>>> 			 <&iommu StreamID1 MASK1>,
+>>>>>> 			 <&iommu StreamID2 MASK2>;
+>>>>>> 	};
+>>>>>
+>>>>> Stupid question, but why not simply describe the masked IDs? What use does
+>>>>> the `raw' ID have to Linux?
+>>>>
+>>>> We do describe the masked StreamID (SID) but we need to specify the mask
+>>>> that the SMMU should apply to the incoming SIDs, right?
+>>>>
+>>>> We have a bus master that emits 43 unique SIDs. However, we have only 40
+>>>> SMMU_SMRn registers in the SMMU. So we need to mask out some of the
+>>>> incoming SID bits so that the 43 SIDs can match one of 40 entries in the
+>>>> SMR.
+>>>
+>>> Hmm, so you're talking about stream matching, right? That doesn't belong in
+>>> the device-tree. I appreciate that the current driver does a terrible job at
+>>> allocating the SMRs (it's bloody difficult!), but we should try to improve
+>>> the dynamic behaviour instead of moving configuration of the SMMU out into
+>>> device-tree, where it's inflexible at best.
+>>
+>> I am talking about SMMU_SMRn[MASK] register bits. This is not something
+>> that can be dynamically detected at run-time. It is configuration at the
+>> same level as the actual StreamIDs.
 > 
-> Obviously some (many) users will opt to build libc with a particular
-> -march where all of the necessary instructions for TLS and atomics are
-> available without help from the kernel. However, if attempting to
-> build a baseline libc that works on any model results in one that
-> can't work on new hardware/kernel, that's a big problem, and exactly
-> the one which I'm trying to solve.
+> Why can't it be dynamically detected? Whilst the StreamIDs are fixed in
+> hardware (from the SMMU architecture perspective), the SMRs are completely
+> programmable. Why doesn't something like Andreas's proposal work for you?
+> The idea there was to find the constant bits among the StreamIDs for a
+> master and create the mask accordingly.
+> 
+Lets say I have an IOMMU with 2 masters and 2 SMRn slots with the
+following stream IDs coming from the masters:
 
-As I've already said, that's a system integrator bug to have a kernel
-without a kuser page with userspace which requires it.
+Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
+Master 2: 0x30
 
-I think you're are missing one obvious solution to this which you can do:
-you are passed the HWCAP fields in the ELF auxinfo.  This will tell you
-if the CPU has TLS support or not.  If it has TLS support, then you don't
-need to use the kuser helpers, and you know that it is a CPU which is ARM
-architecture v6k or later, and it has things like the CP15 barrier
-instructions.  If you want to know that the CPU supports the DMB
-instruction rather than the CP15 barrier instruction, then you have to
-check the uname details, or read /proc/cpuinfo (but I'd rather you
-didn't.)
+To make this work I would program SMR[0] with StreamID 0x20 and mask 0xF
+to ignore lower 4 bits. SMR[1] would just be StreamID 0x30 with mask 0x0.
 
-In addition, the HWCAP fields tell you about some of the other
-instructions and FP options which are available to you, whether there's
-integer division available, etc.
+However, I could also have an IOMMU with 2 masters and 9 SMRn slots with
+the following stream IDs:
+
+Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
+Master 2: 0x29
+
+Here I would program all SMRn and leave the mask to be 0 for all SMRn's.
+So how do I detect when to apply a mask or not?
+
+I am not familiar with Andreas's proposal. Do you have a link?
+
+Thanks,
+
+Olav Haugan
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
