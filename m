@@ -1,72 +1,41 @@
-From: tthayer@altera.com (tthayer at altera.com)
-Date: Fri, 27 Jun 2014 10:26:58 -0500
-Subject: [PATCHv8 2/3] devicetree: Addition of the Altera SDRAM EDAC. Add the
-In-Reply-To: <1403882819-24929-1-git-send-email-tthayer@altera.com>
-References: <1403882819-24929-1-git-send-email-tthayer@altera.com>
-Message-ID: <1403882819-24929-3-git-send-email-tthayer@altera.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 27 Jun 2014 16:20:35 +0100
+Subject: [PATCH CFT 20/30] net: fec: quiesce packet processing before stopping
+ device in fec_set_features()
+In-Reply-To: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+Message-ID: <E1X0Xx5-0001OJ-G0@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@altera.com>
+fec_set_features() calls fec_stop() to stop the transmit ring while the
+transmit queue is still active.  This can lead to the transmit ring
+being restarted by an intervening packet queued for transmission, or
+by the tx quirk timer expiring.
 
-Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
+Fix this by disabling NAPI (which ensures that the NAPI handlers are
+not running), and then take the transmit lock while we stop and
+restart the adapter (which prevents new packets being queued).
 
-Signed-off-by: Thor Thayer <tthayer@altera.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-v2: Changes to SoC EDAC source code.
+ drivers/net/ethernet/freescale/fec_main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-v3: Fix typo in device tree documentation.
-
-v4,v5: No changes - bump version for consistency.
-
-v6: Assign ECC registers in SDRAM controller to EDAC
-
-v7: Fix SDRAM EDAC base address.
-
-v8: No change. Bump version for consistency.
----
- .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |    6 ++++++
- 2 files changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-new file mode 100644
-index 0000000..d68e033
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-@@ -0,0 +1,15 @@
-+Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
-+
-+Required properties:
-+- compatible : should contain "altr,sdram-edac";
-+- reg : should contain the ECC register range in sdram
-+        controller (address and length).
-+- interrupts : Should contain the SDRAM ECC IRQ in the
-+	appropriate format for the IRQ controller.
-+
-+Example:
-+	sdramedac at ffc2502c {
-+		compatible = "altr,sdram-edac";
-+		reg = <0xffc2502c 0x28>;
-+		interrupts = <0 39 4>;
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 310292e..da0785d 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -687,6 +687,12 @@
- 			reg = <0xffc25000 0x4>;
- 		};
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 7a3cfb19ae90..cc2fab7333fe 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -2363,9 +2363,9 @@ static int fec_set_features(struct net_device *netdev,
+ 			fep->csum_flags &= ~FLAG_RX_CSUM_ENABLED;
  
-+		sdramedac at ffc2502c {
-+			compatible = "altr,sdram-edac";
-+			reg = <0xffc2502c 0x28>;
-+			interrupts = <0 39 4>;
-+		};
-+
- 		rst: rstmgr at ffd05000 {
- 			compatible = "altr,rst-mgr";
- 			reg = <0xffd05000 0x1000>;
+ 		if (netif_running(netdev)) {
+-			fec_stop(netdev);
+ 			napi_disable(&fep->napi);
+ 			netif_tx_lock_bh(netdev);
++			fec_stop(netdev);
+ 			fec_restart(netdev, fep->phy_dev->duplex);
+ 			netif_wake_queue(netdev);
+ 			netif_tx_unlock_bh(netdev);
 -- 
-1.7.9.5
+1.8.3.1
