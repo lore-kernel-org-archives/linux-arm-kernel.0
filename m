@@ -1,57 +1,70 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 27 Jun 2014 14:03:40 +0300
-Subject: [RFC 09/10] drm/tegra: Add IOMMU support
-In-Reply-To: <4455459.GtiCHWk2CB@wuerfel>
-References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-10-git-send-email-thierry.reding@gmail.com>
- <20140627124614.050be2e406a4b9a02d9fe97c@nvidia.com>
- <4455459.GtiCHWk2CB@wuerfel>
-Message-ID: <878uoid377.fsf@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Jun 2014 13:03:34 +0200
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140626085926.GB11244@arm.com>
+ <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
+Message-ID: <6381366.2IfqZj1r0B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 26 June 2014 19:44:21 Rob Herring wrote:
+> > Although a bit late, I'm raising this now and hopefully we'll come to a
+> > conclusion soon. Delaying arm64 PCIe support even further is not a real
+> > option, which leaves us with:
+> >
+> > 1. Someone else (with enough PCIe knowledge) volunteering to take over
+> >    soon or
+> 
+> Well, I might have 2 months ago, but now I'm pretty booked up.
+> 
+> > 2. Dropping Liviu's work and going for an arm64-specific implementation
+> >    (most likely based on the arm32 implementation, see below)
+> 
+> 3. Keeping Liviu's patches leaving some of the architecture specific
+> bits. I know Arnd and I both commented on it still needing more common
+> pieces, but compared to option 2 that would be way better.
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Agreed.
+ 
+> 920a685 pci: Add support for creating a generic host_bridge from device tree
+> 
+> This function could be moved to drivers/of/of_pci.c if having it in
+> drivers/pci is too much maintenance burden. However, nearly the same
+> code is already being duplicated in every DT enabled ARM PCI host
+> driver and will continue as more PCI hosts are added. So this isn't
+> really a question of converting other architectures to common PCI host
+> infrastructure, but converting DT based PCI hosts to common
+> infrastructure. ARM is the only arch moving host drivers to
+> drivers/pci ATM. Until other architectures start doing that,
+> converting them is pointless.
 
-> On Friday 27 June 2014 12:46:14 Hiroshi DOyu wrote:
->> 
->> Thierry Reding <thierry.reding@gmail.com> writes:
->> 
->> > From: Thierry Reding <treding@nvidia.com>
->> >
->> > When an IOMMU device is available on the platform bus, allocate an IOMMU
->> > domain and attach the display controllers to it. The display controllers
->> > can then scan out non-contiguous buffers by mapping them through the
->> > IOMMU.
->> >
->> > Signed-off-by: Thierry Reding <treding@nvidia.com>
->> > ---
->> > @@ -1283,8 +1284,18 @@ static int tegra_dc_init(struct host1x_client *client)
->> >  {
->> >         struct drm_device *drm = dev_get_drvdata(client->parent);
->> >         struct tegra_dc *dc = host1x_client_to_dc(client);
->> > +       struct tegra_drm *tegra = drm->dev_private;
->> >         int err;
->> >
->> > +       if (tegra->domain) {
->> > +               err = iommu_attach_device(tegra->domain, dc->dev);
->> 
->> I wanted to keep device drivers iommu-free with the following:
->> 
->> http://patchwork.ozlabs.org/patch/354074/
->> 
->
-> We definitely need something like your series to make iommus work transparently
-> on ARM for normal devices, using the of_dma_configure() to look up the correct
-> iommu per device and initialize it.
+This is the most important part in my mind. Every implementation gets
+this code wrong at least initially, and we have to provide some generic
+helper to get the broken code out of host drivers. I don't care whether
+that helper is part of the PCI core or part of the OF core.
 
-OK
+> 7cfde80 arm64: Add architecture support for PCI
+> 
+> What is here is really just a function of which option we pick.
+> 
+> 
+> > First option is ideal but there is work to do as laid out by Arnd here:
+> >
+> > http://article.gmane.org/gmane.linux.kernel/1679304
+> 
+> I don't agree arm32 is harder than microblaze. Yes, converting ALL of
+> arm would be, but that is not necessary. With Liviu's latest branch
+> the hacks I previously needed are gone (thanks!), and this is all I
+> need to get Versatile PCI working (under QEMU):
 
-> However, any devices that work with multiple iommu domains cannot do that
-> and still need to use the iommu API directy. I believe the tegra drm code
-> falls into this category.
+I meant converting all of arm32 would be harder, but I agree we don't
+have to do it. It would be nice to convert all of the drivers/pci/host
+drivers though, iow all multiplatform-enabled ones, and leaving the
+current arm32 pci implementation for the platforms we don't want to
+convert to multiplatform anyway (footbridge, iop, ixp4xx, ks8695 (?),
+pxa, sa1100).
 
-I think that the similar thing can be said to "DMA API" vs "IOMMU
-API". Most of traditional devices would be ok with the existing DMA API
-which can be backed by IOMMU. OTOH, some smart devices may need to dive
-into IOMMU API for more precise control of it.
+	Arnd
