@@ -1,43 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Jun 2014 00:03:12 +0100
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627222626.GA17988@brightrain.aerifal.cx>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627213743.GB16724@brightrain.aerifal.cx>
- <20140627220400.GT32514@n2100.arm.linux.org.uk>
- <20140627222626.GA17988@brightrain.aerifal.cx>
-Message-ID: <20140627230312.GW32514@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 27 Jun 2014 18:04:33 -0500
+Subject: [PATCH v2 05/12] usb: phy: add the Berlin USB PHY driver
+In-Reply-To: <20140627160557.GA6622@kwain>
+References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403606121-6368-6-git-send-email-antoine.tenart@free-electrons.com>
+ <20140627155622.GL8069@saruman.home> <20140627160557.GA6622@kwain>
+Message-ID: <20140627230433.GC762@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 06:26:26PM -0400, Rich Felker wrote:
-> Thus, my interest is in ensuring that, whenever the kuser helper page
-> is disabled (or, as proposed, moved to a dynamic address), there's a
-> safe and efficient way to detect this condition and know what to do to
-> work around it.
+On Fri, Jun 27, 2014 at 06:05:57PM +0200, Antoine T?nart wrote:
+> Hi Felipe,
+> 
+> On Fri, Jun 27, 2014 at 10:56:22AM -0500, Felipe Balbi wrote:
+> > On Tue, Jun 24, 2014 at 12:35:14PM +0200, Antoine T?nart wrote:
+> > > Add the driver driving the Marvell Berlin USB PHY. This allows to
+> > > initialize the PHY and to use it from the USB driver later.
+> > > 
+> > > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> > 
+> > since this is a brand new driver, it should go to drivers/phy instead.
+> 
+> This PHY is used by a ChipIdea USB driver, which uses the provided
+> common function for ChipIdea. These functions use the usb_phy framework.
+> That's why this PHY driver is there.
 
-Let me be clear: we are not going to move it to a dynamic address.
-That's far too big a problem for the older architectures since
-their caches alias all over the place.  Plus - and more importantly -
-it means an ABI breakage across the board.
-
-Let's say we did move it into a randomly mapped page in userspace.
-We also need to keep the kuser page in place in order to support
-existing libcs as well, but now we have not one but two places to
-poke thread local values to - and we now have to flush the cache
-line associated with that too, or have the kernel write directly
-to that page in userspace.
-
-We can't share those pages, because there's the danger that something
-could write to the vectors page, and thus end up taking over the
-whole machine.  Even if we did, we still have to flush the cache at
-not just one location, but two.
-
-As I've already pointed out, there's easier solutions to this problem
-(using the ELF HWCAPS).
+right, but you can add support for the new PHY layer which would help
+other users convert their PHY drivers to the new PHY framework.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/7dfe9ab3/attachment.sig>
