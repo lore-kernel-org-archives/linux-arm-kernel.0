@@ -1,12 +1,12 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 27 Jun 2014 10:29:09 +0300
+Date: Fri, 27 Jun 2014 10:31:40 +0300
 Subject: [PATCH RESEND] clk: flatten clk tree in debugfs
 In-Reply-To: <20140626213645.32686.26036@quantum>
 References: <1401462237-14954-1-git-send-email-pdeschrijver@nvidia.com>
  <20140613080239.GO5961@tbergstrom-lnx.Nvidia.com>
  <20140626163906.GI3679@tbergstrom-lnx.Nvidia.com>
  <20140626213645.32686.26036@quantum>
-Message-ID: <20140627072909.GJ3679@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140627073140.GK3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
