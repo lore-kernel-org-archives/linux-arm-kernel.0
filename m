@@ -1,61 +1,40 @@
-From: dalias@libc.org (Rich Felker)
-Date: Fri, 27 Jun 2014 18:26:26 -0400
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627220400.GT32514@n2100.arm.linux.org.uk>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627213743.GB16724@brightrain.aerifal.cx>
- <20140627220400.GT32514@n2100.arm.linux.org.uk>
-Message-ID: <20140627222626.GA17988@brightrain.aerifal.cx>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 16:30:08 -0600
+Subject: [RFC 0/5] Per-user clock constraints
+In-Reply-To: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <53ADF070.8050002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 11:04:00PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 27, 2014 at 05:37:43PM -0400, Rich Felker wrote:
-> > On Fri, Jun 27, 2014 at 12:27:45PM -0700, Andy Lutomirski wrote:
-> > > Hi ARM people and Kees-
-> > > 
-> > > The "vectors" page appears to be an abomination that's a lot like the
-> > > x86_64 vsyscall page.  IMO it should be phased out.
-> > 
-> > I'm not a fan of this extreme approach, but if it's taken, there needs
-> > to be some way to continue to make universal binaries which work
-> > safely on:
-> > 
-> > - Pre-v6, v6, and v7+ hardware.
+On 06/27/2014 01:57 AM, Tomeu Vizoso wrote:
+> Hi,
 > 
-> And that is to make use of the kuser page.
+> I'm retaking Rabin's patches [0] for splitting the clk API in two: one API for
+> clk consumers and another for providers. The consumer API uses a clk structure
+> that just keeps track of the consumer and has a reference to the actual
+> clk_core struct, which is used internally.
 > 
-> > - Pre-removal and post-removal kernels.
+> I have kept a patch from Rabin that aims to aid in debugging nested
+> enable/disable calls, though my personal aim is to allow more than one consumer
+> to influence the final, effective rate. For now this is limited to setting
+> floor and ceiling constraints.
 > 
-> Please, don't get stuff confused.
-> 
-> The kuser page isn't going anywhere _except_ for one situation: where
-> the system integrator has determined that they have built their
-> userspace not to require the kuser helpers, and wish to have greater
-> security and performance through doing so.
-> 
-> What we *aren't* doing with the kernel is removing the page entirely
-> for ARMv7+ CPUs.  We are merely giving system integrators the option
-> to increase security /provided/ their userspace is built appropriately.
-> 
-> If the userspace requires the kuser helpers, then the page *must* be
-> provided by the kernel.
-> 
-> It is a system integrator/distro bug to provide a kernel with the kuser
-> helpers disabled, but then to provide a libc which requires the page.
+> For those functions in the consumer clk API that were called from providers, I
+> have added variants to clk-provider.h that are the same only that accept a
+> clk_core instead. In this first version of the patchset, these functions are
+> prepended with two underscores and have the _internal suffix at the end. Mike
+> has stated his preference of not prefixing with underscores any public API and
+> I agree with him, but we still need a way to distinguish e.g. clk_set_parent()
+> in the provider API from that in the consumer API (and from the lock-less
+> variant in clk-provider.h!).
 
->From our standpoint it is not necessarily the system integrator/distro
-who provides the libc, but rather the distributor of the (possibly
-static-linked, or possibly dynamic-linked but with its own full set of
-libs) application binary. As a provider of tools used to produce such
-binaries, we want these binaries to work regardless of how the kernel
-was configured.
+The name clk_provider_set_rate would be a good hint that it's an API for
+clock providers not consumers.
 
-Thus, my interest is in ensuring that, whenever the kuser helper page
-is disabled (or, as proposed, moved to a dynamic address), there's a
-safe and efficient way to detect this condition and know what to do to
-work around it.
+The name clk_core_set_rate would be a good hint that the function takes
+a clk_core object rather than the clk (client) object.
 
-Rich
+Neither names see too unwieldy to me.
+
+Anyway, that's the color of my bikeshed:-)
