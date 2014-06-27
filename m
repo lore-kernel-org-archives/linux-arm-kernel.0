@@ -1,51 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 27 Jun 2014 10:57:13 -0500
-Subject: [PATCH] arch: arm: mach-omap2: usb-tusb6010.c:  Cleaning up
- variable is set more than once
-In-Reply-To: <1403699310-22960-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1403699310-22960-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <20140627155713.GM8069@saruman.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 09:59:57 -0600
+Subject: [PATCH] clk: tegra: export clock names for debugging
+In-Reply-To: <20140627121954.GR3679@tbergstrom-lnx.Nvidia.com>
+References: <1403797705-26910-1-git-send-email-pdeschrijver@nvidia.com>
+ <53AC41B0.40307@wwwdotorg.org>
+ <20140627121954.GR3679@tbergstrom-lnx.Nvidia.com>
+Message-ID: <53AD94FD.2070400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 02:28:30PM +0200, Rickard Strandqvist wrote:
-> A struct member variable is set to the same value more than once
+On 06/27/2014 06:19 AM, Peter De Schrijver wrote:
+> On Thu, Jun 26, 2014 at 05:52:16PM +0200, Stephen Warren wrote:
+>> On 06/26/2014 09:48 AM, Peter De Schrijver wrote:
+>>> When writing a module for testing or debugging purposes, there is no way to
+>>> get hold of clk handles. This patch solves this by exposing all valid clocks
+>>> as clkdev's for the virtual device tegra-clk-debug.
+>>
+>> This is to support clk_get_sys()?
+>>
 > 
-> This was found using a static code analysis program called cppcheck.
+> Yes.
 > 
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-
-I think there was a bigger series from Roger rewriting most of this, but
-if I'm mistaken:
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
-> ---
->  arch/arm/mach-omap2/usb-tusb6010.c |    1 -
->  1 file changed, 1 deletion(-)
+>> I guess this seems fine, so feel free to apply it, but I slightly wonder
+>> why not just include this change as part of the presumably local and
+>> never-to-be-upstreamed test/dev module?
 > 
-> diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
-> index e832bc7..8333400 100644
-> --- a/arch/arm/mach-omap2/usb-tusb6010.c
-> +++ b/arch/arm/mach-omap2/usb-tusb6010.c
-> @@ -95,7 +95,6 @@ static int tusb_set_sync_mode(unsigned sysclk_ps)
->  	dev_t.t_avdp_w = t_scsnh_advnh;
->  	dev_t.cyc_aavdh_we = 3;
->  	dev_t.cyc_wpl = 6;
-> -	dev_t.t_ce_rdyz = 7000;
->  
->  	gpmc_calc_timings(&t, &tusb_sync, &dev_t);
->  
-> -- 
-> 1.7.10.4
-> 
+> The idea is to allow local debug modules to get hold of the struct clk *. I
+> don't think that's possible without using clk_get_sys()?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/71396a49/attachment.sig>
+Well, for a debug hack you can always just add extra clock entries into
+some DT node and so avoid clk_get_sys:-)
+
+My point wasn't so much about not using clk_get_sys in a debug driver,
+but more that if this patch is only required to support non-upstreamed
+debug code, perhaps this patch should stay downstream along with that
+non-upstreamed debug code. That said, I'm not really objecting to it,
+just making a minor comment.
