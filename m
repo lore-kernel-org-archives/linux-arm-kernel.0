@@ -1,279 +1,43 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 27 Jun 2014 10:56:22 -0500
-Subject: [PATCH v2 05/12] usb: phy: add the Berlin USB PHY driver
-In-Reply-To: <1403606121-6368-6-git-send-email-antoine.tenart@free-electrons.com>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-6-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140627155622.GL8069@saruman.home>
+Date: Fri, 27 Jun 2014 10:57:13 -0500
+Subject: [PATCH] arch: arm: mach-omap2: usb-tusb6010.c:  Cleaning up
+ variable is set more than once
+In-Reply-To: <1403699310-22960-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1403699310-22960-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <20140627155713.GM8069@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 12:35:14PM +0200, Antoine T?nart wrote:
-> Add the driver driving the Marvell Berlin USB PHY. This allows to
-> initialize the PHY and to use it from the USB driver later.
+On Wed, Jun 25, 2014 at 02:28:30PM +0200, Rickard Strandqvist wrote:
+> A struct member variable is set to the same value more than once
 > 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> This was found using a static code analysis program called cppcheck.
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 
-since this is a brand new driver, it should go to drivers/phy instead.
+I think there was a bigger series from Roger rewriting most of this, but
+if I'm mistaken:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
 
 > ---
->  drivers/usb/phy/Kconfig          |   9 ++
->  drivers/usb/phy/Makefile         |   1 +
->  drivers/usb/phy/phy-berlin-usb.c | 211 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 221 insertions(+)
->  create mode 100644 drivers/usb/phy/phy-berlin-usb.c
+>  arch/arm/mach-omap2/usb-tusb6010.c |    1 -
+>  1 file changed, 1 deletion(-)
 > 
-> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-> index e253fa05be68..9a47cc1c73fe 100644
-> --- a/drivers/usb/phy/Kconfig
-> +++ b/drivers/usb/phy/Kconfig
-> @@ -18,6 +18,15 @@ config AB8500_USB
->  	  This transceiver supports high and full speed devices plus,
->  	  in host mode, low speed.
+> diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
+> index e832bc7..8333400 100644
+> --- a/arch/arm/mach-omap2/usb-tusb6010.c
+> +++ b/arch/arm/mach-omap2/usb-tusb6010.c
+> @@ -95,7 +95,6 @@ static int tusb_set_sync_mode(unsigned sysclk_ps)
+>  	dev_t.t_avdp_w = t_scsnh_advnh;
+>  	dev_t.cyc_aavdh_we = 3;
+>  	dev_t.cyc_wpl = 6;
+> -	dev_t.t_ce_rdyz = 7000;
 >  
-> +config BERLIN_USBPHY
-> +	tristate "Marvell Berlin USB Transceiver Driver"
-> +	depends on ARCH_BERLIN
-> +	select USB_PHY
-> +	help
-> +	  Enable this to support the USB tranceiver on Marvell Berlin
-> +	  SoCs.
-> +
-> +
->  config FSL_USB2_OTG
->  	bool "Freescale USB OTG Transceiver Driver"
->  	depends on USB_EHCI_FSL && USB_FSL_USB2 && USB_OTG_FSM && PM_RUNTIME
-> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> index 24a91332d4ad..450ac91c5e20 100644
-> --- a/drivers/usb/phy/Makefile
-> +++ b/drivers/usb/phy/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_OF)			+= of.o
->  # transceiver drivers, keep the list sorted
+>  	gpmc_calc_timings(&t, &tusb_sync, &dev_t);
 >  
->  obj-$(CONFIG_AB8500_USB)		+= phy-ab8500-usb.o
-> +obj-$(CONFIG_BERLIN_USBPHY)		+= phy-berlin-usb.o
->  obj-$(CONFIG_FSL_USB2_OTG)		+= phy-fsl-usb.o
->  obj-$(CONFIG_ISP1301_OMAP)		+= phy-isp1301-omap.o
->  obj-$(CONFIG_NOP_USB_XCEIV)		+= phy-generic.o
-> diff --git a/drivers/usb/phy/phy-berlin-usb.c b/drivers/usb/phy/phy-berlin-usb.c
-> new file mode 100644
-> index 000000000000..276d28f5cb83
-> --- /dev/null
-> +++ b/drivers/usb/phy/phy-berlin-usb.c
-> @@ -0,0 +1,211 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + * Jisheng Zhang <jszhang@marvell.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/gpio.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset.h>
-> +#include <linux/usb/phy.h>
-> +
-> +#define USB_PHY_PLL		0x04
-> +#define USB_PHY_PLL_CONTROL	0x08
-> +#define USB_PHY_TX_CTRL0	0x10
-> +#define USB_PHY_TX_CTRL1	0x14
-> +#define USB_PHY_TX_CTRL2	0x18
-> +#define USB_PHY_RX_CTRL		0x20
-> +#define USB_PHY_ANALOG		0x34
-> +
-> +/* USB_PHY_PLL */
-> +#define CLK_REF_DIV(x)		((x) << 4)
-> +#define FEEDBACK_CLK_DIV(x)	((x) << 8)
-> +
-> +/* USB_PHY_PLL_CONTROL */
-> +#define CLK_STABLE		BIT(0)
-> +#define PLL_CTRL_PIN		BIT(1)
-> +#define PLL_CTRL_REG		BIT(2)
-> +#define PLL_ON			BIT(3)
-> +#define PHASE_OFF_TOL_125	(0x0 << 5)
-> +#define PHASE_OFF_TOL_250	BIT(5)
-> +#define KVC0_CALIB		(0x0 << 9)
-> +#define KVC0_REG_CTRL		BIT(9)
-> +#define KVC0_HIGH		(0x0 << 10)
-> +#define KVC0_LOW		(0x3 << 10)
-> +#define CLK_BLK_EN		BIT(13)
-> +
-> +/* USB_PHY_TX_CTRL0 */
-> +#define EXT_HS_RCAL_EN		BIT(3)
-> +#define EXT_FS_RCAL_EN		BIT(4)
-> +#define IMPCAL_VTH_DIV(x)	((x) << 5)
-> +#define EXT_RS_RCAL_DIV(x)	((x) << 8)
-> +#define EXT_FS_RCAL_DIV(x)	((x) << 12)
-> +
-> +/* USB_PHY_TX_CTRL1 */
-> +#define TX_VDD15_14		(0x0 << 4)
-> +#define TX_VDD15_15		BIT(4)
-> +#define TX_VDD15_16		(0x2 << 4)
-> +#define TX_VDD15_17		(0x3 << 4)
-> +#define TX_VDD12_VDD		(0x0 << 6)
-> +#define TX_VDD12_11		BIT(6)
-> +#define TX_VDD12_12		(0x2 << 6)
-> +#define TX_VDD12_13		(0x3 << 6)
-> +#define LOW_VDD_EN		BIT(8)
-> +#define TX_OUT_AMP(x)		((x) << 9)
-> +
-> +/* USB_PHY_TX_CTRL2 */
-> +#define TX_CHAN_CTRL_REG(x)	((x) << 0)
-> +#define DRV_SLEWRATE(x)		((x) << 4)
-> +#define IMP_CAL_FS_HS_DLY_0	(0x0 << 6)
-> +#define IMP_CAL_FS_HS_DLY_1	BIT(6)
-> +#define IMP_CAL_FS_HS_DLY_2	(0x2 << 6)
-> +#define IMP_CAL_FS_HS_DLY_3	(0x3 << 6)
-> +#define FS_DRV_EN_MASK(x)	((x) << 8)
-> +#define HS_DRV_EN_MASK(x)	((x) << 12)
-> +
-> +/* USB_PHY_RX_CTRL */
-> +#define PHASE_FREEZE_DLY_2_CL	(0x0 << 0)
-> +#define PHASE_FREEZE_DLY_4_CL	BIT(0)
-> +#define ACK_LENGTH_8_CL		(0x0 << 2)
-> +#define ACK_LENGTH_12_CL	BIT(2)
-> +#define ACK_LENGTH_16_CL	(0x2 << 2)
-> +#define ACK_LENGTH_20_CL	(0x3 << 2)
-> +#define SQ_LENGTH_3		(0x0 << 4)
-> +#define SQ_LENGTH_6		BIT(4)
-> +#define SQ_LENGTH_9		(0x2 << 4)
-> +#define SQ_LENGTH_12		(0x3 << 4)
-> +#define DISCON_THRESHOLD_260	(0x0 << 6)
-> +#define DISCON_THRESHOLD_270	BIT(6)
-> +#define DISCON_THRESHOLD_280	(0x2 << 6)
-> +#define DISCON_THRESHOLD_290	(0x3 << 6)
-> +#define SQ_THRESHOLD(x)		((x) << 8)
-> +#define LPF_COEF(x)		((x) << 12)
-> +#define INTPL_CUR_10		(0x0 << 14)
-> +#define INTPL_CUR_20		BIT(14)
-> +#define INTPL_CUR_30		(0x2 << 14)
-> +#define INTPL_CUR_40		(0x3 << 14)
-> +
-> +/* USB_PHY_ANALOG */
-> +#define ANA_PWR_UP		BIT(1)
-> +#define ANA_PWR_DOWN		BIT(2)
-> +#define V2I_VCO_RATIO(x)	((x) << 7)
-> +#define R_ROTATE_90		(0x0 << 10)
-> +#define R_ROTATE_0		BIT(10)
-> +#define MODE_TEST_EN		BIT(11)
-> +#define ANA_TEST_DC_CTRL(x)	((x) << 12)
-> +
-> +#define to_berlin_phy_priv(p)	container_of((p), struct berlin_phy_priv, phy)
-> +
-> +static const u32 phy_berlin_pll_dividers[] = {
-> +	/* Berlin 2 */
-> +	CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
-> +	/* Berlin 2CD */
-> +	CLK_REF_DIV(0x6) | FEEDBACK_CLK_DIV(0x55),
-> +};
-> +
-> +struct berlin_phy_priv {
-> +	void __iomem		*base;
-> +	struct usb_phy		phy;
-> +	struct reset_control	*rst_ctrl;
-> +	u32			pll_divider;
-> +};
-> +
-> +static int berlin_phy_init(struct usb_phy *phy)
-> +{
-> +	struct berlin_phy_priv *priv = to_berlin_phy_priv(phy);
-> +
-> +	reset_control_reset(priv->rst_ctrl);
-> +
-> +	writel(priv->pll_divider,
-> +	       priv->base + USB_PHY_PLL);
-> +	writel(CLK_STABLE | PLL_CTRL_REG | PHASE_OFF_TOL_250 | KVC0_REG_CTRL |
-> +	       CLK_BLK_EN, priv->base + USB_PHY_PLL_CONTROL);
-> +	writel(V2I_VCO_RATIO(0x5) | R_ROTATE_0 | ANA_TEST_DC_CTRL(0x5),
-> +	       priv->base + USB_PHY_ANALOG);
-> +	writel(PHASE_FREEZE_DLY_4_CL | ACK_LENGTH_16_CL | SQ_LENGTH_12 |
-> +	       DISCON_THRESHOLD_260 | SQ_THRESHOLD(0xa) | LPF_COEF(0x2) |
-> +	       INTPL_CUR_30, priv->base + USB_PHY_RX_CTRL);
-> +
-> +	writel(TX_VDD12_13 | TX_OUT_AMP(0x3), priv->base + USB_PHY_TX_CTRL1);
-> +	writel(EXT_HS_RCAL_EN | IMPCAL_VTH_DIV(0x3) | EXT_RS_RCAL_DIV(0x4),
-> +	       priv->base + USB_PHY_TX_CTRL0);
-> +
-> +	writel(EXT_HS_RCAL_EN | IMPCAL_VTH_DIV(0x3) | EXT_RS_RCAL_DIV(0x4) |
-> +	       EXT_FS_RCAL_DIV(0x2), priv->base + USB_PHY_TX_CTRL0);
-> +
-> +	writel(EXT_HS_RCAL_EN | IMPCAL_VTH_DIV(0x3) | EXT_RS_RCAL_DIV(0x4),
-> +	       priv->base + USB_PHY_TX_CTRL0);
-> +	writel(TX_CHAN_CTRL_REG(0xf) | DRV_SLEWRATE(0x3) | IMP_CAL_FS_HS_DLY_3 |
-> +	       FS_DRV_EN_MASK(0xd), priv->base + USB_PHY_TX_CTRL2);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id phy_berlin_sata_of_match[] = {
-> +	{
-> +		.compatible = "marvell,berlin2-usb-phy",
-> +		.data = &phy_berlin_pll_dividers[0],
-> +	},
-> +	{
-> +		.compatible = "marvell,berlin2cd-usb-phy",
-> +		.data = &phy_berlin_pll_dividers[1],
-> +	},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
-> +
-> +static int berlin_phy_probe(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *match =
-> +		of_match_device(phy_berlin_sata_of_match, &pdev->dev);
-> +	struct berlin_phy_priv *priv;
-> +	struct resource *res;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	priv->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->base))
-> +		return PTR_ERR(priv->base);
-> +
-> +	priv->rst_ctrl = devm_reset_control_get(&pdev->dev, NULL);
-> +	if (IS_ERR(priv->rst_ctrl))
-> +		return PTR_ERR(priv->rst_ctrl);
-> +
-> +	priv->pll_divider = *((u32 *)match->data);
-> +
-> +	priv->phy.io_priv = priv->base;
-> +	priv->phy.dev = &pdev->dev;
-> +	priv->phy.label = "phy-berlin-usb";
-> +	priv->phy.init = berlin_phy_init;
-> +	priv->phy.type = USB_PHY_TYPE_USB2;
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	return usb_add_phy_dev(&priv->phy);
-> +}
-> +
-> +static struct platform_driver phy_berlin_usb_driver = {
-> +	.probe	= berlin_phy_probe,
-> +	.driver	= {
-> +		.name		= "phy-berlin-usb",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= phy_berlin_sata_of_match,
-> +	 },
-> +};
-> +module_platform_driver(phy_berlin_usb_driver);
-> +
-> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-> +MODULE_DESCRIPTION("Marvell Berlin USB PHY driver");
-> +MODULE_LICENSE("GPL");
 > -- 
-> 1.9.1
+> 1.7.10.4
 > 
 
 -- 
@@ -284,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/845cf3a3/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/71396a49/attachment.sig>
