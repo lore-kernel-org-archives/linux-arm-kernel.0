@@ -1,39 +1,32 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 27 Jun 2014 13:48:33 +0100
-Subject: [PATCH V5 1/2] arm: mm: Introduce {pte,pmd}_isset and
- {pte,pmd}_isclear
-In-Reply-To: <20140627123433.GO26276@arm.com>
-References: <1403612604-2645-1-git-send-email-steve.capper@linaro.org>
- <1403612604-2645-2-git-send-email-steve.capper@linaro.org>
- <20140627112420.GK26276@arm.com>
- <20140627122359.GA30585@linaro.org>
- <20140627123433.GO26276@arm.com>
-Message-ID: <20140627124832.GD30585@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jun 2014 13:49:49 +0100
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <6381366.2IfqZj1r0B@wuerfel>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140626085926.GB11244@arm.com>
+ <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
+ <6381366.2IfqZj1r0B@wuerfel>
+Message-ID: <20140627124949.GR26276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 01:34:34PM +0100, Will Deacon wrote:
-> On Fri, Jun 27, 2014 at 01:24:00PM +0100, Steve Capper wrote:
-> > On Fri, Jun 27, 2014 at 12:24:20PM +0100, Will Deacon wrote:
-> > > On Tue, Jun 24, 2014 at 01:23:23PM +0100, Steve Capper wrote:
-> > > >  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-> > > > -#define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
-> > > > -#define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
-> > > > +#define pmd_trans_huge(pmd)	(pmd_val(pmd) && pmd_isclear((pmd), PMD_TABLE_BIT))
-> > > 
-> > > Why isn't this just pmd_present(pmd) && !pmd_table(pmd)? Put another way, I
-> > > see to have forgotten why we need PMD_TABLE_BIT instead of just using
-> > > pmd_table and pmd_sect to work out whether we have a table or a block.
-> > > 
-> > 
-> > If we use pmd_sect, we are testing for block entries, but THPs are allowed to
-> > be faulting entries (i.e. PROT_NONE). A non-zero pmd that does not have the
-> > table bit set can safely be assumed to be a PROT_NONE THP.
+On Fri, Jun 27, 2014 at 12:03:34PM +0100, Arnd Bergmann wrote:
+> On Thursday 26 June 2014 19:44:21 Rob Herring wrote:
+> > I don't agree arm32 is harder than microblaze. Yes, converting ALL of
+> > arm would be, but that is not necessary. With Liviu's latest branch
+> > the hacks I previously needed are gone (thanks!), and this is all I
+> > need to get Versatile PCI working (under QEMU):
 > 
-> Ah yes, I forgot about faulting entries. We should still be able to use
-> pmd_table(pmd) as opposed to PMD_TABLE_BIT though, right?
+> I meant converting all of arm32 would be harder, but I agree we don't
+> have to do it. It would be nice to convert all of the drivers/pci/host
+> drivers though, iow all multiplatform-enabled ones, and leaving the
+> current arm32 pci implementation for the platforms we don't want to
+> convert to multiplatform anyway (footbridge, iop, ixp4xx, ks8695 (?),
+> pxa, sa1100).
 
-Yes, that should be okay, thanks I'll simplify this.
+I'm more than happy to convert the generic host controller we merged
+recently, but I'd probably want the core changes merged first so that I
+know I'm not wasting my time!
 
-> 
-> Will
+Will
