@@ -1,34 +1,70 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 27 Jun 2014 16:19:03 +0100
-Subject: [PATCH CFT 02/30] net: fec: iMX6 FEC does not support half-duplex
- gigabit
+Date: Fri, 27 Jun 2014 16:18:58 +0100
+Subject: [PATCH CFT 01/30] net: fec: Don't clear IPV6 header checksum field
+ when IP accelerator enable
 In-Reply-To: <20140627151542.GL32514@n2100.arm.linux.org.uk>
 References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X0Xvb-0001Mu-JB@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X0XvW-0001Mp-Fd@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iMX6 gigabit FEC does not support half-duplex gigabit operation.
-Phys attacked to the FEC may support this, and we currently do nothing
-to disable this feature.  This may result in an invalid configuration.
-Mask out phy support for gigabit half-duplex operation.
+From: Fugang Duan <b38611@freescale.com>
+To: linux-arm-kernel at lists.infradead.org, netdev at vger.kernel.org
 
+The commit 96c50caa5148 (net: fec: Enable IP header hardware checksum)
+enable HW IP header checksum for IPV4 and IPV6, which causes IPV6 TCP/UDP
+cannot work. (The issue is reported by Russell King)
+
+For FEC IP header checksum function: Insert IP header checksum. This "IINS"
+bit is written by the user. If set, IP accelerator calculates the IP header
+checksum and overwrites the IINS corresponding header field with the calculated
+value. The checksum field must be cleared by user, otherwise the checksum
+always is 0xFFFF.
+
+So the previous patch clear IP header checksum field regardless of IP frame
+type.
+
+In fact, IP HW detect the packet as IPV6 type, even if the "IINS" bit is set,
+the IP accelerator is not triggered to calculates IPV6 header checksum because
+IPV6 frame format don't have checksum.
+
+So this results in the IPV6 frame being corrupted.
+
+The patch just add software detect the current packet type, if it is IPV6
+frame, it don't clear IP header checksum field.
+
+Reported-and-tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Fugang Duan <B38611@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/freescale/fec_main.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 77037fd377b8..a91fe68030e6 100644
+index 38d9d276ab8b..77037fd377b8 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1667,6 +1667,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
- 	/* mask with MAC supported features */
- 	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT) {
- 		phy_dev->supported &= PHY_GBIT_FEATURES;
-+		phy_dev->supported &= ~SUPPORTED_1000baseT_Half;
- #if !defined(CONFIG_M5272)
- 		phy_dev->supported |= SUPPORTED_Pause;
- #endif
+@@ -320,6 +320,11 @@ static void *swap_buffer(void *bufaddr, int len)
+ 	return bufaddr;
+ }
+ 
++static inline bool is_ipv4_pkt(struct sk_buff *skb)
++{
++	return skb->protocol == htons(ETH_P_IP) && ip_hdr(skb)->version == 4;
++}
++
+ static int
+ fec_enet_clear_csum(struct sk_buff *skb, struct net_device *ndev)
+ {
+@@ -330,7 +335,8 @@ fec_enet_clear_csum(struct sk_buff *skb, struct net_device *ndev)
+ 	if (unlikely(skb_cow_head(skb, 0)))
+ 		return -1;
+ 
+-	ip_hdr(skb)->check = 0;
++	if (is_ipv4_pkt(skb))
++		ip_hdr(skb)->check = 0;
+ 	*(__sum16 *)(skb->head + skb->csum_start + skb->csum_offset) = 0;
+ 
+ 	return 0;
 -- 
 1.8.3.1
