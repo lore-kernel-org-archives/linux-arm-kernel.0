@@ -1,29 +1,32 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 27 Jun 2014 15:34:21 +0200
-Subject: [RESEND PATCH] ARM: multi_v7_defconfig: add ST Keyscan driver
-Message-ID: <1403876061-8519-1-git-send-email-gabriel.fernandez@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 27 Jun 2014 09:37:18 -0400
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <20140627130430.GH32514@n2100.arm.linux.org.uk>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140627130430.GH32514@n2100.arm.linux.org.uk>
+Message-ID: <20140627133718.GI23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds KEYBOARD_ST_KEYSCAN config
+On Fri, Jun 27, 2014 at 02:04:30PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 27, 2014 at 09:01:29AM -0400, Jason Cooper wrote:
+> > Sebastian Hesselbarth (2):
+> >       dt-binding: add vendor prefix for SolidRun
+> >       ARM: dts: mvebu: split SolidRun CuBox into variants
+> 
+> Are we sure about this?  I mean, in order to find out whether mine is an
+> engineering sample or not, I had to ask Rabeeh, and Rabeeh had to ask
+> various questions about the exterior construction in order to identify
+> which mine was.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+What were the specific details Rebeeh use to differentiate ES and
+production?  Is it something generic we could put in a comment?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 19dbddb..c123e35 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -155,6 +155,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
- CONFIG_KEYBOARD_SPEAR=y
-+CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_MISC=y
--- 
-1.9.1
+Sebastian, what happens when the wrong dtb is loaded?  afaict, card
+detect won't work for the sd card.  Which isn't earth-shattering, but I
+know at least the Debian guys are going to want a programmatic way to
+determine which board they are on.
+
+thx,
+
+Jason.
