@@ -1,24 +1,77 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 27 Jun 2014 17:09:02 +0100
-Subject: [PATCH 1/5] regulator: act8865: fix parsing of platform data
-In-Reply-To: <1403451105-31929-2-git-send-email-b.galvani@gmail.com>
-References: <1403451105-31929-1-git-send-email-b.galvani@gmail.com>
- <1403451105-31929-2-git-send-email-b.galvani@gmail.com>
-Message-ID: <20140627160902.GR23300@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 10:10:53 -0600
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <53AD60D7.4040404@gmail.com>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>	<53ABED5B.8010506@samsung.com>
+ <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
+ <53AD60D7.4040404@gmail.com>
+Message-ID: <53AD978D.8060703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 05:31:41PM +0200, Beniamino Galvani wrote:
-> The driver loops through all available regulators (ACT8865_REG_NUM)
-> and accesses pdata->regulators[i].platform_data without checking the
-> actual value of num_regulators in platform data, potentially causing a
-> invalid memory access.
+On 06/27/2014 06:17 AM, Tomasz Figa wrote:
+> Hi Doug,
+> 
+> On 26.06.2014 17:25, Doug Anderson wrote:
+>> Tomasz,
+>>
+>> On Thu, Jun 26, 2014 at 2:52 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+>>> Hi Vikas, Doug,
+>>>
+>>> On 26.06.2014 11:15, Vikas Sajjan wrote:
+>>>> From: Doug Anderson <dianders@chromium.org>
+>>>>
+>>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+>>>> being reset across sleep/wake.  If we don't set it to anything then
+>>>> the TPM will be reset.  U-Boot will detect this as invalid
+>>>> and will reset the system on resume time. This GPIO can always be low
+>>>> and not hurt anything.  It will get pulled back high again during a
+>>>> normal warm reset when it will default back to an input.
+>>>>
+>>>> To properly preserve the TPM state across suspend/resume and to make
+>>>> the chrome U-Boot happy, properly set the GPIO to mask the
+>>>> reset to the TPM.
+>>>>
+>>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   20 ++++++++++++++++++++
+>>>>  1 file changed, 20 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>>> index 7649982..8fd990a 100644
+>>>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>>> @@ -87,6 +87,18 @@
+>>>>               pinctrl-0 = <&usb301_vbus_en>;
+>>>>               enable-active-high;
+>>>>       };
+>>>> +
+>>>> +     /* We need GPX0_6 to be low at sleep time; just keep it low always */
+>>>> +     mask_tpm_reset_regulator: mask-tpm-reset-regulator {
+>>>> +     compatible = "regulator-fixed";
+>>>> +     regulator-name = "mask-tpm-reset ";
+>>>> +             gpio = <&gpx0 6 0>;
+>>>> +             enable-active-low;
+>>>> +             regulator-boot-on;
+>>>> +             regulator-always-on;
+>>>> +             pinctrl-names = "default";
+>>>> +             pinctrl-0 = <&mask_tpm_reset>;
+>>>> +     };
+>>>
+>>> I don't think this pin is supposed to be a real regulator. If I'm right,
+>>> you should just add a hog for it, if you don't have a proper driver to
+>>> handle it.
+>>
+>> Yes, I agree that it shouldn't really be a regulator, but there's not
+>> a whole lot of choice.  The pin needs to actually be driven low, not
+>> just pulled low.  Without your proposed patch (pinctrl: samsung: Allow
+>> pin value to be initialized using pinfunc) I don't think it's possible
+>> to actually drive a pin low with a hog.  I could be wrong, though.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/15ca84b6/attachment.sig>
+Surely there's a driver (or could be a driver) for the TPM chip, and
+that driver should have a reset-mask-gpios property, so the driver can
+call gpio_get() and gpio_set_output() on the GPIO?
+
+Faking this out via a not-really-a-regulator or pinctrl hogs seems like
+an abuse of those features to me.
