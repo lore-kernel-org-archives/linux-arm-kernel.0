@@ -1,58 +1,161 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 27 Jun 2014 13:15:16 +0200
-Subject: [RFC 04/10] memory: Add Tegra124 memory controller support
-In-Reply-To: <9283417.yKmnrljUYI@wuerfel>
-References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-5-git-send-email-thierry.reding@gmail.com>
- <9283417.yKmnrljUYI@wuerfel>
-Message-ID: <20140627111514.GE2797@ulmo>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jun 2014 12:16:01 +0100
+Subject: [PATCHv3 2/3] arm: dma-mapping: Refactor attach/detach,
+ alloc/free func
+In-Reply-To: <1402044161-32980-3-git-send-email-ritesh.harjani@gmail.com>
+References: <1402044161-32980-1-git-send-email-ritesh.harjani@gmail.com>
+ <1402044161-32980-2-git-send-email-ritesh.harjani@gmail.com>
+ <1402044161-32980-3-git-send-email-ritesh.harjani@gmail.com>
+Message-ID: <20140627111601.GJ26276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 01:07:04PM +0200, Arnd Bergmann wrote:
-> On Thursday 26 June 2014 22:49:44 Thierry Reding wrote:
-> > +static const struct tegra_mc_client tegra124_mc_clients[] = {
-> > +       {
-> > +               .id = 0x01,
-> > +               .name = "display0a",
-> > +               .swgroup = TEGRA_SWGROUP_DC,
-> > +               .smmu = {
-> > +                       .reg = 0x228,
-> > +                       .bit = 1,
-> > +               },
-> > +               .latency = {
-> > +                       .reg = 0x2e8,
-> > +                       .shift = 0,
-> > +                       .mask = 0xff,
-> > +                       .def = 0xc2,
-> > +               },
-> > +       }, {
+On Fri, Jun 06, 2014 at 09:42:40AM +0100, ritesh.harjani at gmail.com wrote:
+> From: Ritesh Harjani <ritesh.harjani@gmail.com>
 > 
-> This is a rather long table that I assume would need to get duplicated
-> and modified for each specific SoC. Have you considered to put the information
-> into DT instead, as auxiliary data in the iommu specifier as provided by
-> the device?
+> Refactor following function calls to lib/iommu-helper.c
+> 
+> 1.
+> arm_iommu_attach/detach device function calls.
+> arm_iommu_init/release_mapping function calls.
+> 
+> 2. iommu_alloc/free_buffer can be moved out from
+> arm/dma-mapping.c to lib/iommu_helper.c
 
-Most of this data really is register information and I don't think that
-belongs in DT. Also since this is fixed for a given SoC and in no way
-configurable (well, with the exception of the .def field above) I don't
-see any point in parsing this from device tree.
+Moves like this are always difficult to review, so I'm just going to look at
+the additions (i.e. the new helpers).
 
-Also only the .smmu substruct is immediately relevant to the IOMMU part
-of the driver. The .swgroup field could possibly also be moved into that
-substructure since it is only relevant to the IOMMU.
+> diff --git a/include/linux/iommu-helper.h b/include/linux/iommu-helper.h
+> index 961d8ef..09bcea3 100644
+> --- a/include/linux/iommu-helper.h
+> +++ b/include/linux/iommu-helper.h
+> @@ -2,6 +2,7 @@
+>  #define _LINUX_IOMMU_HELPER_H
+> 
+>  #include <linux/kernel.h>
+> +#include <linux/dma-attrs.h>
+> 
+>  #ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
+>  struct dma_iommu_mapping {
+> @@ -19,6 +20,23 @@ struct dma_iommu_mapping {
+>         struct kref             kref;
+>  };
+> 
+> +extern struct page **iommu_helper_alloc_buffer(struct device *dev, size_t size,
+> +                                         gfp_t gfp, struct dma_attrs *attrs,
+> +                       void (*arch_clear_buffer_cb)(struct page*, size_t));
+> +
+> +extern int iommu_helper_free_buffer(struct device *dev, struct page **pages,
+> +                              size_t size, struct dma_attrs *attrs);
+> +
+> +extern void iommu_helper_detach_device(struct device *dev);
+> +
+> +extern void iommu_helper_release_mapping(struct dma_iommu_mapping *mapping);
+> +
+> +extern int iommu_helper_attach_device(struct device *dev,
+> +                           struct dma_iommu_mapping *mapping);
+> +
+> +extern struct dma_iommu_mapping *
+> +iommu_helper_init_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
+> +
+>  #define to_dma_iommu_mapping(dev) ((dev)->mapping)
+>  #endif
+> 
+> diff --git a/lib/iommu-helper.c b/lib/iommu-helper.c
+> index c27e269..3664709 100644
+> --- a/lib/iommu-helper.c
+> +++ b/lib/iommu-helper.c
+> @@ -6,6 +6,17 @@
+>  #include <linux/bitmap.h>
+>  #include <linux/bug.h>
+> 
+> +#ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
 
-So essentially what this table does is map SWGROUPs (which are provided
-in the IOMMU specifier) to the clients and registers that the IOMMU
-programming needs. As an analogy it corresponds roughly to the pins and
-pingroups tables of pinctrl drivers. Those don't belong in device tree
-either.
+Why isn't this dependency simply part of the Makefile rules?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/26343dbd/attachment.sig>
+> +#include <linux/iommu.h>
+> +#include <linux/device.h>
+> +#include <linux/iommu-helper.h>
+> +#include <linux/slab.h>
+> +#include <linux/vmalloc.h>
+> +#include <linux/errno.h>
+> +#include <linux/dma-contiguous.h>
+> +#include <linux/mm.h>
+> +#endif
+> +
+>  int iommu_is_span_boundary(unsigned int index, unsigned int nr,
+>                            unsigned long shift,
+>                            unsigned long boundary_size)
+> @@ -39,3 +50,227 @@ again:
+>         return -1;
+>  }
+>  EXPORT_SYMBOL(iommu_area_alloc);
+> +
+> +#ifdef CONFIG_DMA_USE_IOMMU_HELPER_MAPPING
+> +
+> +struct page **iommu_helper_alloc_buffer(struct device *dev, size_t size,
+> +                                         gfp_t gfp, struct dma_attrs *attrs,
+> +                       void (*arch_clear_buffer_cb)(struct page*, size_t))
+> +{
+> +       struct page **pages;
+> +       int count = size >> PAGE_SHIFT;
+> +       int array_size = count * sizeof(struct page *);
+> +       int i = 0;
+> +
+> +       if (array_size <= PAGE_SIZE)
+> +               pages = kzalloc(array_size, gfp);
+> +       else
+> +               pages = vzalloc(array_size);
+> +       if (!pages)
+> +               return NULL;
+> +
+> +       if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
+> +               unsigned long order = get_order(size);
+> +               struct page *page;
+> +
+> +               page = dma_alloc_from_contiguous(dev, count, order);
+> +               if (!page)
+> +                       goto error;
+> +
+> +               if (arch_clear_buffer_cb)
+> +                       arch_clear_buffer_cb(page, size);
+
+Actually, clearing a buffer is always a memset of zero -- the arch-specific
+part is about cache maintenance. The fly in the ointment here is flushing
+highmem pages when you have an outer (physically addressed cache), since we
+want to do the outer-cache maintenance outside of the kmap_atomic region as
+a large block, but the inner-cache maintenance by VA with the highmem
+mapping.
+
+Given that this is only called on the alloc path, is this actually a
+fastpath for anybody? If not, we could move the outer-cache flushing into
+the loop and simply have a arch_flush_buffer_cb instead, which would flush
+l1 and l2 in turn.
+
+That way, architectures that don't have highmem and don't require cache
+maintenance needn't supply a callback at all. Failure to supply a callback
+with your current code means that the buffer is full of junk.
+
+> +/**
+> + * iommu_helper_init_mapping
+> + * @bus: pointer to the bus holding the client device (for IOMMU calls)
+> + * @base: start address of the valid IO address space
+> + * @size: maximum size of the valid IO address space
+> + *
+> + * Creates a mapping structure which holds information about used/unused
+> + * IO address ranges, which is required to perform memory allocation and
+> + * mapping with IOMMU aware functions.
+> + *
+> + */
+> +
+> +struct dma_iommu_mapping *
+> +iommu_helper_init_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+
+I spoke to Arnd on IRC the other day about this, and ultimately this
+function can plug into of_dma_configure to place each iommu_group into a
+separate iommu_mapping automatically.
+
+Can you put a dummy version of it in the header file, so it returns an error
+when !CONFIG_DMA_USE_IOMMU_HELPER_MAPPING?
+
+Will
