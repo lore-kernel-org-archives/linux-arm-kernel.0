@@ -1,72 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 27 Jun 2014 13:01:10 +0200
-Subject: [RFC 10/10] mmc: sdhci-tegra: Add IOMMU support
-In-Reply-To: <20140627124602.53d046dae5d7e269815e56a0@nvidia.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 27 Jun 2014 14:03:40 +0300
+Subject: [RFC 09/10] drm/tegra: Add IOMMU support
+In-Reply-To: <4455459.GtiCHWk2CB@wuerfel>
 References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-11-git-send-email-thierry.reding@gmail.com>
- <20140627124602.53d046dae5d7e269815e56a0@nvidia.com>
-Message-ID: <20140627110109.GC2797@ulmo>
+ <1403815790-8548-10-git-send-email-thierry.reding@gmail.com>
+ <20140627124614.050be2e406a4b9a02d9fe97c@nvidia.com>
+ <4455459.GtiCHWk2CB@wuerfel>
+Message-ID: <878uoid377.fsf@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 12:46:02PM +0300, Hiroshi DOyu wrote:
-> 
-> Thierry Reding <thierry.reding@gmail.com> writes:
-> 
-> > From: Thierry Reding <treding@nvidia.com>
-> >
-> > Attach to the device's master interface of the IOMMU at .probe() time.
-> > IOMMU support becomes available via the DMA mapping API interoperation
-> > code, but this explicit attachment is necessary to ensure proper probe
-> > order.
-> >
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> >  drivers/mmc/host/sdhci-tegra.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
-> > index 33100d10d176..b884614fa4e6 100644
-> > --- a/drivers/mmc/host/sdhci-tegra.c
-> > +++ b/drivers/mmc/host/sdhci-tegra.c
-> > @@ -15,6 +15,7 @@
-> >  #include <linux/err.h>
-> >  #include <linux/module.h>
-> >  #include <linux/init.h>
-> > +#include <linux/iommu.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/clk.h>
-> >  #include <linux/io.h>
-> > @@ -237,6 +238,11 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
-> >  	match = of_match_device(sdhci_tegra_dt_match, &pdev->dev);
-> >  	if (!match)
-> >  		return -EINVAL;
-> > +
-> > +	rc = iommu_attach(&pdev->dev);
-> > +	if (rc < 0)
-> > +		return rc;
-> > +
-> 
-> I thought that, if we consider that ->probe() should include minimal H/W
-> probing so that DMA API call in ->probe() could be deferred after
-> ->probe() and till it's in use actually, like opening a device node. For
-> me this decision(minimal h/w probe) seemed logical but it would add a
-> new restriction. One advantage is that we could still keep all drivers
-> wihtout any IOMMU code if it doesn't call DMA API in ->probe().
 
-This isn't immediately apparent in this case, but I think that in the
-future we may need to have this kind of explicit attachment to an IOMMU
-for example once devices start to appear that have multiple master
-interfaces (possibly on different IOMMUs). For easy cases like this
-SDMMC driver we may be able to get away more easily by hooking this up
-within the driver core for example. I'd have to look into how exactly
-this would work, though.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/043068d9/attachment.sig>
+> On Friday 27 June 2014 12:46:14 Hiroshi DOyu wrote:
+>> 
+>> Thierry Reding <thierry.reding@gmail.com> writes:
+>> 
+>> > From: Thierry Reding <treding@nvidia.com>
+>> >
+>> > When an IOMMU device is available on the platform bus, allocate an IOMMU
+>> > domain and attach the display controllers to it. The display controllers
+>> > can then scan out non-contiguous buffers by mapping them through the
+>> > IOMMU.
+>> >
+>> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+>> > ---
+>> > @@ -1283,8 +1284,18 @@ static int tegra_dc_init(struct host1x_client *client)
+>> >  {
+>> >         struct drm_device *drm = dev_get_drvdata(client->parent);
+>> >         struct tegra_dc *dc = host1x_client_to_dc(client);
+>> > +       struct tegra_drm *tegra = drm->dev_private;
+>> >         int err;
+>> >
+>> > +       if (tegra->domain) {
+>> > +               err = iommu_attach_device(tegra->domain, dc->dev);
+>> 
+>> I wanted to keep device drivers iommu-free with the following:
+>> 
+>> http://patchwork.ozlabs.org/patch/354074/
+>> 
+>
+> We definitely need something like your series to make iommus work transparently
+> on ARM for normal devices, using the of_dma_configure() to look up the correct
+> iommu per device and initialize it.
+
+OK
+
+> However, any devices that work with multiple iommu domains cannot do that
+> and still need to use the iommu API directy. I believe the tegra drm code
+> falls into this category.
+
+I think that the similar thing can be said to "DMA API" vs "IOMMU
+API". Most of traditional devices would be ok with the existing DMA API
+which can be backed by IOMMU. OTOH, some smart devices may need to dive
+into IOMMU API for more precise control of it.
