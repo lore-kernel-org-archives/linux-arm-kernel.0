@@ -1,70 +1,121 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 27 Jun 2014 13:14:50 +0100
-Subject: [PATCH] ARM: integrator: fix OF-related regression
-In-Reply-To: <CAL_Jsq+wdJu-toWixA9xq124jizj-mW3KE-osETnFj0g4vn=Yg@mail.gmail.com>
-References: <1403611687-23512-1-git-send-email-linus.walleij@linaro.org>
- <CAL_Jsq+Us51c-6+kP5Y+aML-HPV-=9SooPepD6u13xyrvDfcKw@mail.gmail.com>
- <CACRpkdZr6T65zOmxy9mQdeapMfu=nwfcXRtufb5DU5NO+vwU7A@mail.gmail.com>
- <20140626193938.GA16226@debian>
- <CAL_Jsq+wdJu-toWixA9xq124jizj-mW3KE-osETnFj0g4vn=Yg@mail.gmail.com>
-Message-ID: <20140627121450.D7D32C41060@trevor.secretlab.ca>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 27 Jun 2014 14:17:27 +0200
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>	<53ABED5B.8010506@samsung.com>
+ <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
+Message-ID: <53AD60D7.4040404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jun 2014 16:31:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On Thu, Jun 26, 2014 at 2:39 PM, Rabin Vincent <rabin@rab.in> wrote:
-> > On Thu, Jun 26, 2014 at 02:15:42PM +0200, Linus Walleij wrote:
-> >> On Wed, Jun 25, 2014 at 3:06 PM, Rob Herring <robherring2@gmail.com> wrote:
-> >> > On Tue, Jun 24, 2014 at 7:08 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >> >> Commit 07e461cd7e73a84f0e3757932b93cc80976fd749
-> >> >> "of: Ensure unique names without sacrificing determinism"
-> >> >> caused a boot failure regression on the Integrator machines.
-> >> >>
-> >> >> The problem is probably caused by fiddling too much with
-> >> >> the device tree population in the OF init function, such
-> >> >> as passing the SoC bus device as parent when populating
-> >> >> the device tree.
-> >> >>
-> >> >> This patch fixes the problem by:
-> >> >>
-> >> >> - Avoiding to explicitly look up the tree root
-> >> >> - Look up devices needed before device population from
-> >> >>   the match only, passing NULL as root
-> >> >> - Passing NULL as root and parent when calling
-> >> >>   of_platform_populate()
-> >> >
-> >> > Just curious, I don't see how this fixes booting for Integrator. Where
-> >> > exactly does boot fail?
-> >>
-> >> It fails by failing to populate the devicetree somehow. I don't
-> >> have the proper debugging needs, I just trial-and-horror-fixed
-> >> it by making the board init similar to other platforms :-/
-> >
-> > earlyprintk doesn't work on Integrator hardware?  It does on QEMU's
-> > integratorcp so it's trivial to debug there.
-> 
-> I got as far as building a kernel to do that before getting distracted...
-> 
-> > The problem is that integrator_init_sysfs() adds a device attribute
-> > called "fpga" to the soc0 bus, and the soc0 bus device is also used as
-> > the root of the device tree, and the device tree has a node called "fpga".
-> >
-> > Before 07e461cd7e73a84f0e3757932b93cc80976fd749 this node directory and
-> > attribute file had unique paths:
-> >
-> >         sysfs: creating file '/devices/soc0/fpga'
-> >         sysfs: creating dir '/devices/soc0/fpga.0'
-> >
-> > 07e461cd7e73a84f0e3757932b93cc80976fd749 removed the .0 from the fpga node's
-> > directory, leading to that node (and its subnodes) failing to register due to a
-> > filename conflict with the fpga attribute's file:
-> 
-> Thanks for debugging. Now this makes sense as to why this is specific
-> to Integrator. I think this is the right direction and we should not
-> put devices under soc0/. That way the structure is consistent across
-> SOCs and regardless of whether you decide to create an soc_device or
-> not.
+Hi Doug,
 
-Agreed.
+On 26.06.2014 17:25, Doug Anderson wrote:
+> Tomasz,
+> 
+> On Thu, Jun 26, 2014 at 2:52 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Hi Vikas, Doug,
+>>
+>> On 26.06.2014 11:15, Vikas Sajjan wrote:
+>>> From: Doug Anderson <dianders@chromium.org>
+>>>
+>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
+>>> being reset across sleep/wake.  If we don't set it to anything then
+>>> the TPM will be reset.  U-Boot will detect this as invalid
+>>> and will reset the system on resume time. This GPIO can always be low
+>>> and not hurt anything.  It will get pulled back high again during a
+>>> normal warm reset when it will default back to an input.
+>>>
+>>> To properly preserve the TPM state across suspend/resume and to make
+>>> the chrome U-Boot happy, properly set the GPIO to mask the
+>>> reset to the TPM.
+>>>
+>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   20 ++++++++++++++++++++
+>>>  1 file changed, 20 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> index 7649982..8fd990a 100644
+>>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>>> @@ -87,6 +87,18 @@
+>>>               pinctrl-0 = <&usb301_vbus_en>;
+>>>               enable-active-high;
+>>>       };
+>>> +
+>>> +     /* We need GPX0_6 to be low at sleep time; just keep it low always */
+>>> +     mask_tpm_reset_regulator: mask-tpm-reset-regulator {
+>>> +     compatible = "regulator-fixed";
+>>> +     regulator-name = "mask-tpm-reset ";
+>>> +             gpio = <&gpx0 6 0>;
+>>> +             enable-active-low;
+>>> +             regulator-boot-on;
+>>> +             regulator-always-on;
+>>> +             pinctrl-names = "default";
+>>> +             pinctrl-0 = <&mask_tpm_reset>;
+>>> +     };
+>>
+>> I don't think this pin is supposed to be a real regulator. If I'm right,
+>> you should just add a hog for it, if you don't have a proper driver to
+>> handle it.
+> 
+> Yes, I agree that it shouldn't really be a regulator, but there's not
+> a whole lot of choice.  The pin needs to actually be driven low, not
+> just pulled low.  Without your proposed patch (pinctrl: samsung: Allow
+> pin value to be initialized using pinfunc) I don't think it's possible
+> to actually drive a pin low with a hog.  I could be wrong, though.
+> 
 
-g.
+Uhm, I was convinced that this patch was already in. So I think your use
+case is definitely a good reason to get back to this patch and use the
+facility it provides to solve your problem.
+
+> 
+> So I think our options are:
+> 
+> * Begrudgingly use the regulator this way.
+> 
+> * Re-propose your pinctrl patch and use hogs.
+
+I'd prefer this one, as stated above. I think the reasons are obvious:
+no made up devices and re-using infrastructure useful for other purposes
+as well.
+
+> 
+> * Implement a tiny driver that will just hold a GPIO in a certain
+> state and instantiate that driver here.
+> 
+> * Decide that really the firmware should have set this pin and that if
+> someone wants suspend/resume to work then they'll just have to update
+> their firmware.  Queue the debate about what firmware vs. kernel's job
+> is and commence yelling about the fact that it's hard to get an
+> official RW firmware update approved.  Note: I'm not quite sure why I
+> didn't have the firmware init this GPIO to begin with (so that if the
+> kernel didn't do anything it would just work).  Probably just me being
+> stupid.
+> 
+
+Right, ideally the firmware should be making operating system's life
+easier not harder, but we all know that even if there are examples of
+good firmware, there will always be the opposite as well... So the
+kernel should be able to work anyway.
+
+> 
+> Ah, one other thing that could justify this being its own special
+> driver (though you might be able to use the regulator framework for it
+> too?).  Technically you'll save a tiny amount of power in the system
+> if you leave this GPIO high while the system is running and only drive
+> it low when the system goes to suspend.  That's because there's a
+> pretty strong external pullup on this pin.  The amount of power is
+> probably not noticeable and the savings is only possible when the
+> system is on (and in high power state) anyway, but...
+
+This could be also handled by adding a sleep hog, i.e. "sleep" state for
+the pinctrl device itself and adding proper suspend/resume callbacks to
+the pinctrl-samsung driver (I'm not sure whether a call to
+pinctrl_select_state() would work in syscore ops).
+
+Best regards,
+Tomasz
