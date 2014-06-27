@@ -1,33 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Jun 2014 15:16:28 +0200
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140627124949.GR26276@arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <6381366.2IfqZj1r0B@wuerfel> <20140627124949.GR26276@arm.com>
-Message-ID: <7528887.J1DnSBg239@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jun 2014 14:17:48 +0100
+Subject: [RFC PATCH 4/9] irqchip: GIC: add support for forwarded interrupts
+In-Reply-To: <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140627131748.GT26276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 June 2014 13:49:49 Will Deacon wrote:
-> On Fri, Jun 27, 2014 at 12:03:34PM +0100, Arnd Bergmann wrote:
-> > On Thursday 26 June 2014 19:44:21 Rob Herring wrote:
-> > > I don't agree arm32 is harder than microblaze. Yes, converting ALL of
-> > > arm would be, but that is not necessary. With Liviu's latest branch
-> > > the hacks I previously needed are gone (thanks!), and this is all I
-> > > need to get Versatile PCI working (under QEMU):
-> > 
-> > I meant converting all of arm32 would be harder, but I agree we don't
-> > have to do it. It would be nice to convert all of the drivers/pci/host
-> > drivers though, iow all multiplatform-enabled ones, and leaving the
-> > current arm32 pci implementation for the platforms we don't want to
-> > convert to multiplatform anyway (footbridge, iop, ixp4xx, ks8695 (?),
-> > pxa, sa1100).
+Hi Marc,
+
+On Wed, Jun 25, 2014 at 10:28:45AM +0100, Marc Zyngier wrote:
+> Now that we've switched to EOImode == 1, prevent a forwarded interrupt
+> from being deactivated after its priority has been dropped.
 > 
-> I'm more than happy to convert the generic host controller we merged
-> recently, but I'd probably want the core changes merged first so that I
-> know I'm not wasting my time!
+> Also add support for the interrupt state to be saved/restored.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 48 +++++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 42 insertions(+), 6 deletions(-)
 
-That is definitely fine with me, but it's Bjorn's decision.
+[...]
 
-	Arnd
+> +static void gic_irq_set_fwd_state(struct irq_data *d, u32 val, u32 mask)
+> +{
+> +	if (mask & IRQ_FWD_STATE_PENDING)
+> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_PENDING) ? GIC_DIST_ENABLE_SET : GIC_DIST_ENABLE_CLEAR);
+> +	if (mask & IRQ_FWD_STATE_ACTIVE)
+> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_ACTIVE) ? GIC_DIST_ACTIVE_SET : GIC_DIST_ACTIVE_CLEAR);
+> +	if (mask & IRQ_FWD_STATE_MASKED)
+> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_MASKED) ? GIC_DIST_ENABLE_CLEAR : GIC_DIST_ENABLE_SET);
+
+Given that this isn't atomic and KVM only cares about ACTIVE, why not change
+mask to be a single state only? Renumbering the states so that's not bits
+would help to enforce this (i.e. make IRQ_FWD_STATE_ACTIVE 0, PENDING 1,
+...).
+
+That would also allow you to switch on the state and return early.
+
+> +static u32 gic_irq_get_fwd_state(struct irq_data *d, u32 mask)
+> +{
+> +	u32 val = 0;
+> +
+> +	if (mask & IRQ_FWD_STATE_PENDING && gic_peek_irq(d, GIC_DIST_ENABLE_SET))
+> +		val |= IRQ_FWD_STATE_PENDING;
+> +	if (mask & IRQ_FWD_STATE_ACTIVE && gic_peek_irq(d, GIC_DIST_ACTIVE_SET))
+> +		val |= IRQ_FWD_STATE_ACTIVE;
+> +	if (mask & IRQ_FWD_STATE_MASKED && !gic_peek_irq(d, GIC_DIST_ENABLE_SET))
+> +		val |= IRQ_FWD_STATE_MASKED;
+
+*and* you could peek GIC_DIST_ENABLE_SET in one place here.
+
+Will
