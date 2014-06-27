@@ -1,32 +1,24 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 27 Jun 2014 09:53:17 +0200
-Subject: [PATCH v5 03/14] clk: max77686: Add DT include for MAX77686 PMIC
- clock
-In-Reply-To: <53AD21E5.1030609@suse.de>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-4-git-send-email-javier.martinez@collabora.co.uk>
- <53AD21E5.1030609@suse.de>
-Message-ID: <53AD22ED.5040303@collabora.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Jun 2014 09:55:41 +0200
+Subject: [PATCH] ARM: bcm: Fix bcm and multi_v7 defconfigs
+In-Reply-To: <1403850439-8771-1-git-send-email-olof@lixom.net>
+References: <1403850439-8771-1-git-send-email-olof@lixom.net>
+Message-ID: <5792451.i1WdiOPTXg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
-
-On 06/27/2014 09:48 AM, Andreas F?rber wrote:
-> Am 26.06.2014 20:15, schrieb Javier Martinez Canillas:
->> This patch adds a dt-binding include for Maxim 77686
->> PMIC clock IDs that can be to be shared between the
+On Thursday 26 June 2014 23:27:19 Olof Johansson wrote:
+> BCM (Kona/capri platform) has regressed in two ways on this release. First,
+> bcm_defconfig no longer selected the appropriate MMC driver options due to
+> changes in dependencies. Secondly, the new MFD and regulator drivers were not
+> enabled on multi_v7_defconfig, so that caused the system to fail probing MMC
+> there.
 > 
-> "can be shared"?
+> Fix by enabling the new options as needed.
 > 
-
-As it should be quite clear right now I'm not a native English speaker. I meant
-that the header file can be included by both Device Tree source files and the
-max77802 driver.
-
-> Regards,
-> Andreas
+> Cc: Matt Porter <matt.porter@linaro.org>
+> Cc: Christian Daudt <bcm@fixthebug.org>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > 
 
-Best regards,
-Javier
+Acked-by: Arnd Bergmann <arnd@arndb.de>
