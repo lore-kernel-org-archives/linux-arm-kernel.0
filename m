@@ -1,69 +1,86 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 27 Jun 2014 07:56:39 +0530
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <53ACB568.4000903@codeaurora.org>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
- <53AB1CC1.4010907@codeaurora.org>
- <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
- <53ACB568.4000903@codeaurora.org>
-Message-ID: <CAKohpo=a6y1=aRi_7kZLQx56HXzvDJ-B2j8YiMevD8Wt6BvsEw@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 27 Jun 2014 04:45:11 +0200
+Subject: [alsa-devel] [PATCH 1/7] ASoC: fix debugfs directory creation bug
+In-Reply-To: <E1X0AZe-0003i7-0z@rmk-PC.arm.linux.org.uk>
+References: <20140626142231.GR32514@n2100.arm.linux.org.uk>
+ <E1X0AZe-0003i7-0z@rmk-PC.arm.linux.org.uk>
+Message-ID: <53ACDAB7.5080703@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 June 2014 05:36, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> I gave it a spin. It looks mostly good except for the infinite loop:
+On 06/26/2014 04:22 PM, Russell King wrote:
+> Avoid creating duplicate directories by prefixing codecs and platforms
+> with their separate identifiers.  This avoids snd-soc-dummy (which can
+> appear both as a dummy platform and a dummy codec on the same card)
+> from clashing.
 
-Great !!
+Do we actually want to create debugfs entries for the snd-soc-dummies? There 
+shouldn't be any meaningful information in there.
 
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-> index b7ee67c4d1c0..6744321ae33d 100644
-> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -138,8 +138,10 @@ try_again:
->                 }
+If we want to and if we change the naming scheme of the debugfs entries 
+anyway we should also add the component name to the entry name. This fixes a 
+issue with devices that register multiple components.
+
+The other thing is that we are working on generalizing the ASoC code and 
+getting rid of the distinction between CODECs and platforms. Which means 
+there won't really a way to get the prefix anymore soon.
+
+- Lars
+
 >
->                 /* Try with "cpu-supply" */
-> -               if (reg == reg_cpu0)
-> +               if (reg == reg_cpu0) {
-> +                       reg = reg_cpu;
->                         goto try_again;
-> +               }
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   sound/soc/soc-core.c | 28 ++++++++++++++++++++++++----
+>   1 file changed, 24 insertions(+), 4 deletions(-)
 >
->                 dev_warn(cpu_dev, "failed to get cpu%d regulator: %ld\n",
->                          cpu, PTR_ERR(cpu_reg));
-
-Awesome code, I wrote it. Thanks for fixing it.
-
-> and I think we just want reg_cpu to be "cpu", not "cpu-supply" because I
-> think the regulator core adds in the "-supply" part already.
-
-Okay.
-
-> After fixing that I can get cpufreq going. I'm currently working on
-> populating the OPPs at runtime without relying on DT. So eventually I'll
-> need this patch:
-
-I see..
-
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-> index b7ee67c4d1c0..6744321ae33d 100644
-> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -239,11 +241,6 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
->         }
+> diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+> index b87d7d882e6d..91120b8e283e 100644
+> --- a/sound/soc/soc-core.c
+> +++ b/sound/soc/soc-core.c
+> @@ -270,12 +270,32 @@ static const struct file_operations codec_reg_fops = {
+>   	.llseek = default_llseek,
+>   };
 >
->         ret = of_init_opp_table(cpu_dev);
-> -       if (ret) {
-> -               dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
-> -               goto out_put_node;
-> -       }
-> -
->         ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
->         if (ret) {
->                 dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
+> +static struct dentry *soc_debugfs_create_dir(struct dentry *parent,
+> +	const char *fmt, ...)
+> +{
+> +	struct dentry *de;
+> +	va_list ap;
+> +	char *s;
+> +
+> +	va_start(ap, fmt);
+> +	s = kvasprintf(GFP_KERNEL, fmt, ap);
+> +	va_end(ap);
+> +
+> +	if (!s)
+> +		return NULL;
+> +
+> +	de = debugfs_create_dir(s, parent);
+> +	kfree(s);
+> +
+> +	return de;
+> +}
+> +
+>   static void soc_init_codec_debugfs(struct snd_soc_codec *codec)
+>   {
+>   	struct dentry *debugfs_card_root = codec->card->debugfs_card_root;
 >
-> which I hope is ok.
-
-I need to see details of these routines once again, but will surely make
-it work for you.
+> -	codec->debugfs_codec_root = debugfs_create_dir(codec->name,
+> -						       debugfs_card_root);
+> +	codec->debugfs_codec_root = soc_debugfs_create_dir(debugfs_card_root,
+> +						"codec:%s", codec->name);
+>   	if (!codec->debugfs_codec_root) {
+>   		dev_warn(codec->dev,
+>   			"ASoC: Failed to create codec debugfs directory\n");
+> @@ -306,8 +326,8 @@ static void soc_init_platform_debugfs(struct snd_soc_platform *platform)
+>   {
+>   	struct dentry *debugfs_card_root = platform->card->debugfs_card_root;
+>
+> -	platform->debugfs_platform_root = debugfs_create_dir(platform->name,
+> -						       debugfs_card_root);
+> +	platform->debugfs_platform_root = soc_debugfs_create_dir(debugfs_card_root,
+> +						"platform:%s", platform->name);
+>   	if (!platform->debugfs_platform_root) {
+>   		dev_warn(platform->dev,
+>   			"ASoC: Failed to create platform debugfs directory\n");
+>
