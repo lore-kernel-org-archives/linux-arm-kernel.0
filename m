@@ -1,46 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 14:59:32 +0100
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <53AD7544.2060701@gmail.com>
-References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140627130430.GH32514@n2100.arm.linux.org.uk> <53AD724D.4020704@gmail.com>
- <20140627133933.GJ23978@titan.lakedaemon.net> <53AD7544.2060701@gmail.com>
-Message-ID: <20140627135932.GI32514@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jun 2014 15:01:56 +0100
+Subject: [PATCHv3 1/5] arm64: add MIDR_EL1 field accessors
+In-Reply-To: <1403795926-17139-2-git-send-email-mark.rutland@arm.com>
+References: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
+ <1403795926-17139-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140627140155.GV26276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 03:44:36PM +0200, Sebastian Hesselbarth wrote:
-> On 06/27/2014 03:39 PM, Jason Cooper wrote:
->> On Fri, Jun 27, 2014 at 03:31:57PM +0200, Sebastian Hesselbarth wrote:
->>> Also, production variants have their MAC address stored at 0xd0000 on
->>> SPI flash. And while ES has PL2303 USB-to-UART, production use a
->>> different brand, IIRC FTDI.
->>
->> Could you do a follow on patch adding a comment to this effect?  The
->> Debian guys will need this for flash-kernel and friends.
->
-> I don't know if that information will be of any use at all.
->
-> You cannot determine USB-to-UART type from CuBox but your host PC only.
->
-> And I am not sure, if we want to rely on some six numbers stored on
-> SPI flash, i.e. there is no magic nor header to be really sure, it
-> is a MAC address.
+On Thu, Jun 26, 2014 at 04:18:42PM +0100, Mark Rutland wrote:
+> The MIDR_EL1 register is composed of a number of bitfields, and uses of
+> the fields has so far involved open-coding of the shifts and masks
+> required.
+> 
+> This patch adds shifts and masks for each of the MIDR_EL1 subfields, and
+> also provides accessors built atop of these. Existing uses within
+> cputype.h are updated to use these accessors.
+> 
+> The read_cpuid_part_number macro is modified to return the extracted
+> bitfield rather than returning the value in-place with all other fields
+> (including revision) masked out, to better match the other accessors.
+> As the value is only used in comparison with the *_CPU_PART_* macros
+> which are similarly updated, and these values are never exposed to
+> userspace, this change should not affect any functionality.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-This is kind'a my point - you're confirming that you can't reliably
-tell which version you have by running something on the cubox itself.
-As Jason points out, there are those who need to choose the correct
-DT file when installing.
+We need to make sure this doesn't conflict horribly with the missing arm64
+hunk from Russell's series in this area. Ideally, we'd take Russell's patch
+as part of this series.
 
-So, this means that the user has to be asked.  If users have to be
-asked, users need some way to identify the hardware that they're
-running on.
-
-No, I didn't know until recently, because my Cubox was given to me by
-Nicolas Pitre a couple of years ago - that's the problem, the engineering
-samples may not be with the original people and therefore their origins
-may not be known.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Will
