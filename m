@@ -1,76 +1,67 @@
-From: dalias@libc.org (Rich Felker)
-Date: Fri, 27 Jun 2014 18:33:28 -0400
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627221744.GU32514@n2100.arm.linux.org.uk>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
- <20140627213051.GS32514@n2100.arm.linux.org.uk>
- <20140627215541.GC16724@brightrain.aerifal.cx>
- <20140627221744.GU32514@n2100.arm.linux.org.uk>
-Message-ID: <20140627223328.GB17988@brightrain.aerifal.cx>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 16:37:45 -0600
+Subject: [RFC 3/5] clk: use struct clk only for external API
+In-Reply-To: <1403855872-14749-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1403855872-14749-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <53ADF239.9050008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 11:17:44PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 27, 2014 at 05:55:41PM -0400, Rich Felker wrote:
-> > I think you're assuming that libc is used only as a shared library and
-> > that the user installs one appropriate for their kernel. This
-> > precludes the use of static-linked binaries which are an extremely
-> > important usage case for us, especially on ARM where, for example, we
-> > want users to be able to make binaries that have a fully-working libc
-> > but that can be run on Android, where neither musl nor any other
-> > remotely-working libc is installed by default.
-> > 
-> > Obviously some (many) users will opt to build libc with a particular
-> > -march where all of the necessary instructions for TLS and atomics are
-> > available without help from the kernel. However, if attempting to
-> > build a baseline libc that works on any model results in one that
-> > can't work on new hardware/kernel, that's a big problem, and exactly
-> > the one which I'm trying to solve.
+On 06/27/2014 01:57 AM, Tomeu Vizoso wrote:
+> From: Rabin Vincent <rabin.vincent@stericsson.com>
 > 
-> As I've already said, that's a system integrator bug to have a kernel
-> without a kuser page with userspace which requires it.
+> In order to provide per-user accounting, this separates the struct clk
+> used in the common clock framework into two structures 'struct clk_core'
+> and 'struct clk'.  struct clk_core will be used for internal
+> manipulation and struct clk will be used in the clock API
+> implementation.
 > 
-> I think you're are missing one obvious solution to this which you can do:
-> you are passed the HWCAP fields in the ELF auxinfo.  This will tell you
-> if the CPU has TLS support or not.  If it has TLS support, then you don't
-> need to use the kuser helpers, and you know that it is a CPU which is ARM
-> architecture v6k or later,
+> In this patch, struct clk is simply renamed to struct clk_core and a new
+> struct clk is implemented which simply wraps it.  In the next patch, the
+> new struct clk will be used to implement per-user clock enable
+> accounting.
 
-Are you sure? I think the minimum models for TLS and for LDREX/STREX
-are different; one is plain v6 and the other is v6k. This greatly
-complicates the issue since the kernel only tells you if the TLS
-register is available, not if the atomics are. It also doesn't tell
-you if the kernel is emulating the hardware features via traps rather
-than providing the kuser helper page, which would be a semi-viable
-configuration.
+> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
 
-> and it has things like the CP15 barrier
-> instructions.
+> -struct clk {
+> +struct clk_core {
+>  	const char		*name;
+>  	const struct clk_ops	*ops;
+>  	struct clk_hw		*hw;
+>  	struct module		*owner;
+> -	struct clk		*parent;
+> +	struct clk_core		*parent;
+>  	const char		**parent_names;
+> -	struct clk		**parents;
+> +	struct clk_core		**parents;
+>  	u8			num_parents;
+>  	u8			new_parent_index;
+>  	unsigned long		rate;
+>  	unsigned long		new_rate;
+> -	struct clk		*new_parent;
+> -	struct clk		*new_child;
+> +	struct clk_core		*new_parent;
+> +	struct clk_core		*new_child;
+>  	unsigned long		flags;
+>  	unsigned int		enable_count;
+>  	unsigned int		prepare_count;
+> @@ -55,6 +55,10 @@ struct clk {
+>  	struct kref		ref;
+>  };
+>  
+> +struct clk {
+> +	struct clk_core clk;
+> +};
 
-No, the CP15 barrier is deprecated and may be removed in futuer chips
-(like the SWP instruction was?), so it can't be used unless you know
-that you have a pre-DMB machine that needs it.
+I'm confused why that field isn't a pointer instead. Don't we want to
+end up with the following data structure:
 
-> If you want to know that the CPU supports the DMB
-> instruction rather than the CP15 barrier instruction, then you have to
-> check the uname details, or read /proc/cpuinfo (but I'd rather you
-> didn't.)
+(dev a's) struct clk --------v
+                           struct clk_core -----> struct clk_hw
+(dev b's) struct clk --------^
 
-These are not safe operations. /proc may not be mounted, or the file
-descriptor table may be full and open may fail, etc.
+Where all 3 arrows are pointers? (and struct clk_core probably contains
+a list of the struct clk that point at it).
 
-> In addition, the HWCAP fields tell you about some of the other
-> instructions and FP options which are available to you, whether there's
-> integer division available, etc.
-
-Yes but for all of those it's safe to assume the lowest baseline. For
-TLS and atomics, removal (even optional) of kuser helper page means
-it's not safe to assume the lowest baseline; there MUST be a fallback
-to use the higher-model-only instructions if the kernel lacks kuser
-helper.
-
-Rich
+Otherwise, we end up creating a whole struct clk_core for each client.
