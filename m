@@ -1,81 +1,258 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Fri, 27 Jun 2014 11:11:35 +0300
-Subject: [PATCH 2/6] of: Add bindings for nvidia,tegra124-soctherm
+Date: Fri, 27 Jun 2014 11:11:34 +0300
+Subject: [PATCH 1/6] thermal: of: Add support for hardware-tracked trip points
 In-Reply-To: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
 References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1403856699-2140-3-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1403856699-2140-2-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds binding documentation and headers for the Tegra124
-SOCTHERM device tree node.
+This adds support for hardware-tracked trip points to the device tree
+thermal sensor framework.
+
+The framework supports an arbitrary number of trip points. Whenever
+the current temperature is updated, the trip points immediately
+below and above the current temperature are found. A sensor driver
+callback `set_trips' is then called with the temperatures.
+If there is no trip point above or below the current temperature,
+the passed trip temperature will be LONG_MAX or LONG_MIN respectively.
+In this callback, the driver should program the hardware such that
+it is notified when either of these trip points are triggered.
+When a trip point is triggered, the driver should call
+`thermal_zone_device_update' for the respective thermal zone. This
+will cause the trip points to be updated again.
+
+If the `set_trips' callback is not implemented (is NULL), the framework
+behaves as before.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- .../devicetree/bindings/thermal/tegra-soctherm.txt | 32 ++++++++++++++++++++++
- include/dt-bindings/thermal/tegra124-soctherm.h    | 15 ++++++++++
- 2 files changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
- create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
+ drivers/thermal/of-thermal.c | 97 ++++++++++++++++++++++++++++++++++++++++++--
+ include/linux/thermal.h      |  3 +-
+ 2 files changed, 95 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
-new file mode 100644
-index 0000000..dc5588e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
-@@ -0,0 +1,32 @@
-+Tegra124 SOCTHERM thermal management system
+diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+index 04b1be7..bfccea5 100644
+--- a/drivers/thermal/of-thermal.c
++++ b/drivers/thermal/of-thermal.c
+@@ -89,6 +89,7 @@ struct __thermal_zone {
+ 	/* trip data */
+ 	int ntrips;
+ 	struct __thermal_trip *trips;
++	long prev_low_trip, prev_high_trip;
+ 
+ 	/* cooling binding data */
+ 	int num_tbps;
+@@ -98,19 +99,66 @@ struct __thermal_zone {
+ 	void *sensor_data;
+ 	int (*get_temp)(void *, long *);
+ 	int (*get_trend)(void *, long *);
++	int (*set_trips)(void *, long, long);
+ };
+ 
++/***   Automatic trip handling   ***/
 +
-+Required properties :
-+- compatible : "nvidia,tegra124-soctherm".
-+- reg : Should contain 1 entry:
-+  - SOCTHERM register set
-+- interrupts : Defines the interrupt used by SOCTHERM
-+- clocks : Must contain an entry for each entry in clock-names.
-+  See ../clocks/clock-bindings.txt for details.
-+- clock-names : Must include the following entries:
-+  - tsensor
-+  - soctherm
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - soctherm
-+- #thermal-sensor-cells : For thermctl sensors. Should be 1.
++static int of_thermal_set_trips(struct thermal_zone_device *tz, long temp)
++{
++	struct __thermal_zone *data = tz->devdata;
++	long low = LONG_MIN, high = LONG_MAX;
++	int i;
 +
-+Example :
++	/* Hardware trip points not supported */
++	if (!data->set_trips)
++		return 0;
 +
-+	soctherm at 0,700e2000 {
-+		compatible = "nvidia,tegra124-soctherm";
-+		reg = <0x0 0x700e2000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_TSENSOR>,
-+			<&tegra_car TEGRA124_CLK_SOC_THERM>;
-+		clock-names = "tsensor", "soctherm";
-+		resets = <&tegra_car 78>;
-+		reset-names = "soctherm";
++	/* No need to change trip points */
++	if (temp > data->prev_low_trip && temp < data->prev_high_trip)
++		return 0;
 +
-+		#thermal-sensor-cells = <1>;
-+	};
-diff --git a/include/dt-bindings/thermal/tegra124-soctherm.h b/include/dt-bindings/thermal/tegra124-soctherm.h
-new file mode 100644
-index 0000000..cbef15d
---- /dev/null
-+++ b/include/dt-bindings/thermal/tegra124-soctherm.h
-@@ -0,0 +1,15 @@
-+/*
-+ * This header provides constants for binding nvidia,tegra124-soctherm.
-+ */
++	for (i = 0; i < data->ntrips; ++i) {
++		struct __thermal_trip *trip = data->trips + i;
++		long trip_low = trip->temperature - trip->hysteresis;
 +
-+#ifndef _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
-+#define _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
++		if (trip_low < temp && trip_low > low)
++			low = trip_low;
 +
-+#define TEGRA124_SOCTHERM_SENSOR_CPU 0
-+#define TEGRA124_SOCTHERM_SENSOR_MEM 1
-+#define TEGRA124_SOCTHERM_SENSOR_GPU 2
-+#define TEGRA124_SOCTHERM_SENSOR_PLLX 3
++		if (trip->temperature > temp && trip->temperature < high)
++			high = trip->temperature;
++	}
 +
-+#endif
++	dev_dbg(&tz->device,
++		"temperature %ld, updating trip points to %ld, %ld\n",
++		temp, low, high);
 +
++	data->prev_low_trip = low;
++	data->prev_high_trip = high;
 +
++	return data->set_trips(data->sensor_data, low, high);
++}
++
+ /***   DT thermal zone device callbacks   ***/
+ 
+ static int of_thermal_get_temp(struct thermal_zone_device *tz,
+ 			       unsigned long *temp)
+ {
+ 	struct __thermal_zone *data = tz->devdata;
++	int err;
+ 
+ 	if (!data->get_temp)
+ 		return -EINVAL;
+ 
+-	return data->get_temp(data->sensor_data, temp);
++	err = data->get_temp(data->sensor_data, temp);
++	if (err)
++		return err;
++
++	err = of_thermal_set_trips(tz, *temp);
++	if (err)
++		return err;
++
++	return 0;
+ }
+ 
+ static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
+@@ -222,6 +270,22 @@ static int of_thermal_set_mode(struct thermal_zone_device *tz,
+ 	return 0;
+ }
+ 
++static int of_thermal_update_trips(struct thermal_zone_device *tz)
++{
++	long temp;
++	int err;
++
++	err = of_thermal_get_temp(tz, &temp);
++	if (err)
++		return err;
++
++	err = of_thermal_set_trips(tz, temp);
++	if (err)
++		return err;
++
++	return 0;
++}
++
+ static int of_thermal_get_trip_type(struct thermal_zone_device *tz, int trip,
+ 				    enum thermal_trip_type *type)
+ {
+@@ -252,6 +316,7 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
+ 				    unsigned long temp)
+ {
+ 	struct __thermal_zone *data = tz->devdata;
++	int err;
+ 
+ 	if (trip >= data->ntrips || trip < 0)
+ 		return -EDOM;
+@@ -259,6 +324,10 @@ static int of_thermal_set_trip_temp(struct thermal_zone_device *tz, int trip,
+ 	/* thermal framework should take care of data->mask & (1 << trip) */
+ 	data->trips[trip].temperature = temp;
+ 
++	err = of_thermal_update_trips(tz);
++	if (err)
++		return err;
++
+ 	return 0;
+ }
+ 
+@@ -279,6 +348,7 @@ static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
+ 				    unsigned long hyst)
+ {
+ 	struct __thermal_zone *data = tz->devdata;
++	int err;
+ 
+ 	if (trip >= data->ntrips || trip < 0)
+ 		return -EDOM;
+@@ -286,6 +356,10 @@ static int of_thermal_set_trip_hyst(struct thermal_zone_device *tz, int trip,
+ 	/* thermal framework should take care of data->mask & (1 << trip) */
+ 	data->trips[trip].hysteresis = hyst;
+ 
++	err = of_thermal_update_trips(tz);
++	if (err)
++		return err;
++
+ 	return 0;
+ }
+ 
+@@ -325,10 +399,12 @@ static struct thermal_zone_device *
+ thermal_zone_of_add_sensor(struct device_node *zone,
+ 			   struct device_node *sensor, void *data,
+ 			   int (*get_temp)(void *, long *),
+-			   int (*get_trend)(void *, long *))
++			   int (*get_trend)(void *, long *),
++			   int (*set_trips)(void *, long, long))
+ {
+ 	struct thermal_zone_device *tzd;
+ 	struct __thermal_zone *tz;
++	int err;
+ 
+ 	tzd = thermal_zone_get_zone_by_name(zone->name);
+ 	if (IS_ERR(tzd))
+@@ -339,8 +415,15 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+ 	mutex_lock(&tzd->lock);
+ 	tz->get_temp = get_temp;
+ 	tz->get_trend = get_trend;
++	tz->set_trips = set_trips;
+ 	tz->sensor_data = data;
+ 
++	err = of_thermal_update_trips(tzd);
++	if (err) {
++		mutex_unlock(&tzd->lock);
++		return ERR_PTR(err);
++	}
++
+ 	tzd->ops->get_temp = of_thermal_get_temp;
+ 	tzd->ops->get_trend = of_thermal_get_trend;
+ 	mutex_unlock(&tzd->lock);
+@@ -384,7 +467,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+ struct thermal_zone_device *
+ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+ 				void *data, int (*get_temp)(void *, long *),
+-				int (*get_trend)(void *, long *))
++				int (*get_trend)(void *, long *),
++				int (*set_trips)(void *, long, long))
+ {
+ 	struct device_node *np, *child, *sensor_np;
+ 
+@@ -422,7 +506,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+ 			return thermal_zone_of_add_sensor(child, sensor_np,
+ 							  data,
+ 							  get_temp,
+-							  get_trend);
++							  get_trend,
++							  set_trips);
+ 		}
+ 	}
+ 	of_node_put(np);
+@@ -466,6 +551,7 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
+ 
+ 	tz->get_temp = NULL;
+ 	tz->get_trend = NULL;
++	tz->set_trips = NULL;
+ 	tz->sensor_data = NULL;
+ 	mutex_unlock(&tzd->lock);
+ }
+@@ -671,6 +757,9 @@ thermal_of_build_thermal_zone(struct device_node *np)
+ 	/* trips */
+ 	child = of_get_child_by_name(np, "trips");
+ 
++	tz->prev_high_trip = LONG_MIN;
++	tz->prev_low_trip = LONG_MAX;
++
+ 	/* No trips provided */
+ 	if (!child)
+ 		goto finish;
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index f7e11c7..2f8951c 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -248,7 +248,8 @@ struct thermal_genl_event {
+ struct thermal_zone_device *
+ thermal_zone_of_sensor_register(struct device *dev, int id,
+ 				void *data, int (*get_temp)(void *, long *),
+-				int (*get_trend)(void *, long *));
++				int (*get_trend)(void *, long *),
++				int (*set_trips)(void *, long, long));
+ void thermal_zone_of_sensor_unregister(struct device *dev,
+ 				       struct thermal_zone_device *tz);
+ #else
 -- 
 1.8.1.5
