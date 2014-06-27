@@ -1,75 +1,66 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Fri, 27 Jun 2014 11:00:23 -0500
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <20140627085125.GA7088@hal>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <20140627085125.GA7088@hal>
-Message-ID: <53AD9517.4060400@mentor.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Jun 2014 17:04:10 +0100
+Subject: [PATCH] arm64: fix CONFIG_ZONE_DMA on systems with no 32-bit
+ addressable DRAM
+In-Reply-To: <alpine.DEB.2.02.1406241718210.22030@chino.kir.corp.google.com>
+References: <1403499940-11258-1-git-send-email-msalter@redhat.com>
+ <alpine.DEB.2.02.1406241718210.22030@chino.kir.corp.google.com>
+Message-ID: <20140627160410.GM15296@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2014 03:51 AM, Jan Glauber wrote:
-> On Sun, Jun 22, 2014 at 10:11:49PM -0500, Nathan Lynch wrote:
->> Provide fast userspace implementations of gettimeofday and
->> clock_gettime on systems that implement the generic timers extension
->> defined in ARMv7.  This follows the example of arm64 in conception but
->> significantly differs in some aspects of the implementation (C vs
->> assembly, mainly).
+On Wed, Jun 25, 2014 at 01:26:02AM +0100, David Rientjes wrote:
+> On Mon, 23 Jun 2014, Mark Salter wrote:
 > 
-> Hi Nathan,
+> > Commit 2d5a5612bc (arm64: Limit the CMA buffer to 32-bit if ZONE_DMA)
+> > forces the CMA buffer to be 32-bit addressable if CONFIG_ZONE_DMA is
+> > defined. This breaks CMA on platforms with no 32-bit addressable DRAM.
+> > This patch checks to make sure there is 32-bit addressable DRAM before
+> > setting the 32-bit limit. If there is none, no limit is placed on the
+> > CMA buffer. This allows a single kernel (with CONFIG_ZONE_DMA defined)
+> > to support platforms requiring the 32-bit limit and platforms with no
+> > 32-bit limit.
+> > 
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > ---
+> >  arch/arm64/mm/init.c | 11 ++++++++++-
+> >  1 file changed, 10 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > index c5415e2..2925576 100644
+> > --- a/arch/arm64/mm/init.c
+> > +++ b/arch/arm64/mm/init.c
+> > @@ -149,8 +149,17 @@ void __init arm64_memblock_init(void)
+> >  	early_init_fdt_scan_reserved_mem();
+> >  
+> >  	/* 4GB maximum for 32-bit only capable devices */
+> > -	if (IS_ENABLED(CONFIG_ZONE_DMA))
+> > +	if (IS_ENABLED(CONFIG_ZONE_DMA)) {
+> >  		dma_phys_limit = dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1;
+> > +		/*
+> > +		 * If platform doesn't have DRAM within the dma_phys_limit,
+> > +		 * remove the limit altogether. This allows one kernel (with
+> > +		 * CONFIG_ZONE_DMA defined) to support platforms with 32-bit
+> > +		 * only devices and platforms with no 32-bit DRAM.
+> > +		 */
+> > +		if (dma_phys_limit <= memblock_start_of_DRAM())
+> > +			dma_phys_limit = 0;
+> > +	}
+> >  	dma_contiguous_reserve(dma_phys_limit);
+> >  
+> >  	memblock_allow_resize();
 > 
-> applying your patches I get the following compile error under Ubuntu 12.04:
-> 
->   CC      arch/arm/kernel/vdso.o
->   LDS     arch/arm/kernel/vdso/vdso.lds
->   CC      arch/arm/kernel/vdso/vgettimeofday.o
->   AS      arch/arm/kernel/vdso/datapage.o
->   VDSOL   arch/arm/kernel/vdso/vdso.so.raw
->   HOSTCC  arch/arm/kernel/vdso/vdsomunge
-> arch/arm/kernel/vdso/vdsomunge.c: In function ?main?:
-> arch/arm/kernel/vdso/vdsomunge.c:152:16: error: ?EF_ARM_ABI_FLOAT_HARD? undeclared (first use in this function)
-> arch/arm/kernel/vdso/vdsomunge.c:152:16: note: each undeclared identifier is reported only once for each function it appears in
-> arch/arm/kernel/vdso/vdsomunge.c:156:34: error: ?EF_ARM_ABI_FLOAT_SOFT? undeclared (first use in this function)
-> make[2]: *** [arch/arm/kernel/vdso/vdsomunge] Error 1
-> make[1]: *** [arch/arm/kernel/vdso] Error 2
-> make: *** [arch/arm/kernel] Error 2
-> 
-> Looks like the libc dev is too old (EF_ARM_ABI_FLOAT_* not in /usr/include/elf.h).
-> On a more recent Ubuntu it compiles fine. Not sure how to solve this, maybe disable
-> vdso if the libc is too old?
+> It is a shame that we have very similar logic, all dependent on 
+> memblock_start_of_DRAM(), in both zone_sizes_init() and 
+> arm64_memblock_init() and the latter having to be called before the 
+> former.  I assume there's no way to make this cleaner in the bootstrap 
+> code so the dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1 limit can be handled 
+> properly in a single location?
 
-We should just define some of the needed ELF constants in the tool if
-the host <elf.h> lacks them.  EF_ARM_ABI_FLOAT_HARD/SOFT were added in
-2012, EF_ARM_EABI_VER5 in 2009... everything else the tool uses has been
-there for twelve years or more.
+Probably and I suggested something along the lines of only calculating
+it once in reply to the "[PATCH] arm64: make CONFIG_ZONE_DMA user
+settable" message. I'll follow up on the other thread (Mark considers
+there's a penalty issue with all memory in the DMA zone).
 
-Thanks for the report -- please try the below?
-
-
-diff --git a/arch/arm/kernel/vdso/vdsomunge.c
-b/arch/arm/kernel/vdso/vdsomunge.c
-index 823b84d142bc..b586ef699fb8 100644
---- a/arch/arm/kernel/vdso/vdsomunge.c
-+++ b/arch/arm/kernel/vdso/vdsomunge.c
-@@ -67,6 +67,21 @@
- #define HOST_ORDER ELFDATA2MSB
- #endif
-
-+/* Some of the ELF constants we'd like to use were added to <elf.h>
-+ * relatively recently.
-+ */
-+#ifndef EF_ARM_EABI_VER5
-+#define EF_ARM_EABI_VER5 0x05000000
-+#endif
-+
-+#ifndef EF_ARM_ABI_FLOAT_SOFT
-+#define EF_ARM_ABI_FLOAT_SOFT 0x200
-+#endif
-+
-+#ifndef EF_ARM_ABI_FLOAT_HARD
-+#define EF_ARM_ABI_FLOAT_HARD 0x400
-+#endif
-+
- static const char *outfile;
-
- static void cleanup(void)
+-- 
+Catalin
