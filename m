@@ -1,68 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 27 Jun 2014 16:57:42 -0600
-Subject: [RFC 5/5] clk: Add floor and ceiling constraints to clock rates
-In-Reply-To: <1403855872-14749-6-git-send-email-tomeu.vizoso@collabora.com>
-References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
- <1403855872-14749-6-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <53ADF6E6.6090705@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Jun 2014 00:03:12 +0100
+Subject: [musl] Re: Thread pointer changes
+In-Reply-To: <20140627222626.GA17988@brightrain.aerifal.cx>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627213743.GB16724@brightrain.aerifal.cx>
+ <20140627220400.GT32514@n2100.arm.linux.org.uk>
+ <20140627222626.GA17988@brightrain.aerifal.cx>
+Message-ID: <20140627230312.GW32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2014 01:57 AM, Tomeu Vizoso wrote:
-> Adds a way for clock consumers to set maximum and minimum rates. This can be
-> used for thermal drivers to set ceiling rates, or by misc. drivers to set
-> floor rates to assure a minimum performance level.
+On Fri, Jun 27, 2014 at 06:26:26PM -0400, Rich Felker wrote:
+> Thus, my interest is in ensuring that, whenever the kuser helper page
+> is disabled (or, as proposed, moved to a dynamic address), there's a
+> safe and efficient way to detect this condition and know what to do to
+> work around it.
 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+Let me be clear: we are not going to move it to a dynamic address.
+That's far too big a problem for the older architectures since
+their caches alias all over the place.  Plus - and more importantly -
+it means an ABI breakage across the board.
 
-> +static struct rate_constraint *__ensure_constraint(struct clk *clk_user,
-> +						   enum constraint_type type)
+Let's say we did move it into a randomly mapped page in userspace.
+We also need to keep the kuser page in place in order to support
+existing libcs as well, but now we have not one but two places to
+poke thread local values to - and we now have to flush the cache
+line associated with that too, or have the kernel write directly
+to that page in userspace.
 
-> +	if (!found) {
-> +		constraint = kzalloc(sizeof(*constraint), GFP_KERNEL);
-> +		if (!constraint) {
-> +			pr_err("%s: could not allocate constraint\n", __func__);
+We can't share those pages, because there's the danger that something
+could write to the vectors page, and thus end up taking over the
+whole machine.  Even if we did, we still have to flush the cache at
+not just one location, but two.
 
-Doesn't kzalloc print an error itself if the allocation fails? I've
-certainly seen quite a few patches ripping out custom "allocation
-failed" errors in code.
+As I've already pointed out, there's easier solutions to this problem
+(using the ELF HWCAPS).
 
-> +void __clk_free_clk(struct clk *clk_user)
-> +{
-> +	struct clk_core *clk = clk_to_clk_core(clk_user);
-> +	struct rate_constraint *constraint;
-> +	struct hlist_node *tmp;
-> +
-> +	hlist_for_each_entry_safe(constraint, tmp, &clk->rate_constraints, node) {
-> +		if (constraint->dev_id == clk_user->dev_id &&
-> +		    constraint->con_id == clk_user->con_id) {
-> +			hlist_del(&constraint->node);
-> +			kfree(constraint);
-
-Perhaps the list of constraints should be indexed by the client clk
-structure, so that test should be:
-
-if (constraint->clk_user == clk_user)
-
-It might be a bit more work, but perhaps the constraints should simply
-be stored directly in the struct clk rater than the struct clk_core.
-That would require a nested loop to apply constraints though; first over
-each struct clk associated with a struct clk_core, then over each
-constraints in that struct clk. It would slightly simplify
-adding/removing constraints though, and store the constraints at their
-"source".
-
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-
-> +int clk_set_floor_rate(struct clk *clk, unsigned long rate);
-
-> +int clk_set_ceiling_rate(struct clk *clk, unsigned long rate);
-
-Additions functions to explicitly remove any previously requested
-floor/ceiling rate might be useful. The same effect could be achieved by
-a floor of 0 or a very high ceiling, but it feels cleaner to remove them.
-
-Overall, this series seems to implement the right kind of concept to me.
-It'll certainly stop us (NVIDIA at least) wanting to create all kinds of
-"virtual" clock objects (and associated clock IDs and device tree clock
-IDs) to achieve a similar effect.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
