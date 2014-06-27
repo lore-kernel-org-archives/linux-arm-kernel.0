@@ -1,60 +1,71 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 27 Jun 2014 12:58:53 -0700
-Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <53ADCC7E.4000703@wwwdotorg.org>
-References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
- <53ABED5B.8010506@samsung.com>
- <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
- <53AD60D7.4040404@gmail.com> <53AD978D.8060703@wwwdotorg.org>
- <CAD=FV=UUFARvreHdWNsB1O1dEW6nX_E_C92t8Nma0vL=nAT5Rw@mail.gmail.com>
- <53ADB5E5.10102@wwwdotorg.org>
- <CAD=FV=XYFy_QpBtFPc-EURXmV9qMMyOkk0Ybhoy5E6r+hXGywA@mail.gmail.com>
- <53ADCC7E.4000703@wwwdotorg.org>
-Message-ID: <CAD=FV=VPH+7M+fYWQXM+HNYyMfGfP_RMvg9goZs0s8CPVo_mtA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 21:09:49 +0100
+Subject: Thread pointer changes
+In-Reply-To: <53ADC5B1.6080905@amacapital.net>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+Message-ID: <20140627200949.GQ32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+On Fri, Jun 27, 2014 at 12:27:45PM -0700, Andy Lutomirski wrote:
+> The "vectors" page appears to be an abomination that's a lot like the
+> x86_64 vsyscall page.  IMO it should be phased out.  I'm not going to do
+> it (I don't know enough about ARM, and I'm not really able to test),
+> but, having gone through cleaning up the vsyscall mess a couple of years
+> ago, I'd be happy to help if anyone is interested in doing it.
 
-On Fri, Jun 27, 2014 at 12:56 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/27/2014 12:30 PM, Doug Anderson wrote:
->> Stephen,
->>
->> On Fri, Jun 27, 2014 at 11:20 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 06/27/2014 10:45 AM, Doug Anderson wrote:
->>>> Stephen,
->>>>
->>>> On Fri, Jun 27, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>> Surely there's a driver (or could be a driver) for the TPM chip, and
->>>>> that driver should have a reset-mask-gpios property, so the driver can
->>>>> call gpio_get() and gpio_set_output() on the GPIO?
->>>>>
->>>>> Faking this out via a not-really-a-regulator or pinctrl hogs seems like
->>>>> an abuse of those features to me.
-> ...
->>> As an aside, why do we even care about this? The kernel clearly can
->>> unlock the TPM simply by failing to set the GPIO up correctly, so at
->>> best this is security through obscurity. If someone actively wanted to
->>> do something bad to the TPM, they'd simply comment out this piece of
->>> code in the kernel. At least that's true with usptream kernels which
->>> aren't validated at all during boot. For a downstream signed kernel,
->>> perhaps this patch makes sense (although I haven't thought about all the
->>> security angles), but then it'd make sense to keep this patch downstream.
->>
->> Check out the bullet point about the firmware checking for kernel
->> cheats.  At resume time the chip actually re-loads read only firmware
->> out of SPI flash (no choice about this).  This read only firmware can
->> check the state of the mask pin (which is preserved across sleep wake)
->> to see if the kernel cheated.
->
-> Ah, that covers the security issues then.
->
-> I'd argue that the RO firmware should be setting up GPIOs like this
-> myself (and the pinmux, from a nice big table), and the kernel simply
-> not touch it all since it has no direct use for the pin. But I suppose
-> if the firmware is already baked and read only, that's not possible.
+It's cleaned up as much as is possible to do - I personally put the
+work into that last Summer, so I'm fully aware of all the issues, and
+where we are now with it is where we're going to have to stay for at
+least the next five to ten years as changing it any further breaks
+binary compatibility or severely impacts performance.
 
-Yes.  Earlier in this thread I said I had no idea why I didn't have
-firmware set this up.  I couldn't come up with a good reason... :(
+There are options:
 
--Doug
+1. The page is present (which is the default setting) with kuser helpers
+   present.
+
+2. The page is not accessible, which must only be set where the guy
+   configuring the kernel is sure that the userspace does not need the
+   kuser page.  This point is clearly made in the help text for
+   CONFIG_KUSER_HELPERS.
+
+There isn't actually a third combination (page accessible but no kuser
+helpers) or if there is, that's something someone else has added which
+is not part of the mainline kernel.
+
+One thing which did change last Summer is that various bits of kernel
+code were moved out of the vectors page, code which user space has no
+business poking its nose at (and using it to discover some useful
+kernel addresses) and to also poison the vectors page to mitigate
+against randomly jumping into the page at non-ABI locations.  Neither
+of those two changes should affect any legitimate userspace application.
+
+As I said above, enabling CONFIG_KUSER_HELPERS is known to be an ABI
+break, and it's well documented as such.  The future will be running
+systems without the kuser helpers because on ARMv6 and later, there's
+little point in having them.  In fact, today almost all C libraries
+are built without needing the kuser helpers.
+
+As the future will be no kuser helper page, there's no point in trying
+to turn it into a VDSO page - that presents many challenges as it's
+not as trivial as you think.  Part of the problem that the kuser helper
+page addresses is how to deal with per-thread data on early CPUs without
+having any per-thread registers to store it.  That requires uniprocessor
+and the kernel to poke the thread pointer into the page - and userspace
+then needs to be able to access it reliably.
+
+Due to that, any ARMv5 or earlier CPU will always have the kuser helper
+page.  ARMv6 and later may or may not have the kuser helper page, but
+there you're really building for a different ABI anyway (VFP-based) and
+you also know that you have the thread registers.
+
+The final point to make is that only the C library should really be
+concerned about this page, not applications.  Applications should not
+be making direct calls into this page.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
