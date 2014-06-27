@@ -1,72 +1,79 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 27 Jun 2014 02:09:58 -0700
-Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
-In-Reply-To: <53ACDFC2.5020206@gmail.com>
-References: <53A2AE11.2050208@gmail.com> <53A2BE94.2010308@gmail.com>
- <53A7A579.4010702@gmail.com>
- <CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA@mail.gmail.com>
- <53A9B99F.4040806@codeaurora.org> <53A9FBB5.60709@codeaurora.org>
- <53AABCF5.4050403@gmail.com> <53AB45D1.90909@codeaurora.org>
- <53ABC13C.8030908@gmail.com>
- <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
- <20140626151756.GU32514@n2100.arm.linux.org.uk>
- <53AC77A2.4090207@codeaurora.org> <53ACDFC2.5020206@gmail.com>
-Message-ID: <53AD34E6.8000302@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Jun 2014 11:18:42 +0200
+Subject: [PATCH v4 1/6] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <1403621185-9581-1-git-send-email-denis@eukrea.com>
+References: <1403621185-9581-1-git-send-email-denis@eukrea.com>
+Message-ID: <CACRpkdbFcgK69yakt+XYOg2q_QT8R263+FrADzz=r+fYNEFPSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/26/2014 8:06 PM, Tushar Behera wrote:
-> On 06/27/2014 01:12 AM, Laura Abbott wrote:
->
->>
->> +static unsigned int bank_cnt;
->> +static unsigned int max_cnt;
->> +
->>   int __init arm_add_memory(u64 start, u64 size)
->>   {
->>   	u64 aligned_start;
->>
->>   	/*
->> +	 * Some buggy bootloaders rely on the old meminfo behavior of not adding
->> +	 * more than n banks since anything past that may contain invalid data.
->> +	 */
->> +	if (bank_cnt >= max_cnt) {
->> +		pr_crit("Max banks too low, ignoring memory at 0x%08llx\n",
->> +			(long long)start);
->> +		return -EINVAL;
->> +	}
->> +
->> +	bank_cnt++;
->> +
->> +	/*
->>   	 * Ensure that start/size are aligned to a page boundary.
->>   	 * Size is appropriately rounded down, start is rounded up.
->>   	 */
->> @@ -879,6 +894,7 @@ void __init setup_arch(char **cmdline_p)
->>   		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
->>   	machine_desc = mdesc;
->>   	machine_name = mdesc->name;
->> +	max_cnt = mdesc->bank_limit;
->
-> arm_add_memory is getting called before this is being set, resulting in
-> none of the memory banks getting added[1].
->
-> setup_machine_fdt -> early_init_dt_scan -> early_init_dt_scan_memory
->
-> Would it make sense to re-introduce the config option ARM_NR_BANKS and
-> replace max_cnt with NR_BANKS?
->
-> [1] http://pastebin.com/MawYD7kb
->
+On Tue, Jun 24, 2014 at 4:46 PM, Denis Carikli <denis@eukrea.com> wrote:
 
-I was hoping to avoid re-introducing the config option but that may be
-the case if we can't make the machine_info work. I'll take a better
-look tomorrow.
+> From: Markus Pargmann <mpa@pengutronix.de>
+>
+> This is the core driver for imx25 touchscreen/adc driver. The module
+> has one shared ADC and two different conversion queues which use the
+> ADC. The two queues are identical. Both can be used for general purpose
+> ADC but one is meant to be used for touchscreens.
+>
+> This driver is the core which manages the central components and
+> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
+> the correct components.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 
-Thanks,
-Laura
+I think the subject and commit message is misleading. What this
+patch does is create a MFD hub to handle spawning devices
+and handle chained IRQs for the ADC unit right? It's not a "core driver"
+because it's not really driving anything, just proxying things.
 
+> +static int mx25_tsadc_domain_map(struct irq_domain *d, unsigned int irq,
+> +                            irq_hw_number_t hwirq)
+> +{
+> +       struct mx25_tsadc *tsadc = d->host_data;
+> +
+> +       irq_set_chip_data(irq, tsadc);
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+You also need to set a unique lockdep class or lockdep will
+complain.
+
+static struct lock_class_key my_lock_class;
+
+irq_set_lockdep_class(irq, &my_lock_class);
+
+> +       irq_set_chip_and_handler(irq, &dummy_irq_chip,
+> +                                handle_level_irq);
+> +       set_irq_flags(irq, IRQF_VALID);
+
+This function only exists on ARM. Unless Kconfig ensures
+this is only available on ARM platforms, use
+
+#ifdef CONFIG_ARM
+      set_irq_flags(irq, IRQF_VALID);
+#else
+      irq_set_noprobe(irq);
+#endif
+
+(Sorry we have no better way of doing it.)
+
+> +static int mx25_tsadc_probe(struct platform_device *pdev)
+> +{
+(...)
+> +       of_platform_populate(np, NULL, NULL, dev);
+
+This was news2me. Why aren't MFD cells used now that
+you're using MFD as a spawning hub?
+
+MFD also has a way of translating IRQs passed as resources
+to children, so they arrive at their children readily translated.
+Not using MFD cells means you don't use this nice mechanism
+right?
+
+Or is there some new nice design style that I'm not
+familiar with, like the OF core handling that translation?
+(Seems like that, hence asking...)
+
+Yours,
+Linus Walleij
