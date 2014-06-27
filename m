@@ -1,51 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jun 2014 09:58:20 +0100
-Subject: [PATCHv3 5/5] arm64: add runtime system sanity checks
-In-Reply-To: <53AC8296.808@codeaurora.org>
-References: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
- <1403795926-17139-6-git-send-email-mark.rutland@arm.com>
- <53AC8296.808@codeaurora.org>
-Message-ID: <20140627085820.GC26276@arm.com>
+Date: Fri, 27 Jun 2014 09:58:45 +0100
+Subject: [PATCH] arm64: fpsimd: avoid restoring fpcr if the contents
+ haven't changed
+In-Reply-To: <CAKv+Gu8rFmURfT9PLSQE4z91q5D03aoR7UOEJFSGRrBMXGsdOQ@mail.gmail.com>
+References: <1403804062-22239-1-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu8rFmURfT9PLSQE4z91q5D03aoR7UOEJFSGRrBMXGsdOQ@mail.gmail.com>
+Message-ID: <20140627085845.GD26276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 09:29:10PM +0100, Christopher Covington wrote:
-> Hi Mark,
-> 
-> On 06/26/2014 11:18 AM, Mark Rutland wrote:
-> > Unexpected variation in certain system register values across CPUs is an
-> > indicator of potential problems with a system. The kernel expects CPUs
-> > to be mostly identical in terms of supported features, even in systems
-> > with heterogeneous CPUs, with uniform instruction set support being
-> > critical for the correct operation of userspace.
-> > 
-> > To help detect issues early where hardware violates the expectations of
-> > the kernel, this patch adds simple runtime sanity checks on important ID
-> > registers in the bring up path of each CPU.
-> > 
-> > Where CPUs are fundamentally mismatched, set TAINT_CPU_OUT_OF_SPEC.
-> > Given that the kernel assumes CPUs are identical feature wise, let's not
-> > pretend that we expect such configurations to work. Supporting such
-> > configurations would require massive rework, and hopefully they will
-> > never exist.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  arch/arm64/kernel/cpuinfo.c | 92 +++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 92 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> 
-> > +	/* If different, timekeeping will be broken (especially with KVM) */
-> > +	diff |= CHECK(cntfrq, boot, cur, cpu);
-> 
-> You're calling this a "CPU feature" but I thought this was purely a firmware
-> setting. Does the architecture even allow hardware to program this register?
-> Additionally, in arch_timer_detect_rate it appears that a device tree setting
-> takes precedence, but you're not checking that.
+On Thu, Jun 26, 2014 at 10:10:00PM +0100, Ard Biesheuvel wrote:
+> Hey Will,
 
-KVM virtual machines tend to rely on CNTFRQ being programmed correctly,
-since it's not generally possible for the software generating the
-device-tree (kvmtool, qemu) to probe the frequency on the host.
+Hi Ard,
+
+> On 26 June 2014 19:34, Will Deacon <will.deacon@arm.com> wrote:
+> > Writing to the FPCR is commonly implemented as a self-synchronising
+> > operation in the CPU, so avoid writing to the register when the saved
+> > value matches that in the hardware already.
+> >
+> > Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/include/asm/fpsimdmacros.h | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> >
+> > diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+> > index 768414d55e64..137c0f45b0a8 100644
+> > --- a/arch/arm64/include/asm/fpsimdmacros.h
+> > +++ b/arch/arm64/include/asm/fpsimdmacros.h
+> > @@ -40,6 +40,7 @@
+> >         str     w\tmpnr, [\state, #16 * 2 + 4]
+> >  .endm
+> >
+> > +/* Clobbers \state */
+> >  .macro fpsimd_restore state, tmpnr
+> >         ldp     q0, q1, [\state, #16 * 0]
+> >         ldp     q2, q3, [\state, #16 * 2]
+> > @@ -60,7 +61,15 @@
+> >         ldr     w\tmpnr, [\state, #16 * 2]
+> >         msr     fpsr, x\tmpnr
+> >         ldr     w\tmpnr, [\state, #16 * 2 + 4]
+> > +       /*
+> > +        * Writes to fpcr may be self-synchronising, so avoid restoring
+> > +        * the register if it hasn't changed.
+> > +        */
+> > +       mrs     \state, fpcr
+> > +       cmp     x\tmpnr, \state
+> > +       b.eq    9999f
+> >         msr     fpcr, x\tmpnr
+> > +9999:
+> >  .endm
+> >
+> 
+> I would assume the same would apply to the partial restore that was
+> merged during the last window?
+
+Good point; I'll take a look.
+
+Cheers,
 
 Will
