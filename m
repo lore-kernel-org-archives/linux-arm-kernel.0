@@ -1,64 +1,60 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 27 Jun 2014 21:55:59 +0200
-Subject: [PATCH v8 5/9] seccomp: split mode set routines
-In-Reply-To: <CALCETrVbJqfG6oBaZEjj7H3pPa1oVJx6QXAYc5zZ6o-niV=WKQ@mail.gmail.com>
-References: <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
- <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
- <20140625173245.GA17695@redhat.com>
- <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
- <20140625175136.GA18185@redhat.com>
- <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
- <CALCETrVNwhWSPNiBiZmgP1nD9zLJPTk6cH0yo=85rbxTPTYFRg@mail.gmail.com>
- <CAGXu5jLavA8FJD8m-1y4wO0uzh3qvvMmajAg0Lrr1Cn_Om3a3w@mail.gmail.com>
- <20140627192753.GA30752@redhat.com>
- <CALCETrVbJqfG6oBaZEjj7H3pPa1oVJx6QXAYc5zZ6o-niV=WKQ@mail.gmail.com>
-Message-ID: <20140627195559.GA31661@redhat.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 27 Jun 2014 12:58:53 -0700
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <53ADCC7E.4000703@wwwdotorg.org>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+ <53ABED5B.8010506@samsung.com>
+ <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
+ <53AD60D7.4040404@gmail.com> <53AD978D.8060703@wwwdotorg.org>
+ <CAD=FV=UUFARvreHdWNsB1O1dEW6nX_E_C92t8Nma0vL=nAT5Rw@mail.gmail.com>
+ <53ADB5E5.10102@wwwdotorg.org>
+ <CAD=FV=XYFy_QpBtFPc-EURXmV9qMMyOkk0Ybhoy5E6r+hXGywA@mail.gmail.com>
+ <53ADCC7E.4000703@wwwdotorg.org>
+Message-ID: <CAD=FV=VPH+7M+fYWQXM+HNYyMfGfP_RMvg9goZs0s8CPVo_mtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27, Andy Lutomirski wrote:
+Stephen,
+
+On Fri, Jun 27, 2014 at 12:56 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/27/2014 12:30 PM, Doug Anderson wrote:
+>> Stephen,
+>>
+>> On Fri, Jun 27, 2014 at 11:20 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 06/27/2014 10:45 AM, Doug Anderson wrote:
+>>>> Stephen,
+>>>>
+>>>> On Fri, Jun 27, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>> Surely there's a driver (or could be a driver) for the TPM chip, and
+>>>>> that driver should have a reset-mask-gpios property, so the driver can
+>>>>> call gpio_get() and gpio_set_output() on the GPIO?
+>>>>>
+>>>>> Faking this out via a not-really-a-regulator or pinctrl hogs seems like
+>>>>> an abuse of those features to me.
+> ...
+>>> As an aside, why do we even care about this? The kernel clearly can
+>>> unlock the TPM simply by failing to set the GPIO up correctly, so at
+>>> best this is security through obscurity. If someone actively wanted to
+>>> do something bad to the TPM, they'd simply comment out this piece of
+>>> code in the kernel. At least that's true with usptream kernels which
+>>> aren't validated at all during boot. For a downstream signed kernel,
+>>> perhaps this patch makes sense (although I haven't thought about all the
+>>> security angles), but then it'd make sense to keep this patch downstream.
+>>
+>> Check out the bullet point about the firmware checking for kernel
+>> cheats.  At resume time the chip actually re-loads read only firmware
+>> out of SPI flash (no choice about this).  This read only firmware can
+>> check the state of the mask pin (which is preserved across sleep wake)
+>> to see if the kernel cheated.
 >
-> On Fri, Jun 27, 2014 at 12:27 PM, Oleg Nesterov <oleg@redhat.com> wrote:
-> > On 06/27, Kees Cook wrote:
-> >>
-> >> It looks like SMP ARM issues dsb for rmb, which seems a bit expensive.
-> >> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204g/CIHJFGFE.htm
-> >>
-> >> ...
-> >>
-> >> I really want to avoid adding anything to the secure_computing()
-> >> execution path. :(
-> >
-> > I must have missed something but I do not understand your concerns.
-> >
-> > __secure_computing() is not trivial, and we are going to execute the
-> > filters. Do you really think rmb() can add the noticeable difference?
-> >
-> > Not to mention that we can only get here if we take the slow syscall
-> > enter path due to TIF_SECCOMP...
-> >
+> Ah, that covers the security issues then.
 >
-> On my box, with my fancy multi-phase seccomp patches, the total
-> seccomp overhead for a very short filter is about 13ns.  Adding a full
-> barrier would add several ns, I think.
+> I'd argue that the RO firmware should be setting up GPIOs like this
+> myself (and the pinmux, from a nice big table), and the kernel simply
+> not touch it all since it has no direct use for the pin. But I suppose
+> if the firmware is already baked and read only, that's not possible.
 
-I am just curious, does this 13ns overhead include the penalty from the
-slow syscall enter path triggered by TIF_SECCOMP ?
+Yes.  Earlier in this thread I said I had no idea why I didn't have
+firmware set this up.  I couldn't come up with a good reason... :(
 
-> Admittedly, this is x86, not ARM, so comparisons here are completely
-> bogus.  And that read memory barrier doesn't even need an instruction
-> on x86.  But still, let's try to keep this fast.
-
-Well, I am not going to insist...
-
-But imo it would be better to make it correct in a most simple way, then
-we can optimize this code and see if there is a noticeable difference.
-
-Not only we can change the ordering, we can remove the BUG_ON's and just
-accept the fact the __secure_computing() can race with sys_seccomp() from
-another thread.
-
-If nothing else, it would be much simpler to discuss this patch if it comes
-as a separate change.
-
-Oleg.
+-Doug
