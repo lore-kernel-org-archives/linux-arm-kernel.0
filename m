@@ -1,146 +1,140 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 26 Jun 2014 19:44:21 -0500
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140626085926.GB11244@arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <20140405001953.GE15806@google.com>
- <20140407083120.GE17163@e106497-lin.cambridge.arm.com>
- <5183143.FxBNM0xTAV@wuerfel>
- <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
- <20140626085926.GB11244@arm.com>
-Message-ID: <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 27 Jun 2014 07:19:40 +0530
+Subject: [PATCH] ARM: EXYNOS: Restore the entry address setup code
+ post-resume
+In-Reply-To: <alpine.LFD.2.11.1406261550060.16842@knanqh.ubzr>
+References: <1403780312-22885-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voa=AYDkHG49EEnr0097Dw4eS__T95oDrhswcfHEzY=PTcw@mail.gmail.com>
+ <alpine.LFD.2.11.1406261550060.16842@knanqh.ubzr>
+Message-ID: <CAM4voa=U-Z=dOedfzBXFOckW_nS-mEGv76dJwPhcMPEfvQdRMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Michael Simek...
+Hi,
 
-On Thu, Jun 26, 2014 at 3:59 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> (sorry for replying to a months old thread)
+On Fri, Jun 27, 2014 at 1:36 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 26 Jun 2014, Abhilash Kesavan wrote:
 >
-> On Mon, Apr 07, 2014 at 06:58:24PM +0100, Bjorn Helgaas wrote:
->> On Mon, Apr 7, 2014 at 5:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> Hi,
 >>
->> > I think migrating other architectures to use the same code should be
->> > a separate effort from adding a generic implementation that can be
->> > used by arm64. It's probably a good idea to have patches to convert
->> > arm32 and/or microblaze.
+>> On Thu, Jun 26, 2014 at 4:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+>> > Setup the mcpm entry address again on system resume as the
+>> > iRAM contents are lost across an s2r cycle.
+>> >
+>> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> > ---
+>> > This has been tested after applying the Exynos5420 S2R support series
+>> > along with Nicolas Pitre's boot cluster CCI enablement patches on Peach
+>> > Pit.
+>> >
+>> >  arch/arm/mach-exynos/mcpm-exynos.c | 31 +++++++++++++++++++++----------
+>> >  1 file changed, 21 insertions(+), 10 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+>> > index 8c610e2..0bf734d 100644
+>> > --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>> > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>> > @@ -15,6 +15,7 @@
+>> >  #include <linux/delay.h>
+>> >  #include <linux/io.h>
+>> >  #include <linux/of_address.h>
+>> > +#include <linux/syscore_ops.h>
+>> >
+>> >  #include <asm/cputype.h>
+>> >  #include <asm/cp15.h>
+>> > @@ -26,6 +27,7 @@
+>> >  #define EXYNOS5420_CPUS_PER_CLUSTER    4
+>> >  #define EXYNOS5420_NR_CLUSTERS         2
+>> >
+>> > +static void __iomem *ns_sram_base_addr;
+>> >  /*
+>> >   * The common v7_exit_coherency_flush API could not be used because of the
+>> >   * Erratum 799270 workaround. This macro is the same as the common one (in
+>> > @@ -308,10 +310,26 @@ static const struct of_device_id exynos_dt_mcpm_match[] = {
+>> >         {},
+>> >  };
+>> >
+>> > +static void exynos_mcpm_setup_entry_point(void)
+>> > +{
+>> > +       /*
+>> > +        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+>> > +        * as part of secondary_cpu_start().  Let's redirect it to the
+>> > +        * mcpm_entry_point(). This is done during both secondary boot-up as
+>> > +        * well as system resume.
+>> > +        */
+>> > +       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+>> > +       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+>> > +       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
+>> > +}
+>> > +
+>> > +static struct syscore_ops exynos_mcpm_syscore_ops = {
+>> > +       .resume = exynos_mcpm_setup_entry_point,
+>> > +};
+>> > +
+>> >  static int __init exynos_mcpm_init(void)
+>> >  {
+>> >         struct device_node *node;
+>> > -       void __iomem *ns_sram_base_addr;
+>> >         int ret;
+>> >
+>> >         node = of_find_matching_node(NULL, exynos_dt_mcpm_match);
+>> > @@ -357,16 +375,9 @@ static int __init exynos_mcpm_init(void)
+>> >
+>> >         pr_info("Exynos MCPM support installed\n");
+>> >
+>> > -       /*
+>> > -        * U-Boot SPL is hardcoded to jump to the start of ns_sram_base_addr
+>> > -        * as part of secondary_cpu_start().  Let's redirect it to the
+>> > -        * mcpm_entry_point().
+>> > -        */
+>> > -       __raw_writel(0xe59f0000, ns_sram_base_addr);     /* ldr r0, [pc, #0] */
+>> > -       __raw_writel(0xe12fff10, ns_sram_base_addr + 4); /* bx  r0 */
+>> > -       __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 8);
+>> > +       exynos_mcpm_setup_entry_point();
+>> >
+>> > -       iounmap(ns_sram_base_addr);
+>> > +       register_syscore_ops(&exynos_mcpm_syscore_ops);
+>> >
+>> >         return ret;
+>> >  }
 >>
->> Let me reiterate that I am 100% in favor of replacing arch-specific
->> code with more generic implementations.
+>> This patch alone is not enough to bring the 8 cores back up post
+>> resume on exynos5420, We need to enable the boot cluster snoops as
+>> well.
 >>
->> However, I am not 100% in favor of doing it as separate efforts
->> (although maybe I could be convinced).  The reasons I hesitate are
->> that (1) if only one architecture uses a new "generic" implementation,
->> we really don't know whether it is generic enough, (2) until I see the
->> patches to convert other architectures, I have to assume that I'm the
->> one who will write them, and (3) as soon as we add the code to
->> drivers/pci, it becomes partly my headache to maintain it, even if
->> only one arch benefits from it.
+>> Nicolas, if I add code to enable the boot cluster CCI in
+>> mach-exynos/sleep.S, all 8 cores come up. However, if I use
+>> mcpm_loopback as part of the newly added resume function to do the
+>> same, I get a hang on resume.
+>> Is there anything else that I need to take care of while doing this ?
 >
-> I agree and understand your point.
+> No no no.
 >
->> Please don't think I'm questioning anyone's intent or good will.  It's
->> just that I understand the business pressures, and I know how hard it
->> can be to justify this sort of work to one's management, especially
->> after the immediate problem has been solved.
+> Forget about the MCPM loopback -- that's for boot time setup of the
+> booting cluster nothing else.
+Ok, I thought this is to be used at resume too.
 >
-> But, unfortunately, that's something we failed to address in reasonable
-> time (even though I was one of the proponents of the generic PCIe
-> implementation). This work is very likely to slip further into the late
-> part of this year and I am aware that several ARM partners are blocked
-> on the (upstream) availability of PCIe support for the arm64 kernel.
+> The snoops are enabled in a ***race free way*** by the low-level MCPM
+> code.  But of course you must call it upon resume.  Nothing else than
+> MCPM should ever play with the snoops enable/disable.  Certainly not
+> mach-exynos/sleep.S.
+The sleep.S change was something I tried to isolate where I was going
+wrong. Of course, in this case my basic premise of using mcpm_loopback
+to enable snoops itself was flawed.
 >
-> Although a bit late, I'm raising this now and hopefully we'll come to a
-> conclusion soon. Delaying arm64 PCIe support even further is not a real
-> option, which leaves us with:
+> You must tell your firmware to resume execution after suspend at
+> mcpm_entry_point.  Before suspending, you tell MCPM where it should
+> branch to after it is done with its resuming business by calling
+> mcpm_set_entry_vector(), passing the address for exynos_cpu_resume for
+> example.
+Thanks for the explantion, will re-work the patch.
 >
-> 1. Someone else (with enough PCIe knowledge) volunteering to take over
->    soon or
-
-Well, I might have 2 months ago, but now I'm pretty booked up.
-
-> 2. Dropping Liviu's work and going for an arm64-specific implementation
->    (most likely based on the arm32 implementation, see below)
-
-3. Keeping Liviu's patches leaving some of the architecture specific
-bits. I know Arnd and I both commented on it still needing more common
-pieces, but compared to option 2 that would be way better.
-
-Let's look at the patches in question:
-
-3e71867 pci: Introduce pci_register_io_range() helper function.
-6681dff pci: OF: Fix the conversion of IO ranges into IO resources.
-
-Both OF patches. I'll happily merge them.
-
-
-2d5dd85 pci: Create pci_host_bridge before its associated bus in
-pci_create_root_bus.
-f6f2854 pci: Introduce a domain number for pci_host_bridge.
-524a9f5 pci: Export find_pci_host_bridge() function.
-
-These don't seem to be too controversial.
-
-
-fb75718 pci: of: Parse and map the IRQ when adding the PCI device.
-
-6 LOC. Hardly controversial.
-
-
-920a685 pci: Add support for creating a generic host_bridge from device tree
-
-This function could be moved to drivers/of/of_pci.c if having it in
-drivers/pci is too much maintenance burden. However, nearly the same
-code is already being duplicated in every DT enabled ARM PCI host
-driver and will continue as more PCI hosts are added. So this isn't
-really a question of converting other architectures to common PCI host
-infrastructure, but converting DT based PCI hosts to common
-infrastructure. ARM is the only arch moving host drivers to
-drivers/pci ATM. Until other architectures start doing that,
-converting them is pointless.
-
-bcf5c10 Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-
-Seems like an independent fix that should be applied regardless.
-
-
-7cfde80 arm64: Add architecture support for PCI
-
-What is here is really just a function of which option we pick.
-
-
-> First option is ideal but there is work to do as laid out by Arnd here:
+> And of course the CPU shutdown during idle has to go through MCPM too.
 >
-> http://article.gmane.org/gmane.linux.kernel/1679304
+> When resumed, you also have to call mcpm_cpu_powered_up().
+>
+> See how it is done in cpuidle-big_little.c for example
+Will check the cpuidle big.LITTLE driver also.
 
-I don't agree arm32 is harder than microblaze. Yes, converting ALL of
-arm would be, but that is not necessary. With Liviu's latest branch
-the hacks I previously needed are gone (thanks!), and this is all I
-need to get Versatile PCI working (under QEMU):
-
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 3d23418..22b7529 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -178,6 +178,7 @@ static inline void __iomem *__typesafe_io(unsigned
-long addr)
-
- /* PCI fixed i/o mapping */
- #define PCI_IO_VIRT_BASE       0xfee00000
-+#define PCI_IOBASE             PCI_IO_VIRT_BASE
-
- #if defined(CONFIG_PCI)
- void pci_ioremap_set_mem_type(int mem_type);
-
-Hum, so I guess now I've converted ARM...
-
-Here's a branch with my changes[1]. And BTW, it also has
-multi-platform support for Versatile as moving the PCI host to DT (and
-drivers/pci/host) is about the last remaining obstacle.
-
-Rob
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
-versatile-pci-v2
+Regards,
+Abhilash
