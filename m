@@ -1,67 +1,41 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Fri, 27 Jun 2014 21:57:28 +0000
-Subject: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability
- IOMMU_CAP_INTR_REMAP
-In-Reply-To: <20140627084722.GB26276@arm.com>
-References: <20140616151329.GQ16758@arm.com>
- <20140616152157.GB31771@8bytes.org> <20140616152526.GR16758@arm.com>
- <20140616153832.GC31771@8bytes.org>
- <9353770066894e85809e1e443b71d1cd@BY2PR07MB203.namprd07.prod.outlook.com>
- <748dccbbd3284521af4659ccbbb11453@BY2PR07MB203.namprd07.prod.outlook.com>
- <b085e02e72dc424d9624c3e810951087@BY2PR07MB203.namprd07.prod.outlook.com>
- <1403809223.31091.137.camel@ul30vt.home>
- <ec8dbbcb991e4d73b73f4b4f98342445@BY2PR07MB203.namprd07.prod.outlook.com>
- <1403811384.31091.151.camel@ul30vt.home> <20140627084722.GB26276@arm.com>
-Message-ID: <2645e3a22f5e4ae9994c0ee8fa327cb4@BY2PR07MB203.namprd07.prod.outlook.com>
+From: dalias@libc.org (Rich Felker)
+Date: Fri, 27 Jun 2014 17:58:09 -0400
+Subject: [musl] Re: Thread pointer changes
+In-Reply-To: <CALCETrV5C2JosC_rtucQVg+U0bm8hFQFBTv3dz0it0a8iMCyrQ@mail.gmail.com>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627200949.GQ32514@n2100.arm.linux.org.uk>
+ <20140627210931.GT23102@port70.net>
+ <20140627213051.GS32514@n2100.arm.linux.org.uk>
+ <CALCETrV5C2JosC_rtucQVg+U0bm8hFQFBTv3dz0it0a8iMCyrQ@mail.gmail.com>
+Message-ID: <20140627215809.GD16724@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-
-         What is your opinion on ITS emulation . is it should be part of KVM or VFIO.
-        Also this code needs to depend on ITS host driver a lot, Host ITS driver needs to have an interface for this code to use.
-
-Thanks,
- Tirumalesh
-     
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: Friday, June 27, 2014 1:47 AM
-To: Alex Williamson
-Cc: Chalamarla, Tirumalesh; Joerg Roedel; kvm at vger.kernel.org; open list; stuart.yoder at freescale.com; iommu at lists.linux-foundation.org; tech at virtualopensystems.com; kvmarm at lists.cs.columbia.edu; moderated list:ARM SMMU DRIVER; marc.zyngier at arm.com
-Subject: Re: [RFC PATCH v6 04/20] iommu/arm-smmu: add capability IOMMU_CAP_INTR_REMAP
-
-On Thu, Jun 26, 2014 at 08:36:24PM +0100, Alex Williamson wrote:
-> On Thu, 2014-06-26 at 19:10 +0000, Chalamarla, Tirumalesh wrote:
-> > Thanks for the clarification Alex, That?s exactly my point, why are 
-> > we relying on  QEMU or something else to emulate the MSI space when 
-> > we can directly give access to devices using ITS (of course with a 
-> > small emulation code).  This way we are also benefited from all ITS 
-> > services like VCPU migration etc.
+On Fri, Jun 27, 2014 at 02:47:38PM -0700, Andy Lutomirski wrote:
+> >> > Due to that, any ARMv5 or earlier CPU will always have the kuser helper
+> >> > page.  ARMv6 and later may or may not have the kuser helper page, but
+> >> > there you're really building for a different ABI anyway (VFP-based) and
+> >> > you also know that you have the thread registers.
+> >>
+> >> so is it expected that the libc makes no attempt to provide
+> >> portable binary interface for armv5 and armv6?
+> >
+> > The libc interface that applications make use should not have any
+> > dependence on whether KUSER_HELPERS is enabled or disabled, the
+> > presence of that page should be totally invisible to applications.
 > 
-> I have no idea what ITS is.
+> As of right now, an x86_64 libc can have good performance on any
+> recent kernel and will work correctly on any kernel.  From what you're
+> saying, it sounds impossible to implement such a thing on ARM without
+> fiddling with /proc.
 
-ITS is the MSI doorbell for GICv3 (ARM's latest interrupt controller).
+Indeed. I wasn't even aware of the legacy vsyscall mess for x86_64,
+and we're not using it in musl. Keeping it around seems like just a
+matter of maintaining API/ABI compatibility with legacy versions of
+glibc that are using it. On the other hand, the kuser helper page is
+the ONLY way for a libc that's compatible with pre-v6 arm to get
+working atomics and TLS.
 
-I agree that we will need an ITS emulation if we want to use MSIs in the guest, and I believe that Marc (CC'd) had already started thinking about that.
-
-
-> > What about non QEMU VFIO users, for example, if I wanted to use VFIO to
-> > assign a device to a user process I don't need to depend on QEMU.   I
-> > thought this is one of the main goals of vfio to make it independent of
-> > hypervisors.     
-> 
-> Where did QEMU become a requirement?  Maybe I'm missing something in 
-> the ARM part of the conversation that got chopped off, but this is 
-> exactly why we have the VFIO/QEMU split that we do.  VFIO provides 
-> basic virtualization for config space and restricts access to other 
-> areas that users shouldn't be allowed to change.  QEMU is just one 
-> example of a userspace VFIO driver.  QEMU takes the decomposed device 
-> exposed through the VFIO ABI and re-creates a PCI device out of it.  
-> VFIO itself has no dependency on QEMU.  Thanks,
-
-I also don't understand the QEMU part here. The MSI emulation would be in the kernel, just like the GICv2 emulation that we already have. For userspace drivers, wouldn't you just use eventfd rather than bother with emulating MSIs?
-
-Finally, the interrupt remapping part is about the SMMU preventing MSI writes to arbitrary portions of the host address space. The ITS is about routing interrupts to CPUs.
-
-Will
+Rich
