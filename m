@@ -1,88 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jun 2014 14:55:38 +0100
-Subject: [PATCH v3 02/10] devicetree: Add generic IOMMU device tree
- bindings
-In-Reply-To: <1403815790-8548-3-git-send-email-thierry.reding@gmail.com>
-References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140627135537.GU26276@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 14:59:32 +0100
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <53AD7544.2060701@gmail.com>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140627130430.GH32514@n2100.arm.linux.org.uk> <53AD724D.4020704@gmail.com>
+ <20140627133933.GJ23978@titan.lakedaemon.net> <53AD7544.2060701@gmail.com>
+Message-ID: <20140627135932.GI32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Fri, Jun 27, 2014 at 03:44:36PM +0200, Sebastian Hesselbarth wrote:
+> On 06/27/2014 03:39 PM, Jason Cooper wrote:
+>> On Fri, Jun 27, 2014 at 03:31:57PM +0200, Sebastian Hesselbarth wrote:
+>>> Also, production variants have their MAC address stored at 0xd0000 on
+>>> SPI flash. And while ES has PL2303 USB-to-UART, production use a
+>>> different brand, IIRC FTDI.
+>>
+>> Could you do a follow on patch adding a comment to this effect?  The
+>> Debian guys will need this for flash-kernel and friends.
+>
+> I don't know if that information will be of any use at all.
+>
+> You cannot determine USB-to-UART type from CuBox but your host PC only.
+>
+> And I am not sure, if we want to rely on some six numbers stored on
+> SPI flash, i.e. there is no magic nor header to be really sure, it
+> is a MAC address.
 
-On Thu, Jun 26, 2014 at 09:49:42PM +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> This commit introduces a generic device tree binding for IOMMU devices.
-> Only a very minimal subset is described here, but it is enough to cover
-> the requirements of both the Exynos System MMU and Tegra SMMU as
-> discussed here:
-> 
->     https://lkml.org/lkml/2014/4/27/346
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+This is kind'a my point - you're confirming that you can't reliably
+tell which version you have by running something on the cubox itself.
+As Jason points out, there are those who need to choose the correct
+DT file when installing.
 
-[...]
+So, this means that the user has to be asked.  If users have to be
+asked, users need some way to identify the hardware that they're
+running on.
 
-> +Required properties:
-> +--------------------
-> +- #iommu-cells: The number of cells in an IOMMU specifier needed to encode an
-> +  address.
-> +
-> +Typical values for the above include:
-> +- #iommu-cells = <0>: Single master IOMMU devices are not configurable and
-> +  therefore no additional information needs to be encoded in the specifier.
-> +  This may also apply to multiple master IOMMU devices that do not allow the
-> +  association of masters to be configured.
+No, I didn't know until recently, because my Cubox was given to me by
+Nicolas Pitre a couple of years ago - that's the problem, the engineering
+samples may not be with the original people and therefore their origins
+may not be known.
 
-A multiple-master capable IOMMU could be built with a single master, but
-we'd still need #iommu-cells > 0 here. I appreciate this is just an example,
-but the wording sounds like it's enforced.
-
-> +- #iommu-cells = <1>: Multiple master IOMMU devices may need to be configured
-> +  in order to enable translation for a given master. In such cases the single
-> +  address cell corresponds to the master device's ID.
-
-Again, we will definitely need more than one cell in this case, as I fully
-expect multiple StreamIDs for each master (e.g. Qualcomm mentioned on the
-list the other day that they have a master emitting 43 unique IDs).
-
-Anyway, the actual binding looks great, I just don't want people to think
-they need to do something different because they don't fit your example
-use-cases.
-
-> +Multiple-master IOMMU:
-> +----------------------
-> +
-> +	iommu {
-> +		/* the specifier represents the ID of the master */
-> +		#iommu-cells = <1>;
-> +	};
-> +
-> +	master {
-> +		/* device has master ID 42 in the IOMMU */
-> +		iommus = <&/iommu 42>;
-> +	};
-> +
-> +Multiple-master IOMMU with configurable DMA window:
-> +---------------------------------------------------
-> +
-> +	/ {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		iommu {
-> +			/* master ID, address and length of DMA window */
-> +			#iommu-cells = <4>;
-> +		};
-> +
-> +		master {
-> +			/* master ID 42, 4 GiB DMA window starting at 0 */
-> +			iommus = <&/iommu  42  0  0x1 0x0>;
-> +		};
-> +	};
-
-Could you also please include an example of a master with multiple IDs?
-
-Will
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
