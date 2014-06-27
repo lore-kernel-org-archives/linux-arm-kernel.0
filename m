@@ -1,88 +1,91 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Jun 2014 17:06:00 -0700
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
- <53AB1CC1.4010907@codeaurora.org>
- <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
-Message-ID: <53ACB568.4000903@codeaurora.org>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 26 Jun 2014 17:29:07 -0700
+Subject: [RFC] PCI: pci-imx6: Add delay to workaround kernel hang
+In-Reply-To: <20140626054937.GB7859@dragon>
+References: <1403637507-9424-1-git-send-email-festevam@gmail.com>
+ <20140626031247.GN2224@dragon>
+ <CAOMZO5A0pQfJRwb41046UpkbG6xH7c+EVu+YuY71Zuyq5gHaDA@mail.gmail.com>
+ <20140626054937.GB7859@dragon>
+Message-ID: <CAJ+vNU0DNCT5pcvnptNBo-tPTVOH1HnrCwy7uCZt33dfyq8U-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/14 03:52, Viresh Kumar wrote:
-> On 26 June 2014 00:32, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> I don't think this driver should be using regulator_get_optional() (Mark
->> B. please correct me if I'm wrong). I doubt a supply is actually
->> optional for CPUs, just some DTs aren't specifying them. In those cases,
->> the regulator core will insert a dummy supply and the code will work
->> without having to check for probe defer and error pointers.
-> Hi Stephen,
+On Wed, Jun 25, 2014 at 10:49 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Thu, Jun 26, 2014 at 12:43:19AM -0300, Fabio Estevam wrote:
+>> On Thu, Jun 26, 2014 at 12:12 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+>> > On Tue, Jun 24, 2014 at 04:18:27PM -0300, Fabio Estevam wrote:
+>> >> From: Fabio Estevam <fabio.estevam@freescale.com>
+>> >>
+>> >> When the mx6 PCI conctroller is initialized in the bootloader we see a kernel
+>> >> hang inside imx6_add_pcie_port().
+>> >>
+>> >> Adding a 30ms delay allows the kernel to boot.
+>> >
+>> > We may not want to add a random delay into the driver before we
+>> > understand the root cause of the issue.
+>>
+>> Yes, that's why I sent this as RFC and also explained it below the ---
+>> line that I am actually trying to get some help with this issue.
+>>
+>> >
+>> > Do you see this issue with FSL kernel?
+>>
+>> Yes, it also hangs.
+>>
+>> It is reproducible in 100% of the boots. Just need to use mainline
+>> U-boot (which has PCI driver enabled by default).
+>> I am using an Intel Wifi 7260 PCI card. This was also reported by
+>> other folks in the U-boot list.
 >
-> Thanks for your comments.
+> Richard,
 >
-> Leaving the above one, I have tried to fix all you mentioned. And it surely
-> looks much better now.
+> Can you schedule some time to look at this issue?  I think it will come
+> to us sooner or later if any our customer enables PCIe before launching
+> kernel?
 >
-> I would like to wait for a day or two before sending V2, as people might
-> be reviewing it and the above issue is still wide open..
+> Shawn
 >
-> But in case you wanna test it (completely changed I must say, but
-> for good), its here:
->
-> git://git.linaro.org/people/viresh.kumar/linux.git cpufreq/cpu0-krait-v2
 
-I gave it a spin. It looks mostly good except for the infinite loop:
+Shawn / Richard,
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index b7ee67c4d1c0..6744321ae33d 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -138,8 +138,10 @@ try_again:
-                }
- 
-                /* Try with "cpu-supply" */
--               if (reg == reg_cpu0)
-+               if (reg == reg_cpu0) {
-+                       reg = reg_cpu;
-                        goto try_again;
-+               }
- 
-                dev_warn(cpu_dev, "failed to get cpu%d regulator: %ld\n",
-                         cpu, PTR_ERR(cpu_reg));
+I am also affected by this issue on IMX6 boards that I support. If I
+enable PCI in the bootloader I see similar hangs.
 
-and I think we just want reg_cpu to be "cpu", not "cpu-supply" because I
-think the regulator core adds in the "-supply" part already.
+I have the following hardware configurations on my bench:
+  1. IMX6DL + i210 (same PCI setup as Fabio's above, but DL instead of Q)
+  2. IMX6Q + ath9k device
+  3. IMX6DL + PLX PEX860x PCIe-to-PCIe bridge with various devices
+behind the bridge, using a clock buffer from IMX6 PCIe clock
+  4. IMX6Q + PLX PEX860x PCIe-to-PCIe bridge with various devices
+behind the bridge, using a clock buffer from IMX6 PCIe clock
+  5. IMX6Q + PLX PEX860x PCIe-to-PCIe bridge with various devices
+behind the bridge using a clock generator (always on, ignoring the
+PCIe clock)
 
-After fixing that I can get cpufreq going. I'm currently working on
-populating the OPPs at runtime without relying on DT. So eventually I'll
-need this patch:
+For all of the above I have no PCI issues using
+3.14/3.15/3.16-rc2/vendor 3.10.17_1.0.0_ga unless I enable PCI in the
+bootloader. When I do so, all of the above configurations hang
+somewhere around PCI init/enumeration. The same occurs with the most
+recent vendor kernel 3.10.17_1.0.0_ga kernel (works when PCI is
+disabled in the bootloader, hangs otherwise).
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index b7ee67c4d1c0..6744321ae33d 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -239,11 +241,6 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
-        }
- 
-        ret = of_init_opp_table(cpu_dev);
--       if (ret) {
--               dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
--               goto out_put_node;
--       }
--
-        ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-        if (ret) {
-                dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
+When I apply Fabio's patch above to the 3.16-rc2 kernel I find that
+scenarios #4 and #5 above then work, #3 boots but the PLX bridge fails
+all config cycles (0xff's), #2 boots but with no PCIe link, and #1
+above still hangs. Previously, when I have dug into this particular
+'hang' issue on 3.15 I found that the delay needed to be between
+imx6_pcie_probe() requesting and asserting reset_gpio low, and before
+setting IOMUX_GPR1:18 to power down the PCIe PHY (note here, that the
+PHY is currently enabled in the bootloader when PCI is enabled there).
 
-which I hope is ok.
+When I apply Fabio's patch above to the most recent vendor kernel
+3.10.17_1.0.0_ga I still hang in all cases.
 
-Finally, checking for equivalent pointers from clk_get() will work now,
-but it isn't future-proof if/when the clock framework starts returning
-dynamically allocated clock pointers for each clk_get() invocation.
-Maybe we need a function in the common clock framework that tells us if
-the clocks are the same either via DT or by taking two clock pointers?
+So while I agree there is something horribly wrong with IMX6 PCI
+still, I don't think Fabio's patch is the right solution and I don't
+have anything better at this point in time. I'm happy to share any
+hardware with anyone that can work through this issue.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks,
+
+Tim
