@@ -1,78 +1,76 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Fri, 27 Jun 2014 11:26:19 +0530
-Subject: [PATCH V5 16/20] ARM: exynos: cpuidle: Move the power sequence
- call in the cpu_pm notifier
-In-Reply-To: <53ABEC68.7060500@samsung.com>
-References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
- <1397212815-16068-17-git-send-email-daniel.lezcano@linaro.org>
- <CADWw7Ojjk9U95-Sh3WfK+OuKBJk4_XAJgGNrNmt7gcaAjxwVKQ@mail.gmail.com>
- <53ABEC68.7060500@samsung.com>
-Message-ID: <CADWw7OgYYeSLVc81Yad63f4jd_YYgpY4B2GDJuf_vQezv_yU1Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 26 Jun 2014 23:27:19 -0700
+Subject: [PATCH] ARM: bcm: Fix bcm and multi_v7 defconfigs
+Message-ID: <1403850439-8771-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 3:18 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Chander,
->
-> On 26.06.2014 11:07, Chander Kashyap wrote:
->> On Fri, Apr 11, 2014 at 4:10 PM, Daniel Lezcano
->> <daniel.lezcano@linaro.org> wrote:
->
-> [snip]
->
->>> @@ -359,6 +373,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->>>         switch (cmd) {
->>>         case CPU_PM_ENTER:
->>>                 if (cpu == 0) {
->>> +                       exynos_pm_central_suspend();
->>>                         exynos_cpu_save_register();
->>>                 }
->>>                 break;
->>> @@ -368,6 +383,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
->>>                         if (!soc_is_exynos5250())
->>>                                 scu_enable(S5P_VA_SCU);
->>>                         exynos_cpu_restore_register();
->>> +                       exynos_pm_central_resume();
->>
->> This notifier is called for system wide suspend and cpuidle.
->>
->> In case of Exynos cpuidle only AFTR and LPA state need to program
->> central_sequencer and store/restore the registers.
->>
->> But in 5420 (core-power-down), this is not required, and causing the regression.
->>
->> Hence need to remove this notifier, or need to find a way to
->> differentiate the cpuidle state.
->
-> This patch is already present in v3.16. Moreover, Exynos5420 cpuidle has
-> not been merged yet. This means that this issue is not a regression and
-> I believe any further work on this should be carried out as further
-> patches on top of this change.
->
-> Anyway, this change has introduced a regression, though, but in another
-> area - it broke suspend, at least on Exynos4-based devices, because now
-> certain steps are performed twice. I've sent a patch for 3.16-rc3 to fix
-> this by dropping custom suspend-specific syscore ops, effectively moving
-> most of the handling to CPU PM notifier, which also matches requirements
-> of AFTR and lower power states. See [1].
->
-> [1]
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32935.html
->
-> However, in this case, moving back to suspend-specific syscore_ops and
-> simply duplicating some code for lower cpuidle states might be a better
-> option. Care to send a patch (fix for 3.16, replacing mine) or I should
-> do it?
+BCM (Kona/capri platform) has regressed in two ways on this release. First,
+bcm_defconfig no longer selected the appropriate MMC driver options due to
+changes in dependencies. Secondly, the new MFD and regulator drivers were not
+enabled on multi_v7_defconfig, so that caused the system to fail probing MMC
+there.
 
-Yes need to move the common code to lower cpuildle implementation and
-removing the notifier all together.
-I will do it and send the patch.
+Fix by enabling the new options as needed.
+
+Cc: Matt Porter <matt.porter@linaro.org>
+Cc: Christian Daudt <bcm@fixthebug.org>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+
+Christian, Matt,
+
+Since I know that at least Matt is on vacation right now, I'll add this to the
+arm-soc fixes branch myself so I can continue booting the capri board here.
 
 
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-Olof
+
+ arch/arm/configs/bcm_defconfig      |    2 +-
+ arch/arm/configs/multi_v7_defconfig |    3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index 9d13dae..4bf7226 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -94,10 +94,10 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_PWM=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+-CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_TEST=y
+ CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 9a1e7b0..f70ea21 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -223,12 +223,12 @@ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_SUN6I=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_THERMAL=y
+-CONFIG_DOVE_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MFD_AS3722=y
++CONFIG_MFD_BCM590XX=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
+ CONFIG_MFD_MAX8907=y
+@@ -240,6 +240,7 @@ CONFIG_MFD_TPS65910=y
+ CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
+ CONFIG_REGULATOR_AB8500=y
+ CONFIG_REGULATOR_AS3722=y
++CONFIG_REGULATOR_BCM590XX=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_PALMAS=y
+-- 
+1.7.10.4
