@@ -1,41 +1,37 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 27 Jun 2014 16:17:52 -0700
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627230736.GX32514@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Jun 2014 00:20:57 +0100
+Subject: Thread pointer changes
+In-Reply-To: <53ADC5B1.6080905@amacapital.net>
 References: <20140610072835.GA8466@brightrain.aerifal.cx>
  <20140611145533.GT179@brightrain.aerifal.cx>
  <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
- <20140627213051.GS32514@n2100.arm.linux.org.uk>
- <20140627215541.GC16724@brightrain.aerifal.cx>
- <20140627221744.GU32514@n2100.arm.linux.org.uk>
- <20140627223328.GB17988@brightrain.aerifal.cx>
- <20140627230736.GX32514@n2100.arm.linux.org.uk>
-Message-ID: <CALCETrVFvYNPHMozB2E2L0LWSPv=o6JHfmoz4_pBC2gQwRLpug@mail.gmail.com>
+Message-ID: <20140627232056.GZ32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 4:07 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> The kuser helpers can NOT be removed unless the CPU is v6k+.  Let me
-> put that a different way: the kuser helpers can not be removed unless
-> the ELF HWCAPs indicate TLS support.
+Right, I'm done on this thread for the weekend - I will not be answering
+another message on this subject until next week.  In summary:
 
-Why?  (This is an honest question -- there may be an excellent
-answer.)  I understand why they're needed in the first place, but I
-don't understand why they need to live at a fixed address.
+I've shown that this isn't as big a problem as first thought, because
+there's ways that a libc can trivially detect the CPU that it is running
+on, and from that know what instructions are available to it.
 
-The closest thing to this that I'm familiar with is x86_32's sysenter.
-It's a very useful instruction, but it's basically impossible for libc
-to contain a sysenter instruction in the libc image.  So the kernel
-provides one *at a randomized address*, and libc calls it.
+I've indicated that the kuser helpers are always provided when there
+is no hardware TLS support, which corresponds with a minimum ARM
+architecture of version 6K, and v6k has the atomic instructions.
 
-Admittedly, x86_32 has an advantage over ARM here: libc without a
-sysenter helper is completely functional; it's just slower.
-Nonetheless, ISTM it should be possible to start advertising the kuser
-helper address to libc, get all the libcs to play along, and then
-offer an option of randomizing it for people who know that they don't
-have any old libcs on their systems.
+I've said that we're not going to move kuser helpers to a randomised
+address, and given strong reasons why not.
 
---Andy
+I've indicated where the CPU architecture can be retrieved from, and
+used to determine the availability of other instructions.
+
+I've indicated that the ELF HWCAPs can be used to further refine the
+available instruction information.
+
+That should be sufficient to answer all the questions raised.  Please
+wait until next week before asking further questions, thanks.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
