@@ -1,70 +1,51 @@
-From: detheridge@ti.com (Darren Etheridge)
-Date: Fri, 27 Jun 2014 17:08:51 -0500
-Subject: [PATCH/RESEND 0/9] drm: tilcdc driver fixes
-In-Reply-To: <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <53ADEB73.8090301@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 23:17:44 +0100
+Subject: [musl] Re: Thread pointer changes
+In-Reply-To: <20140627215541.GC16724@brightrain.aerifal.cx>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627200949.GQ32514@n2100.arm.linux.org.uk>
+ <20140627210931.GT23102@port70.net>
+ <20140627213051.GS32514@n2100.arm.linux.org.uk>
+ <20140627215541.GC16724@brightrain.aerifal.cx>
+Message-ID: <20140627221744.GU32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guido,
+On Fri, Jun 27, 2014 at 05:55:41PM -0400, Rich Felker wrote:
+> I think you're assuming that libc is used only as a shared library and
+> that the user installs one appropriate for their kernel. This
+> precludes the use of static-linked binaries which are an extremely
+> important usage case for us, especially on ARM where, for example, we
+> want users to be able to make binaries that have a fully-working libc
+> but that can be run on Android, where neither musl nor any other
+> remotely-working libc is installed by default.
+> 
+> Obviously some (many) users will opt to build libc with a particular
+> -march where all of the necessary instructions for TLS and atomics are
+> available without help from the kernel. However, if attempting to
+> build a baseline libc that works on any model results in one that
+> can't work on new hardware/kernel, that's a big problem, and exactly
+> the one which I'm trying to solve.
 
-On 06/17/2014 09:17 AM, Guido Mart?nez wrote:
-> The tilcdc driver could be compiled as a module, but was severely broken
-> and could not be used as such. This patchset attempts to fix the issues
-> preventing a proper load/unload of the module.
->
-> Issues included dangling sysfs nodes, dangling devices, memory leaks and
-> a double kfree.
->
-> It now seems to be working ok. We have tested this by loading and
-> unloading the driver repeteadly, with both panel and slave connectors
-> and found no flaws.
->
-> There is still one warning left on tilcdc_crtc_destroy, caused by
-> destroying the connector while still in an ON status. We don't know why
-> this happens or why it's an issue, so we did not fix it.
->
+As I've already said, that's a system integrator bug to have a kernel
+without a kuser page with userspace which requires it.
 
-Yes I see what you mean, it triggers the WARN_ON in tilcdc_crtc_destroy 
-because DRM_MODE_DPMS_ON is still set.  This WARN_ON does make some 
-sense because DPMS_OFF would have the effect of turning off clocks and 
-putting the monitor to sleep which seems logical considering we have 
-torn down the display.  Adding a tilcdc_crtc_dpms(DPMS_OFF) right before 
-the WARN_ON confirms this, but it seems strange that this hasn't 
-happened automatically (+ Russell doesn't need to do it in his Armada 
-driver) - so I suspect there is a better way.
+I think you're are missing one obvious solution to this which you can do:
+you are passed the HWCAP fields in the ELF auxinfo.  This will tell you
+if the CPU has TLS support or not.  If it has TLS support, then you don't
+need to use the kuser helpers, and you know that it is a CPU which is ARM
+architecture v6k or later, and it has things like the CP15 barrier
+instructions.  If you want to know that the CPU supports the DMB
+instruction rather than the CP15 barrier instruction, then you have to
+check the uname details, or read /proc/cpuinfo (but I'd rather you
+didn't.)
 
-Otherwise I think this is a good and useful patch series.
+In addition, the HWCAP fields tell you about some of the other
+instructions and FP options which are available to you, whether there's
+integer division available, etc.
 
-Darren
-
-> The first 7 patches are bug fixes which and should probably be applied
-> in the stable trees. The last two are clean-ups.
->
->
-> Resending this since I got no replies.
->
->
-> Guido Mart?nez (9):
->    drm/i2c: tda998x: move drm_i2c_encoder_destroy call
->    drm/tilcdc: panel: fix dangling sysfs connector node
->    drm/tilcdc: slave: fix dangling sysfs connector node
->    drm/tilcdc: tfp410: fix dangling sysfs connector node
->    drm/tilcdc: panel: fix leak when unloading the module
->    drm/tilcdc: fix release order on exit
->    drm/tilcdc: fix double kfree
->    drm/tilcdc: remove submodule destroy calls
->    drm/tilcdc: replace late_initcall with module_init
->
->   drivers/gpu/drm/i2c/tda998x_drv.c      |  2 +-
->   drivers/gpu/drm/tilcdc/Module.symvers  |  0
->   drivers/gpu/drm/tilcdc/tilcdc_drv.c    | 15 +++++--------
->   drivers/gpu/drm/tilcdc/tilcdc_drv.h    |  1 -
->   drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 39 +++++++++++++++++-----------------
->   drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 27 +++++++++++++----------
->   drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 35 +++++++++++++++---------------
->   7 files changed, 59 insertions(+), 60 deletions(-)
->   create mode 100644 drivers/gpu/drm/tilcdc/Module.symvers
->
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
