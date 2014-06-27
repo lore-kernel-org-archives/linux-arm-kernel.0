@@ -1,47 +1,66 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 27 Jun 2014 16:52:03 +0200
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <20140627144610.GK32514@n2100.arm.linux.org.uk>
-References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140627130430.GH32514@n2100.arm.linux.org.uk> <53AD724D.4020704@gmail.com>
- <20140627133933.GJ23978@titan.lakedaemon.net> <53AD7544.2060701@gmail.com>
- <20140627135932.GI32514@n2100.arm.linux.org.uk> <53AD7C24.5090408@gmail.com>
- <20140627144610.GK32514@n2100.arm.linux.org.uk>
-Message-ID: <53AD8513.8090009@gmail.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Fri, 27 Jun 2014 16:53:51 +0200
+Subject: [PATCH] ARM: perf: allow tracing with kernel tracepoints events
+In-Reply-To: <20140626090045.GB376@arm.com>
+References: <CAFrcx1n-cPXm=w+84gQiUjZoFKi7gYnvJ0BQ+8yXKS=k3nEt3g@mail.gmail.com>
+ <1403025065-18001-1-git-send-email-jean.pihet@linaro.org>
+ <20140618125355.GA2186@arm.com>
+ <CAFrcx1mA7kXiG9wMQqn=zYPYqrpGxDYWfoMP97RvkkrMTvNoRw@mail.gmail.com>
+ <20140625090110.GD6153@arm.com>
+ <CAFrcx1=gwRzU9heY8o9sphWUiga63NGdpN+cUh81Njr-X-OEGQ@mail.gmail.com>
+ <20140626090045.GB376@arm.com>
+Message-ID: <CAFrcx1=BGZ4fQugbh_PH-0-OXz_m4uYxUDF9Z9Wwqzp78yqScA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2014 04:46 PM, Russell King - ARM Linux wrote:
-> On Fri, Jun 27, 2014 at 04:13:56PM +0200, Sebastian Hesselbarth wrote:
->> On 06/27/2014 03:59 PM, Russell King - ARM Linux wrote:
->>> This is kind'a my point - you're confirming that you can't reliably
->>> tell which version you have by running something on the cubox itself.
->>> As Jason points out, there are those who need to choose the correct
->>> DT file when installing.
->>>
->>> So, this means that the user has to be asked.  If users have to be
->>> asked, users need some way to identify the hardware that they're
->>> running on.
->>
->> I get your point, but there is no way to automatically tell them apart.
->> IMHO, that is why cubox-dove.dts should represent the *production*
->> version.
+Hi Will,
+
+On 26 June 2014 11:00, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jun 25, 2014 at 03:54:14PM +0100, Jean Pihet wrote:
+>> Hi Will,
 >
-> That's why I'm saying maybe there shouldn't be a distinction at DT
-> level - AFAIK the GPIO-based detection also works on the production
-> version.
+> Hello,
+>
+>> On 25 June 2014 11:01, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Fri, Jun 20, 2014 at 09:10:35AM +0100, Jean Pihet wrote:
+>> >> On 18 June 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
+>> >> > On Tue, Jun 17, 2014 at 06:11:05PM +0100, Jean Pihet wrote:
+>> >> >> Tested with perf record and tracepoints filtering (-e <tracepoint>), with
+>> >> >> unwinding using fp (--call-graph fp) and dwarf info (--call-graph dwarf).
+>> >> >
+>> >> > Whilst the old ACPS unwinding only needs PC, FP and SP, is this definitely
+>> >> > true for exidx and DWARF-based unwinding? Given that libunwind ends up
+>> >> > running a state machine for the latter, can we guarantee that we won't hit
+>> >> > instructions that require access to other general purpose registers?
+>> >> Yes. dwarf unwinding does not need anything extra. Once seeded all the
+>> >> rest is extracted from the dwarf trace info.
+>> >
+>> > Ok, but what if the LR isn't saved on the stack, for example? What if the
+>> > code you're trying to unwind is hand-written assembly annotated with CFI
+>> > directives?
+>> Then in that case the unwinding is not possible unless the
+>> hand-crafted asm is compatible with the requested unwinding method
+>> (fp, dwarf etc.). Do you expect problems there, if so can you give
+>> more details?
+>
+> To use a readily available AArch64 example, take a look at
+> __kernel_gettimeofday in arch/arm64/kernel/vdso/gettimeofday.S
+>
+> It starts by moving the link register into x2, so that it can later call
+> __do_get_tspec without clobbering it. Furthermore, it doesn't make use of
+> the stack at all.
+>
+> How can you unwind that using your current code?
+That is interesting. In that case that particular function will not be
+seen in the call chain since lr, fp are the ones from the caller. I
+did not try on a real case, it would be nice to try it out, I can do
+that as soon as I am back on ARM64.
 
-No, it doesn't.
+Note: I was debugging a deadlock in perf doing call chain unwinding
+and tracepoint triggering. A new patch set is on its way.
 
-On Dove, mpp12 carries sdio*1* card detect.
+Thx & regards,
+Jean
 
-ES has sdio*0* slot card detect routed to mpp12 and cannot rely on
-SDHCI CARD_PRESENT bit. That is what the gpio workaround is for.
-
-Production uses the correct mpp pin and cannot rely on gpio pin
-value, as it is not connected to slot card detect.
-
-So, use the wrong dts on either ES or production will break sdio card
-detect.
-
-Sebastian
+>
+> Will
