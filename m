@@ -1,64 +1,74 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 27 Jun 2014 10:17:00 +0200
-Subject: [RFC 04/10] memory: Add Tegra124 memory controller support
-In-Reply-To: <53AD2020.1050802@nvidia.com>
-References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-5-git-send-email-thierry.reding@gmail.com>
- <53AD2020.1050802@nvidia.com>
-Message-ID: <20140627081659.GA10794@ulmo>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Jun 2014 10:23:42 +0200
+Subject: [GIT PULL] Versatile/Integrator base cleanup patches
+Message-ID: <CACRpkdbMA2oCFJmKH91MSg4hA0dxGcgAzy=ph1YOBLkN6-KxZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 03:41:20PM +0800, Joseph Lo wrote:
-> Hi Thierry,
-> 
-> On 06/27/2014 04:49 AM, Thierry Reding wrote:
-> [snip]
-> >+
-> >+#define MC_INTSTATUS 0x000
-> >+#define  MC_INT_DECERR_MTS (1 << 16)
-> >+#define  MC_INT_SECERR_SEC (1 << 13)
-> >+#define  MC_INT_DECERR_VPR (1 << 12)
-> >+#define  MC_INT_INVALID_APB_ASID_UPDATE (1 << 11)
-> >+#define  MC_INT_INVALID_SMMU_PAGE (1 << 10)
-> >+#define  MC_INT_ARBITRATION_EMEM (1 << 9)
-> >+#define  MC_INT_SECURITY_VIOLATION (1 << 8)
-> >+#define  MC_INT_DECERR_EMEM (1 << 6)
-> >+#define MC_INTMASK 0x004
-> >+#define MC_ERR_STATUS 0x08
-> >+#define MC_ERR_ADR 0x0c
-> >+
-> [snip]
-> >+
-> >+#define SMMU_PDE_ATTR          (SMMU_PDE_READABLE | SMMU_PDE_WRITABLE | \
-> >+                                SMMU_PDE_NONSECURE)
-> >+#define SMMU_PTE_ATTR          (SMMU_PTE_READABLE | SMMU_PTE_WRITABLE | \
-> >+                                SMMU_PTE_NONSECURE)
-> >+
-> >+#define SMMU_PDE_VACANT(n)     (((n) << 10) | SMMU_PDE_ATTR)
-> >+#define SMMU_PTE_VACANT(n)     (((n) << 12) | SMMU_PTE_ATTR)
-> 
-> There is an ISR to catch the invalid SMMU translation. Do you want to modify
-> the identity mapping with read/write attribute of the unused SMMU pages?
+Hi ARM SoC folks,
 
-I'm not sure I understand what you mean by "identity mapping". None of
-the public documentation seems to describe the exact layout of PDEs or
-PTEs, so it's somewhat hard to tell what to set them to when pages are
-unmapped.
+these are the first basic patches at the very bottom of my
+multiplatform stack, getting some infrastructure in place to
+do the final transition to multiplatform for Integrator (still
+working on the final patch) and also paving the road a bit
+for Versatile and RealView but continuing to depopulate
+plat-versatile.
 
-> This can make sure we capture the invalid SMMU translation. And helps for
-> driver to capture issues when using SMMU.
+Please pull it in as a starter, I'd recommend a common
+Versatile branch to be shared with e.g. Rob Herrings Versatile
+devicetree stuff.
 
-That certainly sounds like a useful thing to have. Like I said this is
-an RFC and I'm not even sure if it's acceptable in the current form, so
-I wanted to get feedback early on to avoid wasting effort on something
-that turn out to be a wild-goose chase.
+Yours,
+Linus Walleij
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/4797aef4/attachment.sig>
+
+The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+
+  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/versatile-1
+
+for you to fetch changes up to 11c32d7b6274cb0f554943d65bd4a126c4a86dcd:
+
+  video: move Versatile CLCD helpers (2014-06-27 10:15:22 +0200)
+
+----------------------------------------------------------------
+First pull request of Versatile family clean-ups for v3.17:
+
+- Remove <mach/memory.h> from the Integrator, paving the
+  road for multiplatform.
+- Push the CLCD helper code down into the framebuffer subsystem,
+  removing the last hook in plat-versatile for the Integrator,
+  also paving the road for multiplatform.
+
+Patches tested on Integrator/AP, Integrator/CP and Versatile AB
+(all real hardware).
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      ARM: integrator: get rid of <mach/memory.h>
+      video: move Versatile CLCD helpers
+
+ arch/arm/Kconfig                                   |  1 -
+ arch/arm/boot/dts/integratorap.dts                 |  1 +
+ arch/arm/mach-integrator/Kconfig                   |  1 -
+ arch/arm/mach-integrator/include/mach/memory.h     | 34 ----------------------
+ arch/arm/mach-integrator/integrator_cp.c           |  3 +-
+ arch/arm/mach-realview/core.c                      |  2 +-
+ arch/arm/mach-versatile/core.c                     |  2 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |  3 +-
+ arch/arm/plat-versatile/Kconfig                    |  3 --
+ arch/arm/plat-versatile/Makefile                   |  1 -
+ drivers/video/fbdev/Kconfig                        |  7 +++++
+ drivers/video/fbdev/Makefile                       |  1 +
+ .../video/fbdev/amba-clcd-versatile.c              |  2 +-
+ .../linux/platform_data/video-clcd-versatile.h     |  0
+ 14 files changed, 14 insertions(+), 47 deletions(-)
+ delete mode 100644 arch/arm/mach-integrator/include/mach/memory.h
+ rename arch/arm/plat-versatile/clcd.c =>
+drivers/video/fbdev/amba-clcd-versatile.c (98%)
+ rename arch/arm/plat-versatile/include/plat/clcd.h =>
+include/linux/platform_data/video-clcd-versatile.h (100%)
