@@ -1,55 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Jun 2014 09:50:46 +0200
-Subject: [PATCH v2 1/2] Documentation: Document Hisilicon hix5hd2 sata PHY
-In-Reply-To: <53ACE6EE.4050300@linaro.org>
-References: <1403687648-29082-1-git-send-email-zhangfei.gao@linaro.org>
- <4989178.vejv39dnj8@wuerfel> <53ACE6EE.4050300@linaro.org>
-Message-ID: <11262017.C011KreL6u@wuerfel>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 27 Jun 2014 09:52:48 +0200
+Subject: [PATCH v5 12/14] clk: max77802: Add DT binding documentation
+In-Reply-To: <1403806546-31122-13-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-13-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <53AD22D0.9000403@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 June 2014 11:37:18 zhangfei wrote:
-> >
+Am 26.06.2014 20:15, schrieb Javier Martinez Canillas:
+> Add Device Tree binding documentation for the clocks
+> outputs in the Maxim 77802 Power Management IC.
 > 
-> Sorry for the confusion.
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
 > 
-> The phy is rather an analog controller, without standard register.
-> Instead, the phy interface is just some pin / analog interface.
-> The register is in fact hix5hd2 register, controls all the analog 
-> output, including reset, power, speed, para tunning.
-
-Ok, thanks for the explanation.
-
-> Even the same phy is used in other soc, they can not share this driver, 
-> since the connection must be different, as well as internal soc register 
-> layout.
-> Only if the same controller & phy are reused in other hisilicon soc, 
-> this driver can be shared.
+> Changes since v4: None
 > 
-> Since what we control is hix5hd2 controller itself, so it may not 
-> suitable to put snps here.
-
-Makes sense.
-
-> And about hix5hd2 name: x is not wildcard.
+> Changes since v3:
+>  - Don't use the same clock driver name in clock-names since it's a consumer
+>    concept and most probably will be different. Suggested by Doug Anderson.
 > 
-> Currently hix5hd2 is series of hi3716c v200, hi3719c v100, hi3718c v100.
-> They are same soc, except minus pin assembles different.
+> Changes since v2:
+>  - Split the DT binding documentation in a separate patch.
 > 
-> However, not all hi37x is in this series, for example hi3716c v100 is a 
-> different soc.
+>  .../devicetree/bindings/clock/maxim,max77802.txt   | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
 > 
-> In the future hi3719m, hi3718m may also plan to add to hix5hd2 series.
-> The difference will be different cpu core number, different gpu core 
-> number. Also use different ethernet controller.
+> diff --git a/Documentation/devicetree/bindings/clock/maxim,max77802.txt b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
+> new file mode 100644
+> index 0000000..26bc4f7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
+> @@ -0,0 +1,42 @@
+> +Binding for Maxim MAX77802 32k clock generator block
+> +
+> +This is a part of device tree bindings of MAX77802 multi-function device.
+> +More information can be found in bindings/mfd/max77802.txt file.
+> +
+> +The MAX77802 contains two 32.768khz clock outputs that can be controlled
+> +(gated/ungated) over I2C.
+> +
+> +Following properties should be presend in main device node of the MFD chip.
 
-Ah, I think you explained this before, sorry for misremembering it.
- 
-> So we may still keep "hisilicon,hix5hd2-sata-phy" unchanged.
-> What do you think?
+"present"
 
-Yes, please keep this string, it's good.
+Regards,
+Andreas
 
-Thanks for your patience,
-
-	Arnd
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
