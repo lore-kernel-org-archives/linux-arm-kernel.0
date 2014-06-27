@@ -1,29 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Jun 2014 09:44:28 +0200
-Subject: [PATCH v2 1/6] ARM: mm: cache-l2x0: Add base address argument to
- write_sec callback
-In-Reply-To: <1403703451-12233-2-git-send-email-t.figa@samsung.com>
-References: <1403703451-12233-1-git-send-email-t.figa@samsung.com>
- <1403703451-12233-2-git-send-email-t.figa@samsung.com>
-Message-ID: <CACRpkdaA2oDOTBcL=S2j5bUTSB7oaS8ZWN0Rnf9Pbwtf3fTKjQ@mail.gmail.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 27 Jun 2014 09:48:53 +0200
+Subject: [PATCH v5 03/14] clk: max77686: Add DT include for MAX77686 PMIC
+ clock
+In-Reply-To: <1403806546-31122-4-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <53AD21E5.1030609@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 3:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+Am 26.06.2014 20:15, schrieb Javier Martinez Canillas:
+> This patch adds a dt-binding include for Maxim 77686
+> PMIC clock IDs that can be to be shared between the
 
-> For certain platforms (e.g. Exynos) it is necessary to read back some
-> values from registers before they can be written (i.e. SMC calls that
-> set multiple registers per call), so base address of L2C controller is
-> needed for .write_sec operation. This patch adds base argument to
-> .write_sec callback so that its implementation can also access registers
-> directly.
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+"can be shared"?
 
->  arch/arm/mach-ux500/cache-l2x0.c   | 3 ++-
+Regards,
+Andreas
 
-In our case just changing the signature of the function I see so:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> clk-max77686 clock driver and DeviceTree source files.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+> 
+> Changes since v4: None
+> 
+> Changes since v3: None
 
-Yours,
-Linus Walleij
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
