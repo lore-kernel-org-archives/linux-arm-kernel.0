@@ -1,60 +1,34 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Fri, 27 Jun 2014 14:19:54 -0700
-Subject: [PATCH v1 6/9] usb: xhci: Add NVIDIA Tegra XHCI host-controller
- driver
-In-Reply-To: <53AC6152.5060908@wwwdotorg.org>
-References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
- <1403072180-4944-7-git-send-email-abrestic@chromium.org>
- <53AB4F2D.2060208@wwwdotorg.org>
- <CAL1qeaFhfYdW06Md10eGVYWBrRR+f1yykVYHNp5+9-t1C9joPQ@mail.gmail.com>
- <53AC6152.5060908@wwwdotorg.org>
-Message-ID: <CAL1qeaEb2aV16F+sXWZ=FtEFW2rcGHhqVJk7+OmU5AtjZiHBDQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 15:20:18 -0600
+Subject: [PATCH v2 1/3] of: Add NVIDIA Tegra flow controller bindings
+In-Reply-To: <1403870848-1754-1-git-send-email-thierry.reding@gmail.com>
+References: <1403870848-1754-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53ADE012.5080401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 11:07 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/25/2014 06:06 PM, Andrew Bresticker wrote:
->> On Wed, Jun 25, 2014 at 3:37 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
->>>> Add support for the on-chip XHCI host controller present on Tegra SoCs.
->>>>
->>>> The driver is currently very basic: it loads the controller with its
->>>> firmware, starts the controller, and is able to service messages sent
->>>> by the controller's firmware.  The hardware supports device mode as
->>>> well as runtime power-gating, but support for these is not yet
->>>> implemented here.
+On 06/27/2014 06:07 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> Add device tree bindings for the flow controller found on NVIDIA Tegra
+> SoCs.
+> 
 
->>>> diff --git a/drivers/usb/host/xhci-tegra.c b/drivers/usb/host/xhci-tegra.c
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
 
->>>> +static int tegra_xhci_set_ss_clk(struct tegra_xhci_hcd *tegra,
->>>> +                              unsigned long rate)
->>>
->>>> +     switch (rate) {
->>>> +     case TEGRA_XHCI_SS_CLK_HIGH_SPEED:
->>>> +             /* Reparent to PLLU_480M. Set div first to avoid overclocking */
->>>> +             old_parent_rate = clk_get_rate(clk_get_parent(clk));
->>>> +             new_parent_rate = clk_get_rate(tegra->pll_u_480m);
->>>> +             div = new_parent_rate / rate;
->>>> +             ret = clk_set_rate(clk, old_parent_rate / div);
->>>> +             if (ret)
->>>> +                     return ret;
->>>> +             ret = clk_set_parent(clk, tegra->pll_u_480m);
->>>> +             if (ret)
->>>> +                     return ret;
->>>
->>> Don't you need to call clk_set_rate() again after reparenting, since the
->>> divisor will be different, and the rounding too.
->>
->> Nope, the divider we set before remains in-tact after clk_set_parent().
->
-> Oh I see, the clk_set_rate() call is setting up div so it's appropriate
-> after the new parent is selected.
->
-> Wouldn't it be better to just stop the clock, assert reset, reparent the
-> clock, and then set the desired rate directly?
+> +NVIDIA Tegra20 Flow Controller
+> +
+> +Required properties:
+> +- compatible: "nvidia,tegra20-flowctrl"
+> +- reg: Should contain one register range (address and length)
+> +
+> +Example:
+> +
+> +	flow-controller at 60007000 {
+> +		compatible = "nvidia,tegra20-flowctrl";
+> +		reg = <0x60007000 0x1000>;
+> +	};
 
-I'm not sure how that would be better than making it more obvious as
-to how we arrive at the final rate.  Keep in mind that the XHCI host
-is running at this point (we usually get the scale-up message as a
-USB3 device is being enumerated) and that disabling the clock and/or
-asserting reset to the SS partition clock may not be the best idea...
+The bindings all have the same structure. Can we collapse them all into
+this one file and just list all the valid compatible values and say pick
+one?
