@@ -1,38 +1,88 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 27 Jun 2014 08:17:59 +0900
-Subject: [Nouveau] [PATCH v2 2/3] drm/ttm: introduce dma cache sync helpers
-In-Reply-To: <20140626161055.GX32514@n2100.arm.linux.org.uk>
-References: <1403603667-11302-1-git-send-email-acourbot@nvidia.com>
- <1403603667-11302-3-git-send-email-acourbot@nvidia.com>
- <20140624100220.GK32514@n2100.arm.linux.org.uk>
- <53A953E6.2030503@nvidia.com> <53A95910.20104@nvidia.com>
- <CAAVeFu+rbCViC87kYCLfxGV18iYq=Pa0ABb+L=iNiYPLn+mR8Q@mail.gmail.com>
- <53A96EC5.3030701@canonical.com>
- <1403616338.4230.8.camel@weser.hi.pengutronix.de>
- <CACP_E+KECMyusuZd6hpzthL-RpfUOJpWh0EABf1DGAeaXc00aA@mail.gmail.com>
- <CAAVeFuLU04rk1DWMhVJV=ktVCpq4js38p1ipCr1jh1x72b=GZw@mail.gmail.com>
- <20140626161055.GX32514@n2100.arm.linux.org.uk>
-Message-ID: <CAAVeFuK5L9+nCP=KZTBSG9OifJrFKcfQdCYuBEQbZ2+s9FmFdQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 26 Jun 2014 17:06:00 -0700
+Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
+In-Reply-To: <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
+References: <cover.1403684824.git.viresh.kumar@linaro.org>
+ <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
+ <53AB1CC1.4010907@codeaurora.org>
+ <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
+Message-ID: <53ACB568.4000903@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 1:10 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jun 26, 2014 at 11:53:20PM +0900, Alexandre Courbot wrote:
->> We don't plan to rely on CMA for too long. IOMMU support is on the way
->> and should make our life easier, although no matter the source of
->> memory, we will still have the issue of the lowmem mappings.
+On 06/26/14 03:52, Viresh Kumar wrote:
+> On 26 June 2014 00:32, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> I don't think this driver should be using regulator_get_optional() (Mark
+>> B. please correct me if I'm wrong). I doubt a supply is actually
+>> optional for CPUs, just some DTs aren't specifying them. In those cases,
+>> the regulator core will insert a dummy supply and the code will work
+>> without having to check for probe defer and error pointers.
+> Hi Stephen,
 >
-> When it comes to DMA memory, talking about lowmem vs highmem is utterly
-> meaningless.
+> Thanks for your comments.
 >
-> The lowmem/highmem split is entirely a software concept and is completely
-> adjustable.  An extreme example is that you can boot any platform with
-> more than 32MB of memory with 32MB of lowmem and the remainder as
-> highmem.
+> Leaving the above one, I have tried to fix all you mentioned. And it surely
+> looks much better now.
+>
+> I would like to wait for a day or two before sending V2, as people might
+> be reviewing it and the above issue is still wide open..
+>
+> But in case you wanna test it (completely changed I must say, but
+> for good), its here:
+>
+> git://git.linaro.org/people/viresh.kumar/linux.git cpufreq/cpu0-krait-v2
 
-True, but isn't it also the case that all lowmem is already mapped in
-the kernel address space, and that re-mapping this memory with
-different cache settings (e.g. by creating a WC mapping for user-space
-to write into) is undefined on ARM and must be avoided? That is the
-issue I was referring to.
+I gave it a spin. It looks mostly good except for the infinite loop:
+
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index b7ee67c4d1c0..6744321ae33d 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -138,8 +138,10 @@ try_again:
+                }
+ 
+                /* Try with "cpu-supply" */
+-               if (reg == reg_cpu0)
++               if (reg == reg_cpu0) {
++                       reg = reg_cpu;
+                        goto try_again;
++               }
+ 
+                dev_warn(cpu_dev, "failed to get cpu%d regulator: %ld\n",
+                         cpu, PTR_ERR(cpu_reg));
+
+and I think we just want reg_cpu to be "cpu", not "cpu-supply" because I
+think the regulator core adds in the "-supply" part already.
+
+After fixing that I can get cpufreq going. I'm currently working on
+populating the OPPs at runtime without relying on DT. So eventually I'll
+need this patch:
+
+diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+index b7ee67c4d1c0..6744321ae33d 100644
+--- a/drivers/cpufreq/cpufreq-cpu0.c
++++ b/drivers/cpufreq/cpufreq-cpu0.c
+@@ -239,11 +241,6 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
+        }
+ 
+        ret = of_init_opp_table(cpu_dev);
+-       if (ret) {
+-               dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
+-               goto out_put_node;
+-       }
+-
+        ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+        if (ret) {
+                dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
+
+which I hope is ok.
+
+Finally, checking for equivalent pointers from clk_get() will work now,
+but it isn't future-proof if/when the clock framework starts returning
+dynamically allocated clock pointers for each clk_get() invocation.
+Maybe we need a function in the common clock framework that tells us if
+the clocks are the same either via DT or by taking two clock pointers?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
