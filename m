@@ -1,67 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jun 2014 13:17:21 +0100
-Subject: [PATCH 2/6] arm: mm: Introduce special ptes for LPAE
-In-Reply-To: <1403710824-24340-3-git-send-email-steve.capper@linaro.org>
-References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
- <1403710824-24340-3-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140627121721.GM26276@arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 27 Jun 2014 15:18:33 +0300
+Subject: [PATCH 5/6] clk: tegra: Add soctherm and tsensor clocks to
+ Tegra124 init table
+In-Reply-To: <1403856699-2140-6-git-send-email-mperttunen@nvidia.com>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-6-git-send-email-mperttunen@nvidia.com>
+Message-ID: <20140627121833.GQ3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 04:40:20PM +0100, Steve Capper wrote:
-> We need a mechanism to tag ptes as being special, this indicates that
-> no attempt should be made to access the underlying struct page *
-> associated with the pte. This is used by the fast_gup when operating on
-> ptes as it has no means to access VMAs (that also contain this
-> information) locklessly.
+On Fri, Jun 27, 2014 at 10:11:38AM +0200, Mikko Perttunen wrote:
+> This adds the two clocks, soctherm and tsensor, to the T124 initialization table.
+> They are required for soctherm-based thermal sensing.
 > 
-> The L_PTE_SPECIAL bit is already allocated for LPAE, this patch modifies
-> pte_special and pte_mkspecial to make use of it, and defines
-> __HAVE_ARCH_PTE_SPECIAL.
-> 
-> This patch also excludes special ptes from the icache/dcache sync logic.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 > ---
->  arch/arm/include/asm/pgtable-2level.h | 2 ++
->  arch/arm/include/asm/pgtable-3level.h | 8 ++++++++
->  arch/arm/include/asm/pgtable.h        | 6 ++----
->  3 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-> index 219ac88..f027941 100644
-> --- a/arch/arm/include/asm/pgtable-2level.h
-> +++ b/arch/arm/include/asm/pgtable-2level.h
-> @@ -182,6 +182,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
->  #define pmd_addr_end(addr,end) (end)
->  
->  #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
-> +#define pte_special(pte)	(0)
-> +static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
->  
->  /*
->   * We don't have huge page support for short descriptors, for the moment
-> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> index 85c60ad..b286ba9 100644
-> --- a/arch/arm/include/asm/pgtable-3level.h
-> +++ b/arch/arm/include/asm/pgtable-3level.h
-> @@ -207,6 +207,14 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
->  #define pte_huge(pte)		(pte_val(pte) && !(pte_val(pte) & PTE_TABLE_BIT))
->  #define pte_mkhuge(pte)		(__pte(pte_val(pte) & ~PTE_TABLE_BIT))
->  
-> +#define pte_special(pte)	(!!(pte_val(pte) & L_PTE_SPECIAL))
+> Peter, one more zero for TSENSOR, please :)
 
-Why the !!? Also, shouldn't this be rebased on your series adding the
-pte_isset macro to ARM?
+Ah :) I will take this into clk-tegra-3.17
 
-> +static inline pte_t pte_mkspecial(pte_t pte)
-> +{
-> +	pte_val(pte) |= L_PTE_SPECIAL;
-> +	return pte;
-> +}
+Cheers,
 
-If you put this in pgtable.h based on #ifdef __HAVE_ARCH_PTE_SPECIAL, then
-you can use PTE_BIT_FUNC to avoid reinventing the wheel (or define
-L_PTE_SPECIAL as 0 for 2-level and have one function).
-
-Will
+Peter.
