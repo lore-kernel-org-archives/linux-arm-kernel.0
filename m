@@ -1,77 +1,40 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 27 Jun 2014 13:56:46 -0700
-Subject: [PATCH v8 5/9] seccomp: split mode set routines
-In-Reply-To: <20140627195559.GA31661@redhat.com>
-References: <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
- <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
- <20140625173245.GA17695@redhat.com>
- <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
- <20140625175136.GA18185@redhat.com>
- <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
- <CALCETrVNwhWSPNiBiZmgP1nD9zLJPTk6cH0yo=85rbxTPTYFRg@mail.gmail.com>
- <CAGXu5jLavA8FJD8m-1y4wO0uzh3qvvMmajAg0Lrr1Cn_Om3a3w@mail.gmail.com>
- <20140627192753.GA30752@redhat.com>
- <CALCETrVbJqfG6oBaZEjj7H3pPa1oVJx6QXAYc5zZ6o-niV=WKQ@mail.gmail.com>
- <20140627195559.GA31661@redhat.com>
-Message-ID: <CAGXu5j+M+MHkxNMSaQ+RqYrty=1Fgur6_duSnL8DAZ_SazeJ7w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 15:03:08 -0600
+Subject: [RFC 3/4] soc/tegra: Initialize interrupt controller from DT
+In-Reply-To: <1403888329-24755-3-git-send-email-thierry.reding@gmail.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <1403888329-24755-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53ADDC0C.4060401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 12:55 PM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 06/27, Andy Lutomirski wrote:
->>
->> On Fri, Jun 27, 2014 at 12:27 PM, Oleg Nesterov <oleg@redhat.com> wrote:
->> > On 06/27, Kees Cook wrote:
->> >>
->> >> It looks like SMP ARM issues dsb for rmb, which seems a bit expensive.
->> >> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204g/CIHJFGFE.htm
->> >>
->> >> ...
->> >>
->> >> I really want to avoid adding anything to the secure_computing()
->> >> execution path. :(
->> >
->> > I must have missed something but I do not understand your concerns.
->> >
->> > __secure_computing() is not trivial, and we are going to execute the
->> > filters. Do you really think rmb() can add the noticeable difference?
->> >
->> > Not to mention that we can only get here if we take the slow syscall
->> > enter path due to TIF_SECCOMP...
->> >
->>
->> On my box, with my fancy multi-phase seccomp patches, the total
->> seccomp overhead for a very short filter is about 13ns.  Adding a full
->> barrier would add several ns, I think.
->
-> I am just curious, does this 13ns overhead include the penalty from the
-> slow syscall enter path triggered by TIF_SECCOMP ?
->
->> Admittedly, this is x86, not ARM, so comparisons here are completely
->> bogus.  And that read memory barrier doesn't even need an instruction
->> on x86.  But still, let's try to keep this fast.
->
-> Well, I am not going to insist...
->
-> But imo it would be better to make it correct in a most simple way, then
-> we can optimize this code and see if there is a noticeable difference.
->
-> Not only we can change the ordering, we can remove the BUG_ON's and just
-> accept the fact the __secure_computing() can race with sys_seccomp() from
-> another thread.
->
-> If nothing else, it would be much simpler to discuss this patch if it comes
-> as a separate change.
+On 06/27/2014 10:58 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> Obtains the register ranges for the legacy interrupt controller from DT
+> and provide hard-coded values as fallback.
 
-Yeah, the way I want to go is to add the rmb() for now (it gets us
-"correctness"), and then later deal with any potential performance
-problems on ARM at a later time. (At present, I'm unable to perform
-any timings on ARM -- maybe next week.)
+> diff --git a/drivers/soc/tegra/irq.c b/drivers/soc/tegra/irq.c
 
-I will send the v9 series in a moment here...
+>  void __init tegra_init_irq(void)
 
--Kees
+> -	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+> +	np = of_find_matching_node(NULL, ictlr_matches);
+> +	if (np) {
+> +		for (i = 0; i < ARRAY_SIZE(ictlr_regs); i++)
+> +			if (of_address_to_resource(np, i, &res) == 0)
+> +				ictlr_regs[i] = res;
 
--- 
-Kees Cook
-Chrome OS Security
+It'd be nice to check that loop ran exactly the number of times expected
+based on the compatible value (i.e. SoC) if the legacy interrupt
+controller node.
+
+What about erroring out if entries are missing or can't be parsed.
+
+>  	if (num_ictlrs > ARRAY_SIZE(ictlr_reg_base)) {
+> -		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %d.",
+> +		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %zu.",
+>  			num_ictlrs, ARRAY_SIZE(ictlr_reg_base));
+
+While we're changing this, maybe we should change that test to
+"num_ictlrs != the expected value", so too few is found as well.
