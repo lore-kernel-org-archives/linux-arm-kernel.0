@@ -1,74 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 16:15:42 +0100
-Subject: [PATCH CFT 00/30] Initial round of Freescale FEC ethernet patches
-Message-ID: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 27 Jun 2014 16:18:11 +0100
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <CAErSpo7nhqJGXcnY4FO=6CZtYdSY0qNUyRSP3nnxAUO5L6c+jA@mail.gmail.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140405001953.GE15806@google.com>
+ <20140407083120.GE17163@e106497-lin.cambridge.arm.com>
+ <5183143.FxBNM0xTAV@wuerfel>
+ <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
+ <20140626085926.GB11244@arm.com>
+ <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
+ <20140627141451.GJ15296@arm.com>
+ <CAErSpo7nhqJGXcnY4FO=6CZtYdSY0qNUyRSP3nnxAUO5L6c+jA@mail.gmail.com>
+Message-ID: <20140627151811.GA12812@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v2 of my initial round of patches (roughly half of my total
-patch set) for the Freescale FEC driver.
+On Fri, Jun 27, 2014 at 03:55:04PM +0100, Bjorn Helgaas wrote:
+> On Fri, Jun 27, 2014 at 8:14 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > ...
+> > With Liviu's latest version (not posted) and with
+> > of_create_pci_host_bridge() function moved to of_pci.c, I don't think
+> > there is much new functionality added to drivers/pci/. What I think we
+> > need is clarifying the domain_nr patch (and API change) and more users
+> > of the new generic code. As you said, it doesn't need to be a separate
+> > architecture but rather existing pci host drivers under drivers/pci. Of
+> > course, other arch conversion should follow shortly as well but even
+> > without an immediate conversion, I don't see too much additional
+> > maintenance burden for the core PCIe code (and code sharing between new
+> > PCIe host drivers is even more beneficial).
+> 
+> Sorry, I haven't had time to follow this.  It sounds like there are
+> several pieces we could get out of the way easily.  How about posting
+> the actual patches again?  Maybe re-order them so the easy pieces are
+> first so they can get applied even if there are issues with later
+> ones?
 
-I'm sending this set out for comments and testing.  So far, I have
-had only one ack for one patch in this series, this is pretty poor,
-so I'm now sending it with a CFT tag instead.
+OK, I will post a new series on Monday.
 
-I haven't changed too much - I've fixed the bug which Andy spotted in
-the transmit handling, but otherwise the patches are much the same.
+Thanks,
+Liviu
 
-The remainder of the text is as per my previous message, but with
-updated diffstat:
-
-One of my motivations for only sending half is to get this half into
-a state where DaveM is happy to merge it before I sort out the
-remainder.  There's quite a lot here, so bear with me on this.
-
-I've tried to sort the fixes before the cleanups as best I can, but
-reordering the series is a full-time job due to it's size - it's taken
-from Monday until now to get this far with it, so I'm hoping that there
-won't be any "you should rearrange the patches as X" comments.
-
-While the original series was well tested during it's original
-development, including with performance tests on each patch, that
-testing and validation has been lost due to the changes during the
-last merge window, and subsequent rebasing and updating of the patches.
-
-The series is based on v3.16-rc1, and as such, I have added Andy's
-checksum fix to the start of the series.  This patch is not strictly
-part of the RFC, but is included because my complete patch series needs
-to account for that change.
-
-Some of these patches are to fix theoretical problems in the driver
-(ones which have been found via a review of the code) others address
-real observable problems (such as poor half-duplex performance.)
-
-Towards the end of this series, I have included a patch which was
-initially at the beginning of the series for dumping out the state of
-the transmit ring, which is very useful to debug transmit problems.
-This was acceptable when the transmit ring was between 16 and 128
-descriptors, but during the recent merge window, this was increased to
-512 descriptors, so it will now print around 512 lines to the kernel
-message log on transmit timeout.  I'm not entirely convinced this is a
-good idea - maybe it should become optional, or maybe the timed-out ring
-status should be available via debugfs, but that's a problem to retrieve
-if you're running NFS rootfs and the timeout doesn't recover properly.
-
-This series of patches is also available from the following *unstable*
-git branch - unstable as it's provided for convenience so you don't
-have to apply all these patches individually, unstable as the patches
-need to have attributations added, unstable because DaveM will probably
-want to apply them as patches to his tree:
-
-  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git fec-testing
-
- drivers/net/ethernet/freescale/fec.h      |  10 +-
- drivers/net/ethernet/freescale/fec_main.c | 382 +++++++++++++++++-------------
- 2 files changed, 224 insertions(+), 168 deletions(-)
+> 
+> Bjorn
+> 
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
