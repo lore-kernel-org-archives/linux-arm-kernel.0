@@ -1,51 +1,81 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Fri, 27 Jun 2014 11:11:33 +0300
-Subject: [PATCH 0/6] of-thermal hardware trip points + Tegra124 SOCTHERM driver
-Message-ID: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+Date: Fri, 27 Jun 2014 11:11:35 +0300
+Subject: [PATCH 2/6] of: Add bindings for nvidia,tegra124-soctherm
+In-Reply-To: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1403856699-2140-3-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+This adds binding documentation and headers for the Tegra124
+SOCTHERM device tree node.
 
-this series adds support for hardware-tracked thermal trip points
-for the device tree thermal framework and introduces a new Tegra124 thermal
-driver that uses them.
-
-Hardware-tracked trip points are trip points that do not need to be polled;
-the hardware gives an interrupt when the trip point is reached. The device
-tree thermal framework has not previously given the sensor driver any
-information about set trip points, so using these has been impossible.
-This series adds a new callback from of-thermal to the driver to allow telling
-the driver about trip points. The driver only needs to track two trip points,
-the framework ensures that the current temperature lies between those two.
-Behavior for drivers that do not include this callback is unchanged.
-
-The Tegra124 SOCTHERM thermal driver that is included exposes four thermal zones
-(the thermctl thermal zones) with hardware-tracked trip point support. While the
-hardware supports four tracked trip points, only one is used.
-
-Mikko Perttunen (6):
-  thermal: of: Add support for hardware-tracked trip points
-  of: Add bindings for nvidia,tegra124-soctherm
-  ARM: tegra: Add thermal trip points for Jetson TK1
-  ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
-  clk: tegra: Add soctherm and tsensor clocks to Tegra124 init table
-  thermal: Add Tegra SOCTHERM thermal management driver
-
- .../devicetree/bindings/thermal/tegra-soctherm.txt |  32 ++
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  32 ++
- arch/arm/boot/dts/tegra124.dtsi                    |  48 ++
- drivers/clk/tegra/clk-tegra124.c                   |   2 +
- drivers/thermal/Kconfig                            |   7 +
- drivers/thermal/Makefile                           |   1 +
- drivers/thermal/of-thermal.c                       |  97 +++-
- drivers/thermal/tegra_soctherm.c                   | 553 +++++++++++++++++++++
- include/dt-bindings/thermal/tegra124-soctherm.h    |  15 +
- include/linux/thermal.h                            |   3 +-
- 10 files changed, 785 insertions(+), 5 deletions(-)
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ .../devicetree/bindings/thermal/tegra-soctherm.txt | 32 ++++++++++++++++++++++
+ include/dt-bindings/thermal/tegra124-soctherm.h    | 15 ++++++++++
+ 2 files changed, 47 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
- create mode 100644 drivers/thermal/tegra_soctherm.c
  create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
 
+diff --git a/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+new file mode 100644
+index 0000000..dc5588e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+@@ -0,0 +1,32 @@
++Tegra124 SOCTHERM thermal management system
++
++Required properties :
++- compatible : "nvidia,tegra124-soctherm".
++- reg : Should contain 1 entry:
++  - SOCTHERM register set
++- interrupts : Defines the interrupt used by SOCTHERM
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries:
++  - tsensor
++  - soctherm
++- resets : Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names : Must include the following entries:
++  - soctherm
++- #thermal-sensor-cells : For thermctl sensors. Should be 1.
++
++Example :
++
++	soctherm at 0,700e2000 {
++		compatible = "nvidia,tegra124-soctherm";
++		reg = <0x0 0x700e2000 0x0 0x1000>;
++		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_TSENSOR>,
++			<&tegra_car TEGRA124_CLK_SOC_THERM>;
++		clock-names = "tsensor", "soctherm";
++		resets = <&tegra_car 78>;
++		reset-names = "soctherm";
++
++		#thermal-sensor-cells = <1>;
++	};
+diff --git a/include/dt-bindings/thermal/tegra124-soctherm.h b/include/dt-bindings/thermal/tegra124-soctherm.h
+new file mode 100644
+index 0000000..cbef15d
+--- /dev/null
++++ b/include/dt-bindings/thermal/tegra124-soctherm.h
+@@ -0,0 +1,15 @@
++/*
++ * This header provides constants for binding nvidia,tegra124-soctherm.
++ */
++
++#ifndef _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
++#define _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
++
++#define TEGRA124_SOCTHERM_SENSOR_CPU 0
++#define TEGRA124_SOCTHERM_SENSOR_MEM 1
++#define TEGRA124_SOCTHERM_SENSOR_GPU 2
++#define TEGRA124_SOCTHERM_SENSOR_PLLX 3
++
++#endif
++
++
 -- 
 1.8.1.5
