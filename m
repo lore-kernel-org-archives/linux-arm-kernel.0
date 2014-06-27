@@ -1,45 +1,38 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 27 Jun 2014 10:38:57 +0100
-Subject: [PATCH 8/9] ARM: kernel: add support for cpu cache information
-In-Reply-To: <53AC6A3A.1010001@codeaurora.org>
-References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
- <1403717444-23559-9-git-send-email-sudeep.holla@arm.com>
- <53AB6700.2060807@codeaurora.org> <53AC05C4.2030104@arm.com>
- <53AC6A3A.1010001@codeaurora.org>
-Message-ID: <53AD3BB1.6020404@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 10:40:36 +0100
+Subject: mainline boot: 64 boots: 62 pass, 2 fail (v3.16-rc1-2-gebe0618)
+In-Reply-To: <53AD34E6.8000302@codeaurora.org>
+References: <53A9B99F.4040806@codeaurora.org> <53A9FBB5.60709@codeaurora.org>
+ <53AABCF5.4050403@gmail.com> <53AB45D1.90909@codeaurora.org>
+ <53ABC13C.8030908@gmail.com>
+ <CAGa+x84UTbmFc2Twg9zEcr+ZP2xsq68gFvk=385+_cFM5hvGHg@mail.gmail.com>
+ <20140626151756.GU32514@n2100.arm.linux.org.uk>
+ <53AC77A2.4090207@codeaurora.org> <53ACDFC2.5020206@gmail.com>
+ <53AD34E6.8000302@codeaurora.org>
+Message-ID: <20140627094036.GD32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 26/06/14 19:45, Stephen Boyd wrote:
-> On 06/26/14 04:36, Sudeep Holla wrote:
->> Hi Stephen,
+On Fri, Jun 27, 2014 at 02:09:58AM -0700, Laura Abbott wrote:
+> On 6/26/2014 8:06 PM, Tushar Behera wrote:
+>> arm_add_memory is getting called before this is being set, resulting in
+>> none of the memory banks getting added[1].
 >>
->> On 26/06/14 01:19, Stephen Boyd wrote:
->>> On 06/25/14 10:30, Sudeep Holla wrote:
->>>> +
->>>> +/*
->>>> + * Which cache CCSIDR represents depends on CSSELR value
->>>> + * Make sure no one else changes CSSELR during this
->>>> + * smp_call_function_single prevents preemption for us
->>>> + */
->>>
->>> Where's the smp_call_function_single() or preemption disable happening?
->>>
+>> setup_machine_fdt -> early_init_dt_scan -> early_init_dt_scan_memory
 >>
->> init_cache_level is called using smp_call_function_single in
->> drivers/base/cacheinfo.c(PATCH 2/9)
+>> Would it make sense to re-introduce the config option ARM_NR_BANKS and
+>> replace max_cnt with NR_BANKS?
+>>
+>> [1] http://pastebin.com/MawYD7kb
+>>
 >
-> Oh that's unexpected. Do other architectures require the use of
-> smp_call_function_single() to read their cache information? It seems
-> like an ARM architecture specific detail that has been pushed up into
-> the generic layer.
->
+> I was hoping to avoid re-introducing the config option but that may be
+> the case if we can't make the machine_info work. I'll take a better
+> look tomorrow.
 
-Right, since I started with x86 as reference and it requires it, I missed to
-see others. So x86,ARM{32,64} requires it while ppc,s390 and ia64 doesn't.
-I see how to fix that. Thanks for spotting it.
+The problem with the config option is that it's not single zImage
+friendly.
 
-Regards,
-Sudeep
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
