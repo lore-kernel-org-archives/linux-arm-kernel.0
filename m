@@ -1,55 +1,50 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 27 Jun 2014 10:54:04 +0200
-Subject: [PATCH v5 03/14] clk: max77686: Add DT include for MAX77686 PMIC
- clock
-In-Reply-To: <53AD2AB7.1090000@suse.de>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-4-git-send-email-javier.martinez@collabora.co.uk>
- <53AD21E5.1030609@suse.de> <53AD22ED.5040303@collabora.co.uk>
- <53AD2AB7.1090000@suse.de>
-Message-ID: <53AD312C.90005@collabora.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 09:57:06 +0100
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <20140627085125.GA7088@hal>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <20140627085125.GA7088@hal>
+Message-ID: <20140627085705.GC32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
+On Fri, Jun 27, 2014 at 10:51:27AM +0200, Jan Glauber wrote:
+> On Sun, Jun 22, 2014 at 10:11:49PM -0500, Nathan Lynch wrote:
+> > Provide fast userspace implementations of gettimeofday and
+> > clock_gettime on systems that implement the generic timers extension
+> > defined in ARMv7.  This follows the example of arm64 in conception but
+> > significantly differs in some aspects of the implementation (C vs
+> > assembly, mainly).
+> 
+> Hi Nathan,
+> 
+> applying your patches I get the following compile error under Ubuntu 12.04:
+> 
+>   CC      arch/arm/kernel/vdso.o
+>   LDS     arch/arm/kernel/vdso/vdso.lds
+>   CC      arch/arm/kernel/vdso/vgettimeofday.o
+>   AS      arch/arm/kernel/vdso/datapage.o
+>   VDSOL   arch/arm/kernel/vdso/vdso.so.raw
+>   HOSTCC  arch/arm/kernel/vdso/vdsomunge
+> arch/arm/kernel/vdso/vdsomunge.c: In function ?main?:
+> arch/arm/kernel/vdso/vdsomunge.c:152:16: error: ?EF_ARM_ABI_FLOAT_HARD? undeclared (first use in this function)
+> arch/arm/kernel/vdso/vdsomunge.c:152:16: note: each undeclared identifier is reported only once for each function it appears in
+> arch/arm/kernel/vdso/vdsomunge.c:156:34: error: ?EF_ARM_ABI_FLOAT_SOFT? undeclared (first use in this function)
+> make[2]: *** [arch/arm/kernel/vdso/vdsomunge] Error 1
+> make[1]: *** [arch/arm/kernel/vdso] Error 2
+> make: *** [arch/arm/kernel] Error 2
+> 
+> Looks like the libc dev is too old (EF_ARM_ABI_FLOAT_* not in
+> /usr/include/elf.h). On a more recent Ubuntu it compiles fine.
+> Not sure how to solve this, maybe disable vdso if the libc is too old?
 
-On 06/27/2014 10:26 AM, Andreas F?rber wrote:
-> Hi Javier,
-> 
-> Am 27.06.2014 09:53, schrieb Javier Martinez Canillas:
->> Hello Andreas,
->> 
->> On 06/27/2014 09:48 AM, Andreas F?rber wrote:
->>> Am 26.06.2014 20:15, schrieb Javier Martinez Canillas:
->>>> This patch adds a dt-binding include for Maxim 77686
->>>> PMIC clock IDs that can be to be shared between the
->>>
->>> "can be shared"?
->>>
->> 
->> As it should be quite clear right now I'm not a native English speaker.
-> 
-> Guessed so, me neither. But since it's v5 already and no native speaker
-> pointed it out, I took the liberty to do so while verifying that the
-> LD02 typo didn't propagate into your bindings documentation (it didn't).
-> 
->> I meant
->> that the header file can be included by both Device Tree source files and the
->> max77802 driver.
-> 
-> AFAIU "clock IDs to be shared" and "clock IDs that can be shared" would
-> both be valid, but above a verb is missing (e.g., "can be used to").
-> 
-> Thanks for your upstreaming efforts, and don't let me discourage you.
-> 
+This is what really concerns me about the VDSO.  It adds an additional
+dependence on the C library in order to build the kernel.  What if you
+don't have a C library in your cross-build setup (I don't.)
 
-No discourage at all, your feedback is highly appreciated and sorry that I
-didn't catch all these typos when working on the DT documentation.
+Until that is solved, the VDSO support is not going in, as it will
+effectively render the kernel unbuildable for me.
 
-> Best regards,
-> 
-> Andreas
-> 
-
-Best regards,
-Javier
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
