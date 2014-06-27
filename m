@@ -1,368 +1,148 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 27 Jun 2014 09:57:51 +0200
-Subject: [RFC 4/5] clk: per-user clock accounting for debug
-In-Reply-To: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1403855872-14749-5-git-send-email-tomeu.vizoso@collabora.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 27 Jun 2014 10:06:14 +0200
+Subject: [PATCH v5 08/14] mfd: max77802: Add DT binding documentation
+In-Reply-To: <1403806546-31122-9-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-9-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <53AD25F6.6030007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin.vincent@stericsson.com>
+Am 26.06.2014 20:15, schrieb Javier Martinez Canillas:
+> Add Device Tree binding documentation for Maxim 77802 PMIC.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+> 
+> Changes since v4: None
+> 
+> Changes since v3: None
+> 
+> Changes since v2:
+>  - Explain better the Dynamic Voltage Scaling (DVS) support in some Buck
+>    regulators and the max77802,pmic-buck-{dvs,selb}-gpios properties.
+>    Suggested by Mark Brown.
+> 
+>  Documentation/devicetree/bindings/mfd/max77802.txt | 97 ++++++++++++++++++++++
+>  1 file changed, 97 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
+> new file mode 100644
+> index 0000000..f3b67c5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
+> @@ -0,0 +1,97 @@
+> +Maxim MAX77802 multi-function device
+> +
+> +MAX77802 is a Mulitifunction device with PMIC, RTC and Charger on chip. It is
 
-When a clock has multiple users, the WARNING on imbalance of
-enable/disable may not show the guilty party since although they may
-have commited the error earlier, the warning is emitted later when some
-other user, presumably innocent, disables the clock.
+"Multifunction"?
 
-Provide per-user clock enable/disable accounting and disabler tracking
-in order to help debug these problems.
+> +interfaced to host controller using i2c interface. PMIC, Charger and RTC
+> +submodules are addressed using same i2c slave address.
+> +
+> +Buck regulators 1, 2, 3, 4 and 6 include Dynamic Voltage Scaling (DVS) that
+> +allows each output voltage to change dynamically. Each Buck output voltage
+> +is selected using a set of external inputs: DVS1-3 and SELB1, 2, 3 and 6.
+> +
+> +There are 8 DVS registers that can be used to configure the output voltage
+> +for each Buck regulator and which one is active is controled by DVSx lines.
+> +
+> +SELBx lines are used to control if individual Buck lines are ON or OFF.
+> +
+> +This document describes the binding for mfd device and PMIC submodule.
+> +
+> +Binding for the built-in 32k clock generator block is defined separately
+> +in bindings/clk/maxim,max77802.txt file.
+> +
+> +Required properties:
+> +- compatible : Must be "maxim,max77802";
+> +- reg : Specifies the i2c slave address of PMIC block.
+> +- interrupts : This i2c device has an IRQ line connected to the main SoC.
+> +- interrupt-parent : The parent interrupt controller.
+> +
+> +Optional properties:
+> +- max77802,pmic-buck-default-dvs-idx: We'll always write this DVS index in the
+> +  PMIC for Bucks with DVS.
+> +  NOTE: at the moment these bindings don't include enough details for actual
+> +  GPIO-DVS--this just lets you choose which single slot to use.
+> +
+> +- max77802,pmic-buck-dvs-gpios: A GPIO array where each GPIO is connected to a
+> +  DVS line. We'll try to set these GPIOs to match pmic-buck-default-dvs-idx at
+> +  probe time if they are defined. If some or all of these GPIOs are not defined
+> +  it's assumed that the board has any missing GPIOs hardwired to match
+> +  pmic-buck-default-dvs-idx.
+> +
+> +- max77802,pmic-buck-selb-gpios: A GPIO array where each GPIO is connected to a
+> +  SELBx line. Should be five values: 1, 2, 3, 4, 6. It is strongly suggested to
+> +  include these GPIOs if there's any chance that changing DVS GPIOs one line at
+> +  a time might glitch your DVS values.
+> +
+> +Optional node:
+> +- regulators : The regulators of max77802 have to be instantiated
+> +  under subnode named "regulators" using the following format.
+> +
+> +	regulator_name {
 
-NOTE: with this patch, clk_get_parent() behaves like clk_get(), i.e. it
-needs to be matched with a clk_put().  Otherwise, memory will leak.
+The convention, I was told, would be regulator-name as node name.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/clk/clk-devres.c        |  3 ++-
- drivers/clk/clk-highbank.c      |  2 +-
- drivers/clk/clk.c               | 52 ++++++++++++++++++++++++++++++++++++++---
- drivers/clk/clk.h               |  2 +-
- drivers/clk/clkdev.c            | 27 +++++++++++++++++----
- drivers/clk/qcom/mmcc-msm8960.c |  9 ++++---
- drivers/clk/sunxi/clk-sunxi.c   |  2 +-
- drivers/clk/tegra/clk.c         |  2 +-
- drivers/clk/zynq/clkc.c         | 12 +++++-----
- include/linux/clk-private.h     |  6 ++++-
- include/linux/clk-provider.h    |  3 ++-
- 11 files changed, 96 insertions(+), 24 deletions(-)
+> +		standard regulator constraints....
+> +	};
+> +	refer Documentation/devicetree/bindings/regulator/regulator.txt
+> +
+> +  The regulator node name should be initialized with a string
+> +to get matched with their hardware counterparts as follow:
+> +
+> +	-LDOn 	:	for LDOs, where n can lie in range 1 to 35.
+> +			example: LDO1, LDO2, LDO35.
+> +	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 10.
+> +			example: BUCK1, BUCK5, BUCK10.
+> +Example:
+> +
+> +	max77802 at 09 {
+> +		compatible = "maxim,max77802";
+> +		interrupt-parent = <&wakeup_eint>;
+> +		interrupts = <26 0>;
+> +		reg = <0x09>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		max77802,pmic-buck-default-dvs-idx = <1>;
+> +		max77802,pmic-buck-dvs-gpios = <&gpy7 6 0>,
+> +					       <&gpj4 2 0>,
+> +					       <&gpj4 3 0>;
+> +		max77802,pmic-buck-selb-gpios = <&gph0 2 0>,
+> +						<&gph0 3 0>,
+> +						<&gph0 4 0>,
+> +						<&gph0 5 0>,
+> +						<&gph0 6 0>;
+> +
+> +		regulators {
+> +			ldo11_reg: LDO11 {
+> +				regulator-compatible = "LDO11";
+> +				regulator-name = "vdd_ldo11";
+> +				regulator-min-microvolt = <1900000>;
+> +				regulator-max-microvolt = <1900000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck1_reg {
 
-diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-index 85a9b40..dcaabb0 100644
---- a/drivers/clk/clk-devres.c
-+++ b/drivers/clk/clk-devres.c
-@@ -37,7 +37,8 @@ EXPORT_SYMBOL(__devm_clk_get_internal);
- 
- struct clk *devm_clk_get(struct device *dev, const char *id)
- {
--	return clk_core_to_clk(__devm_clk_get_internal(dev, id));
-+	const char *dev_id = dev ? dev_name(dev) : NULL;
-+	return clk_core_to_clk(__devm_clk_get_internal(dev, id), dev_id, id);
- }
- EXPORT_SYMBOL(devm_clk_get);
- 
-diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
-index cc1bae1..4e38856 100644
---- a/drivers/clk/clk-highbank.c
-+++ b/drivers/clk/clk-highbank.c
-@@ -331,7 +331,7 @@ CLK_OF_DECLARE(hb_a9periph, "calxeda,hb-a9periph-clock", hb_a9periph_init);
- static void __init hb_a9bus_init(struct device_node *node)
- {
- 	struct clk_core *clk = hb_clk_init(node, &a9bclk_ops);
--	clk_prepare_enable(clk_core_to_clk(clk));
-+	clk_prepare_enable(clk_core_to_clk(clk, node->full_name, NULL));
- }
- CLK_OF_DECLARE(hb_a9bus, "calxeda,hb-a9bus-clock", hb_a9bus_init);
- 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index f9a603a..7fc1937 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -568,6 +568,28 @@ static int clk_disable_unused(void)
- }
- late_initcall_sync(clk_disable_unused);
- 
-+struct clk *clk_core_to_clk(struct clk_core *clk_core, const char *dev,
-+			    const char *con)
-+{
-+	struct clk *clk;
-+
-+	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-+	if (!clk)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clk->core = clk_core;
-+	clk->dev_id = dev;
-+	clk->con_id = con;
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL_GPL(clk_core_to_clk);
-+
-+struct clk_core *clk_to_clk_core(struct clk *clk)
-+{
-+	return clk->core;
-+}
-+
- /***    helper functions   ***/
- 
- const char *__clk_get_name(struct clk_core *clk)
-@@ -935,7 +957,20 @@ static void __clk_disable_internal(struct clk_core *clk)
-  */
- void clk_disable(struct clk *clk_user)
- {
--	__clk_disable_internal(clk_to_clk_core(clk_user));
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	unsigned long flags;
-+
-+	flags = clk_enable_lock();
-+	if (!WARN(clk_user->enable_count == 0,
-+		  "incorrect disable clk dev %s con %s last disabler %pF\n",
-+		  clk_user->dev_id, clk_user->con_id, clk_user->last_disable)) {
-+
-+		clk_user->last_disable = __builtin_return_address(0);
-+		clk_user->enable_count--;
-+
-+		__clk_disable(clk);
-+	}
-+	clk_enable_unlock(flags);
- }
- EXPORT_SYMBOL_GPL(clk_disable);
- 
-@@ -995,7 +1030,17 @@ static int __clk_enable_internal(struct clk_core *clk)
-  */
- int clk_enable(struct clk *clk_user)
- {
--	return __clk_enable_internal(clk_to_clk_core(clk_user));
-+	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	unsigned long flags;
-+	int ret;
-+
-+	flags = clk_enable_lock();
-+	ret = __clk_enable(clk);
-+	if (!ret)
-+		clk_user->enable_count++;
-+	clk_enable_unlock(flags);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(clk_enable);
- 
-@@ -1671,8 +1716,9 @@ EXPORT_SYMBOL_GPL(__clk_get_parent_internal);
- struct clk *clk_get_parent(struct clk *clk_user)
- {
- 	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	struct clk_core *parent = __clk_get_parent_internal(clk);
- 
--	return clk_core_to_clk(__clk_get_parent_internal(clk));
-+	return clk_core_to_clk(parent, clk_user->dev_id, clk_user->con_id);
- }
- EXPORT_SYMBOL_GPL(clk_get_parent);
- 
-diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
-index 677ced3..2f682bf 100644
---- a/drivers/clk/clk.h
-+++ b/drivers/clk/clk.h
-@@ -17,5 +17,5 @@ void of_clk_unlock(void);
- #endif
- 
- #if defined(CONFIG_COMMON_CLK)
--#define clk_to_clk_core(clk)	((struct clk_core *)(clk))
-+struct clk_core *clk_to_clk_core(struct clk *clk);
- #endif
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 73cb33a..bf1a2d7 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -18,6 +18,7 @@
- #include <linux/string.h>
- #include <linux/mutex.h>
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/clk-provider.h>
- #include <linux/of.h>
-@@ -75,7 +76,9 @@ struct clk_core *__of_clk_get_internal(struct device_node *np, int index)
- 
- struct clk *of_clk_get(struct device_node *np, int index)
- {
--	return clk_core_to_clk(__of_clk_get_internal(np, index));
-+	struct clk_core *clk = __of_clk_get_internal(np, index);
-+
-+	return clk_core_to_clk(clk, np->full_name, NULL);
- }
- EXPORT_SYMBOL(of_clk_get);
- 
-@@ -127,7 +130,9 @@ struct clk_core *__of_clk_get_by_name_internal(struct device_node *np, const cha
-  */
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
- {
--	return clk_core_to_clk(__of_clk_get_by_name_internal(np, name));
-+	struct clk_core *clk = __of_clk_get_by_name_internal(np, name);
-+
-+	return clk_core_to_clk(clk, np->full_name, NULL);
- }
- EXPORT_SYMBOL(of_clk_get_by_name);
- #endif
-@@ -194,7 +199,9 @@ EXPORT_SYMBOL_GPL(__clk_get_sys_internal);
- 
- struct clk *clk_get_sys(const char *dev_id, const char *con_id)
- {
--	return clk_core_to_clk(__clk_get_sys_internal(dev_id, con_id));
-+	struct clk_core *clk = __clk_get_sys_internal(dev_id, con_id);
-+
-+	return clk_core_to_clk(clk, dev_id, con_id);
- }
- EXPORT_SYMBOL(clk_get_sys);
- 
-@@ -217,13 +224,23 @@ EXPORT_SYMBOL(__clk_get_internal);
- 
- struct clk *clk_get(struct device *dev, const char *con_id)
- {
--	return clk_core_to_clk(__clk_get_internal(dev, con_id));
-+	const char *dev_id = dev ? dev_name(dev) : NULL;
-+
-+	return clk_core_to_clk(__clk_get_internal(dev, con_id), dev_id, con_id);
- }
- EXPORT_SYMBOL(clk_get);
- 
-+static void clk_free_clk(struct clk *clk)
-+{
-+	kfree(clk);
-+}
-+
- void clk_put(struct clk *clk)
- {
--	__clk_put(clk_to_clk_core(clk));
-+	clk_core_t *core = clk_to_clk_core(clk);
-+
-+	clk_free_clk(clk);
-+	__clk_put(core);
- }
- EXPORT_SYMBOL(clk_put);
- 
-diff --git a/drivers/clk/qcom/mmcc-msm8960.c b/drivers/clk/qcom/mmcc-msm8960.c
-index 28a5d30..47f21ea 100644
---- a/drivers/clk/qcom/mmcc-msm8960.c
-+++ b/drivers/clk/qcom/mmcc-msm8960.c
-@@ -470,7 +470,8 @@ static int pix_rdi_set_parent(struct clk_hw *hw, u8 index)
- 	 * needs to be on at what time.
- 	 */
- 	for (i = 0; i < num_parents; i++) {
--		ret = clk_prepare_enable(clk_core_to_clk(clk_get_parent_by_index(clk, i)));
-+		struct clk_core *parent = clk_get_parent_by_index(clk, i);
-+		ret = clk_prepare_enable(clk_core_to_clk(parent, NULL, __clk_get_name(parent)));
- 		if (ret)
- 			goto err;
- 	}
-@@ -498,8 +499,10 @@ static int pix_rdi_set_parent(struct clk_hw *hw, u8 index)
- 	udelay(1);
- 
- err:
--	for (i--; i >= 0; i--)
--		clk_disable_unprepare(clk_core_to_clk(clk_get_parent_by_index(clk, i)));
-+	for (i--; i >= 0; i--) {
-+		struct clk_core *parent = clk_get_parent_by_index(clk, i);
-+		clk_disable_unprepare(clk_core_to_clk(parent, NULL, __clk_get_name(parent)));
-+	}
- 
- 	return ret;
- }
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index b3149d4..183b60d 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1196,7 +1196,7 @@ static void __init sunxi_init_clocks(const char *clocks[], int nclocks)
- 		struct clk_core *clk = __clk_get_internal(NULL, clocks[i]);
- 
- 		if (!IS_ERR(clk))
--			clk_prepare_enable(clk_core_to_clk(clk));
-+			clk_prepare_enable(clk_core_to_clk(clk, NULL, clocks[i]));
- 	}
- }
- 
-diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-index 299b40e..548f138 100644
---- a/drivers/clk/tegra/clk.c
-+++ b/drivers/clk/tegra/clk.c
-@@ -228,7 +228,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
- 			}
- 
- 		if (tbl->state)
--			if (clk_prepare_enable(clk_core_to_clk(clk))) {
-+			if (clk_prepare_enable(clk_core_to_clk(clk, NULL, __clk_get_name(clk)))) {
- 				pr_err("%s: Failed to enable %s\n", __func__,
- 				       __clk_get_name(clk));
- 				WARN_ON(1);
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index c58c540..ed3e1cba 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -154,7 +154,7 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
- 			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
- 	enable_reg = clk_readl(fclk_gate_reg) & 1;
- 	if (enable && !enable_reg) {
--		if (clk_prepare_enable(clk_core_to_clk(clks[fclk])))
-+		if (clk_prepare_enable(clk_core_to_clk(clks[fclk], NULL, clk_name)))
- 			pr_warn("%s: FCLK%u enable failed\n", __func__,
- 					fclk - fclk0);
- 	}
-@@ -333,13 +333,13 @@ static void __init zynq_clk_setup(struct device_node *np)
- 			CLK_DIVIDER_ALLOW_ZERO, &ddrclk_lock);
- 	clks[ddr2x] = clk_register_gate(NULL, clk_output_name[ddr2x],
- 			"ddr2x_div", 0, SLCR_DDR_CLK_CTRL, 1, 0, &ddrclk_lock);
--	clk_prepare_enable(clk_core_to_clk(clks[ddr2x]));
-+	clk_prepare_enable(clk_core_to_clk(clks[ddr2x], NULL, clk_output_name[ddr2x]));
- 	clk = clk_register_divider(NULL, "ddr3x_div", "ddrpll", 0,
- 			SLCR_DDR_CLK_CTRL, 20, 6, CLK_DIVIDER_ONE_BASED |
- 			CLK_DIVIDER_ALLOW_ZERO, &ddrclk_lock);
- 	clks[ddr3x] = clk_register_gate(NULL, clk_output_name[ddr3x],
- 			"ddr3x_div", 0, SLCR_DDR_CLK_CTRL, 0, 0, &ddrclk_lock);
--	clk_prepare_enable(clk_core_to_clk(clks[ddr3x]));
-+	clk_prepare_enable(clk_core_to_clk(clks[ddr3x], NULL, clk_output_name[ddr3x]));
- 
- 	clk = clk_register_divider(NULL, "dci_div0", "ddrpll", 0,
- 			SLCR_DCI_CLK_CTRL, 8, 6, CLK_DIVIDER_ONE_BASED |
-@@ -351,7 +351,7 @@ static void __init zynq_clk_setup(struct device_node *np)
- 	clks[dci] = clk_register_gate(NULL, clk_output_name[dci], "dci_div1",
- 			CLK_SET_RATE_PARENT, SLCR_DCI_CLK_CTRL, 0, 0,
- 			&dciclk_lock);
--	clk_prepare_enable(clk_core_to_clk(clks[dci]));
-+	clk_prepare_enable(clk_core_to_clk(clks[dci], NULL, clk_output_name[dci]));
- 
- 	/* Peripheral clocks */
- 	for (i = fclk0; i <= fclk3; i++) {
-@@ -505,10 +505,10 @@ static void __init zynq_clk_setup(struct device_node *np)
- 	/* leave debug clocks in the state the bootloader set them up to */
- 	tmp = clk_readl(SLCR_DBG_CLK_CTRL);
- 	if (tmp & DBG_CLK_CTRL_CLKACT_TRC)
--		if (clk_prepare_enable(clk_core_to_clk(clks[dbg_trc])))
-+		if (clk_prepare_enable(clk_core_to_clk(clks[dbg_trc], NULL, clk_output_name[dbg_trc])))
- 			pr_warn("%s: trace clk enable failed\n", __func__);
- 	if (tmp & DBG_CLK_CTRL_CPU_1XCLKACT)
--		if (clk_prepare_enable(clk_core_to_clk(clks[dbg_apb])))
-+		if (clk_prepare_enable(clk_core_to_clk(clks[dbg_apb], NULL, clk_output_name[dbg_apb])))
- 			pr_warn("%s: debug APB clk enable failed\n", __func__);
- 
- 	/* One gated clock for all APER clocks. */
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 91659b2..9657fc8 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -56,7 +56,11 @@ struct clk_core {
- };
- 
- struct clk {
--	struct clk_core clk;
-+	struct clk_core	*core;
-+	unsigned int	enable_count;
-+	const char	*dev_id;
-+	const char	*con_id;
-+	void		*last_disable;
- };
- 
- /*
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index be3e958..7beab62 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -533,7 +533,8 @@ struct clk_core *__clk_get_sys_internal(const char *dev_id, const char *con_id);
- struct clk_core *__clk_get_internal(struct device *dev, const char *con_id);
- struct clk_core *__devm_clk_get_internal(struct device *dev, const char *id);
- 
--#define clk_core_to_clk(core)	((struct clk *)(core))
-+struct clk *clk_core_to_clk(struct clk_core *clk_core, const char *dev,
-+			    const char *con);
- 
- /*
-  * FIXME clock api without lock protection
+Missing ": BUCK1"
+
+> +				regulator-compatible = "BUCK1";
+> +				regulator-name = "vdd_mif";
+> +				regulator-min-microvolt = <950000>;
+> +				regulator-max-microvolt = <1300000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +	};
+
+Regards,
+Andreas
+
 -- 
-1.9.3
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
