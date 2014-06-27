@@ -1,141 +1,158 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 27 Jun 2014 16:22:56 -0700
-Subject: [PATCH v9 07/11] sched: move no_new_privs into new atomic flags
-In-Reply-To: <1403911380-27787-1-git-send-email-keescook@chromium.org>
-References: <1403911380-27787-1-git-send-email-keescook@chromium.org>
-Message-ID: <1403911380-27787-8-git-send-email-keescook@chromium.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 28 Jun 2014 01:27:58 +0200
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <53ADAA1C.70407@ti.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53ADAA1C.70407@ti.com>
+Message-ID: <20140627232757.GB26184@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since seccomp transitions between threads requires updates to the
-no_new_privs flag to be atomic, the flag must be part of an atomic flag
-set. This moves the nnp flag into a separate task field, and introduces
-accessors.
+On Fri, Jun 27, 2014 at 01:30:04PM -0400, Santosh Shilimkar wrote:
+> +Arnd, Greg, Catalin and Kumar,
+> 
+> On Friday 27 June 2014 12:58 PM, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > These drivers are closely coupled and need to be moved as a whole. One
+> > reason for moving them out of arch/arm/mach-tegra is to allow them to be
+> > shared with 64-bit ARM.
+> > 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  arch/arm/mach-tegra/Makefile                       | 32 --------
+> >  arch/arm/mach-tegra/common.h                       |  4 -
+> >  arch/arm/mach-tegra/io.c                           | 27 +++++-
+> >  arch/arm/mach-tegra/pmc.h                          | 62 --------------
+> >  arch/arm/mach-tegra/tegra.c                        |  9 --
+> >  drivers/soc/Makefile                               |  1 +
+> >  drivers/soc/tegra/Makefile                         | 34 ++++++++
+> >  .../soc/tegra}/cpuidle-tegra114.c                  |  0
+> >  .../soc/tegra}/cpuidle-tegra20.c                   |  6 +-
+> >  .../soc/tegra}/cpuidle-tegra30.c                   |  0
+> >  .../arm/mach-tegra => drivers/soc/tegra}/cpuidle.c |  0
+> >  .../arm/mach-tegra => drivers/soc/tegra}/cpuidle.h |  3 -
+> >  .../mach-tegra => drivers/soc/tegra}/flowctrl.c    |  0
+> >  .../mach-tegra => drivers/soc/tegra}/flowctrl.h    |  2 -
+> >  .../arm/mach-tegra => drivers/soc/tegra}/headsmp.S |  0
+> >  .../arm/mach-tegra => drivers/soc/tegra}/hotplug.c |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/iomap.h |  0
+> >  .../arm/mach-tegra => drivers/soc/tegra}/irammap.h |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/irq.c   |  1 -
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/irq.h   |  6 --
+> >  .../arm/mach-tegra => drivers/soc/tegra}/platsmp.c |  5 --
+> >  .../mach-tegra => drivers/soc/tegra}/pm-tegra20.c  |  0
+> >  .../mach-tegra => drivers/soc/tegra}/pm-tegra30.c  |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/pm.c    |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/pm.h    |  4 +-
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/pmc.c   |  0
+> >  drivers/soc/tegra/pmc.h                            | 35 ++++++++
+> >  .../mach-tegra => drivers/soc/tegra}/powergate.c   |  0
+> >  .../soc/tegra}/reset-handler.S                     |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/reset.c |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/reset.h |  2 -
+> >  .../soc/tegra}/sleep-tegra20.S                     |  0
+> >  .../soc/tegra}/sleep-tegra30.S                     |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/sleep.S |  0
+> >  {arch/arm/mach-tegra => drivers/soc/tegra}/sleep.h |  2 -
+> >  include/linux/tegra-soc.h                          | 95 ++++++++++++++++++++++
+> >  36 files changed, 195 insertions(+), 135 deletions(-)
+> >  delete mode 100644 arch/arm/mach-tegra/common.h
+> >  delete mode 100644 arch/arm/mach-tegra/pmc.h
+> >  create mode 100644 drivers/soc/tegra/Makefile
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra114.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra20.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra30.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.h (91%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/flowctrl.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/flowctrl.h (98%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/headsmp.S (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/hotplug.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/iomap.h (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/irammap.h (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/irq.c (99%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/irq.h (83%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/platsmp.c (98%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/pm-tegra20.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/pm-tegra30.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/pm.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/pm.h (94%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/pmc.c (100%)
+> >  create mode 100644 drivers/soc/tegra/pmc.h
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/powergate.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset-handler.S (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.h (97%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/sleep-tegra20.S (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/sleep-tegra30.S (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/sleep.S (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/sleep.h (98%)
+> > 
+> NAK for this patch.
+> 
+> You are using drivers/soc/* as a dump yard for your SOC code which
+> is not the intention we created drivers/soc/.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- fs/exec.c                  |    4 ++--
- include/linux/sched.h      |   18 +++++++++++++++---
- kernel/seccomp.c           |    2 +-
- kernel/sys.c               |    4 ++--
- security/apparmor/domain.c |    4 ++--
- 5 files changed, 22 insertions(+), 10 deletions(-)
+That was not my intention. What remains in arch/arm/mach-tegra at this
+point doesn't actually have a corresponding subsystem (well, except
+maybe the cpuidle code).
 
-diff --git a/fs/exec.c b/fs/exec.c
-index a3d33fe592d6..0f5c272410f6 100644
---- a/fs/exec.c
-+++ b/fs/exec.c
-@@ -1234,7 +1234,7 @@ static void check_unsafe_exec(struct linux_binprm *bprm)
- 	 * This isn't strictly necessary, but it makes it harder for LSMs to
- 	 * mess up.
- 	 */
--	if (current->no_new_privs)
-+	if (task_no_new_privs(current))
- 		bprm->unsafe |= LSM_UNSAFE_NO_NEW_PRIVS;
- 
- 	t = p;
-@@ -1272,7 +1272,7 @@ int prepare_binprm(struct linux_binprm *bprm)
- 	bprm->cred->egid = current_egid();
- 
- 	if (!(bprm->file->f_path.mnt->mnt_flags & MNT_NOSUID) &&
--	    !current->no_new_privs &&
-+	    !task_no_new_privs(current) &&
- 	    kuid_has_mapping(bprm->cred->user_ns, inode->i_uid) &&
- 	    kgid_has_mapping(bprm->cred->user_ns, inode->i_gid)) {
- 		/* Set-uid? */
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 306f4f0c987a..0fd19055bb64 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -1307,13 +1307,12 @@ struct task_struct {
- 				 * execve */
- 	unsigned in_iowait:1;
- 
--	/* task may not gain privileges */
--	unsigned no_new_privs:1;
--
- 	/* Revert to default priority/policy when forking */
- 	unsigned sched_reset_on_fork:1;
- 	unsigned sched_contributes_to_load:1;
- 
-+	unsigned long atomic_flags; /* Flags needing atomic access. */
-+
- 	pid_t pid;
- 	pid_t tgid;
- 
-@@ -1967,6 +1966,19 @@ static inline void memalloc_noio_restore(unsigned int flags)
- 	current->flags = (current->flags & ~PF_MEMALLOC_NOIO) | flags;
- }
- 
-+/* Per-process atomic flags. */
-+#define PFA_NO_NEW_PRIVS 0x00000001	/* May not gain new privileges. */
-+
-+static inline bool task_no_new_privs(struct task_struct *p)
-+{
-+	return test_bit(PFA_NO_NEW_PRIVS, &p->atomic_flags);
-+}
-+
-+static inline void task_set_no_new_privs(struct task_struct *p)
-+{
-+	set_bit(PFA_NO_NEW_PRIVS, &p->atomic_flags);
-+}
-+
- /*
-  * task->jobctl flags
-  */
-diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-index 2f83496d6016..137e40c7ae3b 100644
---- a/kernel/seccomp.c
-+++ b/kernel/seccomp.c
-@@ -241,7 +241,7 @@ static long seccomp_attach_filter(struct sock_fprog *fprog)
- 	 * This avoids scenarios where unprivileged tasks can affect the
- 	 * behavior of privileged children.
- 	 */
--	if (!current->no_new_privs &&
-+	if (!task_no_new_privs(current) &&
- 	    security_capable_noaudit(current_cred(), current_user_ns(),
- 				     CAP_SYS_ADMIN) != 0)
- 		return -EACCES;
-diff --git a/kernel/sys.c b/kernel/sys.c
-index 66a751ebf9d9..ce8129192a26 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -1990,12 +1990,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
- 		if (arg2 != 1 || arg3 || arg4 || arg5)
- 			return -EINVAL;
- 
--		current->no_new_privs = 1;
-+		task_set_no_new_privs(current);
- 		break;
- 	case PR_GET_NO_NEW_PRIVS:
- 		if (arg2 || arg3 || arg4 || arg5)
- 			return -EINVAL;
--		return current->no_new_privs ? 1 : 0;
-+		return task_no_new_privs(current) ? 1 : 0;
- 	case PR_GET_THP_DISABLE:
- 		if (arg2 || arg3 || arg4 || arg5)
- 			return -EINVAL;
-diff --git a/security/apparmor/domain.c b/security/apparmor/domain.c
-index 452567d3a08e..d97cba3e3849 100644
---- a/security/apparmor/domain.c
-+++ b/security/apparmor/domain.c
-@@ -621,7 +621,7 @@ int aa_change_hat(const char *hats[], int count, u64 token, bool permtest)
- 	 * There is no exception for unconfined as change_hat is not
- 	 * available.
- 	 */
--	if (current->no_new_privs)
-+	if (task_no_new_privs(current))
- 		return -EPERM;
- 
- 	/* released below */
-@@ -776,7 +776,7 @@ int aa_change_profile(const char *ns_name, const char *hname, bool onexec,
- 	 * no_new_privs is set because this aways results in a reduction
- 	 * of permissions.
- 	 */
--	if (current->no_new_privs && !unconfined(profile)) {
-+	if (task_no_new_privs(current) && !unconfined(profile)) {
- 		put_cred(cred);
- 		return -EPERM;
- 	}
--- 
-1.7.9.5
+> Its really for subsystem drivers which doesn't have appropriate
+> home in Linux kernel today. From your above patch ...
+> 
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra114.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra20.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra30.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.h (91%)
+> This should go into drivers/idle/*. if you have dependencies, please sort
+> them out.
+
+What exactly is the difference between drivers/idle and drivers/cpuidle?
+There's an intel_idle driver in drivers/idle that includes cpuidle.h and
+registers with that subsystem. But there's also an i7300_idle driver
+that doesn't.
+
+drivers/cpuidle seems like a better fit. I'll look into moving the code
+there.
+
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset-handler.S (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.c (100%)
+> >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.h (97%)
+> subsystem: drivers/power/reset/
+
+drivers/power/reset seems to be for drivers that register functions to
+reset a board. The above code for Tegra doesn't do that. Rather it sets
+up the reset handlers for secondary CPUs and for suspend/resume.
+
+> For tegra/*pm*/, you can use drivers/power or drivers/base/power/
+
+drivers/power seems to be exclusively battery charger drivers. The pm.c,
+pm-*.c and sleep-*.S set up suspend/resume. That doesn't seem to belong
+in drivers/base/power either.
+
+pmc.c implements various routines to access the power management
+controller, some of which is needed by suspend/resume, some of it is
+needed by SMP. powergate.c implements a subset of the PMC that needs to
+be exported to drivers to enable power partitions on the SoC. I'm not
+aware of subsystems that deal with this kind of driver.
+
+> For SMP boot, ARMv8 expecting to have either PSCI based implementation or
+> device tree based boot scheme. you can move towards that model if possible.
+
+But we also have the code for SMP on 32-bit ARM. Should that remain in
+arch/arm/mach-tegra or can it move to drivers/soc/tegra?
+
+So the only thing in the above that I think could be moved somewhere
+else is the cpuidle drivers. Or do you have any other suggestions for
+the remaining code?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/e7cc45f2/attachment.sig>
