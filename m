@@ -1,345 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 27 Jun 2014 11:15:53 -0500
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140627124949.GR26276@arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <20140626085926.GB11244@arm.com>
- <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
- <6381366.2IfqZj1r0B@wuerfel> <20140627124949.GR26276@arm.com>
-Message-ID: <53AD98B9.2020109@gmail.com>
+From: fredrik.noring@autoliv.com (Fredrik Noring)
+Date: Fri, 27 Jun 2014 16:16:57 +0000
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <20140627112151.GF32514@n2100.arm.linux.org.uk>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+Message-ID: <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2014 07:49 AM, Will Deacon wrote:
-> On Fri, Jun 27, 2014 at 12:03:34PM +0100, Arnd Bergmann wrote:
->> On Thursday 26 June 2014 19:44:21 Rob Herring wrote:
->>> I don't agree arm32 is harder than microblaze. Yes, converting ALL of
->>> arm would be, but that is not necessary. With Liviu's latest branch
->>> the hacks I previously needed are gone (thanks!), and this is all I
->>> need to get Versatile PCI working (under QEMU):
->>
->> I meant converting all of arm32 would be harder, but I agree we don't
->> have to do it. It would be nice to convert all of the drivers/pci/host
->> drivers though, iow all multiplatform-enabled ones, and leaving the
->> current arm32 pci implementation for the platforms we don't want to
->> convert to multiplatform anyway (footbridge, iop, ixp4xx, ks8695 (?),
->> pxa, sa1100).
+Hi Russel,
+
+> On Thu, Jun 26, 2014 at 04:14:24PM +0100, Russell King - ARM Linux wrote:
+> > That's a similar workload to the one which is mentioned in the
+> > previous report.  I've just set a similar transfer going, but this
+> > will be a 16GB file.
 > 
-> I'm more than happy to convert the generic host controller we merged
-> recently, but I'd probably want the core changes merged first so that I
-> know I'm not wasting my time!
+> I've run this transfer several times, but so far I've unable to reproduce the
+> issue here.
 
-Something like this untested patch...
+Many thanks for testing this. We attempted to bisect, but unfortunately the
+result was not conclusive. One reason might be that the config had to be
+updated during the process, and so we did not end up with the exact same
+configuration (things like e.g. IMX_SDMA in DMA_ENGINE etc.). Some runs
+deadlocked without any visible Oops or printout. Some versions did not have
+an entirely working console configuration.
 
-Another issue I found still present is pci_ioremap_io needs some work 
-to unify with the arm implementation. That's a matter of changing the 
-function from an offset to i/o resource. That should be a pretty 
-mechanical change.
+Please find below a trace that appeared once with 3.16-rc2. Perhaps it is of
+some interest?
 
-Also, there is a potential for memory leak because there is no undo 
-for of_create_pci_host_bridge.
+(We also had memtester run for days on the i.MX6 hardware, without issues.)
 
-Rob
+All the best,
+Fredrik
 
-8<------------------------------------------------------------------
->From 301b402631b2867ced38d5533586da0bd888045c Mon Sep 17 00:00:00 2001
-From: Rob Herring <robh@kernel.org>
-Date: Fri, 27 Jun 2014 09:46:09 -0500
-Subject: [PATCH] pci: generic-host: refactor to use common range parsing
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 0 at net/sched/sch_generic.c:264 dev_watchdog+0x270/0x27c()
+NETDEV WATCHDOG: eth0 (fec): transmit queue 0 timed out
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-rc2 #19
+Backtrace: 
+[<80012390>] (dump_backtrace) from [<8001266c>] (show_stack+0x18/0x1c)
+ r6:00000108 r5:00000000 r4:8064e29c r3:00000000
+[<80012654>] (show_stack) from [<8049791c>] (dump_stack+0x8c/0x9c)
+[<80497890>] (dump_stack) from [<80024f4c>] (warn_slowpath_common+0x74/0x90)
+ r5:00000009 r4:80631d70
+[<80024ed8>] (warn_slowpath_common) from [<80024fa0>] (warn_slowpath_fmt+0x38/0x40)
+ r8:806320c0 r7:9d85a254 r6:9d879000 r5:9d85a000 r4:00000000
+[<80024f6c>] (warn_slowpath_fmt) from [<803b8ff0>] (dev_watchdog+0x270/0x27c)
+ r3:9d85a000 r2:805c4790
+[<803b8d80>] (dev_watchdog) from [<8002f280>] (call_timer_fn+0x6c/0xe4)
+ r10:80630008 r9:9d85a000 r8:803b8d80 r7:00000100 r6:80630000 r5:00000001
+ r4:80631dd8
+[<8002f214>] (call_timer_fn) from [<8002fec8>] (run_timer_softirq+0x1d4/0x254)
+ r10:803b8d80 r9:806320c0 r8:9d85a000 r7:00000000 r6:80631e28 r5:80667040
+ r4:9d85a284
+[<8002fcf4>] (run_timer_softirq) from [<8002945c>] (__do_softirq+0x17c/0x30c)
+ r10:00000001 r9:80632080 r8:40000001 r7:80630000 r6:00000100 r5:80632084
+ r4:00000020
+[<800292e0>] (__do_softirq) from [<80029920>] (irq_exit+0xd0/0x114)
+ r10:80630000 r9:80665f19 r8:00000001 r7:f4000100 r6:00000000 r5:80630008
+ r4:80630000
+[<80029850>] (irq_exit) from [<8000f348>] (handle_IRQ+0x4c/0x98)
+ r5:0000001d r4:8062ce44
+[<8000f2fc>] (handle_IRQ) from [<80008614>] (gic_handle_irq+0x34/0x64)
+ r6:80631f20 r5:80638a40 r4:f400010c r3:000000a0
+[<800085e0>] (gic_handle_irq) from [<800131c4>] (__irq_svc+0x44/0x58)
+Exception stack(0x80631f20 to 0x80631f68)
+1f20: 00000001 00000001 00000000 8063b6f0 8063852c 806384d8 80665f19 804a0040
+1f40: 00000001 80665f19 80630000 80631f74 00000000 80631f68 800614b8 8000f6a8
+1f60: 200f0013 ffffffff
+ r7:80631f54 r6:ffffffff r5:200f0013 r4:8000f6a8
+[<8000f67c>] (arch_cpu_idle) from [<8005cbf8>] (cpu_startup_entry+0x10c/0x164)
+[<8005caec>] (cpu_startup_entry) from [<80492b68>] (rest_init+0xc8/0xd8)
+ r7:80625028 r3:00000000
+[<80492aa0>] (rest_init) from [<805f6c5c>] (start_kernel+0x39c/0x3a8)
+ r5:00000001 r4:806385d0
+[<805f68c0>] (start_kernel) from [<10008074>] (0x10008074)
+---[ end trace a7b7109ab2d04e11 ]---
+***************************************************************
+Consider the environment before printing this message.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- drivers/pci/host/pci-host-generic.c | 191 ++++++------------------------------
- 1 file changed, 29 insertions(+), 162 deletions(-)
-
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 44fe6aa..57fd1e1 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -32,16 +32,14 @@ struct gen_pci_cfg_bus_ops {
- 
- struct gen_pci_cfg_windows {
- 	struct resource				res;
--	struct resource				bus_range;
- 	void __iomem				**win;
- 
- 	const struct gen_pci_cfg_bus_ops	*ops;
- };
- 
- struct gen_pci {
--	struct pci_host_bridge			host;
-+	struct pci_host_bridge			*host;
- 	struct gen_pci_cfg_windows		cfg;
--	struct list_head			resources;
- };
- 
- static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
-@@ -50,7 +48,7 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
- {
- 	struct pci_sys_data *sys = bus->sysdata;
- 	struct gen_pci *pci = sys->private_data;
--	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
-+	resource_size_t idx = bus->number - bus->busn_res.start;
- 
- 	return pci->cfg.win[idx] + ((devfn << 8) | where);
- }
-@@ -66,7 +64,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
- {
- 	struct pci_sys_data *sys = bus->sysdata;
- 	struct gen_pci *pci = sys->private_data;
--	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
-+	resource_size_t idx = bus->number - bus->busn_res.start;
- 
- 	return pci->cfg.win[idx] + ((devfn << 12) | where);
- }
-@@ -138,154 +136,32 @@ static const struct of_device_id gen_pci_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, gen_pci_of_match);
- 
--static int gen_pci_calc_io_offset(struct device *dev,
--				  struct of_pci_range *range,
--				  struct resource *res,
--				  resource_size_t *offset)
--{
--	static atomic_t wins = ATOMIC_INIT(0);
--	int err, idx, max_win;
--	unsigned int window;
--
--	if (!PAGE_ALIGNED(range->cpu_addr))
--		return -EINVAL;
--
--	max_win = (IO_SPACE_LIMIT + 1) / SZ_64K;
--	idx = atomic_inc_return(&wins);
--	if (idx > max_win)
--		return -ENOSPC;
--
--	window = (idx - 1) * SZ_64K;
--	err = pci_ioremap_io(window, range->cpu_addr);
--	if (err)
--		return err;
--
--	of_pci_range_to_resource(range, dev->of_node, res);
--	res->start = window;
--	res->end = res->start + range->size - 1;
--	*offset = window - range->pci_addr;
--	return 0;
--}
--
--static int gen_pci_calc_mem_offset(struct device *dev,
--				   struct of_pci_range *range,
--				   struct resource *res,
--				   resource_size_t *offset)
--{
--	of_pci_range_to_resource(range, dev->of_node, res);
--	*offset = range->cpu_addr - range->pci_addr;
--	return 0;
--}
--
--static void gen_pci_release_of_pci_ranges(struct gen_pci *pci)
--{
--	struct pci_host_bridge_window *win;
--
--	list_for_each_entry(win, &pci->resources, list)
--		release_resource(win->res);
--
--	pci_free_resource_list(&pci->resources);
--}
--
--static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
--{
--	struct of_pci_range range;
--	struct of_pci_range_parser parser;
--	int err, res_valid = 0;
--	struct device *dev = pci->host.dev.parent;
--	struct device_node *np = dev->of_node;
--
--	if (of_pci_range_parser_init(&parser, np)) {
--		dev_err(dev, "missing \"ranges\" property\n");
--		return -EINVAL;
--	}
--
--	for_each_of_pci_range(&parser, &range) {
--		struct resource *parent, *res;
--		resource_size_t offset;
--		u32 restype = range.flags & IORESOURCE_TYPE_BITS;
--
--		res = devm_kmalloc(dev, sizeof(*res), GFP_KERNEL);
--		if (!res) {
--			err = -ENOMEM;
--			goto out_release_res;
--		}
--
--		switch (restype) {
--		case IORESOURCE_IO:
--			parent = &ioport_resource;
--			err = gen_pci_calc_io_offset(dev, &range, res, &offset);
--			break;
--		case IORESOURCE_MEM:
--			parent = &iomem_resource;
--			err = gen_pci_calc_mem_offset(dev, &range, res, &offset);
--			res_valid |= !(res->flags & IORESOURCE_PREFETCH || err);
--			break;
--		default:
--			err = -EINVAL;
--			continue;
--		}
--
--		if (err) {
--			dev_warn(dev,
--				 "error %d: failed to add resource [type 0x%x, %lld bytes]\n",
--				 err, restype, range.size);
--			continue;
--		}
--
--		err = request_resource(parent, res);
--		if (err)
--			goto out_release_res;
--
--		pci_add_resource_offset(&pci->resources, res, offset);
--	}
--
--	if (!res_valid) {
--		dev_err(dev, "non-prefetchable memory resource required\n");
--		err = -EINVAL;
--		goto out_release_res;
--	}
--
--	return 0;
--
--out_release_res:
--	gen_pci_release_of_pci_ranges(pci);
--	return err;
--}
--
- static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- {
- 	int err;
- 	u8 bus_max;
- 	resource_size_t busn;
--	struct resource *bus_range;
--	struct device *dev = pci->host.dev.parent;
-+	struct pci_bus *bus = pci->host->bus;
-+	struct resource *bus_range = &bus->busn_res;
-+	struct device *dev = pci->host->dev.parent;
- 	struct device_node *np = dev->of_node;
- 
--	if (of_pci_parse_bus_range(np, &pci->cfg.bus_range))
--		pci->cfg.bus_range = (struct resource) {
--			.name	= np->name,
--			.start	= 0,
--			.end	= 0xff,
--			.flags	= IORESOURCE_BUS,
--		};
--
- 	err = of_address_to_resource(np, 0, &pci->cfg.res);
- 	if (err) {
- 		dev_err(dev, "missing \"reg\" property\n");
- 		return err;
- 	}
- 
--	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
-+	pci->cfg.win = devm_kcalloc(dev, resource_size(bus_range),
- 				    sizeof(*pci->cfg.win), GFP_KERNEL);
- 	if (!pci->cfg.win)
- 		return -ENOMEM;
- 
- 	/* Limit the bus-range to fit within reg */
--	bus_max = pci->cfg.bus_range.start +
-+	bus_max = bus_range->start +
- 		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
--	pci->cfg.bus_range.end = min_t(resource_size_t, pci->cfg.bus_range.end,
--				       bus_max);
-+	pci_bus_update_busn_res_end(bus, min_t(resource_size_t,
-+				    bus_range->end, bus_max));
- 
- 	/* Map our Configuration Space windows */
- 	if (!devm_request_mem_region(dev, pci->cfg.res.start,
-@@ -293,7 +169,6 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 				     "Configuration Space"))
- 		return -ENOMEM;
- 
--	bus_range = &pci->cfg.bus_range;
- 	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
- 		u32 idx = busn - bus_range->start;
- 		u32 sz = 1 << pci->cfg.ops->bus_shift;
-@@ -305,34 +180,21 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 			return -ENOMEM;
- 	}
- 
--	/* Register bus resource */
--	pci_add_resource(&pci->resources, bus_range);
- 	return 0;
- }
- 
--static int gen_pci_setup(int nr, struct pci_sys_data *sys)
--{
--	struct gen_pci *pci = sys->private_data;
--	list_splice_init(&pci->resources, &sys->resources);
--	return 1;
--}
-+/* Unused, temporary to satisfy ARM arch code */
-+static struct pci_sys_data sys;
- 
- static int gen_pci_probe(struct platform_device *pdev)
- {
--	int err;
-+	int err, lastbus;
- 	const char *type;
- 	const struct of_device_id *of_id;
- 	const int *prop;
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
- 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
--	struct hw_pci hw = {
--		.nr_controllers	= 1,
--		.private_data	= (void **)&pci,
--		.setup		= gen_pci_setup,
--		.map_irq	= of_irq_parse_and_map_pci,
--		.ops		= &gen_pci_ops,
--	};
- 
- 	if (!pci)
- 		return -ENOMEM;
-@@ -353,23 +215,28 @@ static int gen_pci_probe(struct platform_device *pdev)
- 
- 	of_id = of_match_node(gen_pci_of_match, np);
- 	pci->cfg.ops = of_id->data;
--	pci->host.dev.parent = dev;
--	INIT_LIST_HEAD(&pci->host.windows);
--	INIT_LIST_HEAD(&pci->resources);
- 
--	/* Parse our PCI ranges and request their resources */
--	err = gen_pci_parse_request_of_pci_ranges(pci);
--	if (err)
--		return err;
-+	pci->host = of_create_pci_host_bridge(&pdev->dev, &gen_pci_ops, &sys);
-+	if (PTR_ERR(pci->host))
-+		return PTR_ERR(pci->host);
- 
- 	/* Parse and map our Configuration Space windows */
- 	err = gen_pci_parse_map_cfg_windows(pci);
--	if (err) {
--		gen_pci_release_of_pci_ranges(pci);
-+	if (err)
- 		return err;
--	}
- 
--	pci_common_init_dev(dev, &hw);
-+	pci_ioremap_io(0, pci->host->io_base);
-+
-+	pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
-+	pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
-+
-+	lastbus = pci_scan_child_bus(pci->host->bus);
-+	pci_bus_update_busn_res_end(pci->host->bus, lastbus);
-+
-+	pci_assign_unassigned_bus_resources(pci->host->bus);
-+
-+	pci_bus_add_devices(pci->host->bus);
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+To read Autoliv's Information and Confidentiality Notice, follow this link:
+http://www.autoliv.com/disclaimer.html
+***************************************************************
