@@ -1,84 +1,77 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 27 Jun 2014 11:49:24 +0800
-Subject: [PATCH v4 01/13] acpi: arm64 does not have a BIOS add config for BIOS
- table scan.
+Date: Fri, 27 Jun 2014 11:49:25 +0800
+Subject: [PATCH v4 02/13] ACPI: Don't use acpi_lapic in ACPI core code
 In-Reply-To: <1403840976-7456-1-git-send-email-hanjun.guo@linaro.org>
 References: <1403840976-7456-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1403840976-7456-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1403840976-7456-3-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Graeme Gregory <graeme.gregory@linaro.org>
 
-With the addition of ARM64 that does not have a traditional BIOS to
-scan, add a config option which is selected on x86 and ia64 to do
-the traditional BIOS scanning for tables.
+Now ARM64 support is being added to ACPI so architecture specific
+values can not be used in core ACPI code.
+
+Following on the patch "ACPI / processor: Check if LAPIC is present
+during initialization" which uses acpi_lapic in acpi_processor.c,
+on ARM64 platform, GIC is used instead of local APIC, so acpi_lapic
+is not a suitable value for ARM64.
+
+What is actually important at this point is the SMPness of the system,
+so introduce acpi_arch_is_smp() to be arch specific and generic.
 
 Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/ia64/Kconfig    |    1 +
- arch/x86/Kconfig     |    1 +
- drivers/acpi/Kconfig |    3 +++
- drivers/acpi/osl.c   |    4 +++-
- 4 files changed, 8 insertions(+), 1 deletion(-)
+ arch/ia64/include/asm/acpi.h  |    5 +++++
+ arch/x86/include/asm/acpi.h   |    5 +++++
+ drivers/acpi/acpi_processor.c |    2 +-
+ 3 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 2f3abcf..f82b352 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -47,6 +47,7 @@ config IA64
- 	select MODULES_USE_ELF_RELA
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select HAVE_ARCH_AUDITSYSCALL
-+	select ACPI_SCAN_BIOS_NOT_EFI
- 	default y
- 	help
- 	  The Itanium Processor Family is Intel's 64-bit successor to
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index a8f749e..4865d44 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -131,6 +131,7 @@ config X86
- 	select HAVE_CC_STACKPROTECTOR
- 	select GENERIC_CPU_AUTOPROBE
- 	select HAVE_ARCH_AUDITSYSCALL
-+	select ACPI_SCAN_BIOS_NOT_EFI
- 
- config INSTRUCTION_DECODER
- 	def_bool y
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index a34a228..70eaf7a 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -2,6 +2,9 @@
- # ACPI Configuration
- #
- 
-+config ACPI_SCAN_BIOS_NOT_EFI
-+	bool
+diff --git a/arch/ia64/include/asm/acpi.h b/arch/ia64/include/asm/acpi.h
+index 75dc59a..2fc0757 100644
+--- a/arch/ia64/include/asm/acpi.h
++++ b/arch/ia64/include/asm/acpi.h
+@@ -40,6 +40,11 @@ extern int acpi_lapic;
+ #define acpi_noirq 0	/* ACPI always enabled on IA64 */
+ #define acpi_pci_disabled 0 /* ACPI PCI always enabled on IA64 */
+ #define acpi_strict 1	/* no ACPI spec workarounds on IA64 */
 +
- menuconfig ACPI
- 	bool "ACPI (Advanced Configuration and Power Interface) Support"
- 	depends on !IA64_HP_SIM
-diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
-index bad25b0..5ba0b74 100644
---- a/drivers/acpi/osl.c
-+++ b/drivers/acpi/osl.c
-@@ -259,12 +259,14 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
- 			       "System description tables not found\n");
- 			return 0;
- 		}
--	} else {
-+	} else if (IS_ENABLED(CONFIG_ACPI_SCAN_BIOS_NOT_EFI)) {
- 		acpi_physical_address pa = 0;
- 
- 		acpi_find_root_pointer(&pa);
- 		return pa;
- 	}
-+
-+	return 0;
++static inline bool acpi_arch_is_smp(void)
++{
++	return acpi_lapic;
++}
+ #endif
+ #define acpi_processor_cstate_check(x) (x) /* no idle limits on IA64 :) */
+ static inline void disable_acpi(void) { }
+diff --git a/arch/x86/include/asm/acpi.h b/arch/x86/include/asm/acpi.h
+index e06225e..939d377 100644
+--- a/arch/x86/include/asm/acpi.h
++++ b/arch/x86/include/asm/acpi.h
+@@ -121,6 +121,11 @@ static inline void arch_acpi_set_pdc_bits(u32 *buf)
+ 		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH);
  }
  
- /* Must be called with 'acpi_ioremap_lock' or RCU read lock held. */
++static inline bool acpi_arch_is_smp(void)
++{
++	return acpi_lapic;
++}
++
+ #else /* !CONFIG_ACPI */
+ 
+ #define acpi_lapic 0
+diff --git a/drivers/acpi/acpi_processor.c b/drivers/acpi/acpi_processor.c
+index 1c08574..8622a0e 100644
+--- a/drivers/acpi/acpi_processor.c
++++ b/drivers/acpi/acpi_processor.c
+@@ -268,7 +268,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
+ 	pr->apic_id = apic_id;
+ 
+ 	cpu_index = acpi_map_cpuid(pr->apic_id, pr->acpi_id);
+-	if (!cpu0_initialized && !acpi_lapic) {
++	if (!cpu0_initialized && !acpi_arch_is_smp()) {
+ 		cpu0_initialized = 1;
+ 		/* Handle UP system running SMP kernel, with no LAPIC in MADT */
+ 		if ((cpu_index == -1) && (num_online_cpus() == 1))
 -- 
 1.7.9.5
