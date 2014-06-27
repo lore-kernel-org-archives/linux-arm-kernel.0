@@ -1,50 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 09:57:06 +0100
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <20140627085125.GA7088@hal>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <20140627085125.GA7088@hal>
-Message-ID: <20140627085705.GC32514@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jun 2014 09:58:20 +0100
+Subject: [PATCHv3 5/5] arm64: add runtime system sanity checks
+In-Reply-To: <53AC8296.808@codeaurora.org>
+References: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
+ <1403795926-17139-6-git-send-email-mark.rutland@arm.com>
+ <53AC8296.808@codeaurora.org>
+Message-ID: <20140627085820.GC26276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 10:51:27AM +0200, Jan Glauber wrote:
-> On Sun, Jun 22, 2014 at 10:11:49PM -0500, Nathan Lynch wrote:
-> > Provide fast userspace implementations of gettimeofday and
-> > clock_gettime on systems that implement the generic timers extension
-> > defined in ARMv7.  This follows the example of arm64 in conception but
-> > significantly differs in some aspects of the implementation (C vs
-> > assembly, mainly).
+On Thu, Jun 26, 2014 at 09:29:10PM +0100, Christopher Covington wrote:
+> Hi Mark,
 > 
-> Hi Nathan,
+> On 06/26/2014 11:18 AM, Mark Rutland wrote:
+> > Unexpected variation in certain system register values across CPUs is an
+> > indicator of potential problems with a system. The kernel expects CPUs
+> > to be mostly identical in terms of supported features, even in systems
+> > with heterogeneous CPUs, with uniform instruction set support being
+> > critical for the correct operation of userspace.
+> > 
+> > To help detect issues early where hardware violates the expectations of
+> > the kernel, this patch adds simple runtime sanity checks on important ID
+> > registers in the bring up path of each CPU.
+> > 
+> > Where CPUs are fundamentally mismatched, set TAINT_CPU_OUT_OF_SPEC.
+> > Given that the kernel assumes CPUs are identical feature wise, let's not
+> > pretend that we expect such configurations to work. Supporting such
+> > configurations would require massive rework, and hopefully they will
+> > never exist.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  arch/arm64/kernel/cpuinfo.c | 92 +++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 92 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
 > 
-> applying your patches I get the following compile error under Ubuntu 12.04:
+> > +	/* If different, timekeeping will be broken (especially with KVM) */
+> > +	diff |= CHECK(cntfrq, boot, cur, cpu);
 > 
->   CC      arch/arm/kernel/vdso.o
->   LDS     arch/arm/kernel/vdso/vdso.lds
->   CC      arch/arm/kernel/vdso/vgettimeofday.o
->   AS      arch/arm/kernel/vdso/datapage.o
->   VDSOL   arch/arm/kernel/vdso/vdso.so.raw
->   HOSTCC  arch/arm/kernel/vdso/vdsomunge
-> arch/arm/kernel/vdso/vdsomunge.c: In function ?main?:
-> arch/arm/kernel/vdso/vdsomunge.c:152:16: error: ?EF_ARM_ABI_FLOAT_HARD? undeclared (first use in this function)
-> arch/arm/kernel/vdso/vdsomunge.c:152:16: note: each undeclared identifier is reported only once for each function it appears in
-> arch/arm/kernel/vdso/vdsomunge.c:156:34: error: ?EF_ARM_ABI_FLOAT_SOFT? undeclared (first use in this function)
-> make[2]: *** [arch/arm/kernel/vdso/vdsomunge] Error 1
-> make[1]: *** [arch/arm/kernel/vdso] Error 2
-> make: *** [arch/arm/kernel] Error 2
-> 
-> Looks like the libc dev is too old (EF_ARM_ABI_FLOAT_* not in
-> /usr/include/elf.h). On a more recent Ubuntu it compiles fine.
-> Not sure how to solve this, maybe disable vdso if the libc is too old?
+> You're calling this a "CPU feature" but I thought this was purely a firmware
+> setting. Does the architecture even allow hardware to program this register?
+> Additionally, in arch_timer_detect_rate it appears that a device tree setting
+> takes precedence, but you're not checking that.
 
-This is what really concerns me about the VDSO.  It adds an additional
-dependence on the C library in order to build the kernel.  What if you
-don't have a C library in your cross-build setup (I don't.)
+KVM virtual machines tend to rely on CNTFRQ being programmed correctly,
+since it's not generally possible for the software generating the
+device-tree (kvmtool, qemu) to probe the frequency on the host.
 
-Until that is solved, the VDSO support is not going in, as it will
-effectively render the kernel unbuildable for me.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Will
