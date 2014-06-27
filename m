@@ -1,81 +1,95 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 27 Jun 2014 11:33:11 +0800
-Subject: [RFC PATCH] phy: micrel: make phy_has_fixups attribute read
- correctly
-In-Reply-To: <CAGVrzcaN9KKW6vN5Xy775RTBD3ODpK95-o0V+pKDcCCxetPycA@mail.gmail.com>
-References: <1403681075-16181-1-git-send-email-voice.shen@atmel.com>
- <CAGVrzcaN9KKW6vN5Xy775RTBD3ODpK95-o0V+pKDcCCxetPycA@mail.gmail.com>
-Message-ID: <53ACE5F7.3060102@atmel.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 27 Jun 2014 11:37:18 +0800
+Subject: [PATCH v2 1/2] Documentation: Document Hisilicon hix5hd2 sata PHY
+In-Reply-To: <4989178.vejv39dnj8@wuerfel>
+References: <1403687648-29082-1-git-send-email-zhangfei.gao@linaro.org>
+ <20300092.1dHGFVKfHm@wuerfel> <53AC24C6.8000304@linaro.org>
+ <4989178.vejv39dnj8@wuerfel>
+Message-ID: <53ACE6EE.4050300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
 
-On 06/27/2014 02:00 AM, Florian Fainelli wrote:
-> Hello,
->
-> 2014-06-25 0:24 GMT-07:00 Bo Shen <voice.shen@atmel.com>:
->> If the fixups parameters get from dtb, it won't set has_fixups
->> parameters, so when read phy_has_fixups attribute, it always
->> present as 0.
->> Add this patch to make phy_has_fixups attribute read correctly.
->
-> I am not entirely sure whether loading values from Device Tree should
-> be considered a PHY fixup per-se. They do override the hardware reset
-> default values, but I am not sure if we should consider that as a
-> fixup.
 
-In old method, we will call phy_register_fixup_for_uid to update this 
-configuration, which will set the phy_has_fixups as true, then it 
-regards as fix up. So, can we also consider loading values from DTS also 
-as fix up?
+On 06/27/2014 04:53 AM, Arnd Bergmann wrote:
+> On Thursday 26 June 2014 21:48:54 zhangfei wrote:
 
-> Assuming that you need to troubleshoot a given system, one of the
-> first things you will surely ask for is the DTS used by that platform,
-> and in that case you can quickly check whether the PHY default
-> settings are changed, right?
-
-I am not sure I am fully understand here.
-
-The value retrieve from DTS is used to overwrite the default value, so I 
-think it is no need to check.
-
+>>> Since you mention that this is a synopsys part, it may however be
+>>> good to also define a compatible string for the generic device,
+>>> to allow other SoCs to share this driver, and to make it easier
+>>> for people to find out that we already have one so they don't have
+>>> to write another driver for the same hardware.
 >>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->> ---
->>   drivers/net/phy/micrel.c | 4 ++++
->>   1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
->> index bc7c7d2..c384922 100644
->> --- a/drivers/net/phy/micrel.c
->> +++ b/drivers/net/phy/micrel.c
->> @@ -237,6 +237,8 @@ static int ksz9021_load_values_from_of(struct phy_device *phydev,
->>
->>          if (!matches)
->>                  return 0;
->> +       else
->> +               phydev->has_fixups = true;
+>> http://www.synopsys.com/dw/ipdir.php?ds=dwc_sata_phy
+>> name can be: dwc_sata_phy
+>> However, not find register from the website, not sure whether the
+>> register are totally same, or there is some change.
+>> Other soc from hisilicon using the same ip can share this driver.
 >
-> There is no need for the else here
+> I found a list of versions under "Downloads and Documentation", but
+> unfortunately the actual downloads are not accessible without a
+> customer account.
 >
+>>> Can you find out what the Synopsys/Designware product designation for
+>>> this PHY is? It would be good to rename the driver and binding
+>>> if possible. I would still recommend leaving the
+>>> "hisilicon,hix5hd2-sata-phy" string and the "hisilicon,peripheral-syscon"
+>>> property in place, since that indicates a minor variation of the
+>>> generic part.
 >>
->>          if (matches < 4)
->>                  newval = kszphy_extended_read(phydev, reg);
->> @@ -330,6 +332,8 @@ static int ksz9031_of_load_skew_values(struct phy_device *phydev,
+>> "hisilicon,peripheral-syscon" is privide power supply, etc.
 >>
->>          if (!matches)
->>                  return 0;
->> +       else
->> +               phydev->has_fixups = true;
+>> Do you mean change the compatible to "hisilicon,dwc-sata-phy" or
+>> multiple compatible?
 >
-> Same here
+> Multiple compatible strings.
 >
->>
->>          if (matches < numfields)
->>                  newval = ksz9031_extended_read(phydev, OP_DATA, 2, reg);
->> --
->> 1.8.5.2
+> "hisilicon,dwc-sata-phy" would be too generic anyway, it should include the
+> name of the chip that first implements this, or the exact version of the
+> IP block, preferably both.
+>
+> Ideally if you can find out the version that hisilicon uses, it could
+> look something like
+>
+> compatible = "hisilicon,hi15hd2-sata-phy", "snps,dwc-sata-phy-2.3a", ""snps,dwc-sata-phy";
+>
+> Note also the specific version of the hisilicon chip: you must not use
+> wildcards in compatible strings but should always use a real product number.
+> ("1" instead of "x"). If multiple chips are mutually compatible, they
+> can all use the number of the first one here.
+>
 
-Best Regards,
-Bo Shen
+Sorry for the confusion.
+
+The phy is rather an analog controller, without standard register.
+Instead, the phy interface is just some pin / analog interface.
+The register is in fact hix5hd2 register, controls all the analog 
+output, including reset, power, speed, para tunning.
+
+Even the same phy is used in other soc, they can not share this driver, 
+since the connection must be different, as well as internal soc register 
+layout.
+Only if the same controller & phy are reused in other hisilicon soc, 
+this driver can be shared.
+
+Since what we control is hix5hd2 controller itself, so it may not 
+suitable to put snps here.
+
+
+And about hix5hd2 name: x is not wildcard.
+
+Currently hix5hd2 is series of hi3716c v200, hi3719c v100, hi3718c v100.
+They are same soc, except minus pin assembles different.
+
+However, not all hi37x is in this series, for example hi3716c v100 is a 
+different soc.
+
+In the future hi3719m, hi3718m may also plan to add to hix5hd2 series.
+The difference will be different cpu core number, different gpu core 
+number. Also use different ethernet controller.
+
+
+So we may still keep "hisilicon,hix5hd2-sata-phy" unchanged.
+What do you think?
+
+Thanks
