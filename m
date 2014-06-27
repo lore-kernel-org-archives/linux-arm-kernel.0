@@ -1,72 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jun 2014 14:10:18 +0100
-Subject: [RFC PATCH 2/9] genirq: Allow the state of a  forwarded irq to
- be save/restored
-In-Reply-To: <1403688530-23273-3-git-send-email-marc.zyngier@arm.com>
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
- <1403688530-23273-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140627131018.GS26276@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Jun 2014 15:16:28 +0200
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <20140627124949.GR26276@arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <6381366.2IfqZj1r0B@wuerfel> <20140627124949.GR26276@arm.com>
+Message-ID: <7528887.J1DnSBg239@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Wed, Jun 25, 2014 at 10:28:43AM +0100, Marc Zyngier wrote:
-> When a peripheral is shared between virtual machines, its interrupt
-> state becomes part of the guest's state, and must be switched accordingly.
+On Friday 27 June 2014 13:49:49 Will Deacon wrote:
+> On Fri, Jun 27, 2014 at 12:03:34PM +0100, Arnd Bergmann wrote:
+> > On Thursday 26 June 2014 19:44:21 Rob Herring wrote:
+> > > I don't agree arm32 is harder than microblaze. Yes, converting ALL of
+> > > arm would be, but that is not necessary. With Liviu's latest branch
+> > > the hacks I previously needed are gone (thanks!), and this is all I
+> > > need to get Versatile PCI working (under QEMU):
+> > 
+> > I meant converting all of arm32 would be harder, but I agree we don't
+> > have to do it. It would be nice to convert all of the drivers/pci/host
+> > drivers though, iow all multiplatform-enabled ones, and leaving the
+> > current arm32 pci implementation for the platforms we don't want to
+> > convert to multiplatform anyway (footbridge, iop, ixp4xx, ks8695 (?),
+> > pxa, sa1100).
 > 
-> Introduce a pair of accessors (irq_get_fwd_state/irq_set_fwd_state) to
-> retrieve the bits that can be of interest to KVM: pending, active, and masked.
-> 
-> - irq_get_fwd_state returns the state of the interrupt according to a mask
-> containing any of the IRQ_STATE_PENDING, IRQ_STATE_ACTIVE or IRQ_STATE_MASKED
-> bits.
-> - irq_set_fwd_state sets the state of the interrupt according to a similar mask.
-> 
-> Only a forwarded interrupt can be manipulated in such a way.
+> I'm more than happy to convert the generic host controller we merged
+> recently, but I'd probably want the core changes merged first so that I
+> know I'm not wasting my time!
 
-[...]
+That is definitely fine with me, but it's Bjorn's decision.
 
-> +/**
-> + *	irq_set_fwd_state - set the state of a forwarded interrupt.
-> + *	@irq: Interrupt line that is forwarded to a VM
-> + *	@val: State to be restored
-> + *	@mask: Bitmask of IRQ_FWD_STATE_* defining the valid bits in @val
-> + *
-> + *	This call sets the state of a forwarded interrupt, depending
-> + *	on the mask which indicates the valid bits.
-> + *
-> + *	This function should be called with preemption disabled if the
-> + *	interrupt controller has per-cpu registers.
-> + */
-> +int irq_set_fwd_state(unsigned int irq, u32 val, u32 mask)
-> +{
-> +	struct irq_desc *desc;
-> +	struct irq_data *data;
-> +	struct irq_chip *chip;
-> +	unsigned long flags;
-> +
-> +	desc = irq_to_desc(irq);
-> +	if (!desc)
-> +		return -EINVAL;
-> +
-> +	data = irq_desc_get_irq_data(desc);
-> +	if (!irqd_irq_forwarded(data))
-> +		return -EINVAL;
-> +
-> +	chip = irq_desc_get_chip(desc);
-> +	if (!chip->irq_set_fwd_state)
-> +		return -EINVAL;
-> +
-> +	chip_bus_lock(desc);
-> +	raw_spin_lock_irqsave(&desc->lock, flags);
-> +	chip->irq_set_fwd_state(data, val, mask);
-> +	raw_spin_unlock_irqrestore(&desc->lock, flags);
-> +	chip_bus_sync_unlock(desc);
-
-Having looked at this, I don't think you need to take the desc->lock after
-all. I thought you might need it for irq_desc_get_chip, but that's not going
-to change dynamically and you'd end up with a lock ordering problem against
-chip_bus_lock anyway.
-
-Will
+	Arnd
