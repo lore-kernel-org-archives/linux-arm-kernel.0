@@ -1,122 +1,55 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 27 Jun 2014 16:40:49 +0000
-Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <53A9EB5F.4050708@cogentembedded.com>
-References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
- <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
- <53A209DA.9000000@cogentembedded.com>
- <20a0a16226d54b0e8d6f68e41046bbf2@HKXPR06MB168.apcprd06.prod.outlook.com>
- <53A897EF.2020804@cogentembedded.com>
- <666f39dbf0f149c6946d4c2665d3d85d@HKXPR06MB168.apcprd06.prod.outlook.com>
- <53A9EB5F.4050708@cogentembedded.com>
-Message-ID: <fd0ab49699dd40b7b44db0108944d20f@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 27 Jun 2014 09:45:45 -0700
+Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
+In-Reply-To: <53AD978D.8060703@wwwdotorg.org>
+References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>
+ <53ABED5B.8010506@samsung.com>
+ <CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>
+ <53AD60D7.4040404@gmail.com> <53AD978D.8060703@wwwdotorg.org>
+Message-ID: <CAD=FV=UUFARvreHdWNsB1O1dEW6nX_E_C92t8Nma0vL=nAT5Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Stephen,
 
-On 24 June 2014 22:19, Sergei wrote:
-> On 06/24/2014 02:01 PM, Phil Edworthy wrote:
-> 
-> >>>>       I'm investigating an imprecise external abort occurring once userland
-> is
-> >>>> started when I have NetMos
-> 
-> >>      Or is it MosChip now? Can't remember all their renames. :-)
-> 
-> > Do you know of somewhere I can buy a card with this chipset in the EU? I
-> had a
-> > quick search but couldn't find anything.
-> 
->     No. But we probably can send such card to you.
-That would be handy!
+On Fri, Jun 27, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> Surely there's a driver (or could be a driver) for the TPM chip, and
+> that driver should have a reset-mask-gpios property, so the driver can
+> call gpio_get() and gpio_set_output() on the GPIO?
+>
+> Faking this out via a not-really-a-regulator or pinctrl hogs seems like
+> an abuse of those features to me.
 
- 
-> [...]
-> 
-> >>>>> +
-> >>>>> +	/* First resource is for IO */
-> >>>>> +	mask = PAR_ENABLE;
-> >>>>> +	if (res->flags & IORESOURCE_IO)
-> >>>>> +		mask |= IO_SPACE;
-> 
-> >>>>       For the memory space this works OK as you're identity-mapping the
-> >>>> memory
-> >>>> ranges in your device trees. However, for the I/O space this means that
-> it
-> >>>> won't work as the BARs in the PCIe devices get programmed with the
-> PCI bus
-> >>>> addresses but the PCIe window translation register is programmed
-> with a
-> >>>> CPU
-> >>>> address which don't at all match (given your device trees) and hence
-> one
-> >>>> can't
-> >>>> access the card's I/O mapped registers at all...
-> 
-> >>> Hmm, I couldn't find any cards that supported I/O, so I wasn't able to
-> test
-> >>> this. Clearly this is an issue that needs looking into.
-> 
-> >>      Will you look into it then, or should I?
-> 
-> > I'll look at it.
-> 
->     Thanks.
-> 
-> [...]
-> 
-> >>>>> +
-> >>>>> +		if (win > PCI_MAX_RESOURCES)
-> >>>>> +			break;
-> >>>>> +	}
-> >>>>> +
-> >>>>> +	 err = rcar_pcie_parse_map_dma_ranges(pcie, pdev-
-> >dev.of_node);
-> >>>>> +	 if (err)
-> >>>>> +		return err;
-> >>>>> +
-> >>>>> +	of_id = of_match_device(rcar_pcie_of_match, pcie->dev);
-> >>>>> +	if (!of_id || !of_id->data)
-> >>>>> +		return -EINVAL;
-> >>>>> +	hw_init_fn = of_id->data;
-> >>>>> +
-> >>>>> +	/* Failure to get a link might just be that no cards are inserted
-> */
-> >>>>> +	err = hw_init_fn(pcie);
-> >>>>> +	if (err) {
-> >>>>> +		dev_info(&pdev->dev, "PCIe link down\n");
-> >>>>> +		return 0;
-> 
-> >>>>       Not quite sure why you exit normally here without enabling the
-> >>>> hardware.
-> >>>> I think the internal bridge should be visible regardless of whether link is
-> >>>> detected or not...
-> 
-> >>> Why would you want to see the bridge when you can do nothing with it?
-> >> Aren't
-> 
-> >>      Because it's the way PCI works. You have the built-in devices always
-> >> present and seen on a PCI bus. :-)
-> 
-> >>> you are just wasting resources?
-> 
-> >>      I think it's rather you who are wasting resources. ;-) Why not just fail
-> >> the probe when you have no link?
-> 
-> > Ah, so we currently have a half-way house... not failing the probe, but not
-> > enabling the HW. Either all or nothing would be preferable.
-> 
->     Actually, I tried ignoring the link test and the kernel died horrible
-> death without any console output. :-/ Having enabled the earlyprintk
-> support,
-> I was able to see the reason: panic("PCI: unable to scan bus!") in
-> arch/arm/kernel/bios32.c...
-> 
-> > Thanks
-> > Phil
-> 
-> WBR, Sergei
+This totally doesn't belong in the TPM chip driver.  This is an
+unabashed HACK at the board level.  Without a hog we need a board
+driver for this.
 
-Thanks
-Phil
+To be more specific:
+
+* The TPM needs to be reset when the full system gets reset.  This
+unlocks the TPM and allows certain types of updates by the firmware.
+The firmware then locks the TPM before jumping to the kernel.
+
+* The TPM is hooked up to the "reset out" line of the CPU so that when
+the system does a warm reset it will reset the TPM.
+
+* Unfortunately the CPU asserts the "reset out" line when it's
+sleeping (because, of course, sleep is a reset).  This would allow the
+kernel to unlock the TPM which it's not supposed to be able to do.
+
+* To solve the problem, it's up to the kernel to "mask" out the reset
+line before going to sleep.  Then it's up to the read only firmware to
+validate that the kernel properly masked the reset before resuming
+from sleep.  If the firmware finds that the kernel cheated and didn't
+mask the reset then it will not resume to the kernel and will instead
+restart the system.
+
+
+The above is not beautiful in the least sense.  Getting suspend/resume
+working happened very late in the exynos5250-snow project and the
+above workaround was the best that we could come up with without
+slipping schedules.  It also had the side effect of being less
+expensive than other solutions.  Given that the solution was "proven
+out" for exynos5250-snow, it was kept in place for similar products.
+
+-Doug
