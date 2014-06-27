@@ -1,32 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jun 2014 13:49:49 +0100
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <6381366.2IfqZj1r0B@wuerfel>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <20140626085926.GB11244@arm.com>
- <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
- <6381366.2IfqZj1r0B@wuerfel>
-Message-ID: <20140627124949.GR26276@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 27 Jun 2014 08:52:36 -0400
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.17
+Message-ID: <20140627125236.GG23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 12:03:34PM +0100, Arnd Bergmann wrote:
-> On Thursday 26 June 2014 19:44:21 Rob Herring wrote:
-> > I don't agree arm32 is harder than microblaze. Yes, converting ALL of
-> > arm would be, but that is not necessary. With Liviu's latest branch
-> > the hacks I previously needed are gone (thanks!), and this is all I
-> > need to get Versatile PCI working (under QEMU):
-> 
-> I meant converting all of arm32 would be harder, but I agree we don't
-> have to do it. It would be nice to convert all of the drivers/pci/host
-> drivers though, iow all multiplatform-enabled ones, and leaving the
-> current arm32 pci implementation for the platforms we don't want to
-> convert to multiplatform anyway (footbridge, iop, ixp4xx, ks8695 (?),
-> pxa, sa1100).
+Guys,
 
-I'm more than happy to convert the generic host controller we merged
-recently, but I'd probably want the core changes merged first so that I
-know I'm not wasting my time!
+Here's the cooresponding defconfig changes for the kirkwood board
+migration.  The setup file needs to be enabled in multi_v5 and
+mvebu_v5.
 
-Will
+Please pull.
+
+thx,
+
+Jason.
+
+
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.17
+
+for you to fetch changes up to 5658d58545388850c77a070fb3b882ddd958eb88:
+
+  ARM: multi_v5: Enable LaCie 2Big and 5Big Network v2 (2014-06-20 20:50:23 +0000)
+
+----------------------------------------------------------------
+mvebu defconfig changes for v3.17
+
+ - mvebu (v5)
+    - add LaCie 2Big and 5Big Network v2
+
+ - multi (v5)
+    - add LaCie 2Big and 5Big Network v2
+
+----------------------------------------------------------------
+Andrew Lunn (2):
+      ARM: mvebu: Add LaCie 2Big and 5Big Network v2
+      ARM: multi_v5: Enable LaCie 2Big and 5Big Network v2
+
+ arch/arm/configs/multi_v5_defconfig | 2 ++
+ arch/arm/configs/mvebu_v5_defconfig | 2 ++
+ 2 files changed, 4 insertions(+)
