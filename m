@@ -1,164 +1,39 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 27 Jun 2014 10:50:26 +0200
-Subject: [PATCH v5 08/14] mfd: max77802: Add DT binding documentation
-In-Reply-To: <53AD25F6.6030007@suse.de>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-9-git-send-email-javier.martinez@collabora.co.uk>
- <53AD25F6.6030007@suse.de>
-Message-ID: <53AD3052.40901@collabora.co.uk>
+From: jan.glauber@gmail.com (Jan Glauber)
+Date: Fri, 27 Jun 2014 10:51:27 +0200
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20140627085125.GA7088@hal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
+On Sun, Jun 22, 2014 at 10:11:49PM -0500, Nathan Lynch wrote:
+> Provide fast userspace implementations of gettimeofday and
+> clock_gettime on systems that implement the generic timers extension
+> defined in ARMv7.  This follows the example of arm64 in conception but
+> significantly differs in some aspects of the implementation (C vs
+> assembly, mainly).
 
-Thanks a lot for your feedback.
+Hi Nathan,
 
-On 06/27/2014 10:06 AM, Andreas F?rber wrote:
-> Am 26.06.2014 20:15, schrieb Javier Martinez Canillas:
->> Add Device Tree binding documentation for Maxim 77802 PMIC.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->> 
->> Changes since v4: None
->> 
->> Changes since v3: None
->> 
->> Changes since v2:
->>  - Explain better the Dynamic Voltage Scaling (DVS) support in some Buck
->>    regulators and the max77802,pmic-buck-{dvs,selb}-gpios properties.
->>    Suggested by Mark Brown.
->> 
->>  Documentation/devicetree/bindings/mfd/max77802.txt | 97 ++++++++++++++++++++++
->>  1 file changed, 97 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
->> new file mode 100644
->> index 0000000..f3b67c5
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
->> @@ -0,0 +1,97 @@
->> +Maxim MAX77802 multi-function device
->> +
->> +MAX77802 is a Mulitifunction device with PMIC, RTC and Charger on chip. It is
-> 
-> "Multifunction"?
-> 
+applying your patches I get the following compile error under Ubuntu 12.04:
 
-Yes, another typo. I'll fix it on the next series as well.
+  CC      arch/arm/kernel/vdso.o
+  LDS     arch/arm/kernel/vdso/vdso.lds
+  CC      arch/arm/kernel/vdso/vgettimeofday.o
+  AS      arch/arm/kernel/vdso/datapage.o
+  VDSOL   arch/arm/kernel/vdso/vdso.so.raw
+  HOSTCC  arch/arm/kernel/vdso/vdsomunge
+arch/arm/kernel/vdso/vdsomunge.c: In function ?main?:
+arch/arm/kernel/vdso/vdsomunge.c:152:16: error: ?EF_ARM_ABI_FLOAT_HARD? undeclared (first use in this function)
+arch/arm/kernel/vdso/vdsomunge.c:152:16: note: each undeclared identifier is reported only once for each function it appears in
+arch/arm/kernel/vdso/vdsomunge.c:156:34: error: ?EF_ARM_ABI_FLOAT_SOFT? undeclared (first use in this function)
+make[2]: *** [arch/arm/kernel/vdso/vdsomunge] Error 1
+make[1]: *** [arch/arm/kernel/vdso] Error 2
+make: *** [arch/arm/kernel] Error 2
 
->> +interfaced to host controller using i2c interface. PMIC, Charger and RTC
->> +submodules are addressed using same i2c slave address.
->> +
->> +Buck regulators 1, 2, 3, 4 and 6 include Dynamic Voltage Scaling (DVS) that
->> +allows each output voltage to change dynamically. Each Buck output voltage
->> +is selected using a set of external inputs: DVS1-3 and SELB1, 2, 3 and 6.
->> +
->> +There are 8 DVS registers that can be used to configure the output voltage
->> +for each Buck regulator and which one is active is controled by DVSx lines.
->> +
->> +SELBx lines are used to control if individual Buck lines are ON or OFF.
->> +
->> +This document describes the binding for mfd device and PMIC submodule.
->> +
->> +Binding for the built-in 32k clock generator block is defined separately
->> +in bindings/clk/maxim,max77802.txt file.
->> +
->> +Required properties:
->> +- compatible : Must be "maxim,max77802";
->> +- reg : Specifies the i2c slave address of PMIC block.
->> +- interrupts : This i2c device has an IRQ line connected to the main SoC.
->> +- interrupt-parent : The parent interrupt controller.
->> +
->> +Optional properties:
->> +- max77802,pmic-buck-default-dvs-idx: We'll always write this DVS index in the
->> +  PMIC for Bucks with DVS.
->> +  NOTE: at the moment these bindings don't include enough details for actual
->> +  GPIO-DVS--this just lets you choose which single slot to use.
->> +
->> +- max77802,pmic-buck-dvs-gpios: A GPIO array where each GPIO is connected to a
->> +  DVS line. We'll try to set these GPIOs to match pmic-buck-default-dvs-idx at
->> +  probe time if they are defined. If some or all of these GPIOs are not defined
->> +  it's assumed that the board has any missing GPIOs hardwired to match
->> +  pmic-buck-default-dvs-idx.
->> +
->> +- max77802,pmic-buck-selb-gpios: A GPIO array where each GPIO is connected to a
->> +  SELBx line. Should be five values: 1, 2, 3, 4, 6. It is strongly suggested to
->> +  include these GPIOs if there's any chance that changing DVS GPIOs one line at
->> +  a time might glitch your DVS values.
->> +
->> +Optional node:
->> +- regulators : The regulators of max77802 have to be instantiated
->> +  under subnode named "regulators" using the following format.
->> +
->> +	regulator_name {
-> 
-> The convention, I was told, would be regulator-name as node name.
-> 
+Looks like the libc dev is too old (EF_ARM_ABI_FLOAT_* not in /usr/include/elf.h).
+On a more recent Ubuntu it compiles fine. Not sure how to solve this, maybe disable
+vdso if the libc is too old?
 
-Ok, I'll change this to regulator-name. It is a symbolic name to refer to the
-regulator node name anyways since now that the regulator-compatible property is
-deprecated, the regulator node name is used for matching. So the list of valid
-regulator node names is properly defined below:
-
->> +
->> +  The regulator node name should be initialized with a string
->> +to get matched with their hardware counterparts as follow:
->> +
->> +	-LDOn 	:	for LDOs, where n can lie in range 1 to 35.
->> +			example: LDO1, LDO2, LDO35.
->> +	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 10.
->> +			example: BUCK1, BUCK5, BUCK10.
->> +Example:
->> +
->> +	max77802 at 09 {
->> +		compatible = "maxim,max77802";
->> +		interrupt-parent = <&wakeup_eint>;
->> +		interrupts = <26 0>;
->> +		reg = <0x09>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		max77802,pmic-buck-default-dvs-idx = <1>;
->> +		max77802,pmic-buck-dvs-gpios = <&gpy7 6 0>,
->> +					       <&gpj4 2 0>,
->> +					       <&gpj4 3 0>;
->> +		max77802,pmic-buck-selb-gpios = <&gph0 2 0>,
->> +						<&gph0 3 0>,
->> +						<&gph0 4 0>,
->> +						<&gph0 5 0>,
->> +						<&gph0 6 0>;
->> +
->> +		regulators {
->> +			ldo11_reg: LDO11 {
->> +				regulator-compatible = "LDO11";
->> +				regulator-name = "vdd_ldo11";
->> +				regulator-min-microvolt = <1900000>;
->> +				regulator-max-microvolt = <1900000>;
->> +				regulator-always-on;
->> +			};
->> +
->> +			buck1_reg {
-> 
-> Missing ": BUCK1"
-> 
-
-Ups, since it was documentation and not the DTS I completely missed that. Thanks
-for pointing out!
-
->> +				regulator-compatible = "BUCK1";
->> +				regulator-name = "vdd_mif";
->> +				regulator-min-microvolt = <950000>;
->> +				regulator-max-microvolt = <1300000>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +	};
-> 
-> Regards,
-> Andreas
-> 
-
-Best regards,
-Javier
+Regards, Jan
