@@ -1,64 +1,122 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Jun 2014 17:34:11 +0100
-Subject: [PATCHv3 2/5] arm64: cpuinfo: record cpu system register values
-In-Reply-To: <20140627153444.GB15775@arm.com>
-References: <1403795926-17139-1-git-send-email-mark.rutland@arm.com>
- <1403795926-17139-3-git-send-email-mark.rutland@arm.com>
- <20140627153444.GB15775@arm.com>
-Message-ID: <20140627163411.GL7262@leverpostej>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Fri, 27 Jun 2014 16:40:49 +0000
+Subject: [PATCH v8 1/3] PCI: host: rcar: Add Renesas R-Car PCIe driver
+In-Reply-To: <53A9EB5F.4050708@cogentembedded.com>
+References: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
+ <1399892270-25021-2-git-send-email-phil.edworthy@renesas.com>
+ <53A209DA.9000000@cogentembedded.com>
+ <20a0a16226d54b0e8d6f68e41046bbf2@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <53A897EF.2020804@cogentembedded.com>
+ <666f39dbf0f149c6946d4c2665d3d85d@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <53A9EB5F.4050708@cogentembedded.com>
+Message-ID: <fd0ab49699dd40b7b44db0108944d20f@HKXPR06MB168.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 04:34:44PM +0100, Will Deacon wrote:
-> Hi Mark,
+Hi Sergei,
 
-Hi Will,
+On 24 June 2014 22:19, Sergei wrote:
+> On 06/24/2014 02:01 PM, Phil Edworthy wrote:
+> 
+> >>>>       I'm investigating an imprecise external abort occurring once userland
+> is
+> >>>> started when I have NetMos
+> 
+> >>      Or is it MosChip now? Can't remember all their renames. :-)
+> 
+> > Do you know of somewhere I can buy a card with this chipset in the EU? I
+> had a
+> > quick search but couldn't find anything.
+> 
+>     No. But we probably can send such card to you.
+That would be handy!
 
-> On Thu, Jun 26, 2014 at 04:18:43PM +0100, Mark Rutland wrote:
-> > Several kernel subsystems need to know details about CPU system register
-> > values, sometimes for CPUs other than that they are executing on. Rather
-> > than hard-coding system register accesses and cross-calls for these
-> > cases, this patch adds logic to record various system register values at
-> > boot-time. This may be used for feature reporting, firmware bug
-> > detection, etc.
-> > 
-> > Separate hooks are added for the boot and hotplug paths to enable
-> > one-time intialisation and cold/warm boot value mismatch detection in
-> > later patches.
+ 
+> [...]
+> 
+> >>>>> +
+> >>>>> +	/* First resource is for IO */
+> >>>>> +	mask = PAR_ENABLE;
+> >>>>> +	if (res->flags & IORESOURCE_IO)
+> >>>>> +		mask |= IO_SPACE;
+> 
+> >>>>       For the memory space this works OK as you're identity-mapping the
+> >>>> memory
+> >>>> ranges in your device trees. However, for the I/O space this means that
+> it
+> >>>> won't work as the BARs in the PCIe devices get programmed with the
+> PCI bus
+> >>>> addresses but the PCIe window translation register is programmed
+> with a
+> >>>> CPU
+> >>>> address which don't at all match (given your device trees) and hence
+> one
+> >>>> can't
+> >>>> access the card's I/O mapped registers at all...
+> 
+> >>> Hmm, I couldn't find any cards that supported I/O, so I wasn't able to
+> test
+> >>> this. Clearly this is an issue that needs looking into.
+> 
+> >>      Will you look into it then, or should I?
+> 
+> > I'll look at it.
+> 
+>     Thanks.
 > 
 > [...]
 > 
-> > +void cpuinfo_store_cpu(void)
-> > +{
-> > +	unsigned int cpu = smp_processor_id();
-> > +	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
+> >>>>> +
+> >>>>> +		if (win > PCI_MAX_RESOURCES)
+> >>>>> +			break;
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	 err = rcar_pcie_parse_map_dma_ranges(pcie, pdev-
+> >dev.of_node);
+> >>>>> +	 if (err)
+> >>>>> +		return err;
+> >>>>> +
+> >>>>> +	of_id = of_match_device(rcar_pcie_of_match, pcie->dev);
+> >>>>> +	if (!of_id || !of_id->data)
+> >>>>> +		return -EINVAL;
+> >>>>> +	hw_init_fn = of_id->data;
+> >>>>> +
+> >>>>> +	/* Failure to get a link might just be that no cards are inserted
+> */
+> >>>>> +	err = hw_init_fn(pcie);
+> >>>>> +	if (err) {
+> >>>>> +		dev_info(&pdev->dev, "PCIe link down\n");
+> >>>>> +		return 0;
 > 
-> this_cpu_ptr?
-
-Sure.
-
+> >>>>       Not quite sure why you exit normally here without enabling the
+> >>>> hardware.
+> >>>> I think the internal bridge should be visible regardless of whether link is
+> >>>> detected or not...
 > 
-> > +	__cpuinfo_store_cpu(info);
-> > +}
-> > +
-> > +void __init cpuinfo_store_boot_cpu(void)
-> > +{
-> > +	unsigned int cpu = smp_processor_id();
-> > +	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
-> > +	__cpuinfo_store_cpu(info);
+> >>> Why would you want to see the bridge when you can do nothing with it?
+> >> Aren't
 > 
-> This looks familiar. Can you just call cpuinfo_store_cpu here, or even move
-> that code into __cpu_info_store_cpu, which will only work if it runs on the
-> CPU owning that data anyway.
+> >>      Because it's the way PCI works. You have the built-in devices always
+> >> present and seen on a PCI bus. :-)
+> 
+> >>> you are just wasting resources?
+> 
+> >>      I think it's rather you who are wasting resources. ;-) Why not just fail
+> >> the probe when you have no link?
+> 
+> > Ah, so we currently have a half-way house... not failing the probe, but not
+> > enabling the HW. Either all or nothing would be preferable.
+> 
+>     Actually, I tried ignoring the link test and the kernel died horrible
+> death without any console output. :-/ Having enabled the earlyprintk
+> support,
+> I was able to see the reason: panic("PCI: unable to scan bus!") in
+> arch/arm/kernel/bios32.c...
+> 
+> > Thanks
+> > Phil
+> 
+> WBR, Sergei
 
-I can't call cpuinfo_store_cpu() here, as in patch 5 I'll end up doing
-erroneous validation of cpu0 against the (not yet initialised) boot cpu
-data.
-
-Given the use of this_cpu_ptr, I can get rid of the smp_processor_id()
-calls for now, as they're only necessary when reporting to the user. For
-patches 4 and 5 I've moved them to cpuinfo_detect_icache_policy() and
-cpuinfo_sanity_check().
-
-Thanks,
-Mark.
+Thanks
+Phil
