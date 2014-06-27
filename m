@@ -1,70 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Jun 2014 00:07:36 +0100
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627223328.GB17988@brightrain.aerifal.cx>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
- <20140627213051.GS32514@n2100.arm.linux.org.uk>
- <20140627215541.GC16724@brightrain.aerifal.cx>
- <20140627221744.GU32514@n2100.arm.linux.org.uk>
- <20140627223328.GB17988@brightrain.aerifal.cx>
-Message-ID: <20140627230736.GX32514@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 28 Jun 2014 01:10:27 +0200
+Subject: [RFC 5/5] clk: Add floor and ceiling constraints to clock rates
+In-Reply-To: <53ADF6E6.6090705@wwwdotorg.org>
+References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1403855872-14749-6-git-send-email-tomeu.vizoso@collabora.com>
+ <53ADF6E6.6090705@wwwdotorg.org>
+Message-ID: <20140627231026.GA26184@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 06:33:28PM -0400, Rich Felker wrote:
-> On Fri, Jun 27, 2014 at 11:17:44PM +0100, Russell King - ARM Linux wrote:
-> > As I've already said, that's a system integrator bug to have a kernel
-> > without a kuser page with userspace which requires it.
-> > 
-> > I think you're are missing one obvious solution to this which you can do:
-> > you are passed the HWCAP fields in the ELF auxinfo.  This will tell you
-> > if the CPU has TLS support or not.  If it has TLS support, then you don't
-> > need to use the kuser helpers, and you know that it is a CPU which is ARM
-> > architecture v6k or later,
+On Fri, Jun 27, 2014 at 04:57:42PM -0600, Stephen Warren wrote:
+> On 06/27/2014 01:57 AM, Tomeu Vizoso wrote:
+> > Adds a way for clock consumers to set maximum and minimum rates. This can be
+> > used for thermal drivers to set ceiling rates, or by misc. drivers to set
+> > floor rates to assure a minimum performance level.
 > 
-> Are you sure? I think the minimum models for TLS and for LDREX/STREX
-> are different; one is plain v6 and the other is v6k.
-
-LDREX/STREX is v6+.  TLS is v6k+.
-
-> This greatly
-> complicates the issue since the kernel only tells you if the TLS
-> register is available, not if the atomics are.
-
-uname() ?
-
-> > If you want to know that the CPU supports the DMB
-> > instruction rather than the CP15 barrier instruction, then you have to
-> > check the uname details, or read /proc/cpuinfo (but I'd rather you
-> > didn't.)
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
 > 
-> These are not safe operations. /proc may not be mounted, or the file
-> descriptor table may be full and open may fail, etc.
-
-Balderdash.  Since when has uname not been safe?
-
-> > In addition, the HWCAP fields tell you about some of the other
-> > instructions and FP options which are available to you, whether there's
-> > integer division available, etc.
+> > +static struct rate_constraint *__ensure_constraint(struct clk *clk_user,
+> > +						   enum constraint_type type)
 > 
-> Yes but for all of those it's safe to assume the lowest baseline. For
-> TLS and atomics, removal (even optional) of kuser helper page means
-> it's not safe to assume the lowest baseline; there MUST be a fallback
-> to use the higher-model-only instructions if the kernel lacks kuser
-> helper.
+> > +	if (!found) {
+> > +		constraint = kzalloc(sizeof(*constraint), GFP_KERNEL);
+> > +		if (!constraint) {
+> > +			pr_err("%s: could not allocate constraint\n", __func__);
+> 
+> Doesn't kzalloc print an error itself if the allocation fails? I've
+> certainly seen quite a few patches ripping out custom "allocation
+> failed" errors in code.
 
-The kuser helpers can NOT be removed unless the CPU is v6k+.  Let me
-put that a different way: the kuser helpers can not be removed unless
-the ELF HWCAPs indicate TLS support.
+Yes, these are unnecessary. There's even a checkpatch warning for this
+construct nowadays:
 
-If the ELF HWCAPs indicate TLS support, then you have atomics and you
-have TLS registers, and you may or may not have the kuser helpers.
-If it indicates no TLS support, then you will always have kuser helpers.
+	f9a5a624f414 checkpatch: attempt to find unnecessary 'out of memory' messages
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/631482af/attachment.sig>
