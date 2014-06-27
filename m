@@ -1,104 +1,106 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Jun 2014 15:14:51 +0100
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <20140405001953.GE15806@google.com>
- <20140407083120.GE17163@e106497-lin.cambridge.arm.com>
- <5183143.FxBNM0xTAV@wuerfel>
- <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
- <20140626085926.GB11244@arm.com>
- <CAL_JsqKCHf6VXR3FFcBSu1xuhP54dYsAJCZwT-X9p5iTZAOJfQ@mail.gmail.com>
-Message-ID: <20140627141451.GJ15296@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 27 Jun 2014 16:15:44 +0200
+Subject: [PATCH 07/16] ARM: mvebu: Make the CPU idle initialization more
+ generic
+In-Reply-To: <1403875377-940-8-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <53AD7C90.6080600@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 01:44:21AM +0100, Rob Herring wrote:
-> On Thu, Jun 26, 2014 at 3:59 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > Although a bit late, I'm raising this now and hopefully we'll come to a
-> > conclusion soon. Delaying arm64 PCIe support even further is not a real
-> > option, which leaves us with:
-> >
-> > 1. Someone else (with enough PCIe knowledge) volunteering to take over
-> >    soon or
-> > 2. Dropping Liviu's work and going for an arm64-specific implementation
-> >    (most likely based on the arm32 implementation, see below)
+On 27/06/2014 15:22, Gregory CLEMENT wrote:
+> In order to support more mvebu SoCs, this patch use an initialization
+> specific function associated to each SoCs which support CPU Idle.
 > 
-> 3. Keeping Liviu's patches leaving some of the architecture specific
-> bits. I know Arnd and I both commented on it still needing more common
-> pieces, but compared to option 2 that would be way better.
+> Then each SoC will have his own set of check and of data
+> configuration.
 > 
-> Let's look at the patches in question:
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 39 +++++++++++++++++++++++++++++++--------
+>  1 file changed, 31 insertions(+), 8 deletions(-)
 > 
-> 3e71867 pci: Introduce pci_register_io_range() helper function.
-> 6681dff pci: OF: Fix the conversion of IO ranges into IO resources.
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 087157c20b8a..454f0f9ede6b 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -293,23 +293,47 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
+>  	.notifier_call = mvebu_v7_cpu_pm_notify,
+>  };
+>  
+> +static bool (*mvebu_v7_cpu_idle_init)(void);
+> +
+> +static __init bool armada_xp_cpuidle_init(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+> +	if (!np)
+> +		return false;
+> +	of_node_put(np);
+> +
+> +	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
+> +	return true;
+> +}
+> +
+> +static struct of_device_id of_cpuidle_table[] __initdata = {
+> +	{ .compatible = "marvell,armadaxp",
+> +	  .data = (void *)armada_xp_cpuidle_init,
+> +	},
+> +	{ /* end of list */ },
+> +};
+> +
+>  static int __init mvebu_v7_cpu_pm_init(void)
+>  {
+>  	struct device_node *np;
+> +	const struct of_device_id *match;
+> +
+> +	np = of_find_matching_node_and_match(NULL, of_cpuidle_table,
+> +					&match);
+> +
+
+The following part was missing (without this the kernel hang on Armada 375)
+
++       if (!np)
++               return 0;
+
+
+
+>  
+>  	/*
+>  	 * Check that all the requirements are available to enable
+> -	 * cpuidle. So far, it is only supported on Armada XP, cpuidle
+> -	 * needs the coherency fabric and the PMSU enabled
+> +	 * cpuidle. Each SoCs comes with its own requirements and
+> +	 * configuration
+>  	 */
+>  
+> -	if (!of_machine_is_compatible("marvell,armadaxp"))
+> -		return 0;
+> +	mvebu_v7_cpu_idle_init = (bool (*)(void))match->data;
+>  
+> -	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+> -	if (!np)
+> +	if (!mvebu_v7_cpu_idle_init())
+>  		return 0;
+> -	of_node_put(np);
+>  
+>  	np = of_find_matching_node(NULL, of_pmsu_table);
+>  	if (!np)
+> @@ -329,7 +353,6 @@ static int __init mvebu_v7_cpu_pm_init(void)
+>  				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
+>  
+>  	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
+> -	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
+>  	platform_device_register(&mvebu_v7_cpuidle_device);
+>  	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
+>  
 > 
-> Both OF patches. I'll happily merge them.
 
-We just need to make sure they don't break other users of
-of_pci_range_to_resource() that the second patch introduces.
-
-> 2d5dd85 pci: Create pci_host_bridge before its associated bus in
-> pci_create_root_bus.
-> f6f2854 pci: Introduce a domain number for pci_host_bridge.
-> 524a9f5 pci: Export find_pci_host_bridge() function.
-> 
-> These don't seem to be too controversial.
-
-I think here there were discussions around introducing domain_nr to
-pci_host_bridge, particularly to the pci_create_root_bus_in_domain() API
-change. I don't think we reached any conclusion.
-
-> fb75718 pci: of: Parse and map the IRQ when adding the PCI device.
-> 
-> 6 LOC. Hardly controversial.
-
-I agree.
-
-> 920a685 pci: Add support for creating a generic host_bridge from device tree
-> 
-> This function could be moved to drivers/of/of_pci.c if having it in
-> drivers/pci is too much maintenance burden.
-
-I think it makes sense. Currently drivers/pci/host-bridge.c doesn't have
-anything OF related, so of_pci.c looks more appropriate.
-
-> However, nearly the same
-> code is already being duplicated in every DT enabled ARM PCI host
-> driver and will continue as more PCI hosts are added. So this isn't
-> really a question of converting other architectures to common PCI host
-> infrastructure, but converting DT based PCI hosts to common
-> infrastructure. ARM is the only arch moving host drivers to
-> drivers/pci ATM. Until other architectures start doing that,
-> converting them is pointless.
-
-I agree. It's probably more important to convert some of the
-drivers/pci/host implementations to using the common parsing rather than
-a new architecture (this way we avoid even more code duplication).
-
-> bcf5c10 Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-> 
-> Seems like an independent fix that should be applied regardless.
-
-Indeed. But it got stuck at the top of this series and hasn't been
-pushed upstream.
-
-> 7cfde80 arm64: Add architecture support for PCI
-> 
-> What is here is really just a function of which option we pick.
-
-With Liviu's latest version (not posted) and with
-of_create_pci_host_bridge() function moved to of_pci.c, I don't think
-there is much new functionality added to drivers/pci/. What I think we
-need is clarifying the domain_nr patch (and API change) and more users
-of the new generic code. As you said, it doesn't need to be a separate
-architecture but rather existing pci host drivers under drivers/pci. Of
-course, other arch conversion should follow shortly as well but even
-without an immediate conversion, I don't see too much additional
-maintenance burden for the core PCIe code (and code sharing between new
-PCIe host drivers is even more beneficial).
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
