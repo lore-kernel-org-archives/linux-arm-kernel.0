@@ -1,130 +1,89 @@
 From: luto@amacapital.net (Andy Lutomirski)
-Date: Fri, 27 Jun 2014 12:11:12 -0700
-Subject: [PATCH v8 5/9] seccomp: split mode set routines
-In-Reply-To: <CAGXu5jL5rN6=2-SwHiiEVuGVain-T7Ucg2PsN7u08vQ5Rxz6Mg@mail.gmail.com>
-References: <1403642893-23107-1-git-send-email-keescook@chromium.org>
- <1403642893-23107-6-git-send-email-keescook@chromium.org>
- <20140625135121.GB7892@redhat.com>
- <CAGXu5jJkFxh4K=40xuh6tu3kUf4oJM8Dry+4upBdRieW3FNLgw@mail.gmail.com>
- <CALCETrUBNmLnpa+LM91om2RSpR6SjupP-EdefzhU1Me4nv3Dfw@mail.gmail.com>
- <CAGXu5j+J11zJnuFR8bYKAXizAHhCx4R+uJE_QH6zC3q2udkpaQ@mail.gmail.com>
- <CALCETrVrs8sb19+UUqyFEpAFzTih5dkAwn-WpQjfgPcPJMpP5g@mail.gmail.com>
- <20140625173245.GA17695@redhat.com>
- <CALCETrUc65H+fn6dtMdYnB_xR39wcmgDdTbdR3fFRjyrndJhgA@mail.gmail.com>
- <20140625175136.GA18185@redhat.com>
- <CAGXu5jL17k6=GXju6x+eLU20FMwBHhnuRiHoQD1Bzj_EmpiKjg@mail.gmail.com>
- <CALCETrVNwhWSPNiBiZmgP1nD9zLJPTk6cH0yo=85rbxTPTYFRg@mail.gmail.com>
- <CAGXu5jLavA8FJD8m-1y4wO0uzh3qvvMmajAg0Lrr1Cn_Om3a3w@mail.gmail.com>
- <CALCETrUPxTxseJ=sOhD9CyJPtOqCR5sL8yx7KezLmLZcFSFNMA@mail.gmail.com>
- <CAGXu5j+wPvAuo6pVc_XoJqv7CvW6yDf3YE6P7tFwtO9hfcUUsg@mail.gmail.com>
- <CALCETrWr+5n_w+q-fNc0G55eUteN57sm+7-bPCXKb7acmLu0Cg@mail.gmail.com>
- <CAGXu5jL5rN6=2-SwHiiEVuGVain-T7Ucg2PsN7u08vQ5Rxz6Mg@mail.gmail.com>
-Message-ID: <CALCETrUdAWyigafb=tFafRkFYgWdXKwhRs0n5SYsef4KVyJ-eQ@mail.gmail.com>
+Date: Fri, 27 Jun 2014 12:27:45 -0700
+Subject: Thread pointer changes
+In-Reply-To: <20140611145533.GT179@brightrain.aerifal.cx>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+Message-ID: <53ADC5B1.6080905@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 12:04 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Jun 27, 2014 at 11:56 AM, Andy Lutomirski <luto@amacapital.net> wrote:
->> On Fri, Jun 27, 2014 at 11:52 AM, Kees Cook <keescook@chromium.org> wrote:
->>> On Fri, Jun 27, 2014 at 11:39 AM, Andy Lutomirski <luto@amacapital.net> wrote:
->>>> On Fri, Jun 27, 2014 at 11:33 AM, Kees Cook <keescook@chromium.org> wrote:
->>>>> On Wed, Jun 25, 2014 at 11:07 AM, Andy Lutomirski <luto@amacapital.net> wrote:
->>>>>> On Wed, Jun 25, 2014 at 11:00 AM, Kees Cook <keescook@chromium.org> wrote:
->>>>>>> On Wed, Jun 25, 2014 at 10:51 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->>>>>>>> On 06/25, Andy Lutomirski wrote:
->>>>>>>>>
->>>>>>>>> On Wed, Jun 25, 2014 at 10:32 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->>>>>>>>> > On 06/25, Andy Lutomirski wrote:
->>>>>>>>> >>
->>>>>>>>> >> Write the filter, then smp_mb (or maybe a weaker barrier is okay),
->>>>>>>>> >> then set the bit.
->>>>>>>>> >
->>>>>>>>> > Yes, exactly, this is what I meant. Plas rmb() in __secure_computing().
->>>>>>>>> >
->>>>>>>>> > But I still can't understand the rest of your discussion about the
->>>>>>>>> > ordering we need ;)
->>>>>>>>>
->>>>>>>>> Let me try again from scratch.
->>>>>>>>>
->>>>>>>>> Currently there are three relevant variables: TIF_SECCOMP,
->>>>>>>>> seccomp.mode, and seccomp.filter.  __secure_computing needs
->>>>>>>>> seccomp.mode and seccomp.filter to be in sync, and it wants (but
->>>>>>>>> doesn't really need) TIF_SECCOMP to be in sync as well.
->>>>>>>>>
->>>>>>>>> My suggestion is to rearrange it a bit.  Move mode into seccomp.filter
->>>>>>>>> (so that filter == NULL implies no seccomp) and don't check
->>>>>>>
->>>>>>> This would require that we reimplement mode 1 seccomp via mode 2
->>>>>>> filters. Which isn't too hard, but may add complexity.
->>>>>>>
->>>>>>>>> TIF_SECCOMP in secure_computing.  Then turning on seccomp is entirely
->>>>>>>>> atomic except for the fact that the seccomp hooks won't be called if
->>>>>>>>> filter != NULL but !TIF_SECCOMP.  This removes all ordering
->>>>>>>>> requirements.
->>>>>>>>
->>>>>>>> Ah, got it, thanks. Perhaps I missed somehing, but to me this looks like
->>>>>>>> unnecessary complication at first glance.
->>>>>>>>
->>>>>>>> We alredy have TIF_SECCOMP, we need it anyway, and we should only care
->>>>>>>> about the case when this bit is actually set, so that we can race with
->>>>>>>> the 1st call of __secure_computing().
->>>>>>>>
->>>>>>>> Otherwise we are fine: we can miss the new filter anyway, ->mode can't
->>>>>>>> be changed it is already nonzero.
->>>>>>>>
->>>>>>>>> Alternatively, __secure_computing could still BUG_ON(!seccomp.filter).
->>>>>>>>> In that case, filter needs to be set before TIF_SECCOMP is set, but
->>>>>>>>> that's straightforward.
->>>>>>>>
->>>>>>>> Yep. And this is how seccomp_assign_mode() already works? It is called
->>>>>>>> after we change ->filter chain, it changes ->mode before set(TIF_SECCOMP)
->>>>>>>> just it lacks a barrier.
->>>>>>>
->>>>>>> Right, I think the best solution is to add the barrier. I was
->>>>>>> concerned that adding the read barrier in secure_computing would have
->>>>>>> a performance impact, though.
->>>>>>>
->>>>>>
->>>>>> I can't speak for ARM, but I think that all of the read barriers are
->>>>>> essentially free on x86.  (smp_mb is a very different story, but that
->>>>>> shouldn't be needed here.)
->>>>>
->>>>> It looks like SMP ARM issues dsb for rmb, which seems a bit expensive.
->>>>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0204g/CIHJFGFE.html
->>>>>
->>>>> If I skip the rmb in the secure_computing call before checking mode,
->>>>> it sounds like I run the risk of racing an out-of-order TIF_SECCOMP vs
->>>>> mode and filter. This seems unlikely to me, given an addition of the
->>>>> smp_mb__before_atomic() during the seccomp_assign_mode()? I guess I
->>>>> don't have a sense of how aggressively ARM might do data caching in
->>>>> this area. Could the other thread actually see TIF_SECCOMP get set but
->>>>> still have an out of date copy of seccomp.mode?
->>>>>
->>>>> I really want to avoid adding anything to the secure_computing()
->>>>> execution path. :(
->>>>
->>>> Hence my suggestion to make the ordering not matter.  No ordering
->>>> requirement, no barriers.
->>>
->>> I may be misunderstanding something, but I think there's still an
->>> ordering problem. We'll have TIF_SECCOMP already, so if we enter
->>> secure_computing with a NULL filter, we'll kill the process.
->>>
->>> Merging .mode and .filter would remove one of the race failure paths:
->>> having TIF_SECCOMP and not having a mode set (leading to BUG). With
->>> the merge, we could still race and land in the same place as have
->>> TIF_SECCOMP and mode==2, but filter==NULL, leading to WARN and kill.
->>
->> You could just make secure_computing do nothing if filter == NULL.
->> It's probably faster to test that than TIF_SECCOMP anyway, since you
->> need to read the filter cacheline regardless, and testing a regular
->> variable for non-NULLness might be faster than an atomic bit test
->> operation.  (Or may not -- I don't know.)
->
-> I am uncomfortable about making filter == NULL be a "fail open"
-> condition if TIF_SECCOMP is set.
+On 06/11/2014 07:55 AM, Rich Felker wrote:
+> On Tue, Jun 10, 2014 at 03:28:35AM -0400, Rich Felker wrote:
+>> For ARM, I think we should revisit the thread-pointer/atomic inlining
+>> work that was done as a sloppy workaround for kernels without the
+>> kuser_helper page. If the set_thread_area syscall fails (due to an old
+>> kernel that doesn't support it), we can setup a function pointer for
+>> the __aeabi_read_tp function that only supports a single main thread
+>> and returns its thread pointer. Likewise at this stage we could detect
+>> the presence or absence of the kuser_helper page and substitute our
+>> own fallbacks (using the instructions directly) if needed. One thing
+>> that should be checked though is whether there are any kernel versions
+>> which support EABI syscalls but not the thread-pointer setup syscall.
+>> If not, there's really no use in having a fallback for that. These
+>> slides look like they might shed some light on the history:
+>> http://wookware.org/talks/armeabidebconf.pdf
+> 
+> According to those slides, the EABI-form syscall convention (which
+> musl requires) was not added to Linux until 2.6.15. The kuser helpers
+> (just thread pointer and atomic cas) were originally added in 2.6.12.
+> Since we already have a bigger reason not to support pre-2.6.15
+> kernels on ARM, there's no need to worry about whether TLS is
+> supported by the kernel; we can just assume __set_thread_area will
+> always work.
+> 
+> As for whether the kuser helper page exists, there are three cases:
+> 
+> 1. Normal kuser page - everything available and works.
+> 
+> 2. Mainline kernel CONFIG_KUSER_HELPERS disabled - the page is present
+>    but filled with a HCF instruction. This is easy to detect.
+> 
+> 3. Hardened grsec kernels - the page is completely missing, so
+>    attempts to access it fault. And worse yet, most syscalls report
+>    EFAULT even if it's present because it's above the task size
+>    address limit (in the kernel address range). So far the only way
+>    I've found to detect it is process_vm_readv which was not added
+>    until 3.2; I'm not sure if there are relevant pre-3.2 grsec kernels
+>    with kuser helpers disabled.
 
-I'm unconvinced here.  TIF_SECCOMP unset is already a fail-open
-condition if filter is set.
+Hi ARM people and Kees-
+
+The "vectors" page appears to be an abomination that's a lot like the
+x86_64 vsyscall page.  IMO it should be phased out.  I'm not going to do
+it (I don't know enough about ARM, and I'm not really able to test),
+but, having gone through cleaning up the vsyscall mess a couple of years
+ago, I'd be happy to help if anyone is interested in doing it.
+
+I'd suggest:
+
+Step 1: Add an auxvec entry ASAP indicating the address of the vectors
+page if present.  Possibly give some other positive indication if the
+vectors page is *not* present, too.
+
+Step 2: Add a config option, off by default, to make the vectors page be
+a normal VMA.  Use _install_special_mapping for it.  See 3.16-rc2 on x86
+for a very simple example.  arm/kernel/process.c has code for this, too,
+but x86's is nicer (no arch_vma_name crap).  Embedded things (and
+Chromium?) can enable this.
+
+Step 3: Implement an emulated vectors page, just like x86_64 uses for
+vsyscalls now.  This is conceptually simple, but it's a royal PITA for a
+few reasons that I can do into detail about (and help fix!).
+
+Step 4: Eventually convert ARM to use a vDSO instead.  Get rid of
+sigpage and the "vectors" page.  Preserve compatibility by updating the
+auxvec interface.  Provide both AT_SYSINFO_EHDR and AT_VDSO_FINDSYM
+(which is a candidate interface that I might try to push for 3.17).
+
+If anyone does this, merging it with the fancy new x86 vdso code would
+probably be worthwhile.
+
+The end game would be that systems with new kernels but old userspace
+still work with degraded performance.  New kernels and new userspace are
+quite happy.  New userspace on old kernels won't use the vectors page.
+
+
+Thoughts?  Any takers?
 
 --Andy
