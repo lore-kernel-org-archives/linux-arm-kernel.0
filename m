@@ -1,125 +1,77 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 15:22:43 +0200
-Subject: [PATCH 02/16] ARM: mvebu: Add a common function for the boot address
- work around
+Date: Fri, 27 Jun 2014 15:22:46 +0200
+Subject: [PATCH 05/16] ARM: mvebu: Add workaround for cpuidle support for
+ Armada 370
 In-Reply-To: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1403875377-940-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403875377-940-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some of the mvebu SoC and due to internal bootrom issue, CPU
-initial jump code should be placed in SRAM memory of the SoC. In order
-to achieve this, we have to unmap the BootROM and at some specific
-location where the BootROM was place, create a specific MBus window
-for the SRAM. This SRAM is initialized with a few instructions of code
-that allows to jump into the real secondary CPU boot address.
+On Armada 370, there is "a slow exit process from the deep idle state
+due to heavy L1/L2 cache cleanup operations performed by the BootROM
+software" (cf errata GL-BootROM-10). To avoid this, we replace the
+restart code of the BootROM by a simple jump to the boot address. Then
+the code located at this boot address will take care of the
+initialization.
 
-This work around currently needed for booting SMP on Aramda 375 Z1 and
-will be needed for cpuidle support on Armada 370. Instead of duplicate
-the same code, this commit introduce a common function to handle it:
-mvebu_boot_addr_wa().
+For this purpose, we use the common function mvebu_boot_addr_wa()
+introduced in the previous commit.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c    | 31 +++++++++++++++++++++++++++++++
- arch/arm/mach-mvebu/pmsu.h    |  1 +
- arch/arm/mach-mvebu/pmsu_ll.S | 19 +++++++++++++++++++
- 3 files changed, 51 insertions(+)
+ arch/arm/mach-mvebu/pmsu.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 5584d35b8e88..991560905ccc 100644
+index 991560905ccc..cdc6d87d0b49 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -22,6 +22,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/io.h>
-+#include <linux/mbus.h>
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/resource.h>
-@@ -63,6 +64,14 @@ static void __iomem *pmsu_mp_base;
- #define L2C_NFABRIC_PM_CTL		    0x4
- #define L2C_NFABRIC_PM_CTL_PWR_DOWN		BIT(20)
+@@ -34,7 +34,6 @@
+ #include <asm/tlbflush.h>
+ #include "common.h"
  
-+#define ARMADA_370_CRYPT0_ENG_ID	0x9
-+#define CRYPT0_ENG_ATTR	0x1
-+
-+#define SRAM_PHYS_BASE	    0xFFFF0000
-+
-+#define BOOTROM_BASE    0xFFF00000
-+#define BOOTROM_SIZE    0x100000
-+
- extern void ll_disable_coherency(void);
- extern void ll_enable_coherency(void);
+-static void __iomem *pmsu_mp_base;
  
-@@ -85,6 +94,28 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
- 		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
- }
+ #define PMSU_BASE_OFFSET    0x100
+ #define PMSU_REG_SIZE	    0x1000
+@@ -77,6 +76,9 @@ extern void ll_enable_coherency(void);
  
-+extern unsigned char mvebu_boot_wa_start;
-+extern unsigned char mvebu_boot_wa_end;
+ extern void armada_370_xp_cpu_resume(void);
+ 
++static unsigned long pmsu_mp_phys_base;
++static void __iomem *pmsu_mp_base;
 +
-+void mvebu_boot_addr_wa(int crypto_eng_id, u32 resume_addr_reg)
-+{
-+	void __iomem *sram_virt_base;
-+	u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
+ static struct platform_device armada_xp_cpuidle_device = {
+ 	.name = "cpuidle-armada-370-xp",
+ };
+@@ -147,6 +149,8 @@ static int __init armada_370_xp_pmsu_init(void)
+ 		goto out;
+ 	}
+ 
++	pmsu_mp_phys_base = res.start;
 +
-+	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
-+	mvebu_mbus_add_window_by_id(crypto_eng_id, CRYPT0_ENG_ATTR,
-+				SRAM_PHYS_BASE, SZ_64K);
-+	sram_virt_base = ioremap(SRAM_PHYS_BASE, SZ_64K);
-+
-+
-+	memcpy(sram_virt_base, &mvebu_boot_wa_start, code_len);
+ 	pmsu_mp_base = ioremap(res.start, resource_size(&res));
+ 	if (!pmsu_mp_base) {
+ 		pr_err("unable to map registers\n");
+@@ -312,6 +316,18 @@ int __init armada_370_xp_cpu_pm_init(void)
+ 		return 0;
+ 	of_node_put(np);
+ 
 +	/*
-+	 * The last word of the code copied in SRAM must contain the
-+	 * physical base address of the PMSU register
++	 * On Armada 370, there is "a slow exit process from the deep
++	 * idle state due to heavy L1/L2 cache cleanup operations
++	 * performed by the BootROM software". To avoid this, we
++	 * replace the restart code of the bootrom by a a simple jump
++	 * to the boot address. Then the code located at this boot
++	 * address will take care of the initialization.
 +	 */
-+	*(unsigned long *)(sram_virt_base + code_len - 4) = resume_addr_reg;
-+}
++	if (of_machine_is_compatible("marvell,armada370"))
++		mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
++				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
 +
- static int __init armada_370_xp_pmsu_init(void)
- {
- 	struct device_node *np;
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-index 07a737c6b95d..2d97a70c2558 100644
---- a/arch/arm/mach-mvebu/pmsu.h
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -12,5 +12,6 @@
- #define __MACH_MVEBU_PMSU_H
- 
- int armada_xp_boot_cpu(unsigned int cpu_id, void *phys_addr);
-+void mvebu_boot_addr_wa(int crypto_eng_id, unsigned long resume_addr_reg);
- 
- #endif	/* __MACH_370_XP_PMSU_H */
-diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
-index fc3de68d8c54..3b702a16bd3d 100644
---- a/arch/arm/mach-mvebu/pmsu_ll.S
-+++ b/arch/arm/mach-mvebu/pmsu_ll.S
-@@ -23,3 +23,22 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
- 	b	cpu_resume
- ENDPROC(armada_370_xp_cpu_resume)
- 
-+.global mvebu_boot_wa_start
-+.global mvebu_boot_wa_end
-+
-+/* The following code will be executed from SRAM */
-+ENTRY(mvebu_boot_wa_start)
-+mvebu_boot_wa_start:
-+/* use physical address of the boot address register register */
-+	adr     r0, 1f
-+	ldr     r0, [r0]
-+	ldr     r0, [r0]
-+	mov     pc, r0
-+/*
-+ * the last word of this piece of code will be filled by the physical
-+ * address of the boot address register just after being copied in SRAM
-+ */
-+1:
-+	.long   .
-+mvebu_boot_wa_end:
-+ENDPROC(mvebu_boot_wa_end)
+ 	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
+ 	armada_xp_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+ 	platform_device_register(&armada_xp_cpuidle_device);
 -- 
 1.8.1.2
