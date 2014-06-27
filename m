@@ -1,69 +1,129 @@
-From: tthayer@altera.com (tthayer at altera.com)
-Date: Fri, 27 Jun 2014 10:26:57 -0500
-Subject: [PATCHv8 1/3] devicetree: Addition of the Altera SDRAM Controller.
-In-Reply-To: <1403882819-24929-1-git-send-email-tthayer@altera.com>
-References: <1403882819-24929-1-git-send-email-tthayer@altera.com>
-Message-ID: <1403882819-24929-2-git-send-email-tthayer@altera.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 27 Jun 2014 16:20:25 +0100
+Subject: [PATCH CFT 18/30] net: fec: remove inappropriate calls around
+ fec_restart()
+In-Reply-To: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+Message-ID: <E1X0Xwv-0001O2-8y@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@altera.com>
+This is the second stage to "move calls to quiesce/resume packet
+processing out of fec_restart()", where we remove calls which are not
+appropriate to the call site.
 
-Add the Altera SDRAM controller bindings and device tree changes to the Altera SoC project.
+In the majority of cases, there is no need to detach and reattach the
+interface as we are holding the queue xmit lock across the reset.  The
+exception to that is in fec_resume(), where we are already detached by
+the suspend function.  Here, we can remove the call to detach the
+interface.
 
-Signed-off-by: Thor Thayer <tthayer@altera.com>
+We also do not need to stop the transmit queue.  Holding the xmit lock
+is enough to ensure that the transmit packet processing is not running
+while we perform our task.  However, since fec_restart() always cleans
+the rings, we call netif_wake_queue() (or netif_device_attach() in the
+case of resume) just before dropping the xmit lock.  This prevents the
+watchdog firing.
+
+Lastly, always call napi_enable() after the device has been reattached
+in the resume path so that we know that the transmit packet processing
+is already in an enabled state, so we don't call netif_wake_queue()
+while detached.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-v2: Changes to SoC SDRAM EDAC code.
+ drivers/net/ethernet/freescale/fec_main.c | 26 ++++++--------------------
+ 1 file changed, 6 insertions(+), 20 deletions(-)
 
-v3: Implement code suggestions for SDRAM EDAC code.
-
-v4: Remove syscon from SDRAM controller bindings.
-
-v5: No Change, bump version for consistency.
-
-v6: Only map the ctrlcfg register as syscon.
-
-v7: No change. Bump for consistency.
-
-v8: No change. Bump for consistency.
----
- .../bindings/arm/altera/socfpga-sdram.txt          |   11 +++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
- 2 files changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-new file mode 100644
-index 0000000..5027026
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-@@ -0,0 +1,11 @@
-+Altera SOCFPGA SDRAM Controller
-+
-+Required properties:
-+- compatible : "altr,sdr-ctl";
-+- reg : Should contain 1 register ranges(address and length)
-+
-+Example:
-+	sdrctl at ffc25000 {
-+		compatible = "altr,sdr-ctl";
-+		reg = <0xffc25000 0x4>;
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 4676f25..310292e 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -682,6 +682,11 @@
- 			clocks = <&l4_sp_clk>;
- 		};
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 4a295b4bfb94..49c154af6da2 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1058,15 +1058,12 @@ static void fec_enet_work(struct work_struct *work)
+ 		fep->delay_work.timeout = false;
+ 		rtnl_lock();
+ 		if (netif_device_present(ndev) || netif_running(ndev)) {
+-			netif_device_detach(ndev);
+ 			napi_disable(&fep->napi);
+-			netif_tx_disable(ndev);
+ 			netif_tx_lock_bh(ndev);
+ 			fec_restart(ndev, fep->full_duplex);
+-			netif_tx_unlock_bh(ndev);
+ 			netif_wake_queue(ndev);
++			netif_tx_unlock_bh(ndev);
+ 			napi_enable(&fep->napi);
+-			netif_device_attach(ndev);
+ 		}
+ 		rtnl_unlock();
+ 	}
+@@ -1524,15 +1521,12 @@ static void fec_enet_adjust_link(struct net_device *ndev)
  
-+		sdrctl at ffc25000 {
-+			compatible = "altr,sdr-ctl", "syscon";
-+			reg = <0xffc25000 0x4>;
-+		};
-+
- 		rst: rstmgr at ffd05000 {
- 			compatible = "altr,rst-mgr";
- 			reg = <0xffd05000 0x1000>;
+ 		/* if any of the above changed restart the FEC */
+ 		if (status_change) {
+-			netif_device_detach(ndev);
+ 			napi_disable(&fep->napi);
+-			netif_tx_disable(ndev);
+ 			netif_tx_lock_bh(ndev);
+ 			fec_restart(ndev, phy_dev->duplex);
+-			netif_tx_unlock_bh(ndev);
+ 			netif_wake_queue(ndev);
++			netif_tx_unlock_bh(ndev);
+ 			napi_enable(&fep->napi);
+-			netif_device_attach(ndev);
+ 		}
+ 	} else {
+ 		if (fep->link) {
+@@ -1919,15 +1913,12 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
+ 		phy_start_aneg(fep->phy_dev);
+ 	}
+ 	if (netif_running(ndev)) {
+-		netif_device_detach(ndev);
+ 		napi_disable(&fep->napi);
+-		netif_tx_disable(ndev);
+ 		netif_tx_lock_bh(ndev);
+ 		fec_restart(ndev, fep->full_duplex);
+-		netif_tx_unlock_bh(ndev);
+ 		netif_wake_queue(ndev);
++		netif_tx_unlock_bh(ndev);
+ 		napi_enable(&fep->napi);
+-		netif_device_attach(ndev);
+ 	}
+ 
+ 	return 0;
+@@ -2372,15 +2363,12 @@ static int fec_set_features(struct net_device *netdev,
+ 
+ 		if (netif_running(netdev)) {
+ 			fec_stop(netdev);
+-			netif_device_detach(netdev);
+ 			napi_disable(&fep->napi);
+-			netif_tx_disable(netdev);
+ 			netif_tx_lock_bh(netdev);
+ 			fec_restart(netdev, fep->phy_dev->duplex);
+-			netif_tx_unlock_bh(netdev);
+ 			netif_wake_queue(netdev);
++			netif_tx_unlock_bh(netdev);
+ 			napi_enable(&fep->napi);
+-			netif_device_attach(netdev);
+ 		}
+ 	}
+ 
+@@ -2748,15 +2736,13 @@ fec_resume(struct device *dev)
+ 
+ 	rtnl_lock();
+ 	if (netif_running(ndev)) {
+-		netif_device_detach(ndev);
+ 		napi_disable(&fep->napi);
+-		netif_tx_disable(ndev);
+ 		netif_tx_lock_bh(ndev);
+ 		fec_restart(ndev, fep->full_duplex);
++		netif_device_attach(ndev);
+ 		netif_tx_unlock_bh(ndev);
+-		netif_wake_queue(ndev);
+-		napi_enable(&fep->napi);
+ 		netif_device_attach(ndev);
++		napi_enable(&fep->napi);
+ 		phy_start(fep->phy_dev);
+ 	}
+ 	rtnl_unlock();
 -- 
-1.7.9.5
+1.8.3.1
