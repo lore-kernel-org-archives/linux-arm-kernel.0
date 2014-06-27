@@ -1,77 +1,52 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 15:22:46 +0200
-Subject: [PATCH 05/16] ARM: mvebu: Add workaround for cpuidle support for
- Armada 370
+Date: Fri, 27 Jun 2014 15:22:49 +0200
+Subject: [PATCH 08/16] ARM: mvebu: Use a local variable to store the resume
+ address
 In-Reply-To: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1403875377-940-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403875377-940-9-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 370, there is "a slow exit process from the deep idle state
-due to heavy L1/L2 cache cleanup operations performed by the BootROM
-software" (cf errata GL-BootROM-10). To avoid this, we replace the
-restart code of the BootROM by a simple jump to the boot address. Then
-the code located at this boot address will take care of the
-initialization.
-
-For this purpose, we use the common function mvebu_boot_addr_wa()
-introduced in the previous commit.
+The resume address used by the cpu idle code will not always be the
+same. Using a local variable to store the resume address allows to
+keep the same function for the pm notifier but with a different
+address. This address will be set during the initialization.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/pmsu.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 991560905ccc..cdc6d87d0b49 100644
+index 454f0f9ede6b..8bf737fb3aac 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -34,7 +34,6 @@
- #include <asm/tlbflush.h>
- #include "common.h"
+@@ -79,6 +79,8 @@ extern void armada_370_xp_cpu_resume(void);
+ static unsigned long pmsu_mp_phys_base;
+ static void __iomem *pmsu_mp_base;
  
--static void __iomem *pmsu_mp_base;
- 
- #define PMSU_BASE_OFFSET    0x100
- #define PMSU_REG_SIZE	    0x1000
-@@ -77,6 +76,9 @@ extern void ll_enable_coherency(void);
- 
- extern void armada_370_xp_cpu_resume(void);
- 
-+static unsigned long pmsu_mp_phys_base;
-+static void __iomem *pmsu_mp_base;
++static void *mvebu_cpu_resume;
 +
- static struct platform_device armada_xp_cpuidle_device = {
+ static struct platform_device mvebu_v7_cpuidle_device = {
  	.name = "cpuidle-armada-370-xp",
  };
-@@ -147,6 +149,8 @@ static int __init armada_370_xp_pmsu_init(void)
- 		goto out;
+@@ -281,7 +283,7 @@ static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
+ {
+ 	if (action == CPU_PM_ENTER) {
+ 		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+-		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_370_xp_cpu_resume);
++		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, mvebu_cpu_resume);
+ 	} else if (action == CPU_PM_EXIT) {
+ 		mvebu_v7_pmsu_idle_restore();
  	}
- 
-+	pmsu_mp_phys_base = res.start;
-+
- 	pmsu_mp_base = ioremap(res.start, resource_size(&res));
- 	if (!pmsu_mp_base) {
- 		pr_err("unable to map registers\n");
-@@ -312,6 +316,18 @@ int __init armada_370_xp_cpu_pm_init(void)
- 		return 0;
+@@ -304,6 +306,7 @@ static __init bool armada_xp_cpuidle_init(void)
+ 		return false;
  	of_node_put(np);
  
-+	/*
-+	 * On Armada 370, there is "a slow exit process from the deep
-+	 * idle state due to heavy L1/L2 cache cleanup operations
-+	 * performed by the BootROM software". To avoid this, we
-+	 * replace the restart code of the bootrom by a a simple jump
-+	 * to the boot address. Then the code located at this boot
-+	 * address will take care of the initialization.
-+	 */
-+	if (of_machine_is_compatible("marvell,armada370"))
-+		mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
-+				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
-+
- 	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
- 	armada_xp_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
- 	platform_device_register(&armada_xp_cpuidle_device);
++	mvebu_cpu_resume = armada_370_xp_cpu_resume;
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
+ 	return true;
+ }
 -- 
 1.8.1.2
