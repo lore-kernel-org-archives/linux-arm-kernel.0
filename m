@@ -1,90 +1,140 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 15:22:48 +0200
-Subject: [PATCH 07/16] ARM: mvebu: Make the CPU idle initialization more
- generic
+Date: Fri, 27 Jun 2014 15:22:47 +0200
+Subject: [PATCH 06/16] ARM: mvebu: Rename the armada_370_xp into mvebu_v7 in
+ pmsu.c file
 In-Reply-To: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1403875377-940-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403875377-940-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support more mvebu SoCs, this patch use an initialization
-specific function associated to each SoCs which support CPU Idle.
-
-Then each SoC will have his own set of check and of data
-configuration.
+Actually most of the function related to the PMSU are not specific to
+the Armada 370 or Armada XP SoCs, but can also be used for most of the
+other mvebu ARMv7 SoCs.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 39 +++++++++++++++++++++++++++++++--------
- 1 file changed, 31 insertions(+), 8 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 40 ++++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 087157c20b8a..454f0f9ede6b 100644
+index cdc6d87d0b49..087157c20b8a 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -293,23 +293,47 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
- 	.notifier_call = mvebu_v7_cpu_pm_notify,
+@@ -79,7 +79,7 @@ extern void armada_370_xp_cpu_resume(void);
+ static unsigned long pmsu_mp_phys_base;
+ static void __iomem *pmsu_mp_base;
+ 
+-static struct platform_device armada_xp_cpuidle_device = {
++static struct platform_device mvebu_v7_cpuidle_device = {
+ 	.name = "cpuidle-armada-370-xp",
  };
  
-+static bool (*mvebu_v7_cpu_idle_init)(void);
-+
-+static __init bool armada_xp_cpuidle_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-+	if (!np)
-+		return false;
-+	of_node_put(np);
-+
-+	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
-+	return true;
-+}
-+
-+static struct of_device_id of_cpuidle_table[] __initdata = {
-+	{ .compatible = "marvell,armadaxp",
-+	  .data = (void *)armada_xp_cpuidle_init,
-+	},
-+	{ /* end of list */ },
-+};
-+
- static int __init mvebu_v7_cpu_pm_init(void)
+@@ -118,7 +118,7 @@ void mvebu_boot_addr_wa(int crypto_eng_id, u32 resume_addr_reg)
+ 	*(unsigned long *)(sram_virt_base + code_len - 4) = resume_addr_reg;
+ }
+ 
+-static int __init armada_370_xp_pmsu_init(void)
++static int __init mvebu_v7_pmsu_init(void)
  {
  	struct device_node *np;
-+	const struct of_device_id *match;
-+
-+	np = of_find_matching_node_and_match(NULL, of_cpuidle_table,
-+					&match);
-+
+ 	struct resource res;
+@@ -164,7 +164,7 @@ static int __init armada_370_xp_pmsu_init(void)
+ 	return ret;
+ }
  
- 	/*
- 	 * Check that all the requirements are available to enable
--	 * cpuidle. So far, it is only supported on Armada XP, cpuidle
--	 * needs the coherency fabric and the PMSU enabled
-+	 * cpuidle. Each SoCs comes with its own requirements and
-+	 * configuration
- 	 */
+-static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
++static void mvebu_v7_pmsu_enable_l2_powerdown_onidle(void)
+ {
+ 	u32 reg;
  
--	if (!of_machine_is_compatible("marvell,armadaxp"))
--		return 0;
-+	mvebu_v7_cpu_idle_init = (bool (*)(void))match->data;
+@@ -178,7 +178,7 @@ static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
+ }
  
--	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
--	if (!np)
-+	if (!mvebu_v7_cpu_idle_init())
- 		return 0;
--	of_node_put(np);
+ /* No locking is needed because we only access per-CPU registers */
+-void armada_370_xp_pmsu_idle_prepare(bool deepidle)
++static void mvebu_v7_pmsu_idle_prepare(bool deepidle)
+ {
+ 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+ 	u32 reg;
+@@ -215,9 +215,9 @@ void armada_370_xp_pmsu_idle_prepare(bool deepidle)
+ 	writel(reg, pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
+ }
  
- 	np = of_find_matching_node(NULL, of_pmsu_table);
- 	if (!np)
-@@ -329,7 +353,6 @@ static int __init mvebu_v7_cpu_pm_init(void)
+-static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
++static noinline int do_armada_xp_370_cpu_suspend(unsigned long deepidle)
+ {
+-	armada_370_xp_pmsu_idle_prepare(deepidle);
++	mvebu_v7_pmsu_idle_prepare(deepidle);
+ 
+ 	v7_exit_coherency_flush(all);
+ 
+@@ -248,13 +248,13 @@ static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
+ 	return 0;
+ }
+ 
+-static int armada_370_xp_cpu_suspend(unsigned long deepidle)
++static int armada_xp_370_cpu_suspend(unsigned long deepidle)
+ {
+-	return cpu_suspend(deepidle, do_armada_370_xp_cpu_suspend);
++	return cpu_suspend(deepidle, do_armada_xp_370_cpu_suspend);
+ }
+ 
+ /* No locking is needed because we only access per-CPU registers */
+-static noinline void armada_370_xp_pmsu_idle_restore(void)
++static noinline void mvebu_v7_pmsu_idle_restore(void)
+ {
+ 	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+ 	u32 reg;
+@@ -276,24 +276,24 @@ static noinline void armada_370_xp_pmsu_idle_restore(void)
+ 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
+ }
+ 
+-static int armada_370_xp_cpu_pm_notify(struct notifier_block *self,
++static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
+ 				    unsigned long action, void *hcpu)
+ {
+ 	if (action == CPU_PM_ENTER) {
+ 		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+ 		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_370_xp_cpu_resume);
+ 	} else if (action == CPU_PM_EXIT) {
+-		armada_370_xp_pmsu_idle_restore();
++		mvebu_v7_pmsu_idle_restore();
+ 	}
+ 
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block armada_370_xp_cpu_pm_notifier = {
+-	.notifier_call = armada_370_xp_cpu_pm_notify,
++static struct notifier_block mvebu_v7_cpu_pm_notifier = {
++	.notifier_call = mvebu_v7_cpu_pm_notify,
+ };
+ 
+-int __init armada_370_xp_cpu_pm_init(void)
++static int __init mvebu_v7_cpu_pm_init(void)
+ {
+ 	struct device_node *np;
+ 
+@@ -328,13 +328,13 @@ int __init armada_370_xp_cpu_pm_init(void)
+ 		mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
  				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
  
- 	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
--	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
- 	platform_device_register(&mvebu_v7_cpuidle_device);
- 	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
+-	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
+-	armada_xp_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+-	platform_device_register(&armada_xp_cpuidle_device);
+-	cpu_pm_register_notifier(&armada_370_xp_cpu_pm_notifier);
++	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
++	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
++	platform_device_register(&mvebu_v7_cpuidle_device);
++	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
  
+ 	return 0;
+ }
+ 
+-arch_initcall(armada_370_xp_cpu_pm_init);
+-early_initcall(armada_370_xp_pmsu_init);
++arch_initcall(mvebu_v7_cpu_pm_init);
++early_initcall(mvebu_v7_pmsu_init);
 -- 
 1.8.1.2
