@@ -1,65 +1,126 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 15:22:51 +0200
-Subject: [PATCH 10/16] ARM: mvebu: Export the SCU address
+Date: Fri, 27 Jun 2014 15:22:55 +0200
+Subject: [PATCH 14/16] ARM: mvebu: Add CPU idle support for Armada 370
 In-Reply-To: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1403875377-940-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403875377-940-15-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCU address will be needed in other files than the board file, for
-example in pmsu.c. So this patch adds a function allowing to get the
-SCU address.
+Unlike the Armada XP the Armada 370 always power done the L2 cache, so
+it have only 2 cpuidle states. Thanks to the previous patches, adding
+the support for this new SoCs required only the modification of the
+architecture specific part.
+
+The message in case of failure to suspend the system was switched from
+warn to debug. Indeed due to the "slow exit process from the deep idle
+state" in Armada 370, this situation happens quite often. Using the
+_debug version avoids spamming the kernel logs, but still allows to
+enable it if needed.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/board-v7.c | 9 +++++++--
- arch/arm/mach-mvebu/common.h   | 2 ++
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 60 ++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 47 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 8bb742fdf5ca..4c1d955f51c0 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -33,14 +33,14 @@
- #include "coherency.h"
- #include "mvebu-soc-id.h"
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 9396839e162e..bfd471538811 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -250,7 +250,7 @@ static noinline int do_armada_xp_370_cpu_suspend(unsigned long deepidle)
+ 	"isb	"
+ 	: : "r" (0));
  
-+static void __iomem *scu_base;
-+
- /*
-  * Enables the SCU when available. Obviously, this is only useful on
-  * Cortex-A based SOCs, not on PJ4B based ones.
-  */
- static void __init mvebu_scu_enable(void)
- {
--	void __iomem *scu_base;
--
- 	struct device_node *np =
- 		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
- 	if (np) {
-@@ -50,6 +50,11 @@ static void __init mvebu_scu_enable(void)
- 	}
+-	pr_warn("Failed to suspend the system\n");
++	pr_debug("Failed to suspend the system\n");
+ 
+ 	return 0;
  }
+@@ -302,6 +302,24 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
  
-+void __iomem *mvebu_get_scu_base(void)
+ static bool (*mvebu_v7_cpu_idle_init)(void);
+ 
++static struct mvebu_v7_cpuidle armada_370_cpuidle = {
++	.mvebu_v7_idle_driver = {
++		.name			= "armada_370_idle",
++		.states[0]		= ARM_CPUIDLE_WFI_STATE,
++		.states[1]		= {
++			.exit_latency		= 100,
++			.power_usage		= 5,
++			.target_residency	= 1000,
++			.flags			= CPUIDLE_FLAG_TIME_VALID |
++			MVEBU_V7_FLAG_DEEP_IDLE,
++			.name			= "Deep Idle",
++			.desc			= "CPU and L2 Fabric power down",
++		},
++		.state_count = 2,
++	},
++	.mvebu_v7_cpu_suspend = armada_xp_370_cpu_suspend,
++};
++
+ static struct mvebu_v7_cpuidle armada_xp_cpuidle = {
+ 	.mvebu_v7_idle_driver = {
+ 		.name			= "armada_xp_idle",
+@@ -328,6 +346,31 @@ static struct mvebu_v7_cpuidle armada_xp_cpuidle = {
+ 	.mvebu_v7_cpu_suspend = armada_xp_370_cpu_suspend,
+ };
+ 
++static __init bool armada_370_cpuidle_init(void)
 +{
-+	return scu_base;
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
++	if (!np)
++		return false;
++	of_node_put(np);
++
++	/*
++	 * On Armada 370, there is "a slow exit process from the deep
++	 * idle state due to heavy L1/L2 cache cleanup operations
++	 * performed by the BootROM software". To avoid this, we
++	 * replace the restart code of the bootrom by a a simple jump
++	 * to the boot address. Then the code located at this boot
++	 * address will take care of the initialization.
++	 */
++	mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
++			PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
++
++	mvebu_cpu_resume = armada_370_xp_cpu_resume;
++	mvebu_v7_cpuidle_device.dev.platform_data = &armada_370_cpuidle;
++	return true;
 +}
 +
- /*
-  * Early versions of Armada 375 SoC have a bug where the BootROM
-  * leaves an external data abort pending. The kernel is hit by this
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 6ad62cf8352c..9beb0c45ba59 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -25,4 +25,6 @@ void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
+ static __init bool armada_xp_cpuidle_init(void)
+ {
+ 	struct device_node *np;
+@@ -345,6 +388,9 @@ static struct of_device_id of_cpuidle_table[] __initdata = {
+ 	{ .compatible = "marvell,armadaxp",
+ 	  .data = (void *)armada_xp_cpuidle_init,
+ 	},
++	{ .compatible = "marvell,armada370",
++	  .data = (void *)armada_370_cpuidle_init,
++	},
+ 	{ /* end of list */ },
+ };
  
- void armada_xp_cpu_die(unsigned int cpu);
+@@ -373,18 +419,6 @@ static int __init mvebu_v7_cpu_pm_init(void)
+ 		return 0;
+ 	of_node_put(np);
  
-+void __iomem *mvebu_get_scu_base(void);
-+
- #endif
+-	/*
+-	 * On Armada 370, there is "a slow exit process from the deep
+-	 * idle state due to heavy L1/L2 cache cleanup operations
+-	 * performed by the BootROM software". To avoid this, we
+-	 * replace the restart code of the bootrom by a a simple jump
+-	 * to the boot address. Then the code located at this boot
+-	 * address will take care of the initialization.
+-	 */
+-	if (of_machine_is_compatible("marvell,armada370"))
+-		mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
+-				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
+-
+ 	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
+ 	platform_device_register(&mvebu_v7_cpuidle_device);
+ 	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
 -- 
 1.8.1.2
