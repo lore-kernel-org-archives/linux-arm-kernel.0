@@ -1,48 +1,45 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 27 Jun 2014 11:32:56 +0200
-Subject: [PATCH v5 02/14] mfd: max77686: Allow the max77686 rtc to wakeup
- the system
-In-Reply-To: <20140627092149.GH19645@lee--X1>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-3-git-send-email-javier.martinez@collabora.co.uk>
- <20140627092149.GH19645@lee--X1>
-Message-ID: <53AD3A48.4090307@collabora.co.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 27 Jun 2014 10:38:57 +0100
+Subject: [PATCH 8/9] ARM: kernel: add support for cpu cache information
+In-Reply-To: <53AC6A3A.1010001@codeaurora.org>
+References: <1403717444-23559-1-git-send-email-sudeep.holla@arm.com>
+ <1403717444-23559-9-git-send-email-sudeep.holla@arm.com>
+ <53AB6700.2060807@codeaurora.org> <53AC05C4.2030104@arm.com>
+ <53AC6A3A.1010001@codeaurora.org>
+Message-ID: <53AD3BB1.6020404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+Hi,
 
-On 06/27/2014 11:21 AM, Lee Jones wrote:
-> On Thu, 26 Jun 2014, Javier Martinez Canillas wrote:
-> 
->> From: Doug Anderson <dianders@chromium.org>
->> 
->> The max77686 includes an RTC that keeps power during suspend.  It's
->> convenient to be able to use it as a wakeup source.
->> 
->> NOTE: due to wakeup ordering problems this patch alone doesn't work so
->> well on exynos5250-snow.  You also need something that brings the i2c
->> bus up before the max77686 wakeup runs.
->> 
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->> 
->> Changes since v4: None
->> 
->> Changes since v3:
->>  - Keep the note that this patch needs another change due wakeup
->>    ordering problems.
->> 
->>  drivers/rtc/rtc-max77686.c | 28 ++++++++++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
-> 
-> This patch doesn't actually touch the MFD subsystem directly.  Can you
-> change the $SUBJECT line accordingly please?
-> 
+On 26/06/14 19:45, Stephen Boyd wrote:
+> On 06/26/14 04:36, Sudeep Holla wrote:
+>> Hi Stephen,
+>>
+>> On 26/06/14 01:19, Stephen Boyd wrote:
+>>> On 06/25/14 10:30, Sudeep Holla wrote:
+>>>> +
+>>>> +/*
+>>>> + * Which cache CCSIDR represents depends on CSSELR value
+>>>> + * Make sure no one else changes CSSELR during this
+>>>> + * smp_call_function_single prevents preemption for us
+>>>> + */
+>>>
+>>> Where's the smp_call_function_single() or preemption disable happening?
+>>>
+>>
+>> init_cache_level is called using smp_call_function_single in
+>> drivers/base/cacheinfo.c(PATCH 2/9)
+>
+> Oh that's unexpected. Do other architectures require the use of
+> smp_call_function_single() to read their cache information? It seems
+> like an ARM architecture specific detail that has been pushed up into
+> the generic layer.
+>
 
-You're right, I'll change the $subject.
+Right, since I started with x86 as reference and it requires it, I missed to
+see others. So x86,ARM{32,64} requires it while ppc,s390 and ia64 doesn't.
+I see how to fix that. Thanks for spotting it.
 
-Best regards,
-Javier
+Regards,
+Sudeep
