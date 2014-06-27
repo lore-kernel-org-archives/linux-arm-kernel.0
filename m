@@ -1,66 +1,55 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Fri, 27 Jun 2014 14:22:19 -0700
-Subject: [PATCH v1 4/9] pinctrl: tegra-xusb: Add USB PHY support
-In-Reply-To: <53AC61B9.5030408@wwwdotorg.org>
-References: <1403072180-4944-1-git-send-email-abrestic@chromium.org>
- <1403072180-4944-5-git-send-email-abrestic@chromium.org>
- <53AB493F.3030802@wwwdotorg.org>
- <CAL1qeaHhoqEPu-j+drNiRMyeutz=qqZPxSP8H+v-sgjZSfS5tQ@mail.gmail.com>
- <53AC61B9.5030408@wwwdotorg.org>
-Message-ID: <CAL1qeaFBM3VCwEUHQywoRAkreHT+j4BQf8NWWLpzw0D2heeBXA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 22:30:51 +0100
+Subject: [musl] Re: Thread pointer changes
+In-Reply-To: <20140627210931.GT23102@port70.net>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627200949.GQ32514@n2100.arm.linux.org.uk>
+ <20140627210931.GT23102@port70.net>
+Message-ID: <20140627213051.GS32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 11:08 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/25/2014 05:30 PM, Andrew Bresticker wrote:
->> On Wed, Jun 25, 2014 at 3:12 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 06/18/2014 12:16 AM, Andrew Bresticker wrote:
->>>> In addition to the PCIe and SATA PHYs, the XUSB pad controller also
->>>> supports 3 UTMI, 2 HSIC, and 2 USB3 PHYs.  Each USB3 PHY uses a single
->>>> PCIe or SATA lane and is mapped to one of the three UTMI ports.
->>>>
->>>
->>>> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
->>>
->>>> @@ -372,6 +720,193 @@ static int tegra_xusb_padctl_pinconf_group_set(struct pinctrl_dev *pinctrl,
->>>>                       padctl_writel(padctl, regval, lane->offset);
->>>>                       break;
->>>>
->>>> +             case TEGRA_XUSB_PADCTL_USB3_PORT_NUM:
->>>> +                     if (value >= TEGRA_XUSB_PADCTL_USB3_PORTS) {
->>>> +                             dev_err(padctl->dev, "Invalid USB3 port: %lu\n",
->>>> +                                     value);
->>>> +                             return -EINVAL;
->>>> +                     }
->>>> +                     if (!is_pcie_sata_lane(group)) {
->>>> +                             dev_err(padctl->dev,
->>>> +                                     "USB3 port not applicable for pin %d\n",
->>>> +                                     group);
->>>> +                             return -EINVAL;
->>>> +                     }
->>>> +                     padctl->usb3_ports[value].lane = group;
->>>> +                     break;
->>>
->>> It feels odd to use pinctrl for a SW-only purpose. In other words, that
->>> chunk of code isn't writing the pinconf data to HW, but rather some
->>> internal variable.
->>
->> Well the mapping of lanes to USB3 ports is a hardware property and we
->> do use it when programming the hardware later to choose which set of
->> lane registers to program given a USB3 port, but it's true that it's
->> not some value we program into HW directly.
->>
->>> Perhaps it would make more sense for the DT binding to represent this
->>> data directly in a custom property that's parsed at probe() time. That
->>> way, pinctrl only touches "real" HW stuff.
->>
->> I'm on the fence about this.  If you or others feel strongly about
->> this then I can make it a separate DT property and move it out of the
->> pinctrl properties.
->
-> I'd certainly prefer to use pinctrl bindings only for things that get
-> directly written into HW. Other configuration data should be easy to
-> retrieve directly from properties.
+On Fri, Jun 27, 2014 at 11:09:31PM +0200, Szabolcs Nagy wrote:
+> i thought the helpers in the kernel can avoid certain memory
+> barriers that the userspace has to do on armv6 for atomics
+> (and those barriers are deprecated on armv7 so i thought the
+> kuser page was better for portable binaries)
 
-Ok, I'll make a separate DT property for the USB3 port <-> lane
-assignments then.
+The helpers are provided so that libc can be independent of the CPU
+facilities in the machine.  The key word there is _libc_, not
+applications.
+
+So, a libc can be built to support the lowest architecture that
+someone deems to support, and it may make use of the kuser helpers.
+If it does, then you have a libc which requires that the kuser
+helpers are always provided by the kernel, and the KUSER_HELPERS
+option must never be disabled.  If it is disabled, then the libc
+will be useless against that kernel.
+
+However, a libc built against modern architectures should not be
+making use of the kuser helpers.  We found last year that the
+Ubuntu 12.04 glibc did still make use of one kuser helper, and
+as such Ubuntu 12.04 also needs KUSER_HELPERS to remain enabled.
+
+The last combination is that the libc is built for modern architectures
+without needing any kuser helpers at all.  In this case - and only this
+case - the kernel's KUSER_HELPERS option can be disabled should the
+system integrator want to increase security.
+
+> > Due to that, any ARMv5 or earlier CPU will always have the kuser helper
+> > page.  ARMv6 and later may or may not have the kuser helper page, but
+> > there you're really building for a different ABI anyway (VFP-based) and
+> > you also know that you have the thread registers.
+> 
+> so is it expected that the libc makes no attempt to provide
+> portable binary interface for armv5 and armv6?
+
+The libc interface that applications make use should not have any
+dependence on whether KUSER_HELPERS is enabled or disabled, the
+presence of that page should be totally invisible to applications.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
