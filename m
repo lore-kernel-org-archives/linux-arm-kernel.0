@@ -1,32 +1,26 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Fri, 27 Jun 2014 18:05:57 +0200
-Subject: [PATCH v2 05/12] usb: phy: add the Berlin USB PHY driver
-In-Reply-To: <20140627155622.GL8069@saruman.home>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-6-git-send-email-antoine.tenart@free-electrons.com>
- <20140627155622.GL8069@saruman.home>
-Message-ID: <20140627160557.GA6622@kwain>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 27 Jun 2014 17:07:25 +0100
+Subject: [PATCH 2/5] regulator: act8865: set correct number of regulators
+ in pdata
+In-Reply-To: <1403451105-31929-3-git-send-email-b.galvani@gmail.com>
+References: <1403451105-31929-1-git-send-email-b.galvani@gmail.com>
+ <1403451105-31929-3-git-send-email-b.galvani@gmail.com>
+Message-ID: <20140627160725.GQ23300@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Sun, Jun 22, 2014 at 05:31:42PM +0200, Beniamino Galvani wrote:
+> When platform data is populated from DT all the regulators are
+> instantiated and the value of num_regulators should be the number of
+> all available regulators rather than the number of matched ones.
 
-On Fri, Jun 27, 2014 at 10:56:22AM -0500, Felipe Balbi wrote:
-> On Tue, Jun 24, 2014 at 12:35:14PM +0200, Antoine T?nart wrote:
-> > Add the driver driving the Marvell Berlin USB PHY. This allows to
-> > initialize the PHY and to use it from the USB driver later.
-> > 
-> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> 
-> since this is a brand new driver, it should go to drivers/phy instead.
-
-This PHY is used by a ChipIdea USB driver, which uses the provided
-common function for ChipIdea. These functions use the usb_phy framework.
-That's why this PHY driver is there.
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Could you go into more detail on your logic on this one please?  The
+platform data (and DT configuration) for regulators should be completely
+optional.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/ecfd6ea3/attachment.sig>
