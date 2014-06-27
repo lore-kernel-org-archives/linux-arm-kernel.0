@@ -1,33 +1,28 @@
-From: nsz@port70.net (Szabolcs Nagy)
-Date: Fri, 27 Jun 2014 23:09:31 +0200
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627200949.GQ32514@n2100.arm.linux.org.uk>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
-Message-ID: <20140627210931.GT23102@port70.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 15:10:25 -0600
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53ADDDC1.2080603@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [2014-06-27 21:09:49 +0100]:
-> As I said above, enabling CONFIG_KUSER_HELPERS is known to be an ABI
-> break, and it's well documented as such.  The future will be running
-> systems without the kuser helpers because on ARMv6 and later, there's
-> little point in having them.  In fact, today almost all C libraries
-> are built without needing the kuser helpers.
+On 06/27/2014 10:58 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> These drivers are closely coupled and need to be moved as a whole. One
+> reason for moving them out of arch/arm/mach-tegra is to allow them to be
+> shared with 64-bit ARM.
 
-i thought the helpers in the kernel can avoid certain memory
-barriers that the userspace has to do on armv6 for atomics
-(and those barriers are deprecated on armv7 so i thought the
-kuser page was better for portable binaries)
+Aside from any discussions re: splitting out cpuidle, power domains, ...
+into separate subsystem directories, this patch looks conceptually fine
+to me.
 
-> Due to that, any ARMv5 or earlier CPU will always have the kuser helper
-> page.  ARMv6 and later may or may not have the kuser helper page, but
-> there you're really building for a different ABI anyway (VFP-based) and
-> you also know that you have the thread registers.
-
-so is it expected that the libc makes no attempt to provide
-portable binary interface for armv5 and armv6?
-
-ie should musl treat those as different targets?
+That said, given that I think arch/arm64 isn't going to have mach-*
+directories or machine descriptors, I wonder how all this code is going
+to be invoked at boot. arch/arm/mach-tegra/tegra.c calls a bunch of
+these functions at boot right now. So, it seems like moving the code so
+that it can compile in both places is only part of the solution? Are we
+going to have an arm64-specific SoC driver that binds to the SoC
+compatible in order to initialize everything? If so, I wonder if the
+same can work for arch/arm so everything works the same way?
