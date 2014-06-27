@@ -1,24 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Jun 2014 09:55:41 +0200
-Subject: [PATCH] ARM: bcm: Fix bcm and multi_v7 defconfigs
-In-Reply-To: <1403850439-8771-1-git-send-email-olof@lixom.net>
-References: <1403850439-8771-1-git-send-email-olof@lixom.net>
-Message-ID: <5792451.i1WdiOPTXg@wuerfel>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 27 Jun 2014 09:55:51 +0200
+Subject: [PATCH v5 12/14] clk: max77802: Add DT binding documentation
+In-Reply-To: <53AD22D0.9000403@suse.de>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-13-git-send-email-javier.martinez@collabora.co.uk>
+ <53AD22D0.9000403@suse.de>
+Message-ID: <53AD2387.5090704@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 June 2014 23:27:19 Olof Johansson wrote:
-> BCM (Kona/capri platform) has regressed in two ways on this release. First,
-> bcm_defconfig no longer selected the appropriate MMC driver options due to
-> changes in dependencies. Secondly, the new MFD and regulator drivers were not
-> enabled on multi_v7_defconfig, so that caused the system to fail probing MMC
-> there.
+Hello Andres,
+
+Thanks a lot for your feedback.
+
+On 06/27/2014 09:52 AM, Andreas F?rber wrote:
+> Am 26.06.2014 20:15, schrieb Javier Martinez Canillas:
+>> Add Device Tree binding documentation for the clocks
+>> outputs in the Maxim 77802 Power Management IC.
+>> 
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>> 
+>> Changes since v4: None
+>> 
+>> Changes since v3:
+>>  - Don't use the same clock driver name in clock-names since it's a consumer
+>>    concept and most probably will be different. Suggested by Doug Anderson.
+>> 
+>> Changes since v2:
+>>  - Split the DT binding documentation in a separate patch.
+>> 
+>>  .../devicetree/bindings/clock/maxim,max77802.txt   | 42 ++++++++++++++++++++++
+>>  1 file changed, 42 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+>> 
+>> diff --git a/Documentation/devicetree/bindings/clock/maxim,max77802.txt b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
+>> new file mode 100644
+>> index 0000000..26bc4f7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
+>> @@ -0,0 +1,42 @@
+>> +Binding for Maxim MAX77802 32k clock generator block
+>> +
+>> +This is a part of device tree bindings of MAX77802 multi-function device.
+>> +More information can be found in bindings/mfd/max77802.txt file.
+>> +
+>> +The MAX77802 contains two 32.768khz clock outputs that can be controlled
+>> +(gated/ungated) over I2C.
+>> +
+>> +Following properties should be presend in main device node of the MFD chip.
 > 
-> Fix by enabling the new options as needed.
-> 
-> Cc: Matt Porter <matt.porter@linaro.org>
-> Cc: Christian Daudt <bcm@fixthebug.org>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+> "present"
+>
+
+Right, it's a typo. I'll wait for further feedback and will fix both issues you
+pointed out in the next version of the series.
+
+> Regards,
+> Andreas
 > 
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Best regards,
+Javier
