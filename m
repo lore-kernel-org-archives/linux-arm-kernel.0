@@ -1,89 +1,74 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 27 Jun 2014 17:14:38 +0200
-Subject: [PATCH] ARM: dts: Add mask-tpm-reset to the device tree
-In-Reply-To: <CAD=FV=Wz5nB=fe-snzdNC-Tb50wXz9h3S5z4jAHzKxH3N66UVw@mail.gmail.com>
-References: <1403774127-21892-1-git-send-email-vikas.sajjan@samsung.com>	<53ABED5B.8010506@samsung.com>	<CAD=FV=Vwgdis6FzJ8MHDwfuohB1kN8Mf--2N=rxGNeAfKjJMig@mail.gmail.com>	<53AD60D7.4040404@gmail.com>
- <CAD=FV=Wz5nB=fe-snzdNC-Tb50wXz9h3S5z4jAHzKxH3N66UVw@mail.gmail.com>
-Message-ID: <53AD8A5E.9090904@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 16:15:42 +0100
+Subject: [PATCH CFT 00/30] Initial round of Freescale FEC ethernet patches
+Message-ID: <20140627151542.GL32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.06.2014 17:10, Doug Anderson wrote:
-> Tomasz and Vikas,
-> 
-> On Fri, Jun 27, 2014 at 5:17 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Doug,
->>
->> On 26.06.2014 17:25, Doug Anderson wrote:
->>> Tomasz,
->>>
->>> On Thu, Jun 26, 2014 at 2:52 AM, Tomasz Figa <t.figa@samsung.com> wrote:
->>>> Hi Vikas, Doug,
->>>>
->>>> On 26.06.2014 11:15, Vikas Sajjan wrote:
->>>>> From: Doug Anderson <dianders@chromium.org>
->>>>>
->>>>> The mask-tpm-reset GPIO is used by the kernel to prevent the TPM from
->>>>> being reset across sleep/wake.  If we don't set it to anything then
->>>>> the TPM will be reset.  U-Boot will detect this as invalid
->>>>> and will reset the system on resume time. This GPIO can always be low
->>>>> and not hurt anything.  It will get pulled back high again during a
->>>>> normal warm reset when it will default back to an input.
->>>>>
->>>>> To properly preserve the TPM state across suspend/resume and to make
->>>>> the chrome U-Boot happy, properly set the GPIO to mask the
->>>>> reset to the TPM.
->>>>>
->>>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
->>>>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
->>>>> ---
->>>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   20 ++++++++++++++++++++
->>>>>  1 file changed, 20 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->>>>> index 7649982..8fd990a 100644
->>>>> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->>>>> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->>>>> @@ -87,6 +87,18 @@
->>>>>               pinctrl-0 = <&usb301_vbus_en>;
->>>>>               enable-active-high;
->>>>>       };
->>>>> +
->>>>> +     /* We need GPX0_6 to be low at sleep time; just keep it low always */
->>>>> +     mask_tpm_reset_regulator: mask-tpm-reset-regulator {
->>>>> +     compatible = "regulator-fixed";
->>>>> +     regulator-name = "mask-tpm-reset ";
->>>>> +             gpio = <&gpx0 6 0>;
->>>>> +             enable-active-low;
->>>>> +             regulator-boot-on;
->>>>> +             regulator-always-on;
->>>>> +             pinctrl-names = "default";
->>>>> +             pinctrl-0 = <&mask_tpm_reset>;
->>>>> +     };
->>>>
->>>> I don't think this pin is supposed to be a real regulator. If I'm right,
->>>> you should just add a hog for it, if you don't have a proper driver to
->>>> handle it.
->>>
->>> Yes, I agree that it shouldn't really be a regulator, but there's not
->>> a whole lot of choice.  The pin needs to actually be driven low, not
->>> just pulled low.  Without your proposed patch (pinctrl: samsung: Allow
->>> pin value to be initialized using pinfunc) I don't think it's possible
->>> to actually drive a pin low with a hog.  I could be wrong, though.
->>>
->>
->> Uhm, I was convinced that this patch was already in. So I think your use
->> case is definitely a good reason to get back to this patch and use the
->> facility it provides to solve your problem.
-> 
-> Thanks, that seems very reasonable to me, too.
-> 
-> Are you going to pick up revitalizing this patch series or are you
-> hoping Vikas will?  IIRC I was in favor of your patch but it generated
-> a whole bunch of discussion and never actually landed.
+This is v2 of my initial round of patches (roughly half of my total
+patch set) for the Freescale FEC driver.
 
-I will respin it along with few other patches for pinctrl-samsung, but
-obviously not before Monday.
+I'm sending this set out for comments and testing.  So far, I have
+had only one ack for one patch in this series, this is pretty poor,
+so I'm now sending it with a CFT tag instead.
 
-Best regards,
-Tomasz
+I haven't changed too much - I've fixed the bug which Andy spotted in
+the transmit handling, but otherwise the patches are much the same.
+
+The remainder of the text is as per my previous message, but with
+updated diffstat:
+
+One of my motivations for only sending half is to get this half into
+a state where DaveM is happy to merge it before I sort out the
+remainder.  There's quite a lot here, so bear with me on this.
+
+I've tried to sort the fixes before the cleanups as best I can, but
+reordering the series is a full-time job due to it's size - it's taken
+from Monday until now to get this far with it, so I'm hoping that there
+won't be any "you should rearrange the patches as X" comments.
+
+While the original series was well tested during it's original
+development, including with performance tests on each patch, that
+testing and validation has been lost due to the changes during the
+last merge window, and subsequent rebasing and updating of the patches.
+
+The series is based on v3.16-rc1, and as such, I have added Andy's
+checksum fix to the start of the series.  This patch is not strictly
+part of the RFC, but is included because my complete patch series needs
+to account for that change.
+
+Some of these patches are to fix theoretical problems in the driver
+(ones which have been found via a review of the code) others address
+real observable problems (such as poor half-duplex performance.)
+
+Towards the end of this series, I have included a patch which was
+initially at the beginning of the series for dumping out the state of
+the transmit ring, which is very useful to debug transmit problems.
+This was acceptable when the transmit ring was between 16 and 128
+descriptors, but during the recent merge window, this was increased to
+512 descriptors, so it will now print around 512 lines to the kernel
+message log on transmit timeout.  I'm not entirely convinced this is a
+good idea - maybe it should become optional, or maybe the timed-out ring
+status should be available via debugfs, but that's a problem to retrieve
+if you're running NFS rootfs and the timeout doesn't recover properly.
+
+This series of patches is also available from the following *unstable*
+git branch - unstable as it's provided for convenience so you don't
+have to apply all these patches individually, unstable as the patches
+need to have attributations added, unstable because DaveM will probably
+want to apply them as patches to his tree:
+
+  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git fec-testing
+
+ drivers/net/ethernet/freescale/fec.h      |  10 +-
+ drivers/net/ethernet/freescale/fec_main.c | 382 +++++++++++++++++-------------
+ 2 files changed, 224 insertions(+), 168 deletions(-)
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
