@@ -1,55 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jun 2014 14:17:48 +0100
-Subject: [RFC PATCH 4/9] irqchip: GIC: add support for forwarded interrupts
-In-Reply-To: <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
- <1403688530-23273-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140627131748.GT26276@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 27 Jun 2014 15:22:42 +0200
+Subject: [PATCH 01/16] ARM: mvebu: Sort the headers of pmsu.c in alphabetic
+ order
+In-Reply-To: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403875377-940-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Sorting the headers in alphabetic order will help to reduce the
+conflict when adding new headers later.
 
-On Wed, Jun 25, 2014 at 10:28:45AM +0100, Marc Zyngier wrote:
-> Now that we've switched to EOImode == 1, prevent a forwarded interrupt
-> from being deactivated after its priority has been dropped.
-> 
-> Also add support for the interrupt state to be saved/restored.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic.c | 48 +++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 42 insertions(+), 6 deletions(-)
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/pmsu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-[...]
-
-> +static void gic_irq_set_fwd_state(struct irq_data *d, u32 val, u32 mask)
-> +{
-> +	if (mask & IRQ_FWD_STATE_PENDING)
-> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_PENDING) ? GIC_DIST_ENABLE_SET : GIC_DIST_ENABLE_CLEAR);
-> +	if (mask & IRQ_FWD_STATE_ACTIVE)
-> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_ACTIVE) ? GIC_DIST_ACTIVE_SET : GIC_DIST_ACTIVE_CLEAR);
-> +	if (mask & IRQ_FWD_STATE_MASKED)
-> +		gic_poke_irq(d, (val & IRQ_FWD_STATE_MASKED) ? GIC_DIST_ENABLE_CLEAR : GIC_DIST_ENABLE_SET);
-
-Given that this isn't atomic and KVM only cares about ACTIVE, why not change
-mask to be a single state only? Renumbering the states so that's not bits
-would help to enforce this (i.e. make IRQ_FWD_STATE_ACTIVE 0, PENDING 1,
-...).
-
-That would also allow you to switch on the state and return early.
-
-> +static u32 gic_irq_get_fwd_state(struct irq_data *d, u32 mask)
-> +{
-> +	u32 val = 0;
-> +
-> +	if (mask & IRQ_FWD_STATE_PENDING && gic_peek_irq(d, GIC_DIST_ENABLE_SET))
-> +		val |= IRQ_FWD_STATE_PENDING;
-> +	if (mask & IRQ_FWD_STATE_ACTIVE && gic_peek_irq(d, GIC_DIST_ACTIVE_SET))
-> +		val |= IRQ_FWD_STATE_ACTIVE;
-> +	if (mask & IRQ_FWD_STATE_MASKED && !gic_peek_irq(d, GIC_DIST_ENABLE_SET))
-> +		val |= IRQ_FWD_STATE_MASKED;
-
-*and* you could peek GIC_DIST_ENABLE_SET in one place here.
-
-Will
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index a1d407c0febe..5584d35b8e88 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -19,13 +19,13 @@
+ #define pr_fmt(fmt) "mvebu-pmsu: " fmt
+ 
+ #include <linux/cpu_pm.h>
+-#include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/of_address.h>
++#include <linux/kernel.h>
+ #include <linux/io.h>
++#include <linux/of_address.h>
+ #include <linux/platform_device.h>
+-#include <linux/smp.h>
+ #include <linux/resource.h>
++#include <linux/smp.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+-- 
+1.8.1.2
