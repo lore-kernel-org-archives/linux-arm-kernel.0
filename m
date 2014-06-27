@@ -1,132 +1,101 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 27 Jun 2014 15:53:19 -0700
-Subject: [PATCH V2 3/3] mmc: mmci: Reverse IRQ handling for the arm_variant
-In-Reply-To: <CAGXu5j+6Vuywpw_NrMDL0HN3N16TZvZidY0p6MfOakyqAO8TsA@mail.gmail.com>
-References: <1402906147-26596-1-git-send-email-ulf.hansson@linaro.org>
- <CALAqxLWs5HLhLo+BspcgyJe0O++PB1HU2G1GpsoQ=cVP34=v=A@mail.gmail.com>
- <CAPDyKFqK5G0j7ZKAYJqD+ZqBFCjuLTw=NtjBcAsfM=Xzd4cghA@mail.gmail.com>
- <CALAqxLXQeYA8jt_hLrJSuWtt7j3t2iZSZjEVAX7ScODAgrmVbA@mail.gmail.com>
- <CALAqxLX8TcFNDLvA1XozEZ_kf58jX0_SeDETfK9UcXVYajVVRQ@mail.gmail.com>
- <CAPDyKFry7_=-3kmydz7ikfDW5vMi512gC3Bj35PmuWT2z70GvQ@mail.gmail.com>
- <CAGXu5j+6Vuywpw_NrMDL0HN3N16TZvZidY0p6MfOakyqAO8TsA@mail.gmail.com>
-Message-ID: <CALAqxLViuWehKgqHTf5SjLRXOXwzp-yNPehmYkfJGR4At63w7w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Jun 2014 23:54:45 +0100
+Subject: [musl] Re: Thread pointer changes
+In-Reply-To: <CALCETrUvPV0xmw1jCVdwJ8KW3HMW8JKoCRnHcUyuU-1ze=6X8A@mail.gmail.com>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627200949.GQ32514@n2100.arm.linux.org.uk>
+ <20140627210931.GT23102@port70.net>
+ <20140627213051.GS32514@n2100.arm.linux.org.uk>
+ <20140627215541.GC16724@brightrain.aerifal.cx>
+ <20140627221744.GU32514@n2100.arm.linux.org.uk>
+ <CALCETrUvPV0xmw1jCVdwJ8KW3HMW8JKoCRnHcUyuU-1ze=6X8A@mail.gmail.com>
+Message-ID: <20140627225445.GV32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 1:37 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, Jun 17, 2014 at 12:33 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 17 June 2014 01:29, John Stultz <john.stultz@linaro.org> wrote:
->>> On Mon, Jun 16, 2014 at 3:41 PM, John Stultz <john.stultz@linaro.org> wrote:
->>>> On Mon, Jun 16, 2014 at 2:20 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>> This patch based upon my latest mmc tree and the next branch. I tried
->>>>> to apply it for 3.15, and I think you will be able resolve the
->>>>> conflict - I should be quite trivial.
->>>>
->>>> No worries. I just didn't want to waste time resolving it if it was
->>>> logically dependent on some other change.
->>>>
->>>> I'll give it a shot and get back to you.
->>>
->>> So unfortunately I'm still seeing trouble..
->>>
->>> [   94.202843] EXT4-fs error (device mmcblk0p5):
->>> ext4_mb_generate_buddy:756: group 1, 2303 clusters in bitmap, 2272 in
->>> gd; block bitmap corrupt.
->>> [   94.203873] Aborting journal on device mmcblk0p5-8.
->>> [   94.206553] Kernel panic - not syncing: EXT4-fs (device mmcblk0p5):
->>> panic forced after error
->>> [   94.206553]
->>> [   94.207420] CPU: 0 PID: 1 Comm: init Not tainted
->>> 3.15.0-00002-g044f37a-dirty #589
->>> [   94.208330] [<c0011725>] (unwind_backtrace) from [<c000f3f1>]
->>> (show_stack+0x11/0x14)
->>> [   94.208835] [<c000f3f1>] (show_stack) from [<c042d599>]
->>> (dump_stack+0x59/0x7c)
->>> [   94.209288] [<c042d599>] (dump_stack) from [<c042a57f>] (panic+0x67/0x178)
->>> [   94.209724] [<c042a57f>] (panic) from [<c0135055>]
->>> (ext4_handle_error+0x69/0x74)
->>> [   94.210184] [<c0135055>] (ext4_handle_error) from [<c01358db>]
->>> (__ext4_grp_locked_error+0x6b/0x160)
->>> [   94.210747] [<c01358db>] (__ext4_grp_locked_error) from
->>> [<c0143691>] (ext4_mb_generate_buddy+0x1b1/0x29c)
->>> [   94.211392] [<c0143691>] (ext4_mb_generate_buddy) from [<c0144dfd>]
->>> (ext4_mb_init_cache+0x219/0x4e0)
->>> [   94.211959] [<c0144dfd>] (ext4_mb_init_cache) from [<c014517f>]
->>> (ext4_mb_init_group+0xbb/0x13c)
->>> [   94.213973] [<c014517f>] (ext4_mb_init_group) from [<c01452f3>]
->>> (ext4_mb_good_group+0xf3/0xfc)
->>> [   94.214873] [<c01452f3>] (ext4_mb_good_group) from [<c01462ab>]
->>> (ext4_mb_regular_allocator+0x153/0x2c4)
->>> [   94.215953] [<c01462ab>] (ext4_mb_regular_allocator) from
->>> [<c01486b1>] (ext4_mb_new_blocks+0x2fd/0x4e4)
->>> [   94.216939] [<c01486b1>] (ext4_mb_new_blocks) from [<c013fe41>]
->>> (ext4_ext_map_blocks+0x965/0x10f0)
->>> [   94.217694] [<c013fe41>] (ext4_ext_map_blocks) from [<c01230ff>]
->>> (ext4_map_blocks+0xff/0x374)
->>> [   94.219200] [<c0126839>] (mpage_map_and_submit_extent) from
->>> [<c0127049>] (ext4_writepages+0x2b9/0x4e8)
->>> [   94.219972] [<c0127049>] (ext4_writepages) from [<c0094e69>]
->>> (do_writepages+0x19/0x28)
->>> [   94.220648] [<c0094e69>] (do_writepages) from [<c008cbcd>]
->>> (__filemap_fdatawrite_range+0x3d/0x44)
->>> [   94.221391] [<c008cbcd>] (__filemap_fdatawrite_range) from
->>> [<c008cc3f>] (filemap_flush+0x23/0x28)
->>> [   94.222135] [<c008cc3f>] (filemap_flush) from [<c012c419>]
->>> (ext4_rename+0x2f9/0x3e4)
->>> [   94.222806] [<c012c419>] (ext4_rename) from [<c00c3707>]
->>> (vfs_rename+0x183/0x45c)
->>> [   94.223496] [<c00c3707>] (vfs_rename) from [<c00c3c0b>]
->>> (SyS_renameat2+0x22b/0x26c)
->>> [   94.224154] [<c00c3c0b>] (SyS_renameat2) from [<c00c3c83>]
->>> (SyS_rename+0x1f/0x24)
->>> [   94.224801] [<c00c3c83>] (SyS_rename) from [<c000cd41>]
->>> (ret_fast_syscall+0x1/0x5c)
->>>
->>>
->>> That said, this mirrors the behavior when I was reverting your change
->>> by hand on-top of 3.15. While git bisect pointed to your patch and
->>> reverting it from the commit seems to resolve the issue at that point,
->>> there seems to be some other commit in the 3.14->3.15-rc1 interval
->>> that is causing problems as well.
->>>
->>> Are there any sort of debugging options for mmc that I can use to try
->>> to better narrow down whats going wrong?
->>
->> It seems like you want to debug the mmci host driver and unfortunate
->> the debug utilities available are only dev_dbg prints. I wouldn't be
->> surprised if the problem goes away when you enable them. :-)
->>
->> I have some other locally stored debug patches for mmci, but those are
->> not re-based and I am not sure you want to deal with them as is.
->>
->> I guess I need to set up the QEMU environment and run the tests
->> myself, unless we go for the revert path.
->> How do you perform the tests, is just a simple mounting/un-mounting
->> that triggers the problem?
->> Any specific things that I need to think of when running QEMU?
->
-> FWIW, I'm hitting this problem as well. For me, it is every time I try
-> to boot. Only reverting to 3.14 makes it go away, and this series
-> doesn't fix it for me either. :(
->
-> My only difference is that I don't run with an initrd:
->
-> qemu-system-arm -nographic -m 1024 -M vexpress-a15 -dtb
-> rtsm_ve-cortex_a15x4.dtb -kernel ~/src/linux/arch/arm/boot/zImage
-> -drive file=$HOME/image/arm/vda.qcow2,if=sd,format=qcow2 -append
-> "root=/dev/mmcblk0p1 console=ttyAMA0"
+On Fri, Jun 27, 2014 at 03:25:32PM -0700, Andy Lutomirski wrote:
+> On Fri, Jun 27, 2014 at 3:17 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jun 27, 2014 at 05:55:41PM -0400, Rich Felker wrote:
+> >> I think you're assuming that libc is used only as a shared library and
+> >> that the user installs one appropriate for their kernel. This
+> >> precludes the use of static-linked binaries which are an extremely
+> >> important usage case for us, especially on ARM where, for example, we
+> >> want users to be able to make binaries that have a fully-working libc
+> >> but that can be run on Android, where neither musl nor any other
+> >> remotely-working libc is installed by default.
+> >>
+> >> Obviously some (many) users will opt to build libc with a particular
+> >> -march where all of the necessary instructions for TLS and atomics are
+> >> available without help from the kernel. However, if attempting to
+> >> build a baseline libc that works on any model results in one that
+> >> can't work on new hardware/kernel, that's a big problem, and exactly
+> >> the one which I'm trying to solve.
+> >
+> > As I've already said, that's a system integrator bug to have a kernel
+> > without a kuser page with userspace which requires it.
+> 
+> Shouldn't the goal be to reduce the number of new userspace programs
+> that require a kuser page on TLS-capable hardware?  In 2012, I made an
+> effort to do exactly that on x86_64 wrt the vsyscall page, and, these
+> days, a system booted with vsyscall=none is likely to be fully
+> functional as long as vdso=0 isn't specified.  Hopefully, in a couple
+> of years, even vdso=0 vsyscall=none will work with all freshly-built
+> binaries.
 
-I've been continuing to try to bisect this down with
-8d94b54d99ea968a9d188ca0e68793ebed601220 and
-e7f3d22289e4307b3071cc18b1d8ecc6598c0be4 reverted each step. It seems
-like it pops up somewhere between 3.15-rc6 and 3.15-rc7, but the
-bisection results are really inconsistent.  I suspect it actually
-shows up earlier, its just its harder to trip the problem with the
-patches reverted, so I'm marking good commits that are actually bad.
+You mean like running Ubuntu 14.04 (which is built for ARMv7 hard
+float) does not require the kuser page for anything.  Ubuntu 12.04
+needing it was rather unexpected; that came down to a glibc
+configuration error.
 
-If you are seeing this on every bootup, it might be worth trying to do
-the bisection with the two commits above reverted to see if you can
-narrow it down any better?
+Fedora doesn't support anything before ARMv6, but they also provide
+ARMv7 optimised packages as well, and it's highly likely that the
+ARMv7 packages don't need the page either.
 
-thanks
--john
+I believe Android has moved in that direction too.
+
+I don't know whether things like arch or debian have moved in that
+direction yet, but I would be very surprised if they haven't.
+
+> > I think you're are missing one obvious solution to this which you can do:
+> > you are passed the HWCAP fields in the ELF auxinfo.  This will tell you
+> > if the CPU has TLS support or not.  If it has TLS support, then you don't
+> > need to use the kuser helpers, and you know that it is a CPU which is ARM
+> > architecture v6k or later, and it has things like the CP15 barrier
+> > instructions.  If you want to know that the CPU supports the DMB
+> > instruction rather than the CP15 barrier instruction, then you have to
+> > check the uname details, or read /proc/cpuinfo (but I'd rather you
+> > didn't.)
+> 
+> That sounds helpful.  Would it make sense to try to convince all libc
+> providers (and Go!) to do this?
+
+I'm not sure it's worth the effort - as mentioned above, I suspect
+most distros have, or are dropping support for the older architectures
+which don't provide all the bells and whistles.
+
+> If DMB vs CP15 makes a big difference, then adding that to HWCAP might
+> be a good idea.
+
+The CP15 version of the instruction (introduced in ARMv6) has been
+deprecated in ARMv7, though we still use the CP15 instruction in the
+kernel if we're including support for ARMv6 - we only use the ARMv7
+DMB instruction when we're building only for ARMv7 architectures.
+
+Oh, I should also have mentioned: for a libc, if you want to stretch
+across from ARMv4 all the way up to ARMv7, then you have to do lots
+more than just worry about thread local storage.  You also have the
+problem that you can't just fall back on the SWP instruction to
+provide atomic implementations - this instruction has been deprecated
+and for the latest CPUs, the kernel may be configured to emulate this
+instruction.  Besides, on ARMv6 and later, you really want to use the
+load/store exclusive instructions for implementing atomic accesses
+and not the horrid SWP instruction.  So you need to implement atomic
+stuff using SWP for some CPUs and the new load/store exclusive for
+other CPUs.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
