@@ -1,86 +1,72 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 27 Jun 2014 16:20:30 +0100
-Subject: [PATCH CFT 19/30] net: fec: quiesce packet processing before stopping
- device in fec_suspend()
-In-Reply-To: <20140627151542.GL32514@n2100.arm.linux.org.uk>
-References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X0Xx0-0001OC-CB@rmk-PC.arm.linux.org.uk>
+From: tthayer@altera.com (tthayer at altera.com)
+Date: Fri, 27 Jun 2014 10:26:58 -0500
+Subject: [PATCHv8 2/3] devicetree: Addition of the Altera SDRAM EDAC. Add the
+In-Reply-To: <1403882819-24929-1-git-send-email-tthayer@altera.com>
+References: <1403882819-24929-1-git-send-email-tthayer@altera.com>
+Message-ID: <1403882819-24929-3-git-send-email-tthayer@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fec_suspend() calls fec_stop() to stop the transmit ring while the
-transmit packet processing is still active.  This can lead to the
-transmit queue being restarted by an intervening packet queued for
-transmission, or by the tx quirk timer expiring.
+From: Thor Thayer <tthayer@altera.com>
 
-Fix this by disabling NAPI first, which will ensure that the NAPI
-handlers are not running.  Then, take the transmit lock before
-detaching the netif device.  This ensures that there are no races
-with the transmit path - and also ensures that the watchdog won't
-fire.
+Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
 
-We can then safely stop the ethernet device itself, knowing that the
-rest of the driver is safely shut down.
-
-On resume, we bring the device back up in reverse order - we restart
-the device, reattach the device (under the tx lock), and then enable
-the NAPI handlers.
-
-We also need to adjust the close function to cope with this new
-sequence, so that it's possible to cleanly close down the driver
-after the hardware fails to resume (eg, due to the regulator_enable()
-or pinctrl calls in the resume path returning an error.)
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Thor Thayer <tthayer@altera.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+v2: Changes to SoC EDAC source code.
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 49c154af6da2..7a3cfb19ae90 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -2212,10 +2212,11 @@ fec_enet_close(struct net_device *ndev)
+v3: Fix typo in device tree documentation.
+
+v4,v5: No changes - bump version for consistency.
+
+v6: Assign ECC registers in SDRAM controller to EDAC
+
+v7: Fix SDRAM EDAC base address.
+
+v8: No change. Bump version for consistency.
+---
+ .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |    6 ++++++
+ 2 files changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+new file mode 100644
+index 0000000..d68e033
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
+@@ -0,0 +1,15 @@
++Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
++
++Required properties:
++- compatible : should contain "altr,sdram-edac";
++- reg : should contain the ECC register range in sdram
++        controller (address and length).
++- interrupts : Should contain the SDRAM ECC IRQ in the
++	appropriate format for the IRQ controller.
++
++Example:
++	sdramedac at ffc2502c {
++		compatible = "altr,sdram-edac";
++		reg = <0xffc2502c 0x28>;
++		interrupts = <0 39 4>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 310292e..da0785d 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -687,6 +687,12 @@
+ 			reg = <0xffc25000 0x4>;
+ 		};
  
- 	phy_stop(fep->phy_dev);
- 
--	napi_disable(&fep->napi);
--	netif_tx_disable(ndev);
--	if (netif_device_present(ndev))
-+	if (netif_device_present(ndev)) {
-+		napi_disable(&fep->napi);
-+		netif_tx_disable(ndev);
- 		fec_stop(ndev);
-+	}
- 
- 	phy_disconnect(fep->phy_dev);
- 	fep->phy_dev = NULL;
-@@ -2702,8 +2703,11 @@ fec_suspend(struct device *dev)
- 	rtnl_lock();
- 	if (netif_running(ndev)) {
- 		phy_stop(fep->phy_dev);
--		fec_stop(ndev);
-+		napi_disable(&fep->napi);
-+		netif_tx_lock_bh(ndev);
- 		netif_device_detach(ndev);
-+		netif_tx_unlock_bh(ndev);
-+		fec_stop(ndev);
- 	}
- 	rtnl_unlock();
- 
-@@ -2736,12 +2740,10 @@ fec_resume(struct device *dev)
- 
- 	rtnl_lock();
- 	if (netif_running(ndev)) {
--		napi_disable(&fep->napi);
--		netif_tx_lock_bh(ndev);
- 		fec_restart(ndev, fep->full_duplex);
-+		netif_tx_lock_bh(ndev);
- 		netif_device_attach(ndev);
- 		netif_tx_unlock_bh(ndev);
--		netif_device_attach(ndev);
- 		napi_enable(&fep->napi);
- 		phy_start(fep->phy_dev);
- 	}
++		sdramedac at ffc2502c {
++			compatible = "altr,sdram-edac";
++			reg = <0xffc2502c 0x28>;
++			interrupts = <0 39 4>;
++		};
++
+ 		rst: rstmgr at ffd05000 {
+ 			compatible = "altr,rst-mgr";
+ 			reg = <0xffd05000 0x1000>;
 -- 
-1.8.3.1
+1.7.9.5
