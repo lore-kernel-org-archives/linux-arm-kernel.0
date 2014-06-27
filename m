@@ -1,55 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 22:30:51 +0100
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627210931.GT23102@port70.net>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
-Message-ID: <20140627213051.GS32514@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Jun 2014 15:33:28 -0600
+Subject: [RFC 04/10] memory: Add Tegra124 memory controller support
+In-Reply-To: <20140627110811.GD2797@ulmo>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <1403815790-8548-5-git-send-email-thierry.reding@gmail.com>
+ <20140627124638.7ec150cca163c89727b8953f@nvidia.com>
+ <20140627110811.GD2797@ulmo>
+Message-ID: <53ADE328.1080005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 11:09:31PM +0200, Szabolcs Nagy wrote:
-> i thought the helpers in the kernel can avoid certain memory
-> barriers that the userspace has to do on armv6 for atomics
-> (and those barriers are deprecated on armv7 so i thought the
-> kuser page was better for portable binaries)
-
-The helpers are provided so that libc can be independent of the CPU
-facilities in the machine.  The key word there is _libc_, not
-applications.
-
-So, a libc can be built to support the lowest architecture that
-someone deems to support, and it may make use of the kuser helpers.
-If it does, then you have a libc which requires that the kuser
-helpers are always provided by the kernel, and the KUSER_HELPERS
-option must never be disabled.  If it is disabled, then the libc
-will be useless against that kernel.
-
-However, a libc built against modern architectures should not be
-making use of the kuser helpers.  We found last year that the
-Ubuntu 12.04 glibc did still make use of one kuser helper, and
-as such Ubuntu 12.04 also needs KUSER_HELPERS to remain enabled.
-
-The last combination is that the libc is built for modern architectures
-without needing any kuser helpers at all.  In this case - and only this
-case - the kernel's KUSER_HELPERS option can be disabled should the
-system integrator want to increase security.
-
-> > Due to that, any ARMv5 or earlier CPU will always have the kuser helper
-> > page.  ARMv6 and later may or may not have the kuser helper page, but
-> > there you're really building for a different ABI anyway (VFP-based) and
-> > you also know that you have the thread registers.
+On 06/27/2014 05:08 AM, Thierry Reding wrote:
+> On Fri, Jun 27, 2014 at 12:46:38PM +0300, Hiroshi DOyu wrote:
+>>
+>> Thierry Reding <thierry.reding@gmail.com> writes:
+>>
+>>> From: Thierry Reding <treding@nvidia.com>
+>>>
+>>> The memory controller on NVIDIA Tegra124 exposes various knobs that can
+>>> be used to tune the behaviour of the clients attached to it.
+>>>
+>>> Currently this driver sets up the latency allowance registers to the HW
+>>> defaults. Eventually an API should be exported by this driver (via a
+>>> custom API or a generic subsystem) to allow clients to register latency
+>>> requirements.
+>>>
+>>> This driver also registers an IOMMU (SMMU) that's implemented by the
+>>> memory controller.
+>>>
+>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>>> ---
+>>>  drivers/memory/Kconfig                   |    9 +
+>>>  drivers/memory/Makefile                  |    1 +
+>>>  drivers/memory/tegra124-mc.c             | 1945 ++++++++++++++++++++++++++++++
+>>>  include/dt-bindings/memory/tegra124-mc.h |   30 +
+>>>  4 files changed, 1985 insertions(+)
+>>>  create mode 100644 drivers/memory/tegra124-mc.c
+>>>  create mode 100644 include/dt-bindings/memory/tegra124-mc.h
+>>
+>> I prefer reusing the existing SMMU and having MC and SMMU separated
+>> since most of SMMU code are not different from functionality POV, and
+>> new MC features are quite independent of SMMU.
+>>
+>> If it's really convenient to combine MC and SMMU into one driver, we
+>> could move "drivers/iomm/tegra-smmu.c" here first, and add MC features
+>> on the top of it.
 > 
-> so is it expected that the libc makes no attempt to provide
-> portable binary interface for armv5 and armv6?
+> I'm not sure if we can do that, since the tegra-smmu driver is
+> technically used by Tegra30 and Tegra114. We've never really made use of
+> it, but there are device trees in mainline releases that contain the
+> separate SMMU node.
 
-The libc interface that applications make use should not have any
-dependence on whether KUSER_HELPERS is enabled or disabled, the
-presence of that page should be totally invisible to applications.
+The existing DT nodes do nothing more than instantiate the driver.
+However, IIUC nothing actually uses the driver for any purpose, so if we
+simply deleted those nodes or changed them incompatibly, there'd be no
+functional difference. Perhaps this is stretching DT ABIness very
+slightly, but I think it makes no practical difference.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140627/91142d67/attachment.sig>
