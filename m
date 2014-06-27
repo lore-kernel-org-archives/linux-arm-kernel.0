@@ -1,159 +1,66 @@
-From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
-Date: Fri, 27 Jun 2014 16:53:53 +0530
-Subject: [PATCH v2 2/2] usb: chipidea: Add support for zynq usb host and
- device controller
-In-Reply-To: <1403868233-5123-1-git-send-email-punnaia@xilinx.com>
-References: <1403868233-5123-1-git-send-email-punnaia@xilinx.com>
-Message-ID: <fa656d2d-a2a8-4b8d-a29b-e89e4bfced3e@BL2FFO11FD034.protection.gbl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jun 2014 12:24:20 +0100
+Subject: [PATCH V5 1/2] arm: mm: Introduce {pte,pmd}_isset and
+ {pte,pmd}_isclear
+In-Reply-To: <1403612604-2645-2-git-send-email-steve.capper@linaro.org>
+References: <1403612604-2645-1-git-send-email-steve.capper@linaro.org>
+ <1403612604-2645-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140627112420.GK26276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zynq soc uses Chipidea/Synopsys usb IP core(CI13612). This patch adds
-necessary glue to allow the chipidea driver to work on zynq soc.
+Hi Steve,
 
-Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
----
-Changes in v2:
-- modified the commit message for better readability
-- fixed the dev_err message
----
- drivers/usb/chipidea/Makefile       |    1 +
- drivers/usb/chipidea/ci_hdrc_zynq.c |  115 +++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+), 0 deletions(-)
- create mode 100644 drivers/usb/chipidea/ci_hdrc_zynq.c
+On Tue, Jun 24, 2014 at 01:23:23PM +0100, Steve Capper wrote:
+> Long descriptors on ARM are 64 bits, and some pte functions such as
+> pte_dirty return a bitwise-and of a flag with the pte value. If the
+> flag to be tested resides in the upper 32 bits of the pte, then we run
+> into the danger of the result being dropped if downcast.
+> 
+> For example:
+> 	gather_stats(page, md, pte_dirty(*pte), 1);
+> where pte_dirty(*pte) is downcast to an int.
+> 
+> This patch introduces a new macro pte_isset which performs the bitwise
+> and, then performs a double logical invert (where needed) to ensure
+> predictable downcasting. The logical inverse pte_isclear is also
+> introduced.
+> 
+> Equivalent pmd functions for Transparent HugePages have also been
+> added.
 
-diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-index 2f099c7..b0d6b6f 100644
---- a/drivers/usb/chipidea/Makefile
-+++ b/drivers/usb/chipidea/Makefile
-@@ -12,6 +12,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
- 
- obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
- obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zevio.o
-+obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zynq.o
- 
- # PCI doesn't provide stubs, need to check
- ifneq ($(CONFIG_PCI),)
-diff --git a/drivers/usb/chipidea/ci_hdrc_zynq.c b/drivers/usb/chipidea/ci_hdrc_zynq.c
-new file mode 100644
-index 0000000..5ef2717
---- /dev/null
-+++ b/drivers/usb/chipidea/ci_hdrc_zynq.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (C) 2014 Xilinx, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/usb/chipidea.h>
-+
-+#include "ci.h"
-+
-+#define ZYNQ_USB_DMA_MASK	0xFFFFFFF0
-+
-+struct ci_hdrc_zynq_data {
-+	struct platform_device *ci_pdev;
-+	struct clk *clk;
-+};
-+
-+static struct ci_hdrc_platform_data pdata = {
-+	.name           = "ci_hdrc_zynq",
-+	.capoffset      = DEF_CAPOFFSET,
-+	.flags          = CI_HDRC_REQUIRE_TRANSCEIVER
-+};
-+
-+static int ci_hdrc_zynq_probe(struct platform_device *pdev)
-+{
-+	struct ci_hdrc_zynq_data *data;
-+	int ret;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data) {
-+		dev_err(&pdev->dev, "Failed to allocate ci_hdrc_zynq data!\n");
-+		return -ENOMEM;
-+	}
-+
-+	data->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(data->clk)) {
-+		dev_err(&pdev->dev,
-+			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
-+		return PTR_ERR(data->clk);
-+	}
-+
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Failed to prepare or enable clock, err=%d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = dma_coerce_mask_and_coherent(&pdev->dev, ZYNQ_USB_DMA_MASK);
-+	if (ret)
-+		goto err_clk;
-+
-+	data->ci_pdev = ci_hdrc_add_device(&pdev->dev,
-+				pdev->resource, pdev->num_resources,
-+				&pdata);
-+	if (IS_ERR(data->ci_pdev)) {
-+		ret = PTR_ERR(data->ci_pdev);
-+		dev_err(&pdev->dev,
-+			"Can't register ci_hdrc platform device, err=%d\n",
-+			ret);
-+		goto err_clk;
-+	}
-+
-+	platform_set_drvdata(pdev, data);
-+
-+	pm_runtime_no_callbacks(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+	return 0;
-+
-+err_clk:
-+	clk_disable_unprepare(data->clk);
-+	return ret;
-+}
-+
-+static int ci_hdrc_zynq_remove(struct platform_device *pdev)
-+{
-+	struct ci_hdrc_zynq_data *data = platform_get_drvdata(pdev);
-+
-+	pm_runtime_disable(&pdev->dev);
-+	ci_hdrc_remove_device(data->ci_pdev);
-+	clk_disable_unprepare(data->clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ci_hdrc_zynq_dt_ids[] = {
-+	{ .compatible = "xlnx,zynq-usb-2.20a" },
-+	{},
-+};
-+
-+static struct platform_driver ci_hdrc_zynq_driver = {
-+	.probe = ci_hdrc_zynq_probe,
-+	.remove = ci_hdrc_zynq_remove,
-+	.driver = {
-+		.name = "zynq_usb",
-+		.owner = THIS_MODULE,
-+		.of_match_table = ci_hdrc_zynq_dt_ids,
-+	 },
-+};
-+
-+module_platform_driver(ci_hdrc_zynq_driver);
-+
-+MODULE_ALIAS("platform:zynq_usb");
-+MODULE_DESCRIPTION("CI HDRC ZYNQ USB binding");
-+MODULE_AUTHOR("Xilinx Inc");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.4
+
+[...]
+
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 85c60ad..3b10ec6 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -207,17 +207,21 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+>  #define pte_huge(pte)		(pte_val(pte) && !(pte_val(pte) & PTE_TABLE_BIT))
+>  #define pte_mkhuge(pte)		(__pte(pte_val(pte) & ~PTE_TABLE_BIT))
+>  
+> -#define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
+> +#define pmd_isset(pmd, val)	((u32)(val) == (val) ? pmd_val(pmd) & (val) \
+> +						: !!(pmd_val(pmd) & (val)))
+> +#define pmd_isclear(pmd, val)	(!(pmd_val(pmd) & (val)))
+> +
+> +#define pmd_young(pmd)		(pmd_isset((pmd), PMD_SECT_AF))
+>  
+>  #define __HAVE_ARCH_PMD_WRITE
+> -#define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
+> +#define pmd_write(pmd)		(pmd_isclear((pmd), PMD_SECT_RDONLY))
+>  
+>  #define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
+>  #define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
+>  
+>  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+> -#define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+> -#define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+> +#define pmd_trans_huge(pmd)	(pmd_val(pmd) && pmd_isclear((pmd), PMD_TABLE_BIT))
+
+Why isn't this just pmd_present(pmd) && !pmd_table(pmd)? Put another way, I
+see to have forgotten why we need PMD_TABLE_BIT instead of just using
+pmd_table and pmd_sect to work out whether we have a table or a block.
+
+Will
