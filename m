@@ -1,49 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 27 Jun 2014 08:52:36 -0400
-Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.17
-Message-ID: <20140627125236.GG23978@titan.lakedaemon.net>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Fri, 27 Jun 2014 14:55:15 +0200
+Subject: [PATCH v2 2/2] usb: chipidea: Add support for zynq usb host and
+ device controller
+In-Reply-To: <fa656d2d-a2a8-4b8d-a29b-e89e4bfced3e@BL2FFO11FD034.protection.gbl>
+References: <1403868233-5123-1-git-send-email-punnaia@xilinx.com>
+ <fa656d2d-a2a8-4b8d-a29b-e89e4bfced3e@BL2FFO11FD034.protection.gbl>
+Message-ID: <20140627125515.GA6025@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+Hi,
 
-Here's the cooresponding defconfig changes for the kirkwood board
-migration.  The setup file needs to be enabled in multi_v5 and
-mvebu_v5.
+On Fri, Jun 27, 2014 at 04:53:53PM +0530, Punnaiah Choudary Kalluri wrote:
+> Zynq soc uses Chipidea/Synopsys usb IP core(CI13612). This patch adds
+> necessary glue to allow the chipidea driver to work on zynq soc.
+> 
 
-Please pull.
+Did you see the currently discussed patches for the generic chipidea
+glue?
 
-thx,
+http://www.spinics.net/lists/linux-usb/msg109576.html
 
-Jason.
+Try to improve that code instead writing another version
+of this simple gluecode.
 
 
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+Thanks,
+Michael
 
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.17
-
-for you to fetch changes up to 5658d58545388850c77a070fb3b882ddd958eb88:
-
-  ARM: multi_v5: Enable LaCie 2Big and 5Big Network v2 (2014-06-20 20:50:23 +0000)
-
-----------------------------------------------------------------
-mvebu defconfig changes for v3.17
-
- - mvebu (v5)
-    - add LaCie 2Big and 5Big Network v2
-
- - multi (v5)
-    - add LaCie 2Big and 5Big Network v2
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: mvebu: Add LaCie 2Big and 5Big Network v2
-      ARM: multi_v5: Enable LaCie 2Big and 5Big Network v2
-
- arch/arm/configs/multi_v5_defconfig | 2 ++
- arch/arm/configs/mvebu_v5_defconfig | 2 ++
- 2 files changed, 4 insertions(+)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
