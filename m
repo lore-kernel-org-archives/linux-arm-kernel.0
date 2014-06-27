@@ -1,52 +1,90 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 15:22:49 +0200
-Subject: [PATCH 08/16] ARM: mvebu: Use a local variable to store the resume
- address
+Date: Fri, 27 Jun 2014 15:22:48 +0200
+Subject: [PATCH 07/16] ARM: mvebu: Make the CPU idle initialization more
+ generic
 In-Reply-To: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1403875377-940-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1403875377-940-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The resume address used by the cpu idle code will not always be the
-same. Using a local variable to store the resume address allows to
-keep the same function for the pm notifier but with a different
-address. This address will be set during the initialization.
+In order to support more mvebu SoCs, this patch use an initialization
+specific function associated to each SoCs which support CPU Idle.
+
+Then each SoC will have his own set of check and of data
+configuration.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/pmsu.c | 39 +++++++++++++++++++++++++++++++--------
+ 1 file changed, 31 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 454f0f9ede6b..8bf737fb3aac 100644
+index 087157c20b8a..454f0f9ede6b 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -79,6 +79,8 @@ extern void armada_370_xp_cpu_resume(void);
- static unsigned long pmsu_mp_phys_base;
- static void __iomem *pmsu_mp_base;
- 
-+static void *mvebu_cpu_resume;
-+
- static struct platform_device mvebu_v7_cpuidle_device = {
- 	.name = "cpuidle-armada-370-xp",
+@@ -293,23 +293,47 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
+ 	.notifier_call = mvebu_v7_cpu_pm_notify,
  };
-@@ -281,7 +283,7 @@ static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
- {
- 	if (action == CPU_PM_ENTER) {
- 		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
--		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_370_xp_cpu_resume);
-+		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, mvebu_cpu_resume);
- 	} else if (action == CPU_PM_EXIT) {
- 		mvebu_v7_pmsu_idle_restore();
- 	}
-@@ -304,6 +306,7 @@ static __init bool armada_xp_cpuidle_init(void)
- 		return false;
- 	of_node_put(np);
  
-+	mvebu_cpu_resume = armada_370_xp_cpu_resume;
- 	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
- 	return true;
- }
++static bool (*mvebu_v7_cpu_idle_init)(void);
++
++static __init bool armada_xp_cpuidle_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
++	if (!np)
++		return false;
++	of_node_put(np);
++
++	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
++	return true;
++}
++
++static struct of_device_id of_cpuidle_table[] __initdata = {
++	{ .compatible = "marvell,armadaxp",
++	  .data = (void *)armada_xp_cpuidle_init,
++	},
++	{ /* end of list */ },
++};
++
+ static int __init mvebu_v7_cpu_pm_init(void)
+ {
+ 	struct device_node *np;
++	const struct of_device_id *match;
++
++	np = of_find_matching_node_and_match(NULL, of_cpuidle_table,
++					&match);
++
+ 
+ 	/*
+ 	 * Check that all the requirements are available to enable
+-	 * cpuidle. So far, it is only supported on Armada XP, cpuidle
+-	 * needs the coherency fabric and the PMSU enabled
++	 * cpuidle. Each SoCs comes with its own requirements and
++	 * configuration
+ 	 */
+ 
+-	if (!of_machine_is_compatible("marvell,armadaxp"))
+-		return 0;
++	mvebu_v7_cpu_idle_init = (bool (*)(void))match->data;
+ 
+-	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+-	if (!np)
++	if (!mvebu_v7_cpu_idle_init())
+ 		return 0;
+-	of_node_put(np);
+ 
+ 	np = of_find_matching_node(NULL, of_pmsu_table);
+ 	if (!np)
+@@ -329,7 +353,6 @@ static int __init mvebu_v7_cpu_pm_init(void)
+ 				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
+ 
+ 	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
+-	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
+ 	platform_device_register(&mvebu_v7_cpuidle_device);
+ 	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
+ 
 -- 
 1.8.1.2
