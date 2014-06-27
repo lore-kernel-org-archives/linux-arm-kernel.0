@@ -1,90 +1,48 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 27 Jun 2014 11:53:45 +0100
-Subject: [PATCH v5 1/8] Documentation: arm: define DT idle states bindings
-In-Reply-To: <20140625145849.GC15240@leverpostej>
-References: <1403705421-17597-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1403705421-17597-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20140625145849.GC15240@leverpostej>
-Message-ID: <20140627105345.GA3626@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Jun 2014 12:54:20 +0200
+Subject: [RFC 09/10] drm/tegra: Add IOMMU support
+In-Reply-To: <20140627124614.050be2e406a4b9a02d9fe97c@nvidia.com>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <1403815790-8548-10-git-send-email-thierry.reding@gmail.com>
+ <20140627124614.050be2e406a4b9a02d9fe97c@nvidia.com>
+Message-ID: <4455459.GtiCHWk2CB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 03:58:49PM +0100, Mark Rutland wrote:
-
-[...]
-
-> > +===========================================
-> > +4 - state node
-> > +===========================================
-> > +
-> > +A state node represents an idle state description and must be defined as
-> > +follows:
-> > +
-> > +- state node
-> > +
-> > +       Description: must be child of the idle-states node
-> > +
-> > +       The state node name shall follow standard device tree naming
-> > +       rules ([5], 2.2.1 "Node names"), in particular state nodes which
-> > +       are siblings within a single common parent must be given a unique name.
-> > +
-> > +       The idle state entered by executing the wfi instruction (idle_standby
-> > +       SBSA,[3][4]) is considered standard on all ARM platforms and therefore
-> > +       must not be listed.
-> > +
-> > +       With the definitions provided above, the following list represents
-> > +       the valid properties for a state node:
-> > +
-> > +       - compatible
-> > +               Usage: Required
-> > +               Value type: <stringlist>
-> > +               Definition: Must be "arm,idle-state".
-> > +
-> > +       - logic-state-retained
-> > +               Usage: See definition
-> > +               Value type: <none>
-> > +               Definition: if present logic is retained on state entry,
-> > +                           otherwise it is lost.
+On Friday 27 June 2014 12:46:14 Hiroshi DOyu wrote:
 > 
-> What logic state is retained? All system registers?
+> Thierry Reding <thierry.reding@gmail.com> writes:
 > 
-> > +       - cache-state-retained
-> > +               Usage: See definition
-> > +               Value type: <none>
-> > +               Definition: if present cache memory is retained on state entry,
-> > +                           otherwise it is lost.
+> > From: Thierry Reding <treding@nvidia.com>
+> >
+> > When an IOMMU device is available on the platform bus, allocate an IOMMU
+> > domain and attach the display controllers to it. The display controllers
+> > can then scan out non-contiguous buffers by mapping them through the
+> > IOMMU.
+> >
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> > @@ -1283,8 +1284,18 @@ static int tegra_dc_init(struct host1x_client *client)
+> >  {
+> >         struct drm_device *drm = dev_get_drvdata(client->parent);
+> >         struct tegra_dc *dc = host1x_client_to_dc(client);
+> > +       struct tegra_drm *tegra = drm->dev_private;
+> >         int err;
+> >
+> > +       if (tegra->domain) {
+> > +               err = iommu_attach_device(tegra->domain, dc->dev);
 > 
-> Likewise, how much of the cache hierarchy is affected? Any of it? All of
-> it?
+> I wanted to keep device drivers iommu-free with the following:
 > 
-> > +       - timer-state-retained
-> > +               Usage: See definition
-> > +               Value type: <none>
-> > +               Definition: if present the timer control logic is retained on
-> > +                            state entry, otherwise it is lost.
+> http://patchwork.ozlabs.org/patch/354074/
 > 
-> The architected generic timers? Any CPU-local timers? Or any timers
-> whatsoever?
 
-Ok, as I mentioned this timer property is a blocking point for the
-entire set. I gave it more thought, and it is a very hard nut to crack,
-even if we resort to power domains (tick devices do not even contain
-struct device or device node pointers, even if I added a list of
-phandles to timers that are lost on idle state entry I would not be able
-to figure out if the tick device is lost on idle state entry).
+We definitely need something like your series to make iommus work transparently
+on ARM for normal devices, using the of_dma_configure() to look up the correct
+iommu per device and initialize it.
 
-I am reasoning in kernel terms, I know it is bad but I can't help it
-in this case.
+However, any devices that work with multiple iommu domains cannot do that
+and still need to use the iommu API directy. I believe the tegra drm code
+falls into this category.
 
-Would a boolean property like the following one be deemed acceptable, eg:
-
-- local-timer-stop
-
-I want to be 100% honest here, this might turn out a Linux specific
-thing, or might be not, but I still think it is representative of how HW
-works.
-
-Comments welcome and would be very appreciated on this specific detail.
-
-Thanks,
-Lorenzo
+	Arnd
