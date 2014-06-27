@@ -1,79 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Jun 2014 11:18:42 +0200
-Subject: [PATCH v4 1/6] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <1403621185-9581-1-git-send-email-denis@eukrea.com>
-References: <1403621185-9581-1-git-send-email-denis@eukrea.com>
-Message-ID: <CACRpkdbFcgK69yakt+XYOg2q_QT8R263+FrADzz=r+fYNEFPSg@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 27 Jun 2014 02:21:12 -0700
+Subject: [PATCHv5 2/2] arm: Get rid of meminfo
+In-Reply-To: <20140624084936.GJ14781@pengutronix.de>
+References: <1396544698-15596-1-git-send-email-lauraa@codeaurora.org>
+ <1396544698-15596-3-git-send-email-lauraa@codeaurora.org>
+ <20140623091754.GD14781@pengutronix.de> <53A8927B.3020409@codeaurora.org>
+ <20140624084936.GJ14781@pengutronix.de>
+Message-ID: <53AD3788.4090101@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 4:46 PM, Denis Carikli <denis@eukrea.com> wrote:
+On 6/24/2014 1:49 AM, Uwe Kleine-K?nig wrote:
+> Hi Laura,
+> 
+> On Mon, Jun 23, 2014 at 01:47:55PM -0700, Laura Abbott wrote:
+>> Thanks for the report.
+> Thanks for your reply to address it :-)
+> Are you already aware of the mail with Message-Id:
+> CAGa+x85H510fNGTXJHGYfQybRa2FGgg2NyCgJ8rmjJ6TE7GNbA at mail.gmail.com ?
+> Seems to be another fall-out but I think you were not on Cc.
+> 
+>> On 6/23/2014 2:17 AM, Uwe Kleine-K?nig wrote:
+>>> This patch is in 3.16-rc1 as 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
+>>> now.
+>>>
+>>> Unfortunately it makes my efm32 machine unbootable.
+>>>
+>>> With earlyprintk enabled I get the following output:
+>>>
+>>> [    0.000000] Booting Linux on physical CPU 0x0
+>>> [    0.000000] Linux version 3.15.0-rc1-00028-g1c2f87c22566-dirty (ukleinek at perseus) (gcc version 4.7.2 (OSELAS.Toolchain-2012.12.1) ) #280 PREEMPT Mon Jun 23 11:05:34 CEST 2014
+>>> [    0.000000] CPU: ARMv7-M [412fc231] revision 1 (ARMv7M), cr=00000000
+>>> [    0.000000] CPU: unknown data cache, unknown instruction cache
+>>> [    0.000000] Machine model: Energy Micro Giant Gecko Development Kit
+>>> [    0.000000] debug: ignoring loglevel setting.
+>>> [    0.000000] bootconsole [earlycon0] enabled
+>>> [    0.000000] On node 0 totalpages: 1024
+>>> [    0.000000] free_area_init_node: node 0, pgdat 880208f4, node_mem_map 00000000
+>>> [    0.000000]   Normal zone: 3840 pages exceeds freesize 1024
+>>
+>> This looks off. The number of pages for the memmap exceeds the available free
+>> size. Working backwards, I think the wrong bounds are being calculated in
+>> find_limits in arch/arm/mm/init.c . max_low is now calculated via the current
+>> limit but nommu never sets a limit unlike the mmu case. Can you try the
+>> following patch and see if it fixes the issue? If this doesn't work, can
+>> you share working bootup logs so I can do a bit more compare and contrast?
+>>
+>> Thanks,
+>> Laura
+>>
+>> ---8<----
+>> From 9b19241d577caf91928e26e55413047d1be90feb Mon Sep 17 00:00:00 2001
+>> From: Laura Abbott <lauraa@codeaurora.org>
+>> Date: Mon, 23 Jun 2014 13:26:56 -0700
+>> Subject: [PATCH] arm: Set memblock limit for nommu
+>>
+>> Commit 1c2f87c (ARM: 8025/1: Get rid of meminfo) changed find_limits
+>> to use memblock_get_current_limit for calculating the max_low pfn.
+>> nommu targets never actually set a limit on memblock though which
+>> means memblock_get_current_limit will just return the default
+>> value. Set the memblock_limit to be the end of DDR to make sure
+> s/DDR/RAM/ ?
+> 
+>> bounds are calculated correctly.
+> This patch makes my machine boot. Full boot log appended below.
+> (Side note: I place my dtb in the SRAM at 0x10000000 but don't add this to
+> the available memory because it's only 128 KiB in size and so too small
+> to be worth to track. Not sure this is allowed?!)
+> 
+> Thanks
+> Uwe
+> 
+ 
+I put this in the patch tracker as 8086/1
 
-> From: Markus Pargmann <mpa@pengutronix.de>
->
-> This is the core driver for imx25 touchscreen/adc driver. The module
-> has one shared ADC and two different conversion queues which use the
-> ADC. The two queues are identical. Both can be used for general purpose
-> ADC but one is meant to be used for touchscreens.
->
-> This driver is the core which manages the central components and
-> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
-> the correct components.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
+Thanks,
+Laura
 
-I think the subject and commit message is misleading. What this
-patch does is create a MFD hub to handle spawning devices
-and handle chained IRQs for the ADC unit right? It's not a "core driver"
-because it's not really driving anything, just proxying things.
-
-> +static int mx25_tsadc_domain_map(struct irq_domain *d, unsigned int irq,
-> +                            irq_hw_number_t hwirq)
-> +{
-> +       struct mx25_tsadc *tsadc = d->host_data;
-> +
-> +       irq_set_chip_data(irq, tsadc);
-
-You also need to set a unique lockdep class or lockdep will
-complain.
-
-static struct lock_class_key my_lock_class;
-
-irq_set_lockdep_class(irq, &my_lock_class);
-
-> +       irq_set_chip_and_handler(irq, &dummy_irq_chip,
-> +                                handle_level_irq);
-> +       set_irq_flags(irq, IRQF_VALID);
-
-This function only exists on ARM. Unless Kconfig ensures
-this is only available on ARM platforms, use
-
-#ifdef CONFIG_ARM
-      set_irq_flags(irq, IRQF_VALID);
-#else
-      irq_set_noprobe(irq);
-#endif
-
-(Sorry we have no better way of doing it.)
-
-> +static int mx25_tsadc_probe(struct platform_device *pdev)
-> +{
-(...)
-> +       of_platform_populate(np, NULL, NULL, dev);
-
-This was news2me. Why aren't MFD cells used now that
-you're using MFD as a spawning hub?
-
-MFD also has a way of translating IRQs passed as resources
-to children, so they arrive at their children readily translated.
-Not using MFD cells means you don't use this nice mechanism
-right?
-
-Or is there some new nice design style that I'm not
-familiar with, like the OF core handling that translation?
-(Seems like that, hence asking...)
-
-Yours,
-Linus Walleij
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
