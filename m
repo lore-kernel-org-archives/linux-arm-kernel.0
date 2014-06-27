@@ -1,44 +1,150 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 27 Jun 2014 16:19:29 +0100
-Subject: [PATCH CFT 07/30] net: fec: ensure that a disconnected phy isn't
- configured
-In-Reply-To: <20140627151542.GL32514@n2100.arm.linux.org.uk>
-References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X0Xw1-0001NF-3k@rmk-PC.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 27 Jun 2014 17:19:22 +0200
+Subject: [PATCH v3 1/4] drm/fb-helper: Fix hpd vs. initial config races
+Message-ID: <1403882365-18337-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we disconnect from a phy, we should forget our pointer to it so we
-don't accidentally try to configure it.  We handle a NULL phy pointer
-correctly in most places, except fec_enet_set_pauseparam().  Fix this
-too.
+From: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Some drivers need to be able to have a perfect race-free fbcon setup.
+Current drivers only enable hotplug processing after the call to
+drm_fb_helper_initial_config which leaves a tiny but important race.
+
+This race is especially noticable on embedded platforms where the
+driver itself enables the voltage for the hdmi output, since only then
+will monitors (after a bit of delay, as usual) respond by asserting
+the hpd pin.
+
+Most of the infrastructure is already there with the split-out
+drm_fb_helper_init. And drm_fb_helper_initial_config already has all
+the required locking to handle concurrent hpd events since
+
+commit 53f1904bced78d7c00f5d874c662ec3ac85d0f9f
+Author: Daniel Vetter <daniel.vetter@ffwll.ch>
+Date:   Thu Mar 20 14:26:35 2014 +0100
+
+    drm/fb-helper: improve drm_fb_helper_initial_config locking
+
+The only missing bit is making drm_fb_helper_hotplug_event save
+against concurrent calls of drm_fb_helper_initial_config. The only
+unprotected bit is the check for fb_helper->fb.
+
+With that drivers can first initialize the fb helper, then enabel
+hotplug processing and then set up the initial config all in a
+completely race-free manner. Update kerneldoc and convert i915 as a
+proof of concept.
+
+Feature requested by Thierry since his tegra driver atm reliably boots
+slowly enough to misses the hotplug event for an external hdmi screen,
+but also reliably boots to quickly for the hpd pin to be asserted when
+the fb helper calls into the hdmi ->detect function.
+
+Cc: Thierry Reding <treding@nvidia.com>
+Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Changes in v3:
+- remove an additional occurrence of i915's enable_hotplug_processing
+  that was introduced after the original patch
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 6a03d7eced4d..cf805468eecc 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1875,6 +1875,9 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
- {
- 	struct fec_enet_private *fep = netdev_priv(ndev);
+ drivers/gpu/drm/drm_fb_helper.c | 11 +++++------
+ drivers/gpu/drm/i915/i915_dma.c |  3 ---
+ drivers/gpu/drm/i915/i915_drv.c |  2 --
+ drivers/gpu/drm/i915/i915_drv.h |  1 -
+ drivers/gpu/drm/i915/i915_irq.c |  4 ----
+ 5 files changed, 5 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+index d5d8cea1a679..13a098c9af31 100644
+--- a/drivers/gpu/drm/drm_fb_helper.c
++++ b/drivers/gpu/drm/drm_fb_helper.c
+@@ -1613,8 +1613,10 @@ EXPORT_SYMBOL(drm_fb_helper_initial_config);
+  * either the output polling work or a work item launched from the driver's
+  * hotplug interrupt).
+  *
+- * Note that the driver must ensure that this is only called _after_ the fb has
+- * been fully set up, i.e. after the call to drm_fb_helper_initial_config.
++ * Note that drivers may call this even before calling
++ * drm_fb_helper_initial_config but only aftert drm_fb_helper_init. This allows
++ * for a race-free fbcon setup and will make sure that the fbdev emulation will
++ * not miss any hotplug events.
+  *
+  * RETURNS:
+  * 0 on success and a non-zero error code otherwise.
+@@ -1624,11 +1626,8 @@ int drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper)
+ 	struct drm_device *dev = fb_helper->dev;
+ 	u32 max_width, max_height;
  
-+	if (!fep->phy_dev)
-+		return -ENODEV;
-+
- 	if (pause->tx_pause != pause->rx_pause) {
- 		netdev_info(ndev,
- 			"hardware only support enable/disable both tx and rx");
-@@ -2186,6 +2189,7 @@ fec_enet_close(struct net_device *ndev)
+-	if (!fb_helper->fb)
+-		return 0;
+-
+ 	mutex_lock(&fb_helper->dev->mode_config.mutex);
+-	if (!drm_fb_helper_is_bound(fb_helper)) {
++	if (!fb_helper->fb || !drm_fb_helper_is_bound(fb_helper)) {
+ 		fb_helper->delayed_hotplug = true;
+ 		mutex_unlock(&fb_helper->dev->mode_config.mutex);
+ 		return 0;
+diff --git a/drivers/gpu/drm/i915/i915_dma.c b/drivers/gpu/drm/i915/i915_dma.c
+index 5e583a1838f8..84b55665bd87 100644
+--- a/drivers/gpu/drm/i915/i915_dma.c
++++ b/drivers/gpu/drm/i915/i915_dma.c
+@@ -1377,9 +1377,6 @@ static int i915_load_modeset_init(struct drm_device *dev)
+ 	 */
+ 	intel_fbdev_initial_config(dev);
  
- 	phy_stop(fep->phy_dev);
- 	phy_disconnect(fep->phy_dev);
-+	fep->phy_dev = NULL;
+-	/* Only enable hotplug handling once the fbdev is fully set up. */
+-	dev_priv->enable_hotplug_processing = true;
+-
+ 	drm_kms_helper_poll_init(dev);
  
- 	fec_enet_clk_enable(ndev, false);
- 	pinctrl_pm_select_sleep_state(&fep->pdev->dev);
+ 	return 0;
+diff --git a/drivers/gpu/drm/i915/i915_drv.c b/drivers/gpu/drm/i915/i915_drv.c
+index 6eb45ac7a7d5..b0955fffca98 100644
+--- a/drivers/gpu/drm/i915/i915_drv.c
++++ b/drivers/gpu/drm/i915/i915_drv.c
+@@ -521,7 +521,6 @@ static int i915_drm_freeze(struct drm_device *dev)
+ 		}
+ 
+ 		intel_runtime_pm_disable_interrupts(dev);
+-		dev_priv->enable_hotplug_processing = false;
+ 
+ 		intel_suspend_gt_powersave(dev);
+ 
+@@ -659,7 +658,6 @@ static int __i915_drm_thaw(struct drm_device *dev, bool restore_gtt_mappings)
+ 		 * notifications.
+ 		 * */
+ 		intel_hpd_init(dev);
+-		dev_priv->enable_hotplug_processing = true;
+ 		/* Config may have changed between suspend and resume */
+ 		drm_helper_hpd_irq_event(dev);
+ 	}
+diff --git a/drivers/gpu/drm/i915/i915_drv.h b/drivers/gpu/drm/i915/i915_drv.h
+index 8cea59649ef2..df6a98cd702f 100644
+--- a/drivers/gpu/drm/i915/i915_drv.h
++++ b/drivers/gpu/drm/i915/i915_drv.h
+@@ -1404,7 +1404,6 @@ struct drm_i915_private {
+ 	u32 pipestat_irq_mask[I915_MAX_PIPES];
+ 
+ 	struct work_struct hotplug_work;
+-	bool enable_hotplug_processing;
+ 	struct {
+ 		unsigned long hpd_last_jiffies;
+ 		int hpd_cnt;
+diff --git a/drivers/gpu/drm/i915/i915_irq.c b/drivers/gpu/drm/i915/i915_irq.c
+index 1c1ec22bc7ef..c0d7674c45cd 100644
+--- a/drivers/gpu/drm/i915/i915_irq.c
++++ b/drivers/gpu/drm/i915/i915_irq.c
+@@ -1109,10 +1109,6 @@ static void i915_hotplug_work_func(struct work_struct *work)
+ 	bool changed = false;
+ 	u32 hpd_event_bits;
+ 
+-	/* HPD irq before everything is fully set up. */
+-	if (!dev_priv->enable_hotplug_processing)
+-		return;
+-
+ 	mutex_lock(&mode_config->mutex);
+ 	DRM_DEBUG_KMS("running encoder hotplug functions\n");
+ 
 -- 
-1.8.3.1
+2.0.0
