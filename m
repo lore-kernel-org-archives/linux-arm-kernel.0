@@ -1,30 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Jun 2014 12:21:51 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <20140626151424.GT32514@n2100.arm.linux.org.uk>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
-Message-ID: <20140627112151.GF32514@n2100.arm.linux.org.uk>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Fri, 27 Jun 2014 20:22:12 +0900
+Subject: [PATCH v3 0/2] drm: nouveau: memory coherency for ARM
+Message-ID: <1403868134-31741-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 04:14:24PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 26, 2014 at 02:44:52PM +0000, Mattis Lorentzon wrote:
-> > We have managed to trigger the Oops by just transferring a large file
-> > over nfs
-> > cat /mnt/foo > /dev/null
-> > where foo is a file that is approximately 2 GB. There may be some
-> > packet losses on this network, perhaps this differs from your workload?
-> 
-> That's a similar workload to the one which is mentioned in the previous
-> report.  I've just set a similar transfer going, but this will be a 16GB
-> file.
+v2 was doing some pretty nasty things with the DMA API, so I took a different
+approach for this v3.
 
-I've run this transfer several times, but so far I've unable to reproduce
-the issue here.
+As suggested, this version uses ttm_dma_populate() to populate BOs. The reason
+for doing this was that it would entitle us to using the DMA sync functions,
+but since the memory returned is already coherent anyway, we do not even
+need to call these functions anymore.
+
+So this series has turned into 2 small patches:
+
+- The first attempts to make it more obvious that Nouveau can use different
+ways to populate TTs, and make it possible to choose which method to use from
+a single place.
+- The second leverages this work to select the DMA allocator to populate TTs
+on ARM.
+
+Doing this solves all our coherency problems with Nouveau on Tegra, and
+hopefully makes the code easier to read in the process.
+
+Alexandre Courbot (2):
+  drm/nouveau: cleanup TTM population logic
+  drm/nouveau: use DMA TT population method on ARM
+
+ drivers/gpu/drm/nouveau/nouveau_bo.c  | 63 ++++++++++++++++++-----------------
+ drivers/gpu/drm/nouveau/nouveau_drm.h | 11 ++++++
+ drivers/gpu/drm/nouveau/nouveau_ttm.c | 17 ++++++++++
+ 3 files changed, 61 insertions(+), 30 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+2.0.0
