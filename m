@@ -1,106 +1,81 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jun 2014 16:15:44 +0200
-Subject: [PATCH 07/16] ARM: mvebu: Make the CPU idle initialization more
- generic
-In-Reply-To: <1403875377-940-8-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-8-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <53AD7C90.6080600@free-electrons.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Fri, 27 Jun 2014 16:17:28 +0200
+Subject: [PATCH v14 updated] imx-drm: use defines for clock polarity settings
+In-Reply-To: <20140626205631.GB32514@n2100.arm.linux.org.uk>
+References: <20140626205631.GB32514@n2100.arm.linux.org.uk>
+Message-ID: <1403878648-9526-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/2014 15:22, Gregory CLEMENT wrote:
-> In order to support more mvebu SoCs, this patch use an initialization
-> specific function associated to each SoCs which support CPU Idle.
-> 
-> Then each SoC will have his own set of check and of data
-> configuration.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/pmsu.c | 39 +++++++++++++++++++++++++++++++--------
->  1 file changed, 31 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 087157c20b8a..454f0f9ede6b 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -293,23 +293,47 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
->  	.notifier_call = mvebu_v7_cpu_pm_notify,
->  };
->  
-> +static bool (*mvebu_v7_cpu_idle_init)(void);
-> +
-> +static __init bool armada_xp_cpuidle_init(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-> +	if (!np)
-> +		return false;
-> +	of_node_put(np);
-> +
-> +	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
-> +	return true;
-> +}
-> +
-> +static struct of_device_id of_cpuidle_table[] __initdata = {
-> +	{ .compatible = "marvell,armadaxp",
-> +	  .data = (void *)armada_xp_cpuidle_init,
-> +	},
-> +	{ /* end of list */ },
-> +};
-> +
->  static int __init mvebu_v7_cpu_pm_init(void)
->  {
->  	struct device_node *np;
-> +	const struct of_device_id *match;
-> +
-> +	np = of_find_matching_node_and_match(NULL, of_cpuidle_table,
-> +					&match);
-> +
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ drivers/gpu/ipu-v3/ipu-di.c          |    4 ++--
+ drivers/staging/imx-drm/ipuv3-crtc.c |    4 ++--
+ include/video/imx-ipu-v3.h           |    8 +++++++-
+ 3 files changed, 11 insertions(+), 5 deletions(-)
 
-The following part was missing (without this the kernel hang on Armada 375)
-
-+       if (!np)
-+               return 0;
-
-
-
->  
->  	/*
->  	 * Check that all the requirements are available to enable
-> -	 * cpuidle. So far, it is only supported on Armada XP, cpuidle
-> -	 * needs the coherency fabric and the PMSU enabled
-> +	 * cpuidle. Each SoCs comes with its own requirements and
-> +	 * configuration
->  	 */
->  
-> -	if (!of_machine_is_compatible("marvell,armadaxp"))
-> -		return 0;
-> +	mvebu_v7_cpu_idle_init = (bool (*)(void))match->data;
->  
-> -	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-> -	if (!np)
-> +	if (!mvebu_v7_cpu_idle_init())
->  		return 0;
-> -	of_node_put(np);
->  
->  	np = of_find_matching_node(NULL, of_pmsu_table);
->  	if (!np)
-> @@ -329,7 +353,6 @@ static int __init mvebu_v7_cpu_pm_init(void)
->  				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
->  
->  	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
-> -	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
->  	platform_device_register(&mvebu_v7_cpuidle_device);
->  	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
->  
-> 
-
-
+diff --git a/drivers/gpu/ipu-v3/ipu-di.c b/drivers/gpu/ipu-v3/ipu-di.c
+index c490ba4..5f7f799 100644
+--- a/drivers/gpu/ipu-v3/ipu-di.c
++++ b/drivers/gpu/ipu-v3/ipu-di.c
+@@ -595,7 +595,7 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		}
+ 	}
+ 
+-	if (sig->clk_pol)
++	if (sig->clk_pol == IPU_CLK_POL_POSEDGE)
+ 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
+ 
+ 	ipu_di_write(di, di_gen, DI_GENERAL);
+@@ -606,7 +606,7 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 	reg = ipu_di_read(di, DI_POL);
+ 	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
+ 
+-	if (sig->enable_pol)
++	if (sig->enable_pol == IPU_ENABLE_POL_HIGH)
+ 		reg |= DI_POL_DRDY_POLARITY_15;
+ 	if (sig->data_pol)
+ 		reg |= DI_POL_DRDY_DATA_POLARITY;
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index 720868b..4e54f7a 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -165,8 +165,8 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		sig_cfg.Vsync_pol = 1;
+ 
+-	sig_cfg.enable_pol = 1;
+-	sig_cfg.clk_pol = 0;
++	sig_cfg.enable_pol = IPU_ENABLE_POL_HIGH;
++	sig_cfg.clk_pol = IPU_CLK_POL_NEGEDGE;
+ 	sig_cfg.width = mode->hdisplay;
+ 	sig_cfg.height = mode->vdisplay;
+ 	sig_cfg.pixel_fmt = out_pixel_fmt;
+diff --git a/include/video/imx-ipu-v3.h b/include/video/imx-ipu-v3.h
+index 3e43e22..d52edb4 100644
+--- a/include/video/imx-ipu-v3.h
++++ b/include/video/imx-ipu-v3.h
+@@ -27,6 +27,12 @@ enum ipuv3_type {
+ 
+ #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
+ 
++#define IPU_CLK_POL_NEGEDGE	0
++#define IPU_CLK_POL_POSEDGE	1
++
++#define IPU_ENABLE_POL_LOW	0
++#define IPU_ENABLE_POL_HIGH	1
++
+ /*
+  * Bitfield of Display Interface signal polarities.
+  */
+@@ -37,7 +43,7 @@ struct ipu_di_signal_cfg {
+ 	unsigned clksel_en:1;
+ 	unsigned clkidle_en:1;
+ 	unsigned data_pol:1;	/* true = inverted */
+-	unsigned clk_pol:1;	/* true = rising edge */
++	unsigned clk_pol:1;
+ 	unsigned enable_pol:1;
+ 	unsigned Hsync_pol:1;	/* true = active high */
+ 	unsigned Vsync_pol:1;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
