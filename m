@@ -1,28 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 28 Jun 2014 08:59:39 +0900
-Subject: [PATCH v2 0/3] Add R8A7791/Koelsch/Henninger board PCI DT support
-In-Reply-To: <537B9CF0.8020000@cogentembedded.com>
-References: <201405200148.28683.sergei.shtylyov@cogentembedded.com>
- <537B9CF0.8020000@cogentembedded.com>
-Message-ID: <20140627235939.GC27128@verge.net.au>
+From: dalias@libc.org (Rich Felker)
+Date: Fri, 27 Jun 2014 20:11:43 -0400
+Subject: [musl] Re: Thread pointer changes
+In-Reply-To: <20140627225445.GV32514@n2100.arm.linux.org.uk>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627200949.GQ32514@n2100.arm.linux.org.uk>
+ <20140627210931.GT23102@port70.net>
+ <20140627213051.GS32514@n2100.arm.linux.org.uk>
+ <20140627215541.GC16724@brightrain.aerifal.cx>
+ <20140627221744.GU32514@n2100.arm.linux.org.uk>
+ <CALCETrUvPV0xmw1jCVdwJ8KW3HMW8JKoCRnHcUyuU-1ze=6X8A@mail.gmail.com>
+ <20140627225445.GV32514@n2100.arm.linux.org.uk>
+Message-ID: <20140628001143.GA19165@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 20, 2014 at 10:20:32PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 05/20/2014 01:48 AM, Sergei Shtylyov wrote:
-> 
-> >    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-> >'renesas-devel-v3.15-rc5-20140517' tag. Here we add internal PCI support for
-> >the R8A7791-based Koelsch and Henninger boards for the sake of getting USB
-> >EHCI/OHCI working...
-> 
->    Forgot to mention that it depends on the internal PCI bridge device tree
-> support reposted just before these patches...
-> 
-> >[1/3] ARM: shmobile: r8a7791: add internal PCI bridge nodes
-> >[2/3] ARM: shmobile: koelsch: enable internal PCI
-> >[3/3] ARM: shmobile: henninger: enable internal PCI
+On Fri, Jun 27, 2014 at 11:54:45PM +0100, Russell King - ARM Linux wrote:
+> Oh, I should also have mentioned: for a libc, if you want to stretch
+> across from ARMv4 all the way up to ARMv7, then you have to do lots
+> more than just worry about thread local storage.  You also have the
+> problem that you can't just fall back on the SWP instruction to
+> provide atomic implementations - this instruction has been deprecated
+> and for the latest CPUs, the kernel may be configured to emulate this
+> instruction.  Besides, on ARMv6 and later, you really want to use the
+> load/store exclusive instructions for implementing atomic accesses
+> and not the horrid SWP instruction.  So you need to implement atomic
+> stuff using SWP for some CPUs and the new load/store exclusive for
+> other CPUs.
 
-Thanks, please repost these patches when the device tree support
+SWP is mostly useless for implementing the POSIX threads primitives,
+most of which need compare-and-swap due to the requirement of
+self-synchronized destruction. At the source level we do a swap
+operation in a couple places, but so far on ARM it's just implemented
+in terms of CAS. We could revisit this once there's runtime selection
+of the lock code anyway; using SWP might make a big difference for
+internal locks (e.g. in malloc) where the CAS semantics are not
+needed.
+
+Rich
