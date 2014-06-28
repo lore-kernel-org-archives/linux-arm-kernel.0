@@ -1,54 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Jun 2014 16:26:09 +0100
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140628152609.GH32514@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 28 Jun 2014 17:39:55 +0200
+Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
+In-Reply-To: <20140617112624.GI23430@n2100.arm.linux.org.uk>
+References: <20140527121806.GF3693@n2100.arm.linux.org.uk>
+ <20140527143745.386c77d9@free-electrons.com>
+ <20140528112450.GH3693@n2100.arm.linux.org.uk>
+ <20140530100819.1208149f@free-electrons.com>
+ <20140530092044.GO3693@n2100.arm.linux.org.uk>
+ <20140613121121.7e7dc8e6@free-electrons.com>
+ <20140613102019.GQ23430@n2100.arm.linux.org.uk>
+ <20140613133437.1a85f287@free-electrons.com>
+ <20140613155139.05e2393c@free-electrons.com>
+ <20140617104854.7393c14c@free-electrons.com>
+ <20140617112624.GI23430@n2100.arm.linux.org.uk>
+Message-ID: <20140628173955.7d105d3a@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
-> Place vdso-related user-space code in arch/arm/kernel/vdso/.
+Hello Russell,
+
+On Tue, 17 Jun 2014 12:26:24 +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 17, 2014 at 10:48:54AM +0200, Thomas Petazzoni wrote:
+> > Russell,
+> > 
+> > Do you have some input/feedback about the below proposals/questions?
 > 
-> It is almost completely written in C with some assembly helpers to
-> load the data page address, sample the counter, and fall back to
-> system calls when necessary.
+> Not at the moment, I'm busy sorting through the 150-odd months-old
+> patches which remain in my tree post-merge window, working through
+> regressions, and trying to sort them out so I can (re-)post them and
+> hopefully get rid of them.
 > 
-> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
-> high-resolution clocks and falls back to syscalls.  Low-resolution
-> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
+> Of course, if it didn't take many months to get patches into mainline,
+> then I wouldn't be doing this right now, and I could spend more time
+> thinking more about these sorts of issues, rather than (eg) thinking
+> about how to generate DT binding documentation for drivers which have
+> been merged without that required documentation, which I then need to
+> modify, and then promptly get asked to write that required documentation
+> for.
 
-Okay, how is this used by userspace?
+I surely understand that it sometimes takes a lot of time to get some
+feedback from maintainers, I also had similar troubles with the
+maintainers of certain subsystems.
 
-It seems that on ARM, we generate a dso with these symbols:
+However, I'd really like to see the hardware I/O coherency issue make
+some progress: it's currently completely broken on Armada 370, causing
+random corruptions, and the only solution is to be able to properly
+enable write-allocate. Your patch series makes that partially possible,
+but there are some remaining problems, which I summarized at
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/263524.html.
 
-DYNAMIC SYMBOL TABLE:
-000001e4 l    d  .eh_frame_hdr	00000000              .eh_frame_hdr
-00000000 g    DO *ABS*	00000000  LINUX_3.17  LINUX_3.17
-000003c4 g    DF .text	00000080  LINUX_3.17  __kernel_clock_getres
-00000444 g    DF .text	0000002c  LINUX_3.17  __kernel_gettimeofday
-00000298 g    DF .text	0000012c  LINUX_3.17  __kernel_clock_gettime
+Thanks a lot for your help and suggestions,
 
-whereas, x86-64 generates this:
-
-DYNAMIC SYMBOL TABLE:
-ffffffffff700330 l    d  .eh_frame_hdr	0000000000000000              .eh_frame_hdr
-ffffffffff700600  w   DF .text	00000000000002b9  LINUX_2.6   clock_gettime
-0000000000000000 g    DO *ABS*	0000000000000000  LINUX_2.6   LINUX_2.6
-ffffffffff7008c0 g    DF .text	000000000000015a  LINUX_2.6   __vdso_gettimeofday
-ffffffffff700a40 g    DF .text	000000000000003d  LINUX_2.6   __vdso_getcpu
-ffffffffff7008c0  w   DF .text	000000000000015a  LINUX_2.6   gettimeofday
-ffffffffff700a20  w   DF .text	0000000000000016  LINUX_2.6   time
-ffffffffff700a40  w   DF .text	000000000000003d  LINUX_2.6   getcpu
-ffffffffff700600 g    DF .text	00000000000002b9  LINUX_2.6   __vdso_clock_gettime
-ffffffffff700a20 g    DF .text	0000000000000016  LINUX_2.6   __vdso_time
-
-hence references to gettimeofday automatically get resolved to the
-vdso version without needing C library updates.
-
-Or... do we need a glibc update to make use of this?
-
+Thomas
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
