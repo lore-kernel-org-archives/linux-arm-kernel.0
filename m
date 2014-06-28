@@ -1,34 +1,45 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 28 Jun 2014 15:42:23 +0100
-Subject: [PATCH] ARM: add eabi version
-Message-ID: <E1X0tpf-0001dO-5k@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Jun 2014 15:49:04 +0100
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <20140628095504.GD32514@n2100.arm.linux.org.uk>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <20140627085125.GA7088@hal> <20140627085705.GC32514@n2100.arm.linux.org.uk>
+ <CAKv+Gu9NfGT8r8FSYzsuP70r1BRD_pdJw7AZHkc4qLt2_SwanA@mail.gmail.com>
+ <20140627094648.GE32514@n2100.arm.linux.org.uk> <53ADA358.7000305@mentor.com>
+ <20140628094219.GB32514@n2100.arm.linux.org.uk>
+ <20140628095504.GD32514@n2100.arm.linux.org.uk>
+Message-ID: <20140628144904.GF32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that we specify the EABI version for EABI builds, otherwise we're
-left to the toolchain's whims for this feature.  Adding -meabi=5 sets
-the EABI version in the object files to 5, and adds the additional tag
-information to the aeabi section.
+On Sat, Jun 28, 2014 at 10:55:04AM +0100, Russell King - ARM Linux wrote:
+> On Sat, Jun 28, 2014 at 10:42:19AM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Jun 27, 2014 at 12:01:12PM -0500, Nathan Lynch wrote:
+> > > Since removing -lgcc from the link (one of the changes from v6 to v7), I
+> > > believe the VDSO is not asking more of the toolchain or build
+> > > environment than the rest of the kernel does.  I have definitely built
+> > > it without a target libc.  Apart from the host program's use of
+> > > too-recent ELF constants (now fixed), I would appreciate help
+> > > identifying any remaining sources of fragility.
+> > 
+> > There's still something wrong:
+> > 
+> > fs/binfmt_elf.c: In function 'create_elf_tables':
+> > fs/binfmt_elf.c:231:35: error: 'AT_SYSINFO_EHDR' undeclared (first use in this function)
+> > fs/binfmt_elf.c:231:35: note: each undeclared identifier is reported only once for each function it appears in
+> > 
+> > The problem is the fscking generated includes.  This is going to be a
+> > right pain - Arnd, is there anything which can be done about this?
+> 
+> And yes, I see that you've mentioned this in the cover - but I think we
+> /really/ need this solved before we can merge this series, otherwise
+> we're likely to get lots of people asking about it.
 
-This is required for the upcoming VDSO support.
+Thinking about this some more - if this can't be resolved by kbuild,
+then I think we should add to arch/arm/Kconfig to detect the generated
+include file, print a helpful message telling the user how to fix their
+build tree, and error out.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 5964ff1a3c32..f5c5a92edbe1 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -96,7 +96,7 @@ tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
- tune-y := $(tune-y)
- 
- ifeq ($(CONFIG_AEABI),y)
--CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
-+CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp -Wa,-meabi=5
- else
- CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
- endif
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
