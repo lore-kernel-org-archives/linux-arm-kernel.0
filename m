@@ -1,76 +1,108 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Sat, 28 Jun 2014 11:13:42 -0500
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <20140628152609.GH32514@n2100.arm.linux.org.uk>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <20140628152609.GH32514@n2100.arm.linux.org.uk>
-Message-ID: <53AEE9B6.7000609@mentor.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Jun 2014 17:34:13 +0100
+Subject: [PATCH RFCv2 1/5] ARM: use write allocate by default on ARMv6+
+In-Reply-To: <20140628173955.7d105d3a@free-electrons.com>
+References: <20140528112450.GH3693@n2100.arm.linux.org.uk>
+ <20140530100819.1208149f@free-electrons.com>
+ <20140530092044.GO3693@n2100.arm.linux.org.uk>
+ <20140613121121.7e7dc8e6@free-electrons.com>
+ <20140613102019.GQ23430@n2100.arm.linux.org.uk>
+ <20140613133437.1a85f287@free-electrons.com>
+ <20140613155139.05e2393c@free-electrons.com>
+ <20140617104854.7393c14c@free-electrons.com>
+ <20140617112624.GI23430@n2100.arm.linux.org.uk>
+ <20140628173955.7d105d3a@free-electrons.com>
+Message-ID: <20140628163413.GI32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2014 10:26 AM, Russell King - ARM Linux wrote:
-> On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
->> Place vdso-related user-space code in arch/arm/kernel/vdso/.
->>
->> It is almost completely written in C with some assembly helpers to
->> load the data page address, sample the counter, and fall back to
->> system calls when necessary.
->>
->> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
->> high-resolution clocks and falls back to syscalls.  Low-resolution
->> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
+On Sat, Jun 28, 2014 at 05:39:55PM +0200, Thomas Petazzoni wrote:
+> Hello Russell,
 > 
-> Okay, how is this used by userspace?
-
-Primarily it's intended to be transparent to userspace applications;
-glibc -- with a patch -- detects the VDSO at startup and binds the
-appropriate routines to the VDSO's.
-
-However, even an unpatched glibc makes the VDSO symbols available for
-lookup via dlsym, which has been convenient for testing.
-
-
-> It seems that on ARM, we generate a dso with these symbols:
+> On Tue, 17 Jun 2014 12:26:24 +0100, Russell King - ARM Linux wrote:
+> > On Tue, Jun 17, 2014 at 10:48:54AM +0200, Thomas Petazzoni wrote:
+> > > Russell,
+> > > 
+> > > Do you have some input/feedback about the below proposals/questions?
+> > 
+> > Not at the moment, I'm busy sorting through the 150-odd months-old
+> > patches which remain in my tree post-merge window, working through
+> > regressions, and trying to sort them out so I can (re-)post them and
+> > hopefully get rid of them.
+> > 
+> > Of course, if it didn't take many months to get patches into mainline,
+> > then I wouldn't be doing this right now, and I could spend more time
+> > thinking more about these sorts of issues, rather than (eg) thinking
+> > about how to generate DT binding documentation for drivers which have
+> > been merged without that required documentation, which I then need to
+> > modify, and then promptly get asked to write that required documentation
+> > for.
 > 
-> DYNAMIC SYMBOL TABLE:
-> 000001e4 l    d  .eh_frame_hdr	00000000              .eh_frame_hdr
-> 00000000 g    DO *ABS*	00000000  LINUX_3.17  LINUX_3.17
-> 000003c4 g    DF .text	00000080  LINUX_3.17  __kernel_clock_getres
-> 00000444 g    DF .text	0000002c  LINUX_3.17  __kernel_gettimeofday
-> 00000298 g    DF .text	0000012c  LINUX_3.17  __kernel_clock_gettime
-> 
-> whereas, x86-64 generates this:
-> 
-> DYNAMIC SYMBOL TABLE:
-> ffffffffff700330 l    d  .eh_frame_hdr	0000000000000000              .eh_frame_hdr
-> ffffffffff700600  w   DF .text	00000000000002b9  LINUX_2.6   clock_gettime
-> 0000000000000000 g    DO *ABS*	0000000000000000  LINUX_2.6   LINUX_2.6
-> ffffffffff7008c0 g    DF .text	000000000000015a  LINUX_2.6   __vdso_gettimeofday
-> ffffffffff700a40 g    DF .text	000000000000003d  LINUX_2.6   __vdso_getcpu
-> ffffffffff7008c0  w   DF .text	000000000000015a  LINUX_2.6   gettimeofday
-> ffffffffff700a20  w   DF .text	0000000000000016  LINUX_2.6   time
-> ffffffffff700a40  w   DF .text	000000000000003d  LINUX_2.6   getcpu
-> ffffffffff700600 g    DF .text	00000000000002b9  LINUX_2.6   __vdso_clock_gettime
-> ffffffffff700a20 g    DF .text	0000000000000016  LINUX_2.6   __vdso_time
-> 
-> hence references to gettimeofday automatically get resolved to the
-> vdso version without needing C library updates.
+> I surely understand that it sometimes takes a lot of time to get some
+> feedback from maintainers, I also had similar troubles with the
+> maintainers of certain subsystems.
 
-Hmm, I'm not sure.  I had wondered why x86-64's vdso has the aliases
-(clock_gettime --> __vdso_clock_gettime).  Most other architectures'
-VDSOs don't.
+Yes, it takes /months/.  The typical way things work is you send a
+patch set of any size.  You get a number of minor comments on it.  You
+address those comments.  You get another set of minor comments on a
+different selection of patches.  You address those.  So the loop
+continues, wasting lots of time updating the patches and re-posting
+them.
 
+That means that the maintainers who are trying to push those patches
+are consumed with this process trying to deal with these other people
+rather than working on the area that they're supposed to be maintaining.
 
-> Or... do we need a glibc update to make use of this?
+It's a vicious circle where eventually no one is doing any useful work -
+one which I see kernel development heading headlong towards.
 
-That is the idea, yes.  You don't have to rebuild applications but glibc
-needs to be updated to dispatch its gettimeofday and clock_gettime to
-the VDSO.
+I still have a significant quantity of patches (slightly more than
+when I sent my reply on the 17th of June) with only a relatively small
+amount of movement towards getting some of them accepted by maintainers.
 
-I'm in the process of refreshing and re-testing that patch.  I posted an
-RFC to libc-alpha a few months back:
+I'm not talking about patches which I've only just created - I'm talking
+about patches which are more than /six/ months old.
 
-https://www.sourceware.org/ml/libc-alpha/2014-02/msg00680.html
+The more time this takes, the less time I have to look at core ARM stuff.
 
-I should have a new one posted within a couple days.
+Then you have problems like the fscked regulator code, which seems to be
+the only code in the kernel which doesn't allow GPIO number 0 to be
+specified, not even via DT.  It just ignores it.  It seems that I'm
+having to work to fix that code, rather than being able to report it
+as a bug and have the bug fixed.
+
+There is very little to no sharing of these issues, so consequently I'm
+the one who ends up with _loads_ of crap on my plate to try and solve.
+
+> However, I'd really like to see the hardware I/O coherency issue make
+> some progress: it's currently completely broken on Armada 370, causing
+> random corruptions, and the only solution is to be able to properly
+> enable write-allocate. Your patch series makes that partially possible,
+> but there are some remaining problems, which I summarized at
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/263524.html.
+
+Yes, I'm aware that there are still some remaining problems, but I don't
+have a solution for it yet.
+
+What we really need for your case is someway to detect your SoCs in the
+early assembly code - and right now I don't have any idea how to do that.
+The reason we need to do that is because we must have the write-allocate
+cache mode and the shared bits set appropriately from the initial page
+table setup in the early assembly code, because we can't just overwrite
+the existing page tables with differing cache attributes without polluting
+the TLB with those differing cache attributes (which can lead to
+unpredictable behaviour.)
+
+The Armada 37x/38x problem is a very difficult one to solve... really
+I wish that those spins of the SoC had been chucked in the trash, because
+working around this properly is going to take a lot of time and effort.
+That would've been /far/ better for us.
+
+I'll also note that it would've been a _lot_ easier to work around had
+we not had this DT stuff, and kept the machine IDs being passed to the
+kernel.  Such is life though, while DT makes some stuff easier, it
+makes other stuff absolute hell.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
