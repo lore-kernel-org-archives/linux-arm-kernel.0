@@ -1,66 +1,69 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 28 Jun 2014 15:56:20 +0100
-Subject: [PATCH 1/2] imx-drm: ipuv3-plane: fix ipu_plane_dpms()
+Date: Sat, 28 Jun 2014 15:56:25 +0100
+Subject: [PATCH 2/2] imx-drm: imx-ldb: fix NULL pointer in imx_ldb_unbind()
 In-Reply-To: <20140628145556.GG32514@n2100.arm.linux.org.uk>
 References: <20140628145556.GG32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X0u3A-0001gL-ES@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1X0u3F-0001gP-Hf@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When unbinding imx-drm, the following oops was observed:
+When trying to unbind imx-drm, the following oops was observed from
+the imx-ldb driver:
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000004
-pgd = e995c000
-[00000004] *pgd=4fea5831
-Internal error: Oops: 817 [#1] SMP ARM
-Modules linked in: bnep rfcomm bluetooth nfsd exportfs hid_cypress brcmfmac brcmutil snd_soc_fsl_ssi snd_soc_fsl_spdif imx_pcm_fiq imx_pcm_dma snd_soc_sgtl5000 imx_sdma imx2_wdt imx_ldb(C) imx_thermal snd_soc_imx_sgtl5000 snd_soc_imx_spdif snd_soc_imx_audmux
-CPU: 1 PID: 779 Comm: bash Tainted: G         C    3.16.0-rc2+ #1230
-task: ea9eb180 ti: ea378000 task.ti: ea378000
-PC is at ipu_dp_put+0x10/0x18
-LR is at ipu_plane_dpms+0x60/0x8c
-pc : [<c0350d20>]    lr : [<c04bd9e8>]    psr: 200f0013
-sp : ea379d80  ip : ea379d90  fp : ea379d8c
-r10: 00100100  r9 : 00000000  r8 : 00200200
-r7 : e9ba0264  r6 : e9ba01f8  r5 : 00000000  r4 : ea34b800
-r3 : 00000000  r2 : 00000000  r1 : 0000009b  r0 : 00000000
+Unable to handle kernel NULL pointer dereference at virtual address 0000001c
+pgd = de954000
+[0000001c] *pgd=2e92c831, *pte=00000000, *ppte=00000000
+Internal error: Oops: 17 [#1] SMP ARM
+Modules linked in: bnep rfcomm bluetooth nfsd exportfs hid_cypress brcmfmac brcmutil snd_soc_fsl_ssi snd_soc_fsl_spdif imx_pcm_fiq imx_pcm_dma imx_ldb(C) imx_thermal imx_sdma imx2_wdt snd_soc_sgtl5000 snd_soc_imx_sgtl5000 snd_soc_imx_spdif snd_soc_imx_audmux
+CPU: 1 PID: 1228 Comm: bash Tainted: G         C    3.16.0-rc2+ #1229
+task: ea378d80 ti: de948000 task.ti: de948000
+PC is at imx_ldb_unbind+0x1c/0x58 [imx_ldb]
+LR is at component_unbind+0x38/0x70
+pc : [<bf025068>]    lr : [<c0353108>]    psr: 200f0013
+sp : de949da8  ip : de949dc0  fp : de949dbc
+r10: e9a44b0c  r9 : 00000000  r8 : de949f78
+r7 : 00000012  r6 : e9b3f400  r5 : e9b133b8  r4 : e9b13010
+r3 : 00000000  r2 : e9b3f400  r1 : ea9a0210  r0 : e9b13020
 Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 10c53c7d  Table: 3995c04a  DAC: 00000015
-Process bash (pid: 779, stack limit = 0xea378240)
-Stack: (0xea379d80 to 0xea37a000)
+Control: 10c53c7d  Table: 2e95404a  DAC: 00000015
+Process bash (pid: 1228, stack limit = 0xde948240)
+Stack: (0xde949da8 to 0xde94a000)
 ...
 Backtrace:
-[<c0350d10>] (ipu_dp_put) from [<c04bd9e8>] (ipu_plane_dpms+0x60/0x8c)
-[<c04bd988>] (ipu_plane_dpms) from [<c04bda40>] (ipu_disable_plane+0x2c/0x60)
-[<c04bda14>] (ipu_disable_plane) from [<c04bda9c>] (ipu_plane_destroy+0x28/0x60)
-[<c04bda74>] (ipu_plane_destroy) from [<c033ff84>] (drm_mode_config_cleanup+0x1b8/0x250)
-[<c033fdcc>] (drm_mode_config_cleanup) from [<c04bc234>] (imx_drm_driver_unload+0x44/0x4c)
+[<bf02504c>] (imx_ldb_unbind [imx_ldb]) from [<c0353108>] (component_unbind+0x38/0x70)
+[<c03530d0>] (component_unbind) from [<c03531d4>] (component_unbind_all+0x94/0xc8)
+[<c0353140>] (component_unbind_all) from [<c04bc224>] (imx_drm_driver_unload+0x34/0x4c)
 [<c04bc1f0>] (imx_drm_driver_unload) from [<c03394a4>] (drm_dev_unregister+0x2c/0xa0)
 [<c0339478>] (drm_dev_unregister) from [<c0339f8c>] (drm_put_dev+0x30/0x6c)
 [<c0339f5c>] (drm_put_dev) from [<c04bc1cc>] (imx_drm_unbind+0x14/0x18)
 [<c04bc1b8>] (imx_drm_unbind) from [<c03530b4>] (component_master_del+0xbc/0xd8)
 ...
-Code: e1a0c00d e92dd800 e24cb004 e3a03000 (e5c03004)
+Code: e5904058 e2840010 e2845fea e59430a0 (e593301c)
+---[ end trace 4f211c6dbbcd4963 ]---
 
-This is caused by a missing check in ipu_plane_dpms for a NULL pointer.
+This is caused by only having one channel out of the pair configured in
+DT; the second channel remains uninitialised, but upon unbind, the
+driver attempts to clean up both, thereby dereferencing a NULL pointer.
+Avoid this by checking that the second channel is initialised.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/ipuv3-plane.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/staging/imx-drm/imx-ldb.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/staging/imx-drm/ipuv3-plane.c b/drivers/staging/imx-drm/ipuv3-plane.c
-index 6f393a11f44d..50de10a550e9 100644
---- a/drivers/staging/imx-drm/ipuv3-plane.c
-+++ b/drivers/staging/imx-drm/ipuv3-plane.c
-@@ -281,7 +281,8 @@ static void ipu_plane_dpms(struct ipu_plane *ipu_plane, int mode)
+diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+index 7e3f019d7e72..4662e00b456a 100644
+--- a/drivers/staging/imx-drm/imx-ldb.c
++++ b/drivers/staging/imx-drm/imx-ldb.c
+@@ -574,6 +574,9 @@ static void imx_ldb_unbind(struct device *dev, struct device *master,
+ 	for (i = 0; i < 2; i++) {
+ 		struct imx_ldb_channel *channel = &imx_ldb->channel[i];
  
- 		ipu_idmac_put(ipu_plane->ipu_ch);
- 		ipu_dmfc_put(ipu_plane->dmfc);
--		ipu_dp_put(ipu_plane->dp);
-+		if (ipu_plane->dp)
-+			ipu_dp_put(ipu_plane->dp);
++		if (!channel->connector.funcs)
++			continue;
++
+ 		channel->connector.funcs->destroy(&channel->connector);
+ 		channel->encoder.funcs->destroy(&channel->encoder);
  	}
- }
- 
 -- 
 1.8.3.1
