@@ -1,53 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 28 Jun 2014 23:03:22 +0800
-Subject: [PATCH] Update imx-sdma cyclic handling to report residue
-In-Reply-To: <20140625120032.GI32514@n2100.arm.linux.org.uk>
-References: <20140625120032.GI32514@n2100.arm.linux.org.uk>
-Message-ID: <20140628150320.GC7869@dragon>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 28 Jun 2014 17:04:01 +0200
+Subject: [PATCH 4/5] ARM: mvebu: Enable SCU Speculative linefills to L2
+ for Armada 375/38x
+In-Reply-To: <1403822608-31158-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403822608-31158-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140628170401.758c9d63@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 01:00:33PM +0100, Russell King - ARM Linux wrote:
-> I received a report this morning from one of the Novena developers that
-> the behaviour of the iMX6 ASoC codec driver (using imx-pcm-dma.c) was
-> sub-optimal under high system load.
-> 
-> While there are issues relating to system load remaining, upon reviewing
-> the ASoC imx-pcm-dma.c driver, it was noticed that it not using the
-> residue support, because SDMA doesn't support it.  This has the effect
-> that SDMA has to make multiple calls into the ASoC and ALSA code, one
-> for each period.
-> 
-> Since ALSA's snd_pcm_elapsed() does not need to be called multiple times
-> and it is entirely sufficient to call it once to update ALSA with the
-> current buffer position via the pointer method, we can do better here.
-> We can also avoid stopping the DMA entirely, just like real cyclic DMA
-> implementations behave.  While this means that we replay some old samples,
-> this is a nicer behaviour than having audio stop and restart.
-> 
-> The changes to achieve this are relatively minor - imx-sdma.c can track
-> where the DMA is to the nearest descriptor boundary - it does this
-> already when deciding how many callbacks to issue.  In doing this,
-> buf_tail always points at the descriptor which will complete next.
-> 
-> The residue is defined by the bytes remaining to the end of the buffer,
-> when the buffer is viewed as a single block of memory [start...end].
-> So, when we start out, there's a full buffer worth of residue, and this
-> counts down as we approach the end of the buffer, eventually becoming
-> zero at the end, before returning to the full buffer worth when we
-> wrap back to the start.
-> 
-> Moving the walking of the descriptors into the interrupt handler means
-> that we can update the BD_DONE flag at interrupt time, thus avoiding
-> a delayed tasklet stopping the cyclic DMA.
-> 
-> This means that the residue can be calculated from (total descriptors -
-> buf_tail) * descriptor size.  This is what the change below does.  We
-> update imx-pcm-dma.c to remove the NO_RESIDUE flag since we now provide
-> the residue.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Dear Gregory CLEMENT,
 
-For all the audio test cases I usually run, nothing breaks, so
+On Fri, 27 Jun 2014 00:43:27 +0200, Gregory CLEMENT wrote:
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 8bb742fdf5ca..a24ea105e709 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -45,6 +45,7 @@ static void __init mvebu_scu_enable(void)
+>  		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+>  	if (np) {
+>  		scu_base = of_iomap(np, 0);
+> +		scu_spec_linefills_enable(scu_base, true);
+
+I find it rather weird to have a function call <foo>_enable() take a
+boolean parameter to indicate whether <foo> should be enabled or
+disabled. You should choose between:
+
+	scu_spec_linefills_ctrl(scu_base, true/false)
+
+(or some better suffix than _ctrl), or:
+
+	scu_spec_linefills_enable(scu_base)
+	scu_spec_linefills_disable(scu_base)
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
