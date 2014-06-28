@@ -1,86 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 28 Jun 2014 17:02:16 +0200
-Subject: [PATCH 2/5] ARM: smp_scu: Add the enable speculative linefills
- operation
-In-Reply-To: <1403822608-31158-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
- <1403822608-31158-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140628170216.0c1965cf@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 28 Jun 2014 23:03:22 +0800
+Subject: [PATCH] Update imx-sdma cyclic handling to report residue
+In-Reply-To: <20140625120032.GI32514@n2100.arm.linux.org.uk>
+References: <20140625120032.GI32514@n2100.arm.linux.org.uk>
+Message-ID: <20140628150320.GC7869@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
-
-On Fri, 27 Jun 2014 00:43:25 +0200, Gregory CLEMENT wrote:
-> Quotin the ARM datasheet "When set, coherent linefill requests are
-
-Quotin -> Quoting
-
-> sent speculatively to the L2C-310 in parallel with the tag look-up. If
-> the tag look-up misses, the confirmed linefill is sent to the L2C-310
-> and gets RDATA earlier because the data request was already initiated
-> by the speculative request. "
+On Wed, Jun 25, 2014 at 01:00:33PM +0100, Russell King - ARM Linux wrote:
+> I received a report this morning from one of the Novena developers that
+> the behaviour of the iMX6 ASoC codec driver (using imx-pcm-dma.c) was
+> sub-optimal under high system load.
 > 
-> Some SoC (such as the Armada 375/38x) can benefit of this feature. As
+> While there are issues relating to system load remaining, upon reviewing
+> the ASoC imx-pcm-dma.c driver, it was noticed that it not using the
+> residue support, because SDMA doesn't support it.  This has the effect
+> that SDMA has to make multiple calls into the ASoC and ALSA code, one
+> for each period.
+> 
+> Since ALSA's snd_pcm_elapsed() does not need to be called multiple times
+> and it is entirely sufficient to call it once to update ALSA with the
+> current buffer position via the pointer method, we can do better here.
+> We can also avoid stopping the DMA entirely, just like real cyclic DMA
+> implementations behave.  While this means that we replay some old samples,
+> this is a nicer behaviour than having audio stop and restart.
+> 
+> The changes to achieve this are relatively minor - imx-sdma.c can track
+> where the DMA is to the nearest descriptor boundary - it does this
+> already when deciding how many callbacks to issue.  In doing this,
+> buf_tail always points at the descriptor which will complete next.
+> 
+> The residue is defined by the bytes remaining to the end of the buffer,
+> when the buffer is viewed as a single block of memory [start...end].
+> So, when we start out, there's a full buffer worth of residue, and this
+> counts down as we approach the end of the buffer, eventually becoming
+> zero at the end, before returning to the full buffer worth when we
+> wrap back to the start.
+> 
+> Moving the walking of the descriptors into the interrupt handler means
+> that we can update the BD_DONE flag at interrupt time, thus avoiding
+> a delayed tasklet stopping the cyclic DMA.
+> 
+> This means that the residue can be calculated from (total descriptors -
+> buf_tail) * descriptor size.  This is what the change below does.  We
+> update imx-pcm-dma.c to remove the NO_RESIDUE flag since we now provide
+> the residue.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-benefit of -> benefit from.
+For all the audio test cases I usually run, nothing breaks, so
 
->  #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
-> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-> index cfea41b41ad0..3fd21a495028 100644
-> --- a/arch/arm/kernel/smp_scu.c
-> +++ b/arch/arm/kernel/smp_scu.c
-> @@ -18,6 +18,7 @@
->  
->  #define SCU_CTRL		0x00
->  #define SCU_CTRL_ENABLE		    BIT(1)
-> +#define SCU_CTRL_SPEC_LINEFILLS	    BIT(3)
->  #define SCU_CONFIG		0x04
->  #define SCU_CPU_STATUS		0x08
->  #define SCU_INVALIDATE		0x0c
-> @@ -88,3 +89,24 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
->  
->  	return 0;
->  }
-> +
-> +/*
-> + * When enabled, coherent linefill requests are sent speculatively to
-> + * the L2C-310 in parallel with the tag look-up
-> + *
-> + */
-> +void scu_spec_linefills_enable(void __iomem *scu_base, bool enable)
-> +{
-> +	u32 scu_ctrl;
-> +
-> +	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
-> +	/* already enabled? */
-
-Comment not needed, since SCU_CTRL_ENABLE already documents what's
-happening. Or a more useful comment would be: "We cannot change the SCU
-configuration while it is enabled".
-
-> +	if (scu_ctrl & SCU_CTRL_ENABLE)
-> +		return;
-
-Return an error in this case maybe?
-
-> +	if (enable)
-> +		scu_ctrl |= SCU_CTRL_SPEC_LINEFILLS;
-> +	else
-> +		scu_ctrl &= ~SCU_CTRL_SPEC_LINEFILLS;
-> +
-> +	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
-> +}
-
-Instead of having a separate function to do this (and the standby
-operation), what about doing that directly in scu_enable() ? Either
-unconditionally if that is fine for all SCU users, or through a flags
-argument?
-
-Best regards,
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
