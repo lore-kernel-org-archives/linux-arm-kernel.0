@@ -1,73 +1,68 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Sat, 28 Jun 2014 10:19:53 -0500
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <20140628095314.GC32514@n2100.arm.linux.org.uk>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <20140628095314.GC32514@n2100.arm.linux.org.uk>
-Message-ID: <53AEDD19.80808@mentor.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 28 Jun 2014 17:20:44 +0200
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
+In-Reply-To: <20140628150706.GM23978@titan.lakedaemon.net>
+References: <20140627124655.GF23978@titan.lakedaemon.net>
+ <20140628162302.48b6b835@free-electrons.com>
+ <20140628150706.GM23978@titan.lakedaemon.net>
+Message-ID: <20140628172044.4231c32d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2014 04:53 AM, Russell King - ARM Linux wrote:
-> On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
->> Place vdso-related user-space code in arch/arm/kernel/vdso/.
->>
->> It is almost completely written in C with some assembly helpers to
->> load the data page address, sample the counter, and fall back to
->> system calls when necessary.
->>
->> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
->> high-resolution clocks and falls back to syscalls.  Low-resolution
->> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
->>
->> Of particular note is that a post-processing step ("vdsomunge") is
->> necessary to produce a shared object which is architecturally allowed
->> to be used by both soft- and hard-float EABI programs.
->>
->> The 2012 edition of the ARM ABI defines Tag_ABI_VFP_args = 3 "Code is
->> compatible with both the base and VFP variants; the user did not
->> permit non-variadic functions to pass FP parameters/results."
->> Unfortunately current toolchains do not support this tag, which is
->> ideally what we would use.
->>
->> The best available option is to ensure that both EF_ARM_ABI_FLOAT_SOFT
->> and EF_ARM_ABI_FLOAT_HARD are unset in the ELF header's e_flags,
->> indicating that the shared object is "old" and should be accepted for
->> backward compatibility's sake.  While binutils < 2.24 appear to
->> produce a vdso.so with both flags clear, 2.24 always sets
->> EF_ARM_ABI_FLOAT_SOFT, with no way to inhibit this behavior.  So we
->> have to fix things up with a custom post-processing step.
->>
->> In fact, the VDSO code in glibc does much less validation (including
->> checking these flags) than the code for handling conventional
->> file-backed shared libraries, so this is a bit moot unless glibc's
->> VDSO code becomes more strict.
->>
->> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->> ---
->>  arch/arm/kernel/asm-offsets.c        |   5 +
->>  arch/arm/kernel/vdso/.gitignore      |   1 +
->>  arch/arm/kernel/vdso/Makefile        |  59 +++++++
->>  arch/arm/kernel/vdso/checkundef.sh   |   9 +
->>  arch/arm/kernel/vdso/datapage.S      |  15 ++
->>  arch/arm/kernel/vdso/vdso.S          |  35 ++++
->>  arch/arm/kernel/vdso/vdso.lds.S      |  88 ++++++++++
->>  arch/arm/kernel/vdso/vdsomunge.c     | 193 +++++++++++++++++++++
->>  arch/arm/kernel/vdso/vgettimeofday.c | 320 +++++++++++++++++++++++++++++++++++
->>  9 files changed, 725 insertions(+)
->>  create mode 100644 arch/arm/kernel/vdso/.gitignore
->>  create mode 100644 arch/arm/kernel/vdso/Makefile
->>  create mode 100755 arch/arm/kernel/vdso/checkundef.sh
->>  create mode 100644 arch/arm/kernel/vdso/datapage.S
->>  create mode 100644 arch/arm/kernel/vdso/vdso.S
->>  create mode 100644 arch/arm/kernel/vdso/vdso.lds.S
->>  create mode 100644 arch/arm/kernel/vdso/vdsomunge.c
->>  create mode 100644 arch/arm/kernel/vdso/vgettimeofday.c
-> 
-> One change I would like to see (to stop the directory tree getting soo
-> deep) is to move this to arch/arm/vdso - just like x86 is arch/x86/vdso.
-> Was there a pressing reason to have it in arch/arm/kernel ?
+Dear Jason Cooper,
 
-No pressing reason.  I think I was just following the example of non-x86
-architectures.  I can move it to arch/arm/vdso.
+(Adding Russell in Cc, to get the status of the "ARM: mm: add support
+for HW coherent systems in PL310 cache" patch)
+
+On Sat, 28 Jun 2014 11:07:06 -0400, Jason Cooper wrote:
+
+> > >     - don't apply thermal quirk by default
+> > >     - make Aramada 375 external abort logic a quirk
+> > >     - update L2/PCIe deadlock workaround after L2CC cleanup
+> > 
+> > This patch is needed in 3.16, not in 3.17. They really are bug fixes,
+> > fixing a complete system deadlock under PCI load.
+> 
+> crap.  :(  Ok, guys, please ignore this pull request and I'll send a new
+> one with this done properly.
+> 
+> Thomas, you say 'patch', but you quote three.  Should all three be in
+> mvebu/fixes?  Or, just the last one?
+
+Yeah, sorry, I wasn't clear. If you look back at what I sent in
+https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
+([PATCHv5 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+deadlock), there were three patches:
+
+ PATCH 1/3, "ARM: mm: add support for HW coherent systems in PL310
+ cache", for Russell. It has already been merged by Russell in
+ "git-curr", as visible at
+ http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8076/1.
+ I'm hoping this is scheduled for 3.16, because I need this patch for
+ 3.16 to avoid the PCIe deadlock.
+
+ PATCH 2/3 and 3/3 are related, and the latter is needed to solve the
+ PCIe deadlock, by using the new DT property made available in PATCH
+ 1/3. PATCH 2/3 is ARM: mvebu: move Armada 375 external abort logic as
+ a quirk and PATCH 3/3 is ARM: mvebu: update L2/PCIe deadlock
+ workaround after L2CC cleanup.
+
+All in all, I'm hoping for the series at
+https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
+to fully show up in 3.16, because it's really related to fixing a
+serious PCIe deadlock (can be triggered in under a minute of PCIe
+usage).
+
+Note that even though PCIe was supported in 3.15 for Armada 375/38x,
+the bug cannot be triggered because it requires SMP to be visible, and
+SMP support for 375 and 38x was only merged in 3.16. So there is no
+need for these patches to be marked for 3.15-stable. But clearly they
+are needed for 3.16.
+
+Thanks!
+
+Thomas Petazzoni
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
