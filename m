@@ -1,79 +1,66 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 27 Jun 2014 19:12:06 -0600
-Subject: [PATCH 1/2] arm64: add MIDR to per-CPU information
-In-Reply-To: <20140628010440.9839.9366.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20140628010440.9839.9366.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20140628011206.9839.2351.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 28 Jun 2014 03:12:09 +0200
+Subject: [RFC 3/4] soc/tegra: Initialize interrupt controller from DT
+In-Reply-To: <53ADDC0C.4060401@wwwdotorg.org>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <1403888329-24755-3-git-send-email-thierry.reding@gmail.com>
+ <53ADDC0C.4060401@wwwdotorg.org>
+Message-ID: <20140628011208.GA13290@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save the MIDR of each CPU we bring online instead of assuming they're all
-the same.
+On Fri, Jun 27, 2014 at 03:03:08PM -0600, Stephen Warren wrote:
+> On 06/27/2014 10:58 AM, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Obtains the register ranges for the legacy interrupt controller from DT
+> > and provide hard-coded values as fallback.
+> 
+> > diff --git a/drivers/soc/tegra/irq.c b/drivers/soc/tegra/irq.c
+> 
+> >  void __init tegra_init_irq(void)
+> 
+> > -	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+> > +	np = of_find_matching_node(NULL, ictlr_matches);
+> > +	if (np) {
+> > +		for (i = 0; i < ARRAY_SIZE(ictlr_regs); i++)
+> > +			if (of_address_to_resource(np, i, &res) == 0)
+> > +				ictlr_regs[i] = res;
+> 
+> It'd be nice to check that loop ran exactly the number of times expected
+> based on the compatible value (i.e. SoC) if the legacy interrupt
+> controller node.
+> 
+> What about erroring out if entries are missing or can't be parsed.
 
-Based on e8d432c9cf0a ("ARM: kernel: add MIDR to per-CPU information
-data").
+I've added some strict checking of the expected number of entries. I
+decided against erroring out on missing entries or when they can't be
+parsed because we can still continue using the fallback entries in the
+ictlr_regs table. However if a mismatch between the number of detected
+entries and the expected entries is detected, the code will now WARN.
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm64/kernel/setup.c |   13 +++++++------
- arch/arm64/kernel/smp.c   |    5 +++++
- 2 files changed, 12 insertions(+), 6 deletions(-)
+> >  	if (num_ictlrs > ARRAY_SIZE(ictlr_reg_base)) {
+> > -		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %d.",
+> > +		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %zu.",
+> >  			num_ictlrs, ARRAY_SIZE(ictlr_reg_base));
+> 
+> While we're changing this, maybe we should change that test to
+> "num_ictlrs != the expected value", so too few is found as well.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 46d1125571f6..37cc2bb9f3ae 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -45,6 +45,7 @@
- #include <linux/efi.h>
- 
- #include <asm/fixmap.h>
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/elf.h>
- #include <asm/cputable.h>
-@@ -417,16 +418,16 @@ static int __init arm64_device_init(void)
- }
- arch_initcall_sync(arm64_device_init);
- 
--static DEFINE_PER_CPU(struct cpu, cpu_data);
-+DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
- 
- static int __init topology_init(void)
- {
--	int i;
-+	int cpu;
- 
--	for_each_possible_cpu(i) {
--		struct cpu *cpu = &per_cpu(cpu_data, i);
--		cpu->hotpluggable = 1;
--		register_cpu(cpu, i);
-+	for_each_possible_cpu(cpu) {
-+		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
-+		cpuinfo->cpu.hotpluggable = 1;
-+		register_cpu(&cpuinfo->cpu, cpu);
- 	}
- 
- 	return 0;
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 40f38f46c8e0..c69963496dc6 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -39,6 +39,7 @@
- 
- #include <asm/atomic.h>
- #include <asm/cacheflush.h>
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/cpu_ops.h>
- #include <asm/mmu_context.h>
-@@ -118,6 +119,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 
- static void smp_store_cpu_info(unsigned int cpuid)
- {
-+	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
-+
-+	cpu_info->cpuid = read_cpuid_id();
-+
- 	store_cpu_topology(cpuid);
- }
- 
+Done. This is slightly complicated by the fact that the non-DT code has
+no notion of how many are expected. The maximum number is only used to
+prevent overflows when accessing the ictlr_reg_base array.
+
+I've solved this by selecting the maximum depending on tegra_chip_id. I
+have sent a v2 to the list with the patch removed that moves all the
+drivers to drivers/soc since more work will be required for that. In the
+meantime this change is separate and can be merged independent of that.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/a0ff50f7/attachment.sig>
