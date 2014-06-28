@@ -1,66 +1,76 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Sat, 28 Jun 2014 03:12:09 +0200
-Subject: [RFC 3/4] soc/tegra: Initialize interrupt controller from DT
-In-Reply-To: <53ADDC0C.4060401@wwwdotorg.org>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <1403888329-24755-3-git-send-email-thierry.reding@gmail.com>
- <53ADDC0C.4060401@wwwdotorg.org>
-Message-ID: <20140628011208.GA13290@ulmo>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 27 Jun 2014 19:12:14 -0600
+Subject: [PATCH 2/2] arm64: kernel: update cpuinfo to print all online CPUs
+ features
+In-Reply-To: <20140628010440.9839.9366.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20140628010440.9839.9366.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20140628011214.9839.32281.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 03:03:08PM -0600, Stephen Warren wrote:
-> On 06/27/2014 10:58 AM, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > Obtains the register ranges for the legacy interrupt controller from DT
-> > and provide hard-coded values as fallback.
-> 
-> > diff --git a/drivers/soc/tegra/irq.c b/drivers/soc/tegra/irq.c
-> 
-> >  void __init tegra_init_irq(void)
-> 
-> > -	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
-> > +	np = of_find_matching_node(NULL, ictlr_matches);
-> > +	if (np) {
-> > +		for (i = 0; i < ARRAY_SIZE(ictlr_regs); i++)
-> > +			if (of_address_to_resource(np, i, &res) == 0)
-> > +				ictlr_regs[i] = res;
-> 
-> It'd be nice to check that loop ran exactly the number of times expected
-> based on the compatible value (i.e. SoC) if the legacy interrupt
-> controller node.
-> 
-> What about erroring out if entries are missing or can't be parsed.
+Update the /proc/cpuinfo show function so that it shows the CPU ID of each
+CPU instead of using the ID of the CPU that happens to be running the code.
 
-I've added some strict checking of the expected number of entries. I
-decided against erroring out on missing entries or when they can't be
-parsed because we can still continue using the fallback entries in the
-ictlr_regs table. However if a mismatch between the number of detected
-entries and the expected entries is detected, the code will now WARN.
+Based on b4b8f770eb10 ("ARM: kernel: update cpuinfo to print all online
+CPUs features").
 
-> >  	if (num_ictlrs > ARRAY_SIZE(ictlr_reg_base)) {
-> > -		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %d.",
-> > +		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %zu.",
-> >  			num_ictlrs, ARRAY_SIZE(ictlr_reg_base));
-> 
-> While we're changing this, maybe we should change that test to
-> "num_ictlrs != the expected value", so too few is found as well.
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ arch/arm64/kernel/setup.c |   33 ++++++++++++++++-----------------
+ 1 file changed, 16 insertions(+), 17 deletions(-)
 
-Done. This is slightly complicated by the fact that the non-DT code has
-no notion of how many are expected. The maximum number is only used to
-prevent overflows when accessing the ictlr_reg_base array.
-
-I've solved this by selecting the maximum depending on tegra_chip_id. I
-have sent a v2 to the list with the patch removed that moves all the
-drivers to drivers/soc since more work will be required for that. In the
-meantime this change is separate and can be merged independent of that.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/a0ff50f7/attachment.sig>
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 37cc2bb9f3ae..dd301ceaa655 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -448,10 +448,8 @@ static const char *hwcap_str[] = {
+ 
+ static int c_show(struct seq_file *m, void *v)
+ {
+-	int i;
+-
+-	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+-		   cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
++	int i, j;
++	u32 cpuid;
+ 
+ 	for_each_online_cpu(i) {
+ 		/*
+@@ -461,23 +459,24 @@ static int c_show(struct seq_file *m, void *v)
+ 		 */
+ #ifdef CONFIG_SMP
+ 		seq_printf(m, "processor\t: %d\n", i);
++		cpuid = per_cpu(cpu_data, i).cpuid;
++#else
++		cpuid = read_cpuid_id();
+ #endif
+-	}
+ 
+-	/* dump out the processor features */
+-	seq_puts(m, "Features\t: ");
++		/* dump out the processor features */
++		seq_puts(m, "Features\t: ");
+ 
+-	for (i = 0; hwcap_str[i]; i++)
+-		if (elf_hwcap & (1 << i))
+-			seq_printf(m, "%s ", hwcap_str[i]);
++		for (i = 0; hwcap_str[i]; i++)
++			if (elf_hwcap & (1 << i))
++				seq_printf(m, "%s ", hwcap_str[i]);
+ 
+-	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
+-	seq_printf(m, "CPU architecture: AArch64\n");
+-	seq_printf(m, "CPU variant\t: 0x%x\n", (read_cpuid_id() >> 20) & 15);
+-	seq_printf(m, "CPU part\t: 0x%03x\n", (read_cpuid_id() >> 4) & 0xfff);
+-	seq_printf(m, "CPU revision\t: %d\n", read_cpuid_id() & 15);
+-
+-	seq_puts(m, "\n");
++		seq_printf(m, "\nCPU implementer\t: 0x%02x\n", cpuid >> 24);
++		seq_printf(m, "CPU architecture: AArch64\n");
++		seq_printf(m, "CPU variant\t: 0x%x\n", (cpuid >> 20) & 15);
++		seq_printf(m, "CPU part\t: 0x%03x\n", (cpuid >> 4) & 0xfff);
++		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
++	}
+ 
+ 	seq_printf(m, "Hardware\t: %s\n", machine_name);
+ 
