@@ -1,81 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Sat, 28 Jun 2014 03:02:31 +0200
-Subject: [PATCH v2 4/4] soc/tegra: Remove unused defines
-In-Reply-To: <1403917351-13215-1-git-send-email-thierry.reding@gmail.com>
-References: <1403917351-13215-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1403917351-13215-4-git-send-email-thierry.reding@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 27 Jun 2014 19:11:58 -0600
+Subject: [PATCH 0/2] arm64: clean up /proc/cpuinfo
+Message-ID: <20140628010440.9839.9366.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On arm64, /proc/cpuinfo currently looks like:
 
-Eventually the aim is to get rid of this file because it cannot be built
-on ARM64. Until it can be completely removed, eliminate unused entries
-to make it easier to see which are still used.
+    Processor       : AArch64 Processor rev 0 (aarch64)
+    processor       : 0
+    processor       : 1
+    ...
+    Features        : ...
 
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Compared to most other architectures (including arm), this has an extra
+"Processor" header, and the "Features" and other bits only appear once,
+so there's no way to have per-CPU features, variants, etc.
+
+These patches make arm64 more consistent with the other architectures
+by removing the extra header and printing the CPU ID information for
+each CPU.
+
 ---
- arch/arm/mach-tegra/iomap.h | 30 ------------------------------
- 1 file changed, 30 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
-index 52bbb5c8fe84..c2fd86a9b43f 100644
---- a/arch/arm/mach-tegra/iomap.h
-+++ b/arch/arm/mach-tegra/iomap.h
-@@ -28,21 +28,9 @@
- #define TEGRA_ARM_PERIF_BASE		0x50040000
- #define TEGRA_ARM_PERIF_SIZE		SZ_8K
- 
--#define TEGRA_TMR1_BASE			0x60005000
--#define TEGRA_TMR1_SIZE			SZ_8
--
--#define TEGRA_TMR2_BASE			0x60005008
--#define TEGRA_TMR2_SIZE			SZ_8
--
- #define TEGRA_TMRUS_BASE		0x60005010
- #define TEGRA_TMRUS_SIZE		SZ_64
- 
--#define TEGRA_TMR3_BASE			0x60005050
--#define TEGRA_TMR3_SIZE			SZ_8
--
--#define TEGRA_TMR4_BASE			0x60005058
--#define TEGRA_TMR4_SIZE			SZ_8
--
- #define TEGRA_CLK_RESET_BASE		0x60006000
- #define TEGRA_CLK_RESET_SIZE		SZ_4K
- 
-@@ -58,21 +46,6 @@
- #define TEGRA_APB_MISC_BASE		0x70000000
- #define TEGRA_APB_MISC_SIZE		SZ_4K
- 
--#define TEGRA_UARTA_BASE		0x70006000
--#define TEGRA_UARTA_SIZE		SZ_64
--
--#define TEGRA_UARTB_BASE		0x70006040
--#define TEGRA_UARTB_SIZE		SZ_64
--
--#define TEGRA_UARTC_BASE		0x70006200
--#define TEGRA_UARTC_SIZE		SZ_256
--
--#define TEGRA_UARTD_BASE		0x70006300
--#define TEGRA_UARTD_SIZE		SZ_256
--
--#define TEGRA_UARTE_BASE		0x70006400
--#define TEGRA_UARTE_SIZE		SZ_256
--
- #define TEGRA_PMC_BASE			0x7000E400
- #define TEGRA_PMC_SIZE			SZ_256
- 
-@@ -91,9 +64,6 @@
- #define TEGRA124_EMC_BASE		0x7001B000
- #define TEGRA124_EMC_SIZE		SZ_2K
- 
--#define TEGRA_CSITE_BASE		0x70040000
--#define TEGRA_CSITE_SIZE		SZ_256K
--
- /* On TEGRA, many peripherals are very closely packed in
-  * two 256MB io windows (that actually only use about 64KB
-  * at the start of each).
--- 
-2.0.0
+Bjorn Helgaas (2):
+      arm64: add MIDR to per-CPU information
+      arm64: kernel: update cpuinfo to print all online CPUs features
+
+
+ arch/arm64/kernel/setup.c |   46 +++++++++++++++++++++++----------------------
+ arch/arm64/kernel/smp.c   |    5 +++++
+ 2 files changed, 28 insertions(+), 23 deletions(-)
