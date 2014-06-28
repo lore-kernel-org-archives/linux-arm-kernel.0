@@ -1,43 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 28 Jun 2014 13:46:42 +0100
-Subject: [alsa-devel] [PATCH 1/7] ASoC: fix debugfs directory creation bug
-In-Reply-To: <53ACDAB7.5080703@metafoo.de>
-References: <20140626142231.GR32514@n2100.arm.linux.org.uk>
- <E1X0AZe-0003i7-0z@rmk-PC.arm.linux.org.uk>
- <53ACDAB7.5080703@metafoo.de>
-Message-ID: <20140628124642.GR2520@sirena.org.uk>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sat, 28 Jun 2014 15:23:11 +0200
+Subject: [PATCH] regmap: Fix debugfs-file 'registers' mode
+Message-ID: <1403961791-15376-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 04:45:11AM +0200, Lars-Peter Clausen wrote:
-> On 06/26/2014 04:22 PM, Russell King wrote:
-> >Avoid creating duplicate directories by prefixing codecs and platforms
-> >with their separate identifiers.  This avoids snd-soc-dummy (which can
-> >appear both as a dummy platform and a dummy codec on the same card)
-> >from clashing.
+The macro "REGMAP_ALLOW_WRITE_DEBUGFS" can be used to enable write
+support on the registers file in the debugfs. The mode of the file is
+fixed to 0400 so it is not possible to write the file ever.
 
-> Do we actually want to create debugfs entries for the snd-soc-dummies? There
-> shouldn't be any meaningful information in there.
+This patch fixes the mode by setting it to the correct value depending
+on the macro.
 
-On the one hand they're virtual things that we probably should be hiding
-but then again part of what we're trying to do is stub things out as
-they would be normally so special casing potentically causes problems.
+Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
 
-> If we want to and if we change the naming scheme of the debugfs entries
-> anyway we should also add the component name to the entry name. This fixes a
-> issue with devices that register multiple components.
+Hi,
 
-> The other thing is that we are working on generalizing the ASoC code and
-> getting rid of the distinction between CODECs and platforms. Which means
-> there won't really a way to get the prefix anymore soon.
+as the kconfig option will probably not be merged, I extracted the mode fix of
+my previous patch.
 
-Right, these are both issues.  However I think the patch is OK for now,
-it does avoid an actual problem so I'll apply it for now - we can
-further improve it later.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/e3a0cf44/attachment.sig>
+Regards,
+
+Markus
+
+ drivers/base/regmap/regmap-debugfs.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+index 45d812c0ea77..f45a0a0e0371 100644
+--- a/drivers/base/regmap/regmap-debugfs.c
++++ b/drivers/base/regmap/regmap-debugfs.c
+@@ -512,7 +512,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+ 			    map, &regmap_reg_ranges_fops);
+ 
+ 	if (map->max_register || regmap_readable(map, 0)) {
+-		debugfs_create_file("registers", 0400, map->debugfs,
++		unsigned int registers_mode;
++
++		if (IS_ENABLED(REGMAP_ALLOW_WRITE_DEBUGFS))
++			registers_mode = 0600;
++		else
++			registers_mode = 0400;
++
++		debugfs_create_file("registers", registers_mode, map->debugfs,
+ 				    map, &regmap_map_fops);
+ 		debugfs_create_file("access", 0400, map->debugfs,
+ 				    map, &regmap_access_fops);
+-- 
+2.0.0
