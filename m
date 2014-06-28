@@ -1,62 +1,53 @@
-From: dalias@libc.org (Rich Felker)
-Date: Fri, 27 Jun 2014 20:38:56 -0400
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627232056.GZ32514@n2100.arm.linux.org.uk>
-References: <20140610072835.GA8466@brightrain.aerifal.cx>
- <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627232056.GZ32514@n2100.arm.linux.org.uk>
-Message-ID: <20140628003856.GC19165@brightrain.aerifal.cx>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 28 Jun 2014 03:02:28 +0200
+Subject: [PATCH v2 1/4] of: Add NVIDIA Tegra Legacy Interrupt Controller
+ binding
+Message-ID: <1403917351-13215-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 28, 2014 at 12:20:57AM +0100, Russell King - ARM Linux wrote:
-> I've shown that this isn't as big a problem as first thought, because
-> there's ways that a libc can trivially detect the CPU that it is running
-> on, and from that know what instructions are available to it.
+From: Thierry Reding <treding@nvidia.com>
 
-I'd really rather be able to detect "Is kuser helper page available?"
-than "Are the instructions to get by without it available?" The big
-reason is that, when you want a binary that works "anywhere" on an ISA
-like ARM where the vendor keeps deprecating instructions and replacing
-them with new ones, it's safer to rely on the kernel to tell you which
-instructions work than having hard-coded ones that might start failing
-somewhere down the line. The other reason is that the pre-v6 kuser
-compare-and-swap is actually faster on non-SMP machines since it
-doesn't have to do any locking or barrier.
+The Legacy Interrupt Controller found on NVIDIA Tegra SoCs is used by
+the AVP coprocessor and can also serve as a backup for the ARM Cortex
+CPU's local interrupt controller (GIC).
 
-I do actually have a solution for this: using process_vm_readv, the
-existence of the kuser helper page can be probed to determine if it's
-safe to access, and the kuser version number can be read. But this is
-somewhat hackish and might have other downsides.
+The LIC is subdivided into multiple identical units, each handling 32
+possible interrupt sources.
 
-> I've indicated that the kuser helpers are always provided when there
-> is no hardware TLS support, which corresponds with a minimum ARM
-> architecture of version 6K, and v6k has the atomic instructions.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v2:
+- new patch
 
-Thanks. I wasn't aware that !(hwcap & HWCAP_TLS) was a sufficient
-condition to ensure that the kuser helper page is available. In theory
-SYS_get_thread_area or trap-emulated TLS access could have been
-required in this case but I'm glad to hear that they're not.
+ .../interrupt-controller/nvidia,tegra20-ictlr.txt     | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
 
-> I've said that we're not going to move kuser helpers to a randomised
-> address, and given strong reasons why not.
-
-Understood.
-
-> I've indicated where the CPU architecture can be retrieved from, and
-> used to determine the availability of other instructions.
-
-This is another area where I feel there is some deficiency: deducing
-from a cpu string the availability or non-availability of features
-sounds fragile. I think it can be done efficiently via AT_PLATFORM,
-and like you said SYS_uname is probably safe/reliable too, but I'd
-much rather have something in the form of explicit capabilities rather
-than having to infer them from a cpu model string.
-
-> I've indicated that the ELF HWCAPs can be used to further refine the
-> available instruction information.
-
-With the exception of knowing whether to use DMB for barriers.
-
-Rich
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+new file mode 100644
+index 000000000000..c695ec713740
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+@@ -0,0 +1,19 @@
++NVIDIA Tegra Legacy Interrupt Controller
++
++The legacy interrupt controller is divided into units that serve 32 interrupts
++each. Tegra20 implements four units, whereas Tegra30 and later implement five.
++
++Required properties:
++- compatible: "nvidia,tegra<chip>-ictlr"
++- reg: Physical base address and length of the controller's registers. There
++  should be one entry for each unit.
++
++Example:
++
++	interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr";
++		reg = <0x60004000 0x40   /* primary controller */
++		       0x60004100 0x40   /* secondary controller */
++		       0x60004200 0x40   /* tertiary controller */
++		       0x60004300 0x40>; /* quaternary controller */
++	};
+-- 
+2.0.0
