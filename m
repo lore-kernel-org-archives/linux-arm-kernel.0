@@ -1,68 +1,54 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 28 Jun 2014 17:20:44 +0200
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
-In-Reply-To: <20140628150706.GM23978@titan.lakedaemon.net>
-References: <20140627124655.GF23978@titan.lakedaemon.net>
- <20140628162302.48b6b835@free-electrons.com>
- <20140628150706.GM23978@titan.lakedaemon.net>
-Message-ID: <20140628172044.4231c32d@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Jun 2014 16:26:09 +0100
+Subject: [PATCH v7 7/9] ARM: add vdso user-space code
+In-Reply-To: <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20140628152609.GH32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-(Adding Russell in Cc, to get the status of the "ARM: mm: add support
-for HW coherent systems in PL310 cache" patch)
-
-On Sat, 28 Jun 2014 11:07:06 -0400, Jason Cooper wrote:
-
-> > >     - don't apply thermal quirk by default
-> > >     - make Aramada 375 external abort logic a quirk
-> > >     - update L2/PCIe deadlock workaround after L2CC cleanup
-> > 
-> > This patch is needed in 3.16, not in 3.17. They really are bug fixes,
-> > fixing a complete system deadlock under PCI load.
+On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
+> Place vdso-related user-space code in arch/arm/kernel/vdso/.
 > 
-> crap.  :(  Ok, guys, please ignore this pull request and I'll send a new
-> one with this done properly.
+> It is almost completely written in C with some assembly helpers to
+> load the data page address, sample the counter, and fall back to
+> system calls when necessary.
 > 
-> Thomas, you say 'patch', but you quote three.  Should all three be in
-> mvebu/fixes?  Or, just the last one?
+> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
+> high-resolution clocks and falls back to syscalls.  Low-resolution
+> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
 
-Yeah, sorry, I wasn't clear. If you look back at what I sent in
-https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
-([PATCHv5 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
-deadlock), there were three patches:
+Okay, how is this used by userspace?
 
- PATCH 1/3, "ARM: mm: add support for HW coherent systems in PL310
- cache", for Russell. It has already been merged by Russell in
- "git-curr", as visible at
- http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8076/1.
- I'm hoping this is scheduled for 3.16, because I need this patch for
- 3.16 to avoid the PCIe deadlock.
+It seems that on ARM, we generate a dso with these symbols:
 
- PATCH 2/3 and 3/3 are related, and the latter is needed to solve the
- PCIe deadlock, by using the new DT property made available in PATCH
- 1/3. PATCH 2/3 is ARM: mvebu: move Armada 375 external abort logic as
- a quirk and PATCH 3/3 is ARM: mvebu: update L2/PCIe deadlock
- workaround after L2CC cleanup.
+DYNAMIC SYMBOL TABLE:
+000001e4 l    d  .eh_frame_hdr	00000000              .eh_frame_hdr
+00000000 g    DO *ABS*	00000000  LINUX_3.17  LINUX_3.17
+000003c4 g    DF .text	00000080  LINUX_3.17  __kernel_clock_getres
+00000444 g    DF .text	0000002c  LINUX_3.17  __kernel_gettimeofday
+00000298 g    DF .text	0000012c  LINUX_3.17  __kernel_clock_gettime
 
-All in all, I'm hoping for the series at
-https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
-to fully show up in 3.16, because it's really related to fixing a
-serious PCIe deadlock (can be triggered in under a minute of PCIe
-usage).
+whereas, x86-64 generates this:
 
-Note that even though PCIe was supported in 3.15 for Armada 375/38x,
-the bug cannot be triggered because it requires SMP to be visible, and
-SMP support for 375 and 38x was only merged in 3.16. So there is no
-need for these patches to be marked for 3.15-stable. But clearly they
-are needed for 3.16.
+DYNAMIC SYMBOL TABLE:
+ffffffffff700330 l    d  .eh_frame_hdr	0000000000000000              .eh_frame_hdr
+ffffffffff700600  w   DF .text	00000000000002b9  LINUX_2.6   clock_gettime
+0000000000000000 g    DO *ABS*	0000000000000000  LINUX_2.6   LINUX_2.6
+ffffffffff7008c0 g    DF .text	000000000000015a  LINUX_2.6   __vdso_gettimeofday
+ffffffffff700a40 g    DF .text	000000000000003d  LINUX_2.6   __vdso_getcpu
+ffffffffff7008c0  w   DF .text	000000000000015a  LINUX_2.6   gettimeofday
+ffffffffff700a20  w   DF .text	0000000000000016  LINUX_2.6   time
+ffffffffff700a40  w   DF .text	000000000000003d  LINUX_2.6   getcpu
+ffffffffff700600 g    DF .text	00000000000002b9  LINUX_2.6   __vdso_clock_gettime
+ffffffffff700a20 g    DF .text	0000000000000016  LINUX_2.6   __vdso_time
 
-Thanks!
+hence references to gettimeofday automatically get resolved to the
+vdso version without needing C library updates.
 
-Thomas Petazzoni
+Or... do we need a glibc update to make use of this?
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
