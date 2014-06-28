@@ -1,50 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 28 Jun 2014 22:52:54 +0800
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
-Message-ID: <20140628145253.GB7869@dragon>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 28 Jun 2014 10:54:25 -0400
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <53ADAB8C.6070609@gmail.com>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140627130430.GH32514@n2100.arm.linux.org.uk>
+ <53AD724D.4020704@gmail.com>
+ <20140627133933.GJ23978@titan.lakedaemon.net>
+ <53AD7544.2060701@gmail.com>
+ <D0DC98AD-E460-42C9-B2F4-51EDDE371E31@lakedaemon.net>
+ <53ADAB8C.6070609@gmail.com>
+Message-ID: <20140628145424.GK23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 02:12:29PM +0530, Viresh Kumar wrote:
-> cpufreq-cpu0 driver supports only platforms which have single clock line shared
-> among all CPUs.
+On Fri, Jun 27, 2014 at 07:36:12PM +0200, Sebastian Hesselbarth wrote:
+> On 06/27/2014 06:49 PM, Jason Cooper wrote:
+> >> On Jun 27, 2014, at 9:44, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> > ...
+> >> And I am not sure, if we want to rely on some six numbers stored on
+> >> SPI flash, i.e. there is no magic nor header to be really sure, it
+> >> is a MAC address.
+> > 
+> > It couldn't be compared with the MAC address of the nic?
 > 
-> We already have platforms where this limitation doesn't hold true.For example on
-> Qualcomm's KRAIT all CPUs have separate clock line and so have separate
-> policies.
+> Sure, but if it is not equal it tells you nothing.
 > 
-> Instead of adding another driver for this (Stephen just tried that:
-> https://lkml.org/lkml/2014/6/24/918), we must reuse cpufreq-cpu0 driver.
+> You can change the NICs MAC in your bootloader, it will be different
+> from the numbers you read from SPI, and some mechanism will assume you
+> just made your production version into ES.
 > 
-> cpufreq-cpu0 must be updated to break the assumption on which it is based (all
-> cores sharing clock line) and this patch tries to do exactly that.
-> 
-> As we don't have standard DT bindings to mention CPUs sharing clock-line, i.e.
-> affected_cpus, this patch also have few limitations. Though easy to fix once we
-> have proper bindings.
-> 
-> Limitation: We only supports two types of platforms:
-> - All CPUs sharing same clock line, existing user platforms
-> - All CPUs have separate clock lines, KRAIT
-> 
-> And so platforms which have multiple clusters with multiple CPUs per cluster
-> aren't supported yet. We need proper bindings for that first.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   8 +-
->  drivers/cpufreq/Kconfig                            |   5 +-
->  drivers/cpufreq/cpufreq-cpu0.c                     | 280 +++++++++++++--------
->  3 files changed, 190 insertions(+), 103 deletions(-)
+> We really want to introduce such a crutch?
 
-Hi Viresh,
+Well, we need to keep in mind distro's concerns, but we don't need to
+(and shouldn't) attempt to solve them.
 
-Thanks for all the effort on maintaining and improving cpufreq-cpu0
-driver.  Your patch rewrote the most part of the driver, so I'd like to
-hand over the driver to you.  Please add yourself as the primary person
-for MODULE_AUTHOR.
+That's why I wanted to add a comment expressing the facts as best we
+know them.  We could also now add a link to this thread to assist future
+distro maintainers.
 
-Shawn
+As this patch sits, it is an accurate description of the two variants of
+dove-based CuBoxes.  The fact that SolidRun didn't leave a clear
+differentiator is unfortunate, but we can't magic a solution out of our
+ass.  Nor should we block a patch because we can't.
+
+It also might be worth reaching out to Rabeeh one more time and asking
+explicitly if there is a programmatic way to differentiate the two
+boards on the board itself.
+
+It would have been ideal if the ES had 512MB of RAM...
+
+thx,
+
+Jason.
