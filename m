@@ -1,71 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Jun 2014 10:53:14 +0100
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
+Date: Sat, 28 Jun 2014 10:55:04 +0100
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <20140628094219.GB32514@n2100.arm.linux.org.uk>
 References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140628095314.GC32514@n2100.arm.linux.org.uk>
+ <20140627085125.GA7088@hal> <20140627085705.GC32514@n2100.arm.linux.org.uk>
+ <CAKv+Gu9NfGT8r8FSYzsuP70r1BRD_pdJw7AZHkc4qLt2_SwanA@mail.gmail.com>
+ <20140627094648.GE32514@n2100.arm.linux.org.uk> <53ADA358.7000305@mentor.com>
+ <20140628094219.GB32514@n2100.arm.linux.org.uk>
+Message-ID: <20140628095504.GD32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
-> Place vdso-related user-space code in arch/arm/kernel/vdso/.
+On Sat, Jun 28, 2014 at 10:42:19AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 27, 2014 at 12:01:12PM -0500, Nathan Lynch wrote:
+> > Since removing -lgcc from the link (one of the changes from v6 to v7), I
+> > believe the VDSO is not asking more of the toolchain or build
+> > environment than the rest of the kernel does.  I have definitely built
+> > it without a target libc.  Apart from the host program's use of
+> > too-recent ELF constants (now fixed), I would appreciate help
+> > identifying any remaining sources of fragility.
 > 
-> It is almost completely written in C with some assembly helpers to
-> load the data page address, sample the counter, and fall back to
-> system calls when necessary.
+> There's still something wrong:
 > 
-> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
-> high-resolution clocks and falls back to syscalls.  Low-resolution
-> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
+> fs/binfmt_elf.c: In function 'create_elf_tables':
+> fs/binfmt_elf.c:231:35: error: 'AT_SYSINFO_EHDR' undeclared (first use in this function)
+> fs/binfmt_elf.c:231:35: note: each undeclared identifier is reported only once for each function it appears in
 > 
-> Of particular note is that a post-processing step ("vdsomunge") is
-> necessary to produce a shared object which is architecturally allowed
-> to be used by both soft- and hard-float EABI programs.
-> 
-> The 2012 edition of the ARM ABI defines Tag_ABI_VFP_args = 3 "Code is
-> compatible with both the base and VFP variants; the user did not
-> permit non-variadic functions to pass FP parameters/results."
-> Unfortunately current toolchains do not support this tag, which is
-> ideally what we would use.
-> 
-> The best available option is to ensure that both EF_ARM_ABI_FLOAT_SOFT
-> and EF_ARM_ABI_FLOAT_HARD are unset in the ELF header's e_flags,
-> indicating that the shared object is "old" and should be accepted for
-> backward compatibility's sake.  While binutils < 2.24 appear to
-> produce a vdso.so with both flags clear, 2.24 always sets
-> EF_ARM_ABI_FLOAT_SOFT, with no way to inhibit this behavior.  So we
-> have to fix things up with a custom post-processing step.
-> 
-> In fact, the VDSO code in glibc does much less validation (including
-> checking these flags) than the code for handling conventional
-> file-backed shared libraries, so this is a bit moot unless glibc's
-> VDSO code becomes more strict.
-> 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> ---
->  arch/arm/kernel/asm-offsets.c        |   5 +
->  arch/arm/kernel/vdso/.gitignore      |   1 +
->  arch/arm/kernel/vdso/Makefile        |  59 +++++++
->  arch/arm/kernel/vdso/checkundef.sh   |   9 +
->  arch/arm/kernel/vdso/datapage.S      |  15 ++
->  arch/arm/kernel/vdso/vdso.S          |  35 ++++
->  arch/arm/kernel/vdso/vdso.lds.S      |  88 ++++++++++
->  arch/arm/kernel/vdso/vdsomunge.c     | 193 +++++++++++++++++++++
->  arch/arm/kernel/vdso/vgettimeofday.c | 320 +++++++++++++++++++++++++++++++++++
->  9 files changed, 725 insertions(+)
->  create mode 100644 arch/arm/kernel/vdso/.gitignore
->  create mode 100644 arch/arm/kernel/vdso/Makefile
->  create mode 100755 arch/arm/kernel/vdso/checkundef.sh
->  create mode 100644 arch/arm/kernel/vdso/datapage.S
->  create mode 100644 arch/arm/kernel/vdso/vdso.S
->  create mode 100644 arch/arm/kernel/vdso/vdso.lds.S
->  create mode 100644 arch/arm/kernel/vdso/vdsomunge.c
->  create mode 100644 arch/arm/kernel/vdso/vgettimeofday.c
+> The problem is the fscking generated includes.  This is going to be a
+> right pain - Arnd, is there anything which can be done about this?
 
-One change I would like to see (to stop the directory tree getting soo
-deep) is to move this to arch/arm/vdso - just like x86 is arch/x86/vdso.
-Was there a pressing reason to have it in arch/arm/kernel ?
+And yes, I see that you've mentioned this in the cover - but I think we
+/really/ need this solved before we can merge this series, otherwise
+we're likely to get lots of people asking about it.
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
