@@ -1,64 +1,62 @@
 From: dalias@libc.org (Rich Felker)
-Date: Fri, 27 Jun 2014 20:20:48 -0400
+Date: Fri, 27 Jun 2014 20:38:56 -0400
 Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <20140627233505.GA32514@n2100.arm.linux.org.uk>
-References: <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
- <20140627213051.GS32514@n2100.arm.linux.org.uk>
- <20140627215541.GC16724@brightrain.aerifal.cx>
- <20140627221744.GU32514@n2100.arm.linux.org.uk>
- <20140627223328.GB17988@brightrain.aerifal.cx>
- <20140627230736.GX32514@n2100.arm.linux.org.uk>
- <CALCETrVFvYNPHMozB2E2L0LWSPv=o6JHfmoz4_pBC2gQwRLpug@mail.gmail.com>
- <20140627233505.GA32514@n2100.arm.linux.org.uk>
-Message-ID: <20140628002048.GB19165@brightrain.aerifal.cx>
+In-Reply-To: <20140627232056.GZ32514@n2100.arm.linux.org.uk>
+References: <20140610072835.GA8466@brightrain.aerifal.cx>
+ <20140611145533.GT179@brightrain.aerifal.cx>
+ <53ADC5B1.6080905@amacapital.net>
+ <20140627232056.GZ32514@n2100.arm.linux.org.uk>
+Message-ID: <20140628003856.GC19165@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 28, 2014 at 12:35:05AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 27, 2014 at 04:17:52PM -0700, Andy Lutomirski wrote:
-> > On Fri, Jun 27, 2014 at 4:07 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > The kuser helpers can NOT be removed unless the CPU is v6k+.  Let me
-> > > put that a different way: the kuser helpers can not be removed unless
-> > > the ELF HWCAPs indicate TLS support.
-> > 
-> > Why?  (This is an honest question -- there may be an excellent
-> > answer.)  I understand why they're needed in the first place, but I
-> > don't understand why they need to live at a fixed address.
-> 
-> Just very briefly - and this will be my last reply on this until Monday,
-> especially so as I've spent a solid 1h30 replying to the emails in this
-> thread, and it's past midnight here.
+On Sat, Jun 28, 2014 at 12:20:57AM +0100, Russell King - ARM Linux wrote:
+> I've shown that this isn't as big a problem as first thought, because
+> there's ways that a libc can trivially detect the CPU that it is running
+> on, and from that know what instructions are available to it.
 
-Understood. Don't feel like you have to reply to the further emails in
-this thread; we can wait until you have time.
+I'd really rather be able to detect "Is kuser helper page available?"
+than "Are the instructions to get by without it available?" The big
+reason is that, when you want a binary that works "anywhere" on an ISA
+like ARM where the vendor keeps deprecating instructions and replacing
+them with new ones, it's safer to rely on the kernel to tell you which
+instructions work than having hard-coded ones that might start failing
+somewhere down the line. The other reason is that the pre-v6 kuser
+compare-and-swap is actually faster on non-SMP machines since it
+doesn't have to do any locking or barrier.
 
-> To answer your "why" (which I'll take as "why can't they be removed")
-> the reason for that is the lack of TLS support.  If the kuser page
-> is removed _and_ there is no hardware TLS support, then there is no way
-> for userspace to have TLS.
-> 
-> As for your second bit (about why they need to live at a fixed address)
-> we could have randomised it on v6 and later CPUs, but there are some
-> v6 CPUs which suffer from data cache aliasing, just like all the previous
-> CPUs.  With the data cache aliasing, it would make the TLS implementation
-> a lot more complex.
-> 
-> As part of the TLS implementation for older CPUs, the TLS value is stored
-> right at the top of that page, and on every context switch, we have to
-> update that value.  If the page was at a randomised address, the kernel
-> would either have to poke directly into userspace and flush it from the
-> caches (which is error prone - what if userspace unmaps the page) or it
-> has to do cache flushing to ensure that the value is visible via the
-> user alias of the page.
-> 
-> If it wasn't for this need, we would have probably gone for a VDSO from
-> the start.
+I do actually have a solution for this: using process_vm_readv, the
+existence of the kuser helper page can be probed to determine if it's
+safe to access, and the kuser version number can be read. But this is
+somewhat hackish and might have other downsides.
 
-Thank you for taking the time to give the technical explanation of why
-it is the way it is. That makes a lot more sense, and indeed it makes
-the option of having a randomized address seem a lot less attractive.
+> I've indicated that the kuser helpers are always provided when there
+> is no hardware TLS support, which corresponds with a minimum ARM
+> architecture of version 6K, and v6k has the atomic instructions.
+
+Thanks. I wasn't aware that !(hwcap & HWCAP_TLS) was a sufficient
+condition to ensure that the kuser helper page is available. In theory
+SYS_get_thread_area or trap-emulated TLS access could have been
+required in this case but I'm glad to hear that they're not.
+
+> I've said that we're not going to move kuser helpers to a randomised
+> address, and given strong reasons why not.
+
+Understood.
+
+> I've indicated where the CPU architecture can be retrieved from, and
+> used to determine the availability of other instructions.
+
+This is another area where I feel there is some deficiency: deducing
+from a cpu string the availability or non-availability of features
+sounds fragile. I think it can be done efficiently via AT_PLATFORM,
+and like you said SYS_uname is probably safe/reliable too, but I'd
+much rather have something in the form of explicit capabilities rather
+than having to infer them from a cpu model string.
+
+> I've indicated that the ELF HWCAPs can be used to further refine the
+> available instruction information.
+
+With the exception of knowing whether to use DMB for barriers.
 
 Rich
