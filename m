@@ -1,61 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Jun 2014 21:11:20 +0100
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <53AF1B65.5000904@mentor.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <20140628152609.GH32514@n2100.arm.linux.org.uk> <53AEE9B6.7000609@mentor.com>
- <20140628181212.GJ32514@n2100.arm.linux.org.uk> <53AF1B65.5000904@mentor.com>
-Message-ID: <20140628201120.GK32514@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Sat, 28 Jun 2014 22:40:26 +0200
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <53AEF81D.3080408@ti.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53ADAA1C.70407@ti.com> <20140627232757.GB26184@ulmo>
+ <53AEF81D.3080408@ti.com>
+Message-ID: <20140628204025.GA16415@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 28, 2014 at 02:45:41PM -0500, Nathan Lynch wrote:
-> On 06/28/2014 01:12 PM, Russell King - ARM Linux wrote:
-> > I know that I'm probably many years away from it, even if Ubuntu
-> > adopt it for something recent - I'm rather stuck with 12.04 due to
-> > the move towards requiring 3D GPU acceleration in later versions.
-> > It seems that the choices on ARM now are to either have a crippled
-> > distro through lack of open GPU support, or stick with an old distro
-> > that doesn't require GPUs.
-> 
-> Based on other messages from you on the ML I'm assuming you have an
-> i.MX6 system in mind?  (Forgive me if I'm wrong.)  On any Cortex-A9 or
-> -A8 the VDSO isn't going to be any great benefit anyway.  Those CPUs
-> don't implement the generic timers extension, so only clock_gettime()
-> with low-resolution clock ids will see a speedup.  And few programs use
-> those, to my knowledge.
-> 
-> A15, A7, and I'm pretty sure A12 and A17 all implement the timer
-> extension and will see full benefit.  Some Qualcomm CPUs too, I think.
+On Sat, Jun 28, 2014 at 01:15:09PM -0400, Santosh Shilimkar wrote:
+> On Friday 27 June 2014 07:27 PM, Thierry Reding wrote:
+[...]
+> > drivers/power seems to be exclusively battery charger drivers. The pm.c,
+> > pm-*.c and sleep-*.S set up suspend/resume. That doesn't seem to belong
+> > in drivers/base/power either.
+> >
+> It does have AVS PM code as well and also home for power controller
+> code. Similar efforts are happening on OMAP [1] to move the PM code
+> under drivers/power/*
 
-Here's the results from vdsotest... yes on iMX6 as that's the most
-advanced bootable system I have:
+Quite frankly that doesn't sound any better than putting that code into
+drivers/soc. If there is no common framework for a set of drivers, then
+I don't see what improvement we get by putting all of them together. If
+anything it makes things more chaotic because we sprinkle random driver
+bits across the whole tree rather than keeping them together.
 
-clock-gettime-monotonic system calls per second: 1601780
-clock-gettime-monotonic vdso calls per second:   1600862 (1.00x speedup)
-clock-getres-monotonic system calls per second: 3001396
-clock-getres-monotonic vdso calls per second:   52163259 (17.38x speedup)
-clock-gettime-monotonic-coarse system calls per second: 2824631
-clock-gettime-monotonic-coarse vdso calls per second:   13760820 (4.87x speedup)
-clock-getres-monotonic-coarse system calls per second: 3166932
-clock-getres-monotonic-coarse vdso calls per second:   52111805 (16.45x speedup)
-clock-gettime-realtime system calls per second: 1596863
-clock-gettime-realtime vdso calls per second:   1590424 (1.00x speedup)
-clock-getres-realtime system calls per second: 2993748
-clock-getres-realtime vdso calls per second:   52123753 (17.41x speedup)
-clock-gettime-realtime-coarse system calls per second: 3007894
-clock-gettime-realtime-coarse vdso calls per second:   17081617 (5.68x speedup)
-clock-getres-realtime-coarse system calls per second: 3072073
-clock-getres-realtime-coarse vdso calls per second:   49401452 (16.08x speedup)
-Note: vDSO version of getcpu not found
-getcpu system calls per second: 4902323
-getcpu vdso calls per second:   4972290 (1.01x speedup)
-Note: vDSO version of getcpu not found
-Note: vDSO version of getcpu not found
-gettimeofday system calls per second: 1637099
-gettimeofday vdso calls per second:   1637573 (1.00x speedup)
+That sounds a lot like a dumping ground to me.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+According to the MAINTAINERS file, drivers/power is:
+
+	POWER SUPPLY CLASS/SUBSYSTEM and DRIVERS
+
+and that's just not what the Tegra PM code is. That said, it may have
+been a little premature to move this code out of arch/arm/mach-tegra,
+and I think I'll revisit at a later point.
+
+> > pmc.c implements various routines to access the power management
+> > controller, some of which is needed by suspend/resume, some of it is
+> > needed by SMP. powergate.c implements a subset of the PMC that needs to
+> > be exported to drivers to enable power partitions on the SoC. I'm not
+> > aware of subsystems that deal with this kind of driver.
+> >
+> Please see above.
+
+Like I said, I don't see what business suspend/resume related code has
+in drivers/power. What we're talking about here really is functionality
+very specific to Tegra. Also some of that code needs to be run at very
+early points in the boot process, so we can't reasonably turn it into a
+proper driver anyway.
+
+Also, the real win we get from moving code out into drivers/ is if we
+can provide a common framework for them. I don't see how we can possibly
+do that for this code since there simply isn't enough commonality
+between SoCs. At the same time we now have a situation where both 32-bit
+and 64-bit variants of some SoCs share some of the same hardware at the
+very low level and since we don't have mach-* directories for 64-bit ARM
+and shouldn't be duplicating code either, we need to find a new home for
+this type of code. drivers/soc seemed to fit perfectly well.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140628/8cdfdb3a/attachment.sig>
