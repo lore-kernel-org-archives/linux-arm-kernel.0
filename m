@@ -1,45 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Jun 2014 15:49:04 +0100
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <20140628095504.GD32514@n2100.arm.linux.org.uk>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <20140627085125.GA7088@hal> <20140627085705.GC32514@n2100.arm.linux.org.uk>
- <CAKv+Gu9NfGT8r8FSYzsuP70r1BRD_pdJw7AZHkc4qLt2_SwanA@mail.gmail.com>
- <20140627094648.GE32514@n2100.arm.linux.org.uk> <53ADA358.7000305@mentor.com>
- <20140628094219.GB32514@n2100.arm.linux.org.uk>
- <20140628095504.GD32514@n2100.arm.linux.org.uk>
-Message-ID: <20140628144904.GF32514@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 28 Jun 2014 22:52:54 +0800
+Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
+In-Reply-To: <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
+References: <cover.1403684824.git.viresh.kumar@linaro.org>
+ <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
+Message-ID: <20140628145253.GB7869@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 28, 2014 at 10:55:04AM +0100, Russell King - ARM Linux wrote:
-> On Sat, Jun 28, 2014 at 10:42:19AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Jun 27, 2014 at 12:01:12PM -0500, Nathan Lynch wrote:
-> > > Since removing -lgcc from the link (one of the changes from v6 to v7), I
-> > > believe the VDSO is not asking more of the toolchain or build
-> > > environment than the rest of the kernel does.  I have definitely built
-> > > it without a target libc.  Apart from the host program's use of
-> > > too-recent ELF constants (now fixed), I would appreciate help
-> > > identifying any remaining sources of fragility.
-> > 
-> > There's still something wrong:
-> > 
-> > fs/binfmt_elf.c: In function 'create_elf_tables':
-> > fs/binfmt_elf.c:231:35: error: 'AT_SYSINFO_EHDR' undeclared (first use in this function)
-> > fs/binfmt_elf.c:231:35: note: each undeclared identifier is reported only once for each function it appears in
-> > 
-> > The problem is the fscking generated includes.  This is going to be a
-> > right pain - Arnd, is there anything which can be done about this?
+On Wed, Jun 25, 2014 at 02:12:29PM +0530, Viresh Kumar wrote:
+> cpufreq-cpu0 driver supports only platforms which have single clock line shared
+> among all CPUs.
 > 
-> And yes, I see that you've mentioned this in the cover - but I think we
-> /really/ need this solved before we can merge this series, otherwise
-> we're likely to get lots of people asking about it.
+> We already have platforms where this limitation doesn't hold true.For example on
+> Qualcomm's KRAIT all CPUs have separate clock line and so have separate
+> policies.
+> 
+> Instead of adding another driver for this (Stephen just tried that:
+> https://lkml.org/lkml/2014/6/24/918), we must reuse cpufreq-cpu0 driver.
+> 
+> cpufreq-cpu0 must be updated to break the assumption on which it is based (all
+> cores sharing clock line) and this patch tries to do exactly that.
+> 
+> As we don't have standard DT bindings to mention CPUs sharing clock-line, i.e.
+> affected_cpus, this patch also have few limitations. Though easy to fix once we
+> have proper bindings.
+> 
+> Limitation: We only supports two types of platforms:
+> - All CPUs sharing same clock line, existing user platforms
+> - All CPUs have separate clock lines, KRAIT
+> 
+> And so platforms which have multiple clusters with multiple CPUs per cluster
+> aren't supported yet. We need proper bindings for that first.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   8 +-
+>  drivers/cpufreq/Kconfig                            |   5 +-
+>  drivers/cpufreq/cpufreq-cpu0.c                     | 280 +++++++++++++--------
+>  3 files changed, 190 insertions(+), 103 deletions(-)
 
-Thinking about this some more - if this can't be resolved by kbuild,
-then I think we should add to arch/arm/Kconfig to detect the generated
-include file, print a helpful message telling the user how to fix their
-build tree, and error out.
+Hi Viresh,
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thanks for all the effort on maintaining and improving cpufreq-cpu0
+driver.  Your patch rewrote the most part of the driver, so I'd like to
+hand over the driver to you.  Please add yourself as the primary person
+for MODULE_AUTHOR.
+
+Shawn
