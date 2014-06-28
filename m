@@ -1,43 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 28 Jun 2014 17:04:01 +0200
-Subject: [PATCH 4/5] ARM: mvebu: Enable SCU Speculative linefills to L2
- for Armada 375/38x
-In-Reply-To: <1403822608-31158-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>
- <1403822608-31158-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140628170401.758c9d63@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 28 Jun 2014 11:07:06 -0400
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
+In-Reply-To: <20140628162302.48b6b835@free-electrons.com>
+References: <20140627124655.GF23978@titan.lakedaemon.net>
+ <20140628162302.48b6b835@free-electrons.com>
+Message-ID: <20140628150706.GM23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Sat, Jun 28, 2014 at 04:23:02PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Fri, 27 Jun 2014 08:46:55 -0400, Jason Cooper wrote:
+> 
+> > ----------------------------------------------------------------
+> > mvebu SoC changes for v3.17
+> > 
+> >  - kirkwood
+> >     - add setup file for netxbig LEDs (non-trivial DT binding doesn't exist yet)
+> > 
+> >  - mvebu
+> >     - staticize where needed
+> >     - add CPU hotplug for Armada XP
+> >     - add public datasheet for Armada XP
+> 
+> It's actually Armada 370 that got a datasheet published.
 
-On Fri, 27 Jun 2014 00:43:27 +0200, Gregory CLEMENT wrote:
+oops, I must've copied from the line above in my head.  You are correct
+of course.
 
-> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-> index 8bb742fdf5ca..a24ea105e709 100644
-> --- a/arch/arm/mach-mvebu/board-v7.c
-> +++ b/arch/arm/mach-mvebu/board-v7.c
-> @@ -45,6 +45,7 @@ static void __init mvebu_scu_enable(void)
->  		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
->  	if (np) {
->  		scu_base = of_iomap(np, 0);
-> +		scu_spec_linefills_enable(scu_base, true);
+> >     - don't apply thermal quirk by default
+> >     - make Aramada 375 external abort logic a quirk
+> >     - update L2/PCIe deadlock workaround after L2CC cleanup
+> 
+> This patch is needed in 3.16, not in 3.17. They really are bug fixes,
+> fixing a complete system deadlock under PCI load.
 
-I find it rather weird to have a function call <foo>_enable() take a
-boolean parameter to indicate whether <foo> should be enabled or
-disabled. You should choose between:
+crap.  :(  Ok, guys, please ignore this pull request and I'll send a new
+one with this done properly.
 
-	scu_spec_linefills_ctrl(scu_base, true/false)
+Thomas, you say 'patch', but you quote three.  Should all three be in
+mvebu/fixes?  Or, just the last one?
 
-(or some better suffix than _ctrl), or:
+thx,
 
-	scu_spec_linefills_enable(scu_base)
-	scu_spec_linefills_disable(scu_base)
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason.
