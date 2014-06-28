@@ -1,69 +1,77 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 28 Jun 2014 15:56:25 +0100
-Subject: [PATCH 2/2] imx-drm: imx-ldb: fix NULL pointer in imx_ldb_unbind()
-In-Reply-To: <20140628145556.GG32514@n2100.arm.linux.org.uk>
-References: <20140628145556.GG32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X0u3F-0001gP-Hf@rmk-PC.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 28 Jun 2014 10:56:25 -0400
+Subject: [PATCH 07/16] ARM: mvebu: Make the CPU idle initialization
+ more generic
+In-Reply-To: <53AD7C90.6080600@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-8-git-send-email-gregory.clement@free-electrons.com>
+ <53AD7C90.6080600@free-electrons.com>
+Message-ID: <20140628145625.GL23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When trying to unbind imx-drm, the following oops was observed from
-the imx-ldb driver:
+Gregory,
 
-Unable to handle kernel NULL pointer dereference at virtual address 0000001c
-pgd = de954000
-[0000001c] *pgd=2e92c831, *pte=00000000, *ppte=00000000
-Internal error: Oops: 17 [#1] SMP ARM
-Modules linked in: bnep rfcomm bluetooth nfsd exportfs hid_cypress brcmfmac brcmutil snd_soc_fsl_ssi snd_soc_fsl_spdif imx_pcm_fiq imx_pcm_dma imx_ldb(C) imx_thermal imx_sdma imx2_wdt snd_soc_sgtl5000 snd_soc_imx_sgtl5000 snd_soc_imx_spdif snd_soc_imx_audmux
-CPU: 1 PID: 1228 Comm: bash Tainted: G         C    3.16.0-rc2+ #1229
-task: ea378d80 ti: de948000 task.ti: de948000
-PC is at imx_ldb_unbind+0x1c/0x58 [imx_ldb]
-LR is at component_unbind+0x38/0x70
-pc : [<bf025068>]    lr : [<c0353108>]    psr: 200f0013
-sp : de949da8  ip : de949dc0  fp : de949dbc
-r10: e9a44b0c  r9 : 00000000  r8 : de949f78
-r7 : 00000012  r6 : e9b3f400  r5 : e9b133b8  r4 : e9b13010
-r3 : 00000000  r2 : e9b3f400  r1 : ea9a0210  r0 : e9b13020
-Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 10c53c7d  Table: 2e95404a  DAC: 00000015
-Process bash (pid: 1228, stack limit = 0xde948240)
-Stack: (0xde949da8 to 0xde94a000)
-...
-Backtrace:
-[<bf02504c>] (imx_ldb_unbind [imx_ldb]) from [<c0353108>] (component_unbind+0x38/0x70)
-[<c03530d0>] (component_unbind) from [<c03531d4>] (component_unbind_all+0x94/0xc8)
-[<c0353140>] (component_unbind_all) from [<c04bc224>] (imx_drm_driver_unload+0x34/0x4c)
-[<c04bc1f0>] (imx_drm_driver_unload) from [<c03394a4>] (drm_dev_unregister+0x2c/0xa0)
-[<c0339478>] (drm_dev_unregister) from [<c0339f8c>] (drm_put_dev+0x30/0x6c)
-[<c0339f5c>] (drm_put_dev) from [<c04bc1cc>] (imx_drm_unbind+0x14/0x18)
-[<c04bc1b8>] (imx_drm_unbind) from [<c03530b4>] (component_master_del+0xbc/0xd8)
-...
-Code: e5904058 e2840010 e2845fea e59430a0 (e593301c)
----[ end trace 4f211c6dbbcd4963 ]---
+On Fri, Jun 27, 2014 at 04:15:44PM +0200, Gregory CLEMENT wrote:
+> On 27/06/2014 15:22, Gregory CLEMENT wrote:
+> > In order to support more mvebu SoCs, this patch use an initialization
+> > specific function associated to each SoCs which support CPU Idle.
+> > 
+> > Then each SoC will have his own set of check and of data
+> > configuration.
+> > 
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >  arch/arm/mach-mvebu/pmsu.c | 39 +++++++++++++++++++++++++++++++--------
+> >  1 file changed, 31 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> > index 087157c20b8a..454f0f9ede6b 100644
+> > --- a/arch/arm/mach-mvebu/pmsu.c
+> > +++ b/arch/arm/mach-mvebu/pmsu.c
+> > @@ -293,23 +293,47 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
+> >  	.notifier_call = mvebu_v7_cpu_pm_notify,
+> >  };
+> >  
+> > +static bool (*mvebu_v7_cpu_idle_init)(void);
+> > +
+> > +static __init bool armada_xp_cpuidle_init(void)
+> > +{
+> > +	struct device_node *np;
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+> > +	if (!np)
+> > +		return false;
+> > +	of_node_put(np);
+> > +
+> > +	mvebu_v7_cpuidle_device.dev.platform_data = armada_xp_370_cpu_suspend;
+> > +	return true;
+> > +}
+> > +
+> > +static struct of_device_id of_cpuidle_table[] __initdata = {
+> > +	{ .compatible = "marvell,armadaxp",
+> > +	  .data = (void *)armada_xp_cpuidle_init,
+> > +	},
+> > +	{ /* end of list */ },
+> > +};
+> > +
+> >  static int __init mvebu_v7_cpu_pm_init(void)
+> >  {
+> >  	struct device_node *np;
+> > +	const struct of_device_id *match;
+> > +
+> > +	np = of_find_matching_node_and_match(NULL, of_cpuidle_table,
+> > +					&match);
+> > +
+> 
+> The following part was missing (without this the kernel hang on Armada 375)
+> 
+> +       if (!np)
+> +               return 0;
 
-This is caused by only having one channel out of the pair configured in
-DT; the second channel remains uninitialised, but upon unbind, the
-driver attempts to clean up both, thereby dereferencing a NULL pointer.
-Avoid this by checking that the second channel is initialised.
+If there's no other changes, I can fix this up when I apply it.  As well
+as the S-o-b.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/staging/imx-drm/imx-ldb.c | 3 +++
- 1 file changed, 3 insertions(+)
+thx,
 
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index 7e3f019d7e72..4662e00b456a 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -574,6 +574,9 @@ static void imx_ldb_unbind(struct device *dev, struct device *master,
- 	for (i = 0; i < 2; i++) {
- 		struct imx_ldb_channel *channel = &imx_ldb->channel[i];
- 
-+		if (!channel->connector.funcs)
-+			continue;
-+
- 		channel->connector.funcs->destroy(&channel->connector);
- 		channel->encoder.funcs->destroy(&channel->encoder);
- 	}
--- 
-1.8.3.1
+Jason.
