@@ -1,76 +1,57 @@
 From: a.heider@gmail.com (Andre Heider)
-Date: Sun, 29 Jun 2014 18:21:38 +0200
-Subject: [PATCH 04/13] uio: uio_pruss: use dmam_alloc_coherent()
+Date: Sun, 29 Jun 2014 18:21:39 +0200
+Subject: [PATCH 05/13] ARM: OMAP2+: hwmod: Introduce a flag to deassert the HW
+ reset line
 In-Reply-To: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
 References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
-Message-ID: <1404058907-21112-5-git-send-email-a.heider@gmail.com>
+Message-ID: <1404058907-21112-6-git-send-email-a.heider@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace dma_alloc_coherent() with dmam_alloc_coherent() and remove the
-dma_free_coherent() call.
+hwmod's hardreset lines are not deasserted after a reset.
+Add the HWMOD_INIT_DEASSERT_HARD_RESET flag to deassert those after a
+successful reset.
 
-This shaves off 2 vars in the driver data struct.
+This is required to get the PRU-ICSS in a usable state on am33xx SoCs.
 
 Signed-off-by: Andre Heider <a.heider@gmail.com>
 ---
- drivers/uio/uio_pruss.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c | 2 ++
+ arch/arm/mach-omap2/omap_hwmod.h | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
-index 310598a..50ff206 100644
---- a/drivers/uio/uio_pruss.c
-+++ b/drivers/uio/uio_pruss.c
-@@ -63,10 +63,8 @@ struct uio_pruss_dev {
- 	struct uio_info *info;
- 	struct clk *pruss_clk;
- 	dma_addr_t sram_paddr;
--	dma_addr_t ddr_paddr;
- 	void __iomem *prussio_vaddr;
- 	unsigned long sram_vaddr;
--	void *ddr_vaddr;
- 	unsigned int hostirq_start;
- 	unsigned int pintc_base;
- 	struct gen_pool *sram_pool;
-@@ -100,10 +98,6 @@ static void pruss_cleanup(struct device *dev, struct uio_pruss_dev *gdev)
- 		uio_unregister_device(p);
- 		kfree(p->name);
- 	}
--	if (gdev->ddr_vaddr) {
--		dma_free_coherent(dev, extram_pool_sz, gdev->ddr_vaddr,
--			gdev->ddr_paddr);
--	}
- 	if (gdev->sram_vaddr)
- 		gen_pool_free(gdev->sram_pool,
- 			      gdev->sram_vaddr,
-@@ -119,6 +113,7 @@ static int pruss_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	int ret = -ENODEV, cnt = 0;
- 	struct uio_pruss_pdata *pdata = dev_get_platdata(dev);
-+	dma_addr_t ddr_paddr;
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index f7bb435..1e56b65 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2622,6 +2622,8 @@ static int __init _setup_reset(struct omap_hwmod *oh)
  
- 	gdev = devm_kzalloc(dev, sizeof(struct uio_pruss_dev), GFP_KERNEL);
- 	if (!gdev)
-@@ -155,9 +150,8 @@ static int pruss_probe(struct platform_device *pdev)
- 		}
- 	}
+ 	if (!(oh->flags & HWMOD_INIT_NO_RESET))
+ 		r = _reset(oh);
++	if (!r && oh->flags & HWMOD_INIT_DEASSERT_HARD_RESET)
++		r = _deassert_hardreset(oh, oh->name);
  
--	gdev->ddr_vaddr = dma_alloc_coherent(dev, extram_pool_sz,
--				&(gdev->ddr_paddr), GFP_KERNEL | GFP_DMA);
--	if (!gdev->ddr_vaddr) {
-+	if (!dmam_alloc_coherent(dev, extram_pool_sz, &ddr_paddr,
-+				 GFP_KERNEL | GFP_DMA)) {
- 		dev_err(dev, "Could not allocate external memory\n");
- 		goto out_free;
- 	}
-@@ -174,7 +168,7 @@ static int pruss_probe(struct platform_device *pdev)
- 		p->mem[1].size = sram_pool_sz;
- 		p->mem[1].memtype = UIO_MEM_PHYS;
+ 	return r;
+ }
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 0f97d63..c41d44d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -514,6 +514,7 @@ struct omap_hwmod_omap4_prcm {
+  * HWMOD_SWSUP_SIDLE_ACT: omap_hwmod code should manually bring the module
+  *     out of idle, but rely on smart-idle to the put it back in idle,
+  *     so the wakeups are still functional (Only known case for now is UART)
++ * HWMOD_INIT_DEASSERT_HARD_RESET: deassert the HW reset line at boot
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -528,6 +529,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_BLOCK_WFI				(1 << 10)
+ #define HWMOD_FORCE_MSTANDBY			(1 << 11)
+ #define HWMOD_SWSUP_SIDLE_ACT			(1 << 12)
++#define HWMOD_INIT_DEASSERT_HARD_RESET		(1 << 13)
  
--		p->mem[2].addr = gdev->ddr_paddr;
-+		p->mem[2].addr = ddr_paddr;
- 		p->mem[2].size = extram_pool_sz;
- 		p->mem[2].memtype = UIO_MEM_PHYS;
- 
+ /*
+  * omap_hwmod._int_flags definitions
 -- 
 2.0.0
