@@ -1,66 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 Jun 2014 17:07:51 +0100
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <53B0353D.1080705@mentor.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <20140628152609.GH32514@n2100.arm.linux.org.uk> <53AEE9B6.7000609@mentor.com>
- <20140628181212.GJ32514@n2100.arm.linux.org.uk> <53AF1B65.5000904@mentor.com>
- <20140628201120.GK32514@n2100.arm.linux.org.uk> <53AF3510.7030707@mentor.com>
- <20140629083415.GL32514@n2100.arm.linux.org.uk> <53B0353D.1080705@mentor.com>
-Message-ID: <20140629160751.GQ32514@n2100.arm.linux.org.uk>
+From: a.heider@gmail.com (Andre Heider)
+Date: Sun, 29 Jun 2014 18:21:34 +0200
+Subject: [PATCH 00/13] uio_pruss: add support for devicetree and am33xx
+Message-ID: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 10:48:13AM -0500, Nathan Lynch wrote:
-> On 06/29/2014 03:34 AM, Russell King - ARM Linux wrote:
-> > On Sat, Jun 28, 2014 at 04:35:12PM -0500, Nathan Lynch wrote:
-> >> That's consistent with my results on iMX6.  The reported 1.00x "speedup"
-> >> for clock-gettime-monotonic etc indicates the VDSO is falling back to
-> >> syscall.
-> >>
-> >> Thanks for testing.
-> > 
-> > Here's another issue which cropped up when I ran this patch set through
-> > the autobuilder last night - allnoconfig's now fail with:
-> > 
-> > mm/memory.c: In function 'gate_vma_init':
-> > mm/memory.c:3410:22: error: 'FIXADDR_USER_START' undeclared (first use in this function)
-> > mm/memory.c:3411:20: error: 'FIXADDR_USER_END' undeclared (first use in this function)
-> > mm/memory.c: In function 'in_gate_area_no_mm':
-> > mm/memory.c:3432:15: error: 'FIXADDR_USER_START' undeclared (first use in this function)
-> > mm/memory.c:3432:46: error: 'FIXADDR_USER_END' undeclared (first use in this function)
-> > make[2]: *** [mm/memory.o] Error 1
-> 
-> arch/arm/include/page.h:
-> #ifdef CONFIG_KUSER_HELPERS
-> #define __HAVE_ARCH_GATE_AREA 1
-> #endif
-> 
-> mm/memory.c:
-> #if !defined(__HAVE_ARCH_GATE_AREA)
-> 
-> #if defined(AT_SYSINFO_EHDR)
-> static struct vm_area_struct gate_vma;
-> 
-> static int __init gate_vma_init(void)
-> {
-> 	gate_vma.vm_mm = NULL;
-> 	gate_vma.vm_start = FIXADDR_USER_START;
-> 	gate_vma.vm_end = FIXADDR_USER_END;
-> ...
-> 
-> The vdso patches add an ARM definition for AT_SYSINFO_EHDR.  So when
-> CONFIG_KUSER_HELPERS=n, this code is pulled in now...
-> 
-> Not sure what the fix would be right now.  I don't understand why there
-> is this relationship between AT_SYSINFO_EHDR and gate vma code.
+Hi,
 
-Me neither.  It looks like changing those tests for AT_SYSINFO_EHDR to
-something like __HAVE_GATE_VMA or CONFIG_HAVE_GATE_VMA would be a good
-step, so we can keep this disabled on ARM.  I don't see a need for the
-gate VMA stuff just because we have a vDSO.
+this series adds PRUv2 support to uio_pruss through devicetree, makes the
+device usable on am33xx and enables it on beaglebone black.
+Inspired by old patches from Matt Porter found in a downstream tree.
+
+To archieve that this series:
+* adds a flag to omap_hwmod.c to get PRUSS out of hardreset (patch 5 and 6)
+* adds devicetree support to uio_pruss (patch 7 and 9)
+* adds the device to the am33xx dtsi and boneblack dts (patch 12 and 13)
+
+Bits and pieces:
+* some cleanup (patch 1-4)
+* take care of a fact that SRAM on am33xx is not exposed through UIO (patch 8)
+* add runtime pm support to enable clocks (patch 10)
+* allow the driver to be compiled on SOC_AM33XX (patch 11)
+
+This is only tested on beaglebone black (as that's the only hardware of the
+PRUSS enabled families I have) with some basic GPIO and IRQ tests.
+
+Notes:
+* I just got this hardware and I don't know if this UIO PRUSS business is
+  desired. Looking at the userspace driver I'd guess not so much ;), but this
+  interface is there for older generations anyway, and this small series lets
+  me use the device.
+* is the hardreset thing I did there the right thing to do? I think the
+  proper way would be a reset controller (which apparently doesn't yet exist
+  for this SoC?) and let the driver deassert/assert on probe/remove?
+* the platform device path has a clk_enable() / clk_put() calls. Are those
+  now redundant with the introduced pm_runtime_enable() pm_runtime_disable()
+  calls?
+
+Thanks,
+Andre
+
+Andre Heider (13):
+  uio: uio_pruss: use struct device
+  uio: uio_pruss: use devm_kzalloc()
+  uio: uio_pruss: use devm_ioremap_resource()
+  uio: uio_pruss: use dmam_alloc_coherent()
+  ARM: OMAP2+: hwmod: Introduce a flag to deassert the HW reset line
+  ARM: AM33XX: hwmod: deassert PRUSS' hardreset lines
+  Documentation: devicetree: add bindings for TI PRUSS
+  uio: uio_pruss: make the UIO SRAM memory region optional
+  uio: uio_pruss: add devicetree support
+  uio: uio_pruss: add runtime pm support
+  uio: uio_pruss: enable the driver for am33xx SoCs
+  ARM: dts: am33xx: add the PRUSSv2 device
+  ARM: dts: am335x-boneblack: enable the PRUSSv2 device
+
+ .../devicetree/bindings/misc/ti,pruss.txt          |  19 +++
+ arch/arm/boot/dts/am335x-boneblack.dts             |   4 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   9 ++
+ arch/arm/mach-omap2/omap_hwmod.c                   |   2 +
+ arch/arm/mach-omap2/omap_hwmod.h                   |   2 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |   1 +
+ drivers/uio/Kconfig                                |   4 +-
+ drivers/uio/uio_pruss.c                            | 144 ++++++++++++---------
+ 8 files changed, 123 insertions(+), 62 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/misc/ti,pruss.txt
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+2.0.0
