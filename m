@@ -1,71 +1,76 @@
 From: a.heider@gmail.com (Andre Heider)
-Date: Sun, 29 Jun 2014 18:21:37 +0200
-Subject: [PATCH 03/13] uio: uio_pruss: use devm_ioremap_resource()
+Date: Sun, 29 Jun 2014 18:21:38 +0200
+Subject: [PATCH 04/13] uio: uio_pruss: use dmam_alloc_coherent()
 In-Reply-To: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
 References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
-Message-ID: <1404058907-21112-4-git-send-email-a.heider@gmail.com>
+Message-ID: <1404058907-21112-5-git-send-email-a.heider@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace resource_size() followed by ioremap() with
-devm_ioremap_resource() and remove the iounmap() call.
+Replace dma_alloc_coherent() with dmam_alloc_coherent() and remove the
+dma_free_coherent() call.
+
+This shaves off 2 vars in the driver data struct.
 
 Signed-off-by: Andre Heider <a.heider@gmail.com>
 ---
- drivers/uio/uio_pruss.c | 20 ++++----------------
- 1 file changed, 4 insertions(+), 16 deletions(-)
+ drivers/uio/uio_pruss.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
-index f07545b..310598a 100644
+index 310598a..50ff206 100644
 --- a/drivers/uio/uio_pruss.c
 +++ b/drivers/uio/uio_pruss.c
-@@ -100,7 +100,6 @@ static void pruss_cleanup(struct device *dev, struct uio_pruss_dev *gdev)
+@@ -63,10 +63,8 @@ struct uio_pruss_dev {
+ 	struct uio_info *info;
+ 	struct clk *pruss_clk;
+ 	dma_addr_t sram_paddr;
+-	dma_addr_t ddr_paddr;
+ 	void __iomem *prussio_vaddr;
+ 	unsigned long sram_vaddr;
+-	void *ddr_vaddr;
+ 	unsigned int hostirq_start;
+ 	unsigned int pintc_base;
+ 	struct gen_pool *sram_pool;
+@@ -100,10 +98,6 @@ static void pruss_cleanup(struct device *dev, struct uio_pruss_dev *gdev)
  		uio_unregister_device(p);
  		kfree(p->name);
  	}
--	iounmap(gdev->prussio_vaddr);
- 	if (gdev->ddr_vaddr) {
- 		dma_free_coherent(dev, extram_pool_sz, gdev->ddr_vaddr,
- 			gdev->ddr_paddr);
-@@ -118,7 +117,7 @@ static int pruss_probe(struct platform_device *pdev)
- 	struct uio_pruss_dev *gdev;
- 	struct resource *regs_prussio;
+-	if (gdev->ddr_vaddr) {
+-		dma_free_coherent(dev, extram_pool_sz, gdev->ddr_vaddr,
+-			gdev->ddr_paddr);
+-	}
+ 	if (gdev->sram_vaddr)
+ 		gen_pool_free(gdev->sram_pool,
+ 			      gdev->sram_vaddr,
+@@ -119,6 +113,7 @@ static int pruss_probe(struct platform_device *pdev)
  	struct device *dev = &pdev->dev;
--	int ret = -ENODEV, cnt = 0, len;
-+	int ret = -ENODEV, cnt = 0;
+ 	int ret = -ENODEV, cnt = 0;
  	struct uio_pruss_pdata *pdata = dev_get_platdata(dev);
++	dma_addr_t ddr_paddr;
  
  	gdev = devm_kzalloc(dev, sizeof(struct uio_pruss_dev), GFP_KERNEL);
-@@ -139,13 +138,9 @@ static int pruss_probe(struct platform_device *pdev)
+ 	if (!gdev)
+@@ -155,9 +150,8 @@ static int pruss_probe(struct platform_device *pdev)
+ 		}
  	}
  
- 	regs_prussio = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!regs_prussio) {
--		dev_err(dev, "No PRUSS I/O resource specified\n");
--		goto out_free;
--	}
--
--	if (!regs_prussio->start) {
--		dev_err(dev, "Invalid memory resource\n");
-+	gdev->prussio_vaddr = devm_ioremap_resource(dev, regs_prussio);
-+	if (IS_ERR(gdev->prussio_vaddr)) {
-+		ret = PTR_ERR(gdev->prussio_vaddr);
+-	gdev->ddr_vaddr = dma_alloc_coherent(dev, extram_pool_sz,
+-				&(gdev->ddr_paddr), GFP_KERNEL | GFP_DMA);
+-	if (!gdev->ddr_vaddr) {
++	if (!dmam_alloc_coherent(dev, extram_pool_sz, &ddr_paddr,
++				 GFP_KERNEL | GFP_DMA)) {
+ 		dev_err(dev, "Could not allocate external memory\n");
  		goto out_free;
  	}
+@@ -174,7 +168,7 @@ static int pruss_probe(struct platform_device *pdev)
+ 		p->mem[1].size = sram_pool_sz;
+ 		p->mem[1].memtype = UIO_MEM_PHYS;
  
-@@ -167,13 +162,6 @@ static int pruss_probe(struct platform_device *pdev)
- 		goto out_free;
- 	}
- 
--	len = resource_size(regs_prussio);
--	gdev->prussio_vaddr = ioremap(regs_prussio->start, len);
--	if (!gdev->prussio_vaddr) {
--		dev_err(dev, "Can't remap PRUSS I/O  address range\n");
--		goto out_free;
--	}
--
- 	gdev->pintc_base = pdata->pintc_base;
- 	gdev->hostirq_start = platform_get_irq(pdev, 0);
+-		p->mem[2].addr = gdev->ddr_paddr;
++		p->mem[2].addr = ddr_paddr;
+ 		p->mem[2].size = extram_pool_sz;
+ 		p->mem[2].memtype = UIO_MEM_PHYS;
  
 -- 
 2.0.0
