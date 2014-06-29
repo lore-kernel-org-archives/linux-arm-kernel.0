@@ -1,39 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 Jun 2014 12:49:01 +0100
-Subject: [PATCH v2 2/6] input: touchscreen: imx25 tcq driver
-In-Reply-To: <53AFF1C4.1010402@kernel.org>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
- <1402672899-6995-1-git-send-email-denis@eukrea.com>
- <1402672899-6995-3-git-send-email-denis@eukrea.com>
- <53A55BD8.7030905@kernel.org>
- <CAOMZO5BxZDX5TDZdUCbpTw2LpVC=vr4cnn4eSpzd_023wcy+Fg@mail.gmail.com>
- <53AFF1C4.1010402@kernel.org>
-Message-ID: <20140629114901.GO32514@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 29 Jun 2014 15:58:19 +0200
+Subject: [PATCH] pinctrl: sunxi: Remove PINCTRL_SUNXI
+Message-ID: <1404050299-27895-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 12:00:20PM +0100, Jonathan Cameron wrote:
-> On 21/06/14 20:55, Fabio Estevam wrote:
->> On Sat, Jun 21, 2014 at 7:18 AM, Jonathan Cameron <jic23@kernel.org> wrote:
->>>> +
->>>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>
->>> Could this not in theory fail?
->>
->> Yes, but devm_ioremap_resource will take care of it, so we don't need
->> to check for error here.
-> Nothing like counter intuitive behaviour.  Ah well.
->
-> Thanks for explaining this!
+The PINCTRL_SUNXI configuration was kept only to deal with the introduction of
+per-machine symbols and the various pintrl drivers through different tree.
 
-Maybe it would be better to have:
+Now that it's not useful anymore, we can just remove it.
 
-	mem = platform_ioremap_resource(pdev, IORESOURCE_MEM, 0);
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-sunxi/Kconfig   |  1 -
+ drivers/pinctrl/sunxi/Kconfig | 15 ++++++---------
+ 2 files changed, 6 insertions(+), 10 deletions(-)
 
-which wraps up both the platform_get_resource() call with
-devm_ioremap_resource() so driver writers don't have to be concerned
-about this aspect?
-
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index f776c5f1bb89..997854b15b5e 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -4,7 +4,6 @@ menuconfig ARCH_SUNXI
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
+-	select PINCTRL_SUNXI
+ 	select SUN4I_TIMER
+ 
+ if ARCH_SUNXI
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 73e0a305ea13..4cbf458579d5 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -1,36 +1,33 @@
+ if ARCH_SUNXI
+ 
+-config PINCTRL_SUNXI
+-	bool
+-
+ config PINCTRL_SUNXI_COMMON
+ 	bool
+ 	select PINMUX
+ 	select GENERIC_PINCONF
+ 
+ config PINCTRL_SUN4I_A10
+-	def_bool PINCTRL_SUNXI || MACH_SUN4I
++	def_bool MACH_SUN4I
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN5I_A10S
+-	def_bool PINCTRL_SUNXI || MACH_SUN5I
++	def_bool MACH_SUN5I
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN5I_A13
+-	def_bool PINCTRL_SUNXI || MACH_SUN5I
++	def_bool MACH_SUN5I
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN6I_A31
+-	def_bool PINCTRL_SUNXI || MACH_SUN6I
++	def_bool MACH_SUN6I
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN6I_A31_R
+-	def_bool PINCTRL_SUNXI || MACH_SUN6I
++	def_bool MACH_SUN6I
+ 	depends on RESET_CONTROLLER
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ config PINCTRL_SUN7I_A20
+-	def_bool PINCTRL_SUNXI || MACH_SUN7I
++	def_bool MACH_SUN7I
+ 	select PINCTRL_SUNXI_COMMON
+ 
+ endif
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+2.0.0
