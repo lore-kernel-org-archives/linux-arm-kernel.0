@@ -1,31 +1,42 @@
 From: a.heider@gmail.com (Andre Heider)
-Date: Sun, 29 Jun 2014 18:21:40 +0200
-Subject: [PATCH 06/13] ARM: AM33XX: hwmod: deassert PRUSS' hardreset lines
+Date: Sun, 29 Jun 2014 18:21:41 +0200
+Subject: [PATCH 07/13] Documentation: devicetree: add bindings for TI PRUSS
 In-Reply-To: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
 References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
-Message-ID: <1404058907-21112-7-git-send-email-a.heider@gmail.com>
+Message-ID: <1404058907-21112-8-git-send-email-a.heider@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set HWMOD_INIT_DEASSERT_HARD_RESET to get the PRUSS out of hardreset
-upon boot.
-
 Signed-off-by: Andre Heider <a.heider@gmail.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/misc/ti,pruss.txt | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/ti,pruss.txt
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-index a579b89..f1c31f7 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -153,6 +153,7 @@ struct omap_hwmod am33xx_pruss_hwmod = {
- 	.name		= "pruss",
- 	.class		= &am33xx_pruss_hwmod_class,
- 	.clkdm_name	= "pruss_ocp_clkdm",
-+	.flags		= HWMOD_INIT_DEASSERT_HARD_RESET,
- 	.main_clk	= "pruss_ocp_gclk",
- 	.prcm		= {
- 		.omap4	= {
+diff --git a/Documentation/devicetree/bindings/misc/ti,pruss.txt b/Documentation/devicetree/bindings/misc/ti,pruss.txt
+new file mode 100644
+index 0000000..4eacc41
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/ti,pruss.txt
+@@ -0,0 +1,19 @@
++TI Programmable Real-Time Unit Sub System (PRUSS)
++
++Required properties:
++- compatible :
++	- "ti,pruss-v1" - for PRUv1 as found on the OMAPL138/DA850/AM18xx SoC families
++	- "ti,pruss-v2" - for PRUv2 as found on the AM33xx SoC family
++- ti,hwmods: Name of the hwmod associated to the PRUSS
++- reg: Address range of rtc register set
++- interrupts: host event interrupts in order
++- interrupt-parent: phandle for the interrupt controller
++
++Example:
++pruss: pruss at 4a300000 {
++	compatible = "ti,pruss-v2";
++	ti,hwmods = "pruss";
++	reg = <0x4a300000 0x080000>;
++	interrupts = <20 21 22 23 24 25 26 27>;
++	interrupt-parent = <&intc>;
++};
 -- 
 2.0.0
