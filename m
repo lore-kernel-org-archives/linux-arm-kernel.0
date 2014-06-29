@@ -1,105 +1,41 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 29 Jun 2014 22:50:21 +0200
-Subject: [PATCH 1/1] ARM: dts: zynq: Add Parallella device tree
-In-Reply-To: <1404075022-28745-1-git-send-email-afaerber@suse.de>
-References: <1404075022-28745-1-git-send-email-afaerber@suse.de>
-Message-ID: <1404075022-28745-2-git-send-email-afaerber@suse.de>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Mon, 30 Jun 2014 00:56:54 +0200
+Subject: [PATCH 2/2] arm: Add back maximum bank limit
+In-Reply-To: <1404068784-27604-2-git-send-email-lauraa@codeaurora.org>
+References: <1404068784-27604-1-git-send-email-lauraa@codeaurora.org>
+ <1404068784-27604-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <53B099B6.1070706@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to boot the Adapteva Parallella board to serial console.
+Hi Laura,
 
-Cc: Andreas Olofsson <andreas@adapteva.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- arch/arm/boot/dts/Makefile            |  4 ++-
- arch/arm/boot/dts/zynq-parallella.dts | 63 +++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/zynq-parallella.dts
+Am 29.06.2014 21:06, schrieb Laura Abbott:
+> Commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
+> (ARM: 8025/1: Get rid of meminfo) dropped the upper bound on
+> the number of memory banks that can be added as there was no
+> technical need in the kernel. It turns out though, some bootloaders
+> (specifically the arndale-octa exynos boards) may pass invalid memory
+> information and rely on the kernel to not parse this data. This is a
+> bug in the bootloader but we still need to work around this.
+> Re-introduce a maximum bank limit per board to prevent invalid banks
+> from being passed to the kernel.
+> 
+> Reported-by: Tushar Behera <trblinux@gmail.com>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265615.html
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5986ff6..2a536f6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -419,7 +419,9 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
- 	wm8650-mid.dtb \
- 	wm8750-apc8750.dtb \
- 	wm8850-w70v2.dtb
--dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
-+dtb-$(CONFIG_ARCH_ZYNQ) += \
-+	zynq-parallella.dtb \
-+	zynq-zc702.dtb \
- 	zynq-zc706.dtb \
- 	zynq-zed.dtb
- dtb-$(CONFIG_MACH_ARMADA_370) += \
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-new file mode 100644
-index 0000000..98df66c
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -0,0 +1,63 @@
-+/*
-+ * Copyright (c) 2014 SUSE LINUX Products GmbH
-+ *
-+ * Derived from zynq-zed.dts:
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *  Copyright (C) 2012 National Instruments Corp.
-+ *  Copyright (C) 2013 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+/dts-v1/;
-+/include/ "zynq-7000.dtsi"
-+
-+/ {
-+	model = "Parallella Board";
-+	compatible = "xlnx,zynq-7000";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
-+	};
-+};
-+
-+&gem0 {
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&ethernet_phy>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	ethernet_phy: ethernet-phy at 0 {
-+		/* Marvell 88E1318 */
-+		compatible = "ethernet-phy-id0141.0e90",
-+		             "ethernet-phy-ieee802.3-c22";
-+		reg = <0>;
-+		marvell,reg-init = <0x3 0x10 0xff00 0x1e>,
-+		                   <0x3 0x11 0xfff0 0xa>;
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
-+
-+&sdhci1 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
+Tested-by: Andreas F?rber <afaerber@suse.de>
+
+[    0.000000] Max banks too low, ignoring memory at 0xfbffffaf
+[    0.000000] Max banks too low, ignoring memory at 0xfffedbff
+[    0.000000] Max banks too low, ignoring memory at 0xffbbffd9
+[    0.000000] Max banks too low, ignoring memory at 0xffefefef
+
+Thanks,
+Andreas
+
 -- 
-1.9.3
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
