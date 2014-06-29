@@ -1,27 +1,25 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 29 Jun 2014 12:00:20 +0100
-Subject: [PATCH v2 2/6] input: touchscreen: imx25 tcq driver
-In-Reply-To: <CAOMZO5BxZDX5TDZdUCbpTw2LpVC=vr4cnn4eSpzd_023wcy+Fg@mail.gmail.com>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>	<1402672899-6995-1-git-send-email-denis@eukrea.com>	<1402672899-6995-3-git-send-email-denis@eukrea.com>	<53A55BD8.7030905@kernel.org>
- <CAOMZO5BxZDX5TDZdUCbpTw2LpVC=vr4cnn4eSpzd_023wcy+Fg@mail.gmail.com>
-Message-ID: <53AFF1C4.1010402@kernel.org>
+Date: Sun, 29 Jun 2014 12:01:20 +0100
+Subject: [PATCH v2 3/6] iio: adc: fsl,imx25-gcq driver
+In-Reply-To: <53A95533.8090500@eukrea.com>
+References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
+ <1402672899-6995-1-git-send-email-denis@eukrea.com>
+ <1402672899-6995-4-git-send-email-denis@eukrea.com>
+ <53A55EDF.4010104@kernel.org> <53A95533.8090500@eukrea.com>
+Message-ID: <53AFF200.9060205@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/06/14 20:55, Fabio Estevam wrote:
-> On Sat, Jun 21, 2014 at 7:18 AM, Jonathan Cameron <jic23@kernel.org> wrote:
->>> +
->>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>
->> Could this not in theory fail?
+On 24/06/14 11:38, Denis Carikli wrote:
+> On 06/21/2014 12:30 PM, Jonathan Cameron wrote:
+>>> +        .info_mask_separate = BIT(IIO_CHAN_INFO_RAW),    \
+>> No known info on converting this to real voltages?  I'd normally expect
+>> a scale parameter at least with any raw channel output, but fair enough
+>> if it's not obvous what this should be.
 >
-> Yes, but devm_ioremap_resource will take care of it, so we don't need
-> to check for error here.
-Nothing like counter intuitive behaviour.  Ah well.
-
-Thanks for explaining this!
+> We know the internal reference voltage.
+> We can also know the external reference voltage by representing it as a regulator.
 >
->>
->>> +       mem = devm_ioremap_resource(dev, res);
->>> +       if (!mem)
->>> +               return -ENOMEM;
+> Since there are many combinations should a regulator for each reference(external reference, xp, yp, xn and yn) be used?
+>
+yes.
