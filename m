@@ -1,22 +1,81 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 29 Jun 2014 16:15:19 +0200
-Subject: [PATCH 1/3] clocksource: move PXA timer to clocksource framework
-In-Reply-To: <1403388588-11956-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Sun, 22 Jun 2014 00:09:46 +0200")
-References: <1403388588-11956-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87bntbpzt4.fsf@free.fr>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 29 Jun 2014 16:16:58 +0200
+Subject: [PATCH v3 1/4] dt: bindings: add bindings for Broadcom bcm43xx sdio
+ devices
+In-Reply-To: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
+References: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+From: Arend van Spriel <arend@broadcom.com>
 
-> Move time.c from arch/arm/mach-pxa/time.c to
-> drivers/clocksource/pxa_timer.c.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Ping ?
+The Broadcom bcm43xx sdio devices are fullmac devices that may be
+integrated in ARM platforms. Currently, the brcmfmac driver for
+these devices support use of platform data. This patch specifies
+the bindings that allow this platform data to be expressed in the
+devicetree.
 
-Cheers.
+Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
+Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
+Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
+Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
+Signed-off-by: Arend van Spriel <arend@broadcom.com>
+[hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
+ on how to handle this yet]
+[hdegoede at redhat.com: move from bindings/staging to bindings]
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
 
---
-Robert
+diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+new file mode 100644
+index 0000000..5dbf169
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+@@ -0,0 +1,41 @@
++Broadcom BCM43xx Fullmac wireless SDIO devices
++
++This node provides properties for controlling the Broadcom wireless device. The
++node is expected to be specified as a child node to the SDIO controller that
++connects the device to the system.
++
++Required properties:
++
++ - compatible : Should be "brcm,bcm4329-fmac".
++
++Optional properties:
++ - brcm,drive-strength : drive strength used for SDIO pins on device in mA
++	(default = 6).
++ - interrupt-parent : the phandle for the interrupt controller to which the
++	device interrupts are connected.
++ - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
++	When not specified the device will use in-band SDIO interrupts.
++ - interrupt-names : name of the out-of-band interrupt, which must be set
++	to "host-wake".
++
++Example:
++
++mmc3: mmc at 01c12000 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins_a>;
++	vmmc-supply = <&reg_vmmc3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	brcmf: bcrmf at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&pio>;
++		interrupts = <10 8>; /* PH10 / EINT10 */
++		interrupt-names = "host-wake";
++	};
++};
+-- 
+2.0.0
