@@ -1,70 +1,148 @@
 From: a.heider@gmail.com (Andre Heider)
-Date: Sun, 29 Jun 2014 18:21:34 +0200
-Subject: [PATCH 00/13] uio_pruss: add support for devicetree and am33xx
-Message-ID: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
+Date: Sun, 29 Jun 2014 18:21:35 +0200
+Subject: [PATCH 01/13] uio: uio_pruss: use struct device
+In-Reply-To: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
+References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
+Message-ID: <1404058907-21112-2-git-send-email-a.heider@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Get rid of the repeating &dev->dev constructs and prevent introducing
+new ones.
 
-this series adds PRUv2 support to uio_pruss through devicetree, makes the
-device usable on am33xx and enables it on beaglebone black.
-Inspired by old patches from Matt Porter found in a downstream tree.
+Signed-off-by: Andre Heider <a.heider@gmail.com>
+---
+ drivers/uio/uio_pruss.c | 37 +++++++++++++++++++------------------
+ 1 file changed, 19 insertions(+), 18 deletions(-)
 
-To archieve that this series:
-* adds a flag to omap_hwmod.c to get PRUSS out of hardreset (patch 5 and 6)
-* adds devicetree support to uio_pruss (patch 7 and 9)
-* adds the device to the am33xx dtsi and boneblack dts (patch 12 and 13)
-
-Bits and pieces:
-* some cleanup (patch 1-4)
-* take care of a fact that SRAM on am33xx is not exposed through UIO (patch 8)
-* add runtime pm support to enable clocks (patch 10)
-* allow the driver to be compiled on SOC_AM33XX (patch 11)
-
-This is only tested on beaglebone black (as that's the only hardware of the
-PRUSS enabled families I have) with some basic GPIO and IRQ tests.
-
-Notes:
-* I just got this hardware and I don't know if this UIO PRUSS business is
-  desired. Looking at the userspace driver I'd guess not so much ;), but this
-  interface is there for older generations anyway, and this small series lets
-  me use the device.
-* is the hardreset thing I did there the right thing to do? I think the
-  proper way would be a reset controller (which apparently doesn't yet exist
-  for this SoC?) and let the driver deassert/assert on probe/remove?
-* the platform device path has a clk_enable() / clk_put() calls. Are those
-  now redundant with the introduced pm_runtime_enable() pm_runtime_disable()
-  calls?
-
-Thanks,
-Andre
-
-Andre Heider (13):
-  uio: uio_pruss: use struct device
-  uio: uio_pruss: use devm_kzalloc()
-  uio: uio_pruss: use devm_ioremap_resource()
-  uio: uio_pruss: use dmam_alloc_coherent()
-  ARM: OMAP2+: hwmod: Introduce a flag to deassert the HW reset line
-  ARM: AM33XX: hwmod: deassert PRUSS' hardreset lines
-  Documentation: devicetree: add bindings for TI PRUSS
-  uio: uio_pruss: make the UIO SRAM memory region optional
-  uio: uio_pruss: add devicetree support
-  uio: uio_pruss: add runtime pm support
-  uio: uio_pruss: enable the driver for am33xx SoCs
-  ARM: dts: am33xx: add the PRUSSv2 device
-  ARM: dts: am335x-boneblack: enable the PRUSSv2 device
-
- .../devicetree/bindings/misc/ti,pruss.txt          |  19 +++
- arch/arm/boot/dts/am335x-boneblack.dts             |   4 +
- arch/arm/boot/dts/am33xx.dtsi                      |   9 ++
- arch/arm/mach-omap2/omap_hwmod.c                   |   2 +
- arch/arm/mach-omap2/omap_hwmod.h                   |   2 +
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |   1 +
- drivers/uio/Kconfig                                |   4 +-
- drivers/uio/uio_pruss.c                            | 144 ++++++++++++---------
- 8 files changed, 123 insertions(+), 62 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/misc/ti,pruss.txt
-
+diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
+index 96c4a19..c28d6e2 100644
+--- a/drivers/uio/uio_pruss.c
++++ b/drivers/uio/uio_pruss.c
+@@ -91,8 +91,7 @@ static irqreturn_t pruss_handler(int irq, struct uio_info *info)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void pruss_cleanup(struct platform_device *dev,
+-			struct uio_pruss_dev *gdev)
++static void pruss_cleanup(struct device *dev, struct uio_pruss_dev *gdev)
+ {
+ 	int cnt;
+ 	struct uio_info *p = gdev->info;
+@@ -103,7 +102,7 @@ static void pruss_cleanup(struct platform_device *dev,
+ 	}
+ 	iounmap(gdev->prussio_vaddr);
+ 	if (gdev->ddr_vaddr) {
+-		dma_free_coherent(&dev->dev, extram_pool_sz, gdev->ddr_vaddr,
++		dma_free_coherent(dev, extram_pool_sz, gdev->ddr_vaddr,
+ 			gdev->ddr_paddr);
+ 	}
+ 	if (gdev->sram_vaddr)
+@@ -115,13 +114,14 @@ static void pruss_cleanup(struct platform_device *dev,
+ 	kfree(gdev);
+ }
+ 
+-static int pruss_probe(struct platform_device *dev)
++static int pruss_probe(struct platform_device *pdev)
+ {
+ 	struct uio_info *p;
+ 	struct uio_pruss_dev *gdev;
+ 	struct resource *regs_prussio;
++	struct device *dev = &pdev->dev;
+ 	int ret = -ENODEV, cnt = 0, len;
+-	struct uio_pruss_pdata *pdata = dev_get_platdata(&dev->dev);
++	struct uio_pruss_pdata *pdata = dev_get_platdata(dev);
+ 
+ 	gdev = kzalloc(sizeof(struct uio_pruss_dev), GFP_KERNEL);
+ 	if (!gdev)
+@@ -132,10 +132,11 @@ static int pruss_probe(struct platform_device *dev)
+ 		kfree(gdev);
+ 		return -ENOMEM;
+ 	}
++
+ 	/* Power on PRU in case its not done as part of boot-loader */
+-	gdev->pruss_clk = clk_get(&dev->dev, "pruss");
++	gdev->pruss_clk = clk_get(dev, "pruss");
+ 	if (IS_ERR(gdev->pruss_clk)) {
+-		dev_err(&dev->dev, "Failed to get clock\n");
++		dev_err(dev, "Failed to get clock\n");
+ 		ret = PTR_ERR(gdev->pruss_clk);
+ 		kfree(gdev->info);
+ 		kfree(gdev);
+@@ -144,14 +145,14 @@ static int pruss_probe(struct platform_device *dev)
+ 		clk_enable(gdev->pruss_clk);
+ 	}
+ 
+-	regs_prussio = platform_get_resource(dev, IORESOURCE_MEM, 0);
++	regs_prussio = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!regs_prussio) {
+-		dev_err(&dev->dev, "No PRUSS I/O resource specified\n");
++		dev_err(dev, "No PRUSS I/O resource specified\n");
+ 		goto out_free;
+ 	}
+ 
+ 	if (!regs_prussio->start) {
+-		dev_err(&dev->dev, "Invalid memory resource\n");
++		dev_err(dev, "Invalid memory resource\n");
+ 		goto out_free;
+ 	}
+ 
+@@ -161,27 +162,27 @@ static int pruss_probe(struct platform_device *dev)
+ 			(unsigned long)gen_pool_dma_alloc(gdev->sram_pool,
+ 					sram_pool_sz, &gdev->sram_paddr);
+ 		if (!gdev->sram_vaddr) {
+-			dev_err(&dev->dev, "Could not allocate SRAM pool\n");
++			dev_err(dev, "Could not allocate SRAM pool\n");
+ 			goto out_free;
+ 		}
+ 	}
+ 
+-	gdev->ddr_vaddr = dma_alloc_coherent(&dev->dev, extram_pool_sz,
++	gdev->ddr_vaddr = dma_alloc_coherent(dev, extram_pool_sz,
+ 				&(gdev->ddr_paddr), GFP_KERNEL | GFP_DMA);
+ 	if (!gdev->ddr_vaddr) {
+-		dev_err(&dev->dev, "Could not allocate external memory\n");
++		dev_err(dev, "Could not allocate external memory\n");
+ 		goto out_free;
+ 	}
+ 
+ 	len = resource_size(regs_prussio);
+ 	gdev->prussio_vaddr = ioremap(regs_prussio->start, len);
+ 	if (!gdev->prussio_vaddr) {
+-		dev_err(&dev->dev, "Can't remap PRUSS I/O  address range\n");
++		dev_err(dev, "Can't remap PRUSS I/O  address range\n");
+ 		goto out_free;
+ 	}
+ 
+ 	gdev->pintc_base = pdata->pintc_base;
+-	gdev->hostirq_start = platform_get_irq(dev, 0);
++	gdev->hostirq_start = platform_get_irq(pdev, 0);
+ 
+ 	for (cnt = 0, p = gdev->info; cnt < MAX_PRUSS_EVT; cnt++, p++) {
+ 		p->mem[0].addr = regs_prussio->start;
+@@ -204,12 +205,12 @@ static int pruss_probe(struct platform_device *dev)
+ 		p->handler = pruss_handler;
+ 		p->priv = gdev;
+ 
+-		ret = uio_register_device(&dev->dev, p);
++		ret = uio_register_device(dev, p);
+ 		if (ret < 0)
+ 			goto out_free;
+ 	}
+ 
+-	platform_set_drvdata(dev, gdev);
++	platform_set_drvdata(pdev, gdev);
+ 	return 0;
+ 
+ out_free:
+@@ -221,7 +222,7 @@ static int pruss_remove(struct platform_device *dev)
+ {
+ 	struct uio_pruss_dev *gdev = platform_get_drvdata(dev);
+ 
+-	pruss_cleanup(dev, gdev);
++	pruss_cleanup(&dev->dev, gdev);
+ 	return 0;
+ }
+ 
 -- 
 2.0.0
