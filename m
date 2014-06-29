@@ -1,66 +1,157 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 29 Jun 2014 16:17:01 +0200
-Subject: [PATCH v3 4/4] brcmfmac: Fix OOB interrupt not working for BCM43362
-In-Reply-To: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
-References: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1404051421-24377-5-git-send-email-hdegoede@redhat.com>
+From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
+Date: Sun, 29 Jun 2014 17:33:49 +0300
+Subject: [PATCH 1/2] [v2] crypto: sha1/ARM: make use of common SHA-1 structures
+Message-ID: <20140629143349.17245.50072.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has taken me a long long time to get the OOB interrupt working on the
-AP6210 sdio wifi/bt module found on various Allwinner A20 boards. In the
-end I found these magic register pokes in the cubietruck kernel tree:
-https://github.com/cubieboard2/linux-sunxi/commit/7f08ba395617d17e7a711507503d89a50406fe7a
+Common SHA-1 structures are defined in <crypto/sha.h> for code sharing.
 
-This is also done for the bcm43362 in broadcom's internal/proprietary driver.
+This patch changes SHA-1/ARM glue code to use these structures.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Reviewed-by: Arend van Spriel <arend@broadcom.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jussi Kivilinna <jussi.kivilinna@iki.fi>
 ---
- drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/crypto/sha1_glue.c |   50 +++++++++++++++++++------------------------
+ 1 file changed, 22 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-index 0fc707c..58e86a5 100644
---- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-+++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-@@ -39,7 +39,9 @@
- #include <brcm_hw_ids.h>
- #include <brcmu_utils.h>
- #include <brcmu_wifi.h>
-+#include <chipcommon.h>
- #include <soc.h>
-+#include "chip.h"
- #include "dhd_bus.h"
- #include "dhd_dbg.h"
- #include "sdio_host.h"
-@@ -119,6 +121,7 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
+diff --git a/arch/arm/crypto/sha1_glue.c b/arch/arm/crypto/sha1_glue.c
+index 76cd976..c494e57 100644
+--- a/arch/arm/crypto/sha1_glue.c
++++ b/arch/arm/crypto/sha1_glue.c
+@@ -24,31 +24,25 @@
+ #include <crypto/sha.h>
+ #include <asm/byteorder.h>
+ 
+-struct SHA1_CTX {
+-	uint32_t h0,h1,h2,h3,h4;
+-	u64 count;
+-	u8 data[SHA1_BLOCK_SIZE];
+-};
+ 
+-asmlinkage void sha1_block_data_order(struct SHA1_CTX *digest,
++asmlinkage void sha1_block_data_order(u32 *digest,
+ 		const unsigned char *data, unsigned int rounds);
+ 
+ 
+ static int sha1_init(struct shash_desc *desc)
  {
- 	int ret = 0;
- 	u8 data;
-+	u32 addr, gpiocontrol;
- 	unsigned long flags;
- 
- 	if ((sdiodev->pdata) && (sdiodev->pdata->oob_irq_supported)) {
-@@ -148,6 +151,19 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
- 
- 		sdio_claim_host(sdiodev->func[1]);
- 
-+		if (sdiodev->bus_if->chip == BCM43362_CHIP_ID) {
-+			/* assign GPIO to SDIO core */
-+			addr = CORE_CC_REG(SI_ENUM_BASE, gpiocontrol);
-+			gpiocontrol = brcmf_sdiod_regrl(sdiodev, addr, &ret);
-+			gpiocontrol |= 0x2;
-+			brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol, &ret);
+-	struct SHA1_CTX *sctx = shash_desc_ctx(desc);
+-	memset(sctx, 0, sizeof(*sctx));
+-	sctx->h0 = SHA1_H0;
+-	sctx->h1 = SHA1_H1;
+-	sctx->h2 = SHA1_H2;
+-	sctx->h3 = SHA1_H3;
+-	sctx->h4 = SHA1_H4;
++	struct sha1_state *sctx = shash_desc_ctx(desc);
 +
-+			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_SELECT, 0xf,
-+					  &ret);
-+			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_OUT, 0, &ret);
-+			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_EN, 0x2, &ret);
-+		}
++	*sctx = (struct sha1_state){
++		.state = { SHA1_H0, SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 },
++	};
 +
- 		/* must configure SDIO_CCCR_IENx to enable irq */
- 		data = brcmf_sdiod_regrb(sdiodev, SDIO_CCCR_IENx, &ret);
- 		data |= 1 << SDIO_FUNC_1 | 1 << SDIO_FUNC_2 | 1;
--- 
-2.0.0
+ 	return 0;
+ }
+ 
+ 
+-static int __sha1_update(struct SHA1_CTX *sctx, const u8 *data,
+-			       unsigned int len, unsigned int partial)
++static int __sha1_update(struct sha1_state *sctx, const u8 *data,
++			 unsigned int len, unsigned int partial)
+ {
+ 	unsigned int done = 0;
+ 
+@@ -56,17 +50,17 @@ static int __sha1_update(struct SHA1_CTX *sctx, const u8 *data,
+ 
+ 	if (partial) {
+ 		done = SHA1_BLOCK_SIZE - partial;
+-		memcpy(sctx->data + partial, data, done);
+-		sha1_block_data_order(sctx, sctx->data, 1);
++		memcpy(sctx->buffer + partial, data, done);
++		sha1_block_data_order(sctx->state, sctx->buffer, 1);
+ 	}
+ 
+ 	if (len - done >= SHA1_BLOCK_SIZE) {
+ 		const unsigned int rounds = (len - done) / SHA1_BLOCK_SIZE;
+-		sha1_block_data_order(sctx, data + done, rounds);
++		sha1_block_data_order(sctx->state, data + done, rounds);
+ 		done += rounds * SHA1_BLOCK_SIZE;
+ 	}
+ 
+-	memcpy(sctx->data, data + done, len - done);
++	memcpy(sctx->buffer, data + done, len - done);
+ 	return 0;
+ }
+ 
+@@ -74,14 +68,14 @@ static int __sha1_update(struct SHA1_CTX *sctx, const u8 *data,
+ static int sha1_update(struct shash_desc *desc, const u8 *data,
+ 			     unsigned int len)
+ {
+-	struct SHA1_CTX *sctx = shash_desc_ctx(desc);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
+ 	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
+ 	int res;
+ 
+ 	/* Handle the fast case right here */
+ 	if (partial + len < SHA1_BLOCK_SIZE) {
+ 		sctx->count += len;
+-		memcpy(sctx->data + partial, data, len);
++		memcpy(sctx->buffer + partial, data, len);
+ 		return 0;
+ 	}
+ 	res = __sha1_update(sctx, data, len, partial);
+@@ -92,7 +86,7 @@ static int sha1_update(struct shash_desc *desc, const u8 *data,
+ /* Add padding and return the message digest. */
+ static int sha1_final(struct shash_desc *desc, u8 *out)
+ {
+-	struct SHA1_CTX *sctx = shash_desc_ctx(desc);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
+ 	unsigned int i, index, padlen;
+ 	__be32 *dst = (__be32 *)out;
+ 	__be64 bits;
+@@ -106,7 +100,7 @@ static int sha1_final(struct shash_desc *desc, u8 *out)
+ 	/* We need to fill a whole block for __sha1_update() */
+ 	if (padlen <= 56) {
+ 		sctx->count += padlen;
+-		memcpy(sctx->data + index, padding, padlen);
++		memcpy(sctx->buffer + index, padding, padlen);
+ 	} else {
+ 		__sha1_update(sctx, padding, padlen, index);
+ 	}
+@@ -114,7 +108,7 @@ static int sha1_final(struct shash_desc *desc, u8 *out)
+ 
+ 	/* Store state in digest */
+ 	for (i = 0; i < 5; i++)
+-		dst[i] = cpu_to_be32(((u32 *)sctx)[i]);
++		dst[i] = cpu_to_be32(sctx->state[i]);
+ 
+ 	/* Wipe context */
+ 	memset(sctx, 0, sizeof(*sctx));
+@@ -124,7 +118,7 @@ static int sha1_final(struct shash_desc *desc, u8 *out)
+ 
+ static int sha1_export(struct shash_desc *desc, void *out)
+ {
+-	struct SHA1_CTX *sctx = shash_desc_ctx(desc);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
+ 	memcpy(out, sctx, sizeof(*sctx));
+ 	return 0;
+ }
+@@ -132,7 +126,7 @@ static int sha1_export(struct shash_desc *desc, void *out)
+ 
+ static int sha1_import(struct shash_desc *desc, const void *in)
+ {
+-	struct SHA1_CTX *sctx = shash_desc_ctx(desc);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
+ 	memcpy(sctx, in, sizeof(*sctx));
+ 	return 0;
+ }
+@@ -145,8 +139,8 @@ static struct shash_alg alg = {
+ 	.final		=	sha1_final,
+ 	.export		=	sha1_export,
+ 	.import		=	sha1_import,
+-	.descsize	=	sizeof(struct SHA1_CTX),
+-	.statesize	=	sizeof(struct SHA1_CTX),
++	.descsize	=	sizeof(struct sha1_state),
++	.statesize	=	sizeof(struct sha1_state),
+ 	.base		=	{
+ 		.cra_name	=	"sha1",
+ 		.cra_driver_name=	"sha1-asm",
