@@ -1,32 +1,45 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 30 Jun 2014 11:37:48 +0200
-Subject: [PATCH] ARM: imx53: mark imx53_dt_board_compat as const
-Message-ID: <1404121068-12275-1-git-send-email-l.stach@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jun 2014 10:38:09 +0100
+Subject: [PATCH 02/13] uio: uio_pruss: use devm_kzalloc()
+In-Reply-To: <1404058907-21112-3-git-send-email-a.heider@gmail.com>
+References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
+ <1404058907-21112-3-git-send-email-a.heider@gmail.com>
+Message-ID: <20140630093809.GW7262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise GCC will mark the .init.rodata section
-R/W, which causes a compile error once we add other
-real R/O data, which happens with patch
-"ARM: imx53: globally disable supervisor protect".
+On Sun, Jun 29, 2014 at 05:21:36PM +0100, Andre Heider wrote:
+> Replace kzalloc() by devm_kzalloc() and remove the kfree() calls.
+> 
+> Signed-off-by: Andre Heider <a.heider@gmail.com>
+> ---
+>  drivers/uio/uio_pruss.c | 15 ++++-----------
+>  1 file changed, 4 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
+> index c28d6e2..f07545b 100644
+> --- a/drivers/uio/uio_pruss.c
+> +++ b/drivers/uio/uio_pruss.c
+> @@ -109,9 +109,7 @@ static void pruss_cleanup(struct device *dev, struct uio_pruss_dev *gdev)
+>  		gen_pool_free(gdev->sram_pool,
+>  			      gdev->sram_vaddr,
+>  			      sram_pool_sz);
+> -	kfree(gdev->info);
+>  	clk_put(gdev->pruss_clk);
+> -	kfree(gdev);
+>  }
+>  
+>  static int pruss_probe(struct platform_device *pdev)
+> @@ -123,24 +121,19 @@ static int pruss_probe(struct platform_device *pdev)
+>  	int ret = -ENODEV, cnt = 0, len;
+>  	struct uio_pruss_pdata *pdata = dev_get_platdata(dev);
+>  
+> -	gdev = kzalloc(sizeof(struct uio_pruss_dev), GFP_KERNEL);
+> +	gdev = devm_kzalloc(dev, sizeof(struct uio_pruss_dev), GFP_KERNEL);
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/mach-imx/mach-imx53.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+If this is changing anyway, how about:
 
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index d757d8cbebd1..c3a404ce39e6 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -45,7 +45,7 @@ static void __init imx53_dt_init(void)
- 	}
- }
- 
--static const char *imx53_dt_board_compat[] __initconst = {
-+static const char * const imx53_dt_board_compat[] __initconst = {
- 	"fsl,imx53",
- 	NULL
- };
--- 
-2.0.0
+	gdev = devm_kzalloc(dev, sizeof(*gdev), GFP_KERNEL);
+
+Cheers,
+Mark.
