@@ -1,68 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 18:43:34 +0100
-Subject: [PATCH v2 1/4] of: Add NVIDIA Tegra Legacy Interrupt Controller
- binding
-In-Reply-To: <1403917351-13215-1-git-send-email-thierry.reding@gmail.com>
-References: <1403917351-13215-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20140630174334.GF28740@leverpostej>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 30 Jun 2014 13:44:32 -0400
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
+In-Reply-To: <20140630122216.6ea35ac9@free-electrons.com>
+References: <20140627124655.GF23978@titan.lakedaemon.net>
+ <20140628162302.48b6b835@free-electrons.com>
+ <20140628150706.GM23978@titan.lakedaemon.net>
+ <20140628172044.4231c32d@free-electrons.com>
+ <20140630122216.6ea35ac9@free-electrons.com>
+Message-ID: <20140630174432.GW23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 28, 2014 at 02:02:28AM +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Mon, Jun 30, 2014 at 12:22:16PM +0200, Thomas Petazzoni wrote:
+> Jason,
 > 
-> The Legacy Interrupt Controller found on NVIDIA Tegra SoCs is used by
-> the AVP coprocessor and can also serve as a backup for the ARM Cortex
-> CPU's local interrupt controller (GIC).
+> On Sat, 28 Jun 2014 17:20:44 +0200, Thomas Petazzoni wrote:
 > 
-> The LIC is subdivided into multiple identical units, each handling 32
-> possible interrupt sources.
+> > Yeah, sorry, I wasn't clear. If you look back at what I sent in
+> > https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
+> > ([PATCHv5 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+> > deadlock), there were three patches:
+> > 
+> >  PATCH 1/3, "ARM: mm: add support for HW coherent systems in PL310
+> >  cache", for Russell. It has already been merged by Russell in
+> >  "git-curr", as visible at
+> >  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8076/1.
+> >  I'm hoping this is scheduled for 3.16, because I need this patch for
+> >  3.16 to avoid the PCIe deadlock.
+> > 
+> >  PATCH 2/3 and 3/3 are related, and the latter is needed to solve the
+> >  PCIe deadlock, by using the new DT property made available in PATCH
+> >  1/3. PATCH 2/3 is ARM: mvebu: move Armada 375 external abort logic as
+> >  a quirk and PATCH 3/3 is ARM: mvebu: update L2/PCIe deadlock
+> >  workaround after L2CC cleanup.
+> > 
+> > All in all, I'm hoping for the series at
+> > https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
+> > to fully show up in 3.16, because it's really related to fixing a
+> > serious PCIe deadlock (can be triggered in under a minute of PCIe
+> > usage).
 > 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v2:
-> - new patch
-> 
->  .../interrupt-controller/nvidia,tegra20-ictlr.txt     | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
-> new file mode 100644
-> index 000000000000..c695ec713740
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
-> @@ -0,0 +1,19 @@
-> +NVIDIA Tegra Legacy Interrupt Controller
-> +
-> +The legacy interrupt controller is divided into units that serve 32 interrupts
-> +each. Tegra20 implements four units, whereas Tegra30 and later implement five.
-> +
-> +Required properties:
-> +- compatible: "nvidia,tegra<chip>-ictlr"
+> Now that Russell is pushing PATCH 1/3 in the 3.16-rc cycle, can you
+> push PATCH 2/3 and PATCH 3/3 pointed above into the 3.16-rc cycle as
+> well?
 
-And valid <chip> values are?
+2 and 3 are now in mvebu/fixes.
 
-> +- reg: Physical base address and length of the controller's registers. There
-> +  should be one entry for each unit.
-> +
-> +Example:
-> +
-> +	interrupt-controller at 60004000 {
-> +		compatible = "nvidia,tegra20-ictlr";
-> +		reg = <0x60004000 0x40   /* primary controller */
-> +		       0x60004100 0x40   /* secondary controller */
-> +		       0x60004200 0x40   /* tertiary controller */
-> +		       0x60004300 0x40>; /* quaternary controller */
+thx,
 
-Could we please bracket the entries individually, e.g.
-
-		reg = <0x60004000 0x40>,
-		      <0x60004100 0x40>,
-		      <0x60004200 0x40>,
-		      <0x60004300 0x40>;
-
-How do the interrupt lines correspond to those of the GIC?
-
-Cheers,
-Mark.
+Jason.
