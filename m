@@ -1,83 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 14:50:27 +0200
-Subject: [PATCH 05/16] ARM: mvebu: Add workaround for cpuidle support
- for Armada 370
-In-Reply-To: <1403875377-940-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140630145027.3b583cfa@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jun 2014 13:53:39 +0100
+Subject: [PATCH V5 2/3] Documentation: gpio: Add APM X-Gene SoC GPIO
+ controller DTS binding
+In-Reply-To: <1403823587-23404-3-git-send-email-fkan@apm.com>
+References: <1403823587-23404-1-git-send-email-fkan@apm.com>
+ <1403823587-23404-3-git-send-email-fkan@apm.com>
+Message-ID: <20140630125339.GA21390@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
-
-On Fri, 27 Jun 2014 15:22:46 +0200, Gregory CLEMENT wrote:
-> On Armada 370, there is "a slow exit process from the deep idle state
-> due to heavy L1/L2 cache cleanup operations performed by the BootROM
-> software" (cf errata GL-BootROM-10). To avoid this, we replace the
-> restart code of the BootROM by a simple jump to the boot address. Then
-> the code located at this boot address will take care of the
-> initialization.
+On Thu, Jun 26, 2014 at 11:59:46PM +0100, Feng Kan wrote:
+> Documentation for APM X-Gene SoC GPIO controller DTS binding.
 > 
-> For this purpose, we use the common function mvebu_boot_addr_wa()
-> introduced in the previous commit.
-
-"in the previous commit" would make sense if the commit immediately
-before this one in the series was the one you would be referencing. But
-that's not the case here, so it should be either: "introduced in one of
-the previous commits", or better "introduced in commit <title of the
-commit>".
-
->  #define PMSU_BASE_OFFSET    0x100
->  #define PMSU_REG_SIZE	    0x1000
-> @@ -77,6 +76,9 @@ extern void ll_enable_coherency(void);
->  
->  extern void armada_370_xp_cpu_resume(void);
->  
-> +static unsigned long pmsu_mp_phys_base;
-
-phys_addr_t.
-
-> +static void __iomem *pmsu_mp_base;
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio-xgene.txt          | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-xgene.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene.txt
+> new file mode 100644
+> index 0000000..bd5fd85
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene.txt
+> @@ -0,0 +1,20 @@
+> +APM X-Gene SoC GPIO controller bindings
 > +
->  static struct platform_device armada_xp_cpuidle_device = {
->  	.name = "cpuidle-armada-370-xp",
->  };
-> @@ -147,6 +149,8 @@ static int __init armada_370_xp_pmsu_init(void)
->  		goto out;
->  	}
->  
-> +	pmsu_mp_phys_base = res.start;
+> +This is a gpio controller that is part of the flash controller.
+> +This gpio controller controls a total of 48 gpios.
 > +
->  	pmsu_mp_base = ioremap(res.start, resource_size(&res));
->  	if (!pmsu_mp_base) {
->  		pr_err("unable to map registers\n");
-> @@ -312,6 +316,18 @@ int __init armada_370_xp_cpu_pm_init(void)
->  		return 0;
->  	of_node_put(np);
->  
-> +	/*
-> +	 * On Armada 370, there is "a slow exit process from the deep
-> +	 * idle state due to heavy L1/L2 cache cleanup operations
-> +	 * performed by the BootROM software". To avoid this, we
-> +	 * replace the restart code of the bootrom by a a simple jump
-> +	 * to the boot address. Then the code located at this boot
-> +	 * address will take care of the initialization.
-> +	 */
-> +	if (of_machine_is_compatible("marvell,armada370"))
-> +		mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
-> +				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
-> +
->  	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
->  	armada_xp_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
->  	platform_device_register(&armada_xp_cpuidle_device);
+> +Required properties:
+> +- compatible: "apm,xgene-gpio" for X-Gene GPIO controller
+> +- reg: Physical base address and size of the controller's registers
 
-Other than that, looks good to me.
+There is just the one bank?
+
+> +- #gpio-cells: Should be two.
+> +	- first cell is the pin number
+> +	- second cell is used to specify optional parameters (unused)
+
+Why is there an unused cell?
+
+Why not just make this a single cell if the binding defines no valid
+parameters?
+
+> +- gpio-controller: Marks the device node as a GPIO controller.
+
+No interrupts?
 
 Thanks,
+Mark.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +
+> +Example:
+> +	gpio0: gpio0 at 1701c000 {
+> +		compatible = "apm,xgene-gpio";
+> +		reg = <0x0 0x1701c000 0x0 0x40>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
