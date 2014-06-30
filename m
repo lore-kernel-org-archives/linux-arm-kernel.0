@@ -1,47 +1,68 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Mon, 30 Jun 2014 16:52:11 +0200
-Subject: [PATCH v2 05/12] usb: phy: add the Berlin USB PHY driver
-In-Reply-To: <20140627230433.GC762@saruman.home>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-6-git-send-email-antoine.tenart@free-electrons.com>
- <20140627155622.GL8069@saruman.home> <20140627160557.GA6622@kwain>
- <20140627230433.GC762@saruman.home>
-Message-ID: <20140630145211.GA29613@kwain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Jun 2014 16:58:47 +0200
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
+ CPU frequency
+In-Reply-To: <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
+References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630102934.GV32514@n2100.arm.linux.org.uk>
+ <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
+ <20140630124919.GC28647@lukather>
+ <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
+ <20140630140146.GD28647@lukather>
+ <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
+Message-ID: <20140630145847.GE28647@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
-
-On Fri, Jun 27, 2014 at 06:04:33PM -0500, Felipe Balbi wrote:
-> On Fri, Jun 27, 2014 at 06:05:57PM +0200, Antoine T?nart wrote:
-> > Hi Felipe,
-> > 
-> > On Fri, Jun 27, 2014 at 10:56:22AM -0500, Felipe Balbi wrote:
-> > > On Tue, Jun 24, 2014 at 12:35:14PM +0200, Antoine T?nart wrote:
-> > > > Add the driver driving the Marvell Berlin USB PHY. This allows to
-> > > > initialize the PHY and to use it from the USB driver later.
-> > > > 
-> > > > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> > > 
-> > > since this is a brand new driver, it should go to drivers/phy instead.
-> > 
-> > This PHY is used by a ChipIdea USB driver, which uses the provided
-> > common function for ChipIdea. These functions use the usb_phy framework.
-> > That's why this PHY driver is there.
+On Mon, Jun 30, 2014 at 04:48:35PM +0200, Vincent Guittot wrote:
+> On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
+> >> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
+> >> >> >> -             if (!rate || len != 4) {
+> >> >> >> -                     pr_err("%s missing clock-frequency property\n",
+> >> >> >> -                             cn->full_name);
+> >> >> >> +             clk = of_clk_get(cn, 0);
+> >> >> >> +             if (!IS_ERR(clk))
+> >> >> >> +                     rate = clk_get_rate(clk);
+> >> >>
+> >> >> We need the max frequency as it will be used to weight the different
+> >> >> CPUs capacity. How do you ensure that the current clock rate is the
+> >> >> max one ?
+> >> >
+> >> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
+> >> > current CPU frequency, not the max one.
+> >>
+> >> What means current frequency in device tree when DVFS is involved ?
+> >
+> > The ePAPR states that clock-frequency is supposed to be "the current
+> > clock speed of the CPU in Hertz". It's exactly what my patch add.
+> >
+> > Now, you're right, DVFS would be an issue here with clock-frequency,
+> > but this patch actually makes it easier to deal with, since you only
+> > get a reference to a clock, and you can get its rate at any given
+> > time.
 > 
-> right, but you can add support for the new PHY layer which would help
-> other users convert their PHY drivers to the new PHY framework.
+> and what about using clk_round_rate(clk, ULONG_MAX) ?
 
-Adding the support for the new PHY layer in the common CI code is not
-complicated, but these functions also use some parts from usb hcd or usb
-otg which are only usb_phy compatible.
+Well, the clock itself might generate a frequency higher that what the
+CPU can run at, so I'm not sure it's a valid assumption.
 
-Shouldn't these parts add the new PHY support first, to avoid ending up
-with a fairly big series, quite long to do and complicated to review?
+> We will not be dependent of when we parse DT
 
-Antoine
+You lost me there. clk_round_rate and clk_get_rate are available at
+the same time in the boot process, aren't they?
+
+Maxime
 
 -- 
-Antoine T?nart, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/6b84a52e/attachment.sig>
