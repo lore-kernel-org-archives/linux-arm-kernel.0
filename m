@@ -1,46 +1,46 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 30 Jun 2014 10:42:13 -0500
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <20140630144045.GM25779@arm.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <20140630144045.GM25779@arm.com>
-Message-ID: <53B18555.2000109@mentor.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jun 2014 17:43:38 +0200
+Subject: [PATCH 09/16] ARM: mvebu: Make the snoop disable optional in
+ mvebu_v7_pmsu_idle_prepare
+In-Reply-To: <1403875377-940-10-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-10-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140630174338.13604523@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2014 09:40 AM, Will Deacon wrote:
-> Hi Nathan,
-> 
-> On Mon, Jun 23, 2014 at 04:11:49AM +0100, Nathan Lynch wrote:
->> Provide fast userspace implementations of gettimeofday and
->> clock_gettime on systems that implement the generic timers extension
->> defined in ARMv7.  This follows the example of arm64 in conception but
->> significantly differs in some aspects of the implementation (C vs
->> assembly, mainly).
-> 
-> [...]
-> 
-> This series is starting to gain traction now, so it's probably time to start
-> thinking about implementing this for CONFIG_COMPAT on arm64. We currently
-> map a fake vectors page there, but this would be much more flexible,
-> particularly as its written in C (and so we would magically get any new
-> functions added to the 32-bit version).
-> 
-> So, there are a couple of questions that spring to mind:
-> 
->   - How difficult is it to share the vdso code with arm64 to build a compat
->     vdso? (getting the Makefile to work will be hard, as we'll need an arm
->     toolchain...).
+Gregory,
 
-Not sure.  x86 might be the best example to work from here, although it
-has the advantage of everything living under arch/x86.  64-bit powerpc
-kernels provide a 32-bit VDSO for compat tasks but I think it doesn't
-really share code with the 64-bit VDSO.
+On Fri, 27 Jun 2014 15:22:50 +0200, Gregory CLEMENT wrote:
 
-> 
->   - If we use your code to build an arm64 vdso, how much slower is it than
->     the handcrafted asm we currently have?
+>  /* No locking is needed because we only access per-CPU registers */
+> -static void mvebu_v7_pmsu_idle_prepare(bool deepidle)
+> +static void mvebu_v7_pmsu_idle_prepare(bool deepidle, bool snoopdis)
 
-Someone with access to 64-bit hardware (i.e. not me) would have to find
-this out, but I would not be surprised if the C code could be tightened
-up -- I have not spent much time on optimizing it.
+I continue to find it odd to have more and more boolean arguments to a
+function to indicate what the function should do. It often indicates
+that the function should rather be split in smaller, fine-grained
+functions. Another sad consequence of using booleans is that the call
+sites of the functions can no longer be understood properly:
+
+	mvebu_v7_pmsu_idle_prepare(false, true);
+	mvebu_v7_pmsu_idle_prepare(true, true);
+	mvebu_v7_pmsu_idle_prepare(false, false);
+
+But oh well, it looks like it's the easiest solution here, and I admit
+it's convenient to have one function to the entire business of
+preparing for idle.
+
+However, this change also badly conflicts with the CPU hotplug support
+that I have sent, and which is already part of linux-next, and for
+which Jason has sent a pull request to the arm-soc folks. See
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-mvebu/platsmp.c
+for the usage of the armada_370_xp_pmsu_idle_enter() function.
+
+Maybe your patch series should be based on mvebu/soc instead?
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
