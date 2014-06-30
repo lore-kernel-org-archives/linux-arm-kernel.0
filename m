@@ -1,87 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 16:33:05 +0100
-Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
- A31 DMA controller
-In-Reply-To: <20140630151906.GG28647@lukather>
-References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
- <20140630142054.GA8756@leverpostej>
- <20140630151906.GG28647@lukather>
-Message-ID: <20140630153305.GA28740@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jun 2014 17:37:55 +0200
+Subject: [PATCH 11/16] ARM: mvebu: dts: Add CA9 MPcore SoC Controller node
+In-Reply-To: <1403875377-940-12-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-12-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140630173755.32793586@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 04:19:06PM +0100, Maxime Ripard wrote:
-> On Mon, Jun 30, 2014 at 03:20:54PM +0100, Mark Rutland wrote:
-> > Hi Maxime,
-> > 
-> > On Mon, Jun 30, 2014 at 02:20:54PM +0100, Maxime Ripard wrote:
-> > > The Allwinner A31 has a 16 channels DMA controller that it shares with the
-> > > newer A23. Although sharing some similarities with the DMA controller of the
-> > > older Allwinner SoCs, it's significantly different, I don't expect it to be
-> > > possible to share the driver for these two.
-> > >
-> > > The A31 Controller is able to memory-to-memory or memory-to-device transfers on
-> > > the 16 channels in parallel.
-> > >
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > ---
-> > >  drivers/dma/Kconfig     |    8 +
-> > >  drivers/dma/Makefile    |    1 +
-> > >  drivers/dma/sun6i-dma.c | 1058 +++++++++++++++++++++++++++++++++++++++++++++++
-> > >  3 files changed, 1067 insertions(+)
-> > >  create mode 100644 drivers/dma/sun6i-dma.c
-> > 
-> > [...]
-> > 
-> > > +       sdc->clk = devm_clk_get(&pdev->dev, NULL);
-> > > +       if (IS_ERR(sdc->clk)) {
-> > > +               dev_err(&pdev->dev, "No clock specified\n");
-> > > +               return PTR_ERR(sdc->clk);
-> > > +       }
-> > > +
-> > > +       mux = clk_get(NULL, "ahb1_mux");
-> > > +       if (IS_ERR(mux)) {
-> > > +               dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
-> > > +               return PTR_ERR(mux);
-> > > +       }
-> > > +
-> > > +       pll6 = clk_get(NULL, "pll6");
-> > > +       if (IS_ERR(pll6)) {
-> > > +               dev_err(&pdev->dev, "Couldn't get PLL6\n");
-> > > +               clk_put(mux);
-> > > +               return PTR_ERR(pll6);
-> > > +       }
-> > 
-> > I'm slightly confused. The binding listed a single unnamed clock (the
-> > AHB clock). What is going on here?
+Gregory,
+
+On Fri, 27 Jun 2014 15:22:52 +0200, Gregory CLEMENT wrote:
+> The CA9 MPcore SoC Control block allows to do some configuration that
+> the SoC could use for a specific use case. In most cases the defaults
+> case is enough. However there is few exception: for cpuidle we need to
+> use the CA9 MPcore Reset Control register.
+
+I'd reword this to something like:
+
+"""
+The CA9 MPcore SoC Control block is a set of registers that allows to
+configure certain internal aspects of the core blocks of the SoC
+(Cortex-A9, L2 cache controller, etc.). In most cases, the default
+values are fine so they aren't many reasons to touch those registers,
+but there is one exception: to support cpuidle on Armada 38x, we need
+to modify the value of the CA9 MPcore Reset Control register.
+
+Therefore, this commit adds a new Device Tree binding for this hardware
+block, and uses this new binding for the Armada 38x Device Tree file.
+
+"""
+
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> ---
+>  .../devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt | 14 ++++++++++++++
+>  arch/arm/boot/dts/armada-38x.dtsi                          |  5 +++++
+>  2 files changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
 > 
-> The device itself needs only a single clock to work...
-> 
-> > 
-> > > +       ret = clk_set_parent(mux, pll6);
-> > > +       clk_put(pll6);
-> > > +       clk_put(mux);
-> > > +
-> > > +       if (ret) {
-> > > +               dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
-> > > +               return ret;
-> > > +       }
-> > 
-> > Why do we need to reparent the mux?
-> 
-> ... but will function only if this clock is derived from PLL6.
+> diff --git a/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt b/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+> new file mode 100644
+> index 000000000000..0a2df51ba560
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/armada-380-mpcore-soc-ctrl.txt
+> @@ -0,0 +1,14 @@
+> +Marvell Armada 38x CA9 MPcore SoC Controller
+> +============================================
+> +
+> +Required properties:
+> +
+> +- compatible: Should be "marvell,armada-380-mpcore-soc-ctrl".
+> +
+> +- reg: should be register base and length as documented in the
 
-Ok, but _why_ is that the case? Could we at least have a comment for
-that?
+should be *the* register base and length
 
-Where does the driver get the named clocks from if they aren't provided
-on the device node? Is there a clock-ranges somewhere?
+> +  datasheet for the CA9 MPcore SoC Control registers
+> +
+> +mpcore-soc-ctrl at 20d20 {
+> +	compatible = "marvell,armada-380-mpcore-soc-ctrl";
+> +	reg = <0x20d20 0x6c>;
+> +};
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 689fa1a46728..242d0ecc99f3 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -286,6 +286,11 @@
+>  				reg = <0x20800 0x10>;
+>  			};
+>  
+> +			mpcore-soc-ctrl at 20d20 {
+> +				compatible = "marvell,armada-380-mpcore-soc-ctrl";
+> +				reg = <0x20d20 0x6c>;
+> +			};
+> +
+>  			coherency-fabric at 21010 {
+>  				compatible = "marvell,armada-380-coherency-fabric";
+>  				reg = <0x21010 0x1c>;
 
-It feels a little fragile to rely on the organisation of the clock tree
-and the naming thereof. If the IP block is ever reused on an SoC with a
-different clock tree layout then we have to handle things differently.
+With those fixed:
 
-Cheers,
-Mark.
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
