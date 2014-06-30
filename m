@@ -1,30 +1,182 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 22:20:09 +0300
-Subject: [PATCH 6/6] ARM: s3c24xx: RX1950: Add DMA device
-In-Reply-To: <1404156009-3919-1-git-send-email-anarsoul@gmail.com>
-References: <1404156009-3919-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1404156009-3919-6-git-send-email-anarsoul@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 30 Jun 2014 21:27:07 +0200
+Subject: [PATCH 1/4] clk: Introduce 'clk_find_nearest_rate()'
+In-Reply-To: <1404147396-8041-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1404147396-8041-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1404147396-8041-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20140630212707.1eb44db6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a corresponding device for a new dmaengine driver.
+Hello Soren,
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm/mach-s3c24xx/mach-rx1950.c | 1 +
- 1 file changed, 1 insertion(+)
+On Mon, 30 Jun 2014 09:56:33 -0700
+Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
 
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index e2c6541..95b88a6 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -710,6 +710,7 @@ static struct i2c_board_info rx1950_i2c_devices[] = {
- 
- static struct platform_device *rx1950_devices[] __initdata = {
- 	&s3c2410_device_dclk,
-+	&s3c2410_device_dma,
- 	&s3c_device_lcd,
- 	&s3c_device_wdt,
- 	&s3c_device_i2c0,
+> Introduce a new API function to find the rate a clock can provide
+> which is closest to a given rate.
+> 
+> clk_round_rate() leaves it to the clock driver how rounding is done.
+> Commonly implementations round down due to use-cases that have a
+> certain frequency maximum that must not be exceeded.
+
+I had the same concern (how could a driver decide whether it should
+round up, down or to the closest value), but had a slightly different
+approach in mind.
+
+AFAIU, you're assuming the clock is always a power of two (which is
+true most of the time, but some clock implementation might differ,
+i.e. a PLL accept any kind of multiplier not necessarily a power of 2).
+
+How about improving the clk_ops interface instead by adding a new method
+
+	long (*round_rate_with_constraint)(struct clk_hw *hw,
+					   unsigned long requested_rate,
+					   unsigned long *parent_rate,
+					   enum clk_round_type type);
+
+with
+
+enum clk_round_type {
+	CLK_ROUND_DOWN,
+	CLK_ROUND_UP,
+	CLK_ROUND_CLOSEST,
+};
+
+or just adding these 3 methods:
+
+	long (*round_rate_up)(struct clk_hw *hw,
+			      unsigned long requested_rate,
+			      unsigned long *parent_rate);
+
+	long (*round_rate_down)(struct clk_hw *hw,
+				unsigned long requested_rate,
+				unsigned long *parent_rate);
+
+	long (*round_rate_closest)(struct clk_hw *hw,
+				   unsigned long requested_rate,
+				   unsigned long *parent_rate);
+
+and let the round_rate method implement the default behaviour.
+
+This way you could add 3 functions to the API:
+
+clk_round_closest (or clk_find_nearest_rate as you called it),
+clk_round_up and clk_round_down, and let the clk driver implementation
+return the appropriate rate.
+
+These are just some thoughts...
+
+Best Regards,
+
+Boris
+
+> 
+> The new API call enables use-cases where accuracy is preferred. E.g.
+> Ethernet clocks.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+> 
+>  drivers/clk/clk.c   | 57
+> +++++++++++++++++++++++++++++++++++++++++++++++++++++
+> include/linux/clk.h |  9 +++++++++ 2 files changed, 66 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 8b73edef151d..fce1165cd879 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1030,6 +1030,63 @@ long clk_round_rate(struct clk *clk, unsigned
+> long rate) EXPORT_SYMBOL_GPL(clk_round_rate);
+>  
+>  /**
+> + * clk_find_nearest_rate - round the given rate for a clk
+> + * @clk: the clk for which we are rounding a rate
+> + * @rate: the rate which is to be rounded
+> + *
+> + * Takes in a rate as input and finds the closest rate that the clk
+> + * can actually use which is then returned.
+> + * Note: This function relies on the clock's clk_round_rate()
+> implementation.
+> + * For cases clk_round_rate() rounds up, not the closest but the
+> rounded up
+> + * rate is found.
+> + */
+> +long clk_find_nearest_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	long ret, lower, upper;
+> +	unsigned long tmp;
+> +
+> +	clk_prepare_lock();
+> +
+> +	lower = __clk_round_rate(clk, rate);
+> +	if (lower >= rate || lower < 0) {
+> +		ret = lower;
+> +		goto unlock;
+> +	}
+> +
+> +	tmp = rate + (rate - lower) - 1;
+> +	if (tmp > LONG_MAX)
+> +		upper = LONG_MAX;
+> +	else
+> +		upper = tmp;
+> +
+> +	upper = __clk_round_rate(clk, upper);
+> +	if (upper <= lower || upper < 0) {
+> +		ret = lower;
+> +		goto unlock;
+> +	}
+> +
+> +	lower = rate + 1;
+> +	while (lower < upper) {
+> +		long rounded, mid;
+> +
+> +		mid = lower + ((upper - lower) >> 1);
+> +		rounded = __clk_round_rate(clk, mid);
+> +		if (rounded < lower)
+> +			lower = mid + 1;
+> +		else
+> +			upper = rounded;
+> +	}
+> +
+> +	ret = upper;
+> +
+> +unlock:
+> +	clk_prepare_unlock();
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_find_nearest_rate);
+> +
+> +/**
+>   * __clk_notify - call clk notifier chain
+>   * @clk: struct clk * that is changing rate
+>   * @msg: clk notifier type (see include/linux/clk.h)
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index fb5e097d8f72..f8b53c515483 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -264,6 +264,15 @@ void devm_clk_put(struct device *dev, struct clk
+> *clk); long clk_round_rate(struct clk *clk, unsigned long rate);
+>  
+>  /**
+> + * clk_find_nearest_rate - Find nearest rate to the exact rate a
+> clock can provide
+> + * @clk: the clk for which we are rounding a rate
+> + * @rate: the rate which is to be rounded
+> + *
+> + * Returns the rate closest to @rate the clock can provide.
+> + */
+> +long clk_find_nearest_rate(struct clk *clk, unsigned long rate);
+> +
+> +/**
+>   * clk_set_rate - set the clock rate for a clock source
+>   * @clk: clock source
+>   * @rate: desired clock rate in Hz
+
+
+
 -- 
-2.0.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
