@@ -1,59 +1,87 @@
-From: trblinux@gmail.com (Tushar Behera)
-Date: Mon, 30 Jun 2014 21:01:34 +0530
-Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
-In-Reply-To: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
-References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <53B182D6.5050608@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jun 2014 16:33:05 +0100
+Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
+ A31 DMA controller
+In-Reply-To: <20140630151906.GG28647@lukather>
+References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630142054.GA8756@leverpostej>
+ <20140630151906.GG28647@lukather>
+Message-ID: <20140630153305.GA28740@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2014 03:02 AM, Kukjin Kim wrote:
-> This series removes S5P64X0 and S5PC100 related codes in mainline,
-> because no more user now. And if its supporting is required later,
-> it will be done with using device tree.
+On Mon, Jun 30, 2014 at 04:19:06PM +0100, Maxime Ripard wrote:
+> On Mon, Jun 30, 2014 at 03:20:54PM +0100, Mark Rutland wrote:
+> > Hi Maxime,
+> > 
+> > On Mon, Jun 30, 2014 at 02:20:54PM +0100, Maxime Ripard wrote:
+> > > The Allwinner A31 has a 16 channels DMA controller that it shares with the
+> > > newer A23. Although sharing some similarities with the DMA controller of the
+> > > older Allwinner SoCs, it's significantly different, I don't expect it to be
+> > > possible to share the driver for these two.
+> > >
+> > > The A31 Controller is able to memory-to-memory or memory-to-device transfers on
+> > > the 16 channels in parallel.
+> > >
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > >  drivers/dma/Kconfig     |    8 +
+> > >  drivers/dma/Makefile    |    1 +
+> > >  drivers/dma/sun6i-dma.c | 1058 +++++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 1067 insertions(+)
+> > >  create mode 100644 drivers/dma/sun6i-dma.c
+> > 
+> > [...]
+> > 
+> > > +       sdc->clk = devm_clk_get(&pdev->dev, NULL);
+> > > +       if (IS_ERR(sdc->clk)) {
+> > > +               dev_err(&pdev->dev, "No clock specified\n");
+> > > +               return PTR_ERR(sdc->clk);
+> > > +       }
+> > > +
+> > > +       mux = clk_get(NULL, "ahb1_mux");
+> > > +       if (IS_ERR(mux)) {
+> > > +               dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
+> > > +               return PTR_ERR(mux);
+> > > +       }
+> > > +
+> > > +       pll6 = clk_get(NULL, "pll6");
+> > > +       if (IS_ERR(pll6)) {
+> > > +               dev_err(&pdev->dev, "Couldn't get PLL6\n");
+> > > +               clk_put(mux);
+> > > +               return PTR_ERR(pll6);
+> > > +       }
+> > 
+> > I'm slightly confused. The binding listed a single unnamed clock (the
+> > AHB clock). What is going on here?
 > 
-> [PATCH 01/17] ARM: S5P64X0: no more support S5P6440 and S5P6450 SoCs
-> [PATCH 02/17] gpio: samsung: remove s5p64x0 related gpio codes
-> [PATCH 03/17] spi: s3c64xx: remove s5p64x0 related spi codes
-> [PATCH 04/17] ASoC: samsung: no more support for S5P6440 and S5P6450
-> [PATCH 05/17] pwm: samsung: remove s5p64x0 related pwm codes
-> [PATCH 06/17] video: fbdev: s3c-fb: remove s5p64x0 related fimd
-> [PATCH 07/17] serial: samsung: no more support for S5P6440 and
-> [PATCH 08/17] ARM: S5PC100: no more support S5PC100 SoC
-> [PATCH 09/17] gpio: samsung: remov s5pc100 related gpio codes
-> [PATCH 10/17] spi: s3c64xx: remove s5pc100 related spi codes
-> [PATCH 11/17] pwm: samsung: remove s5pc100 related pwm codes
-> [PATCH 12/17] serial: samsung: no more support for S5PC100 SoC
-> [PATCH 13/17] ata: pata_samsung_cf: removes s5pc100 related ata
-> [PATCH 14/17] mtd: onenand: remove s5pc100 related onenand codes
-> [PATCH 15/17] video: fbdev: s3c-fb: remove s5pc100 related fimd and
-> [PATCH 16/17] [media] exynos4-is: removes s5pc100 related fimc codes
-> [PATCH 17/17] ASoC: Samsung: remove s5pc100 related codes
+> The device itself needs only a single clock to work...
 > 
-
-One more reference to S5PC100 can be found at drivers/irqchip/Kconfig.
-
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 131f185..9f39cc6 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -23,7 +23,6 @@ config ARM_VIC
- config ARM_VIC_NR
-        int
-        default 4 if ARCH_S5PV210
--       default 3 if ARCH_S5PC100
-        default 2
-        depends on ARM_VIC
-        help
-
+> > 
+> > > +       ret = clk_set_parent(mux, pll6);
+> > > +       clk_put(pll6);
+> > > +       clk_put(mux);
+> > > +
+> > > +       if (ret) {
+> > > +               dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+> > > +               return ret;
+> > > +       }
+> > 
+> > Why do we need to reparent the mux?
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> ... but will function only if this clock is derived from PLL6.
 
+Ok, but _why_ is that the case? Could we at least have a comment for
+that?
 
--- 
-Tushar Behera
+Where does the driver get the named clocks from if they aren't provided
+on the device node? Is there a clock-ranges somewhere?
+
+It feels a little fragile to rely on the organisation of the clock tree
+and the naming thereof. If the IP block is ever reused on an SoC with a
+different clock tree layout then we have to handle things differently.
+
+Cheers,
+Mark.
