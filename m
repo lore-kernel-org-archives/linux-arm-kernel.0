@@ -1,30 +1,76 @@
 From: silvio.fricke@gmail.com (Silvio Fricke)
-Date: Mon, 30 Jun 2014 15:28:09 +0200
-Subject: [PATCH 5/5] ARM: imx_v6_v7_defconfig: Enable flexcan driver for can
- support
+Date: Mon, 30 Jun 2014 15:28:07 +0200
+Subject: [PATCH 3/5] ARM: dts: imx6: edmqmx6: Add two other i2c buses
 In-Reply-To: <cover.1404132504.git.silvio.fricke@gmail.com>
 References: <cover.1404132504.git.silvio.fricke@gmail.com>
-Message-ID: <9816fbb23593185b711c1fe32836ec5b763b688d.1404132504.git.silvio.fricke@gmail.com>
+Message-ID: <d4fb5942740315463ab64d0bc130ef042b342099.1404132504.git.silvio.fricke@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Silvio Fricke <silvio.fricke@gmail.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index c331de8..88877226 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -69,6 +69,8 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_INET_LRO is not set
- CONFIG_IPV6=y
- CONFIG_NETFILTER=y
-+CONFIG_CAN=m
-+CONFIG_CAN_FLEXCAN=m
- CONFIG_CFG80211=y
- CONFIG_MAC80211=y
- CONFIG_RFKILL=y
+diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+index b0dd50b..b98fd74 100644
+--- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
++++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
+@@ -118,6 +118,13 @@
+ 	status = "okay";
+ };
+ 
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++};
++
+ &i2c2 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -274,6 +281,13 @@
+ 	};
+ };
+ 
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
+@@ -316,6 +330,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
++				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_i2c2: i2c2grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_EIM_EB2__I2C2_SCL		0x4001b8b1
+@@ -323,6 +344,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D17__I2C3_SCL		0x4001b8b1
++				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_pcie: pciegrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_KEY_COL1__GPIO4_IO08		0x80000000
 -- 
 2.0.0
