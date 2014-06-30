@@ -1,46 +1,50 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jun 2014 11:52:05 +0100
-Subject: [PATCH 0/5] iommu/arm-smmu: Updates for 3.17
-Message-ID: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 30 Jun 2014 11:52:08 +0100
+Subject: [PATCH 3/5] iommu/arm-smmu: caps: add IOMMU_CAP_INTR_REMAP capability
+In-Reply-To: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1404125530-17984-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+MSIs are just seen as bog standard memory writes by the ARM SMMU, so
+they can be translated (and isolated) in the same way.
 
-Here is the set of arm/smmu patches I currently have that I'd like to get
-in for 3.17 (pending review comments). The diffstat is bigger than usual,
-since I've got my hands on a PCI-capable platform (model) and subsequently
-started to get that up and running. I've also been playing with VFIO and
-KVM guest device assignment, which revealed some issues with stage-2 mappings.
+This patch adds the IOMMU_CAP_INTR_REMAP capability to the ARM SMMU
+driver and reworks our capabaility code so that we don't assume the
+caps are organised as bits in a bitmask (since this isn't the intention).
 
-I'll post further RFC patches relating to VFIO separately, as discussion
-is definitely needed there.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-The other thing to note is that I plan to move to Thierry's generic IOMMU
-devicetree bindings as soon as they are merged:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267061.html
-
-That will break any users of the current binding, but I don't believe we
-actually have any at the moment (there are certainly none in mainline).
-The removal of chained SMMU support in this series is a prerequisite for
-that conversion.
-
-All feedback welcome,
-
-Will
-
-
-Will Deacon (5):
-  iommu/arm-smmu: fix calculation of TCR.T0SZ
-  iommu/arm-smmu: add support for PCI master devices
-  iommu/arm-smmu: caps: add IOMMU_CAP_INTR_REMAP capability
-  iommu/arm-smmu: remove support for chained SMMUs
-  iommu/arm-smmu: prefer stage-1 mappings where we have a choice
-
- .../devicetree/bindings/iommu/arm,smmu.txt         |   6 -
- drivers/iommu/arm-smmu.c                           | 431 ++++++++++-----------
- 2 files changed, 199 insertions(+), 238 deletions(-)
-
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index e4eebc50612c..835d01f47302 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1606,13 +1606,17 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+ static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
+ 				   unsigned long cap)
+ {
+-	unsigned long caps = 0;
+ 	struct arm_smmu_domain *smmu_domain = domain->priv;
++	u32 features = smmu_domain->root_cfg.smmu->features;
+ 
+-	if (smmu_domain->root_cfg.smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+-		caps |= IOMMU_CAP_CACHE_COHERENCY;
+-
+-	return !!(cap & caps);
++	switch (cap) {
++	case IOMMU_CAP_CACHE_COHERENCY:
++		return features & ARM_SMMU_FEAT_COHERENT_WALK;
++	case IOMMU_CAP_INTR_REMAP:
++		return 1; /* MSIs are just memory writes */
++	default:
++		return 0;
++	}
+ }
+ 
+ static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *data)
 -- 
 2.0.0
