@@ -1,50 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jun 2014 11:52:08 +0100
-Subject: [PATCH 3/5] iommu/arm-smmu: caps: add IOMMU_CAP_INTR_REMAP capability
+Date: Mon, 30 Jun 2014 11:52:10 +0100
+Subject: [PATCH 5/5] iommu/arm-smmu: prefer stage-1 mappings where we have a
+ choice
 In-Reply-To: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
 References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1404125530-17984-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1404125530-17984-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSIs are just seen as bog standard memory writes by the ARM SMMU, so
-they can be translated (and isolated) in the same way.
-
-This patch adds the IOMMU_CAP_INTR_REMAP capability to the ARM SMMU
-driver and reworks our capabaility code so that we don't assume the
-caps are organised as bits in a bitmask (since this isn't the intention).
+For an SMMU that supports both Stage-1 and Stage-2 mappings (but not
+nested translation), then we should prefer stage-1 mappings as we
+otherwise rely on the memory attributes of the incoming transactions
+for IOMMU_CACHE mappings.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ drivers/iommu/arm-smmu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index e4eebc50612c..835d01f47302 100644
+index 60986de3ada8..a6e38982d09c 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -1606,13 +1606,17 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
- static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
- 				   unsigned long cap)
- {
--	unsigned long caps = 0;
- 	struct arm_smmu_domain *smmu_domain = domain->priv;
-+	u32 features = smmu_domain->root_cfg.smmu->features;
+@@ -876,12 +876,12 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 		 */
+ 		cfg->cbar = CBAR_TYPE_S1_TRANS_S2_BYPASS;
+ 		start = smmu->num_s2_context_banks;
+-	} else if (smmu->features & ARM_SMMU_FEAT_TRANS_S2) {
+-		cfg->cbar = CBAR_TYPE_S2_TRANS;
+-		start = 0;
+-	} else {
++	} else if (smmu->features & ARM_SMMU_FEAT_TRANS_S1) {
+ 		cfg->cbar = CBAR_TYPE_S1_TRANS_S2_BYPASS;
+ 		start = smmu->num_s2_context_banks;
++	} else {
++		cfg->cbar = CBAR_TYPE_S2_TRANS;
++		start = 0;
+ 	}
  
--	if (smmu_domain->root_cfg.smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
--		caps |= IOMMU_CAP_CACHE_COHERENCY;
--
--	return !!(cap & caps);
-+	switch (cap) {
-+	case IOMMU_CAP_CACHE_COHERENCY:
-+		return features & ARM_SMMU_FEAT_COHERENT_WALK;
-+	case IOMMU_CAP_INTR_REMAP:
-+		return 1; /* MSIs are just memory writes */
-+	default:
-+		return 0;
-+	}
- }
- 
- static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *data)
+ 	ret = __arm_smmu_alloc_bitmap(smmu->context_map, start,
 -- 
 2.0.0
