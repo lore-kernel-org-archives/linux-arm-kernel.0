@@ -1,31 +1,53 @@
-From: a.heider@gmail.com (Andre Heider)
-Date: Mon, 30 Jun 2014 21:40:47 +0200
-Subject: [PATCH 12/13] ARM: dts: am33xx: add the PRUSSv2 device
-In-Reply-To: <20140630093642.GV7262@leverpostej>
-References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
- <1404058907-21112-13-git-send-email-a.heider@gmail.com>
- <20140630093642.GV7262@leverpostej>
-Message-ID: <20140630194047.GC78749@localhost>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 30 Jun 2014 21:42:10 +0200
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+In-Reply-To: <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <20140630194209.GC32594@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 10:36:42AM +0100, Mark Rutland wrote:
-> On Sun, Jun 29, 2014 at 05:21:46PM +0100, Andre Heider wrote:
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -409,6 +409,15 @@
-> >  			ti,hwmods = "rtc";
-> >  		};
-> >  
-> > +		pruss: pruss at 4a300000 {
-> > +			compatible = "ti,pruss-v2";
-> > +			ti,hwmods = "pruss";
-> > +			reg = <0x4a300000 0x080000>;
-> > +			interrupts = <20 21 22 23 24 25 26 27>;
-> 
-> Could this please have entries individually bracketed?
+On Mon, Jun 30, 2014 at 09:51:51AM -0700, Olav Haugan wrote:
+[...]
+> +int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
+> +		    struct scatterlist *sg, unsigned int len, int prot)
+> +{
+> +	if (unlikely(domain->ops->map_range == NULL))
+> +		return -ENODEV;
 
-I'll sync that to with what we end up with on path 7.
+Should we perhaps make this mandatory? For drivers that don't provide it
+we could implement a generic helper that wraps iommu_{map,unmap}().
 
-Thanks,
-Andre
+> +
+> +	BUG_ON(iova & (~PAGE_MASK));
+> +
+> +	return domain->ops->map_range(domain, iova, sg, len, prot);
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_map_range);
+> +
+> +int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
+> +		      unsigned int len)
+> +{
+> +	if (unlikely(domain->ops->unmap_range == NULL))
+> +		return -ENODEV;
+> +
+> +	BUG_ON(iova & (~PAGE_MASK));
+> +
+> +	return domain->ops->unmap_range(domain, iova, len);
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_unmap_range);
+
+Could these be renamed iommu_{map,unmap}_sg() instead to make it more
+obvious what exactly they map? And perhaps this could take an sg_table
+instead, which already provides a count and is a very common structure
+used in drivers (and the DMA mapping API).
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/40852b16/attachment-0001.sig>
