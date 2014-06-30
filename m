@@ -1,31 +1,21 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Jun 2014 18:20:34 +0200
-Subject: [PATCH v5 3/5] ARM: EXYNOS: Move "mach/map.h" inclusion from
- regs-pmu.h to platsmp.c
-In-Reply-To: <1403705032-14835-4-git-send-email-pankaj.dubey@samsung.com>
-References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
- <1403705032-14835-4-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53B18E52.1060906@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 30 Jun 2014 17:24:06 +0100
+Subject: [PATCH v4 05/13] ARM64 / ACPI: Introduce arm-core.c and its
+ related head file
+In-Reply-To: <1403840976-7456-6-git-send-email-hanjun.guo@linaro.org>
+References: <1403840976-7456-1-git-send-email-hanjun.guo@linaro.org>
+ <1403840976-7456-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140630162406.GR28951@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On Fri, Jun 27, 2014 at 04:49:28AM +0100, Hanjun Guo wrote:
+>  drivers/acpi/Makefile          |    2 +
+>  drivers/acpi/plat/Makefile     |    1 +
+>  drivers/acpi/plat/arm-core.c   |  110 ++++++++++++++++++++++++++++++++++++++++
 
-On 25.06.2014 16:03, Pankaj Dubey wrote:
-> As we have removed static mappings from "regs-pmu.h" it does not
-> need map.h anymore. But "platsmp.c" needed this and till now it
-> got included indirectly. So lets move header inclusion of
-> "mach/map.h" from "regs-pmu.h" to "platsmp.c".
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/platsmp.c  |    2 ++
->  arch/arm/mach-exynos/regs-pmu.h |    2 --
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
+Do you ever plan to add ACPI support for 32-bit ARM? If not, this part
+could be placed under arch/arm64 (similar to x86).
 
-IMHO this could be squashed with previous patch.
-
-Best regards,
-Tomasz
+-- 
+Catalin
