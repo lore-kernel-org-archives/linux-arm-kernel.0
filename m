@@ -1,33 +1,34 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 30 Jun 2014 13:27:11 -0500
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <5093993.PR3K0Jp7Pk@wuerfel>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <53ADA358.7000305@mentor.com> <20140628094219.GB32514@n2100.arm.linux.org.uk>
- <5093993.PR3K0Jp7Pk@wuerfel>
-Message-ID: <53B1ABFF.8070106@mentor.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 30 Jun 2014 14:27:25 -0400
+Subject: [PATCH 0/2] Introduce ARM GICv2m MSI(-X) support
+In-Reply-To: <53AA158E.1040700@amd.com>
+References: <1403569980-12913-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140624122639.GL10202@titan.lakedaemon.net>
+ <53AA158E.1040700@amd.com>
+Message-ID: <20140630182725.GZ23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2014 02:43 AM, Arnd Bergmann wrote:
-> On Saturday 28 June 2014 10:42:19 Russell King - ARM Linux wrote:
->> What's happening is if you try and rebuild a kernel with these patches
->> applied, you already have an arch/arm/include/generated/asm/auxvec.h
->> which points at the empty asm-generic version.  This remains after
->> these patches are applied, so the new include of asm/auxvec.h in
->> asm/elf.h picks up on the empty version, not the newly introduced
->> version.
+On Tue, Jun 24, 2014 at 07:19:26PM -0500, Suravee Suthikulanit wrote:
+> On 6/24/2014 7:26 AM, Jason Cooper wrote:
+> >On Mon, Jun 23, 2014 at 07:32:58PM -0500, suravee.suthikulpanit at amd.com wrote:
+> >>This patch set introduces support for MSI(-X) in GICv2m specification,
+> >>which is implemented in some variation of GIC400.
+> >>
+> >>This depends on and has been tested with the V7 of "Add support for PCI in AArch64"
+> >>(https://lkml.org/lkml/2014/3/14/320).
+> >
+> >Is this a build, boot, or runtime dependency?
+> >
 > 
-> One more piece of the puzzle: the top-level Makefile always includes
-> the headers from the source tree before generated headers, so in theory
-> this should not be happening. However, for some reason this ends up
-> as arch/arm/include/generated/asm/auxvec.h rather than
-> arch/arm/include/generated/uapi/asm/auxvec.h, and the kernel-only
-> headers get included before any of the uapi headers.
-> 
-> An easy workaround would probably be to add an
-> arch/arm/include/asm/auxvec.h file that contains only
-> 
-> #include <uapi/asm/auxvec.h>
+> For all of the above.
 
-Thanks Arnd, that seems to do the trick.
+Ok, the gic change in #1 should be a trivial conflict to resolve, so
+it'll be easiest for you guys to merge this with the other code you have
+going into arm-soc.
+
+Just keep me in the Cc and I'll Ack it when it's ready.
+
+thx,
+
+Jason.
