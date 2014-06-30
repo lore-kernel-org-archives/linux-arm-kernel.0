@@ -1,143 +1,74 @@
 From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 30 Jun 2014 14:29:28 -0700
+Date: Mon, 30 Jun 2014 14:33:26 -0700
 Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
+In-Reply-To: <20140629160751.GQ32514@n2100.arm.linux.org.uk>
 References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
  <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <53B1D6B8.7080806@amacapital.net>
+ <20140628152609.GH32514@n2100.arm.linux.org.uk> <53AEE9B6.7000609@mentor.com>
+ <20140628181212.GJ32514@n2100.arm.linux.org.uk> <53AF1B65.5000904@mentor.com>
+ <20140628201120.GK32514@n2100.arm.linux.org.uk> <53AF3510.7030707@mentor.com>
+ <20140629083415.GL32514@n2100.arm.linux.org.uk> <53B0353D.1080705@mentor.com>
+ <20140629160751.GQ32514@n2100.arm.linux.org.uk>
+Message-ID: <53B1D7A6.3060604@mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2014 08:11 PM, Nathan Lynch wrote:
-> Place vdso-related user-space code in arch/arm/kernel/vdso/.
+On 06/29/2014 09:07 AM, Russell King - ARM Linux wrote:
+> On Sun, Jun 29, 2014 at 10:48:13AM -0500, Nathan Lynch wrote:
+>> On 06/29/2014 03:34 AM, Russell King - ARM Linux wrote:
+>>> On Sat, Jun 28, 2014 at 04:35:12PM -0500, Nathan Lynch wrote:
+>>>> That's consistent with my results on iMX6.  The reported 1.00x "speedup"
+>>>> for clock-gettime-monotonic etc indicates the VDSO is falling back to
+>>>> syscall.
+>>>>
+>>>> Thanks for testing.
+>>>
+>>> Here's another issue which cropped up when I ran this patch set through
+>>> the autobuilder last night - allnoconfig's now fail with:
+>>>
+>>> mm/memory.c: In function 'gate_vma_init':
+>>> mm/memory.c:3410:22: error: 'FIXADDR_USER_START' undeclared (first use in this function)
+>>> mm/memory.c:3411:20: error: 'FIXADDR_USER_END' undeclared (first use in this function)
+>>> mm/memory.c: In function 'in_gate_area_no_mm':
+>>> mm/memory.c:3432:15: error: 'FIXADDR_USER_START' undeclared (first use in this function)
+>>> mm/memory.c:3432:46: error: 'FIXADDR_USER_END' undeclared (first use in this function)
+>>> make[2]: *** [mm/memory.o] Error 1
+>>
+>> arch/arm/include/page.h:
+>> #ifdef CONFIG_KUSER_HELPERS
+>> #define __HAVE_ARCH_GATE_AREA 1
+>> #endif
+>>
+>> mm/memory.c:
+>> #if !defined(__HAVE_ARCH_GATE_AREA)
+>>
+>> #if defined(AT_SYSINFO_EHDR)
+>> static struct vm_area_struct gate_vma;
+>>
+>> static int __init gate_vma_init(void)
+>> {
+>> 	gate_vma.vm_mm = NULL;
+>> 	gate_vma.vm_start = FIXADDR_USER_START;
+>> 	gate_vma.vm_end = FIXADDR_USER_END;
+>> ...
+>>
+>> The vdso patches add an ARM definition for AT_SYSINFO_EHDR.  So when
+>> CONFIG_KUSER_HELPERS=n, this code is pulled in now...
+>>
+>> Not sure what the fix would be right now.  I don't understand why there
+>> is this relationship between AT_SYSINFO_EHDR and gate vma code.
 > 
-> It is almost completely written in C with some assembly helpers to
-> load the data page address, sample the counter, and fall back to
-> system calls when necessary.
+> Me neither.  It looks like changing those tests for AT_SYSINFO_EHDR to
+> something like __HAVE_GATE_VMA or CONFIG_HAVE_GATE_VMA would be a good
+> step, so we can keep this disabled on ARM.  I don't see a need for the
+> gate VMA stuff just because we have a vDSO.
 > 
-> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
-> high-resolution clocks and falls back to syscalls.  Low-resolution
-> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
-> 
-> Of particular note is that a post-processing step ("vdsomunge") is
-> necessary to produce a shared object which is architecturally allowed
-> to be used by both soft- and hard-float EABI programs.
-> 
-> The 2012 edition of the ARM ABI defines Tag_ABI_VFP_args = 3 "Code is
-> compatible with both the base and VFP variants; the user did not
-> permit non-variadic functions to pass FP parameters/results."
-> Unfortunately current toolchains do not support this tag, which is
-> ideally what we would use.
-> 
-> The best available option is to ensure that both EF_ARM_ABI_FLOAT_SOFT
-> and EF_ARM_ABI_FLOAT_HARD are unset in the ELF header's e_flags,
-> indicating that the shared object is "old" and should be accepted for
-> backward compatibility's sake.  While binutils < 2.24 appear to
-> produce a vdso.so with both flags clear, 2.24 always sets
-> EF_ARM_ABI_FLOAT_SOFT, with no way to inhibit this behavior.  So we
-> have to fix things up with a custom post-processing step.
-> 
-> In fact, the VDSO code in glibc does much less validation (including
-> checking these flags) than the code for handling conventional
-> file-backed shared libraries, so this is a bit moot unless glibc's
-> VDSO code becomes more strict.
-> 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 
-> diff --git a/arch/arm/kernel/vdso/Makefile b/arch/arm/kernel/vdso/Makefile
-> new file mode 100644
-> index 000000000000..ceb712a7626c
-> --- /dev/null
-> +++ b/arch/arm/kernel/vdso/Makefile
-> @@ -0,0 +1,59 @@
-> +hostprogs-y := vdsomunge
-> +
-> +obj-vdso := vgettimeofday.o datapage.o
-> +
-> +# Build rules
-> +targets := $(obj-vdso) vdso.so vdso.so.dbg vdso.so.raw vdso.lds
-> +obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
-> +
-> +ccflags-y := -shared -fPIC -fno-common -fno-builtin -fno-stack-protector
-> +ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
-> +		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+The code you're running into is mostly bogus.  I'm planning on resending
+a real fix in about five minutes.  I'll see if I can get hpa to pick it
+up in a couple days (or to tell me whos tree it should live in).
 
-Does this need -DDISABLE_BRANCH_PROFILING?
-
-> diff --git a/arch/arm/kernel/vdso/checkundef.sh b/arch/arm/kernel/vdso/checkundef.sh
-> new file mode 100755
-> index 000000000000..185c30da202b
-> --- /dev/null
-> +++ b/arch/arm/kernel/vdso/checkundef.sh
-> @@ -0,0 +1,9 @@
-> +#!/bin/sh
-> +nm="$1"
-> +file="$2"
-> +"$nm" -u "$file" | ( ret=0; while read discard symbol
-> +do
-> +    echo "$file: undefined symbol $symbol"
-> +    ret=1
-> +done ; exit $ret )
-> +exit $?
-
-This is just as buggy as the x86 version.  make;make malfunctions.
-
-Can you rely on a new enough toolchain to use -Wl,--no-undefined?
-
-> diff --git a/arch/arm/kernel/vdso/datapage.S b/arch/arm/kernel/vdso/datapage.S
-> new file mode 100644
-> index 000000000000..fbf36d75da06
-> --- /dev/null
-> +++ b/arch/arm/kernel/vdso/datapage.S
-> @@ -0,0 +1,15 @@
-> +#include <linux/linkage.h>
-> +#include <asm/asm-offsets.h>
-> +
-> +	.align 2
-> +.L_vdso_data_ptr:
-> +	.long	_start - . - VDSO_DATA_SIZE
-> +
-> +ENTRY(__get_datapage)
-> +	.cfi_startproc
-> +	adr	r0, .L_vdso_data_ptr
-> +	ldr	r1, [r0]
-> +	add	r0, r0, r1
-> +	bx	lr
-> +	.cfi_endproc
-> +ENDPROC(__get_datapage)
-
-Can you translate this into English for the non-ARM-speakers here?
-
-> +
-> +#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-> +#define HOST_ORDER ELFDATA2LSB
-> +#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-> +#define HOST_ORDER ELFDATA2MSB
-> +#endif
-> +
-> +static const char *outfile;
-> +
-> +static void cleanup(void)
-> +{
-> +	if (error_message_count > 0 && outfile != NULL)
-> +		unlink(outfile);
-> +}
-> +
-> +static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
-> +{
-> +	return swap ? bswap_32(word) : word;
-> +}
-> +
-> +static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
-> +{
-> +	return swap ? bswap_16(half) : half;
-> +}
-> +
-> +static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
-> +{
-> +	*dst = swap ? bswap_32(val) : val;
-> +}
-
-The macros in arch/x86/vdso/vdso2c.c are IMO much nicer.
+I'd actually prefer if you rebase on top of it, because otherwise I'll
+have to undo whatever hack you add.
 
 --Andy
