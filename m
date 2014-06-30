@@ -1,91 +1,326 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 30 Jun 2014 15:09:30 +0200
-Subject: [PATCH v8 5/7] Documentation: bindings: document the sub-nodes AHCI
- bindings
+Date: Mon, 30 Jun 2014 15:09:26 +0200
+Subject: [PATCH v8 1/7] phy: add a driver for the Berlin SATA PHY
 In-Reply-To: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1404133772-11741-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1404133772-11741-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The libahci now allows to use multiple PHYs and to represent each port
-as a sub-node. Add these bindings to the documentation.
+The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
+
+The mode selection can let us think this PHY can be configured to fit
+other purposes. But there are reasons to think the SATA mode will be
+the only one usable: the PHY registers are only accessible indirectly
+through two registers in the SATA range, the PHY seems to be integrated
+and no information tells us the contrary. For these reasons, make the
+driver a SATA PHY driver.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- .../devicetree/bindings/ata/ahci-platform.txt      | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/phy/Kconfig           |   7 ++
+ drivers/phy/Makefile          |   1 +
+ drivers/phy/phy-berlin-sata.c | 262 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 270 insertions(+)
+ create mode 100644 drivers/phy/phy-berlin-sata.c
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index c96d8dcf98fd..24d95fccfb4a 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -3,6 +3,10 @@
- SATA nodes are defined to describe on-chip Serial ATA controllers.
- Each SATA controller should have its own node.
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 16a2f067c242..365ad3651e1c 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -15,6 +15,13 @@ config GENERIC_PHY
+ 	  phy users can obtain reference to the PHY. All the users of this
+ 	  framework should select this config.
  
-+It is possible, but not required, to represent each port as a sub-node.
-+It allows to enable each port independently when dealing with multiple
-+PHYs.
++config PHY_BERLIN_SATA
++	tristate "Marvell Berlin SATA PHY driver"
++	depends on ARCH_BERLIN && OF
++	select GENERIC_PHY
++	help
++	  Enable this to support the SATA PHY on Marvell Berlin SoCs.
 +
- Required properties:
- - compatible        : compatible string, one of:
-   - "allwinner,sun4i-a10-ahci"
-@@ -14,6 +18,7 @@ Required properties:
-   - "snps,dwc-ahci"
-   - "snps,exynos5440-ahci"
-   - "snps,spear-ahci"
-+  - "generic-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
+ config PHY_EXYNOS_MIPI_VIDEO
+ 	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
+ 	depends on HAS_IOMEM
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index b4f1d5770601..a137a2e23218 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -3,6 +3,7 @@
+ #
  
-@@ -21,11 +26,23 @@ Optional properties:
- - dma-coherent      : Present if dma operations are coherent
- - clocks            : a list of phandle + clock specifier pairs
- - target-supply     : regulator for SATA target power
-+- phys              : reference to the SATA PHY node
-+- phy-names         : must be "sata-phy"
- 
- "fsl,imx53-ahci", "fsl,imx6q-ahci" required properties:
- - clocks            : must contain the sata, sata_ref and ahb clocks
- - clock-names       : must contain "ahb" for the ahb clock
- 
-+Required properties when using sub-nodes:
-+- #address-cells    : number of cells to encode an address
-+- #size-cells       : number of cells representing the size of an address
+ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
++obj-$(CONFIG_PHY_BERLIN_SATA)		+= phy-berlin-sata.o
+ obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
+ obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+ obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
+new file mode 100644
+index 000000000000..4446e93e6d82
+--- /dev/null
++++ b/drivers/phy/phy-berlin-sata.c
+@@ -0,0 +1,262 @@
++/*
++ * Marvell Berlin SATA PHY driver
++ *
++ * Copyright (C) 2014 Marvell Technology Group Ltd.
++ *
++ * Antoine T?nart <antoine.tenart@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
++#include <linux/clk.h>
++#include <linux/module.h>
++#include <linux/phy/phy.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
 +
-+Sub-nodes required properties:
-+- reg               : the port number
-+- phys              : reference to the SATA PHY node
++#define HOST_VSA_ADDR		0x0
++#define HOST_VSA_DATA		0x4
++#define PORT_SCR_CTL		0x2c
++#define PORT_VSR_ADDR		0x78
++#define PORT_VSR_DATA		0x7c
 +
++#define CONTROL_REGISTER	0x0
++#define MBUS_SIZE_CONTROL	0x4
 +
- Examples:
-         sata at ffe08000 {
- 		compatible = "snps,spear-ahci";
-@@ -40,3 +57,23 @@ Examples:
- 		clocks = <&pll6 0>, <&ahb_gates 25>;
- 		target-supply = <&reg_ahci_5v>;
- 	};
++#define POWER_DOWN_PHY0			BIT(6)
++#define POWER_DOWN_PHY1			BIT(14)
++#define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
++#define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
 +
-+With sub-nodes:
-+	sata at f7e90000 {
-+		compatible = "generic-ahci";
-+		reg = <0xe90000 0x1000>;
-+		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&chip CLKID_SATA>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++#define PHY_BASE		0x200
 +
-+		sata0: sata-port at 0 {
-+			reg = <0>;
-+			phys = <&sata_phy 0>;
-+		};
++/* register 0x01 */
++#define REF_FREF_SEL_25		BIT(0)
++#define PHY_MODE_SATA		(0x0 << 5)
 +
-+		sata1: sata-port at 1 {
-+			reg = <1>;
-+			phys = <&sata_phy 1>;
-+		};
-+	};
++/* register 0x02 */
++#define USE_MAX_PLL_RATE	BIT(12)
++
++/* register 0x23 */
++#define DATA_BIT_WIDTH_10	(0x0 << 10)
++#define DATA_BIT_WIDTH_20	(0x1 << 10)
++#define DATA_BIT_WIDTH_40	(0x2 << 10)
++
++/* register 0x25 */
++#define PHY_GEN_MAX_1_5		(0x0 << 10)
++#define PHY_GEN_MAX_3_0		(0x1 << 10)
++#define PHY_GEN_MAX_6_0		(0x2 << 10)
++
++#define BERLIN_SATA_PHY_NB	2
++
++#define to_berlin_sata_phy_priv(desc)	\
++	container_of((desc), struct phy_berlin_priv, phys[(desc)->index])
++
++struct phy_berlin_desc {
++	struct phy	*phy;
++	u32		power_bit;
++	unsigned	index;
++};
++
++struct phy_berlin_priv {
++	void __iomem		*base;
++	spinlock_t		lock;
++	struct clk		*clk;
++	struct phy_berlin_desc	phys[BERLIN_SATA_PHY_NB];
++};
++
++static inline void phy_berlin_sata_reg_setbits(void __iomem *ctrl_reg, u32 reg,
++					       u32 mask, u32 val)
++{
++	u32 regval;
++
++	/* select register */
++	writel(PHY_BASE + reg, ctrl_reg + PORT_VSR_ADDR);
++
++	/* set bits */
++	regval = readl(ctrl_reg + PORT_VSR_DATA);
++	regval &= ~mask;
++	regval |= val;
++	writel(regval, ctrl_reg + PORT_VSR_DATA);
++}
++
++static int phy_berlin_sata_power_on(struct phy *phy)
++{
++	struct phy_berlin_desc *desc = phy_get_drvdata(phy);
++	struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
++	void __iomem *ctrl_reg = priv->base + 0x60 + (desc->index * 0x80);
++	int ret = 0;
++	u32 regval;
++
++	clk_prepare_enable(priv->clk);
++
++	spin_lock(&priv->lock);
++
++	/* Power on PHY */
++	writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
++	regval = readl(priv->base + HOST_VSA_DATA);
++	regval &= ~desc->power_bit;
++	writel(regval, priv->base + HOST_VSA_DATA);
++
++	/* Configure MBus */
++	writel(MBUS_SIZE_CONTROL, priv->base + HOST_VSA_ADDR);
++	regval = readl(priv->base + HOST_VSA_DATA);
++	regval |= MBUS_WRITE_REQUEST_SIZE_128 | MBUS_READ_REQUEST_SIZE_128;
++	writel(regval, priv->base + HOST_VSA_DATA);
++
++	/* set PHY mode and ref freq to 25 MHz */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x1, 0xff,
++				    REF_FREF_SEL_25 | PHY_MODE_SATA);
++
++	/* set PHY up to 6 Gbps */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x25, 0xc00, PHY_GEN_MAX_6_0);
++
++	/* set 40 bits width */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x23,  0xc00, DATA_BIT_WIDTH_40);
++
++	/* use max pll rate */
++	phy_berlin_sata_reg_setbits(ctrl_reg, 0x2, 0x0, USE_MAX_PLL_RATE);
++
++	/* set the controller speed */
++	writel(0x31, ctrl_reg + PORT_SCR_CTL);
++
++	spin_unlock(&priv->lock);
++
++	clk_disable_unprepare(priv->clk);
++
++	return ret;
++}
++
++static int phy_berlin_sata_power_off(struct phy *phy)
++{
++	struct phy_berlin_desc *desc = phy_get_drvdata(phy);
++	struct phy_berlin_priv *priv = to_berlin_sata_phy_priv(desc);
++	u32 regval;
++
++	clk_prepare_enable(priv->clk);
++
++	spin_lock(&priv->lock);
++
++	/* Power down PHY */
++	writel(CONTROL_REGISTER, priv->base + HOST_VSA_ADDR);
++	regval = readl(priv->base + HOST_VSA_DATA);
++	regval |= desc->power_bit;
++	writel(regval, priv->base + HOST_VSA_DATA);
++
++	spin_unlock(&priv->lock);
++
++	clk_disable_unprepare(priv->clk);
++
++	return 0;
++}
++
++static struct phy *phy_berlin_sata_phy_xlate(struct device *dev,
++					     struct of_phandle_args *args)
++{
++	struct phy_berlin_priv *priv = dev_get_drvdata(dev);
++
++	if (WARN_ON(args->args[0] >= BERLIN_SATA_PHY_NB))
++		return ERR_PTR(-ENODEV);
++
++	if (!priv->phys[args->args[0]].phy)
++		return ERR_PTR(-ENODEV);
++
++	return priv->phys[args->args[0]].phy;
++}
++
++static struct phy_ops phy_berlin_sata_ops = {
++	.power_on	= phy_berlin_sata_power_on,
++	.power_off	= phy_berlin_sata_power_off,
++	.owner		= THIS_MODULE,
++};
++
++static u32 phy_berlin_power_down_bits[] = {
++	POWER_DOWN_PHY0,
++	POWER_DOWN_PHY1,
++};
++
++static int phy_berlin_sata_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *child;
++	struct phy *phy;
++	struct phy_provider *phy_provider;
++	struct phy_berlin_priv *priv;
++	struct resource *res;
++	u32 phy_id;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -EINVAL;
++
++	priv->base = devm_ioremap(dev, res->start, resource_size(res));
++	if (!priv->base)
++		return -ENOMEM;
++
++	priv->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(priv->clk))
++		return PTR_ERR(priv->clk);
++
++	dev_set_drvdata(dev, priv);
++	spin_lock_init(&priv->lock);
++
++	for_each_available_child_of_node(dev->of_node, child) {
++		if (of_property_read_u32(child, "reg", &phy_id)) {
++			dev_err(dev, "missing reg property in node %s\n",
++				child->name);
++			return -EINVAL;
++		}
++
++		if (phy_id >= BERLIN_SATA_PHY_NB) {
++			dev_err(dev, "invalid reg in node %s\n", child->name);
++			return -EINVAL;
++		}
++
++		phy = devm_phy_create(dev, &phy_berlin_sata_ops, NULL);
++		if (IS_ERR(phy)) {
++			dev_err(dev, "failed to create PHY %d\n", phy_id);
++			return PTR_ERR(phy);
++		}
++
++		priv->phys[phy_id].phy = phy;
++		priv->phys[phy_id].power_bit =
++			phy_berlin_power_down_bits[phy_id];
++		priv->phys[phy_id].index = phy_id;
++		phy_set_drvdata(phy, &priv->phys[phy_id]);
++
++		/* Make sure the PHY is off */
++		phy_berlin_sata_power_off(phy);
++	}
++
++	phy_provider =
++		devm_of_phy_provider_register(dev, phy_berlin_sata_phy_xlate);
++	if (IS_ERR(phy_provider))
++		return PTR_ERR(phy_provider);
++
++	return 0;
++}
++
++static const struct of_device_id phy_berlin_sata_of_match[] = {
++	{ .compatible = "marvell,berlin2q-sata-phy" },
++	{ },
++};
++
++static struct platform_driver phy_berlin_sata_driver = {
++	.probe	= phy_berlin_sata_probe,
++	.driver	= {
++		.name		= "phy-berlin-sata",
++		.owner		= THIS_MODULE,
++		.of_match_table	= phy_berlin_sata_of_match,
++	},
++};
++module_platform_driver(phy_berlin_sata_driver);
++
++MODULE_DESCRIPTION("Marvell Berlin SATA PHY driver");
++MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
