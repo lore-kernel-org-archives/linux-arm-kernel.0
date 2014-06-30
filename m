@@ -1,52 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jun 2014 20:59:47 +0100
-Subject: [RFC PATCH 0/6] kernel: Add support for restart notifier call
- chain
-In-Reply-To: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
-References: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20140630195946.GI32514@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Jun 2014 22:06:10 +0200
+Subject: [GIT PULL] the great <mach/gpio.h> purge
+Message-ID: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 12:11:33PM -0700, Guenter Roeck wrote:
-> Various drivers implement architecture and/or device specific means
-> to restart (reset) the system. Various mechanisms have been implemented
-> to support those schemes. The best known mechanism is arm_pm_restart,
-> which is a function pointer to be set either from platform specific code
-> or from drivers. Another mechanism is to use hardware watchdogs to issue
-> a reset; this mechanism is used if there is no other method available
-> to reset a board or system. Two examples are alim7101_wdt, which currently
-> uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
-> the arm_pm_restart function.
-> 
-> The existing mechanisms have a number of drawbacks. Typically only one scheme
-> to restart the system is supported (at least if arm_pm_restart is used).
-> At least in theory there can be mutliple means to restart the system, some of
-> which may be less desirable (for example one mechanism may only reset the CPU,
-> while another may reset the entire system). Using arm_pm_restart can also be
-> racy if the function pointer is set from a driver, as the driver may be in
-> the process of being unloaded when arm_pm_restart is called.
-> Using the reboot notifier is always racy, as it is unknown if and when
-> other functions using the reboot notifier have completed execution
-> by the time the watchdog fires.
-> 
-> To solve the problem, introduce a system restart notifier. This notifier
-> is expected to be called from the architecture specific machine_restart()
-> function. Drivers providing system restart functionality (such as the watchdog
-> drivers mentioned above) are expected to register with this notifier.
-> 
-> Patch 1 of this series implements the notifier function. Patches 2 and 3
-> implement calling the notifier chain from arm and arm64 restart code.
-> Patch 4 and 5 convert existing restart handlers in the watchdog subsystem
-> to use the restart notifier. Patch 6 unexports arm_pm_restart to ensure
-> that no one gets the idea to implement a restart handler as module.
+Hi ARM SoC guys,
 
-I think you need to restructure stuff somewhat, because I think
-you've missed drivers/power/reset/ entirely, or at least you've
-missed drivers/power/reset/restart-poweroff.c which calls
-arm_pm_restart directly.  I'm not quite sure how we ended up with
-that...
+please pull in this patch set removing <mach/gpio.h> for good.
+I guess it could collide with some S5P deletion.
+If you decide to pull the S5P purge first, tell me so I can rebase.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Yours,
+Linus Walleij
+
+
+The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
+tags/gpio-h-purge
+
+for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
+
+  ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
+
+----------------------------------------------------------------
+This is a purge of all things <mach/gpio.h>, now I never
+want to see it again.
+
+- Remove the need for <mach/gpio.h> from S5P
+- Kill CONFIG_NEED_MACH_GPIO_H
+- Kill remnants of ARM_GPIOLIB_COMPLEX
+
+----------------------------------------------------------------
+Linus Walleij (4):
+      ARM: s5p: cut the custom ARCH_NR_GPIOS definition
+      ARM: mach-s5p: get rid of all <mach/gpio.h> headers
+      ARM: kill CONFIG_NEED_MACH_GPIO_H
+      ARM: delete old reference to ARM_GPIOLIB_COMPLEX
+
+ arch/arm/Kconfig                                         | 10 ----------
+ arch/arm/include/asm/gpio.h                              |  7 -------
+ arch/arm/mach-s5p64x0/common.c                           |  2 +-
+ arch/arm/mach-s5p64x0/dev-audio.c                        |  3 ++-
+ .../mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
+ arch/arm/mach-s5p64x0/mach-smdk6440.c                    |  1 +
+ arch/arm/mach-s5p64x0/mach-smdk6450.c                    |  1 +
+ arch/arm/mach-s5p64x0/setup-fb-24bpp.c                   |  2 +-
+ arch/arm/mach-s5p64x0/setup-i2c0.c                       |  2 +-
+ arch/arm/mach-s5p64x0/setup-i2c1.c                       |  2 +-
+ arch/arm/mach-s5p64x0/setup-sdhci-gpio.c                 |  2 +-
+ arch/arm/mach-s5p64x0/setup-spi.c                        |  2 +-
+ arch/arm/mach-s5pc100/dev-audio.c                        |  2 +-
+ .../mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} |  6 +-----
+ arch/arm/mach-s5pc100/mach-smdkc100.c                    |  1 +
+ arch/arm/mach-s5pc100/setup-fb-24bpp.c                   |  2 +-
+ arch/arm/mach-s5pc100/setup-i2c0.c                       |  2 +-
+ arch/arm/mach-s5pc100/setup-i2c1.c                       |  2 +-
+ arch/arm/mach-s5pc100/setup-ide.c                        |  2 +-
+ arch/arm/mach-s5pc100/setup-keypad.c                     |  2 +-
+ arch/arm/mach-s5pc100/setup-sdhci-gpio.c                 |  2 +-
+ arch/arm/mach-s5pc100/setup-spi.c                        |  2 +-
+ arch/arm/mach-s5pv210/dev-audio.c                        |  2 +-
+ .../mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
+ arch/arm/mach-s5pv210/mach-aquila.c                      |  1 +
+ arch/arm/mach-s5pv210/mach-goni.c                        |  1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c                    |  1 +
+ arch/arm/mach-s5pv210/setup-fb-24bpp.c                   |  2 +-
+ arch/arm/mach-s5pv210/setup-fimc.c                       |  3 ++-
+ arch/arm/mach-s5pv210/setup-i2c0.c                       |  2 +-
+ arch/arm/mach-s5pv210/setup-i2c1.c                       |  2 +-
+ arch/arm/mach-s5pv210/setup-i2c2.c                       |  2 +-
+ arch/arm/mach-s5pv210/setup-ide.c                        |  2 +-
+ arch/arm/mach-s5pv210/setup-keypad.c                     |  2 +-
+ arch/arm/mach-s5pv210/setup-sdhci-gpio.c                 |  2 +-
+ arch/arm/mach-s5pv210/setup-spi.c                        |  2 +-
+ arch/arm/plat-samsung/Kconfig                            | 16 ----------------
+ arch/arm/plat-samsung/include/plat/gpio-core.h           |  3 +++
+ arch/arm/plat-samsung/pm-gpio.c                          |  2 --
+ arch/arm/plat-samsung/s5p-irq-eint.c                     |  2 +-
+ drivers/gpio/gpio-samsung.c                              |  3 ---
+ sound/soc/samsung/goni_wm8994.c                          |  2 +-
+ 42 files changed, 41 insertions(+), 82 deletions(-)
+ rename arch/arm/mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} (95%)
+ rename arch/arm/mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} (97%)
+ rename arch/arm/mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} (96%)
