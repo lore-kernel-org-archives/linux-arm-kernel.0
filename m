@@ -1,93 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Jun 2014 14:01:57 +0100
-Subject: [PATCH 5/5] ARM: DT: STi: Add DT node for MiPHY365x
-In-Reply-To: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1404133317-25953-6-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jun 2014 15:06:04 +0200
+Subject: [PATCH v7 6/9] ARM: miscellaneous vdso infrastructure, preparation
+In-Reply-To: <53B157CF.1040204@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <201406301211.43359.arnd@arndb.de> <53B157CF.1040204@mentor.com>
+Message-ID: <4924024.rTPP3FKi53@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-devices. It has 2 ports which it can use for either; both SATA, both
-PCIe or one of each in any configuration.
+On Monday 30 June 2014 07:27:59 Nathan Lynch wrote:
+> On 06/30/2014 05:11 AM, Arnd Bergmann wrote:
+> > On Monday 23 June 2014, Nathan Lynch wrote:
+> >> +struct vdso_data {
+> >> +       u32 seq_count;          /* sequence count - odd during updates */
+> >> +       u16 use_syscall;        /* whether to fall back to syscalls */
+> >> +       u16 cs_shift;           /* clocksource shift */
+> >> +       u32 xtime_coarse_sec;   /* coarse time */
+> >> +       u32 xtime_coarse_nsec;
+> > 
+> > Note that we will at some point have to introduce 64-bit time_t in user space
+> > in some form. We will have to add new system calls for anything dealing with
+> > time on the kernel boundary, but it would be good to be prepared here.
+> > 
+> > Is vdso_data an ABI-relevant data structure? If so, I think all you need here
+> > is to make xtime_coarse_sec a u64 type for now, so we can add the other functions
+> > later. The code can of course for now access only the lower half (keeping
+> > endianess in mind), so there should not be any performance impact.
+> > 
+> > If the structure is not part of the ABI, there probably isn't much we can
+> > do here.
+> 
+> In short, no, vdso_data is not ABI-relevant.
+> 
+> The vdso_data structure may be accessed legitimately only through the
+> entry points (gettimeofday, clock_gettime) that the VDSO provides, and
+> it is my intent that we should be able to change the structure as
+> needed, just like other architectures.  vdso_data should not show up in
+> any exported header and I'll double-check to make sure it does not.
+> 
+> So, when the time comes, we should be able to change it to accommodate
+> 64-bit time_t by (I imagine) making any field that stores seconds 64
+> bits and adding new entry points (clock_gettime64 or whatever).
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih416-b2020-revE.dts |  5 +++++
- arch/arm/boot/dts/stih416-b2020.dts      |  7 +++++++
- arch/arm/boot/dts/stih416.dtsi           | 21 +++++++++++++++++++++
- 3 files changed, 33 insertions(+)
+Ok, very good.
 
-diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-index ba0fa2c..0e2c870 100644
---- a/arch/arm/boot/dts/stih416-b2020-revE.dts
-+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-@@ -31,5 +31,10 @@
- 		ethernet1: dwmac at fef08000 {
- 			snps,reset-gpio = <&PIO0 7>;
- 		};
-+
-+		miphy365x_phy: miphy365x at fe382000 {
-+			st,pcie-tx-pol-inv;
-+			st,sata-gen = <3>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-index 4e2df66..6f1145c 100644
---- a/arch/arm/boot/dts/stih416-b2020.dts
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -12,4 +12,11 @@
- / {
- 	model = "STiH416 B2020";
- 	compatible = "st,stih416-b2020", "st,stih416";
-+
-+	soc {
-+		miphy365x_phy: miphy365x at fe382000 {
-+			st,pcie-tx-pol-inv;
-+			st,sata-gen = <3>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 06473c5..6d7aee3 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -9,6 +9,8 @@
- #include "stih41x.dtsi"
- #include "stih416-clock.dtsi"
- #include "stih416-pinctrl.dtsi"
-+
-+#include <dt-bindings/phy/phy-miphy365x.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset-controller/stih416-resets.h>
- / {
-@@ -236,5 +238,24 @@
- 			resets	= <&powerdown STIH416_KEYSCAN_POWERDOWN>,
- 				  <&softreset STIH416_KEYSCAN_SOFTRESET>;
- 		};
-+
-+		miphy365x_phy: miphy365x at fe382000 {
-+			compatible      = "st,miphy365x-phy";
-+			st,syscfg  	= <&syscfg_rear>;
-+			#phy-cells 	= <2>;
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			ranges;
-+
-+			phy_port0: port at fe382000 {
-+				reg = <0xfe382000 0x100>, <0xfe394000 0x100>;
-+				reg-names = "sata", "pcie";
-+			};
-+
-+			phy_port1: port at fe38a000 {
-+				reg = <0xfe38a000 0x100>, <0xfe804000 0x100>;
-+				reg-names = "sata", "pcie";
-+			};
-+		};
- 	};
- };
--- 
-1.8.3.2
+	Arnd
