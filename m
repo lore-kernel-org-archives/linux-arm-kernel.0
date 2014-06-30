@@ -1,77 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jun 2014 12:12:23 +0200
-Subject: [PATCH v2 2/2] ARM: sunxi: Add clocks node to the CPU nodes
-In-Reply-To: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404123143-13041-3-git-send-email-maxime.ripard@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 30 Jun 2014 11:25:12 +0100
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <20140627232757.GB26184@ulmo>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53ADAA1C.70407@ti.com> <20140627232757.GB26184@ulmo>
+Message-ID: <20140630102512.GE28951@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the clock will make the topology code work, and will remove the
-following error at boot
+On Sat, Jun 28, 2014 at 12:27:58AM +0100, Thierry Reding wrote:
+> On Fri, Jun 27, 2014 at 01:30:04PM -0400, Santosh Shilimkar wrote:
+> > On Friday 27 June 2014 12:58 PM, Thierry Reding wrote:
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra114.c (100%)
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra20.c (100%)
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra30.c (100%)
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.c (100%)
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.h (91%)
+> > This should go into drivers/idle/*. if you have dependencies, please sort
+> > them out.
+> 
+> What exactly is the difference between drivers/idle and drivers/cpuidle?
+> There's an intel_idle driver in drivers/idle that includes cpuidle.h and
+> registers with that subsystem. But there's also an i7300_idle driver
+> that doesn't.
+> 
+> drivers/cpuidle seems like a better fit. I'll look into moving the code
+> there.
 
-[    0.097194] /cpus/cpu at 0 missing clock-frequency property
-[    0.103657] /cpus/cpu at 1 missing clock-frequency property
-[    0.110698] /cpus/cpu at 2 missing clock-frequency property
-[    0.117132] /cpus/cpu at 3 missing clock-frequency property
+Actually, please look at Lorenzo's generic cpuidle series. Basically
+most cpuidle drivers simply define some C states and call the
+corresponding platform back-end. On arm64, we aim to separate the
+back-end in the cpu_operations structure and just have a generic cpuidle
+driver with states defined in the DT (and passed to the back-end).
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 4 ++++
- arch/arm/boot/dts/sun7i-a20.dtsi | 2 ++
- 2 files changed, 6 insertions(+)
+As for the back-end, what about using PSCI?
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index a9dfa12eb735..905b84add002 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -34,24 +34,28 @@
- 		cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <0>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <1>;
- 		};
- 
- 		cpu at 2 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <2>;
- 		};
- 
- 		cpu at 3 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <3>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 17823759bdc9..1d263b7f02dc 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -35,12 +35,14 @@
- 		cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <0>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-+			clocks = <&cpu>;
- 			reg = <1>;
- 		};
- 	};
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset-handler.S (100%)
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.c (100%)
+> > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.h (97%)
+> > subsystem: drivers/power/reset/
+> 
+> drivers/power/reset seems to be for drivers that register functions to
+> reset a board. The above code for Tegra doesn't do that. Rather it sets
+> up the reset handlers for secondary CPUs and for suspend/resume.
+
+PSCI again?
+
 -- 
-2.0.0
+Catalin
