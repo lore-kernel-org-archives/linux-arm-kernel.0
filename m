@@ -1,33 +1,44 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 30 Jun 2014 11:38:10 -0400
-Subject: [musl] Re: Thread pointer changes
-In-Reply-To: <CALCETrVOabOU=NMz-GO1L_iu5QgVYoUOrYMzDDBMxYRy4W69ag@mail.gmail.com>
-References: <20140611145533.GT179@brightrain.aerifal.cx>
- <53ADC5B1.6080905@amacapital.net>
- <20140627200949.GQ32514@n2100.arm.linux.org.uk>
- <20140627210931.GT23102@port70.net>
- <20140627213051.GS32514@n2100.arm.linux.org.uk>
- <20140627215541.GC16724@brightrain.aerifal.cx>
- <20140627221744.GU32514@n2100.arm.linux.org.uk>
- <20140627223328.GB17988@brightrain.aerifal.cx>
- <20140627230736.GX32514@n2100.arm.linux.org.uk>
- <CALCETrVFvYNPHMozB2E2L0LWSPv=o6JHfmoz4_pBC2gQwRLpug@mail.gmail.com>
- <20140627233505.GA32514@n2100.arm.linux.org.uk>
- <CALCETrVOabOU=NMz-GO1L_iu5QgVYoUOrYMzDDBMxYRy4W69ag@mail.gmail.com>
-Message-ID: <53B18462.3040700@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Jun 2014 17:40:30 +0200
+Subject: [GIT PULL] efm32 for 3.17-rc1
+Message-ID: <20140630154030.GJ14781@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2014 07:40 PM, Andy Lutomirski wrote:
+Hello,
 
-> If you ever want an ARM vdso (e.g. for timing), I'd be happy to help
-> and try to share code with x86.
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 
-http://www.spinics.net/lists/arm-kernel/msg340661.html
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 
-Christopher
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/ukl/linux.git tags/efm32-for-armsoc
+
+for you to fetch changes up to f89056edb765268fe6880ab8caaee9331c3f5618:
+
+  ARM: efm32: switch to vendor,device compatible strings (2014-06-30 17:11:53 +0200)
+
+----------------------------------------------------------------
+Just two follow-up changes for cleanups that went into v3.15-rc2.
+
+----------------------------------------------------------------
+These two patches were not sent to the list yet, but I will send them as
+reply to this mail. If you prefer to pick them up by hand instead of
+pulling, feel free to do so. I didn't put them into my for-next branch.
+
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (2):
+      ARM: efm32: switch to properly namespaced location property
+      ARM: efm32: switch to vendor,device compatible strings
+
+ arch/arm/boot/dts/efm32gg-dk3750.dts |  6 +++---
+ arch/arm/boot/dts/efm32gg.dtsi       | 32 ++++++++++++++++----------------
+ 2 files changed, 19 insertions(+), 19 deletions(-)
+
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
