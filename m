@@ -1,43 +1,26 @@
-From: a.heider@gmail.com (Andre Heider)
-Date: Mon, 30 Jun 2014 21:42:40 +0200
-Subject: [PATCH 02/13] uio: uio_pruss: use devm_kzalloc()
-In-Reply-To: <20140630093809.GW7262@leverpostej>
-References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
- <1404058907-21112-3-git-send-email-a.heider@gmail.com>
- <20140630093809.GW7262@leverpostej>
-Message-ID: <20140630194240.GD78749@localhost>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 30 Jun 2014 21:43:46 +0200
+Subject: [RFC 3/5] clk: use struct clk only for external API
+In-Reply-To: <53ADF239.9050008@wwwdotorg.org>
+References: <1403855872-14749-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1403855872-14749-4-git-send-email-tomeu.vizoso@collabora.com>
+ <53ADF239.9050008@wwwdotorg.org>
+Message-ID: <20140630194311.GA5167@dator>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 10:38:09AM +0100, Mark Rutland wrote:
-> On Sun, Jun 29, 2014 at 05:21:36PM +0100, Andre Heider wrote:
-> > --- a/drivers/uio/uio_pruss.c
-> > +++ b/drivers/uio/uio_pruss.c
-> > @@ -109,9 +109,7 @@ static void pruss_cleanup(struct device *dev, struct uio_pruss_dev *gdev)
-> >  		gen_pool_free(gdev->sram_pool,
-> >  			      gdev->sram_vaddr,
-> >  			      sram_pool_sz);
-> > -	kfree(gdev->info);
-> >  	clk_put(gdev->pruss_clk);
-> > -	kfree(gdev);
-> >  }
-> >  
-> >  static int pruss_probe(struct platform_device *pdev)
-> > @@ -123,24 +121,19 @@ static int pruss_probe(struct platform_device *pdev)
-> >  	int ret = -ENODEV, cnt = 0, len;
-> >  	struct uio_pruss_pdata *pdata = dev_get_platdata(dev);
-> >  
-> > -	gdev = kzalloc(sizeof(struct uio_pruss_dev), GFP_KERNEL);
-> > +	gdev = devm_kzalloc(dev, sizeof(struct uio_pruss_dev), GFP_KERNEL);
+On Fri, Jun 27, 2014 at 04:37:45PM -0600, Stephen Warren wrote:
+> On 06/27/2014 01:57 AM, Tomeu Vizoso wrote:
+> > +struct clk {
+> > +	struct clk_core clk;
+> > +};
 > 
-> If this is changing anyway, how about:
-> 
-> 	gdev = devm_kzalloc(dev, sizeof(*gdev), GFP_KERNEL);
-> 
+> I'm confused why that field isn't a pointer instead.
 
-Sounds good, will do just that.
+It becomes a pointer in the following patch.
 
-Thanks for having at look at the series, Mark!
-
-Regards,
-Andre
+It's been a while since I created these patches, but IIRC I split it
+this way because this patch was large and touching several drivers and
+thus I wanted to make it do just the rename and keep core changes to a
+minimum.  Such as step may not be needed with Tomeu's series since it's
+organized differently.
