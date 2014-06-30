@@ -1,89 +1,84 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Jun 2014 16:01:45 +0100
-Subject: [PATCH v6 16/21] arm64: KVM: remove __kvm_hyp_code_{start,
- end} from hyp.S
+Date: Mon, 30 Jun 2014 16:01:47 +0100
+Subject: [PATCH v6 18/21] arm64: KVM: move HCR_EL2.{IMO,
+ FMO} manipulation into the vgic switch code
 In-Reply-To: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
 References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1404140510-5382-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1404140510-5382-19-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have __hyp_text_{start,end} to express the boundaries
-of the HYP text section, and __kvm_hyp_code_{start,end} are getting
-in the way of a more modular world switch code.
+GICv3 requires the IMO and FMO bits to be tightly coupled with some
+of the interrupt controller's register switch.
 
-Just turn __kvm_hyp_code_{start,end} into #defines mapping the
-linker-emited symbols.
+In order to have similar code paths, move the manipulation of these
+bits to the GICv2 switch code.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 6 ++++--
- arch/arm64/include/asm/virt.h    | 4 ++++
- arch/arm64/kvm/hyp.S             | 6 ------
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h |  5 +++--
+ arch/arm64/kvm/hyp.S             | 17 ++++++++++++-----
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 9fcd54b..d0bfc4b 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -18,6 +18,8 @@
- #ifndef __ARM_KVM_ASM_H__
- #define __ARM_KVM_ASM_H__
- 
-+#include <asm/virt.h>
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 3d69030..cc83520 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -76,9 +76,10 @@
+  */
+ #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+ 			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
+-			 HCR_AMO | HCR_IMO | HCR_FMO | \
+-			 HCR_SWIO | HCR_TIDCP | HCR_RW)
++			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+ #define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
++#define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
 +
- /*
-  * 0 is reserved as an invalid value.
-  * Order *must* be kept in sync with the hyp switch code.
-@@ -96,8 +98,8 @@ extern char __kvm_hyp_init_end[];
  
- extern char __kvm_hyp_vector[];
- 
--extern char __kvm_hyp_code_start[];
--extern char __kvm_hyp_code_end[];
-+#define	__kvm_hyp_code_start	__hyp_text_start
-+#define	__kvm_hyp_code_end	__hyp_text_end
- 
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 215ad46..7a5df52 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -50,6 +50,10 @@ static inline bool is_hyp_mode_mismatched(void)
- 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
- }
- 
-+/* The section containing the hypervisor text */
-+extern char __hyp_text_start[];
-+extern char __hyp_text_end[];
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* ! __ASM__VIRT_H */
+ /* Hyp System Control Register (SCTLR_EL2) bits */
+ #define SCTLR_EL2_EE	(1 << 25)
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 877d82a1..9c5d0ac 100644
+index 56df9a3..5945f3b 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -36,9 +36,6 @@
- 	.pushsection	.hyp.text, "ax"
- 	.align	PAGE_SHIFT
+@@ -335,11 +335,8 @@
+ .endm
  
--__kvm_hyp_code_start:
--	.globl __kvm_hyp_code_start
+ .macro activate_traps
+-	ldr	x2, [x0, #VCPU_IRQ_LINES]
+-	ldr	x1, [x0, #VCPU_HCR_EL2]
+-	orr	x2, x2, x1
+-	msr	hcr_el2, x2
 -
- .macro save_common_regs
- 	// x2: base address for cpu context
- 	// x3: tmp register
-@@ -880,7 +877,4 @@ ENTRY(__kvm_hyp_vector)
- 	ventry	el1_error_invalid		// Error 32-bit EL1
- ENDPROC(__kvm_hyp_vector)
++	ldr     x2, [x0, #VCPU_HCR_EL2]
++	msr     hcr_el2, x2
+ 	ldr	x2, =(CPTR_EL2_TTA)
+ 	msr	cptr_el2, x2
  
--__kvm_hyp_code_end:
--	.globl	__kvm_hyp_code_end
--
- 	.popsection
+@@ -382,12 +379,22 @@
+ 	ldr	x24, [x24, VGIC_SAVE_FN]
+ 	kern_hyp_va	x24
+ 	blr	x24
++	mrs	x24, hcr_el2
++	mov	x25, #HCR_INT_OVERRIDE
++	neg	x25, x25
++	and	x24, x24, x25
++	msr	hcr_el2, x24
+ .endm
+ 
+ /*
+  * Call into the vgic backend for state restoring
+  */
+ .macro restore_vgic_state
++	mrs	x24, hcr_el2
++	ldr	x25, [x0, #VCPU_IRQ_LINES]
++	orr	x24, x24, #HCR_INT_OVERRIDE
++	orr	x24, x24, x25
++	msr	hcr_el2, x24
+ 	adr	x24, __vgic_sr_vectors
+ 	ldr	x24, [x24, #VGIC_RESTORE_FN]
+ 	kern_hyp_va	x24
 -- 
 2.0.0
