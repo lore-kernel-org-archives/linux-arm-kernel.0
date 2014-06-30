@@ -1,20 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Jun 2014 13:09:25 -0400
-Subject: [GIT PULL] ARM: versatile: DT IRQ and clock support
-In-Reply-To: <CAL_JsqKkfDd3h+iW7UUJiUgULSma=bs=muTTyCo3HOWHi30LVw@mail.gmail.com>
-References: <CAL_JsqKkfDd3h+iW7UUJiUgULSma=bs=muTTyCo3HOWHi30LVw@mail.gmail.com>
-Message-ID: <20140630170925.GV23978@titan.lakedaemon.net>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 30 Jun 2014 19:15:46 +0200
+Subject: [PATCH v5 5/5] ARM: EXYNOS: Move PMU specific definitions from
+ common.h
+In-Reply-To: <1403705032-14835-6-git-send-email-pankaj.dubey@samsung.com>
+References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
+ <1403705032-14835-6-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <53B19B42.1040006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 24, 2014 at 02:35:18PM -0500, Rob Herring wrote:
->       irqchip: versatile-fpga: Add IRQCHIP_DECLARE support
->       irqchip: versatile-fpga: add support for arm,versatile-sic
+Hi Pankaj,
 
-fwiw,
+On 25.06.2014 16:03, Pankaj Dubey wrote:
+> This patch moves PMU specific definitions into a new file
+> as exynos-pmu.h.
+> This will help in reducing dependency of common.h in pmu.c.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.h     |   17 -----------------
+>  arch/arm/mach-exynos/exynos-pmu.h |   31 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-exynos/pm.c         |    1 +
+>  arch/arm/mach-exynos/pmu.c        |    2 +-
+>  4 files changed, 33 insertions(+), 18 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+> 
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index 296c6e1..0326ca2 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -135,23 +135,6 @@ extern struct smp_operations exynos_smp_ops;
+>  
+>  extern void exynos_cpu_die(unsigned int cpu);
+>  
+> -/* PMU(Power Management Unit) support */
+> -
+> -#define PMU_TABLE_END	(-1U)
+> -
+> -enum sys_powerdown {
+> -	SYS_AFTR,
+> -	SYS_LPA,
+> -	SYS_SLEEP,
+> -	NUM_SYS_POWERDOWN,
+> -};
+> -
+> -struct exynos_pmu_conf {
+> -	unsigned int offset;
+> -	unsigned int val[NUM_SYS_POWERDOWN];
+> -};
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+While at it, I'd say this struct could be moved to pmu.c, along with the
+PMU_TABLE_END macro as they are both private to this file.
 
-thx,
-
-Jason.
+Best regards,
+Tomasz
