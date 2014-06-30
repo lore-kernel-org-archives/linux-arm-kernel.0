@@ -1,64 +1,65 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 30 Jun 2014 17:42:17 +0300
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <20140630141334.GK28951@arm.com>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53ADAA1C.70407@ti.com> <20140627232757.GB26184@ulmo>
- <20140630102512.GE28951@arm.com>
- <20140630114621.GT3679@tbergstrom-lnx.Nvidia.com>
- <20140630141334.GK28951@arm.com>
-Message-ID: <20140630144217.GV3679@tbergstrom-lnx.Nvidia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Jun 2014 16:43:55 +0200
+Subject: [GIT PULL] nommu fixes for 3.17-rc1
+Message-ID: <20140630144355.GH14781@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > PSCI again?
-> > 
-> > Not possible for boards where linux runs in NS (roth and tn7).
-> 
-> That's one of the main use-cases for PSCI - Linux running in NS mode.
-> AFAIK, the boards that you mentioned are not ARMv8? We don't intend to
+Hello Russell,
 
-They are v7 indeed...
+the following changes since commit 4c834452aad01531db949414f94f817a86348d59:
 
-> enforce PSCI on ARMv7 platforms, mainly because of the legacy firmware
-> (though where starting from scratch it would be nice). That means that
-> the code won't be shared with arm64 and you can leave it under arch/arm
-> (it's a lot of AArch32 assembly anyway).
-> 
-> > The secure monitor on those is outside our control and does not
-> > implement PSCI.
-> 
-> As I said, I don't think we should change firmware on existing ARMv7
-> SoCs but for a new ARMv8 SoC I strongly recommend PSCI. The firmware
-> needs to be written anyway (different AArch64 exception model), so you
-> can raise such requirement with your firmware provider (ARM also
-> provides Trusted Firmware freely as a quick start which implements PSCI,
-> though you can only use it as an example).
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
 
-For v8 this should be fine yes...
+are available in the git repository at:
 
-> 
-> > There might be some value for Tegra114 and Tegra124 if we would like
-> > to use HYP mode, but that's not on the radar today. It's a waste of
-> > time for Tegra20 and Tegra30.
-> 
-> I think you should keep the Hyp support in mind anyway and test Linux
-> booting in NS mode on your platforms. It may not be on your radar today
-> for a SoC but if you later decide that it is, we end up with needing
-> different code paths in Linux for the same SoC depending on how it boots
-> (and you can't easily detect this at boot time, nor you can pass it via
-> DT).
+  git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
 
-You can just look for a psci DT node? If this node is missing, fallback to
-the existing tegra specific mechanism. At least, that's how I envision doing
-PSCI for HYP mode on v7 based boards where linux today runs in secure mode.
-u-boot loads a minimal secure monitor which only does PSCI (we don't care about
-any security as there are no keys available for signing on those boards
-anyway), adds the PSCI node to the DT and then boots linux in HYP mode. 
-tegra_cpu_reset_handler_enable() checks for a PSCI node and uses it if
-available. Else it will fallback to the existing methods. Similar for cpuidle.
-No guarantees that this will ever be implemented though :) Maybe.
+for you to fetch changes up to 7343ab2ad6772f29d6bbb286a7aa0265a7aa5d3b:
 
-Cheers,
+  ARM: make user_addr_max more robust (2014-06-30 15:48:30 +0200)
 
-Peter.
+----------------------------------------------------------------
+A small collection of ARM-nommu related fixes and cleanups.
+
+Regarding the small user base ("Hello, anyone out there apart from me?") and
+the problem being fixed exists since 3.6-rc1 I don't consider the patches
+serious enough to justify them going in before the next merge window.
+
+This series makes efm32 boot again.
+----------------------------------------------------------------
+
+I have chosen -rc3 as base because -rc1 and -rc2 don't work for me as
+they don't have 6980c3e2514e (ARM: 8086/1: Set memblock limit for
+nommu).
+
+Uwe Kleine-K?nig (5):
+      ARM: nommu: drop support for ARM740T, ARM940T and ARM946E-S processors
+      ARM: nommu: don't limit TASK_SIZE
+      ARM: nommu: simplify definition of MODULES_END
+      ARM: nommu: drop unused Kconfig symbol DRAM_SIZE
+      ARM: make user_addr_max more robust
+
+ Documentation/devicetree/bindings/arm/cpus.txt |   3 -
+ arch/arm/Kconfig                               |   5 +-
+ arch/arm/Kconfig-nommu                         |   4 -
+ arch/arm/Makefile                              |   3 -
+ arch/arm/configs/at91x40_defconfig             |   1 -
+ arch/arm/configs/efm32_defconfig               |   1 -
+ arch/arm/include/asm/glue-cache.h              |  16 -
+ arch/arm/include/asm/glue-proc.h               |  27 --
+ arch/arm/include/asm/memory.h                  |  10 +-
+ arch/arm/include/asm/uaccess.h                 |   2 +-
+ arch/arm/mm/Kconfig                            |  67 +---
+ arch/arm/mm/Makefile                           |   3 -
+ arch/arm/mm/proc-arm740.S                      | 151 ---------
+ arch/arm/mm/proc-arm940.S                      | 374 ---------------------
+ arch/arm/mm/proc-arm946.S                      | 429 -------------------------
+ 15 files changed, 12 insertions(+), 1084 deletions(-)
+ delete mode 100644 arch/arm/mm/proc-arm740.S
+ delete mode 100644 arch/arm/mm/proc-arm940.S
+ delete mode 100644 arch/arm/mm/proc-arm946.S
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
