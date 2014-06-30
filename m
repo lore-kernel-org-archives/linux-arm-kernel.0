@@ -1,42 +1,226 @@
-From: punnaia@xilinx.com (punnaiah choudary kalluri)
-Date: Mon, 30 Jun 2014 09:04:01 +0530
-Subject: [PATCH v2 2/2] usb: chipidea: Add support for zynq usb host and
- device controller
-In-Reply-To: <20140628054641.GA14192@shlinux1.ap.freescale.net>
-References: <1403868233-5123-1-git-send-email-punnaia@xilinx.com>
- <fa656d2d-a2a8-4b8d-a29b-e89e4bfced3e@BL2FFO11FD034.protection.gbl>
- <20140627125515.GA6025@pengutronix.de>
- <20140628054641.GA14192@shlinux1.ap.freescale.net>
-Message-ID: <CAGnW=Ba3SGejFPEyNt0rArPpcGwbi5Y6JkRgaw6iw4Aj4R7xJw@mail.gmail.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Mon, 30 Jun 2014 09:31:36 +0530
+Subject: [PATCH v5 05/14] clk: Add generic driver for Maxim PMIC clocks
+In-Reply-To: <1403806546-31122-6-git-send-email-javier.martinez@collabora.co.uk>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAKew6eU5X=WxhECtwUUwbXe_fCRU4bD6B7caWiA2dwcBfThd-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 28, 2014 at 11:16 AM, Peter Chen <peter.chen@freescale.com> wrote:
-> On Fri, Jun 27, 2014 at 02:55:15PM +0200, Michael Grzeschik wrote:
->> Hi,
->>
->> On Fri, Jun 27, 2014 at 04:53:53PM +0530, Punnaiah Choudary Kalluri wrote:
->> > Zynq soc uses Chipidea/Synopsys usb IP core(CI13612). This patch adds
->> > necessary glue to allow the chipidea driver to work on zynq soc.
->> >
->>
->> Did you see the currently discussed patches for the generic chipidea
->> glue?
->>
->> http://www.spinics.net/lists/linux-usb/msg109576.html
->>
->> Try to improve that code instead writing another version
->> of this simple gluecode.
->>
->
-> +1 if you think your version can be covered by generic one.
+Hi Javier,
 
-Ok. I will check this possibility.
-
-Thanks,
-Punnaiah
+On Thu, Jun 26, 2014 at 11:45 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Maxim Integrated Power Management ICs are very similar with
+> regard to their clock outputs. Most of the clock drivers for
+> these chips are duplicating code and are simpler enough that
+> can be converted to use a generic driver to consolidate code
+> and avoid duplication.
 >
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>
+> Changes since v4:
+>  - Return recalc 0 if clock isn't enabled in Suggested by Yadwinder Singh Brar.
+>
+
+It seems you didn't implement or posted same patch again :) .
+
+> Changes since v3:
+>  - Add current copyright information. Suggested by Krzysztof Kozlowski
+>  - Do a single allocation for struct max_gen_clk. Suggested by Krzysztof Kozlowski
+>  - Add EXPORT_SYMBOL() for exported symbols. Suggested by Krzysztof Kozlowski
+>
+>  drivers/clk/Kconfig       |   3 +
+>  drivers/clk/Makefile      |   1 +
+>  drivers/clk/clk-max-gen.c | 195 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/clk-max-gen.h |  32 ++++++++
+>  4 files changed, 231 insertions(+)
+>  create mode 100644 drivers/clk/clk-max-gen.c
+>  create mode 100644 drivers/clk/clk-max-gen.h
+>
+
+[ .. ]
+
+> +
+> +static unsigned long max_gen_recalc_rate(struct clk_hw *hw,
+> +                                        unsigned long parent_rate)
+> +{
+> +       return 32768;
+> +}
+
+Its still same here.
+
+> +
+> +struct clk_ops max_gen_clk_ops = {
+> +       .prepare        = max_gen_clk_prepare,
+> +       .unprepare      = max_gen_clk_unprepare,
+> +       .is_prepared    = max_gen_clk_is_prepared,
+> +       .recalc_rate    = max_gen_recalc_rate,
+> +};
+> +EXPORT_SYMBOL_GPL(max_gen_clk_ops);
+> +
+> +static struct clk *max_gen_clk_register(struct device *dev,
+> +                                       struct max_gen_clk *max_gen)
+> +{
+> +       struct clk *clk;
+> +       struct clk_hw *hw = &max_gen->hw;
+> +
+> +       clk = clk_register(dev, hw);
+> +       if (IS_ERR(clk))
+> +               return clk;
+> +
+> +       max_gen->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
+
+As I suggested in other patch[1] also, its better to use
+clkdev_alloc() instead of kzalloc() here.
+
+> +       if (!max_gen->lookup)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       max_gen->lookup->con_id = hw->init->name;
+
+Also IMO,  init->name should be over-written if name is provided in DT,
+otherwise generic "clock-output-names" property will go futile,
+perhaps it should be done before clk_register.
+
+Regards,
+Yadwinder
+
+[1] : https://lkml.org/lkml/2014/6/27/197
+
+> +       max_gen->lookup->clk = clk;
+> +
+> +       clkdev_add(max_gen->lookup);
+> +
+> +       return clk;
+> +}
+> +
+> +int max_gen_clk_probe(struct platform_device *pdev, struct regmap *regmap,
+> +                     u32 reg, struct clk_init_data *clks_init, int num_init)
+> +{
+> +       int i, ret;
+> +       struct max_gen_clk *max_gen_clks;
+> +       struct clk **clocks;
+> +       struct device *dev = &pdev->dev;
+> +
+> +       clocks = devm_kzalloc(dev, sizeof(struct clk *) * num_init, GFP_KERNEL);
+> +       if (!clocks)
+> +               return -ENOMEM;
+> +
+> +       max_gen_clks = devm_kzalloc(dev, sizeof(struct max_gen_clk)
+> +                                   * num_init, GFP_KERNEL);
+> +       if (!max_gen_clks)
+> +               return -ENOMEM;
+> +
+> +       for (i = 0; i < num_init; i++) {
+> +               max_gen_clks[i].regmap = regmap;
+> +               max_gen_clks[i].mask = 1 << i;
+> +               max_gen_clks[i].reg = reg;
+> +               max_gen_clks[i].hw.init = &clks_init[i];
+> +
+> +               clocks[i] = max_gen_clk_register(dev, &max_gen_clks[i]);
+> +               if (IS_ERR(clocks[i])) {
+> +                       ret = PTR_ERR(clocks[i]);
+> +                       dev_err(dev, "failed to register %s\n",
+> +                               max_gen_clks[i].hw.init->name);
+> +                       goto err_clocks;
+> +               }
+> +       }
+> +
+> +       platform_set_drvdata(pdev, clocks);
+> +
+> +       if (dev->of_node) {
+> +               struct clk_onecell_data *of_data;
+> +
+> +               of_data = devm_kzalloc(dev, sizeof(*of_data), GFP_KERNEL);
+> +               if (!of_data) {
+> +                       ret = -ENOMEM;
+> +                       goto err_clocks;
+> +               }
+> +
+> +               of_data->clks = clocks;
+> +               of_data->clk_num = num_init;
+> +               ret = of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
+> +                                         of_data);
+> +
+> +               if (ret) {
+> +                       dev_err(dev, "failed to register OF clock provider\n");
+> +                       goto err_clocks;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +
+> +err_clocks:
+> +       for (--i; i >= 0; --i) {
+> +               clkdev_drop(max_gen_clks[i].lookup);
+> +               clk_unregister(max_gen_clks[i].hw.clk);
+> +       }
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(max_gen_clk_probe);
+> +
+> +int max_gen_clk_remove(struct platform_device *pdev, int num_init)
+> +{
+> +       struct clk **clocks = platform_get_drvdata(pdev);
+> +       struct device *dev = pdev->dev.parent;
+> +       int i;
+> +
+> +       if (dev->of_node)
+> +               of_clk_del_provider(dev->of_node);
+> +
+> +       for (i = 0; i < num_init; i++) {
+> +               struct clk_hw *hw = __clk_get_hw(clocks[i]);
+> +               struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> +
+> +               clkdev_drop(max_gen->lookup);
+> +               clk_unregister(clocks[i]);
+> +       }
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(max_gen_clk_remove);
+> diff --git a/drivers/clk/clk-max-gen.h b/drivers/clk/clk-max-gen.h
+> new file mode 100644
+> index 0000000..997e86f
+> --- /dev/null
+> +++ b/drivers/clk/clk-max-gen.h
+> @@ -0,0 +1,32 @@
+> +/*
+> + * clk-max-gen.h - Generic clock driver for Maxim PMICs clocks
+> + *
+> + * Copyright (C) 2014 Google, Inc
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#ifndef __CLK_MAX_GEN_H__
+> +#define __CLK_MAX_GEN_H__
+> +
+> +#include <linux/types.h>
+> +#include <linux/device.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/regmap.h>
+> +#include <linux/platform_device.h>
+> +
+> +int max_gen_clk_probe(struct platform_device *pdev, struct regmap *regmap,
+> +                     u32 reg, struct clk_init_data *clks_init, int num_init);
+> +int max_gen_clk_remove(struct platform_device *pdev, int num_init);
+> +extern struct clk_ops max_gen_clk_ops;
+> +
+> +#endif /* __CLK_MAX_GEN_H__ */
 > --
+> 2.0.0.rc2
 >
-> Best Regards,
-> Peter Chen
