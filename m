@@ -1,42 +1,25 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Jun 2014 16:07:24 +0200
-Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
-In-Reply-To: <1519968.Vijxn8Mc9S@vasilykh-desktop-i5>
-References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
- <53B16B06.6070206@samsung.com> <1519968.Vijxn8Mc9S@vasilykh-desktop-i5>
-Message-ID: <53B16F1C.4040206@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Jun 2014 16:08:28 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <mvmr4264i1p.fsf@hawking.suse.de>
+References: <mvmvbri4k06.fsf@hawking.suse.de>
+ <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
+ <mvmr4264i1p.fsf@hawking.suse.de>
+Message-ID: <CAKv+Gu8SbM_Z=ymBFb2D4EWJeo-6dWuKqE2YNOkqJTKLDEJcYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vasily,
+On 30 June 2014 15:56, Andreas Schwab <schwab@suse.de> wrote:
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>
+>> Out of curiosity, how did you trigger this failure? I have build this
+>> code numerous times (and so have others) and I have never seen this
+>> failure.
+>
+> Did you ever start with a clean tree?
+>
 
-On 30.06.2014 16:02, Vasily Khoruzhick wrote:
-> On 30 June 2014 15:49:58 Tomasz Figa wrote:
->> On 23.06.2014 22:29, Vasily Khoruzhick wrote:
->>> There's a several typos in a driver: 2410 instead of S3C2410
->>> and wrong argument to ARRAY_SIZE(). They prevent s3c2410
->>> from properly booting.
->>>
->>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->>> ---
->>>
->>>  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> Applied as a fix for 3.16.
-> 
-> Hi Tomasz,
-> 
-> I also have clk fixes for s3c24xx touchscreen, framebuffer, adc, usb and nand 
-> drivers (to replace clk_enable with clk_prepare_enable and clk_disable with 
-> clk_disable_unprepare),
-> 
-> Should they be merged through different trees or it's possible to merge them 
-> through a single tree?
+Yep, building both in-tree and out-of-tree, no trouble at all.
 
-I'd say they should all go through respective subsystem trees, unless
-they directly depend on patches I already applied, which is not the case
-as far as I can see.
-
-Best regards,
-Tomasz
+-- 
+Ard.
