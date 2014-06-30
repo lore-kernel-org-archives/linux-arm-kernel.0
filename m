@@ -1,67 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 10:48:54 +0100
-Subject: [PATCH v7 1/6] mfd: AXP20x: Add bindings documentation
-In-Reply-To: <1404066237-20234-2-git-send-email-carlo@caione.org>
-References: <1404066237-20234-1-git-send-email-carlo@caione.org>
- <1404066237-20234-2-git-send-email-carlo@caione.org>
-Message-ID: <20140630094854.GY7262@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Jun 2014 10:52:20 +0100
+Subject: [PATCH v2] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <53ADEEDF.7060902@codeaurora.org>
+References: <1400877218-4113-1-git-send-email-thierry.reding@gmail.com>
+ <CAL_JsqKumG1PSFoVfeGpLLG+MjXFeF4aUjun=vv1BJpaxk0Byg@mail.gmail.com>
+ <4545972.cM7IP1qTXQ@wuerfel> <53A4C0C9.2050908@codeaurora.org>
+ <20140624091808.GC26013@arm.com> <53A9BC18.2090106@codeaurora.org>
+ <20140624181150.GB4067@arm.com> <53A9EF3A.2070704@codeaurora.org>
+ <20140625091858.GG6153@arm.com> <53ADEEDF.7060902@codeaurora.org>
+Message-ID: <20140630095220.GA25779@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 07:23:52PM +0100, Carlo Caione wrote:
-> Bindings documentation for the AXP20x driver. In this file also
-> sub-nodes are documented.
+Hi Olav,
+
+On Fri, Jun 27, 2014 at 11:23:27PM +0100, Olav Haugan wrote:
+> On 6/25/2014 2:18 AM, Will Deacon wrote:
+> > Why can't it be dynamically detected? Whilst the StreamIDs are fixed in
+> > hardware (from the SMMU architecture perspective), the SMRs are completely
+> > programmable. Why doesn't something like Andreas's proposal work for you?
+> > The idea there was to find the constant bits among the StreamIDs for a
+> > master and create the mask accordingly.
+> > 
+> Lets say I have an IOMMU with 2 masters and 2 SMRn slots with the
+> following stream IDs coming from the masters:
 > 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 93 ++++++++++++++++++++++++
->  1 file changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
+> Master 2: 0x30
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> new file mode 100644
-> index 0000000..cc9e01b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -0,0 +1,93 @@
-> +AXP202/AXP209 device tree bindings
-> +
-> +The axp20x family current members :-
-> +axp202 (X-Powers)
-> +axp209 (X-Powers)
-> +
-> +Required properties:
-> +- compatible: "x-powers,axp202" or "x-powers,axp209"
-> +- reg: The I2C slave address for the AXP chip
-> +- interrupt-parent: The parent interrupt controller
-> +- interrupts: Interrupt specifiers for interrupt sources
+> To make this work I would program SMR[0] with StreamID 0x20 and mask 0xF
+> to ignore lower 4 bits. SMR[1] would just be StreamID 0x30 with mask 0x0.
+> 
+> However, I could also have an IOMMU with 2 masters and 9 SMRn slots with
+> the following stream IDs:
+> 
+> Master 1: 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28
+> Master 2: 0x29
+> 
+> Here I would program all SMRn and leave the mask to be 0 for all SMRn's.
+> So how do I detect when to apply a mask or not?
 
-How many, what are they?
+You would aim to use the smallest number of SMRs per master possible.
+You could probably use:
 
-> +- interrupt-controller: axp20x has its own internal IRQs
-> +- #interrupt-cells: Should be set to 1
-> +- acin-supply: The input supply for LDO1
-> +- vin2-supply: The input supply for DCDC2
-> +- vin3-supply: The input supply for DCDC3
-> +- ldo24in-supply: The input supply for LDO2, LDO4
-> +- ldo3in-supply: The input supply for LDO3
-> +- ldo5in-supply: The input supply for LDO5
-> +
-> +- regulators: A node that houses a sub-node for each regulator. The regulators are
-> +	      bound using their name as listed here: dcdc2, dcdc3, ldo1, ldo2,
-> +	      ldo3, ldo4, ldo5.  The bindings details of individual regulator
-> +	      device can be found in:
-> +	      Documentation/devicetree/bindings/regulator/regulator.txt with
-> +	      the exception of x-powers,dcdc-freq
-> +- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
-> +		      (range: 750-1875). Default: 1.5MHz
-> +
-> +Optional properties for DCDCs:
-> +- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
-> +			  Default: AUTO mode
+  Master 1: SMR[0].id == 0x20, SMR[0].mask = 0x07
+            SMR[1].id == 0x28, SMR[1].mask = 0x00
 
-When would I want to select PWM mode, and why should this be in the DT?
+  Master 2: SMR[2].id == 0x29, SMR[2].mask = 0x00
 
-Thanks,
-Mark.
+> I am not familiar with Andreas's proposal. Do you have a link?
+
+  http://marc.info/?l=linux-arm-kernel&m=139110598005846&w=2
+
+Note that since Calxeda went under, Andreas is unfortunately no longer
+working on this.
+
+Will
