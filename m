@@ -1,48 +1,66 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Jun 2014 14:20:53 -0700
-Subject: [RFC PATCH 2/6] arm/arm64: KVM: Rename irq_active to irq_queued
-In-Reply-To: <40b2b2cd240d39950a3aa98c53c36fad@www.loen.fr>
-References: <1402779067-34478-1-git-send-email-christoffer.dall@linaro.org>
- <1402779067-34478-3-git-send-email-christoffer.dall@linaro.org>
- <40b2b2cd240d39950a3aa98c53c36fad@www.loen.fr>
-Message-ID: <20140630212053.GA20104@cbox>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 30 Jun 2014 15:23:04 -0600
+Subject: [PATCH 6/6] thermal: Add Tegra SOCTHERM thermal management driver
+In-Reply-To: <1403856699-2140-7-git-send-email-mperttunen@nvidia.com>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-7-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53B1D538.6000704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 22, 2014 at 12:25:02PM +0100, Marc Zyngier wrote:
-> On 2014-06-14 21:51, Christoffer Dall wrote:
-> >We have a special bitmap on the distributor struct to keep track
-> >of when
-> >level-triggered interrupts are queued on the list registers.  This
-> >was
-> >named irq_active, which is confusing, because the active state of an
-> >interrupt as per the GIC spec is a different thing, not specifically
-> >related to edge-triggered/level-triggered configurations but rather
-> >indicates an interrupt which has been ack'ed but not yet eoi'ed.
-> >
-> >Rename the bitmap and the corresponding accessor functions to
-> >irq_queued
-> >to clarify what this is actually used for.
-> 
-> While I agree that irq_active is confusing, I would tend to object
-> to irq_queued for similar reasons. Edge interrupts get queued as
-> well.
+On 06/27/2014 02:11 AM, Mikko Perttunen wrote:
+> This adds support for the Tegra SOCTHERM thermal sensing and management
+> system found in the Tegra124 system-on-chip. This initial driver supports
+> the four thermal zones with hardware-tracked trip points.
 
-yeah, but this is never checked for edge-triggered IRQs so I don't find
-that part confusing.  I find the queued word suitable, because we set in
-in the _queue function and unset it in the unqueue function.
+> diff --git a/drivers/thermal/tegra_soctherm.c b/drivers/thermal/tegra_soctherm.c
 
-> 
-> What this bit does is to allow or forbid resampling of a level
-> interrupt.
-> 
-> How about irq_resample instead? That would mandate a small refactor
-> of the code (a bit set to one would allow resampling, which is the
-> opposite of the current logic), but would look better, I believe.
-> 
-> What do you think?
-> 
-hmm, maybe.  Feel like illustrating what you mean exactly in form of a
-patch?
+> +static struct tegra_tsensor t124_tsensors[] = {
+> +	{
+> +		.base = 0xc0,
+> +		.name = "cpu0",
+> +		.config = &t124_tsensor_config,
+> +		.calib_fuse_offset = 0x098,
+> +		.fuse_corr_alpha = 1135400,
+> +		.fuse_corr_beta = -6266900,
+> +	},
 
--Christoffer
+I wonder why some of those fields are named "fuse_xxx" when the values
+are hard-coded in these tables rather than read from fuses? These values
+don't seem to be used to adjust values read from fuses.
+
+> +static int tegra_thermctl_get_temp(void *data, long *out_temp)
+
+> +	switch (zone->sensor) {
+> +	case 0:
+> +		val = readl(zone->tegra->regs + SENSOR_TEMP1)
+> +			>> SENSOR_TEMP1_CPU_TEMP_SHIFT;
+
+Can't the register offset and shift be stored in *zone, so that this
+whole switch can be replaced with something generic:
+
+val = readl(zone->tegra->regs + zone->reg_offset) >> zone->value_shift;
+
+> +static int tegra_soctherm_probe(struct platform_device *pdev)
+
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq <= 0) {
+> +		dev_err(&pdev->dev, "can't get interrupt\n");
+> +		return -EINVAL;
+> +	}
+
+irq is assigned once here ... (see later)
+
+> +	for (i = 0; i < 4; ++i) {
+
+Why "4"? Should the loop count be the ARRAY_SIZE(some array)? At the
+very least, a named constant that describes the value would be useful...
+
+> +		err = devm_request_threaded_irq(&pdev->dev, irq, soctherm_isr,
+> +						soctherm_isr_thread,
+> +						IRQF_SHARED, "tegra_soctherm",
+> +						zone);
+
+Why request the same IRQ 4 times here. Rather, shouldn't the IRQ be
+requested once, and the ISR simply loop over the status register (or
+whatever there are 4 of)?
