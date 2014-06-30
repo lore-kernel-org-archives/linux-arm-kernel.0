@@ -1,35 +1,75 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jun 2014 12:12:21 +0200
-Subject: [PATCH v2 0/2] ARM: topology: Allow to set the frequency through a
- clock
-Message-ID: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 30 Jun 2014 12:12:22 +0200
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the CPU
+ frequency
+In-Reply-To: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
+topology code.
 
-This patch series add the possibility for the topology code to get the
-CPU frequency through a DT clock handle instead of needing a
-clock-frequency property.
+Allow to use a clock to provide the same information.
 
-Indeed, this information can be quite redundant if the clock tree
-defined in the DT is already describing the CPU parent clock.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/kernel/topology.c | 25 ++++++++++++++++++-------
+ 1 file changed, 18 insertions(+), 7 deletions(-)
 
-Maxime
-
-Changes from v1:
-  - Rebased on top of 3.16
-  - Reworked a bit the code in the first patch as requested by Rob
-    Herring
-
-Maxime Ripard (2):
-  ARM: topology: Use a clock if possible to get the CPU frequency
-  ARM: sunxi: Add clocks node to the CPU nodes
-
- arch/arm/boot/dts/sun6i-a31.dtsi |  4 ++++
- arch/arm/boot/dts/sun7i-a20.dtsi |  2 ++
- arch/arm/kernel/topology.c       | 25 ++++++++++++++++++-------
- 3 files changed, 24 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 9d853189028b..268443d88094 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -11,6 +11,7 @@
+  * for more details.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/cpu.h>
+ #include <linux/cpumask.h>
+ #include <linux/export.h>
+@@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
+ 				 GFP_NOWAIT);
+ 
+ 	for_each_possible_cpu(cpu) {
+-		const u32 *rate;
+-		int len;
++		struct clk *clk;
++		u32 rate = 0;
+ 
+ 		/* too early to use cpu->of_node */
+ 		cn = of_get_cpu_node(cpu, NULL);
+@@ -117,14 +118,24 @@ static void __init parse_dt_topology(void)
+ 		if (cpu_eff->compatible == NULL)
+ 			continue;
+ 
+-		rate = of_get_property(cn, "clock-frequency", &len);
+-		if (!rate || len != 4) {
+-			pr_err("%s missing clock-frequency property\n",
+-				cn->full_name);
++		clk = of_clk_get(cn, 0);
++		if (!IS_ERR(clk))
++			rate = clk_get_rate(clk);
++		else
++			of_property_read_u32(cn, "clock-frequency", &rate);
++
++		if (!rate) {
++			pr_err("%s missing clocks or clock-frequency properties\n",
++			       cn->full_name);
++			continue;
++		}
++
++		if (!rate) {
++			pr_err("%s invalid CPU frequency", cn->full_name);
+ 			continue;
+ 		}
+ 
+-		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
++		capacity = ((rate) >> 20) * cpu_eff->efficiency;
+ 
+ 		/* Save min capacity of the system */
+ 		if (capacity < min_capacity)
 -- 
 2.0.0
