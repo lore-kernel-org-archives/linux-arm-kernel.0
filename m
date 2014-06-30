@@ -1,31 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jun 2014 10:03:18 +0100
-Subject: [PATCH v2] arm64: fpsimd: avoid restoring fpcr if the contents
- haven't changed
-In-Reply-To: <CAKv+Gu_-nPg5eGj1MHXui=2QkDPGFgjh=4dZhODj984KCGqGEA@mail.gmail.com>
-References: <1403884399-16359-1-git-send-email-will.deacon@arm.com>
- <CAKv+Gu_-nPg5eGj1MHXui=2QkDPGFgjh=4dZhODj984KCGqGEA@mail.gmail.com>
-Message-ID: <20140630090318.GB24879@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 30 Jun 2014 11:07:23 +0200
+Subject: [PATCH resend v3 0/2] mmc: Add SDIO function devicetree subnode
+ parsing
+Message-ID: <1404119245-5839-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 06:33:58PM +0100, Ard Biesheuvel wrote:
-> On 27 June 2014 17:53, Will Deacon <will.deacon@arm.com> wrote:
-> > Writing to the FPCR is commonly implemented as a self-synchronising
-> > operation in the CPU, so avoid writing to the register when the saved
-> > value matches that in the hardware already.
+Hi All,
 
-[...]
+Here is a resend of 3 of my submission of Sascha Hauer's
+"mmc: Add SDIO function devicetree subnode parsing" patch.
 
-> >  .macro fpsimd_restore_partial state, tmpnr1, tmpnr2
-> >         ldp     w\tmpnr1, w\tmpnr2, [\state]
-> >         msr     fpsr, x\tmpnr1
-> > -       msr     fpcr, x\tmpnr2
-> > +       fpsimd_restore_fpcr x\tmpnr1, x\tmpnr2
-> 
-> Ehm, isn't this the wrong way around?
+Can we please get some movement on these patches, either a review specifying
+why this cannot go upstream, or else queuing it up for next / 3.17 ?
 
-Yup, well spotted. I'll give the crypto selftests a run to test this path
-with the fix (I was just running paranoia in userspace before).
+Changes since v1:
+- Submit as a stand-alone patch-set, rather then as part of a larger oob irq
+  support patchset crossing multiple subsystems
+- Add a patch to document the already existing practice of using slot subnodes
+- Split of the dt bindings documentation for sdio-func child nodes into its
+  own patch
+- Add a preparation patch, setting slot_no where relevant
+- And finally the "Add SDIO function devicetree subnode parsing" patch itself
+  has been modified to look for the sdio function childnodes under a slot node
+  instead of directly under the host node
 
-Will
+Changes since v2:
+- Drop the slot subnodes again, and drop the 2 slot subnodes patches
+
+Regards,
+
+Hans 
