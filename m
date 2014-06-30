@@ -1,44 +1,53 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 30 Jun 2014 08:59:53 -0700
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <20140628152609.GH32514@n2100.arm.linux.org.uk>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <20140628152609.GH32514@n2100.arm.linux.org.uk>
-Message-ID: <53B18979.7050206@mit.edu>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 30 Jun 2014 18:00:04 +0200
+Subject: [PATCH v5 05/14] clk: Add generic driver for Maxim PMIC clocks
+In-Reply-To: <20140630113539.GX32514@n2100.arm.linux.org.uk>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-6-git-send-email-javier.martinez@collabora.co.uk>
+ <CAKew6eU5X=WxhECtwUUwbXe_fCRU4bD6B7caWiA2dwcBfThd-g@mail.gmail.com>
+ <53B142F1.1050407@collabora.co.uk>
+ <20140630113539.GX32514@n2100.arm.linux.org.uk>
+Message-ID: <53B18984.7010607@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2014 08:26 AM, Russell King - ARM Linux wrote:
-> On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
->> Place vdso-related user-space code in arch/arm/kernel/vdso/.
->>
->> It is almost completely written in C with some assembly helpers to
->> load the data page address, sample the counter, and fall back to
->> system calls when necessary.
->>
->> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
->> high-resolution clocks and falls back to syscalls.  Low-resolution
->> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
->
-> Okay, how is this used by userspace?
->
-> It seems that on ARM, we generate a dso with these symbols:
->
-> DYNAMIC SYMBOL TABLE:
-> 000001e4 l    d  .eh_frame_hdr	00000000              .eh_frame_hdr
-> 00000000 g    DO *ABS*	00000000  LINUX_3.17  LINUX_3.17
-> 000003c4 g    DF .text	00000080  LINUX_3.17  __kernel_clock_getres
-> 00000444 g    DF .text	0000002c  LINUX_3.17  __kernel_gettimeofday
-> 00000298 g    DF .text	0000012c  LINUX_3.17  __kernel_clock_gettime
+Hello Russell,
 
-Sorry, late to the thread.
+Thanks a lot for your suggestion.
 
-I think that, if your function signatures match, you should give them 
-the same names and versions as for x86 (i.e. LINUX_2.6, 
-__vdso_clock_gettime).  Userspace will thank you.
+On 06/30/2014 01:35 PM, Russell King - ARM Linux wrote:
+> On Mon, Jun 30, 2014 at 12:58:57PM +0200, Javier Martinez Canillas wrote:
+>> >> +       if (!max_gen->lookup)
+>> >> +               return ERR_PTR(-ENOMEM);
+>> >> +
+>> >> +       max_gen->lookup->con_id = hw->init->name;
+>> > 
+>> > Also IMO,  init->name should be over-written if name is provided in DT,
+>> > otherwise generic "clock-output-names" property will go futile,
+>> > perhaps it should be done before clk_register.
+>> > 
+>> 
+>> Even though Documentation/devicetree/bindings/clock/clock-bindings.txt says that
+>> the "clock-output-names" property is optional I agree with you that will be
+>> better to support it. So I'll add it on the next version as well.
+> 
+> However, remember that con_id is the _DEVICE_ specific connection name,
+> not the _CLOCK_ name.  You will get a NAK from me if you violate this
+> rule.
+> 
 
-Don't do the weak clock_gettime, etc aliases, though.  That was never a 
-good idea to begin with.
+Yes I know that con_id is the device specific connection name that is set by the
+consumers using the "clock-names" property. But AFAIU the clk_lookup structs
+added by clockdev_add() are only used by legacy non-DT drivers which don't set
+their clock names and instead is the clock driver the one that set con_id to the
+struct clk_init_data .name field.
 
---Andy
+I see that other drivers do the same, is that wrong as well? What value should
+have con_id when registering clkdevs for legacy non-DT drivers?
+
+DT enabled drivers whose devices define their "clock-names" are not affected by
+this since the clock lookup is made by matching OF "clock-names" property + and
+index.
+
+Best regards,
+Javier
