@@ -1,70 +1,72 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 30 Jun 2014 18:05:38 +0200
-Subject: [PATCH v3 07/12] sched: test the cpu's capacity in wake affine
+Date: Mon, 30 Jun 2014 18:05:35 +0200
+Subject: [PATCH v3 04/12] sched: Allow all archs to set the power_orig
 In-Reply-To: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
 References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1404144343-18720-8-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1404144343-18720-5-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the task always wakes affine on this_cpu if the latter is idle.
-Before waking up the task on this_cpu, we check that this_cpu capacity is not
-significantly reduced because of RT tasks or irq activity.
+power_orig is only changed for system with a SMT sched_domain level in order to
+reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
+original capacity that is different from the default value.
 
-Use case where the number of irq and/or the time spent under irq is important
-will take benefit of this because the task that is woken up by irq or softirq
-will not use the same CPU than irq (and softirq) but a idle one which share
-its cache.
+Create a more generic function arch_scale_cpu_power that can be also used by
+non SMT platform to set power_orig.
+
+The weak behavior of arch_scale_cpu_power is the previous SMT one in order to
+keep backward compatibility in the use of power_orig.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 21 ++++++++++++---------
- 1 file changed, 12 insertions(+), 9 deletions(-)
+ kernel/sched/fair.c | 24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 7dff578..a23c938 100644
+index 148b277..f0bba5f 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -4240,6 +4240,7 @@ static int wake_wide(struct task_struct *p)
- static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
- {
- 	s64 this_load, load;
-+	s64 this_eff_load, prev_eff_load;
- 	int idx, this_cpu, prev_cpu;
- 	struct task_group *tg;
- 	unsigned long weight;
-@@ -4283,21 +4284,23 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
- 	 * Otherwise check if either cpus are near enough in load to allow this
- 	 * task to be woken on this_cpu.
- 	 */
--	if (this_load > 0) {
--		s64 this_eff_load, prev_eff_load;
-+	this_eff_load = 100;
-+	this_eff_load *= capacity_of(prev_cpu);
+@@ -5614,6 +5614,20 @@ unsigned long __weak arch_scale_smt_capacity(struct sched_domain *sd, int cpu)
+ 	return default_scale_smt_capacity(sd, cpu);
+ }
+ 
++unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
++{
++	unsigned long weight = sd->span_weight;
 +
-+	prev_eff_load = 100 + (sd->imbalance_pct - 100) / 2;
-+	prev_eff_load *= capacity_of(this_cpu);
- 
--		this_eff_load = 100;
--		this_eff_load *= capacity_of(prev_cpu);
-+	if (this_load > 0) {
- 		this_eff_load *= this_load +
- 			effective_load(tg, this_cpu, weight, weight);
- 
--		prev_eff_load = 100 + (sd->imbalance_pct - 100) / 2;
--		prev_eff_load *= capacity_of(this_cpu);
- 		prev_eff_load *= load + effective_load(tg, prev_cpu, 0, weight);
-+	} else if (!(sd->flags & SD_SHARE_PKG_RESOURCES)) {
-+		this_eff_load = 0;
++	if ((sd->flags & SD_SHARE_CPUCAPACITY) && weight > 1) {
++		if (sched_feat(ARCH_CAPACITY))
++			return arch_scale_smt_capacity(sd, cpu);
++		else
++			return default_scale_smt_capacity(sd, cpu);
 +	}
 +
-+	balanced = this_eff_load <= prev_eff_load;
++	return SCHED_CAPACITY_SCALE;
++}
++
+ static unsigned long scale_rt_capacity(int cpu)
+ {
+ 	struct rq *rq = cpu_rq(cpu);
+@@ -5650,18 +5664,12 @@ static unsigned long scale_rt_capacity(int cpu)
  
--		balanced = this_eff_load <= prev_eff_load;
--	} else
--		balanced = true;
- 	schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
+ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
+ {
+-	unsigned long weight = sd->span_weight;
+ 	unsigned long capacity = SCHED_CAPACITY_SCALE;
+ 	struct sched_group *sdg = sd->groups;
  
- 	if (!balanced)
+-	if ((sd->flags & SD_SHARE_CPUCAPACITY) && weight > 1) {
+-		if (sched_feat(ARCH_CAPACITY))
+-			capacity *= arch_scale_smt_capacity(sd, cpu);
+-		else
+-			capacity *= default_scale_smt_capacity(sd, cpu);
++	capacity *= arch_scale_cpu_capacity(sd, cpu);
+ 
+-		capacity >>= SCHED_CAPACITY_SHIFT;
+-	}
++	capacity >>= SCHED_CAPACITY_SHIFT;
+ 
+ 	sdg->sgc->capacity_orig = capacity;
+ 
 -- 
 1.9.1
