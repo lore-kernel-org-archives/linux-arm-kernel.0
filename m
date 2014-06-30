@@ -1,70 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 14:57:08 +0200
-Subject: [PATCH 06/16] ARM: mvebu: Rename the armada_370_xp into
- mvebu_v7 in pmsu.c file
-In-Reply-To: <1403875377-940-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140630145708.528110bd@free-electrons.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 30 Jun 2014 08:00:40 -0500
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <3FFB61A7A8473C49831AF20FA193534A43CB69F6@ALVA-EXMB01.alv.autoliv.int>
+References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
+ <20140626140115.GQ32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
+ <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627112151.GF32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <3FFB61A7A8473C49831AF20FA193534A43CB69F6@ALVA-EXMB01.alv.autoliv.int>
+Message-ID: <53B15F78.4000208@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On 06/30/2014 07:30 AM, Fredrik Noring wrote:
+>>
+>> On Fri, Jun 27, 2014 at 04:16:57PM +0000, Fredrik Noring wrote:
+>>> Please find below a trace that appeared once with 3.16-rc2. Perhaps it
+>>> is of some interest?
+>>
+>> It's not that serious... I know that the FEC ethernet driver is horrendously
+>> racy (I have had a patch set for about the last six months which fixes some of
+>> its problems) but as I've had a lot of patches to deal with, and it's been
+>> pushed to the back of the queue...
+>>
+>> The races don't lead to data corruption though, merely timeouts and some
+>> lost packets.
 
-On Fri, 27 Jun 2014 15:22:47 +0200, Gregory CLEMENT wrote:
-> Actually most of the function related to the PMSU are not specific to
-> the Armada 370 or Armada XP SoCs, but can also be used for most of the
-> other mvebu ARMv7 SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/pmsu.c | 40 ++++++++++++++++++++--------------------
->  1 file changed, 20 insertions(+), 20 deletions(-)
+> It seems to be a compiler issue, where (GCC) 4.8.2 does not produce a
+properly
+> working kernel. Happily, (Fedora 2013.11.24-2.fc19) 4.8.1 appears to
+do a lot
+> better. No crashes so far with v3.16-rc2!
+>
 
-I'm fine on the principle, but this badly conflicts with the PMSU
-changes I've made to support CPU hotplug, which are already in
-linux-next. See
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/log/arch/arm/mach-mvebu/pmsu.c.
+Did you narrow it down to a particular GCC bug?  The symptoms you
+reported remind me of:
 
->  /* No locking is needed because we only access per-CPU registers */
-> -void armada_370_xp_pmsu_idle_prepare(bool deepidle)
-> +static void mvebu_v7_pmsu_idle_prepare(bool deepidle)
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
 
-Also, note here that you're not only renaming, but also adding the
-'static' qualifier. This is already done in linux-next by
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/mach-mvebu/pmsu.c?id=adb1d99384c7480886153a97d2ea22e9c0d2e053,
-but the function is anyway renamed in
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/mach-mvebu/pmsu.c?id=bbb92284b6c821e9434223d437fbd10b8a24c294
-as a preparation for CPU hotplug support.
-
-> -static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
-> +static noinline int do_armada_xp_370_cpu_suspend(unsigned long deepidle)
-
-This does not seem like a rename to mvebu_v7.
-
->  {
-> -	armada_370_xp_pmsu_idle_prepare(deepidle);
-> +	mvebu_v7_pmsu_idle_prepare(deepidle);
->  
->  	v7_exit_coherency_flush(all);
->  
-> @@ -248,13 +248,13 @@ static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
->  	return 0;
->  }
->  
-> -static int armada_370_xp_cpu_suspend(unsigned long deepidle)
-> +static int armada_xp_370_cpu_suspend(unsigned long deepidle)
-
-Ditto.
-
->  {
-> -	return cpu_suspend(deepidle, do_armada_370_xp_cpu_suspend);
-> +	return cpu_suspend(deepidle, do_armada_xp_370_cpu_suspend);
-
-Ditto.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Sadly, unpatched GCC 4.8.1 and 4.8.2 are unsuitable for building ARM
+kernels.
