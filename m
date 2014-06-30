@@ -1,35 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Jun 2014 16:50:10 +0100
-Subject: [PATCH v6 00/21] arm64: GICv3 support
-In-Reply-To: <20140630154337.GR23978@titan.lakedaemon.net>
-References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
- <20140630154337.GR23978@titan.lakedaemon.net>
-Message-ID: <53B18732.4070509@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Jun 2014 17:51:39 +0200
+Subject: [PATCH 00/16] CPU Idle for Armada 370 and Armada 38x
+In-Reply-To: <20140630174520.194d4781@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140630174520.194d4781@free-electrons.com>
+Message-ID: <53B1878B.9060701@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On 30/06/14 16:43, Jason Cooper wrote:
-> Marc,
+On 30/06/2014 17:45, Thomas Petazzoni wrote:
+> Gregory,
 > 
-> On Mon, Jun 30, 2014 at 04:01:29PM +0100, Marc Zyngier wrote:
->> I now have received enough Reviewed-by from people familiar with the
->> architecture, and a number of Tested-by from actual implementors,
->> which (IMHO) makes ready for merging into 3.17 (Thomas, Jason: How do
->> you want to play it? We have a rather big dependency between the first
->> few patches and the rest of the stuff, which is KVM only).
+> On Fri, 27 Jun 2014 15:22:41 +0200, Gregory CLEMENT wrote:
 > 
-> On a quick glance, it looks like patch #1 is conflict-prone and #2 crosses
-> outside of irqchip/.  So, I could setup a topic branch for #1 that
-> we'll both use.  Then I'll Ack #2 for you to take.  Would that work for
-> you?
+>> This patch set adds the CPU Idle support for two mvebu SoCs: the
+>> Armada 370 and the Armada 38x. As there are common parts with the
+>> current support of cpuidle of the Armada XP. I made the code even more
+>> generic. Thanks to this change, adding a new SoC is now only done in
+>> the architecture specific part and we won't have to touch the cpuidle
+>> driver anymore for this.
+> 
+> I'd like to do some testing of this patch series, especially in big
+> endian situations. Do you have a Git repository where this version was
+> pushed?
 
-That'd be absolutely great. Just point me to the topic branch you'd like
-to use, and I'll get it into the KVM/ARM tree.
+Yes sure, the branch CPU-Idle-mvebu-next-3.16-rc2-V1 on
+https://github.com/MISL-EBU-System-SW/mainline-public.git
 
-Thanks!
+> 
+> Thanks,
+> 
+> Thomas
+> 
 
-	M.
+
 -- 
-Jazz is not dead. It just smells funny...
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
