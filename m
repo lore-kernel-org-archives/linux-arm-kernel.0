@@ -1,58 +1,40 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 22:09:37 +0300
-Subject: [PATCH] Input: s3c2410_ts: Move to
- clk_prepare_enable/clk_disable_unprepare
-Message-ID: <1404155377-2862-1-git-send-email-anarsoul@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 30 Jun 2014 12:11:35 -0700
+Subject: [RFC PATCH 2/6] arm64: Support restart through restart notifier call
+ chain
+In-Reply-To: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
+References: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1404155499-21177-3-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_prepare_enable/clk_disable_unprepare to make the driver
-work properly with common clock framework.
+The kernel core now supports a notifier call chain to restart the system.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/input/touchscreen/s3c2410_ts.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/process.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-index 19cb247..c0e0baa 100644
---- a/drivers/input/touchscreen/s3c2410_ts.c
-+++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -264,7 +264,7 @@ static int s3c2410ts_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 43b7c34..9dd2abd 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -43,6 +43,7 @@
+ #include <linux/hw_breakpoint.h>
+ #include <linux/personality.h>
+ #include <linux/notifier.h>
++#include <linux/watchdog.h>
  
--	clk_enable(ts.clock);
-+	clk_prepare_enable(ts.clock);
- 	dev_dbg(dev, "got and enabled clocks\n");
+ #include <asm/compat.h>
+ #include <asm/cacheflush.h>
+@@ -175,6 +176,8 @@ void machine_restart(char *cmd)
+ 	if (arm_pm_restart)
+ 		arm_pm_restart(reboot_mode, cmd);
  
- 	ts.irq_tc = ret = platform_get_irq(pdev, 0);
-@@ -369,7 +369,7 @@ static int s3c2410ts_remove(struct platform_device *pdev)
- 	free_irq(ts.irq_tc, ts.input);
- 	del_timer_sync(&touch_timer);
- 
--	clk_disable(ts.clock);
-+	clk_disable_unprepare(ts.clock);
- 	clk_put(ts.clock);
- 
- 	input_unregister_device(ts.input);
-@@ -383,7 +383,7 @@ static int s3c2410ts_suspend(struct device *dev)
- {
- 	writel(TSC_SLEEP, ts.io + S3C2410_ADCTSC);
- 	disable_irq(ts.irq_tc);
--	clk_disable(ts.clock);
-+	clk_disable_unprepare(ts.clock);
- 
- 	return 0;
- }
-@@ -393,7 +393,7 @@ static int s3c2410ts_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct s3c2410_ts_mach_info *info = dev_get_platdata(&pdev->dev);
- 
--	clk_enable(ts.clock);
-+	clk_prepare_enable(ts.clock);
- 	enable_irq(ts.irq_tc);
- 
- 	/* Initialise registers */
++	blocking_notifier_call_chain(&restart_notifier_list, reboot_mode, cmd);
++
+ 	/*
+ 	 * Whoops - the architecture was unable to reboot.
+ 	 */
 -- 
-2.0.0
+1.9.1
