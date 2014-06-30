@@ -1,86 +1,340 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 30 Jun 2014 16:43:23 -0600
-Subject: [RFC 04/10] memory: Add Tegra124 memory controller support
-In-Reply-To: <1403815790-8548-5-git-send-email-thierry.reding@gmail.com>
-References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
- <1403815790-8548-5-git-send-email-thierry.reding@gmail.com>
-Message-ID: <53B1E80B.5040503@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 Jun 2014 16:56:39 -0700
+Subject: [PATCH] clk: Add tracepoints for hardware operations
+Message-ID: <1404172599-10171-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2014 02:49 PM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The memory controller on NVIDIA Tegra124 exposes various knobs that can
-> be used to tune the behaviour of the clients attached to it.
-> 
-> Currently this driver sets up the latency allowance registers to the HW
-> defaults. Eventually an API should be exported by this driver (via a
-> custom API or a generic subsystem) to allow clients to register latency
-> requirements.
-> 
-> This driver also registers an IOMMU (SMMU) that's implemented by the
-> memory controller.
+It's useful to have tracepoints around operations that change the
+hardware state so that we can debug clock hardware performance
+and operations. Three basic types of events are supported: on/off
+events for enable, disable, prepare, unprepare that only record
+an event and a clock name, rate changing events for
+clk_set_rate() and parent changing events for clk_set_parent().
 
-> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-> +config TEGRA124_MC
-> +	bool "Tegra124 Memory Controller driver"
-> +	depends on ARCH_TEGRA
+I see that there are tracepoints for clock_enable/clock_set_rate
+in events/power.h but those look to be unused and they also
+take cpu_id which seems odd. I'd rather we just make a new set of
+events for the common clock framework instead and add the "_complete"
+set of events so we know when things have completed.
 
-Does it make sense to default to y for system-level drivers like this?
+ drivers/clk/clk.c          |  28 ++++++++
+ include/trace/events/clk.h | 165 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 193 insertions(+)
+ create mode 100644 include/trace/events/clk.h
 
-> diff --git a/drivers/memory/tegra124-mc.c b/drivers/memory/tegra124-mc.c
-
-As a general comment, I wonder why the Tegra124 code/data here is
-ifdef'd based on CONFIG_ARCH_TEGRA_124_SOC but the Tegra132 code isn't
-ifdef'd at all. I'd assert that the Tegra124 code is small enough it's
-hardly worth worrying about ifdefs.
-
-> +static inline void smmu_flush_ptc(struct tegra_smmu *smmu, struct page *page,
-> +				  unsigned long offset)
-> +{
-> +	phys_addr_t phys = page ? page_to_phys(page) : 0;
-> +	u32 value;
-> +
-> +	if (page) {
-> +		offset &= ~(smmu->soc->atom_size - 1);
-> +
-> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
-> +		value = (phys >> 32) & SMMU_PTC_FLUSH_HI_MASK;
-> +#else
-> +		value = 0;
-> +#endif
-
-Shouldn't Tegra124 have CONFIG_PHYS_ADDR_T_64BIT defined, such that
-there's no need for this ifdef? Certainly Tegra124 {has,can have} RAM
-above 4GB physical, for some memory map layouts (i.e. non swiss cheese).
-
-(I assume most of this code matches the existing Tegra30 SMMU driver, so
-I didn't look at all of it that closely).
-
-> +static int tegra_smmu_attach(struct iommu *iommu, struct device *dev)
-...
-> +#ifndef CONFIG_ARM64
-> +	return arm_iommu_attach_device(dev, group->mapping);
-> +#else
-> +	return 0;
-> +#endif
-
-Hmm. Why must an SMMU driver for the exact same HW operate differently
-depending on the CPU that's attached to the SoC? Surely the requirements
-for how IOMMU drives should work should be the same for all architectures?
-
-> +static int tegra_mc_probe(struct platform_device *pdev)
-
-> +	err = devm_request_irq(&pdev->dev, mc->irq, tegra124_mc_irq,
-> +			       IRQF_SHARED, dev_name(&pdev->dev), mc);
-
-I don't see any code in tegra_mc_remove() that guarantees that the IRQ
-won't fire between tegra_mc_remove() returning, and the devm cleanup
-code running to unhook that IRQ handler.
-
-> diff --git a/include/dt-bindings/memory/tegra124-mc.h b/include/dt-bindings/memory/tegra124-mc.h
-
-This file is part of the DT binding, so should be added in the patch
-that adds the binding.
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 8b73edef151d..f8bf69df3210 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -21,6 +21,9 @@
+ #include <linux/init.h>
+ #include <linux/sched.h>
+ 
++#define CREATE_TRACE_POINTS
++#include <trace/events/clk.h>
++
+ #include "clk.h"
+ 
+ static DEFINE_SPINLOCK(enable_lock);
+@@ -483,10 +486,12 @@ static void clk_unprepare_unused_subtree(struct clk *clk)
+ 		return;
+ 
+ 	if (__clk_is_prepared(clk)) {
++		trace_clk_unprepare(clk);
+ 		if (clk->ops->unprepare_unused)
+ 			clk->ops->unprepare_unused(clk->hw);
+ 		else if (clk->ops->unprepare)
+ 			clk->ops->unprepare(clk->hw);
++		trace_clk_unprepare_complete(clk);
+ 	}
+ }
+ 
+@@ -516,10 +521,12 @@ static void clk_disable_unused_subtree(struct clk *clk)
+ 	 * back to .disable
+ 	 */
+ 	if (__clk_is_enabled(clk)) {
++		trace_clk_disable(clk);
+ 		if (clk->ops->disable_unused)
+ 			clk->ops->disable_unused(clk->hw);
+ 		else if (clk->ops->disable)
+ 			clk->ops->disable(clk->hw);
++		trace_clk_disable_complete(clk);
+ 	}
+ 
+ unlock_out:
+@@ -802,9 +809,13 @@ void __clk_unprepare(struct clk *clk)
+ 
+ 	WARN_ON(clk->enable_count > 0);
+ 
++	trace_clk_unprepare(clk);
++
+ 	if (clk->ops->unprepare)
+ 		clk->ops->unprepare(clk->hw);
+ 
++	trace_clk_unprepare_complete(clk);
++
+ 	__clk_unprepare(clk->parent);
+ }
+ 
+@@ -842,6 +853,8 @@ int __clk_prepare(struct clk *clk)
+ 		if (ret)
+ 			return ret;
+ 
++		trace_clk_prepare(clk);
++
+ 		if (clk->ops->prepare) {
+ 			ret = clk->ops->prepare(clk->hw);
+ 			if (ret) {
+@@ -849,6 +862,8 @@ int __clk_prepare(struct clk *clk)
+ 				return ret;
+ 			}
+ 		}
++
++		trace_clk_prepare_complete(clk);
+ 	}
+ 
+ 	clk->prepare_count++;
+@@ -891,9 +906,13 @@ static void __clk_disable(struct clk *clk)
+ 	if (--clk->enable_count > 0)
+ 		return;
+ 
++	trace_clk_disable(clk);
++
+ 	if (clk->ops->disable)
+ 		clk->ops->disable(clk->hw);
+ 
++	trace_clk_disable_complete(clk);
++
+ 	__clk_disable(clk->parent);
+ }
+ 
+@@ -938,6 +957,7 @@ static int __clk_enable(struct clk *clk)
+ 		if (ret)
+ 			return ret;
+ 
++		trace_clk_enable(clk);
+ 		if (clk->ops->enable) {
+ 			ret = clk->ops->enable(clk->hw);
+ 			if (ret) {
+@@ -945,6 +965,7 @@ static int __clk_enable(struct clk *clk)
+ 				return ret;
+ 			}
+ 		}
++		trace_clk_enable_complete(clk);
+ 	}
+ 
+ 	clk->enable_count++;
+@@ -1241,6 +1262,8 @@ static struct clk *__clk_set_parent_before(struct clk *clk, struct clk *parent)
+ 	unsigned long flags;
+ 	struct clk *old_parent = clk->parent;
+ 
++	trace_clk_set_parent(clk, parent);
++
+ 	/*
+ 	 * Migrate prepare state between parents and prevent race with
+ 	 * clk_enable().
+@@ -1285,6 +1308,7 @@ static void __clk_set_parent_after(struct clk *clk, struct clk *parent,
+ 		__clk_unprepare(old_parent);
+ 	}
+ 
++	trace_clk_set_parent_complete(clk, parent);
+ 	/* update debugfs with new clk tree topology */
+ 	clk_debug_reparent(clk, parent);
+ }
+@@ -1507,6 +1531,8 @@ static void clk_change_rate(struct clk *clk)
+ 	else if (clk->parent)
+ 		best_parent_rate = clk->parent->rate;
+ 
++	trace_clk_set_rate(clk, clk->new_rate);
++
+ 	if (clk->new_parent && clk->new_parent != clk->parent) {
+ 		old_parent = __clk_set_parent_before(clk, clk->new_parent);
+ 
+@@ -1525,6 +1551,8 @@ static void clk_change_rate(struct clk *clk)
+ 	if (!skip_set_rate && clk->ops->set_rate)
+ 		clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
+ 
++	trace_clk_set_rate_complete(clk, clk->new_rate);
++
+ 	clk->rate = clk_recalc(clk, best_parent_rate);
+ 
+ 	if (clk->notifier_count && old_rate != clk->rate)
+diff --git a/include/trace/events/clk.h b/include/trace/events/clk.h
+new file mode 100644
+index 000000000000..8523adce0f73
+--- /dev/null
++++ b/include/trace/events/clk.h
+@@ -0,0 +1,165 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM clk
++
++#if !defined(_TRACE_CLK_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_CLK_H
++
++#include <linux/tracepoint.h>
++
++struct clk;
++
++DECLARE_EVENT_CLASS(clk,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk),
++
++	TP_STRUCT__entry(
++		__string(        name,           __clk_get_name(clk)       )
++	),
++
++	TP_fast_assign(
++		__assign_str(name, __clk_get_name(clk));
++	),
++
++	TP_printk("%s", __get_str(name))
++);
++
++DEFINE_EVENT(clk, clk_enable,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DEFINE_EVENT(clk, clk_enable_complete,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DEFINE_EVENT(clk, clk_disable,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DEFINE_EVENT(clk, clk_disable_complete,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DEFINE_EVENT(clk, clk_prepare,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DEFINE_EVENT(clk, clk_prepare_complete,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DEFINE_EVENT(clk, clk_unprepare,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DEFINE_EVENT(clk, clk_unprepare_complete,
++
++	TP_PROTO(struct clk *clk),
++
++	TP_ARGS(clk)
++);
++
++DECLARE_EVENT_CLASS(clk_rate,
++
++	TP_PROTO(struct clk *clk, unsigned long rate),
++
++	TP_ARGS(clk, rate),
++
++	TP_STRUCT__entry(
++		__string(        name,           __clk_get_name(clk)       )
++		__field(unsigned long,           rate                      )
++	),
++
++	TP_fast_assign(
++		__assign_str(name, __clk_get_name(clk));
++		__entry->rate = rate;
++	),
++
++	TP_printk("%s %lu", __get_str(name), (unsigned long)__entry->rate)
++);
++
++DEFINE_EVENT(clk_rate, clk_set_rate,
++
++	TP_PROTO(struct clk *clk, unsigned long rate),
++
++	TP_ARGS(clk, rate)
++);
++
++DEFINE_EVENT(clk_rate, clk_set_rate_complete,
++
++	TP_PROTO(struct clk *clk, unsigned long rate),
++
++	TP_ARGS(clk, rate)
++);
++
++DECLARE_EVENT_CLASS(clk_parent,
++
++	TP_PROTO(struct clk *clk, struct clk *parent),
++
++	TP_ARGS(clk, parent),
++
++	TP_STRUCT__entry(
++		__string(        name,           __clk_get_name(clk)       )
++		__string(        pname,          __clk_get_name(parent)    )
++	),
++
++	TP_fast_assign(
++		__assign_str(name, __clk_get_name(clk));
++		__assign_str(pname, __clk_get_name(parent));
++	),
++
++	TP_printk("%s %s", __get_str(name), __get_str(pname))
++);
++
++DEFINE_EVENT(clk_parent, clk_set_parent,
++
++	TP_PROTO(struct clk *clk, struct clk *parent),
++
++	TP_ARGS(clk, parent)
++);
++
++DEFINE_EVENT(clk_parent, clk_set_parent_complete,
++
++	TP_PROTO(struct clk *clk, struct clk *parent),
++
++	TP_ARGS(clk, parent)
++);
++
++#endif /* _TRACE_CLK_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
