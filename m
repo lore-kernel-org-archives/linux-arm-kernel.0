@@ -1,47 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 15:45:07 +0100
-Subject: [PATCH] arm: vmlinux.lds.S: drop redundant .comment
-In-Reply-To: <1403630948-30702-1-git-send-email-mark.rutland@arm.com>
-References: <1403630948-30702-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20140630144507.GB8756@leverpostej>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 30 Jun 2014 16:48:35 +0200
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
+ CPU frequency
+In-Reply-To: <20140630140146.GD28647@lukather>
+References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630102934.GV32514@n2100.arm.linux.org.uk>
+ <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
+ <20140630124919.GC28647@lukather>
+ <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
+ <20140630140146.GD28647@lukather>
+Message-ID: <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
+>> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
+>> >> >> -             if (!rate || len != 4) {
+>> >> >> -                     pr_err("%s missing clock-frequency property\n",
+>> >> >> -                             cn->full_name);
+>> >> >> +             clk = of_clk_get(cn, 0);
+>> >> >> +             if (!IS_ERR(clk))
+>> >> >> +                     rate = clk_get_rate(clk);
+>> >>
+>> >> We need the max frequency as it will be used to weight the different
+>> >> CPUs capacity. How do you ensure that the current clock rate is the
+>> >> max one ?
+>> >
+>> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
+>> > current CPU frequency, not the max one.
+>>
+>> What means current frequency in device tree when DVFS is involved ?
+>
+> The ePAPR states that clock-frequency is supposed to be "the current
+> clock speed of the CPU in Hertz". It's exactly what my patch add.
+>
+> Now, you're right, DVFS would be an issue here with clock-frequency,
+> but this patch actually makes it easier to deal with, since you only
+> get a reference to a clock, and you can get its rate at any given
+> time.
 
-On Tue, Jun 24, 2014 at 06:29:08PM +0100, Mark Rutland wrote:
-> Commit 78d7530ac3 ("ARM: Clean up linker script using new linker script
-> macros.") modified the arm kernel linker script to use the STABS_DEBUG
-> macro, but left a .comment section definition. As STABS_DEBUG defines
-> the .comment section in an identical way, the second section definition
-> is redundant and can be removed.
-> 
-> This patch removes the redundant .comment section definition.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm/kernel/vmlinux.lds.S | 1 -
->  1 file changed, 1 deletion(-)
+and what about using clk_round_rate(clk, ULONG_MAX) ?
 
-On the assumption that the below patch is fine I've dropped it into the
-patch system as 8088/1.
+We will not be dependent of when we parse DT
 
-Thanks,
-Mark.
+Vincent
 
-> 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 7bcee5c..6f57cb9 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -318,7 +318,6 @@ SECTIONS
->  	_end = .;
->  
->  	STABS_DEBUG
-> -	.comment 0 : { *(.comment) }
->  }
->  
->  /*
-> -- 
-> 1.9.1
-> 
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
