@@ -1,62 +1,42 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 30 Jun 2014 16:07:39 +0200
-Subject: [GIT PULL 1/2] ARM: berlin: DT changes for v3.17
-Message-ID: <1404137260-5876-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 30 Jun 2014 16:07:24 +0200
+Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
+In-Reply-To: <1519968.Vijxn8Mc9S@vasilykh-desktop-i5>
+References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
+ <53B16B06.6070206@samsung.com> <1519968.Vijxn8Mc9S@vasilykh-desktop-i5>
+Message-ID: <53B16F1C.4040206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Kevin, Olof,
+Hi Vasily,
 
-this cycle I try some incremental PRs for Berlin. This is round 1 of DT
-related changes for Berlin SoCs.
+On 30.06.2014 16:02, Vasily Khoruzhick wrote:
+> On 30 June 2014 15:49:58 Tomasz Figa wrote:
+>> On 23.06.2014 22:29, Vasily Khoruzhick wrote:
+>>> There's a several typos in a driver: 2410 instead of S3C2410
+>>> and wrong argument to ARRAY_SIZE(). They prevent s3c2410
+>>> from properly booting.
+>>>
+>>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>>> ---
+>>>
+>>>  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> Applied as a fix for 3.16.
+> 
+> Hi Tomasz,
+> 
+> I also have clk fixes for s3c24xx touchscreen, framebuffer, adc, usb and nand 
+> drivers (to replace clk_enable with clk_prepare_enable and clk_disable with 
+> clk_disable_unprepare),
+> 
+> Should they be merged through different trees or it's possible to merge them 
+> through a single tree?
 
-We finally have a contribution directly from Marvell, let's hope they
-will continue to provide patches. Then there is DW i2c nodes for BG2Q
-and it's dev board and most notably SMP related nodes for BG2 and BG2Q.
+I'd say they should all go through respective subsystem trees, unless
+they directly depend on patches I already applied, which is not the case
+as far as I can see.
 
-Also, thanks to Jason and David, I now have some git space on infradead,
-so the URL below represents that now.
-
-Please pull.
-
-Thanks,
-  Sebastian
-
-The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
-
-  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-3.17-1
-
-for you to fetch changes up to d19c93670a3dc6d8b37a3256f20eeafff5417f93:
-
-  ARM: dts: berlin: add SMP related nodes and properties for BG2Q (2014-06-16 13:17:53 +0200)
-
-----------------------------------------------------------------
-Berlin DT changes for v3.17
-
-- L2CC latency properties for BG2Q
-- DW i2c nodes for BG2Q and corresponding dev board
-- SMP related nodes for BG2 and BG2Q
-
-----------------------------------------------------------------
-Antoine T?nart (6):
-      ARM: dts: berlin: add I2C nodes for BG2Q
-      ARM: dts: berlin: enable i2c0 and i2c2
-      Documentation: bindings: add the Berlin CPU control doc
-      Documentation: bindings: add the marvell,berlin-smp CPU enable method
-      ARM: dts: berlin: add SMP related nodes and properties for BG2
-      ARM: dts: berlin: add SMP related nodes and properties for BG2Q
-
-Jisheng Zhang (1):
-      ARM: dts: berlin2q: set L2CC tag and data latency to 2 cycles
-
- .../arm/cpu-enable-method/marvell,berlin-smp       | 41 +++++++++++
- .../devicetree/bindings/arm/marvell,berlin.txt     | 16 +++++
- arch/arm/boot/dts/berlin2.dtsi                     |  6 ++
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  8 +++
- arch/arm/boot/dts/berlin2q.dtsi                    | 80 ++++++++++++++++++++++
- 5 files changed, 151 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/marvell,berlin-smp
+Best regards,
+Tomasz
