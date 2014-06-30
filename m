@@ -1,59 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jun 2014 18:02:21 +0100
-Subject: [RFC/PATCH 4/7] iommu: msm: Add MSM IOMMUv1 driver
-In-Reply-To: <1404147116-4598-5-git-send-email-ohaugan@codeaurora.org>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-5-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20140630170221.GA30740@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 30 Jun 2014 20:55:35 +0400
+Subject: [PATCH v7 1/7] phy: add a driver for the Berlin SATA PHY
+In-Reply-To: <20140630154409.GB29613@kwain>
+References: <1403530783-17180-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403530783-17180-2-git-send-email-antoine.tenart@free-electrons.com>
+ <53AB1CFD.4040500@cogentembedded.com> <20140630095940.GB10058@kwain>
+ <53B176F1.5060308@gmail.com> <20140630154409.GB29613@kwain>
+Message-ID: <53B19687.5050400@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olav,
+Hello.
 
-On Mon, Jun 30, 2014 at 05:51:53PM +0100, Olav Haugan wrote:
-> MSM IOMMUv1 driver supports Qualcomm SoC MSM8974 and
-> MSM8084.
-> 
-> The IOMMU driver supports the following features:
-> 
->     - ARM V7S page table format independent of ARM CPU page table format
->     - 4K/64K/1M/16M mappings (V7S)
->     - ATOS used for unit testing of driver
->     - Sharing of page tables among SMMUs
->     - Verbose context bank fault reporting
->     - Verbose global fault reporting
->     - Support for clocks and GDSC
->     - map/unmap range
->     - Domain specific enabling of coherent Hardware Table Walk (HTW)
-> 
-> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
-> ---
->  .../devicetree/bindings/iommu/msm,iommu_v1.txt     |   56 +
->  drivers/iommu/Kconfig                              |   36 +
->  drivers/iommu/Makefile                             |    2 +
->  drivers/iommu/msm_iommu-v1.c                       | 1448 +++++++++++++
->  drivers/iommu/msm_iommu.c                          |  149 ++
->  drivers/iommu/msm_iommu_dev-v1.c                   |  340 +++
->  drivers/iommu/msm_iommu_hw-v1.h                    | 2236 ++++++++++++++++++++
->  drivers/iommu/msm_iommu_pagetable.c                |  600 ++++++
->  drivers/iommu/msm_iommu_pagetable.h                |   33 +
->  drivers/iommu/msm_iommu_priv.h                     |   55 +
->  include/linux/qcom_iommu.h                         |  221 ++
->  11 files changed, 5176 insertions(+)
+On 06/30/2014 07:44 PM, Antoine T?nart wrote:
 
-This patch is *huge*! It may get bounced from some lists (I think the
-linux-arm-kernel lists has a ~100k limit), so it might be worth trying to do
-this incrementally.
+>>>>> +	/* set the controller speed */
+>>>>> +	writel(0x31, ctrl_reg + PORT_SCR_CTL);
 
-That said, a quick glance at your code indicates that this IOMMU is
-compliant with the ARM SMMU architecture, and we already have a driver for
-that. Please can you rework this series to build on top of the code in
-mainline already, rather than simply duplicating it? We need fewer IOMMU
-drivers, not more!
+>>>>     Value undocumented? Or is this the SATA SControl register by chance?
 
-It's also worth talking to Varun Sethi, as he was already looking at
-implementing block mappings in the existing driver.
+>>> Some magic is still there...
 
-Thanks,
+>> I guess Sergei was referring to AHCI spec here.
 
-Will
+    Actually, even to the SATA specs. :-)
+
+>> PORT_SCR bits are documented in AHCI spec as:
+
+>> 7:4 = 0x3 Limit speed negotiation to a rate not greater than Gen3
+>>            communication rate.
+
+>> 3:0 = 0x1 Perform interface communication sequence [...]. This is
+>>            functionally equivalent to a hard reset [...].
+
+>> So, the question is: Should we really need to reset controller in the
+>> PHY driver or is it already done in AHCI common code? At least we
+>> should change the comment to something like
+>> /* set Gen3 controller speed and perform hard reset */
+
+> I just checked, the AHCI common code has a function to do the reset:
+> ahci_reset_controller(). As of the max speed negociation rate, I did not
+> see it in the common AHCI functions.
+
+    You've looked in a wrong place -- since SControl is a standard *SATA* 
+register, it gets read/written by the libata core. The low-level driver only 
+provides scr_{read|write}() methods.
+
+> The eSATA port on the Berlin2Q works without this line, but it may be a
+> good idea to keep the max speed negociation rate.
+
+    It's usually libata's task to negotiate the SATA speed.
+
+> Anyway, we can remove the reset part. Nice catch!
+
+    Thanks.
+
+> Antoine
+
+WBR, Sergei
