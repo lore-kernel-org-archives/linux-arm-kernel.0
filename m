@@ -1,33 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Jun 2014 09:23:45 +0200
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <53AEF81D.3080408@ti.com>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <20140627232757.GB26184@ulmo> <53AEF81D.3080408@ti.com>
-Message-ID: <5279186.O063V9ZcHh@wuerfel>
+Date: Mon, 30 Jun 2014 09:27:18 +0200
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <20140628144904.GF32514@n2100.arm.linux.org.uk>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <20140628095504.GD32514@n2100.arm.linux.org.uk>
+ <20140628144904.GF32514@n2100.arm.linux.org.uk>
+Message-ID: <6335724.sfrxa4DtUh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 June 2014 13:15:09 Santosh Shilimkar wrote:
-> >> For SMP boot, ARMv8 expecting to have either PSCI based implementation or
-> >> device tree based boot scheme. you can move towards that model if possible.
+On Saturday 28 June 2014 15:49:04 Russell King - ARM Linux wrote:
+> On Sat, Jun 28, 2014 at 10:55:04AM +0100, Russell King - ARM Linux wrote:
+> > On Sat, Jun 28, 2014 at 10:42:19AM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Jun 27, 2014 at 12:01:12PM -0500, Nathan Lynch wrote:
+> > > > Since removing -lgcc from the link (one of the changes from v6 to v7), I
+> > > > believe the VDSO is not asking more of the toolchain or build
+> > > > environment than the rest of the kernel does.  I have definitely built
+> > > > it without a target libc.  Apart from the host program's use of
+> > > > too-recent ELF constants (now fixed), I would appreciate help
+> > > > identifying any remaining sources of fragility.
+> > > 
+> > > There's still something wrong:
+> > > 
+> > > fs/binfmt_elf.c: In function 'create_elf_tables':
+> > > fs/binfmt_elf.c:231:35: error: 'AT_SYSINFO_EHDR' undeclared (first use in this function)
+> > > fs/binfmt_elf.c:231:35: note: each undeclared identifier is reported only once for each function it appears in
+> > > 
+> > > The problem is the fscking generated includes.  This is going to be a
+> > > right pain - Arnd, is there anything which can be done about this?
 > > 
-> > But we also have the code for SMP on 32-bit ARM. Should that remain in
-> > arch/arm/mach-tegra or can it move to drivers/soc/tegra?
-> > 
-> You answered yourself. I don't see any point moving such a code to drivers
-> which is really SMP bring up code for ARM 32 bit. For ARM 64 bit, as
-> outline by maintainers (Catalin, Arnd), you should use PSCI or DT based
-> boot scheme.
+> > And yes, I see that you've mentioned this in the cover - but I think we
+> > /really/ need this solved before we can merge this series, otherwise
+> > we're likely to get lots of people asking about it.
+> 
+> Thinking about this some more - if this can't be resolved by kbuild,
+> then I think we should add to arch/arm/Kconfig to detect the generated
+> include file, print a helpful message telling the user how to fix their
+> build tree, and error out.
 
-I was hoping that one day we could unify the SMP bootup code with the
-cpuidle infrastructure, as a lot of the underlying functions are shared
-on the majority of SoCs. I have no plans to work on that myself though,
-and it would have to be agreed on by the cpuidle maintainers.
-
-For ARM64, the hope was indeed to use PSCI for all SoCs. I just have no
-idea how that would be enforced for mobile SoCs that get shipped to
-system integrators with an bootloader and kernel tree that doesn't even
-get reviewed anywhere first.
+I think there is a way to flag files to be deleted on every build in the
+Makefile, I'd have to read up on that. I've run into similar problems
+before, also with generated files sometimes not getting removed during
+'make clean'.
 
 	Arnd
