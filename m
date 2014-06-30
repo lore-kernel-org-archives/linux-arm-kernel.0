@@ -1,76 +1,108 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 30 Jun 2014 09:53:07 +0100
-Subject: [PATCH v7 0/4] arm: KGDB NMI/FIQ support
-In-Reply-To: <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
-References: <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 30 Jun 2014 08:56:45 +0000 (UTC)
+Subject: OMAP baseline test results for v3.16-rc2
+Message-ID: <alpine.DEB.2.02.1406300855570.24036@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset makes it possible to use kgdb's NMI infrastructure on ARM
-platforms.
-
-The patches have been previously circulated as part of a large patchset
-mixing together ARM architecture code and driver changes
-(http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901 ). This
-patchset is dramatically cut down to include only the arch/arm code. The
-driver code (irqchip and tty/serial) will follow when/if the arch code
-is accepted.
-
-The first two patches modify the FIQ infrastructure to allow interrupt
-controller drivers to register callbacks (the fiq_chip structure) to
-manage FIQ routings and to signal FIQ EOI. This makes it possible to
-use FIQ in multi-platform kernels and with recent ARM interrupt
-controllers.
-
-The remaining two patches provide architecture support for KGDB's NMI
-feature (and rely upon the preceding changes to the FIQ code).
-
-Tested on qemu (versatile), STiH416 (B2020 board) and Freescale i.MX6
-quad (wandboard).
-
-Changes since v6:
-
-- Corrected off-by-one comparison in has_fiq() (Nicolas Pitre)
-- Rewrote the FIQ stack initialization (Nicolas Pitre). This fixes a
-  serious data corruption bug due to bad stack mismanagement.
-- Introduced __fiq_abt to ensure lr_abt and spsr_abt are saved and
-  restored if we fast-interrupt an abort (Russell King).
-- Significantly improved the commenting of the exception handlers.
-- Added a call to trace_hardirqs_on() if we clear the I bit as we
-  exit the exception handler.
-
-Changes since v5:
-
-- Separated anything not strictly impacting arch/arm.
-- Fixed a spurious add/remove of code within the series (there was
-  broken code in intermediate patches)
-
-For previous changes see:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901
 
 
-Anton Vorontsov (2):
-  ARM: Move some macros from entry-armv to entry-header
-  ARM: Add KGDB/KDB FIQ debugger generic code
+Here are some basic OMAP test results for Linux v3.16-rc2.
+Logs and other details at:
 
-Daniel Thompson (2):
-  arm: fiq: Add callbacks to manage FIQ routings
-  arm: fiq: Allow EOI to be communicated to the intc
+    http://www.pwsan.com/omap/testlogs/test_v3.16-rc2/20140630000629/
 
- arch/arm/Kconfig                 |   2 +
- arch/arm/Kconfig.debug           |  18 +++++
- arch/arm/include/asm/fiq.h       |  14 ++++
- arch/arm/include/asm/kgdb.h      |   7 ++
- arch/arm/kernel/Makefile         |   1 +
- arch/arm/kernel/entry-armv.S     | 151 +----------------------------------
- arch/arm/kernel/entry-header.S   | 164 +++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/fiq.c            | 112 +++++++++++++++++++++++++-
- arch/arm/kernel/kgdb_fiq.c       | 127 ++++++++++++++++++++++++++++++
- arch/arm/kernel/kgdb_fiq_entry.S | 130 +++++++++++++++++++++++++++++++
- 10 files changed, 574 insertions(+), 152 deletions(-)
- create mode 100644 arch/arm/kernel/kgdb_fiq.c
- create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
 
---
-1.9.3
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: zImage:
+    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Build: uImage+dtb:
+    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap5-uevm
+
+Boot to userspace:
+    FAIL ( 2/14): 2430sdp, 4460varsomom
+    skip ( 1/14): 5912osk
+    Pass (11/14): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 5430es2uevm
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, 4460varsomom
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+PM: chip off via dynamic idle:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+
+vmlinux object size
+(delta in bytes from test_v3.16-rc1 (7171511eaec5bf23fb06078f59784a3a0626b38f)):
+   text     data      bss    total  kernel
+   +594      -24        0     +570  omap1_defconfig
+   +626      -24        0     +602  omap1_defconfig_1510innovator_only
+   +594       +8        0     +602  omap1_defconfig_5912osk_only
+   +746       +8        0     +754  multi_v7_defconfig
+   +598       +8      +64     +670  omap2plus_defconfig
+   +390      -24        0     +366  omap2plus_defconfig_2430sdp_only
+   +530       +8        0     +538  omap2plus_defconfig_am33xx_only
+   +594       +8        0     +602  omap2plus_defconfig_am43xx_only
+   +598       +8        0     +606  omap2plus_defconfig_cpupm
+   +530       +8        0     +538  omap2plus_defconfig_dra7xx_only
+    +30       +8        0      +38  omap2plus_defconfig_n800_multi_omap2xxx
+    -34      -16        0      -50  omap2plus_defconfig_n800_only_a
+   +530      -24        0     +506  omap2plus_defconfig_no_pm
+   +534      +16        0     +550  omap2plus_defconfig_omap2_4_only
+   +594      -16      +64     +642  omap2plus_defconfig_omap3_4_only
+   +594      +16        0     +610  omap2plus_defconfig_omap5_only
+   -172        0      -40     -212  rmk_omap3430_ldp_allnoconfig
+   +182       +8        0     +190  rmk_omap3430_ldp_oldconfig
+   -204        0       -8     -212  rmk_omap4430_sdp_allnoconfig
+   +290        0        0     +290  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.16-rc1 (7171511eaec5bf23fb06078f59784a3a0626b38f))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
