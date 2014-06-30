@@ -1,70 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 13:53:39 +0100
-Subject: [PATCH V5 2/3] Documentation: gpio: Add APM X-Gene SoC GPIO
- controller DTS binding
-In-Reply-To: <1403823587-23404-3-git-send-email-fkan@apm.com>
-References: <1403823587-23404-1-git-send-email-fkan@apm.com>
- <1403823587-23404-3-git-send-email-fkan@apm.com>
-Message-ID: <20140630125339.GA21390@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jun 2014 14:57:08 +0200
+Subject: [PATCH 06/16] ARM: mvebu: Rename the armada_370_xp into
+ mvebu_v7 in pmsu.c file
+In-Reply-To: <1403875377-940-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140630145708.528110bd@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 11:59:46PM +0100, Feng Kan wrote:
-> Documentation for APM X-Gene SoC GPIO controller DTS binding.
+Dear Gregory CLEMENT,
+
+On Fri, 27 Jun 2014 15:22:47 +0200, Gregory CLEMENT wrote:
+> Actually most of the function related to the PMSU are not specific to
+> the Armada 370 or Armada XP SoCs, but can also be used for most of the
+> other mvebu ARMv7 SoCs.
 > 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  .../devicetree/bindings/gpio/gpio-xgene.txt          | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-xgene.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene.txt
-> new file mode 100644
-> index 0000000..bd5fd85
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene.txt
-> @@ -0,0 +1,20 @@
-> +APM X-Gene SoC GPIO controller bindings
-> +
-> +This is a gpio controller that is part of the flash controller.
-> +This gpio controller controls a total of 48 gpios.
-> +
-> +Required properties:
-> +- compatible: "apm,xgene-gpio" for X-Gene GPIO controller
-> +- reg: Physical base address and size of the controller's registers
+>  arch/arm/mach-mvebu/pmsu.c | 40 ++++++++++++++++++++--------------------
+>  1 file changed, 20 insertions(+), 20 deletions(-)
 
-There is just the one bank?
+I'm fine on the principle, but this badly conflicts with the PMSU
+changes I've made to support CPU hotplug, which are already in
+linux-next. See
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/log/arch/arm/mach-mvebu/pmsu.c.
 
-> +- #gpio-cells: Should be two.
-> +	- first cell is the pin number
-> +	- second cell is used to specify optional parameters (unused)
+>  /* No locking is needed because we only access per-CPU registers */
+> -void armada_370_xp_pmsu_idle_prepare(bool deepidle)
+> +static void mvebu_v7_pmsu_idle_prepare(bool deepidle)
 
-Why is there an unused cell?
+Also, note here that you're not only renaming, but also adding the
+'static' qualifier. This is already done in linux-next by
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/mach-mvebu/pmsu.c?id=adb1d99384c7480886153a97d2ea22e9c0d2e053,
+but the function is anyway renamed in
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/mach-mvebu/pmsu.c?id=bbb92284b6c821e9434223d437fbd10b8a24c294
+as a preparation for CPU hotplug support.
 
-Why not just make this a single cell if the binding defines no valid
-parameters?
+> -static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
+> +static noinline int do_armada_xp_370_cpu_suspend(unsigned long deepidle)
 
-> +- gpio-controller: Marks the device node as a GPIO controller.
+This does not seem like a rename to mvebu_v7.
 
-No interrupts?
+>  {
+> -	armada_370_xp_pmsu_idle_prepare(deepidle);
+> +	mvebu_v7_pmsu_idle_prepare(deepidle);
+>  
+>  	v7_exit_coherency_flush(all);
+>  
+> @@ -248,13 +248,13 @@ static noinline int do_armada_370_xp_cpu_suspend(unsigned long deepidle)
+>  	return 0;
+>  }
+>  
+> -static int armada_370_xp_cpu_suspend(unsigned long deepidle)
+> +static int armada_xp_370_cpu_suspend(unsigned long deepidle)
 
-Thanks,
-Mark.
+Ditto.
 
-> +
-> +Example:
-> +	gpio0: gpio0 at 1701c000 {
-> +		compatible = "apm,xgene-gpio";
-> +		reg = <0x0 0x1701c000 0x0 0x40>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +	};
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>  {
+> -	return cpu_suspend(deepidle, do_armada_370_xp_cpu_suspend);
+> +	return cpu_suspend(deepidle, do_armada_xp_370_cpu_suspend);
+
+Ditto.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
