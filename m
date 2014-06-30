@@ -1,91 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jun 2014 22:06:10 +0200
-Subject: [GIT PULL] the great <mach/gpio.h> purge
-Message-ID: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jun 2014 22:14:57 +0200
+Subject: [PATCH 0/4] Migrate PXA27x platforms to clock framework
+In-Reply-To: <877g3yp7ie.fsf@free.fr>
+References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
+ <7034630.fvV46PN35C@wuerfel> <877g3yp7ie.fsf@free.fr>
+Message-ID: <4210399.Q2NclJgeeS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+On Monday 30 June 2014 20:38:49 Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > On Sunday 29 June 2014 20:32:20 Robert Jarzmik wrote:
+> >> As this serie is holding the rest of the device-tree drivers
+> >> port, I'd like it to be reviewed, even it's an old unsexy
+> >> platform.
+> >
+> > I have one basic question about this series: if pxa27x gets moved
+> > to used the common-clk framework but the others (pxa25x, pxa26x,
+> > pxa3xx, pxa93x) don't, does that imply that they become mutually
+> > exclusiv at compile-time?
+> 
+> Unfortunately yes, they become exclusive.
+> The reason being that arch/arm/mach-pxa/clock.c defines the function
+> "clk_enable()", which of course is also defined by the clock framework.
 
-please pull in this patch set removing <mach/gpio.h> for good.
-I guess it could collide with some S5P deletion.
-If you decide to pull the S5P purge first, tell me so I can rebase.
+Ok. Are you able to make it a compile-time decision whether the old
+or the new clock code is used?
 
-Yours,
-Linus Walleij
+That way, you can still build everything together (using the old
+code) while you are working on the other SoCs.
 
+> > If so, do you plan to first complete all of them before merging
+> > upstream, or do you intend to have one or more kernel releases
+> > that don't allow building a combined kernel for all pxa platforms?
+> I intend to have first only pxa27x.
+> Then in a second stage pxa27x + pxa25x + pxa3xx.
+> 
+> > I don't object to doing the latter, but if that is the plan, you
+> > need to make that very clear in the changelog and have all the
+> > relevant maintainers agree to that.
+> OK, that would be Haojian then, I think he maintains all PXA platforms.
+> 
+> Haojian, are you ok with that ? And BTW, does a combined kernel for PXA
+> platforms even exists (mixing pxa3xx and pxa2xx for example) ?
 
-The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+You can select all machines at compile-time and get a clean build.
+I would also assume that it works fine.
 
-  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> > Also (for my understanding) when you say that you plan to do
+> > pxa25x and pxa3xx next, does that include pxa26x and pxa93x?
+> I don't have the Technical Reference Manuals for these ones so the answer is
+> no. And Google wasn't a great friend at providing them.
 
-are available in the git repository at:
+I only looked at the current source code, but pxa26x seems to be
+basically identical to pxa25x (no relevant code changes at all)
+and pxa93x uses the same code as pxa3xx, apparently the only difference
+is the addition of the communication processor.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
-tags/gpio-h-purge
-
-for you to fetch changes up to 53430333c345c3531f9443d43c6fba1da693abe4:
-
-  ARM: delete old reference to ARM_GPIOLIB_COMPLEX (2014-06-30 21:37:39 +0200)
-
-----------------------------------------------------------------
-This is a purge of all things <mach/gpio.h>, now I never
-want to see it again.
-
-- Remove the need for <mach/gpio.h> from S5P
-- Kill CONFIG_NEED_MACH_GPIO_H
-- Kill remnants of ARM_GPIOLIB_COMPLEX
-
-----------------------------------------------------------------
-Linus Walleij (4):
-      ARM: s5p: cut the custom ARCH_NR_GPIOS definition
-      ARM: mach-s5p: get rid of all <mach/gpio.h> headers
-      ARM: kill CONFIG_NEED_MACH_GPIO_H
-      ARM: delete old reference to ARM_GPIOLIB_COMPLEX
-
- arch/arm/Kconfig                                         | 10 ----------
- arch/arm/include/asm/gpio.h                              |  7 -------
- arch/arm/mach-s5p64x0/common.c                           |  2 +-
- arch/arm/mach-s5p64x0/dev-audio.c                        |  3 ++-
- .../mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
- arch/arm/mach-s5p64x0/mach-smdk6440.c                    |  1 +
- arch/arm/mach-s5p64x0/mach-smdk6450.c                    |  1 +
- arch/arm/mach-s5p64x0/setup-fb-24bpp.c                   |  2 +-
- arch/arm/mach-s5p64x0/setup-i2c0.c                       |  2 +-
- arch/arm/mach-s5p64x0/setup-i2c1.c                       |  2 +-
- arch/arm/mach-s5p64x0/setup-sdhci-gpio.c                 |  2 +-
- arch/arm/mach-s5p64x0/setup-spi.c                        |  2 +-
- arch/arm/mach-s5pc100/dev-audio.c                        |  2 +-
- .../mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} |  6 +-----
- arch/arm/mach-s5pc100/mach-smdkc100.c                    |  1 +
- arch/arm/mach-s5pc100/setup-fb-24bpp.c                   |  2 +-
- arch/arm/mach-s5pc100/setup-i2c0.c                       |  2 +-
- arch/arm/mach-s5pc100/setup-i2c1.c                       |  2 +-
- arch/arm/mach-s5pc100/setup-ide.c                        |  2 +-
- arch/arm/mach-s5pc100/setup-keypad.c                     |  2 +-
- arch/arm/mach-s5pc100/setup-sdhci-gpio.c                 |  2 +-
- arch/arm/mach-s5pc100/setup-spi.c                        |  2 +-
- arch/arm/mach-s5pv210/dev-audio.c                        |  2 +-
- .../mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} |  7 +------
- arch/arm/mach-s5pv210/mach-aquila.c                      |  1 +
- arch/arm/mach-s5pv210/mach-goni.c                        |  1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c                    |  1 +
- arch/arm/mach-s5pv210/setup-fb-24bpp.c                   |  2 +-
- arch/arm/mach-s5pv210/setup-fimc.c                       |  3 ++-
- arch/arm/mach-s5pv210/setup-i2c0.c                       |  2 +-
- arch/arm/mach-s5pv210/setup-i2c1.c                       |  2 +-
- arch/arm/mach-s5pv210/setup-i2c2.c                       |  2 +-
- arch/arm/mach-s5pv210/setup-ide.c                        |  2 +-
- arch/arm/mach-s5pv210/setup-keypad.c                     |  2 +-
- arch/arm/mach-s5pv210/setup-sdhci-gpio.c                 |  2 +-
- arch/arm/mach-s5pv210/setup-spi.c                        |  2 +-
- arch/arm/plat-samsung/Kconfig                            | 16 ----------------
- arch/arm/plat-samsung/include/plat/gpio-core.h           |  3 +++
- arch/arm/plat-samsung/pm-gpio.c                          |  2 --
- arch/arm/plat-samsung/s5p-irq-eint.c                     |  2 +-
- drivers/gpio/gpio-samsung.c                              |  3 ---
- sound/soc/samsung/goni_wm8994.c                          |  2 +-
- 42 files changed, 41 insertions(+), 82 deletions(-)
- rename arch/arm/mach-s5p64x0/include/mach/{gpio.h => gpio-samsung.h} (95%)
- rename arch/arm/mach-s5pc100/include/mach/{gpio.h => gpio-samsung.h} (97%)
- rename arch/arm/mach-s5pv210/include/mach/{gpio.h => gpio-samsung.h} (96%)
+	Arnd
