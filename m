@@ -1,156 +1,31 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 30 Jun 2014 18:05:39 +0200
-Subject: [PATCH v3 08/12] sched: move cfs task on a CPU with higher capacity
+Date: Mon, 30 Jun 2014 18:05:43 +0200
+Subject: [PATCH v3 12/12] sched: add SD_PREFER_SIBLING for SMT level
 In-Reply-To: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
 References: <1404144343-18720-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1404144343-18720-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1404144343-18720-13-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the CPU is used for handling lot of IRQs, trig a load balance to check if
-it's worth moving its tasks on another CPU that has more capacity.
-
-As a sidenote, this will note generate more spurious ilb because we already
-trig an ilb if there is more than 1 busy cpu. If this cpu is the only one that
-has a task, we will trig the ilb once for migrating the task.
-
-The nohz_kick_needed function has been cleaned up a bit while adding the new
-test
+Add the SD_PREFER_SIBLING flag for SMT level in order to ensure that
+the scheduler will put at least 1 task per core.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 58 +++++++++++++++++++++++++++++++++++++----------------
- 1 file changed, 41 insertions(+), 17 deletions(-)
+ kernel/sched/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index a23c938..742ad88 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -5944,6 +5944,14 @@ static bool update_sd_pick_busiest(struct lb_env *env,
- 			return true;
- 	}
- 
-+	/*
-+	 * The group capacity is reduced probably because of activity from other
-+	 * sched class or interrupts which use part of the available capacity
-+	 */
-+	if ((sg->sgc->capacity_orig * 100) > (sgs->group_capacity *
-+				env->sd->imbalance_pct))
-+		return true;
-+
- 	return false;
- }
- 
-@@ -6421,13 +6429,24 @@ static int need_active_balance(struct lb_env *env)
- 	struct sched_domain *sd = env->sd;
- 
- 	if (env->idle == CPU_NEWLY_IDLE) {
-+		int src_cpu = env->src_cpu;
- 
- 		/*
- 		 * ASYM_PACKING needs to force migrate tasks from busy but
- 		 * higher numbered CPUs in order to pack all tasks in the
- 		 * lowest numbered CPUs.
- 		 */
--		if ((sd->flags & SD_ASYM_PACKING) && env->src_cpu > env->dst_cpu)
-+		if ((sd->flags & SD_ASYM_PACKING) && src_cpu > env->dst_cpu)
-+			return 1;
-+
-+		/*
-+		 * If the CPUs share their cache and the src_cpu's capacity is
-+		 * reduced because of other sched_class or IRQs, we trig an
-+		 * active balance to move the task
-+		 */
-+		if ((sd->flags & SD_SHARE_PKG_RESOURCES)
-+		 && ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
-+							sd->imbalance_pct)))
- 			return 1;
- 	}
- 
-@@ -6529,6 +6548,8 @@ redo:
- 
- 	schedstat_add(sd, lb_imbalance[idle], env.imbalance);
- 
-+	env.src_cpu = busiest->cpu;
-+
- 	ld_moved = 0;
- 	if (busiest->nr_running > 1) {
- 		/*
-@@ -6538,7 +6559,6 @@ redo:
- 		 * correctly treated as an imbalance.
- 		 */
- 		env.flags |= LBF_ALL_PINNED;
--		env.src_cpu   = busiest->cpu;
- 		env.src_rq    = busiest;
- 		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
- 
-@@ -7233,9 +7253,10 @@ static inline int nohz_kick_needed(struct rq *rq)
- 	struct sched_domain *sd;
- 	struct sched_group_capacity *sgc;
- 	int nr_busy, cpu = rq->cpu;
-+	bool kick = false;
- 
- 	if (unlikely(rq->idle_balance))
--		return 0;
-+		return false;
- 
-        /*
- 	* We may be recently in ticked or tickless idle mode. At the first
-@@ -7249,38 +7270,41 @@ static inline int nohz_kick_needed(struct rq *rq)
- 	 * balancing.
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 92dd6d1..9103669 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6068,6 +6068,7 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
  	 */
- 	if (likely(!atomic_read(&nohz.nr_cpus)))
--		return 0;
-+		return false;
  
- 	if (time_before(now, nohz.next_balance))
--		return 0;
-+		return false;
+ 	if (sd->flags & SD_SHARE_CPUCAPACITY) {
++		sd->flags |= SD_PREFER_SIBLING;
+ 		sd->imbalance_pct = 110;
+ 		sd->smt_gain = 1178; /* ~15% */
  
- 	if (rq->nr_running >= 2)
--		goto need_kick;
-+		return true;
- 
- 	rcu_read_lock();
- 	sd = rcu_dereference(per_cpu(sd_busy, cpu));
--
- 	if (sd) {
- 		sgc = sd->groups->sgc;
- 		nr_busy = atomic_read(&sgc->nr_busy_cpus);
- 
--		if (nr_busy > 1)
--			goto need_kick_unlock;
-+		if (nr_busy > 1) {
-+			kick = true;
-+			goto unlock;
-+		}
-+
-+		if ((rq->cfs.h_nr_running >= 1)
-+		 && ((rq->cpu_capacity * sd->imbalance_pct) <
-+					(rq->cpu_capacity_orig * 100))) {
-+			kick = true;
-+			goto unlock;
-+		}
- 	}
- 
- 	sd = rcu_dereference(per_cpu(sd_asym, cpu));
--
- 	if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
- 				  sched_domain_span(sd)) < cpu))
--		goto need_kick_unlock;
-+		kick = true;
- 
-+unlock:
- 	rcu_read_unlock();
--	return 0;
--
--need_kick_unlock:
--	rcu_read_unlock();
--need_kick:
--	return 1;
-+	return kick;
- }
- #else
- static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle) { }
 -- 
 1.9.1
