@@ -1,63 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Jun 2014 14:21:25 +0200
-Subject: [PATCH 2/5] ARM: smp_scu: Add the enable speculative linefills
- operation
-In-Reply-To: <20140628170216.0c1965cf@free-electrons.com>
-References: <1403822608-31158-1-git-send-email-gregory.clement@free-electrons.com>	<1403822608-31158-3-git-send-email-gregory.clement@free-electrons.com>
- <20140628170216.0c1965cf@free-electrons.com>
-Message-ID: <53B15645.9000200@free-electrons.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 30 Jun 2014 07:27:59 -0500
+Subject: [PATCH v7 6/9] ARM: miscellaneous vdso infrastructure, preparation
+In-Reply-To: <201406301211.43359.arnd@arndb.de>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-7-git-send-email-nathan_lynch@mentor.com>
+ <201406301211.43359.arnd@arndb.de>
+Message-ID: <53B157CF.1040204@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,>> + */
->> +void scu_spec_linefills_enable(void __iomem *scu_base, bool enable)
->> +{
->> +	u32 scu_ctrl;
->> +
->> +	scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
->> +	/* already enabled? */
+On 06/30/2014 05:11 AM, Arnd Bergmann wrote:
+> On Monday 23 June 2014, Nathan Lynch wrote:
+>> +struct vdso_data {
+>> +       u32 seq_count;          /* sequence count - odd during updates */
+>> +       u16 use_syscall;        /* whether to fall back to syscalls */
+>> +       u16 cs_shift;           /* clocksource shift */
+>> +       u32 xtime_coarse_sec;   /* coarse time */
+>> +       u32 xtime_coarse_nsec;
 > 
-> Comment not needed, since SCU_CTRL_ENABLE already documents what's
-> happening. Or a more useful comment would be: "We cannot change the SCU
-> configuration while it is enabled".
-
-Right, however I need to figure out if it is really the case. Because in
-ARM documentation about the SCU control register, I didn't find any mention
-of this restriction.
-
+> Note that we will at some point have to introduce 64-bit time_t in user space
+> in some form. We will have to add new system calls for anything dealing with
+> time on the kernel boundary, but it would be good to be prepared here.
 > 
->> +	if (scu_ctrl & SCU_CTRL_ENABLE)
->> +		return;
+> Is vdso_data an ABI-relevant data structure? If so, I think all you need here
+> is to make xtime_coarse_sec a u64 type for now, so we can add the other functions
+> later. The code can of course for now access only the lower half (keeping
+> endianess in mind), so there should not be any performance impact.
 > 
-> Return an error in this case maybe?
+> If the structure is not part of the ABI, there probably isn't much we can
+> do here.
 
-If it failed we just don't benefit of an optimization, it won't prevent the
-system working. And also, we can't do anything more if it failed. However
-it could be nice to let the calling function know that it failed.
+In short, no, vdso_data is not ABI-relevant.
 
-> 
->> +	if (enable)
->> +		scu_ctrl |= SCU_CTRL_SPEC_LINEFILLS;
->> +	else
->> +		scu_ctrl &= ~SCU_CTRL_SPEC_LINEFILLS;
->> +
->> +	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
->> +}
-> 
-> Instead of having a separate function to do this (and the standby
-> operation), what about doing that directly in scu_enable() ? Either
-> unconditionally if that is fine for all SCU users, or through a flags
-> argument?
+The vdso_data structure may be accessed legitimately only through the
+entry points (gettimeofday, clock_gettime) that the VDSO provides, and
+it is my intent that we should be able to change the structure as
+needed, just like other architectures.  vdso_data should not show up in
+any exported header and I'll double-check to make sure it does not.
 
-OK using a flag argument makes sens indeed. About setting it unconditionally,
-I would prefer not taking the risk to break the other platforms.
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+So, when the time comes, we should be able to change it to accommodate
+64-bit time_t by (I imagine) making any field that stores seconds 64
+bits and adding new entry points (clock_gettime64 or whatever).
