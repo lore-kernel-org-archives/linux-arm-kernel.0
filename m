@@ -1,68 +1,125 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Mon, 30 Jun 2014 15:33:13 +0200
-Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
-In-Reply-To: <20140627032506.GA18039@shlinux1.ap.freescale.net>
-References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
- <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140627032506.GA18039@shlinux1.ap.freescale.net>
-Message-ID: <20140630133313.GA11880@kwain>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 30 Jun 2014 15:44:24 +0200
+Subject: The imx6q suspend/resume is broken on 3.16-rc due to PCIe
+In-Reply-To: <20140628143712.GA7869@dragon>
+References: <20140624153559.GA5741@dragon>
+ <CAOMZO5AT54hOF2bi9bQwmBcdtG0QHyofQgoRG6Mw_RpDQXzx=w@mail.gmail.com>
+ <20140625062243.GD3242@dragon>
+ <CAOMZO5BuOhWo7SCEPFmNRUQBi=5JhDrVv0yvBQM2d_jMyLkbyw@mail.gmail.com>
+ <1403693452.4249.1.camel@weser.hi.pengutronix.de>
+ <20140625125306.GB6917@dragon>
+ <1403772229.4254.4.camel@weser.hi.pengutronix.de>
+ <20140628143712.GA7869@dragon>
+Message-ID: <1404135864.4305.23.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
-
-On Fri, Jun 27, 2014 at 11:25:07AM +0800, Peter Chen wrote:
-> On Tue, Jun 24, 2014 at 12:35:16PM +0200, Antoine T?nart wrote:
-> >  
-> >  ifneq ($(CONFIG_OF),)
-> >  	obj-$(CONFIG_USB_CHIPIDEA)	+= usbmisc_imx.o ci_hdrc_imx.o
-> > +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_generic.o
-> >  endif
+Am Samstag, den 28.06.2014, 22:37 +0800 schrieb Shawn Guo:
+> On Thu, Jun 26, 2014 at 10:43:49AM +0200, Lucas Stach wrote:
+> > Am Mittwoch, den 25.06.2014, 20:53 +0800 schrieb Shawn Guo:
+> > > On Wed, Jun 25, 2014 at 12:50:52PM +0200, Lucas Stach wrote:
+> > > > Am Mittwoch, den 25.06.2014, 07:50 -0300 schrieb Fabio Estevam:
+> > > > > On Wed, Jun 25, 2014 at 3:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > > > > 
+> > > > > > Please test against v3.16-rc1 or -rc2.  The breakage on linux-next
+> > > > > > should be another issue.
+> > > > > 
+> > > > > Yes, I see it now. Tested on -rc2 and suspend/resume works with PCI
+> > > > > driver removed.
+> > > > 
+> > > > Can you please send me a dmesg from a working boot?
+> > > 
+> > > What do you mean by "working boot"?  Boot is always working.  What fails
+> > > is system resuming.
+> > > 
+> > > Shawn
+> > > 
+> > Oops, what I meant is a dmesg after a working resume (from kernel 3.15).
+> > I can see how failing to resume from L2 can cause the hang and we should
+> > really implement the PHY PD toggling in the pcie driver, but I would
+> > like to understand why you don't hit this on 3.15.
 > 
-> As a generic driver, you may need to support both dt and non-dt
-> solution.
-
-Since the dt is now the best practice and since there is no need (yet)
-for a non-dt usage of this driver shouldn't we let anyone needing it
-implement it when the time comes?
-
-> > +static int ci_hdrc_generic_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct ci_hdrc_generic_priv *priv;
-> > +	struct ci_hdrc_platform_data ci_pdata = {
-> > +		.name		= "ci_hdrc",
+> Sorry, Lucas.  I just noticed that in my 3.15 testing PCIe is not
+> enabled in device tree at all.  So the issue should have already been
+> there before your changes to PCIe driver.
 > 
-> How about this using dev_name(&pdev->dev) for name?
+Hi Shawn,
 
-Yes, why not. I don't have a strong preference.
+can you please test the attached patch on top of 3.16-rc* to see if it
+helps? If it works for you I would like to try and get this into 3.16 as
+a bugfix.
 
-> > +
-> > +clk_err:
-> > +	clk_disable_unprepare(priv->clk);
-> 
-> You may need to add "if (!IS_ERR(priv->clk))"
+Regards,
+Lucas
 
-Right! I'll update this.
+--------------------------->8-----------------------------
+>From f3bfdc9c19249188fa153b1568c3129cd31af4f5 Mon Sep 17 00:00:00 2001
+From: Lucas Stach <l.stach@pengutronix.de>
+Date: Mon, 30 Jun 2014 15:33:04 +0200
+Subject: [PATCH] PCI: imx6: add workaround for errata ERR005723
 
-> > +
-> > +static const struct of_device_id ci_hdrc_generic_of_match[] = {
-> > +	{ .compatible = "chipidea-usb" },
-> > +	{ }
-> > +};
-> 
-> Even as a generic driver, you can also use your own compatible string.
+Fixes system hang after resume from suspend to mem.
 
-Well, there is nothing specific about the Berlin CI. Some subsystems
-use the 'generic' keyword in these cases. Do you see a particular reason
-I should use some Berlin related compatible here?
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ drivers/pci/host/pci-imx6.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index a568efaa331c..5c58a3ee5dbf 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -589,6 +589,38 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int imx6_pcie_suspend(struct device *dev)
++{
++	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
++
++	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
++			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
++
++	return 0;
++}
++
++static int imx6_pcie_resume(struct device *dev)
++{
++	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
++
++	/*
++	 * This is a workaround for
++	 * ERR005723: PCIe does not support L2 power down
++	 * Toggling the PHY PD bit around system L2 state switching seems to be
++	 * enough to wake the PCIe logic after a power down.
++	 */
++	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
++			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(imx6_pcie_pm_ops,
++		imx6_pcie_suspend,
++		imx6_pcie_resume);
++
+ static const struct of_device_id imx6_pcie_of_match[] = {
+ 	{ .compatible = "fsl,imx6q-pcie", },
+ 	{},
+@@ -600,6 +632,7 @@ static struct platform_driver imx6_pcie_driver = {
+ 		.name	= "imx6q-pcie",
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = imx6_pcie_of_match,
++		.pm = &imx6_pcie_pm_ops,
+ 	},
+ };
+ 
+-- 
+2.0.0
 
-Thanks for the review!
-
-Antoine
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
