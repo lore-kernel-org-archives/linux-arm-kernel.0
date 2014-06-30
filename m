@@ -1,210 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Jun 2014 15:41:14 +0100
-Subject: [PATCH v2 4/5] phy: miphy365x: Represent each PHY channel as a subnode
-In-Reply-To: <1404133317-25953-5-git-send-email-lee.jones@linaro.org>
-References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
- <1404133317-25953-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140630144114.GB25926@lee--X1>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 30 Jun 2014 17:42:17 +0300
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <20140630141334.GK28951@arm.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53ADAA1C.70407@ti.com> <20140627232757.GB26184@ulmo>
+ <20140630102512.GE28951@arm.com>
+ <20140630114621.GT3679@tbergstrom-lnx.Nvidia.com>
+ <20140630141334.GK28951@arm.com>
+Message-ID: <20140630144217.GV3679@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phy: miphy365x: Represent each PHY channel as a DT subnode
+> > > PSCI again?
+> > 
+> > Not possible for boards where linux runs in NS (roth and tn7).
+> 
+> That's one of the main use-cases for PSCI - Linux running in NS mode.
+> AFAIK, the boards that you mentioned are not ARMv8? We don't intend to
 
-This has the added advantages of being able to enable/disable each
-of the channels as simply as enabling/disabling the DT node.
+They are v7 indeed...
 
-Suggested-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> enforce PSCI on ARMv7 platforms, mainly because of the legacy firmware
+> (though where starting from scratch it would be nice). That means that
+> the code won't be shared with arm64 and you can leave it under arch/arm
+> (it's a lot of AArch32 assembly anyway).
+> 
+> > The secure monitor on those is outside our control and does not
+> > implement PSCI.
+> 
+> As I said, I don't think we should change firmware on existing ARMv7
+> SoCs but for a new ARMv8 SoC I strongly recommend PSCI. The firmware
+> needs to be written anyway (different AArch64 exception model), so you
+> can raise such requirement with your firmware provider (ARM also
+> provides Trusted Firmware freely as a quick start which implements PSCI,
+> though you can only use it as an example).
 
-diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-index 1109f42..2c4ea6e 100644
---- a/drivers/phy/phy-miphy365x.c
-+++ b/drivers/phy/phy-miphy365x.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/of_address.h>
- #include <linux/clk.h>
- #include <linux/phy/phy.h>
- #include <linux/delay.h>
-@@ -144,6 +145,7 @@ struct miphy365x {
- 	void __iomem *pcie;
- 	u8 type;
- 	u8 port;
-+	bool enabled;
- };
- 
- struct miphy365x_dev {
-@@ -468,7 +470,7 @@ static struct phy *miphy365x_xlate(struct device *dev,
- 	struct miphy365x_dev *state = dev_get_drvdata(dev);
- 	u8 port, type;
- 
--	if (args->count != 2) {
-+	if (args->args_count != 2) {
- 		dev_err(dev, "Invalid number of cells in 'phy' property\n");
- 		return ERR_PTR(-EINVAL);
- 	}
-@@ -484,6 +486,11 @@ static struct phy *miphy365x_xlate(struct device *dev,
- 	if (WARN_ON(port >= ARRAY_SIZE(ports)))
- 		return ERR_PTR(-EINVAL);
- 
-+	if (!state->phys[port].enabled) {
-+		dev_warn(dev, "PHY port %d is disabled\n", port);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
- 	if (type == MIPHY_TYPE_SATA)
- 		state->phys[port].base = state->phys[port].sata;
- 	else if (type == MIPHY_TYPE_PCIE)
-@@ -503,38 +510,75 @@ static struct phy_ops miphy365x_ops = {
- 	.owner		= THIS_MODULE,
- };
- 
--static int miphy365x_get_base_addr(struct platform_device *pdev,
--				    struct miphy365x_phy *phy, u8 port)
-+static int miphy365x_get_base_addr_one(struct platform_device *pdev,
-+				       struct miphy365x *phy,
-+				       struct device_node *child,
-+				       int index)
- {
--	struct resource *res;
--	char type[6];
-+	void __iomem *base;
-+	const char *name;
-+	int ret;
- 
--	sprintf(type, "sata%d", port);
-+	base = of_iomap(child, index);
-+	if (!base) {
-+		dev_err(&pdev->dev, "Failed to map %s\n", child->full_name);
-+		return -EINVAL;
-+	}
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, type);
--	if (!res)
--		return -ENODEV;
-+	ret = of_property_read_string_index(child, "reg-names", index, &name);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"%s: no reg-names property not found\n", child->name);
-+		return ret;
-+	}
- 
--	phy->sata = devm_ioremap(&pdev->dev, res->start, resource_size(res));
--	if (!phy->sata)
--		return -ENOMEM;
-+	if (!strncmp(name, "sata", 4))
-+		phy->sata = base;
-+	else if (!strncmp(name, "pcie", 4))
-+		phy->pcie = base;
-+	else {
-+		dev_err(&pdev->dev, "reg-names in %s not sata or pcie: %s",
-+			child->name, name);
-+		return -EINVAL;
-+	}
- 
--	sprintf(type, "pcie%d", port);
-+	return 0;
-+}
- 
--	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, type);
--	if (!res)
--		return -ENODEV;
-+static int miphy365x_get_base_addr(struct platform_device *pdev,
-+				   struct miphy365x *phy,
-+				   struct device_node *child)
-+{
-+	int index;
-+	int ret;
- 
--	phy->pcie = devm_ioremap(&pdev->dev, res->start, resource_size(res));
--	if (!phy->pcie)
--		return -ENOMEM;
-+	/* Each port handles SATA or PCIE. */
-+	for (index = 0; index < 2; index++) {
-+		ret = miphy365x_get_base_addr_one(pdev, phy,
-+						  child, index);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	return 0;
- }
- 
--static int miphy365x_of_probe(struct device_node *np,
-+static int miphy365x_of_probe(struct platform_device *pdev,
- 			      struct miphy365x_dev *phy_dev)
- {
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *child;
-+	int child_count = 0;
-+
-+	for_each_child_of_node(np, child)
-+		child_count++;
-+
-+	if (child_count != ARRAY_SIZE(ports)) {
-+		dev_err(&pdev->dev, "%d ports supported, %d supplied\n",
-+			ARRAY_SIZE(ports), child_count);
-+		return -EINVAL;
-+	}
-+
- 	phy_dev->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
- 	if (IS_ERR(phy_dev->regmap)) {
- 		dev_err(phy_dev->dev, "No syscfg phandle specified\n");
-@@ -556,11 +600,10 @@ static int miphy365x_of_probe(struct device_node *np,
- 
- static int miphy365x_probe(struct platform_device *pdev)
- {
--	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *child, *np = pdev->dev.of_node;
- 	struct miphy365x_dev *phy_dev;
- 	struct device *dev = &pdev->dev;
- 	struct phy_provider *provider;
--	u8 port;
- 	int ret;
- 
- 	if (!np) {
-@@ -572,7 +615,7 @@ static int miphy365x_probe(struct platform_device *pdev)
- 	if (!phy_dev)
- 		return -ENOMEM;
- 
--	ret = miphy365x_of_probe(np, phy_dev);
-+	ret = miphy365x_of_probe(pdev, phy_dev);
- 	if (ret)
- 		return ret;
- 
-@@ -582,8 +625,9 @@ static int miphy365x_probe(struct platform_device *pdev)
- 
- 	mutex_init(&phy_dev->miphy_mutex);
- 
--	for (port = 0; port < ARRAY_SIZE(ports); port++) {
-+	for_each_child_of_node(np, child) {
- 		struct phy *phy;
-+		static int port = 0;
- 
- 		phy = devm_phy_create(dev, &miphy365x_ops, NULL);
- 		if (IS_ERR(phy)) {
-@@ -591,15 +635,17 @@ static int miphy365x_probe(struct platform_device *pdev)
- 			return PTR_ERR(phy);
- 		}
- 
--		phy_dev->phys[port].phy  = phy;
--		phy_dev->phys[port].port = port;
--
--		ret = miphy365x_get_base_addr(pdev,
--					&phy_dev->phys[port], port);
-+		ret = miphy365x_get_base_addr(pdev, &phy_dev->phys[port],
-+					      child);
- 		if (ret)
- 			return ret;
- 
-+		phy_dev->phys[port].phy  = phy;
-+		phy_dev->phys[port].port = port;
-+		phy_dev->phys[port].enabled = !!of_device_is_available(child);
-+
- 		phy_set_drvdata(phy, &phy_dev->phys[port]);
-+		port++;
- 	}
- 
- 	provider = devm_of_phy_provider_register(dev, miphy365x_xlate);
+For v8 this should be fine yes...
+
+> 
+> > There might be some value for Tegra114 and Tegra124 if we would like
+> > to use HYP mode, but that's not on the radar today. It's a waste of
+> > time for Tegra20 and Tegra30.
+> 
+> I think you should keep the Hyp support in mind anyway and test Linux
+> booting in NS mode on your platforms. It may not be on your radar today
+> for a SoC but if you later decide that it is, we end up with needing
+> different code paths in Linux for the same SoC depending on how it boots
+> (and you can't easily detect this at boot time, nor you can pass it via
+> DT).
+
+You can just look for a psci DT node? If this node is missing, fallback to
+the existing tegra specific mechanism. At least, that's how I envision doing
+PSCI for HYP mode on v7 based boards where linux today runs in secure mode.
+u-boot loads a minimal secure monitor which only does PSCI (we don't care about
+any security as there are no keys available for signing on those boards
+anyway), adds the PSCI node to the DT and then boots linux in HYP mode. 
+tegra_cpu_reset_handler_enable() checks for a PSCI node and uses it if
+available. Else it will fallback to the existing methods. Similar for cpuidle.
+No guarantees that this will ever be implemented though :) Maybe.
+
+Cheers,
+
+Peter.
