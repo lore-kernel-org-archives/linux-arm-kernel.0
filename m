@@ -1,57 +1,124 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 30 Jun 2014 11:08:33 -0500
-Subject: [PATCH v4] clk: qcom: Add support for IPQ8064's global clock
- controller (GCC)
-In-Reply-To: <1403034411-13781-1-git-send-email-galak@codeaurora.org>
-References: <1403034411-13781-1-git-send-email-galak@codeaurora.org>
-Message-ID: <6639D384-040E-498A-8C0B-B3FAF47692ED@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jun 2014 17:09:20 +0100
+Subject: [PATCH v6 03/21] arm64: GICv3 device tree binding documentation
+In-Reply-To: <1404140510-5382-4-git-send-email-marc.zyngier@arm.com>
+References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
+ <1404140510-5382-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140630160920.GC28740@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-On Jun 17, 2014, at 2:46 PM, Kumar Gala <galak@codeaurora.org> wrote:
+On Mon, Jun 30, 2014 at 04:01:32PM +0100, Marc Zyngier wrote:
+> Add the necessary documentation to support GICv3.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> Add a driver for the global clock controller found on IPQ8064 based
-> platforms. This should allow most non-multimedia device drivers to probe
-> and control their clocks.
-> 
-> This is currently missing clocks for USB HSIC and networking devices.
-> 
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+No-one's prepared to say they reviewed this?
+
+Let's fix that ;)
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
 > ---
-> v4:
-> * Fix usb utmi freq clk table
-> * Fix numbering issue in dt-bindings/clock/qcom,gcc-ipq806x.h
+>  Documentation/devicetree/bindings/arm/gic-v3.txt | 79 ++++++++++++++++++++++++
+>  1 file changed, 79 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
 > 
-> v3:
-> * Based on APQ8084 clk patches
-> * Added USB3 and SATA clks
-> * Minor clean ups (made hex numbers lowercase)
+> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> new file mode 100644
+> index 0000000..33cd05e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> @@ -0,0 +1,79 @@
+> +* ARM Generic Interrupt Controller, version 3
+> +
+> +AArch64 SMP cores are often associated with a GICv3, providing Private
+> +Peripheral Interrupts (PPI), Shared Peripheral Interrupts (SPI),
+> +Software Generated Interrupts (SGI), and Locality-specific Peripheral
+> +Interrupts (LPI).
+> +
+> +Main node required properties:
+> +
+> +- compatible : should at least contain  "arm,gic-v3".
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. Must be a single cell with a value of at least 3.
+> +
+> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
+> +  interrupts. Other values are reserved for future use.
+> +
+> +  The 2nd cell contains the interrupt number for the interrupt type.
+> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
+> +  range [0-15].
+> +
+> +  The 3rd cell is the flags, encoded as follows:
+> +	bits[3:0] trigger type and level flags.
+> +		1 = edge triggered
+> +		4 = level triggered
+> +
+> +  Cells 4 and beyond are reserved for future use. When the 1st cell
+> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
+> +  ignored. It is recommended that padding cells have a value of 0.
+> +
+> +- reg : Specifies base physical address(s) and size of the GIC
+> +  registers, in the following order:
+> +  - GIC Distributor interface (GICD)
+> +  - GIC Redistributors (GICR), one range per redistributor region
+> +  - GIC CPU interface (GICC)
+> +  - GIC Hypervisor interface (GICH)
+> +  - GIC Virtual CPU interface (GICV)
+> +
+> +  GICC, GICH and GICV are optional.
+> +
+> +- interrupts : Interrupt source of the VGIC maintenance interrupt.
+> +
+> +Optional
+> +
+> +- redistributor-stride : If using padding pages, specifies the stride
+> +  of consecutive redistributors. Must be a multiple of 64kB.
+> +
+> +- #redistributor-regions: The number of independent contiguous regions
+> +  occupied by the redistributors. Required if more than one such
+> +  region is present.
+> +
+> +Examples:
+> +
+> +	gic: interrupt-controller at 2cf00000 {
+> +		compatible = "arm,gic-v3";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x0 0x2f000000 0 0x10000>,	// GICD
+> +		      <0x0 0x2f100000 0 0x200000>,	// GICR
+> +		      <0x0 0x2c000000 0 0x2000>,	// GICC
+> +		      <0x0 0x2c010000 0 0x2000>,	// GICH
+> +		      <0x0 0x2c020000 0 0x2000>;	// GICV
+> +		interrupts = <1 9 4>;
+> +	};
+> +
+> +	gic: interrupt-controller at 2c010000 {
+> +		compatible = "arm,gic-v3";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		redistributor-stride = <0x0 0x40000>;	// 256kB stride
+> +		#redistributor-regions = <2>;
+> +		reg = <0x0 0x2c010000 0 0x10000>,	// GICD
+> +		      <0x0 0x2d000000 0 0x800000>,	// GICR 1: CPUs 0-31
+> +		      <0x0 0x2e000000 0 0x800000>;	// GICR 2: CPUs 32-63
+> +		      <0x0 0x2c040000 0 0x2000>,	// GICC
+> +		      <0x0 0x2c060000 0 0x2000>,	// GICH
+> +		      <0x0 0x2c080000 0 0x2000>;	// GICV
+> +		interrupts = <1 9 4>;
+> +	};
+> -- 
+> 2.0.0
 > 
-> v2:
-> * dropped audio clock from commit message
-> * changed Kconfig symbol to IPQ_GCC_806X
-> * Fixed PXO/CXO clk freq to 25Mhz
-> 
-> .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
-> drivers/clk/qcom/Kconfig                           |    8 +
-> drivers/clk/qcom/Makefile                          |    1 +
-> drivers/clk/qcom/gcc-ipq806x.c                     | 2424 ++++++++++++++++++++
-> include/dt-bindings/clock/qcom,gcc-ipq806x.h       |  293 +++
-> include/dt-bindings/reset/qcom,gcc-ipq806x.h       |  132 ++
-> 6 files changed, 2859 insertions(+)
-> create mode 100644 drivers/clk/qcom/gcc-ipq806x.c
-> create mode 100644 include/dt-bindings/clock/qcom,gcc-ipq806x.h
-> create mode 100644 include/dt-bindings/reset/qcom,gcc-ipq806x.h
-
-Mike,
-
-Any update on pulling this in?
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
