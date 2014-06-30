@@ -1,43 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Jun 2014 08:14:18 -0400
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
-In-Reply-To: <20140630141102.44461793@free-electrons.com>
-References: <20140627124655.GF23978@titan.lakedaemon.net>
- <20140628162302.48b6b835@free-electrons.com>
- <20140628150706.GM23978@titan.lakedaemon.net>
- <20140628172044.4231c32d@free-electrons.com>
- <20140630122216.6ea35ac9@free-electrons.com>
- <20140630102955.GW32514@n2100.arm.linux.org.uk>
- <20140630120652.GN23978@titan.lakedaemon.net>
- <20140630141102.44461793@free-electrons.com>
-Message-ID: <20140630121418.GO23978@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jun 2014 14:16:30 +0200
+Subject: [PATCH 01/16] ARM: mvebu: Sort the headers of pmsu.c in
+ alphabetic order
+In-Reply-To: <1403875377-940-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140630141630.684479f6@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 02:11:02PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Mon, 30 Jun 2014 08:06:52 -0400, Jason Cooper wrote:
-> 
-> > On Mon, Jun 30, 2014 at 11:29:55AM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Jun 30, 2014 at 12:22:16PM +0200, Thomas Petazzoni wrote:
-> > > > Now that Russell is pushing PATCH 1/3 in the 3.16-rc cycle, can you
-> > > > push PATCH 2/3 and PATCH 3/3 pointed above into the 3.16-rc cycle as
-> > > > well?
-> > > 
-> > > It's in -rc3.
-> > 
-> > Do you want me to do a topic branch on top of -rc3 for these or can I
-> > just throw them on mvebu/fixes?  iow, is there a dep?
-> 
-> There's no build dependency with the patch pushed by Russell. The patch
-> that went through Russell merely adds the support for a new DT property
-> in the PL310 DT binding, and the two patches that should go through
-> your tree use this new DT property. So there is really no build
-> dependency between the two things.
+Gregory,
 
-yup, right.  Shame on me for not re-reviewing the patches first :)
+On Fri, 27 Jun 2014 15:22:42 +0200, Gregory CLEMENT wrote:
+> Sorting the headers in alphabetic order will help to reduce the
+> conflict when adding new headers later.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index a1d407c0febe..5584d35b8e88 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -19,13 +19,13 @@
+>  #define pr_fmt(fmt) "mvebu-pmsu: " fmt
+>  
+>  #include <linux/cpu_pm.h>
+> -#include <linux/kernel.h>
+>  #include <linux/init.h>
+> -#include <linux/of_address.h>
+> +#include <linux/kernel.h>
+>  #include <linux/io.h>
 
-thx,
+So, with your patch applied, if I'm correct, we will have:
 
-Jason.
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/io.h>
+
+It seems like we're not yet alphabetically sorted here :)
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
