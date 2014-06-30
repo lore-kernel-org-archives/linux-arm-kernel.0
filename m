@@ -1,96 +1,73 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 30 Jun 2014 23:57:59 +0200
-Subject: [PATCH 9/9] ARM: dts: sun4i: Add ir node to various boards
-In-Reply-To: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
-References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1404165479-23785-10-git-send-email-hdegoede@redhat.com>
+From: elder@linaro.org (Alex Elder)
+Date: Mon, 30 Jun 2014 17:09:45 -0500
+Subject: [PATCH] devicetree: bindings: document Broadcom CPU enable method
+Message-ID: <1404166185-4168-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on a cubieboard and the mini-x.
+Broadcom mobile SoCs use a ROM-implemented holding pen for
+controlled boot of secondary cores.  A special register is
+used to communicate to the ROM that a secondary core should
+start executing kernel code.  This enable method is currently
+used for members of the bcm281xx and bcm21664 SoC families.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+The use of an enable method also allows the SMP operation vector to
+be assigned as a result of device tree content for these SoCs.
+
+Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts      |  6 ++++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts |  6 ++++++
- arch/arm/boot/dts/sun4i-a10-hackberry.dts  |  6 ++++++
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts | 13 +++++++++++++
- 4 files changed, 31 insertions(+)
+Notes:
+  - This patch was previously posted as part of this series:
+	https://lkml.org/lkml/2014/6/16/580
+  - The binding definition is now found in a separate file rather
+    than embedding it in:
+	Documentation/devicetree/bindings/arm/cpus.txt
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index 55d9510..9e99ade 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -88,6 +88,12 @@
- 			};
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
+ .../bindings/arm/bcm/brcm,bcm11351-cpu-method      | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method
+
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method
+new file mode 100644
+index 0000000..8240c02
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method
+@@ -0,0 +1,36 @@
++Broadcom Kona Family CPU Enable Method
++--------------------------------------
++This binding defines the enable method used for starting secondary
++CPUs in the following Broadcom SoCs:
++  BCM11130, BCM11140, BCM11351, BCM28145, BCM28155, BCM21664
++
++The enable method is specified by defining the following required
++properties in the "cpus" device tree node:
++  - enable-method = "brcm,bcm11351-cpu-method";
++  - secondary-boot-reg = <...>;
++
++The secondary-boot-reg property is a u32 value that specifies the
++physical address of the register used to request the ROM holding pen
++code release a secondary CPU.  The value written to the register is
++formed by encoding the target CPU id into the low bits of the
++physical start address it should jump to.
++
++Example:
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "brcm,bcm11351-cpu-method";
++		secondary-boot-reg = <0x3500417c>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
 +		};
 +
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 539b693..3ce56bfb 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -80,6 +80,12 @@
- 			};
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
 +		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index 21df4e3..891ea44 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -87,6 +87,12 @@
- 			};
- 		};
- 
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-index 387770d..b9ecce6 100644
---- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-@@ -52,6 +52,19 @@
- 			status = "okay";
- 		};
- 
-+		pinctrl at 01c20800 {
-+			ir0_pins_a: ir0 at 0 {
-+				/* The ir receiver is not always populated */
-+				allwinner,pull = <1>;
-+			};
-+		};
-+
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
++	};
 -- 
-2.0.0
+1.9.1
