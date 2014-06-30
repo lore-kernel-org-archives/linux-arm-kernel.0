@@ -1,84 +1,209 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 30 Jun 2014 12:48:15 +0200
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <20140630103649.GF28951@arm.com>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
- <7497427.LQy8pJts8f@wuerfel> <20140630090118.GA24128@ulmo>
- <20140630103649.GF28951@arm.com>
-Message-ID: <20140630104814.GA1495@ulmo>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 30 Jun 2014 11:43:50 +0100
+Subject: [PATCH 2/2] arm: Add back maximum bank limit
+In-Reply-To: <1404068784-27604-2-git-send-email-lauraa@codeaurora.org>
+References: <1404068784-27604-1-git-send-email-lauraa@codeaurora.org>
+ <1404068784-27604-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140630104350.600EDC40F52@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 11:36:49AM +0100, Catalin Marinas wrote:
-> On Mon, Jun 30, 2014 at 10:01:19AM +0100, Thierry Reding wrote:
-> > On Mon, Jun 30, 2014 at 09:20:30AM +0200, Arnd Bergmann wrote:
-> > > On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
-> > > > Also, the real win we get from moving code out into drivers/ is if we
-> > > > can provide a common framework for them. I don't see how we can possibly
-> > > > do that for this code since there simply isn't enough commonality
-> > > > between SoCs. At the same time we now have a situation where both 32-bit
-> > > > and 64-bit variants of some SoCs share some of the same hardware at the
-> > > > very low level and since we don't have mach-* directories for 64-bit ARM
-> > > > and shouldn't be duplicating code either, we need to find a new home for
-> > > > this type of code. drivers/soc seemed to fit perfectly well.
-> > > 
-> > > For the low-level stuff yes, but I agree with Santosh there needs to be
-> > > some more work trying to split out individual high-level drivers.
-> > > 
-> > > There are two common patterns for the interface between the low-level
-> > > register access and the more high-level stuff:  you can either use
-> > > a "syscon" driver that just exports a struct regmap and that gets referenced
-> > > from other drivers using a phandle in their device nodes, or you have
-> > > a driver in drivers/soc that exports a somewhat higher-level interface
-> > > and comes with its own header file that gets included by other drivers.
-> > > At the moment, the syscon/regmap variant can only be used once device
-> > > drivers are loaded, but there is some broad agreement that it should
-> > > be changed to allow calling syscon_regmap_lookup_by_phandle() at
-> > > early boot using just DT accessors.
-> > 
-> > Note that we already have all these drivers and they do work for earlier
-> > Tegra generations. My attempt to move these out of arch/arm/mach-tegra
-> > is merely about being able to share them with upcoming 64-bit variants.
-> > So it's not about adding new functionality but rather about keeping the
-> > existing level of functionality on 64-bit.
+On Sun, 29 Jun 2014 12:06:24 -0700, Laura Abbott <lauraa@codeaurora.org> wrote:
+> Commit 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76
+> (ARM: 8025/1: Get rid of meminfo) dropped the upper bound on
+> the number of memory banks that can be added as there was no
+> technical need in the kernel. It turns out though, some bootloaders
+> (specifically the arndale-octa exynos boards) may pass invalid memory
+> information and rely on the kernel to not parse this data. This is a
+> bug in the bootloader but we still need to work around this.
+> Re-introduce a maximum bank limit per board to prevent invalid banks
+> from being passed to the kernel.
 > 
-> Only that for arm64 we try to do things slightly differently and not
-> because we just like to but because we want better standardisation
-> across SoCs. One example is the booting protocol. Another example, you
-> don't get some early initcalls for your SoC (no machine descriptor). The
-> hardware should be configured by firmware in such a way that it boots at
-> least up to arch_initcall() level (ideally, we should move anything to
-> device_initcall() but it's not always easy).
+> Reported-by: Tushar Behera <trblinux@gmail.com>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-Well, one of the problems on Tegra is that we need part of the PMC to
-power up CPUs. There's no firmware that could do this for us. We need
-also access to another block called flow controller. Both of those
-drivers need to be available very early for things to work. At the same
-time the driver exposes control over power domains. So while we possibly
-can push CPU bringup/teardown to firmware for ARM64, we can't do the
-same for the other parts of the PMC, so we end up with a weird kind of
-driver.
+Hi Laura,
 
-Parts of it can't register with the driver model because it isn't
-available that early, and at the same time we need to register parts
-only later because they require the driver model.
+This is more invasive than I'd like. I think it can be fixed more
+elegantly. Some suggestions below...
 
-> > I'm not a fan of the syscon/regmap approach at all and the existing
-> > drivers use a higher-level API already, so I think we're going to stick
-> > with that.
+> ---
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265615.html
 > 
-> It's not about whether you are a fan of it or not but whether we can get
-> more code sharing across several SoCs and not just between tegra arm32
-> and arm64 versions.
+> For those who did not see the discussion before
+> ---
+>  arch/arm/include/asm/mach/arch.h | 10 ++++++++--
+>  arch/arm/kernel/atags_parse.c    |  1 +
+>  arch/arm/kernel/devtree.c        |  9 ++++++++-
+>  arch/arm/kernel/setup.c          | 20 ++++++++++++++++++++
+>  arch/arm/mach-exynos/exynos.c    |  1 +
+>  5 files changed, 38 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 060a75e..ebcc543 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -40,6 +40,8 @@ struct machine_desc {
+>  	unsigned int		video_start;	/* start of video RAM	*/
+>  	unsigned int		video_end;	/* end of video RAM	*/
+>  
+> +	unsigned int		bank_limit;	/* maximum number of memory
+> +						 * banks to add */
+>  	unsigned char		reserve_lp0 :1;	/* never has lp0	*/
+>  	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+> @@ -76,6 +78,8 @@ extern const struct machine_desc __arch_info_begin[], __arch_info_end[];
+>  #define for_each_machine_desc(p)			\
+>  	for (p = __arch_info_begin; p < __arch_info_end; p++)
+>  
+> +extern void set_max_bank_limit(const struct machine_desc *mdesc);
+> +
+>  /*
+>   * Set of macros to define architecture features.  This is built into
+>   * a table by the linker.
+> @@ -85,7 +89,8 @@ static const struct machine_desc __mach_desc_##_type	\
+>   __used							\
+>   __attribute__((__section__(".arch.info.init"))) = {	\
+>  	.nr		= MACH_TYPE_##_type,		\
+> -	.name		= _name,
+> +	.name		= _name,			\
+> +	.bank_limit	= 12,
 
-syscon by definition cannot be shared between different SoCs.
+The hard limit of 12 seems entirely arbitrary. I don't like the idea of
+reintroducing it.  There shouldn't be any need for a default at all.
+Leave it as zero, and the limit will only apply if a value has been set.
+12 seems like an artificial limit. (more below)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/a1391015/attachment.sig>
+>  
+>  #define MACHINE_END				\
+>  };
+> @@ -95,6 +100,7 @@ static const struct machine_desc __mach_desc_##_name	\
+>   __used							\
+>   __attribute__((__section__(".arch.info.init"))) = {	\
+>  	.nr		= ~0,				\
+> -	.name		= _namestr,
+> +	.name		= _namestr,			\
+> +	.bank_limit	= 12,
+>  
+>  #endif
+> diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
+> index 7807ef5..6b01d20 100644
+> --- a/arch/arm/kernel/atags_parse.c
+> +++ b/arch/arm/kernel/atags_parse.c
+> @@ -204,6 +204,7 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
+>  		dump_machine_table(); /* does not return */
+>  	}
+>  
+> +	set_max_bank_limit(mdesc);
+
+Is there actually a bug on any atags booting? If this is firmly in the
+realm of firmware workaround then I would drop the change from the atags
+boot path.
+
+>  	if (__atags_pointer)
+>  		tags = phys_to_virt(__atags_pointer);
+>  	else if (mdesc->atag_offset)
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index e94a157..04213ce 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -27,6 +27,10 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>  
+> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+> +{
+> +	arm_add_memory(base, size);
+> +}
+>  
+>  #ifdef CONFIG_SMP
+>  extern struct of_cpu_method __cpu_method_of_table[];
+> @@ -212,7 +216,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>  	mdesc_best = &__mach_desc_GENERIC_DT;
+>  #endif
+>  
+> -	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys)))
+> +	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+>  		return NULL;
+
+Instead of splitting early_init_dt_scan(), the call to
+early_init_dt_scan() could probably be moved after the
+of_flat_dt_match_machine() call. It's at least worth a try. Looking at
+the code I don't see anything obvious that requires the
+early_init_dt_scan() code to run first.
+
+Once you've got the mdesc pointer, you've could set the limit before
+doing the full scan. Or, better yet because this is a fix for broken
+data, you could call a dt_fixup hook on the mdesc. Then exynos is the
+only platform that needs special treatment. The best thing for exynos to
+do is fix the buggy data by clearing the bogus entries. Then there's no
+need to reintroduce early_init_dt_add_memory_arch() for ARM.
+
+>  
+>  	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+> @@ -237,6 +241,9 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>  		dump_machine_table(); /* does not return */
+>  	}
+>  
+> +	set_max_bank_limit(mdesc);
+> +	early_init_dt_scan_all();
+> +
+>  	/* Change machine number to match the mdesc we're using */
+>  	__machine_arch_type = mdesc->nr;
+>  
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 8a16ee5..bc796e3 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -629,11 +629,31 @@ void __init dump_machine_table(void)
+>  		/* can't use cpu_relax() here as it may require MMU setup */;
+>  }
+>  
+> +static unsigned int bank_cnt;
+> +static unsigned int max_cnt;
+> +
+> +void set_max_bank_limit(const struct machine_desc *mdesc)
+> +{
+> +	max_cnt = mdesc->bank_limit;
+> +}
+> +
+>  int __init arm_add_memory(u64 start, u64 size)
+>  {
+>  	u64 aligned_start;
+>  
+>  	/*
+> +	 * Some buggy bootloaders rely on the old meminfo behavior of not adding
+> +	 * more than n banks since anything past that may contain invalid data.
+> +	 */
+> +	if (bank_cnt >= max_cnt) {
+
+if (max_cnt && (bank_cnt >= max_cnt)) {
+
+(But unnecessary if the suggestion to reorganize setup_machine_fdt()
+works).
+
+> +		pr_crit("Max banks too low, ignoring memory at 0x%08llx\n",
+> +			(long long)start);
+> +		return -EINVAL;
+> +	}
+> +
+> +	bank_cnt++;
+> +
+> +	/*
+>  	 * Ensure that start/size are aligned to a page boundary.
+>  	 * Size is appropriately rounded down, start is rounded up.
+>  	 */
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index f38cf7c..91283fd 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -350,4 +350,5 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+>  	.dt_compat	= exynos_dt_compat,
+>  	.restart	= exynos_restart,
+>  	.reserve	= exynos_reserve,
+> +	.bank_limit     = 8,
+>  MACHINE_END
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
