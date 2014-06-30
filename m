@@ -1,44 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 30 Jun 2014 11:45:43 -0500
-Subject: [PATCH v3 0/2] arm: dts: add support for am437x sk
-In-Reply-To: <1403547659-24558-1-git-send-email-balbi@ti.com>
-References: <1403547659-24558-1-git-send-email-balbi@ti.com>
-Message-ID: <20140630164543.GA31442@saruman.home>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 30 Jun 2014 11:50:29 -0500
+Subject: [PATCH v7 7/9] ARM: add vdso user-space code
+In-Reply-To: <53B18979.7050206@mit.edu>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
+ <20140628152609.GH32514@n2100.arm.linux.org.uk> <53B18979.7050206@mit.edu>
+Message-ID: <53B19555.2070706@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/30/2014 10:59 AM, Andy Lutomirski wrote:
+> On 06/28/2014 08:26 AM, Russell King - ARM Linux wrote:
+>> On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
+>>> Place vdso-related user-space code in arch/arm/kernel/vdso/.
+>>>
+>>> It is almost completely written in C with some assembly helpers to
+>>> load the data page address, sample the counter, and fall back to
+>>> system calls when necessary.
+>>>
+>>> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
+>>> high-resolution clocks and falls back to syscalls.  Low-resolution
+>>> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
+>>
+>> Okay, how is this used by userspace?
+>>
+>> It seems that on ARM, we generate a dso with these symbols:
+>>
+>> DYNAMIC SYMBOL TABLE:
+>> 000001e4 l    d  .eh_frame_hdr    00000000              .eh_frame_hdr
+>> 00000000 g    DO *ABS*    00000000  LINUX_3.17  LINUX_3.17
+>> 000003c4 g    DF .text    00000080  LINUX_3.17  __kernel_clock_getres
+>> 00000444 g    DF .text    0000002c  LINUX_3.17  __kernel_gettimeofday
+>> 00000298 g    DF .text    0000012c  LINUX_3.17  __kernel_clock_gettime
+> 
+> Sorry, late to the thread.
+> 
+> I think that, if your function signatures match, you should give them
+> the same names and versions as for x86 (i.e. LINUX_2.6,
+> __vdso_clock_gettime).  Userspace will thank you.
 
-On Mon, Jun 23, 2014 at 01:20:57PM -0500, Felipe Balbi wrote:
-> Hi,
-> 
-> here's v3 of am437x sk support. Patches tested on top of next-20140617.
-> 
-> Note that this series was tested with the following extra patches:
-> 
-> http://marc.info/?l=linux-omap&m=140299431732700&w=2
-> http://marc.info/?l=linux-omap&m=140300146503126&w=2
-> http://marc.info/?l=linux-omap&m=140299231232123
-> http://marc.info/?l=linux-omap&m=140310472709968&w=2
-> http://marc.info/?l=linux-omap&m=140310471409959&w=2
-> 
-> A branch is also available with all these patches at [1].
-> 
-> [1] http://git.kernel.org/cgit/linux/kernel/git/balbi/usb.git/log/?h=am437x-starterkit
-> 
-> Felipe Balbi (2):
->   arm: dts: am4372: let boards access all nodes through phandles
->   arm: dts: add support for AM437x StarterKit
+I don't care strongly about it, but I was following arm64's example with
+the naming, and I thought the version should match the Linux version in
+which the VDSO symbols were introduced.  I can see that about half the
+vdso-providing architectures (e.g. arm64, powerpc, s390) follow that
+version convention instead of using LINUX_2.6.  However, looking through
+git history I see that when people add new symbols to their VDSOs they
+don't mark them with the current Linux version -- for example, when
+powerpc added getcpu -- so I'm left thinking the version is not that
+meaningful.
 
-ping on this series, it has been tested by several folks and still no
-updates from anybody in the DT land.
+In other words, I'm inclined to make the changes you suggest, unless
+someone knows why I shouldn't.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/2a6f8a3c/attachment.sig>
+
+> Don't do the weak clock_gettime, etc aliases, though.  That was never a
+> good idea to begin with.
+
+OK, that was my suspicion, thanks for confirming.
