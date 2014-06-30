@@ -1,80 +1,35 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Jun 2014 18:11:50 +0200
-Subject: [PATCH v5 1/5] ARM: EXYNOS: Add support for mapping PMU base
- address via DT
-In-Reply-To: <1403705032-14835-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
- <1403705032-14835-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53B18C46.9010405@samsung.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Mon, 30 Jun 2014 12:19:15 -0400
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <9801429.iblEns5zC3@wuerfel>
+References: <20140328184517.GA27219@cbox> <20140611065412.GA24286@lvm>
+ <53981043.3010300@redhat.com> <9801429.iblEns5zC3@wuerfel>
+Message-ID: <53B18E03.4050902@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On 6/11/14, 5:06 AM, Arnd Bergmann wrote:
+> On Wednesday 11 June 2014 10:16:03 Paolo Bonzini wrote:
+>>
+>>> If kernels actually do use the UEFI runtime services and have no need
+>>> for direct access to an RTC when runing in a UEFI compliant system, then
+>>> I agree with not specifying the hardware details.
+>>
+>> The RTC is not needed for ordinary operation of the kernel and, in the
+>> current kernel, the EFI RTC driver is only used for IA64.  However, it
+>> seems to be platform independent.  I'll give it a shot (on x86, since
+>> that's the only architecture for which I know how to get UEFI firmware).
+>
+> Using the EFI RTC seems appropriate for ARM, as it's a reasonable
+> abstraction that should work with any hypervisor. I suspect the only
+> reason we don't use it on x86 is that we know which RTC hardware we
+> have and the kernel comes with a mandatory driver already.
 
-In general the patch seems quite nice, but please see few comments inline.
+(sorry for delay in responding to this thread)
 
-On 25.06.2014 16:03, Pankaj Dubey wrote:
-> Add support for mapping Samsung Power Management Unit (PMU)
-> base address from device tree.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.h |    1 +
->  arch/arm/mach-exynos/exynos.c |   45 +++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 46 insertions(+)
+Indeed. We should use the EFI RTC driver in general, rather than push 
+for many individual RTC drivers on aarch64 systems that are EFI enabled. 
+Within Red Hat, we currently have EFI Runtime Services live in many of 
+our labs and are using the EFI RTC. This is the way forward.
 
-[snip]
-
-> +static void exynos_map_pmu(void)
-> +{
-> +	struct device_node *np = NULL;
-
-nit: Unnecessary variable initialization.
-
-> +
-> +	np = of_find_matching_node(NULL, exynos_dt_pmu_match);
-> +
-
-nit: Unnecessary blank line.
-
-> +	if (!np) {
-> +		pr_err("Failed to find PMU node\n");
-> +		return;
-
-Returning here probably doesn't make too much sense, especially when you
-just panic if the mapping fails and you remove the static mapping in
-patch 2/5, so backwards compatibility isn't provided anyway.
-
-So something like this might be a better idea:
-
-	np = of_find_matching_node(NULL, exynos_dt_pmu_match);
-	if (np)
-		pmu_base_addr = of_iomap(np, 0);
-
-	if (!pmu_base_addr)
-		panic("failed to find exynos pmu register\n");
-
-> +	}
-> +
-> +	pmu_base_addr = of_iomap(np, 0);
-> +
-> +	if (!pmu_base_addr)
-> +		panic("failed to find exynos pmu register\n");
-> +}
-> +
-> +static void __init exynos_init_time(void)
-> +{
-> +	/* Nothing to do timer specific.
-> +	 * Since platsmp.c needs pmu base address by the time
-> +	 * DT is not unflatten so we can't use DT APIs before
-> +	 * init_time
-> +	 */
-> +	exynos_map_pmu();
-
-Would moving this to .init_irq() callback work too? There are more
-things happening in .init_time() so it seems more fragile and some
-platforms (e.g. mach-tegra) do such platform-specific initialization in
-.init_irq() instead.
-
-Best regards,
-Tomasz
+Jon.
