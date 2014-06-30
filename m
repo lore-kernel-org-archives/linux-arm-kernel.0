@@ -1,30 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Jun 2014 17:28:17 +0100
-Subject: [PATCH v4 07/13] ARM64 / ACPI: Introduce lowlevel suspend function
-In-Reply-To: <1403840976-7456-8-git-send-email-hanjun.guo@linaro.org>
-References: <1403840976-7456-1-git-send-email-hanjun.guo@linaro.org>
- <1403840976-7456-8-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140630162817.GS28951@arm.com>
+From: ayankumarh@gmail.com (AYAN KUMAR HALDER)
+Date: Mon, 30 Jun 2014 21:58:31 +0530
+Subject: Query regarding suspend/resume support in MMC
+Message-ID: <CAGAs2Am1UyVrZ=VZyGVASM1p45TECy-4jaavmQvRFmz2rKtLqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 27, 2014 at 04:49:30AM +0100, Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
-> 
-> acpi_wakeup_address is used on x86 as the address bios jumps into
-> when machine wakes up from suspend. As arm64 does not have such a
-> bios this mechanism will be provided by other means. But the define
-> is still required inside the acpi core.
+Hi,
 
-Why not fix the place where it is used rather than defining a dummy
-pointer?
+I am trying to understand the suspend/resume mechanism in mmc.
 
-> Introduce a null stub for acpi_suspend_lowlevel as this is also
-> required by core. This will be filled in when standards are
-> defined for arm64 ACPI global power states.
+The kernel ( in hibernation as well as in suspend to ram) first calls
+suspend_thaw_processes() and then calls
+pm_notifier_call_chain(PM_POST_SUSPEND/HIBERNATION). The mmc driver
+schedules mmc_rescan on receiving the notification of
+PM_POST_SUSPEND/HIBERNATION. Thus before mmc_rescan() gets called, the
+mmc card is not ready to be used.
 
-I assume acpi_suspend_lowlevel would be just a dummy definition but it
-will have some use when the standard allows.
+So if any processes before hibernation/suspend were using mmc device,
+then on resume when these processes would be unfrozen( from
+thaw_processes ) and if it tries to access the mmc device( before
+mmc_rescan gets scheduled), then it would hit a problem.
 
--- 
-Catalin
+Please let me know if my understanding is correct or not.
+
+Regards,
+Ayan Kumar Halder
