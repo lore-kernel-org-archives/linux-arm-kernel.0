@@ -1,44 +1,25 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 30 Jun 2014 08:00:40 -0500
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <3FFB61A7A8473C49831AF20FA193534A43CB69F6@ALVA-EXMB01.alv.autoliv.int>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CB69F6@ALVA-EXMB01.alv.autoliv.int>
-Message-ID: <53B15F78.4000208@mentor.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Jun 2014 14:01:52 +0100
+Subject: [PATCH 0/5] phy: miphy365x: Introduce support for MiPHY365x
+Message-ID: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2014 07:30 AM, Fredrik Noring wrote:
->>
->> On Fri, Jun 27, 2014 at 04:16:57PM +0000, Fredrik Noring wrote:
->>> Please find below a trace that appeared once with 3.16-rc2. Perhaps it
->>> is of some interest?
->>
->> It's not that serious... I know that the FEC ethernet driver is horrendously
->> racy (I have had a patch set for about the last six months which fixes some of
->> its problems) but as I've had a lot of patches to deal with, and it's been
->> pushed to the back of the queue...
->>
->> The races don't lead to data corruption though, merely timeouts and some
->> lost packets.
+Hi Kishon,
 
-> It seems to be a compiler issue, where (GCC) 4.8.2 does not produce a
-properly
-> working kernel. Happily, (Fedora 2013.11.24-2.fc19) 4.8.1 appears to
-do a lot
-> better. No crashes so far with v3.16-rc2!
->
+This submission is the same as the last one, only each channel is
+now represented by its own sub-node.  The documentation has also
+been updated accordingly.
 
-Did you narrow it down to a particular GCC bug?  The symptoms you
-reported remind me of:
+Kind regards,
+Lee
 
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
-
-Sadly, unpatched GCC 4.8.1 and 4.8.2 are unsuitable for building ARM
-kernels.
+ .../devicetree/bindings/phy/phy-miphy365x.txt      |  76 +++
+ arch/arm/boot/dts/stih416-b2020-revE.dts           |   5 +
+ arch/arm/boot/dts/stih416-b2020.dts                |   7 +
+ arch/arm/boot/dts/stih416.dtsi                     |  21 +
+ drivers/phy/Kconfig                                |  10 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-miphy365x.c                        | 676 +++++++++++++++++++++
+ include/dt-bindings/phy/phy-miphy365x.h            |  25 +
+ 8 files changed, 821 insertions(+)
