@@ -1,45 +1,40 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Jun 2014 15:48:57 +0200
-Subject: [PATCH v3] clk: exynos5420: Remove aclk66_peric from the clock
- tree description
-In-Reply-To: <1402000514-30752-1-git-send-email-dianders@chromium.org>
-References: <1401467562-5585-1-git-send-email-dianders@chromium.org>
- <1402000514-30752-1-git-send-email-dianders@chromium.org>
-Message-ID: <53B16AC9.7090509@samsung.com>
+Date: Mon, 30 Jun 2014 15:49:34 +0200
+Subject: [PATCH] clk: samsung: Register clk provider only after registering
+ its all clocks
+In-Reply-To: <1403106412-24526-1-git-send-email-s.nawrocki@samsung.com>
+References: <1403106412-24526-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <53B16AEE.30003@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.06.2014 22:35, Doug Anderson wrote:
-> The "aclk66_peric" clock is a gate clock with a whole bunch of gates
-> underneath it.  This big gate isn't very useful to include in our
-> clock tree.  If any of the children need to be turned on then the big
-> gate will need to be on anyway.  ...and there are plenty of other "big
-> gates" that aren't described in our clock tree, some of which shut off
-> collections of clocks that have no relationship in the hierarchy so
-> are hard to model.
+On 18.06.2014 17:46, Sylwester Nawrocki wrote:
+> Ensure the clock provider is not registered until after all its related
+> clocks were created and are ready to use. Currently there are races
+> possible and any (of_)clk_get() call right after a clock provider's
+> clk_init_cb callback call may fail.
 > 
-> "aclk66_peric" is causing earlyprintk problems since it gets disabled
-> as part of the boot process, so let's just remove it.
-> 
-> Strangely (and for no good reason) this clock is exported as part of
-> the common clock bindings.  Remove it since there are no in-kernel
-> device trees using it and no reason anyone out of tree should refer to
-> it either.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > ---
-> Changes in v3:
-> - Now just remove aclk66_peric from the tree as suggested by Tomasz.
 > 
-> Changes in v2:
-> - Use GATE_A and clk_get().  Save the clock for putting later.
-> - Return 0 from exynos5420_clk_late_init().
+> NOTE: Tested only on Exynos4412.
 > 
->  drivers/clk/samsung/clk-exynos5420.c   | 85 ++++++++++++++++++++++------------
->  include/dt-bindings/clock/exynos5420.h |  1 -
->  2 files changed, 55 insertions(+), 31 deletions(-)
+>  drivers/clk/samsung/clk-exynos3250.c |    2 ++
+>  drivers/clk/samsung/clk-exynos4.c    |    2 ++
+>  drivers/clk/samsung/clk-exynos5250.c |    2 ++
+>  drivers/clk/samsung/clk-exynos5260.c |    2 ++
+>  drivers/clk/samsung/clk-exynos5410.c |    2 ++
+>  drivers/clk/samsung/clk-exynos5420.c |    2 ++
+>  drivers/clk/samsung/clk-exynos5440.c |    2 ++
+>  drivers/clk/samsung/clk-s3c2410.c    |    2 ++
+>  drivers/clk/samsung/clk-s3c2412.c    |    2 ++
+>  drivers/clk/samsung/clk-s3c2443.c    |    2 ++
+>  drivers/clk/samsung/clk-s3c64xx.c    |    2 ++
+>  drivers/clk/samsung/clk.c            |   19 ++++++++++---------
+>  drivers/clk/samsung/clk.h            |    2 ++
+>  13 files changed, 34 insertions(+), 9 deletions(-)
 
-Applied as a fix for 3.16.
+Applied for 3.17.
 
 Best regards,
 Tomasz
