@@ -1,53 +1,61 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 30 Jun 2014 18:00:04 +0200
-Subject: [PATCH v5 05/14] clk: Add generic driver for Maxim PMIC clocks
-In-Reply-To: <20140630113539.GX32514@n2100.arm.linux.org.uk>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-6-git-send-email-javier.martinez@collabora.co.uk>
- <CAKew6eU5X=WxhECtwUUwbXe_fCRU4bD6B7caWiA2dwcBfThd-g@mail.gmail.com>
- <53B142F1.1050407@collabora.co.uk>
- <20140630113539.GX32514@n2100.arm.linux.org.uk>
-Message-ID: <53B18984.7010607@collabora.co.uk>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 30 Jun 2014 11:00:25 -0500
+Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <20140628170709.GB23634@xo-6d-61-c0.localdomain>
+References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
+ <1403660878-56350-3-git-send-email-s-anna@ti.com>
+ <20140628170709.GB23634@xo-6d-61-c0.localdomain>
+Message-ID: <53B18999.2020506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hi Pavel,
 
-Thanks a lot for your suggestion.
-
-On 06/30/2014 01:35 PM, Russell King - ARM Linux wrote:
-> On Mon, Jun 30, 2014 at 12:58:57PM +0200, Javier Martinez Canillas wrote:
->> >> +       if (!max_gen->lookup)
->> >> +               return ERR_PTR(-ENOMEM);
->> >> +
->> >> +       max_gen->lookup->con_id = hw->init->name;
->> > 
->> > Also IMO,  init->name should be over-written if name is provided in DT,
->> > otherwise generic "clock-output-names" property will go futile,
->> > perhaps it should be done before clk_register.
->> > 
->> 
->> Even though Documentation/devicetree/bindings/clock/clock-bindings.txt says that
->> the "clock-output-names" property is optional I agree with you that will be
->> better to support it. So I'll add it on the next version as well.
+On 06/28/2014 12:07 PM, Pavel Machek wrote:
+> Hi!
 > 
-> However, remember that con_id is the _DEVICE_ specific connection name,
-> not the _CLOCK_ name.  You will get a NAK from me if you violate this
-> rule.
+>> The non-DT support has to be maintained for now to not break
+>> OMAP3 legacy boot, and the legacy-style code will be cleaned
+>> up once OMAP3 is also converted to DT-boot only.
 > 
+>> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
+>>  	return 0;
+>>  }
+>>  
+>> +static const struct omap_mbox_device_data omap2_data = {
+>> +	.num_users	= 4,
+>> +	.num_fifos	= 6,
+>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+>> +};
+>> +
+>> +static const struct omap_mbox_device_data omap3_data = {
+>> +	.num_users	= 2,
+>> +	.num_fifos	= 2,
+>> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+>> +};
+>> +
+>> +static const struct omap_mbox_device_data am335x_data = {
+>> +	.num_users	= 4,
+>> +	.num_fifos	= 8,
+>> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
+>> +};
+> 
+> So you use compatible strings to look up 3 integers. Would it be better to have
+> num_users/num_fifos/intr_type directly in the device tree? That should be cleaner
+> and more flexible...
+> 
+> If you do that, would it be possible to have share compatible string?
 
-Yes I know that con_id is the device specific connection name that is set by the
-consumers using the "clock-names" property. But AFAIU the clk_lookup structs
-added by clockdev_add() are only used by legacy non-DT drivers which don't set
-their clock names and instead is the clock driver the one that set con_id to the
-struct clk_init_data .name field.
+Yeah, I have actually encoded the .num_users and .num_fifos in DT in the
+previous version [1] with shared compatible strings, but dropped those
+properties in favour of adding minimal custom properties to DT based on
+some offline IRC comments. I have no objections either way, but there is
+really nothing to be gained from minimizing compatible strings.
 
-I see that other drivers do the same, is that wrong as well? What value should
-have con_id when registering clkdevs for legacy non-DT drivers?
+Tony,
+Any comments on this?
 
-DT enabled drivers whose devices define their "clock-names" are not affected by
-this since the clock lookup is made by matching OF "clock-names" property + and
-index.
+regards
+Suman
 
-Best regards,
-Javier
+[1] https://patchwork.kernel.org/patch/2839662/
