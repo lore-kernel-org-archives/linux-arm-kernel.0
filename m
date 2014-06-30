@@ -1,60 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Jun 2014 14:49:39 -0700
-Subject: [PATCH] ARM: debug: msm: Support big-endian CPUs
-Message-ID: <1404164979-17068-1-git-send-email-sboyd@codeaurora.org>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 30 Jun 2014 14:52:06 -0700
+Subject: Tegra baseline test results for v3.16-rc2
+Message-ID: <53B1DC06.8040308@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the CPU is in big-endian mode these macros will access the
-hardware incorrectly. Reverse thins as necessary to fix this.
+Here are some basic Tegra test results for Linux v3.16-rc2.
+Logs and other details at:
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/include/debug/msm.S | 6 ++++++
- 1 file changed, 6 insertions(+)
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.16-rc2/20140621223108/
 
-diff --git a/arch/arm/include/debug/msm.S b/arch/arm/include/debug/msm.S
-index 9ef57612811d..e55a9426b496 100644
---- a/arch/arm/include/debug/msm.S
-+++ b/arch/arm/include/debug/msm.S
-@@ -23,6 +23,7 @@
- 	.endm
- 
- 	.macro	senduart, rd, rx
-+ARM_BE8(rev	\rd, \rd )
- #ifdef CONFIG_DEBUG_QCOM_UARTDM
- 	@ Write the 1 character to UARTDM_TF
- 	str	\rd, [\rx, #0x70]
-@@ -35,24 +36,29 @@
- #ifdef CONFIG_DEBUG_QCOM_UARTDM
- 	@ check for TX_EMT in UARTDM_SR
- 	ldr	\rd, [\rx, #0x08]
-+ARM_BE8(rev     \rd, \rd )
- 	tst	\rd, #0x08
- 	bne	1002f
- 	@ wait for TXREADY in UARTDM_ISR
- 1001:	ldr	\rd, [\rx, #0x14]
-+ARM_BE8(rev     \rd, \rd )
- 	tst	\rd, #0x80
- 	beq 	1001b
- 1002:
- 	@ Clear TX_READY by writing to the UARTDM_CR register
- 	mov	\rd, #0x300
-+ARM_BE8(rev     \rd, \rd )
- 	str	\rd, [\rx, #0x10]
- 	@ Write 0x1 to NCF register
- 	mov 	\rd, #0x1
-+ARM_BE8(rev     \rd, \rd )
- 	str	\rd, [\rx, #0x40]
- 	@ UARTDM reg. Read to induce delay
- 	ldr	\rd, [\rx, #0x08]
- #else
- 	@ wait for TX_READY
- 1001:	ldr	\rd, [\rx, #0x08]
-+ARM_BE8(rev     \rd, \rd )
- 	tst	\rd, #0x04
- 	beq	1001b
- #endif
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+
+
+vmlinux object size
+(delta in bytes from test_v3.16-rc1 (7171511eaec5bf23fb06078f59784a3a0626b38f)):
+    text     data      bss    total  kernel
+  +27997    +1624        0   +29621  multi_v7_defconfig
+    +766       -8        0     +758  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.16-rc1 (7171511eaec5bf23fb06078f59784a3a0626b38f))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+      -24k      24k        .     652k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+      -24k      24k        .     652k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
