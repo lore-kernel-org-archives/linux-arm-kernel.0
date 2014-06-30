@@ -1,68 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 15:20:54 +0100
-Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
- A31 DMA controller
-In-Reply-To: <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140630142054.GA8756@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 30 Jun 2014 16:22:25 +0200
+Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
+In-Reply-To: <6153646.CZ57BgYKf3@wuerfel>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+ <6153646.CZ57BgYKf3@wuerfel>
+Message-ID: <20140630142224.GA30417@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Mon, Jun 30, 2014 at 02:20:54PM +0100, Maxime Ripard wrote:
-> The Allwinner A31 has a 16 channels DMA controller that it shares with the
-> newer A23. Although sharing some similarities with the DMA controller of the
-> older Allwinner SoCs, it's significantly different, I don't expect it to be
-> possible to share the driver for these two.
->
-> The A31 Controller is able to memory-to-memory or memory-to-device transfers on
-> the 16 channels in parallel.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Mon, Jun 30, 2014 at 03:34:27PM +0200, Arnd Bergmann wrote:
+> On Tuesday 01 July 2014 06:32:10 Kukjin Kim wrote:
+> > This series removes S5P64X0 and S5PC100 related codes in mainline,
+> > because no more user now. And if its supporting is required later,
+> > it will be done with using device tree.
+> > 
+> 
 > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/dma/Kconfig     |    8 +
->  drivers/dma/Makefile    |    1 +
->  drivers/dma/sun6i-dma.c | 1058 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1067 insertions(+)
->  create mode 100644 drivers/dma/sun6i-dma.c
 
-[...]
+It seems like I'm not completely up-to-date. What happened to our prime
+directive never to remove support for boards? Why is this special? What
+about people that still use this hardware? The commit message says that
+there are no longer any users. How was this determined?
 
-> +       sdc->clk = devm_clk_get(&pdev->dev, NULL);
-> +       if (IS_ERR(sdc->clk)) {
-> +               dev_err(&pdev->dev, "No clock specified\n");
-> +               return PTR_ERR(sdc->clk);
-> +       }
-> +
-> +       mux = clk_get(NULL, "ahb1_mux");
-> +       if (IS_ERR(mux)) {
-> +               dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
-> +               return PTR_ERR(mux);
-> +       }
-> +
-> +       pll6 = clk_get(NULL, "pll6");
-> +       if (IS_ERR(pll6)) {
-> +               dev_err(&pdev->dev, "Couldn't get PLL6\n");
-> +               clk_put(mux);
-> +               return PTR_ERR(pll6);
-> +       }
-
-I'm slightly confused. The binding listed a single unnamed clock (the
-AHB clock). What is going on here?
-
-> +       ret = clk_set_parent(mux, pll6);
-> +       clk_put(pll6);
-> +       clk_put(mux);
-> +
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
-> +               return ret;
-> +       }
-
-Why do we need to reparent the mux?
-
-Thanks,
-Mark.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/d8c55375/attachment.sig>
