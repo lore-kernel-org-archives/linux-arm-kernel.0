@@ -1,117 +1,207 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Jun 2014 08:58:09 +0000 (UTC)
-Subject: OMAP baseline test results for v3.16-rc3
-Message-ID: <alpine.DEB.2.02.1406300856510.24036@utopia.booyaka.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 30 Jun 2014 09:53:08 +0100
+Subject: [PATCH v7 1/4] arm: fiq: Add callbacks to manage FIQ routings
+In-Reply-To: <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+References: <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
+ <1404118391-3850-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1404118391-3850-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
+virq into a FIQ virq. This is too inflexible for multi-platform kernels
+and makes runtime error checking impossible.
 
+We solve this by introducing a flexible mapping that allows interrupt
+controllers that support FIQ to register those mappings. This, in turn,
+makes it much possible for drivers in DT kernels to install FIQ handlers
+without knowing anything about the interrupt controller.
 
-Here are some basic OMAP test results for Linux v3.16-rc3.
-Logs and other details at:
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Fabio Estevam <festevam@gmail.com>
+---
+ arch/arm/include/asm/fiq.h |   8 ++++
+ arch/arm/kernel/fiq.c      | 103 ++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 109 insertions(+), 2 deletions(-)
 
-    http://www.pwsan.com/omap/testlogs/test_v3.16-rc3/20140630004413/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap5-uevm
-
-Boot to userspace:
-    FAIL ( 2/14): 2430sdp, 4460varsomom
-    skip ( 1/14): 5912osk
-    Pass (11/14): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 5430es2uevm
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, 4460varsomom
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-PM: chip off via dynamic idle:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-
-vmlinux object size
-(delta in bytes from test_v3.16-rc2 (a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee)):
-   text     data      bss    total  kernel
-   +687      +16        0     +703  omap1_defconfig
-   +687      +24        0     +711  omap1_defconfig_1510innovator_only
-   +687      +16        0     +703  omap1_defconfig_5912osk_only
-  +1915     +224        0    +2139  multi_v7_defconfig
-  +1719     +120        0    +1839  omap2plus_defconfig
-  +1591      +56        0    +1647  omap2plus_defconfig_2430sdp_only
-  +1783     +120        0    +1903  omap2plus_defconfig_am33xx_only
-  +1659     +120        0    +1779  omap2plus_defconfig_am43xx_only
-  +1719      +56        0    +1775  omap2plus_defconfig_cpupm
-  +5819      +56        0    +5875  omap2plus_defconfig_dra7xx_only
-  +1010      +56        0    +1066  omap2plus_defconfig_n800_multi_omap2xxx
-  +1042      +48        0    +1090  omap2plus_defconfig_n800_only_a
-  +1763     +144        0    +1907  omap2plus_defconfig_no_pm
-  +1719     +120        0    +1839  omap2plus_defconfig_omap2_4_only
-  +1591     +120        0    +1711  omap2plus_defconfig_omap3_4_only
-  +1659      +56        0    +1715  omap2plus_defconfig_omap5_only
-   +980      +56      -96     +940  rmk_omap3430_ldp_allnoconfig
-  +4995      +64        0    +5059  rmk_omap3430_ldp_oldconfig
-  +1028      +52     -120     +960  rmk_omap4430_sdp_allnoconfig
-  +1019      +64        0    +1083  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.16-rc2 (a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .      .  3517evm        omap2plus_defconfig
-    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .      .  37xxevm        omap2plus_defconfig
-    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
-    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
-    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
-    -8k     8k      .      .  5430es2uevm    omap2plus_defconfig
-    -8k     8k      .      .  am335xbonelt   omap2plus_defconfig
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index d493d0b..ed44528 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -16,8 +16,14 @@
+ #ifndef __ASM_FIQ_H
+ #define __ASM_FIQ_H
+ 
++#include <linux/irq.h>
+ #include <asm/ptrace.h>
+ 
++struct fiq_chip {
++	void (*fiq_enable)(struct irq_data *data);
++	void (*fiq_disable)(struct irq_data *data);
++};
++
+ struct fiq_handler {
+ 	struct fiq_handler *next;
+ 	/* Name
+@@ -38,6 +44,8 @@ extern void release_fiq(struct fiq_handler *f);
+ extern void set_fiq_handler(void *start, unsigned int length);
+ extern void enable_fiq(int fiq);
+ extern void disable_fiq(int fiq);
++extern bool has_fiq(int fiq);
++extern void fiq_register_mapping(int irq, struct fiq_chip *chip);
+ 
+ /* helpers defined in fiqasm.S: */
+ extern void __set_fiq_regs(unsigned long const *regs);
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 918875d..5d831cf 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -40,6 +40,9 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/seq_file.h>
++#include <linux/irq.h>
++#include <linux/radix-tree.h>
++#include <linux/slab.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+@@ -52,7 +55,15 @@
+ 		(unsigned)&vector_fiq_offset;		\
+ 	})
+ 
++struct fiq_data {
++	struct fiq_chip *fiq_chip;
++	struct irq_data *irq_data;
++};
++
+ static unsigned long no_fiq_insn;
++static int fiq_start = -1;
++static RADIX_TREE(fiq_data_tree, GFP_KERNEL);
++static DEFINE_MUTEX(fiq_data_mutex);
+ 
+ /* Default reacquire function
+  * - we always relinquish FIQ control
+@@ -127,18 +138,65 @@ void release_fiq(struct fiq_handler *f)
+ 	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
+ }
+ 
+-static int fiq_start;
++static struct fiq_data *lookup_fiq_data(int fiq)
++{
++	struct fiq_data *data;
++
++	rcu_read_lock();
++	data = radix_tree_lookup(&fiq_data_tree, fiq);
++	rcu_read_unlock();
++
++	return data;
++}
+ 
+ void enable_fiq(int fiq)
+ {
++	struct fiq_data *data = lookup_fiq_data(fiq);
++
++	if (data) {
++		if (data->fiq_chip->fiq_enable)
++			data->fiq_chip->fiq_enable(data->irq_data);
++		enable_irq(fiq);
++		return;
++	}
++
++	if (WARN_ON(fiq_start == -1))
++		return;
++
+ 	enable_irq(fiq + fiq_start);
+ }
+ 
+ void disable_fiq(int fiq)
+ {
++	struct fiq_data *data = lookup_fiq_data(fiq);
++
++	if (data) {
++		if (data->fiq_chip->fiq_disable)
++			data->fiq_chip->fiq_disable(data->irq_data);
++		disable_irq(fiq);
++		return;
++	}
++
++	if (WARN_ON(fiq_start == -1))
++		return;
++
+ 	disable_irq(fiq + fiq_start);
+ }
+ 
++bool has_fiq(int fiq)
++{
++	struct fiq_data *data = lookup_fiq_data(fiq);
++
++	if (data)
++		return true;
++
++	if (fiq_start == -1)
++		return false;
++
++	return fiq >= fiq_start;
++}
++EXPORT_SYMBOL(has_fiq);
++
+ EXPORT_SYMBOL(set_fiq_handler);
+ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
+@@ -147,9 +205,50 @@ EXPORT_SYMBOL(release_fiq);
+ EXPORT_SYMBOL(enable_fiq);
+ EXPORT_SYMBOL(disable_fiq);
+ 
++/*
++ * Add a mapping from a Linux irq to the fiq data.
++ */
++void fiq_register_mapping(int irq, struct fiq_chip *chip)
++{
++	struct fiq_data *fiq_data = NULL;
++	int res;
++
++	/* fiq_register_mapping can't be mixed with init_FIQ */
++	BUG_ON(fiq_start != -1);
++
++	fiq_data = kmalloc(sizeof(*fiq_data), GFP_KERNEL);
++	if (!fiq_data)
++		goto err;
++
++	fiq_data->fiq_chip = chip;
++	fiq_data->irq_data = irq_get_irq_data(irq);
++	BUG_ON(!fiq_data->irq_data);
++
++	mutex_lock(&fiq_data_mutex);
++	res = radix_tree_insert(&fiq_data_tree, irq, fiq_data);
++	mutex_unlock(&fiq_data_mutex);
++	if (res)
++		goto err;
++
++	return;
++
++err:
++	kfree(fiq_data);
++	pr_err("fiq: Cannot register mapping %d\n", irq);
++}
++
++/*
++ * Set the offset between normal IRQs and their FIQ shadows.
++ */
+ void __init init_FIQ(int start)
+ {
++	fiq_start = start;
++}
++
++static int __init init_default_fiq_handler(void)
++{
+ 	unsigned offset = FIQ_OFFSET;
+ 	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
+-	fiq_start = start;
++	return 0;
+ }
++pure_initcall(init_default_fiq_handler);
+-- 
+1.9.3
