@@ -1,69 +1,60 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 30 Jun 2014 15:09:31 +0200
-Subject: [PATCH v8 6/7] ARM: berlin: add the AHCI node for the BG2Q
+Date: Mon, 30 Jun 2014 15:09:27 +0200
+Subject: [PATCH v8 2/7] Documentation: bindings: add the Berlin SATA PHY
 In-Reply-To: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1404133772-11741-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1404133772-11741-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q has an AHCI SATA controller. Add the corresponding nodes
-(AHCI, PHY) into its device tree.
+The Berlin SATA PHY drives the PHY related to the SATA interface. Add
+the corresponding documentation.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 635a16a64cb4..fa34ae6657ac 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -303,6 +303,45 @@
- 			clock-names = "refclk";
- 		};
- 
-+		ahci: sata at e90000 {
-+			compatible = "generic-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
+diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+new file mode 100644
+index 000000000000..88f8c23384c0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+@@ -0,0 +1,34 @@
++Berlin SATA PHY
++---------------
 +
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy 0>;
-+				status = "disabled";
-+			};
++Required properties:
++- compatible: should be "marvell,berlin2q-sata-phy"
++- address-cells: should be 1
++- size-cells: should be 0
++- phy-cells: from the generic PHY bindings, must be 1
++- reg: address and length of the register
++- clocks: reference to the clock entry
 +
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy 1>;
-+				status = "disabled";
-+			};
++Sub-nodes:
++Each PHY should be represented as a sub-node.
++
++Sub-nodes required properties:
++- reg: the PHY number
++
++Example:
++	sata_phy: phy at f7e900a0 {
++		compatible = "marvell,berlin2q-sata-phy";
++		reg = <0xf7e900a0 0x200>;
++		clocks = <&chip CLKID_SATA>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		#phy-cells = <1>;
++
++		sata-phy at 0 {
++			reg = <0>;
 +		};
 +
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin2q-sata-phy";
-+			reg = <0xe900a0 0x200>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+
-+			sata-phy at 0 {
-+				reg = <0>;
-+			};
-+
-+			sata-phy at 1 {
-+				reg = <1>;
-+			};
++		sata-phy at 1 {
++			reg = <1>;
 +		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++	};
 -- 
 1.9.1
