@@ -1,100 +1,43 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 30 Jun 2014 11:09:15 +0200
-Subject: [PATCH v3 1/4] dt: bindings: add bindings for Broadcom bcm43xx
- sdio devices
-In-Reply-To: <53B12059.50808@broadcom.com>
-References: <1404051421-24377-1-git-send-email-hdegoede@redhat.com>
- <1404051421-24377-2-git-send-email-hdegoede@redhat.com>
- <53B12059.50808@broadcom.com>
-Message-ID: <53B1293B.7060901@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jun 2014 10:13:52 +0100
+Subject: [PATCH 0/2] arm64: clean up /proc/cpuinfo
+In-Reply-To: <20140628010440.9839.9366.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20140628010440.9839.9366.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20140630091352.GP7262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Bjorn,
 
-On 06/30/2014 10:31 AM, Arend van Spriel wrote:
-> On 29-06-14 16:16, Hans de Goede wrote:
->> From: Arend van Spriel <arend@broadcom.com>
->>
->> The Broadcom bcm43xx sdio devices are fullmac devices that may be
->> integrated in ARM platforms. Currently, the brcmfmac driver for
->> these devices support use of platform data. This patch specifies
->> the bindings that allow this platform data to be expressed in the
->> devicetree.
->>
->> Reviewed-by: Hante Meuleman <meuleman@broadcom.com>
->> Reviewed-by: Franky (Zhenhui) Lin <frankyl@broadcom.com>
->> Reviewed-by: Daniel (Deognyoun) Kim <dekim@broadcom.com>
->> Reviewed-by: Pieter-Paul Giesberts <pieterpg@broadcom.com>
->> Signed-off-by: Arend van Spriel <arend@broadcom.com>
->> [hdegoede at redhat.com: drop clk / reg_on gpio handling, as there is no consensus
->>  on how to handle this yet]
->> [hdegoede at redhat.com: move from bindings/staging to bindings]
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  .../bindings/net/wireless/brcm,bcm43xx-fmac.txt    | 41 ++++++++++++++++++++++
->>  1 file changed, 41 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->> new file mode 100644
->> index 0000000..5dbf169
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
->> @@ -0,0 +1,41 @@
->> +Broadcom BCM43xx Fullmac wireless SDIO devices
->> +
->> +This node provides properties for controlling the Broadcom wireless device. The
->> +node is expected to be specified as a child node to the SDIO controller that
->> +connects the device to the system.
->> +
->> +Required properties:
->> +
->> + - compatible : Should be "brcm,bcm4329-fmac".
->> +
->> +Optional properties:
->> + - brcm,drive-strength : drive strength used for SDIO pins on device in mA
->> +	(default = 6).
->> + - interrupt-parent : the phandle for the interrupt controller to which the
->> +	device interrupts are connected.
->> + - interrupts : specifies attributes for the out-of-band interrupt (host-wake).
->> +	When not specified the device will use in-band SDIO interrupts.
->> + - interrupt-names : name of the out-of-band interrupt, which must be set
->> +	to "host-wake".
->> +
->> +Example:
->> +
->> +mmc3: mmc at 01c12000 {
->> +	#address-cells = <1>;
->> +	#size-cells = <0>;
->> +
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc3_pins_a>;
->> +	vmmc-supply = <&reg_vmmc3>;
->> +	bus-width = <4>;
->> +	non-removable;
->> +	status = "okay";
->> +
->> +	brcmf: bcrmf at 1 {
->> +		reg = <1>;
+On Sat, Jun 28, 2014 at 02:11:58AM +0100, Bjorn Helgaas wrote:
+> On arm64, /proc/cpuinfo currently looks like:
 > 
-> I guess the reg property is needed to have this node linked to sdio func
-> 1 dev, right?
+>     Processor       : AArch64 Processor rev 0 (aarch64)
+>     processor       : 0
+>     processor       : 1
+>     ...
+>     Features        : ...
+> 
+> Compared to most other architectures (including arm), this has an extra
+> "Processor" header, and the "Features" and other bits only appear once,
+> so there's no way to have per-CPU features, variants, etc.
+> 
+> These patches make arm64 more consistent with the other architectures
+> by removing the extra header and printing the CPU ID information for
+> each CPU.
 
-Right.
+This looks very much like the series I've been working on [1,2,3], that
+reports the MIDR information and performs some additional sanity
+checking (expecting CPUs to have identical hwcap features).
 
-> I would add it to the list of required properties above
-> even if this behaviour is already described in a more generic binding.
+Did you need this for any reason it particular, or was this just a clean
+up?
 
-Then we would also need to describe the need to add:
+Does my series look OK to you?
 
-	#address-cells = <1>;
-	#size-cells = <0>;
+Cheers,
+Mark.
 
-To the mmc-host node itself, I don't think that that really
-belongs here, and thus the description of the reg property itself
-also does not really belong here IMHO.
-
-Regards,
-
-Hans
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/255389.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/264387.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266973.html
