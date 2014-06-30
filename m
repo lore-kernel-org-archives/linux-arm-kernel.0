@@ -1,199 +1,96 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 14:40:54 +0200
-Subject: [PATCH 02/16] ARM: mvebu: Add a common function for the boot
- address work around
-In-Reply-To: <1403875377-940-3-git-send-email-gregory.clement@free-electrons.com>
+Date: Mon, 30 Jun 2014 14:46:20 +0200
+Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
+ address of the boot register
+In-Reply-To: <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
 References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140630144054.2f71514b@free-electrons.com>
+ <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140630144620.0030cf94@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Gregory,
 
-On Fri, 27 Jun 2014 15:22:43 +0200, Gregory CLEMENT wrote:
+I'm not sure that the best approach to solve this problem. Instead,
+maybe the system-controller.c code should set up the boot address
+workaround on Armada 375. Since the workaround on 375 is really related
+to setting the boot address which is done by the system controller,
+maybe the initialization of the workaround belongs in
+system-controller.c ?
 
-> On some of the mvebu SoC and due to internal bootrom issue, CPU
+On Fri, 27 Jun 2014 15:22:44 +0200, Gregory CLEMENT wrote:
+> In order to boot the secondary CPUs on Armada 375 Z1, we need to read
+> the boot address of these CPUs through a register part of the System
+> Controller. This done very early where MMU is not enable yet, so we
+> need to get the physical address of this register to use it.
 
-"due to an internal BootROM issue, the CPU"
+I don't think that really explains what's going on here, maybe:
 
-> initial jump code should be placed in SRAM memory of the SoC. In order
+"As part of a workaround for a BootROM issue on Armada 375 Z1, a piece
+of assembly code loaded into the Cryptographic Engine SRAM needs to
+read the System Controller Resume Address register before the MMU is
+enabled. We therefore need a way of getting the physical address for
+the System Controller Resume Address register."
 
-"in SRAM memory" -> "in the SRAM memory".
+> In the previous version of this workaround the physical address were
 
-> to achieve this, we have to unmap the BootROM and at some specific
-> location where the BootROM was place, create a specific MBus window
+were -> was.
 
-place -> placed
-
-> for the SRAM. This SRAM is initialized with a few instructions of code
-> that allows to jump into the real secondary CPU boot address.
-
-jump into -> jump to.
-
-> This work around currently needed for booting SMP on Aramda 375 Z1 and
-
-This work around *is* currently needed for SMP support on *Armada*.
-
-> will be needed for cpuidle support on Armada 370. Instead of duplicate
-
-duplicate -> duplicating.
-
-> the same code, this commit introduce a common function to handle it:
-
-introduce -> introduces.
-
-> mvebu_boot_addr_wa().
-
-I'm not sure the name of the function is appropriate, as we don't know
-what it is doing. Maybe mvebu_setup_boot_addr_wa() ?
-
-Also, maybe your commit log should indicate that the workaround
-involves using the Crypto engine SRAM, which will help understanding
-the reference to the crypto engine in the code.
-
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/pmsu.c    | 31 +++++++++++++++++++++++++++++++
->  arch/arm/mach-mvebu/pmsu.h    |  1 +
->  arch/arm/mach-mvebu/pmsu_ll.S | 19 +++++++++++++++++++
->  3 files changed, 51 insertions(+)
-
-I don't really have a better suggestion, but the workaround doesn't
-seem to be related to the PMSU, so are pmsu.c and pmsu_ll.S really the
-right files to store this code?
-
+> hardcoded whereas depending of the Mbus configuration this address may
+> change.
 > 
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 5584d35b8e88..991560905ccc 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -22,6 +22,7 @@
->  #include <linux/init.h>
->  #include <linux/kernel.h>
->  #include <linux/io.h>
-> +#include <linux/mbus.h>
->  #include <linux/of_address.h>
->  #include <linux/platform_device.h>
->  #include <linux/resource.h>
-> @@ -63,6 +64,14 @@ static void __iomem *pmsu_mp_base;
->  #define L2C_NFABRIC_PM_CTL		    0x4
->  #define L2C_NFABRIC_PM_CTL_PWR_DOWN		BIT(20)
+> This commit will allow to use the generic boot workaround function
+> with the correct address.
+
+
+
+> ---
+>  arch/arm/mach-mvebu/common.h            |  1 +
+>  arch/arm/mach-mvebu/system-controller.c | 11 +++++++++++
+>  2 files changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+> index b67fb7a10d8b..6ad62cf8352c 100644
+> --- a/arch/arm/mach-mvebu/common.h
+> +++ b/arch/arm/mach-mvebu/common.h
+> @@ -20,6 +20,7 @@
+>  void mvebu_restart(enum reboot_mode mode, const char *cmd);
+>  int mvebu_cpu_reset_deassert(int cpu);
+>  void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
+> +u32 mvebu_system_controller_get_phys_addr(void);
+>  void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
 >  
-> +#define ARMADA_370_CRYPT0_ENG_ID	0x9
-
-Not needed in this file, the MBus window target ID is passed as
-argument to the mvebu_boot_addr_wa() function.
-
-> +#define CRYPT0_ENG_ATTR	0x1
-
-For consistency, I'd prefer to see this being passed as argument to
-mvebu_boot_addr_wa().
-
-> +#define SRAM_PHYS_BASE	    0xFFFF0000
-> +
-> +#define BOOTROM_BASE    0xFFF00000
-> +#define BOOTROM_SIZE    0x100000
-> +
->  extern void ll_disable_coherency(void);
->  extern void ll_enable_coherency(void);
+>  void armada_xp_cpu_die(unsigned int cpu);
+> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+> index 0c5524ac75b7..ae6ab543aa36 100644
+> --- a/arch/arm/mach-mvebu/system-controller.c
+> +++ b/arch/arm/mach-mvebu/system-controller.c
+> @@ -30,6 +30,7 @@
+>  #include "common.h"
 >  
-> @@ -85,6 +94,28 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
->  		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
+>  static void __iomem *system_controller_base;
+> +static u32 system_controller_phys_base;
+>  
+>  struct mvebu_system_controller {
+>  	u32 rstoutn_mask_offset;
+> @@ -109,6 +110,13 @@ void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
+>  	writel(virt_to_phys(boot_addr), system_controller_base +
+>  	       mvebu_sc->resume_boot_addr);
 >  }
->  
-> +extern unsigned char mvebu_boot_wa_start;
-> +extern unsigned char mvebu_boot_wa_end;
 > +
-> +void mvebu_boot_addr_wa(int crypto_eng_id, u32 resume_addr_reg)
+> +u32 mvebu_system_controller_get_phys_addr(void)
 
-unsigned int crypto_eng_target ('unsigned int' is the type used by
-the mvebu-mbus API), and add unsigned int crypto_eng_attribute, to
-match the mvebu-mbus API. Also, void * seems more appropriate than u32
-for an address, maybe even void __iomem * since it's actually pointing
-to a memory-mapped register.
+phys_addr_t should be the return type.
 
 > +{
-> +	void __iomem *sram_virt_base;
-> +	u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
-> +
-> +	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
-> +	mvebu_mbus_add_window_by_id(crypto_eng_id, CRYPT0_ENG_ATTR,
-> +				SRAM_PHYS_BASE, SZ_64K);
-> +	sram_virt_base = ioremap(SRAM_PHYS_BASE, SZ_64K);
+> +	BUG_ON(system_controller_phys_base == NULL);
+> +	BUG_ON(mvebu_sc->resume_boot_addr == 0);
+> +	return system_controller_phys_base + mvebu_sc->resume_boot_addr;
 
-Maybe a return value check?
-
-> +
-> +
-
-One too many new line.
-
-> +	memcpy(sram_virt_base, &mvebu_boot_wa_start, code_len);
-> +	/*
-> +	 * The last word of the code copied in SRAM must contain the
-> +	 * physical base address of the PMSU register
-> +	 */
-> +	*(unsigned long *)(sram_virt_base + code_len - 4) = resume_addr_reg;
-
-Maybe instead:
-
-	writel(resume_addr_reg, sram_virt_base + code_len - 4);
-
-And also:
-
-	iounmap(sram_virt_base);
-
-> +}
-> +
->  static int __init armada_370_xp_pmsu_init(void)
->  {
->  	struct device_node *np;
-> diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-> index 07a737c6b95d..2d97a70c2558 100644
-> --- a/arch/arm/mach-mvebu/pmsu.h
-> +++ b/arch/arm/mach-mvebu/pmsu.h
-> @@ -12,5 +12,6 @@
->  #define __MACH_MVEBU_PMSU_H
->  
->  int armada_xp_boot_cpu(unsigned int cpu_id, void *phys_addr);
-> +void mvebu_boot_addr_wa(int crypto_eng_id, unsigned long resume_addr_reg);
->  
->  #endif	/* __MACH_370_XP_PMSU_H */
-> diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
-> index fc3de68d8c54..3b702a16bd3d 100644
-> --- a/arch/arm/mach-mvebu/pmsu_ll.S
-> +++ b/arch/arm/mach-mvebu/pmsu_ll.S
-> @@ -23,3 +23,22 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
->  	b	cpu_resume
->  ENDPROC(armada_370_xp_cpu_resume)
->  
-> +.global mvebu_boot_wa_start
-> +.global mvebu_boot_wa_end
-> +
-> +/* The following code will be executed from SRAM */
-> +ENTRY(mvebu_boot_wa_start)
-> +mvebu_boot_wa_start:
-> +/* use physical address of the boot address register register */
-
-"register register" -> register.
-
-> +	adr     r0, 1f
-> +	ldr     r0, [r0]
-> +	ldr     r0, [r0]
-> +	mov     pc, r0
-> +/*
-> + * the last word of this piece of code will be filled by the physical
-
-"filled with". "filled by" indicates *who* is filling the missing
-information, "filled with" indicates with *what* it is being filled.
-
-> + * address of the boot address register just after being copied in SRAM
-> + */
-> +1:
-> +	.long   .
-> +mvebu_boot_wa_end:
-> +ENDPROC(mvebu_boot_wa_end)
+So the function name suggests you're returning the base physical address
+of the System Controller registers, while you're in fact returning the
+physical address of one particular register (the Resume Address one). I
+believe the function is misnamed.
 
 Thanks,
 
