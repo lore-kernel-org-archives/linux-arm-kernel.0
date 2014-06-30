@@ -1,79 +1,91 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 30 Jun 2014 15:09:25 +0200
-Subject: [PATCH v8 0/7] ARM: berlin: add AHCI support
-Message-ID: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Mon, 30 Jun 2014 15:09:30 +0200
+Subject: [PATCH v8 5/7] Documentation: bindings: document the sub-nodes AHCI
+ bindings
+In-Reply-To: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1404133772-11741-6-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the support for Berlin SoC AHCI controller. The
-controller allows to use the SATA host interface and, for example, the
-eSATA port on the BG2Q.
+The libahci now allows to use multiple PHYs and to represent each port
+as a sub-node. Add these bindings to the documentation.
 
-The series adds a PHY driver to control the two SATA ports available,
-and adds a generic compatible to use the existing ahci_platform driver.
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ .../devicetree/bindings/ata/ahci-platform.txt      | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-Also enable the eSATA interface on the BG2Q DMP.
-
-Changes since v7:
-        - got back to the each PHY as a sub-node representation
-	- renamed the power bit in the PHY driver
-
-Changes since v6:
-        - added the 'clocks' property and support in the PHY driver
-        - updated the PHY compatible
-
-Changes since v5:
-        - rebased on top of v3.16-rc1
-        - added the 'clocks' property in the sata node
-
-Changes since v4:
-        - updated PHY driver as tristate
-        - handled the case were no SATA port is enabled
-        - updated the compatible to a generic one
-        - cosmetic fixups
-
-Changes since v3:
-        - moved all PHY operations to the PHY driver
-        - removed PHY sub-nodes
-        - removed the custom Berlin AHCI driver and switched to
-          ahci_platform
-        - added multiple PHYs support to the libahci_platform
-
-Changes since v2:
-        - modeled each PHY as a sub-node
-        - cosmetic fixups
-
-Changes since v1:
-        - added a PHY driver, allowing to enable each port
-          individually and removed the 'force-port-map' property
-        - made the drivers a bit less magic :)
-        - wrote a function to select and configure registers in the
-          AHCI driver
-        - removed BG2 / BG2CD nodes
-
-Antoine T?nart (7):
-  phy: add a driver for the Berlin SATA PHY
-  Documentation: bindings: add the Berlin SATA PHY
-  ata: libahci: allow to use multiple PHYs
-  ata: ahci_platform: add a generic AHCI compatible
-  Documentation: bindings: document the sub-nodes AHCI bindings
-  ARM: berlin: add the AHCI node for the BG2Q
-  ARM: berlin: enable the eSATA interface on the BG2Q DMP
-
- .../devicetree/bindings/ata/ahci-platform.txt      |  37 +++
- .../devicetree/bindings/phy/berlin-sata-phy.txt    |  34 +++
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   8 +
- arch/arm/boot/dts/berlin2q.dtsi                    |  39 +++
- drivers/ata/ahci.h                                 |   3 +-
- drivers/ata/ahci_platform.c                        |   2 +
- drivers/ata/libahci.c                              |   7 +
- drivers/ata/libahci_platform.c                     | 170 ++++++++++---
- drivers/phy/Kconfig                                |   7 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-berlin-sata.c                      | 262 +++++++++++++++++++++
- 11 files changed, 534 insertions(+), 36 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
- create mode 100644 drivers/phy/phy-berlin-sata.c
-
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index c96d8dcf98fd..24d95fccfb4a 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -3,6 +3,10 @@
+ SATA nodes are defined to describe on-chip Serial ATA controllers.
+ Each SATA controller should have its own node.
+ 
++It is possible, but not required, to represent each port as a sub-node.
++It allows to enable each port independently when dealing with multiple
++PHYs.
++
+ Required properties:
+ - compatible        : compatible string, one of:
+   - "allwinner,sun4i-a10-ahci"
+@@ -14,6 +18,7 @@ Required properties:
+   - "snps,dwc-ahci"
+   - "snps,exynos5440-ahci"
+   - "snps,spear-ahci"
++  - "generic-ahci"
+ - interrupts        : <interrupt mapping for SATA IRQ>
+ - reg               : <registers mapping>
+ 
+@@ -21,11 +26,23 @@ Optional properties:
+ - dma-coherent      : Present if dma operations are coherent
+ - clocks            : a list of phandle + clock specifier pairs
+ - target-supply     : regulator for SATA target power
++- phys              : reference to the SATA PHY node
++- phy-names         : must be "sata-phy"
+ 
+ "fsl,imx53-ahci", "fsl,imx6q-ahci" required properties:
+ - clocks            : must contain the sata, sata_ref and ahb clocks
+ - clock-names       : must contain "ahb" for the ahb clock
+ 
++Required properties when using sub-nodes:
++- #address-cells    : number of cells to encode an address
++- #size-cells       : number of cells representing the size of an address
++
++
++Sub-nodes required properties:
++- reg               : the port number
++- phys              : reference to the SATA PHY node
++
++
+ Examples:
+         sata at ffe08000 {
+ 		compatible = "snps,spear-ahci";
+@@ -40,3 +57,23 @@ Examples:
+ 		clocks = <&pll6 0>, <&ahb_gates 25>;
+ 		target-supply = <&reg_ahci_5v>;
+ 	};
++
++With sub-nodes:
++	sata at f7e90000 {
++		compatible = "generic-ahci";
++		reg = <0xe90000 0x1000>;
++		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&chip CLKID_SATA>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		sata0: sata-port at 0 {
++			reg = <0>;
++			phys = <&sata_phy 0>;
++		};
++
++		sata1: sata-port at 1 {
++			reg = <1>;
++			phys = <&sata_phy 1>;
++		};
++	};
 -- 
 1.9.1
