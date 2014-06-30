@@ -1,48 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Jun 2014 08:55:15 +0200
-Subject: [PATCH 0/4] Migrate PXA27x platforms to clock framework
-In-Reply-To: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
-References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <7034630.fvV46PN35C@wuerfel>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 30 Jun 2014 09:04:21 +0200
+Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
+In-Reply-To: <20140630041226.GB3329@shlinux2>
+References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
+ <20140630041226.GB3329@shlinux2>
+Message-ID: <20140630070421.GI8053@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 29 June 2014 20:32:20 Robert Jarzmik wrote:
-> As the RFC posted in [1] didn't meet an unrivaled success for
-> review, I'm posting this serie for PXA27x transition to clock
-> framework.
+Hi!
+
+On Mon, Jun 30, 2014 at 12:12:27PM +0800, Shawn Guo wrote:
+> On Wed, Jun 25, 2014 at 01:01:31PM +0200, Steffen Trumtrar wrote:
+> > Most peripherals on the i.MX53 have an
+> > 	Off-Platform Peripheral Access Control Register (OPACR)
+> > in which the access rights (together with the MPROT registers) can be declared.
+> > However, this does not seem to work for example for SSI1+SDMA, because the
+> > supervisor bit is not set for the SDMA unit.
+> > It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
+> > works because it does NOT have an OPACR.
+> > 
+> > The right solution would be to fix the access rights for the SDMA, but the unit
+> > responsible for this is the Central Security Unit (CSU), which of course is NOT
+> > documented. So, until documentation for this is openly available, turn off the
+> > supervisor protection because it cripples the hardware.
+> > 
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> >  arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> > index 2bad387..380c7ee 100644
+> > --- a/arch/arm/mach-imx/mach-imx53.c
+> > +++ b/arch/arm/mach-imx/mach-imx53.c
+> > @@ -15,6 +15,7 @@
+> >  #include <linux/err.h>
+> >  #include <linux/io.h>
+> >  #include <linux/irq.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/of_irq.h>
+> >  #include <linux/of_platform.h>
+> >  #include <asm/mach/arch.h>
+> > @@ -24,11 +25,24 @@
+> >  #include "hardware.h"
+> >  #include "mx53.h"
+> >  
+> > +static const struct of_device_id aips_of_matches[] __initconst = {
+> > +	{ .compatible = "fsl,imx53-aipstz" },
+> > +	{ /*sentinel*/ }
+> > +};
+> > +
+> >  static void __init imx53_dt_init(void)
+> >  {
+> > +	void __iomem *aips_base_addr;
+> > +	struct device_node *np;
+> > +
+> >  	mxc_arch_reset_init_dt();
+> >  
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > +
+> > +	for_each_matching_node(np, aips_of_matches) {
+> > +		aips_base_addr = of_iomap(np, 0);
+> > +		imx_set_aips(aips_base_addr);
+> > +	}
 > 
-> This transition is needed :
->  - to enable device-tree drivers port, as clocks are needed almost
->    everywhere
->  - to enable the long term multi-platform kernel to support PXA
+> The same code pattern might be needed for i.MX31 and i.MX35 device tree
+> support later.  Can we have a helper for it, so that i.MX3 DT conversion
+> can benefit from it?
 > 
-> As I had said before, this serie aims at :
->  - keeping legacy platforms working (ie. without device-tree)
->  - enable PXA27x to work with a device-tree kernel, and hence
->    open the way to drivers conversion
->  - be robust enough to support pxa25x and pxa3xx later inclusion
->    with almost no change to clk-pxa-dt.c.
-> 
-> As this serie is holding the rest of the device-tree drivers
-> port, I'd like it to be reviewed, even it's an old unsexy
-> platform.
 
-I have one basic question about this series: if pxa27x gets moved
-to used the common-clk framework but the others (pxa25x, pxa26x,
-pxa3xx, pxa93x) don't, does that imply that they become mutually
-exclusiv at compile-time?
+What would be the best place to put this? common.h?
+Maybe we should then also rename the imx_set_aips to imx_disable_supervisor,
+because that is basically what the function does.
+If I understood our graphics department correctly, the i.MX6 needs this, too,
+for the VPU (?).
 
-If so, do you plan to first complete all of them before merging
-upstream, or do you intend to have one or more kernel releases
-that don't allow building a combined kernel for all pxa platforms?
-I don't object to doing the latter, but if that is the plan, you
-need to make that very clear in the changelog and have all the
-relevant maintainers agree to that.
+Regards,
+Steffen
 
-Also (for my understanding) when you say that you plan to do
-pxa25x and pxa3xx next, does that include pxa26x and pxa93x?
-I assume it does as they are apparently minor revisions of the
-former, but it's not completely clear from your description.
-
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
