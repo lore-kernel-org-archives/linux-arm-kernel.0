@@ -1,59 +1,32 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 30 Jun 2014 11:50:29 -0500
-Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <53B18979.7050206@mit.edu>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <20140628152609.GH32514@n2100.arm.linux.org.uk> <53B18979.7050206@mit.edu>
-Message-ID: <53B19555.2070706@mentor.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Mon, 30 Jun 2014 09:51:55 -0700
+Subject: [RFC/PATCH 6/7] defconfig: msm: Enable Qualcomm SMMUv1 driver
+In-Reply-To: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <1404147116-4598-7-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2014 10:59 AM, Andy Lutomirski wrote:
-> On 06/28/2014 08:26 AM, Russell King - ARM Linux wrote:
->> On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
->>> Place vdso-related user-space code in arch/arm/kernel/vdso/.
->>>
->>> It is almost completely written in C with some assembly helpers to
->>> load the data page address, sample the counter, and fall back to
->>> system calls when necessary.
->>>
->>> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
->>> high-resolution clocks and falls back to syscalls.  Low-resolution
->>> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
->>
->> Okay, how is this used by userspace?
->>
->> It seems that on ARM, we generate a dso with these symbols:
->>
->> DYNAMIC SYMBOL TABLE:
->> 000001e4 l    d  .eh_frame_hdr    00000000              .eh_frame_hdr
->> 00000000 g    DO *ABS*    00000000  LINUX_3.17  LINUX_3.17
->> 000003c4 g    DF .text    00000080  LINUX_3.17  __kernel_clock_getres
->> 00000444 g    DF .text    0000002c  LINUX_3.17  __kernel_gettimeofday
->> 00000298 g    DF .text    0000012c  LINUX_3.17  __kernel_clock_gettime
-> 
-> Sorry, late to the thread.
-> 
-> I think that, if your function signatures match, you should give them
-> the same names and versions as for x86 (i.e. LINUX_2.6,
-> __vdso_clock_gettime).  Userspace will thank you.
+Enable the Qualcomm SMMUv1 driver allowing bus masters to operate
+on physically discontigous memory.
 
-I don't care strongly about it, but I was following arm64's example with
-the naming, and I thought the version should match the Linux version in
-which the VDSO symbols were introduced.  I can see that about half the
-vdso-providing architectures (e.g. arm64, powerpc, s390) follow that
-version convention instead of using LINUX_2.6.  However, looking through
-git history I see that when people add new symbols to their VDSOs they
-don't mark them with the current Linux version -- for example, when
-powerpc added getcpu -- so I'm left thinking the version is not that
-meaningful.
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+---
+ arch/arm/configs/qcom_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-In other words, I'm inclined to make the changes you suggest, unless
-someone knows why I shouldn't.
-
-
-> Don't do the weak clock_gettime, etc aliases, though.  That was never a
-> good idea to begin with.
-
-OK, that was my suspicion, thanks for confirming.
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 0414889..12838bb 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -137,6 +137,7 @@ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
+ CONFIG_MSM_IOMMU_V0=y
++CONFIG_MSM_IOMMU_V1=y
+ CONFIG_GENERIC_PHY=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
