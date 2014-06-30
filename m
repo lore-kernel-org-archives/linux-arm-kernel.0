@@ -1,145 +1,129 @@
 From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 30 Jun 2014 09:51:52 -0700
-Subject: [RFC/PATCH 3/7] iopoll: Introduce memory-mapped IO polling macros
+Date: Mon, 30 Jun 2014 09:51:51 -0700
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
 In-Reply-To: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
 References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <1404147116-4598-4-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Wagantall <mattw@codeaurora.org>
+Mapping and unmapping are more often than not in the critical path.
+map_range and unmap_range allows SMMU driver implementations to optimize
+the process of mapping and unmapping buffers into the SMMU page tables.
+Instead of mapping one physical address, do TLB operation (expensive),
+mapping, do TLB operation, mapping, do TLB operation the driver can map
+a scatter-gatherlist of physically contiguous pages into one virtual
+address space and then at the end do one TLB operation.
 
-It is sometimes necessary to poll a memory-mapped register until its
-value satisfies some condition. Introduce a family of convenience macros
-that do this. Tight-loop and sleeping versions are provided with and
-without timeouts.
+Additionally, the mapping operation would be faster in general since
+clients does not have to keep calling map API over and over again for
+each physically contiguous chunk of memory that needs to be mapped to a
+virtually contiguous region.
 
-Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
 ---
- include/linux/iopoll.h | 114 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 114 insertions(+)
- create mode 100644 include/linux/iopoll.h
+ drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
+ include/linux/iommu.h | 24 ++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
-diff --git a/include/linux/iopoll.h b/include/linux/iopoll.h
-new file mode 100644
-index 0000000..d085e03
---- /dev/null
-+++ b/include/linux/iopoll.h
-@@ -0,0 +1,114 @@
-+/*
-+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index e5555fc..f2a6b80 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+ EXPORT_SYMBOL_GPL(iommu_unmap);
+ 
+ 
++int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
++		    struct scatterlist *sg, unsigned int len, int prot)
++{
++	if (unlikely(domain->ops->map_range == NULL))
++		return -ENODEV;
 +
-+#ifndef _LINUX_IOPOLL_H
-+#define _LINUX_IOPOLL_H
++	BUG_ON(iova & (~PAGE_MASK));
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/hrtimer.h>
-+#include <linux/delay.h>
-+#include <asm-generic/errno.h>
-+#include <asm/io.h>
++	return domain->ops->map_range(domain, iova, sg, len, prot);
++}
++EXPORT_SYMBOL_GPL(iommu_map_range);
 +
-+/**
-+ * readl_poll_timeout - Periodically poll an address until a condition is met or a timeout occurs
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @sleep_us: Maximum time to sleep between reads in uS (0 tight-loops)
-+ * @timeout_us: Timeout in uS, 0 means never timeout
-+ *
-+ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-+ * case, the last read value at @addr is stored in @val. Must not
-+ * be called from atomic context if sleep_us or timeout_us are used.
-+ */
-+#define readl_poll_timeout(addr, val, cond, sleep_us, timeout_us) \
-+({ \
-+	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-+	might_sleep_if(timeout_us); \
-+	for (;;) { \
-+		(val) = readl(addr); \
-+		if (cond) \
-+			break; \
-+		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
-+			(val) = readl(addr); \
-+			break; \
-+		} \
-+		if (sleep_us) \
-+			usleep_range(DIV_ROUND_UP(sleep_us, 4), sleep_us); \
-+	} \
-+	(cond) ? 0 : -ETIMEDOUT; \
-+})
++int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
++		      unsigned int len)
++{
++	if (unlikely(domain->ops->unmap_range == NULL))
++		return -ENODEV;
 +
-+/**
-+ * readl_poll_timeout_noirq - Periodically poll an address until a condition is met or a timeout occurs
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @max_reads: Maximum number of reads before giving up
-+ * @time_between_us: Time to udelay() between successive reads
-+ *
-+ * Returns 0 on success and -ETIMEDOUT upon a timeout.
-+ */
-+#define readl_poll_timeout_noirq(addr, val, cond, max_reads, time_between_us) \
-+({ \
-+	int count; \
-+	for (count = (max_reads); count > 0; count--) { \
-+		(val) = readl(addr); \
-+		if (cond) \
-+			break; \
-+		udelay(time_between_us); \
-+	} \
-+	(cond) ? 0 : -ETIMEDOUT; \
-+})
++	BUG_ON(iova & (~PAGE_MASK));
 +
-+/**
-+ * readl_poll - Periodically poll an address until a condition is met
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @sleep_us: Maximum time to sleep between reads in uS (0 tight-loops)
-+ *
-+ * Must not be called from atomic context if sleep_us is used.
-+ */
-+#define readl_poll(addr, val, cond, sleep_us) \
-+	readl_poll_timeout(addr, val, cond, sleep_us, 0)
++	return domain->ops->unmap_range(domain, iova, len);
++}
++EXPORT_SYMBOL_GPL(iommu_unmap_range);
 +
-+/**
-+ * readl_tight_poll_timeout - Tight-loop on an address until a condition is met or a timeout occurs
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @timeout_us: Timeout in uS, 0 means never timeout
-+ *
-+ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-+ * case, the last read value at @addr is stored in @val. Must not
-+ * be called from atomic context if timeout_us is used.
-+ */
-+#define readl_tight_poll_timeout(addr, val, cond, timeout_us) \
-+	readl_poll_timeout(addr, val, cond, 0, timeout_us)
+ int iommu_domain_window_enable(struct iommu_domain *domain, u32 wnd_nr,
+ 			       phys_addr_t paddr, u64 size, int prot)
+ {
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index b96a5b2..63dca6d 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -22,6 +22,7 @@
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ #include <linux/types.h>
++#include <linux/scatterlist.h>
+ #include <trace/events/iommu.h>
+ 
+ #define IOMMU_READ	(1 << 0)
+@@ -93,6 +94,8 @@ enum iommu_attr {
+  * @detach_dev: detach device from an iommu domain
+  * @map: map a physically contiguous memory region to an iommu domain
+  * @unmap: unmap a physically contiguous memory region from an iommu domain
++ * @map_range: map a scatter-gather list of physically contiguous memory chunks to an iommu domain
++ * @unmap_range: unmap a scatter-gather list of physically contiguous memory chunks from an iommu domain
+  * @iova_to_phys: translate iova to physical address
+  * @domain_has_cap: domain capabilities query
+  * @add_device: add device to iommu grouping
+@@ -110,6 +113,10 @@ struct iommu_ops {
+ 		   phys_addr_t paddr, size_t size, int prot);
+ 	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
+ 		     size_t size);
++	int (*map_range)(struct iommu_domain *domain, unsigned int iova,
++		    struct scatterlist *sg, unsigned int len, int prot);
++	int (*unmap_range)(struct iommu_domain *domain, unsigned int iova,
++		      unsigned int len);
+ 	phys_addr_t (*iova_to_phys)(struct iommu_domain *domain, dma_addr_t iova);
+ 	int (*domain_has_cap)(struct iommu_domain *domain,
+ 			      unsigned long cap);
+@@ -153,6 +160,10 @@ extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
+ 		     phys_addr_t paddr, size_t size, int prot);
+ extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+ 		       size_t size);
++extern int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
++		    struct scatterlist *sg, unsigned int len, int prot);
++extern int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
++		      unsigned int len);
+ extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova);
+ extern int iommu_domain_has_cap(struct iommu_domain *domain,
+ 				unsigned long cap);
+@@ -280,6 +291,19 @@ static inline int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+ 	return -ENODEV;
+ }
+ 
++static inline int iommu_map_range(struct iommu_domain *domain,
++				  unsigned int iova, struct scatterlist *sg,
++				  unsigned int len, int prot)
++{
++	return -ENODEV;
++}
 +
-+/**
-+ * readl_tight_poll - Tight-loop on an address until a condition is met
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ *
-+ * May be called from atomic context.
-+ */
-+#define readl_tight_poll(addr, val, cond) \
-+	readl_poll_timeout(addr, val, cond, 0, 0)
++static inline int iommu_unmap_range(struct iommu_domain *domain,
++				    unsigned int iova, unsigned int len)
++{
++	return -ENODEV;
++}
 +
-+#endif /* _LINUX_IOPOLL_H */
+ static inline int iommu_domain_window_enable(struct iommu_domain *domain,
+ 					     u32 wnd_nr, phys_addr_t paddr,
+ 					     u64 size, int prot)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
