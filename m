@@ -1,56 +1,26 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Jun 2014 19:15:46 +0200
-Subject: [PATCH v5 5/5] ARM: EXYNOS: Move PMU specific definitions from
- common.h
-In-Reply-To: <1403705032-14835-6-git-send-email-pankaj.dubey@samsung.com>
-References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
- <1403705032-14835-6-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53B19B42.1040006@samsung.com>
+From: graeme.gregory@linaro.org (Graeme Gregory)
+Date: Mon, 30 Jun 2014 18:21:04 +0100
+Subject: [PATCH v4 05/13] ARM64 / ACPI: Introduce arm-core.c and its
+ related head file
+In-Reply-To: <20140630162406.GR28951@arm.com>
+References: <1403840976-7456-1-git-send-email-hanjun.guo@linaro.org>
+ <1403840976-7456-6-git-send-email-hanjun.guo@linaro.org>
+ <20140630162406.GR28951@arm.com>
+Message-ID: <53B19C80.8060306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
 
-On 25.06.2014 16:03, Pankaj Dubey wrote:
-> This patch moves PMU specific definitions into a new file
-> as exynos-pmu.h.
-> This will help in reducing dependency of common.h in pmu.c.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.h     |   17 -----------------
->  arch/arm/mach-exynos/exynos-pmu.h |   31 +++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/pm.c         |    1 +
->  arch/arm/mach-exynos/pmu.c        |    2 +-
->  4 files changed, 33 insertions(+), 18 deletions(-)
->  create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
-> 
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 296c6e1..0326ca2 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -135,23 +135,6 @@ extern struct smp_operations exynos_smp_ops;
->  
->  extern void exynos_cpu_die(unsigned int cpu);
->  
-> -/* PMU(Power Management Unit) support */
-> -
-> -#define PMU_TABLE_END	(-1U)
-> -
-> -enum sys_powerdown {
-> -	SYS_AFTR,
-> -	SYS_LPA,
-> -	SYS_SLEEP,
-> -	NUM_SYS_POWERDOWN,
-> -};
-> -
-> -struct exynos_pmu_conf {
-> -	unsigned int offset;
-> -	unsigned int val[NUM_SYS_POWERDOWN];
-> -};
+On 30/06/2014 17:24, Catalin Marinas wrote:
+> On Fri, Jun 27, 2014 at 04:49:28AM +0100, Hanjun Guo wrote:
+>>   drivers/acpi/Makefile          |    2 +
+>>   drivers/acpi/plat/Makefile     |    1 +
+>>   drivers/acpi/plat/arm-core.c   |  110 ++++++++++++++++++++++++++++++++++++++++
+> Do you ever plan to add ACPI support for 32-bit ARM? If not, this part
+> could be placed under arch/arm64 (similar to x86).
+>
+Originally the plan was to support both platforms, but it seems people 
+have stopped talking to Linaro about 32bit support now so unless anyone 
+else has some actual info I guess it would be safe to move it into arm64.
 
-While at it, I'd say this struct could be moved to pmu.c, along with the
-PMU_TABLE_END macro as they are both private to this file.
-
-Best regards,
-Tomasz
+Graeme
