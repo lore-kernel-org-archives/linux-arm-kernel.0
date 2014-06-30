@@ -1,63 +1,61 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 15:28:06 +0200
-Subject: [PATCH 12/16] cpuidle: mvebu: Rename the driver from
- armada-370-xp to mvebu-v7
-In-Reply-To: <1403875377-940-13-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-13-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140630152806.12d018cf@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Jun 2014 15:38:41 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+In-Reply-To: <mvmvbri4k06.fsf@hawking.suse.de>
+References: <mvmvbri4k06.fsf@hawking.suse.de>
+Message-ID: <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+On 30 June 2014 15:14, Andreas Schwab <schwab@suse.de> wrote:
+> This fixes the following build failure:
+>
+>   CC [M]  arch/arm64/crypto/aes-glue-ce.o
+> ld: cannot find arch/arm64/crypto/aes-glue-ce.o: No such file or directory
+> scripts/Makefile.build:393: recipe for target 'arch/arm64/crypto/aes-ce-blk.o' failed
+> make[1]: *** [arch/arm64/crypto/aes-ce-blk.o] Error 1
+> Makefile:893: recipe for target 'arch/arm64/crypto' failed
+> make: *** [arch/arm64/crypto] Error 2
+>
+> The $(obj)/aes-glue-%.o rule only creates $(obj)/.tmp_aes-glue-ce.o, it
+> should use if_changed_rule instead of if_changed_dep.
+>
 
-On Fri, 27 Jun 2014 15:22:53 +0200, Gregory CLEMENT wrote:
-> Actually this driver will be able to manage the cpuidle for more SoCs
-> that Armada 370 ad XP. It will support Armada 38x and potentially
-> Armada 375. This patch change the names accordingly to this behavior.
+Oops, my bad
 
-I think the last sentence should rather be something like: "This patch
-renames the driver as well as the functions and variables used in the
-driver".
+Out of curiosity, how did you trigger this failure? I have build this
+code numerous times (and so have others) and I have never seen this
+failure.
 
-I would also specifically mention the renaming of the driver that
-requires changing the pmsu.c file. It is worth mentioning that this
-rename, touching both drivers/cpuidle and arch/arm/mach-mvebu, may
-require some special handling in terms of patch merging (the patch
-mainly touches drivers/cpuidle so it should theoretically go through
-the cpuidle maintainer, but since the pmsu.c file is touched a lot by
-other patches, there will probably be lots of conflicts if this patch
-goes through the cpuidle tree). Surely something to mention as a
-comment in the patch, maybe to get the Acked-by of the cpuidle people
-and merge things through the mvebu and arm-soc trees.
-
-> -config ARM_ARMADA_370_XP_CPUIDLE
-> -	bool "CPU Idle Driver for Armada 370/XP family processors"
-> +config ARM_MVEBU_V7_CPUIDLE
-> +	bool "CPU Idle Driver for mvebu v7 family processors"
-
-Actually, what worries me a bit of that Dove is a ARMv7 processor of
-the mvebu family, but which is not using this cpuidle driver. Do you
-expect Dove to be able to use this driver in the future?
-
->  	depends on ARCH_MVEBU
->  	help
-> -	  Select this to enable cpuidle on Armada 370/XP processors.
-> +	  Select this to enable cpuidle on Armada 370, 385 and XP processors.
-
-385 -> 38x, because 380 and 385 are both capable of using this driver.
-
-> diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
-> deleted file mode 100644
-> index a5fba0287bfb..000000000000
-> --- a/drivers/cpuidle/cpuidle-armada-370-xp.c
-> +++ /dev/null
-
-You haven't enabled rename detection in git? Or git isn't detecting the
-rename because of the number of changes in the file?
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ard.
+
+
+
+> Signed-off-by: Andreas Schwab <schwab@suse.de>
+> ---
+>  arch/arm64/crypto/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+> index 2070a56..a3f935f 100644
+> --- a/arch/arm64/crypto/Makefile
+> +++ b/arch/arm64/crypto/Makefile
+> @@ -35,4 +35,4 @@ AFLAGS_aes-neon.o     := -DINTERLEAVE=4
+>  CFLAGS_aes-glue-ce.o   := -DUSE_V8_CRYPTO_EXTENSIONS
+>
+>  $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
+> -       $(call if_changed_dep,cc_o_c)
+> +       $(call if_changed_rule,cc_o_c)
+> --
+> 2.0.1
+>
+> --
+> Andreas Schwab, SUSE Labs, schwab at suse.de
+> GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+> "And now for something completely different."
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
