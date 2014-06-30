@@ -1,35 +1,51 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Mon, 30 Jun 2014 12:20:14 +0200
-Subject: [PATCH v6 1/7] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <53A96A1C.5030800@gmail.com>
-References: <1402914392-6028-1-git-send-email-antoine.tenart@free-electrons.com>
- <1402914392-6028-2-git-send-email-antoine.tenart@free-electrons.com>
- <53A9685E.9090501@ti.com> <53A96A1C.5030800@gmail.com>
-Message-ID: <20140630102014.GA5155@kwain>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jun 2014 12:22:16 +0200
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
+In-Reply-To: <20140628172044.4231c32d@free-electrons.com>
+References: <20140627124655.GF23978@titan.lakedaemon.net>
+ <20140628162302.48b6b835@free-electrons.com>
+ <20140628150706.GM23978@titan.lakedaemon.net>
+ <20140628172044.4231c32d@free-electrons.com>
+Message-ID: <20140630122216.6ea35ac9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Jason,
 
-On Tue, Jun 24, 2014 at 05:37:56PM +0530, Varka Bhadram wrote:
-> On 06/24/2014 05:30 PM, Kishon Vijay Abraham I wrote:
-> >On Monday 16 June 2014 03:56 PM, Antoine T?nart wrote:
-> >>+
-> >>+static struct phy *phy_berlin_sata_phy_xlate(struct device *dev,
-> >>+					     struct of_phandle_args *args)
+On Sat, 28 Jun 2014 17:20:44 +0200, Thomas Petazzoni wrote:
+
+> Yeah, sorry, I wasn't clear. If you look back at what I sent in
+> https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
+> ([PATCHv5 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+> deadlock), there were three patches:
 > 
-> Indent the function properly like this:
-> static struct phy *phy_berlin_sata_phy_xlate(struct device *dev,
-> 					     struct of_phandle_args *args)
+>  PATCH 1/3, "ARM: mm: add support for HW coherent systems in PL310
+>  cache", for Russell. It has already been merged by Russell in
+>  "git-curr", as visible at
+>  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8076/1.
+>  I'm hoping this is scheduled for 3.16, because I need this patch for
+>  3.16 to avoid the PCIe deadlock.
 > 
-> check with checkpatch.pl script
+>  PATCH 2/3 and 3/3 are related, and the latter is needed to solve the
+>  PCIe deadlock, by using the new DT property made available in PATCH
+>  1/3. PATCH 2/3 is ARM: mvebu: move Armada 375 external abort logic as
+>  a quirk and PATCH 3/3 is ARM: mvebu: update L2/PCIe deadlock
+>  workaround after L2CC cleanup.
+> 
+> All in all, I'm hoping for the series at
+> https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
+> to fully show up in 3.16, because it's really related to fixing a
+> serious PCIe deadlock (can be triggered in under a minute of PCIe
+> usage).
 
-Already fixed in v7.
+Now that Russell is pushing PATCH 1/3 in the 3.16-rc cycle, can you
+push PATCH 2/3 and PATCH 3/3 pointed above into the 3.16-rc cycle as
+well?
 
+Thanks,
 
-Antoine
-
+Thomas
 -- 
-Antoine T?nart, Free Electrons
+Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
