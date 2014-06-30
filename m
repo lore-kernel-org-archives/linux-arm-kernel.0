@@ -1,8 +1,8 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 22:13:29 +0300
-Subject: [PATCH] usb: gadget: s3c2410: Move to
+Date: Mon, 30 Jun 2014 22:14:32 +0300
+Subject: [PATCH] video: fbdev: s3c2410fb: Move to
  clk_prepare_enable/clk_disable_unprepare
-Message-ID: <1404155609-3103-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1404155672-3158-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,46 +11,57 @@ work properly with common clock framework.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- drivers/usb/gadget/s3c2410_udc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/video/fbdev/s3c2410fb.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index 7987aa0..357b58e 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -1788,7 +1788,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
- 		return PTR_ERR(usb_bus_clock);
+diff --git a/drivers/video/fbdev/s3c2410fb.c b/drivers/video/fbdev/s3c2410fb.c
+index 81af5a6..d68595d 100644
+--- a/drivers/video/fbdev/s3c2410fb.c
++++ b/drivers/video/fbdev/s3c2410fb.c
+@@ -932,7 +932,7 @@ static int s3c24xxfb_probe(struct platform_device *pdev,
+ 		goto release_irq;
  	}
  
--	clk_enable(usb_bus_clock);
-+	clk_prepare_enable(usb_bus_clock);
+-	clk_enable(info->clk);
++	clk_prepare_enable(info->clk);
+ 	dprintk("got and enabled clock\n");
  
- 	udc_clock = clk_get(NULL, "usb-device");
- 	if (IS_ERR(udc_clock)) {
-@@ -1796,7 +1796,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
- 		return PTR_ERR(udc_clock);
+ 	usleep_range(1000, 1100);
+@@ -996,7 +996,7 @@ static int s3c24xxfb_probe(struct platform_device *pdev,
+ free_video_memory:
+ 	s3c2410fb_unmap_video_memory(fbinfo);
+ release_clock:
+-	clk_disable(info->clk);
++	clk_disable_unprepare(info->clk);
+ 	clk_put(info->clk);
+ release_irq:
+ 	free_irq(irq, info);
+@@ -1038,7 +1038,7 @@ static int s3c2410fb_remove(struct platform_device *pdev)
+ 	s3c2410fb_unmap_video_memory(fbinfo);
+ 
+ 	if (info->clk) {
+-		clk_disable(info->clk);
++		clk_disable_unprepare(info->clk);
+ 		clk_put(info->clk);
+ 		info->clk = NULL;
  	}
+@@ -1070,7 +1070,7 @@ static int s3c2410fb_suspend(struct platform_device *dev, pm_message_t state)
+ 	 * before the clock goes off again (bjd) */
  
--	clk_enable(udc_clock);
-+	clk_prepare_enable(udc_clock);
+ 	usleep_range(1000, 1100);
+-	clk_disable(info->clk);
++	clk_disable_unprepare(info->clk);
  
- 	mdelay(10);
+ 	return 0;
+ }
+@@ -1080,7 +1080,7 @@ static int s3c2410fb_resume(struct platform_device *dev)
+ 	struct fb_info	   *fbinfo = platform_get_drvdata(dev);
+ 	struct s3c2410fb_info *info = fbinfo->par;
  
-@@ -1952,13 +1952,13 @@ static int s3c2410_udc_remove(struct platform_device *pdev)
- 	release_mem_region(rsrc_start, rsrc_len);
+-	clk_enable(info->clk);
++	clk_prepare_enable(info->clk);
+ 	usleep_range(1000, 1100);
  
- 	if (!IS_ERR(udc_clock) && udc_clock != NULL) {
--		clk_disable(udc_clock);
-+		clk_disable_unprepare(udc_clock);
- 		clk_put(udc_clock);
- 		udc_clock = NULL;
- 	}
- 
- 	if (!IS_ERR(usb_bus_clock) && usb_bus_clock != NULL) {
--		clk_disable(usb_bus_clock);
-+		clk_disable_unprepare(usb_bus_clock);
- 		clk_put(usb_bus_clock);
- 		usb_bus_clock = NULL;
- 	}
+ 	s3c2410fb_init_registers(fbinfo);
 -- 
 2.0.0
