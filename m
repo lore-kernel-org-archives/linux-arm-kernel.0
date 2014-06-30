@@ -1,51 +1,86 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 12:22:16 +0200
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
-In-Reply-To: <20140628172044.4231c32d@free-electrons.com>
-References: <20140627124655.GF23978@titan.lakedaemon.net>
- <20140628162302.48b6b835@free-electrons.com>
- <20140628150706.GM23978@titan.lakedaemon.net>
- <20140628172044.4231c32d@free-electrons.com>
-Message-ID: <20140630122216.6ea35ac9@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jun 2014 11:29:34 +0100
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get
+ the CPU frequency
+In-Reply-To: <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140630102934.GV32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
-
-On Sat, 28 Jun 2014 17:20:44 +0200, Thomas Petazzoni wrote:
-
-> Yeah, sorry, I wasn't clear. If you look back at what I sent in
-> https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
-> ([PATCHv5 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
-> deadlock), there were three patches:
+On Mon, Jun 30, 2014 at 12:12:22PM +0200, Maxime Ripard wrote:
+> The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
+> topology code.
 > 
->  PATCH 1/3, "ARM: mm: add support for HW coherent systems in PL310
->  cache", for Russell. It has already been merged by Russell in
->  "git-curr", as visible at
->  http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8076/1.
->  I'm hoping this is scheduled for 3.16, because I need this patch for
->  3.16 to avoid the PCIe deadlock.
+> Allow to use a clock to provide the same information.
 > 
->  PATCH 2/3 and 3/3 are related, and the latter is needed to solve the
->  PCIe deadlock, by using the new DT property made available in PATCH
->  1/3. PATCH 2/3 is ARM: mvebu: move Armada 375 external abort logic as
->  a quirk and PATCH 3/3 is ARM: mvebu: update L2/PCIe deadlock
->  workaround after L2CC cleanup.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+This looks fine to me, but I don't know this code.  Maybe Vincent Guittot
+should be on the To: list (added)?
+
+> ---
+>  arch/arm/kernel/topology.c | 25 ++++++++++++++++++-------
+>  1 file changed, 18 insertions(+), 7 deletions(-)
 > 
-> All in all, I'm hoping for the series at
-> https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
-> to fully show up in 3.16, because it's really related to fixing a
-> serious PCIe deadlock (can be triggered in under a minute of PCIe
-> usage).
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index 9d853189028b..268443d88094 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -11,6 +11,7 @@
+>   * for more details.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/cpu.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/export.h>
+> @@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
+>  				 GFP_NOWAIT);
+>  
+>  	for_each_possible_cpu(cpu) {
+> -		const u32 *rate;
+> -		int len;
+> +		struct clk *clk;
+> +		u32 rate = 0;
+>  
+>  		/* too early to use cpu->of_node */
+>  		cn = of_get_cpu_node(cpu, NULL);
+> @@ -117,14 +118,24 @@ static void __init parse_dt_topology(void)
+>  		if (cpu_eff->compatible == NULL)
+>  			continue;
+>  
+> -		rate = of_get_property(cn, "clock-frequency", &len);
+> -		if (!rate || len != 4) {
+> -			pr_err("%s missing clock-frequency property\n",
+> -				cn->full_name);
+> +		clk = of_clk_get(cn, 0);
+> +		if (!IS_ERR(clk))
+> +			rate = clk_get_rate(clk);
+> +		else
+> +			of_property_read_u32(cn, "clock-frequency", &rate);
+> +
+> +		if (!rate) {
+> +			pr_err("%s missing clocks or clock-frequency properties\n",
+> +			       cn->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (!rate) {
+> +			pr_err("%s invalid CPU frequency", cn->full_name);
+>  			continue;
+>  		}
+>  
+> -		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
+> +		capacity = ((rate) >> 20) * cpu_eff->efficiency;
+>  
+>  		/* Save min capacity of the system */
+>  		if (capacity < min_capacity)
+> -- 
+> 2.0.0
+> 
 
-Now that Russell is pushing PATCH 1/3 in the 3.16-rc cycle, can you
-push PATCH 2/3 and PATCH 3/3 pointed above into the 3.16-rc cycle as
-well?
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
