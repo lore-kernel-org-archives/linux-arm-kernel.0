@@ -1,101 +1,91 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 14:46:20 +0200
-Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
- address of the boot register
-In-Reply-To: <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140630144620.0030cf94@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Jun 2014 14:49:19 +0200
+Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
+ CPU frequency
+In-Reply-To: <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
+References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630102934.GV32514@n2100.arm.linux.org.uk>
+ <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
+Message-ID: <20140630124919.GC28647@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
-
-I'm not sure that the best approach to solve this problem. Instead,
-maybe the system-controller.c code should set up the boot address
-workaround on Armada 375. Since the workaround on 375 is really related
-to setting the boot address which is done by the system controller,
-maybe the initialization of the workaround belongs in
-system-controller.c ?
-
-On Fri, 27 Jun 2014 15:22:44 +0200, Gregory CLEMENT wrote:
-> In order to boot the secondary CPUs on Armada 375 Z1, we need to read
-> the boot address of these CPUs through a register part of the System
-> Controller. This done very early where MMU is not enable yet, so we
-> need to get the physical address of this register to use it.
-
-I don't think that really explains what's going on here, maybe:
-
-"As part of a workaround for a BootROM issue on Armada 375 Z1, a piece
-of assembly code loaded into the Cryptographic Engine SRAM needs to
-read the System Controller Resume Address register before the MMU is
-enabled. We therefore need a way of getting the physical address for
-the System Controller Resume Address register."
-
-> In the previous version of this workaround the physical address were
-
-were -> was.
-
-> hardcoded whereas depending of the Mbus configuration this address may
-> change.
+On Mon, Jun 30, 2014 at 12:39:26PM +0200, Vincent Guittot wrote:
+> On 30 June 2014 12:29, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Mon, Jun 30, 2014 at 12:12:22PM +0200, Maxime Ripard wrote:
+> >> The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
+> >> topology code.
+> >>
+> >> Allow to use a clock to provide the same information.
+> >>
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >
+> > This looks fine to me, but I don't know this code.  Maybe Vincent Guittot
+> > should be on the To: list (added)?
 > 
-> This commit will allow to use the generic boot workaround function
-> with the correct address.
+> Thanks
 
+Ah, sorry for that.
 
-
-> ---
->  arch/arm/mach-mvebu/common.h            |  1 +
->  arch/arm/mach-mvebu/system-controller.c | 11 +++++++++++
->  2 files changed, 12 insertions(+)
 > 
-> diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-> index b67fb7a10d8b..6ad62cf8352c 100644
-> --- a/arch/arm/mach-mvebu/common.h
-> +++ b/arch/arm/mach-mvebu/common.h
-> @@ -20,6 +20,7 @@
->  void mvebu_restart(enum reboot_mode mode, const char *cmd);
->  int mvebu_cpu_reset_deassert(int cpu);
->  void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
-> +u32 mvebu_system_controller_get_phys_addr(void);
->  void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
->  
->  void armada_xp_cpu_die(unsigned int cpu);
-> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-> index 0c5524ac75b7..ae6ab543aa36 100644
-> --- a/arch/arm/mach-mvebu/system-controller.c
-> +++ b/arch/arm/mach-mvebu/system-controller.c
-> @@ -30,6 +30,7 @@
->  #include "common.h"
->  
->  static void __iomem *system_controller_base;
-> +static u32 system_controller_phys_base;
->  
->  struct mvebu_system_controller {
->  	u32 rstoutn_mask_offset;
-> @@ -109,6 +110,13 @@ void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
->  	writel(virt_to_phys(boot_addr), system_controller_base +
->  	       mvebu_sc->resume_boot_addr);
->  }
-> +
-> +u32 mvebu_system_controller_get_phys_addr(void)
+> >
+> >> ---
+> >>  arch/arm/kernel/topology.c | 25 ++++++++++++++++++-------
+> >>  1 file changed, 18 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> >> index 9d853189028b..268443d88094 100644
+> >> --- a/arch/arm/kernel/topology.c
+> >> +++ b/arch/arm/kernel/topology.c
+> >> @@ -11,6 +11,7 @@
+> >>   * for more details.
+> >>   */
+> >>
+> >> +#include <linux/clk.h>
+> >>  #include <linux/cpu.h>
+> >>  #include <linux/cpumask.h>
+> >>  #include <linux/export.h>
+> >> @@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
+> >>                                GFP_NOWAIT);
+> >>
+> >>       for_each_possible_cpu(cpu) {
+> >> -             const u32 *rate;
+> >> -             int len;
+> >> +             struct clk *clk;
+> >> +             u32 rate = 0;
+> >>
+> >>               /* too early to use cpu->of_node */
+> >>               cn = of_get_cpu_node(cpu, NULL);
+> >> @@ -117,14 +118,24 @@ static void __init parse_dt_topology(void)
+> >>               if (cpu_eff->compatible == NULL)
+> >>                       continue;
+> >>
+> >> -             rate = of_get_property(cn, "clock-frequency", &len);
+> >> -             if (!rate || len != 4) {
+> >> -                     pr_err("%s missing clock-frequency property\n",
+> >> -                             cn->full_name);
+> >> +             clk = of_clk_get(cn, 0);
+> >> +             if (!IS_ERR(clk))
+> >> +                     rate = clk_get_rate(clk);
+> 
+> We need the max frequency as it will be used to weight the different
+> CPUs capacity. How do you ensure that the current clock rate is the
+> max one ?
 
-phys_addr_t should be the return type.
+Hmm, the clock-frequency attribute in the ePAPR is defined at the
+current CPU frequency, not the max one.
 
-> +{
-> +	BUG_ON(system_controller_phys_base == NULL);
-> +	BUG_ON(mvebu_sc->resume_boot_addr == 0);
-> +	return system_controller_phys_base + mvebu_sc->resume_boot_addr;
+Maxime
 
-So the function name suggests you're returning the base physical address
-of the System Controller registers, while you're in fact returning the
-physical address of one particular register (the Resume Address one). I
-believe the function is misnamed.
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/72cfdc8d/attachment-0001.sig>
