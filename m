@@ -1,153 +1,32 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 30 Jun 2014 12:37:33 -0500
-Subject: [Patch v7 3/3] usb: dwc3: qcom: Add device tree binding
-In-Reply-To: <1404144233-17222-4-git-send-email-agross@codeaurora.org>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <1404144233-17222-4-git-send-email-agross@codeaurora.org>
-Message-ID: <28407117-A323-4664-B10C-17EBE857FB6A@codeaurora.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 30 Jun 2014 19:43:22 +0200
+Subject: [PATCH v7 3/6] input: misc: Add driver for AXP20x Power Enable Key
+In-Reply-To: <20140630094712.GX7262@leverpostej>
+References: <1404066237-20234-1-git-send-email-carlo@caione.org>
+ <1404066237-20234-4-git-send-email-carlo@caione.org>
+ <20140630094712.GX7262@leverpostej>
+Message-ID: <CAOQ7t2ZSJgyyHxEgSxOfL=R8eAW47rYgeXfHY-FE0Ne5v=h6Ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 30, 2014 at 11:47 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> +static struct platform_driver axp20x_pek_driver = {
+>> +       .probe          = axp20x_pek_probe,
+>> +       .remove         = axp20x_pek_remove,
+>> +       .driver         = {
+>> +               .name           = "axp20x-pek",
+>> +               .owner          = THIS_MODULE,
+>> +       },
+>> +};
+>> +module_platform_driver(axp20x_pek_driver);
+>
+> So this requires platform data rather than a DTB? Or have I missed
+> something?
 
-On Jun 30, 2014, at 11:03 AM, Andy Gross <agross@codeaurora.org> wrote:
+It is not loaded by DTB but by the MFD core driver (axp20x). So I
+assume this is still a platform device.
 
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> 
-> QCOM USB3.0 core wrapper consist of USB3.0 IP from Synopsys
-> (SNPS) and HS, SS PHY's control and configuration registers.
-> 
-> It could operate in device mode (SS, HS, FS) and host
-> mode (SS, HS, FS, LS).
-> 
-> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
-> .../devicetree/bindings/usb/qcom,dwc3.txt          |  104 ++++++++++++++++++++
-> 1 file changed, 104 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/usb/qcom,dwc3.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
-> new file mode 100644
-> index 0000000..105b6b7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
-> @@ -0,0 +1,104 @@
-> +Qualcomm SuperSpeed DWC3 USB SoC controller
-> +
-> +
-> +QCOM DWC3 Highspeed USB PHY
-> +========================
-> +Required properities:
-> +- compatible:	should contain "qcom,dwc3-hsphy";
-> +- reg:			offset and length of the register set in the memory map
-> +- clocks:		A list of phandle + clock-specifier pairs for the
-> +				clocks listed in clock-names
-> +- clock-names:	Should contain the following:
-> +  "utmi"		UTMI clock
-> +- v1p8-supply:	phandle to the regulator for the 1.8v supply to HSPHY.
-> +- v3p3-supply:	phandle to the regulator for the 3.3v supply to HSPHY.
-> +- vbus-supply:	phandle to the regulator for the vbus supply for host
-> +		mode.
-> +- vddcx-supply: phandle to the regulator for the vdd supply for HSPHY
-> +                digital circuit operation.
-> +
-> +Optional clocks:
-> +  "xo"			External reference clock
-> +
-> +
-> +QCOM DWC3 Superspeed USB PHY
-> +=========================
-> +Required properities:
-> +- compatible:	should contain "qcom,dwc3-ssphy";
-> +- reg:			offset and length of the register set in the memory map
-> +- clocks:		A list of phandle + clock-specifier pairs for the
-> +				clocks listed in clock-names
-> +- clock-names:	Should contain the following:
-> +  "ref"			Reference clock used in host mode.
-> +- v1p8-supply:	phandle to the regulator for the 1.8v supply to HSPHY.
-> +- vddcx-supply: phandle to the regulator for the vdd supply for HSPHY
-> +                digital circuit operation.
-> +
-> +Optional clocks:
-> +  "xo"			External reference clock
-> +
-> +QCOM DWC3 controller wrapper
-> +===========================
-> +Required properties:
-> +- compatible:	should contain "qcom,dwc3"
-> +- clocks:		A list of phandle + clock-specifier pairs for the
-> +				clocks listed in clock-names
-> +- clock-names:	Should contain the following:
-> +  "core"		Master/Core clock, have to be >= 125 MHz for SS
-> +				operation and >= 60MHz for HS operation
-> +
-> +Optional clocks:
-> +  "iface"		System bus AXI clock.  Not present on all platforms
-> +  "sleep"		Sleep clock, used when USB3 core goes into low
-> +				power mode (U3).
-
-We should encode the an optional port number here in the cases that we have multiple controllers and need to know about it so we can set TCSR correctly.
-
-> +
-> +Optional regulator:
-> +- gdsc-supply:	phandle to the regulator from globally distributed
-> +				switch controller
-> +
-> +Required child node:
-> +A child node must exist to represent the core DWC3 IP block. The name of
-> +the node is not important. The content of the node is defined in dwc3.txt.
-> +
-> +Example device nodes:
-> +
-> +		hs_phy_0: phy at 110f8800 {
-> +			compatible = "qcom,dwc3-hsphy";
-> +			reg = <0x110f8800 0x30>;
-> +			clocks = <&gcc USB30_0_UTMI_CLK>;
-> +			clock-names = "utmi";
-> +
-> +			status = "disabled";
-> +		};
-> +
-> +		ss_phy_0: phy at 110f8830 {
-> +			compatible = "qcom,dwc3-ssphy";
-> +			reg = <0x110f8830 0x30>;
-> +
-> +			clocks = <&gcc USB30_0_MASTER_CLK>;
-> +			clock-names = "ref";
-> +
-> +			status = "disabled";
-> +		};
-> +
-> +		usb3_0: usb30 at 0 {
-> +			compatible = "qcom,dwc3";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			clocks = <&gcc USB30_0_MASTER_CLK>;
-> +			clock-names = "core";
-> +
-> +			ranges;
-> +
-> +			status = "disabled";
-> +
-> +			dwc3 at 11000000 {
-> +				compatible = "snps,dwc3";
-> +				reg = <0x11000000 0xcd00>;
-> +				interrupts = <0 110 0x4>;
-> +				usb-phy = <&hs_phy_0>, <&ss_phy_0>;
-> +				phy-names = "usb2-phy", "usb3-phy";
-> +				tx-fifo-resize;
-> +				dr_mode = "host";
-> +			};
-> +		};
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Carlo Caione
