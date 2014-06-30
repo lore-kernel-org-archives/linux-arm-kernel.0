@@ -1,86 +1,44 @@
 From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 30 Jun 2014 08:56:03 -0700
+Date: Mon, 30 Jun 2014 08:59:53 -0700
 Subject: [PATCH v7 7/9] ARM: add vdso user-space code
-In-Reply-To: <20140628100347.GE32514@n2100.arm.linux.org.uk>
+In-Reply-To: <20140628152609.GH32514@n2100.arm.linux.org.uk>
 References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
  <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
- <20140628095314.GC32514@n2100.arm.linux.org.uk>
- <20140628100347.GE32514@n2100.arm.linux.org.uk>
-Message-ID: <53B18893.6040701@amacapital.net>
+ <20140628152609.GH32514@n2100.arm.linux.org.uk>
+Message-ID: <53B18979.7050206@mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2014 03:03 AM, Russell King - ARM Linux wrote:
-> On Sat, Jun 28, 2014 at 10:53:14AM +0100, Russell King - ARM Linux wrote:
->> On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
->>> Place vdso-related user-space code in arch/arm/kernel/vdso/.
->>>
->>> It is almost completely written in C with some assembly helpers to
->>> load the data page address, sample the counter, and fall back to
->>> system calls when necessary.
->>>
->>> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
->>> high-resolution clocks and falls back to syscalls.  Low-resolution
->>> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
->>>
->>> Of particular note is that a post-processing step ("vdsomunge") is
->>> necessary to produce a shared object which is architecturally allowed
->>> to be used by both soft- and hard-float EABI programs.
->>>
->>> The 2012 edition of the ARM ABI defines Tag_ABI_VFP_args = 3 "Code is
->>> compatible with both the base and VFP variants; the user did not
->>> permit non-variadic functions to pass FP parameters/results."
->>> Unfortunately current toolchains do not support this tag, which is
->>> ideally what we would use.
->>>
->>> The best available option is to ensure that both EF_ARM_ABI_FLOAT_SOFT
->>> and EF_ARM_ABI_FLOAT_HARD are unset in the ELF header's e_flags,
->>> indicating that the shared object is "old" and should be accepted for
->>> backward compatibility's sake.  While binutils < 2.24 appear to
->>> produce a vdso.so with both flags clear, 2.24 always sets
->>> EF_ARM_ABI_FLOAT_SOFT, with no way to inhibit this behavior.  So we
->>> have to fix things up with a custom post-processing step.
->>>
->>> In fact, the VDSO code in glibc does much less validation (including
->>> checking these flags) than the code for handling conventional
->>> file-backed shared libraries, so this is a bit moot unless glibc's
->>> VDSO code becomes more strict.
->>>
->>> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->>> ---
->>>   arch/arm/kernel/asm-offsets.c        |   5 +
->>>   arch/arm/kernel/vdso/.gitignore      |   1 +
->>>   arch/arm/kernel/vdso/Makefile        |  59 +++++++
->>>   arch/arm/kernel/vdso/checkundef.sh   |   9 +
->>>   arch/arm/kernel/vdso/datapage.S      |  15 ++
->>>   arch/arm/kernel/vdso/vdso.S          |  35 ++++
->>>   arch/arm/kernel/vdso/vdso.lds.S      |  88 ++++++++++
->>>   arch/arm/kernel/vdso/vdsomunge.c     | 193 +++++++++++++++++++++
->>>   arch/arm/kernel/vdso/vgettimeofday.c | 320 +++++++++++++++++++++++++++++++++++
->>>   9 files changed, 725 insertions(+)
->>>   create mode 100644 arch/arm/kernel/vdso/.gitignore
->>>   create mode 100644 arch/arm/kernel/vdso/Makefile
->>>   create mode 100755 arch/arm/kernel/vdso/checkundef.sh
->>>   create mode 100644 arch/arm/kernel/vdso/datapage.S
->>>   create mode 100644 arch/arm/kernel/vdso/vdso.S
->>>   create mode 100644 arch/arm/kernel/vdso/vdso.lds.S
->>>   create mode 100644 arch/arm/kernel/vdso/vdsomunge.c
->>>   create mode 100644 arch/arm/kernel/vdso/vgettimeofday.c
+On 06/28/2014 08:26 AM, Russell King - ARM Linux wrote:
+> On Sun, Jun 22, 2014 at 10:11:56PM -0500, Nathan Lynch wrote:
+>> Place vdso-related user-space code in arch/arm/kernel/vdso/.
 >>
->> One change I would like to see (to stop the directory tree getting soo
->> deep) is to move this to arch/arm/vdso - just like x86 is arch/x86/vdso.
->> Was there a pressing reason to have it in arch/arm/kernel ?
+>> It is almost completely written in C with some assembly helpers to
+>> load the data page address, sample the counter, and fall back to
+>> system calls when necessary.
+>>
+>> If CONFIG_ARM_ARCH_TIMER is not enabled, the vdso cannot service
+>> high-resolution clocks and falls back to syscalls.  Low-resolution
+>> clocks e.g. CLOCK_REALTIME_COARSE can be serviced regardless.
 >
-> It also looks like there's something missing for vdso_install to work.
-> arch/x86 has this:
+> Okay, how is this used by userspace?
 >
-> PHONY += vdso_install
-> vdso_install:
->          $(Q)$(MAKE) $(build)=arch/x86/vdso $@
+> It seems that on ARM, we generate a dso with these symbols:
 >
-> but doesn't list it in the arch help.  I'm sure we can do better on ARM. :)
+> DYNAMIC SYMBOL TABLE:
+> 000001e4 l    d  .eh_frame_hdr	00000000              .eh_frame_hdr
+> 00000000 g    DO *ABS*	00000000  LINUX_3.17  LINUX_3.17
+> 000003c4 g    DF .text	00000080  LINUX_3.17  __kernel_clock_getres
+> 00000444 g    DF .text	0000002c  LINUX_3.17  __kernel_gettimeofday
+> 00000298 g    DF .text	0000012c  LINUX_3.17  __kernel_clock_gettime
 
-In 3.16-rc3 this is rather improved, albeit still undocumented.  It's 
-probably worth matching x86's behavior for gdb's benefit.
+Sorry, late to the thread.
+
+I think that, if your function signatures match, you should give them 
+the same names and versions as for x86 (i.e. LINUX_2.6, 
+__vdso_clock_gettime).  Userspace will thank you.
+
+Don't do the weak clock_gettime, etc aliases, though.  That was never a 
+good idea to begin with.
 
 --Andy
