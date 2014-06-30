@@ -1,54 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 20:50:59 +0200
-Subject: [PATCHv5 1/3] ARM: mm: add support for HW coherent systems in
- PL310 cache
-In-Reply-To: <20140630173217.GT28951@arm.com>
-References: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1402585772-10405-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140630173217.GT28951@arm.com>
-Message-ID: <20140630205059.2e7b2278@free-electrons.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 30 Jun 2014 20:59:43 +0200
+Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
+In-Reply-To: <53B18999.2020506@ti.com>
+References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
+ <1403660878-56350-3-git-send-email-s-anna@ti.com>
+ <20140628170709.GB23634@xo-6d-61-c0.localdomain>
+ <53B18999.2020506@ti.com>
+Message-ID: <20140630185942.GA5410@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin Marinas,
+Hi!
 
-On Mon, 30 Jun 2014 18:32:17 +0100, Catalin Marinas wrote:
-
-> > +/*
-> >   * Note that the end addresses passed to Linux primitives are
-> >   * noninclusive, while the hardware cache range operations use
-> >   * inclusive start and end addresses.
-> > @@ -1487,6 +1514,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
-> >  
-> >  	data = of_match_node(l2x0_ids, np)->data;
-> >  
-> > +	if (of_device_is_compatible(np, "arm,pl310-cache") &&
-> > +	    of_property_read_bool(np, "arm,io-coherent"))
-> > +		data = &of_l2c310_coherent_data;
+> >> The non-DT support has to be maintained for now to not break
+> >> OMAP3 legacy boot, and the legacy-style code will be cleaned
+> >> up once OMAP3 is also converted to DT-boot only.
+> > 
+> >> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
+> >>  	return 0;
+> >>  }
+> >>  
+> >> +static const struct omap_mbox_device_data omap2_data = {
+> >> +	.num_users	= 4,
+> >> +	.num_fifos	= 6,
+> >> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+> >> +};
+> >> +
+> >> +static const struct omap_mbox_device_data omap3_data = {
+> >> +	.num_users	= 2,
+> >> +	.num_fifos	= 2,
+> >> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
+> >> +};
+> >> +
+> >> +static const struct omap_mbox_device_data am335x_data = {
+> >> +	.num_users	= 4,
+> >> +	.num_fifos	= 8,
+> >> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
+> >> +};
+> > 
+> > So you use compatible strings to look up 3 integers. Would it be better to have
+> > num_users/num_fifos/intr_type directly in the device tree? That should be cleaner
+> > and more flexible...
+> > 
+> > If you do that, would it be possible to have share compatible string?
 > 
-> I don't have a better way without duplicating the l2c_init_data
-> structure since the fixup function does not take a device_node
-> pointer. If it did, you could have added the check in l2c310_fixup and
-> zeroed the sync pointer there.
-> 
-> Anyway, your approach works for me as well:
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Yeah, I have actually encoded the .num_users and .num_fifos in DT in the
+> previous version [1] with shared compatible strings, but dropped those
+> properties in favour of adding minimal custom properties to DT based on
+> some offline IRC comments. I have no objections either way, but there is
+> really nothing to be gained from minimizing compatible strings.
 
-Thanks for the confirmation. Note that it comes a bit too late though:
-the patch is already in 3.16-rc3:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mm/cache-l2x0.c?id=98ea2dba65932ffc456b6d7b11b8a0624e2f7b95.
-
-However, I'm interested in hearing your opinion about the I/O coherency
-discussion in !SMP, and especially whether the TTB flags need to be
-consistent with the PMD flags in terms of cache policy and
-shareability. See
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/263524.html.
-
-Thanks!
-
-Thomas
+Actually, I'd guess best solution would be to do both: have it encoded
+in device tree _and_ have separate compatible string for each version
+(in case there are other differences). You'd still get rid of the
+table...
+									Pavel
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
