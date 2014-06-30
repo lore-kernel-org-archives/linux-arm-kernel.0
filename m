@@ -1,57 +1,24 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 30 Jun 2014 16:48:35 +0200
-Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
- CPU frequency
-In-Reply-To: <20140630140146.GD28647@lukather>
-References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140630102934.GV32514@n2100.arm.linux.org.uk>
- <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
- <20140630124919.GC28647@lukather>
- <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
- <20140630140146.GD28647@lukather>
-Message-ID: <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 30 Jun 2014 10:49:12 -0400
+Subject: [PATCH 13/17] ata: pata_samsung_cf: removes s5pc100 related ata
+ codes
+In-Reply-To: <1404163947-3105-14-git-send-email-kgene.kim@samsung.com>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+ <1404163947-3105-14-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20140630144912.GE14807@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
->> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
->> >> >> -             if (!rate || len != 4) {
->> >> >> -                     pr_err("%s missing clock-frequency property\n",
->> >> >> -                             cn->full_name);
->> >> >> +             clk = of_clk_get(cn, 0);
->> >> >> +             if (!IS_ERR(clk))
->> >> >> +                     rate = clk_get_rate(clk);
->> >>
->> >> We need the max frequency as it will be used to weight the different
->> >> CPUs capacity. How do you ensure that the current clock rate is the
->> >> max one ?
->> >
->> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
->> > current CPU frequency, not the max one.
->>
->> What means current frequency in device tree when DVFS is involved ?
->
-> The ePAPR states that clock-frequency is supposed to be "the current
-> clock speed of the CPU in Hertz". It's exactly what my patch add.
->
-> Now, you're right, DVFS would be an issue here with clock-frequency,
-> but this patch actually makes it easier to deal with, since you only
-> get a reference to a clock, and you can get its rate at any given
-> time.
+On Tue, Jul 01, 2014 at 06:32:23AM +0900, Kukjin Kim wrote:
+> This patch removes support for s5pc100 ata because of no more support
+> S5PC100 SoC in mainline.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Tejun Heo <tj@kernel.org>
 
-and what about using clk_round_rate(clk, ULONG_MAX) ?
+Applied to libata/for-3.17.
 
-We will not be dependent of when we parse DT
+Thanks.
 
-Vincent
-
-
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+-- 
+tejun
