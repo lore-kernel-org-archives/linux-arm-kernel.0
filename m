@@ -1,88 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jun 2014 15:20:52 +0200
-Subject: [PATCH v10 0/2] Add support for the Allwinner A31 DMA Controller
-Message-ID: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jun 2014 15:34:27 +0200
+Subject: [PATCH 00/17] ARM: S5P64X0, S5PC100: no more support in mainline
+In-Reply-To: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <6153646.CZ57BgYKf3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 01 July 2014 06:32:10 Kukjin Kim wrote:
+> This series removes S5P64X0 and S5PC100 related codes in mainline,
+> because no more user now. And if its supporting is required later,
+> it will be done with using device tree.
+> 
 
-This patchset adds support for the DMA controller found in the
-Allwinner A31 and A23 SoCs.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-This has been tested using the newly introduced SPI driver on an A31
-EVK. Support for DMA-driven SPI transfers will be the subject of
-another patch serie.
+Your patch 1/17 has not made it to the mailing list, it's probably too
+large. Can you try recreating the patch using 'git format-patch -D'?
 
-Thanks,
-Maxime
+I'd like to see the changes to arch/arm/plat-samsung.
 
-Changes from v9:
-  - Rebased on top of 3.16-rc1
-  - Fixed the whitespace error in the documentation
-
-Changes from v8:
-  - Drop the select on DMA_OF
-  - Depend on COMPILE_TEST to get more build tests coverage
-
-Changes from v7:
-  - select DMA_OF, since we're only relying on DT
-  - Properly kill the tasklet as suggested in
-    https://lwn.net/Articles/588457/
-  - Split up the dt bindings documentation into a separate patch
-
-Changes from v6:
-  - Dropped the merged patches and the clock patches that are pretty
-    orthogonal to this driver
-
-Changes from v5:
-  - Rebased on top of 3.15-rc1
-
-Changes from v4:
-  - Removed the packed attribute on the LLI
-  - Switched to using a NULL device pointer in clk_get on PLL6 and
-    AHB1 mux to make explicit that we are getting global clocks
-  - Switched from spin_lock_irqsave to spin_lock in the interrupt
-    handler
-  - Various nitpicks from Andy Shevchenko:
-    + Switched to using %p printk formats for pointers
-    + Inverted some tests to lose a level of indentation
-    + Dropped ifdef DEBUG protecting calls to dev_dbg
-
-Changes from v3:
-  - A few other comments made by Andy Shevchenko were fixed:
-    + Used references in %pa* printk formats
-    + Used is_slave_direction in prep_slave_sg to make sure we were
-      actually called for something, and to avoid making assumptions
-      that we were actually called with the expected directions
-    + A few others minor fixes: s/pr_err/dev_err/, etc.
-
-Changes from v2:
-  - Removed the clk_put calls in the clock protection functions
-  - Splitted out the sunxi machines into several files
-  - Moved the clock protection code into these new machine files
-  - Moved the PLL6 reparenting to the DMA driver
-  - Addressed various comments from Andy Shevchenko: switched to using
-    devm_kcalloc, used correct printk formats for physical and DMA
-    addresses, etc.
-
-Changes from v1:
-  - Removed the clk_put call in the clocks protecting patches
-  - Minor fixes here and there as suggested by Andy Shevchenko: switch
-    to dmam_pool_create, switch to dev_dbg instead of pr_debug, etc.
-
-
-Maxime Ripard (2):
-  Documentation: dt: Add Allwinner A31 DMA controller bindings
-  dmaengine: sun6i: Add driver for the Allwinner A31 DMA controller
-
- .../devicetree/bindings/dma/sun6i-dma.txt          |   45 +
- drivers/dma/Kconfig                                |    8 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/sun6i-dma.c                            | 1058 ++++++++++++++++++++
- 4 files changed, 1112 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
- create mode 100644 drivers/dma/sun6i-dma.c
-
--- 
-2.0.0
+	Arnd
