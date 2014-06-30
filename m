@@ -1,25 +1,42 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Mon, 30 Jun 2014 15:56:50 +0200
-Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
-In-Reply-To: <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
- (Ard Biesheuvel's message of "Mon, 30 Jun 2014 15:38:41 +0200")
-References: <mvmvbri4k06.fsf@hawking.suse.de>
- <CAKv+Gu-NAVjMR-Jkw=W-8f7M5FSsQOSdzYN6A0kHDd1m0WA8EA@mail.gmail.com>
-Message-ID: <mvmr4264i1p.fsf@hawking.suse.de>
+From: vbridgers2013@gmail.com (Vince Bridgers)
+Date: Mon, 30 Jun 2014 09:01:17 -0500
+Subject: [PATCH net v2 3/3] net: stmmac: Improve mcast/ucast filter for
+ all Synopsys EMAC Configurations
+In-Reply-To: <4380814.yCFVZiTZxJ@wuerfel>
+References: <1404092110-18667-1-git-send-email-vbridgers2013@gmail.com>
+ <1404092110-18667-4-git-send-email-vbridgers2013@gmail.com>
+ <4380814.yCFVZiTZxJ@wuerfel>
+Message-ID: <CAOwfj2NGdVGd2iHfbF73U9Jc6VmFQSHfEm7Jevo5WyzYkrDX+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+ Hi Arnd,
 
-> Out of curiosity, how did you trigger this failure? I have build this
-> code numerous times (and so have others) and I have never seen this
-> failure.
+On Mon, Jun 30, 2014 at 1:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 29 June 2014 20:35:10 Vince Bridgers wrote:
+>> The synopsys EMAC can be configured for different numbers of multicast hash
+>> bins and perfect filter entries at device creation time and there's no way
+>> to query this configuration information at runtime. As a result, a devicetree
+>> parameter is required in order for the driver to program these filters
+>> correctly for a particular device instance. This patch extends the current
+>> driver by providing a different multicast filter programming function if
+>> different than the currently supported 64 multicast hash bins and 32
+>> perfect unicast addresses. This patch is required to correct multicast
+>> filtering for the Altera Cyclone V SOC.
+>>
+>> Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
+>>
+>
+> No objections to the content of the patch, but it would be better to split
+> it out into two separate patches: one that does the mechanical prototype
+> and formatting changes, and a smaller one that actually introduces the
+> functional change. That would make it much easier to review, and to bisect
+> potential problems when something goes wrong.
+>
+>         Arnd
 
-Did you ever start with a clean tree?
+I'll make the suggested change and resubmit. Thank you for the suggestion.
 
-Andreas.
+All the best,
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Vince
