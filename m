@@ -1,59 +1,33 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 30 Jun 2014 16:22:31 +0900
-Subject: [PATCH 4/4] ARM: dts: rockchip: unuse the slot-node and deprecated the
- supports-highspeed for dw-mmc
-In-Reply-To: <1404112951-29467-1-git-send-email-jh80.chung@samsung.com>
-References: <1404112951-29467-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <1404112951-29467-5-git-send-email-jh80.chung@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jun 2014 09:23:45 +0200
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <53AEF81D.3080408@ti.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <20140627232757.GB26184@ulmo> <53AEF81D.3080408@ti.com>
+Message-ID: <5279186.O063V9ZcHh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw-mmc controller can support multiple slots.
-But, there are no use-cases anywhere. So we don't need to support the
-slot-node for dw-mmc controller.
-And "supports-highspeed" property in dw-mmc is deprecated.
-"supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
+On Saturday 28 June 2014 13:15:09 Santosh Shilimkar wrote:
+> >> For SMP boot, ARMv8 expecting to have either PSCI based implementation or
+> >> device tree based boot scheme. you can move towards that model if possible.
+> > 
+> > But we also have the code for SMP on 32-bit ARM. Should that remain in
+> > arch/arm/mach-tegra or can it move to drivers/soc/tegra?
+> > 
+> You answered yourself. I don't see any point moving such a code to drivers
+> which is really SMP bring up code for ARM 32 bit. For ARM 64 bit, as
+> outline by maintainers (Catalin, Arnd), you should use PSCI or DT based
+> boot scheme.
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Reviewed-by: Tushar Behera <trblinux@gmail.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+I was hoping that one day we could unify the SMP bootup code with the
+cpuidle infrastructure, as a lot of the underlying functions are shared
+on the majority of SoCs. I have no plans to work on that myself though,
+and it would have to be agreed on by the cpuidle maintainers.
 
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index afb3273..ecea889 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -59,12 +59,8 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
- 			vmmc-supply = <&vcc_sd0>;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--				disable-wp;
--			};
-+			bus-width = <4>;
-+			disable-wp;
- 		};
- 
- 		dwmmc at 10218000 { /* wifi */
-@@ -74,12 +70,8 @@
- 
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
--
--			slot at 0 {
--				reg = <0>;
--				bus-width = <4>;
--				disable-wp;
--			};
-+			bus-width = <4>;
-+			disable-wp;
- 		};
- 
- 		gpio-keys {
--- 
-1.7.9.5
+For ARM64, the hope was indeed to use PSCI for all SoCs. I just have no
+idea how that would be enforced for mobile SoCs that get shipped to
+system integrators with an bootloader and kernel tree that doesn't even
+get reviewed anywhere first.
+
+	Arnd
