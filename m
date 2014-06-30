@@ -1,64 +1,79 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 30 Jun 2014 09:50:30 +0200
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
-In-Reply-To: <20140628145424.GK23978@titan.lakedaemon.net>
-References: <20140627130129.GH23978@titan.lakedaemon.net>
- <20140627130430.GH32514@n2100.arm.linux.org.uk> <53AD724D.4020704@gmail.com>
- <20140627133933.GJ23978@titan.lakedaemon.net> <53AD7544.2060701@gmail.com>
- <D0DC98AD-E460-42C9-B2F4-51EDDE371E31@lakedaemon.net>
- <53ADAB8C.6070609@gmail.com> <20140628145424.GK23978@titan.lakedaemon.net>
-Message-ID: <53B116C6.80601@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 30 Jun 2014 13:27:52 +0530
+Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
+In-Reply-To: <CAKohponvN3rAvJrfi4TojFcq5gq7r2oNE4Q0_NtwBHmEZ8waBA@mail.gmail.com>
+References: <cover.1403684824.git.viresh.kumar@linaro.org>
+ <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
+ <53AB1CC1.4010907@codeaurora.org>
+ <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
+ <53ACB568.4000903@codeaurora.org>
+ <20140627015354.32686.83046@quantum>
+ <CAKohponvN3rAvJrfi4TojFcq5gq7r2oNE4Q0_NtwBHmEZ8waBA@mail.gmail.com>
+Message-ID: <CAKohpo=dgSW551yzqjAV2_opw_4naqFEWpwUz9ktkGgR5vCBZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2014 04:54 PM, Jason Cooper wrote:
-> On Fri, Jun 27, 2014 at 07:36:12PM +0200, Sebastian Hesselbarth wrote:
->> On 06/27/2014 06:49 PM, Jason Cooper wrote:
->>>> On Jun 27, 2014, at 9:44, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->>> ...
->>>> And I am not sure, if we want to rely on some six numbers stored on
->>>> SPI flash, i.e. there is no magic nor header to be really sure, it
->>>> is a MAC address.
->>>
->>> It couldn't be compared with the MAC address of the nic?
+On 27 June 2014 07:45, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 27 June 2014 07:23, Mike Turquette <mturquette@linaro.org> wrote:
+>>> but it isn't future-proof if/when the clock framework starts returning
+>>> dynamically allocated clock pointers for each clk_get() invocation.
+>>> Maybe we need a function in the common clock framework that tells us if
+>>> the clocks are the same either via DT or by taking two clock pointers?
 >>
->> Sure, but if it is not equal it tells you nothing.
->>
->> You can change the NICs MAC in your bootloader, it will be different
->> from the numbers you read from SPI, and some mechanism will assume you
->> just made your production version into ES.
->>
->> We really want to introduce such a crutch?
-> 
-> Well, we need to keep in mind distro's concerns, but we don't need to
-> (and shouldn't) attempt to solve them.
-> 
-> That's why I wanted to add a comment expressing the facts as best we
-> know them.  We could also now add a link to this thread to assist future
-> distro maintainers.
-> 
-> As this patch sits, it is an accurate description of the two variants of
-> dove-based CuBoxes.  The fact that SolidRun didn't leave a clear
-> differentiator is unfortunate, but we can't magic a solution out of our
-> ass.  Nor should we block a patch because we can't.
+>> I looked through the patch briefly and did not see why we would need to
+>> do this. Any hint?
+>
+> We want to know which CPUs are sharing clock line, so that we can
+> fill affected-cpus field of cpufreq core.
 
-Ok, I'll look through my eMails and Web again to collect some
-differences and prepare a "add comment" only patch for the CuBox DTSs.
+What about comparing "clocks" property in cpu DT nodes?
 
-> It also might be worth reaching out to Rabeeh one more time and asking
-> explicitly if there is a programmatic way to differentiate the two
-> boards on the board itself.
+@Rob/Grant: I tried looking for an existing routine to do that, but couldn't
+find it. And so wrote one.
 
-Yeah, I remember someone said that there is a different SPI vendor on
-production CuBox. That could be a way to tell them apart _if_ it is
-used exclusively on production boxes.
+I am not good at DT stuff and so I do hope there would be few correction
+required here. Let me know if this can be added to drivers/of/base.c :
 
-But I'll ask Rabeeh about it again.
++/**
++ * of_property_match - Match property in two nodes
++ * @np1, np2: Nodes to match
++ * @list_name: property to match
++ *
++ * Returns 1 on match, 0 on no match, and error for missing property.
++ */
++static int of_property_match(const struct device_node *np1,
++                             const struct device_node *np2,
++                             const char *list_name)
++{
++       const __be32 *list1, *list2, *list1_end;
++       int size1, size2;
++       phandle phandle1, phandle2;
++
++       /* Retrieve the list property */
++       list1 = of_get_property(np1, list_name, &size1);
++       if (!list1)
++               return -ENOENT;
++
++       list2 = of_get_property(np2, list_name, &size2);
++       if (!list2)
++               return -ENOENT;
++
++       if (size1 != size2)
++               return 0;
++
++       list1_end = list1 + size1 / sizeof(*list1);
++
++       /* Loop over the phandles */
++       while (list1 < list1_end) {
++               phandle1 = be32_to_cpup(list1++);
++               phandle2 = be32_to_cpup(list2++);
++
++               if (phandle1 != phandle2)
++                       return 0;
++       }
++
++       return 1;
++}
 
-> It would have been ideal if the ES had 512MB of RAM...
-
-Depends, for differentiation yes, otherwise I am quite happy with 1G ;)
-
-Some magic and a variant number in SPI would have been better I guess.
-
-Sebastian
+@Stephen: I have updated my tree with this change, in case you wanna
+try.
