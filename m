@@ -1,31 +1,53 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 22:20:07 +0300
-Subject: [PATCH 4/6] ARM: s3c24xx: DMA: SDI channel requires handshake
+Date: Mon, 30 Jun 2014 22:20:08 +0300
+Subject: [PATCH 5/6] ARM: s3c24xx: Kconfig: Fix unmet dependency on
+ S3C2440_PLL_* symbols for S3C2442
 In-Reply-To: <1404156009-3919-1-git-send-email-anarsoul@gmail.com>
 References: <1404156009-3919-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1404156009-3919-4-git-send-email-anarsoul@gmail.com>
+Message-ID: <1404156009-3919-5-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least Windows Mobile driver enables it.
+It's possible to build kernel with S3C2442, but without S3C2440 support, and
+some S3C2442 machines depend on CONFIG_S3C2440_PLL_16934400
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-s3c24xx/common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-s3c24xx/Kconfig | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-index 2fa0a99..e505114 100644
---- a/arch/arm/mach-s3c24xx/common.c
-+++ b/arch/arm/mach-s3c24xx/common.c
-@@ -322,7 +322,7 @@ static struct resource s3c2410_dma_resource[] = {
- static struct s3c24xx_dma_channel s3c2410_dma_channels[DMACH_MAX] = {
- 	[DMACH_XD0] = { S3C24XX_DMA_AHB, true, S3C24XX_DMA_CHANREQ(0, 0), },
- 	[DMACH_XD1] = { S3C24XX_DMA_AHB, true, S3C24XX_DMA_CHANREQ(0, 1), },
--	[DMACH_SDI] = { S3C24XX_DMA_APB, false, S3C24XX_DMA_CHANREQ(2, 0) |
-+	[DMACH_SDI] = { S3C24XX_DMA_APB, true, S3C24XX_DMA_CHANREQ(2, 0) |
- 						S3C24XX_DMA_CHANREQ(2, 2) |
- 						S3C24XX_DMA_CHANREQ(1, 3),
- 	},
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 8c2a7f3..2305a5f 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -437,12 +437,7 @@ config MACH_S3C2416_DT
+ 
+ endif	# CPU_S3C2416
+ 
+-if CPU_S3C2440
+-
+-config S3C2440_DMA
+-	bool
+-	help
+-	  Support for S3C2440 specific DMA code5A
++if CPU_S3C2440 || CPU_S3C2442
+ 
+ config S3C2440_XTAL_12000000
+ 	bool
+@@ -469,6 +464,14 @@ config S3C2440_PLL_16934400
+ 	default y if S3C24XX_PLL
+ 	help
+ 	  PLL tables for S3C2440 or S3C2442 CPUs with 16.934MHz crystals.
++endif
++
++if CPU_S3C2440
++
++config S3C2440_DMA
++	bool
++	help
++	  Support for S3C2440 specific DMA code5A
+ 
+ comment "S3C2440 Boards"
+ 
 -- 
 2.0.0
