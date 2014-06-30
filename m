@@ -1,34 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jun 2014 12:35:39 +0100
-Subject: [PATCH v5 05/14] clk: Add generic driver for Maxim PMIC clocks
-In-Reply-To: <53B142F1.1050407@collabora.co.uk>
-References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
- <1403806546-31122-6-git-send-email-javier.martinez@collabora.co.uk>
- <CAKew6eU5X=WxhECtwUUwbXe_fCRU4bD6B7caWiA2dwcBfThd-g@mail.gmail.com>
- <53B142F1.1050407@collabora.co.uk>
-Message-ID: <20140630113539.GX32514@n2100.arm.linux.org.uk>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 30 Jun 2014 12:30:53 +0100
+Subject: [PATCH v7 2/4] ARM: ep93xx: Enable DEBUG_LL_UART_PL01X
+In-Reply-To: <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
+References: <1401206421-29832-1-git-send-email-daniel.thompson@linaro.org>
+ <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1404127855-30459-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 12:58:57PM +0200, Javier Martinez Canillas wrote:
-> >> +       if (!max_gen->lookup)
-> >> +               return ERR_PTR(-ENOMEM);
-> >> +
-> >> +       max_gen->lookup->con_id = hw->init->name;
-> > 
-> > Also IMO,  init->name should be over-written if name is provided in DT,
-> > otherwise generic "clock-output-names" property will go futile,
-> > perhaps it should be done before clk_register.
-> > 
-> 
-> Even though Documentation/devicetree/bindings/clock/clock-bindings.txt says that
-> the "clock-output-names" property is optional I agree with you that will be
-> better to support it. So I'll add it on the next version as well.
+This defconfig already enables DEBUG_LL and by default DEBUG_LL_UART_NONE
+will be selected (but due to some back compability magic I'd like to
+remove is not actually honoured). DEBUG_LL_UART_PL01X is a much saner
+default.
 
-However, remember that con_id is the _DEVICE_ specific connection name,
-not the _CLOCK_ name.  You will get a NAK from me if you violate this
-rule.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ arch/arm/configs/ep93xx_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
+index 1b650c8..72233b9 100644
+--- a/arch/arm/configs/ep93xx_defconfig
++++ b/arch/arm/configs/ep93xx_defconfig
+@@ -107,5 +107,6 @@ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_PL01X=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ CONFIG_LIBCRC32C=y
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.3
