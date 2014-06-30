@@ -1,71 +1,94 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 30 Jun 2014 17:06:16 +0200
-Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
- CPU frequency
-In-Reply-To: <20140630145847.GE28647@lukather>
-References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140630102934.GV32514@n2100.arm.linux.org.uk>
- <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
- <20140630124919.GC28647@lukather>
- <CAKfTPtCgpc1J888hbqxoaF5UfcUoRwcpokme32WHPpsPAAawUQ@mail.gmail.com>
- <20140630140146.GD28647@lukather>
- <CAKfTPtAu+mSVO8dvg_Z6w_nYWndap+FY5VGKeg-0pae_4JqR=A@mail.gmail.com>
- <20140630145847.GE28647@lukather>
-Message-ID: <CAKfTPtDvQJ5i=t8FN0gLQex0yAC4NNgewTnGKdiCeGk7nQwZYg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 30 Jun 2014 08:06:46 -0700
+Subject: [PATCH 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
+ regulators
+In-Reply-To: <53B15476.4030000@samsung.com>
+References: <1403520321-2431-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1403520321-2431-2-git-send-email-yuvaraj.cd@samsung.com>
+ <CAD=FV=UGjm9y3XoBgWKjw9kp9W=ZrwB-S6Lh7T_LBUgCQZn1ag@mail.gmail.com>
+ <CAKuRcO+OaknUtj9mJ+SQJPMj70hdLTMkDYCXq4L5JdwzDKdj6g@mail.gmail.com>
+ <CAD=FV=Vy5vRan0KEDFFwVO0omgsUMwJK6WwCsWxGYynzT-e5ig@mail.gmail.com>
+ <53B15476.4030000@samsung.com>
+Message-ID: <CAD=FV=WCFFvb1+d3XEhTNXgzSksC__t4g1OLvhO-iDXSHHPFsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2014 16:58, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> On Mon, Jun 30, 2014 at 04:48:35PM +0200, Vincent Guittot wrote:
->> On 30 June 2014 16:01, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
->> > On Mon, Jun 30, 2014 at 03:27:21PM +0200, Vincent Guittot wrote:
->> >> >> >> -             rate = of_get_property(cn, "clock-frequency", &len);
->> >> >> >> -             if (!rate || len != 4) {
->> >> >> >> -                     pr_err("%s missing clock-frequency property\n",
->> >> >> >> -                             cn->full_name);
->> >> >> >> +             clk = of_clk_get(cn, 0);
->> >> >> >> +             if (!IS_ERR(clk))
->> >> >> >> +                     rate = clk_get_rate(clk);
->> >> >>
->> >> >> We need the max frequency as it will be used to weight the different
->> >> >> CPUs capacity. How do you ensure that the current clock rate is the
->> >> >> max one ?
->> >> >
->> >> > Hmm, the clock-frequency attribute in the ePAPR is defined at the
->> >> > current CPU frequency, not the max one.
->> >>
->> >> What means current frequency in device tree when DVFS is involved ?
->> >
->> > The ePAPR states that clock-frequency is supposed to be "the current
->> > clock speed of the CPU in Hertz". It's exactly what my patch add.
->> >
->> > Now, you're right, DVFS would be an issue here with clock-frequency,
->> > but this patch actually makes it easier to deal with, since you only
->> > get a reference to a clock, and you can get its rate at any given
->> > time.
+Jaehoon,
+
+On Mon, Jun 30, 2014 at 5:13 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> On 06/27/2014 01:18 AM, Doug Anderson wrote:
+>> Yuvaraj,
 >>
->> and what about using clk_round_rate(clk, ULONG_MAX) ?
+>> On Thu, Jun 26, 2014 at 4:21 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+>>> Doug
+>>>
+>>> On Tue, Jun 24, 2014 at 11:30 PM, Doug Anderson <dianders@chromium.org> wrote:
+>>>> Yuvaraj,
+>>>>
+>>>> On Mon, Jun 23, 2014 at 3:45 AM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>>>> This patch makes use of mmc_regulator_get_supply() to handle
+>>>>> the vmmc and vqmmc regulators.Also it moves the code handling
+>>>>> the these regulators to dw_mci_set_ios().It turned on the vmmc
+>>>>> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
+>>>>> during MMC_POWER_OFF.
+>>>>>
+>>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>>>> ---
+>>>>>  drivers/mmc/host/dw_mmc.c |   71 ++++++++++++++++++++++-----------------------
+>>>>>  drivers/mmc/host/dw_mmc.h |    2 ++
+>>>>>  2 files changed, 36 insertions(+), 37 deletions(-)
+>>>>
+>>>> Perhaps you could CC me on the whole series for the next version since
+>>>> I was involved in privately reviewing previous versions?
+>>> It was just accidental missing you in the CC .Surely i will add you in
+>>> CC for next versions.
+>>>>
+>>>> Overall caveat for my review is that I'm nowhere near an SD/MMC expert.
+>>>>
+>>>>
+>>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>>>> index 1ac227c..f5cabce 100644
+>>>>> --- a/drivers/mmc/host/dw_mmc.c
+>>>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>>>> @@ -937,6 +937,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>>>         struct dw_mci_slot *slot = mmc_priv(mmc);
+>>>>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+>>>>>         u32 regs;
+>>>>> +       int ret;
+>>>>>
+>>>>>         switch (ios->bus_width) {
+>>>>>         case MMC_BUS_WIDTH_4:
+>>>>> @@ -975,16 +976,41 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>>>>
+>>>>>         switch (ios->power_mode) {
+>>>>>         case MMC_POWER_UP:
+>>>>> +               if ((!IS_ERR(mmc->supply.vmmc)) &&
+>>>>> +                               !test_bit(DW_MMC_CARD_POWERED, &slot->flags)) {
+>>>>> +                       ret = regulator_enable(mmc->supply.vmmc);
+>>>>> +                       if (!ret)
+>>>>> +                               set_bit(DW_MMC_CARD_POWERED, &slot->flags);
+>>>>> +               }
+>>>>
+>>>> As per below, I'm not sure why you'd want to turn on vqmmc and vmmc at
+>>>> different times.
+>>> As you can see people's have different opinion on this.When i had a
+>>> look at the other drivers in the subsystem which does in the same flow
+>>> as above.However i will change in the next version.
+>>
+>> Given my self proclaimed lack of SD/MMC knowledge, if others have a
+>> good reason for doing them separate then you should do it that way.
+>> So far I haven't heard that reason but I certainly could be wrong.
 >
-> Well, the clock itself might generate a frequency higher that what the
-> CPU can run at, so I'm not sure it's a valid assumption.
+> At first time, i had believed nothing problem that it turns on vmmc and vqmmc at different time.
+> It could have the potential problem.
 
-yes, you're right
+OK.  As I said I'm nowhere near an expert on SD/MMC, so if there's
+something out there that says that turning vmmc on before vqmmc is the
+right thing to do then I guess that's the answer.  I would still be
+very curious to get more details on what the potential problem is.
+Could you provide a reference to documentation that says vmmc should
+be on before vqmmc or describe a situation where it's important?
 
->
->> We will not be dependent of when we parse DT
->
-> You lost me there. clk_round_rate and clk_get_rate are available at
-> the same time in the boot process, aren't they?
+Thanks!
 
-yes, but  clk_round_rate(clk, ULONG_MAX) will return the max frequency
-and not the current one. But as you mentioned, it doesn't ensure that
-it's a possible frequency for the core
-
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+-Doug
