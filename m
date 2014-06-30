@@ -1,36 +1,34 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon, 30 Jun 2014 09:56:36 -0700
-Subject: [PATCH 4/4] ARM: zynq: dt: Use properly rounded frequencies in OPPs
+Date: Mon, 30 Jun 2014 09:56:35 -0700
+Subject: [PATCH 3/4] net: macb: Use clk_find_nearest_rate() API
 In-Reply-To: <1404147396-8041-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1404147396-8041-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1404147396-8041-5-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1404147396-8041-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the clk_find_nearest_rate() API, OPPs can be specified
-using proper rounding, now.
+The Ethernet clock has to match the specified frequencies as accurately
+as possible. clk_round_rate() does not specify how rounding is
+implemented. Hence use clk_find_nearest_rate().
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
 
----
- arch/arm/boot/dts/zynq-7000.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/cadence/macb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 760bbc463c5b..b8e39ed5b132 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -29,8 +29,8 @@
- 			operating-points = <
- 				/* kHz    uV */
- 				666667  1000000
--				333334  1000000
--				222223  1000000
-+				333333  1000000
-+				222222  1000000
- 			>;
- 		};
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index e9daa072ebb4..7b7f5eb1b341 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -223,7 +223,7 @@ static void macb_set_tx_clk(struct clk *clk, int speed, struct net_device *dev)
+ 		return;
+ 	}
+ 
+-	rate_rounded = clk_round_rate(clk, rate);
++	rate_rounded = clk_find_nearest_rate(clk, rate);
+ 	if (rate_rounded < 0)
+ 		return;
  
 -- 
 2.0.1.1.gfbfc394
