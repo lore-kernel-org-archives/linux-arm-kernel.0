@@ -1,58 +1,38 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 22:08:08 +0300
-Subject: [PATCH] ARM: Samsung: ADC: Move to
- clk_prepare_enable/clk_disable_unprepare
-Message-ID: <1404155288-2787-1-git-send-email-anarsoul@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 30 Jun 2014 12:11:33 -0700
+Subject: [RFC PATCH 0/6] kernel: Add support for restart notifier call chain
+Message-ID: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_prepare_enable/clk_disable_unprepare to make the driver
-work properly with common clock framework.
+Various drivers implement architecture and/or device specific means
+to restart (reset) the system. Various mechanisms have been implemented
+to support those schemes. The best known mechanism is arm_pm_restart,
+which is a function pointer to be set either from platform specific code
+or from drivers. Another mechanism is to use hardware watchdogs to issue
+a reset; this mechanism is used if there is no other method available
+to reset a board or system. Two examples are alim7101_wdt, which currently
+uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
+the arm_pm_restart function.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm/plat-samsung/adc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+The existing mechanisms have a number of drawbacks. Typically only one scheme
+to restart the system is supported (at least if arm_pm_restart is used).
+At least in theory there can be mutliple means to restart the system, some of
+which may be less desirable (for example one mechanism may only reset the CPU,
+while another may reset the entire system). Using arm_pm_restart can also be
+racy if the function pointer is set from a driver, as the driver may be in
+the process of being unloaded when arm_pm_restart is called.
+Using the reboot notifier is always racy, as it is unknown if and when
+other functions using the reboot notifier have completed execution
+by the time the watchdog fires.
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index 79690f2..c5831b49 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -389,7 +389,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	clk_enable(adc->clk);
-+	clk_prepare_enable(adc->clk);
- 
- 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
- 
-@@ -413,7 +413,7 @@ static int s3c_adc_remove(struct platform_device *pdev)
- {
- 	struct adc_device *adc = platform_get_drvdata(pdev);
- 
--	clk_disable(adc->clk);
-+	clk_disable_unprepare(adc->clk);
- 	regulator_disable(adc->vdd);
- 
- 	return 0;
-@@ -436,7 +436,7 @@ static int s3c_adc_suspend(struct device *dev)
- 
- 	disable_irq(adc->irq);
- 	spin_unlock_irqrestore(&adc->lock, flags);
--	clk_disable(adc->clk);
-+	clk_disable_unprepare(adc->clk);
- 	regulator_disable(adc->vdd);
- 
- 	return 0;
-@@ -454,7 +454,7 @@ static int s3c_adc_resume(struct device *dev)
- 	ret = regulator_enable(adc->vdd);
- 	if (ret)
- 		return ret;
--	clk_enable(adc->clk);
-+	clk_prepare_enable(adc->clk);
- 	enable_irq(adc->irq);
- 
- 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
--- 
-2.0.0
+To solve the problem, introduce a system restart notifier. This notifier
+is expected to be called from the architecture specific machine_restart()
+function. Drivers providing system restart functionality (such as the watchdog
+drivers mentioned above) are expected to register with this notifier.
+
+Patch 1 of this series implements the notifier function. Patches 2 and 3
+implement calling the notifier chain from arm and arm64 restart code.
+Patch 4 and 5 convert existing restart handlers in the watchdog subsystem
+to use the restart notifier. Patch 6 unexports arm_pm_restart to ensure
+that no one gets the idea to implement a restart handler as module.
