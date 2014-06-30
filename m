@@ -1,116 +1,74 @@
 From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 30 Jun 2014 09:51:50 -0700
-Subject: [RFC/PATCH 1/7] iommu: msm: Rename iommu driver files
+Date: Mon, 30 Jun 2014 09:51:56 -0700
+Subject: [RFC/PATCH 7/7] iommu-api: Add domain attribute to enable coherent HTW
 In-Reply-To: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
 References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <1404147116-4598-2-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <1404147116-4598-8-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the MSM IOMMU driver for MSM8960 SoC to "-v0" version to align
-with hardware version number for next generation MSM IOMMU (v1).
+Add a new iommu domain attribute that can be used to enable cache
+coherent hardware table walks (HTW) by the SMMU. HTW might be supported
+by the SMMU HW but depending on the use case and the usage of the SMMU
+in the SoC it might not be always beneficial to always turn on coherent HTW for
+all domains/iommu's.
 
 Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
 ---
- arch/arm/configs/qcom_defconfig                          |  2 +-
- drivers/iommu/Kconfig                                    | 11 +++++++++--
- drivers/iommu/Makefile                                   |  2 +-
- drivers/iommu/{msm_iommu.c => msm_iommu-v0.c}            |  2 +-
- drivers/iommu/{msm_iommu_dev.c => msm_iommu_dev-v0.c}    |  2 +-
- drivers/iommu/{msm_iommu_hw-8xxx.h => msm_iommu_hw-v0.h} |  0
- 6 files changed, 13 insertions(+), 6 deletions(-)
- rename drivers/iommu/{msm_iommu.c => msm_iommu-v0.c} (99%)
- rename drivers/iommu/{msm_iommu_dev.c => msm_iommu_dev-v0.c} (99%)
- rename drivers/iommu/{msm_iommu_hw-8xxx.h => msm_iommu_hw-v0.h} (100%)
+ drivers/iommu/msm_iommu-v1.c | 16 ++++++++++++++++
+ include/linux/iommu.h        |  1 +
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 42ebd72..0414889 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -136,7 +136,7 @@ CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
- CONFIG_MSM_MMCC_8974=y
--CONFIG_MSM_IOMMU=y
-+CONFIG_MSM_IOMMU_V0=y
- CONFIG_GENERIC_PHY=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index d260605..705a257 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -28,12 +28,19 @@ config FSL_PAMU
- 	  transaction types.
+diff --git a/drivers/iommu/msm_iommu-v1.c b/drivers/iommu/msm_iommu-v1.c
+index 2c574ef..e163ffc 100644
+--- a/drivers/iommu/msm_iommu-v1.c
++++ b/drivers/iommu/msm_iommu-v1.c
+@@ -1456,8 +1456,16 @@ static int msm_domain_get_attr(struct iommu_domain *domain,
+ 			       enum iommu_attr attr, void *data)
+ {
+ 	s32 ret = 0;
++	struct msm_iommu_priv *priv = domain->priv;
  
- # MSM IOMMU support
+ 	switch (attr) {
++	case DOMAIN_ATTR_COHERENT_HTW:
++	{
++		s32 *int_ptr = (s32 *) data;
 +
-+# MSM_IOMMU always gets selected by whoever wants it.
- config MSM_IOMMU
--	bool "MSM IOMMU Support"
-+	bool
++		*int_ptr = priv->pt.redirect;
++		break;
++	}
+ 	default:
+ 		pr_err("Unsupported attribute type\n");
+ 		ret = -EINVAL;
+@@ -1471,8 +1479,16 @@ static int msm_domain_set_attr(struct iommu_domain *domain,
+ 			       enum iommu_attr attr, void *data)
+ {
+ 	s32 ret = 0;
++	struct msm_iommu_priv *priv = domain->priv;
+ 
+ 	switch (attr) {
++	case DOMAIN_ATTR_COHERENT_HTW:
++	{
++		s32 *int_ptr = (s32 *) data;
 +
-+# MSM IOMMUv0 support
-+config MSM_IOMMU_V0
-+	bool "MSM IOMMUv0 Support"
- 	depends on ARCH_MSM8X60 || ARCH_MSM8960
- 	select IOMMU_API
-+	select MSM_IOMMU
- 	help
--	  Support for the IOMMUs found on certain Qualcomm SOCs.
-+	  Support for the IOMMUs (v0) found on certain Qualcomm SOCs.
- 	  These IOMMUs allow virtualization of the address space used by most
- 	  cores within the multimedia subsystem.
++		priv->pt.redirect = *int_ptr;
++		break;
++	}
+ 	default:
+ 		pr_err("Unsupported attribute type\n");
+ 		ret = -EINVAL;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 63dca6d..6d9596d 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -81,6 +81,7 @@ enum iommu_attr {
+ 	DOMAIN_ATTR_FSL_PAMU_STASH,
+ 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+ 	DOMAIN_ATTR_FSL_PAMUV1,
++	DOMAIN_ATTR_COHERENT_HTW,
+ 	DOMAIN_ATTR_MAX,
+ };
  
-diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-index 8893bad..894ced9 100644
---- a/drivers/iommu/Makefile
-+++ b/drivers/iommu/Makefile
-@@ -1,7 +1,7 @@
- obj-$(CONFIG_IOMMU_API) += iommu.o
- obj-$(CONFIG_IOMMU_API) += iommu-traces.o
- obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
--obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
-+obj-$(CONFIG_MSM_IOMMU_V0) += msm_iommu-v0.o msm_iommu_dev-v0.o
- obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
- obj-$(CONFIG_AMD_IOMMU_V2) += amd_iommu_v2.o
- obj-$(CONFIG_ARM_SMMU) += arm-smmu.o
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu-v0.c
-similarity index 99%
-rename from drivers/iommu/msm_iommu.c
-rename to drivers/iommu/msm_iommu-v0.c
-index f5ff657..17731061 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu-v0.c
-@@ -31,7 +31,7 @@
- #include <asm/cacheflush.h>
- #include <asm/sizes.h>
- 
--#include "msm_iommu_hw-8xxx.h"
-+#include "msm_iommu_hw-v0.h"
- #include "msm_iommu.h"
- 
- #define MRC(reg, processor, op1, crn, crm, op2)				\
-diff --git a/drivers/iommu/msm_iommu_dev.c b/drivers/iommu/msm_iommu_dev-v0.c
-similarity index 99%
-rename from drivers/iommu/msm_iommu_dev.c
-rename to drivers/iommu/msm_iommu_dev-v0.c
-index 61def7cb..2f86e46 100644
---- a/drivers/iommu/msm_iommu_dev.c
-+++ b/drivers/iommu/msm_iommu_dev-v0.c
-@@ -27,7 +27,7 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- 
--#include "msm_iommu_hw-8xxx.h"
-+#include "msm_iommu_hw-v0.h"
- #include "msm_iommu.h"
- 
- struct iommu_ctx_iter_data {
-diff --git a/drivers/iommu/msm_iommu_hw-8xxx.h b/drivers/iommu/msm_iommu_hw-v0.h
-similarity index 100%
-rename from drivers/iommu/msm_iommu_hw-8xxx.h
-rename to drivers/iommu/msm_iommu_hw-v0.h
 -- 
 The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
