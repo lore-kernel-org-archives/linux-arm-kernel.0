@@ -1,53 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 30 Jun 2014 17:41:28 +0200
-Subject: [PATCH 1/2] ARM: efm32: switch to properly namespaced location
- property
-In-Reply-To: <20140630154030.GJ14781@pengutronix.de>
-References: <20140630154030.GJ14781@pengutronix.de>
-Message-ID: <1404142889-20740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 30 Jun 2014 10:42:13 -0500
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <20140630144045.GM25779@arm.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <20140630144045.GM25779@arm.com>
+Message-ID: <53B18555.2000109@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that both spi and serial driver support these (commits f2bb31057a42
-(spi: efm32: properly namespace location property) and
-74be65a3cff5 (serial: efm32: properly namespace location property)) use
-the better names.
+On 06/30/2014 09:40 AM, Will Deacon wrote:
+> Hi Nathan,
+> 
+> On Mon, Jun 23, 2014 at 04:11:49AM +0100, Nathan Lynch wrote:
+>> Provide fast userspace implementations of gettimeofday and
+>> clock_gettime on systems that implement the generic timers extension
+>> defined in ARMv7.  This follows the example of arm64 in conception but
+>> significantly differs in some aspects of the implementation (C vs
+>> assembly, mainly).
+> 
+> [...]
+> 
+> This series is starting to gain traction now, so it's probably time to start
+> thinking about implementing this for CONFIG_COMPAT on arm64. We currently
+> map a fake vectors page there, but this would be much more flexible,
+> particularly as its written in C (and so we would magically get any new
+> functions added to the 32-bit version).
+> 
+> So, there are a couple of questions that spring to mind:
+> 
+>   - How difficult is it to share the vdso code with arm64 to build a compat
+>     vdso? (getting the Makefile to work will be hard, as we'll need an arm
+>     toolchain...).
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/efm32gg-dk3750.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Not sure.  x86 might be the best example to work from here, although it
+has the advantage of everything living under arch/x86.  64-bit powerpc
+kernels provide a 32-bit VDSO for compat tasks but I think it doesn't
+really share code with the 64-bit VDSO.
 
-diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
-index b4031fa4a567..d5dd2a2a7970 100644
---- a/arch/arm/boot/dts/efm32gg-dk3750.dts
-+++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
-@@ -43,7 +43,7 @@
- 
- 		spi0: spi at 4000c000 { /* USART0 */
- 			cs-gpios = <&gpio 68 1>; // E4
--			location = <1>;
-+			efm32,location = <1>;
- 			status = "ok";
- 
- 			microsd at 0 {
-@@ -57,7 +57,7 @@
- 
- 		spi1: spi at 4000c400 { /* USART1 */
- 			cs-gpios = <&gpio 51 1>; // D3
--			location = <1>;
-+			efm32,location = <1>;
- 			status = "ok";
- 
- 			ks8851 at 0 {
-@@ -70,7 +70,7 @@
- 		};
- 
- 		uart4: uart at 4000e400 { /* UART1 */
--			location = <2>;
-+			efm32,location = <2>;
- 			status = "ok";
- 		};
- 
--- 
-2.0.0
+> 
+>   - If we use your code to build an arm64 vdso, how much slower is it than
+>     the handcrafted asm we currently have?
+
+Someone with access to 64-bit hardware (i.e. not me) would have to find
+this out, but I would not be surprised if the C code could be tightened
+up -- I have not spent much time on optimizing it.
