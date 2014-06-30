@@ -1,39 +1,48 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 17:02:38 +0300
-Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
-In-Reply-To: <53B16B06.6070206@samsung.com>
-References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
- <53B16B06.6070206@samsung.com>
-Message-ID: <1519968.Vijxn8Mc9S@vasilykh-desktop-i5>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 30 Jun 2014 16:07:40 +0200
+Subject: [GIT PULL 2/2] ARM: berlin: SoC changes for v3.17
+In-Reply-To: <1404137260-5876-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1404137260-5876-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1404137260-5876-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2014 15:49:58 Tomasz Figa wrote:
-> On 23.06.2014 22:29, Vasily Khoruzhick wrote:
-> > There's a several typos in a driver: 2410 instead of S3C2410
-> > and wrong argument to ARRAY_SIZE(). They prevent s3c2410
-> > from properly booting.
-> > 
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > ---
-> > 
-> >  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> Applied as a fix for 3.16.
+Arnd, Kevin, Olof,
 
-Hi Tomasz,
+This is round 1 of SoC related changes for Berlin SoCs.
 
-I also have clk fixes for s3c24xx touchscreen, framebuffer, adc, usb and nand 
-drivers (to replace clk_enable with clk_prepare_enable and clk_disable with 
-clk_disable_unprepare),
+There is only one patch from Antoine providing SMP on BG2 and BG2Q.
 
-Should they be merged through different trees or it's possible to merge them 
-through a single tree?
+Please pull.
 
-> 
-> Best regards,
-> Tomasz
+Thanks,
+  Sebastian
 
-Regards
-Vasily
+The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+
+  Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-3.17-1
+
+for you to fetch changes up to 7b7dfdd2b9927c1861bb6d03ca35261f1739aceb:
+
+  ARM: berlin: add SMP support (2014-06-16 13:16:44 +0200)
+
+----------------------------------------------------------------
+Berlin SoC changes for v3.17
+
+- SMP support for BG2 and BG2Q
+
+----------------------------------------------------------------
+Antoine T?nart (1):
+      ARM: berlin: add SMP support
+
+ arch/arm/mach-berlin/Kconfig   |  3 ++
+ arch/arm/mach-berlin/Makefile  |  3 +-
+ arch/arm/mach-berlin/headsmp.S | 30 +++++++++++++
+ arch/arm/mach-berlin/platsmp.c | 99 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 134 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-berlin/headsmp.S
+ create mode 100644 arch/arm/mach-berlin/platsmp.c
