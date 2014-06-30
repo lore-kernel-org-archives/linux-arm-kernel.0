@@ -1,63 +1,50 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Jun 2014 20:00:52 +0200
-Subject: [PATCH v2] i2c: s3c2410: resume the I2C controller earlier
-In-Reply-To: <1403654214-25072-1-git-send-email-dianders@chromium.org>
-References: <1403654214-25072-1-git-send-email-dianders@chromium.org>
-Message-ID: <53B1A5D4.6050904@samsung.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 30 Jun 2014 11:03:10 -0700
+Subject: [PATCH 2/2] arm: Add back maximum bank limit
+In-Reply-To: <20140630104350.600EDC40F52@trevor.secretlab.ca>
+References: <1404068784-27604-1-git-send-email-lauraa@codeaurora.org>	<1404068784-27604-2-git-send-email-lauraa@codeaurora.org>
+ <20140630104350.600EDC40F52@trevor.secretlab.ca>
+Message-ID: <53B1A65E.6050806@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On 25.06.2014 01:56, Doug Anderson wrote:
-> From: Vincent Palatin <vpalatin@chromium.org>
+On 6/30/2014 3:43 AM, Grant Likely wrote:
 > 
-> When the wake-up is triggered by the PMIC RTC, the RTC driver is trying
-> to read the PMIC interrupt status over I2C and fails because the I2C
-> controller is not resumed yet.
-> Let's resume the I2C controller earlier in the _noirq phase
-> (as other hardwares are doing), so we can properly get the wake-up
-> condition.
-> 
-> Signed-off-by: Vincent Palatin <vpalatin@chromium.org>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> Changes in v2:
-> - Added missing freeze/thaw/poweroff/restore
-> 
->  drivers/i2c/busses/i2c-s3c2410.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index e828a1d..ecb389c 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -1267,7 +1267,7 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
->  	return 0;
->  }
->  
-> -static int s3c24xx_i2c_resume(struct device *dev)
-> +static int s3c24xx_i2c_resume_noirq(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
-> @@ -1285,7 +1285,11 @@ static int s3c24xx_i2c_resume(struct device *dev)
->  static const struct dev_pm_ops s3c24xx_i2c_dev_pm_ops = {
->  #ifdef CONFIG_PM_SLEEP
->  	.suspend_noirq = s3c24xx_i2c_suspend_noirq,
-> -	.resume = s3c24xx_i2c_resume,
-> +	.resume_noirq = s3c24xx_i2c_resume_noirq,
-> +	.freeze_noirq = s3c24xx_i2c_suspend_noirq,
-> +	.thaw_noirq = s3c24xx_i2c_resume_noirq,
-> +	.poweroff_noirq = s3c24xx_i2c_suspend_noirq,
-> +	.restore_noirq = s3c24xx_i2c_resume_noirq,
->  #endif
->  };
+> Instead of splitting early_init_dt_scan(), the call to
+> early_init_dt_scan() could probably be moved after the
+> of_flat_dt_match_machine() call. It's at least worth a try. Looking at
+> the code I don't see anything obvious that requires the
+> early_init_dt_scan() code to run first.
+>
 
-Also fixes certain issues on Exynos4-based boards.
+of_flat_dt_match_machine -> of_flat_dt_match which uses
+initial_boot_params which isn't set until early_init_dt_scan. I had the
+same thought about just rearranging but we still need something to be
+set before doing the scan, hence the split.
+ 
+> Once you've got the mdesc pointer, you've could set the limit before
+> doing the full scan. Or, better yet because this is a fix for broken
+> data, you could call a dt_fixup hook on the mdesc. Then exynos is the
+> only platform that needs special treatment. The best thing for exynos to
+> do is fix the buggy data by clearing the bogus entries. Then there's no
+> need to reintroduce early_init_dt_add_memory_arch() for ARM.
+> 
 
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+The fixup hook does sound better. The flow would become
 
---
-Best regards,
-Tomasz
+setup_machine_fdt
+	- early_init_dt_verify
+	- of_flat_dt_match_machine
+	- mdesc->dt_fixup
+	- early_init_dt_scan_all
+
+I notice that powerpc already has a DT fixup infrastructure but I don't see
+any such thing for ARM. How much of that do you think could and should be
+leveraged for ARM?
+
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
