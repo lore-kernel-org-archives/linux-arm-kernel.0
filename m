@@ -1,81 +1,86 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jun 2014 17:19:20 +0200
-Subject: [GIT PULL] nommu fixes for 3.17-rc1
-In-Reply-To: <20140630144355.GH14781@pengutronix.de>
-References: <20140630144355.GH14781@pengutronix.de>
-Message-ID: <20140630151920.GI14781@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Jun 2014 17:19:06 +0200
+Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
+ A31 DMA controller
+In-Reply-To: <20140630142054.GA8756@leverpostej>
+References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140630142054.GA8756@leverpostej>
+Message-ID: <20140630151906.GG28647@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+On Mon, Jun 30, 2014 at 03:20:54PM +0100, Mark Rutland wrote:
+> Hi Maxime,
+> 
+> On Mon, Jun 30, 2014 at 02:20:54PM +0100, Maxime Ripard wrote:
+> > The Allwinner A31 has a 16 channels DMA controller that it shares with the
+> > newer A23. Although sharing some similarities with the DMA controller of the
+> > older Allwinner SoCs, it's significantly different, I don't expect it to be
+> > possible to share the driver for these two.
+> >
+> > The A31 Controller is able to memory-to-memory or memory-to-device transfers on
+> > the 16 channels in parallel.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  drivers/dma/Kconfig     |    8 +
+> >  drivers/dma/Makefile    |    1 +
+> >  drivers/dma/sun6i-dma.c | 1058 +++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 1067 insertions(+)
+> >  create mode 100644 drivers/dma/sun6i-dma.c
+> 
+> [...]
+> 
+> > +       sdc->clk = devm_clk_get(&pdev->dev, NULL);
+> > +       if (IS_ERR(sdc->clk)) {
+> > +               dev_err(&pdev->dev, "No clock specified\n");
+> > +               return PTR_ERR(sdc->clk);
+> > +       }
+> > +
+> > +       mux = clk_get(NULL, "ahb1_mux");
+> > +       if (IS_ERR(mux)) {
+> > +               dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
+> > +               return PTR_ERR(mux);
+> > +       }
+> > +
+> > +       pll6 = clk_get(NULL, "pll6");
+> > +       if (IS_ERR(pll6)) {
+> > +               dev_err(&pdev->dev, "Couldn't get PLL6\n");
+> > +               clk_put(mux);
+> > +               return PTR_ERR(pll6);
+> > +       }
+> 
+> I'm slightly confused. The binding listed a single unnamed clock (the
+> AHB clock). What is going on here?
 
-On Mon, Jun 30, 2014 at 04:43:55PM +0200, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-argh, I misstyped rmk's email alias and so the mail was sent to a wrong
-address. This mail is correct.
-
-Best regards
-Uwe
+The device itself needs only a single clock to work...
 
 > 
-> the following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+> > +       ret = clk_set_parent(mux, pll6);
+> > +       clk_put(pll6);
+> > +       clk_put(mux);
+> > +
+> > +       if (ret) {
+> > +               dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+> > +               return ret;
+> > +       }
 > 
->   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
-> 
-> for you to fetch changes up to 7343ab2ad6772f29d6bbb286a7aa0265a7aa5d3b:
-> 
->   ARM: make user_addr_max more robust (2014-06-30 15:48:30 +0200)
-> 
-> ----------------------------------------------------------------
-> A small collection of ARM-nommu related fixes and cleanups.
-> 
-> Regarding the small user base ("Hello, anyone out there apart from me?") and
-> the problem being fixed exists since 3.6-rc1 I don't consider the patches
-> serious enough to justify them going in before the next merge window.
-> 
-> This series makes efm32 boot again.
-> ----------------------------------------------------------------
-> 
-> I have chosen -rc3 as base because -rc1 and -rc2 don't work for me as
-> they don't have 6980c3e2514e (ARM: 8086/1: Set memblock limit for
-> nommu).
-> 
-> Uwe Kleine-K?nig (5):
->       ARM: nommu: drop support for ARM740T, ARM940T and ARM946E-S processors
->       ARM: nommu: don't limit TASK_SIZE
->       ARM: nommu: simplify definition of MODULES_END
->       ARM: nommu: drop unused Kconfig symbol DRAM_SIZE
->       ARM: make user_addr_max more robust
-> 
->  Documentation/devicetree/bindings/arm/cpus.txt |   3 -
->  arch/arm/Kconfig                               |   5 +-
->  arch/arm/Kconfig-nommu                         |   4 -
->  arch/arm/Makefile                              |   3 -
->  arch/arm/configs/at91x40_defconfig             |   1 -
->  arch/arm/configs/efm32_defconfig               |   1 -
->  arch/arm/include/asm/glue-cache.h              |  16 -
->  arch/arm/include/asm/glue-proc.h               |  27 --
->  arch/arm/include/asm/memory.h                  |  10 +-
->  arch/arm/include/asm/uaccess.h                 |   2 +-
->  arch/arm/mm/Kconfig                            |  67 +---
->  arch/arm/mm/Makefile                           |   3 -
->  arch/arm/mm/proc-arm740.S                      | 151 ---------
->  arch/arm/mm/proc-arm940.S                      | 374 ---------------------
->  arch/arm/mm/proc-arm946.S                      | 429 -------------------------
->  15 files changed, 12 insertions(+), 1084 deletions(-)
->  delete mode 100644 arch/arm/mm/proc-arm740.S
->  delete mode 100644 arch/arm/mm/proc-arm940.S
->  delete mode 100644 arch/arm/mm/proc-arm946.S
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
+> Why do we need to reparent the mux?
+
+... but will function only if this clock is derived from PLL6.
+
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/5f27ba48/attachment.sig>
