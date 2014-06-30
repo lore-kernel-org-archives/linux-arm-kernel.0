@@ -1,36 +1,80 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 30 Jun 2014 09:03:18 -0700
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <20140627085125.GA7088@hal>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <20140627085125.GA7088@hal>
-Message-ID: <53B18A46.1050902@mit.edu>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 30 Jun 2014 10:03:24 -0600
+Subject: [PATCH 6/9 v2] coresight-etm: add CoreSight ETM/PTM driver
+In-Reply-To: <53B14386.1040706@de.bosch.com>
+References: <1403892261-25026-1-git-send-email-mathieu.poirier@linaro.org>
+ <1403892261-25026-7-git-send-email-mathieu.poirier@linaro.org>
+ <53B14386.1040706@de.bosch.com>
+Message-ID: <CANLsYky_D3J0=b-zGuwP0kgV4m2ZY5Gw0ft1M7=LbePczc0N0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/27/2014 01:51 AM, Jan Glauber wrote:
-> On Sun, Jun 22, 2014 at 10:11:49PM -0500, Nathan Lynch wrote:
->> Provide fast userspace implementations of gettimeofday and
->> clock_gettime on systems that implement the generic timers extension
->> defined in ARMv7.  This follows the example of arm64 in conception but
->> significantly differs in some aspects of the implementation (C vs
->> assembly, mainly).
+On 30 June 2014 05:01, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> On 27.06.2014 20:04, mathieu.poirier at linaro.org wrote:
+>>
+>> From: Pratik Patel <pratikp@codeaurora.org>
+>>
+>> This driver manages CoreSight ETM (Embedded Trace Macrocell) that
+>> supports processor tracing. Currently supported version are ARM
+>> ETMv3.3, v3.5 and PTM.
+>>
+>> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+>> Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>   arch/arm/include/asm/hardware/cp14.h   |  540 ++++++++++++
+>>   drivers/coresight/Kconfig              |   19 +
+>>   drivers/coresight/Makefile             |    1 +
+>>   drivers/coresight/coresight-etm-cp14.c |  506 +++++++++++
+>>   drivers/coresight/coresight-etm.c      | 1507
+>> ++++++++++++++++++++++++++++++++
+>>   drivers/coresight/coresight-etm.h      |  192 ++++
+>>   6 files changed, 2765 insertions(+)
+>>   create mode 100644 arch/arm/include/asm/hardware/cp14.h
+>>   create mode 100644 drivers/coresight/coresight-etm-cp14.c
+>>   create mode 100644 drivers/coresight/coresight-etm.c
+>>   create mode 100644 drivers/coresight/coresight-etm.h
+>
+> ....
+>>
+>> diff --git a/drivers/coresight/coresight-etm-cp14.c
+>> b/drivers/coresight/coresight-etm-cp14.c
+>> new file mode 100644
+>> index 0000000..4173710
+>> --- /dev/null
+>> +++ b/drivers/coresight/coresight-etm-cp14.c
+>> @@ -0,0 +1,506 @@
+>> +/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/types.h>
+>> +#include <linux/bug.h>
+>> +#include <asm/hardware/cp14.h>
+>> +
+>> +#include <coresight-etm.h>
+>
+>
+> As coresight-etm.h is in drivers/coresight I had to use
+>
+> -#include <coresight-etm.h>
+> +#include "coresight-etm.h"
+>
+> Not sure if this somehow depends on the kernel version/tooling, though.
 
-Sorry for replying to the wrong email in the thread -- my gmane feed 
-missed the original.
+You mean that you got a compilation failure?
 
-One thing that might be nice to add is AT_VDSO_FINDSYM [1].  A lot of 
-userspace implementations (especially for static, embedded things) might 
-significantly prefer that style of entry point.
-
-If you want to use vdso2c for vdso image post-processing, I'd be happy 
-to try to make it available outside arch/x86 and to make it more 
-configurable as needed.
-
-Please use _install_special_mapping instead of install_special_mapping. 
-  AFAICS it's basically impossible to use install_special_mapping correctly.
-
-[1] 
-https://git.kernel.org/cgit/linux/kernel/git/luto/linux.git/log/?h=x86/vdso_findsym
-
---Andy
+>
+> Best regards
+>
+> Dirk
+>
