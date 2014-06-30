@@ -1,53 +1,45 @@
 From: vbridgers2013@gmail.com (Vince Bridgers)
-Date: Sun, 29 Jun 2014 20:35:08 -0500
-Subject: [PATCH net v2 1/3] dts: Add bindings for multicast hash bins and
- perfect filter entries
+Date: Sun, 29 Jun 2014 20:35:09 -0500
+Subject: [PATCH net v2 2/3] ARM: socfpga: Add socfpga Ethernet filter
+ attributes entries
 In-Reply-To: <1404092110-18667-1-git-send-email-vbridgers2013@gmail.com>
 References: <1404092110-18667-1-git-send-email-vbridgers2013@gmail.com>
-Message-ID: <1404092110-18667-2-git-send-email-vbridgers2013@gmail.com>
+Message-ID: <1404092110-18667-3-git-send-email-vbridgers2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change adds bindings for the number of multicast hash bins and perfect
-filter entries supported by the Synopsys EMAC. The Synopsys EMAC core is
-configurable at device creation time, and can be configured for a different
-number of multicast hash bins and a different number of perfect filter
-entries. The device does not provide a way to query these parameters,
-therefore parameters are required. The Altera Cyclone V SOC has support for
-256 multicast hash bins and 128 perfect filter entries, and is different
-than what's currently provided in the stmmac driver.
+This patch adds socfpga Ethernet filter attributes for multicast
+and unicast filters per Synopsys Ethernet IP configuration chosen
+by Altera for the Cyclone 5 and Arria SOC FPGAs.
 
 Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
-V2: None from last submission
+V2: None
 ---
- Documentation/devicetree/bindings/net/stmmac.txt |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/socfpga.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
-index a2acd2b..9b03c57 100644
---- a/Documentation/devicetree/bindings/net/stmmac.txt
-+++ b/Documentation/devicetree/bindings/net/stmmac.txt
-@@ -25,6 +25,10 @@ Required properties:
- - snps,force_sf_dma_mode	Force DMA to use the Store and Forward
- 				mode for both tx and rx. This flag is
- 				ignored if force_thresh_dma_mode is set.
-+- snps,multicast-filter-bins:	Number of multicast filter hash bins
-+				supported by this device instance
-+- snps,perfect-filter-entries:	Number of perfect filter entries supported
-+				by this device instance
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 4676f25..70fdd20 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -486,6 +486,8 @@
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC0_RESET>;
+ 			reset-names = "stmmaceth";
++			snps,multicast-filter-bins = <256>;
++			snps,perfect-filter-entries = <128>;
+ 			status = "disabled";
+ 		};
  
- Optional properties:
- - resets: Should contain a phandle to the STMMAC reset signal, if any
-@@ -47,6 +51,8 @@ Examples:
- 		mac-address = [000000000000]; /* Filled in by U-Boot */
- 		max-frame-size = <3800>;
- 		phy-mode = "gmii";
-+		snps,multicast-filter-bins = <256>;
-+		snps,perfect-filter-entries = <128>;
- 		clocks = <&clock>;
- 		clock-names = "stmmaceth">;
- 	};
+@@ -500,6 +502,8 @@
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC1_RESET>;
+ 			reset-names = "stmmaceth";
++			snps,multicast-filter-bins = <256>;
++			snps,perfect-filter-entries = <128>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.7.9.5
