@@ -1,47 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 30 Jun 2014 09:43:19 +0000 (UTC)
-Subject: [PATCH 2/3] ARM: OMAP3: PRM/CM: Add back macros used by TI
- DSP/Bridge driver
-In-Reply-To: <1403587467-59876-3-git-send-email-s-anna@ti.com>
-References: <1403587467-59876-1-git-send-email-s-anna@ti.com>
- <1403587467-59876-3-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1406300943050.24036@utopia.booyaka.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 30 Jun 2014 10:44:29 +0100
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <5279186.O063V9ZcHh@wuerfel>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <20140627232757.GB26184@ulmo> <53AEF81D.3080408@ti.com>
+ <5279186.O063V9ZcHh@wuerfel>
+Message-ID: <20140630094429.GD28951@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jun 2014, Suman Anna wrote:
-
-> The commit 7be914f {ARM: OMAP3: PRM/CM: Cleanup unused header} removed
-> some of the macros used by the TI DSP/Bridge driver. This fixes the
-> following build errors when trying to build DSP/Bridge driver (disabled
-> at present), otherwise results in the following build errors:
+On Mon, Jun 30, 2014 at 08:23:45AM +0100, Arnd Bergmann wrote:
+> On Saturday 28 June 2014 13:15:09 Santosh Shilimkar wrote:
+> > >> For SMP boot, ARMv8 expecting to have either PSCI based implementation or
+> > >> device tree based boot scheme. you can move towards that model if possible.
+> > > 
+> > > But we also have the code for SMP on 32-bit ARM. Should that remain in
+> > > arch/arm/mach-tegra or can it move to drivers/soc/tegra?
+> > > 
+> > You answered yourself. I don't see any point moving such a code to drivers
+> > which is really SMP bring up code for ARM 32 bit. For ARM 64 bit, as
+> > outline by maintainers (Catalin, Arnd), you should use PSCI or DT based
+> > boot scheme.
 > 
-> drivers/staging/tidspbridge/core/tiomap3430.c:531:31: error: 'OMAP3430_AUTO_IVA2_DPLL_SHIFT' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap3430.c:531:31: note: each undeclared identifier is reported only once for each function it appears in
-> make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430.o] Error 1
-> make[3]: *** Waiting for unfinished jobs....
-> drivers/staging/tidspbridge/core/tiomap_io.c: In function 'sm_interrupt_dsp':
-> drivers/staging/tidspbridge/core/tiomap_io.c:404:31: error: 'OMAP3430_AUTO_IVA2_DPLL_SHIFT' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap_io.c:404:31: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/staging/tidspbridge/core/tiomap_io.c:414:12: error: 'OMAP3430_IVA2_DPLL_FREQSEL_SHIFT' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap_io.c:415:12: error: 'OMAP3430_EN_IVA2_DPLL_SHIFT' undeclared (first use in this function)
-> make[3]: *** [drivers/staging/tidspbridge/core/tiomap_io.o] Error 1
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c: In function 'dsp_clk_wakeup_event_ctrl':
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:442:19: error: 'OMAP3430_GRPSEL_GPT5_MASK' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:442:19: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:455:19: error: 'OMAP3430_GRPSEL_GPT6_MASK' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:468:19: error: 'OMAP3430_GRPSEL_GPT7_MASK' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:481:19: error: 'OMAP3430_GRPSEL_GPT8_MASK' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:494:19: error: 'OMAP3430_GRPSEL_MCBSP1_MASK' undeclared (first use in this function)
-> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:546:19: error: 'OMAP3430_GRPSEL_MCBSP5_MASK' undeclared (first use in this function)
-> make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430_pwr.o] Error 1
-> make[2]: *** [drivers/staging/tidspbridge] Error 2
-> 
-> Fixes: 7be914f (ARM: OMAP3: PRM/CM: Cleanup unused header)
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+> I was hoping that one day we could unify the SMP bootup code with the
+> cpuidle infrastructure, as a lot of the underlying functions are shared
+> on the majority of SoCs. I have no plans to work on that myself though,
+> and it would have to be agreed on by the cpuidle maintainers.
 
-Thanks; queued for v3.16-rc.
+If you look at the arm64 implementation and Lorenzo's generic cpuidle
+code, that's not far off. Basically for arm64 we have a cpu_operations
+structure which implements boot, suspend, disable etc., placing SMP
+booting, hotplug and cpuidle together.
 
-- Paul
+While PSCI is the (strongly) recommended way, the current structure
+allows for other implementations and spin-table is an example (though
+this lacks any form of parking CPUs back to firmware). What I don't want
+to see is every platform implementing its own booting method for no good
+reasons and especially when functionality is duplicated with other
+platforms.
+
+In the tegra case, I suppose the arm32 implementation assumes Linux
+running in secure mode. On arm64 we don't support this (though it may
+work for certain configurations) and once you realise you need SMC calls
+for CPU up/down/suspend, I would rather standardise on PSCI (unless a
+better standard appears ;)).
+
+> For ARM64, the hope was indeed to use PSCI for all SoCs. I just have no
+> idea how that would be enforced for mobile SoCs that get shipped to
+> system integrators with an bootloader and kernel tree that doesn't even
+> get reviewed anywhere first.
+
+We can't enforce this but at least with enough "marketing" support, we
+can sell this as a good idea. For example, if one implements PSCI you
+get (generic) cpuidle for free (just DT bindings). That's definitely not
+enough and other things like a comprehensive validation suite for PSCI
+also helps (currently ARM only works on bare metal but it would be good
+to have a kernel-based test suite as well).
+
+-- 
+Catalin
