@@ -1,124 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 17:09:20 +0100
-Subject: [PATCH v6 03/21] arm64: GICv3 device tree binding documentation
-In-Reply-To: <1404140510-5382-4-git-send-email-marc.zyngier@arm.com>
-References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
- <1404140510-5382-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140630160920.GC28740@leverpostej>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 30 Jun 2014 18:11:50 +0200
+Subject: [PATCH v5 1/5] ARM: EXYNOS: Add support for mapping PMU base
+ address via DT
+In-Reply-To: <1403705032-14835-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1403705032-14835-1-git-send-email-pankaj.dubey@samsung.com>
+ <1403705032-14835-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <53B18C46.9010405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Pankaj,
 
-On Mon, Jun 30, 2014 at 04:01:32PM +0100, Marc Zyngier wrote:
-> Add the necessary documentation to support GICv3.
+In general the patch seems quite nice, but please see few comments inline.
+
+On 25.06.2014 16:03, Pankaj Dubey wrote:
+> Add support for mapping Samsung Power Management Unit (PMU)
+> base address from device tree.
 > 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-No-one's prepared to say they reviewed this?
-
-Let's fix that ;)
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
->  Documentation/devicetree/bindings/arm/gic-v3.txt | 79 ++++++++++++++++++++++++
->  1 file changed, 79 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
-> new file mode 100644
-> index 0000000..33cd05e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
-> @@ -0,0 +1,79 @@
-> +* ARM Generic Interrupt Controller, version 3
+>  arch/arm/mach-exynos/common.h |    1 +
+>  arch/arm/mach-exynos/exynos.c |   45 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
+
+[snip]
+
+> +static void exynos_map_pmu(void)
+> +{
+> +	struct device_node *np = NULL;
+
+nit: Unnecessary variable initialization.
+
 > +
-> +AArch64 SMP cores are often associated with a GICv3, providing Private
-> +Peripheral Interrupts (PPI), Shared Peripheral Interrupts (SPI),
-> +Software Generated Interrupts (SGI), and Locality-specific Peripheral
-> +Interrupts (LPI).
+> +	np = of_find_matching_node(NULL, exynos_dt_pmu_match);
 > +
-> +Main node required properties:
+
+nit: Unnecessary blank line.
+
+> +	if (!np) {
+> +		pr_err("Failed to find PMU node\n");
+> +		return;
+
+Returning here probably doesn't make too much sense, especially when you
+just panic if the mapping fails and you remove the static mapping in
+patch 2/5, so backwards compatibility isn't provided anyway.
+
+So something like this might be a better idea:
+
+	np = of_find_matching_node(NULL, exynos_dt_pmu_match);
+	if (np)
+		pmu_base_addr = of_iomap(np, 0);
+
+	if (!pmu_base_addr)
+		panic("failed to find exynos pmu register\n");
+
+> +	}
 > +
-> +- compatible : should at least contain  "arm,gic-v3".
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. Must be a single cell with a value of at least 3.
+> +	pmu_base_addr = of_iomap(np, 0);
 > +
-> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
-> +  interrupts. Other values are reserved for future use.
+> +	if (!pmu_base_addr)
+> +		panic("failed to find exynos pmu register\n");
+> +}
 > +
-> +  The 2nd cell contains the interrupt number for the interrupt type.
-> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
-> +  range [0-15].
-> +
-> +  The 3rd cell is the flags, encoded as follows:
-> +	bits[3:0] trigger type and level flags.
-> +		1 = edge triggered
-> +		4 = level triggered
-> +
-> +  Cells 4 and beyond are reserved for future use. When the 1st cell
-> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
-> +  ignored. It is recommended that padding cells have a value of 0.
-> +
-> +- reg : Specifies base physical address(s) and size of the GIC
-> +  registers, in the following order:
-> +  - GIC Distributor interface (GICD)
-> +  - GIC Redistributors (GICR), one range per redistributor region
-> +  - GIC CPU interface (GICC)
-> +  - GIC Hypervisor interface (GICH)
-> +  - GIC Virtual CPU interface (GICV)
-> +
-> +  GICC, GICH and GICV are optional.
-> +
-> +- interrupts : Interrupt source of the VGIC maintenance interrupt.
-> +
-> +Optional
-> +
-> +- redistributor-stride : If using padding pages, specifies the stride
-> +  of consecutive redistributors. Must be a multiple of 64kB.
-> +
-> +- #redistributor-regions: The number of independent contiguous regions
-> +  occupied by the redistributors. Required if more than one such
-> +  region is present.
-> +
-> +Examples:
-> +
-> +	gic: interrupt-controller at 2cf00000 {
-> +		compatible = "arm,gic-v3";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		reg = <0x0 0x2f000000 0 0x10000>,	// GICD
-> +		      <0x0 0x2f100000 0 0x200000>,	// GICR
-> +		      <0x0 0x2c000000 0 0x2000>,	// GICC
-> +		      <0x0 0x2c010000 0 0x2000>,	// GICH
-> +		      <0x0 0x2c020000 0 0x2000>;	// GICV
-> +		interrupts = <1 9 4>;
-> +	};
-> +
-> +	gic: interrupt-controller at 2c010000 {
-> +		compatible = "arm,gic-v3";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		redistributor-stride = <0x0 0x40000>;	// 256kB stride
-> +		#redistributor-regions = <2>;
-> +		reg = <0x0 0x2c010000 0 0x10000>,	// GICD
-> +		      <0x0 0x2d000000 0 0x800000>,	// GICR 1: CPUs 0-31
-> +		      <0x0 0x2e000000 0 0x800000>;	// GICR 2: CPUs 32-63
-> +		      <0x0 0x2c040000 0 0x2000>,	// GICC
-> +		      <0x0 0x2c060000 0 0x2000>,	// GICH
-> +		      <0x0 0x2c080000 0 0x2000>;	// GICV
-> +		interrupts = <1 9 4>;
-> +	};
-> -- 
-> 2.0.0
-> 
+> +static void __init exynos_init_time(void)
+> +{
+> +	/* Nothing to do timer specific.
+> +	 * Since platsmp.c needs pmu base address by the time
+> +	 * DT is not unflatten so we can't use DT APIs before
+> +	 * init_time
+> +	 */
+> +	exynos_map_pmu();
+
+Would moving this to .init_irq() callback work too? There are more
+things happening in .init_time() so it seems more fragile and some
+platforms (e.g. mach-tegra) do such platform-specific initialization in
+.init_irq() instead.
+
+Best regards,
+Tomasz
