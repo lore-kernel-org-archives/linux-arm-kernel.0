@@ -1,46 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 17:43:38 +0200
-Subject: [PATCH 09/16] ARM: mvebu: Make the snoop disable optional in
- mvebu_v7_pmsu_idle_prepare
-In-Reply-To: <1403875377-940-10-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-10-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140630174338.13604523@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 30 Jun 2014 11:43:37 -0400
+Subject: [PATCH v6 00/21] arm64: GICv3 support
+In-Reply-To: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
+References: <1404140510-5382-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140630154337.GR23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+Marc,
 
-On Fri, 27 Jun 2014 15:22:50 +0200, Gregory CLEMENT wrote:
+On Mon, Jun 30, 2014 at 04:01:29PM +0100, Marc Zyngier wrote:
+> I now have received enough Reviewed-by from people familiar with the
+> architecture, and a number of Tested-by from actual implementors,
+> which (IMHO) makes ready for merging into 3.17 (Thomas, Jason: How do
+> you want to play it? We have a rather big dependency between the first
+> few patches and the rest of the stuff, which is KVM only).
 
->  /* No locking is needed because we only access per-CPU registers */
-> -static void mvebu_v7_pmsu_idle_prepare(bool deepidle)
-> +static void mvebu_v7_pmsu_idle_prepare(bool deepidle, bool snoopdis)
+On a quick glance, it looks like patch #1 is conflict-prone and #2 crosses
+outside of irqchip/.  So, I could setup a topic branch for #1 that
+we'll both use.  Then I'll Ack #2 for you to take.  Would that work for
+you?
 
-I continue to find it odd to have more and more boolean arguments to a
-function to indicate what the function should do. It often indicates
-that the function should rather be split in smaller, fine-grained
-functions. Another sad consequence of using booleans is that the call
-sites of the functions can no longer be understood properly:
+thx,
 
-	mvebu_v7_pmsu_idle_prepare(false, true);
-	mvebu_v7_pmsu_idle_prepare(true, true);
-	mvebu_v7_pmsu_idle_prepare(false, false);
-
-But oh well, it looks like it's the easiest solution here, and I admit
-it's convenient to have one function to the entire business of
-preparing for idle.
-
-However, this change also badly conflicts with the CPU hotplug support
-that I have sent, and which is already part of linux-next, and for
-which Jason has sent a pull request to the arm-soc folks. See
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-mvebu/platsmp.c
-for the usage of the armada_370_xp_pmsu_idle_enter() function.
-
-Maybe your patch series should be based on mvebu/soc instead?
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason.
