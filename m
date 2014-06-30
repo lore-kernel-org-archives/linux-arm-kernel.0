@@ -1,24 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jun 2014 10:41:57 +0100
-Subject: [PATCH] Fixes gemmi_idle in file idle.c
-In-Reply-To: <1404096760-5239-1-git-send-email-xerofoify@gmail.com>
-References: <1404096760-5239-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <20140630094157.GT32514@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 30 Jun 2014 09:43:19 +0000 (UTC)
+Subject: [PATCH 2/3] ARM: OMAP3: PRM/CM: Add back macros used by TI
+ DSP/Bridge driver
+In-Reply-To: <1403587467-59876-3-git-send-email-s-anna@ti.com>
+References: <1403587467-59876-1-git-send-email-s-anna@ti.com>
+ <1403587467-59876-3-git-send-email-s-anna@ti.com>
+Message-ID: <alpine.DEB.2.02.1406300943050.24036@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 10:52:40PM -0400, Nicholas Krause wrote:
-> disables the IRQ line in gemmi_idle before calling cpu_do_idle.
-> In addition, according to the Fixme message in this file fixes
-> races that may occur due to not disabling the IRQ before calling
-> cpu_do_idle.
+On Tue, 24 Jun 2014, Suman Anna wrote:
 
-1) the idle method is called with interrupts already disabled.
-2) I wonder if you read the comment above the comment you removed, and
-   if so, why it wasn't removed.
-3) can you indicate how the hardware problem has been fixed, or give some
-   justification why this change should be accepted.
+> The commit 7be914f {ARM: OMAP3: PRM/CM: Cleanup unused header} removed
+> some of the macros used by the TI DSP/Bridge driver. This fixes the
+> following build errors when trying to build DSP/Bridge driver (disabled
+> at present), otherwise results in the following build errors:
+> 
+> drivers/staging/tidspbridge/core/tiomap3430.c:531:31: error: 'OMAP3430_AUTO_IVA2_DPLL_SHIFT' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap3430.c:531:31: note: each undeclared identifier is reported only once for each function it appears in
+> make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430.o] Error 1
+> make[3]: *** Waiting for unfinished jobs....
+> drivers/staging/tidspbridge/core/tiomap_io.c: In function 'sm_interrupt_dsp':
+> drivers/staging/tidspbridge/core/tiomap_io.c:404:31: error: 'OMAP3430_AUTO_IVA2_DPLL_SHIFT' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap_io.c:404:31: note: each undeclared identifier is reported only once for each function it appears in
+> drivers/staging/tidspbridge/core/tiomap_io.c:414:12: error: 'OMAP3430_IVA2_DPLL_FREQSEL_SHIFT' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap_io.c:415:12: error: 'OMAP3430_EN_IVA2_DPLL_SHIFT' undeclared (first use in this function)
+> make[3]: *** [drivers/staging/tidspbridge/core/tiomap_io.o] Error 1
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c: In function 'dsp_clk_wakeup_event_ctrl':
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:442:19: error: 'OMAP3430_GRPSEL_GPT5_MASK' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:442:19: note: each undeclared identifier is reported only once for each function it appears in
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:455:19: error: 'OMAP3430_GRPSEL_GPT6_MASK' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:468:19: error: 'OMAP3430_GRPSEL_GPT7_MASK' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:481:19: error: 'OMAP3430_GRPSEL_GPT8_MASK' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:494:19: error: 'OMAP3430_GRPSEL_MCBSP1_MASK' undeclared (first use in this function)
+> drivers/staging/tidspbridge/core/tiomap3430_pwr.c:546:19: error: 'OMAP3430_GRPSEL_MCBSP5_MASK' undeclared (first use in this function)
+> make[3]: *** [drivers/staging/tidspbridge/core/tiomap3430_pwr.o] Error 1
+> make[2]: *** [drivers/staging/tidspbridge] Error 2
+> 
+> Fixes: 7be914f (ARM: OMAP3: PRM/CM: Cleanup unused header)
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thanks; queued for v3.16-rc.
+
+- Paul
