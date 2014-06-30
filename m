@@ -1,61 +1,70 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 01 Jul 2014 06:32:13 +0900
-Subject: [PATCH 03/17] spi: s3c64xx: remove s5p64x0 related spi codes
-In-Reply-To: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
-References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1404163947-3105-4-git-send-email-kgene.kim@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  1 Jul 2014 00:04:59 +0800
+Subject: [PATCH] pinctrl: sunxi: Fix multi bank interrupt support in
+ gpio_to_irq
+Message-ID: <1404144299-740-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes s5p64x0 related spi because of no more support for
-s5p64x0 SoCs. Meanwhile, cleanup SPI DT bindings for s5p6440-spi, it
-should be s5p64x0-spi instead.
+When mapping the interrupts, the gpio_to_irq function did not consider
+the bank number of the gpio pin in question, only the offset or the
+interrupt number in the bank. As a result, requests for interrupts in
+the later banks get mapped to the first bank.
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Mark Brown <broonie@linaro.org>
+This issue was discovered while enabling mmc on the new sun8i platform.
+The tablet I have uses a pin/interrupt from the second bank to do mmc
+card detection. Tested on this very device with register inspection and
+actual mmc card insertion/removal.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/spi/spi-samsung.txt |    1 -
- drivers/spi/spi-s3c64xx.c                             |    9 ---------
- 2 files changed, 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index 86aa061..fe6f903 100644
---- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -8,7 +8,6 @@ Required SoC Specific Properties:
- - compatible: should be one of the following.
-     - samsung,s3c2443-spi: for s3c2443, s3c2416 and s3c2450 platforms
-     - samsung,s3c6410-spi: for s3c6410 platforms
--    - samsung,s5p6440-spi: for s5p6440 and s5p6450 platforms
-     - samsung,s5pv210-spi: for s5pv210 and s5pc110 platforms
-     - samsung,exynos4210-spi: for exynos4 and exynos5 platforms
+Hi,
+
+This patch fixes gpios from the later banks used as external interrupts.
+With this, mmc card detection works correctly on my A23 tablet. this
+should also get MMC card detection working on the Mele M9.
+
+This patch applies to pinctrl/for-next (4aba0a02ff8). It is a follow-up
+fix for Maxime's multiple bank external interrupt support for sunxi pinctrl.
+It is orthogonal to Hans' level/edge triggered gpio irqs series. It should
+apply cleanly either way.
+
+
+Cheers
+ChenYu
+
+---
+
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 66c3b42..33a5e87 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -521,6 +521,7 @@ static int sunxi_pinctrl_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct sunxi_pinctrl *pctl = dev_get_drvdata(chip->dev);
+ 	struct sunxi_desc_function *desc;
++	unsigned irqnum;
  
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 75a5696..4a1890a 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1323,12 +1323,6 @@ static struct s3c64xx_spi_port_config s3c6410_spi_port_config = {
- 	.tx_st_done	= 21,
- };
+ 	if (offset >= chip->ngpio)
+ 		return -ENXIO;
+@@ -529,10 +530,12 @@ static int sunxi_pinctrl_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ 	if (!desc)
+ 		return -EINVAL;
  
--static struct s3c64xx_spi_port_config s5p64x0_spi_port_config = {
--	.fifo_lvl_mask	= { 0x1ff, 0x7F },
--	.rx_lvl_offset	= 15,
--	.tx_st_done	= 25,
--};
--
- static struct s3c64xx_spi_port_config s5pc100_spi_port_config = {
- 	.fifo_lvl_mask	= { 0x7f, 0x7F },
- 	.rx_lvl_offset	= 13,
-@@ -1368,9 +1362,6 @@ static struct platform_device_id s3c64xx_spi_driver_ids[] = {
- 		.name		= "s3c6410-spi",
- 		.driver_data	= (kernel_ulong_t)&s3c6410_spi_port_config,
- 	}, {
--		.name		= "s5p64x0-spi",
--		.driver_data	= (kernel_ulong_t)&s5p64x0_spi_port_config,
--	}, {
- 		.name		= "s5pc100-spi",
- 		.driver_data	= (kernel_ulong_t)&s5pc100_spi_port_config,
- 	}, {
++	irqnum = desc->irqbank * IRQ_PER_BANK + desc->irqnum;
++
+ 	dev_dbg(chip->dev, "%s: request IRQ for GPIO %d, return %d\n",
+-		chip->label, offset + chip->base, desc->irqnum);
++		chip->label, offset + chip->base, irqnum);
+ 
+-	return irq_find_mapping(pctl->domain, desc->irqnum);
++	return irq_find_mapping(pctl->domain, irqnum);
+ }
+ 
+ 
 -- 
-1.7.10.4
+2.0.0
