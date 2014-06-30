@@ -1,117 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Jun 2014 00:08:57 -0700
-Subject: [GIT PULL] omap fixes against v3.16-rc1
-In-Reply-To: <20140617145854.GT17845@atomide.com>
-References: <20140617145854.GT17845@atomide.com>
-Message-ID: <20140630070857.GK28884@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jun 2014 09:20:30 +0200
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <20140628204025.GA16415@ulmo>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
+Message-ID: <7497427.LQy8pJts8f@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140617 08:01]:
-> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
+On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
+> > > pmc.c implements various routines to access the power management
+> > > controller, some of which is needed by suspend/resume, some of it is
+> > > needed by SMP. powergate.c implements a subset of the PMC that needs to
+> > > be exported to drivers to enable power partitions on the SoC. I'm not
+> > > aware of subsystems that deal with this kind of driver.
+> > >
+> > Please see above.
 > 
->   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-against-rc1
-> 
-> for you to fetch changes up to edc56f871eefbc56baf1fd981eeff35ef447925c:
-> 
->   ARM: dts: dra7-evm: remove interrupt binding (2014-06-17 01:22:55 -0700)
-> 
-> ----------------------------------------------------------------
-> Fixes for omaps for issues discovered during the merge window and
-> enabling of a few features that had to wait for the driver
-> dependencies to clear.
-> 
-> The fixes included are:
-> 
-> - Fix am43xx hard reset flags
-> 
-> - Fix SoC detection for DRA722
-> 
-> - Fix CPU OPP table for omap5
-> 
-> - Fix legacy mux parser bug if requested muxname is a prefix of
->   multiple mux entries
-> 
-> - Fix qspi interrupt binding that relies on the irq crossbar
->   that has not yet been enabled
-> 
-> - Add missing phy_sel for am43x-epos-evm
-> 
-> - Drop unused gic_init_irq() that is no longer needed
-> 
-> And the enabling of features that had driver dependencies are:
-> 
-> - Change dra7 to use Audio Tracking Logic clock instead of a fixed
->   clock now that the clock driver for it has been merged
-> 
-> - Enable off idle configuration for selected omaps as all the kernel
->   dependencies for device tree based booting are finally merged as
->   this is needed to get the automated PM tests working finally with
->   device tree based booting
-> 
-> - Add hwmod entry for ocp2scp3 for omap5 to get sata working as
->   all the driver dependencies are now in the kernel and this patch
->   fell through the cracks during the merge window
+> Like I said, I don't see what business suspend/resume related code has
+> in drivers/power. What we're talking about here really is functionality
+> very specific to Tegra. Also some of that code needs to be run at very
+> early points in the boot process, so we can't reasonably turn it into a
+> proper driver anyway.
 
-Ping, it's already -rc3 and these are still pending?
+I believe the powergate.c stuff can be changed into pm_domain code, but
+we don't have a good subsystem with generic DT bindings yet, so that
+may need some more groundwork first. drivers/power or a subdirectory
+of that may end up being the right place though.
 
-Regards,
+> Also, the real win we get from moving code out into drivers/ is if we
+> can provide a common framework for them. I don't see how we can possibly
+> do that for this code since there simply isn't enough commonality
+> between SoCs. At the same time we now have a situation where both 32-bit
+> and 64-bit variants of some SoCs share some of the same hardware at the
+> very low level and since we don't have mach-* directories for 64-bit ARM
+> and shouldn't be duplicating code either, we need to find a new home for
+> this type of code. drivers/soc seemed to fit perfectly well.
 
-Tony
+For the low-level stuff yes, but I agree with Santosh there needs to be
+some more work trying to split out individual high-level drivers.
 
- 
-> ----------------------------------------------------------------
-> Brian Norris (1):
->       ARM: OMAP2+: drop unused function
-> 
-> Dave Gerlach (1):
->       ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
-> 
-> David R. Piegdon (1):
->       ARM: OMAP2+: Fix parser-bug in platform muxing code
-> 
-> George Cherian (1):
->       ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for am43x-epos-evm
-> 
-> Keshava Munegowda (1):
->       ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
-> 
-> Nishanth Menon (2):
->       ARM: DRA722: add detection of SoC information
->       ARM: dts: omap5: Update CPU OPP table as per final production Manual
-> 
-> Peter Ujfalusi (1):
->       ARM: DTS: dra7/dra7xx-clocks: ATL related changes
-> 
-> Sourav Poddar (1):
->       ARM: dts: dra7-evm: remove interrupt binding
-> 
-> Tony Lindgren (2):
->       ARM: dts: Enable twl4030 off-idle configuration for selected omaps
->       Merge tag 'for-v3.16-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/fixes
-> 
->  arch/arm/boot/dts/am43x-epos-evm.dts       |  4 ++
->  arch/arm/boot/dts/dra7.dtsi                | 12 ++++-
->  arch/arm/boot/dts/dra7xx-clocks.dtsi       | 16 +++----
->  arch/arm/boot/dts/omap3-beagle-xm.dts      |  6 +++
->  arch/arm/boot/dts/omap3-evm-common.dtsi    |  7 +++
->  arch/arm/boot/dts/omap3-n900.dts           |  5 ++
->  arch/arm/boot/dts/omap5.dtsi               |  1 -
->  arch/arm/mach-omap2/Makefile               |  6 ++-
->  arch/arm/mach-omap2/cm33xx.h               |  2 +-
->  arch/arm/mach-omap2/common.h               |  1 -
->  arch/arm/mach-omap2/id.c                   | 12 +++++
->  arch/arm/mach-omap2/mux.c                  |  6 ++-
->  arch/arm/mach-omap2/omap4-common.c         | 20 --------
->  arch/arm/mach-omap2/omap_hwmod.c           |  6 +--
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 73 ++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/soc.h                  |  1 +
->  16 files changed, 139 insertions(+), 39 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+There are two common patterns for the interface between the low-level
+register access and the more high-level stuff:  you can either use
+a "syscon" driver that just exports a struct regmap and that gets referenced
+from other drivers using a phandle in their device nodes, or you have
+a driver in drivers/soc that exports a somewhat higher-level interface
+and comes with its own header file that gets included by other drivers.
+At the moment, the syscon/regmap variant can only be used once device
+drivers are loaded, but there is some broad agreement that it should
+be changed to allow calling syscon_regmap_lookup_by_phandle() at
+early boot using just DT accessors.
+
+	Arnd
