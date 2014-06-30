@@ -1,26 +1,21 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 30 Jun 2014 15:50:22 +0200
-Subject: [PATCH 3/6] clk: samsung: exynos4: Remove SRC_MASK_ISP gates
-In-Reply-To: <1403618235-19353-4-git-send-email-t.figa@samsung.com>
-References: <1403618235-19353-1-git-send-email-t.figa@samsung.com>
- <1403618235-19353-4-git-send-email-t.figa@samsung.com>
-Message-ID: <53B16B1E.8090206@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Jun 2014 14:52:32 +0100
+Subject: [STLinux Kernel] [PATCH 4/5] phy: miphy365x: Represent each PHY
+ channel as a subnode
+In-Reply-To: <53B160CD.9090201@st.com>
+References: <1404133317-25953-1-git-send-email-lee.jones@linaro.org>
+ <1404133317-25953-5-git-send-email-lee.jones@linaro.org>
+ <53B160CD.9090201@st.com>
+Message-ID: <20140630135232.GA25926@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.06.2014 15:57, Tomasz Figa wrote:
-> ISP special clocks have dedicated gating registers and so MUX SRC_MASK
-> register should not be used. This patch fixes the problem of
-> Exynos4x12-based boards freezing on system suspend, because those
-> mux outputs need not to be masked while suspending.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
->  drivers/clk/samsung/clk-exynos4.c | 16 ++++------------
->  1 file changed, 4 insertions(+), 12 deletions(-)
+> 	No description, no sign-off?
 
-Applied as a fix for 3.16.
+Ah bum.  More haste, less speed.  Will fix.
 
-Best regards,
-Tomasz
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
