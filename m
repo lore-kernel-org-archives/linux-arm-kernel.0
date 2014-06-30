@@ -1,87 +1,117 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 30 Jun 2014 09:04:21 +0200
-Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
-In-Reply-To: <20140630041226.GB3329@shlinux2>
-References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
- <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
- <20140630041226.GB3329@shlinux2>
-Message-ID: <20140630070421.GI8053@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Jun 2014 00:08:57 -0700
+Subject: [GIT PULL] omap fixes against v3.16-rc1
+In-Reply-To: <20140617145854.GT17845@atomide.com>
+References: <20140617145854.GT17845@atomide.com>
+Message-ID: <20140630070857.GK28884@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Mon, Jun 30, 2014 at 12:12:27PM +0800, Shawn Guo wrote:
-> On Wed, Jun 25, 2014 at 01:01:31PM +0200, Steffen Trumtrar wrote:
-> > Most peripherals on the i.MX53 have an
-> > 	Off-Platform Peripheral Access Control Register (OPACR)
-> > in which the access rights (together with the MPROT registers) can be declared.
-> > However, this does not seem to work for example for SSI1+SDMA, because the
-> > supervisor bit is not set for the SDMA unit.
-> > It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
-> > works because it does NOT have an OPACR.
-> > 
-> > The right solution would be to fix the access rights for the SDMA, but the unit
-> > responsible for this is the Central Security Unit (CSU), which of course is NOT
-> > documented. So, until documentation for this is openly available, turn off the
-> > supervisor protection because it cripples the hardware.
-> > 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > ---
-> >  arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> > index 2bad387..380c7ee 100644
-> > --- a/arch/arm/mach-imx/mach-imx53.c
-> > +++ b/arch/arm/mach-imx/mach-imx53.c
-> > @@ -15,6 +15,7 @@
-> >  #include <linux/err.h>
-> >  #include <linux/io.h>
-> >  #include <linux/irq.h>
-> > +#include <linux/of_address.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_platform.h>
-> >  #include <asm/mach/arch.h>
-> > @@ -24,11 +25,24 @@
-> >  #include "hardware.h"
-> >  #include "mx53.h"
-> >  
-> > +static const struct of_device_id aips_of_matches[] __initconst = {
-> > +	{ .compatible = "fsl,imx53-aipstz" },
-> > +	{ /*sentinel*/ }
-> > +};
-> > +
-> >  static void __init imx53_dt_init(void)
-> >  {
-> > +	void __iomem *aips_base_addr;
-> > +	struct device_node *np;
-> > +
-> >  	mxc_arch_reset_init_dt();
-> >  
-> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > +
-> > +	for_each_matching_node(np, aips_of_matches) {
-> > +		aips_base_addr = of_iomap(np, 0);
-> > +		imx_set_aips(aips_base_addr);
-> > +	}
+* Tony Lindgren <tony@atomide.com> [140617 08:01]:
+> The following changes since commit 7171511eaec5bf23fb06078f59784a3a0626b38f:
 > 
-> The same code pattern might be needed for i.MX31 and i.MX35 device tree
-> support later.  Can we have a helper for it, so that i.MX3 DT conversion
-> can benefit from it?
+>   Linux 3.16-rc1 (2014-06-15 17:45:28 -1000)
 > 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.16/fixes-against-rc1
+> 
+> for you to fetch changes up to edc56f871eefbc56baf1fd981eeff35ef447925c:
+> 
+>   ARM: dts: dra7-evm: remove interrupt binding (2014-06-17 01:22:55 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for omaps for issues discovered during the merge window and
+> enabling of a few features that had to wait for the driver
+> dependencies to clear.
+> 
+> The fixes included are:
+> 
+> - Fix am43xx hard reset flags
+> 
+> - Fix SoC detection for DRA722
+> 
+> - Fix CPU OPP table for omap5
+> 
+> - Fix legacy mux parser bug if requested muxname is a prefix of
+>   multiple mux entries
+> 
+> - Fix qspi interrupt binding that relies on the irq crossbar
+>   that has not yet been enabled
+> 
+> - Add missing phy_sel for am43x-epos-evm
+> 
+> - Drop unused gic_init_irq() that is no longer needed
+> 
+> And the enabling of features that had driver dependencies are:
+> 
+> - Change dra7 to use Audio Tracking Logic clock instead of a fixed
+>   clock now that the clock driver for it has been merged
+> 
+> - Enable off idle configuration for selected omaps as all the kernel
+>   dependencies for device tree based booting are finally merged as
+>   this is needed to get the automated PM tests working finally with
+>   device tree based booting
+> 
+> - Add hwmod entry for ocp2scp3 for omap5 to get sata working as
+>   all the driver dependencies are now in the kernel and this patch
+>   fell through the cracks during the merge window
 
-What would be the best place to put this? common.h?
-Maybe we should then also rename the imx_set_aips to imx_disable_supervisor,
-because that is basically what the function does.
-If I understood our graphics department correctly, the i.MX6 needs this, too,
-for the VPU (?).
+Ping, it's already -rc3 and these are still pending?
 
 Regards,
-Steffen
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
+
+ 
+> ----------------------------------------------------------------
+> Brian Norris (1):
+>       ARM: OMAP2+: drop unused function
+> 
+> Dave Gerlach (1):
+>       ARM: OMAP2+: hwmod: Change hardreset soc_ops for AM43XX
+> 
+> David R. Piegdon (1):
+>       ARM: OMAP2+: Fix parser-bug in platform muxing code
+> 
+> George Cherian (1):
+>       ARM: dts: am43x-epos-evm: Add Missing cpsw-phy-sel for am43x-epos-evm
+> 
+> Keshava Munegowda (1):
+>       ARM: OMAP5: hwmod: Add ocp2scp3 and sata hwmods
+> 
+> Nishanth Menon (2):
+>       ARM: DRA722: add detection of SoC information
+>       ARM: dts: omap5: Update CPU OPP table as per final production Manual
+> 
+> Peter Ujfalusi (1):
+>       ARM: DTS: dra7/dra7xx-clocks: ATL related changes
+> 
+> Sourav Poddar (1):
+>       ARM: dts: dra7-evm: remove interrupt binding
+> 
+> Tony Lindgren (2):
+>       ARM: dts: Enable twl4030 off-idle configuration for selected omaps
+>       Merge tag 'for-v3.16-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.16/fixes
+> 
+>  arch/arm/boot/dts/am43x-epos-evm.dts       |  4 ++
+>  arch/arm/boot/dts/dra7.dtsi                | 12 ++++-
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi       | 16 +++----
+>  arch/arm/boot/dts/omap3-beagle-xm.dts      |  6 +++
+>  arch/arm/boot/dts/omap3-evm-common.dtsi    |  7 +++
+>  arch/arm/boot/dts/omap3-n900.dts           |  5 ++
+>  arch/arm/boot/dts/omap5.dtsi               |  1 -
+>  arch/arm/mach-omap2/Makefile               |  6 ++-
+>  arch/arm/mach-omap2/cm33xx.h               |  2 +-
+>  arch/arm/mach-omap2/common.h               |  1 -
+>  arch/arm/mach-omap2/id.c                   | 12 +++++
+>  arch/arm/mach-omap2/mux.c                  |  6 ++-
+>  arch/arm/mach-omap2/omap4-common.c         | 20 --------
+>  arch/arm/mach-omap2/omap_hwmod.c           |  6 +--
+>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 73 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/soc.h                  |  1 +
+>  16 files changed, 139 insertions(+), 39 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
