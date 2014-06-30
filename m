@@ -1,61 +1,36 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 30 Jun 2014 11:00:25 -0500
-Subject: [PATCH 2/6] mailbox/omap: add support for parsing dt devices
-In-Reply-To: <20140628170709.GB23634@xo-6d-61-c0.localdomain>
-References: <1403660878-56350-1-git-send-email-s-anna@ti.com>
- <1403660878-56350-3-git-send-email-s-anna@ti.com>
- <20140628170709.GB23634@xo-6d-61-c0.localdomain>
-Message-ID: <53B18999.2020506@ti.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Mon, 30 Jun 2014 09:03:18 -0700
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <20140627085125.GA7088@hal>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <20140627085125.GA7088@hal>
+Message-ID: <53B18A46.1050902@mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On 06/27/2014 01:51 AM, Jan Glauber wrote:
+> On Sun, Jun 22, 2014 at 10:11:49PM -0500, Nathan Lynch wrote:
+>> Provide fast userspace implementations of gettimeofday and
+>> clock_gettime on systems that implement the generic timers extension
+>> defined in ARMv7.  This follows the example of arm64 in conception but
+>> significantly differs in some aspects of the implementation (C vs
+>> assembly, mainly).
 
-On 06/28/2014 12:07 PM, Pavel Machek wrote:
-> Hi!
-> 
->> The non-DT support has to be maintained for now to not break
->> OMAP3 legacy boot, and the legacy-style code will be cleaned
->> up once OMAP3 is also converted to DT-boot only.
-> 
->> @@ -587,24 +606,157 @@ static int omap_mbox_unregister(struct omap_mbox_device *mdev)
->>  	return 0;
->>  }
->>  
->> +static const struct omap_mbox_device_data omap2_data = {
->> +	.num_users	= 4,
->> +	.num_fifos	= 6,
->> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
->> +};
->> +
->> +static const struct omap_mbox_device_data omap3_data = {
->> +	.num_users	= 2,
->> +	.num_fifos	= 2,
->> +	.intr_type	= MBOX_INTR_CFG_TYPE1,
->> +};
->> +
->> +static const struct omap_mbox_device_data am335x_data = {
->> +	.num_users	= 4,
->> +	.num_fifos	= 8,
->> +	.intr_type	= MBOX_INTR_CFG_TYPE2,
->> +};
-> 
-> So you use compatible strings to look up 3 integers. Would it be better to have
-> num_users/num_fifos/intr_type directly in the device tree? That should be cleaner
-> and more flexible...
-> 
-> If you do that, would it be possible to have share compatible string?
+Sorry for replying to the wrong email in the thread -- my gmane feed 
+missed the original.
 
-Yeah, I have actually encoded the .num_users and .num_fifos in DT in the
-previous version [1] with shared compatible strings, but dropped those
-properties in favour of adding minimal custom properties to DT based on
-some offline IRC comments. I have no objections either way, but there is
-really nothing to be gained from minimizing compatible strings.
+One thing that might be nice to add is AT_VDSO_FINDSYM [1].  A lot of 
+userspace implementations (especially for static, embedded things) might 
+significantly prefer that style of entry point.
 
-Tony,
-Any comments on this?
+If you want to use vdso2c for vdso image post-processing, I'd be happy 
+to try to make it available outside arch/x86 and to make it more 
+configurable as needed.
 
-regards
-Suman
+Please use _install_special_mapping instead of install_special_mapping. 
+  AFAICS it's basically impossible to use install_special_mapping correctly.
 
-[1] https://patchwork.kernel.org/patch/2839662/
+[1] 
+https://git.kernel.org/cgit/linux/kernel/git/luto/linux.git/log/?h=x86/vdso_findsym
+
+--Andy
