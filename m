@@ -1,73 +1,76 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 30 Jun 2014 11:52:52 -0500
-Subject: [Patch v7 1/3] usb: dwc3: Add Qualcomm DWC3 glue layer driver
-In-Reply-To: <1404144233-17222-2-git-send-email-agross@codeaurora.org>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
- <1404144233-17222-2-git-send-email-agross@codeaurora.org>
-Message-ID: <20140630165252.GC31442@saruman.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Jun 2014 18:49:00 +0200
+Subject: [PATCH] regulator: convert to use gpio_desc internally
+In-Reply-To: <20140630163931.GD32514@n2100.arm.linux.org.uk>
+References: <E1X1IOQ-0007fV-1w@rmk-PC.arm.linux.org.uk>
+ <CACRpkdY_w=Vjv0fL5Ay-CkCpvuyjvwyBhOd4wYr0LcmJD6i4qA@mail.gmail.com>
+ <20140630163931.GD32514@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkda5BjAwphVEkCg6-oUR0yN=RMhjP6FL=Oripy7bQ-aSng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 30, 2014 at 6:39 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-On Mon, Jun 30, 2014 at 11:03:51AM -0500, Andy Gross wrote:
-> +static int dwc3_qcom_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct dwc3_qcom *qdwc;
-> +	int ret = 0;
-> +
-> +	qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
-> +	if (!qdwc)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, qdwc);
-> +
-> +	qdwc->dev = &pdev->dev;
-> +
-> +	qdwc->gdsc = devm_regulator_get(qdwc->dev, "gdsc");
-> +
-> +	qdwc->core_clk = devm_clk_get(qdwc->dev, "core");
-> +	if (IS_ERR(qdwc->core_clk)) {
-> +		dev_dbg(qdwc->dev, "failed to get core clock\n");
-> +		return PTR_ERR(qdwc->core_clk);
-> +	}
-> +
-> +	qdwc->iface_clk = devm_clk_get(qdwc->dev, "iface");
-> +	if (IS_ERR(qdwc->iface_clk)) {
-> +		dev_dbg(qdwc->dev, "failed to get iface clock, skipping\n");
-> +		qdwc->iface_clk = NULL;
+> Bear in mind that Mark has already committed this patch - rather too
+> hastily I think.  I've no idea why he didn't wait for your review
+> before doing so, that would have been the appropriate thing to have
+> done.
 
-so this clock and sleep_clk are optional, that's fine...
+Well, he's usually just as quick at pulling them out when there
+is trouble so let's hope that happens.
 
-> +	}
-> +
-> +	qdwc->sleep_clk = devm_clk_get(qdwc->dev, "sleep");
-> +	if (IS_ERR(qdwc->sleep_clk)) {
-> +		dev_dbg(qdwc->dev, "failed to get sleep clock, skipping\n");
-> +		qdwc->sleep_clk = NULL;
-> +	}
-> +
-> +	if (!IS_ERR(qdwc->gdsc)) {
-> +		ret = regulator_enable(qdwc->gdsc);
-> +		if (ret)
-> +			dev_err(qdwc->dev, "cannot enable gdsc\n");
-> +	}
-> +
-> +	clk_prepare_enable(qdwc->core_clk);
-> +
-> +	if (qdwc->iface_clk)
-> +		clk_prepare_enable(qdwc->iface_clk);
+>> >  #include <linux/gpio.h>
+>>
+>> ^ This include should not be needed anymore after using
+>> <linux/gpio/consumer.h> I presume?
+>
+> No, because we still need to use the legacy API to request the GPIO.
 
-... right here you can drop the NULL check because clk_prepare_enable()
-is safe against NULL pointers.
+Oh :-/
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/6fa2844b/attachment.sig>
+I have a hard time seeing that mixture here due to the nature
+of patch, sorry.
+
+>> > @@ -1660,10 +1661,13 @@ static int regulator_ena_gpio_request(struct regulator_dev *rdev,
+>> >                                 const struct regulator_config *config)
+>> >  {
+>> >         struct regulator_enable_gpio *pin;
+>> > +       struct gpio_desc *gpiod;
+>> >         int ret;
+>> >
+>> > +       gpiod = gpio_to_desc(config->ena_gpio);
+>>
+>> So this point is where we will optionally first look for a descriptor
+>> from the device
+>> itself, like devm_gpiod_get(&rdev->dev, "enable"); or so. (For a later
+>> patch.) That
+>> should work smoothly with DT I think (but haven't tried, admittedly).
+>
+> This is where the problem comes.  devm_gpiod_get() can only be used once
+> per GPIO, so there's no sharing possible when using this interface.
+> Since we need to share GPIOs here, we can't use any GPIO interface which
+> ensures exclusivity.
+>
+> Consider the case where you have two regulators wired up to a single
+> control GPIO.  DT would specify the same GPIO in two regulator
+> descriptions.  The GPIO interfaces will allow the GPIO to be "got"
+> for the first regulator to be probed, and fail the second one with
+> -EBUSY.
+>
+> That's what this code is trying to avoid.
+
+OK that's a snag.
+
+Alexandre: do you have a good idea about how we solve the
+multiple consumer problem for GPIO descriptors?
+
+I can think of things like tagging lines as allowing multiple consumers
+in the gpiochip (in the gpiochip node, in the DT case) or simply just
+allowing this for any GPIO, or just allow it if obtained using a certain
+variant gpiod_multiple_consumer_get() call.
+
+Ideas?
+
+Yours,
+Linus Walleij
