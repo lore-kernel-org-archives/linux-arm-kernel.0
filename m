@@ -1,63 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 30 Jun 2014 12:49:50 +0200
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <20140630102512.GE28951@arm.com>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53ADAA1C.70407@ti.com> <20140627232757.GB26184@ulmo>
- <20140630102512.GE28951@arm.com>
-Message-ID: <20140630104949.GB1495@ulmo>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Jun 2014 11:52:06 +0100
+Subject: [PATCH 1/5] iommu/arm-smmu: fix calculation of TCR.T0SZ
+In-Reply-To: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+References: <1404125530-17984-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1404125530-17984-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 11:25:12AM +0100, Catalin Marinas wrote:
-> On Sat, Jun 28, 2014 at 12:27:58AM +0100, Thierry Reding wrote:
-> > On Fri, Jun 27, 2014 at 01:30:04PM -0400, Santosh Shilimkar wrote:
-> > > On Friday 27 June 2014 12:58 PM, Thierry Reding wrote:
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra114.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra20.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra30.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.h (91%)
-> > > This should go into drivers/idle/*. if you have dependencies, please sort
-> > > them out.
-> > 
-> > What exactly is the difference between drivers/idle and drivers/cpuidle?
-> > There's an intel_idle driver in drivers/idle that includes cpuidle.h and
-> > registers with that subsystem. But there's also an i7300_idle driver
-> > that doesn't.
-> > 
-> > drivers/cpuidle seems like a better fit. I'll look into moving the code
-> > there.
-> 
-> Actually, please look at Lorenzo's generic cpuidle series. Basically
-> most cpuidle drivers simply define some C states and call the
-> corresponding platform back-end. On arm64, we aim to separate the
-> back-end in the cpu_operations structure and just have a generic cpuidle
-> driver with states defined in the DT (and passed to the back-end).
-> 
-> As for the back-end, what about using PSCI?
-> 
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset-handler.S (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.h (97%)
-> > > subsystem: drivers/power/reset/
-> > 
-> > drivers/power/reset seems to be for drivers that register functions to
-> > reset a board. The above code for Tegra doesn't do that. Rather it sets
-> > up the reset handlers for secondary CPUs and for suspend/resume.
-> 
-> PSCI again?
+T0SZ controls the input address range for TTBR0, so use the input
+address range rather than the output address range for the calculation.
+For stage-2, this means using the output size of stage-1.
 
-I have yet to look at what exactly needs to be done on 64-bit Tegra to
-get CPUs up. So I'll revisit this part of the patches when that's
-happened. It may yet turn out that most of this doesn't need to be
-shared after all.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/8dfcac35/attachment.sig>
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 1599354e974d..81e8ec290756 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -800,6 +800,8 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+ 			reg = TTBCR_TG0_64K;
+ 
+ 		if (!stage1) {
++			reg |= (64 - smmu->s1_output_size) << TTBCR_T0SZ_SHIFT;
++
+ 			switch (smmu->s2_output_size) {
+ 			case 32:
+ 				reg |= (TTBCR2_ADDR_32 << TTBCR_PASIZE_SHIFT);
+@@ -821,7 +823,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
+ 				break;
+ 			}
+ 		} else {
+-			reg |= (64 - smmu->s1_output_size) << TTBCR_T0SZ_SHIFT;
++			reg |= (64 - smmu->input_size) << TTBCR_T0SZ_SHIFT;
+ 		}
+ 	} else {
+ 		reg = 0;
+-- 
+2.0.0
