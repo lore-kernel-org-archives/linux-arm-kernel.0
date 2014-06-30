@@ -1,32 +1,49 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 20:50:02 +0200
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17
-In-Reply-To: <20140630174432.GW23978@titan.lakedaemon.net>
-References: <20140627124655.GF23978@titan.lakedaemon.net>
- <20140628162302.48b6b835@free-electrons.com>
- <20140628150706.GM23978@titan.lakedaemon.net>
- <20140628172044.4231c32d@free-electrons.com>
- <20140630122216.6ea35ac9@free-electrons.com>
- <20140630174432.GW23978@titan.lakedaemon.net>
-Message-ID: <20140630205002.50096488@free-electrons.com>
+Date: Mon, 30 Jun 2014 20:50:59 +0200
+Subject: [PATCHv5 1/3] ARM: mm: add support for HW coherent systems in
+ PL310 cache
+In-Reply-To: <20140630173217.GT28951@arm.com>
+References: <1402585772-10405-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1402585772-10405-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140630173217.GT28951@arm.com>
+Message-ID: <20140630205059.2e7b2278@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Dear Catalin Marinas,
 
-On Mon, 30 Jun 2014 13:44:32 -0400, Jason Cooper wrote:
+On Mon, 30 Jun 2014 18:32:17 +0100, Catalin Marinas wrote:
 
-> > > All in all, I'm hoping for the series at
-> > > https://www.mail-archive.com/devicetree at vger.kernel.org/msg30473.html
-> > > to fully show up in 3.16, because it's really related to fixing a
-> > > serious PCIe deadlock (can be triggered in under a minute of PCIe
-> > > usage).
-> > 
-> > Now that Russell is pushing PATCH 1/3 in the 3.16-rc cycle, can you
-> > push PATCH 2/3 and PATCH 3/3 pointed above into the 3.16-rc cycle as
-> > well?
+> > +/*
+> >   * Note that the end addresses passed to Linux primitives are
+> >   * noninclusive, while the hardware cache range operations use
+> >   * inclusive start and end addresses.
+> > @@ -1487,6 +1514,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+> >  
+> >  	data = of_match_node(l2x0_ids, np)->data;
+> >  
+> > +	if (of_device_is_compatible(np, "arm,pl310-cache") &&
+> > +	    of_property_read_bool(np, "arm,io-coherent"))
+> > +		data = &of_l2c310_coherent_data;
 > 
-> 2 and 3 are now in mvebu/fixes.
+> I don't have a better way without duplicating the l2c_init_data
+> structure since the fixup function does not take a device_node
+> pointer. If it did, you could have added the check in l2c310_fixup and
+> zeroed the sync pointer there.
+> 
+> Anyway, your approach works for me as well:
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Thanks for the confirmation. Note that it comes a bit too late though:
+the patch is already in 3.16-rc3:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mm/cache-l2x0.c?id=98ea2dba65932ffc456b6d7b11b8a0624e2f7b95.
+
+However, I'm interested in hearing your opinion about the I/O coherency
+discussion in !SMP, and especially whether the TTB flags need to be
+consistent with the PMD flags in terms of cache policy and
+shareability. See
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/263524.html.
 
 Thanks!
 
