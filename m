@@ -1,59 +1,59 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 30 Jun 2014 14:46:21 +0300
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <20140630102512.GE28951@arm.com>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53ADAA1C.70407@ti.com> <20140627232757.GB26184@ulmo>
- <20140630102512.GE28951@arm.com>
-Message-ID: <20140630114621.GT3679@tbergstrom-lnx.Nvidia.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 30 Jun 2014 20:49:18 +0900
+Subject: [PATCHv2 4/5] ARM: dts: rockchip: unuse the slot-node and deprecated
+ the supports-highspeed for dw-mmc
+In-Reply-To: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
+References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <1404128960-27225-5-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 12:25:12PM +0200, Catalin Marinas wrote:
-> On Sat, Jun 28, 2014 at 12:27:58AM +0100, Thierry Reding wrote:
-> > On Fri, Jun 27, 2014 at 01:30:04PM -0400, Santosh Shilimkar wrote:
-> > > On Friday 27 June 2014 12:58 PM, Thierry Reding wrote:
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra114.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra20.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle-tegra30.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/cpuidle.h (91%)
-> > > This should go into drivers/idle/*. if you have dependencies, please sort
-> > > them out.
-> > 
-> > What exactly is the difference between drivers/idle and drivers/cpuidle?
-> > There's an intel_idle driver in drivers/idle that includes cpuidle.h and
-> > registers with that subsystem. But there's also an i7300_idle driver
-> > that doesn't.
-> > 
-> > drivers/cpuidle seems like a better fit. I'll look into moving the code
-> > there.
-> 
-> Actually, please look at Lorenzo's generic cpuidle series. Basically
-> most cpuidle drivers simply define some C states and call the
-> corresponding platform back-end. On arm64, we aim to separate the
-> back-end in the cpu_operations structure and just have a generic cpuidle
-> driver with states defined in the DT (and passed to the back-end).
-> 
-> As for the back-end, what about using PSCI?
-> 
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset-handler.S (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.c (100%)
-> > > >  rename {arch/arm/mach-tegra => drivers/soc/tegra}/reset.h (97%)
-> > > subsystem: drivers/power/reset/
-> > 
-> > drivers/power/reset seems to be for drivers that register functions to
-> > reset a board. The above code for Tegra doesn't do that. Rather it sets
-> > up the reset handlers for secondary CPUs and for suspend/resume.
-> 
-> PSCI again?
+dw-mmc controller can support multiple slots.
+But, there are no use-cases anywhere. So we don't need to support the
+slot-node for dw-mmc controller.
+And "supports-highspeed" property in dw-mmc is deprecated.
+"supports-highspeed" property can be replaced to "cap-sd/mmc-highspeed".
 
-Not possible for boards where linux runs in NS (roth and tn7). The secure
-monitor on those is outside our control and does not implement PSCI. There
-might be some value for Tegra114 and Tegra124 if we would like to use HYP
-mode, but that's not on the radar today. It's a waste of time for Tegra20
-and Tegra30.
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+Reviewed-by: Tushar Behera <trblinux@gmail.com>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts |   16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-Cheers,
-
-Peter.
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index afb3273..ecea889 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+@@ -59,12 +59,8 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
+ 			vmmc-supply = <&vcc_sd0>;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-				disable-wp;
+-			};
++			bus-width = <4>;
++			disable-wp;
+ 		};
+ 
+ 		dwmmc at 10218000 { /* wifi */
+@@ -74,12 +70,8 @@
+ 
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
+-
+-			slot at 0 {
+-				reg = <0>;
+-				bus-width = <4>;
+-				disable-wp;
+-			};
++			bus-width = <4>;
++			disable-wp;
+ 		};
+ 
+ 		gpio-keys {
+-- 
+1.7.9.5
