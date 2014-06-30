@@ -1,129 +1,116 @@
 From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 30 Jun 2014 09:51:51 -0700
-Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+Date: Mon, 30 Jun 2014 09:51:50 -0700
+Subject: [RFC/PATCH 1/7] iommu: msm: Rename iommu driver files
 In-Reply-To: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
 References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <1404147116-4598-2-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mapping and unmapping are more often than not in the critical path.
-map_range and unmap_range allows SMMU driver implementations to optimize
-the process of mapping and unmapping buffers into the SMMU page tables.
-Instead of mapping one physical address, do TLB operation (expensive),
-mapping, do TLB operation, mapping, do TLB operation the driver can map
-a scatter-gatherlist of physically contiguous pages into one virtual
-address space and then at the end do one TLB operation.
-
-Additionally, the mapping operation would be faster in general since
-clients does not have to keep calling map API over and over again for
-each physically contiguous chunk of memory that needs to be mapped to a
-virtually contiguous region.
+Rename the MSM IOMMU driver for MSM8960 SoC to "-v0" version to align
+with hardware version number for next generation MSM IOMMU (v1).
 
 Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
 ---
- drivers/iommu/iommu.c | 24 ++++++++++++++++++++++++
- include/linux/iommu.h | 24 ++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
+ arch/arm/configs/qcom_defconfig                          |  2 +-
+ drivers/iommu/Kconfig                                    | 11 +++++++++--
+ drivers/iommu/Makefile                                   |  2 +-
+ drivers/iommu/{msm_iommu.c => msm_iommu-v0.c}            |  2 +-
+ drivers/iommu/{msm_iommu_dev.c => msm_iommu_dev-v0.c}    |  2 +-
+ drivers/iommu/{msm_iommu_hw-8xxx.h => msm_iommu_hw-v0.h} |  0
+ 6 files changed, 13 insertions(+), 6 deletions(-)
+ rename drivers/iommu/{msm_iommu.c => msm_iommu-v0.c} (99%)
+ rename drivers/iommu/{msm_iommu_dev.c => msm_iommu_dev-v0.c} (99%)
+ rename drivers/iommu/{msm_iommu_hw-8xxx.h => msm_iommu_hw-v0.h} (100%)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index e5555fc..f2a6b80 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -898,6 +898,30 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
- EXPORT_SYMBOL_GPL(iommu_unmap);
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 42ebd72..0414889 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -136,7 +136,7 @@ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
+-CONFIG_MSM_IOMMU=y
++CONFIG_MSM_IOMMU_V0=y
+ CONFIG_GENERIC_PHY=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index d260605..705a257 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -28,12 +28,19 @@ config FSL_PAMU
+ 	  transaction types.
  
+ # MSM IOMMU support
++
++# MSM_IOMMU always gets selected by whoever wants it.
+ config MSM_IOMMU
+-	bool "MSM IOMMU Support"
++	bool
++
++# MSM IOMMUv0 support
++config MSM_IOMMU_V0
++	bool "MSM IOMMUv0 Support"
+ 	depends on ARCH_MSM8X60 || ARCH_MSM8960
+ 	select IOMMU_API
++	select MSM_IOMMU
+ 	help
+-	  Support for the IOMMUs found on certain Qualcomm SOCs.
++	  Support for the IOMMUs (v0) found on certain Qualcomm SOCs.
+ 	  These IOMMUs allow virtualization of the address space used by most
+ 	  cores within the multimedia subsystem.
  
-+int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
-+		    struct scatterlist *sg, unsigned int len, int prot)
-+{
-+	if (unlikely(domain->ops->map_range == NULL))
-+		return -ENODEV;
-+
-+	BUG_ON(iova & (~PAGE_MASK));
-+
-+	return domain->ops->map_range(domain, iova, sg, len, prot);
-+}
-+EXPORT_SYMBOL_GPL(iommu_map_range);
-+
-+int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
-+		      unsigned int len)
-+{
-+	if (unlikely(domain->ops->unmap_range == NULL))
-+		return -ENODEV;
-+
-+	BUG_ON(iova & (~PAGE_MASK));
-+
-+	return domain->ops->unmap_range(domain, iova, len);
-+}
-+EXPORT_SYMBOL_GPL(iommu_unmap_range);
-+
- int iommu_domain_window_enable(struct iommu_domain *domain, u32 wnd_nr,
- 			       phys_addr_t paddr, u64 size, int prot)
- {
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index b96a5b2..63dca6d 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -22,6 +22,7 @@
- #include <linux/errno.h>
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index 8893bad..894ced9 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -1,7 +1,7 @@
+ obj-$(CONFIG_IOMMU_API) += iommu.o
+ obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+ obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
+-obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
++obj-$(CONFIG_MSM_IOMMU_V0) += msm_iommu-v0.o msm_iommu_dev-v0.o
+ obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
+ obj-$(CONFIG_AMD_IOMMU_V2) += amd_iommu_v2.o
+ obj-$(CONFIG_ARM_SMMU) += arm-smmu.o
+diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu-v0.c
+similarity index 99%
+rename from drivers/iommu/msm_iommu.c
+rename to drivers/iommu/msm_iommu-v0.c
+index f5ff657..17731061 100644
+--- a/drivers/iommu/msm_iommu.c
++++ b/drivers/iommu/msm_iommu-v0.c
+@@ -31,7 +31,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/sizes.h>
+ 
+-#include "msm_iommu_hw-8xxx.h"
++#include "msm_iommu_hw-v0.h"
+ #include "msm_iommu.h"
+ 
+ #define MRC(reg, processor, op1, crn, crm, op2)				\
+diff --git a/drivers/iommu/msm_iommu_dev.c b/drivers/iommu/msm_iommu_dev-v0.c
+similarity index 99%
+rename from drivers/iommu/msm_iommu_dev.c
+rename to drivers/iommu/msm_iommu_dev-v0.c
+index 61def7cb..2f86e46 100644
+--- a/drivers/iommu/msm_iommu_dev.c
++++ b/drivers/iommu/msm_iommu_dev-v0.c
+@@ -27,7 +27,7 @@
  #include <linux/err.h>
- #include <linux/types.h>
-+#include <linux/scatterlist.h>
- #include <trace/events/iommu.h>
+ #include <linux/slab.h>
  
- #define IOMMU_READ	(1 << 0)
-@@ -93,6 +94,8 @@ enum iommu_attr {
-  * @detach_dev: detach device from an iommu domain
-  * @map: map a physically contiguous memory region to an iommu domain
-  * @unmap: unmap a physically contiguous memory region from an iommu domain
-+ * @map_range: map a scatter-gather list of physically contiguous memory chunks to an iommu domain
-+ * @unmap_range: unmap a scatter-gather list of physically contiguous memory chunks from an iommu domain
-  * @iova_to_phys: translate iova to physical address
-  * @domain_has_cap: domain capabilities query
-  * @add_device: add device to iommu grouping
-@@ -110,6 +113,10 @@ struct iommu_ops {
- 		   phys_addr_t paddr, size_t size, int prot);
- 	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
- 		     size_t size);
-+	int (*map_range)(struct iommu_domain *domain, unsigned int iova,
-+		    struct scatterlist *sg, unsigned int len, int prot);
-+	int (*unmap_range)(struct iommu_domain *domain, unsigned int iova,
-+		      unsigned int len);
- 	phys_addr_t (*iova_to_phys)(struct iommu_domain *domain, dma_addr_t iova);
- 	int (*domain_has_cap)(struct iommu_domain *domain,
- 			      unsigned long cap);
-@@ -153,6 +160,10 @@ extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
- 		     phys_addr_t paddr, size_t size, int prot);
- extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
- 		       size_t size);
-+extern int iommu_map_range(struct iommu_domain *domain, unsigned int iova,
-+		    struct scatterlist *sg, unsigned int len, int prot);
-+extern int iommu_unmap_range(struct iommu_domain *domain, unsigned int iova,
-+		      unsigned int len);
- extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova);
- extern int iommu_domain_has_cap(struct iommu_domain *domain,
- 				unsigned long cap);
-@@ -280,6 +291,19 @@ static inline int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return -ENODEV;
- }
+-#include "msm_iommu_hw-8xxx.h"
++#include "msm_iommu_hw-v0.h"
+ #include "msm_iommu.h"
  
-+static inline int iommu_map_range(struct iommu_domain *domain,
-+				  unsigned int iova, struct scatterlist *sg,
-+				  unsigned int len, int prot)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int iommu_unmap_range(struct iommu_domain *domain,
-+				    unsigned int iova, unsigned int len)
-+{
-+	return -ENODEV;
-+}
-+
- static inline int iommu_domain_window_enable(struct iommu_domain *domain,
- 					     u32 wnd_nr, phys_addr_t paddr,
- 					     u64 size, int prot)
+ struct iommu_ctx_iter_data {
+diff --git a/drivers/iommu/msm_iommu_hw-8xxx.h b/drivers/iommu/msm_iommu_hw-v0.h
+similarity index 100%
+rename from drivers/iommu/msm_iommu_hw-8xxx.h
+rename to drivers/iommu/msm_iommu_hw-v0.h
 -- 
 The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
