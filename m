@@ -1,61 +1,112 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Jun 2014 11:36:49 +0100
-Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
-In-Reply-To: <20140630090118.GA24128@ulmo>
-References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
- <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
- <7497427.LQy8pJts8f@wuerfel> <20140630090118.GA24128@ulmo>
-Message-ID: <20140630103649.GF28951@arm.com>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Mon, 30 Jun 2014 03:39:15 -0700
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <9034CBD80F070943B59700D7F8149ED9A0875776@SC-VEXCH4.marvell.com>
+References: <1398133596-29170-1-git-send-email-zhangwm@marvell.com>
+ <20140422103642.GF7484@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3B59B@SC-VEXCH4.marvell.com>
+ <20140423170821.GJ5649@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
+ <5360FB07.5030407@arm.com>
+ <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+ <20140513184503.GF16388@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+ <537337F3.4080300@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875776@SC-VEXCH4.marvell.com>
+Message-ID: <9034CBD80F070943B59700D7F8149ED90182308172@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 10:01:19AM +0100, Thierry Reding wrote:
-> On Mon, Jun 30, 2014 at 09:20:30AM +0200, Arnd Bergmann wrote:
-> > On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
-> > > Also, the real win we get from moving code out into drivers/ is if we
-> > > can provide a common framework for them. I don't see how we can possibly
-> > > do that for this code since there simply isn't enough commonality
-> > > between SoCs. At the same time we now have a situation where both 32-bit
-> > > and 64-bit variants of some SoCs share some of the same hardware at the
-> > > very low level and since we don't have mach-* directories for 64-bit ARM
-> > > and shouldn't be duplicating code either, we need to find a new home for
-> > > this type of code. drivers/soc seemed to fit perfectly well.
-> > 
-> > For the low-level stuff yes, but I agree with Santosh there needs to be
-> > some more work trying to split out individual high-level drivers.
-> > 
-> > There are two common patterns for the interface between the low-level
-> > register access and the more high-level stuff:  you can either use
-> > a "syscon" driver that just exports a struct regmap and that gets referenced
-> > from other drivers using a phandle in their device nodes, or you have
-> > a driver in drivers/soc that exports a somewhat higher-level interface
-> > and comes with its own header file that gets included by other drivers.
-> > At the moment, the syscon/regmap variant can only be used once device
-> > drivers are loaded, but there is some broad agreement that it should
-> > be changed to allow calling syscon_regmap_lookup_by_phandle() at
-> > early boot using just DT accessors.
+Sudeep & Will?
+
+> -----Original Message-----
+> From: Neil Zhang
+> Sent: 2014?5?21? 19:47
+> To: 'Sudeep Holla'; Will Deacon
+> Cc: 'linux at arm.linux.org.uk'; 'linux-arm-kernel at lists.infradead.org';
+> 'linux-kernel at vger.kernel.org'; 'devicetree at vger.kernel.org'
+> Subject: RE: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
 > 
-> Note that we already have all these drivers and they do work for earlier
-> Tegra generations. My attempt to move these out of arch/arm/mach-tegra
-> is merely about being able to share them with upcoming 64-bit variants.
-> So it's not about adding new functionality but rather about keeping the
-> existing level of functionality on 64-bit.
+> Sudeep?
+> 
+> > -----Original Message-----
+> > From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> > Sent: 2014?5?14? 17:32
+> > To: Neil Zhang; Will Deacon
+> > Cc: Sudeep Holla; 'linux at arm.linux.org.uk';
+> > 'linux-arm-kernel at lists.infradead.org';
+> > 'linux-kernel at vger.kernel.org'; 'devicetree at vger.kernel.org'
+> > Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm
+> > notifier
+> >
+> >
+> >
+> > On 14/05/14 03:28, Neil Zhang wrote:
+> > >> -----Original Message-----
+> > >> From: Will Deacon [mailto:will.deacon at arm.com]
+> > >> Sent: 2014?5?14? 2:45
+> > >> To: Neil Zhang
+> > >> Cc: Sudeep Holla; 'linux at arm.linux.org.uk';
+> > >> 'linux-arm-kernel at lists.infradead.org';
+> > >> 'linux-kernel at vger.kernel.org'; 'devicetree at vger.kernel.org'
+> > >> Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm
+> > >> notifier
+> > >>
+> > >> On Mon, May 12, 2014 at 11:22:09AM +0100, Neil Zhang wrote:
+> > >>>>> The device tree bindings for power domains is under discussion
+> > >>>>> [1]
+> > >>>>
+> > >>>> Thanks for the information.
+> > >>>> But it currently for device only, core related stuff are not supported.
+> > >>>> And is it really good to register power provider for core and let
+> > >>>> vfp / pmu etc to get it?
+> > >>>>
+> > >>>
+> > >>> What's your suggestion about it?
+> > >>> Is it OK that I add it under the PMU node?
+> > >>
+> > >> I don't really mind. I just want to avoid re-inventing the wheel in
+> > >> a PMU-specific way and having to maintain that code forever because
+> > >> it ended up in our DT description.
+> > >>
+> > >> Will
+> > >
+> > > I will prepare another patch to add DT description under PMU since
+> > > there is no generic power domain support for pm notifier if no other
+> > concerns.
+> > > We can change the manner if there is generic power domain support
+> > > for
+> > pm notifier later.
+> > > Thanks.
+> >
+> > No, please don't add any DT bindings for power domains specific to PMU
+> > node.
+> > We can't change the DT bindings once added.
+> >
+> > As I pointed out the DT bindings for generic power domains are under
+> > discussion.
+> > See if you can reuse it, if not help in extending it so that it can be used.
+> >
+> 
+> Sorry for reply later.
+> As I said before the under discussed generic power domain is not suitable for
+> CPU peripherals since they are all known belong to CPU or cluster power
+> domain.
+> If we want to follow the way they are discussion, we need to register core
+> and cluster power provider, and need vfp/gic/pmu etc to require them.
+> Is it really suitable?
+> 
+Do you have any comments?
+If no, I would like to put it under PMU node.
 
-Only that for arm64 we try to do things slightly differently and not
-because we just like to but because we want better standardisation
-across SoCs. One example is the booting protocol. Another example, you
-don't get some early initcalls for your SoC (no machine descriptor). The
-hardware should be configured by firmware in such a way that it boots at
-least up to arch_initcall() level (ideally, we should move anything to
-device_initcall() but it's not always easy).
+> > Regards,
+> > Sudeep
+> >
+> >
+> 
+> Best Regards,
+> Neil Zhang
 
-> I'm not a fan of the syscon/regmap approach at all and the existing
-> drivers use a higher-level API already, so I think we're going to stick
-> with that.
-
-It's not about whether you are a fan of it or not but whether we can get
-more code sharing across several SoCs and not just between tegra arm32
-and arm64 versions.
-
--- 
-Catalin
+Best Regards,
+Neil Zhang
