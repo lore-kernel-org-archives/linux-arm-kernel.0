@@ -1,91 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jun 2014 14:49:19 +0200
-Subject: [PATCH v2 1/2] ARM: topology: Use a clock if possible to get the
- CPU frequency
-In-Reply-To: <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
-References: <1404123143-13041-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404123143-13041-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140630102934.GV32514@n2100.arm.linux.org.uk>
- <CAKfTPtC+XcH122AytyZ=x1JVx9THmxCasJLA3Z1e17X_OmH1xA@mail.gmail.com>
-Message-ID: <20140630124919.GC28647@lukather>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jun 2014 14:50:27 +0200
+Subject: [PATCH 05/16] ARM: mvebu: Add workaround for cpuidle support
+ for Armada 370
+In-Reply-To: <1403875377-940-6-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140630145027.3b583cfa@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 12:39:26PM +0200, Vincent Guittot wrote:
-> On 30 June 2014 12:29, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Mon, Jun 30, 2014 at 12:12:22PM +0200, Maxime Ripard wrote:
-> >> The Cortex-A7 and Cortex-A15 based SoCs need a clock-frequency property in the
-> >> topology code.
-> >>
-> >> Allow to use a clock to provide the same information.
-> >>
-> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >
-> > This looks fine to me, but I don't know this code.  Maybe Vincent Guittot
-> > should be on the To: list (added)?
+Dear Gregory CLEMENT,
+
+On Fri, 27 Jun 2014 15:22:46 +0200, Gregory CLEMENT wrote:
+> On Armada 370, there is "a slow exit process from the deep idle state
+> due to heavy L1/L2 cache cleanup operations performed by the BootROM
+> software" (cf errata GL-BootROM-10). To avoid this, we replace the
+> restart code of the BootROM by a simple jump to the boot address. Then
+> the code located at this boot address will take care of the
+> initialization.
 > 
-> Thanks
+> For this purpose, we use the common function mvebu_boot_addr_wa()
+> introduced in the previous commit.
 
-Ah, sorry for that.
+"in the previous commit" would make sense if the commit immediately
+before this one in the series was the one you would be referencing. But
+that's not the case here, so it should be either: "introduced in one of
+the previous commits", or better "introduced in commit <title of the
+commit>".
 
-> 
-> >
-> >> ---
-> >>  arch/arm/kernel/topology.c | 25 ++++++++++++++++++-------
-> >>  1 file changed, 18 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> >> index 9d853189028b..268443d88094 100644
-> >> --- a/arch/arm/kernel/topology.c
-> >> +++ b/arch/arm/kernel/topology.c
-> >> @@ -11,6 +11,7 @@
-> >>   * for more details.
-> >>   */
-> >>
-> >> +#include <linux/clk.h>
-> >>  #include <linux/cpu.h>
-> >>  #include <linux/cpumask.h>
-> >>  #include <linux/export.h>
-> >> @@ -100,8 +101,8 @@ static void __init parse_dt_topology(void)
-> >>                                GFP_NOWAIT);
-> >>
-> >>       for_each_possible_cpu(cpu) {
-> >> -             const u32 *rate;
-> >> -             int len;
-> >> +             struct clk *clk;
-> >> +             u32 rate = 0;
-> >>
-> >>               /* too early to use cpu->of_node */
-> >>               cn = of_get_cpu_node(cpu, NULL);
-> >> @@ -117,14 +118,24 @@ static void __init parse_dt_topology(void)
-> >>               if (cpu_eff->compatible == NULL)
-> >>                       continue;
-> >>
-> >> -             rate = of_get_property(cn, "clock-frequency", &len);
-> >> -             if (!rate || len != 4) {
-> >> -                     pr_err("%s missing clock-frequency property\n",
-> >> -                             cn->full_name);
-> >> +             clk = of_clk_get(cn, 0);
-> >> +             if (!IS_ERR(clk))
-> >> +                     rate = clk_get_rate(clk);
-> 
-> We need the max frequency as it will be used to weight the different
-> CPUs capacity. How do you ensure that the current clock rate is the
-> max one ?
+>  #define PMSU_BASE_OFFSET    0x100
+>  #define PMSU_REG_SIZE	    0x1000
+> @@ -77,6 +76,9 @@ extern void ll_enable_coherency(void);
+>  
+>  extern void armada_370_xp_cpu_resume(void);
+>  
+> +static unsigned long pmsu_mp_phys_base;
 
-Hmm, the clock-frequency attribute in the ePAPR is defined at the
-current CPU frequency, not the max one.
+phys_addr_t.
 
-Maxime
+> +static void __iomem *pmsu_mp_base;
+> +
+>  static struct platform_device armada_xp_cpuidle_device = {
+>  	.name = "cpuidle-armada-370-xp",
+>  };
+> @@ -147,6 +149,8 @@ static int __init armada_370_xp_pmsu_init(void)
+>  		goto out;
+>  	}
+>  
+> +	pmsu_mp_phys_base = res.start;
+> +
+>  	pmsu_mp_base = ioremap(res.start, resource_size(&res));
+>  	if (!pmsu_mp_base) {
+>  		pr_err("unable to map registers\n");
+> @@ -312,6 +316,18 @@ int __init armada_370_xp_cpu_pm_init(void)
+>  		return 0;
+>  	of_node_put(np);
+>  
+> +	/*
+> +	 * On Armada 370, there is "a slow exit process from the deep
+> +	 * idle state due to heavy L1/L2 cache cleanup operations
+> +	 * performed by the BootROM software". To avoid this, we
+> +	 * replace the restart code of the bootrom by a a simple jump
+> +	 * to the boot address. Then the code located at this boot
+> +	 * address will take care of the initialization.
+> +	 */
+> +	if (of_machine_is_compatible("marvell,armada370"))
+> +		mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
+> +				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
+> +
+>  	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
+>  	armada_xp_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+>  	platform_device_register(&armada_xp_cpuidle_device);
 
+Other than that, looks good to me.
+
+Thanks,
+
+Thomas
 -- 
-Maxime Ripard, Free Electrons
+Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/72cfdc8d/attachment-0001.sig>
