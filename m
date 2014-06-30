@@ -1,32 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Jun 2014 08:46:24 +0200
-Subject: [PATCH net v2 3/3] net: stmmac: Improve mcast/ucast filter for
- all Synopsys EMAC Configurations
-In-Reply-To: <1404092110-18667-4-git-send-email-vbridgers2013@gmail.com>
-References: <1404092110-18667-1-git-send-email-vbridgers2013@gmail.com>
- <1404092110-18667-4-git-send-email-vbridgers2013@gmail.com>
-Message-ID: <4380814.yCFVZiTZxJ@wuerfel>
+Date: Mon, 30 Jun 2014 08:55:15 +0200
+Subject: [PATCH 0/4] Migrate PXA27x platforms to clock framework
+In-Reply-To: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
+References: <1404066744-13416-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <7034630.fvV46PN35C@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 29 June 2014 20:35:10 Vince Bridgers wrote:
-> The synopsys EMAC can be configured for different numbers of multicast hash
-> bins and perfect filter entries at device creation time and there's no way
-> to query this configuration information at runtime. As a result, a devicetree
-> parameter is required in order for the driver to program these filters
-> correctly for a particular device instance. This patch extends the current
-> driver by providing a different multicast filter programming function if
-> different than the currently supported 64 multicast hash bins and 32
-> perfect unicast addresses. This patch is required to correct multicast
-> filtering for the Altera Cyclone V SOC.
+On Sunday 29 June 2014 20:32:20 Robert Jarzmik wrote:
+> As the RFC posted in [1] didn't meet an unrivaled success for
+> review, I'm posting this serie for PXA27x transition to clock
+> framework.
 > 
-> Signed-off-by: Vince Bridgers <vbridgers2013@gmail.com>
+> This transition is needed :
+>  - to enable device-tree drivers port, as clocks are needed almost
+>    everywhere
+>  - to enable the long term multi-platform kernel to support PXA
 > 
+> As I had said before, this serie aims at :
+>  - keeping legacy platforms working (ie. without device-tree)
+>  - enable PXA27x to work with a device-tree kernel, and hence
+>    open the way to drivers conversion
+>  - be robust enough to support pxa25x and pxa3xx later inclusion
+>    with almost no change to clk-pxa-dt.c.
+> 
+> As this serie is holding the rest of the device-tree drivers
+> port, I'd like it to be reviewed, even it's an old unsexy
+> platform.
 
-No objections to the content of the patch, but it would be better to split
-it out into two separate patches: one that does the mechanical prototype
-and formatting changes, and a smaller one that actually introduces the
-functional change. That would make it much easier to review, and to bisect
-potential problems when something goes wrong.
+I have one basic question about this series: if pxa27x gets moved
+to used the common-clk framework but the others (pxa25x, pxa26x,
+pxa3xx, pxa93x) don't, does that imply that they become mutually
+exclusiv at compile-time?
+
+If so, do you plan to first complete all of them before merging
+upstream, or do you intend to have one or more kernel releases
+that don't allow building a combined kernel for all pxa platforms?
+I don't object to doing the latter, but if that is the plan, you
+need to make that very clear in the changelog and have all the
+relevant maintainers agree to that.
+
+Also (for my understanding) when you say that you plan to do
+pxa25x and pxa3xx next, does that include pxa26x and pxa93x?
+I assume it does as they are apparently minor revisions of the
+former, but it's not completely clear from your description.
 
 	Arnd
