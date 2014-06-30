@@ -1,57 +1,204 @@
-From: fredrik.noring@autoliv.com (Fredrik Noring)
-Date: Mon, 30 Jun 2014 12:30:57 +0000
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <20140627163108.GP32514@n2100.arm.linux.org.uk>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB804356534D@ALVA-EXMB04.alv.autoliv.int>
- <20140626140115.GQ32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435655E9@ALVA-EXMB04.alv.autoliv.int>
- <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
-Message-ID: <3FFB61A7A8473C49831AF20FA193534A43CB69F6@ALVA-EXMB01.alv.autoliv.int>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jun 2014 14:40:54 +0200
+Subject: [PATCH 02/16] ARM: mvebu: Add a common function for the boot
+ address work around
+In-Reply-To: <1403875377-940-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140630144054.2f71514b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Gregory,
 
-It seems to be a compiler issue, where (GCC) 4.8.2 does not produce a properly
-working kernel. Happily, (Fedora 2013.11.24-2.fc19) 4.8.1 appears to do a lot
-better. No crashes so far with v3.16-rc2!
+On Fri, 27 Jun 2014 15:22:43 +0200, Gregory CLEMENT wrote:
 
-All the best,
-Fredrik
+> On some of the mvebu SoC and due to internal bootrom issue, CPU
 
-> -----Original Message-----
-> Hi Fredrik,
-> 
-> On Fri, Jun 27, 2014 at 04:16:57PM +0000, Fredrik Noring wrote:
-> > Please find below a trace that appeared once with 3.16-rc2. Perhaps it
-> > is of some interest?
-> 
-> It's not that serious... I know that the FEC ethernet driver is horrendously
-> racy (I have had a patch set for about the last six months which fixes some of
-> its problems) but as I've had a lot of patches to deal with, and it's been
-> pushed to the back of the queue...
-> 
-> The races don't lead to data corruption though, merely timeouts and some
-> lost packets.
-> 
-> Now because things have changed during the last merge window, I've got an
-> even bigger problem sorting through that patch set and getting it back into a
-> submittable state.  I've just sent out v2 for it onto the
-> netdev at vger.kernel.org mailing list.
-> 
-> The initial version (marked RFC) attracted very little interest from testers, or
-> acks.  I'd very much like to have some testing of it, so if you want to try it
-> out, I can provide you with a git URL, patches or a combined patch.
-> 
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-***************************************************************
-Consider the environment before printing this message.
+"due to an internal BootROM issue, the CPU"
 
-To read Autoliv's Information and Confidentiality Notice, follow this link:
-http://www.autoliv.com/disclaimer.html
-***************************************************************
+> initial jump code should be placed in SRAM memory of the SoC. In order
+
+"in SRAM memory" -> "in the SRAM memory".
+
+> to achieve this, we have to unmap the BootROM and at some specific
+> location where the BootROM was place, create a specific MBus window
+
+place -> placed
+
+> for the SRAM. This SRAM is initialized with a few instructions of code
+> that allows to jump into the real secondary CPU boot address.
+
+jump into -> jump to.
+
+> This work around currently needed for booting SMP on Aramda 375 Z1 and
+
+This work around *is* currently needed for SMP support on *Armada*.
+
+> will be needed for cpuidle support on Armada 370. Instead of duplicate
+
+duplicate -> duplicating.
+
+> the same code, this commit introduce a common function to handle it:
+
+introduce -> introduces.
+
+> mvebu_boot_addr_wa().
+
+I'm not sure the name of the function is appropriate, as we don't know
+what it is doing. Maybe mvebu_setup_boot_addr_wa() ?
+
+Also, maybe your commit log should indicate that the workaround
+involves using the Crypto engine SRAM, which will help understanding
+the reference to the crypto engine in the code.
+
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/pmsu.c    | 31 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-mvebu/pmsu.h    |  1 +
+>  arch/arm/mach-mvebu/pmsu_ll.S | 19 +++++++++++++++++++
+>  3 files changed, 51 insertions(+)
+
+I don't really have a better suggestion, but the workaround doesn't
+seem to be related to the PMSU, so are pmsu.c and pmsu_ll.S really the
+right files to store this code?
+
+> 
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 5584d35b8e88..991560905ccc 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+>  #include <linux/io.h>
+> +#include <linux/mbus.h>
+>  #include <linux/of_address.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/resource.h>
+> @@ -63,6 +64,14 @@ static void __iomem *pmsu_mp_base;
+>  #define L2C_NFABRIC_PM_CTL		    0x4
+>  #define L2C_NFABRIC_PM_CTL_PWR_DOWN		BIT(20)
+>  
+> +#define ARMADA_370_CRYPT0_ENG_ID	0x9
+
+Not needed in this file, the MBus window target ID is passed as
+argument to the mvebu_boot_addr_wa() function.
+
+> +#define CRYPT0_ENG_ATTR	0x1
+
+For consistency, I'd prefer to see this being passed as argument to
+mvebu_boot_addr_wa().
+
+> +#define SRAM_PHYS_BASE	    0xFFFF0000
+> +
+> +#define BOOTROM_BASE    0xFFF00000
+> +#define BOOTROM_SIZE    0x100000
+> +
+>  extern void ll_disable_coherency(void);
+>  extern void ll_enable_coherency(void);
+>  
+> @@ -85,6 +94,28 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+>  		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
+>  }
+>  
+> +extern unsigned char mvebu_boot_wa_start;
+> +extern unsigned char mvebu_boot_wa_end;
+> +
+> +void mvebu_boot_addr_wa(int crypto_eng_id, u32 resume_addr_reg)
+
+unsigned int crypto_eng_target ('unsigned int' is the type used by
+the mvebu-mbus API), and add unsigned int crypto_eng_attribute, to
+match the mvebu-mbus API. Also, void * seems more appropriate than u32
+for an address, maybe even void __iomem * since it's actually pointing
+to a memory-mapped register.
+
+> +{
+> +	void __iomem *sram_virt_base;
+> +	u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
+> +
+> +	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
+> +	mvebu_mbus_add_window_by_id(crypto_eng_id, CRYPT0_ENG_ATTR,
+> +				SRAM_PHYS_BASE, SZ_64K);
+> +	sram_virt_base = ioremap(SRAM_PHYS_BASE, SZ_64K);
+
+Maybe a return value check?
+
+> +
+> +
+
+One too many new line.
+
+> +	memcpy(sram_virt_base, &mvebu_boot_wa_start, code_len);
+> +	/*
+> +	 * The last word of the code copied in SRAM must contain the
+> +	 * physical base address of the PMSU register
+> +	 */
+> +	*(unsigned long *)(sram_virt_base + code_len - 4) = resume_addr_reg;
+
+Maybe instead:
+
+	writel(resume_addr_reg, sram_virt_base + code_len - 4);
+
+And also:
+
+	iounmap(sram_virt_base);
+
+> +}
+> +
+>  static int __init armada_370_xp_pmsu_init(void)
+>  {
+>  	struct device_node *np;
+> diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
+> index 07a737c6b95d..2d97a70c2558 100644
+> --- a/arch/arm/mach-mvebu/pmsu.h
+> +++ b/arch/arm/mach-mvebu/pmsu.h
+> @@ -12,5 +12,6 @@
+>  #define __MACH_MVEBU_PMSU_H
+>  
+>  int armada_xp_boot_cpu(unsigned int cpu_id, void *phys_addr);
+> +void mvebu_boot_addr_wa(int crypto_eng_id, unsigned long resume_addr_reg);
+>  
+>  #endif	/* __MACH_370_XP_PMSU_H */
+> diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
+> index fc3de68d8c54..3b702a16bd3d 100644
+> --- a/arch/arm/mach-mvebu/pmsu_ll.S
+> +++ b/arch/arm/mach-mvebu/pmsu_ll.S
+> @@ -23,3 +23,22 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
+>  	b	cpu_resume
+>  ENDPROC(armada_370_xp_cpu_resume)
+>  
+> +.global mvebu_boot_wa_start
+> +.global mvebu_boot_wa_end
+> +
+> +/* The following code will be executed from SRAM */
+> +ENTRY(mvebu_boot_wa_start)
+> +mvebu_boot_wa_start:
+> +/* use physical address of the boot address register register */
+
+"register register" -> register.
+
+> +	adr     r0, 1f
+> +	ldr     r0, [r0]
+> +	ldr     r0, [r0]
+> +	mov     pc, r0
+> +/*
+> + * the last word of this piece of code will be filled by the physical
+
+"filled with". "filled by" indicates *who* is filling the missing
+information, "filled with" indicates with *what* it is being filled.
+
+> + * address of the boot address register just after being copied in SRAM
+> + */
+> +1:
+> +	.long   .
+> +mvebu_boot_wa_end:
+> +ENDPROC(mvebu_boot_wa_end)
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
