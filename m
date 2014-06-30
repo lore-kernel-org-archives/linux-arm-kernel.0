@@ -1,61 +1,76 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 30 Jun 2014 10:20:29 +0530
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <20140628145253.GB7869@dragon>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
- <20140628145253.GB7869@dragon>
-Message-ID: <CAKohpomX0Wk_aL117ZqXsC-jruHi8wOj=A4YqtNDcStJZ8iJOw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 30 Jun 2014 12:12:27 +0800
+Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
+In-Reply-To: <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
+References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20140630041226.GB3329@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2014 20:22, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Thanks for all the effort on maintaining and improving cpufreq-cpu0
-> driver.
+On Wed, Jun 25, 2014 at 01:01:31PM +0200, Steffen Trumtrar wrote:
+> Most peripherals on the i.MX53 have an
+> 	Off-Platform Peripheral Access Control Register (OPACR)
+> in which the access rights (together with the MPROT registers) can be declared.
+> However, this does not seem to work for example for SSI1+SDMA, because the
+> supervisor bit is not set for the SDMA unit.
+> It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
+> works because it does NOT have an OPACR.
+> 
+> The right solution would be to fix the access rights for the SDMA, but the unit
+> responsible for this is the Central Security Unit (CSU), which of course is NOT
+> documented. So, until documentation for this is openly available, turn off the
+> supervisor protection because it cripples the hardware.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> index 2bad387..380c7ee 100644
+> --- a/arch/arm/mach-imx/mach-imx53.c
+> +++ b/arch/arm/mach-imx/mach-imx53.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/irq.h>
+> +#include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <asm/mach/arch.h>
+> @@ -24,11 +25,24 @@
+>  #include "hardware.h"
+>  #include "mx53.h"
+>  
+> +static const struct of_device_id aips_of_matches[] __initconst = {
+> +	{ .compatible = "fsl,imx53-aipstz" },
+> +	{ /*sentinel*/ }
+> +};
+> +
+>  static void __init imx53_dt_init(void)
+>  {
+> +	void __iomem *aips_base_addr;
+> +	struct device_node *np;
+> +
+>  	mxc_arch_reset_init_dt();
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +
+> +	for_each_matching_node(np, aips_of_matches) {
+> +		aips_base_addr = of_iomap(np, 0);
+> +		imx_set_aips(aips_base_addr);
+> +	}
 
-You're welcome..
+The same code pattern might be needed for i.MX31 and i.MX35 device tree
+support later.  Can we have a helper for it, so that i.MX3 DT conversion
+can benefit from it?
 
-> Your patch rewrote the most part of the driver, so I'd like to
-> hand over the driver to you.  Please add yourself as the primary person
-> for MODULE_AUTHOR.
+Shawn
 
-I don't think a complete handover would be right, and so still keeping
-you as author :)
-
-Author: Viresh Kumar <viresh.kumar@linaro.org>
-Date:   Mon Jun 30 10:15:22 2014 +0530
-
-    cpufreq: cpu0: Add Module Author
-
-    Two people are maintaining it now, Viresh and Shawn. Add Viresh's details in
-    MODULE_AUTHOR() and copyright section.
-
-    Suggested-by: Shawn Guo <shawn.guo@linaro.org>
-    Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/cpufreq-generic.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/cpufreq/cpufreq-generic.c
-b/drivers/cpufreq/cpufreq-generic.c
-index 4da3f2f..5656dd1 100644
---- a/drivers/cpufreq/cpufreq-generic.c
-+++ b/drivers/cpufreq/cpufreq-generic.c
-@@ -1,6 +1,9 @@
- /*
-  * Copyright (C) 2012 Freescale Semiconductor, Inc.
-  *
-+ * Copyright (C) 2014 Linaro.
-+ * Viresh Kumar <viresh.kumar@linaro.org>
-+ *
-  * The OPP code in function set_target() is reused from
-  * drivers/cpufreq/omap-cpufreq.c
-  *
-@@ -402,6 +405,7 @@ static struct platform_driver generic_cpufreq_platdrv = {
- };
- module_platform_driver(generic_cpufreq_platdrv);
-
-+MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
- MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
- MODULE_DESCRIPTION("Generic cpufreq driver");
- MODULE_LICENSE("GPL");
+>  }
+>  
+>  static const char *imx53_dt_board_compat[] __initconst = {
+> -- 
+> 2.0.0
+> 
