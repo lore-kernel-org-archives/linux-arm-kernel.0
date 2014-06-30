@@ -1,142 +1,74 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 30 Jun 2014 15:36:53 +0200
-Subject: [PATCH 14/16] ARM: mvebu: Add CPU idle support for Armada 370
-In-Reply-To: <1403875377-940-15-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-15-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140630153653.3f9526ae@free-electrons.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 30 Jun 2014 14:54:11 +0100
+Subject: [PATCH v6 4/4] ARM: Add KGDB/KDB FIQ debugger generic code
+In-Reply-To: <53ABEDC9.6020407@linaro.org>
+References: <1403174303-25456-1-git-send-email-daniel.thompson@linaro.org>
+ <1403623097-1153-1-git-send-email-daniel.thompson@linaro.org>
+ <1403623097-1153-5-git-send-email-daniel.thompson@linaro.org>
+ <20140624160844.GV32514@n2100.arm.linux.org.uk> <53ABEDC9.6020407@linaro.org>
+Message-ID: <53B16C03.7090503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On 26/06/14 10:54, Daniel Thompson wrote:
+>> Also bear in mind that svc_entry calls trace_hardirqs_off - is this
+>> appropriate and safe for the FIQ to call?
+> 
+> I personally think it appropriate and it looked safe on the lockdep side
+> of things. However I will look a bit deeper at this since I don't
+> remember how far I chased things back.
 
-On Fri, 27 Jun 2014 15:22:55 +0200, Gregory CLEMENT wrote:
-> Unlike the Armada XP the Armada 370 always power done the L2 cache, so
+I've reviewed as far as I can.
 
-power -> powers
-done -> down
+Regarding safety I can't find anything much to upset the FIQ handler. I
+think it might occasionally trigger the trace code's recursion avoidance
+causing the trace event to be dropped but that's about it.
 
-> it have only 2 cpuidle states. Thanks to the previous patches, adding
-
-have -> has.
-
-> the support for this new SoCs required only the modification of the
-
-required -> requires.
-
-> architecture specific part.
-
-May not be true if we move the cpuidle states back into the cpuidle
-driver, as I suggested in a comment to one of the previous patch.
-
-> The message in case of failure to suspend the system was switched from
-> warn to debug. Indeed due to the "slow exit process from the deep idle
-> state" in Armada 370, this situation happens quite often. Using the
-> _debug version avoids spamming the kernel logs, but still allows to
-> enable it if needed.
-
-Is it really expected that the system fails to enter the idle state? I
-must say I don't really see the relation with the slow exit from deep
-idle state, because the do_armada_xp_370_cpu_suspend() function is only
-here to *enter* the idle state, so how is entering the deep idle state
-related to an issue when exiting the idle state?
+I admit I came very close to removing the trace_hardirqs calls from the
+FIQ code but in the end I've left it. The hardirqs *are* off during FIQ
+execution.
 
 
-> +static struct mvebu_v7_cpuidle armada_370_cpuidle = {
-> +	.mvebu_v7_idle_driver = {
-> +		.name			= "armada_370_idle",
-> +		.states[0]		= ARM_CPUIDLE_WFI_STATE,
-> +		.states[1]		= {
-> +			.exit_latency		= 100,
-> +			.power_usage		= 5,
-> +			.target_residency	= 1000,
-> +			.flags			= CPUIDLE_FLAG_TIME_VALID |
-> +			MVEBU_V7_FLAG_DEEP_IDLE,
-> +			.name			= "Deep Idle",
-> +			.desc			= "CPU and L2 Fabric power down",
-> +		},
-> +		.state_count = 2,
-> +	},
-> +	.mvebu_v7_cpu_suspend = armada_xp_370_cpu_suspend,
-> +};
+>>> +	msr	cpsr_c, #FIQ_MODE | PSR_I_BIT | PSR_F_BIT
+>>
+>> Here we switch to FIQ mode.  What about the PSR_A_BIT which prevents
+>> imprecise aborts on ARMv6+ ?
+>>
+>> Nevertheless, I think it's safe because the A bit will be set by the
+>> CPU when taking the FIQ exception, and it should remain set since
+>> cpsr_c won't modify it.
+> 
+> Agreed.
+> 
+> Note that while double checking this I realized that this code will drop
+> the value of PSR_ISETSTATE (T bit) that the vector_stub macro set for
+> us. I'll fix this.
 
-As I said, I'd prefer to see this in the cpuidle driver.
+I was wrong about this. CPSR T bit is part of execution state can cannot
+be modified by msr.
 
-> +
->  static struct mvebu_v7_cpuidle armada_xp_cpuidle = {
->  	.mvebu_v7_idle_driver = {
->  		.name			= "armada_xp_idle",
-> @@ -328,6 +346,31 @@ static struct mvebu_v7_cpuidle armada_xp_cpuidle = {
->  	.mvebu_v7_cpu_suspend = armada_xp_370_cpu_suspend,
->  };
->  
-> +static __init bool armada_370_cpuidle_init(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-> +	if (!np)
-> +		return false;
-> +	of_node_put(np);
-> +
-> +	/*
-> +	 * On Armada 370, there is "a slow exit process from the deep
-> +	 * idle state due to heavy L1/L2 cache cleanup operations
-> +	 * performed by the BootROM software". To avoid this, we
-> +	 * replace the restart code of the bootrom by a a simple jump
-> +	 * to the boot address. Then the code located at this boot
-> +	 * address will take care of the initialization.
-> +	 */
-> +	mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
-> +			PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
-> +
-> +	mvebu_cpu_resume = armada_370_xp_cpu_resume;
-> +	mvebu_v7_cpuidle_device.dev.platform_data = &armada_370_cpuidle;
-> +	return true;
-> +}
-> +
->  static __init bool armada_xp_cpuidle_init(void)
->  {
->  	struct device_node *np;
-> @@ -345,6 +388,9 @@ static struct of_device_id of_cpuidle_table[] __initdata = {
->  	{ .compatible = "marvell,armadaxp",
->  	  .data = (void *)armada_xp_cpuidle_init,
->  	},
-> +	{ .compatible = "marvell,armada370",
-> +	  .data = (void *)armada_370_cpuidle_init,
-> +	},
->  	{ /* end of list */ },
->  };
->  
-> @@ -373,18 +419,6 @@ static int __init mvebu_v7_cpu_pm_init(void)
->  		return 0;
->  	of_node_put(np);
->  
-> -	/*
-> -	 * On Armada 370, there is "a slow exit process from the deep
-> -	 * idle state due to heavy L1/L2 cache cleanup operations
-> -	 * performed by the BootROM software". To avoid this, we
-> -	 * replace the restart code of the bootrom by a a simple jump
-> -	 * to the boot address. Then the code located at this boot
-> -	 * address will take care of the initialization.
-> -	 */
-> -	if (of_machine_is_compatible("marvell,armada370"))
-> -		mvebu_boot_addr_wa(ARMADA_370_CRYPT0_ENG_ID, pmsu_mp_phys_base +
-> -				PMSU_BOOT_ADDR_REDIRECT_OFFSET(0));
 
-So we're almost entirely reverting/moving the code added by "[PATCH
-05/16] ARM: mvebu: Add workaround for cpuidle support for Armada 370".
-Maybe there is an issue in your series, and the workaround for cpuidle
-support on Armada 370 should only be added in this patch, and not
-earlier?
+> I've picked out the following actions from the above:
+> 
+> 1. Wrap a save and restore lr_abt and spsr_abt around the FIQ handler
 
-> -
->  	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
->  	platform_device_register(&mvebu_v7_cpuidle_device);
->  	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
+Done.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> 2. Add a paired up trace_hardirqs_on() (and review more deeply).
+
+Done.
+
+> 3. Add comments explaining hazards w.r.t. data abort,
+
+Done.
+
+> 4. Correctly manage T bit during transition back to FIQ mode.
+
+Not applicable.
+
+> Do I miss anything?
+
+I hope not!
+
+
+Daniel.
