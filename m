@@ -1,31 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Jun 2014 09:43:26 +0200
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <20140628094219.GB32514@n2100.arm.linux.org.uk>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <53ADA358.7000305@mentor.com> <20140628094219.GB32514@n2100.arm.linux.org.uk>
-Message-ID: <5093993.PR3K0Jp7Pk@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 30 Jun 2014 09:50:30 +0200
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.17
+In-Reply-To: <20140628145424.GK23978@titan.lakedaemon.net>
+References: <20140627130129.GH23978@titan.lakedaemon.net>
+ <20140627130430.GH32514@n2100.arm.linux.org.uk> <53AD724D.4020704@gmail.com>
+ <20140627133933.GJ23978@titan.lakedaemon.net> <53AD7544.2060701@gmail.com>
+ <D0DC98AD-E460-42C9-B2F4-51EDDE371E31@lakedaemon.net>
+ <53ADAB8C.6070609@gmail.com> <20140628145424.GK23978@titan.lakedaemon.net>
+Message-ID: <53B116C6.80601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 June 2014 10:42:19 Russell King - ARM Linux wrote:
-> What's happening is if you try and rebuild a kernel with these patches
-> applied, you already have an arch/arm/include/generated/asm/auxvec.h
-> which points at the empty asm-generic version.  This remains after
-> these patches are applied, so the new include of asm/auxvec.h in
-> asm/elf.h picks up on the empty version, not the newly introduced
-> version.
+On 06/28/2014 04:54 PM, Jason Cooper wrote:
+> On Fri, Jun 27, 2014 at 07:36:12PM +0200, Sebastian Hesselbarth wrote:
+>> On 06/27/2014 06:49 PM, Jason Cooper wrote:
+>>>> On Jun 27, 2014, at 9:44, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>>> ...
+>>>> And I am not sure, if we want to rely on some six numbers stored on
+>>>> SPI flash, i.e. there is no magic nor header to be really sure, it
+>>>> is a MAC address.
+>>>
+>>> It couldn't be compared with the MAC address of the nic?
+>>
+>> Sure, but if it is not equal it tells you nothing.
+>>
+>> You can change the NICs MAC in your bootloader, it will be different
+>> from the numbers you read from SPI, and some mechanism will assume you
+>> just made your production version into ES.
+>>
+>> We really want to introduce such a crutch?
+> 
+> Well, we need to keep in mind distro's concerns, but we don't need to
+> (and shouldn't) attempt to solve them.
+> 
+> That's why I wanted to add a comment expressing the facts as best we
+> know them.  We could also now add a link to this thread to assist future
+> distro maintainers.
+> 
+> As this patch sits, it is an accurate description of the two variants of
+> dove-based CuBoxes.  The fact that SolidRun didn't leave a clear
+> differentiator is unfortunate, but we can't magic a solution out of our
+> ass.  Nor should we block a patch because we can't.
 
-One more piece of the puzzle: the top-level Makefile always includes
-the headers from the source tree before generated headers, so in theory
-this should not be happening. However, for some reason this ends up
-as arch/arm/include/generated/asm/auxvec.h rather than
-arch/arm/include/generated/uapi/asm/auxvec.h, and the kernel-only
-headers get included before any of the uapi headers.
+Ok, I'll look through my eMails and Web again to collect some
+differences and prepare a "add comment" only patch for the CuBox DTSs.
 
-An easy workaround would probably be to add an
-arch/arm/include/asm/auxvec.h file that contains only
+> It also might be worth reaching out to Rabeeh one more time and asking
+> explicitly if there is a programmatic way to differentiate the two
+> boards on the board itself.
 
-#include <uapi/asm/auxvec.h>
+Yeah, I remember someone said that there is a different SPI vendor on
+production CuBox. That could be a way to tell them apart _if_ it is
+used exclusively on production boxes.
 
-	Arnd
+But I'll ask Rabeeh about it again.
+
+> It would have been ideal if the ES had 512MB of RAM...
+
+Depends, for differentiation yes, otherwise I am quite happy with 1G ;)
+
+Some magic and a variant number in SPI would have been better I guess.
+
+Sebastian
