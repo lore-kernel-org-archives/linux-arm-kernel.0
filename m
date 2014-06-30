@@ -1,60 +1,79 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 30 Jun 2014 15:09:27 +0200
-Subject: [PATCH v8 2/7] Documentation: bindings: add the Berlin SATA PHY
-In-Reply-To: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1404133772-11741-3-git-send-email-antoine.tenart@free-electrons.com>
+Date: Mon, 30 Jun 2014 15:09:25 +0200
+Subject: [PATCH v8 0/7] ARM: berlin: add AHCI support
+Message-ID: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin SATA PHY drives the PHY related to the SATA interface. Add
-the corresponding documentation.
+This series adds the support for Berlin SoC AHCI controller. The
+controller allows to use the SATA host interface and, for example, the
+eSATA port on the BG2Q.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- .../devicetree/bindings/phy/berlin-sata-phy.txt    | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+The series adds a PHY driver to control the two SATA ports available,
+and adds a generic compatible to use the existing ahci_platform driver.
+
+Also enable the eSATA interface on the BG2Q DMP.
+
+Changes since v7:
+        - got back to the each PHY as a sub-node representation
+	- renamed the power bit in the PHY driver
+
+Changes since v6:
+        - added the 'clocks' property and support in the PHY driver
+        - updated the PHY compatible
+
+Changes since v5:
+        - rebased on top of v3.16-rc1
+        - added the 'clocks' property in the sata node
+
+Changes since v4:
+        - updated PHY driver as tristate
+        - handled the case were no SATA port is enabled
+        - updated the compatible to a generic one
+        - cosmetic fixups
+
+Changes since v3:
+        - moved all PHY operations to the PHY driver
+        - removed PHY sub-nodes
+        - removed the custom Berlin AHCI driver and switched to
+          ahci_platform
+        - added multiple PHYs support to the libahci_platform
+
+Changes since v2:
+        - modeled each PHY as a sub-node
+        - cosmetic fixups
+
+Changes since v1:
+        - added a PHY driver, allowing to enable each port
+          individually and removed the 'force-port-map' property
+        - made the drivers a bit less magic :)
+        - wrote a function to select and configure registers in the
+          AHCI driver
+        - removed BG2 / BG2CD nodes
+
+Antoine T?nart (7):
+  phy: add a driver for the Berlin SATA PHY
+  Documentation: bindings: add the Berlin SATA PHY
+  ata: libahci: allow to use multiple PHYs
+  ata: ahci_platform: add a generic AHCI compatible
+  Documentation: bindings: document the sub-nodes AHCI bindings
+  ARM: berlin: add the AHCI node for the BG2Q
+  ARM: berlin: enable the eSATA interface on the BG2Q DMP
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |  37 +++
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    |  34 +++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   8 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |  39 +++
+ drivers/ata/ahci.h                                 |   3 +-
+ drivers/ata/ahci_platform.c                        |   2 +
+ drivers/ata/libahci.c                              |   7 +
+ drivers/ata/libahci_platform.c                     | 170 ++++++++++---
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-berlin-sata.c                      | 262 +++++++++++++++++++++
+ 11 files changed, 534 insertions(+), 36 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
+ create mode 100644 drivers/phy/phy-berlin-sata.c
 
-diff --git a/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-new file mode 100644
-index 000000000000..88f8c23384c0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/berlin-sata-phy.txt
-@@ -0,0 +1,34 @@
-+Berlin SATA PHY
-+---------------
-+
-+Required properties:
-+- compatible: should be "marvell,berlin2q-sata-phy"
-+- address-cells: should be 1
-+- size-cells: should be 0
-+- phy-cells: from the generic PHY bindings, must be 1
-+- reg: address and length of the register
-+- clocks: reference to the clock entry
-+
-+Sub-nodes:
-+Each PHY should be represented as a sub-node.
-+
-+Sub-nodes required properties:
-+- reg: the PHY number
-+
-+Example:
-+	sata_phy: phy at f7e900a0 {
-+		compatible = "marvell,berlin2q-sata-phy";
-+		reg = <0xf7e900a0 0x200>;
-+		clocks = <&chip CLKID_SATA>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		#phy-cells = <1>;
-+
-+		sata-phy at 0 {
-+			reg = <0>;
-+		};
-+
-+		sata-phy at 1 {
-+			reg = <1>;
-+		};
-+	};
 -- 
 1.9.1
