@@ -1,105 +1,48 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 30 Jun 2014 12:11:38 -0700
-Subject: [RFC PATCH 5/6] watchdog: alim7101: Register restart handler with
- restart notifier
-In-Reply-To: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
-References: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1404155499-21177-6-git-send-email-linux@roeck-us.net>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 30 Jun 2014 22:11:06 +0300
+Subject: [PATCH] s3cmci: Move to clk_prepare_enable/clk_disable_unprepare
+Message-ID: <1404155466-2971-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel core now provides an API to trigger a system restart.
-Register with it to restart the system instead of misusing the
-reboot notifier.
+Use clk_prepare_enable/clk_disable_unprepare to make the driver
+work properly with common clock framework.
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- drivers/watchdog/alim7101_wdt.c | 41 +++++++++++++++++++++++++++++++----------
- 1 file changed, 31 insertions(+), 10 deletions(-)
+ drivers/mmc/host/s3cmci.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/watchdog/alim7101_wdt.c b/drivers/watchdog/alim7101_wdt.c
-index 996b2f7..239d6b2 100644
---- a/drivers/watchdog/alim7101_wdt.c
-+++ b/drivers/watchdog/alim7101_wdt.c
-@@ -301,6 +301,27 @@ static struct miscdevice wdt_miscdev = {
- 	.fops	=	&wdt_fops,
- };
- 
-+static int wdt_restart_notify(struct notifier_block *this, unsigned long mode,
-+			      void *cmd)
-+{
-+	/*
-+	 * Cobalt devices have no way of rebooting themselves other
-+	 * than getting the watchdog to pull reset, so we restart the
-+	 * watchdog on reboot with no heartbeat.
-+	 */
-+	wdt_change(WDT_ENABLE);
-+
-+	/* loop until the watchdog fires */
-+	while (true)
-+		;
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block wdt_restart_notifier = {
-+	.notifier_call = wdt_restart_notify,
-+};
-+
- /*
-  *	Notifier for system down
-  */
-@@ -311,15 +332,6 @@ static int wdt_notify_sys(struct notifier_block *this,
- 	if (code == SYS_DOWN || code == SYS_HALT)
- 		wdt_turnoff();
- 
--	if (code == SYS_RESTART) {
--		/*
--		 * Cobalt devices have no way of rebooting themselves other
--		 * than getting the watchdog to pull reset, so we restart the
--		 * watchdog on reboot with no heartbeat
--		 */
--		wdt_change(WDT_ENABLE);
--		pr_info("Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second\n");
--	}
- 	return NOTIFY_DONE;
- }
- 
-@@ -338,6 +350,7 @@ static void __exit alim7101_wdt_unload(void)
- 	/* Deregister */
- 	misc_deregister(&wdt_miscdev);
- 	unregister_reboot_notifier(&wdt_notifier);
-+	unregister_restart_notifier(&wdt_restart_notifier);
- 	pci_dev_put(alim7101_pmu);
- }
- 
-@@ -390,11 +403,17 @@ static int __init alim7101_wdt_init(void)
- 		goto err_out;
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 0d115a8..e5516a2 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1707,7 +1707,7 @@ static int s3cmci_probe(struct platform_device *pdev)
+ 		goto probe_free_dma;
  	}
  
-+	rc = register_restart_notifier(&wdt_restart_notifier);
-+	if (rc) {
-+		pr_err("cannot register reboot notifier (err=%d)\n", rc);
-+		goto err_out_reboot;
-+	}
-+
- 	rc = misc_register(&wdt_miscdev);
- 	if (rc) {
- 		pr_err("cannot register miscdev on minor=%d (err=%d)\n",
- 		       wdt_miscdev.minor, rc);
--		goto err_out_reboot;
-+		goto err_out_restart;
- 	}
+-	ret = clk_enable(host->clk);
++	ret = clk_prepare_enable(host->clk);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to enable clock source.\n");
+ 		goto clk_free;
+@@ -1765,7 +1765,7 @@ static int s3cmci_probe(struct platform_device *pdev)
+ 	s3cmci_cpufreq_deregister(host);
  
- 	if (nowayout)
-@@ -404,6 +423,8 @@ static int __init alim7101_wdt_init(void)
- 		timeout, nowayout);
- 	return 0;
+  free_dmabuf:
+-	clk_disable(host->clk);
++	clk_disable_unprepare(host->clk);
  
-+err_out_restart:
-+	unregister_restart_notifier(&wdt_restart_notifier);
- err_out_reboot:
- 	unregister_reboot_notifier(&wdt_notifier);
- err_out:
+  clk_free:
+ 	clk_put(host->clk);
+@@ -1817,7 +1817,7 @@ static void s3cmci_shutdown(struct platform_device *pdev)
+ 	s3cmci_debugfs_remove(host);
+ 	s3cmci_cpufreq_deregister(host);
+ 	mmc_remove_host(mmc);
+-	clk_disable(host->clk);
++	clk_disable_unprepare(host->clk);
+ }
+ 
+ static int s3cmci_remove(struct platform_device *pdev)
 -- 
-1.9.1
+2.0.0
