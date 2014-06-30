@@ -1,80 +1,39 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 30 Jun 2014 16:03:02 +0200
-Subject: [PATCH 16/17] [media] exynos4-is: removes s5pc100 related fimc
- codes
-In-Reply-To: <1404163947-3105-17-git-send-email-kgene.kim@samsung.com>
-References: <1404163947-3105-1-git-send-email-kgene.kim@samsung.com>
- <1404163947-3105-17-git-send-email-kgene.kim@samsung.com>
-Message-ID: <53B16E16.7080200@samsung.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 30 Jun 2014 17:02:38 +0300
+Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
+In-Reply-To: <53B16B06.6070206@samsung.com>
+References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
+ <53B16B06.6070206@samsung.com>
+Message-ID: <1519968.Vijxn8Mc9S@vasilykh-desktop-i5>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/14 23:32, Kukjin Kim wrote:
-> This patch removes s5pc100 related fimc codes because of no more support
-> S5PC100 SoC in mainline.
-
-I have applied this patch to my tree. It's also fine if you would like to
-merge the whole series together. In such case feel free to add:
-
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
-Please let me know if you want me to drop this patch from the media tree.
-
---
-Regards,
-Sylwester
-
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> ---
->  Documentation/video4linux/fimc.txt            |    2 +-
->  drivers/media/platform/exynos4-is/fimc-core.c |   15 ---------------
->  2 files changed, 1 insertion(+), 16 deletions(-)
+On 30 June 2014 15:49:58 Tomasz Figa wrote:
+> On 23.06.2014 22:29, Vasily Khoruzhick wrote:
+> > There's a several typos in a driver: 2410 instead of S3C2410
+> > and wrong argument to ARRAY_SIZE(). They prevent s3c2410
+> > from properly booting.
+> > 
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > ---
+> > 
+> >  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/video4linux/fimc.txt b/Documentation/video4linux/fimc.txt
-> index e0c6b8b..1441fcf 100644
-> --- a/Documentation/video4linux/fimc.txt
-> +++ b/Documentation/video4linux/fimc.txt
-> @@ -15,7 +15,7 @@ drivers/media/platform/exynos4-is directory.
->  1. Supported SoCs
->  =================
->  
-> -S5PC100 (mem-to-mem only), S5PV210, EXYNOS4210
-> +S5PV210, EXYNOS4210
->  
->  2. Supported features
->  =====================
-> diff --git a/drivers/media/platform/exynos4-is/fimc-core.c b/drivers/media/platform/exynos4-is/fimc-core.c
-> index b70fd99..5c800b4 100644
-> --- a/drivers/media/platform/exynos4-is/fimc-core.c
-> +++ b/drivers/media/platform/exynos4-is/fimc-core.c
-> @@ -1204,18 +1204,6 @@ static const struct fimc_variant fimc2_variant_s5pv210 = {
->  	.pix_limit	 = &s5p_pix_limit[2],
->  };
->  
-> -/* S5PC100 */
-> -static const struct fimc_drvdata fimc_drvdata_s5p = {
-> -	.variant = {
-> -		[0] = &fimc0_variant_s5p,
-> -		[1] = &fimc0_variant_s5p,
-> -		[2] = &fimc2_variant_s5p,
-> -	},
-> -	.num_entities	= 3,
-> -	.lclk_frequency = 133000000UL,
-> -	.out_buf_count	= 4,
-> -};
-> -
->  /* S5PV210, S5PC110 */
->  static const struct fimc_drvdata fimc_drvdata_s5pv210 = {
->  	.variant = {
-> @@ -1251,9 +1239,6 @@ static const struct fimc_drvdata fimc_drvdata_exynos4x12 = {
->  
->  static const struct platform_device_id fimc_driver_ids[] = {
->  	{
-> -		.name		= "s5p-fimc",
-> -		.driver_data	= (unsigned long)&fimc_drvdata_s5p,
-> -	}, {
->  		.name		= "s5pv210-fimc",
->  		.driver_data	= (unsigned long)&fimc_drvdata_s5pv210,
->  	}, {
+> Applied as a fix for 3.16.
+
+Hi Tomasz,
+
+I also have clk fixes for s3c24xx touchscreen, framebuffer, adc, usb and nand 
+drivers (to replace clk_enable with clk_prepare_enable and clk_disable with 
+clk_disable_unprepare),
+
+Should they be merged through different trees or it's possible to merge them 
+through a single tree?
+
+> 
+> Best regards,
+> Tomasz
+
+Regards
+Vasily
