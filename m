@@ -1,48 +1,68 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 17:16:53 +0300
-Subject: [PATCH 1/2] clk: samsung: fix several typos to fix boot on s3c2410
-In-Reply-To: <53B16F1C.4040206@samsung.com>
-References: <1403555350-14895-1-git-send-email-anarsoul@gmail.com>
- <1519968.Vijxn8Mc9S@vasilykh-desktop-i5> <53B16F1C.4040206@samsung.com>
-Message-ID: <2414590.ONaMigMLUH@vasilykh-desktop-i5>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jun 2014 15:20:54 +0100
+Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
+ A31 DMA controller
+In-Reply-To: <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140630142054.GA8756@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2014 16:07:24 Tomasz Figa wrote:
-> Hi Vasily,
-> 
-> On 30.06.2014 16:02, Vasily Khoruzhick wrote:
-> > On 30 June 2014 15:49:58 Tomasz Figa wrote:
-> >> On 23.06.2014 22:29, Vasily Khoruzhick wrote:
-> >>> There's a several typos in a driver: 2410 instead of S3C2410
-> >>> and wrong argument to ARRAY_SIZE(). They prevent s3c2410
-> >>> from properly booting.
-> >>> 
-> >>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> >>> ---
-> >>> 
-> >>>  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
-> >>>  1 file changed, 2 insertions(+), 2 deletions(-)
-> >> 
-> >> Applied as a fix for 3.16.
-> > 
-> > Hi Tomasz,
-> > 
-> > I also have clk fixes for s3c24xx touchscreen, framebuffer, adc, usb and
-> > nand drivers (to replace clk_enable with clk_prepare_enable and
-> > clk_disable with clk_disable_unprepare),
-> > 
-> > Should they be merged through different trees or it's possible to merge
-> > them through a single tree?
-> 
-> I'd say they should all go through respective subsystem trees, unless
-> they directly depend on patches I already applied, which is not the case
-> as far as I can see.
+Hi Maxime,
 
-Hm, they aren't necessary for compiling the kernel, but system fails to boot 
-without these patches due to merge of common clk changes for s3c24xx.
+On Mon, Jun 30, 2014 at 02:20:54PM +0100, Maxime Ripard wrote:
+> The Allwinner A31 has a 16 channels DMA controller that it shares with the
+> newer A23. Although sharing some similarities with the DMA controller of the
+> older Allwinner SoCs, it's significantly different, I don't expect it to be
+> possible to share the driver for these two.
+>
+> The A31 Controller is able to memory-to-memory or memory-to-device transfers on
+> the 16 channels in parallel.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/dma/Kconfig     |    8 +
+>  drivers/dma/Makefile    |    1 +
+>  drivers/dma/sun6i-dma.c | 1058 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1067 insertions(+)
+>  create mode 100644 drivers/dma/sun6i-dma.c
 
-> Best regards,
-> Tomasz
+[...]
 
-P.S. Sorry for 2nd mail, Tomasz, I've occassionally omited MLs.
+> +       sdc->clk = devm_clk_get(&pdev->dev, NULL);
+> +       if (IS_ERR(sdc->clk)) {
+> +               dev_err(&pdev->dev, "No clock specified\n");
+> +               return PTR_ERR(sdc->clk);
+> +       }
+> +
+> +       mux = clk_get(NULL, "ahb1_mux");
+> +       if (IS_ERR(mux)) {
+> +               dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
+> +               return PTR_ERR(mux);
+> +       }
+> +
+> +       pll6 = clk_get(NULL, "pll6");
+> +       if (IS_ERR(pll6)) {
+> +               dev_err(&pdev->dev, "Couldn't get PLL6\n");
+> +               clk_put(mux);
+> +               return PTR_ERR(pll6);
+> +       }
+
+I'm slightly confused. The binding listed a single unnamed clock (the
+AHB clock). What is going on here?
+
+> +       ret = clk_set_parent(mux, pll6);
+> +       clk_put(pll6);
+> +       clk_put(mux);
+> +
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+> +               return ret;
+> +       }
+
+Why do we need to reparent the mux?
+
+Thanks,
+Mark.
