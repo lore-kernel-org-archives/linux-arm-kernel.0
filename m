@@ -1,54 +1,95 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jun 2014 10:33:32 +0100
-Subject: [PATCH 07/13] Documentation: devicetree: add bindings for TI PRUSS
-In-Reply-To: <1404058907-21112-8-git-send-email-a.heider@gmail.com>
+Date: Mon, 30 Jun 2014 10:36:06 +0100
+Subject: [PATCH 09/13] uio: uio_pruss: add devicetree support
+In-Reply-To: <1404058907-21112-10-git-send-email-a.heider@gmail.com>
 References: <1404058907-21112-1-git-send-email-a.heider@gmail.com>
- <1404058907-21112-8-git-send-email-a.heider@gmail.com>
-Message-ID: <20140630093332.GT7262@leverpostej>
+ <1404058907-21112-10-git-send-email-a.heider@gmail.com>
+Message-ID: <20140630093606.GU7262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 05:21:41PM +0100, Andre Heider wrote:
+On Sun, Jun 29, 2014 at 05:21:43PM +0100, Andre Heider wrote:
+> Add support to probe via devicetree.
+> 
 > Signed-off-by: Andre Heider <a.heider@gmail.com>
 > ---
->  Documentation/devicetree/bindings/misc/ti,pruss.txt | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/ti,pruss.txt
+>  drivers/uio/uio_pruss.c | 46 +++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 39 insertions(+), 7 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/ti,pruss.txt b/Documentation/devicetree/bindings/misc/ti,pruss.txt
-> new file mode 100644
-> index 0000000..4eacc41
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/ti,pruss.txt
-> @@ -0,0 +1,19 @@
-> +TI Programmable Real-Time Unit Sub System (PRUSS)
+> diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
+> index afaf726..2df54ab 100644
+> --- a/drivers/uio/uio_pruss.c
+> +++ b/drivers/uio/uio_pruss.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/slab.h>
+>  #include <linux/genalloc.h>
+> +#include <linux/of_device.h>
+>  
+>  #define DRV_NAME "pruss_uio"
+>  #define DRV_VERSION "1.0"
+> @@ -70,6 +71,27 @@ struct uio_pruss_dev {
+>  	struct gen_pool *sram_pool;
+>  };
+>  
+> +#ifdef CONFIG_OF
+> +struct uio_pruss_params {
+> +	u32 pintc_offset;
+> +};
 > +
-> +Required properties:
-> +- compatible :
-> +	- "ti,pruss-v1" - for PRUv1 as found on the OMAPL138/DA850/AM18xx SoC families
-> +	- "ti,pruss-v2" - for PRUv2 as found on the AM33xx SoC family
-> +- ti,hwmods: Name of the hwmod associated to the PRUSS
-> +- reg: Address range of rtc register set
-> +- interrupts: host event interrupts in order
-
-How many of these do we expect?
-
-> +- interrupt-parent: phandle for the interrupt controller
+> +static const struct uio_pruss_params uio_pruss_v1_params = {
+> +	.pintc_offset = 0x4000,
+> +};
 > +
-> +Example:
-> +pruss: pruss at 4a300000 {
-> +	compatible = "ti,pruss-v2";
-> +	ti,hwmods = "pruss";
-> +	reg = <0x4a300000 0x080000>;
-> +	interrupts = <20 21 22 23 24 25 26 27>;
+> +static const struct uio_pruss_params uio_pruss_v2_params = {
+> +	.pintc_offset = 0x20000,
+> +};
+> +
+> +static const struct of_device_id pruss_of_match_table[] = {
+> +	{ .compatible = "ti,pruss-v1", .data = &uio_pruss_v1_params, },
+> +	{ .compatible = "ti,pruss-v2", .data = &uio_pruss_v2_params, },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, pruss_of_match_table);
+> +#endif
+> +
+>  static irqreturn_t pruss_handler(int irq, struct uio_info *info)
+>  {
+>  	struct uio_pruss_dev *gdev = info->priv;
+> @@ -111,6 +133,8 @@ static int pruss_probe(struct platform_device *pdev)
+>  	struct uio_pruss_dev *gdev;
+>  	struct resource *regs_prussio;
+>  	struct device *dev = &pdev->dev;
+> +	const struct of_device_id *match;
+> +	const struct uio_pruss_params *params;
+>  	int ret = -ENODEV, cnt = 0, i;
+>  	struct uio_pruss_pdata *pdata = dev_get_platdata(dev);
+>  	dma_addr_t ddr_paddr;
+> @@ -123,13 +147,21 @@ static int pruss_probe(struct platform_device *pdev)
+>  	if (!gdev->info)
+>  		return -ENOMEM;
+>  
+> -	/* Power on PRU in case its not done as part of boot-loader */
+> -	gdev->pruss_clk = clk_get(dev, "pruss");
+> -	if (IS_ERR(gdev->pruss_clk)) {
+> -		dev_err(dev, "Failed to get clock\n");
+> -		return PTR_ERR(gdev->pruss_clk);
+> +	if (dev->of_node) {
+> +		match = of_match_device(pruss_of_match_table, dev);
+> +		params = match->data;
+> +		gdev->pintc_base = params->pintc_offset;
+>  	} else {
+> +		/* Power on PRU in case its not done as part of boot-loader */
+> +		gdev->pruss_clk = clk_get(dev, "pruss");
+> +		if (IS_ERR(gdev->pruss_clk)) {
+> +			dev_err(dev, "Failed to get clock\n");
+> +			return PTR_ERR(gdev->pruss_clk);
+> +		}
 
-Assuming these represent more than one interrupt, could you please
-bracket them individually? e.g.
+The "pruss" clock was not documented in the binding.
 
-	interrupts = <20 21>, <22 23>, <24 25>, <26 27>;
+Is the clock really called "pruss", or is it given a specific name in
+the manual?
 
-It makes it far clearer that it's a list of multi-cell elements rather
-than a giant binary blob, and usually makes it easier to read a dts.
-
-Thanks,
+Cheers,
 Mark.
