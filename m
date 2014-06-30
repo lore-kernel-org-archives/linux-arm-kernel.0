@@ -1,67 +1,53 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Jun 2014 22:14:32 +0300
-Subject: [PATCH] video: fbdev: s3c2410fb: Move to
- clk_prepare_enable/clk_disable_unprepare
-Message-ID: <1404155672-3158-1-git-send-email-anarsoul@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 30 Jun 2014 21:21:22 +0200
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <7497427.LQy8pJts8f@wuerfel>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
+ <7497427.LQy8pJts8f@wuerfel>
+Message-ID: <20140630192121.GA32594@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_prepare_enable/clk_disable_unprepare to make the driver
-work properly with common clock framework.
+On Mon, Jun 30, 2014 at 09:20:30AM +0200, Arnd Bergmann wrote:
+> On Saturday 28 June 2014 22:40:26 Thierry Reding wrote:
+> > > > pmc.c implements various routines to access the power management
+> > > > controller, some of which is needed by suspend/resume, some of it is
+> > > > needed by SMP. powergate.c implements a subset of the PMC that needs to
+> > > > be exported to drivers to enable power partitions on the SoC. I'm not
+> > > > aware of subsystems that deal with this kind of driver.
+> > > >
+> > > Please see above.
+> > 
+> > Like I said, I don't see what business suspend/resume related code has
+> > in drivers/power. What we're talking about here really is functionality
+> > very specific to Tegra. Also some of that code needs to be run at very
+> > early points in the boot process, so we can't reasonably turn it into a
+> > proper driver anyway.
+> 
+> I believe the powergate.c stuff can be changed into pm_domain code, but
+> we don't have a good subsystem with generic DT bindings yet, so that
+> may need some more groundwork first. drivers/power or a subdirectory
+> of that may end up being the right place though.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/video/fbdev/s3c2410fb.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+So I ended up implementing the powergates as generic_pm_domain, but that
+breaks existing drivers currently. The reason is that generic_pm_domains
+are automatically turned off on suspend and turned back on on resume. On
+Tegra if a partition is powered off then the whole module looses state
+and would need to be completely reinitialized. None of the drivers
+currently support that and I'm also not sure if it's really what we want
+since it means for example redetecting links and reenumerating devices
+on PCI, or probing display outputs in DRM. That's going to take a lot of
+time and may not be appropriate for suspend-to-RAM.
 
-diff --git a/drivers/video/fbdev/s3c2410fb.c b/drivers/video/fbdev/s3c2410fb.c
-index 81af5a6..d68595d 100644
---- a/drivers/video/fbdev/s3c2410fb.c
-+++ b/drivers/video/fbdev/s3c2410fb.c
-@@ -932,7 +932,7 @@ static int s3c24xxfb_probe(struct platform_device *pdev,
- 		goto release_irq;
- 	}
- 
--	clk_enable(info->clk);
-+	clk_prepare_enable(info->clk);
- 	dprintk("got and enabled clock\n");
- 
- 	usleep_range(1000, 1100);
-@@ -996,7 +996,7 @@ static int s3c24xxfb_probe(struct platform_device *pdev,
- free_video_memory:
- 	s3c2410fb_unmap_video_memory(fbinfo);
- release_clock:
--	clk_disable(info->clk);
-+	clk_disable_unprepare(info->clk);
- 	clk_put(info->clk);
- release_irq:
- 	free_irq(irq, info);
-@@ -1038,7 +1038,7 @@ static int s3c2410fb_remove(struct platform_device *pdev)
- 	s3c2410fb_unmap_video_memory(fbinfo);
- 
- 	if (info->clk) {
--		clk_disable(info->clk);
-+		clk_disable_unprepare(info->clk);
- 		clk_put(info->clk);
- 		info->clk = NULL;
- 	}
-@@ -1070,7 +1070,7 @@ static int s3c2410fb_suspend(struct platform_device *dev, pm_message_t state)
- 	 * before the clock goes off again (bjd) */
- 
- 	usleep_range(1000, 1100);
--	clk_disable(info->clk);
-+	clk_disable_unprepare(info->clk);
- 
- 	return 0;
- }
-@@ -1080,7 +1080,7 @@ static int s3c2410fb_resume(struct platform_device *dev)
- 	struct fb_info	   *fbinfo = platform_get_drvdata(dev);
- 	struct s3c2410fb_info *info = fbinfo->par;
- 
--	clk_enable(info->clk);
-+	clk_prepare_enable(info->clk);
- 	usleep_range(1000, 1100);
- 
- 	s3c2410fb_init_registers(fbinfo);
--- 
-2.0.0
+Unfortunately I haven't found a way to force a domain to remain powered
+during suspend/resume.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140630/68ea991b/attachment-0001.sig>
