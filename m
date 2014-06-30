@@ -1,215 +1,71 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 30 Jun 2014 11:03:51 -0500
-Subject: [Patch v7 1/3] usb: dwc3: Add Qualcomm DWC3 glue layer driver
-In-Reply-To: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
-References: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1404144233-17222-2-git-send-email-agross@codeaurora.org>
+Date: Mon, 30 Jun 2014 11:03:50 -0500
+Subject: [Patch v7 0/3] DWC3 USB support for Qualcomm platform
+Message-ID: <1404144233-17222-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+These patches add basic support for USB3.0 controllers found
+on MSM platforms. USB3.0 core is based on Synopsys DesignWare 
+SuperSpeed IP. 
 
-DWC3 glue layer is hardware layer around Synopsys DesignWare
-USB3 core. Its purpose is to supply Synopsys IP with required
-clocks, voltages and interface it with the rest of the SoC.
+This work was started by Ivan Ivanov and went through a number of iterations.  I
+picked these patches up and did a little rework to get them working.
 
-Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/usb/dwc3/Kconfig     |    9 +++
- drivers/usb/dwc3/Makefile    |    1 +
- drivers/usb/dwc3/dwc3-qcom.c |  153 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 163 insertions(+)
+Changes since v6:
+* Renamed all MSM references to qcom, including file names
+* Removed direct TCSR manipulation.  This done from new TCSR driver.
+* Added defines for register bits
+* XO clk is optional on some platforms.  Corrected logic to handle this.
+* Ignore set_voltage failures.  This allows us to support dummy regulators on
+  platforms where there is no voltage control.
+* Reworked devicetree binding to remove TCSR reg resources
+
+Changes since v5:
+* devicetree bindings descriptions fixes 
+* Fixed NULL pointer dereferences in dev_prink's
+* Removed extra space in "sleep " clock name
+
+Changes since v4:
+* Substitute references to "wc3" with just "dw" in USB PHY drivers and
+  file names. This is to indicate that the PHY's are DesignWare, but
+  not necessarily related to DWC3 IP core. 
+
+Changes since v3:
+* Remove "_clk" suffix from clock names
+* Clarify required child node for qcom,dwc3
+* Fix comments in functions headers
+* Use dbg instead err in drivers probe functions.
+
+Changes since v2:
+* Several improvements in devicetree bindings description
+* Disable regulators in glue layer if there is error during 
+  ioremap.
+
+Changes since first version:
+* Split devicetree bindings description file to separate patch
+* Address comments for device bindings description
+* Fix typo in 'gdsc' requlator name.
+
+Ivan T. Ivanov (3):
+  usb: dwc3: Add Qualcomm DWC3 glue layer driver
+  usb: phy: Add Qualcomm DWC3 HS/SS PHY drivers
+  usb: dwc3: qcom: Add device tree binding
+
+ .../devicetree/bindings/usb/qcom,dwc3.txt          |  104 ++++++
+ drivers/usb/dwc3/Kconfig                           |    9 +
+ drivers/usb/dwc3/Makefile                          |    1 +
+ drivers/usb/dwc3/dwc3-qcom.c                       |  153 ++++++++
+ drivers/usb/phy/Kconfig                            |   11 +
+ drivers/usb/phy/Makefile                           |    2 +
+ drivers/usb/phy/phy-qcom-hsusb.c                   |  348 ++++++++++++++++++
+ drivers/usb/phy/phy-qcom-ssusb.c                   |  385 ++++++++++++++++++++
+ 8 files changed, 1013 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/qcom,dwc3.txt
  create mode 100644 drivers/usb/dwc3/dwc3-qcom.c
+ create mode 100644 drivers/usb/phy/phy-qcom-hsusb.c
+ create mode 100644 drivers/usb/phy/phy-qcom-ssusb.c
 
-diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
-index 8eb996e..29fcbfd 100644
---- a/drivers/usb/dwc3/Kconfig
-+++ b/drivers/usb/dwc3/Kconfig
-@@ -79,6 +79,15 @@ config USB_DWC3_KEYSTONE
- 	  Support of USB2/3 functionality in TI Keystone2 platforms.
- 	  Say 'Y' or 'M' here if you have one such device
- 
-+config USB_DWC3_QCOM
-+       tristate "Qualcomm Platforms"
-+       default USB_DWC3
-+       select USB_QCOM_DWC3_PHY
-+       help
-+         Recent Qualcomm SoCs ship with one DesignWare Core USB3 IP inside,
-+         say 'Y' or 'M' if you have one such device.
-+
-+
- comment "Debugging features"
- 
- config USB_DWC3_DEBUG
-diff --git a/drivers/usb/dwc3/Makefile b/drivers/usb/dwc3/Makefile
-index 10ac3e7..0da8e75 100644
---- a/drivers/usb/dwc3/Makefile
-+++ b/drivers/usb/dwc3/Makefile
-@@ -33,3 +33,4 @@ obj-$(CONFIG_USB_DWC3_OMAP)		+= dwc3-omap.o
- obj-$(CONFIG_USB_DWC3_EXYNOS)		+= dwc3-exynos.o
- obj-$(CONFIG_USB_DWC3_PCI)		+= dwc3-pci.o
- obj-$(CONFIG_USB_DWC3_KEYSTONE)		+= dwc3-keystone.o
-+obj-$(CONFIG_USB_DWC3_QCOM)		+= dwc3-qcom.o
-diff --git a/drivers/usb/dwc3/dwc3-qcom.c b/drivers/usb/dwc3/dwc3-qcom.c
-new file mode 100644
-index 0000000..e99764a
---- /dev/null
-+++ b/drivers/usb/dwc3/dwc3-qcom.c
-@@ -0,0 +1,153 @@
-+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/usb/phy.h>
-+
-+#include "core.h"
-+
-+
-+struct dwc3_qcom {
-+	struct device		*dev;
-+
-+	struct clk		*core_clk;
-+	struct clk		*iface_clk;
-+	struct clk		*sleep_clk;
-+
-+	struct regulator	*gdsc;
-+};
-+
-+static int dwc3_qcom_probe(struct platform_device *pdev)
-+{
-+	struct device_node *node = pdev->dev.of_node;
-+	struct dwc3_qcom *qdwc;
-+	int ret = 0;
-+
-+	qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
-+	if (!qdwc)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, qdwc);
-+
-+	qdwc->dev = &pdev->dev;
-+
-+	qdwc->gdsc = devm_regulator_get(qdwc->dev, "gdsc");
-+
-+	qdwc->core_clk = devm_clk_get(qdwc->dev, "core");
-+	if (IS_ERR(qdwc->core_clk)) {
-+		dev_dbg(qdwc->dev, "failed to get core clock\n");
-+		return PTR_ERR(qdwc->core_clk);
-+	}
-+
-+	qdwc->iface_clk = devm_clk_get(qdwc->dev, "iface");
-+	if (IS_ERR(qdwc->iface_clk)) {
-+		dev_dbg(qdwc->dev, "failed to get iface clock, skipping\n");
-+		qdwc->iface_clk = NULL;
-+	}
-+
-+	qdwc->sleep_clk = devm_clk_get(qdwc->dev, "sleep");
-+	if (IS_ERR(qdwc->sleep_clk)) {
-+		dev_dbg(qdwc->dev, "failed to get sleep clock, skipping\n");
-+		qdwc->sleep_clk = NULL;
-+	}
-+
-+	if (!IS_ERR(qdwc->gdsc)) {
-+		ret = regulator_enable(qdwc->gdsc);
-+		if (ret)
-+			dev_err(qdwc->dev, "cannot enable gdsc\n");
-+	}
-+
-+	clk_prepare_enable(qdwc->core_clk);
-+
-+	if (qdwc->iface_clk)
-+		clk_prepare_enable(qdwc->iface_clk);
-+
-+	if (qdwc->sleep_clk)
-+		clk_prepare_enable(qdwc->sleep_clk);
-+
-+	ret = of_platform_populate(node, NULL, NULL, qdwc->dev);
-+	if (ret) {
-+		dev_err(qdwc->dev, "failed to register core - %d\n", ret);
-+		dev_dbg(qdwc->dev, "failed to add create dwc3 core\n");
-+		goto dis_clks;
-+	}
-+
-+	return 0;
-+
-+dis_clks:
-+	if (qdwc->sleep_clk)
-+		clk_disable_unprepare(qdwc->sleep_clk);
-+
-+	if (qdwc->iface_clk)
-+		clk_disable_unprepare(qdwc->iface_clk);
-+
-+	clk_disable_unprepare(qdwc->core_clk);
-+
-+	if (!IS_ERR(qdwc->gdsc)) {
-+		ret = regulator_disable(qdwc->gdsc);
-+		if (ret)
-+			dev_dbg(qdwc->dev, "cannot disable gdsc\n");
-+	}
-+
-+	return ret;
-+}
-+
-+static int dwc3_qcom_remove(struct platform_device *pdev)
-+{
-+	int ret = 0;
-+
-+	struct dwc3_qcom *qdwc = platform_get_drvdata(pdev);
-+
-+	if (qdwc->sleep_clk)
-+		clk_disable_unprepare(qdwc->sleep_clk);
-+
-+	if (qdwc->iface_clk)
-+		clk_disable_unprepare(qdwc->iface_clk);
-+
-+	clk_disable_unprepare(qdwc->core_clk);
-+
-+	if (!IS_ERR(qdwc->gdsc)) {
-+		ret = regulator_disable(qdwc->gdsc);
-+		if (ret)
-+			dev_dbg(qdwc->dev, "cannot disable gdsc\n");
-+	}
-+	return ret;
-+}
-+
-+static const struct of_device_id of_dwc3_match[] = {
-+	{ .compatible = "qcom,dwc3" },
-+	{ /* Sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, of_dwc3_match);
-+
-+static struct platform_driver dwc3_qcom_driver = {
-+	.probe		= dwc3_qcom_probe,
-+	.remove		= dwc3_qcom_remove,
-+	.driver		= {
-+		.name	= "qcom-dwc3",
-+		.owner	= THIS_MODULE,
-+		.of_match_table	= of_dwc3_match,
-+	},
-+};
-+
-+module_platform_driver(dwc3_qcom_driver);
-+
-+MODULE_ALIAS("platform:qcom-dwc3");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("DesignWare USB3 QCOM Glue Layer");
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
