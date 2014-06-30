@@ -1,33 +1,41 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 30 Jun 2014 15:09:29 +0200
-Subject: [PATCH v8 4/7] ata: ahci_platform: add a generic AHCI compatible
-In-Reply-To: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1404133772-11741-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1404133772-11741-5-git-send-email-antoine.tenart@free-electrons.com>
+From: schwab@suse.de (Andreas Schwab)
+Date: Mon, 30 Jun 2014 15:14:33 +0200
+Subject: [PATCH] arm64/crypto: fix makefile rule for aes-glue-%.o
+Message-ID: <mvmvbri4k06.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci_platform driver is a generic driver using the libahci_platform
-functions. Add a generic compatible to avoid having an endless list of
-compatibles with no differences for the same driver.
+This fixes the following build failure:
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+  CC [M]  arch/arm64/crypto/aes-glue-ce.o
+ld: cannot find arch/arm64/crypto/aes-glue-ce.o: No such file or directory
+scripts/Makefile.build:393: recipe for target 'arch/arm64/crypto/aes-ce-blk.o' failed
+make[1]: *** [arch/arm64/crypto/aes-ce-blk.o] Error 1
+Makefile:893: recipe for target 'arch/arm64/crypto' failed
+make: *** [arch/arm64/crypto] Error 2
+
+The $(obj)/aes-glue-%.o rule only creates $(obj)/.tmp_aes-glue-ce.o, it
+should use if_changed_rule instead of if_changed_dep.
+
+Signed-off-by: Andreas Schwab <schwab@suse.de>
 ---
- drivers/ata/ahci_platform.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/crypto/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index ebe505c17763..a30cecd68609 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -78,6 +78,8 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
- 			 ahci_platform_resume);
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+index 2070a56..a3f935f 100644
+--- a/arch/arm64/crypto/Makefile
++++ b/arch/arm64/crypto/Makefile
+@@ -35,4 +35,4 @@ AFLAGS_aes-neon.o	:= -DINTERLEAVE=4
+ CFLAGS_aes-glue-ce.o	:= -DUSE_V8_CRYPTO_EXTENSIONS
  
- static const struct of_device_id ahci_of_match[] = {
-+	{ .compatible = "generic-ahci", },
-+	/* Keep the following compatibles for device tree compatibility */
- 	{ .compatible = "snps,spear-ahci", },
- 	{ .compatible = "snps,exynos5440-ahci", },
- 	{ .compatible = "ibm,476gtr-ahci", },
+ $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
+-	$(call if_changed_dep,cc_o_c)
++	$(call if_changed_rule,cc_o_c)
 -- 
-1.9.1
+2.0.1
+
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
