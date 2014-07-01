@@ -1,119 +1,43 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:47 +0900
-Subject: [PATCH 7/8] ARM: shmobile: Move r8a7791 reset code to pm-r8a7791.c
-In-Reply-To: <cover.1404174157.git.horms+renesas@verge.net.au>
-References: <cover.1404174157.git.horms+renesas@verge.net.au>
-Message-ID: <8e26118d44c4877fa52dc8117692f3cc9af3c769.1404174157.git.horms+renesas@verge.net.au>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 01 Jul 2014 09:40:10 +0900
+Subject: [PATCH] ARM: dts: Add TMU dt node to monitor the temperature for
+ Exynos3250
+Message-ID: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+This patch add TMU (Thermal Management Unit) dt node to monitor the high
+temperature for Exynos3250.
 
-Move r8a7791 specific reset vector setup code from the
-SMP glue code to PM code. This makes the code one step
-closer to allow PM operations such as Suspend-to-RAM
-in the case when SMP is disabled in the kernel config.
-
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-[horms+renesas at verge.net.au: updated for recent header file changes]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-shmobile/pm-r8a7791.c  | 27 +++++++++++++++++++++++++--
- arch/arm/mach-shmobile/smp-r8a7791.c | 24 ------------------------
- 2 files changed, 25 insertions(+), 26 deletions(-)
+This patch has a dependency on following patch [1]:
+ [1] https://lkml.org/lkml/2014/6/30/805
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7791.c b/arch/arm/mach-shmobile/pm-r8a7791.c
-index b7e6513..c44304c 100644
---- a/arch/arm/mach-shmobile/pm-r8a7791.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7791.c
-@@ -11,12 +11,17 @@
-  */
+ arch/arm/boot/dts/exynos3250.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 3660cab..1e566af 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -192,6 +192,16 @@
+ 			status = "disabled";
+ 		};
  
- #include <linux/kernel.h>
--
-+#include <linux/smp.h>
- #include <asm/io.h>
--
-+#include "common.h"
- #include "pm-rcar.h"
- #include "r8a7791.h"
- 
-+#define RST		0xe6160000
-+#define CA15BAR		0x0020
-+#define CA15RESCNT	0x0040
-+#define RAM		0xe6300000
++		tmu: tmu at 100C0000 {
++			compatible = "samsung,exynos3250-tmu";
++			interrupt-parent = <&gic>;
++			reg = <0x100C0000 0x100>;
++			interrupts = <0 216 0>;
++			clocks = <&cmu CLK_TMU_APBIF>;
++			clock-names = "tmu_apbif";
++			status = "disabled";
++		};
 +
- /* SYSC */
- #define SYSCIER 0x0c
- #define SYSCIMR 0x10
-@@ -40,10 +45,28 @@ static inline void r8a7791_sysc_init(void) {}
- 
- void __init r8a7791_pm_init(void)
- {
-+	void __iomem *p;
-+	u32 bar;
- 	static int once;
- 
- 	if (once++)
- 		return;
- 
-+	/* RAM for jump stub, because BAR requires 256KB aligned address */
-+	p = ioremap_nocache(RAM, shmobile_boot_size);
-+	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
-+	iounmap(p);
-+
-+	/* setup reset vectors */
-+	p = ioremap_nocache(RST, 0x63);
-+	bar = (RAM >> 8) & 0xfffffc00;
-+	writel_relaxed(bar, p + CA15BAR);
-+	writel_relaxed(bar | 0x10, p + CA15BAR);
-+
-+	/* enable clocks to all CPUs */
-+	writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) | 0xa5a50000,
-+		       p + CA15RESCNT);
-+	iounmap(p);
-+
- 	r8a7791_sysc_init();
- }
-diff --git a/arch/arm/mach-shmobile/smp-r8a7791.c b/arch/arm/mach-shmobile/smp-r8a7791.c
-index 2482555..df086aa 100644
---- a/arch/arm/mach-shmobile/smp-r8a7791.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7791.c
-@@ -24,35 +24,11 @@
- #include "r8a7791.h"
- #include "rcar-gen2.h"
- 
--#define RST		0xe6160000
--#define CA15BAR		0x0020
--#define CA15RESCNT	0x0040
--#define RAM		0xe6300000
--
- static void __init r8a7791_smp_prepare_cpus(unsigned int max_cpus)
- {
--	void __iomem *p;
--	u32 bar;
--
- 	/* let APMU code install data related to shmobile_boot_vector */
- 	shmobile_smp_apmu_prepare_cpus(max_cpus);
- 
--	/* RAM for jump stub, because BAR requires 256KB aligned address */
--	p = ioremap_nocache(RAM, shmobile_boot_size);
--	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
--	iounmap(p);
--
--	/* setup reset vectors */
--	p = ioremap_nocache(RST, 0x63);
--	bar = (RAM >> 8) & 0xfffffc00;
--	writel_relaxed(bar, p + CA15BAR);
--	writel_relaxed(bar | 0x10, p + CA15BAR);
--
--	/* enable clocks to all CPUs */
--	writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) | 0xa5a50000,
--		       p + CA15RESCNT);
--	iounmap(p);
--
- 	r8a7791_pm_init();
- 	shmobile_smp_apmu_suspend_init();
- }
+ 		gic: interrupt-controller at 10481000 {
+ 			compatible = "arm,cortex-a15-gic";
+ 			#interrupt-cells = <3>;
 -- 
-2.0.0.rc2
+1.8.0
