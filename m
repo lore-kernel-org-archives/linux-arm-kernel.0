@@ -1,68 +1,76 @@
-From: guido@vanguardiasur.com.ar (Guido =?iso-8859-1?Q?Mart=EDnez?=)
-Date: Tue, 1 Jul 2014 20:52:00 -0300
-Subject: [PATCH/RESEND 0/9] drm: tilcdc driver fixes
-In-Reply-To: <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
-References: <1402110128-30471-1-git-send-email-guido@vanguardiasur.com.ar>
- <1403014631-18072-1-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <20140701235200.GB31549@fox>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 02 Jul 2014 08:52:15 +0900
+Subject: [PATCH] ARM: dts: Add TMU dt node to monitor the temperature for
+ Exynos3250
+In-Reply-To: <CAK5sBcER-rFmqe74b8uS=ZxKnTNGtkE0x6f7zaLphmyuHJz7Yg@mail.gmail.com>
+References: <1404175210-9278-1-git-send-email-cw00.choi@samsung.com>
+ <CAK5sBcFJMK-y+MZPXCufKEmp=v1nFJHstvNTczsQ3ez3SUPbKw@mail.gmail.com>
+ <53B23362.7080103@samsung.com>
+ <CAK5sBcER-rFmqe74b8uS=ZxKnTNGtkE0x6f7zaLphmyuHJz7Yg@mail.gmail.com>
+Message-ID: <53B349AF.4080606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On 07/01/2014 01:10 PM, Sachin Kamat wrote:
+> Hi Chanwoo,
+> 
+> On Tue, Jul 1, 2014 at 9:34 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> Hi Sachin,
+>>
+>> On 07/01/2014 12:33 PM, Sachin Kamat wrote:
+>>> Hi Chanwoo,
+>>>
+>>> On Tue, Jul 1, 2014 at 6:10 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>>> This patch add TMU (Thermal Management Unit) dt node to monitor the high
+>>>> temperature for Exynos3250.
+>>>>
+>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>> ---
+>>>> This patch has a dependency on following patch [1]:
+>>>>  [1] https://lkml.org/lkml/2014/6/30/805
+>>>>
+>>>>  arch/arm/boot/dts/exynos3250.dtsi | 10 ++++++++++
+>>>>  1 file changed, 10 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>>>> index 3660cab..1e566af 100644
+>>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>>>> @@ -192,6 +192,16 @@
+>>>>                         status = "disabled";
+>>>>                 };
+>>>>
+>>>> +               tmu: tmu at 100C0000 {
+>>>> +                       compatible = "samsung,exynos3250-tmu";
+>>>> +                       interrupt-parent = <&gic>;
+>>>> +                       reg = <0x100C0000 0x100>;
+>>>> +                       interrupts = <0 216 0>;
+>>>> +                       clocks = <&cmu CLK_TMU_APBIF>;
+>>>> +                       clock-names = "tmu_apbif";
+>>>> +                       status = "disabled";
+>>>
+>>> I don't think there would be any board specific properties needed. Hence
+>>> leave the status as enabled (by deleting the above line).
+>>>
+>>
+>> I think that if specific board need TMU feature, dts file for specific board
+>> should include tmu dt node with 'okay' status. The specific board based on
+>> Exynos3250 might not need TMU feature.
+> 
+> The status field in DT node is not meant for stating the build configuration but
+> represents the readiness of the hardware for usage on the platform. If
+> a particular
+> board does not need this feature it needs to be disabled in the build
+> config and only
+> for any special requirements disable it in board file.
 
-did you take a look at this patchset? I foolishly missed adding you on
-the To: header, so apologies for that in advance.
+TMU (Thermal Management Unit) needs specific regulator for TMU power as following:
+The regulator for TMU is dependent on board.
 
-Thanks,
+For exmaple: in board dts file including tmu dt
 
-On Tue, Jun 17, 2014 at 11:17:02AM -0300, Guido Mart?nez wrote:
-> The tilcdc driver could be compiled as a module, but was severely broken
-> and could not be used as such. This patchset attempts to fix the issues
-> preventing a proper load/unload of the module.
-> 
-> Issues included dangling sysfs nodes, dangling devices, memory leaks and
-> a double kfree.
-> 
-> It now seems to be working ok. We have tested this by loading and
-> unloading the driver repeteadly, with both panel and slave connectors
-> and found no flaws.
-> 
-> There is still one warning left on tilcdc_crtc_destroy, caused by
-> destroying the connector while still in an ON status. We don't know why
-> this happens or why it's an issue, so we did not fix it.
-> 
-> The first 7 patches are bug fixes which and should probably be applied
-> in the stable trees. The last two are clean-ups.
-> 
-> 
-> Resending this since I got no replies.
-> 
-> 
-> Guido Mart?nez (9):
->   drm/i2c: tda998x: move drm_i2c_encoder_destroy call
->   drm/tilcdc: panel: fix dangling sysfs connector node
->   drm/tilcdc: slave: fix dangling sysfs connector node
->   drm/tilcdc: tfp410: fix dangling sysfs connector node
->   drm/tilcdc: panel: fix leak when unloading the module
->   drm/tilcdc: fix release order on exit
->   drm/tilcdc: fix double kfree
->   drm/tilcdc: remove submodule destroy calls
->   drm/tilcdc: replace late_initcall with module_init
-> 
->  drivers/gpu/drm/i2c/tda998x_drv.c      |  2 +-
->  drivers/gpu/drm/tilcdc/Module.symvers  |  0
->  drivers/gpu/drm/tilcdc/tilcdc_drv.c    | 15 +++++--------
->  drivers/gpu/drm/tilcdc/tilcdc_drv.h    |  1 -
->  drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 39 +++++++++++++++++-----------------
->  drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 27 +++++++++++++----------
->  drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 35 +++++++++++++++---------------
->  7 files changed, 59 insertions(+), 60 deletions(-)
->  create mode 100644 drivers/gpu/drm/tilcdc/Module.symvers
-> 
-> -- 
-> 2.0.0
-> 
-
--- 
-Guido Mart?nez, VanguardiaSur
-www.vanguardiasur.com.ar
+	&tmu {
+		vtmu-supply = <&ldo7_reg>;
+		status = "okay";
+	};
