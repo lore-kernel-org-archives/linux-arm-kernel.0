@@ -1,128 +1,36 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 01 Jul 2014 15:00:38 -0700
-Subject: [PATCH 2/2] cpufreq: cpu0: Extend support beyond CPU0
-In-Reply-To: <CAKohpokaVPn7yNPNAGrE6juGaOYuxZvVsbmkOZmyi9rDub6t7g@mail.gmail.com>
-References: <cover.1403684824.git.viresh.kumar@linaro.org>
- <e9c0eef07745e561b9d12dcb50c3e2f7eb3e8880.1403684824.git.viresh.kumar@linaro.org>
- <53AB1CC1.4010907@codeaurora.org>
- <CAKohpo=Q7eWNwcK6KF9_U-zD0g=96QHW9hiQupLpV5GqoWE+mA@mail.gmail.com>
- <53ACB568.4000903@codeaurora.org> <20140627015354.32686.83046@quantum>
- <CAKohponvN3rAvJrfi4TojFcq5gq7r2oNE4Q0_NtwBHmEZ8waBA@mail.gmail.com>
- <CAKohpo=dgSW551yzqjAV2_opw_4naqFEWpwUz9ktkGgR5vCBZA@mail.gmail.com>
- <CABGGiswMuofH5WRh4jgwh1=CV+fEXM_Ec3+WNwThbuMLVxsdcg@mail.gmail.com>
- <CAKohpokaVPn7yNPNAGrE6juGaOYuxZvVsbmkOZmyi9rDub6t7g@mail.gmail.com>
-Message-ID: <20140701220038.32686.81633@quantum>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 23:14:28 +0100
+Subject: [PATCH 0/3] s/FOOTBRIDGE/ARCH_FOOTBRIDGE/
+In-Reply-To: <1404247026-379-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1404247026-379-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20140701221428.GC32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Viresh Kumar (2014-07-01 04:14:04)
-> On 1 July 2014 00:03, Rob Herring <rob.herring@linaro.org> wrote:
-> >> What about comparing "clocks" property in cpu DT nodes?
-> >
-> > What if a different clock is selected for some reason.
+On Tue, Jul 01, 2014 at 10:37:03PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Russell,
 > 
-> I don't know why that will happen for CPUs sharing clock line.
-> 
-> > I think a clock api function would be better.
-> 
-> @Mike: What do you think? I think we can get a clock API for
-> this.
+> I'm not sure that FOOTBRIDGE and ARCH_FOOTBRIDGE are semantically
+> identical; if not, feel free to nack this series.
 
-I can't help but think this is a pretty ugly solution. Why not specify
-the nature of the cpu clock(s) in DT directly? There was a thread
-already that discussed adding such a property to the CPU DT binding but
-it seems to have gone cold[1]. Furthermore my mailer sucks and I see now
-that my response to that thread never hit the list due to mangled
-headers. Here is a copy/paste of my response to the aforementioned
-thread:
+CONFIG_FOOTBRIDGE means that we have a DC21285 in the system.  We
+used to have ARCH_FOOTBRIDGE and ARCH_CO285 which both selected
+CONFIG_FOOTBRIDGE.
 
-"""
-I'll join the bikeshedding.
+ARCH_FOOTBRIDGE was for either host or addin mode using a PAGE_OFFSET
+of 0xc0000000.  ARCH_CO285 had a PAGE_OFFSET of 0x80000000 as they
+wanted to be able to map almost all of PCI memory space.
 
-The hardware property that matters for cpufreq-cpu0 users is that a
-multi-core CPU uses a single clock input to scale frequency across all
-of the cores in that cluster. So an accurate description is:
+So think of CONFIG_FOOTBRIDGE as meaning that we have the physical
+device, and CONFIG_ARCH_FOOTBRIDGE meaning that we want to support
+boards with the device on.
 
-scaling-method = "clock-ganged"; //hardware-people-speak
+So, it may make sense to rename CONFIG_FOOTBRIDGE to CONFIG_DC21285
+if that makes the configuration symbol intention clearer.
 
-Or,
+This is why I prefer even hidden symbols to have a help text - having
+the help text explains why they exist...
 
-scaling-method = "clock-shared"; //software-people-speak
-
-Versus independently scalable CPUs in an SMP cluster:
-
-scaling-method = "independent"; //x86, Krait, etc.
-
-Or perhaps instead of "independent" at the parent "cpus" node we would
-put the following in each cpu at N node:
-
-scaling-method = "clock";
-
-Or "psci" or "acpi" or whatever.
-
-Thought exercise: for Hyperthreaded(tm) CPUs with 2 virtual cores for
-every hard CPU (and multiple CPUs in a cluster):
-
-scaling-method = "paired";
-
-Or more simply, "hyperthreaded".
-"""
-
-Regards,
-Mike
-
-[1] http://www.spinics.net/lists/cpufreq/msg10034.html
-
-> 
-> > That being said, I don't really have any issue with such a function.
-> > Some comments on the implementation.
-> 
-> >> +static int of_property_match(const struct device_node *np1,
-> >> +                             const struct device_node *np2,
-> >> +                             const char *list_name)
-> >> +{
-> >> +       const __be32 *list1, *list2, *list1_end;
-> >
-> > s/list/prop/
-> >
-> > Everywhere.
-> 
-> Ok.
-> 
-> >> +       int size1, size2;
-> >> +       phandle phandle1, phandle2;
-> >> +
-> >> +       /* Retrieve the list property */
-> >> +       list1 = of_get_property(np1, list_name, &size1);
-> >> +       if (!list1)
-> >> +               return -ENOENT;
-> >> +
-> >> +       list2 = of_get_property(np2, list_name, &size2);
-> >> +       if (!list2)
-> >> +               return -ENOENT;
-> >> +
-> >> +       if (size1 != size2)
-> >> +               return 0;
-> >> +
-> >> +       list1_end = list1 + size1 / sizeof(*list1);
-> >> +
-> >> +       /* Loop over the phandles */
-> >> +       while (list1 < list1_end) {
-> >> +               phandle1 = be32_to_cpup(list1++);
-> >> +               phandle2 = be32_to_cpup(list2++);
-> >> +
-> >> +               if (phandle1 != phandle2)
-> >> +                       return 0;
-> >> +       }
-> >
-> > You can just do a memcmp here.
-> 
-> Yeah, that would be much better.
-> 
-> > This is wrong anyway because you don't know #clock-cells size.
-> 
-> I was actually comparing all the clock-cells, whatever there number
-> is to make sure "clocks" properties are exactly same. Anyway
-> memcmp will still guarantee that.
-> 
-> Thanks for your review.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
