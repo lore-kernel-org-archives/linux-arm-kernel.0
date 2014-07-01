@@ -1,263 +1,172 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Tue, 1 Jul 2014 21:50:50 +0100
-Subject: [RESEND] [PATCH v8 8/9] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-9-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140701205050.GB19569@bart.dudau.co.uk>
+From: detheridge@ti.com (Darren Etheridge)
+Date: Tue, 1 Jul 2014 16:00:20 -0500
+Subject: [PATCH v3] ARM: dts: am335x-evmsk: enable display and lcd panel
+ support
+Message-ID: <1404248420-10086-1-git-send-email-detheridge@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several platforms use a rather generic version of parsing
-the device tree to find the host bridge ranges. Move the common code
-into the generic PCI code and use it to create a pci_host_bridge
-structure that can be used by arch code.
+Add the necessary nodes to enable the LCD controller and the
+LCD panel that is attached to the Texas Instruments AM335x
+EVMSK platform.  Also setup the necessary pin mux within the
+DT file to drive the LCD connector and add the correct
+pinmux settings for the lcd pins to be configured to when
+the SoC goes into sleep state for the minimum power
+consumption.
 
-Based on early attempts by Andrew Murray to unify the code.
-Used powerpc and microblaze PCI code as starting point.
+For the sleep mode LCD pin settings, MUX_MODE7 is chosen as
+this corresponds to switching the pins into input GPIO's with
+an internal pulldown.  Which has been determined to offer the
+lowest power solution vs leaving the pins configured in LCD
+mode.
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+Signed-off-by: Darren Etheridge <detheridge@ti.com>
+Acked-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/of/of_pci.c       | 136 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/pci/host-bridge.c |  15 +++++
- include/linux/of_pci.h    |  10 ++++
- include/linux/pci.h       |   8 +++
- 4 files changed, 169 insertions(+)
+Tony, Benoit,
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 8481996..e81402a 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -1,6 +1,7 @@
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_pci.h>
+I didn't see this patch get applied anywhere, so I updated it and I am
+resending it.  Please let me know if you need any more info before you will
+apply it.
+
+Thanks, Darren
+
+v3:
+Updated subject to match classification style of subsystem
+Rebased against 3.16-rc3
+
+v2:
+Fixed up the incorrect label ordering in the pinmux comments for LCD pins
+16 through 23 as reported by Wolfram Sang <wsa@sang-engineering.com>
+
+ arch/arm/boot/dts/am335x-evmsk.dts | 105 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 105 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index ab9a34c..59766e2 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -149,12 +149,113 @@
+ 			"Headphone Jack",       "HPLOUT",
+ 			"Headphone Jack",       "HPROUT";
+ 	};
++
++	panel {
++		compatible = "ti,tilcdc,panel";
++		pinctrl-names = "default", "sleep";
++		pinctrl-0 = <&lcd_pins_default>;
++		pinctrl-1 = <&lcd_pins_sleep>;
++		status = "okay";
++		panel-info {
++			ac-bias           = <255>;
++			ac-bias-intrpt    = <0>;
++			dma-burst-sz      = <16>;
++			bpp               = <32>;
++			fdd               = <0x80>;
++			sync-edge         = <0>;
++			sync-ctrl         = <1>;
++			raster-order      = <0>;
++			fifo-th           = <0>;
++		};
++		display-timings {
++			480x272 {
++				hactive         = <480>;
++				vactive         = <272>;
++				hback-porch     = <43>;
++				hfront-porch    = <8>;
++				hsync-len       = <4>;
++				vback-porch     = <12>;
++				vfront-porch    = <4>;
++				vsync-len       = <10>;
++				clock-frequency = <9000000>;
++				hsync-active    = <0>;
++				vsync-active    = <0>;
++			};
++		};
++	};
+ };
  
- static inline int __of_pci_pci_compare(struct device_node *node,
-@@ -89,6 +90,141 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- }
- EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+ &am33xx_pinmux {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&gpio_keys_s0 &clkout2_pin>;
  
-+/**
-+ * pci_host_bridge_of_get_ranges - Parse PCI host bridge resources from DT
-+ * @dev: device node of the host bridge having the range property
-+ * @resources: list where the range of resources will be added after DT parsing
-+ * @io_base: pointer to a variable that will contain the physical address for
-+ * the start of the I/O range.
-+ *
-+ * It is the callers job to free the @resources list if an error is returned.
-+ *
-+ * This function will parse the "ranges" property of a PCI host bridge device
-+ * node and setup the resource mapping based on its content. It is expected
-+ * that the property conforms with the Power ePAPR document.
-+ *
-+ * Each architecture is then offered the chance of applying their own
-+ * filtering of pci_host_bridge_windows based on their own restrictions by
-+ * calling pcibios_fixup_bridge_ranges(). The filtered list of windows
-+ * can then be used when creating a pci_host_bridge structure.
-+ */
-+static int pci_host_bridge_of_get_ranges(struct device_node *dev,
-+		struct list_head *resources, resource_size_t *io_base)
-+{
-+	struct resource *res;
-+	struct of_pci_range range;
-+	struct of_pci_range_parser parser;
-+	int err;
++	lcd_pins_default: lcd_pins_default {
++		pinctrl-single,pins = <
++			0x20 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad8.lcd_data23 */
++			0x24 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad9.lcd_data22 */
++			0x28 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad10.lcd_data21 */
++			0x2c (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad11.lcd_data20 */
++			0x30 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad12.lcd_data19 */
++			0x34 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad13.lcd_data18 */
++			0x38 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad14.lcd_data17 */
++			0x3c (PIN_OUTPUT | MUX_MODE1)	/* gpmc_ad15.lcd_data16 */
++			0xa0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data0.lcd_data0 */
++			0xa4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data1.lcd_data1 */
++			0xa8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data2.lcd_data2 */
++			0xac (PIN_OUTPUT | MUX_MODE0)	/* lcd_data3.lcd_data3 */
++			0xb0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data4.lcd_data4 */
++			0xb4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data5.lcd_data5 */
++			0xb8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data6.lcd_data6 */
++			0xbc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data7.lcd_data7 */
++			0xc0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data8.lcd_data8 */
++			0xc4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data9.lcd_data9 */
++			0xc8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data10.lcd_data10 */
++			0xcc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data11.lcd_data11 */
++			0xd0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data12.lcd_data12 */
++			0xd4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data13.lcd_data13 */
++			0xd8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_data14.lcd_data14 */
++			0xdc (PIN_OUTPUT | MUX_MODE0)	/* lcd_data15.lcd_data15 */
++			0xe0 (PIN_OUTPUT | MUX_MODE0)	/* lcd_vsync.lcd_vsync */
++			0xe4 (PIN_OUTPUT | MUX_MODE0)	/* lcd_hsync.lcd_hsync */
++			0xe8 (PIN_OUTPUT | MUX_MODE0)	/* lcd_pclk.lcd_pclk */
++			0xec (PIN_OUTPUT | MUX_MODE0)	/* lcd_ac_bias_en.lcd_ac_bias_en */
++		>;
++	};
 +
-+	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
++	lcd_pins_sleep: lcd_pins_sleep {
++		pinctrl-single,pins = <
++			0x20 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad8.lcd_data23 */
++			0x24 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad9.lcd_data22 */
++			0x28 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad10.lcd_data21 */
++			0x2c (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad11.lcd_data20 */
++			0x30 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad12.lcd_data19 */
++			0x34 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad13.lcd_data18 */
++			0x38 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad14.lcd_data17 */
++			0x3c (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad15.lcd_data16 */
++			0xa0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data0.lcd_data0 */
++			0xa4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data1.lcd_data1 */
++			0xa8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data2.lcd_data2 */
++			0xac (PULL_DISABLE | MUX_MODE7)	/* lcd_data3.lcd_data3 */
++			0xb0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data4.lcd_data4 */
++			0xb4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data5.lcd_data5 */
++			0xb8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data6.lcd_data6 */
++			0xbc (PULL_DISABLE | MUX_MODE7)	/* lcd_data7.lcd_data7 */
++			0xc0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data8.lcd_data8 */
++			0xc4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data9.lcd_data9 */
++			0xc8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data10.lcd_data10 */
++			0xcc (PULL_DISABLE | MUX_MODE7)	/* lcd_data11.lcd_data11 */
++			0xd0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data12.lcd_data12 */
++			0xd4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data13.lcd_data13 */
++			0xd8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data14.lcd_data14 */
++			0xdc (PULL_DISABLE | MUX_MODE7)	/* lcd_data15.lcd_data15 */
++			0xe0 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_vsync.lcd_vsync */
++			0xe4 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_hsync.lcd_hsync */
++			0xe8 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_pclk.lcd_pclk */
++			0xec (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_ac_bias_en.lcd_ac_bias_en */
++		>;
++	};
 +
-+	/* Check for ranges property */
-+	err = of_pci_range_parser_init(&parser, dev);
-+	if (err)
-+		return err;
 +
-+	pr_debug("Parsing ranges property...\n");
-+	for_each_of_pci_range(&parser, &range) {
-+		/* Read next ranges element */
-+		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx cpu_addr:0x%016llx size:0x%016llx\n",
-+			range.pci_space, range.pci_addr, range.cpu_addr, range.size);
+ 	user_leds_s0: user_leds_s0 {
+ 		pinctrl-single,pins = <
+ 			0x10 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad4.gpio1_4 */
+@@ -573,3 +674,7 @@
+ 		ti,wire-config = <0x00 0x11 0x22 0x33>;
+ 	};
+ };
 +
-+		/*
-+		 * If we failed translation or got a zero-sized region
-+		 * then skip this range
-+		 */
-+		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-+			continue;
-+
-+		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-+		if (!res)
-+			return -ENOMEM;
-+
-+		err = of_pci_range_to_resource(&range, dev, res);
-+		if (err)
-+			return err;
-+
-+		if (resource_type(res) == IORESOURCE_IO)
-+			*io_base = range.cpu_addr;
-+
-+		pci_add_resource_offset(resources, res,
-+				res->start - range.pci_addr);
-+	}
-+
-+	/* Apply architecture specific fixups for the ranges */
-+	return pcibios_fixup_bridge_ranges(resources);
-+}
-+
-+static atomic_t domain_nr = ATOMIC_INIT(-1);
-+
-+/**
-+ * of_create_pci_host_bridge - Create a PCI host bridge structure using
-+ * information passed in the DT.
-+ * @parent: device owning this host bridge
-+ * @ops: pci_ops associated with the host controller
-+ * @host_data: opaque data structure used by the host controller.
-+ *
-+ * returns a pointer to the newly created pci_host_bridge structure, or
-+ * NULL if the call failed.
-+ *
-+ * This function will try to obtain the host bridge domain number by
-+ * using of_alias_get_id() call with "pci-domain" as a stem. If that
-+ * fails, a local allocator will be used that will put each host bridge
-+ * in a new domain.
-+ */
-+struct pci_host_bridge *
-+of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
-+{
-+	int err, domain, busno;
-+	struct resource *bus_range;
-+	struct pci_bus *root_bus;
-+	struct pci_host_bridge *bridge;
-+	resource_size_t io_base = 0;
-+	LIST_HEAD(res);
-+
-+	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-+	if (!bus_range)
-+		return ERR_PTR(-ENOMEM);
-+
-+	domain = of_alias_get_id(parent->of_node, "pci-domain");
-+	if (domain == -ENODEV)
-+		domain = atomic_inc_return(&domain_nr);
-+
-+	err = of_pci_parse_bus_range(parent->of_node, bus_range);
-+	if (err) {
-+		dev_info(parent, "No bus range for %s, using default [0-255]\n",
-+			parent->of_node->full_name);
-+		bus_range->start = 0;
-+		bus_range->end = 255;
-+		bus_range->flags = IORESOURCE_BUS;
-+	}
-+	busno = bus_range->start;
-+	pci_add_resource(&res, bus_range);
-+
-+	/* now parse the rest of host bridge bus ranges */
-+	err = pci_host_bridge_of_get_ranges(parent->of_node, &res, &io_base);
-+	if (err)
-+		goto err_create;
-+
-+	/* then create the root bus */
-+	root_bus = pci_create_root_bus_in_domain(parent, domain, busno,
-+						ops, host_data, &res);
-+	if (IS_ERR(root_bus)) {
-+		err = PTR_ERR(root_bus);
-+		goto err_create;
-+	}
-+
-+	bridge = to_pci_host_bridge(root_bus->bridge);
-+	bridge->io_base = io_base;
-+
-+	return bridge;
-+
-+err_create:
-+	pci_free_resource_list(&res);
-+	return ERR_PTR(err);
-+}
-+EXPORT_SYMBOL_GPL(of_create_pci_host_bridge);
-+
- #ifdef CONFIG_PCI_MSI
- 
- static LIST_HEAD(of_pci_msi_chip_list);
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 36c669e..54ceafd 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -83,3 +83,18 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
- 	res->end = region->end + offset;
- }
- EXPORT_SYMBOL(pcibios_bus_to_resource);
-+
-+/**
-+ * Simple version of the platform specific code for filtering the list
-+ * of resources obtained from the ranges declaration in DT.
-+ *
-+ * Platforms can override this function in order to impose stronger
-+ * constraints onto the list of resources that a host bridge can use.
-+ * The filtered list will then be used to create a root bus and associate
-+ * it with the host bridge.
-+ *
-+ */
-+int __weak pcibios_fixup_bridge_ranges(struct list_head *resources)
-+{
-+	return 0;
-+}
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index dde3a4a..71e36d0 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -15,6 +15,9 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- int of_pci_get_devfn(struct device_node *np);
- int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-+struct pci_host_bridge *of_create_pci_host_bridge(struct device *parent,
-+					struct pci_ops *ops, void *host_data);
-+
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -43,6 +46,13 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- {
- 	return -EINVAL;
- }
-+
-+static inline struct pci_host_bridge *
-+of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops,
-+			void *host_data)
-+{
-+	return NULL;
-+}
- #endif
- 
- #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 7e7b939..556dc5f 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -402,6 +402,7 @@ struct pci_host_bridge {
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
- 	int domain_nr;
-+	resource_size_t io_base;	/* physical address for the start of I/O area */
- 	struct list_head windows;	/* pci_host_bridge_windows */
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
-@@ -1809,8 +1810,15 @@ static inline void pci_set_of_node(struct pci_dev *dev) { }
- static inline void pci_release_of_node(struct pci_dev *dev) { }
- static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
- static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
-+
- #endif  /* CONFIG_OF */
- 
-+/* Used by architecture code to apply any quirks to the list of
-+ * pci_host_bridge resource ranges before they are being used
-+ * by of_create_pci_host_bridge()
-+ */
-+extern int pcibios_fixup_bridge_ranges(struct list_head *resources);
-+
- #ifdef CONFIG_EEH
- static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
- {
++&lcdc {
++      status = "okay";
++};
 -- 
-2.0.0
+1.9.1
