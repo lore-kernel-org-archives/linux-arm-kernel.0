@@ -1,54 +1,58 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 1 Jul 2014 15:26:09 +0300
-Subject: [PATCHv5 03/15] hwspinlock/core: maintain a list of registered
- hwspinlock banks
-In-Reply-To: <1398904476-26200-4-git-send-email-s-anna@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-4-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=WgbakGbTaYz+4K24aT3vyRkDYwPKCm6XrcJvH667NMMfTTA@mail.gmail.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 1 Jul 2014 21:27:17 +0900
+Subject: [PATCH] regulator: convert to use gpio_desc internally
+In-Reply-To: <20140701111041.GL23300@sirena.org.uk>
+References: <E1X1IOQ-0007fV-1w@rmk-PC.arm.linux.org.uk>
+ <CACRpkdY_w=Vjv0fL5Ay-CkCpvuyjvwyBhOd4wYr0LcmJD6i4qA@mail.gmail.com>
+ <20140630163931.GD32514@n2100.arm.linux.org.uk>
+ <CACRpkda5BjAwphVEkCg6-oUR0yN=RMhjP6FL=Oripy7bQ-aSng@mail.gmail.com>
+ <CAAVeFuK8YPFh3gHRt7_n00SBN6raGj2KxU_rY3GFrQq4dT3LTA@mail.gmail.com>
+ <20140701111041.GL23300@sirena.org.uk>
+Message-ID: <CAAVeFuLc9GVMXQt=6oSkcHwH4ZpoOQkpj7uivUHZW+UkmEdDrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
-
-On Thu, May 1, 2014 at 3:34 AM, Suman Anna <s-anna@ti.com> wrote:
+On Tue, Jul 1, 2014 at 8:10 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Jul 01, 2014 at 09:59:01AM +0900, Alexandre Courbot wrote:
 >
-> The hwspinlock_device structure is used for registering a bank of
-> locks with the driver core. The structure already contains the
-> necessary members to identify the bank of locks. The core does not
-> maintain the hwspinlock_devices itself, but maintains only a radix
-> tree for all the registered locks. A specific lock can be requested
-> by users using a global lock id, and any device-specific fields
-> can be retrieved through a reference to the hwspinlock_device in
-> each lock.
+>> We could compare on the (dev, func, index) triplet instead of the GPIO
+>> number, but that looks a little bit overkill (and won't work if we mix
+>> integers and descriptors).
 >
-> The global lock id, however, is not friendly to be requested for
-> users using the device-tree model. The device-tree representation
-> will typically have each of the hwspinlock devices represented as
-> a DT node, and a specific lock can be requested using the device's
-> phandle and a lock specifier. Add support to the core therefore to
-> maintain all the registered hwspinlock_devices, so that a device
-> can be looked up and a specific lock belonging to the device
-> requested through a phandle + args approach.
+> This only works if requests always come from the same triplet - if we're
+> requesting in the client context that doesn't work.
+
+Indeed.
+
 >
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> How about we add a SHAREABLE flag to the descriptors that indicates
+>> whether a GPIO can be shared. I can then see one of the following two
+>> policies being applied:
+>
+>> 2) GPIOs are shareable by default, and remain that way as long as they
+>> are obtained using the gpiod interface exclusively. A call to
+>> gpio_to_desc() or gpio_request_one() would mark the GPIO as
+>> non-shareable until it is released by the integer interface (and would
+>> fail if the GPIO is already requested by gpiod). Any integer interface
+>> call on a gpiod-requested GPIO would now simply fail with -EPERM.
+>
+> This seems sensible to me.
+>
+>> I am not sure whether 2) covers all the requirements to allow gpiod to
+>> be "secure", but if it does, then I suggest we give it a shot
+>> (although at least a few drivers will certainly need fixing, but such
+>> is life). This would add a very welcome layer of security and
+>> guarantee gpiod users that nobody can spoof or mess otherwise with
+>> their GPIOs unless the board or firmware designer allows it.
+>
+> I don't see security as a big deal - so long as normal, well written
+> code gets the benefit of the access protection I think we're doing
+> enough.  If something jumpst through hoops to bypass it then it's buggy
+> but fundamentally we have to trust the kernel to at least some extent.
 
-I'm not sure we need this patch.
+The security consideration apart, making GPIOs obtained through gpiod
+shareable seems to be a good way to solve the issue we are having
+here.
 
-It seems to me that the global lock id can be the base_id + lock
-index, where the former should be a property of the parent dt node,
-and the latter can just be the phandle argument. Then, with the global
-lock id in hand, drivers could just use the existing
-hwspin_lock_request_specific API.
-
-If future hardware will bring a more complex scenario, we could then
-introduce the xlate proposal to resolve it. As long as we're not
-changing the dt data, and this is all handled by kernel code, then I'd
-prefer opting for less code now as long as it addresses the
-requirements.
-
-Please let me know if currently there is a use case that can't be
-addressed using this simpler model.
-
-Thanks,
-Ohad.
+Linus, if you agree with the idea I can try to give it a shot sometime
+this week.
