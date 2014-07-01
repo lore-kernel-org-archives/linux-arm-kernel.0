@@ -1,106 +1,134 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 1 Jul 2014 09:21:19 +0200
-Subject: [PATCH v10 2/2] dmaengine: sun6i: Add driver for the Allwinner
- A31 DMA controller
-In-Reply-To: <20140630153305.GA28740@leverpostej>
-References: <1404134454-25513-1-git-send-email-maxime.ripard@free-electrons.com>
- <1404134454-25513-3-git-send-email-maxime.ripard@free-electrons.com>
- <20140630142054.GA8756@leverpostej>
- <20140630151906.GG28647@lukather>
- <20140630153305.GA28740@leverpostej>
-Message-ID: <20140701072119.GH28647@lukather>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 1 Jul 2014 10:27:38 +0300
+Subject: [PATCH 1/6] thermal: of: Add support for hardware-tracked trip
+ points
+In-Reply-To: <53B1D1C8.5010907@wwwdotorg.org>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-2-git-send-email-mperttunen@nvidia.com>
+ <53B1D1C8.5010907@wwwdotorg.org>
+Message-ID: <53B262EA.9030806@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 04:33:05PM +0100, Mark Rutland wrote:
-> On Mon, Jun 30, 2014 at 04:19:06PM +0100, Maxime Ripard wrote:
-> > On Mon, Jun 30, 2014 at 03:20:54PM +0100, Mark Rutland wrote:
-> > > Hi Maxime,
-> > > 
-> > > On Mon, Jun 30, 2014 at 02:20:54PM +0100, Maxime Ripard wrote:
-> > > > The Allwinner A31 has a 16 channels DMA controller that it shares with the
-> > > > newer A23. Although sharing some similarities with the DMA controller of the
-> > > > older Allwinner SoCs, it's significantly different, I don't expect it to be
-> > > > possible to share the driver for these two.
-> > > >
-> > > > The A31 Controller is able to memory-to-memory or memory-to-device transfers on
-> > > > the 16 channels in parallel.
-> > > >
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > > ---
-> > > >  drivers/dma/Kconfig     |    8 +
-> > > >  drivers/dma/Makefile    |    1 +
-> > > >  drivers/dma/sun6i-dma.c | 1058 +++++++++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 1067 insertions(+)
-> > > >  create mode 100644 drivers/dma/sun6i-dma.c
-> > > 
-> > > [...]
-> > > 
-> > > > +       sdc->clk = devm_clk_get(&pdev->dev, NULL);
-> > > > +       if (IS_ERR(sdc->clk)) {
-> > > > +               dev_err(&pdev->dev, "No clock specified\n");
-> > > > +               return PTR_ERR(sdc->clk);
-> > > > +       }
-> > > > +
-> > > > +       mux = clk_get(NULL, "ahb1_mux");
-> > > > +       if (IS_ERR(mux)) {
-> > > > +               dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
-> > > > +               return PTR_ERR(mux);
-> > > > +       }
-> > > > +
-> > > > +       pll6 = clk_get(NULL, "pll6");
-> > > > +       if (IS_ERR(pll6)) {
-> > > > +               dev_err(&pdev->dev, "Couldn't get PLL6\n");
-> > > > +               clk_put(mux);
-> > > > +               return PTR_ERR(pll6);
-> > > > +       }
-> > > 
-> > > I'm slightly confused. The binding listed a single unnamed clock (the
-> > > AHB clock). What is going on here?
-> > 
-> > The device itself needs only a single clock to work...
-> > 
-> > > 
-> > > > +       ret = clk_set_parent(mux, pll6);
-> > > > +       clk_put(pll6);
-> > > > +       clk_put(mux);
-> > > > +
-> > > > +       if (ret) {
-> > > > +               dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
-> > > > +               return ret;
-> > > > +       }
-> > > 
-> > > Why do we need to reparent the mux?
-> > 
-> > ... but will function only if this clock is derived from PLL6.
-> 
-> Ok, but _why_ is that the case? Could we at least have a comment for
-> that?
+Inline.
 
-I have no idea, sorry.
+On 01/07/14 00:08, Stephen Warren wrote:
+> On 06/27/2014 02:11 AM, Mikko Perttunen wrote:
+>> This adds support for hardware-tracked trip points to the device tree
+>> thermal sensor framework.
+>>
+>> The framework supports an arbitrary number of trip points. Whenever
+>> the current temperature is updated, the trip points immediately
+>> below and above the current temperature are found. A sensor driver
+>> callback `set_trips' is then called with the temperatures.
+>> If there is no trip point above or below the current temperature,
+>> the passed trip temperature will be LONG_MAX or LONG_MIN respectively.
+>> In this callback, the driver should program the hardware such that
+>> it is notified when either of these trip points are triggered.
+>> When a trip point is triggered, the driver should call
+>> `thermal_zone_device_update' for the respective thermal zone. This
+>> will cause the trip points to be updated again.
+>>
+>> If the `set_trips' callback is not implemented (is NULL), the framework
+>> behaves as before.
+>
+> Is there no "core thermal" code? I would have expected this new feature
+> to be implemented in "core" code rather than of/dt "support" code.
+> Perhaps there would also be some additions to the of/dt code, but I'd
+> still expect the bulk of the feature to be complete independant of
+> of/dt. Systems still using board files or ACPI or ... would surely
+> benefit from this too?
 
-> Where does the driver get the named clocks from if they aren't provided
-> on the device node? Is there a clock-ranges somewhere?
+The thermal core only supports a fixed number of trip points for each 
+driver and the core informs the driver of any changes to those, so 
+drivers using the core framework can already have hardware trip points, 
+but just a fixed number of them.
 
-No, it just looks up the global clock name.
+The way of-thermal works, is it reads all the trip points from the 
+device tree, registers a new thermal_zone_device with that number of 
+trip points and then handles the trip points completely independently. 
+Of course, if we're just polling, this is fine, since the thermal core
+also knows about those trip points and will trigger cooling when polling 
+the each zone. However, the driver doesn't, so it cannot setup any 
+interrupts to call thermal_zone_device_update.
 
-> It feels a little fragile to rely on the organisation of the clock tree
-> and the naming thereof. If the IP block is ever reused on an SoC with a
-> different clock tree layout then we have to handle things differently.
+>
+>> diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+>
+>> +static int of_thermal_set_trips(struct thermal_zone_device *tz, long temp)
+>
+> s/tz/tzd/ or s/tz/tzdev/ ? Since "tz" says "thermal zone" to me, but
+> it's actually a "thermal zone device".
 
-What do you suggest then?
+I followed the existing convention; "tz" is the name used most often by 
+both the core and the of-thermal framework.
 
-Maxime
+>
+>> +	struct __thermal_zone *data = tz->devdata;
+>
+> s/data/tz/ ? "data" is a rather generic term, and "tz" seems like a good
+> abbreviation for a __thermal_zone.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/66f06a27/attachment.sig>
+Same, though here both "data" and "tz" seem to be used..
+
+>
+>> +	for (i = 0; i < data->ntrips; ++i) {
+>> +		struct __thermal_trip *trip = data->trips + i;
+>> +		long trip_low = trip->temperature - trip->hysteresis;
+>> +
+>> +		if (trip_low < temp && trip_low > low)
+>> +			low = trip_low;
+>> +
+>> +		if (trip->temperature > temp && trip->temperature < high)
+>> +			high = trip->temperature;
+>> +	}
+>
+> That seems to always apply hysteresis to the low end of a trip object.
+> Don't you need to apply the hysteresis to either the low or high end of
+> the range, depending on whether the temperature is currently below/above
+> the range, and hence which direction the edge will be crossed?
+
+I believe applying only to the low end is correct. Say that we have a 
+trip point at 40C and hysteresis of 2C. When we exceed 40C cooling will 
+start immediately, but it will only be stopped when we cool down to 38C. 
+At that point there is again a 2C gap between the current temperature 
+and the trip point. It would seem that this is the interpretation used 
+by our downstream kernel and also some people on the Internet (however 
+trustworthy they may be..)
+
+If you don't feel this is right, please elaborate.
+
+>
+> Similar comments elsewhere. Perhaps the patch is consistent with some
+> existing confusing naming style though?
+>
+>> +static int of_thermal_update_trips(struct thermal_zone_device *tz)
+>> +{
+>> +	long temp;
+>> +	int err;
+>> +
+>> +	err = of_thermal_get_temp(tz, &temp);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	err = of_thermal_set_trips(tz, temp);
+>
+> Doesn't this patch modify of_thermal_get_temp() to call
+> of_thermal_set_trips() itself?
+
+You're right. I suppose this function is unneeded.
+
+>
+>> @@ -384,7 +467,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+>>   struct thermal_zone_device *
+>>   thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+>>   				void *data, int (*get_temp)(void *, long *),
+>> -				int (*get_trend)(void *, long *))
+>> +				int (*get_trend)(void *, long *),
+>> +				int (*set_trips)(void *, long, long))
+>
+> Passing in a struct containing fields for all the ops seem better than
+> forever extending this function with more and more function pointers.
+>
+
+Very true.
