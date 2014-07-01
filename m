@@ -1,54 +1,18 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 1 Jul 2014 16:42:01 -0700
-Subject: Android and compatibility with deprecated armv7 instructions
-In-Reply-To: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
-References: <CAMbhsRSzDYqDnLbicYYNq+=J1N8hZ0fu-mik+UNLs0cBfUf8DA@mail.gmail.com>
-Message-ID: <CAOesGMh25XO=PYSSTbYkoVrQER=09mnKt68LMbLVT4+dBa716w@mail.gmail.com>
+From: tuomas.tynkkynen@iki.fi (Tuomas Tynkkynen)
+Date: Wed, 02 Jul 2014 02:47:58 +0300
+Subject: [PATCH 6/6] thermal: Add Tegra SOCTHERM thermal management driver
+In-Reply-To: <1403856699-2140-7-git-send-email-mperttunen@nvidia.com>
+References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
+ <1403856699-2140-7-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53B348AE.20605@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 1, 2014 at 4:06 PM, Colin Cross <ccross@google.com> wrote:
-> I know this has been discussed before (for example:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/210309.html),
-> but I thought I'd bring it up again before the Android ABI diverges
-> from the upstream kernel.
->
-> Android armv8 devices expect to have compatibility with existing
-> native apps, many of which contain deprecated instructions.  For
-> example, the Unity gaming engine used SWP until Unity 3.5, and many
-> apps compiled against older versions are still in the app store.
-> These apps have been running fine with SWP emulation on all recent
-> Android devices with SMP v7 cpus, so they are obviously fine with the
-> slowdown of emulation, and they haven't recompiled against a newer
-> Unity version for 2 years so it is unrealistic to expect them to be
-> updated.  I've also been told Unity used CP15 barriers.
->
-> ffmpeg is widely used in popular Android apps and uses the SETEND
-> instruction: https://ffmpeg.org/pipermail/ffmpeg-cvslog/2013-August/067252.html
->
-> We can carry patches to enable the deprecated armv7 instructions in a
-> tree shared by all Android vendors, but it seems like a silly reason
-> to diverge from the upstream kernel.  To maintain a consistent ABI for
-> all devices we're going to have to test for these instructions in the
-> Android compatibility test suite, and the upstream kernel wouldn't
-> pass.
->
-> Would you consider taking support for SWP emulation, enabling CP15
-> barriers (CP15BEN bit only until there's a real device that needs
-> emulation, also requires clearing COMPAT_PSR_E_BIT in
-> compat_setup_return) and enabling SETEND, all behind a default-off
-> CONFIG_DEPRECATED_ARMV7_COMPAT?
+On 27/06/14 11:11, Mikko Perttunen wrote:
+> +	/* Sign extend from 6 bits to 32 bits */
+> +	shifted_cp = (s32)((val & 0x1f) | ((val & 0x20) ? 0xffffffe0 : 0x0));
+> +	val = ((val & (0x1f << 21)) >> 21);
+> +	/* Sign extend from 5 bits to 32 bits */
+> +	shifted_ft = (s32)((val & 0xf) | ((val & 0x10) ? 0xfffffff0 : 0x0));
 
-It sounds really silly to push back against this, since it's actually
-needed by so many platforms out there.
-
-One thing that powerpc did was to add a warning when emulated
-instructions are used (with ratelimiting to avoid DoS). See
-arch/powerpc/kernel/traps.c, ppc_warn_emulated etc. It gives the best
-of both worlds: Lets current software run, but also gives a warning
-that someone should probably try to get it recompiled for best
-performance at some point (for someone who cares about the logs, which
-isn't everybody).
-
-
--Olof
+There's sign_extend32 in bitops.h
