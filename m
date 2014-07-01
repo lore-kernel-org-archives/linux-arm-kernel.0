@@ -1,28 +1,54 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 1 Jul 2014 18:03:46 +0100
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <CAFEAcA9KJpvKUDgk_ziT9LmOMmFEHVRdTz=OdVt1pm2GEf5JoQ@mail.gmail.com>
-References: <20140328184517.GA27219@cbox> <20140611065412.GA24286@lvm>
- <53981043.3010300@redhat.com> <9801429.iblEns5zC3@wuerfel>
- <53B18E03.4050902@jonmasters.org> <20140630204647.GA19743@cbox>
- <CAFEAcA9KJpvKUDgk_ziT9LmOMmFEHVRdTz=OdVt1pm2GEf5JoQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1407011800510.8923@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Jul 2014 19:04:41 +0200
+Subject: [PATCH 22/24] ARM64:ILP32: Use a seperate syscall table as a few
+ syscalls need to be using the compat syscalls.
+In-Reply-To: <20140701165041.GU18313@arm.com>
+References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
+ <4268617.3t49DXZOBa@wuerfel> <20140701165041.GU18313@arm.com>
+Message-ID: <4834150.MH2srkQr01@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jun 2014, Peter Maydell wrote:
-> On 30 June 2014 21:46, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > Seems like we should stick a note in there about being UEFI compatible
-> > requires an RTC.  We went this far before Peter raised the issue with
-> > noone else realizing it, so it seems like a good idea to me.
+On Tuesday 01 July 2014 17:50:41 Catalin Marinas wrote:
+> On Tue, Jul 01, 2014 at 05:38:12PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 01 July 2014 15:30:51 Pinski, Andrew wrote:
+> > > > On Jul 1, 2014, at 8:07 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
+> > > >> On Sat, May 24, 2014 at 12:02:17AM -0700, Andrew Pinski wrote:
+> > > >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > > >> index 1e1ebfc..8241ffe 100644
+> > > >> --- a/arch/arm64/kernel/entry.S
+> > > >> +++ b/arch/arm64/kernel/entry.S
+> > > >> @@ -620,9 +620,14 @@ ENDPROC(ret_from_fork)
+> > > >>  */
+> > > >>    .align    6
+> > > >> el0_svc:
+> > > >> -    adrp    stbl, sys_call_table        // load syscall table pointer
+> > > >>    uxtw    scno, w8            // syscall number in w8
+> > > >>    mov    sc_nr, #__NR_syscalls
+> > > >> +#ifdef CONFIG_ARM64_ILP32
+> > > >> +    get_thread_info tsk
+> > > >> +    ldr    x16, [tsk, #TI_FLAGS]
+> > > >> +    tbnz    x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
+> > > >> +#endif
+> > > >> +    adrp    stbl, sys_call_table        // load syscall table pointer
+> > > > 
+> > > > This adds a slight penalty on the AArch64 SVC entry path. I can't tell
+> > > > whether that's visible or not but I think the x86 guys decided to set an
+> > > > extra bit to the syscall number to distinguish it from native calls.
+> > 
+> > IIRC the intention on x86 was that you should always be able to call
+> > any of the three syscall ABIs (x86-32, x86-64, x32) from any process
+> > by passing the right number, for flexibility.
 > 
-> How about:
-> =====
-> Guest OSes in the VM image should rely on the UEFI RTC API for
-> real time clock services. (To provide that API, the VM system will
-> likely need to implement some real time clock device, but the
-> details of these are a private implementation issue between it
-> and its associated UEFI implementation.)
+> I don't see how this is useful though. Do you happen to have more
+> information?
 
-I don't see why we need to add the text within brackets: it is out of
-scope for this document.
+It's been a decade since this code was merged, so my memory isn't very
+good here. I believe one of the main reasons was being able to run
+emulation layers in user space that make use of the kernel helpers.
+
+Another use case might be an application that wants to use the native
+ioctl interface for a driver that does not have a (efficient) compat
+ioctl handler.
+
+	Arnd
