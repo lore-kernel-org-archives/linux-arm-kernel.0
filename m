@@ -1,54 +1,96 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Jul 2014 11:41:59 +0200
-Subject: [GIT PULL v2] nommu fixes for 3.17-rc1
-In-Reply-To: <20140630144355.GH14781@pengutronix.de>
-References: <20140630144355.GH14781@pengutronix.de>
-Message-ID: <20140701094159.GM14781@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 1 Jul 2014 11:52:10 +0200
+Subject: [PATCH v2 00/14] AT91: PIT: Cleanups and move to
+ drivers/clocksource
+In-Reply-To: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140701115210.58a350e6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Tue,  1 Jul 2014 11:33:13 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-I updated my tag to pull to not include the commit that drops ARM740T,
-ARM940T and ARM946E-S because of Arnd's concerns. Also the two cleanups
-that depended on this one are dropped.
+> Hi everyone,
+> 
+> This series cleans up the PIT driver in order for it to not depend on
+> anything in mach-at91 anymore, and in the end move it out of
+> mach-at91.
+> 
+> Along the way, these patches also do a bit of cleanup.
+> 
+> This has been tested on a G45-EK without DT and an Xplained with DT.
+> 
 
-(As before) I picked -rc3 as base because 1c2f87c22566..6980c3e2514e~ is
-broken on nommu. 
+On the whole series:
 
-The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+Acked-by Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> Thanks,
+> Maxime
+> 
+> Changes from v1:
+>   - Changed Kconfig option to ATMEL_PIT
+>   - Used DIV_ROUND_CLOSEST to compute the pit rate
+> 
+> Maxime Ripard (14):
+>   AT91: PIT: Follow the general coding rules
+>   AT91: generic.h: Add include safe guards
+>   AT91: PIT: Use DIV_ROUND_CLOSEST to compute the cycles
+>   AT91: PIT: Use of_have_populated_dt instead of CONFIG_OF
+>   AT91: PIT: Rework probe functions
+>   AT91: dt: Remove init_time definitions
+>   AT91: PIT: Use consistent exit path in probe
+>   AT91: PIT: Use pr_fmt
+>   AT91: PIT: use request_irq instead of setup_irq
+>   AT91: PIT: (Almost) remove the global variables
+>   AT91: soc: Add init_time callback
+>   AT91: Convert the boards to the init_time callback
+>   AT91: PIT: Convert to an early_platform_device
+>   AT91: PIT: Move the driver to drivers/clocksource
+> 
+>  arch/arm/mach-at91/Kconfig              |   5 -
+>  arch/arm/mach-at91/Makefile             |   1 -
+>  arch/arm/mach-at91/at91sam9260.c        |  34 +++-
+>  arch/arm/mach-at91/at91sam9261.c        |  34 +++-
+>  arch/arm/mach-at91/at91sam9263.c        |  34 +++-
+>  arch/arm/mach-at91/at91sam926x_time.c   | 294
+> ------------------------------
+> arch/arm/mach-at91/at91sam9g45.c        |  35 +++-
+> arch/arm/mach-at91/at91sam9rl.c         |  34 +++-
+> arch/arm/mach-at91/board-afeb-9260v1.c  |   2 +-
+> arch/arm/mach-at91/board-cam60.c        |   2 +-
+> arch/arm/mach-at91/board-cpu9krea.c     |   2 +-
+> arch/arm/mach-at91/board-dt-sam9.c      |  10 --
+> arch/arm/mach-at91/board-dt-sama5.c     |   9 -
+> arch/arm/mach-at91/board-flexibity.c    |   2 +-
+> arch/arm/mach-at91/board-foxg20.c       |   2 +-
+> arch/arm/mach-at91/board-gsia18s.c      |   2 +-
+> arch/arm/mach-at91/board-pcontrol-g20.c |   2 +-
+> arch/arm/mach-at91/board-sam9-l9260.c   |   2 +-
+> arch/arm/mach-at91/board-sam9260ek.c    |   2 +-
+> arch/arm/mach-at91/board-sam9261ek.c    |   4 +-
+> arch/arm/mach-at91/board-sam9263ek.c    |   2 +-
+> arch/arm/mach-at91/board-sam9g20ek.c    |   4 +-
+> arch/arm/mach-at91/board-sam9m10g45ek.c |   2 +-
+> arch/arm/mach-at91/board-sam9rlek.c     |   2 +-
+> arch/arm/mach-at91/board-snapper9260.c  |   2 +-
+> arch/arm/mach-at91/board-stamp9g20.c    |   4 +-
+> arch/arm/mach-at91/generic.h            |   8 +-
+> arch/arm/mach-at91/setup.c              |   5 +
+> arch/arm/mach-at91/soc.h                |   1 +
+> drivers/clocksource/Kconfig             |   4 +
+> drivers/clocksource/Makefile            |   1 +
+> drivers/clocksource/timer-atmel-pit.c   | 304
+> ++++++++++++++++++++++++++++++++ 32 files changed, 506 insertions(+),
+> 345 deletions(-) delete mode 100644
+> arch/arm/mach-at91/at91sam926x_time.c create mode 100644
+> drivers/clocksource/timer-atmel-pit.c
+> 
 
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
-
-for you to fetch changes up to 83de911cf897a4317147dd9cb379378c2c4abf4c:
-
-  ARM: make user_addr_max more robust (2014-07-01 11:12:09 +0200)
-
-----------------------------------------------------------------
-Two different fixes for the same problem making some ARM nommu configurations
-not boot since 3.6-rc1. The problem is that user_addr_max returned the biggest
-available RAM address which makes some copy_from_user variants fail to read
-from XIP memory.
-
-Even in the presence of one of the two fixes the other still makes sense, so
-both patches are included here.
-
-This problem was the last one preventing efm32 boot to a prompt with mainline.
-
-----------------------------------------------------------------
-Uwe Kleine-K?nig (2):
-      ARM: nommu: don't limit TASK_SIZE
-      ARM: make user_addr_max more robust
-
- arch/arm/include/asm/memory.h  | 4 +---
- arch/arm/include/asm/uaccess.h | 2 +-
- 2 files changed, 2 insertions(+), 4 deletions(-)
 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
