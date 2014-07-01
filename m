@@ -1,88 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 01 Jul 2014 09:24:41 +0100
-Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <alpine.DEB.2.02.1406302006220.8923@kaball.uk.xensource.com>
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
- <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
- <alpine.DEB.2.02.1406302006220.8923@kaball.uk.xensource.com>
-Message-ID: <53B27049.10302@arm.com>
+From: spk.linux@gmail.com (Sachin Kamat)
+Date: Tue, 1 Jul 2014 13:56:29 +0530
+Subject: [PATCHv2 0/5] ARM: remove the sub-node and deprecated
+ supports-highspeed property for dwmmc.
+In-Reply-To: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
+References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <CAK5sBcEa5bRKUBB0n422m-K7A7YSshm2kTBUCNPgzwQkws3H8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+Hi Jaehoon,
 
-On 30/06/14 20:09, Stefano Stabellini wrote:
-> On Wed, 25 Jun 2014, Anup Patel wrote:
->> Hi Marc,
->>
->> On Wed, Jun 25, 2014 at 2:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> So far, GICv2 has been used in with EOImode == 0. The effect of this
->>> mode is to perform the priority drop and the deactivation of the
->>> interrupt at the same time.
->>>
->>> While this works perfectly for Linux (we only have a single priority),
->>> it causes issues when an interrupt is forwarded to a guest, and when
->>> we want the guest to perform the EOI itself.
->>>
->>> For this case, the GIC architecture provides EOImode == 1, where:
->>> - A write to the EOI register drops the priority of the interrupt and leaves
->>> it active. Other interrupts at the same priority level can now be taken,
->>> but the active interrupt cannot be taken again
->>> - A write to the DIR marks the interrupt as inactive, meaning it can
->>> now be taken again.
->>>
->>> We only enable this feature when booted in HYP mode. Also, as most device
->>> trees are broken (they report the CPU interface size to be 4kB, while
->>> the GICv2 CPU interface size is 8kB), output a warning if we're booted
->>> in HYP mode, and disable the feature.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  drivers/irqchip/irq-gic.c       | 61 +++++++++++++++++++++++++++++++++++++----
->>>  include/linux/irqchip/arm-gic.h |  4 +++
->>>  2 files changed, 59 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index 508b815..9295bf2 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -45,6 +45,7 @@
->>>  #include <asm/irq.h>
->>>  #include <asm/exception.h>
->>>  #include <asm/smp_plat.h>
->>> +#include <asm/virt.h>
->>>
->>>  #include "irq-gic-common.h"
->>>  #include "irqchip.h"
->>> @@ -94,6 +95,10 @@ struct irq_chip gic_arch_extn = {
->>>         .irq_set_wake   = NULL,
->>>  };
->>>
->>> +static struct irq_chip *gic_chip;
->>> +
->>> +static bool supports_deactivate = false;
->>> +
->>>  #ifndef MAX_GIC_NR
->>>  #define MAX_GIC_NR     1
->>>  #endif
->>> @@ -185,6 +190,12 @@ static void gic_eoi_irq(struct irq_data *d)
->>>         writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
->>>  }
->>>
->>> +static void gic_eoi_dir_irq(struct irq_data *d)
->>> +{
->>> +       gic_eoi_irq(d);
->>> +       writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
->>> +}
-> 
-> Would it be better if you moved the gic_eoi_irq call earlier? Maybe
-> somewhere in gic_handle_irq?
+On Mon, Jun 30, 2014 at 5:19 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Since used the mmc_of_parse(), didn't parse the sub-node.
+> So we can remove the sub-node, because almost SoC used the only one card per a host.
+> And supports-highspeed can be replaced to "cap-mmc/sd-highspeed" property.
+>
+> Jaehoon Chung (5):
+>   mmc: dw_mmc: modify the dt-binding for removing slot-node and
+>     supports-highspeed
+>   ARM: dts: exynos: unuse the slot-node and deprecated the
+>     supports-highspeed for dw-mmc
+>   ARM: dts: socfpga: unuse the slot-node and deprecated the
+>     supports-highspeed for dw-mmc
+>   ARM: dts: rockchip: unuse the slot-node and deprecated the
+>     supports-highspeed for dw-mmc
+>   mmc: dw_mmc: replace "disable-wp" from slot's quirk to host's quirk
 
-I'm not sure I see what we'd gain by doing so. Can you elaborate?
+It is a good practice to include revision history for subsequent versions.
 
-Thanks,
+Tested on Exynos 5250 based Snow and Arndale boards. Works fine now.
 
-	M.
+Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sachin.
