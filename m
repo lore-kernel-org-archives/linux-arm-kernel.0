@@ -1,45 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 1 Jul 2014 09:26:47 +0200
-Subject: [RFC PATCH 2/6] arm64: Support restart through restart notifier
- call chain
-In-Reply-To: <1404155499-21177-3-git-send-email-linux@roeck-us.net>
-References: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
- <1404155499-21177-3-git-send-email-linux@roeck-us.net>
-Message-ID: <20140701072647.GI28647@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 01 Jul 2014 09:30:18 +0200
+Subject: [PATCH 6/9] ARM: dts: sun7i: Add board support for LinkSprite
+ pcDuino V3
+In-Reply-To: <CAGb2v64KMxXQ7QaRcsWxHbCLNJtWkh5sxj82C-y9GyNW7R+M_Q@mail.gmail.com>
+References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
+ <1404165479-23785-7-git-send-email-hdegoede@redhat.com>
+ <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
+ <53B25F60.2050704@redhat.com>
+ <CAGb2v64KMxXQ7QaRcsWxHbCLNJtWkh5sxj82C-y9GyNW7R+M_Q@mail.gmail.com>
+Message-ID: <53B2638A.3060206@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 12:11:35PM -0700, Guenter Roeck wrote:
-> The kernel core now supports a notifier call chain to restart the system.
+Hi,
+
+On 07/01/2014 09:21 AM, Chen-Yu Tsai wrote:
+> On Tue, Jul 1, 2014 at 3:12 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 07/01/2014 04:22 AM, Chen-Yu Tsai wrote:
+>>> On Tue, Jul 1, 2014 at 5:57 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>> From: Zoltan HERPAI <wigyori@uid0.hu>
+>>>>
+>>>> The LinkSprite pcDuino V3 is an A20 based development board featuring
+>>>> arduino compatible io headers, 1G RAM, 4G nand, sata, rtl8188cus usb wifi
+>>>> and 100 Mbit ethernet using an ip101a phy:
+>>>>
+>>>> http://www.pcduino.com/pcduino-v3/
+>>>>
+>>>> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
+>>>> [hdegoede at redhat.com: Various cleanups, correct led pins]
+>>>> [hdegoede at redhat.com: Add axp209, ir and gpio-keys nodes]
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>
+>>>> --
+>>>>
+>>>> Changes since v2:
+>>>>  - update MMC entry to comply with upstream
+>>>>  - unify the 4 patches into one
+>>>>
+>>>> Changes since v1:
+>>>>  - fix cosmetic issues
+>>>>  - fix i2c entry
+>>>>  - remove unnecessary input bindings include
+>>>>  - add MMC support
+>>>> ---
+>>>>  arch/arm/boot/dts/Makefile               |   3 +-
+>>>>  arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 173 +++++++++++++++++++++++++++++++
+>>>>  2 files changed, 175 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>>> index ed0de8b..fdc590e 100644
+>>>> --- a/arch/arm/boot/dts/Makefile
+>>>> +++ b/arch/arm/boot/dts/Makefile
+>>>> @@ -380,7 +380,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>>>         sun7i-a20-cubieboard2.dtb \
+>>>>         sun7i-a20-cubietruck.dtb \
+>>>>         sun7i-a20-i12-tvbox.dtb \
+>>>> -       sun7i-a20-olinuxino-micro.dtb
+>>>> +       sun7i-a20-olinuxino-micro.dtb \
+>>>> +       sun7i-a20-pcduino3.dtb
+>>>
+>>> You may need to rebase onto my sun8i ippo-q8h dts patch.
+>>>
+>>>   https://patchwork.kernel.org/patch/4389951/
+>>>
+>>> There's a likely conflict in the Makefile here.
+>>
+>> Has that one already been accepted by Maxime ? I'm fine rebasing patches
+>> on top of accepted stuff, but rebasing on pending stuff is not really
+>> useful IMHO.
 > 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  arch/arm64/kernel/process.c | 3 +++
->  1 file changed, 3 insertions(+)
+> Maxime replied stating he applied it. See the lower part of the patchwork
+> page.
 > 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 43b7c34..9dd2abd 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -43,6 +43,7 @@
->  #include <linux/hw_breakpoint.h>
->  #include <linux/personality.h>
->  #include <linux/notifier.h>
-> +#include <linux/watchdog.h>
+> AFAIK he's accepted my initial sun8i patches and CIR DT patches this cycle.
 
-I don't think you need this include, or shouldn't it be reboot.h
-instead?
+Ok, I'm not seeing anything for 3.17 here though:
+https://github.com/mripard/linux/
 
-Maxime
+Maxime, can you push a sunxi/dt-for-3.17 with what you currently have there?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/c23e431a/attachment.sig>
+Then I'll rebase this series on top, fix the commit msg thingie Chen pointed
+out and send a v2.
+
+Regards,
+
+Hans
