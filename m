@@ -1,74 +1,74 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  1 Jul 2014 11:33:22 +0200
-Subject: [PATCH v2 09/14] AT91: PIT: use request_irq instead of setup_irq
+Date: Tue,  1 Jul 2014 11:33:20 +0200
+Subject: [PATCH v2 07/14] AT91: PIT: Use consistent exit path in probe
 In-Reply-To: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1404207208-14513-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1404207208-14513-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can use the generic request_irq now to register a timer interrupt handler,
-instead of the more complex setup_irq.
+The current probe code is, whenever it fails to retrieve a resource, either
+panicing, silently returning, or returning and displaying an error.
+
+Make the code consistent by always panicing whenever it fails to grab any
+resource.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam926x_time.c | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ arch/arm/mach-at91/at91sam926x_time.c | 16 +++++-----------
+ 1 file changed, 5 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 0abdcb36c555..e476474cb05e 100644
+index f6c44539af6e..641e860e83e7 100644
 --- a/arch/arm/mach-at91/at91sam926x_time.c
 +++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -173,16 +173,10 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--static struct irqaction at91sam926x_pit_irq = {
--	.name		= "at91_tick",
--	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= at91sam926x_pit_interrupt,
--};
--
- /*
-  * Set up both clocksource and clockevent support.
-  */
--static void __init at91sam926x_pit_common_init(void)
-+static void __init at91sam926x_pit_common_init(unsigned int pit_irq)
- {
- 	unsigned long	pit_rate;
- 	unsigned	bits;
-@@ -208,7 +202,9 @@ static void __init at91sam926x_pit_common_init(void)
- 	clocksource_register_hz(&pit_clk, pit_rate);
- 
+@@ -208,7 +208,7 @@ static void __init at91sam926x_pit_common_init(void)
  	/* Set up irq handler */
--	ret = setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
-+	ret = request_irq(pit_irq, at91sam926x_pit_interrupt,
-+			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
-+			  "at91_tick", pit_base_addr);
+ 	ret = setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
  	if (ret)
- 		panic(pr_fmt("Unable to setup IRQ\n"));
+-		pr_crit("AT91: PIT: Unable to setup IRQ\n");
++		panic("AT91: PIT: Unable to setup IRQ\n");
  
-@@ -239,9 +235,7 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
- 	if (!irq)
- 		panic(pr_fmt("Unable to get IRQ from DT\n"));
+ 	/* Set up and register clockevents */
+ 	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
+@@ -222,7 +222,7 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
  
--	at91sam926x_pit_irq.irq = irq;
+ 	pit_base_addr = of_iomap(node, 0);
+ 	if (!pit_base_addr)
+-		return;
++		panic("AT91: PIT: Could not map PIT address\n");
+ 
+ 	mck = of_clk_get(node, 0);
+ 	if (IS_ERR(mck))
+@@ -234,18 +234,12 @@ static void __init at91sam926x_pit_dt_init(struct device_node *node)
+ 
+ 	/* Get the interrupts property */
+ 	irq = irq_of_parse_and_map(node, 0);
+-	if (!irq) {
+-		pr_crit("AT91: PIT: Unable to get IRQ from DT\n");
+-		goto clk_err;
+-	}
++	if (!irq)
++		panic("AT91: PIT: Unable to get IRQ from DT\n");
+ 
+ 	at91sam926x_pit_irq.irq = irq;
+ 
+ 	at91sam926x_pit_common_init();
 -
--	at91sam926x_pit_common_init();
-+	at91sam926x_pit_common_init(irq);
+-clk_err:
+-	clk_put(mck);
+-	iounmap(pit_base_addr);
  }
  CLOCKSOURCE_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
  		       at91sam926x_pit_dt_init);
-@@ -252,9 +246,7 @@ void __init at91sam926x_pit_init(void)
+@@ -256,7 +250,7 @@ void __init at91sam926x_pit_init(void)
  	if (IS_ERR(mck))
- 		panic(pr_fmt("Unable to get mck clk\n"));
+ 		panic("AT91: PIT: Unable to get mck clk\n");
  
--	at91sam926x_pit_irq.irq = NR_IRQS_LEGACY + AT91_ID_SYS;
--
--	at91sam926x_pit_common_init();
-+	at91sam926x_pit_common_init(NR_IRQS_LEGACY + AT91_ID_SYS);
+-	at91sam926x_pit_irq.irq = NR_IRQS_LEGACY + AT91_ID_SYS,
++	at91sam926x_pit_irq.irq = NR_IRQS_LEGACY + AT91_ID_SYS;
+ 
+ 	at91sam926x_pit_common_init();
  }
- 
- void __init at91sam926x_ioremap_pit(u32 addr)
 -- 
 2.0.0
