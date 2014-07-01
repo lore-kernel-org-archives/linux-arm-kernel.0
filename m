@@ -1,90 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 1 Jul 2014 13:24:39 +0800
-Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
-In-Reply-To: <20140630070421.GI8053@pengutronix.de>
-References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
- <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
- <20140630041226.GB3329@shlinux2> <20140630070421.GI8053@pengutronix.de>
-Message-ID: <20140701052433.GA14471@dragon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  1 Jul 2014 02:55:25 -0300
+Subject: [PATCH 1/5] ARM: dts: imx6sx: Fix sdma node
+Message-ID: <1404194129-25543-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 09:04:21AM +0200, Steffen Trumtrar wrote:
-> Hi!
-> 
-> On Mon, Jun 30, 2014 at 12:12:27PM +0800, Shawn Guo wrote:
-> > On Wed, Jun 25, 2014 at 01:01:31PM +0200, Steffen Trumtrar wrote:
-> > > Most peripherals on the i.MX53 have an
-> > > 	Off-Platform Peripheral Access Control Register (OPACR)
-> > > in which the access rights (together with the MPROT registers) can be declared.
-> > > However, this does not seem to work for example for SSI1+SDMA, because the
-> > > supervisor bit is not set for the SDMA unit.
-> > > It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
-> > > works because it does NOT have an OPACR.
-> > > 
-> > > The right solution would be to fix the access rights for the SDMA, but the unit
-> > > responsible for this is the Central Security Unit (CSU), which of course is NOT
-> > > documented. So, until documentation for this is openly available, turn off the
-> > > supervisor protection because it cripples the hardware.
-> > > 
-> > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > > ---
-> > >  arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
-> > >  1 file changed, 14 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> > > index 2bad387..380c7ee 100644
-> > > --- a/arch/arm/mach-imx/mach-imx53.c
-> > > +++ b/arch/arm/mach-imx/mach-imx53.c
-> > > @@ -15,6 +15,7 @@
-> > >  #include <linux/err.h>
-> > >  #include <linux/io.h>
-> > >  #include <linux/irq.h>
-> > > +#include <linux/of_address.h>
-> > >  #include <linux/of_irq.h>
-> > >  #include <linux/of_platform.h>
-> > >  #include <asm/mach/arch.h>
-> > > @@ -24,11 +25,24 @@
-> > >  #include "hardware.h"
-> > >  #include "mx53.h"
-> > >  
-> > > +static const struct of_device_id aips_of_matches[] __initconst = {
-> > > +	{ .compatible = "fsl,imx53-aipstz" },
-> > > +	{ /*sentinel*/ }
-> > > +};
-> > > +
-> > >  static void __init imx53_dt_init(void)
-> > >  {
-> > > +	void __iomem *aips_base_addr;
-> > > +	struct device_node *np;
-> > > +
-> > >  	mxc_arch_reset_init_dt();
-> > >  
-> > >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > > +
-> > > +	for_each_matching_node(np, aips_of_matches) {
-> > > +		aips_base_addr = of_iomap(np, 0);
-> > > +		imx_set_aips(aips_base_addr);
-> > > +	}
-> > 
-> > The same code pattern might be needed for i.MX31 and i.MX35 device tree
-> > support later.  Can we have a helper for it, so that i.MX3 DT conversion
-> > can benefit from it?
-> > 
-> 
-> What would be the best place to put this? common.h?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-How about the same place as imx_set_aips()?
+Use the correct compatible string for sdma and also provide the sdma firmware
+path.
 
-> Maybe we should then also rename the imx_set_aips to imx_disable_supervisor,
-> because that is basically what the function does.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6sx.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-I'm fine with either way.
-
-> If I understood our graphics department correctly, the i.MX6 needs this, too,
-> for the VPU (?).
-
-Hmm, I do not see this setup for i.MX6 in FSL kernel tree.  Is it being
-done at somewhere else?
-
-Shawn
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index a7d74e7..2929078 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -703,13 +703,15 @@
+ 			};
+ 
+ 			sdma: sdma at 020ec000 {
+-				compatible = "fsl,imx6sx-sdma";
++				compatible = "fsl,imx6sx-sdma", "fsl,imx35-sdma";
+ 				reg = <0x020ec000 0x4000>;
+ 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6SX_CLK_SDMA>,
+ 					 <&clks IMX6SX_CLK_SDMA>;
+ 				clock-names = "ipg", "ahb";
+ 				#dma-cells = <3>;
++				/* imx6sx reuses imx6q sdma firmware */
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
+ 			};
+ 		};
+ 
+-- 
+1.8.3.2
