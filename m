@@ -1,53 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 1 Jul 2014 16:38:11 +0200
-Subject: [PATCH 00/16] CPU Idle for Armada 370 and Armada 38x
-In-Reply-To: <53B1878B.9060701@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <20140630174520.194d4781@free-electrons.com>
- <53B1878B.9060701@free-electrons.com>
-Message-ID: <20140701163811.7d731695@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 01 Jul 2014 09:05:47 -0600
+Subject: [RFC 1/4] ARM: tegra: Move SoC drivers to drivers/soc/tegra
+In-Reply-To: <20140701105056.GO18313@arm.com>
+References: <1403888329-24755-1-git-send-email-thierry.reding@gmail.com>
+ <53AEF81D.3080408@ti.com> <20140628204025.GA16415@ulmo>
+ <7497427.LQy8pJts8f@wuerfel> <20140630090118.GA24128@ulmo>
+ <20140630103649.GF28951@arm.com> <20140630104814.GA1495@ulmo>
+ <20140630131628.GA31517@e102568-lin.cambridge.arm.com>
+ <20140630193635.GB32594@mithrandir> <20140701105056.GO18313@arm.com>
+Message-ID: <53B2CE4B.2010506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
-
-On Mon, 30 Jun 2014 17:51:39 +0200, Gregory CLEMENT wrote:
-
-> > I'd like to do some testing of this patch series, especially in big
-> > endian situations. Do you have a Git repository where this version was
-> > pushed?
+On 07/01/2014 04:50 AM, Catalin Marinas wrote:
+> On Mon, Jun 30, 2014 at 08:36:36PM +0100, Thierry Reding wrote:
+>> On Mon, Jun 30, 2014 at 02:16:34PM +0100, Lorenzo Pieralisi wrote:
+>>> And I think that most of the early bring up issues are just related to
+>>> powering-up/resetting a cpu for it to be booted, probably that's the
+>>> abstraction we should be focusing on, because it should just require poking
+>>> a bunch of registers to kickstart a CPU, no more than that, FW should be
+>>> able to deal with that and that's yet another reason behind PSCI design.
+>>
+>> Right, I agree that if we can push that into PSCI that would be great
+>> (provided there's an open-source implementation of PSCI).
 > 
-> Yes sure, the branch CPU-Idle-mvebu-next-3.16-rc2-V1 on
-> https://github.com/MISL-EBU-System-SW/mainline-public.git
+> At least one (BSD-style license):
+> 
+> https://github.com/ARM-software/arm-trusted-firmware
+> 
+> There are also some patches for U-Boot (only covering secondary CPU
+> booting for now and not merged yet).
 
-Ok, I've tested the following cases:
+Are the U-Boot patches:
 
- * Armada XP LE and BE: it shouldn't be affected by your patch series,
-   and indeed, it works fine.
+a) Patches to make U-Boot provide a PSCI implementation.
 
- * Armada 370 LE worked fine.
+b) Patches to make U-Boot use PSCI as a client.
 
- * Armada 370 BE didn't work, I had to fix the code in
-   pmsu.c/pmsu_ll.S. I already replied to the appropriate patch to
-   indicate what was wrong.
-
- * Armada 375 LE worked fine. Armada 375 BE was also affected by the
-   same issue as Armada 370 BE because they use the same work-around
-   for the boot issue (Armada 375 Z1 of course, since Armada 375 A0 is
-   not affected). With the fix added for big-endian, Armada 375 BE
-   works again (i.e its SMP initialization works).
-
- * Armada 38x LE and BE worked fine (there was a completely unrelated
-   issue in the SMP initialization of 38x in BE, I'll sent a patch
-   shortly for this).
-
-So all in all, in terms of testing, despite the minor fix for the BE
-configuration, it looks good to me.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+If you have a link or patch subject to search for, that'd be
+interesting. Thanks.
