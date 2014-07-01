@@ -1,26 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 01 Jul 2014 10:40:46 -0700
-Subject: [PATCH 8/8] arm: perf: krait: stop using singleton PMU
-In-Reply-To: <1404227478-9645-9-git-send-email-mark.rutland@arm.com>
-References: <1404227478-9645-1-git-send-email-mark.rutland@arm.com>
- <1404227478-9645-9-git-send-email-mark.rutland@arm.com>
-Message-ID: <53B2F29E.5030403@codeaurora.org>
+From: loeliger@gmail.com (Jon Loeliger)
+Date: Tue, 1 Jul 2014 12:41:36 -0500
+Subject: Some Large Address Space Ponders on A9
+In-Reply-To: <20140701162620.GB18309@arm.com>
+References: <CAJgR-BhNHYVYJo+jXAOCy+xzXP-AMjJ7LhuzssrQSEPQN4W=2A@mail.gmail.com>
+ <20140701162620.GB18309@arm.com>
+Message-ID: <CAJgR-BjmDo9HiLqnnDmAabVCXHZCTwvZ9unfLNC_FbyKv+bn7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/14 08:11, Mark Rutland wrote:
-> Currently the krait_pmu_{enable,disable}_event functions use the global
-> cpu_pmu variable while all the other pmu enable/disable functions
-> derive this from the event argument.
->
-> This patch brings the Krait functions into line with the rest of the PMU
-> backends by deriving the address of the pmu from the event argument.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Tue, Jul 1, 2014 at 11:26 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Here's the problem.  Over in include/linux/types.h we find:
+>>
+>>     #ifdef CONFIG_PHYS_ADDR_T_64BIT
+>>     typedef u64 phys_addr_t;
+>>     #else
+>>     typedef u32 phys_addr_t;
+>>     #endif
+>>
+>>     typedef phys_addr_t resource_size_t;
+>
+> I won't comment on how you define this in DT but for the kernel things
+> will likely break when you increase phys_addr_t to 64-bit on non-LPAE
+> builds.
+>
+> First (only) question - how do you intend to map such physical address?
+> The only way I'm aware of on A9 is using supersections and the ARM Linux
+> port provides __arm_ioremap_pfn(). However, the supersections code is
+> only enabled if !SMP.
+>
+> --
+> Catalin
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+So, I don't really need to map in that as physical address space
+that will be actually accessed.  I need to be able to parse the
+large values out of the DT (2-cell values) into resource_size_t
+variables and then manipulate the address space they represent.
+Later, my IP block can handle the larger addresses, not as physical
+memory, but as addresses.  I guess you could think of it as a
+windowing or address translation mechanism that isn't coming
+from the A9's 32-bit AXI bus.
+
+Does that help explain the weird?  Or just confuse it? :-)
+
+jdl
