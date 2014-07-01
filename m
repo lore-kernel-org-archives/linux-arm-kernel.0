@@ -1,71 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 1 Jul 2014 22:08:07 +0200
-Subject: [PATCH v7 0/9] ARM: VDSO
-In-Reply-To: <53B2E311.6030609@mentor.com>
-References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
- <CAKv+Gu87_5Fx=z6Kg3EBi7YTm+f9DpiaZVw_UU9xKZD1MoJW8w@mail.gmail.com>
- <53B2E311.6030609@mentor.com>
-Message-ID: <CAKv+Gu-4kzpNf4+0WcsteeOd+=z2-fnCumxDyTFY5yCT9jrB4A@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  1 Jul 2014 22:37:04 +0200
+Subject: [PATCH 1/3] serial: DC21285: depend on ARCH_FOOTBRIDGE instead of
+ FOOTBRIDGE
+In-Reply-To: <1404247026-379-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1404247026-379-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1404247026-379-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 July 2014 18:34, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
-> On 06/30/2014 03:12 AM, Ard Biesheuvel wrote:
->> On 23 June 2014 05:11, Nathan Lynch <nathan_lynch@mentor.com> wrote:
->>> Provide fast userspace implementations of gettimeofday and
->>> clock_gettime on systems that implement the generic timers extension
->>> defined in ARMv7.
->
-> ...
->
->> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> On Exynos-5250 (Cortex-A15):
->>
->> clock-gettime-monotonic system calls per second: 1759517
->> clock-gettime-monotonic vdso calls per second:   6027915 (3.43x speedup)
->> clock-getres-monotonic system calls per second: 2144055
->> clock-getres-monotonic vdso calls per second:   82783103 (38.61x speedup)
->> clock-gettime-monotonic-coarse system calls per second: 1971433
->> clock-gettime-monotonic-coarse vdso calls per second:   10710734 (5.43x speedup)
->> clock-getres-monotonic-coarse system calls per second: 2182380
->> clock-getres-monotonic-coarse vdso calls per second:   76710594 (35.15x speedup)
->> clock-gettime-realtime system calls per second: 1722524
->> clock-gettime-realtime vdso calls per second:   6309212 (3.66x speedup)
->> clock-getres-realtime system calls per second: 2182357
->> clock-getres-realtime vdso calls per second:   83120713 (38.09x speedup)
->> clock-gettime-realtime-coarse system calls per second: 2085498
->> clock-gettime-realtime-coarse vdso calls per second:   11326069 (5.43x speedup)
->> clock-getres-realtime-coarse system calls per second: 2178266
->> clock-getres-realtime-coarse vdso calls per second:   76731175 (35.23x speedup)
->> Note: vDSO version of getcpu not found
->> getcpu system calls per second: 2645300
->> getcpu vdso calls per second:   2612154 (0.99x speedup)
->> Note: vDSO version of getcpu not found
->> Note: vDSO version of getcpu not found
->> gettimeofday system calls per second: 1707745
->> gettimeofday vdso calls per second:   6474501 (3.79x speedup)
->
-> Thank you very much for testing (especially on a platform I don't have).
->
-> These results match up with what I get on OMAP5 (also Cortex-A15).
->
+The Kconfig symbol FOOTBRIDGE is only defined if ARCH_FOOTBRIDGE is
+enabled and the latter unconditionally selects the former. So they are
+either both selected or none and so they are equivalent. To allow
+removing FOOTBRIDGE switch the dependency of SERIAL_21285 to
+ARCH_FOOTBRIDGE.
 
-Good.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-serial at vger.kernel.org
+---
+ drivers/tty/serial/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Since it looks like I will need to make some significant changes for the
-> next version, I think I can't in good conscience carry your Tested-by on
-> to v8 (although I'm open to different opinions).  But I still very much
-> appreciate it.
->
-
-We (at Linaro) had independently identified VDSO for ARM as a topic of
-interest after seeing gettimeofday() turn up in a couple of benchmarks
-(which btw seem to be the primary users of gettimeofday() at such a
-high rate), so of course, when someone else steps up and does the
-work, i am happy to at least spend some time testing it. Therefore, I
-would be happy to test your new version either before or after you
-(re)post it, whichever you prefer.
-
-Regards,
-Ard.
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index fb57159bad3a..570ca2ff55d1 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -380,7 +380,7 @@ config SERIAL_ZS_CONSOLE
+ 
+ config SERIAL_21285
+ 	tristate "DC21285 serial port support"
+-	depends on FOOTBRIDGE
++	depends on ARCH_FOOTBRIDGE
+ 	select SERIAL_CORE
+ 	help
+ 	  If you have a machine based on a 21285 (Footbridge) StrongARM(R)/
+-- 
+2.0.0
