@@ -1,109 +1,138 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 1 Jul 2014 08:30:45 +0200
-Subject: [PATCH v2 2/2] ARM: imx53: globally disable supervisor protect
-In-Reply-To: <20140701052433.GA14471@dragon>
-References: <1403694091-27247-1-git-send-email-s.trumtrar@pengutronix.de>
- <1403694091-27247-2-git-send-email-s.trumtrar@pengutronix.de>
- <20140630041226.GB3329@shlinux2>
- <20140630070421.GI8053@pengutronix.de>
- <20140701052433.GA14471@dragon>
-Message-ID: <20140701063045.GK8053@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 1 Jul 2014 08:32:14 +0200
+Subject: [PATCH 1/4] clk: Introduce 'clk_find_nearest_rate()'
+In-Reply-To: <475a8ee0-11aa-4fad-94dc-9e5360f298d2@BL2FFO11FD028.protection.gbl>
+References: <1404147396-8041-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1404147396-8041-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20140630212707.1eb44db6@bbrezillon>
+ <475a8ee0-11aa-4fad-94dc-9e5360f298d2@BL2FFO11FD028.protection.gbl>
+Message-ID: <20140701083214.5b31295e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi S?ren,
 
-On Tue, Jul 01, 2014 at 01:24:39PM +0800, Shawn Guo wrote:
-> On Mon, Jun 30, 2014 at 09:04:21AM +0200, Steffen Trumtrar wrote:
-> > Hi!
+On Mon, 30 Jun 2014 17:12:23 -0700
+S?ren Brinkmann <soren.brinkmann@xilinx.com> wrote:
+
+> Hi Boris,
+> 
+> On Mon, 2014-06-30 at 09:27PM +0200, Boris BREZILLON wrote:
+> > Hello Soren,
 > > 
-> > On Mon, Jun 30, 2014 at 12:12:27PM +0800, Shawn Guo wrote:
-> > > On Wed, Jun 25, 2014 at 01:01:31PM +0200, Steffen Trumtrar wrote:
-> > > > Most peripherals on the i.MX53 have an
-> > > > 	Off-Platform Peripheral Access Control Register (OPACR)
-> > > > in which the access rights (together with the MPROT registers) can be declared.
-> > > > However, this does not seem to work for example for SSI1+SDMA, because the
-> > > > supervisor bit is not set for the SDMA unit.
-> > > > It does work for SSI2, the QSB for example uses SSI2 for its audio. But SSI2 only
-> > > > works because it does NOT have an OPACR.
-> > > > 
-> > > > The right solution would be to fix the access rights for the SDMA, but the unit
-> > > > responsible for this is the Central Security Unit (CSU), which of course is NOT
-> > > > documented. So, until documentation for this is openly available, turn off the
-> > > > supervisor protection because it cripples the hardware.
-> > > > 
-> > > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > > > ---
-> > > >  arch/arm/mach-imx/mach-imx53.c | 14 ++++++++++++++
-> > > >  1 file changed, 14 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> > > > index 2bad387..380c7ee 100644
-> > > > --- a/arch/arm/mach-imx/mach-imx53.c
-> > > > +++ b/arch/arm/mach-imx/mach-imx53.c
-> > > > @@ -15,6 +15,7 @@
-> > > >  #include <linux/err.h>
-> > > >  #include <linux/io.h>
-> > > >  #include <linux/irq.h>
-> > > > +#include <linux/of_address.h>
-> > > >  #include <linux/of_irq.h>
-> > > >  #include <linux/of_platform.h>
-> > > >  #include <asm/mach/arch.h>
-> > > > @@ -24,11 +25,24 @@
-> > > >  #include "hardware.h"
-> > > >  #include "mx53.h"
-> > > >  
-> > > > +static const struct of_device_id aips_of_matches[] __initconst = {
-> > > > +	{ .compatible = "fsl,imx53-aipstz" },
-> > > > +	{ /*sentinel*/ }
-> > > > +};
-> > > > +
-> > > >  static void __init imx53_dt_init(void)
-> > > >  {
-> > > > +	void __iomem *aips_base_addr;
-> > > > +	struct device_node *np;
-> > > > +
-> > > >  	mxc_arch_reset_init_dt();
-> > > >  
-> > > >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > > > +
-> > > > +	for_each_matching_node(np, aips_of_matches) {
-> > > > +		aips_base_addr = of_iomap(np, 0);
-> > > > +		imx_set_aips(aips_base_addr);
-> > > > +	}
-> > > 
-> > > The same code pattern might be needed for i.MX31 and i.MX35 device tree
-> > > support later.  Can we have a helper for it, so that i.MX3 DT conversion
-> > > can benefit from it?
-> > > 
+> > On Mon, 30 Jun 2014 09:56:33 -0700
+> > Soren Brinkmann <soren.brinkmann@xilinx.com> wrote:
 > > 
-> > What would be the best place to put this? common.h?
+> > > Introduce a new API function to find the rate a clock can provide
+> > > which is closest to a given rate.
+> > > 
+> > > clk_round_rate() leaves it to the clock driver how rounding is
+> > > done. Commonly implementations round down due to use-cases that
+> > > have a certain frequency maximum that must not be exceeded.
+> > 
+> > I had the same concern (how could a driver decide whether it should
+> > round up, down or to the closest value), but had a slightly
+> > different approach in mind.
+> > 
+> > AFAIU, you're assuming the clock is always a power of two (which is
+> > true most of the time, but some clock implementation might differ,
+> > i.e. a PLL accept any kind of multiplier not necessarily a power of
+> > 2).
 > 
-> How about the same place as imx_set_aips()?
+> No, the idea is to always work. There should not be any such
+> limitation. Where do you see that?
+
+My bad, I should have read the code more carefully.
+BTW, it could help readers if you add some comments to explain how you
+are finding the nearest rate.
+
+My main concern with this approach is that you can spend some time
+iterating to find the nearest rate where a clk driver would find it
+quite quickly (because it knows exactly how the clk works and what are
+the possible clk muxing and clk modifiers options).
+
+> 
+> > 
+> > How about improving the clk_ops interface instead by adding a new
+> > method
+> > 
+> > 	long (*round_rate_with_constraint)(struct clk_hw *hw,
+> > 					   unsigned long
+> > requested_rate, unsigned long *parent_rate,
+> > 					   enum clk_round_type
+> > type);
+> > 
+> > with
+> > 
+> > enum clk_round_type {
+> > 	CLK_ROUND_DOWN,
+> > 	CLK_ROUND_UP,
+> > 	CLK_ROUND_CLOSEST,
+> > };
+> 
+> I thought about that, but the find_nearest() did already exist more or
+> less and in the end it is not much of a difference, IMHO. If it turns
+> out that the others are needed as well and somebody implements it,
+> they could be added as another convenience function like I did,
+> and/or it could be wrapped in the function you propose here.
+>
+> > 
+> > or just adding these 3 methods:
+> > 
+> > 	long (*round_rate_up)(struct clk_hw *hw,
+> > 			      unsigned long requested_rate,
+> > 			      unsigned long *parent_rate);
+> > 
+> > 	long (*round_rate_down)(struct clk_hw *hw,
+> > 				unsigned long requested_rate,
+> > 				unsigned long *parent_rate);
+> > 
+> > 	long (*round_rate_closest)(struct clk_hw *hw,
+> > 				   unsigned long requested_rate,
+> > 				   unsigned long *parent_rate);
+> 
+> That would be quite a change for clock drivers. So far, there are not
+> many restrictions on round_rate. I think there has already been a
+> discussion in this direction that went nowhere.
+> https://lkml.org/lkml/2010/7/14/260
 > 
 
-Oh, yeah. Okay.
+Not if we keep these (or this, depending on the solution you chose)
+functions optional, and return -ENOTSUP, if they're not implemented.
 
-> > Maybe we should then also rename the imx_set_aips to imx_disable_supervisor,
-> > because that is basically what the function does.
+> > 
+> > and let the round_rate method implement the default behaviour.
 > 
-> I'm fine with either way.
-> 
-> > If I understood our graphics department correctly, the i.MX6 needs this, too,
-> > for the VPU (?).
-> 
-> Hmm, I do not see this setup for i.MX6 in FSL kernel tree.  Is it being
-> done at somewhere else?
-> 
+> There is no real default. Rounding is not specified for the current
+> API.
 
-barebox does it for i.MX6. But it would be better to have it in the kernel,
-so everything works no matter which bootloader is used. AFAIK it is not needed
-for anything the bootloader does.
+What I meant by default behavior is the behavior already implemented by
+the clock driver (either round up, down or closest).
+This way you do not introduce regressions with existing users, and can
+use new methods in new use cases.
 
-Steffen
+> 
+> > 
+> > This way you could add 3 functions to the API:
+> > 
+> > clk_round_closest (or clk_find_nearest_rate as you called it),
+> > clk_round_up and clk_round_down, and let the clk driver
+> > implementation return the appropriate rate.
+> 
+> I'd say the current patch set does kind of align with that, doesn't
+> it? We can add the find_nearest_rate() (there was a discussion on the
+> name, ane we decided against round_closest in favor of the current
+> proposal) now and the other functions could be added later if people
+> find them to be useful. And if they all get added we can think about
+> consolidating them if it made sense.
+
+Yes sure.
+
+Best Regards,
+
+Boris
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
