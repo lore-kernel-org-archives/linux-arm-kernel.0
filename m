@@ -1,41 +1,123 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 1 Jul 2014 09:56:44 -0500
-Subject: [PATCH CFT 00/30] Initial round of Freescale FEC ethernet patches
-In-Reply-To: <20140701143401.GT32514@n2100.arm.linux.org.uk>
-References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
- <53B2C3E8.7030903@mentor.com> <20140701143401.GT32514@n2100.arm.linux.org.uk>
-Message-ID: <53B2CC2C.7080306@mentor.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 1 Jul 2014 07:56:49 -0700
+Subject: [PATCH v7 7/9] ARM: add vdso user-space code
+In-Reply-To: <53B2B77E.7040904@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
+ <53B1D6B8.7080806@amacapital.net> <53B2B77E.7040904@mentor.com>
+Message-ID: <CALCETrVWKnrcoSiFYvnLauqcr6yGFTX6D3nk6dvU2t8L_MqVOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2014 09:34 AM, Russell King - ARM Linux wrote:
-> On Tue, Jul 01, 2014 at 09:21:28AM -0500, Nathan Lynch wrote:
->> [apologies if this is a duplicate, I got a weird SMTP error from my
->> organization's mail server when I tried to send this yesterday]
+On Tue, Jul 1, 2014 at 6:28 AM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+> On 06/30/2014 04:29 PM, Andy Lutomirski wrote:
+>> On 06/22/2014 08:11 PM, Nathan Lynch wrote:
+>>> +
+>>> +# Build rules
+>>> +targets := $(obj-vdso) vdso.so vdso.so.dbg vdso.so.raw vdso.lds
+>>> +obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
+>>> +
+>>> +ccflags-y := -shared -fPIC -fno-common -fno-builtin -fno-stack-protector
+>>> +ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+>>> +            $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
 >>
->> On 06/27/2014 10:15 AM, Russell King - ARM Linux wrote:
->>> This is v2 of my initial round of patches (roughly half of my total
->>> patch set) for the Freescale FEC driver.
->>>
->>> I'm sending this set out for comments and testing.  So far, I have
->>> had only one ack for one patch in this series, this is pretty poor,
->>> so I'm now sending it with a CFT tag instead.
+>> Does this need -DDISABLE_BRANCH_PROFILING?
+>
+> Yes, thanks.
+>
+>
+>>> diff --git a/arch/arm/kernel/vdso/checkundef.sh b/arch/arm/kernel/vdso/checkundef.sh
+>>> new file mode 100755
+>>> index 000000000000..185c30da202b
+>>> --- /dev/null
+>>> +++ b/arch/arm/kernel/vdso/checkundef.sh
+>>> @@ -0,0 +1,9 @@
+>>> +#!/bin/sh
+>>> +nm="$1"
+>>> +file="$2"
+>>> +"$nm" -u "$file" | ( ret=0; while read discard symbol
+>>> +do
+>>> +    echo "$file: undefined symbol $symbol"
+>>> +    ret=1
+>>> +done ; exit $ret )
+>>> +exit $?
 >>
->> FWIW I've given your fec-testing branch some testing on BD-SL-i.MX6
->> (Sabre Lite) with 3.16-rc2 (-rc1 has some issue with detecting the mmc).
->>  Mainly running glibc 'make check' with SSH, NFSv4, IPv4 on a gigabit
->> switch.  This workload wasn't exhibiting problems before your patches
->> and it does not appear to be regressed by them.
+>> This is just as buggy as the x86 version.  make;make malfunctions.
 >>
->> I wanted to test it because I've noticed hard-to-characterize sluggish
->> interactive response in SSH sessions on this system.  Like key echo
->> takes 0.2 seconds too long... sometimes.  I guess it could be anything,
->> but I haven't encountered it yet with your patches.
-> 
-> Thanks for testing.
-> 
-> Can I add a tested-by tag for you for those patches?
+>> Can you rely on a new enough toolchain to use -Wl,--no-undefined?
+>
+> Looks like relying on --no-undefined should be okay.
+>
+>
+>>> diff --git a/arch/arm/kernel/vdso/datapage.S b/arch/arm/kernel/vdso/datapage.S
+>>> new file mode 100644
+>>> index 000000000000..fbf36d75da06
+>>> --- /dev/null
+>>> +++ b/arch/arm/kernel/vdso/datapage.S
+>>> @@ -0,0 +1,15 @@
+>>> +#include <linux/linkage.h>
+>>> +#include <asm/asm-offsets.h>
+>>> +
+>>> +    .align 2
+>>> +.L_vdso_data_ptr:
+>>> +    .long   _start - . - VDSO_DATA_SIZE
+>>> +
+>>> +ENTRY(__get_datapage)
+>>> +    .cfi_startproc
+>>> +    adr     r0, .L_vdso_data_ptr
+>>> +    ldr     r1, [r0]
+>>> +    add     r0, r0, r1
+>>> +    bx      lr
+>>> +    .cfi_endproc
+>>> +ENDPROC(__get_datapage)
+>>
+>> Can you translate this into English for the non-ARM-speakers here?
+>
+> It's a PC-relative load of the data page.  If someone knows how to make
+> this happen in the C portion of the vdso, it would might get us a little
+> speedup.
+>
+>
+>>> +#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+>>> +#define HOST_ORDER ELFDATA2LSB
+>>> +#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+>>> +#define HOST_ORDER ELFDATA2MSB
+>>> +#endif
+>>> +
+>>> +static const char *outfile;
+>>> +
+>>> +static void cleanup(void)
+>>> +{
+>>> +    if (error_message_count > 0 && outfile != NULL)
+>>> +            unlink(outfile);
+>>> +}
+>>> +
+>>> +static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
+>>> +{
+>>> +    return swap ? bswap_32(word) : word;
+>>> +}
+>>> +
+>>> +static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
+>>> +{
+>>> +    return swap ? bswap_16(half) : half;
+>>> +}
+>>> +
+>>> +static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
+>>> +{
+>>> +    *dst = swap ? bswap_32(val) : val;
+>>> +}
+>>
+>> The macros in arch/x86/vdso/vdso2c.c are IMO much nicer.
+>
+> Respectfully, I think I'd disagree, but more importantly, vdso2c.c seems
+> to assume a little-endian target.
+>
 
-Of course.
+That would be easy enough to fix.
 
-Tested-by: Nathan Lynch <nathan_lynch@mentor.com>
+The real reason that I went with the macroized approach is that x86
+needs to support 32-bit and 64-bit targets with the same host code.
+ELF has lots of odd types, and using the macros means that I can't
+screw up the width of the integer that I'm converting.
+
+--Andy
