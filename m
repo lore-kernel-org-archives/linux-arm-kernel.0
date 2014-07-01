@@ -1,44 +1,61 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 1 Jul 2014 08:09:38 -0700
-Subject: mwifiex card reset
-In-Reply-To: <CA+NduCAuRFTQneJUBiKP2Aeq2HCxe71yxg_iDDStkNvhzRg-Rg@mail.gmail.com>
-References: <CALtMJEBWPM+75wxM2Mp5EX_o6NWtZUJdYRCv6psbvdUn4k295w@mail.gmail.com>
- <20140628052220.GG10407@us.netrek.org>
- <20140628072322.GC7410@atomide.com>
- <CALtMJED5vfgkAhMBXKaDP6u9U9n41c-wziyTxt6e_7XTSxG3oQ@mail.gmail.com>
- <20140630061912.GA2461@atomide.com> <53B1BAC1.3090902@zonque.org>
- <477F20668A386D41ADCC57781B1F70430FE5F37540@SC-VEXCH1.marvell.com>
- <20140701065721.GM24891@us.netrek.org>
- <CA+NduCAuRFTQneJUBiKP2Aeq2HCxe71yxg_iDDStkNvhzRg-Rg@mail.gmail.com>
-Message-ID: <CAD=FV=Xi5B2=tssgQSgjeKtYVcw-x9pS6Ci580M6OfroPCb+RA@mail.gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 1 Jul 2014 16:11:30 +0100
+Subject: [PATCH v2 4/5] efi: efistub: refactor stub components
+In-Reply-To: <1403792617-25792-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1403792617-25792-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140701151130.GF7539@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Olof who posted the patch that Yuvaraj referenced.
+On Thu, 26 Jun, at 04:23:36PM, Ard Biesheuvel wrote:
+> In order to move from the #include "../../../xxxxx.c" anti-pattern used by
+> both the x86 and arm64 versions of the stub to a static library linked into
+> either the kernel proper (arm64) or a separate boot executable (x86), there
+> is some prepatory work required.
+> 
+> This patch does the following:
+> - move forward declarations of functions shared between the arch specific and
+>   the generic parts of the stub to include/linux/efi.h
+> - move forward declarations of functions shared between various .c files of the
+>   generic stub code to a new local header file called "efistub.h"
+> - add #includes to all .c files which were formerly relying on the #includor to
+>   include the correct header files
+> - remove all static modifiers from functions which will need to be externally
+>   visible once we move to a static library
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-On Tue, Jul 1, 2014 at 5:20 AM, Yuvaraj Cd <yuvaraj.lkml@gmail.com> wrote:
-> On Tue, Jul 1, 2014 at 12:27 PM, James Cameron <quozl@laptop.org> wrote:
->> On Mon, Jun 30, 2014 at 11:44:29PM -0700, Bing Zhao wrote:
->>> I may have missed something, but doesn't the MMC_POWER_OFF and
->>> MMC_POWER_ON|UP handling in controller driver help?
->>> Anyway the clocks/GPIOs/regulators are sort of platform
->>> dependent. Would it be better putting it in /arch/arm/mach-xxxxx/?
->>
->> Wouldn't device tree for mmc be better?
-> I have come across same problem.Below is the thread in which more
-> discussions happened on this.
->  http://patchwork.ozlabs.org/patch/312444/
-> I am adding few more those who are interested in this solution.
+[...]
 
-Thanks to Yuvaraj for referencing the old thread.
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index 0ceb816bdfc2..3a64f2f85821 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -1163,4 +1163,46 @@ static inline void
+>  efi_runtime_map_setup(void *map, int nr_entries, u32 desc_size) {}
+>  #endif
+>  
+> +/* prototypes shared between arch specific and generic stub code */
+> +
+> +#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
+> +#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
+> +
+> +void efi_printk(efi_system_table_t *sys_table_arg, char *str);
+> +
+> +void efi_free(efi_system_table_t *sys_table_arg, unsigned long size,
+> +	      unsigned long addr);
+> +
+> +char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
+> +			  efi_loaded_image_t *image, int *cmd_line_len);
+> +
 
-It seems like there are already enough chefs in the kitchen so I'm not
-going to add any more suggestions myself.  I'll point out that on all
-ARM Chromebooks (which to date have a Marvell part connected via SDIO)
-all face the same problem.  In production kernels we've continued to
-get by with various hacks.  The current kernels use a hack with
-regulator chaining and assumptions about 32K clocks already being on.
-This is less egregious than the hacks in older kernels which initted
-WiFi in the LCD backlight function (dont ask) but is still a hack.
+We've been very good so far at not splattering include/linux/efi.h with
+any of the EFI boot stub prototypes, and it would be awesome if we
+didn't have to start now.
 
--Doug
+Is there any way we could avoid doing this? Arguably everything should
+be in the new efistub.h, no?
+
+-- 
+Matt Fleming, Intel Open Source Technology Center
