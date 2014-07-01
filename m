@@ -1,42 +1,36 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  1 Jul 2014 19:43:32 +0100
-Subject: [PATCH v8 7/9] pci: of: Parse and map the IRQ when adding the PCI
- device.
+Date: Tue,  1 Jul 2014 19:43:26 +0100
+Subject: [PATCH v8 1/9] Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
 In-Reply-To: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1404240214-9804-8-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1404240214-9804-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enhance the default implementation of pcibios_add_device() to
-parse and map the IRQ of the device if a DT binding is available.
+The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
+is wrong. It returns a mapped (i.e. virtual) address that can start from
+zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
+architectures that use !CONFIG_GENERIC_MAP define.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/pci/pci.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ include/asm-generic/io.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 63a54a3..8e65dc3 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -17,6 +17,7 @@
- #include <linux/spinlock.h>
- #include <linux/string.h>
- #include <linux/log2.h>
-+#include <linux/of_pci.h>
- #include <linux/pci-aspm.h>
- #include <linux/pm_wakeup.h>
- #include <linux/interrupt.h>
-@@ -1453,6 +1454,9 @@ EXPORT_SYMBOL(pcim_pin_device);
-  */
- int __weak pcibios_add_device(struct pci_dev *dev)
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index 975e1cc..2e2161b 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -331,7 +331,7 @@ static inline void iounmap(void __iomem *addr)
+ #ifndef CONFIG_GENERIC_IOMAP
+ static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
  {
-+#ifdef CONFIG_OF
-+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+#endif
- 	return 0;
+-	return (void __iomem *) port;
++	return (void __iomem *)(PCI_IOBASE + (port & IO_SPACE_LIMIT));
  }
  
+ static inline void ioport_unmap(void __iomem *p)
 -- 
 2.0.0
