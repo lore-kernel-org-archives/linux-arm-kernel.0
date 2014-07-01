@@ -1,30 +1,66 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 1 Jul 2014 09:21:28 -0500
-Subject: [PATCH CFT 00/30] Initial round of Freescale FEC ethernet patches
-In-Reply-To: <20140627151542.GL32514@n2100.arm.linux.org.uk>
-References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
-Message-ID: <53B2C3E8.7030903@mentor.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 15:22:10 +0100
+Subject: [PATCH RFC v2 3/8] component: add support for component match
+ array
+In-Reply-To: <20140626144601.GS32514@n2100.arm.linux.org.uk>
+References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
+ <E1WzWOy-0007zc-36@rmk-PC.arm.linux.org.uk>
+ <CA+gwMcdO5P-Yu+-FeHHGxkKwObsATL-ThVDwmEm2_cZ3enUXPQ@mail.gmail.com>
+ <20140626144601.GS32514@n2100.arm.linux.org.uk>
+Message-ID: <20140701142210.GS32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[apologies if this is a duplicate, I got a weird SMTP error from my
-organization's mail server when I tried to send this yesterday]
-
-On 06/27/2014 10:15 AM, Russell King - ARM Linux wrote:
-> This is v2 of my initial round of patches (roughly half of my total
-> patch set) for the Freescale FEC driver.
+On Thu, Jun 26, 2014 at 03:46:01PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 26, 2014 at 02:34:17PM +0200, Philipp Zabel wrote:
+> > Hi Russell,
+> > 
+> > On Tue, Jun 24, 2014 at 9:29 PM, Russell King
+> > <rmk+kernel@arm.linux.org.uk> wrote:
+> > [...]
+> > > +/*
+> > > + * Add a component to be matched.
+> > > + *
+> > > + * The match array is first created or extended if necessary.
+> > > + */
+> > > +void component_match_add(struct device *dev, struct component_match **matchptr,
+> > > +       int (*compare)(struct device *, void *), void *compare_data)
+> > > +{
+> > > +       struct component_match *match = *matchptr;
+> > > +
+> > > +       if (IS_ERR(match))
+> > > +               return;
+> > > +
+> > > +       if (!match || match->num == match->alloc) {
+> > > +               size_t new_size = match ? match->alloc + 16 : 15;
+> > > +
+> > > +               match = component_match_realloc(dev, match, new_size);
+> > > +
+> > > +               *matchptr = match;
+> > > +
+> > > +               if (IS_ERR(match))
+> > > +                       return;
+> > > +       }
+> > > +
+> > > +       match->compare[match->num].fn = compare;
+> > > +       match->compare[match->num].data = compare_data;
+> > > +       match->num++;
+> > > +}
+> > 
+> > component_match_add should be exported.
 > 
-> I'm sending this set out for comments and testing.  So far, I have
-> had only one ack for one patch in this series, this is pretty poor,
-> so I'm now sending it with a CFT tag instead.
+> Fixed, thanks.
 
-FWIW I've given your fec-testing branch some testing on BD-SL-i.MX6
-(Sabre Lite) with 3.16-rc2 (-rc1 has some issue with detecting the mmc).
- Mainly running glibc 'make check' with SSH, NFSv4, IPv4 on a gigabit
-switch.  This workload wasn't exhibiting problems before your patches
-and it does not appear to be regressed by them.
+As there's no further comments, and Inki Dae has not responded, I'm
+going to send these out without the RFC tag in the hope that people
+will provide acks.  This allows us to move forward with this despite
+the Exynos DRM blockage.
 
-I wanted to test it because I've noticed hard-to-characterize sluggish
-interactive response in SSH sessions on this system.  Like key echo
-takes 0.2 seconds too long... sometimes.  I guess it could be anything,
-but I haven't encountered it yet with your patches.
+The ultimate plan is for patches 1 to 3 inclusive to be merged into
+Greg's driver tree, 1 to 3 and 5 into Greg's staging tree, and 1 to
+3 and 4 for David Airlie's DRM tree - patches 1 to 3 are needed for
+both patches 4 and 5.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
