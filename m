@@ -1,126 +1,75 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:32 +0900
-Subject: [PATCH 1/7] ARM: shmobile: Move r7s72100.h
-In-Reply-To: <cover.1404173049.git.horms+renesas@verge.net.au>
-References: <cover.1404173049.git.horms+renesas@verge.net.au>
-Message-ID: <96bd090066e2150f3970b32f35895de2ab631c95.1404173049.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Jul 2014 09:28:47 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.17
+Message-ID: <cover.1404174157.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Change location of r7s72100.h so it can be included using "r7s72100.h"
-instead of the old style <mach/r7s72100.h>.
+Please consider these Second Round of Renesas ARM Based SoC Updates for v3.17.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-genmai-reference.c | 4 +++-
- arch/arm/mach-shmobile/board-genmai.c           | 4 +++-
- arch/arm/mach-shmobile/clock-r7s72100.c         | 3 ++-
- arch/arm/mach-shmobile/include/mach/r7s72100.h  | 7 -------
- arch/arm/mach-shmobile/r7s72100.h               | 7 +++++++
- arch/arm/mach-shmobile/setup-r7s72100.c         | 4 +++-
- 6 files changed, 18 insertions(+), 11 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/include/mach/r7s72100.h
- create mode 100644 arch/arm/mach-shmobile/r7s72100.h
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v3.17,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index c06dc5c..e5448f7 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -20,11 +20,13 @@
- 
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
--#include <mach/r7s72100.h>
-+
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+
- #include "clock.h"
- #include "common.h"
-+#include "r7s72100.h"
- 
- /*
-  * This is a really crude hack to provide clkdev support to platform
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index a0994f3..e2a3ba4 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -25,11 +25,13 @@
- #include <linux/sh_eth.h>
- #include <linux/spi/rspi.h>
- #include <linux/spi/spi.h>
--#include <mach/r7s72100.h>
-+
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r7s72100.h"
- 
- /* Ether */
- static const struct sh_eth_plat_data ether_pdata __initconst = {
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 457dab0..3eb2ec4 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -19,8 +19,9 @@
- #include <linux/io.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
--#include <mach/r7s72100.h>
-+
- #include "common.h"
-+#include "r7s72100.h"
- 
- /* Frequency Control Registers */
- #define FRQCR		0xfcfe0010
-diff --git a/arch/arm/mach-shmobile/include/mach/r7s72100.h b/arch/arm/mach-shmobile/include/mach/r7s72100.h
-deleted file mode 100644
-index efb723c..0000000
---- a/arch/arm/mach-shmobile/include/mach/r7s72100.h
-+++ /dev/null
-@@ -1,7 +0,0 @@
--#ifndef __ASM_R7S72100_H__
--#define __ASM_R7S72100_H__
--
--void r7s72100_add_dt_devices(void);
--void r7s72100_clock_init(void);
--
--#endif /* __ASM_R7S72100_H__ */
-diff --git a/arch/arm/mach-shmobile/r7s72100.h b/arch/arm/mach-shmobile/r7s72100.h
-new file mode 100644
-index 0000000..efb723c
---- /dev/null
-+++ b/arch/arm/mach-shmobile/r7s72100.h
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_R7S72100_H__
-+#define __ASM_R7S72100_H__
-+
-+void r7s72100_add_dt_devices(void);
-+void r7s72100_clock_init(void);
-+
-+#endif /* __ASM_R7S72100_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index a55d68d..4a98b23 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -22,10 +22,12 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/sh_timer.h>
--#include <mach/r7s72100.h>
-+
- #include <asm/mach/arch.h>
-+
- #include "common.h"
- #include "irqs.h"
-+#include "r7s72100.h"
- 
- static struct resource mtu2_resources[] __initdata = {
- 	DEFINE_RES_MEM(0xfcff0000, 0x400),
--- 
-2.0.0.rc2
+This conflicts with other changes made to pm-r8a7790.c in the soc branch
+of the renesas tree. A resolution can be found in the
+renesas-next-v3.16-rc1-20140628 tag of the next branch of that tree.
+
+In short, the resulting includes should be:
+
+#include <linux/kernel.h>
+#include <linux/smp.h>
+#include <asm/io.h>
+#include "common.h"
+#include "pm-rcar.h"
+#include "r8a7790.h"
+
+
+The following changes since commit 3ed66ec5ced8b801cb851b2b8548301df94f8f54:
+
+  ARM: shmobile: Remove ARCH_HAS_CPUFREQ config for shmobile (2014-06-23 09:53:55 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc2-for-v3.17
+
+for you to fetch changes up to bfe4cfa8ae21628267f2b879b4396ee17ea4fd3a:
+
+  ARM: shmobile: Allow r8a7791 to build non-SMP APMU code (2014-06-26 16:01:34 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v3.17
+
+* Suspend on non-SMP update for r8a7790
+* Move r8a7791.h out of mach directory.
+  This is part of a multi-stage effort to move headers
+  out of that directory.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: Move r8a7791.h
+
+Magnus Damm (7):
+      ARM: shmobile: Allow use of boot code for non-SMP case
+      ARM: shmobile: Adjust APMU code to build for non-SMP
+      ARM: shmobile: Use __init for APMU suspend init function
+      ARM: shmobile: Move r8a7790 reset code to pm-r8a7790.c
+      ARM: shmobile: Allow r8a7790 to build non-SMP APMU code
+      ARM: shmobile: Move r8a7791 reset code to pm-r8a7791.c
+      ARM: shmobile: Allow r8a7791 to build non-SMP APMU code
+
+ arch/arm/mach-shmobile/Makefile                    | 21 ++++++-----
+ arch/arm/mach-shmobile/board-koelsch-reference.c   |  4 ++-
+ arch/arm/mach-shmobile/board-koelsch.c             |  4 ++-
+ arch/arm/mach-shmobile/headsmp.S                   | 13 ++++---
+ arch/arm/mach-shmobile/platsmp-apmu.c              | 13 ++++---
+ arch/arm/mach-shmobile/pm-r8a7790.c                | 41 ++++++++++++++++++++--
+ arch/arm/mach-shmobile/pm-r8a7791.c                | 30 ++++++++++++++--
+ .../arm/mach-shmobile/{include/mach => }/r8a7791.h |  0
+ arch/arm/mach-shmobile/setup-r8a7791.c             |  4 ++-
+ arch/arm/mach-shmobile/smp-r8a7790.c               | 31 ----------------
+ arch/arm/mach-shmobile/smp-r8a7791.c               | 29 ++-------------
+ 11 files changed, 108 insertions(+), 82 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7791.h (100%)
