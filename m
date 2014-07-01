@@ -1,48 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 1 Jul 2014 16:45:53 +0200
-Subject: [PATCH v3 4/4] pinctrl: sunxi: Define enable / disable irq
- callbacks for level triggered irqs
-In-Reply-To: <1404051062-24079-5-git-send-email-hdegoede@redhat.com>
-References: <1404051062-24079-1-git-send-email-hdegoede@redhat.com>
- <1404051062-24079-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140701144553.GP28647@lukather>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 1 Jul 2014 12:02:54 -0300
+Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
+ address of the boot register
+In-Reply-To: <20140701134651.7d34de62@free-electrons.com>
+References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
+ <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
+ <20140701134651.7d34de62@free-electrons.com>
+Message-ID: <20140701150254.GA1986@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 29, 2014 at 04:11:02PM +0200, Hans de Goede wrote:
-> Some drivers use disable_irq / enable_irq and do the work clearing the source
-> in another thread instead of using a threaded interrupt handler.
+On 01 Jul 01:46 PM, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
 > 
-> The irqchip used not having irq_disable and irq_enable callbacks in this case,
-> will lead to unnecessary spurious interrupts:
+> On Fri, 27 Jun 2014 15:22:44 +0200, Gregory CLEMENT wrote:
 > 
-> On a disable_irq in a chip without a handller for this, the irq core will
-> remember the disable, but not actually call into the irqchip. With a level
-> triggered interrupt (where the source has not been cleared) this will lead
-> to an immediate retrigger, at which point the irq-core will mask the irq.
-> So having an irq_disable callback in the irqchip will save us the interrupt
-> firing a 2nd time for nothing.
+> >  static void __iomem *system_controller_base;
+> > +static u32 system_controller_phys_base;
+> >  
+> >  struct mvebu_system_controller {
+> >  	u32 rstoutn_mask_offset;
+> > @@ -109,6 +110,13 @@ void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
+> >  	writel(virt_to_phys(boot_addr), system_controller_base +
+> >  	       mvebu_sc->resume_boot_addr);
+> >  }
+> > +
+> > +u32 mvebu_system_controller_get_phys_addr(void)
+> > +{
+> > +	BUG_ON(system_controller_phys_base == NULL);
 > 
-> Drivers using disable / enable_irq like this, will call enable_irq when
-> they finally have cleared the interrupt source, without an enable_irq callback,
-> this will turn into an unmask, at which point the irq will trigger immediately
-> because when it was originally acked the level was still high, so the ack was
-> a nop.
+> This rightfully generates a fairly strong warning at compile time:
+> you're comparing an u32 to NULL. It should be == 0 here.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Maxime
-
+Or a more readable BUG_ON(!system_controller_phys_base);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/00c1b355/attachment.sig>
