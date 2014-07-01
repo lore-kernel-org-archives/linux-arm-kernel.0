@@ -1,117 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Jul 2014 10:23:02 +0200
-Subject: [PATCH 1/4] clk: Introduce 'clk_find_nearest_rate()'
-In-Reply-To: <1404147396-8041-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1404147396-8041-1-git-send-email-soren.brinkmann@xilinx.com>
- <1404147396-8041-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20140701082302.GL14781@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Jul 2014 09:24:41 +0100
+Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
+In-Reply-To: <alpine.DEB.2.02.1406302006220.8923@kaball.uk.xensource.com>
+References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
+ <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
+ <alpine.DEB.2.02.1406302006220.8923@kaball.uk.xensource.com>
+Message-ID: <53B27049.10302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 09:56:33AM -0700, Soren Brinkmann wrote:
-> Introduce a new API function to find the rate a clock can provide which
-> is closest to a given rate.
+Hi Stefano,
+
+On 30/06/14 20:09, Stefano Stabellini wrote:
+> On Wed, 25 Jun 2014, Anup Patel wrote:
+>> Hi Marc,
+>>
+>> On Wed, Jun 25, 2014 at 2:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> So far, GICv2 has been used in with EOImode == 0. The effect of this
+>>> mode is to perform the priority drop and the deactivation of the
+>>> interrupt at the same time.
+>>>
+>>> While this works perfectly for Linux (we only have a single priority),
+>>> it causes issues when an interrupt is forwarded to a guest, and when
+>>> we want the guest to perform the EOI itself.
+>>>
+>>> For this case, the GIC architecture provides EOImode == 1, where:
+>>> - A write to the EOI register drops the priority of the interrupt and leaves
+>>> it active. Other interrupts at the same priority level can now be taken,
+>>> but the active interrupt cannot be taken again
+>>> - A write to the DIR marks the interrupt as inactive, meaning it can
+>>> now be taken again.
+>>>
+>>> We only enable this feature when booted in HYP mode. Also, as most device
+>>> trees are broken (they report the CPU interface size to be 4kB, while
+>>> the GICv2 CPU interface size is 8kB), output a warning if we're booted
+>>> in HYP mode, and disable the feature.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  drivers/irqchip/irq-gic.c       | 61 +++++++++++++++++++++++++++++++++++++----
+>>>  include/linux/irqchip/arm-gic.h |  4 +++
+>>>  2 files changed, 59 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index 508b815..9295bf2 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -45,6 +45,7 @@
+>>>  #include <asm/irq.h>
+>>>  #include <asm/exception.h>
+>>>  #include <asm/smp_plat.h>
+>>> +#include <asm/virt.h>
+>>>
+>>>  #include "irq-gic-common.h"
+>>>  #include "irqchip.h"
+>>> @@ -94,6 +95,10 @@ struct irq_chip gic_arch_extn = {
+>>>         .irq_set_wake   = NULL,
+>>>  };
+>>>
+>>> +static struct irq_chip *gic_chip;
+>>> +
+>>> +static bool supports_deactivate = false;
+>>> +
+>>>  #ifndef MAX_GIC_NR
+>>>  #define MAX_GIC_NR     1
+>>>  #endif
+>>> @@ -185,6 +190,12 @@ static void gic_eoi_irq(struct irq_data *d)
+>>>         writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+>>>  }
+>>>
+>>> +static void gic_eoi_dir_irq(struct irq_data *d)
+>>> +{
+>>> +       gic_eoi_irq(d);
+>>> +       writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
+>>> +}
 > 
-> clk_round_rate() leaves it to the clock driver how rounding is done.
-> Commonly implementations round down due to use-cases that have a certain
-> frequency maximum that must not be exceeded.
-> 
-> The new API call enables use-cases where accuracy is preferred. E.g.
-> Ethernet clocks.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> 
->  drivers/clk/clk.c   | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk.h |  9 +++++++++
->  2 files changed, 66 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 8b73edef151d..fce1165cd879 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1030,6 +1030,63 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
->  EXPORT_SYMBOL_GPL(clk_round_rate);
->  
->  /**
-> + * clk_find_nearest_rate - round the given rate for a clk
-> + * @clk: the clk for which we are rounding a rate
-> + * @rate: the rate which is to be rounded
-> + *
-> + * Takes in a rate as input and finds the closest rate that the clk
-> + * can actually use which is then returned.
-> + * Note: This function relies on the clock's clk_round_rate() implementation.
-> + * For cases clk_round_rate() rounds up, not the closest but the rounded up
-> + * rate is found.
-> + */
-> +long clk_find_nearest_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	long ret, lower, upper;
-> +	unsigned long tmp;
-> +
-> +	clk_prepare_lock();
-> +
-> +	lower = __clk_round_rate(clk, rate);
-> +	if (lower >= rate || lower < 0) {
-> +		ret = lower;
-> +		goto unlock;
-> +	}
-> +
-> +	tmp = rate + (rate - lower) - 1;
-> +	if (tmp > LONG_MAX)
-> +		upper = LONG_MAX;
-> +	else
-> +		upper = tmp;
-Consider rate = 0xf0000000, lower = 0x7fffffff (= LONG_MAX). Then tmp =
-(unsigned long)0x160000000 = 0x60000000. In this case you pick upper =
-0x60000000 while you should use upper = LONG_MAX.
+> Would it be better if you moved the gic_eoi_irq call earlier? Maybe
+> somewhere in gic_handle_irq?
 
-I think you need
+I'm not sure I see what we'd gain by doing so. Can you elaborate?
 
--	if (tmp > LONG_MAX)
-+	if (tmp > LONG_MAX || tmp < rate)
+Thanks,
 
-(and a comment)
-
-> +
-> +	upper = __clk_round_rate(clk, upper);
-> +	if (upper <= lower || upper < 0) {
-Is it an idea to do something like:
-
-		if (IS_ENABLED(CONFIG_CLK_SANITY_CHECKS))
-			WARN_ON(upper < lower && upper >= 0);
-
-here?
-
-> +		ret = lower;
-> +		goto unlock;
-> +	}
-> +
-> +	lower = rate + 1;
-> +	while (lower < upper) {
-> +		long rounded, mid;
-> +
-> +		mid = lower + ((upper - lower) >> 1);
-> +		rounded = __clk_round_rate(clk, mid);
-> +		if (rounded < lower)
-> +			lower = mid + 1;
-> +		else
-> +			upper = rounded;
-> +	}
-This is broken if you don't assume that __clk_round_rate rounds down.
-Consider an implementation that already does round_nearest and clk can
-assume the values 0x60000 and 0x85000 (and nothing in between), and rate
-= 0x70000. This results in
-
-	lower = 0x60000;
-	tmp = 0x7ffff;
-	upper = __clk_round_rate(clk, 0x7ffff) = 0x85000
-
-before the loop and the loop then doesn't even terminate.
-
-Best regards
-Uwe
-
+	M.
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Jazz is not dead. It just smells funny...
