@@ -1,37 +1,78 @@
-From: spk.linux@gmail.com (Sachin Kamat)
-Date: Tue, 1 Jul 2014 13:56:29 +0530
-Subject: [PATCHv2 0/5] ARM: remove the sub-node and deprecated
- supports-highspeed property for dwmmc.
-In-Reply-To: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
-References: <1404128960-27225-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <CAK5sBcEa5bRKUBB0n422m-K7A7YSshm2kTBUCNPgzwQkws3H8w@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue,  1 Jul 2014 10:27:47 +0200
+Subject: [PATCH v3 1/2] ARM: i.MX: allow disabling supervisor protect via DT
+Message-ID: <1404203268-31404-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+The i.MX SoCs allow to setup fine grained access rights to peripherals on the
+AIPS bus.
+This is done via the Peripheral Access Register (PAR) in e.g. the i.MX21
+or in later SoC versions the Off-Platform Peripheral Access Control Register
+(OPACR), e.g. i.MX53.
+Under certain circumstances this leads to problems in which bus masters are
+not granted their access rights to peripherals.
+To be able to disable these restrictions on DT platforms, add a helper function
+that looks for AIPS nodes in the DT and disables them for every match it finds.
+The match table has to be declared in the mach-specific entry file, where this
+helper function should then be called.
 
-On Mon, Jun 30, 2014 at 5:19 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Since used the mmc_of_parse(), didn't parse the sub-node.
-> So we can remove the sub-node, because almost SoC used the only one card per a host.
-> And supports-highspeed can be replaced to "cap-mmc/sd-highspeed" property.
->
-> Jaehoon Chung (5):
->   mmc: dw_mmc: modify the dt-binding for removing slot-node and
->     supports-highspeed
->   ARM: dts: exynos: unuse the slot-node and deprecated the
->     supports-highspeed for dw-mmc
->   ARM: dts: socfpga: unuse the slot-node and deprecated the
->     supports-highspeed for dw-mmc
->   ARM: dts: rockchip: unuse the slot-node and deprecated the
->     supports-highspeed for dw-mmc
->   mmc: dw_mmc: replace "disable-wp" from slot's quirk to host's quirk
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/mach-imx/common.h |  2 ++
+ arch/arm/mach-imx/cpu.c    | 13 +++++++++++++
+ 2 files changed, 15 insertions(+)
 
-It is a good practice to include revision history for subsequent versions.
-
-Tested on Exynos 5250 based Snow and Arndale boards. Works fine now.
-
-Tested-by: Sachin Kamat <sachin.kamat@samsung.com>
-
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 9ab785c..9f6e778 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -19,6 +19,7 @@ struct pt_regs;
+ struct clk;
+ struct device_node;
+ enum mxc_cpu_pwr_mode;
++struct of_device_id;
+ 
+ void mx1_map_io(void);
+ void mx21_map_io(void);
+@@ -77,6 +78,7 @@ void mxc_arch_reset_init(void __iomem *);
+ void mxc_arch_reset_init_dt(void);
+ int mx53_revision(void);
+ void imx_set_aips(void __iomem *);
++void imx_aips_allow_unprivileged_access(const struct of_device_id *of_matches);
+ int mxc_device_init(void);
+ void imx_set_soc_revision(unsigned int rev);
+ unsigned int imx_get_soc_revision(void);
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index bbe8ff1..7f66d77 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -2,6 +2,7 @@
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/slab.h>
+ #include <linux/sys_soc.h>
+ 
+@@ -60,6 +61,18 @@ void __init imx_set_aips(void __iomem *base)
+ 	__raw_writel(reg, base + 0x50);
+ }
+ 
++void __init imx_aips_allow_unprivileged_access(
++		const struct of_device_id *of_matches)
++{
++	void __iomem *aips_base_addr;
++	struct device_node *np;
++
++	for_each_matching_node(np, of_matches) {
++		aips_base_addr = of_iomap(np, 0);
++		imx_set_aips(aips_base_addr);
++	}
++}
++
+ struct device * __init imx_soc_device_init(void)
+ {
+ 	struct soc_device_attribute *soc_dev_attr;
 -- 
-Regards,
-Sachin.
+2.0.0
