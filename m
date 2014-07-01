@@ -1,39 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 1 Jul 2014 13:46:51 +0200
-Subject: [PATCH 03/16] ARM: mvebu: Add function to export the physical
- address of the boot register
-In-Reply-To: <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1403875377-940-1-git-send-email-gregory.clement@free-electrons.com>
- <1403875377-940-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140701134651.7d34de62@free-electrons.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 01 Jul 2014 20:52:21 +0900
+Subject: [Patch v7 0/6] add cpuidle support for Exynos5420
+In-Reply-To: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
+References: <1402914383-20471-1-git-send-email-k.chander@samsung.com>
+Message-ID: <03d501cf9522$eaf67200$c0e35600$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+Chander Kashyap wrote:
+> 
+> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
+> 
+> This patchset adds cpuidle support for Exynos5420 SoC based on
+> generic big.little cpuidle driver.
+> 
+> Tested on SMDK5420.
+> Rebased on 3.16-rc1
+> 
+> Changelog is in respective patches.
+> Chander Kashyap (5):
+>   driver: cpuidle-big-little: add of_device_id structure
+>   arm: exynos: add generic function to calculate cpu number
+>   cpuidle: config: Add ARCH_EXYNOS entry to select cpuidle-big-little
+>     driver
+>   driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
+>   exynos: cpuidle: do not allow cpuidle registration for Exynos5420
+>   mcpm: exynos: populate suspend and powered_up callbacks
+> 
+>  arch/arm/mach-exynos/exynos.c        |    4 +++-
+>  arch/arm/mach-exynos/mcpm-exynos.c   |   36 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-exynos/regs-pmu.h      |    9 +++++++++
+>  drivers/cpuidle/Kconfig.arm          |    2 +-
+>  drivers/cpuidle/cpuidle-big_little.c |   12 +++++++++++-
+>  5 files changed, 60 insertions(+), 3 deletions(-)
+> 
 
-On Fri, 27 Jun 2014 15:22:44 +0200, Gregory CLEMENT wrote:
++ Nicolas
 
->  static void __iomem *system_controller_base;
-> +static u32 system_controller_phys_base;
->  
->  struct mvebu_system_controller {
->  	u32 rstoutn_mask_offset;
-> @@ -109,6 +110,13 @@ void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
->  	writel(virt_to_phys(boot_addr), system_controller_base +
->  	       mvebu_sc->resume_boot_addr);
->  }
-> +
-> +u32 mvebu_system_controller_get_phys_addr(void)
-> +{
-> +	BUG_ON(system_controller_phys_base == NULL);
+Hi,
 
-This rightfully generates a fairly strong warning at compile time:
-you're comparing an u32 to NULL. It should be == 0 here.
+This series looks good to me and I asked Chander to test this series with
+Nico's mcpm patches on smdk5420 and he said it works fine. So I will apply
+this into samsung tree if Nicolas has no objection on 6/6.
 
-Best regards,
+BTW, one more, there are duplicated sign-off from Chander with different
+e-mail address, I'm not sure it should be fine or not because I didn't see
+same thing before.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Kukjin
