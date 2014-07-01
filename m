@@ -1,55 +1,107 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue,  1 Jul 2014 19:43:25 +0100
-Subject: [PATCH v8 0/9] Support for creating generic PCI host bridges from DT
-Message-ID: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Tue,  1 Jul 2014 19:43:29 +0100
+Subject: [PATCH v8 4/9] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1404240214-9804-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is my resurected attempt at adding support for generic PCI host
-bridge controllers that make use of device tree information to
-configure themselves. I've tagged it as v8 although the patches
-have now been reshuffled in order to ease adoption so referring to
-the older versions might be a bit of a hoop jumping exercise.
+The ranges property for a host bridge controller in DT describes
+the mapping between the PCI bus address and the CPU physical address.
+The resources framework however expects that the IO resources start
+at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
+The conversion from pci ranges to resources failed to take that into account.
 
-Changes from v7:
-  - Reordered the patches so that fixes and non-controversial patches
-    from v7 can be accepted more easily. If agreed I can split the
-    series again into patches that can be upstreamed easily and ones
-    that still need discussion.
-  - Moved the of_create_host_bridge() function to drivers/of/of_pci.c
-    to better reflect its target use.
-  - Added the function to remap the bus I/O resources that used to be
-    provided in my arm64 patch series and (re)named it pci_remap_iospace()
-  - Removed error code checking from parsing and mapping of IRQ from DT
-    in recognition that some PCI devices will not have legacy IRQ mappings.
+In the process move the function into drivers/of/address.c as it now
+depends on pci_address_to_pio() code and make it return an error message.
 
-v7 thread here with all the historic information: https://lkml.org/lkml/2014/3/14/279
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+---
+ drivers/of/address.c       | 47 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_address.h | 13 ++-----------
+ 2 files changed, 49 insertions(+), 11 deletions(-)
 
-Best regards,
-Liviu
-
-
-Liviu Dudau (9):
-  Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-  pci: Export find_pci_host_bridge() function.
-  pci: Introduce pci_register_io_range() helper function.
-  pci: OF: Fix the conversion of IO ranges into IO resources.
-  pci: Create pci_host_bridge before its associated bus in pci_create_root_bus.
-  pci: Introduce a domain number for pci_host_bridge.
-  pci: of: Parse and map the IRQ when adding the PCI device.
-  pci: Add support for creating a generic host_bridge from device tree
-  pci: Remap I/O bus resources into CPU space with pci_remap_iospace()
-
- drivers/of/address.c       | 108 ++++++++++++++++++++++++++++++++++++
- drivers/of/of_pci.c        | 135 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/pci/host-bridge.c  |  21 ++++++-
- drivers/pci/pci.c          |  37 +++++++++++++
- drivers/pci/probe.c        |  68 ++++++++++++++++-------
- include/asm-generic/io.h   |   2 +-
- include/linux/of_address.h |  14 +----
- include/linux/of_pci.h     |  10 ++++
- include/linux/pci.h        |  15 +++++
- 9 files changed, 376 insertions(+), 34 deletions(-)
-
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 1345733..cbbaed2 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -872,3 +872,50 @@ bool of_dma_is_coherent(struct device_node *np)
+ 	return false;
+ }
+ EXPORT_SYMBOL_GPL(of_dma_is_coherent);
++
++/*
++ * of_pci_range_to_resource - Create a resource from an of_pci_range
++ * @range:	the PCI range that describes the resource
++ * @np:		device node where the range belongs to
++ * @res:	pointer to a valid resource that will be updated to
++ *              reflect the values contained in the range.
++ *
++ * Returns EINVAL if the range cannot be converted to resource.
++ *
++ * Note that if the range is an IO range, the resource will be converted
++ * using pci_address_to_pio() which can fail if it is called too early or
++ * if the range cannot be matched to any host bridge IO space (our case here).
++ * To guard against that we try to register the IO range first.
++ * If that fails we know that pci_address_to_pio() will do too.
++ */
++int of_pci_range_to_resource(struct of_pci_range *range,
++	struct device_node *np, struct resource *res)
++{
++	int err;
++	res->flags = range->flags;
++	res->parent = res->child = res->sibling = NULL;
++	res->name = np->full_name;
++
++	if (res->flags & IORESOURCE_IO) {
++		unsigned long port = -1;
++		err = pci_register_io_range(range->cpu_addr, range->size);
++		if (err)
++			goto invalid_range;
++		port = pci_address_to_pio(range->cpu_addr);
++		if (port == (unsigned long)-1) {
++			err = -EINVAL;
++			goto invalid_range;
++		}
++		res->start = port;
++	} else {
++		res->start = range->cpu_addr;
++	}
++	res->end = res->start + range->size - 1;
++	return 0;
++
++invalid_range:
++	res->start = (resource_size_t)OF_BAD_ADDR;
++	res->end = (resource_size_t)OF_BAD_ADDR;
++	return err;
++}
++
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index ac4aac4..33c0420 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -23,17 +23,8 @@ struct of_pci_range {
+ #define for_each_of_pci_range(parser, range) \
+ 	for (; of_pci_range_parser_one(parser, range);)
+ 
+-static inline void of_pci_range_to_resource(struct of_pci_range *range,
+-					    struct device_node *np,
+-					    struct resource *res)
+-{
+-	res->flags = range->flags;
+-	res->start = range->cpu_addr;
+-	res->end = range->cpu_addr + range->size - 1;
+-	res->parent = res->child = res->sibling = NULL;
+-	res->name = np->full_name;
+-}
+-
++extern int of_pci_range_to_resource(struct of_pci_range *range,
++		struct device_node *np, struct resource *res);
+ /* Translate a DMA address from device space to CPU space */
+ extern u64 of_translate_dma_address(struct device_node *dev,
+ 				    const __be32 *in_addr);
 -- 
 2.0.0
