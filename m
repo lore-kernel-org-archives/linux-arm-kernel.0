@@ -1,96 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 1 Jul 2014 11:52:10 +0200
-Subject: [PATCH v2 00/14] AT91: PIT: Cleanups and move to
- drivers/clocksource
-In-Reply-To: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1404207208-14513-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140701115210.58a350e6@bbrezillon>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 1 Jul 2014 09:58:53 +0000
+Subject: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range functions
+In-Reply-To: <20140701093359.GI28164@arm.com>
+References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
+ <1404147116-4598-3-git-send-email-ohaugan@codeaurora.org>
+ <20140701093359.GI28164@arm.com>
+Message-ID: <83bbe0f7172d42db9ebe2f9be5ad58f5@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  1 Jul 2014 11:33:13 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> Hi everyone,
-> 
-> This series cleans up the PIT driver in order for it to not depend on
-> anything in mach-at91 anymore, and in the end move it out of
-> mach-at91.
-> 
-> Along the way, these patches also do a bit of cleanup.
-> 
-> This has been tested on a G45-EK without DT and an Xplained with DT.
-> 
-
-On the whole series:
-
-Acked-by Boris BREZILLON <boris.brezillon@free-electrons.com>
-
-> Thanks,
-> Maxime
-> 
-> Changes from v1:
->   - Changed Kconfig option to ATMEL_PIT
->   - Used DIV_ROUND_CLOSEST to compute the pit rate
-> 
-> Maxime Ripard (14):
->   AT91: PIT: Follow the general coding rules
->   AT91: generic.h: Add include safe guards
->   AT91: PIT: Use DIV_ROUND_CLOSEST to compute the cycles
->   AT91: PIT: Use of_have_populated_dt instead of CONFIG_OF
->   AT91: PIT: Rework probe functions
->   AT91: dt: Remove init_time definitions
->   AT91: PIT: Use consistent exit path in probe
->   AT91: PIT: Use pr_fmt
->   AT91: PIT: use request_irq instead of setup_irq
->   AT91: PIT: (Almost) remove the global variables
->   AT91: soc: Add init_time callback
->   AT91: Convert the boards to the init_time callback
->   AT91: PIT: Convert to an early_platform_device
->   AT91: PIT: Move the driver to drivers/clocksource
-> 
->  arch/arm/mach-at91/Kconfig              |   5 -
->  arch/arm/mach-at91/Makefile             |   1 -
->  arch/arm/mach-at91/at91sam9260.c        |  34 +++-
->  arch/arm/mach-at91/at91sam9261.c        |  34 +++-
->  arch/arm/mach-at91/at91sam9263.c        |  34 +++-
->  arch/arm/mach-at91/at91sam926x_time.c   | 294
-> ------------------------------
-> arch/arm/mach-at91/at91sam9g45.c        |  35 +++-
-> arch/arm/mach-at91/at91sam9rl.c         |  34 +++-
-> arch/arm/mach-at91/board-afeb-9260v1.c  |   2 +-
-> arch/arm/mach-at91/board-cam60.c        |   2 +-
-> arch/arm/mach-at91/board-cpu9krea.c     |   2 +-
-> arch/arm/mach-at91/board-dt-sam9.c      |  10 --
-> arch/arm/mach-at91/board-dt-sama5.c     |   9 -
-> arch/arm/mach-at91/board-flexibity.c    |   2 +-
-> arch/arm/mach-at91/board-foxg20.c       |   2 +-
-> arch/arm/mach-at91/board-gsia18s.c      |   2 +-
-> arch/arm/mach-at91/board-pcontrol-g20.c |   2 +-
-> arch/arm/mach-at91/board-sam9-l9260.c   |   2 +-
-> arch/arm/mach-at91/board-sam9260ek.c    |   2 +-
-> arch/arm/mach-at91/board-sam9261ek.c    |   4 +-
-> arch/arm/mach-at91/board-sam9263ek.c    |   2 +-
-> arch/arm/mach-at91/board-sam9g20ek.c    |   4 +-
-> arch/arm/mach-at91/board-sam9m10g45ek.c |   2 +-
-> arch/arm/mach-at91/board-sam9rlek.c     |   2 +-
-> arch/arm/mach-at91/board-snapper9260.c  |   2 +-
-> arch/arm/mach-at91/board-stamp9g20.c    |   4 +-
-> arch/arm/mach-at91/generic.h            |   8 +-
-> arch/arm/mach-at91/setup.c              |   5 +
-> arch/arm/mach-at91/soc.h                |   1 +
-> drivers/clocksource/Kconfig             |   4 +
-> drivers/clocksource/Makefile            |   1 +
-> drivers/clocksource/timer-atmel-pit.c   | 304
-> ++++++++++++++++++++++++++++++++ 32 files changed, 506 insertions(+),
-> 345 deletions(-) delete mode 100644
-> arch/arm/mach-at91/at91sam926x_time.c create mode 100644
-> drivers/clocksource/timer-atmel-pit.c
-> 
 
 
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Will Deacon
+> Sent: Tuesday, July 01, 2014 3:04 PM
+> To: Olav Haugan
+> Cc: linux-arm-msm at vger.kernel.org; iommu at lists.linux-foundation.org;
+> thierry.reding at gmail.com; vgandhi at codeaurora.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC/PATCH 2/7] iommu-api: Add map_range/unmap_range
+> functions
+> 
+> Hi Olav,
+> 
+> On Mon, Jun 30, 2014 at 05:51:51PM +0100, Olav Haugan wrote:
+> > Mapping and unmapping are more often than not in the critical path.
+> > map_range and unmap_range allows SMMU driver implementations to
+> > optimize the process of mapping and unmapping buffers into the SMMU
+> page tables.
+> > Instead of mapping one physical address, do TLB operation (expensive),
+> > mapping, do TLB operation, mapping, do TLB operation the driver can
+> > map a scatter-gatherlist of physically contiguous pages into one
+> > virtual address space and then at the end do one TLB operation.
+> >
+> > Additionally, the mapping operation would be faster in general since
+> > clients does not have to keep calling map API over and over again for
+> > each physically contiguous chunk of memory that needs to be mapped to
+> > a virtually contiguous region.
+> 
+> I like the idea of this, although it does mean that drivers implementing
+> the range mapping functions need more featureful page-table manipulation
+> code than currently required.
+> 
+> For example, iommu_map uses iommu_pgsize to guarantee that mappings are
+> created in blocks of the largest support page size. This can be used to
+> simplify iterating in the SMMU driver (although the ARM SMMU driver
+> doesn't yet make use of this, I think Varun would add this when he adds
+> support for sections).
+Yes, this would be supported.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-Varun
