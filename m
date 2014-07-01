@@ -1,71 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 1 Jul 2014 17:18:08 +0200
-Subject: [PATCH v2 4/5] efi: efistub: refactor stub components
-In-Reply-To: <20140701151130.GF7539@console-pimps.org>
-References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
- <1403792617-25792-5-git-send-email-ard.biesheuvel@linaro.org>
- <20140701151130.GF7539@console-pimps.org>
-Message-ID: <CAKv+Gu9tY7RqVXdWejwOPnpBTX0S5M9QxBH2te71kpysOV3vWA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 01 Jul 2014 19:18:41 +0400
+Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
+In-Reply-To: <20140701104254.GD3427@piout.net>
+References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140627032506.GA18039@shlinux1.ap.freescale.net>
+ <20140630133313.GA11880@kwain>
+ <20140701002112.GA26146@shlinux1.ap.freescale.net>
+ <53B27789.3090509@gmail.com>
+ <20140701083007.GB26146@shlinux1.ap.freescale.net>
+ <20140701104254.GD3427@piout.net>
+Message-ID: <53B2D151.60404@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 July 2014 17:11, Matt Fleming <matt@console-pimps.org> wrote:
-> On Thu, 26 Jun, at 04:23:36PM, Ard Biesheuvel wrote:
->> In order to move from the #include "../../../xxxxx.c" anti-pattern used by
->> both the x86 and arm64 versions of the stub to a static library linked into
->> either the kernel proper (arm64) or a separate boot executable (x86), there
->> is some prepatory work required.
->>
->> This patch does the following:
->> - move forward declarations of functions shared between the arch specific and
->>   the generic parts of the stub to include/linux/efi.h
->> - move forward declarations of functions shared between various .c files of the
->>   generic stub code to a new local header file called "efistub.h"
->> - add #includes to all .c files which were formerly relying on the #includor to
->>   include the correct header files
->> - remove all static modifiers from functions which will need to be externally
->>   visible once we move to a static library
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> [...]
->
->> diff --git a/include/linux/efi.h b/include/linux/efi.h
->> index 0ceb816bdfc2..3a64f2f85821 100644
->> --- a/include/linux/efi.h
->> +++ b/include/linux/efi.h
->> @@ -1163,4 +1163,46 @@ static inline void
->>  efi_runtime_map_setup(void *map, int nr_entries, u32 desc_size) {}
->>  #endif
->>
->> +/* prototypes shared between arch specific and generic stub code */
->> +
->> +#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
->> +#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
->> +
->> +void efi_printk(efi_system_table_t *sys_table_arg, char *str);
->> +
->> +void efi_free(efi_system_table_t *sys_table_arg, unsigned long size,
->> +           unsigned long addr);
->> +
->> +char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
->> +                       efi_loaded_image_t *image, int *cmd_line_len);
->> +
->
-> We've been very good so far at not splattering include/linux/efi.h with
-> any of the EFI boot stub prototypes, and it would be awesome if we
-> didn't have to start now.
->
-> Is there any way we could avoid doing this? Arguably everything should
-> be in the new efistub.h, no?
->
+Hello.
 
-There are bits that are shared between code under arch/xxx and
-drivers/firmware/efi, and what those bits are is different between the
-archs. I used <asm/efi.h> just for convenience, but perhaps we could
-add <asm/efistub.h> for each arch, and #include it in both "efistub.h"
-under drivers/firmware/efi and the stub bits that live under arch/xxx?
-Then any other users of <asm/efi.h> won't have to see it.
+On 07/01/2014 02:42 PM, Alexandre Belloni wrote:
 
--- 
-Ard.
+>>>>> Well, there is nothing specific about the Berlin CI. Some subsystems
+>>>>> use the 'generic' keyword in these cases. Do you see a particular reason
+>>>>> I should use some Berlin related compatible here?
+
+>>>> Not must, one suggestion is: can you change the compatible string
+>>>> to "chipidea-usb-generic"?
+
+>>> I don't know about ChipIdea/ARC/DW's product portfolio but I guess
+>>> the compatible should also carry '2.0' or 'usb2' in it. Or we just
+>>> use some version number like 'chipidea,ci13000' or 'chipidea,ci13xxx'.
+
+>> The recommended format for compatible string is: "manufacturer,model",
+>> I agree with "chipidea,ci13xxx", thanks.
+
+> I think we should probably avoid using wildcards in the compatible
+> string.
+
+    I'm sure wildcards shouldn't be allowed there. :-)
+
+WBR, Sergei
