@@ -1,134 +1,69 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 1 Jul 2014 10:27:38 +0300
-Subject: [PATCH 1/6] thermal: of: Add support for hardware-tracked trip
- points
-In-Reply-To: <53B1D1C8.5010907@wwwdotorg.org>
-References: <1403856699-2140-1-git-send-email-mperttunen@nvidia.com>
- <1403856699-2140-2-git-send-email-mperttunen@nvidia.com>
- <53B1D1C8.5010907@wwwdotorg.org>
-Message-ID: <53B262EA.9030806@nvidia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 1 Jul 2014 09:27:44 +0200
+Subject: [GIT PULL] nommu fixes for 3.17-rc1
+In-Reply-To: <4782912.zqsM5TNPdE@wuerfel>
+References: <20140630144355.GH14781@pengutronix.de>
+ <4782912.zqsM5TNPdE@wuerfel>
+Message-ID: <20140701072744.GK14781@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inline.
+Hello Arnd,
 
-On 01/07/14 00:08, Stephen Warren wrote:
-> On 06/27/2014 02:11 AM, Mikko Perttunen wrote:
->> This adds support for hardware-tracked trip points to the device tree
->> thermal sensor framework.
->>
->> The framework supports an arbitrary number of trip points. Whenever
->> the current temperature is updated, the trip points immediately
->> below and above the current temperature are found. A sensor driver
->> callback `set_trips' is then called with the temperatures.
->> If there is no trip point above or below the current temperature,
->> the passed trip temperature will be LONG_MAX or LONG_MIN respectively.
->> In this callback, the driver should program the hardware such that
->> it is notified when either of these trip points are triggered.
->> When a trip point is triggered, the driver should call
->> `thermal_zone_device_update' for the respective thermal zone. This
->> will cause the trip points to be updated again.
->>
->> If the `set_trips' callback is not implemented (is NULL), the framework
->> behaves as before.
->
-> Is there no "core thermal" code? I would have expected this new feature
-> to be implemented in "core" code rather than of/dt "support" code.
-> Perhaps there would also be some additions to the of/dt code, but I'd
-> still expect the bulk of the feature to be complete independant of
-> of/dt. Systems still using board files or ACPI or ... would surely
-> benefit from this too?
+On Mon, Jun 30, 2014 at 05:52:45PM +0200, Arnd Bergmann wrote:
+> On Monday 30 June 2014 16:43:55 Uwe Kleine-K?nig wrote:
+> > Hello Russell,
+> > 
+> > the following changes since commit 4c834452aad01531db949414f94f817a86348d59:
+> > 
+> >   Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
+> > 
+> > for you to fetch changes up to 7343ab2ad6772f29d6bbb286a7aa0265a7aa5d3b:
+> > 
+> >   ARM: make user_addr_max more robust (2014-06-30 15:48:30 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > A small collection of ARM-nommu related fixes and cleanups.
+> > 
+> > Regarding the small user base ("Hello, anyone out there apart from me?") and
+> > the problem being fixed exists since 3.6-rc1 I don't consider the patches
+> > serious enough to justify them going in before the next merge window.
+> > 
+> > This series makes efm32 boot again.
+> > ----------------------------------------------------------------
+> > 
+> > I have chosen -rc3 as base because -rc1 and -rc2 don't work for me as
+> > they don't have 6980c3e2514e (ARM: 8086/1: Set memblock limit for
+> > nommu).
+> > 
+> > Uwe Kleine-K?nig (5):
+> >       ARM: nommu: drop support for ARM740T, ARM940T and ARM946E-S processors
+> >       ARM: nommu: don't limit TASK_SIZE
+> >       ARM: nommu: simplify definition of MODULES_END
+> >       ARM: nommu: drop unused Kconfig symbol DRAM_SIZE
+> >       ARM: make user_addr_max more robust
+> > 
+> 
+> I seem to have missed the patches when you posted them a couple of weeks
+> ago. I do have one last-minute comment about dropping ARM740T/940T/946T:
+> 
+> Your reasoning is that mach-integrator now doesn't work with !MMU any more
+> since it selects ARM_PATCH_PHYS_VIRT, and that no other platform uses
+> these CPUs. The change to integrator was done as a preparation for
+> multiplatform support and probably did not mean to remove support for !MMU
+> integrator. We do plan to remove support for at91x40 in the future, which
+> is the last ARM7TDMI user, and there is no upstream ARM9TDMI user nor has
+> there been at least for a couple of years.
+I don't care much here, so for now I will reshuffle my series to make
+efm32 boot again and drop the patches removing the armv4/v4-nommu archs.
 
-The thermal core only supports a fixed number of trip points for each 
-driver and the core informs the driver of any changes to those, so 
-drivers using the core framework can already have hardware trip points, 
-but just a fixed number of them.
+Best regards
+Uwe
 
-The way of-thermal works, is it reads all the trip points from the 
-device tree, registers a new thermal_zone_device with that number of 
-trip points and then handles the trip points completely independently. 
-Of course, if we're just polling, this is fine, since the thermal core
-also knows about those trip points and will trigger cooling when polling 
-the each zone. However, the driver doesn't, so it cannot setup any 
-interrupts to call thermal_zone_device_update.
-
->
->> diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
->
->> +static int of_thermal_set_trips(struct thermal_zone_device *tz, long temp)
->
-> s/tz/tzd/ or s/tz/tzdev/ ? Since "tz" says "thermal zone" to me, but
-> it's actually a "thermal zone device".
-
-I followed the existing convention; "tz" is the name used most often by 
-both the core and the of-thermal framework.
-
->
->> +	struct __thermal_zone *data = tz->devdata;
->
-> s/data/tz/ ? "data" is a rather generic term, and "tz" seems like a good
-> abbreviation for a __thermal_zone.
-
-Same, though here both "data" and "tz" seem to be used..
-
->
->> +	for (i = 0; i < data->ntrips; ++i) {
->> +		struct __thermal_trip *trip = data->trips + i;
->> +		long trip_low = trip->temperature - trip->hysteresis;
->> +
->> +		if (trip_low < temp && trip_low > low)
->> +			low = trip_low;
->> +
->> +		if (trip->temperature > temp && trip->temperature < high)
->> +			high = trip->temperature;
->> +	}
->
-> That seems to always apply hysteresis to the low end of a trip object.
-> Don't you need to apply the hysteresis to either the low or high end of
-> the range, depending on whether the temperature is currently below/above
-> the range, and hence which direction the edge will be crossed?
-
-I believe applying only to the low end is correct. Say that we have a 
-trip point at 40C and hysteresis of 2C. When we exceed 40C cooling will 
-start immediately, but it will only be stopped when we cool down to 38C. 
-At that point there is again a 2C gap between the current temperature 
-and the trip point. It would seem that this is the interpretation used 
-by our downstream kernel and also some people on the Internet (however 
-trustworthy they may be..)
-
-If you don't feel this is right, please elaborate.
-
->
-> Similar comments elsewhere. Perhaps the patch is consistent with some
-> existing confusing naming style though?
->
->> +static int of_thermal_update_trips(struct thermal_zone_device *tz)
->> +{
->> +	long temp;
->> +	int err;
->> +
->> +	err = of_thermal_get_temp(tz, &temp);
->> +	if (err)
->> +		return err;
->> +
->> +	err = of_thermal_set_trips(tz, temp);
->
-> Doesn't this patch modify of_thermal_get_temp() to call
-> of_thermal_set_trips() itself?
-
-You're right. I suppose this function is unneeded.
-
->
->> @@ -384,7 +467,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
->>   struct thermal_zone_device *
->>   thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
->>   				void *data, int (*get_temp)(void *, long *),
->> -				int (*get_trend)(void *, long *))
->> +				int (*get_trend)(void *, long *),
->> +				int (*set_trips)(void *, long, long))
->
-> Passing in a struct containing fields for all the ops seem better than
-> forever extending this function with more and more function pointers.
->
-
-Very true.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
