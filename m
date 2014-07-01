@@ -1,42 +1,35 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 1 Jul 2014 16:07:47 +0800
-Subject: [PATCH] ARM: imx53: mark imx53_dt_board_compat as const
-In-Reply-To: <1404121068-12275-1-git-send-email-l.stach@pengutronix.de>
-References: <1404121068-12275-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140701080745.GG14471@dragon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 1 Jul 2014 10:06:46 +0200
+Subject: [PATCH 0/9] ARM: dts: sunxi: Various sunxi dts patches
+In-Reply-To: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
+References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140701080646.GL28647@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 30, 2014 at 11:37:48AM +0200, Lucas Stach wrote:
-> Otherwise GCC will mark the .init.rodata section
-> R/W, which causes a compile error once we add other
-> real R/O data, which happens with patch
-> "ARM: imx53: globally disable supervisor protect".
+On Mon, Jun 30, 2014 at 11:57:50PM +0200, Hans de Goede wrote:
+> Hi Maxime,
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-
-The same change needs to be applied on some other IMX platforms, so I
-just send a new patch based on this.
-
-Shawn
-
-> ---
->  arch/arm/mach-imx/mach-imx53.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Here is a set of sunxi dts patches for your dt tree. It is a mixed collection:
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index d757d8cbebd1..c3a404ce39e6 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -45,7 +45,7 @@ static void __init imx53_dt_init(void)
->  	}
->  }
->  
-> -static const char *imx53_dt_board_compat[] __initconst = {
-> +static const char * const imx53_dt_board_compat[] __initconst = {
->  	"fsl,imx53",
->  	NULL
->  };
-> -- 
-> 2.0.0
-> 
+> -Some patches submitted earlier by others which I've picked up from the
+>  list and brushed up a bit were necessary.
+> -2 new boards
+> -sun4i ir support (and renaming of the compatible from sun7i-a20-ir to
+>  sun4i-a10-ir as they have the same ip block for this)
+
+Applied, thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/b6ce826e/attachment.sig>
