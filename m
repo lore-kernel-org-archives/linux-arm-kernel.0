@@ -1,64 +1,38 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Mon, 30 Jun 2014 23:11:51 -0400
-Subject: [PATCH 1/2] Deletes arch/arm/mach-gemini/idle.c
-In-Reply-To: <1404184262-6178-1-git-send-email-xerofoify@gmail.com>
-References: <1404184262-6178-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <CAPDOMVhBv58nNdGyDPw3xsZ3AwpsnkQRGYvcAjL27mjOn5fiRg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 30 Jun 2014 20:31:28 -0700
+Subject: [GIT PULL] the great <mach/gpio.h> purge
+In-Reply-To: <02c501cf94d1$fca59720$f5f0c560$@samsung.com>
+References: <CACRpkdbPHn6bWdr8t9BrmE2JZZuuVnF7ujzEFdrM86WmrRS5Hw@mail.gmail.com>
+ <02c501cf94d1$fca59720$f5f0c560$@samsung.com>
+Message-ID: <CAOesGMgkG_LJR2Db6+S339SYpaf+0cBxs2oXNOAHiq4-J3H0pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is only one patch please disregard patch 1/2.
-Cheers Nick
+On Mon, Jun 30, 2014 at 7:13 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Linus Walleij wrote:
+>>
+>> Hi ARM SoC guys,
+>>
+> Hi Linus,
+>
+>> please pull in this patch set removing <mach/gpio.h> for good.
+>> I guess it could collide with some S5P deletion.
+>
+> Yeah...
+>
+>> If you decide to pull the S5P purge first, tell me so I can rebase.
+>>
+> So, I think, would be better if we could remove S5P64X0 and S5PC100 then
+> <mach/gpio.h> in samsung stuff. But it's up to arm-soc maintainer? ;-)
 
-On Mon, Jun 30, 2014 at 11:11 PM, Nicholas Krause <xerofoify@gmail.com> wrote:
-> This patch deletes the above file in order to remove the function
-> in this file that may cause races. In addition this function is
-> no longer needed due to commit 8182a34d85698 fixing this issue.
-> Therefore gemmi_idle is no longer needed and due to in being the
-> only function in this file I am removing it.
->
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-> ---
->  arch/arm/mach-gemini/idle.c | 30 ------------------------------
->  1 file changed, 30 deletions(-)
->  delete mode 100644 arch/arm/mach-gemini/idle.c
->
-> diff --git a/arch/arm/mach-gemini/idle.c b/arch/arm/mach-gemini/idle.c
-> deleted file mode 100644
-> index 2880f5a..0000000
-> --- a/arch/arm/mach-gemini/idle.c
-> +++ /dev/null
-> @@ -1,30 +0,0 @@
-> -/*
-> - * arch/arm/mach-gemini/idle.c
-> - */
-> -
-> -#include <linux/init.h>
-> -#include <asm/system_misc.h>
-> -#include <asm/proc-fns.h>
-> -
-> -static void gemini_idle(void)
-> -{
-> -       /*
-> -        * Because of broken hardware we have to enable interrupts or the CPU
-> -        * will never wakeup... Acctualy it is not very good to enable
-> -        * interrupts first since scheduler can miss a tick, but there is
-> -        * no other way around this. Platforms that needs it for power saving
-> -        * should enable it in init code, since by default it is
-> -        * disabled.
-> -        */
-> -
-> -       local_irq_disable();
-> -       cpu_do_idle();
-> -}
-> -
-> -static int __init gemini_idle_init(void)
-> -{
-> -       arm_pm_idle = gemini_idle;
-> -       return 0;
-> -}
-> -
-> -arch_initcall(gemini_idle_init);
-> --
-> 1.9.1
->
+
+As long as it's just deletion from both sides, I can happily resolve
+that when merging.
+
+Kukjin, I presume the removal would be in a cleanup branch as well?
+Please try to send it soon so we can get some time in -next with it.
+
+(I'll do merges in a couple of days, the backlog is building up. :)
+
+
+-Olof
