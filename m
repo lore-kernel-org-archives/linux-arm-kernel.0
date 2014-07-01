@@ -1,74 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:19 +0900
-Subject: [PATCH 2/4] ARM: shmobile: lager: enable internal PCI
-In-Reply-To: <cover.1404174433.git.horms+renesas@verge.net.au>
-References: <cover.1404174433.git.horms+renesas@verge.net.au>
-Message-ID: <d8584660676e00157735abcb34b09d690d96ee16.1404174433.git.horms+renesas@verge.net.au>
+Date: Tue,  1 Jul 2014 09:28:28 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC r8a7779
+ Multiplatform Updates for v3.17
+Message-ID: <cover.1404173506.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
-them.
+Please consider these Second Round of Renesas ARM Based SoC r8a7779
+Multiplatform Updates for v3.17o.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
-[Sergei: enabled PCI0]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Tested-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790-lager.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+This pull request is based on the previous round of
+such requests, tagged as renesas-r8a7779-multiplatform-for-v3.17,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 0890d47..544202b 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -219,6 +219,21 @@
- 		renesas,groups = "i2c3";
- 		renesas,function = "i2c3";
- 	};
-+
-+	usb0_pins: usb0 {
-+		renesas,groups = "usb0";
-+		renesas,function = "usb0";
-+	};
-+
-+	usb1_pins: usb1 {
-+		renesas,groups = "usb1";
-+		renesas,function = "usb1";
-+	};
-+
-+	usb2_pins: usb2 {
-+		renesas,groups = "usb2";
-+		renesas,function = "usb2";
-+	};
- };
- 
- &ether {
-@@ -368,3 +383,21 @@
- 		regulator-always-on;
- 	};
- };
-+
-+&pci0 {
-+	status = "okay";
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci2 {
-+	status = "okay";
-+	pinctrl-0 = <&usb2_pins>;
-+	pinctrl-names = "default";
-+};
--- 
-2.0.0.rc2
+I have applied this clean-up change to a non-cleanup branch
+to avoid adding conflicts that were known (to me) at the
+time of queuing up this change.
+
+
+The following changes since commit c1a0f9932b66b2298163c31f8ac3f2844476e1c2:
+
+  ARM: shmobile: marzen: Do not use workaround for scif devices (2014-06-17 19:56:37 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-r8a7779-multiplatform2-for-v3.17
+
+for you to fetch changes up to 1b55353c9214788b0d0797a5fd4585af1557a12c:
+
+  ARM: shmobile: Move r8a7779.h (2014-06-25 16:52:39 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC r8a7779-multiplatform Updates for v3.17
+
+* Move r8a7779.h out of mach directory.
+  This is part of a multi-stage effort to move headers
+  out of that directory.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: Move r8a7779.h
+
+ arch/arm/mach-shmobile/board-marzen-reference.c     | 4 +++-
+ arch/arm/mach-shmobile/board-marzen.c               | 4 +++-
+ arch/arm/mach-shmobile/clock-r8a7779.c              | 3 ++-
+ arch/arm/mach-shmobile/pm-r8a7779.c                 | 4 +++-
+ arch/arm/mach-shmobile/{include/mach => }/r8a7779.h | 0
+ arch/arm/mach-shmobile/setup-r8a7779.c              | 4 +++-
+ arch/arm/mach-shmobile/smp-r8a7779.c                | 4 +++-
+ 7 files changed, 17 insertions(+), 6 deletions(-)
+ rename arch/arm/mach-shmobile/{include/mach => }/r8a7779.h (100%)
