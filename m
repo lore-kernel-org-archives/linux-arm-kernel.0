@@ -1,54 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Jul 2014 19:04:41 +0200
-Subject: [PATCH 22/24] ARM64:ILP32: Use a seperate syscall table as a few
- syscalls need to be using the compat syscalls.
-In-Reply-To: <20140701165041.GU18313@arm.com>
-References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <4268617.3t49DXZOBa@wuerfel> <20140701165041.GU18313@arm.com>
-Message-ID: <4834150.MH2srkQr01@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 18:06:43 +0100
+Subject: [PATCH 4/4] ARM: mvebu: add armada drm init to Dove board setup
+In-Reply-To: <20140701165319.GH23978@titan.lakedaemon.net>
+References: <1404219871-18419-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1404219871-18419-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140701131026.GO32514@n2100.arm.linux.org.uk>
+ <20140701165319.GH23978@titan.lakedaemon.net>
+Message-ID: <20140701170643.GA32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 July 2014 17:50:41 Catalin Marinas wrote:
-> On Tue, Jul 01, 2014 at 05:38:12PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 01 July 2014 15:30:51 Pinski, Andrew wrote:
-> > > > On Jul 1, 2014, at 8:07 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
-> > > >> On Sat, May 24, 2014 at 12:02:17AM -0700, Andrew Pinski wrote:
-> > > >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > > >> index 1e1ebfc..8241ffe 100644
-> > > >> --- a/arch/arm64/kernel/entry.S
-> > > >> +++ b/arch/arm64/kernel/entry.S
-> > > >> @@ -620,9 +620,14 @@ ENDPROC(ret_from_fork)
-> > > >>  */
-> > > >>    .align    6
-> > > >> el0_svc:
-> > > >> -    adrp    stbl, sys_call_table        // load syscall table pointer
-> > > >>    uxtw    scno, w8            // syscall number in w8
-> > > >>    mov    sc_nr, #__NR_syscalls
-> > > >> +#ifdef CONFIG_ARM64_ILP32
-> > > >> +    get_thread_info tsk
-> > > >> +    ldr    x16, [tsk, #TI_FLAGS]
-> > > >> +    tbnz    x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
-> > > >> +#endif
-> > > >> +    adrp    stbl, sys_call_table        // load syscall table pointer
-> > > > 
-> > > > This adds a slight penalty on the AArch64 SVC entry path. I can't tell
-> > > > whether that's visible or not but I think the x86 guys decided to set an
-> > > > extra bit to the syscall number to distinguish it from native calls.
-> > 
-> > IIRC the intention on x86 was that you should always be able to call
-> > any of the three syscall ABIs (x86-32, x86-64, x32) from any process
-> > by passing the right number, for flexibility.
+On Tue, Jul 01, 2014 at 12:53:19PM -0400, Jason Cooper wrote:
+> Russell,
 > 
-> I don't see how this is useful though. Do you happen to have more
-> information?
+> On Tue, Jul 01, 2014 at 02:10:26PM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Jul 01, 2014 at 03:04:31PM +0200, Sebastian Hesselbarth wrote:
+> > > +	pdev = platform_device_register_full(&armada_drm_dev_info);
+> > > +	/* assign last found lcd node to drm device for clk lookup */
+> > > +	pdev->dev.of_node = clknp;
+> > 
+> > NAK.  This really isn't a good way to deal with this, even in a
+> > temporary basis.  While assigning a DT node to a manually created
+> > platform device does solve that problem, it also introduces the
+> > problem that this platform device will now match any platform driver
+> > which recognises the "marvell,dove-lcd" compatible type, which may
+> > occur _before_ we find the driver to match using the legacy strings.
+> > 
+> > There really isn't an easy solution to this other than doing the thing
+> > properly.
+> 
+> And this creates our current deadlock.
 
-It's been a decade since this code was merged, so my memory isn't very
-good here. I believe one of the main reasons was being able to run
-emulation layers in user space that make use of the kernel helpers.
+Right, and what it does is it creates /another/ deadlock.  Let's say
+that we get those changes in place in the mvebu tree.
 
-Another use case might be an application that wants to use the native
-ioctl interface for a driver that does not have a (efficient) compat
-ioctl handler.
+I'm pushing to get the component stuff in place right now.  Once it's
+in place, I'll be pushing the Armada DRM stuff forward.  Let's say
+that gets in.
 
-	Arnd
+We now have a problem.  The mvebu stuff now creates a platform device
+which will bind with the CRTC part of Armada DRM, rather than the
+master part and everything now breaks.
+
+So, rather than having a component / DRM problem, it ends up becoming
+a component / DRM / mvebu problem - rather than just two subsystems
+needing coordination, we end up with /another/ subsystem to contend
+with as well.
+
+> > The other problem in this series is that while you introduce some
+> > bindings which may work today, they're not going to work tomorrow, and
+> > that's a problem.  Don't do DT piecemeal like this and end up having to
+> > break the bindings (which we will have to do to add the endpoints.)
+> 
+> Seriously, we've got to do something to get off of the X.  Why not just
+> declare the binding Sebastian just sent as unstable?  Then we change it
+> as needed until we get all the pieces in place.
+
+As I've already pointed out, why not add the complete binding right now
+and be done with it?  That would sort out my concern about DT, and -
+as I've already said (again) - we know exactly how this should look
+because we have the of_graph stuff in drivers/of as standard helpers,
+and we have imx-drm and v4l2 media stuff using it already.  It's
+well established, and I've demonstrated that Armada DRM _will_ also
+conform.
+
+In fact, I have plans to consolidate the code between Armada DRM and
+imx-drm into some standard DRM helpers (if you read through the patches
+I linked to on cgit, you will notice that has already started.)
+
+But... the DT issue is relatively minor compared to the one which I
+raise above, which adds to the problems of moving forward.  It
+effectively means I need to then carry a patch which undoes that,
+and that patch would need to go through the DRM tree along with the
+rest of the Armada DRM updates, which means more people need to be
+involved, which then makes the process even slower than it already
+is.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
