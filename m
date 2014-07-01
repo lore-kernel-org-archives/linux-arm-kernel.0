@@ -1,100 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 01 Jul 2014 17:42:24 +0100
-Subject: [RFC PATCH 3/9] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <alpine.DEB.2.02.1407011730070.8923@kaball.uk.xensource.com>
-References: <1403688530-23273-1-git-send-email-marc.zyngier@arm.com>
- <1403688530-23273-4-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy11HQtiOD6XLqQcZ+zf_Z9Mx0nPrJ0ECNNuRkZt=CfdpA@mail.gmail.com>
- <alpine.DEB.2.02.1406302006220.8923@kaball.uk.xensource.com>
- <53B27049.10302@arm.com>
- <alpine.DEB.2.02.1407011730070.8923@kaball.uk.xensource.com>
-Message-ID: <53B2E4F0.8040700@arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 01 Jul 2014 17:42:42 +0100
+Subject: [PATCH] ARM: convert all "mov.* pc,
+ reg" to "bx reg" for ARMv6+ (part1)
+In-Reply-To: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Tue, 01 Jul 2014 17:19:33 +0100")
+References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
+Message-ID: <yw1x4mz1f2t9.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/14 17:34, Stefano Stabellini wrote:
-> On Tue, 1 Jul 2014, Marc Zyngier wrote:
->> Hi Stefano,
->>
->> On 30/06/14 20:09, Stefano Stabellini wrote:
->>> On Wed, 25 Jun 2014, Anup Patel wrote:
->>>> Hi Marc,
->>>>
->>>> On Wed, Jun 25, 2014 at 2:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> So far, GICv2 has been used in with EOImode == 0. The effect of this
->>>>> mode is to perform the priority drop and the deactivation of the
->>>>> interrupt at the same time.
->>>>>
->>>>> While this works perfectly for Linux (we only have a single priority),
->>>>> it causes issues when an interrupt is forwarded to a guest, and when
->>>>> we want the guest to perform the EOI itself.
->>>>>
->>>>> For this case, the GIC architecture provides EOImode == 1, where:
->>>>> - A write to the EOI register drops the priority of the interrupt and leaves
->>>>> it active. Other interrupts at the same priority level can now be taken,
->>>>> but the active interrupt cannot be taken again
->>>>> - A write to the DIR marks the interrupt as inactive, meaning it can
->>>>> now be taken again.
->>>>>
->>>>> We only enable this feature when booted in HYP mode. Also, as most device
->>>>> trees are broken (they report the CPU interface size to be 4kB, while
->>>>> the GICv2 CPU interface size is 8kB), output a warning if we're booted
->>>>> in HYP mode, and disable the feature.
->>>>>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>  drivers/irqchip/irq-gic.c       | 61 +++++++++++++++++++++++++++++++++++++----
->>>>>  include/linux/irqchip/arm-gic.h |  4 +++
->>>>>  2 files changed, 59 insertions(+), 6 deletions(-)
->>>>>
->>>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>>> index 508b815..9295bf2 100644
->>>>> --- a/drivers/irqchip/irq-gic.c
->>>>> +++ b/drivers/irqchip/irq-gic.c
->>>>> @@ -45,6 +45,7 @@
->>>>>  #include <asm/irq.h>
->>>>>  #include <asm/exception.h>
->>>>>  #include <asm/smp_plat.h>
->>>>> +#include <asm/virt.h>
->>>>>
->>>>>  #include "irq-gic-common.h"
->>>>>  #include "irqchip.h"
->>>>> @@ -94,6 +95,10 @@ struct irq_chip gic_arch_extn = {
->>>>>         .irq_set_wake   = NULL,
->>>>>  };
->>>>>
->>>>> +static struct irq_chip *gic_chip;
->>>>> +
->>>>> +static bool supports_deactivate = false;
->>>>> +
->>>>>  #ifndef MAX_GIC_NR
->>>>>  #define MAX_GIC_NR     1
->>>>>  #endif
->>>>> @@ -185,6 +190,12 @@ static void gic_eoi_irq(struct irq_data *d)
->>>>>         writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
->>>>>  }
->>>>>
->>>>> +static void gic_eoi_dir_irq(struct irq_data *d)
->>>>> +{
->>>>> +       gic_eoi_irq(d);
->>>>> +       writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
->>>>> +}
->>>
->>> Would it be better if you moved the gic_eoi_irq call earlier? Maybe
->>> somewhere in gic_handle_irq?
->>
->> I'm not sure I see what we'd gain by doing so. Can you elaborate?
-> 
-> You would be dropping the priority earlier. It would be beneficial if
-> Linux was running the interrupt handlers with interrupts enabled, but I
-> realize now that it is not the case.
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
 
-Ah, I see what you mean. No, as you noticed, we run the handlers with
-interrupts disabled, so keeping the EOI and DIR close together is
-probably what makes the most sense.
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
+>
+> We provide a new macro "ret" with all its variants for the condition
+> code which will resolve to the appropriate instruction.
 
-Thanks,
+When the source register is not "lr" the name "ret" is a misnomer since
+only the "bx lr" instruction is predicted as a function return.  The
+"bx" instruction with other source registers uses the normal prediction
+mechanisms, leaving the return stack alone, and should not be used for
+function returns.  Any code currently using another register to return
+from a function should probably be modified to use lr instead, unless
+there are special reasons for doing otherwise.  If code jumping to an
+address in a non-lr register is not a return, using the "ret" name will
+make for some rather confusing reading.
 
-	M.
+I would suggest either using a more neutral name than "ret" or adding an
+alias to be used for non-return jumps so as to make the intent clearer.
+
 -- 
-Jazz is not dead. It just smells funny...
+M?ns Rullg?rd
+mans at mansr.com
