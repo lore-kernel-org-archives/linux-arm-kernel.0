@@ -1,51 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 1 Jul 2014 19:52:53 +0800
-Subject: [PATCH 4/5] ARM: imx: clk-gate2: Use post decrement for
- share_count
-In-Reply-To: <1404194129-25543-4-git-send-email-festevam@gmail.com>
-References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
- <1404194129-25543-4-git-send-email-festevam@gmail.com>
-Message-ID: <20140701115252.GM14471@dragon>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue,  1 Jul 2014 12:55:26 +0100
+Subject: [PATCH] regulator: core: Still free GPIOs using gpio_free()
+Message-ID: <1404215726-2480-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 02:55:28AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> SSI clocks use the share_count mechanism since SSI and SPDIF share the same
-> clock gate bits.
-> 
-> When using the share_count for the SSI clock we notice that it gets disabled
-> due to the usage of pre-decrement operation in the clk_gate2_disable() function.
-> 
-> Use the post-decrement operation so that the correct share_count is used and the
-> SSI clock does not get disable when an audio file needs to be played. 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/clk-gate2.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-> index 4ba587d..463083c 100644
-> --- a/arch/arm/mach-imx/clk-gate2.c
-> +++ b/arch/arm/mach-imx/clk-gate2.c
-> @@ -67,7 +67,7 @@ static void clk_gate2_disable(struct clk_hw *hw)
->  
->  	spin_lock_irqsave(gate->lock, flags);
->  
-> -	if (gate->share_count && --(*gate->share_count) > 0)
-> +	if (gate->share_count && (*gate->share_count)-- > 0)
+From: Mark Brown <broonie@linaro.org>
 
-The change makes no sense.  Let's say that clk_gate2_disable() gets
-called with share_count being 1.  In this case, we should access
-register to gate the clock, right?
+Even though we mostly use GPIO descriptors internally we still use
+gpio_request_one() to request so we need to pair that with gpio_free() to
+release the GPIO.
 
-Shawn
+Reported-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ drivers/regulator/core.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
->  		goto out;
->  
->  	reg = readl(gate->reg);
-> -- 
-> 1.8.3.2
-> 
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index c563d93125cd..80381409f856 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -1710,7 +1710,12 @@ static void regulator_ena_gpio_free(struct regulator_dev *rdev)
+ 		if (pin->gpiod == rdev->ena_pin->gpiod) {
+ 			if (pin->request_count <= 1) {
+ 				pin->request_count = 0;
+-				gpiod_put(pin->gpiod);
++				/*
++				 * Since we requested with gpio_request_one()
++				 * we still need to free with gpio_free()
++				 * for now.
++				 */
++				gpio_free(desc_to_gpio(pin->gpiod));
+ 				list_del(&pin->list);
+ 				kfree(pin);
+ 			} else {
+-- 
+2.0.0
