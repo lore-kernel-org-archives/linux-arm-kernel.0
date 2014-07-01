@@ -1,90 +1,78 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 01 Jul 2014 09:30:18 +0200
-Subject: [PATCH 6/9] ARM: dts: sun7i: Add board support for LinkSprite
- pcDuino V3
-In-Reply-To: <CAGb2v64KMxXQ7QaRcsWxHbCLNJtWkh5sxj82C-y9GyNW7R+M_Q@mail.gmail.com>
-References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
- <1404165479-23785-7-git-send-email-hdegoede@redhat.com>
- <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
- <53B25F60.2050704@redhat.com>
- <CAGb2v64KMxXQ7QaRcsWxHbCLNJtWkh5sxj82C-y9GyNW7R+M_Q@mail.gmail.com>
-Message-ID: <53B2638A.3060206@redhat.com>
+From: Wei.Yang@windriver.com (Wei.Yang at windriver.com)
+Date: Tue, 1 Jul 2014 15:41:28 +0800
+Subject: [PATCH v1] ARM:sa1100: Remove a redundant spin lock
+Message-ID: <1404200488-7809-1-git-send-email-Wei.Yang@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Yang Wei <Wei.Yang@windriver.com>
 
-On 07/01/2014 09:21 AM, Chen-Yu Tsai wrote:
-> On Tue, Jul 1, 2014 at 3:12 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 07/01/2014 04:22 AM, Chen-Yu Tsai wrote:
->>> On Tue, Jul 1, 2014 at 5:57 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>> From: Zoltan HERPAI <wigyori@uid0.hu>
->>>>
->>>> The LinkSprite pcDuino V3 is an A20 based development board featuring
->>>> arduino compatible io headers, 1G RAM, 4G nand, sata, rtl8188cus usb wifi
->>>> and 100 Mbit ethernet using an ip101a phy:
->>>>
->>>> http://www.pcduino.com/pcduino-v3/
->>>>
->>>> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
->>>> [hdegoede at redhat.com: Various cleanups, correct led pins]
->>>> [hdegoede at redhat.com: Add axp209, ir and gpio-keys nodes]
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>
->>>> --
->>>>
->>>> Changes since v2:
->>>>  - update MMC entry to comply with upstream
->>>>  - unify the 4 patches into one
->>>>
->>>> Changes since v1:
->>>>  - fix cosmetic issues
->>>>  - fix i2c entry
->>>>  - remove unnecessary input bindings include
->>>>  - add MMC support
->>>> ---
->>>>  arch/arm/boot/dts/Makefile               |   3 +-
->>>>  arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 173 +++++++++++++++++++++++++++++++
->>>>  2 files changed, 175 insertions(+), 1 deletion(-)
->>>>  create mode 100644 arch/arm/boot/dts/sun7i-a20-pcduino3.dts
->>>>
->>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>>> index ed0de8b..fdc590e 100644
->>>> --- a/arch/arm/boot/dts/Makefile
->>>> +++ b/arch/arm/boot/dts/Makefile
->>>> @@ -380,7 +380,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>>>         sun7i-a20-cubieboard2.dtb \
->>>>         sun7i-a20-cubietruck.dtb \
->>>>         sun7i-a20-i12-tvbox.dtb \
->>>> -       sun7i-a20-olinuxino-micro.dtb
->>>> +       sun7i-a20-olinuxino-micro.dtb \
->>>> +       sun7i-a20-pcduino3.dtb
->>>
->>> You may need to rebase onto my sun8i ippo-q8h dts patch.
->>>
->>>   https://patchwork.kernel.org/patch/4389951/
->>>
->>> There's a likely conflict in the Makefile here.
->>
->> Has that one already been accepted by Maxime ? I'm fine rebasing patches
->> on top of accepted stuff, but rebasing on pending stuff is not really
->> useful IMHO.
-> 
-> Maxime replied stating he applied it. See the lower part of the patchwork
-> page.
-> 
-> AFAIK he's accepted my initial sun8i patches and CIR DT patches this cycle.
+The pair read/write of accessing pci confiuration space function
+has already protected by pci_lock. so remove nano_lock.
 
-Ok, I'm not seeing anything for 3.17 here though:
-https://github.com/mripard/linux/
+Signed-off-by: Yang Wei <Wei.Yang@windriver.com>
+---
+ arch/arm/mach-sa1100/pci-nanoengine.c |    9 ---------
+ 1 file changed, 9 deletions(-)
 
-Maxime, can you push a sunxi/dt-for-3.17 with what you currently have there?
-
-Then I'll rebase this series on top, fix the commit msg thingie Chen pointed
-out and send a v2.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/mach-sa1100/pci-nanoengine.c b/arch/arm/mach-sa1100/pci-nanoengine.c
+index ff02e2d..b944c99 100644
+--- a/arch/arm/mach-sa1100/pci-nanoengine.c
++++ b/arch/arm/mach-sa1100/pci-nanoengine.c
+@@ -30,7 +30,6 @@
+ #include <mach/nanoengine.h>
+ #include <mach/hardware.h>
+ 
+-static DEFINE_SPINLOCK(nano_lock);
+ 
+ static int nanoengine_get_pci_address(struct pci_bus *bus,
+ 	unsigned int devfn, int where, unsigned long *address)
+@@ -52,7 +51,6 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
+ {
+ 	int ret;
+ 	unsigned long address;
+-	unsigned long flags;
+ 	u32 v;
+ 
+ 	/* nanoEngine PCI bridge does not return -1 for a non-existing
+@@ -64,15 +62,12 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
+ 		goto exit_function;
+ 	}
+ 
+-	spin_lock_irqsave(&nano_lock, flags);
+ 
+ 	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
+ 	if (ret != PCIBIOS_SUCCESSFUL)
+ 		return ret;
+ 	v = __raw_readl(address);
+ 
+-	spin_unlock_irqrestore(&nano_lock, flags);
+-
+ 	v >>= ((where & 3) * 8);
+ 	v &= (unsigned long)(-1) >> ((4 - size) * 8);
+ 
+@@ -86,13 +81,11 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
+ {
+ 	int ret;
+ 	unsigned long address;
+-	unsigned long flags;
+ 	unsigned shift;
+ 	u32 v;
+ 
+ 	shift = (where & 3) * 8;
+ 
+-	spin_lock_irqsave(&nano_lock, flags);
+ 
+ 	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
+ 	if (ret != PCIBIOS_SUCCESSFUL)
+@@ -113,8 +106,6 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
+ 	}
+ 	__raw_writel(v, address);
+ 
+-	spin_unlock_irqrestore(&nano_lock, flags);
+-
+ 	return PCIBIOS_SUCCESSFUL;
+ }
+ 
+-- 
+1.7.9.5
