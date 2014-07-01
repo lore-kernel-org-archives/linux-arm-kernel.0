@@ -1,361 +1,41 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 01 Jul 2014 11:45:15 -0700
-Subject: [PATCH v4 03/13] clk: rockchip: add basic infrastructure for clock
- branches
-In-Reply-To: <5016876.bZlHhqDB9E@diego>
-References: <1808429.dNxms7FR7U@diego> <5016876.bZlHhqDB9E@diego>
-Message-ID: <20140701184515.32686.69435@quantum>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 1 Jul 2014 20:55:20 +0200
+Subject: [PATCH v2 0/5] efistub: convert into static library
+In-Reply-To: <20140701183906.GH7539@console-pimps.org>
+References: <1403792617-25792-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140701183906.GH7539@console-pimps.org>
+Message-ID: <CAKv+Gu8eN4s9V6=mmQFpMDKuuMRE0y5T6pxk27=BLMFRX1O57w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2014-06-22 13:44:07)
-> +void __init rockchip_clk_register_branches(
-> +                                     struct rockchip_clk_branch *list,
-> +                                     unsigned int nr_clk)
-> +{
-> +       struct clk *clk;
+On 1 July 2014 20:39, Matt Fleming <matt@console-pimps.org> wrote:
+> On Thu, 26 Jun, at 04:23:32PM, Ard Biesheuvel wrote:
+>> This is v2 of the series to change the #include "../../../../xxx.c" pattern
+>> into a static library linked into either the kernel (arm64) or a separate boot
+>> decompressor (x86, ARM).
+>>
+>> Changes since v1:
+>> - added patch #1 to change EFI_ERROR, it is not a result code defined by UEFI so
+>>   it should only be returned by get_dram_base() and efi_entry()
+>> - added a section to libstub Makefile to clean CFLAGS of stack protecter and
+>>   other options that are inappropriate for the stub
+>> - rebased onto the UEFI Runtime Services NEON patches (re)posted earlier today
+>>
+>> Ard Biesheuvel (5):
+>>   efi/arm64: avoid EFI_ERROR as a generic return code
+>>   efi/x86: efistub: move shared dependencies to <asm/efi.h>
+>>   efi/arm64: efistub: move shared dependencies to <asm/efi.h>
+>>   efi: efistub: refactor stub components
+>>   efi: efistub: convert into static library
+>
+> Thanks Ard. I've picked these up.
+>
 
-clk should be initialized to NULL here, otherwise I get a warning down
-below ...
-
-> +       unsigned int idx;
-> +       unsigned long flags;
-> +
-> +       for (idx = 0; idx < nr_clk; idx++, list++) {
-> +               flags = list->flags;
-> +
-> +               /* catch simple muxes */
-> +               switch (list->branch_type) {
-> +               case branch_mux:
-> +                       clk = clk_register_mux(NULL, list->name,
-> +                               list->parent_names, list->num_parents,
-> +                               flags, reg_base + list->muxdiv_offset,
-> +                               list->mux_shift, list->mux_width,
-> +                               list->mux_flags, &clk_lock);
-> +                       break;
-> +               case branch_divider:
-> +                       if (list->div_table)
-> +                               clk = clk_register_divider_table(NULL,
-> +                                       list->name, list->parent_names[0],
-> +                                       flags, reg_base + list->muxdiv_offset,
-> +                                       list->div_shift, list->div_width,
-> +                                       list->div_flags, list->div_table,
-> +                                       &clk_lock);
-> +                       else
-> +                               clk = clk_register_divider(NULL, list->name,
-> +                                       list->parent_names[0], flags,
-> +                                       reg_base + list->muxdiv_offset,
-> +                                       list->div_shift, list->div_width,
-> +                                       list->div_flags, &clk_lock);
-> +                       break;
-> +               case branch_fraction_divider:
-> +                       /* unimplemented */
-> +                       continue;
-> +                       break;
-> +               case branch_gate:
-> +                       flags |= CLK_SET_RATE_PARENT;
-> +
-> +                       /* keep all gates untouched for now */
-> +                       flags |= CLK_IGNORE_UNUSED;
-> +
-> +                       clk = clk_register_gate(NULL, list->name,
-> +                               list->parent_names[0], flags,
-> +                               reg_base + list->gate_offset,
-> +                               list->gate_shift, list->gate_flags, &clk_lock);
-> +                       break;
-> +               case branch_composite:
-> +                       /* keep all gates untouched for now */
-> +                       flags |= CLK_IGNORE_UNUSED;
-> +
-> +                       clk = rockchip_clk_register_branch(list->name,
-> +                               list->parent_names, list->num_parents,
-> +                               reg_base, list->muxdiv_offset, list->mux_shift,
-> +                               list->mux_width, list->mux_flags,
-> +                               list->div_shift, list->div_width,
-> +                               list->div_flags, list->div_table,
-> +                               list->gate_offset, list->gate_shift,
-> +                               list->gate_flags, flags, &clk_lock);
-> +                       break;
-> +               }
-> +
-> +               if (IS_ERR(clk)) {
-
-... here. gcc throws:
-
-"""
-drivers/clk/rockchip/clk.c: In function ?rockchip_clk_register_branches?:
-include/linux/err.h:35:22: warning: ?clk? may be used uninitialized in this function [-Wmaybe-uninitialized]
-  return IS_ERR_VALUE((unsigned long)ptr);
-"""
+OK, thanks. One tiny snag that I would like to fix up once we have
+some Acks to add: I just noticed that i removed the 'static' from
+handle_kernel_image()'s definition from arm64 in 4/5, but removed it
+from the forward declaration in 5/5, which likely breaks bisect for
+arm64 if you happen to end up right in the middle.
 
 Regards,
-Mike
-
-> +                       pr_err("%s: failed to register clock %s: %ld\n",
-> +                              __func__, list->name, PTR_ERR(clk));
-> +                       continue;
-> +               }
-> +
-> +               rockchip_clk_add_lookup(clk, list->id);
-> +       }
-> +}
-> diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-> new file mode 100644
-> index 0000000..5b051b0
-> --- /dev/null
-> +++ b/drivers/clk/rockchip/clk.h
-> @@ -0,0 +1,250 @@
-> +/*
-> + * Copyright (c) 2014 MundoReader S.L.
-> + * Author: Heiko Stuebner <heiko@sntech.de>
-> + *
-> + * based on
-> + *
-> + * samsung/clk.h
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + * Copyright (c) 2013 Linaro Ltd.
-> + * Author: Thomas Abraham <thomas.ab@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef CLK_ROCKCHIP_CLK_H
-> +#define CLK_ROCKCHIP_CLK_H
-> +
-> +#include <linux/io.h>
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +
-> +#define HIWORD_UPDATE(val, mask, shift) \
-> +               ((val) << (shift) | (mask) << ((shift) + 16))
-> +
-> +/* register positions shared by RK2928, RK3066 and RK3188 */
-> +#define RK2928_PLL_CON(x)              (x * 0x4)
-> +#define RK2928_MODE_CON                0x40
-> +#define RK2928_CLKSEL_CON(x)   (x * 0x4 + 0x44)
-> +#define RK2928_CLKGATE_CON(x)  (x * 0x4 + 0xd0)
-> +#define RK2928_GLB_SRST_FST            0x100
-> +#define RK2928_GLB_SRST_SND            0x104
-> +#define RK2928_SOFTRST_CON(x)  (x * 0x4 + 0x110)
-> +#define RK2928_MISC_CON                0x134
-> +
-> +#define PNAME(x) static const char *x[] __initconst
-> +
-> +enum rockchip_clk_branch_type {
-> +       branch_composite,
-> +       branch_mux,
-> +       branch_divider,
-> +       branch_fraction_divider,
-> +       branch_gate,
-> +};
-> +
-> +struct rockchip_clk_branch {
-> +       unsigned int                    id;
-> +       enum rockchip_clk_branch_type   branch_type;
-> +       const char                      *name;
-> +       const char                      **parent_names;
-> +       u8                              num_parents;
-> +       unsigned long                   flags;
-> +       int                             muxdiv_offset;
-> +       u8                              mux_shift;
-> +       u8                              mux_width;
-> +       u8                              mux_flags;
-> +       u8                              div_shift;
-> +       u8                              div_width;
-> +       u8                              div_flags;
-> +       struct clk_div_table            *div_table;
-> +       int                             gate_offset;
-> +       u8                              gate_shift;
-> +       u8                              gate_flags;
-> +};
-> +
-> +#define COMPOSITE(_id, cname, pnames, f, mo, ms, mw, mf, ds, dw,\
-> +                 df, go, gs, gf)                               \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_composite,             \
-> +               .name           = cname,                        \
-> +               .parent_names   = pnames,                       \
-> +               .num_parents    = ARRAY_SIZE(pnames),           \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = mo,                           \
-> +               .mux_shift      = ms,                           \
-> +               .mux_width      = mw,                           \
-> +               .mux_flags      = mf,                           \
-> +               .div_shift      = ds,                           \
-> +               .div_width      = dw,                           \
-> +               .div_flags      = df,                           \
-> +               .gate_offset    = go,                           \
-> +               .gate_shift     = gs,                           \
-> +               .gate_flags     = gf,                           \
-> +       }
-> +
-> +#define COMPOSITE_NOMUX(_id, cname, pname, f, mo, ds, dw, df,  \
-> +                       go, gs, gf)                             \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_composite,             \
-> +               .name           = cname,                        \
-> +               .parent_names   = (const char *[]){ pname },    \
-> +               .num_parents    = 1,                            \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = mo,                           \
-> +               .div_shift      = ds,                           \
-> +               .div_width      = dw,                           \
-> +               .div_flags      = df,                           \
-> +               .gate_offset    = go,                           \
-> +               .gate_shift     = gs,                           \
-> +               .gate_flags     = gf,                           \
-> +       }
-> +
-> +#define COMPOSITE_NOMUX_DIVTBL(_id, cname, pname, f, mo, ds, dw,\
-> +                              df, dt, go, gs, gf)              \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_composite,             \
-> +               .name           = cname,                        \
-> +               .parent_names   = (const char *[]){ pname },    \
-> +               .num_parents    = 1,                            \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = mo,                           \
-> +               .div_shift      = ds,                           \
-> +               .div_width      = dw,                           \
-> +               .div_flags      = df,                           \
-> +               .div_table      = dt,                           \
-> +               .gate_offset    = go,                           \
-> +               .gate_shift     = gs,                           \
-> +               .gate_flags     = gf,                           \
-> +       }
-> +
-> +#define COMPOSITE_NODIV(_id, cname, pnames, f, mo, ms, mw, mf, \
-> +                       go, gs, gf)                             \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_composite,             \
-> +               .name           = cname,                        \
-> +               .parent_names   = pnames,                       \
-> +               .num_parents    = ARRAY_SIZE(pnames),           \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = mo,                           \
-> +               .mux_shift      = ms,                           \
-> +               .mux_width      = mw,                           \
-> +               .mux_flags      = mf,                           \
-> +               .gate_offset    = go,                           \
-> +               .gate_shift     = gs,                           \
-> +               .gate_flags     = gf,                           \
-> +       }
-> +
-> +#define COMPOSITE_NOGATE(_id, cname, pnames, f, mo, ms, mw, mf,        \
-> +                        ds, dw, df)                            \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_composite,             \
-> +               .name           = cname,                        \
-> +               .parent_names   = pnames,                       \
-> +               .num_parents    = ARRAY_SIZE(pnames),           \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = mo,                           \
-> +               .mux_shift      = ms,                           \
-> +               .mux_width      = mw,                           \
-> +               .mux_flags      = mf,                           \
-> +               .div_shift      = ds,                           \
-> +               .div_width      = dw,                           \
-> +               .div_flags      = df,                           \
-> +               .gate_offset    = -1,                           \
-> +       }
-> +
-> +#define COMPOSITE_FRAC(_id, cname, pname, f, mo, df, go, gs, gf)\
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_fraction_divider,      \
-> +               .name           = cname,                        \
-> +               .parent_names   = (const char *[]){ pname },    \
-> +               .num_parents    = 1,                            \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = mo,                           \
-> +               .div_shift      = 16,                           \
-> +               .div_width      = 16,                           \
-> +               .div_flags      = df,                           \
-> +               .gate_offset    = go,                           \
-> +               .gate_shift     = gs,                           \
-> +               .gate_flags     = gf,                           \
-> +       }
-> +
-> +#define MUX(_id, cname, pnames, f, o, s, w, mf)                        \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_mux,                   \
-> +               .name           = cname,                        \
-> +               .parent_names   = pnames,                       \
-> +               .num_parents    = ARRAY_SIZE(pnames),           \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = o,                            \
-> +               .mux_shift      = s,                            \
-> +               .mux_width      = w,                            \
-> +               .mux_flags      = mf,                           \
-> +               .gate_offset    = -1,                           \
-> +       }
-> +
-> +#define DIV(_id, cname, pname, f, o, s, w, df)                 \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_divider,               \
-> +               .name           = cname,                        \
-> +               .parent_names   = (const char *[]){ pname },    \
-> +               .num_parents    = 1,                            \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = o,                            \
-> +               .div_shift      = s,                            \
-> +               .div_width      = w,                            \
-> +               .div_flags      = df,                           \
-> +               .gate_offset    = -1,                           \
-> +       }
-> +
-> +#define DIVTBL(_id, cname, pname, f, o, s, w, df, dt)          \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_divider,               \
-> +               .name           = cname,                        \
-> +               .parent_names   = (const char *[]){ pname },    \
-> +               .num_parents    = 1,                            \
-> +               .flags          = f,                            \
-> +               .muxdiv_offset  = o,                            \
-> +               .div_shift      = s,                            \
-> +               .div_width      = w,                            \
-> +               .div_flags      = df,                           \
-> +               .div_table      = dt,                           \
-> +       }
-> +
-> +#define GATE(_id, cname, pname, f, o, b, gf)                   \
-> +       {                                                       \
-> +               .id             = _id,                          \
-> +               .branch_type    = branch_gate,                  \
-> +               .name           = cname,                        \
-> +               .parent_names   = (const char *[]){ pname },    \
-> +               .num_parents    = 1,                            \
-> +               .flags          = f,                            \
-> +               .gate_offset    = o,                            \
-> +               .gate_shift     = b,                            \
-> +               .gate_flags     = gf,                           \
-> +       }
-> +
-> +
-> +void rockchip_clk_init(struct device_node *np, void __iomem *base,
-> +                      unsigned long nr_clks);
-> +void rockchip_clk_add_lookup(struct clk *clk, unsigned int id);
-> +void rockchip_clk_register_branches(struct rockchip_clk_branch *clk_list,
-> +                                   unsigned int nr_clk);
-> +
-> +#endif
-> -- 
-> 1.9.0
-> 
-> 
+Ard.
