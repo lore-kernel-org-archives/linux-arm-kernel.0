@@ -1,31 +1,57 @@
-From: xerofoify@gmail.com (Nick Krause)
-Date: Mon, 30 Jun 2014 21:59:17 -0400
-Subject: [PATCH] Fixes gemmi_idle in file idle.c
-In-Reply-To: <20140630094157.GT32514@n2100.arm.linux.org.uk>
-References: <1404096760-5239-1-git-send-email-xerofoify@gmail.com>
- <20140630094157.GT32514@n2100.arm.linux.org.uk>
-Message-ID: <CAPDOMVjNU+XJnxqVsY5ZAh=VUx8RUf_Av0C8yVdaTczQWsh-ng@mail.gmail.com>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Mon, 30 Jun 2014 23:11:02 -0400
+Subject: [PATCH 1/2] Deletes  arch/arm/mach-gemini/idle.c
+Message-ID: <1404184262-6178-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the good feedback on kernel development , I will delete this file
-in order to clean up race conditions caused by it.
-Cheers Nick
+This patch deletes the above file in order to remove the function
+in this file that may cause races. In addition this function is
+no longer needed due to commit 8182a34d85698 fixing this issue.
+Therefore gemmi_idle is no longer needed and due to in being the
+only function in this file I am removing it.
 
-On Mon, Jun 30, 2014 at 5:41 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jun 29, 2014 at 10:52:40PM -0400, Nicholas Krause wrote:
->> disables the IRQ line in gemmi_idle before calling cpu_do_idle.
->> In addition, according to the Fixme message in this file fixes
->> races that may occur due to not disabling the IRQ before calling
->> cpu_do_idle.
->
-> 1) the idle method is called with interrupts already disabled.
-> 2) I wonder if you read the comment above the comment you removed, and
->    if so, why it wasn't removed.
-> 3) can you indicate how the hardware problem has been fixed, or give some
->    justification why this change should be accepted.
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-gemini/idle.c | 30 ------------------------------
+ 1 file changed, 30 deletions(-)
+ delete mode 100644 arch/arm/mach-gemini/idle.c
+
+diff --git a/arch/arm/mach-gemini/idle.c b/arch/arm/mach-gemini/idle.c
+deleted file mode 100644
+index 2880f5a..0000000
+--- a/arch/arm/mach-gemini/idle.c
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * arch/arm/mach-gemini/idle.c
+- */
+-
+-#include <linux/init.h>
+-#include <asm/system_misc.h>
+-#include <asm/proc-fns.h>
+-
+-static void gemini_idle(void)
+-{
+-	/*
+-	 * Because of broken hardware we have to enable interrupts or the CPU
+-	 * will never wakeup... Acctualy it is not very good to enable
+-	 * interrupts first since scheduler can miss a tick, but there is
+-	 * no other way around this. Platforms that needs it for power saving
+-	 * should enable it in init code, since by default it is
+-	 * disabled.
+-	 */
+-
+-	local_irq_disable();
+-	cpu_do_idle();
+-}
+-
+-static int __init gemini_idle_init(void)
+-{
+-	arm_pm_idle = gemini_idle;
+-	return 0;
+-}
+-
+-arch_initcall(gemini_idle_init);
+-- 
+1.9.1
