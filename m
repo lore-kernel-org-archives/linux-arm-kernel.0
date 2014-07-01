@@ -1,32 +1,45 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 01 Jul 2014 10:58:48 +0200
-Subject: [PATCH 0/9] ARM: dts: sunxi: Various sunxi dts patches
-In-Reply-To: <20140701080646.GL28647@lukather>
-References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
- <20140701080646.GL28647@lukather>
-Message-ID: <53B27848.80904@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Jul 2014 10:00:34 +0100
+Subject: [PATCH v7 7/9] ARM: add vdso user-space code
+In-Reply-To: <53B1D6B8.7080806@amacapital.net>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-8-git-send-email-nathan_lynch@mentor.com>
+ <53B1D6B8.7080806@amacapital.net>
+Message-ID: <20140701090034.GB28164@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/01/2014 10:06 AM, Maxime Ripard wrote:
-> On Mon, Jun 30, 2014 at 11:57:50PM +0200, Hans de Goede wrote:
->> Hi Maxime,
->>
->> Here is a set of sunxi dts patches for your dt tree. It is a mixed collection:
->>
->> -Some patches submitted earlier by others which I've picked up from the
->>  list and brushed up a bit were necessary.
->> -2 new boards
->> -sun4i ir support (and renaming of the compatible from sun7i-a20-ir to
->>  sun4i-a10-ir as they have the same ip block for this)
+On Mon, Jun 30, 2014 at 10:29:28PM +0100, Andy Lutomirski wrote:
+> On 06/22/2014 08:11 PM, Nathan Lynch wrote:
+> > diff --git a/arch/arm/kernel/vdso/datapage.S b/arch/arm/kernel/vdso/datapage.S
+> > new file mode 100644
+> > index 000000000000..fbf36d75da06
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/vdso/datapage.S
+> > @@ -0,0 +1,15 @@
+> > +#include <linux/linkage.h>
+> > +#include <asm/asm-offsets.h>
+> > +
+> > +	.align 2
+> > +.L_vdso_data_ptr:
+> > +	.long	_start - . - VDSO_DATA_SIZE
+> > +
+> > +ENTRY(__get_datapage)
+> > +	.cfi_startproc
+> > +	adr	r0, .L_vdso_data_ptr
+> > +	ldr	r1, [r0]
+> > +	add	r0, r0, r1
+> > +	bx	lr
+> > +	.cfi_endproc
+> > +ENDPROC(__get_datapage)
 > 
-> Applied, thanks!
+> Can you translate this into English for the non-ARM-speakers here?
 
-Thanks, and good to know about your new tree on kernel.org. I'll use that
-to base dts patches on from now on.
+Also, I'm not sure .cfi directives are the right things to use for AArch32.
+ARM has special .fnstart, .fnend, .movsp diretives for its own unwind
+format.
 
-Regards,
+Maybe GDB works with both -- have you tried unwinding out of this with
+anything?
 
-Hans
+Will
