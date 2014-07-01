@@ -1,38 +1,66 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  1 Jul 2014 16:12:42 +0200
-Subject: [PATCH 33/33] ARM: at91/dt: usb_a9263: define crystals frequencies
-In-Reply-To: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404223962-30471-34-git-send-email-alexandre.belloni@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Jul 2014 15:15:41 +0100
+Subject: [PATCH v7 8/9] ARM: vdso initialization, mapping, and
+ synchronization
+In-Reply-To: <53B2C178.30607@mentor.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <1403493118-7597-9-git-send-email-nathan_lynch@mentor.com>
+ <53B1D8AC.7060104@mit.edu> <20140701090309.GC28164@arm.com>
+ <53B2C178.30607@mentor.com>
+Message-ID: <20140701141541.GP28164@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Calao USB-A9263 main and slow crystals frequencies.
+On Tue, Jul 01, 2014 at 03:11:04PM +0100, Nathan Lynch wrote:
+> On 07/01/2014 04:03 AM, Will Deacon wrote:
+> > On Mon, Jun 30, 2014 at 10:37:48PM +0100, Andy Lutomirski wrote:
+> >> On 06/22/2014 08:11 PM, Nathan Lynch wrote:
+> >>> Initialize the vdso page list at boot, install the vdso mapping at
+> >>> exec time, and update the data page during timer ticks.  This code is
+> >>> not built if CONFIG_VDSO is not enabled.
+> >>>
+> >>> Account for the vdso length when randomizing the offset from the
+> >>> stack.  The vdso is placed immediately following the sigpage with a
+> >>> separate install_special_mapping call in arm_install_vdso.
+> > 
+> > [...]
+> > 
+> >>> +/* assumes mmap_sem is write-locked */
+> >>> +void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
+> >>> +{
+> >>> +	int ret;
+> >>> +
+> >>> +	mm->context.vdso = ~0UL;
+> >>> +
+> >>> +	if (vdso_pagelist == NULL)
+> >>> +		return;
+> >>> +
+> >>> +	/*
+> >>> +	 * Put vDSO base into mm struct before calling
+> >>> +	 * install_special_mapping so the perf counter mmap tracking
+> >>> +	 * code will recognise it as a vDSO.
+> >>> +	 */
+> >>> +	mm->context.vdso = addr;
+> >>> +
+> >>> +	ret = install_special_mapping(mm, addr, vdso_mapping_len,
+> >>> +				      VM_READ|VM_EXEC|
+> >>> +				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+> >>> +				      vdso_pagelist);
+> >>
+> >> Eek.  You're mapping the shared data VM_MAYWRITE.  This will cause
+> >> bizarre and confusing failures if ptrace pokes at it.
+> > 
+> > Hmm, but how else can we support software breakpoints on the vdso?
+> 
+> I believe Andy is suggesting separate VMAs (with different VM flags) for
+> the VDSO's data and code.  So, breakpoints in code would work, but
+> attempts to modify the data page via ptrace() would fail outright
+> instead of silently COWing.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
----
- arch/arm/boot/dts/usb_a9263.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Ah, yes. That makes a lot of sense for the data page -- we should do
+something similar on arm64 too, since the CoW will break everything for the
+task being debugged. We could also drop the EXEC flags too.
 
-diff --git a/arch/arm/boot/dts/usb_a9263.dts b/arch/arm/boot/dts/usb_a9263.dts
-index 290e60383baf..68c0de36c339 100644
---- a/arch/arm/boot/dts/usb_a9263.dts
-+++ b/arch/arm/boot/dts/usb_a9263.dts
-@@ -29,6 +29,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <12000000>;
- 		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
- 	};
- 
- 	ahb {
--- 
-1.9.1
+Thanks for the explanation,
+
+Will
