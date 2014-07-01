@@ -1,32 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 1 Jul 2014 18:08:53 +0100
-Subject: [RFC PATCH 0/6] kernel: Add support for restart notifier call
- chain
-In-Reply-To: <53B2BB74.7050300@roeck-us.net>
-References: <1404155499-21177-1-git-send-email-linux@roeck-us.net>
- <20140630195946.GI32514@n2100.arm.linux.org.uk>
- <20140630202851.GA12888@roeck-us.net>
- <20140701112413.GQ18313@arm.com> <53B2BB74.7050300@roeck-us.net>
-Message-ID: <20140701170853.GX18313@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 1 Jul 2014 18:10:19 +0100
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <alpine.DEB.2.02.1407011800510.8923@kaball.uk.xensource.com>
+References: <20140328184517.GA27219@cbox> <20140611065412.GA24286@lvm>
+ <53981043.3010300@redhat.com> <9801429.iblEns5zC3@wuerfel>
+ <53B18E03.4050902@jonmasters.org> <20140630204647.GA19743@cbox>
+ <CAFEAcA9KJpvKUDgk_ziT9LmOMmFEHVRdTz=OdVt1pm2GEf5JoQ@mail.gmail.com>
+ <alpine.DEB.2.02.1407011800510.8923@kaball.uk.xensource.com>
+Message-ID: <CAFEAcA9v_xY36iYpCXOt5JTNE4ehiQh7k3LtkyF+=d50LMm=GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 02:45:24PM +0100, Guenter Roeck wrote:
-> On 07/01/2014 04:24 AM, Catalin Marinas wrote:
-> > On Mon, Jun 30, 2014 at 09:28:51PM +0100, Guenter Roeck wrote:
-> >> What is restart-poweroff supposed to do in the first place, and why
-> >> doesn't it call machine_restart() ? If it is what I think it is, ie
-> >> a fallback for pm_power_off, it could be made generic and does not
-> >> really have to depend on ARM.
-> >
-> > I think this one pretends to do a power-off via restart. It could call
-> > machine_restart() but this only passes the default reboot_mode to
-> > arm_pm_restart().
-> 
-> Unless one sets reboot_mode first. See my proposed patch in
-> https://lkml.org/lkml/2014/6/30/792.
+On 1 July 2014 18:03, Stefano Stabellini
+<stefano.stabellini@eu.citrix.com> wrote:
+> On Mon, 30 Jun 2014, Peter Maydell wrote:
+>> How about:
+>> =====
+>> Guest OSes in the VM image should rely on the UEFI RTC API for
+>> real time clock services. (To provide that API, the VM system will
+>> likely need to implement some real time clock device, but the
+>> details of these are a private implementation issue between it
+>> and its associated UEFI implementation.)
+>
+> I don't see why we need to add the text within brackets: it is out of
+> scope for this document.
 
-It looks fine to me.
+The intention is to be an informative note, not normative text
+(I'm happy if we want to format the text to make that clearer,
+with some sort of NOTE: markup). I'd like VM implementors
+reading this spec to make the correct decisions even if they
+don't happen to know inside-out the details of the UEFI
+specification and what exactly UEFI demands of the hardware,
+and I think it's worth adding the occasional clarifying sentence
+even if it doesn't strictly speaking add any extra rules to the
+specification.
 
--- 
-Catalin
+thanks
+-- PMM
