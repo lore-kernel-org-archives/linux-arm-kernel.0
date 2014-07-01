@@ -1,45 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 1 Jul 2014 15:23:54 -0400
-Subject: [PATCH] ARM: mvebu: fix SMP boot for Armada 38x and Armada 375
- Z1 in big endian
-In-Reply-To: <1404228186-21203-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1404228186-21203-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140701192354.GI23978@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 01 Jul 2014 13:26:18 -0600
+Subject: [PATCH] ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+
+ (part1)
+In-Reply-To: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
+References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
+Message-ID: <53B30B5A.5030600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 05:23:06PM +0200, Thomas Petazzoni wrote:
-> The SMP boot on Armada 38x and Armada 375 Z1 is currently broken in
-> big-endian configurations, and this commit fixes it for both
-> platforms.
+On 07/01/2014 10:19 AM, Russell King wrote:
+> ARMv6 and greater introduced a new instruction ("bx") which can be used
+> to return from function calls.  Recent CPUs perform better when the
+> "bx lr" instruction is used rather than the "mov pc, lr" instruction,
+> and this sequence is strongly recommended to be used by the ARM
+> architecture manual (section A.4.1.1).
 > 
-> For Armada 375 Z1, the problem was in the
-> armada_375_smp_cpu1_enable_code part of the code that gets copied to
-> the Crypto SRAM as a work-around for an issue of the Z1 stepping. This
-> piece of code was not switching the CPU core to big-endian, and not
-> endian-swapping the value read from the Resume Address register (the
-> value is stored little-endian). Due to the introduction of the
-> conditional 'rev r1, r1' instruction, the offset between the 'ldr r0,
-> [pc, #4]' instruction and the value it was looking is different
-> between LE and BE configurations. To solve this, we instead use one
-> 'adr' instruction followed by one 'ldr'.
+> We provide a new macro "ret" with all its variants for the condition
+> code which will resolve to the appropriate instruction.
 > 
-> For Armada 38x, the problem was simply that the CPU core was not
-> switched to big endian in the secondary CPU startup function.
-> 
-> This change was tested in LE and BE configurations on Armada 385,
-> Armada 375 Z1 and Armada 375 A0.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Jason, since the support for SMP was integrated in 3.16, this patch
-> should go in the 3.16-rc cycle. Thanks!
-> 
->  arch/arm/mach-mvebu/headsmp-a9.S | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+> Rather than doing this piecemeal, and miss some instances, change all
+> the "mov pc" instances to use the new macro, with the exception of
+> the "movs" instruction and the kprobes code.  This allows us to detect
+> the "mov pc, lr" case and fix it up - and also gives us the possibility
+> of deploying this for other registers depending on the CPU selection.
 
-Applied to mvebu/fixes
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-thx,
-
-Jason.
+(On an NVIDIA Tegra Jetson TK1 board, both CPU hotplug and system sleep
+were tested, which are the use-cases that actually use the edited
+assembly files)
