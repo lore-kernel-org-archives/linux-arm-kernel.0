@@ -1,125 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  1 Jul 2014 02:55:29 -0300
-Subject: [PATCH 5/5] ARM: dts: imx6sx-sdb: Add audio support
-In-Reply-To: <1404194129-25543-1-git-send-email-festevam@gmail.com>
-References: <1404194129-25543-1-git-send-email-festevam@gmail.com>
-Message-ID: <1404194129-25543-5-git-send-email-festevam@gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 1 Jul 2014 09:15:45 +0300
+Subject: [PATCH] video: fbdev: s3c2410fb: Move to
+ clk_prepare_enable/clk_disable_unprepare
+In-Reply-To: <1404155672-3158-1-git-send-email-anarsoul@gmail.com>
+References: <1404155672-3158-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <53B25211.1000600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 30/06/14 22:14, Vasily Khoruzhick wrote:
+> Use clk_prepare_enable/clk_disable_unprepare to make the driver
+> work properly with common clock framework.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  drivers/video/fbdev/s3c2410fb.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sx-sdb.dts | 72 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+Thanks, queued for 3.17.
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 2571261..a3980d9 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -82,9 +82,39 @@
- 			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
- 			enable-active-high;
- 		};
-+
-+		reg_psu_5v: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "PSU-5V0";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
-+		model = "wm8962-audio";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"Headphone Jack", "HPOUTL",
-+			"Headphone Jack", "HPOUTR",
-+			"Ext Spk", "SPKOUTL",
-+			"Ext Spk", "SPKOUTR",
-+			"AMIC", "MICBIAS",
-+			"IN3R", "AMIC";
-+		mux-int-port = <2>;
-+		mux-ext-port = <6>;
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+};
-+
- &fec1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet1>;
-@@ -200,6 +230,31 @@
- 	};
- };
- 
-+&i2c4 {
-+        clock-frequency = <100000>;
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&pinctrl_i2c4>;
-+        status = "okay";
-+
-+	codec: wm8962 at 1a {
-+		compatible = "wlf,wm8962";
-+		reg = <0x1a>;
-+		clocks = <&clks IMX6SX_CLK_AUDIO>;
-+		DCVDD-supply = <&vgen4_reg>;
-+		DBVDD-supply = <&vgen4_reg>;
-+		AVDD-supply = <&vgen4_reg>;
-+		CPVDD-supply = <&vgen4_reg>;
-+		MICVDD-supply = <&vgen3_reg>;
-+		PLLVDD-supply = <&vgen4_reg>;
-+		SPKVDD1-supply = <&reg_psu_5v>;
-+		SPKVDD2-supply = <&reg_psu_5v>;
-+	};
-+};
-+
-+&ssi2 {
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -260,6 +315,16 @@
- 
- &iomuxc {
- 	imx6x-sdb {
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX6SX_PAD_CSI_DATA00__AUDMUX_AUD6_TXC	0x130b0
-+				MX6SX_PAD_CSI_DATA01__AUDMUX_AUD6_TXFS	0x130b0
-+				MX6SX_PAD_CSI_HSYNC__AUDMUX_AUD6_TXD	0x120b0
-+				MX6SX_PAD_CSI_VSYNC__AUDMUX_AUD6_RXD	0x130b0
-+				MX6SX_PAD_CSI_PIXCLK__AUDMUX_MCLK	0x130b0
-+			>;
-+		};
-+
- 		pinctrl_enet1: enet1grp {
- 			fsl,pins = <
- 				MX6SX_PAD_ENET1_MDIO__ENET1_MDIO	0xa0b1
-@@ -293,6 +358,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c4: i2c4grp {
-+			fsl,pins = <
-+				MX6SX_PAD_CSI_DATA07__I2C4_SDA		0x4001b8b1
-+				MX6SX_PAD_CSI_DATA06__I2C4_SCL		0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_vcc_sd3: vccsd3grp {
- 			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
--- 
-1.8.3.2
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140701/500eafb6/attachment.sig>
