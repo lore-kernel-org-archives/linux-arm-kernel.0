@@ -1,67 +1,247 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 01 Jul 2014 18:24:43 +0100
-Subject: [PATCH] ARM: convert all "mov.* pc,
- reg" to "bx reg" for ARMv6+ (part1)
-In-Reply-To: <20140701171346.GP3705@n2100.arm.linux.org.uk> (Russell King's
- message of "Tue, 1 Jul 2014 18:13:46 +0100")
-References: <E1X20mL-00083I-Sv@rmk-PC.arm.linux.org.uk>
- <yw1x4mz1f2t9.fsf@unicorn.mansr.com>
- <20140701171346.GP3705@n2100.arm.linux.org.uk>
-Message-ID: <yw1xzjgtdmas.fsf@unicorn.mansr.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 01 Jul 2014 10:26:16 -0700
+Subject: [PATCH v5 05/14] clk: Add generic driver for Maxim PMIC clocks
+In-Reply-To: <CAKew6eU5X=WxhECtwUUwbXe_fCRU4bD6B7caWiA2dwcBfThd-g@mail.gmail.com>
+References: <1403806546-31122-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1403806546-31122-6-git-send-email-javier.martinez@collabora.co.uk>
+ <CAKew6eU5X=WxhECtwUUwbXe_fCRU4bD6B7caWiA2dwcBfThd-g@mail.gmail.com>
+Message-ID: <20140701172616.32686.44374@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Quoting Yadwinder Singh Brar (2014-06-29 21:01:36)
+> Hi Javier,
+> 
+> On Thu, Jun 26, 2014 at 11:45 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+> > Maxim Integrated Power Management ICs are very similar with
+> > regard to their clock outputs. Most of the clock drivers for
+> > these chips are duplicating code and are simpler enough that
+> > can be converted to use a generic driver to consolidate code
+> > and avoid duplication.
+> >
+> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >
+> > Changes since v4:
+> >  - Return recalc 0 if clock isn't enabled in Suggested by Yadwinder Singh Brar.
+> >
+> 
+> It seems you didn't implement or posted same patch again :) .
+> 
+> > Changes since v3:
+> >  - Add current copyright information. Suggested by Krzysztof Kozlowski
+> >  - Do a single allocation for struct max_gen_clk. Suggested by Krzysztof Kozlowski
+> >  - Add EXPORT_SYMBOL() for exported symbols. Suggested by Krzysztof Kozlowski
+> >
+> >  drivers/clk/Kconfig       |   3 +
+> >  drivers/clk/Makefile      |   1 +
+> >  drivers/clk/clk-max-gen.c | 195 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/clk-max-gen.h |  32 ++++++++
+> >  4 files changed, 231 insertions(+)
+> >  create mode 100644 drivers/clk/clk-max-gen.c
+> >  create mode 100644 drivers/clk/clk-max-gen.h
+> >
+> 
+> [ .. ]
+> 
+> > +
+> > +static unsigned long max_gen_recalc_rate(struct clk_hw *hw,
+> > +                                        unsigned long parent_rate)
+> > +{
+> > +       return 32768;
+> > +}
+> 
+> Its still same here.
 
-> On Tue, Jul 01, 2014 at 05:42:42PM +0100, M?ns Rullg?rd wrote:
->> Russell King <rmk+kernel@arm.linux.org.uk> writes:
->> 
->> > ARMv6 and greater introduced a new instruction ("bx") which can be used
->> > to return from function calls.  Recent CPUs perform better when the
->> > "bx lr" instruction is used rather than the "mov pc, lr" instruction,
->> > and this sequence is strongly recommended to be used by the ARM
->> > architecture manual (section A.4.1.1).
->> >
->> > We provide a new macro "ret" with all its variants for the condition
->> > code which will resolve to the appropriate instruction.
->> 
->> When the source register is not "lr" the name "ret" is a misnomer since
->> only the "bx lr" instruction is predicted as a function return.  The
->> "bx" instruction with other source registers uses the normal prediction
->> mechanisms, leaving the return stack alone, and should not be used for
->> function returns.  Any code currently using another register to return
->> from a function should probably be modified to use lr instead, unless
->> there are special reasons for doing otherwise.  If code jumping to an
->> address in a non-lr register is not a return, using the "ret" name will
->> make for some rather confusing reading.
->> 
->> I would suggest either using a more neutral name than "ret" or adding an
->> alias to be used for non-return jumps so as to make the intent clearer.
->
-> If you read the patch, the branches which are changed are those which
-> do indeed return in some way.  There are those which do this having
-> moved lr to a different register.
+Changing this would be a new behavior. I do not know of any other clock
+drivers that conditionally returns a rate of 0 based on whether or not
+the clock is gated.
 
-The patch is huge, and it wasn't obvious (to me) from the diff context
-what the non-lr jumps were doing.
+It is also buggy since calls to clk_enable and clk_disable do not invoke
+.recalc_rate, so the rate of your clock would not be updated from the
+framework's perspective until some later point where you call
+clk_set_rate or something.
 
-> As you point out, "bx lr" /may/ be treated specially (I've actually been
+If your driver needs to know whether or not the clock is enabled then we
+could introduce a new bool clk_is_enabled(struct clk *clk); to clk.h,
+but I'd rather not do that. Instead if a driver needs a clock then it
+calls clk_enable on it without any knowledge about the internal state of
+the clock enable_count.
 
-Most, if not all, Cortex-A cores do this according the public TRMs.
-They also do the same thing for "mov pc, lr" so there will probably be
-no performance gain from this change.  It's still a good idea though,
-since we don't know what future cores will do.
+Regards,
+Mike
 
-> discussing this with Will Deacon over the last couple of days, who has
-> also been talking to the hardware people in ARM, and Will is happy with
-> this patch as in its current form.)  This is why I've changed all
-> "mov pc, reg" instructions which return in some way to use this macro,
-> and left others (those which are used to call some function and return
-> back to the same point) alone.
-
-In that case the patch should be fine.  Your patch description didn't
-make it clear that only actual returns were being changed.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+> 
+> > +
+> > +struct clk_ops max_gen_clk_ops = {
+> > +       .prepare        = max_gen_clk_prepare,
+> > +       .unprepare      = max_gen_clk_unprepare,
+> > +       .is_prepared    = max_gen_clk_is_prepared,
+> > +       .recalc_rate    = max_gen_recalc_rate,
+> > +};
+> > +EXPORT_SYMBOL_GPL(max_gen_clk_ops);
+> > +
+> > +static struct clk *max_gen_clk_register(struct device *dev,
+> > +                                       struct max_gen_clk *max_gen)
+> > +{
+> > +       struct clk *clk;
+> > +       struct clk_hw *hw = &max_gen->hw;
+> > +
+> > +       clk = clk_register(dev, hw);
+> > +       if (IS_ERR(clk))
+> > +               return clk;
+> > +
+> > +       max_gen->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
+> 
+> As I suggested in other patch[1] also, its better to use
+> clkdev_alloc() instead of kzalloc() here.
+> 
+> > +       if (!max_gen->lookup)
+> > +               return ERR_PTR(-ENOMEM);
+> > +
+> > +       max_gen->lookup->con_id = hw->init->name;
+> 
+> Also IMO,  init->name should be over-written if name is provided in DT,
+> otherwise generic "clock-output-names" property will go futile,
+> perhaps it should be done before clk_register.
+> 
+> Regards,
+> Yadwinder
+> 
+> [1] : https://lkml.org/lkml/2014/6/27/197
+> 
+> > +       max_gen->lookup->clk = clk;
+> > +
+> > +       clkdev_add(max_gen->lookup);
+> > +
+> > +       return clk;
+> > +}
+> > +
+> > +int max_gen_clk_probe(struct platform_device *pdev, struct regmap *regmap,
+> > +                     u32 reg, struct clk_init_data *clks_init, int num_init)
+> > +{
+> > +       int i, ret;
+> > +       struct max_gen_clk *max_gen_clks;
+> > +       struct clk **clocks;
+> > +       struct device *dev = &pdev->dev;
+> > +
+> > +       clocks = devm_kzalloc(dev, sizeof(struct clk *) * num_init, GFP_KERNEL);
+> > +       if (!clocks)
+> > +               return -ENOMEM;
+> > +
+> > +       max_gen_clks = devm_kzalloc(dev, sizeof(struct max_gen_clk)
+> > +                                   * num_init, GFP_KERNEL);
+> > +       if (!max_gen_clks)
+> > +               return -ENOMEM;
+> > +
+> > +       for (i = 0; i < num_init; i++) {
+> > +               max_gen_clks[i].regmap = regmap;
+> > +               max_gen_clks[i].mask = 1 << i;
+> > +               max_gen_clks[i].reg = reg;
+> > +               max_gen_clks[i].hw.init = &clks_init[i];
+> > +
+> > +               clocks[i] = max_gen_clk_register(dev, &max_gen_clks[i]);
+> > +               if (IS_ERR(clocks[i])) {
+> > +                       ret = PTR_ERR(clocks[i]);
+> > +                       dev_err(dev, "failed to register %s\n",
+> > +                               max_gen_clks[i].hw.init->name);
+> > +                       goto err_clocks;
+> > +               }
+> > +       }
+> > +
+> > +       platform_set_drvdata(pdev, clocks);
+> > +
+> > +       if (dev->of_node) {
+> > +               struct clk_onecell_data *of_data;
+> > +
+> > +               of_data = devm_kzalloc(dev, sizeof(*of_data), GFP_KERNEL);
+> > +               if (!of_data) {
+> > +                       ret = -ENOMEM;
+> > +                       goto err_clocks;
+> > +               }
+> > +
+> > +               of_data->clks = clocks;
+> > +               of_data->clk_num = num_init;
+> > +               ret = of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
+> > +                                         of_data);
+> > +
+> > +               if (ret) {
+> > +                       dev_err(dev, "failed to register OF clock provider\n");
+> > +                       goto err_clocks;
+> > +               }
+> > +       }
+> > +
+> > +       return 0;
+> > +
+> > +err_clocks:
+> > +       for (--i; i >= 0; --i) {
+> > +               clkdev_drop(max_gen_clks[i].lookup);
+> > +               clk_unregister(max_gen_clks[i].hw.clk);
+> > +       }
+> > +
+> > +       return ret;
+> > +}
+> > +EXPORT_SYMBOL_GPL(max_gen_clk_probe);
+> > +
+> > +int max_gen_clk_remove(struct platform_device *pdev, int num_init)
+> > +{
+> > +       struct clk **clocks = platform_get_drvdata(pdev);
+> > +       struct device *dev = pdev->dev.parent;
+> > +       int i;
+> > +
+> > +       if (dev->of_node)
+> > +               of_clk_del_provider(dev->of_node);
+> > +
+> > +       for (i = 0; i < num_init; i++) {
+> > +               struct clk_hw *hw = __clk_get_hw(clocks[i]);
+> > +               struct max_gen_clk *max_gen = to_max_gen_clk(hw);
+> > +
+> > +               clkdev_drop(max_gen->lookup);
+> > +               clk_unregister(clocks[i]);
+> > +       }
+> > +       return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(max_gen_clk_remove);
+> > diff --git a/drivers/clk/clk-max-gen.h b/drivers/clk/clk-max-gen.h
+> > new file mode 100644
+> > index 0000000..997e86f
+> > --- /dev/null
+> > +++ b/drivers/clk/clk-max-gen.h
+> > @@ -0,0 +1,32 @@
+> > +/*
+> > + * clk-max-gen.h - Generic clock driver for Maxim PMICs clocks
+> > + *
+> > + * Copyright (C) 2014 Google, Inc
+> > + *
+> > + * This program is free software; you can redistribute  it and/or modify it
+> > + * under  the terms of  the GNU General  Public License as published by the
+> > + * Free Software Foundation;  either version 2 of the  License, or (at your
+> > + * option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + */
+> > +
+> > +#ifndef __CLK_MAX_GEN_H__
+> > +#define __CLK_MAX_GEN_H__
+> > +
+> > +#include <linux/types.h>
+> > +#include <linux/device.h>
+> > +#include <linux/clkdev.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +int max_gen_clk_probe(struct platform_device *pdev, struct regmap *regmap,
+> > +                     u32 reg, struct clk_init_data *clks_init, int num_init);
+> > +int max_gen_clk_remove(struct platform_device *pdev, int num_init);
+> > +extern struct clk_ops max_gen_clk_ops;
+> > +
+> > +#endif /* __CLK_MAX_GEN_H__ */
+> > --
+> > 2.0.0.rc2
+> >
