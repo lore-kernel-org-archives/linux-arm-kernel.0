@@ -1,50 +1,48 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 1 Jul 2014 17:49:02 +0100
+Date: Tue, 1 Jul 2014 17:50:41 +0100
 Subject: [PATCH 22/24] ARM64:ILP32: Use a seperate syscall table as a few
  syscalls need to be using the compat syscalls.
-In-Reply-To: <800835FF-E10A-4C0C-A68F-0ED1434F1CE2@caviumnetworks.com>
+In-Reply-To: <4268617.3t49DXZOBa@wuerfel>
 References: <1400914939-9708-1-git-send-email-apinski@cavium.com>
- <1400914939-9708-23-git-send-email-apinski@cavium.com>
  <20140701150539.GA18309@arm.com>
  <800835FF-E10A-4C0C-A68F-0ED1434F1CE2@caviumnetworks.com>
-Message-ID: <20140701164902.GT18313@arm.com>
+ <4268617.3t49DXZOBa@wuerfel>
+Message-ID: <20140701165041.GU18313@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 04:30:51PM +0100, Pinski, Andrew wrote:
-> On Jul 1, 2014, at 8:07 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
-> > On Sat, May 24, 2014 at 12:02:17AM -0700, Andrew Pinski wrote:
-> >> +/* Using Compat syscalls where necessary */
-> >> +#define sys_ioctl        compat_sys_ioctl
-> >> +/* iovec */
-> >> +#define sys_readv        compat_sys_readv
-> >> +#define sys_writev        compat_sys_writev
-> >> +#define sys_preadv        compat_sys_preadv64
-> >> +#define sys_pwritev        compat_sys_pwritev64
-> >> +#define sys_vmsplice        compat_sys_vmsplice
-> > 
-> > Do these actually work? compat_iovec has two members of 32-bit each
-> > while the ILP32 iovec has a void * (32-bit) and a __kernel_size_t which
-> > is 64-bit.
+On Tue, Jul 01, 2014 at 05:38:12PM +0100, Arnd Bergmann wrote:
+> On Tuesday 01 July 2014 15:30:51 Pinski, Andrew wrote:
+> > > On Jul 1, 2014, at 8:07 AM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
+> > >> On Sat, May 24, 2014 at 12:02:17AM -0700, Andrew Pinski wrote:
+> > >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > >> index 1e1ebfc..8241ffe 100644
+> > >> --- a/arch/arm64/kernel/entry.S
+> > >> +++ b/arch/arm64/kernel/entry.S
+> > >> @@ -620,9 +620,14 @@ ENDPROC(ret_from_fork)
+> > >>  */
+> > >>    .align    6
+> > >> el0_svc:
+> > >> -    adrp    stbl, sys_call_table        // load syscall table pointer
+> > >>    uxtw    scno, w8            // syscall number in w8
+> > >>    mov    sc_nr, #__NR_syscalls
+> > >> +#ifdef CONFIG_ARM64_ILP32
+> > >> +    get_thread_info tsk
+> > >> +    ldr    x16, [tsk, #TI_FLAGS]
+> > >> +    tbnz    x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
+> > >> +#endif
+> > >> +    adrp    stbl, sys_call_table        // load syscall table pointer
+> > > 
+> > > This adds a slight penalty on the AArch64 SVC entry path. I can't tell
+> > > whether that's visible or not but I think the x86 guys decided to set an
+> > > extra bit to the syscall number to distinguish it from native calls.
 > 
-> size_t should be unsigned long in ilp32 so a 32bit unsigned integer
-> type.  That part of the abi was already defined in the arm abi
-> documents.  Now are saying we should pass size_t different between
-> user and kernel space?
+> IIRC the intention on x86 was that you should always be able to call
+> any of the three syscall ABIs (x86-32, x86-64, x32) from any process
+> by passing the right number, for flexibility.
 
-OK, I think you are right here. The ILP32 would not see __kernel_size_t
-defined as __kernel_ulong_t because __BITS_PER_LONG != 64.
-
-> >> +/* Pointer in struct */
-> >> +#define sys_mount               compat_sys_mount
-> > 
-> > Which structure is this?
-> 
-> NFS structure, I can expand out the comment if needed. 
-
-That would be good for future reference.
-
-Thanks.
+I don't see how this is useful though. Do you happen to have more
+information?
 
 -- 
 Catalin
