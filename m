@@ -1,37 +1,32 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  1 Jul 2014 16:12:40 +0200
-Subject: [PATCH 31/33] ARM: at91/dt: sam9263ek: define crystals frequencies
+Date: Tue,  1 Jul 2014 16:12:39 +0200
+Subject: [PATCH 30/33] ARM: at91: move at91sam9263 SoC to the CCF
 In-Reply-To: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404223962-30471-32-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404223962-30471-31-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define at91sam9263ek main and slow crystals frequencies.
+This patch removes the selection of AT91_USE_OLD_CLK when selecting
+at91sam9263 SoC support. This will automatically enable COMMON_CLK_AT91
+option and add support for at91 common clock implementation.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9263ek.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-at91/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 15009c9f2293..5cf93eecd8f1 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -29,6 +29,14 @@
- 			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <16367660>;
- 		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <16367660>;
-+		};
- 	};
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 461966d0ee4d..6cc6f7aebdae 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -138,7 +138,6 @@ config SOC_AT91SAM9263
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
+-	select AT91_USE_OLD_CLK
+ 	select HAVE_AT91_USB_CLK
  
- 	ahb {
+ config SOC_AT91SAM9RL
 -- 
 1.9.1
