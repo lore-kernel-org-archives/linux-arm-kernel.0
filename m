@@ -1,50 +1,52 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue,  1 Jul 2014 07:05:39 -0500
-Subject: [PATCH] mach-bcm SMC: address clang inline asm incompatibility
-Message-ID: <1404216339-6480-1-git-send-email-elder@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 1 Jul 2014 08:05:48 -0400
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.16 (incremental #2)
+Message-ID: <20140701120548.GC23978@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My GCC-based build environment likes to call register r12 by the
-name "ip" in inline asm.  Behan Webster informed me that his Clang-
-based build environment likes "r12" instead.
+Guys,
 
-Try to make them both happy.
+Here's a small set of fixes to take care PCIe deadlocks with SMP, and
+cpuidle on big-endian systems.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
-Signed-off-by: Behan Webster <behanw@converseincode.com>
----
- arch/arm/mach-bcm/bcm_kona_smc.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+This is an incremental pull request from tags/mvebu-fixes-3.16 up to
+tags/mvebu-fixes-3.16-2 on the mvebu/fixes branch.
 
-diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-index a55a7ec..3937bd5 100644
---- a/arch/arm/mach-bcm/bcm_kona_smc.c
-+++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-@@ -106,9 +106,14 @@ int __init bcm_kona_smc_init(void)
-  * request result appropriately.  This result value is found in r0
-  * when the "smc" request completes.
-  */
-+#ifdef __clang__
-+#define R12	"r12"
-+#else  /* !__clang__ */
-+#define R12	"ip"	/* gcc calls r12 "ip" */
-+#endif /* !__clang__ */
- static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
- {
--	register u32 ip asm("ip");	/* Also called r12 */
-+	register u32 ip asm(R12);	/* Also called r12 */
- 	register u32 r0 asm("r0");
- 	register u32 r4 asm("r4");
- 	register u32 r5 asm("r5");
-@@ -120,7 +125,7 @@ static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
- 
- 	asm volatile (
- 		/* Make sure we got the registers we want */
--		__asmeq("%0", "ip")
-+		__asmeq("%0", R12)
- 		__asmeq("%1", "r0")
- 		__asmeq("%2", "r4")
- 		__asmeq("%3", "r5")
--- 
-1.9.1
+Please pull.
+
+thx,
+
+Jason.
+
+The following changes since commit 8dbdb8e704db34085f5978c335c10256b0fb9629:
+
+  ARM: mvebu: Fix the improper use of the compatible string armada38x using a wildcard (2014-06-24 11:33:24 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.16-2
+
+for you to fetch changes up to 6509dc74c9f55ffaa558738b96c4da8b98d39571:
+
+  ARM: mvebu: fix cpuidle implementation to work on big-endian systems (2014-06-30 18:15:11 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.16 (round #2)
+
+ - mvebu
+    - Fix PCIe deadlock now that SMP is enabled
+    - Fix cpuidle for big-endian systems
+
+----------------------------------------------------------------
+Thomas Petazzoni (3):
+      ARM: mvebu: move Armada 375 external abort logic as a quirk
+      ARM: mvebu: update L2/PCIe deadlock workaround after L2CC cleanup
+      ARM: mvebu: fix cpuidle implementation to work on big-endian systems
+
+ arch/arm/mach-mvebu/Makefile   |  2 +-
+ arch/arm/mach-mvebu/board-v7.c | 29 +++++++++++++++++++----------
+ arch/arm/mach-mvebu/pmsu.c     |  9 ++-------
+ arch/arm/mach-mvebu/pmsu_ll.S  | 25 +++++++++++++++++++++++++
+ 4 files changed, 47 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/pmsu_ll.S
