@@ -1,61 +1,54 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 1 Jul 2014 18:33:29 +0200
-Subject: [RFC 1/2] pwrseq: Add subsystem to handle complex power sequences
-In-Reply-To: <53A2F25E.80200@redhat.com>
-References: <1403183091-27876-1-git-send-email-ulf.hansson@linaro.org>
- <1403183091-27876-2-git-send-email-ulf.hansson@linaro.org>
- <53A2EDCA.8080000@redhat.com> <53A2F25E.80200@redhat.com>
-Message-ID: <CAPDyKFrgY9SER8t6O6saZDAi_BCOoqJy-mkEKxO0R8Qfy=052w@mail.gmail.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Tue, 1 Jul 2014 11:34:25 -0500
+Subject: [PATCH v7 0/9] ARM: VDSO
+In-Reply-To: <CAKv+Gu87_5Fx=z6Kg3EBi7YTm+f9DpiaZVw_UU9xKZD1MoJW8w@mail.gmail.com>
+References: <1403493118-7597-1-git-send-email-nathan_lynch@mentor.com>
+ <CAKv+Gu87_5Fx=z6Kg3EBi7YTm+f9DpiaZVw_UU9xKZD1MoJW8w@mail.gmail.com>
+Message-ID: <53B2E311.6030609@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2014 16:23, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 06/19/2014 04:03 PM, Hans de Goede wrote:
->> Hi,
->>
->
-> <snip>
->
->> Also I'm not sold on how you're making this a devm only thing, and
->> are using devres_alloc to not only allocate memory for resource tracking,
->> but also the actual backing struct, that is not how devres_alloc is
->> intended to be used AFAIK.
->>
->> A problem with having this one always devm managed is that it makes it
->> hard to use in library functions without side effects.
->>
->> e.g. if you look at how your using this in mmc_of_parse in the next
->> patch, this gives mmc_of_parse the side-effect of having allocated
->> and bound the power-seq method, even if mmc_of_parse later
->> fails on e.g. gpio binding. If then for some reason the mmc host
->> probe method decides to not propagate the mmc_of_parse method
->> error (leading to freeing of all devm managed resources), then this is
->> undesirable.
->>
->> Where as with a non devm version, it would be clear that on error
->> mmc_of_parse would need to explicitly release the pwrseq again.
->>
->> I realize that pwrseq implementations likely will want to use
->> devm functions too, and I'm a great fan of devm. But this is something
->> to keep in mind. At a minimum the description of of_mmc_parse needs
->> to get updated with info about it having potential side-effects even
->> when it fails, and that failure should always be treated as a fatal
->> error and cause the host probe method to fail.
->
-> Thinking more about this, it may be a good idea to give the pwrseq
-> its own struct device, turning it into a virtual device, this way the
-> pwrseq-method can use devm managed resources bound to this device,
-> we can set the of_node of this device to the actual powerseq
-> childnode and it gets its own sysfs dir in which we could do useful things
-> such as have an attribute to query the current power state.
->
-> This would also mean introducing a non devm version of devm_pwrseq_get
-> + an explicit release, which would be useful to avoid the side-effects
-> mentioned above when used in library functions such as mmc_of_parse.
+On 06/30/2014 03:12 AM, Ard Biesheuvel wrote:
+> On 23 June 2014 05:11, Nathan Lynch <nathan_lynch@mentor.com> wrote:
+>> Provide fast userspace implementations of gettimeofday and
+>> clock_gettime on systems that implement the generic timers extension
+>> defined in ARMv7.
 
-Hans, thanks for your comments. I will try to include all your ideas in a v2.
+...
 
-Kind regards
-Uffe
+> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> On Exynos-5250 (Cortex-A15):
+> 
+> clock-gettime-monotonic system calls per second: 1759517
+> clock-gettime-monotonic vdso calls per second:   6027915 (3.43x speedup)
+> clock-getres-monotonic system calls per second: 2144055
+> clock-getres-monotonic vdso calls per second:   82783103 (38.61x speedup)
+> clock-gettime-monotonic-coarse system calls per second: 1971433
+> clock-gettime-monotonic-coarse vdso calls per second:   10710734 (5.43x speedup)
+> clock-getres-monotonic-coarse system calls per second: 2182380
+> clock-getres-monotonic-coarse vdso calls per second:   76710594 (35.15x speedup)
+> clock-gettime-realtime system calls per second: 1722524
+> clock-gettime-realtime vdso calls per second:   6309212 (3.66x speedup)
+> clock-getres-realtime system calls per second: 2182357
+> clock-getres-realtime vdso calls per second:   83120713 (38.09x speedup)
+> clock-gettime-realtime-coarse system calls per second: 2085498
+> clock-gettime-realtime-coarse vdso calls per second:   11326069 (5.43x speedup)
+> clock-getres-realtime-coarse system calls per second: 2178266
+> clock-getres-realtime-coarse vdso calls per second:   76731175 (35.23x speedup)
+> Note: vDSO version of getcpu not found
+> getcpu system calls per second: 2645300
+> getcpu vdso calls per second:   2612154 (0.99x speedup)
+> Note: vDSO version of getcpu not found
+> Note: vDSO version of getcpu not found
+> gettimeofday system calls per second: 1707745
+> gettimeofday vdso calls per second:   6474501 (3.79x speedup)
+
+Thank you very much for testing (especially on a platform I don't have).
+
+These results match up with what I get on OMAP5 (also Cortex-A15).
+
+Since it looks like I will need to make some significant changes for the
+next version, I think I can't in good conscience carry your Tested-by on
+to v8 (although I'm open to different opinions).  But I still very much
+appreciate it.
