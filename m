@@ -1,132 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Jul 2014 10:40:26 +0100
-Subject: [RFC/PATCH 3/7] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <1404147116-4598-4-git-send-email-ohaugan@codeaurora.org>
-References: <1404147116-4598-1-git-send-email-ohaugan@codeaurora.org>
- <1404147116-4598-4-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20140701094026.GJ28164@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 1 Jul 2014 11:41:59 +0200
+Subject: [GIT PULL v2] nommu fixes for 3.17-rc1
+In-Reply-To: <20140630144355.GH14781@pengutronix.de>
+References: <20140630144355.GH14781@pengutronix.de>
+Message-ID: <20140701094159.GM14781@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+Hello Russell,
 
-On Mon, Jun 30, 2014 at 05:51:52PM +0100, Olav Haugan wrote:
-> From: Matt Wagantall <mattw@codeaurora.org>
-> 
-> It is sometimes necessary to poll a memory-mapped register until its
-> value satisfies some condition. Introduce a family of convenience macros
-> that do this. Tight-loop and sleeping versions are provided with and
-> without timeouts.
+I updated my tag to pull to not include the commit that drops ARM740T,
+ARM940T and ARM946E-S because of Arnd's concerns. Also the two cleanups
+that depended on this one are dropped.
 
-We could certainly use something like this in the SMMU and GICv3 drivers, so
-I agree that it makes sense for this to be in generic code.
+(As before) I picked -rc3 as base because 1c2f87c22566..6980c3e2514e~ is
+broken on nommu. 
 
-> +/**
-> + * readl_poll_timeout - Periodically poll an address until a condition is met or a timeout occurs
-> + * @addr: Address to poll
-> + * @val: Variable to read the value into
-> + * @cond: Break condition (usually involving @val)
-> + * @sleep_us: Maximum time to sleep between reads in uS (0 tight-loops)
-> + * @timeout_us: Timeout in uS, 0 means never timeout
+The following changes since commit 4c834452aad01531db949414f94f817a86348d59:
 
-I think 0 should actually mean `use the default timeout', which could be
-something daft like 1s. Removing the timeout is asking for kernel lock-ups.
-We could also have a version without the timeout parameter at all, which
-acts like a timeout of 0.
+  Linux 3.16-rc3 (2014-06-29 14:11:36 -0700)
 
-> + *
-> + * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-> + * case, the last read value at @addr is stored in @val. Must not
-> + * be called from atomic context if sleep_us or timeout_us are used.
-> + */
-> +#define readl_poll_timeout(addr, val, cond, sleep_us, timeout_us) \
-> +({ \
-> +	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-> +	might_sleep_if(timeout_us); \
-> +	for (;;) { \
-> +		(val) = readl(addr); \
-> +		if (cond) \
-> +			break; \
-> +		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
-> +			(val) = readl(addr); \
-> +			break; \
-> +		} \
-> +		if (sleep_us) \
-> +			usleep_range(DIV_ROUND_UP(sleep_us, 4), sleep_us); \
-> +	} \
-> +	(cond) ? 0 : -ETIMEDOUT; \
-> +})
-> +
-> +/**
-> + * readl_poll_timeout_noirq - Periodically poll an address until a condition is met or a timeout occurs
-> + * @addr: Address to poll
-> + * @val: Variable to read the value into
-> + * @cond: Break condition (usually involving @val)
-> + * @max_reads: Maximum number of reads before giving up
+are available in the git repository at:
 
-I don't think max_reads is a useful tunable.
+  git://git.pengutronix.de/git/ukl/linux.git tags/nommu-for-rmk
 
-> + * @time_between_us: Time to udelay() between successive reads
-> + *
-> + * Returns 0 on success and -ETIMEDOUT upon a timeout.
-> + */
-> +#define readl_poll_timeout_noirq(addr, val, cond, max_reads, time_between_us) \
+for you to fetch changes up to 83de911cf897a4317147dd9cb379378c2c4abf4c:
 
-Maybe readl_poll_[timeout_]atomic is a better name?
+  ARM: make user_addr_max more robust (2014-07-01 11:12:09 +0200)
 
-> +({ \
-> +	int count; \
-> +	for (count = (max_reads); count > 0; count--) { \
-> +		(val) = readl(addr); \
-> +		if (cond) \
-> +			break; \
-> +		udelay(time_between_us); \
-> +	} \
-> +	(cond) ? 0 : -ETIMEDOUT; \
-> +})
-> +
-> +/**
-> + * readl_poll - Periodically poll an address until a condition is met
-> + * @addr: Address to poll
-> + * @val: Variable to read the value into
-> + * @cond: Break condition (usually involving @val)
-> + * @sleep_us: Maximum time to sleep between reads in uS (0 tight-loops)
-> + *
-> + * Must not be called from atomic context if sleep_us is used.
-> + */
-> +#define readl_poll(addr, val, cond, sleep_us) \
-> +	readl_poll_timeout(addr, val, cond, sleep_us, 0)
+----------------------------------------------------------------
+Two different fixes for the same problem making some ARM nommu configurations
+not boot since 3.6-rc1. The problem is that user_addr_max returned the biggest
+available RAM address which makes some copy_from_user variants fail to read
+from XIP memory.
 
-Good idea ;)
+Even in the presence of one of the two fixes the other still makes sense, so
+both patches are included here.
 
-> +/**
-> + * readl_tight_poll_timeout - Tight-loop on an address until a condition is met or a timeout occurs
-> + * @addr: Address to poll
-> + * @val: Variable to read the value into
-> + * @cond: Break condition (usually involving @val)
-> + * @timeout_us: Timeout in uS, 0 means never timeout
-> + *
-> + * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-> + * case, the last read value at @addr is stored in @val. Must not
-> + * be called from atomic context if timeout_us is used.
-> + */
-> +#define readl_tight_poll_timeout(addr, val, cond, timeout_us) \
-> +	readl_poll_timeout(addr, val, cond, 0, timeout_us)
-> +
-> +/**
-> + * readl_tight_poll - Tight-loop on an address until a condition is met
-> + * @addr: Address to poll
-> + * @val: Variable to read the value into
-> + * @cond: Break condition (usually involving @val)
-> + *
-> + * May be called from atomic context.
-> + */
-> +#define readl_tight_poll(addr, val, cond) \
-> +	readl_poll_timeout(addr, val, cond, 0, 0)
+This problem was the last one preventing efm32 boot to a prompt with mainline.
 
-This would be readl_poll_timeout_atomic if you went with my suggestion (i.e.
-readl_poll_timeout would have an unconditional might_sleep).
+----------------------------------------------------------------
+Uwe Kleine-K?nig (2):
+      ARM: nommu: don't limit TASK_SIZE
+      ARM: make user_addr_max more robust
 
-What do you reckon?
+ arch/arm/include/asm/memory.h  | 4 +---
+ arch/arm/include/asm/uaccess.h | 2 +-
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-Will
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
