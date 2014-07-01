@@ -1,27 +1,26 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  1 Jul 2014 16:12:41 +0200
-Subject: [PATCH 32/33] ARM: at91/dt: tny_a9263: define crystals frequencies
+Date: Tue,  1 Jul 2014 16:12:29 +0200
+Subject: [PATCH 20/33] ARM: at91/dt: animeo_ip: define crystals frequencies
 In-Reply-To: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1404223962-30471-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1404223962-30471-33-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1404223962-30471-21-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Calao TNY-A9263 main and slow crystals frequencies.
+Define Somfy Animeo IP main and slow crystals frequencies.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
 ---
- arch/arm/boot/dts/tny_a9263.dts | 8 ++++++++
+ arch/arm/boot/dts/animeo_ip.dts | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tny_a9263.dts b/arch/arm/boot/dts/tny_a9263.dts
-index 0751a6a979a8..3043296345b7 100644
---- a/arch/arm/boot/dts/tny_a9263.dts
-+++ b/arch/arm/boot/dts/tny_a9263.dts
-@@ -29,6 +29,14 @@
+diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+index 3c4f6d983cbd..4e0ad3b82796 100644
+--- a/arch/arm/boot/dts/animeo_ip.dts
++++ b/arch/arm/boot/dts/animeo_ip.dts
+@@ -40,6 +40,14 @@
  			compatible = "atmel,osc", "fixed-clock";
- 			clock-frequency = <12000000>;
+ 			clock-frequency = <18432000>;
  		};
 +
 +		slow_xtal {
@@ -29,7 +28,7 @@ index 0751a6a979a8..3043296345b7 100644
 +		};
 +
 +		main_xtal {
-+			clock-frequency = <12000000>;
++			clock-frequency = <18432000>;
 +		};
  	};
  
