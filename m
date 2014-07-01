@@ -1,124 +1,112 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Tue, 1 Jul 2014 21:45:09 +0100
-Subject: [PATCH v8 3/9] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <8556461.i7qCGvGY5a@wuerfel>
-References: <1404240214-9804-1-git-send-email-Liviu.Dudau@arm.com>
- <1404240214-9804-4-git-send-email-Liviu.Dudau@arm.com>
- <8556461.i7qCGvGY5a@wuerfel>
-Message-ID: <20140701204508.GA19569@bart.dudau.co.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 01 Jul 2014 13:46:50 -0700
+Subject: [PATCH v4 02/13] clk: composite: allow read-only clocks
+In-Reply-To: <3089033.Y3HT2Lq8qX@diego>
+References: <1808429.dNxms7FR7U@diego> <3089033.Y3HT2Lq8qX@diego>
+Message-ID: <20140701204650.32686.12713@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 09:36:10PM +0200, Arnd Bergmann wrote:
-> On Tuesday 01 July 2014 19:43:28 Liviu Dudau wrote:
-> > +/*
-> > + * Record the PCI IO range (expressed as CPU physical address + size).
-> > + * Return a negative value if an error has occured, zero otherwise
-> > + */
-> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> > +{
-> > +#ifdef PCI_IOBASE
-> > +       struct io_range *res;
-> > +       resource_size_t allocated_size = 0;
-> > +
-> > +       /* check if the range hasn't been previously recorded */
-> > +       list_for_each_entry(res, &io_range_list, list) {
-> > +               if (addr >= res->start && addr + size <= res->start + size)
-> > +                       return 0;
-> > +               allocated_size += res->size;
-> > +       }
-> > +
-> > +       /* range not registed yet, check for available space */
-> > +       if (allocated_size + size - 1 > IO_SPACE_LIMIT)
-> > +               return -E2BIG;
-> > +
-> > +       /* add the range to the list */
-> > +       res = kzalloc(sizeof(*res), GFP_KERNEL);
-> > +       if (!res)
-> > +               return -ENOMEM;
-> > +
-> > +       res->start = addr;
-> > +       res->size = size;
-> > +
-> > +       list_add_tail(&res->list, &io_range_list);
-> > +
-> > +       return 0;
-> > +#else
-> > +       return -EINVAL;
-> > +#endif
-> > +}
-> > +
-> >  unsigned long __weak pci_address_to_pio(phys_addr_t address)
-> >  {
-> > +#ifdef PCI_IOBASE
-> > +       struct io_range *res;
-> > +       resource_size_t offset = 0;
-> > +
-> > +       list_for_each_entry(res, &io_range_list, list) {
-> > +               if (address >= res->start &&
-> > +                       address < res->start + res->size) {
-> > +                       return res->start - address + offset;
-> > +               }
-> > +               offset += res->size;
-> > +       }
-> > +
-> > +       return (unsigned long)-1;
-> > +#else
-> >         if (address > IO_SPACE_LIMIT)
-> >                 return (unsigned long)-1;
-> >  
-> >         return (unsigned long) address;
-> > +#endif
-> >  }
+Quoting Heiko St?bner (2014-06-22 13:43:35)
+> This allows readl-only composite clocks by making mux_ops->set_parent and
+> divider_ops->round_rate/set_rate optional.
 > 
-> This still conflicts with the other allocator you have in patch 9
-> for pci_remap_iospace: nothing guarantees that the mapping is the
-> same for both.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/clk-composite.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 > 
-> Also, this is a completely pointless exercise at this moment, because
-> nobody cares about the result of pci_address_to_pio on architectures
-> that don't already provide this function. If we ever get a proper
-> Open Firmware implementation that wants to put hardcoded PCI devices
-> into DT, we can add an implementation, but for now this seems overkill.
-> 
-> The allocator in pci_register_io_range seems reasonable, why not merge
-> this function with pci_remap_iospace() as I have asked you multiple
-> times before? Just make it return the io_offset so the caller can
-> put that into the PCI host resources.
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> index 0a4cd21..046d3f6 100644
+> --- a/drivers/clk/clk-composite.c
+> +++ b/drivers/clk/clk-composite.c
+> @@ -210,7 +210,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>         clk_composite_ops = &composite->ops;
+>  
+>         if (mux_hw && mux_ops) {
+> -               if (!mux_ops->get_parent || !mux_ops->set_parent) {
+> +               if (!mux_ops->get_parent) {
+>                         clk = ERR_PTR(-EINVAL);
+>                         goto err;
+>                 }
+> @@ -218,7 +218,8 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>                 composite->mux_hw = mux_hw;
+>                 composite->mux_ops = mux_ops;
+>                 clk_composite_ops->get_parent = clk_composite_get_parent;
+> -               clk_composite_ops->set_parent = clk_composite_set_parent;
+> +               if (mux_ops->set_parent)
+> +                       clk_composite_ops->set_parent = clk_composite_set_parent;
+>                 if (mux_ops->determine_rate)
+>                         clk_composite_ops->determine_rate = clk_composite_determine_rate;
+>         }
+> @@ -235,10 +236,6 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>                         if (rate_ops->set_rate) {
+>                                 clk_composite_ops->set_rate = clk_composite_set_rate;
+>                         }
+> -               } else {
+> -                       WARN(rate_ops->set_rate,
+> -                               "%s: missing round_rate op is required\n",
+> -                               __func__);
 
-Hi Arnd,
-
-While I agree with you that at some moment the allocators were inconsistent
-wrt each other, for this version I would respectfully disagree on this.
-The allocator in pci_register_io_range() only makes sure that the ranges
-are not overlapping, it doesn't do any mapping whatsoever, while
-pci_remap_iospace() does only an ioremap_page_range(). The idea is that
-you get the offset out of pci_address_to_pio() and apply it to
-pci_remap_iospace().
-
-Why do you think there are conflicts?
-
-Best regards,
-Liviu
+Getting rid of this WARN isn't such a great solution. How about rolling
+in the following cleanup?
 
 
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
 
+>From 03a08d7e746aedc6ce99228d629752f241383e7f Mon Sep 17 00:00:00 2001
+From: Mike Turquette <mturquette@linaro.org>
+Date: Tue, 1 Jul 2014 12:11:38 -0700
+Subject: [PATCH] clk: composite: improve rate_hw sanity check logic
+
+The function pointer population and sanity checking logic got a bit ugly
+with the advent of the .determine_rate callback. Clean it up.
+
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/clk-composite.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index faf7c32..bdf4f2b 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -226,21 +226,27 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 			clk = ERR_PTR(-EINVAL);
+ 			goto err;
+ 		}
++		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+ 
+-		/* .round_rate is a prerequisite for .set_rate */
+-		if (rate_ops->round_rate) {
+-			clk_composite_ops->round_rate = clk_composite_round_rate;
+-			if (rate_ops->set_rate) {
+-				clk_composite_ops->set_rate = clk_composite_set_rate;
+-			}
++		if (rate_ops->determine_rate)
++			clk_composite_ops->determine_rate =
++				clk_composite_determine_rate;
++		else if (rate_ops->round_rate)
++			clk_composite_ops->round_rate =
++				clk_composite_round_rate;
++
++		/* .set_rate requires either .round_rate or .determine_rate */
++		if (rate_ops->set_rate) {
++			if (rate_ops->determine_rate || rate_ops->round_rate)
++				clk_composite_ops->set_rate =
++					clk_composite_set_rate;
++			else
++				WARN(1, "%s: missing round_rate op is required\n",
++						__func__);
+ 		}
+ 
+ 		composite->rate_hw = rate_hw;
+ 		composite->rate_ops = rate_ops;
+-		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+-		if (rate_ops->determine_rate ||
+-		    (rate_ops->round_rate && clk_composite_ops->set_parent))
+-			clk_composite_ops->determine_rate = clk_composite_determine_rate;
+ 	}
+ 
+ 	if (gate_hw && gate_ops) {
 -- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+1.8.3.2
