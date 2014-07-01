@@ -1,77 +1,98 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  1 Jul 2014 09:28:35 +0900
-Subject: [PATCH 4/7] ARM: shmobile: Move r8a7778.h
+Date: Tue,  1 Jul 2014 09:28:34 +0900
+Subject: [PATCH 3/7] ARM: shmobile: Move r8a7740.h
 In-Reply-To: <cover.1404173049.git.horms+renesas@verge.net.au>
 References: <cover.1404173049.git.horms+renesas@verge.net.au>
-Message-ID: <02c94f38bf3bcdaaceb1f3486b4dbee1ab550793.1404173049.git.horms+renesas@verge.net.au>
+Message-ID: <9e38b84b456ab7b2abd28257eec5caee4fb1f5ea.1404173049.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Change location of r8a7778.h so it can be included as "r8a7778.h"
-instead of the old style <mach/r8a7778.h>
+Change location of r8a7740.h so it can be included as "r8a7740.h"
+instead of the old style <mach/r8a7740.h>
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw-reference.c |  4 +-
- arch/arm/mach-shmobile/board-bockw.c           |  4 +-
- arch/arm/mach-shmobile/include/mach/r8a7778.h  | 83 --------------------------
- arch/arm/mach-shmobile/r8a7778.h               | 83 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/setup-r8a7778.c         |  4 +-
- 5 files changed, 92 insertions(+), 86 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/include/mach/r8a7778.h
- create mode 100644 arch/arm/mach-shmobile/r8a7778.h
+ .../board-armadillo800eva-reference.c              |  4 +-
+ arch/arm/mach-shmobile/board-armadillo800eva.c     |  4 +-
+ arch/arm/mach-shmobile/clock-r8a7740.c             |  3 +-
+ arch/arm/mach-shmobile/include/mach/r8a7740.h      | 63 ----------------------
+ arch/arm/mach-shmobile/r8a7740.h                   | 63 ++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7740.c             |  4 +-
+ 6 files changed, 74 insertions(+), 67 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/r8a7740.h
+ create mode 100644 arch/arm/mach-shmobile/r8a7740.h
 
-diff --git a/arch/arm/mach-shmobile/board-bockw-reference.c b/arch/arm/mach-shmobile/board-bockw-reference.c
-index 91ff3a2..ba840cd 100644
---- a/arch/arm/mach-shmobile/board-bockw-reference.c
-+++ b/arch/arm/mach-shmobile/board-bockw-reference.c
-@@ -19,9 +19,11 @@
-  */
- 
- #include <linux/of_platform.h>
--#include <mach/r8a7778.h>
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+index 368518b..2085766 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+@@ -24,10 +24,12 @@
+ #include <linux/kernel.h>
+ #include <linux/gpio.h>
+ #include <linux/io.h>
+-#include <mach/r8a7740.h>
 +
  #include <asm/mach/arch.h>
+ #include <asm/hardware/cache-l2x0.h>
 +
  #include "common.h"
-+#include "r8a7778.h"
++#include "r8a7740.h"
  
  /*
-  *	see board-bock.c for checking detail of dip-switch
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 8cb057f..b4e4789 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -34,13 +34,15 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
- #include <linux/usb/renesas_usbhs.h>
+  * CON1		Camera Module
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 53d03e8..32339cf 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -45,7 +45,7 @@
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/reboot.h>
+-#include <mach/r8a7740.h>
 +
+ #include <media/mt9t112.h>
+ #include <media/sh_mobile_ceu.h>
  #include <media/soc_camera.h>
--#include <mach/r8a7778.h>
- #include <asm/mach/arch.h>
- #include <sound/rcar_snd.h>
+@@ -59,9 +59,11 @@
+ #include <video/sh_mobile_hdmi.h>
+ #include <sound/sh_fsi.h>
  #include <sound/simple_card.h>
 +
  #include "common.h"
  #include "irqs.h"
-+#include "r8a7778.h"
+ #include "pm-rmobile.h"
++#include "r8a7740.h"
+ #include "sh-gpio.h"
  
- #define FPGA	0x18200000
- #define IRQ0MR	0x30
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+ /*
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index ffefec5..789091c 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -22,9 +22,10 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
+-#include <mach/r8a7740.h>
++
+ #include "clock.h"
+ #include "common.h"
++#include "r8a7740.h"
+ 
+ /*
+  *        |  MDx  |  XTAL1/EXTAL1   |  System   | EXTALR |
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
 deleted file mode 100644
-index f4076a5..0000000
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index 1d1a5fd..0000000
+--- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
 +++ /dev/null
-@@ -1,83 +0,0 @@
+@@ -1,63 +0,0 @@
 -/*
-- * Copyright (C) 2013  Renesas Solutions Corp.
-- * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-- * Copyright (C) 2013  Cogent Embedded, Inc.
+- * Copyright (C) 2011  Renesas Solutions Corp.
+- * Copyright (C) 2011  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -86,81 +107,61 @@ index f4076a5..0000000
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 - */
--#ifndef __ASM_R8A7778_H__
--#define __ASM_R8A7778_H__
 -
--#include <linux/sh_eth.h>
+-#ifndef __ASM_R8A7740_H__
+-#define __ASM_R8A7740_H__
 -
--/* HPB-DMA slave IDs */
+-/*
+- * MD_CKx pin
+- */
+-#define MD_CK2	(1 << 2)
+-#define MD_CK1	(1 << 1)
+-#define MD_CK0	(1 << 0)
+-
+-/* DMA slave IDs */
 -enum {
--	HPBDMA_SLAVE_DUMMY,
--	HPBDMA_SLAVE_SDHI0_TX,
--	HPBDMA_SLAVE_SDHI0_RX,
--	HPBDMA_SLAVE_SSI0_TX,
--	HPBDMA_SLAVE_SSI0_RX,
--	HPBDMA_SLAVE_SSI1_TX,
--	HPBDMA_SLAVE_SSI1_RX,
--	HPBDMA_SLAVE_SSI2_TX,
--	HPBDMA_SLAVE_SSI2_RX,
--	HPBDMA_SLAVE_SSI3_TX,
--	HPBDMA_SLAVE_SSI3_RX,
--	HPBDMA_SLAVE_SSI4_TX,
--	HPBDMA_SLAVE_SSI4_RX,
--	HPBDMA_SLAVE_SSI5_TX,
--	HPBDMA_SLAVE_SSI5_RX,
--	HPBDMA_SLAVE_SSI6_TX,
--	HPBDMA_SLAVE_SSI6_RX,
--	HPBDMA_SLAVE_SSI7_TX,
--	HPBDMA_SLAVE_SSI7_RX,
--	HPBDMA_SLAVE_SSI8_TX,
--	HPBDMA_SLAVE_SSI8_RX,
--	HPBDMA_SLAVE_HPBIF0_TX,
--	HPBDMA_SLAVE_HPBIF0_RX,
--	HPBDMA_SLAVE_HPBIF1_TX,
--	HPBDMA_SLAVE_HPBIF1_RX,
--	HPBDMA_SLAVE_HPBIF2_TX,
--	HPBDMA_SLAVE_HPBIF2_RX,
--	HPBDMA_SLAVE_HPBIF3_TX,
--	HPBDMA_SLAVE_HPBIF3_RX,
--	HPBDMA_SLAVE_HPBIF4_TX,
--	HPBDMA_SLAVE_HPBIF4_RX,
--	HPBDMA_SLAVE_HPBIF5_TX,
--	HPBDMA_SLAVE_HPBIF5_RX,
--	HPBDMA_SLAVE_HPBIF6_TX,
--	HPBDMA_SLAVE_HPBIF6_RX,
--	HPBDMA_SLAVE_HPBIF7_TX,
--	HPBDMA_SLAVE_HPBIF7_RX,
--	HPBDMA_SLAVE_HPBIF8_TX,
--	HPBDMA_SLAVE_HPBIF8_RX,
--	HPBDMA_SLAVE_USBFUNC_TX,
--	HPBDMA_SLAVE_USBFUNC_RX,
+-	SHDMA_SLAVE_INVALID,
+-	SHDMA_SLAVE_SDHI0_RX,
+-	SHDMA_SLAVE_SDHI0_TX,
+-	SHDMA_SLAVE_SDHI1_RX,
+-	SHDMA_SLAVE_SDHI1_TX,
+-	SHDMA_SLAVE_SDHI2_RX,
+-	SHDMA_SLAVE_SDHI2_TX,
+-	SHDMA_SLAVE_FSIA_RX,
+-	SHDMA_SLAVE_FSIA_TX,
+-	SHDMA_SLAVE_FSIB_TX,
+-	SHDMA_SLAVE_USBHS_TX,
+-	SHDMA_SLAVE_USBHS_RX,
+-	SHDMA_SLAVE_MMCIF_TX,
+-	SHDMA_SLAVE_MMCIF_RX,
 -};
 -
--extern void r8a7778_add_standard_devices(void);
--extern void r8a7778_add_standard_devices_dt(void);
--extern void r8a7778_add_dt_devices(void);
+-extern void r8a7740_meram_workaround(void);
+-extern void r8a7740_init_irq_of(void);
+-extern void r8a7740_map_io(void);
+-extern void r8a7740_add_early_devices(void);
+-extern void r8a7740_add_standard_devices(void);
+-extern void r8a7740_add_standard_devices_dt(void);
+-extern void r8a7740_clock_init(u8 md_ck);
+-extern void r8a7740_pinmux_init(void);
+-extern void r8a7740_pm_init(void);
 -
--extern void r8a7778_init_late(void);
--extern void r8a7778_init_delay(void);
--extern void r8a7778_init_irq_dt(void);
--extern void r8a7778_clock_init(void);
--extern void r8a7778_init_irq_extpin(int irlm);
--extern void r8a7778_init_irq_extpin_dt(int irlm);
--extern void r8a7778_pinmux_init(void);
+-#ifdef CONFIG_PM
+-extern void __init r8a7740_init_pm_domains(void);
+-#else
+-static inline void r8a7740_init_pm_domains(void) {}
+-#endif /* CONFIG_PM */
 -
--extern int r8a7778_usb_phy_power(bool enable);
--
--#endif /* __ASM_R8A7778_H__ */
-diff --git a/arch/arm/mach-shmobile/r8a7778.h b/arch/arm/mach-shmobile/r8a7778.h
+-#endif /* __ASM_R8A7740_H__ */
+diff --git a/arch/arm/mach-shmobile/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
 new file mode 100644
-index 0000000..f4076a5
+index 0000000..1d1a5fd
 --- /dev/null
-+++ b/arch/arm/mach-shmobile/r8a7778.h
-@@ -0,0 +1,83 @@
++++ b/arch/arm/mach-shmobile/r8a7740.h
+@@ -0,0 +1,63 @@
 +/*
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
++ * Copyright (C) 2011  Renesas Solutions Corp.
++ * Copyright (C) 2011  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -175,89 +176,74 @@ index 0000000..f4076a5
 + * along with this program; if not, write to the Free Software
 + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 + */
-+#ifndef __ASM_R8A7778_H__
-+#define __ASM_R8A7778_H__
 +
-+#include <linux/sh_eth.h>
++#ifndef __ASM_R8A7740_H__
++#define __ASM_R8A7740_H__
 +
-+/* HPB-DMA slave IDs */
++/*
++ * MD_CKx pin
++ */
++#define MD_CK2	(1 << 2)
++#define MD_CK1	(1 << 1)
++#define MD_CK0	(1 << 0)
++
++/* DMA slave IDs */
 +enum {
-+	HPBDMA_SLAVE_DUMMY,
-+	HPBDMA_SLAVE_SDHI0_TX,
-+	HPBDMA_SLAVE_SDHI0_RX,
-+	HPBDMA_SLAVE_SSI0_TX,
-+	HPBDMA_SLAVE_SSI0_RX,
-+	HPBDMA_SLAVE_SSI1_TX,
-+	HPBDMA_SLAVE_SSI1_RX,
-+	HPBDMA_SLAVE_SSI2_TX,
-+	HPBDMA_SLAVE_SSI2_RX,
-+	HPBDMA_SLAVE_SSI3_TX,
-+	HPBDMA_SLAVE_SSI3_RX,
-+	HPBDMA_SLAVE_SSI4_TX,
-+	HPBDMA_SLAVE_SSI4_RX,
-+	HPBDMA_SLAVE_SSI5_TX,
-+	HPBDMA_SLAVE_SSI5_RX,
-+	HPBDMA_SLAVE_SSI6_TX,
-+	HPBDMA_SLAVE_SSI6_RX,
-+	HPBDMA_SLAVE_SSI7_TX,
-+	HPBDMA_SLAVE_SSI7_RX,
-+	HPBDMA_SLAVE_SSI8_TX,
-+	HPBDMA_SLAVE_SSI8_RX,
-+	HPBDMA_SLAVE_HPBIF0_TX,
-+	HPBDMA_SLAVE_HPBIF0_RX,
-+	HPBDMA_SLAVE_HPBIF1_TX,
-+	HPBDMA_SLAVE_HPBIF1_RX,
-+	HPBDMA_SLAVE_HPBIF2_TX,
-+	HPBDMA_SLAVE_HPBIF2_RX,
-+	HPBDMA_SLAVE_HPBIF3_TX,
-+	HPBDMA_SLAVE_HPBIF3_RX,
-+	HPBDMA_SLAVE_HPBIF4_TX,
-+	HPBDMA_SLAVE_HPBIF4_RX,
-+	HPBDMA_SLAVE_HPBIF5_TX,
-+	HPBDMA_SLAVE_HPBIF5_RX,
-+	HPBDMA_SLAVE_HPBIF6_TX,
-+	HPBDMA_SLAVE_HPBIF6_RX,
-+	HPBDMA_SLAVE_HPBIF7_TX,
-+	HPBDMA_SLAVE_HPBIF7_RX,
-+	HPBDMA_SLAVE_HPBIF8_TX,
-+	HPBDMA_SLAVE_HPBIF8_RX,
-+	HPBDMA_SLAVE_USBFUNC_TX,
-+	HPBDMA_SLAVE_USBFUNC_RX,
++	SHDMA_SLAVE_INVALID,
++	SHDMA_SLAVE_SDHI0_RX,
++	SHDMA_SLAVE_SDHI0_TX,
++	SHDMA_SLAVE_SDHI1_RX,
++	SHDMA_SLAVE_SDHI1_TX,
++	SHDMA_SLAVE_SDHI2_RX,
++	SHDMA_SLAVE_SDHI2_TX,
++	SHDMA_SLAVE_FSIA_RX,
++	SHDMA_SLAVE_FSIA_TX,
++	SHDMA_SLAVE_FSIB_TX,
++	SHDMA_SLAVE_USBHS_TX,
++	SHDMA_SLAVE_USBHS_RX,
++	SHDMA_SLAVE_MMCIF_TX,
++	SHDMA_SLAVE_MMCIF_RX,
 +};
 +
-+extern void r8a7778_add_standard_devices(void);
-+extern void r8a7778_add_standard_devices_dt(void);
-+extern void r8a7778_add_dt_devices(void);
++extern void r8a7740_meram_workaround(void);
++extern void r8a7740_init_irq_of(void);
++extern void r8a7740_map_io(void);
++extern void r8a7740_add_early_devices(void);
++extern void r8a7740_add_standard_devices(void);
++extern void r8a7740_add_standard_devices_dt(void);
++extern void r8a7740_clock_init(u8 md_ck);
++extern void r8a7740_pinmux_init(void);
++extern void r8a7740_pm_init(void);
 +
-+extern void r8a7778_init_late(void);
-+extern void r8a7778_init_delay(void);
-+extern void r8a7778_init_irq_dt(void);
-+extern void r8a7778_clock_init(void);
-+extern void r8a7778_init_irq_extpin(int irlm);
-+extern void r8a7778_init_irq_extpin_dt(int irlm);
-+extern void r8a7778_pinmux_init(void);
++#ifdef CONFIG_PM
++extern void __init r8a7740_init_pm_domains(void);
++#else
++static inline void r8a7740_init_pm_domains(void) {}
++#endif /* CONFIG_PM */
 +
-+extern int r8a7778_usb_phy_power(bool enable);
++#endif /* __ASM_R8A7740_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 10170b3..348af35 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -31,15 +31,17 @@
+ #include <linux/sh_dma.h>
+ #include <linux/sh_timer.h>
+ #include <linux/platform_data/sh_ipmmu.h>
+-#include <mach/r8a7740.h>
 +
-+#endif /* __ASM_R8A7778_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index d9f4529..2ccc012 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -37,11 +37,13 @@
- #include <linux/usb/ehci_pdriver.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/dma-mapping.h>
--#include <mach/r8a7778.h>
-+
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
  #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/time.h>
 +
  #include "common.h"
+ #include "dma-register.h"
  #include "irqs.h"
-+#include "r8a7778.h"
+ #include "pm-rmobile.h"
++#include "r8a7740.h"
  
- /* SCIF */
- #define R8A7778_SCIF(index, baseaddr, irq)			\
+ static struct map_desc r8a7740_io_desc[] __initdata = {
+ 	 /*
 -- 
 2.0.0.rc2
