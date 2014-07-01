@@ -1,26 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Jul 2014 15:52:44 +0100
-Subject: [PATCH 0/2] cpuidle fixes and cleanup
-In-Reply-To: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
-References: <1404225158-8453-1-git-send-email-k.chander@samsung.com>
-Message-ID: <20140701145244.GX32514@n2100.arm.linux.org.uk>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Tue, 1 Jul 2014 09:56:44 -0500
+Subject: [PATCH CFT 00/30] Initial round of Freescale FEC ethernet patches
+In-Reply-To: <20140701143401.GT32514@n2100.arm.linux.org.uk>
+References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+ <53B2C3E8.7030903@mentor.com> <20140701143401.GT32514@n2100.arm.linux.org.uk>
+Message-ID: <53B2CC2C.7080306@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 01, 2014 at 08:02:36PM +0530, Chander Kashyap wrote:
-> This patch series fixes the cpuidle for different states. Also removes arm
-> diagnostic and power register save/restore code as it is made generic.
+On 07/01/2014 09:34 AM, Russell King - ARM Linux wrote:
+> On Tue, Jul 01, 2014 at 09:21:28AM -0500, Nathan Lynch wrote:
+>> [apologies if this is a duplicate, I got a weird SMTP error from my
+>> organization's mail server when I tried to send this yesterday]
+>>
+>> On 06/27/2014 10:15 AM, Russell King - ARM Linux wrote:
+>>> This is v2 of my initial round of patches (roughly half of my total
+>>> patch set) for the Freescale FEC driver.
+>>>
+>>> I'm sending this set out for comments and testing.  So far, I have
+>>> had only one ack for one patch in this series, this is pretty poor,
+>>> so I'm now sending it with a CFT tag instead.
+>>
+>> FWIW I've given your fec-testing branch some testing on BD-SL-i.MX6
+>> (Sabre Lite) with 3.16-rc2 (-rc1 has some issue with detecting the mmc).
+>>  Mainly running glibc 'make check' with SSH, NFSv4, IPv4 on a gigabit
+>> switch.  This workload wasn't exhibiting problems before your patches
+>> and it does not appear to be regressed by them.
+>>
+>> I wanted to test it because I've noticed hard-to-characterize sluggish
+>> interactive response in SSH sessions on this system.  Like key echo
+>> takes 0.2 seconds too long... sometimes.  I guess it could be anything,
+>> but I haven't encountered it yet with your patches.
 > 
-> Based on:
-> ARM: save/restore diagnostic register on Cortex-A9 suspend/resume
->  http://www.spinics.net/lists/arm-kernel/msg340506.html
+> Thanks for testing.
+> 
+> Can I add a tested-by tag for you for those patches?
 
-As there is an outstanding issue with this patch, we can't proceed with
-this set of changes until we know what's going on there.
+Of course.
 
-Also, bear in mind that I have changes which conflict with this in my
-tree (which I've just updated.)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Tested-by: Nathan Lynch <nathan_lynch@mentor.com>
