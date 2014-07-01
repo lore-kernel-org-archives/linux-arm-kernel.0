@@ -1,77 +1,86 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 1 Jul 2014 15:21:19 +0800
-Subject: [PATCH 6/9] ARM: dts: sun7i: Add board support for LinkSprite
- pcDuino V3
-In-Reply-To: <53B25F60.2050704@redhat.com>
-References: <1404165479-23785-1-git-send-email-hdegoede@redhat.com>
- <1404165479-23785-7-git-send-email-hdegoede@redhat.com>
- <CAGb2v65mDnuwveUiTKU2J3b3jbNzRLvPjS+wXNEj2MRtDN4Q2w@mail.gmail.com>
- <53B25F60.2050704@redhat.com>
-Message-ID: <CAGb2v64KMxXQ7QaRcsWxHbCLNJtWkh5sxj82C-y9GyNW7R+M_Q@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Tue, 1 Jul 2014 09:24:24 +0200
+Subject: [PATCH v2 07/12] usb: chipidea: add a generic driver
+In-Reply-To: <20140701002112.GA26146@shlinux1.ap.freescale.net>
+References: <1403606121-6368-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1403606121-6368-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140627032506.GA18039@shlinux1.ap.freescale.net>
+ <20140630133313.GA11880@kwain>
+ <20140701002112.GA26146@shlinux1.ap.freescale.net>
+Message-ID: <20140701072424.GA8958@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 1, 2014 at 3:12 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 07/01/2014 04:22 AM, Chen-Yu Tsai wrote:
->> On Tue, Jul 1, 2014 at 5:57 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> From: Zoltan HERPAI <wigyori@uid0.hu>
->>>
->>> The LinkSprite pcDuino V3 is an A20 based development board featuring
->>> arduino compatible io headers, 1G RAM, 4G nand, sata, rtl8188cus usb wifi
->>> and 100 Mbit ethernet using an ip101a phy:
->>>
->>> http://www.pcduino.com/pcduino-v3/
->>>
->>> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
->>> [hdegoede at redhat.com: Various cleanups, correct led pins]
->>> [hdegoede at redhat.com: Add axp209, ir and gpio-keys nodes]
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>
->>> --
->>>
->>> Changes since v2:
->>>  - update MMC entry to comply with upstream
->>>  - unify the 4 patches into one
->>>
->>> Changes since v1:
->>>  - fix cosmetic issues
->>>  - fix i2c entry
->>>  - remove unnecessary input bindings include
->>>  - add MMC support
->>> ---
->>>  arch/arm/boot/dts/Makefile               |   3 +-
->>>  arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 173 +++++++++++++++++++++++++++++++
->>>  2 files changed, 175 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/sun7i-a20-pcduino3.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index ed0de8b..fdc590e 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -380,7 +380,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>>         sun7i-a20-cubieboard2.dtb \
->>>         sun7i-a20-cubietruck.dtb \
->>>         sun7i-a20-i12-tvbox.dtb \
->>> -       sun7i-a20-olinuxino-micro.dtb
->>> +       sun7i-a20-olinuxino-micro.dtb \
->>> +       sun7i-a20-pcduino3.dtb
->>
->> You may need to rebase onto my sun8i ippo-q8h dts patch.
->>
->>   https://patchwork.kernel.org/patch/4389951/
->>
->> There's a likely conflict in the Makefile here.
->
-> Has that one already been accepted by Maxime ? I'm fine rebasing patches
-> on top of accepted stuff, but rebasing on pending stuff is not really
-> useful IMHO.
+Peter,
 
-Maxime replied stating he applied it. See the lower part of the patchwork
-page.
+On Tue, Jul 01, 2014 at 08:21:14AM +0800, Peter Chen wrote:
+> On Mon, Jun 30, 2014 at 03:33:13PM +0200, Antoine T?nart wrote:
+> > On Fri, Jun 27, 2014 at 11:25:07AM +0800, Peter Chen wrote:
+> > > On Tue, Jun 24, 2014 at 12:35:16PM +0200, Antoine T?nart wrote:
+> > > >  
+> > > >  ifneq ($(CONFIG_OF),)
+> > > >  	obj-$(CONFIG_USB_CHIPIDEA)	+= usbmisc_imx.o ci_hdrc_imx.o
+> > > > +	obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_generic.o
+> > > >  endif
+> > > 
+> > > As a generic driver, you may need to support both dt and non-dt
+> > > solution.
+> > 
+> > Since the dt is now the best practice and since there is no need (yet)
+> > for a non-dt usage of this driver shouldn't we let anyone needing it
+> > implement it when the time comes?
+> > 
+> 
+> No, at least your code structure should support both dt and non-dt,
+> and let the compile pass for non-dt platform if you don't have one.
+> Then, someone with non-dt platform can change few to support it. 
+> A good example is: drivers/usb/host/ehci-platform.c
 
-AFAIK he's accepted my initial sun8i patches and CIR DT patches this cycle.
+Ok. I'll isolate dt-specific code in the probe, and remove the CONFIG_OF
+dependency.
+
+> 
+> > > > +static int ci_hdrc_generic_probe(struct platform_device *pdev)
+> > > > +{
+> > > > +	struct device *dev = &pdev->dev;
+> > > > +	struct ci_hdrc_generic_priv *priv;
+> > > > +	struct ci_hdrc_platform_data ci_pdata = {
+> > > > +		.name		= "ci_hdrc",
+> > > 
+> > > How about this using dev_name(&pdev->dev) for name?
+> > 
+> > Yes, why not. I don't have a strong preference.
+> > 
+> > > > +
+> > > > +clk_err:
+> > > > +	clk_disable_unprepare(priv->clk);
+> > > 
+> > > You may need to add "if (!IS_ERR(priv->clk))"
+> > 
+> > Right! I'll update this.
+> > 
+> > > > +
+> > > > +static const struct of_device_id ci_hdrc_generic_of_match[] = {
+> > > > +	{ .compatible = "chipidea-usb" },
+> > > > +	{ }
+> > > > +};
+> > > 
+> > > Even as a generic driver, you can also use your own compatible string.
+> > 
+> > Well, there is nothing specific about the Berlin CI. Some subsystems
+> > use the 'generic' keyword in these cases. Do you see a particular reason
+> > I should use some Berlin related compatible here?
+> > 
+> 
+> Not must, one suggestion is: can you change the compatible string
+> to "chipidea-usb-generic"?
+
+Sounds good, I'll update.
 
 
-ChenYu
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
