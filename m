@@ -1,55 +1,21 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 01 Jul 2014 15:46:39 +0100
-Subject: [PATCH v3 2/8] component: ignore multiple additions of the same
- component
-In-Reply-To: <20140701144011.GU32514@n2100.arm.linux.org.uk>
-Message-ID: <E1X1zKR-0000cJ-2t@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Jul 2014 15:48:44 +0100
+Subject: [PATCH CFT 12/30] net: fec: ensure fec_enet_free_buffers()
+ properly cleans the rings
+In-Reply-To: <53ADBC8A.8070103@cogentembedded.com>
+References: <20140627151542.GL32514@n2100.arm.linux.org.uk>
+ <E1X0XwQ-0001Na-Kg@rmk-PC.arm.linux.org.uk>
+ <53ADBC8A.8070103@cogentembedded.com>
+Message-ID: <20140701144843.GW32514@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Permit masters to call component_master_add_child() and match the same
-child multiple times.  This may happen if there's multiple connections
-to a single component device from other devices.  In such scenarios,
-we should not return a failure, but instead ignore the attempt.
+On Fri, Jun 27, 2014 at 10:48:42PM +0400, Sergei Shtylyov wrote:
+>    dev_kfree_skb() (actually, consume_skb() that it calls) already checks 
+> 'skb' for NULL.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-This patch is destined for Greg's driver and staging trees, and David's DRM
-tree.
+This patch has now been updated for that, thanks.
 
- drivers/base/component.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index d0ebd4431736..55813e91bf0d 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -69,6 +69,11 @@ static void component_detach_master(struct master *master, struct component *c)
- 	c->master = NULL;
- }
- 
-+/*
-+ * Add a component to a master, finding the component via the compare
-+ * function and compare data.  This is safe to call for duplicate matches
-+ * and will not result in the same component being added multiple times.
-+ */
- int component_master_add_child(struct master *master,
- 	int (*compare)(struct device *, void *), void *compare_data)
- {
-@@ -76,11 +81,12 @@ int component_master_add_child(struct master *master,
- 	int ret = -ENXIO;
- 
- 	list_for_each_entry(c, &component_list, node) {
--		if (c->master)
-+		if (c->master && c->master != master)
- 			continue;
- 
- 		if (compare(c->dev, compare_data)) {
--			component_attach_master(master, c);
-+			if (!c->master)
-+				component_attach_master(master, c);
- 			ret = 0;
- 			break;
- 		}
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
